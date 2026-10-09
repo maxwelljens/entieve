@@ -16,8 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - EVE-faithful simulation (`sim`): shield/armor/structure with four damage
   types and resists, capacitor recharge curve, turret tracking formula with
   wrecking shots and ammo damage profiles, targeting, warping, mining,
-  looting, NPC behavior, station services (repair, market, refine, fitting),
-  stargate travel, respawns, save/restore, state hashing.
+  looting, NPC behavior, station services (repair, market, refine, fitting,
+  cargo transfer between holds and the station hangar), stargate travel,
+  respawns, clone-bay death respawn (home station across systems), exact
+  save/restore with handle reconstruction, state hashing.
 - Ebitengine client (`render`, `ui`, `game`): vector ships, starfield,
   brackets, EVE-style overview, ship HUD, module rack, inventory, fitting,
   station services, starmap, combat log, time acceleration (1x-8x).

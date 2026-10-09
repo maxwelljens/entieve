@@ -277,11 +277,13 @@ type Command interface{ isCommand() }
 CmdStop, CmdManualVel{Dir core.Vec2, SpeedFrac float64},
 CmdApproach{Target}, CmdOrbit{Target, Range}, CmdWarpTo{Target},
 CmdAlignTo{Target}, CmdLock{Target}, CmdUnlock{Target},
-CmdActivate{Module int, Target}, CmdDeactivate{Module int}, CmdReload{Module int},
-CmdLoot{Wreck, Item ItemID|""}, CmdMine{Asteroid, Module int},
+CmdActivate{Slot SlotRef, Target}, CmdDeactivate{Slot SlotRef},
+CmdLoot{Wreck, Item ItemID|""}, CmdMine{Asteroid, Slot SlotRef},
 CmdDock{Station}, CmdUndock{}, CmdJump{Gate},
-CmdBuy{Item ItemID|ShipID-as-ItemID, Qty, Order int}, CmdSell{ItemID, Qty},
-CmdRefine{ItemID, Qty}, CmdRepair{}, CmdAssemble{ShipID}, CmdFitModule{ModuleID, Slot, Index}, CmdUnfitModule{Slot, Index}
+CmdBuy{Item, Qty}, CmdSell{Item, Qty},
+CmdTransfer{Item, Qty, From, To}, // holds: "cargo" | "ore" | "hangar"
+CmdRefine{Item, Qty}, CmdRepair{}, CmdAssemble{ShipID},
+CmdFitModule{ModuleID, Slot SlotRef}, CmdUnfitModule{Slot SlotRef}
 ```
 (`Target ecs.Entity`; module index = flat slot index within its slot class.)
 
@@ -309,6 +311,14 @@ func (s *Sim) LoadSystem(id content.SystemID, entryAtCel content.CelID) error //
 func (s *Sim) Snapshot() (*Save, error)       // full serializable state
 func (s *Sim) Restore(*Save) error
 ```
+
+Read model: `(*Sim).Grid() []Info` lists on-grid entities (docked excluded)
+in **entity-handle order**, NOT distance order — it is the name-resolution
+surface for commands and scripts, and distance ordering flips as targets
+circle each other (two rats named "Scuttler" would swap places mid-fight).
+Distance sorting is a presentation concern: the overview sorts its own rows.
+`Restore` works on a private deep copy of the save, so several sims may be
+restored from one `Save` without aliasing its data.
 
 Systems (`sim/` internal, called by `Step` in this order):
 1. `command` (apply queued commands to intent),
@@ -369,9 +379,11 @@ Layer order shield → armor → structure. Each layer has the ship's `Resists`
 Overflow damage carries to the next layer at full value (documented
 simplification of EVE's 50% bleed-through between shield/armor is NOT used —
 keep full carry-over, note it in `docs/GAMEPLAY.md`). Structure ≤ 0 → ship
-dies: player → pod-less "ship destroyed" respawn at last station in a fresh
-`ship-sloop` (emit `EvtDestroyed`); NPC → `Wreck` with rolled loot + bounty
-credited to killer's wallet.
+dies: the player wakes up pod-less in a fresh `ship-sloop` at the clone bay —
+the last docked station, or the home station in the universe's start system
+when the current system has none (EVE clone semantics; `EvtDestroyed` is
+emitted, cargo is lost, wallet and hangar keep). NPC → `Wreck` with rolled
+loot + bounty credited to killer's wallet.
 
 ### Showcase world (`world-showcase`)
 
