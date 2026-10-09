@@ -170,12 +170,15 @@ type Result struct {
 	Ran        int // steps successfully queued
 }
 
-// Run advances eng for `ticks` Steps, queueing each step at its AtTick and
-// collecting every emitted event. Steps whose target name does not resolve
-// at their tick land in Result.Unresolved.
-func Run(eng Engine, steps []Step, ticks int64, onEvent func(sim.Event)) *Result {
+// Hooks are optional observers for RunH.
+type Hooks struct {
+	OnEvent func(sim.Event)
+	OnTick  func(tick int64, eng Engine) // called after each Step
+}
+
+// RunH is Run with observer hooks (used by tests to probe state).
+func RunH(eng Engine, steps []Step, ticks int64, hooks Hooks) *Result {
 	res := &Result{}
-	next := 0
 	byTick := map[int64][]Step{}
 	var keys []int64
 	for _, st := range steps {
@@ -185,7 +188,6 @@ func Run(eng Engine, steps []Step, ticks int64, onEvent func(sim.Event)) *Result
 		byTick[st.AtTick] = append(byTick[st.AtTick], st)
 	}
 	sort.Slice(keys, func(a, b int) bool { return keys[a] < keys[b] })
-	_ = next
 	for tick := int64(0); tick < ticks; tick++ {
 		for _, st := range byTick[tick] {
 			cmd, ok := st.command(eng)
@@ -199,9 +201,12 @@ func Run(eng Engine, steps []Step, ticks int64, onEvent func(sim.Event)) *Result
 		eng.Step()
 		for _, ev := range eng.Events() {
 			res.Events = append(res.Events, ev)
-			if onEvent != nil {
-				onEvent(ev)
+			if hooks.OnEvent != nil {
+				hooks.OnEvent(ev)
 			}
+		}
+		if hooks.OnTick != nil {
+			hooks.OnTick(tick, eng)
 		}
 	}
 	return res
@@ -244,6 +249,11 @@ func (st Step) command(eng Engine) (sim.Command, bool) {
 		return sim.CmdUndock{}, true
 	case "assemble":
 		return sim.CmdAssemble{Ship: content.ShipID(st.Ship)}, true
+	case "activate":
+		slot, _ := ParseSlot(st.Slot)
+		if st.Target == "" {
+			return sim.CmdActivate{Slot: slot}, true // self-targeted module
+		}
 	}
 	target, ok := need()
 	if !ok {
@@ -276,4 +286,11 @@ func (st Step) command(eng Engine) (sim.Command, bool) {
 		return sim.CmdActivate{Slot: slot, Target: target.Entity}, true
 	}
 	return nil, false
+}
+
+// Run advances eng for `ticks` Steps, queueing each step at its AtTick and
+// collecting every emitted event. Steps whose target name does not resolve
+// at their tick land in Result.Unresolved (never fatal).
+func Run(eng Engine, steps []Step, ticks int64, onEvent func(sim.Event)) *Result {
+	return RunH(eng, steps, ticks, Hooks{OnEvent: onEvent})
 }

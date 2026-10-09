@@ -1,0 +1,65 @@
+[
+  {"at_tick": 60,   "action": "manual", "dir_x": 1, "dir_y": 0.2, "speed": 1.0,
+   "note": "manual piloting"},
+  {"at_tick": 1800, "action": "stop", "note": "end manual leg"},
+
+  {"at_tick": 1860, "action": "approach", "target": "Haven's Rest"},
+  {"at_tick": 4800, "action": "warp", "target": "Haven's Rest", "note": "warp start + land"},
+
+  {"at_tick": 9000, "action": "dock", "target": "Haven's Rest", "note": "station services begin"},
+  {"at_tick": 9060, "action": "repair"},
+  {"at_tick": 9120, "action": "buy", "item": "mod-cap-booster", "qty": 1},
+  {"at_tick": 9180, "action": "buy", "item": "ship-barge", "qty": 1},
+  {"at_tick": 9240, "action": "sell", "item": "charge-emp", "qty": 48},
+  {"at_tick": 9300, "action": "sell", "item": "charge-fusion", "qty": 48},
+  {"at_tick": 9360, "action": "sell", "item": "charge-ap", "qty": 48},
+  {"at_tick": 9420, "action": "sell", "item": "charge-plutonium", "qty": 48},
+  {"at_tick": 9480, "action": "sell", "item": "loot-navdata", "qty": 1},
+  {"at_tick": 9540, "action": "refine", "item": "ore-sterngrit", "qty": 10},
+  {"at_tick": 9600, "action": "unfit", "slot": "low1", "note": "cap-recharger to hangar"},
+  {"at_tick": 9660, "action": "fit", "item": "mod-cap-booster", "slot": "low1"},
+  {"at_tick": 9720, "action": "assemble", "ship": "ship-barge"},
+  {"at_tick": 9780, "action": "assemble", "ship": "ship-sloop"},
+  {"at_tick": 9840, "action": "undock"},
+  {"at_tick": 9900, "action": "warp", "target": "Solace Belt"},
+
+  {"at_tick": 12060, "action": "lock", "target": "Rat Scuttler"},
+  {"at_tick": 12120, "action": "orbit", "target": "Rat Scuttler", "range": 5000},
+  {"at_tick": 12180, "action": "activate", "slot": "high0", "target": "Rat Scuttler",
+   "note": "emp turret; runs through all four ammo types then goes dry"},
+  {"at_tick": 12240, "action": "activate", "slot": "high2", "target": "Rat Scuttler",
+   "note": "rocket pod (no ammo)"},
+  {"at_tick": 12300, "action": "activate", "slot": "mid2", "target": "Rat Scuttler",
+   "note": "stasis web"},
+  {"at_tick": 12360, "action": "activate", "slot": "mid1", "note": "shield booster (self)"},
+  {"at_tick": 12420, "action": "activate", "slot": "low0", "note": "armor repper (self)"},
+  {"at_tick": 12480, "action": "activate", "slot": "mid0", "note": "afterburner (self)"},
+  {"at_tick": 12540, "action": "activate", "slot": "low1", "note": "cap booster (self)"},
+
+  {"at_tick": 18060, "action": "lock", "target": "Rat Marauder"},
+  {"at_tick": 18120, "action": "activate", "slot": "high0", "target": "Rat Marauder"},
+  {"at_tick": 18180, "action": "orbit", "target": "Rat Marauder", "range": 7500},
+
+  {"at_tick": 24060, "action": "lock", "target": "Rat Hierarch", "note": "boss; tanks, may flee, scrams"},
+  {"at_tick": 24120, "action": "activate", "slot": "high0", "target": "Rat Hierarch"},
+  {"at_tick": 24180, "action": "activate", "slot": "high2", "target": "Rat Hierarch"},
+  {"at_tick": 24240, "action": "orbit", "target": "Rat Hierarch", "range": 10000},
+  {"at_tick": 30060, "action": "warp", "target": "Haven's Rest", "note": "possible warp scramble here"},
+  {"at_tick": 33060, "action": "loot", "target": "Rat Scuttler Wreck"},
+  {"at_tick": 33120, "action": "loot", "target": "Rat Marauder Wreck"},
+
+  {"at_tick": 36060, "action": "approach", "target": "Sterngrit Asteroid"},
+  {"at_tick": 38060, "action": "mine", "target": "Sterngrit Asteroid", "slot": "high1",
+   "note": "mining into ore hold until the rock depletes"},
+
+  {"at_tick": 50060, "action": "approach", "target": "Gate to Penumbra"},
+  {"at_tick": 52060, "action": "jump", "target": "Gate to Penumbra"},
+  {"at_tick": 52120, "action": "approach", "target": "Gate to Solace"},
+  {"at_tick": 54060, "action": "jump", "target": "Gate to Solace", "note": "gate travel both ways"},
+
+  {"at_tick": 57060, "action": "lock", "target": "Rat Scuttler", "note": "respawned rat proves respawn timers"},
+  {"at_tick": 57120, "action": "activate", "slot": "high0", "target": "Rat Scuttler"},
+
+  {"at_tick": 66060, "action": "warp", "target": "Haven's Rest"},
+  {"at_tick": 70060, "action": "dock", "target": "Haven's Rest"}
+]
