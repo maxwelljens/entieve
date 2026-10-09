@@ -1,0 +1,23 @@
+{
+  "id": "ship-rat-marauder",
+  "name": "Marauder",
+  "class": "rat",
+  "description": "A refitted corsair gunship with real tank and three rail mounts. Do not underestimate it.",
+  "slots": { "high": 3, "mid": 2, "low": 2 },
+  "shield": 180,
+  "armor": 240,
+  "structure": 300,
+  "resists": { "em": 0.2, "thermal": 0.2, "kinetic": 0.25, "explosive": 0.3 },
+  "capacitor": 500,
+  "recharge": 240,
+  "max_speed": 260,
+  "agility": 1.0,
+  "mass": 4000000,
+  "sig_radius": 75,
+  "cargo": 250,
+  "ore_hold": 0,
+  "warp_speed": 2.5,
+  "max_target_range": 45000,
+  "max_targets": 3,
+  "scan_resolution": 440
+}

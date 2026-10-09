@@ -1,0 +1,42 @@
+[
+  {
+    "id": "charge-emp",
+    "name": "EMP Charge",
+    "description": "Light charge that dumps its energy as an electromagnetic pulse. EM-biased damage.",
+    "category": "ammo",
+    "volume": 0.01,
+    "base_price": 120,
+    "damage": { "em": 18, "thermal": 4, "kinetic": 2, "explosive": 1 },
+    "ammo_class": "light"
+  },
+  {
+    "id": "charge-fusion",
+    "name": "Fusion Charge",
+    "description": "Volatile light charge that detonates on impact. Explosive-biased damage.",
+    "category": "ammo",
+    "volume": 0.01,
+    "base_price": 110,
+    "damage": { "em": 1, "thermal": 3, "kinetic": 4, "explosive": 19 },
+    "ammo_class": "light"
+  },
+  {
+    "id": "charge-ap",
+    "name": "Armor-Piercing Charge",
+    "description": "Dense penetrator slug for light turrets. Kinetic-biased damage.",
+    "category": "ammo",
+    "volume": 0.01,
+    "base_price": 95,
+    "damage": { "em": 1, "thermal": 2, "kinetic": 21, "explosive": 2 },
+    "ammo_class": "light"
+  },
+  {
+    "id": "charge-plutonium",
+    "name": "Plutonium Charge",
+    "description": "Radioactive shell that burns through plating. Thermal-biased damage.",
+    "category": "ammo",
+    "volume": 0.01,
+    "base_price": 130,
+    "damage": { "em": 2, "thermal": 19, "kinetic": 4, "explosive": 2 },
+    "ammo_class": "light"
+  }
+]

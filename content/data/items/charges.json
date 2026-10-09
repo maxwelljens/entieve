@@ -1,0 +1,10 @@
+[
+  {
+    "id": "charge-cap-cell",
+    "name": "Capacitor Booster Cell",
+    "description": "Single-use fuel cell burned by cap booster modules to instantly restore capacitor.",
+    "category": "charge",
+    "volume": 0.01,
+    "base_price": 1000
+  }
+]

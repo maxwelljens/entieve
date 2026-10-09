@@ -1,0 +1,59 @@
+[
+  {
+    "id": "mod-shield-boost",
+    "name": "Shield Booster",
+    "description": "Active shield rep that burns capacitor to push shield HP back up every cycle.",
+    "slot": "mid",
+    "kind": "shield_boost",
+    "activation_cost": 40,
+    "activation_time": 4,
+    "boost": { "shield_boost_per_cycle": 60 },
+    "price": 230000
+  },
+  {
+    "id": "mod-shield-extender",
+    "name": "Shield Extender",
+    "description": "Passive bulkhead that adds raw shield HP at the cost of a bigger signature.",
+    "slot": "mid",
+    "kind": "shield_extender",
+    "activation_cost": 0,
+    "activation_time": 0,
+    "passive": { "shield_hp": 280 },
+    "price": 140000
+  },
+  {
+    "id": "mod-armor-rep",
+    "name": "Armor Repairer",
+    "description": "Active armor rep: welds plating back together every cycle while the capacitor holds.",
+    "slot": "low",
+    "kind": "armor_rep",
+    "activation_cost": 30,
+    "activation_time": 5,
+    "boost": { "armor_rep_per_cycle": 55 },
+    "price": 210000
+  },
+  {
+    "id": "mod-armor-plate",
+    "name": "Armor Plate",
+    "description": "Passive layered plating that adds raw armor HP. Simple, cheap, effective.",
+    "slot": "low",
+    "kind": "armor_plate",
+    "activation_cost": 0,
+    "activation_time": 0,
+    "passive": { "armor_hp": 400 },
+    "price": 120000
+  },
+  {
+    "id": "mod-resist-coat",
+    "name": "Resist Coat",
+    "description": "Passive coating that hardens all layers against all four damage types.",
+    "slot": "low",
+    "kind": "resist_coat",
+    "activation_cost": 0,
+    "activation_time": 0,
+    "passive": {
+      "resist_bonus": { "em": 0.15, "thermal": 0.15, "kinetic": 0.15, "explosive": 0.15 }
+    },
+    "price": 165000
+  }
+]

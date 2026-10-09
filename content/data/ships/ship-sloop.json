@@ -1,0 +1,23 @@
+{
+  "id": "ship-sloop",
+  "name": "Sloop",
+  "class": "frigate",
+  "description": "A quick, cheap combat frigate. The standard-issue hull for new pilots in the Thevek Reach.",
+  "slots": { "high": 3, "mid": 3, "low": 2 },
+  "shield": 160,
+  "armor": 200,
+  "structure": 240,
+  "resists": { "em": 0.15, "thermal": 0.2, "kinetic": 0.25, "explosive": 0.3 },
+  "capacitor": 420,
+  "recharge": 220,
+  "max_speed": 385,
+  "agility": 0.45,
+  "mass": 1200000,
+  "sig_radius": 40,
+  "cargo": 400,
+  "ore_hold": 0,
+  "warp_speed": 3.5,
+  "max_target_range": 45000,
+  "max_targets": 4,
+  "scan_resolution": 620
+}

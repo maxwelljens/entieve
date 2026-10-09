@@ -1,0 +1,54 @@
+{
+  "id": "sys-gloam",
+  "name": "Gloam",
+  "security": "null",
+  "constellation": "Loomfall",
+  "region": "Thevek Reach",
+  "position": { "X": 11.5, "Y": -4.2 },
+  "palette": {
+    "nebula1": "#06070f",
+    "nebula2": "#140b20",
+    "nebula3": "#1e0a2a",
+    "star": "#c98cff"
+  },
+  "celestials": [
+    {
+      "id": "cel-gloam-star",
+      "name": "Gloam",
+      "kind": "star",
+      "position": { "X": 0, "Y": 0 },
+      "radius": 390000000,
+      "colors": ["#e0b3ff"]
+    },
+    {
+      "id": "cel-gloam-belt",
+      "name": "Gloam Belt",
+      "kind": "belt",
+      "position": { "X": -900000000, "Y": -1400000000 },
+      "radius": 300000,
+      "colors": ["#9db8d0"],
+      "belt": {
+        "asteroids": [
+          { "ore": "ore-glacierite", "count": 14, "volume": 8000 }
+        ]
+      },
+      "spawns": [
+        { "npc_id": "npc-rat-scuttler", "count": 3, "respawn_sec": 90 },
+        { "npc_id": "npc-rat-marauder", "count": 2, "respawn_sec": 180 },
+        { "npc_id": "npc-rat-hierarch", "count": 1, "respawn_sec": 600 }
+      ]
+    },
+    {
+      "id": "cel-gate-penumbra",
+      "name": "Penumbra Gate",
+      "kind": "gate",
+      "position": { "X": 2800000000, "Y": 1900000000 },
+      "radius": 2500,
+      "colors": ["#b98cff"],
+      "gate": {
+        "to_system": "sys-penumbra",
+        "to_cel": "cel-gate-gloam"
+      }
+    }
+  ]
+}

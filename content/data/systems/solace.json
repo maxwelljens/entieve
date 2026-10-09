@@ -1,0 +1,97 @@
+{
+  "id": "sys-solace",
+  "name": "Solace",
+  "security": "high",
+  "constellation": "Loomfall",
+  "region": "Thevek Reach",
+  "position": { "X": 0, "Y": 0 },
+  "palette": {
+    "nebula1": "#0a1024",
+    "nebula2": "#16244a",
+    "nebula3": "#2a1a3e",
+    "star": "#ffd98a"
+  },
+  "celestials": [
+    {
+      "id": "cel-solace-star",
+      "name": "Solace",
+      "kind": "star",
+      "position": { "X": 0, "Y": 0 },
+      "radius": 696000000,
+      "colors": ["#fff4cc"]
+    },
+    {
+      "id": "cel-solace-prime",
+      "name": "Solace Prime",
+      "kind": "planet",
+      "position": { "X": 1400000000, "Y": -600000000 },
+      "radius": 6371000,
+      "colors": ["#4a7fb5"]
+    },
+    {
+      "id": "cel-haven-rest",
+      "name": "Haven Rest",
+      "kind": "station",
+      "position": { "X": 520000000, "Y": 310000000 },
+      "radius": 800,
+      "colors": ["#c9d4e8"],
+      "station": {
+        "services": ["repair", "market", "refine", "fitting"]
+      }
+    },
+    {
+      "id": "cel-solace-belt",
+      "name": "Solace Belt",
+      "kind": "belt",
+      "position": { "X": -1100000000, "Y": 800000000 },
+      "radius": 260000,
+      "colors": ["#8f8475"],
+      "belt": {
+        "asteroids": [
+          { "ore": "ore-sterngrit", "count": 12, "volume": 300 },
+          { "ore": "ore-cordite", "count": 8, "volume": 1000 }
+        ]
+      },
+      "spawns": [
+        { "npc_id": "npc-rat-scuttler", "count": 2, "respawn_sec": 90 }
+      ]
+    },
+    {
+      "id": "cel-gate-penumbra",
+      "name": "Penumbra Gate",
+      "kind": "gate",
+      "position": { "X": 2400000000, "Y": -1700000000 },
+      "radius": 2500,
+      "colors": ["#7fd0ff"],
+      "gate": {
+        "to_system": "sys-penumbra",
+        "to_cel": "cel-gate-solace"
+      }
+    }
+  ],
+  "market": [
+    { "item": "ship-sloop", "qty": 10, "price": 350000 },
+    { "item": "ship-cutlass", "qty": 8, "price": 480000 },
+    { "item": "ship-barge", "qty": 6, "price": 750000 },
+    { "item": "ship-hauler", "qty": 6, "price": 650000 },
+    { "item": "mod-emp-turret", "qty": 25, "price": 250000 },
+    { "item": "mod-rail-turret", "qty": 25, "price": 320000 },
+    { "item": "mod-rocket-pod", "qty": 25, "price": 180000 },
+    { "item": "mod-shield-boost", "qty": 25, "price": 230000 },
+    { "item": "mod-shield-extender", "qty": 25, "price": 140000 },
+    { "item": "mod-armor-rep", "qty": 25, "price": 210000 },
+    { "item": "mod-armor-plate", "qty": 25, "price": 120000 },
+    { "item": "mod-resist-coat", "qty": 25, "price": 165000 },
+    { "item": "mod-cap-booster", "qty": 25, "price": 195000 },
+    { "item": "mod-cap-recharger", "qty": 25, "price": 90000 },
+    { "item": "mod-afterburner", "qty": 25, "price": 155000 },
+    { "item": "mod-mining-laser", "qty": 25, "price": 175000 },
+    { "item": "mod-stasis-web", "qty": 25, "price": 130000 },
+    { "item": "mod-warp-scram", "qty": 25, "price": 240000 },
+    { "item": "charge-emp", "qty": 8000, "price": 120 },
+    { "item": "charge-fusion", "qty": 8000, "price": 110 },
+    { "item": "charge-ap", "qty": 8000, "price": 95 },
+    { "item": "charge-plutonium", "qty": 8000, "price": 130 },
+    { "item": "charge-cap-cell", "qty": 2000, "price": 1000 }
+  ]
+}

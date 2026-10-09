@@ -1,0 +1,50 @@
+[
+  {
+    "id": "min-ferrite",
+    "name": "Ferrite",
+    "description": "Common base metal; the bread and butter of every industrial hull.",
+    "category": "mineral",
+    "volume": 0.01,
+    "base_price": 6
+  },
+  {
+    "id": "min-nickel",
+    "name": "Nickel",
+    "description": "Refined transition metal used in armor plating and reactor linings.",
+    "category": "mineral",
+    "volume": 0.01,
+    "base_price": 14
+  },
+  {
+    "id": "min-cobalt",
+    "name": "Cobalt",
+    "description": "Hard, heat-resistant metal; staple of high-grade plating.",
+    "category": "mineral",
+    "volume": 0.01,
+    "base_price": 22
+  },
+  {
+    "id": "min-silex",
+    "name": "Silex",
+    "description": "Crystalline silicate flake used in ceramics and sensor lattices.",
+    "category": "mineral",
+    "volume": 0.01,
+    "base_price": 34
+  },
+  {
+    "id": "min-glacite",
+    "name": "Glacite",
+    "description": "Supercooled mineral ice recovered from frontier belts.",
+    "category": "mineral",
+    "volume": 0.01,
+    "base_price": 46
+  },
+  {
+    "id": "min-argon",
+    "name": "Argon",
+    "description": "Inert gas prized as a laser coolant and reactor buffer.",
+    "category": "mineral",
+    "volume": 0.01,
+    "base_price": 58
+  }
+]

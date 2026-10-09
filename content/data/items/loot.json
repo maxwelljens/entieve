@@ -1,0 +1,34 @@
+[
+  {
+    "id": "loot-navdata",
+    "name": "Encrypted Navdata",
+    "description": "Partially corrupted navigation core; fenced data brokers pay well for it.",
+    "category": "loot",
+    "volume": 0.1,
+    "base_price": 25000
+  },
+  {
+    "id": "loot-alloy-scrap",
+    "name": "Alloy Scrap",
+    "description": "Twisted plating and hull fragments scooped from wrecks.",
+    "category": "loot",
+    "volume": 0.5,
+    "base_price": 4000
+  },
+  {
+    "id": "loot-iced-core",
+    "name": "Iced Core",
+    "description": "Cryogenically sealed reactor core pulled from tougher rats.",
+    "category": "loot",
+    "volume": 1,
+    "base_price": 90000
+  },
+  {
+    "id": "loot-hierarch-crest",
+    "name": "Hierarch's Crest",
+    "description": "War trophy from a Gloam hierarch: a polished identification crest worth a fortune.",
+    "category": "loot",
+    "volume": 0.5,
+    "base_price": 450000
+  }
+]

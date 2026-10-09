@@ -1,0 +1,24 @@
+[
+  {
+    "id": "mod-stasis-web",
+    "name": "Stasis Web",
+    "description": "Projects a stasis field that slows the locked target by 45% while active.",
+    "slot": "mid",
+    "kind": "stasis_web",
+    "activation_cost": 15,
+    "activation_time": 5,
+    "boost": { "web_strength": 0.45 },
+    "price": 130000
+  },
+  {
+    "id": "mod-warp-scram",
+    "name": "Warp Scrambler",
+    "description": "Disrupts the target's warp drive for 10 s per cycle: nothing gets away.",
+    "slot": "mid",
+    "kind": "warp_scram",
+    "activation_cost": 20,
+    "activation_time": 5,
+    "boost": { "scram_duration": 10 },
+    "price": 240000
+  }
+]

@@ -1,0 +1,69 @@
+[
+  {
+    "id": "npc-rat-scuttler",
+    "name": "Scuttler",
+    "faction": "Mire Corsairs",
+    "ship": "ship-rat-scuttler",
+    "fit": ["mod-emp-turret", "mod-emp-turret", "mod-afterburner", "mod-armor-plate"],
+    "aggro_range": 20000,
+    "orbit_range": 3000,
+    "flee_threshold": 0.15,
+    "bounty": 7500,
+    "loot": [
+      { "item": "loot-alloy-scrap", "chance": 0.6, "min_qty": 1, "max_qty": 2 },
+      { "item": "loot-navdata", "chance": 0.15, "min_qty": 1, "max_qty": 1 }
+    ]
+  },
+  {
+    "id": "npc-rat-marauder",
+    "name": "Marauder",
+    "faction": "Mire Corsairs",
+    "ship": "ship-rat-marauder",
+    "fit": [
+      "mod-rail-turret",
+      "mod-rail-turret",
+      "mod-rail-turret",
+      "mod-shield-boost",
+      "mod-warp-scram",
+      "mod-armor-plate",
+      "mod-resist-coat"
+    ],
+    "aggro_range": 30000,
+    "orbit_range": 8000,
+    "flee_threshold": 0.2,
+    "bounty": 65000,
+    "loot": [
+      { "item": "loot-alloy-scrap", "chance": 0.75, "min_qty": 2, "max_qty": 4 },
+      { "item": "loot-navdata", "chance": 0.35, "min_qty": 1, "max_qty": 2 },
+      { "item": "loot-iced-core", "chance": 0.1, "min_qty": 1, "max_qty": 1 }
+    ]
+  },
+  {
+    "id": "npc-rat-hierarch",
+    "name": "Hierarch",
+    "faction": "Gloam Hierarchy",
+    "ship": "ship-rat-hierarch",
+    "fit": [
+      "mod-rail-turret",
+      "mod-rail-turret",
+      "mod-emp-turret",
+      "mod-emp-turret",
+      "mod-shield-boost",
+      "mod-stasis-web",
+      "mod-cap-booster",
+      "mod-armor-plate",
+      "mod-resist-coat",
+      "mod-cap-recharger"
+    ],
+    "aggro_range": 40000,
+    "orbit_range": 12000,
+    "flee_threshold": 0,
+    "bounty": 250000,
+    "loot": [
+      { "item": "loot-hierarch-crest", "chance": 0.35, "min_qty": 1, "max_qty": 1 },
+      { "item": "loot-iced-core", "chance": 0.5, "min_qty": 1, "max_qty": 2 },
+      { "item": "loot-alloy-scrap", "chance": 0.85, "min_qty": 3, "max_qty": 6 },
+      { "item": "loot-navdata", "chance": 0.5, "min_qty": 1, "max_qty": 3 }
+    ]
+  }
+]

@@ -1,0 +1,250 @@
+{
+  "id": "world-showcase",
+  "name": "Showcase",
+  "description": "The test world: a fully fitted sloop near the Solace Belt whose scenario checkpoints exercise every Entieve feature. Driven headlessly by tests/showcase_test.go.",
+  "start": {
+    "system": "sys-solace",
+    "position": { "X": -1050000000, "Y": 850000000 },
+    "ship": "ship-sloop",
+    "fit": [
+      "mod-emp-turret",
+      "mod-mining-laser",
+      "mod-rocket-pod",
+      "mod-afterburner",
+      "mod-shield-boost",
+      "mod-stasis-web",
+      "mod-armor-rep",
+      "mod-cap-recharger"
+    ],
+    "cargo": [
+      { "item": "charge-emp", "qty": 50 },
+      { "item": "charge-fusion", "qty": 50 },
+      { "item": "charge-ap", "qty": 50 },
+      { "item": "charge-plutonium", "qty": 50 },
+      { "item": "charge-cap-cell", "qty": 20 },
+      { "item": "ore-sterngrit", "qty": 100 },
+      { "item": "ore-cordite", "qty": 60 },
+      { "item": "loot-alloy-scrap", "qty": 5 },
+      { "item": "loot-navdata", "qty": 3 },
+      { "item": "loot-iced-core", "qty": 2 }
+    ],
+    "wallet": 10000000
+  },
+  "scenario": [
+    {
+      "name": "Fitting: one module of every kind",
+      "feature": "fitting-all-kinds",
+      "detail": "Start fit fills the sloop's whole 3/3/2 rack: 3 high (mod-emp-turret, mod-mining-laser, mod-rocket-pod), 3 mid (mod-afterburner, mod-shield-boost, mod-stasis-web), 2 low (mod-armor-rep, mod-cap-recharger). Observe in the Fitting window or the sim Fitting store: High/Mid/Low hold 3/3/2 ModuleIDs; the remaining kinds (shield-extender, armor-plate, resist-coat, cap-booster, warp-scram) are exercised via module-fit/module-unfit below."
+    },
+    {
+      "name": "Module activation and cycles",
+      "feature": "module-activation",
+      "detail": "CmdActivate(0) fires the EMP turret: EvtModuleActive is emitted, the module runtime shows a 3 s cycle, CmdDeactivate stops it. Repeat for F1-F8 mapped high modules."
+    },
+    {
+      "name": "Ammo consumption per shot",
+      "feature": "ammo-consumption",
+      "detail": "With 50 charge-emp in cargo, each turret shot consumes exactly one: cargo qty drops 50 -> 49 per cycle, visible in the Inventory window and the EvtLog fire line."
+    },
+    {
+      "name": "Dry gun refuses to fire",
+      "feature": "dry-gun",
+      "detail": "CmdReload the turret with no matching charge in cargo, then activate: no damage, and exactly one EvtLog 'dry gun / no charges' line per would-be cycle."
+    },
+    {
+      "name": "Turret hit chance",
+      "feature": "turret-hit",
+      "detail": "Lock a belt rat (CmdLock) at optimal and fire: combat log hit lines show the 0.01-0.99 damage multiplier; flying transverse lowers the hit chance via the tracking formula."
+    },
+    {
+      "name": "Wrecking shot",
+      "feature": "wrecking-shot",
+      "detail": "When the hit roll lands below 0.01 the shot is a wrecking x3 hit: the combat log line shows triple damage. Deterministic per seed - rerun the same seed to reproduce it."
+    },
+    {
+      "name": "Four damage types",
+      "feature": "four-damage-types",
+      "detail": "CmdReload swaps charges - charge-emp (EM), charge-plutonium (thermal), charge-ap (kinetic), charge-fusion (explosive): each volley's log line shows the matching damage type dominating."
+    },
+    {
+      "name": "Resists reduce damage",
+      "feature": "resists",
+      "detail": "Compare the raw volley against applied damage in the log: the hull's resists (e.g. explosive 0.30) cut that type. CmdFitModule mod-resist-coat into a freed low slot adds +0.15 to every resist."
+    },
+    {
+      "name": "Capacitor drain",
+      "feature": "capacitor-drain",
+      "detail": "Every activation costs GJ: the HUD capacitor bar drops 15 GJ per turret cycle, 40 GJ per shield-boost cycle, 25 GJ per afterburner cycle (sim Capacitor.Current)."
+    },
+    {
+      "name": "Capacitor recharge curve",
+      "feature": "capacitor-recharge",
+      "detail": "Deactivate everything: the cap refills on the EVE curve, peak rate near 25% capacity (dC/dt = 2.5*C/tau*sqrt(f)*(1-sqrt(f))). CmdUnfit/CmdFit mod-cap-recharger (passive recharge -45 s tau) to see the bar refill noticeably faster."
+    },
+    {
+      "name": "Cap booster instant GJ",
+      "feature": "cap-booster",
+      "detail": "Drain the cap, CmdUnfitModule(low, index of mod-cap-recharger), CmdFitModule mod-cap-booster into a mid slot, activate: +120 GJ lands at once (Boost.CapRestore) and one charge-cap-cell is consumed from cargo."
+    },
+    {
+      "name": "Shield boosting",
+      "feature": "shield-boost",
+      "detail": "Take shield damage, activate mod-shield-boost: the HUD shield arc climbs 60 HP every 4 s while the capacitor lasts (EvtModuleActive cycles in the log)."
+    },
+    {
+      "name": "Armor repair",
+      "feature": "armor-rep",
+      "detail": "Let armor take damage past the shield, activate mod-armor-rep: +55 HP per 5 s cycle, watch the HUD armor ring recover."
+    },
+    {
+      "name": "Afterburner speed boost",
+      "feature": "afterburner",
+      "detail": "CmdActivate the afterburner: velocity jumps to 1.75x MaxSpeed (385 -> ~674 m/s), the HUD speed readout rises and cap drains 25 GJ / 10 s."
+    },
+    {
+      "name": "Stasis web slows target",
+      "feature": "stasis-web",
+      "detail": "Lock a rat, activate mod-stasis-web within range: its speed in the Overview drops to 55% (web_strength 0.45) and the log notes the web."
+    },
+    {
+      "name": "Warp scramble blocks escape",
+      "feature": "warp-scram",
+      "detail": "CmdFitModule mod-warp-scram (mid), activate it on a fleeing rat: its warp start is cancelled and EvtLog reports 'warp scrambled' for scram_duration 10 s per cycle."
+    },
+    {
+      "name": "Targeting lock and unlock",
+      "feature": "targeting",
+      "detail": "Tab/CmdLock starts lock progress from scan_resolution vs target sig radius; EvtTargetLocked fires on completion, CmdUnlock drops the lock. Max 4 concurrent locks (hull max_targets)."
+    },
+    {
+      "name": "Warp travel",
+      "feature": "warp",
+      "detail": "CmdWarpTo a distant celestial: EvtWarp phases run align -> warp -> land, arriving within 2500 m of the target; the HUD shows warp drive active."
+    },
+    {
+      "name": "Approach",
+      "feature": "approach",
+      "detail": "CmdApproach a bracket: the ship turns toward it and accelerates to MaxSpeed; Overview distance shrinks monotonically."
+    },
+    {
+      "name": "Orbit",
+      "feature": "orbit",
+      "detail": "CmdOrbit(target, range): the ship holds a circle - Overview distance oscillates around the set range while facing stays tangent."
+    },
+    {
+      "name": "Manual piloting",
+      "feature": "manual-piloting",
+      "detail": "CmdManualVel(dir, speedFrac) steers by raw heading and throttle: velocity vector follows dir at MaxSpeed x speedFrac; CmdStop brings the ship to rest."
+    },
+    {
+      "name": "NPC aggro",
+      "feature": "npc-aggro",
+      "detail": "Approach a Solace belt rat within its aggro_range (20000 m): its bracket turns hostile red and it breaks orbit to come at you - EvtLog aggro line."
+    },
+    {
+      "name": "NPC flee",
+      "feature": "npc-flee",
+      "detail": "Drive a scuttler below flee_threshold (0.15 structure): it stops attacking and warps off - EvtLog flee line. The hierarch's threshold is 0: it never runs."
+    },
+    {
+      "name": "NPC death",
+      "feature": "npc-death",
+      "detail": "Push a rat's structure to 0: EvtDestroyed fires, the ship is replaced by a wreck carrying its rolled loot table."
+    },
+    {
+      "name": "Bounty payout",
+      "feature": "bounty",
+      "detail": "On NPC death the bounty lands in the wallet: scuttler 7,500 / marauder 65,000 / hierarch 250,000 credits - watch the wallet delta in EvtLog."
+    },
+    {
+      "name": "Wreck looting",
+      "feature": "looting",
+      "detail": "CmdLoot(wreck, item) transfers stacks into cargo: EvtLooted names each item, the wreck's remaining loot shrinks to empty."
+    },
+    {
+      "name": "Mining cycle",
+      "feature": "mining",
+      "detail": "Lock an asteroid in cel-solace-belt, CmdMine(asteroid, index of mod-mining-laser): every 30 s cycle moves 40 m³ - EvtLog cycle line, cargo/ore-hold total rises."
+    },
+    {
+      "name": "Asteroid depletion",
+      "feature": "asteroid-depletion",
+      "detail": "Keep mining one rock: its Remaining volume (Asteroid component) drains to 0, the bracket empties/disappears, and further cycles log 'asteroid depleted'."
+    },
+    {
+      "name": "Ore hold vs cargo",
+      "feature": "ore-hold",
+      "detail": "On the sloop (ore_hold 0) mined ore lands in cargo (400 m³); on ship-barge the same ore fills the dedicated 15,000 m³ ore hold instead - compare the Inventory window's two tabs."
+    },
+    {
+      "name": "Cargo transfer",
+      "feature": "cargo-transfer",
+      "detail": "Move stacks between cargo, ore hold and station hangar (CmdLoot with an item id / Inventory drag): Cargo store stacks re-balance while totals stay conserved."
+    },
+    {
+      "name": "Gate jump",
+      "feature": "gate-jump",
+      "detail": "CmdJump(cel-gate-penumbra): EvtJumped, then LoadSystem(sys-penumbra) swaps grid content; jumping back via cel-gate-solace proves the reciprocal gates both ways."
+    },
+    {
+      "name": "Docking",
+      "feature": "docking",
+      "detail": "CmdDock(cel-haven-rest) within docking range: EvtDocked fires, the ship leaves the grid (Docked marker) and the station services scene opens."
+    },
+    {
+      "name": "Undocking",
+      "feature": "undocking",
+      "detail": "CmdUndock: EvtUndocked, the ship reappears on the grid at the station's position with full state preserved."
+    },
+    {
+      "name": "Station repair",
+      "feature": "station-repair",
+      "detail": "Damage the ship, dock at Haven Rest (repair service), CmdRepair: shield/armor/structure snap back to hull maximum for a fee deducted from the wallet."
+    },
+    {
+      "name": "Market buy",
+      "feature": "market-buy",
+      "detail": "CmdBuy for a hull order (ship-sloop, cast to ItemID) or a module order (mod-rail-turret): EvtMarket fires, wallet decreases by price x qty, the item appears in station inventory."
+    },
+    {
+      "name": "Market sell",
+      "feature": "market-sell",
+      "detail": "CmdSell(loot-alloy-scrap, qty) at Haven Rest: EvtMarket, wallet increases by the order price, the station order qty is unchanged (it is a buy-side listing)."
+    },
+    {
+      "name": "Refining ore",
+      "feature": "refining",
+      "detail": "Dock where refine service exists, CmdRefine(ore-sterngrit, 10): cargo gains min-ferrite per refine_yield (0.45/unit -> 4-5 units), EvtMarket/log confirms."
+    },
+    {
+      "name": "Ship assembly",
+      "feature": "ship-assembly",
+      "detail": "Buy the ship-hauler hull order at the market, CmdAssemble(ship-hauler): the hull is assembled into your hangar and can be swapped into."
+    },
+    {
+      "name": "Module fitting",
+      "feature": "module-fit",
+      "detail": "Free a mid slot (CmdUnfitModule), then CmdFitModule(mod-cap-booster, mid, index): the Fitting window shows the new module and its stats apply (slot class must match)."
+    },
+    {
+      "name": "Module un-fitting",
+      "feature": "module-unfit",
+      "detail": "CmdUnfitModule removes a module back to inventory: the slot empties and its passive/active contributions vanish - HUD stats (e.g. tau with cap-recharger) change back."
+    },
+    {
+      "name": "NPC respawn timers",
+      "feature": "npc-respawn",
+      "detail": "Clear a spawn (belt: 90 s in Solace, 120 s Penumbra belt; anomaly cel-penumbra-den: 300 s): after respawn_sec of sim time the group is back - watch EvtAnomalyCleared then the respawn log."
+    },
+    {
+      "name": "Save and restore",
+      "feature": "save-restore",
+      "detail": "Sim.Snapshot() produces a Save; Sim.Restore(s) into a fresh sim reproduces wallet, cargo, fit, position and module states exactly - Snapshot() of both must match field-for-field."
+    },
+    {
+      "name": "Determinism",
+      "feature": "determinism",
+      "detail": "Two sims built from the same content, world and seed given the same command sequence report equal Sim.Hash() at every step, including after a Snapshot/Restore round-trip."
+    }
+  ]
+}

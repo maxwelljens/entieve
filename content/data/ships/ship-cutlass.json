@@ -1,0 +1,23 @@
+{
+  "id": "ship-cutlass",
+  "name": "Cutlass",
+  "class": "destroyer",
+  "description": "A close-range brawler: extra guns and plating for pilots who like to brawl on top of their target.",
+  "slots": { "high": 4, "mid": 3, "low": 4 },
+  "shield": 220,
+  "armor": 300,
+  "structure": 330,
+  "resists": { "em": 0.18, "thermal": 0.22, "kinetic": 0.28, "explosive": 0.32 },
+  "capacitor": 520,
+  "recharge": 240,
+  "max_speed": 320,
+  "agility": 0.7,
+  "mass": 1800000,
+  "sig_radius": 55,
+  "cargo": 450,
+  "ore_hold": 0,
+  "warp_speed": 3.0,
+  "max_target_range": 50000,
+  "max_targets": 5,
+  "scan_resolution": 540
+}

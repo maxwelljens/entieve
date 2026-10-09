@@ -1,0 +1,17 @@
+{
+  "id": "world-default",
+  "name": "New Pilot",
+  "description": "The normal game start: a sloop with a modest fit parked outside Haven Rest station in Solace.",
+  "start": {
+    "system": "sys-solace",
+    "position": { "X": 540000000, "Y": 340000000 },
+    "ship": "ship-sloop",
+    "fit": ["mod-emp-turret", "mod-afterburner", "mod-armor-rep"],
+    "cargo": [
+      { "item": "charge-emp", "qty": 80 },
+      { "item": "charge-fusion", "qty": 40 },
+      { "item": "charge-ap", "qty": 20 }
+    ],
+    "wallet": 500000
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "ship-rat-hierarch",
+  "name": "Hierarch",
+  "class": "rat",
+  "description": "The command hull of a rat fleet: heavy tank, four turrets, and a crew that fights to the last.",
+  "slots": { "high": 4, "mid": 3, "low": 3 },
+  "shield": 600,
+  "armor": 700,
+  "structure": 850,
+  "resists": { "em": 0.3, "thermal": 0.3, "kinetic": 0.35, "explosive": 0.4 },
+  "capacitor": 900,
+  "recharge": 300,
+  "max_speed": 220,
+  "agility": 1.4,
+  "mass": 18000000,
+  "sig_radius": 150,
+  "cargo": 400,
+  "ore_hold": 0,
+  "warp_speed": 2.2,
+  "max_target_range": 60000,
+  "max_targets": 6,
+  "scan_resolution": 320
+}

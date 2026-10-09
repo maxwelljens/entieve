@@ -1,0 +1,23 @@
+{
+  "id": "ship-barge",
+  "name": "Barge",
+  "class": "barge",
+  "description": "A slow, sturdy mining barge with a huge ore hold. Strip belts, warp home, repeat.",
+  "slots": { "high": 2, "mid": 2, "low": 3 },
+  "shield": 200,
+  "armor": 350,
+  "structure": 450,
+  "resists": { "em": 0.1, "thermal": 0.15, "kinetic": 0.3, "explosive": 0.25 },
+  "capacitor": 380,
+  "recharge": 280,
+  "max_speed": 160,
+  "agility": 1.1,
+  "mass": 9000000,
+  "sig_radius": 95,
+  "cargo": 300,
+  "ore_hold": 15000,
+  "warp_speed": 2.2,
+  "max_target_range": 35000,
+  "max_targets": 3,
+  "scan_resolution": 380
+}

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "mod-mining-laser",
+    "name": "Mining Laser",
+    "description": "Strip-mines 100 m³ of asteroid per 30 s cycle straight into the ore hold.",
+    "slot": "high",
+    "kind": "mining_laser",
+    "activation_cost": 20,
+    "activation_time": 30,
+    "mining": { "volume_per_cycle": 100, "cycle_time": 30 },
+    "price": 175000
+  }
+]
