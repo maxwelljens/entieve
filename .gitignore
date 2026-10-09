@@ -1,0 +1,20 @@
+# Binaries
+/bin/
+/dist/
+/entieve
+/cmd/entieve/entieve
+
+# Saves
+/save.json
+*.save.json
+
+# Test artifacts
+/coverage.out
+/coverage.html
+
+# Editor/OS noise
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/

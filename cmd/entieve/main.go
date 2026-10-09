@@ -1,0 +1,249 @@
+// Command entieve is the Entieve game and engine toolkit.
+//
+// Subcommands:
+//
+//	entieve run       — play the game (Ebitengine window)
+//	entieve validate  — lint and cross-check all game content
+//	entieve simulate  — run the simulation headlessly (AI-agent tooling)
+//	entieve version   — print version
+//
+// The simulate subcommand is the AI-controllability seam: agents script the
+// game with tick-scheduled command files (see docs/CONTENT_AUTHORING.md and
+// the script package) and read back the event log and state report.
+package main
+
+import (
+	"encoding/json"
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+
+	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/game"
+	"github.com/entieve/entieve/script"
+	"github.com/entieve/entieve/sim"
+)
+
+// version is stamped at build time via -ldflags "-X main.version=...".
+var version = "0.1.0-dev"
+
+const usage = `Entieve — a love letter to EVE Online
+
+Usage:
+  entieve run       [--world ID] [--seed N] [--load save.json] [--save save.json]
+  entieve validate  [--dir content/data]
+  entieve simulate  [--world ID] [--seed N] [--ticks N] [--script steps.json] [--quiet]
+  entieve version
+
+Run "entieve <subcommand> -h" for subcommand flags.`
+
+func main() {
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func run(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, usage)
+		return 2
+	}
+	switch args[0] {
+	case "run":
+		return cmdRun(args[1:], stdout, stderr)
+	case "validate":
+		return cmdValidate(args[1:], stdout, stderr)
+	case "simulate":
+		return cmdSimulate(args[1:], stdout, stderr)
+	case "version":
+		fmt.Fprintf(stdout, "entieve %s\n", version)
+		return 0
+	case "-h", "--help", "help":
+		fmt.Fprintln(stdout, usage)
+		return 0
+	default:
+		fmt.Fprintf(stderr, "entieve: unknown subcommand %q\n\n%s\n", args[0], usage)
+		return 2
+	}
+}
+
+func cmdRun(args []string, stdout, stderr io.Writer) int {
+	fs := newFlagSet("run", stderr)
+	world := fs.String("world", "world-default", "world (scenario) ID to play")
+	seed := fs.Int64("seed", 42, "simulation RNG seed")
+	load := fs.String("load", "", "save file to load at startup")
+	save := fs.String("save", defaultSavePath(), "save file written by the in-game save key")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	c, err := content.Load(content.FS())
+	if err != nil {
+		fmt.Fprintf(stderr, "entieve: load content: %v\n", err)
+		return 1
+	}
+	wd, ok := c.World(content.WorldID(*world))
+	if !ok {
+		fmt.Fprintf(stderr, "entieve: unknown world %q (see worlds/ in content data)\n", *world)
+		return 1
+	}
+	opts := game.Options{
+		Content:  c,
+		World:    wd,
+		Title:    "Entieve — " + wd.Name,
+		SavePath: *save,
+		Seed:     *seed,
+	}
+	if *load != "" {
+		save, err := readSave(*load)
+		if err != nil {
+			fmt.Fprintf(stderr, "entieve: load save: %v\n", err)
+			return 1
+		}
+		opts.Save = save
+	}
+	g, err := game.New(opts)
+	if err != nil {
+		fmt.Fprintf(stderr, "entieve: start game: %v\n", err)
+		return 1
+	}
+	if err := g.Run(); err != nil {
+		fmt.Fprintf(stderr, "entieve: game: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func cmdValidate(args []string, stdout, stderr io.Writer) int {
+	fs := newFlagSet("validate", stderr)
+	dir := fs.String("dir", "", "validate content from a directory instead of embedded data")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	var (
+		c   *content.Content
+		err error
+	)
+	if *dir != "" {
+		c, err = content.LoadDir(*dir)
+	} else {
+		c, err = content.Load(content.FS())
+	}
+	if err != nil {
+		fmt.Fprintf(stderr, "entieve validate: load: %v\n", err)
+		return 1
+	}
+	if err := c.Validate(); err != nil {
+		fmt.Fprintf(stderr, "entieve validate: FAILED\n%v\n", err)
+		return 1
+	}
+	fmt.Fprintf(stdout, "content OK: %d items, %d ships, %d modules, %d npcs, %d systems, %d worlds\n",
+		len(c.Items), len(c.Ships), len(c.Modules), len(c.NPCs), len(c.Systems), len(c.Worlds))
+	return 0
+}
+
+func cmdSimulate(args []string, stdout, stderr io.Writer) int {
+	fs := newFlagSet("simulate", stderr)
+	world := fs.String("world", "world-showcase", "world (scenario) ID to simulate")
+	seed := fs.Int64("seed", 42, "simulation RNG seed")
+	ticks := fs.Int64("ticks", 600, "number of ticks to run (60 ticks = 1 sim second)")
+	scriptPath := fs.String("script", "", "JSON command script to execute during the run")
+	quiet := fs.Bool("quiet", false, "suppress the event log (report still printed)")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	c, err := content.Load(content.FS())
+	if err != nil {
+		fmt.Fprintf(stderr, "entieve simulate: load content: %v\n", err)
+		return 1
+	}
+	wd, ok := c.World(content.WorldID(*world))
+	if !ok {
+		fmt.Fprintf(stderr, "entieve simulate: unknown world %q\n", *world)
+		return 1
+	}
+	s, err := sim.New(c, wd, *seed)
+	if err != nil {
+		fmt.Fprintf(stderr, "entieve simulate: %v\n", err)
+		return 1
+	}
+	var steps []script.Step
+	if *scriptPath != "" {
+		data, err := os.ReadFile(*scriptPath)
+		if err != nil {
+			fmt.Fprintf(stderr, "entieve simulate: read script: %v\n", err)
+			return 1
+		}
+		steps, err = script.Parse(data)
+		if err != nil {
+			fmt.Fprintf(stderr, "entieve simulate: %v\n", err)
+			return 1
+		}
+	}
+	onEvent := func(ev sim.Event) {
+		if !*quiet {
+			fmt.Fprintf(stdout, "[%7.2fs] %-8s %s\n", ev.Time, ev.Kind, ev.Text)
+		}
+	}
+	res := script.Run(s, steps, *ticks, onEvent)
+	for _, st := range res.Unresolved {
+		fmt.Fprintf(stderr, "entieve simulate: unresolved step at tick %d: %s %s\n",
+			st.AtTick, st.Action, st.Target)
+	}
+	printReport(stdout, s, res, *ticks)
+	return 0
+}
+
+func printReport(w io.Writer, s *sim.Sim, res *script.Result, ticks int64) {
+	fmt.Fprintf(w, "\n== simulation report ==\n")
+	fmt.Fprintf(w, "ticks: %d (%.2fs sim time)\n", ticks, s.Time())
+	fmt.Fprintf(w, "wallet: %.2f cr\n", s.Wallet())
+	fmt.Fprintf(w, "state hash: %016x\n", s.Hash())
+	fmt.Fprintf(w, "events: %d, steps run: %d, unresolved: %d\n",
+		len(res.Events), res.Ran, len(res.Unresolved))
+	kindCount := map[string]int{}
+	for _, ev := range res.Events {
+		kindCount[string(ev.Kind)]++
+	}
+	var keys []string
+	for k := range kindCount {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		fmt.Fprintf(w, "  %-16s %d\n", k, kindCount[k])
+	}
+	grid := s.Grid()
+	sort.Slice(grid, func(i, j int) bool { return grid[i].Name < grid[j].Name })
+	fmt.Fprintf(w, "grid: %d entities\n", len(grid))
+	for _, in := range grid {
+		fmt.Fprintf(w, "  %-10s %-28s dist %12.0f m\n", in.Kind, in.Name, in.Distance)
+	}
+}
+
+func readSave(path string) (*sim.Save, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var sv sim.Save
+	if err := json.Unmarshal(data, &sv); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", filepath.Base(path), err)
+	}
+	return &sv, nil
+}
+
+func defaultSavePath() string {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "save.json"
+	}
+	return filepath.Join(dir, "entieve", "save.json")
+}
+
+// newFlagSet builds a flag set with a compact, predictable error style.
+func newFlagSet(name string, stderr io.Writer) *flag.FlagSet {
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	return fs
+}
