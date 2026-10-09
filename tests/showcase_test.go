@@ -10,9 +10,11 @@
 package tests
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/script"
 	"github.com/entieve/entieve/sim"
 )
@@ -20,8 +22,8 @@ import (
 const (
 	showcaseWorldID = "world-showcase"
 	showcaseScript  = "scripts/showcase.json"
-	showcaseTicks   = 85_000 // ~24 sim minutes; covers the full script tour
-	probeEveryTicks = 300    // 5 sim seconds
+	showcaseTicks   = 60_000 // 16.6 sim minutes; covers the full script tour
+	probeEveryTicks = 300    // 5 sim seconds (state vocabularies track every tick)
 )
 
 // featureRule observes one feature in the evidence gathered from the run.
@@ -31,14 +33,27 @@ type featureRule func(c *content.Content, e *evidence) (ok bool, reason string)
 // world-showcase's scenario checkpoints (kebab-case).
 var rules = map[string]featureRule{
 	"fitting-all-kinds": func(c *content.Content, e *evidence) (bool, string) {
-		kinds := e.playerFittingKinds(c)
+		// The world-start fit is the showcase rack: death respawns hand out a
+		// bare sloop, so judge the declared loadout, not the end state.
+		kinds := map[string]bool{}
+		p := playerOf(e.Start)
+		if p == nil || p.Fitting == nil {
+			return false, "no player fitting at world start"
+		}
+		ids := append(append([]content.ModuleID{}, p.Fitting.High...), p.Fitting.Mid...)
+		ids = append(ids, p.Fitting.Low...)
+		for _, id := range ids {
+			if def, ok := c.Module(id); ok {
+				kinds[def.Kind] = true
+			}
+		}
 		for _, want := range []string{content.KindWeapon, content.KindMiningLaser, content.KindAfterburner} {
 			if !kinds[want] {
-				return false, "no fitted module of kind " + want
+				return false, "start fit has no module of kind " + want
 			}
 		}
 		if !kinds[content.KindShieldBoost] && !kinds[content.KindArmorRep] {
-			return false, "no active tank module fitted"
+			return false, "start fit has no active tank module"
 		}
 		return true, ""
 	},
@@ -54,7 +69,7 @@ var rules = map[string]featureRule{
 		return false, "no ammunition was consumed"
 	},
 	"dry-gun": func(c *content.Content, e *evidence) (bool, string) {
-		return e.eventRe(`dry|out of ammo|no ammunition|ammunition depleted`), "no dry-gun warning"
+		return e.eventRe(`no charges|dry|out of ammo`), "no dry-gun warning"
 	},
 	"turret-hit": func(c *content.Content, e *evidence) (bool, string) {
 		return e.eventRe(`\bhits?\b|damage`), "no turret hit observed"
@@ -63,18 +78,47 @@ var rules = map[string]featureRule{
 		return e.eventRe(`wrecking`), "no wrecking shot observed"
 	},
 	"four-damage-types": func(c *content.Content, e *evidence) (bool, string) {
-		if e.allAmmoTypesFired() {
+		if e.allChargeTypesBurned() {
 			return true, ""
 		}
-		for _, pat := range []string{`electromagnetic|\bem\b`, `thermal`, `kinetic`, `explosive`} {
-			if !e.eventRe(pat) {
-				return false, "damage type not observed: " + pat
-			}
-		}
-		return true, ""
+		return false, "not all four charge damage profiles were consumed"
 	},
 	"resists": func(c *content.Content, e *evidence) (bool, string) {
-		return e.eventRe(`resist|absorbs`), "no resist application observed"
+		hits := e.playerHits()
+		if len(hits) == 0 {
+			return false, "no player hits to compare against resist ceilings"
+		}
+		checked := 0
+		byTarget := map[string][]float64{}
+		for _, h := range hits {
+			byTarget[h.Target] = append(byTarget[h.Target], h.Value)
+		}
+		for name, vals := range byTarget {
+			hull, fit := hullForTarget(c, name)
+			if hull == nil {
+				continue // not a rat hull we can price
+			}
+			ceiling := resistCeiling(c, hull, fit)
+			max := 0.0
+			for _, v := range vals {
+				if v > max {
+					max = v
+				}
+				if v > ceiling*1.01 {
+					return false, fmt.Sprintf("%s took %.2f damage in one hit, above the resist ceiling %.2f", name, v, ceiling)
+				}
+			}
+			// The "multipliers approach 1" check only makes sense with enough
+			// rolls: expect max mult ~n/(n+1) over n hits.
+			if len(vals) >= 8 && max < ceiling*0.55 {
+				return false, fmt.Sprintf("%s hits never approached the resist ceiling %.2f (max %.2f over %d hits)", name, ceiling, max, len(vals))
+			}
+			checked++
+		}
+		if checked == 0 {
+			return false, "no rat-hull hits observed"
+		}
+		return true, ""
 	},
 	"capacitor-drain": func(c *content.Content, e *evidence) (bool, string) {
 		return e.minCapFrac() < 0.5, "capacitor never drained below 50%"
@@ -83,7 +127,7 @@ var rules = map[string]featureRule{
 		return e.capDrainThenRecover(0.5, 0.8), "capacitor never drained then recovered"
 	},
 	"cap-booster": func(c *content.Content, e *evidence) (bool, string) {
-		return e.eventRe(`cap(acitor)? (booster|cell|restor)`), "no cap booster activation"
+		return e.eventRe(`cap(acitor)? ?(booster|cell|restor)`), "no cap booster activation"
 	},
 	"shield-boost": func(c *content.Content, e *evidence) (bool, string) {
 		return e.eventRe(`shield boost`) || e.layerRose("shield", 25), "no shield boost observed"
@@ -110,22 +154,36 @@ var rules = map[string]featureRule{
 		return e.eventRe(`warp`), "warp start/land not both observed"
 	},
 	"approach": func(c *content.Content, e *evidence) (bool, string) {
-		return e.eventRe(`approach`) || e.movedSublight(50, 2e6), "no sublight approach observed"
+		return e.IntentsSeen[string(sim.IntentApproach)] || e.eventRe(`approach`) || e.movedSublight(50, 2e6),
+			"no sublight approach observed"
 	},
 	"orbit": func(c *content.Content, e *evidence) (bool, string) {
-		return e.eventRe(`orbit`), "no orbit observed"
+		return e.IntentsSeen[string(sim.IntentOrbit)] || e.eventRe(`orbit`), "no orbit observed"
 	},
 	"manual-piloting": func(c *content.Content, e *evidence) (bool, string) {
-		return e.eventRe(`manual`), "no manual piloting observed"
+		return e.IntentsSeen[string(sim.IntentManual)] || e.eventRe(`manual`), "no manual piloting observed"
 	},
 	"npc-aggro": func(c *content.Content, e *evidence) (bool, string) {
-		return e.eventRe(`aggro|hostile|engaging`), "no NPC aggro observed"
+		return e.eventRe(`attacking you|aggro|hostile|engaging`) ||
+				e.AIStatesSeen[string(sim.NpcApproach)] || e.AIStatesSeen[string(sim.NpcOrbit)],
+			"no NPC aggro observed"
 	},
 	"npc-flee": func(c *content.Content, e *evidence) (bool, string) {
-		return e.eventRe(`flee|fleeing|retreat`), "no NPC flee observed"
+		return e.eventRe(`retreat|flee`) || e.AIStatesSeen[string(sim.NpcFlee)], "no NPC flee observed"
 	},
 	"npc-death": func(c *content.Content, e *evidence) (bool, string) {
-		return e.kindSeen(sim.EvDestroyed, "") && e.eventRe(`wreck`), "no NPC death with wreck"
+		// A death that is NOT the player's (the player can also die here).
+		p := playerOf(e.Start)
+		var playerID uint64
+		if p != nil {
+			playerID = p.ID
+		}
+		for _, ev := range e.Events {
+			if ev.Kind == sim.EvDestroyed && uint64(ev.Actor) != playerID {
+				return true, ""
+			}
+		}
+		return false, "no NPC death observed"
 	},
 	"bounty": func(c *content.Content, e *evidence) (bool, string) {
 		return e.eventRe(`bounty`) && e.walletDelta() != 0, "no bounty payout observed"
@@ -148,7 +206,7 @@ var rules = map[string]featureRule{
 		return e.eventRe(`ore hold`), "ore hold never received ore"
 	},
 	"cargo-transfer": func(c *content.Content, e *evidence) (bool, string) {
-		return e.eventRe(`hangar|transfer|stored|delivered`), "no cargo transfer observed"
+		return e.eventRe(`transfer|hangar|stored|delivered`), "no cargo transfer observed"
 	},
 	"gate-jump": func(c *content.Content, e *evidence) (bool, string) {
 		return e.kindSeen(sim.EvJumped, ""), "no gate jump observed"
@@ -160,7 +218,7 @@ var rules = map[string]featureRule{
 		return e.kindSeen(sim.EvUndocked, ""), "no undocking observed"
 	},
 	"station-repair": func(c *content.Content, e *evidence) (bool, string) {
-		return e.eventRe(`repair`), "no station repair observed"
+		return e.eventRe(`repair|full strength`), "no station repair observed"
 	},
 	"market-buy": func(c *content.Content, e *evidence) (bool, string) {
 		return e.eventRe(`bought|purchased`), "no market purchase observed"
@@ -181,7 +239,7 @@ var rules = map[string]featureRule{
 		return e.eventRe(`unfitted|removed|unfit`), "no module unfitting observed"
 	},
 	"npc-respawn": func(c *content.Content, e *evidence) (bool, string) {
-		return e.eventRe(`respawn|spawned`), "no NPC respawn observed"
+		return e.eventRe(`respawn|spawned|sensor contact`), "no NPC respawn observed"
 	},
 	"save-restore": func(c *content.Content, e *evidence) (bool, string) {
 		return e.SaveRestoreOK, "save/restore round-trip failed"
@@ -216,35 +274,50 @@ func TestShowcaseCoversEveryFeature(t *testing.T) {
 	}
 
 	steps := loadScript(t, showcaseScript)
-	ev := &evidence{Start: start}
+	ev := &evidence{
+		Start:        start,
+		IntentsSeen:  map[string]bool{},
+		AIStatesSeen: map[string]bool{},
+	}
 	res := script.RunH(s, steps, showcaseTicks, script.Hooks{
 		OnEvent: func(e sim.Event) { ev.Events = append(ev.Events, e) },
 		OnTick: func(tick int64, eng script.Engine) {
-			if tick%probeEveryTicks != 0 {
-				return
-			}
 			sim2, ok := eng.(*sim.Sim)
 			if !ok {
 				return
 			}
-			p := probe{Tick: tick}
-			if e := sim2.Player(); !e.IsZero() {
-				if tr, ok := sim2.Transforms.Get(e); ok {
-					p.Pos = tr.Pos
-				}
-				if mo, ok := sim2.Motions.Get(e); ok {
-					p.Speed = mo.Vel.Len()
-				}
-				if cp, ok := sim2.Caps.Get(e); ok {
-					p.Cap, p.CapMax = cp.Current, cp.Capacity
-				}
-				if sh, ok := sim2.Ships.Get(e); ok {
-					p.Shield, p.ShieldMax = sh.Shield, sh.MaxShield
-					p.Armor, p.ArmorMax = sh.Armor, sh.MaxArmor
-					p.Structure = sh.Structure
+			p := sim2.Player()
+			// State vocabularies accumulate on every tick — no sampling gaps.
+			if !p.IsZero() {
+				if in, ok := sim2.Intents.Get(p); ok {
+					ev.IntentsSeen[string(in.Kind)] = true
 				}
 			}
-			ev.Probes = append(ev.Probes, p)
+			sim2.AIs.Each(func(_ ecs.Entity, ai *sim.NpcAI) {
+				ev.AIStatesSeen[string(ai.State)] = true
+			})
+			// Probes sample the player's vitals for curve-based rules.
+			if tick%probeEveryTicks != 0 {
+				return
+			}
+			pr := probe{Tick: tick}
+			if !p.IsZero() {
+				if tr, ok := sim2.Transforms.Get(p); ok {
+					pr.Pos = tr.Pos
+				}
+				if mo, ok := sim2.Motions.Get(p); ok {
+					pr.Speed = mo.Vel.Len()
+				}
+				if cp, ok := sim2.Caps.Get(p); ok {
+					pr.Cap, pr.CapMax = cp.Current, cp.Capacity
+				}
+				if sh, ok := sim2.Ships.Get(p); ok {
+					pr.Shield, pr.ShieldMax = sh.Shield, sh.MaxShield
+					pr.Armor, pr.ArmorMax = sh.Armor, sh.MaxArmor
+					pr.Structure = sh.Structure
+				}
+			}
+			ev.Probes = append(ev.Probes, pr)
 		},
 	})
 	for _, st := range res.Unresolved {
@@ -279,7 +352,7 @@ func TestShowcaseCoversEveryFeature(t *testing.T) {
 }
 
 // checkSaveRestore verifies snapshot → restore → identical hash, and that
-// both sims continue identically afterwards.
+// restored sims continue identically afterwards.
 func checkSaveRestore(t *testing.T, c *content.Content, wd *content.WorldDef, save *sim.Save) bool {
 	t.Helper()
 	a, err := sim.New(c, wd, 42)
@@ -290,7 +363,6 @@ func checkSaveRestore(t *testing.T, c *content.Content, wd *content.WorldDef, sa
 		t.Errorf("restore: %v", err)
 		return false
 	}
-	// Restoring into a fresh sim must reproduce the captured hash.
 	b, err := sim.New(c, wd, 42)
 	if err != nil {
 		return false

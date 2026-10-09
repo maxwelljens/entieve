@@ -39,6 +39,8 @@ type Step struct {
 	Qty    int     `json:"qty,omitempty"`
 	Slot   string  `json:"slot,omitempty"`  // "high0", "mid1", "low2"...
 	Ship   string  `json:"ship,omitempty"`  // ship ID (assemble)
+	From   string  `json:"from,omitempty"`  // transfer source: "cargo"|"ore"|"hangar"
+	To     string  `json:"to,omitempty"`    // transfer destination: "cargo"|"ore"|"hangar"
 	Range  float64 `json:"range,omitempty"` // orbit range, m
 	DirX   float64 `json:"dir_x,omitempty"`
 	DirY   float64 `json:"dir_y,omitempty"`
@@ -53,7 +55,7 @@ var validActions = map[string]bool{
 	"activate": true, "deactivate": true, "loot": true, "mine": true,
 	"dock": true, "undock": true, "jump": true,
 	"buy": true, "sell": true, "refine": true, "repair": true,
-	"assemble": true, "fit": true, "unfit": true,
+	"assemble": true, "fit": true, "unfit": true, "transfer": true,
 }
 
 // Parse decodes a JSON step array (an object with a "steps" array is also
@@ -93,7 +95,7 @@ var needsTarget = map[string]bool{
 
 // needsItem actions require an item/ship/module ID.
 var needsItem = map[string]bool{
-	"buy": true, "sell": true, "refine": true, "fit": true,
+	"buy": true, "sell": true, "refine": true, "fit": true, "transfer": true,
 }
 
 func (st Step) validate(i int) error {
@@ -133,6 +135,18 @@ func (st Step) validate(i int) error {
 	case "buy", "sell", "refine":
 		if err := need(st.Qty < 1, "qty must be >= 1"); err != nil {
 			return err
+		}
+	case "transfer":
+		if err := need(st.Qty < 1, "qty must be >= 1"); err != nil {
+			return err
+		}
+		for _, side := range []string{st.From, st.To} {
+			if side != "cargo" && side != "ore" && side != "hangar" {
+				return fmt.Errorf("script: step %d (transfer): from/to must be cargo|ore|hangar", i)
+			}
+		}
+		if st.From == st.To {
+			return fmt.Errorf("script: step %d (transfer): from and to must differ", i)
 		}
 	case "orbit":
 		if err := need(st.Range <= 0, "range must be > 0"); err != nil {
@@ -239,6 +253,8 @@ func (st Step) command(eng Engine) (sim.Command, bool) {
 		return sim.CmdUnfitModule{Slot: slot}, true
 	case "buy":
 		return sim.CmdBuy{Item: content.ItemID(st.Item), Qty: st.Qty}, true
+	case "transfer":
+		return sim.CmdTransfer{Item: content.ItemID(st.Item), Qty: st.Qty, From: st.From, To: st.To}, true
 	case "sell":
 		return sim.CmdSell{Item: content.ItemID(st.Item), Qty: st.Qty}, true
 	case "refine":

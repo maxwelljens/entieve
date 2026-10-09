@@ -36,6 +36,10 @@ type evidence struct {
 	Probes     []probe
 	Unresolved []string
 
+	// State vocabularies observed on EVERY tick (no sampling gaps).
+	IntentsSeen  map[string]bool // sim.IntentKind values flown
+	AIStatesSeen map[string]bool // sim.NpcAIState values entered by any NPC
+
 	// Programmatic checks performed by the showcase harness itself.
 	SaveRestoreOK bool
 	DeterminismOK bool
@@ -104,7 +108,9 @@ func (e *evidence) playerFittingKinds(c *content.Content) map[string]bool {
 	if p == nil || p.Fitting == nil {
 		return kinds
 	}
-	for _, id := range append(append([]content.ModuleID{}, p.Fitting.High...), append(p.Fitting.Mid, p.Fitting.Low...)...) {
+	ids := append(append([]content.ModuleID{}, p.Fitting.High...), p.Fitting.Mid...)
+	ids = append(ids, p.Fitting.Low...)
+	for _, id := range ids {
 		if def, ok := c.Module(id); ok {
 			kinds[def.Kind] = true
 		}
@@ -112,7 +118,7 @@ func (e *evidence) playerFittingKinds(c *content.Content) map[string]bool {
 	return kinds
 }
 
-// minCapFrac / maxCapFrac summarize capacitor observations.
+// minCapFrac summarizes capacitor observations (1 = never observed below full).
 func (e *evidence) minCapFrac() float64 {
 	min := 1.0
 	for _, p := range e.Probes {
@@ -125,8 +131,8 @@ func (e *evidence) minCapFrac() float64 {
 	return min
 }
 
-// capRoseLater reports whether the capacitor was observed draining below
-// drainBelow and later refilling above refillAbove.
+// capDrainThenRecover reports whether the capacitor was observed draining
+// below drainBelow and later refilling above refillAbove.
 func (e *evidence) capDrainThenRecover(drainBelow, refillAbove float64) bool {
 	sawDrain := false
 	for _, p := range e.Probes {
@@ -181,14 +187,89 @@ func (e *evidence) walletDelta() float64 {
 	return e.End.Wallet - e.Start.Wallet
 }
 
-// allAmmoTypesFired reports whether events mention every light charge name.
-func (e *evidence) allAmmoTypesFired() bool {
-	for _, pat := range []string{`emp`, `fusion`, `\bap\b`, `plutonium`} {
-		if !e.eventRe(pat) {
+// allChargeTypesBurned reports whether every light charge type was consumed
+// (each carries its own damage profile into the volley).
+func (e *evidence) allChargeTypesBurned() bool {
+	for _, id := range []content.ItemID{"charge-emp", "charge-fusion", "charge-ap", "charge-plutonium"} {
+		if e.itemQtyDropped(id) <= 0 {
 			return false
 		}
 	}
 	return true
+}
+
+// hitLine matches "<shooter> hits <target> for <n> damage".
+var hitLine = regexp.MustCompile(`^(Wrecking hit! )?(.+?) hits (.+?) for `)
+
+// playerHits returns (target, value) for every non-wrecking hit the player
+// landed. "you" is normalized back to the player's ship name.
+func (e *evidence) playerHits() []hitObservation {
+	var out []hitObservation
+	p := playerOf(e.Start)
+	name := "Sloop"
+	if p != nil && p.Name != nil && *p.Name != "" {
+		name = *p.Name
+	}
+	for _, ev := range e.Events {
+		m := hitLine.FindStringSubmatch(ev.Text)
+		if m == nil || m[1] != "" {
+			continue // wrecking hits get the x3 multiplier and skip this check
+		}
+		shooter := strings.ReplaceAll(m[2], "you", name)
+		if shooter != name {
+			continue
+		}
+		out = append(out, hitObservation{Target: m[3], Value: ev.Value})
+	}
+	return out
+}
+
+type hitObservation struct {
+	Target string
+	Value  float64
+}
+
+// resistCeiling computes the maximum possible penetrating damage of one
+// non-wrecking player volley against a hull: every volley the player's guns
+// can fire (base profiles plus every charge type), maximised per hull's
+// effective resists (hull base plus passive module bonuses from an NPC fit).
+func resistCeiling(c *content.Content, hull *content.ShipDef, fit []content.ModuleID) float64 {
+	res := hull.Resists
+	for _, mid := range fit {
+		if def, ok := c.Module(mid); ok && def.Passive != nil {
+			res = res.Add(def.Passive.ResistBonus)
+		}
+	}
+	volleys := []content.Damage{}
+	for _, def := range c.Modules {
+		if def.Kind == content.KindWeapon && def.Weapon != nil {
+			volleys = append(volleys, def.Weapon.Damage)
+		}
+	}
+	for _, def := range c.Items {
+		if def.Damage != nil {
+			volleys = append(volleys, *def.Damage)
+		}
+	}
+	best := 0.0
+	for _, v := range volleys {
+		if pen := v.ApplyTo(res).Total(); pen > best {
+			best = pen
+		}
+	}
+	return best
+}
+
+// hullForTarget maps a rat display name to its hull via its NPC definition.
+func hullForTarget(c *content.Content, name string) (*content.ShipDef, []content.ModuleID) {
+	for _, npc := range c.NPCs {
+		if npc.Name == name {
+			if hull, ok := c.Ship(npc.Ship); ok {
+				return hull, npc.Fit
+			}
+		}
+	}
+	return nil, nil
 }
 
 // summarize renders a compact failure report.
