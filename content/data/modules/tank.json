@@ -5,9 +5,11 @@
     "description": "Active shield rep that burns capacitor to push shield HP back up every cycle.",
     "slot": "mid",
     "kind": "shield_boost",
-    "activation_cost": 40,
+    "activation_cost": 30,
     "activation_time": 4,
-    "boost": { "shield_boost_per_cycle": 60 },
+    "boost": {
+      "shield_boost_per_cycle": 60
+    },
     "price": 230000
   },
   {
@@ -18,7 +20,9 @@
     "kind": "shield_extender",
     "activation_cost": 0,
     "activation_time": 0,
-    "passive": { "shield_hp": 280 },
+    "passive": {
+      "shield_hp": 280
+    },
     "price": 140000
   },
   {
@@ -27,9 +31,11 @@
     "description": "Active armor rep: welds plating back together every cycle while the capacitor holds.",
     "slot": "low",
     "kind": "armor_rep",
-    "activation_cost": 30,
+    "activation_cost": 25,
     "activation_time": 5,
-    "boost": { "armor_rep_per_cycle": 55 },
+    "boost": {
+      "armor_rep_per_cycle": 55
+    },
     "price": 210000
   },
   {
@@ -40,7 +46,9 @@
     "kind": "armor_plate",
     "activation_cost": 0,
     "activation_time": 0,
-    "passive": { "armor_hp": 400 },
+    "passive": {
+      "armor_hp": 400
+    },
     "price": 120000
   },
   {
@@ -52,7 +60,12 @@
     "activation_cost": 0,
     "activation_time": 0,
     "passive": {
-      "resist_bonus": { "em": 0.15, "thermal": 0.15, "kinetic": 0.15, "explosive": 0.15 }
+      "resist_bonus": {
+        "em": 0.15,
+        "thermal": 0.15,
+        "kinetic": 0.15,
+        "explosive": 0.15
+      }
     },
     "price": 165000
   }

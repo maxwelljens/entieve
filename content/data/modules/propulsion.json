@@ -5,9 +5,11 @@
     "description": "Active propulsion module: +75% max speed while it runs, paid for in capacitor.",
     "slot": "mid",
     "kind": "afterburner",
-    "activation_cost": 25,
+    "activation_cost": 20,
     "activation_time": 10,
-    "boost": { "speed_multiplier": 1.75 },
+    "boost": {
+      "speed_multiplier": 1.75
+    },
     "price": 155000
   }
 ]

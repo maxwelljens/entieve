@@ -44,11 +44,11 @@
       "name": "Solace Belt",
       "kind": "belt",
       "position": { "X": -1100000000, "Y": 800000000 },
-      "radius": 260000,
+      "radius": 4000,
       "colors": ["#8f8475"],
       "belt": {
         "asteroids": [
-          { "ore": "ore-sterngrit", "count": 12, "volume": 300 },
+          { "ore": "ore-sterngrit", "count": 12, "volume": 200 },
           { "ore": "ore-cordite", "count": 8, "volume": 1000 }
         ]
       },

@@ -5,9 +5,11 @@
     "description": "Burns a capacitor booster cell from cargo to slam GJ back into the capacitor at once.",
     "slot": "mid",
     "kind": "cap_booster",
-    "activation_cost": 0,
+    "activation_cost": 2,
     "activation_time": 5,
-    "boost": { "cap_restore": 120 },
+    "boost": {
+      "cap_restore": 120
+    },
     "price": 195000
   },
   {
@@ -18,7 +20,9 @@
     "kind": "cap_recharger",
     "activation_cost": 0,
     "activation_time": 0,
-    "passive": { "recharge": -45 },
+    "passive": {
+      "recharge": -45
+    },
     "price": 90000
   }
 ]

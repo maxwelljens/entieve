@@ -4,7 +4,10 @@
   "security": "low",
   "constellation": "Loomfall",
   "region": "Thevek Reach",
-  "position": { "X": 6.2, "Y": -1.8 },
+  "position": {
+    "X": 6.2,
+    "Y": -1.8
+  },
   "palette": {
     "nebula1": "#140a24",
     "nebula2": "#2c1033",
@@ -16,39 +19,73 @@
       "id": "cel-penumbra-star",
       "name": "Penumbra",
       "kind": "star",
-      "position": { "X": 0, "Y": 0 },
+      "position": {
+        "X": 0,
+        "Y": 0
+      },
       "radius": 510000000,
-      "colors": ["#ffd2a1"]
+      "colors": [
+        "#ffd2a1"
+      ]
     },
     {
       "id": "cel-penumbra-belt",
       "name": "Penumbra Belt",
       "kind": "belt",
-      "position": { "X": -1300000000, "Y": 1100000000 },
+      "position": {
+        "X": -1300000000,
+        "Y": 1100000000
+      },
       "radius": 280000,
-      "colors": ["#7c6f63"],
+      "colors": [
+        "#7c6f63"
+      ],
       "belt": {
         "asteroids": [
-          { "ore": "ore-cordite", "count": 10, "volume": 5500 },
-          { "ore": "ore-lucidite", "count": 6, "volume": 7000 }
+          {
+            "ore": "ore-cordite",
+            "count": 10,
+            "volume": 5500
+          },
+          {
+            "ore": "ore-lucidite",
+            "count": 6,
+            "volume": 7000
+          }
         ]
       },
       "spawns": [
-        { "npc_id": "npc-rat-scuttler", "count": 2, "respawn_sec": 120 }
+        {
+          "npc_id": "npc-rat-scuttler",
+          "count": 2,
+          "respawn_sec": 120
+        }
       ]
     },
     {
       "id": "cel-penumbra-den",
       "name": "Penumbra Den",
       "kind": "anomaly",
-      "position": { "X": 1600000000, "Y": -900000000 },
-      "radius": 200000,
-      "colors": ["#ff5a3c"],
+      "position": {
+        "X": 1600000000,
+        "Y": -900000000
+      },
+      "radius": 4000,
+      "colors": [
+        "#ff5a3c"
+      ],
       "anomaly": {
         "spawns": [
-          { "npc_id": "npc-rat-marauder", "count": 2, "respawn_sec": 300 },
-          { "npc_id": "npc-rat-scuttler", "count": 2, "respawn_sec": 300 },
-          { "npc_id": "npc-rat-hierarch", "count": 1, "respawn_sec": 300 }
+          {
+            "npc_id": "npc-rat-marauder",
+            "count": 1,
+            "respawn_sec": 300
+          },
+          {
+            "npc_id": "npc-rat-hierarch",
+            "count": 1,
+            "respawn_sec": 300
+          }
         ],
         "respawn_sec": 300
       }
@@ -57,9 +94,14 @@
       "id": "cel-gate-solace",
       "name": "Solace Gate",
       "kind": "gate",
-      "position": { "X": -2600000000, "Y": 1500000000 },
+      "position": {
+        "X": -2600000000,
+        "Y": 1500000000
+      },
       "radius": 2500,
-      "colors": ["#7fd0ff"],
+      "colors": [
+        "#7fd0ff"
+      ],
       "gate": {
         "to_system": "sys-solace",
         "to_cel": "cel-gate-penumbra"
@@ -69,9 +111,14 @@
       "id": "cel-gate-gloam",
       "name": "Gloam Gate",
       "kind": "gate",
-      "position": { "X": 3000000000, "Y": -2200000000 },
+      "position": {
+        "X": 3000000000,
+        "Y": -2200000000
+      },
       "radius": 2500,
-      "colors": ["#b98cff"],
+      "colors": [
+        "#b98cff"
+      ],
       "gate": {
         "to_system": "sys-gloam",
         "to_cel": "cel-gate-penumbra"

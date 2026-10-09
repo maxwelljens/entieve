@@ -5,13 +5,18 @@
     "description": "Light turret for charge-class ammunition. Versatile EM-biased volley; loads any light charge.",
     "slot": "high",
     "kind": "weapon",
-    "activation_cost": 15,
+    "activation_cost": 2,
     "activation_time": 3,
     "weapon": {
-      "damage": { "em": 16, "thermal": 5, "kinetic": 2, "explosive": 1 },
+      "damage": {
+        "em": 16,
+        "thermal": 5,
+        "kinetic": 2,
+        "explosive": 1
+      },
       "optimal": 12000,
       "falloff": 6000,
-      "tracking": 0.45,
+      "tracking": 145,
       "ammo_class": "light",
       "shot_time": 3
     },
@@ -23,13 +28,18 @@
     "description": "Long-range light railgun. Snipes at 18 km with kinetic punch; loads any light charge.",
     "slot": "high",
     "kind": "weapon",
-    "activation_cost": 18,
+    "activation_cost": 2,
     "activation_time": 4,
     "weapon": {
-      "damage": { "em": 3, "thermal": 6, "kinetic": 17, "explosive": 1 },
+      "damage": {
+        "em": 3,
+        "thermal": 6,
+        "kinetic": 17,
+        "explosive": 1
+      },
       "optimal": 18000,
       "falloff": 4500,
-      "tracking": 0.32,
+      "tracking": 95,
       "ammo_class": "light",
       "shot_time": 4
     },
@@ -41,13 +51,18 @@
     "description": "Short-range rocket pod with endless internal feedstock: no ammo, explosive volley, great tracking.",
     "slot": "high",
     "kind": "weapon",
-    "activation_cost": 12,
+    "activation_cost": 1,
     "activation_time": 2.5,
     "weapon": {
-      "damage": { "em": 0, "thermal": 5, "kinetic": 4, "explosive": 33 },
+      "damage": {
+        "em": 0,
+        "thermal": 5,
+        "kinetic": 4,
+        "explosive": 33
+      },
       "optimal": 4000,
       "falloff": 9000,
-      "tracking": 0.65,
+      "tracking": 220,
       "ammo_class": "",
       "shot_time": 2.5
     },

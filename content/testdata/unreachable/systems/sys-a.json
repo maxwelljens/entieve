@@ -1,0 +1,11 @@
+{
+  "id": "sys-a",
+  "name": "Fixture A",
+  "security": "high",
+  "constellation": "Fixture",
+  "region": "Fixture Reach",
+  "position": { "X": 0, "Y": 0 },
+  "celestials": [
+    { "id": "cel-a-star", "name": "Star A", "kind": "star", "position": { "X": 0, "Y": 0 }, "radius": 100000000 }
+  ]
+}

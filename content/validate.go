@@ -1,0 +1,695 @@
+package content
+
+import (
+	"errors"
+	"fmt"
+	"slices"
+	"strings"
+)
+
+// Allowed value sets. model.go constants are authoritative.
+var (
+	validCategories = map[string]bool{
+		CatMineral: true, CatOre: true, CatAmmo: true, CatCharge: true, CatLoot: true,
+	}
+	slotRanks  = map[string]int{SlotHigh: 0, SlotMid: 1, SlotLow: 2}
+	validKinds = map[string]bool{
+		KindWeapon: true, KindShieldBoost: true, KindShieldExtender: true,
+		KindArmorRep: true, KindArmorPlate: true, KindResistCoat: true,
+		KindCapBooster: true, KindCapRecharger: true, KindAfterburner: true,
+		KindMiningLaser: true, KindStasisWeb: true, KindWarpScram: true,
+	}
+	boostKinds = map[string]bool{
+		KindShieldBoost: true, KindArmorRep: true, KindCapBooster: true,
+		KindAfterburner: true, KindStasisWeb: true, KindWarpScram: true,
+	}
+	passiveKinds = map[string]bool{
+		KindShieldExtender: true, KindArmorPlate: true, KindResistCoat: true, KindCapRecharger: true,
+	}
+	validCelKinds = map[string]bool{
+		CelStar: true, CelPlanet: true, CelMoon: true, CelStation: true,
+		CelBelt: true, CelGate: true, CelAnomaly: true,
+	}
+	validServices   = map[string]bool{"repair": true, "market": true, "refine": true, "fitting": true}
+	validSecurities = map[string]bool{"high": true, "low": true, "null": true}
+	// activeKinds run cycles (used by the balance sanity tests).
+	activeKinds = map[string]bool{
+		KindWeapon: true, KindShieldBoost: true, KindArmorRep: true,
+		KindCapBooster: true, KindAfterburner: true, KindMiningLaser: true,
+		KindStasisWeb: true, KindWarpScram: true,
+	}
+)
+
+type validator struct {
+	c    *Content
+	errs []string
+}
+
+func (v *validator) addf(format string, args ...any) {
+	v.errs = append(v.errs, fmt.Sprintf(format, args...))
+}
+
+// keys returns the sorted keys of a map keyed by string-like types so error
+// output is deterministic.
+func keys[K ~string, V any](m map[K]V) []K {
+	out := make([]K, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	slices.Sort(out)
+	return out
+}
+
+// Validate cross-checks the whole content graph and returns ONE error whose
+// message lists every problem found, one per line, each prefixed with its
+// file/id context. It returns nil when the content is clean.
+//
+// Load already rejects duplicate top-level IDs across files (with file
+// names); Validate covers everything else — including duplicate celestial
+// IDs, which survive loading because celestials live in slices.
+func (c *Content) Validate() error {
+	if c == nil {
+		return errors.New("content: nil content")
+	}
+	v := &validator{c: c}
+	v.items()
+	v.ships()
+	v.modules()
+	v.npcs()
+	v.systems()
+	v.worlds()
+	v.universe()
+	if len(v.errs) == 0 {
+		return nil
+	}
+	return fmt.Errorf("content: %d validation problem(s):\n%s", len(v.errs), strings.Join(v.errs, "\n"))
+}
+
+func (v *validator) items() {
+	c := v.c
+	for _, id := range keys(c.Items) {
+		it := c.Items[id]
+		if id == "" {
+			v.addf("items: missing id (name %q)", it.Name)
+			continue
+		}
+		ctx := "items/" + string(id)
+		if it.Name == "" {
+			v.addf("%s: missing name", ctx)
+		}
+		if !validCategories[it.Category] {
+			v.addf("%s: unknown category %q (want mineral|ore|ammo|charge|loot)", ctx, it.Category)
+		}
+		if it.Volume < 0 {
+			v.addf("%s: negative volume %v", ctx, it.Volume)
+		}
+		if it.BasePrice < 0 {
+			v.addf("%s: negative base price %v", ctx, it.BasePrice)
+		}
+		if it.Category == CatOre {
+			v.oreYields(ctx, it)
+		}
+		if it.Damage != nil && (it.Damage.EM < 0 || it.Damage.Thermal < 0 || it.Damage.Kinetic < 0 || it.Damage.Explosive < 0) {
+			v.addf("%s: negative damage component", ctx)
+		}
+	}
+}
+
+func (v *validator) oreYields(ctx string, it *ItemDef) {
+	if len(it.RefineYield) == 0 {
+		v.addf("%s: ore has no refine_yield", ctx)
+		return
+	}
+	sum := 0.0
+	for _, target := range keys(it.RefineYield) {
+		y := it.RefineYield[target]
+		if _, ok := v.c.Items[target]; !ok {
+			v.addf("%s: refine yield references unknown item %q", ctx, target)
+		}
+		if y <= 0 || y > 1 {
+			v.addf("%s: refine yield for %s is %v, must be in (0,1]", ctx, target, y)
+		}
+		sum += y
+	}
+	if sum > 1 {
+		v.addf("%s: refine yields sum to %v, must be <= 1", ctx, sum)
+	}
+}
+
+func (v *validator) ships() {
+	for _, id := range keys(v.c.Ships) {
+		s := v.c.Ships[id]
+		if id == "" {
+			v.addf("ships: missing id (name %q)", s.Name)
+			continue
+		}
+		ctx := "ships/" + string(id)
+		if s.Name == "" {
+			v.addf("%s: missing name", ctx)
+		}
+		if s.Shield < 0 {
+			v.addf("%s: negative shield %v", ctx, s.Shield)
+		}
+		if s.Armor < 0 {
+			v.addf("%s: negative armor %v", ctx, s.Armor)
+		}
+		if s.Structure < 0 {
+			v.addf("%s: negative structure %v", ctx, s.Structure)
+		}
+		if s.Capacitor < 0 {
+			v.addf("%s: negative capacitor %v", ctx, s.Capacitor)
+		}
+		if s.Recharge < 0 {
+			v.addf("%s: negative recharge %v", ctx, s.Recharge)
+		}
+		if s.MaxSpeed < 0 {
+			v.addf("%s: negative max speed %v", ctx, s.MaxSpeed)
+		}
+		if s.Agility < 0 {
+			v.addf("%s: negative agility %v", ctx, s.Agility)
+		}
+		if s.Mass < 0 {
+			v.addf("%s: negative mass %v", ctx, s.Mass)
+		}
+		if s.SigRadius < 0 {
+			v.addf("%s: negative sig radius %v", ctx, s.SigRadius)
+		}
+		if s.Cargo < 0 {
+			v.addf("%s: negative cargo %v", ctx, s.Cargo)
+		}
+		if s.OreHold < 0 {
+			v.addf("%s: negative ore hold %v", ctx, s.OreHold)
+		}
+		if s.WarpSpeed < 0 {
+			v.addf("%s: negative warp speed %v", ctx, s.WarpSpeed)
+		}
+		if s.MaxTargetRange < 0 {
+			v.addf("%s: negative max target range %v", ctx, s.MaxTargetRange)
+		}
+		if s.ScanResolution < 0 {
+			v.addf("%s: negative scan resolution %v", ctx, s.ScanResolution)
+		}
+		if s.Slots.High < 0 || s.Slots.Mid < 0 || s.Slots.Low < 0 {
+			v.addf("%s: negative slot count (high %d, mid %d, low %d)", ctx, s.Slots.High, s.Slots.Mid, s.Slots.Low)
+		}
+		if s.MaxTargets < 0 {
+			v.addf("%s: negative max targets %d", ctx, s.MaxTargets)
+		}
+		v.resists(ctx, s.Resists)
+	}
+}
+
+func (v *validator) resists(ctx string, r Resists) {
+	for _, t := range AllDamageTypes {
+		x := r.Of(t)
+		if x < 0 || x >= 1 {
+			v.addf("%s: resist %s %v outside [0,1)", ctx, t, x)
+		}
+	}
+}
+
+func (v *validator) modules() {
+	for _, id := range keys(v.c.Modules) {
+		m := v.c.Modules[id]
+		if id == "" {
+			v.addf("modules: missing id (name %q)", m.Name)
+			continue
+		}
+		ctx := "modules/" + string(id)
+		if m.Name == "" {
+			v.addf("%s: missing name", ctx)
+		}
+		if _, ok := slotRanks[m.Slot]; !ok {
+			v.addf("%s: unknown slot %q (want high|mid|low)", ctx, m.Slot)
+		}
+		if !validKinds[m.Kind] {
+			v.addf("%s: unknown kind %q", ctx, m.Kind)
+		}
+		if m.ActivationCost < 0 {
+			v.addf("%s: negative activation cost %v", ctx, m.ActivationCost)
+		}
+		if m.ActivationTime < 0 {
+			v.addf("%s: negative activation time %v", ctx, m.ActivationTime)
+		}
+		if m.Price < 0 {
+			v.addf("%s: negative price %v", ctx, m.Price)
+		}
+
+		// Required attribute blocks per kind.
+		if m.Kind == KindWeapon {
+			if m.Weapon == nil {
+				v.addf("%s: kind %q requires a weapon block", ctx, m.Kind)
+			}
+		}
+		if m.Kind == KindMiningLaser {
+			if m.Mining == nil {
+				v.addf("%s: kind %q requires a mining block", ctx, m.Kind)
+			} else {
+				if m.Mining.VolumePerCycle < 0 {
+					v.addf("%s: negative volume per cycle %v", ctx, m.Mining.VolumePerCycle)
+				}
+				if m.Mining.CycleTime < 0 {
+					v.addf("%s: negative cycle time %v", ctx, m.Mining.CycleTime)
+				}
+			}
+		}
+		if boostKinds[m.Kind] && m.Boost == nil {
+			v.addf("%s: kind %q requires a boost block", ctx, m.Kind)
+		}
+		if passiveKinds[m.Kind] && m.Passive == nil {
+			v.addf("%s: kind %q requires a passive block", ctx, m.Kind)
+		}
+
+		if m.Weapon != nil {
+			w := m.Weapon
+			if w.Damage.EM < 0 || w.Damage.Thermal < 0 || w.Damage.Kinetic < 0 || w.Damage.Explosive < 0 {
+				v.addf("%s: negative weapon damage component", ctx)
+			}
+			if w.Optimal < 0 {
+				v.addf("%s: negative optimal range %v", ctx, w.Optimal)
+			}
+			if w.Falloff < 0 {
+				v.addf("%s: negative falloff %v", ctx, w.Falloff)
+			}
+			if w.Tracking < 0 {
+				v.addf("%s: negative tracking %v", ctx, w.Tracking)
+			}
+			if w.ShotTime < 0 {
+				v.addf("%s: negative shot time %v", ctx, w.ShotTime)
+			}
+			if w.AmmoClass != "" && !v.ammoClassExists(w.AmmoClass) {
+				v.addf("%s: weapon ammo class %q matches no ammo or charge item", ctx, w.AmmoClass)
+			}
+		}
+		if m.Passive != nil {
+			p := m.Passive
+			if p.ShieldHP < 0 {
+				v.addf("%s: negative passive shield hp %v", ctx, p.ShieldHP)
+			}
+			if p.ArmorHP < 0 {
+				v.addf("%s: negative passive armor hp %v", ctx, p.ArmorHP)
+			}
+			if p.Capacitor < 0 {
+				v.addf("%s: negative passive capacitor %v", ctx, p.Capacitor)
+			}
+			v.resists(ctx+" passive resist bonus", p.ResistBonus)
+		}
+		if m.Boost != nil {
+			b := m.Boost
+			if b.ShieldBoostPerCycle < 0 {
+				v.addf("%s: negative shield boost per cycle %v", ctx, b.ShieldBoostPerCycle)
+			}
+			if b.ArmorRepPerCycle < 0 {
+				v.addf("%s: negative armor rep per cycle %v", ctx, b.ArmorRepPerCycle)
+			}
+			if b.CapRestore < 0 {
+				v.addf("%s: negative cap restore %v", ctx, b.CapRestore)
+			}
+			if b.SpeedMultiplier < 0 {
+				v.addf("%s: negative speed multiplier %v", ctx, b.SpeedMultiplier)
+			}
+			if b.WebStrength < 0 || b.WebStrength > 1 {
+				v.addf("%s: web strength %v outside [0,1]", ctx, b.WebStrength)
+			}
+			if b.ScramDuration < 0 {
+				v.addf("%s: negative scram duration %v", ctx, b.ScramDuration)
+			}
+		}
+	}
+}
+
+// ammoClassExists reports whether some ammo or charge item uses the class.
+func (v *validator) ammoClassExists(class string) bool {
+	for _, id := range keys(v.c.Items) {
+		it := v.c.Items[id]
+		if (it.Category == CatAmmo || it.Category == CatCharge) && it.AmmoClass == class {
+			return true
+		}
+	}
+	return false
+}
+
+func (v *validator) npcs() {
+	for _, id := range keys(v.c.NPCs) {
+		n := v.c.NPCs[id]
+		if id == "" {
+			v.addf("npcs: missing id (name %q)", n.Name)
+			continue
+		}
+		ctx := "npcs/" + string(id)
+		if n.Name == "" {
+			v.addf("%s: missing name", ctx)
+		}
+		hull, hullOK := v.c.Ships[n.Ship]
+		if !hullOK {
+			v.addf("%s: unknown ship %q", ctx, n.Ship)
+		} else {
+			v.checkFit(ctx+"/fit", n.Fit, hull)
+		}
+		if n.AggroRange < 0 {
+			v.addf("%s: negative aggro range %v", ctx, n.AggroRange)
+		}
+		if n.OrbitRange < 0 {
+			v.addf("%s: negative orbit range %v", ctx, n.OrbitRange)
+		}
+		if n.FleeThreshold < 0 || n.FleeThreshold > 1 {
+			v.addf("%s: flee threshold %v outside [0,1]", ctx, n.FleeThreshold)
+		}
+		if n.Bounty < 0 {
+			v.addf("%s: negative bounty %v", ctx, n.Bounty)
+		}
+		for i, d := range n.Loot {
+			if _, ok := v.c.Items[d.Item]; !ok {
+				v.addf("%s: loot[%d] references unknown item %q", ctx, i, d.Item)
+			}
+			if d.Chance < 0 || d.Chance > 1 {
+				v.addf("%s: loot[%d] chance %v outside [0,1]", ctx, i, d.Chance)
+			}
+			if d.MinQty < 1 {
+				v.addf("%s: loot[%d] min_qty %d must be >= 1", ctx, i, d.MinQty)
+			}
+			if d.MaxQty < 1 {
+				v.addf("%s: loot[%d] max_qty %d must be >= 1", ctx, i, d.MaxQty)
+			}
+			if d.MinQty > d.MaxQty {
+				v.addf("%s: loot[%d] min_qty %d > max_qty %d", ctx, i, d.MinQty, d.MaxQty)
+			}
+		}
+	}
+}
+
+// checkFit validates a fit list: every module must exist, classes must be
+// grouped high-then-mid-then-low, and no class may overflow the hull.
+func (v *validator) checkFit(ctx string, fit []ModuleID, hull *ShipDef) {
+	var counts [3]int
+	last := -1
+	for i, mid := range fit {
+		m, ok := v.c.Modules[mid]
+		if !ok {
+			v.addf("%s[%d]: unknown module %q", ctx, i, mid)
+			continue
+		}
+		rank, known := slotRanks[m.Slot]
+		if !known {
+			continue // unknown slot already reported by modules()
+		}
+		if rank < last {
+			v.addf("%s[%d]: module %s has slot class %q placed out of order (fit must list high, then mid, then low)", ctx, i, mid, m.Slot)
+		} else if rank > last {
+			last = rank
+		}
+		counts[rank]++
+	}
+	limits := [3]int{hull.Slots.High, hull.Slots.Mid, hull.Slots.Low}
+	names := [3]string{SlotHigh, SlotMid, SlotLow}
+	for i := 0; i < 3; i++ {
+		if counts[i] > limits[i] {
+			v.addf("%s: %d %s-slot modules exceed hull %s %s slots (%d)", ctx, counts[i], names[i], hull.ID, names[i], limits[i])
+		}
+	}
+}
+
+func (v *validator) systems() {
+	for _, id := range keys(v.c.Systems) {
+		sys := v.c.Systems[id]
+		if id == "" {
+			v.addf("systems: missing id (name %q)", sys.Name)
+			continue
+		}
+		ctx := "systems/" + string(id)
+		if sys.Name == "" {
+			v.addf("%s: missing name", ctx)
+		}
+		if !validSecurities[sys.Security] {
+			v.addf("%s: unknown security %q (want high|low|null)", ctx, sys.Security)
+		}
+
+		hasStation := false
+		seenCel := map[CelID]bool{}
+		for i := range sys.Celestials {
+			cel := &sys.Celestials[i]
+			if cel.ID == "" {
+				v.addf("%s: celestial[%d] missing id (name %q)", ctx, i, cel.Name)
+				continue
+			}
+			cctx := ctx + "/" + string(cel.ID)
+			if seenCel[cel.ID] {
+				v.addf("%s: duplicate celestial id %q", ctx, cel.ID)
+			}
+			seenCel[cel.ID] = true
+			if cel.Name == "" {
+				v.addf("%s: missing name", cctx)
+			}
+			if !validCelKinds[cel.Kind] {
+				v.addf("%s: unknown celestial kind %q", cctx, cel.Kind)
+			}
+			if cel.Radius < 0 {
+				v.addf("%s: negative radius %v", cctx, cel.Radius)
+			}
+			v.celestialBlocks(cctx, sys, cel)
+			if cel.Kind == CelStation {
+				hasStation = true
+			}
+			v.spawns(cctx, cel.Spawns)
+		}
+
+		v.market(ctx, sys, hasStation)
+	}
+}
+
+// celestialBlocks checks the kind<->block coherence of a celestial and all
+// cross-references inside it, including gate reciprocity.
+func (v *validator) celestialBlocks(cctx string, sys *SystemDef, cel *CelestialDef) {
+	// Block must be present exactly when its kind says so.
+	pairs := []struct {
+		kind string
+		has  bool
+		what string
+	}{
+		{CelGate, cel.Gate != nil, "gate"},
+		{CelStation, cel.Station != nil, "station"},
+		{CelBelt, cel.Belt != nil, "belt"},
+		{CelAnomaly, cel.Anomaly != nil, "anomaly"},
+	}
+	for _, p := range pairs {
+		if cel.Kind == p.kind && !p.has {
+			v.addf("%s: %s celestial missing %s block", cctx, p.kind, p.what)
+		}
+		if cel.Kind != p.kind && p.has {
+			v.addf("%s: kind %q must not have a %s block", cctx, cel.Kind, p.what)
+		}
+	}
+
+	if cel.Gate != nil {
+		v.gate(cctx, sys, cel)
+	}
+	if cel.Station != nil {
+		for _, s := range cel.Station.Services {
+			if !validServices[s] {
+				v.addf("%s: unknown station service %q (allowed: repair, market, refine, fitting)", cctx, s)
+			}
+		}
+	}
+	if cel.Belt != nil {
+		for i, a := range cel.Belt.Asteroids {
+			ore, ok := v.c.Items[a.Ore]
+			if !ok {
+				v.addf("%s: belt references unknown ore %q", cctx, a.Ore)
+			} else if ore.Category != CatOre {
+				v.addf("%s: belt asteroid ore %q is not category ore", cctx, a.Ore)
+			}
+			if a.Count < 1 {
+				v.addf("%s: asteroid[%d] count %d must be >= 1", cctx, i, a.Count)
+			}
+			if a.Volume <= 0 {
+				v.addf("%s: asteroid[%d] volume %v must be > 0", cctx, i, a.Volume)
+			}
+		}
+	}
+	if cel.Anomaly != nil {
+		if cel.Anomaly.RespawnSec < 0 {
+			v.addf("%s: anomaly respawn_sec %v must be >= 0", cctx, cel.Anomaly.RespawnSec)
+		}
+		v.spawns(cctx+"/anomaly", cel.Anomaly.Spawns)
+	}
+}
+
+func (v *validator) gate(cctx string, sys *SystemDef, cel *CelestialDef) {
+	g := cel.Gate
+	if g.ToSystem == "" {
+		v.addf("%s: gate missing to_system", cctx)
+		return
+	}
+	dest, ok := v.c.Systems[g.ToSystem]
+	if !ok {
+		v.addf("%s: gate destination system %q does not exist", cctx, g.ToSystem)
+		return
+	}
+	if g.ToCel == "" {
+		v.addf("%s: gate missing to_cel", cctx)
+		return
+	}
+	found := false
+	for i := range dest.Celestials {
+		if dest.Celestials[i].ID == g.ToCel {
+			found = true
+			break
+		}
+	}
+	if !found {
+		v.addf("%s: gate destination celestial %q not found in %s", cctx, g.ToCel, g.ToSystem)
+		return
+	}
+	// Reciprocal: the destination must have a gate pointing back to this
+	// very celestial.
+	reciprocal := false
+	for i := range dest.Celestials {
+		d := &dest.Celestials[i]
+		if d.Gate != nil && d.Gate.ToSystem == sys.ID && d.Gate.ToCel == cel.ID {
+			reciprocal = true
+			break
+		}
+	}
+	if !reciprocal {
+		v.addf("%s: no reciprocal gate in %s pointing back to %s", cctx, g.ToSystem, cel.ID)
+	}
+}
+
+func (v *validator) spawns(ctx string, spawns []SpawnDef) {
+	for i, s := range spawns {
+		if _, ok := v.c.NPCs[s.NpcID]; !ok {
+			v.addf("%s: spawn[%d] references unknown npc %q", ctx, i, s.NpcID)
+		}
+		if s.Count < 1 {
+			v.addf("%s: spawn[%d] count %d must be >= 1", ctx, i, s.Count)
+		}
+		if s.RespawnSec < 0 {
+			v.addf("%s: spawn[%d] respawn_sec %v must be >= 0", ctx, i, s.RespawnSec)
+		}
+	}
+}
+
+func (v *validator) market(ctx string, sys *SystemDef, hasStation bool) {
+	for _, o := range sys.Market {
+		// Orders resolve item first, then a ship ID (ships are listed on
+		// the market by casting ShipID to ItemID — see
+		// docs/CONTENT_AUTHORING.md), then a module ID.
+		if _, ok := v.c.Items[o.Item]; !ok {
+			if _, isShip := v.c.Ships[ShipID(o.Item)]; !isShip {
+				if _, isMod := v.c.Modules[ModuleID(o.Item)]; !isMod {
+					v.addf("%s: market order for %q is not an item, ship, or module", ctx, o.Item)
+				}
+			}
+		}
+		if o.Qty < 1 {
+			v.addf("%s: market order %q qty %d must be >= 1", ctx, o.Item, o.Qty)
+		}
+		if o.Price < 0 {
+			v.addf("%s: market order %q price %v must be >= 0", ctx, o.Item, o.Price)
+		}
+	}
+	if len(sys.Market) > 0 && !hasStation {
+		v.addf("%s: market orders present but no station exists", ctx)
+	}
+}
+
+func (v *validator) worlds() {
+	for _, id := range keys(v.c.Worlds) {
+		w := v.c.Worlds[id]
+		if id == "" {
+			v.addf("worlds: missing id (name %q)", w.Name)
+			continue
+		}
+		ctx := "worlds/" + string(id)
+		if w.Name == "" {
+			v.addf("%s: missing name", ctx)
+		}
+		if _, ok := v.c.Systems[w.Start.System]; !ok {
+			v.addf("%s: unknown start system %q", ctx, w.Start.System)
+		}
+		hull, hullOK := v.c.Ships[w.Start.Ship]
+		if !hullOK {
+			v.addf("%s: unknown start ship %q", ctx, w.Start.Ship)
+		} else {
+			v.checkFit(ctx+"/start.fit", w.Start.Fit, hull)
+		}
+		if w.Start.Wallet < 0 {
+			v.addf("%s: negative wallet %v", ctx, w.Start.Wallet)
+		}
+		for i, st := range w.Start.Cargo {
+			if _, ok := v.c.Items[st.Item]; !ok {
+				v.addf("%s: start.cargo[%d]: unknown item %q", ctx, i, st.Item)
+			}
+			if st.Qty < 1 {
+				v.addf("%s: start.cargo[%d]: qty %d must be >= 1", ctx, i, st.Qty)
+			}
+		}
+		for i, cp := range w.Scenario {
+			if cp.Name == "" {
+				v.addf("%s: checkpoint[%d] missing name", ctx, i)
+			}
+			if cp.Feature == "" {
+				v.addf("%s: checkpoint[%d] missing feature", ctx, i)
+			}
+		}
+	}
+	// The showcase world is required: it drives tests/showcase_test.go.
+	if sc, ok := v.c.Worlds["world-showcase"]; !ok {
+		v.addf("worlds: missing required world %q", "world-showcase")
+	} else if len(sc.Scenario) < 10 {
+		v.addf("worlds/world-showcase: %d scenario checkpoints, need at least 10", len(sc.Scenario))
+	}
+}
+
+func (v *validator) universe() {
+	u := v.c.Universe
+	if u == nil {
+		v.addf("universe.json: missing universe definition")
+		return
+	}
+	if u.StartSystem == "" {
+		v.addf("universe.json: missing start_system")
+	} else if _, ok := v.c.Systems[u.StartSystem]; !ok {
+		v.addf("universe.json: unknown start system %q", u.StartSystem)
+	}
+	if len(u.Systems) > 0 {
+		v.addf("universe.json: systems must be empty (systems come from systems/*.json)")
+		return
+	}
+	// Reachability: every system must be reachable through gates from the
+	// start system.
+	if u.StartSystem == "" {
+		return
+	}
+	if _, ok := v.c.Systems[u.StartSystem]; !ok {
+		return
+	}
+	seen := map[SystemID]bool{u.StartSystem: true}
+	queue := []SystemID{u.StartSystem}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		sys := v.c.Systems[cur]
+		if sys == nil {
+			continue
+		}
+		for i := range sys.Celestials {
+			g := sys.Celestials[i].Gate
+			if g == nil {
+				continue
+			}
+			if _, ok := v.c.Systems[g.ToSystem]; !ok {
+				continue
+			}
+			if !seen[g.ToSystem] {
+				seen[g.ToSystem] = true
+				queue = append(queue, g.ToSystem)
+			}
+		}
+	}
+	for _, id := range keys(v.c.Systems) {
+		if !seen[id] {
+			v.addf("systems/%s: unreachable from start system %s", id, u.StartSystem)
+		}
+	}
+}

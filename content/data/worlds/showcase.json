@@ -4,7 +4,10 @@
   "description": "The test world: a fully fitted sloop near the Solace Belt whose scenario checkpoints exercise every Entieve feature. Driven headlessly by tests/showcase_test.go.",
   "start": {
     "system": "sys-solace",
-    "position": { "X": -1050000000, "Y": 850000000 },
+    "position": {
+      "X": -1050000000,
+      "Y": 850000000
+    },
     "ship": "ship-sloop",
     "fit": [
       "mod-emp-turret",
@@ -17,16 +20,46 @@
       "mod-cap-recharger"
     ],
     "cargo": [
-      { "item": "charge-emp", "qty": 50 },
-      { "item": "charge-fusion", "qty": 50 },
-      { "item": "charge-ap", "qty": 50 },
-      { "item": "charge-plutonium", "qty": 50 },
-      { "item": "charge-cap-cell", "qty": 20 },
-      { "item": "ore-sterngrit", "qty": 100 },
-      { "item": "ore-cordite", "qty": 60 },
-      { "item": "loot-alloy-scrap", "qty": 5 },
-      { "item": "loot-navdata", "qty": 3 },
-      { "item": "loot-iced-core", "qty": 2 }
+      {
+        "item": "charge-emp",
+        "qty": 12
+      },
+      {
+        "item": "charge-fusion",
+        "qty": 12
+      },
+      {
+        "item": "charge-ap",
+        "qty": 12
+      },
+      {
+        "item": "charge-plutonium",
+        "qty": 12
+      },
+      {
+        "item": "charge-cap-cell",
+        "qty": 20
+      },
+      {
+        "item": "ore-sterngrit",
+        "qty": 100
+      },
+      {
+        "item": "ore-cordite",
+        "qty": 60
+      },
+      {
+        "item": "loot-alloy-scrap",
+        "qty": 5
+      },
+      {
+        "item": "loot-navdata",
+        "qty": 3
+      },
+      {
+        "item": "loot-iced-core",
+        "qty": 2
+      }
     ],
     "wallet": 10000000
   },
@@ -44,12 +77,12 @@
     {
       "name": "Ammo consumption per shot",
       "feature": "ammo-consumption",
-      "detail": "With 50 charge-emp in cargo, each turret shot consumes exactly one: cargo qty drops 50 -> 49 per cycle, visible in the Inventory window and the EvtLog fire line."
+      "detail": "With 12 charges of each light ammo type in cargo, each turret shot consumes exactly one: stacks run down in cargo order and the gun finally reports 'no charges'."
     },
     {
       "name": "Dry gun refuses to fire",
       "feature": "dry-gun",
-      "detail": "CmdReload the turret with no matching charge in cargo, then activate: no damage, and exactly one EvtLog 'dry gun / no charges' line per would-be cycle."
+      "detail": "Fire a turret with no matching charge left in cargo: exactly one 'no charges' warning per dry cycle, then the module deactivates (the scripted late-game activation on the respawned Scuttler demonstrates it)."
     },
     {
       "name": "Turret hit chance",
@@ -64,12 +97,12 @@
     {
       "name": "Four damage types",
       "feature": "four-damage-types",
-      "detail": "CmdReload swaps charges - charge-emp (EM), charge-plutonium (thermal), charge-ap (kinetic), charge-fusion (explosive): each volley's log line shows the matching damage type dominating."
+      "detail": "The turret consumes all four light charge profiles in cargo order - charge-emp (EM), charge-fusion (explosive), charge-ap (kinetic), charge-plutonium (thermal): each volley carries its charge's damage mix into the damage log."
     },
     {
       "name": "Resists reduce damage",
       "feature": "resists",
-      "detail": "Compare the raw volley against applied damage in the log: the hull's resists (e.g. explosive 0.30) cut that type. CmdFitModule mod-resist-coat into a freed low slot adds +0.15 to every resist."
+      "detail": "Compare the raw volley against applied damage in the hit log: each hull's resists cut the penetrating damage below the raw volley (e.g. the marauder's resist coat adds +0.15 to every type)."
     },
     {
       "name": "Capacitor drain",
@@ -79,12 +112,12 @@
     {
       "name": "Capacitor recharge curve",
       "feature": "capacitor-recharge",
-      "detail": "Deactivate everything: the cap refills on the EVE curve, peak rate near 25% capacity (dC/dt = 2.5*C/tau*sqrt(f)*(1-sqrt(f))). CmdUnfit/CmdFit mod-cap-recharger (passive recharge -45 s tau) to see the bar refill noticeably faster."
+      "detail": "Deactivate everything: the cap refills on the EVE curve with peak rate near 25% capacity (dC/dt = 2.5*C/tau*sqrt(f)*(1-sqrt(f))). The passive mod-cap-recharger shortens the tau."
     },
     {
       "name": "Cap booster instant GJ",
       "feature": "cap-booster",
-      "detail": "Drain the cap, CmdUnfitModule(low, index of mod-cap-recharger), CmdFitModule mod-cap-booster into a mid slot, activate: +120 GJ lands at once (Boost.CapRestore) and one charge-cap-cell is consumed from cargo."
+      "detail": "Drain the cap, CmdUnfitModule a mid module, CmdFitModule mod-cap-booster in its place and activate: GJ lands at once (Boost.CapRestore) and one charge-cap-cell is consumed from cargo."
     },
     {
       "name": "Shield boosting",
@@ -104,12 +137,12 @@
     {
       "name": "Stasis web slows target",
       "feature": "stasis-web",
-      "detail": "Lock a rat, activate mod-stasis-web within range: its speed in the Overview drops to 55% (web_strength 0.45) and the log notes the web."
+      "detail": "Lock a rat, activate mod-stasis-web within range: its speed drops by web_strength (0.45) and the log notes the web."
     },
     {
       "name": "Warp scramble blocks escape",
       "feature": "warp-scram",
-      "detail": "CmdFitModule mod-warp-scram (mid), activate it on a fleeing rat: its warp start is cancelled and EvtLog reports 'warp scrambled' for scram_duration 10 s per cycle."
+      "detail": "npc-rat-marauder fits mod-warp-scram: once it locks you it activates the scrambler (log: 'Warp Scrambler activated on Sloop'), blocking and cancelling warp starts for scram_duration per cycle."
     },
     {
       "name": "Targeting lock and unlock",
@@ -144,7 +177,7 @@
     {
       "name": "NPC flee",
       "feature": "npc-flee",
-      "detail": "Drive a scuttler below flee_threshold (0.15 structure): it stops attacking and warps off - EvtLog flee line. The hierarch's threshold is 0: it never runs."
+      "detail": "Drive a Scuttler below flee_threshold (0.15 structure): it stops fighting and burns off - the flee state and its 'retreats and escapes' log line. The Hierarch's threshold is 0: it never runs."
     },
     {
       "name": "NPC death",
@@ -179,7 +212,7 @@
     {
       "name": "Cargo transfer",
       "feature": "cargo-transfer",
-      "detail": "Move stacks between cargo, ore hold and station hangar (CmdLoot with an item id / Inventory drag): Cargo store stacks re-balance while totals stay conserved."
+      "detail": "CmdTransfer (script action 'transfer') moves stacks between the cargo hold, ore hold and station hangar while docked; loot and market sales move stacks too - totals stay conserved."
     },
     {
       "name": "Gate jump",
@@ -234,7 +267,7 @@
     {
       "name": "NPC respawn timers",
       "feature": "npc-respawn",
-      "detail": "Clear a spawn (belt: 90 s in Solace, 120 s Penumbra belt; anomaly cel-penumbra-den: 300 s): after respawn_sec of sim time the group is back - watch EvtAnomalyCleared then the respawn log."
+      "detail": "Clear a spawn (Solace belt 90 s, Penumbra belt 120 s; anomaly cel-penumbra-den 300 s): after respawn_sec the group is back - the log reports the respawn."
     },
     {
       "name": "Save and restore",

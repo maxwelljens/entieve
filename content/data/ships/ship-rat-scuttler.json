@@ -3,13 +3,22 @@
   "name": "Scuttler",
   "class": "rat",
   "description": "A rattled-together corsair skiff. Fragile, fast, and everywhere in the Reach.",
-  "slots": { "high": 2, "mid": 1, "low": 1 },
+  "slots": {
+    "high": 2,
+    "mid": 1,
+    "low": 1
+  },
   "shield": 80,
   "armor": 100,
   "structure": 130,
-  "resists": { "em": 0.1, "thermal": 0.1, "kinetic": 0.15, "explosive": 0.2 },
-  "capacitor": 250,
-  "recharge": 180,
+  "resists": {
+    "em": 0.1,
+    "thermal": 0.1,
+    "kinetic": 0.15,
+    "explosive": 0.2
+  },
+  "capacitor": 900,
+  "recharge": 150,
   "max_speed": 340,
   "agility": 0.6,
   "mass": 800000,

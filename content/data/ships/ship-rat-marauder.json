@@ -3,12 +3,21 @@
   "name": "Marauder",
   "class": "rat",
   "description": "A refitted corsair gunship with real tank and three rail mounts. Do not underestimate it.",
-  "slots": { "high": 3, "mid": 2, "low": 2 },
+  "slots": {
+    "high": 3,
+    "mid": 2,
+    "low": 2
+  },
   "shield": 180,
   "armor": 240,
   "structure": 300,
-  "resists": { "em": 0.2, "thermal": 0.2, "kinetic": 0.25, "explosive": 0.3 },
-  "capacitor": 500,
+  "resists": {
+    "em": 0.2,
+    "thermal": 0.2,
+    "kinetic": 0.25,
+    "explosive": 0.3
+  },
+  "capacitor": 1800,
   "recharge": 240,
   "max_speed": 260,
   "agility": 1.0,

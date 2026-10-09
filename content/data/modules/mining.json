@@ -7,7 +7,10 @@
     "kind": "mining_laser",
     "activation_cost": 20,
     "activation_time": 30,
-    "mining": { "volume_per_cycle": 100, "cycle_time": 30 },
+    "mining": {
+      "volume_per_cycle": 100,
+      "cycle_time": 30
+    },
     "price": 175000
   }
 ]

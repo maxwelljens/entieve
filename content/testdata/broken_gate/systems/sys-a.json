@@ -1,0 +1,19 @@
+{
+  "id": "sys-a",
+  "name": "Fixture A",
+  "security": "high",
+  "constellation": "Fixture",
+  "region": "Fixture Reach",
+  "position": { "X": 0, "Y": 0 },
+  "celestials": [
+    { "id": "cel-a-star", "name": "Star A", "kind": "star", "position": { "X": 0, "Y": 0 }, "radius": 100000000 },
+    {
+      "id": "cel-gate-to-b",
+      "name": "Gate to B",
+      "kind": "gate",
+      "position": { "X": 1000000000, "Y": 0 },
+      "radius": 2500,
+      "gate": { "to_system": "sys-b", "to_cel": "cel-nope" }
+    }
+  ]
+}
