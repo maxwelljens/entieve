@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -73,5 +74,52 @@ func TestValidateMissingDir(t *testing.T) {
 	code := run([]string{"validate", "--dir", "/nonexistent/content"}, &out, &errOut)
 	if code != 1 {
 		t.Fatalf("exit = %d, want 1", code)
+	}
+}
+
+func TestDescribeKnownIDs(t *testing.T) {
+	cases := map[string]string{
+		"ship-sloop":       `"class"`,
+		"mod-emp-turret":   `"tracking"`,
+		"min-ferrite":      `"category"`,
+		"npc-rat-scuttler": `"aggro_range"`,
+		"sys-solace":       `"celestials"`,
+		"world-showcase":   `"scenario"`,
+	}
+	for id, want := range cases {
+		var out, errOut bytes.Buffer
+		code := run([]string{"describe", id}, &out, &errOut)
+		if code != 0 {
+			t.Fatalf("describe %s: exit = %d, stderr = %q", id, code, errOut.String())
+		}
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("describe %s: output missing %s", id, want)
+		}
+		// Output must be parseable JSON.
+		var v map[string]any
+		if err := json.Unmarshal(out.Bytes(), &v); err != nil {
+			t.Fatalf("describe %s: invalid JSON: %v", id, err)
+		}
+	}
+}
+
+func TestDescribeUnknownSuggests(t *testing.T) {
+	var out, errOut bytes.Buffer
+	code := run([]string{"describe", "emp-turret"}, &out, &errOut)
+	if code != 1 {
+		t.Fatalf("exit = %d, want 1", code)
+	}
+	if !strings.Contains(errOut.String(), "did you mean") || !strings.Contains(errOut.String(), "mod-emp-turret") {
+		t.Fatalf("stderr %q missing suggestion", errOut.String())
+	}
+}
+
+func TestDescribeWantsOneArg(t *testing.T) {
+	var out, errOut bytes.Buffer
+	if code := run([]string{"describe"}, &out, &errOut); code != 2 {
+		t.Fatalf("no arg: exit = %d, want 2", code)
+	}
+	if code := run([]string{"describe", "a", "b"}, &out, &errOut); code != 2 {
+		t.Fatalf("two args: exit = %d, want 2", code)
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/script"
 	"github.com/entieve/entieve/sim"
@@ -22,7 +23,7 @@ import (
 const (
 	showcaseWorldID = "world-showcase"
 	showcaseScript  = "scripts/showcase.json"
-	showcaseTicks   = 60_000 // 16.6 sim minutes; covers the full script tour
+	showcaseTicks   = 65_000 // ~18 sim minutes; covers the full script tour
 	probeEveryTicks = 300    // 5 sim seconds (state vocabularies track every tick)
 )
 
@@ -206,7 +207,8 @@ var rules = map[string]featureRule{
 		return e.eventRe(`ore hold`), "ore hold never received ore"
 	},
 	"cargo-transfer": func(c *content.Content, e *evidence) (bool, string) {
-		return e.eventRe(`transfer|hangar|stored|delivered`), "no cargo transfer observed"
+		// The success verb only — "…to the station hangar" errors must not match.
+		return e.eventRe(`transferred`), "no cargo transfer observed"
 	},
 	"gate-jump": func(c *content.Content, e *evidence) (bool, string) {
 		return e.kindSeen(sim.EvJumped, ""), "no gate jump observed"
@@ -240,6 +242,21 @@ var rules = map[string]featureRule{
 	},
 	"npc-respawn": func(c *content.Content, e *evidence) (bool, string) {
 		return e.eventRe(`respawn|spawned|sensor contact`), "no NPC respawn observed"
+	},
+	"npc-patrol": func(c *content.Content, e *evidence) (bool, string) {
+		return e.IdlePatrolMoved, "no idle NPC was observed patrolling near its anchor"
+	},
+	"sensor-visibility": func(c *content.Content, e *evidence) (bool, string) {
+		if e.SawVisibleAsteroids && e.SawHiddenAsteroids {
+			return true, ""
+		}
+		return false, "asteroids never flipped visible/hidden with sensor range"
+	},
+	"ammo-selection": func(c *content.Content, e *evidence) (bool, string) {
+		return e.eventRe(`loaded with|auto ammo`), "no ammo selection event"
+	},
+	"warp-to-range": func(c *content.Content, e *evidence) (bool, string) {
+		return e.SawRangedWarpLanding, "player never landed at a ranged warp distance from a station"
 	},
 	"save-restore": func(c *content.Content, e *evidence) (bool, string) {
 		return e.SaveRestoreOK, "save/restore round-trip failed"
@@ -278,6 +295,7 @@ func TestShowcaseCoversEveryFeature(t *testing.T) {
 		Start:        start,
 		IntentsSeen:  map[string]bool{},
 		AIStatesSeen: map[string]bool{},
+		npcFirstPos:  map[uint64]core.Vec2{},
 	}
 	res := script.RunH(s, steps, showcaseTicks, script.Hooks{
 		OnEvent: func(e sim.Event) { ev.Events = append(ev.Events, e) },
@@ -293,8 +311,44 @@ func TestShowcaseCoversEveryFeature(t *testing.T) {
 					ev.IntentsSeen[string(in.Kind)] = true
 				}
 			}
-			sim2.AIs.Each(func(_ ecs.Entity, ai *sim.NpcAI) {
+			sim2.AIs.Each(func(e ecs.Entity, ai *sim.NpcAI) {
 				ev.AIStatesSeen[string(ai.State)] = true
+				// Patrol evidence: idle NPCs must drift around their anchor.
+				if ai.State != sim.NpcIdle {
+					return
+				}
+				tr, ok := sim2.Transforms.Get(e)
+				if !ok {
+					return
+				}
+				fp, seen := ev.npcFirstPos[uint64(e)]
+				if !seen {
+					ev.npcFirstPos[uint64(e)] = tr.Pos
+					return
+				}
+				if tr.Pos.Dist(fp) > 50 {
+					ev.IdlePatrolMoved = true
+				}
+			})
+			// Sensor visibility: rocks in/out of SensorRange (landmarks like
+			// belt markers are excluded — they are always visible by design).
+			visibleRocks := 0
+			sim2.Asteroids.Each(func(e ecs.Entity, _ *sim.Asteroid) {
+				if in, ok := sim2.Info(e); ok && in.Visible && in.Kind == sim.KindAsteroid {
+					visibleRocks++
+				}
+			})
+			if visibleRocks > 0 {
+				ev.SawVisibleAsteroids = true
+			} else {
+				ev.SawHiddenAsteroids = true
+			}
+			// Ranged-warp band: close enough to a station to see it on grid,
+			// far enough that a 50 km warp-to-within clearly landed short.
+			sim2.Stations.Each(func(e ecs.Entity, _ *sim.Station) {
+				if in, ok := sim2.Info(e); ok && in.Distance > 15000 && in.Distance < 120000 {
+					ev.SawRangedWarpLanding = true
+				}
 			})
 			// Probes sample the player's vitals for curve-based rules.
 			if tick%probeEveryTicks != 0 {

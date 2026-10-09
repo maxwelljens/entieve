@@ -112,6 +112,14 @@ func (s *Sim) mineCycle(e ecs.Entity, def *content.ModuleDef, slot SlotRef) {
 		*container = addStacks(*container, ast.Ore, int(units))
 	}
 
+	// A completed mining cycle counts as recent player activity for the
+	// NPC aggro trigger (see systemNpc).
+	if e == s.player {
+		if tr, ok := s.Transforms.Get(e); ok {
+			s.recordPlayerWork(tr.Pos)
+		}
+	}
+
 	s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: e, Target: tgt,
 		Text:  "Mined " + formatM3(vol) + " m³ " + s.oreName(ast.Ore),
 		Value: vol, Item: ast.Ore})

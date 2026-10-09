@@ -214,6 +214,10 @@ func (s *Sim) restore(save *Save) error {
 	s.damage = nil
 	s.free = nil
 	s.modTargets = make(map[modKey]ecs.Entity)
+	// Preferences and the recent-player-work marker live outside the frozen
+	// Save schema: a restored sim starts with automatic ammo and no record.
+	s.ammoPrefs = make(map[modKey]content.ItemID)
+	s.lastPlayerWork.pos, s.lastPlayerWork.at = core.Vec2{}, playerWorkNever
 
 	// Slot table extent.
 	maxIdx := -1

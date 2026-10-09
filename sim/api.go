@@ -62,6 +62,23 @@ type Sim struct {
 	modTargets  map[modKey]ecs.Entity
 	free        []freeSlot
 
+	// ammoPrefs is the per-(owner, slot) preferred charge item set by
+	// CmdSetAmmo ("" entry = automatic). Point-looked-up only — never
+	// iterated by behavior, so map order cannot leak into the simulation.
+	// Documented limitation: not part of Save (the save schema is frozen),
+	// so preferences reset on Restore.
+	ammoPrefs map[modKey]content.ItemID
+
+	// lastPlayerWork is where/when the player last fired a weapon or
+	// completed a mining cycle — the recent-activity aggro trigger for NPCs
+	// (see systemNpc). at == playerWorkNever means "never this run"; like
+	// ammoPrefs it is intentionally outside the frozen Save schema and
+	// resets on Restore.
+	lastPlayerWork struct {
+		pos core.Vec2
+		at  float64
+	}
+
 	// Per-tick working state (never snapshotted; always empty between Steps).
 	deferLoot   []CmdLoot
 	deferEcon   []Command
@@ -103,8 +120,10 @@ func New(c *content.Content, w *content.WorldDef, seed int64) (*Sim, error) {
 		systemID:   w.Start.System,
 		wallet:     w.Start.Wallet,
 		modTargets: make(map[modKey]ecs.Entity),
+		ammoPrefs:  make(map[modKey]content.ItemID),
 		market:     initMarket(c),
 	}
+	s.lastPlayerWork.at = playerWorkNever
 	s.bindStores()
 	if err := s.buildPlayer(w); err != nil {
 		return nil, err
@@ -278,9 +297,10 @@ func (s *Sim) Info(e ecs.Entity) (Info, bool) {
 			info.Kind = KindMoon
 		case content.CelAnomaly:
 			info.Kind = KindAnomaly
+		case content.CelBelt:
+			info.Kind = KindBelt
 		default:
-			// Belts and unknown kinds: no dedicated constant exists in
-			// sim/model.go, so belts report as asteroid fields.
+			// Unknown celestial kinds fall back to the asteroid-field kind.
 			info.Kind = KindAsteroid
 		}
 		info.Cel = c.Cel
@@ -308,6 +328,16 @@ func (s *Sim) Info(e ecs.Entity) (Info, bool) {
 		info.Distance = 0
 	} else {
 		info.Distance = s.distBetween(s.player, e)
+	}
+
+	// Visibility: landmarks are always visible (a docked or absent player
+	// still sees the system), everything else only within SensorRange of an
+	// undocked player. Grid() still RETURNS every on-grid entity — Visible
+	// is presentation state for the overview/brackets, never a filter.
+	if landmarkKind(info.Kind) {
+		info.Visible = true
+	} else if !s.player.IsZero() && !s.playerDocked() {
+		info.Visible = info.Distance <= SensorRange
 	}
 
 	// Health fraction over the three layers.

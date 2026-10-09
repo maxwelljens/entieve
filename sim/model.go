@@ -255,8 +255,13 @@ type (
 		Range  float64
 	}
 
-	// CmdWarpTo warps to the target celestial/entity.
-	CmdWarpTo struct{ Target ecs.Entity }
+	// CmdWarpTo warps to the target celestial/entity. Range > 0 lands that
+	// many metres short of the target along the warp vector, 0 lands on it;
+	// the 2500 m landing tolerance still applies around the landing point.
+	CmdWarpTo struct {
+		Target ecs.Entity
+		Range  float64
+	}
 
 	// CmdAlignTo aligns and accelerates toward the target without warping.
 	CmdAlignTo struct{ Target ecs.Entity }
@@ -330,6 +335,15 @@ type (
 	// CmdUnfitModule moves a fitted module to the hangar.
 	CmdUnfitModule struct{ Slot SlotRef }
 
+	// CmdSetAmmo sets the preferred charge item for a weapon slot. The gun
+	// consumes this exact item first while it is in cargo, then falls back to
+	// any charge of its AmmoClass. Item "" restores automatic behaviour
+	// (first stack in canonical order). Emits EvModule.
+	CmdSetAmmo struct {
+		Slot SlotRef
+		Item content.ItemID
+	}
+
 	// CmdTransfer moves item units between the player's storage holds.
 	// From/To are "cargo" (general hold), "ore" (ore hold) or "hangar"
 	// (station hangar; requires being docked at a station with the "fitting"
@@ -364,6 +378,7 @@ func (CmdRepair) isCommand()      {}
 func (CmdAssemble) isCommand()    {}
 func (CmdFitModule) isCommand()   {}
 func (CmdUnfitModule) isCommand() {}
+func (CmdSetAmmo) isCommand()     {}
 func (CmdTransfer) isCommand()    {}
 
 // ---------------------------------------------------------------------------
@@ -429,6 +444,15 @@ const (
 	KindAnomaly  = "anomaly"
 )
 
+// KindBelt is the Info.Kind of a belt marker celestial entity.
+const KindBelt = "belt"
+
+// SensorRange is the on-grid sensor radius (m): ships, asteroids and wrecks
+// are Visible to the player only within this distance. System landmarks
+// (star, planet, moon, station, gate, belt and anomaly markers) are always
+// visible and warpable.
+const SensorRange = 250_000.0
+
 // Info is a flattened view of a grid entity for overview/UI/render.
 type Info struct {
 	Entity   ecs.Entity
@@ -445,6 +469,7 @@ type Info struct {
 	CanLoot  bool
 	CanMine  bool
 	CanWarp  bool
+	Visible  bool // landmark celestial, or within SensorRange of the player
 }
 
 // ---------------------------------------------------------------------------

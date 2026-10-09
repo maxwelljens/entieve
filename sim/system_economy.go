@@ -422,8 +422,10 @@ func (s *Sim) execUnfit(c CmdUnfitModule) {
 		s.log(SevWarning, s.player, "Invalid slot class")
 		return
 	}
-	// Drop and re-key remembered activation targets around the removed slot.
+	// Drop and re-key remembered activation targets and ammo preferences
+	// around the removed slot.
 	s.shiftModTargets(s.player, c.Slot.Class, c.Slot.Index)
+	s.shiftAmmoPrefs(s.player, c.Slot.Class, c.Slot.Index)
 	s.Hangar.Items = addStacks(s.Hangar.Items, content.ItemID(id), 1)
 	s.recomputeFit(s.player)
 	name := string(id)

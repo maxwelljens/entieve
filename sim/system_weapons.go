@@ -66,7 +66,7 @@ func (s *Sim) fireWeapon(e ecs.Entity, def *content.ModuleDef, slot SlotRef, rt 
 			s.deactivate(e, slot, "no cargo", SevWarning)
 			return
 		}
-		ammoItem, ammoDef, ok := findCharge(cargo.Stacks, s, w.AmmoClass)
+		ammoItem, ammoDef, ok := findCharge(s, e, slot, cargo.Stacks, w.AmmoClass)
 		if !ok {
 			s.deactivate(e, slot, "no charges", SevWarning)
 			return
@@ -88,6 +88,11 @@ func (s *Sim) fireWeapon(e ecs.Entity, def *content.ModuleDef, slot SlotRef, rt 
 	if tr == nil || !ok {
 		s.deactivate(e, slot, "target gone", SevWarning)
 		return
+	}
+	// The player firing counts as recent activity on the grid: NPC guards
+	// treat it as an aggro trigger around this position (see systemNpc).
+	if e == s.player {
+		s.recordPlayerWork(tr.Pos)
 	}
 	var sm, tm *Motion
 	if m, ok := s.Motions.Get(e); ok {
@@ -131,9 +136,19 @@ func (s *Sim) fireWeapon(e ecs.Entity, def *content.ModuleDef, slot SlotRef, rt 
 	rt.CycleEnds = s.time + period
 }
 
-// findCharge returns the first cargo stack carrying any item of the given
-// ammo class (canonical stack order).
-func findCharge(stacks []content.CargoStack, s *Sim, ammoClass string) (content.ItemID, *content.ItemDef, bool) {
+// findCharge returns the charge the weapon should consume: the owner's
+// CmdSetAmmo preference when it is still in cargo and still matches the
+// weapon's ammo class, else the first cargo stack carrying any item of the
+// given ammo class (canonical stack order). A preference whose item ran
+// out or no longer matches silently falls back to automatic selection.
+func findCharge(s *Sim, e ecs.Entity, slot SlotRef, stacks []content.CargoStack, ammoClass string) (content.ItemID, *content.ItemDef, bool) {
+	if pref := s.ammoPref(e, slot); pref != "" {
+		if stacksCount(stacks, pref) > 0 {
+			if def, ok := s.Content.Item(pref); ok && def.AmmoClass == ammoClass {
+				return pref, def, true
+			}
+		}
+	}
 	for _, st := range stacks {
 		if st.Qty <= 0 {
 			continue

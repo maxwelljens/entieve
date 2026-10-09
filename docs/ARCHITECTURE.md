@@ -275,9 +275,9 @@ actions are commands consumed at the start of `Step`:
 ```go
 type Command interface{ isCommand() }
 CmdStop, CmdManualVel{Dir core.Vec2, SpeedFrac float64},
-CmdApproach{Target}, CmdOrbit{Target, Range}, CmdWarpTo{Target},
+CmdApproach{Target}, CmdOrbit{Target, Range}, CmdWarpTo{Target, Range}, // Range>0 lands that far short
 CmdAlignTo{Target}, CmdLock{Target}, CmdUnlock{Target},
-CmdActivate{Slot SlotRef, Target}, CmdDeactivate{Slot SlotRef},
+CmdActivate{Slot SlotRef, Target}, CmdDeactivate{Slot SlotRef}, CmdSetAmmo{Slot SlotRef, Item},
 CmdLoot{Wreck, Item ItemID|""}, CmdMine{Asteroid, Slot SlotRef},
 CmdDock{Station}, CmdUndock{}, CmdJump{Gate},
 CmdBuy{Item, Qty}, CmdSell{Item, Qty},
@@ -319,6 +319,21 @@ circle each other (two rats named "Scuttler" would swap places mid-fight).
 Distance sorting is a presentation concern: the overview sorts its own rows.
 `Restore` works on a private deep copy of the save, so several sims may be
 restored from one `Save` without aliasing its data.
+
+Visibility: `Info.Visible` is presentation state for the UI — true for system
+landmarks (star, planet, moon, station, gate, belt/anomaly markers — kinds
+`KindStar..KindAnomaly` incl. `KindBelt`) and for everything within
+`SensorRange` (250 km) of the player. Ships, asteroids and wrecks beyond
+sensor range stay hidden from the overview (no system-wide omniscience);
+`Grid()` still returns them for command/script name resolution.
+
+NPC life: idle rats patrol deterministically around their spawn anchor
+(handle-hashed phase — no RNG draws). An NPC aggros when the player enters
+its effective aggro range, damages it, fires or mines within 30 km of its
+home within 20 s, or comes within 8 km of its home. `SystemDef.Security`
+tempers this: high = 0.4× aggro range and flee at ≥35% structure, low =
+1.0×, null = 1.3× and never flee. Aggroed NPCs pursue up to 2.5× their
+effective aggro range from home before breaking off.
 
 Systems (`sim/` internal, called by `Step` in this order):
 1. `command` (apply queued commands to intent),

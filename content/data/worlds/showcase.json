@@ -278,6 +278,26 @@
       "name": "Determinism",
       "feature": "determinism",
       "detail": "Two sims built from the same content, world and seed given the same command sequence report equal Sim.Hash() at every step, including after a Snapshot/Restore round-trip."
+    },
+    {
+      "name": "Patrolling rats",
+      "feature": "npc-patrol",
+      "detail": "Idle NPCs drift on a slow deterministic patrol around their spawn anchor instead of sitting still: watch a belt rat circle its home while you keep your distance."
+    },
+    {
+      "name": "Sensor visibility",
+      "feature": "sensor-visibility",
+      "detail": "Ships, asteroids and wrecks only appear on the overview within SensorRange (250 km). System landmarks are always listed, but distant rocks and rats stay hidden until you approach; the Scanner window shows anonymous long-range contacts."
+    },
+    {
+      "name": "Ammo selection",
+      "feature": "ammo-selection",
+      "detail": "CmdSetAmmo (script action 'setammo', right-click a weapon slot in game) sets a weapon's preferred charge: the turret consumes that exact item first and falls back to other charges of its class."
+    },
+    {
+      "name": "Warp to within",
+      "feature": "warp-to-range",
+      "detail": "CmdWarpTo with Range > 0 lands that far short of the target (0 = on top): warp in at 50 km from a station and close the last gap yourself."
     }
   ]
 }

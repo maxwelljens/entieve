@@ -73,7 +73,10 @@ func (s *Sim) applyCommand(cmd Command) {
 		}
 
 	case CmdWarpTo:
-		s.beginWarp(c.Target)
+		s.beginWarp(c.Target, c.Range)
+
+	case CmdSetAmmo:
+		s.execSetAmmo(c)
 
 	case CmdLock:
 		s.cmdLock(c.Target)
@@ -248,6 +251,53 @@ func (s *Sim) moduleDef(e ecs.Entity, slot SlotRef) (*content.ModuleDef, *Module
 	return def, rt, true
 }
 
+// execSetAmmo applies a CmdSetAmmo: the slot must be a weapon that consumes
+// charges, and a non-empty item must exist, match the weapon's AmmoClass
+// and sit in cargo. Success records the per-slot preference and emits
+// EvModule ("<module> loaded with <charge>", or "<module> set to auto
+// ammo" when resetting to ""). Every rejection logs a SevWarning
+// "Cannot load X into Y" and leaves the preference unchanged.
+func (s *Sim) execSetAmmo(c CmdSetAmmo) {
+	p := s.player
+	def, _, ok := s.moduleDef(p, c.Slot)
+	if !ok {
+		s.log(SevWarning, p, "No such module slot")
+		return
+	}
+	// Label for warning text: the charge's display name (raw ID when
+	// unknown, "ammo" for the automatic reset).
+	label := string(c.Item)
+	if c.Item == "" {
+		label = "ammo"
+	} else if item, ok := s.Content.Item(c.Item); ok {
+		label = item.Name
+	}
+	cannot := func() {
+		s.log(SevWarning, p, "Cannot load "+label+" into "+def.Name)
+	}
+	if def.Kind != content.KindWeapon || def.Weapon == nil || def.Weapon.AmmoClass == "" {
+		cannot()
+		return
+	}
+	if c.Item == "" {
+		s.setAmmoPref(p, c.Slot, "")
+		s.emit(Event{Kind: EvModule, Actor: p, Text: def.Name + " set to auto ammo"})
+		return
+	}
+	item, ok := s.Content.Item(c.Item)
+	if !ok || item.AmmoClass != def.Weapon.AmmoClass {
+		cannot()
+		return
+	}
+	if cargo, ok := s.Cargos.Get(p); !ok || stacksCount(cargo.Stacks, c.Item) < 1 {
+		cannot()
+		return
+	}
+	s.setAmmoPref(p, c.Slot, c.Item)
+	s.emit(Event{Kind: EvModule, Actor: p,
+		Text: def.Name + " loaded with " + item.Name})
+}
+
 // cmdLock starts locking a target from the player's ship.
 func (s *Sim) cmdLock(target ecs.Entity) {
 	p := s.player
@@ -276,7 +326,15 @@ func (s *Sim) cmdLock(target ecs.Entity) {
 }
 
 // beginWarp validates and starts the warp state machine toward a celestial.
-func (s *Sim) beginWarp(target ecs.Entity) {
+//
+// rangeM is the warp-to range: metres short of the target along the warp
+// vector where the drive lands (0 = land on the target; negatives clamp to
+// 0). A range at or beyond the current distance to the target collapses to
+// 0 — you cannot land short of a target you are already that close to (and
+// a landing point at the current position would stall the align phase).
+// The 2500 m landing tolerance (warpLandRange) applies around the landing
+// point, not the target.
+func (s *Sim) beginWarp(target ecs.Entity, rangeM float64) {
 	p := s.player
 	if s.playerDocked() {
 		s.log(SevWarning, p, "Cannot warp while docked")
@@ -303,6 +361,21 @@ func (s *Sim) beginWarp(target ecs.Entity) {
 	if !ok {
 		return
 	}
-	s.Warps.Set(p, WarpDrive{Phase: "align", To: tp})
+	// Resolve the landing point: rangeM metres short of the target along
+	// the player -> target warp vector.
+	if rangeM < 0 {
+		rangeM = 0
+	}
+	land := tp
+	if pp, ok := s.posOf(p); ok && rangeM > 0 {
+		if dir := tp.Sub(pp); dir.IsZero() {
+			rangeM = 0 // already on top of the target
+		} else if d := dir.Len(); rangeM >= d {
+			rangeM = 0 // cannot land short of a target closer than the range
+		} else {
+			land = tp.Sub(dir.Norm().Scale(rangeM))
+		}
+	}
+	s.Warps.Set(p, WarpDrive{Phase: "align", To: land})
 	s.Intents.Set(p, Intent{Kind: IntentAlign, Target: target})
 }

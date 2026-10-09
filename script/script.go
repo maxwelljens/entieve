@@ -56,6 +56,7 @@ var validActions = map[string]bool{
 	"dock": true, "undock": true, "jump": true,
 	"buy": true, "sell": true, "refine": true, "repair": true,
 	"assemble": true, "fit": true, "unfit": true, "transfer": true,
+	"setammo": true,
 }
 
 // Parse decodes a JSON step array (an object with a "steps" array is also
@@ -116,6 +117,11 @@ func (st Step) validate(i int) error {
 		if _, err := ParseSlot(st.Slot); err != nil {
 			return fmt.Errorf("script: step %d (%s): %v", i, st.Action, err)
 		}
+	case "setammo":
+		if _, err := ParseSlot(st.Slot); err != nil {
+			return fmt.Errorf("script: step %d (setammo): %v", i, err)
+		}
+		// Item may be empty: that means "auto" (first charge in cargo order).
 	case "mine":
 		if _, err := ParseSlot(st.Slot); err != nil {
 			return fmt.Errorf("script: step %d (%s): %v", i, st.Action, err)
@@ -255,6 +261,9 @@ func (st Step) command(eng Engine) (sim.Command, bool) {
 		return sim.CmdBuy{Item: content.ItemID(st.Item), Qty: st.Qty}, true
 	case "transfer":
 		return sim.CmdTransfer{Item: content.ItemID(st.Item), Qty: st.Qty, From: st.From, To: st.To}, true
+	case "setammo":
+		slot, _ := ParseSlot(st.Slot)
+		return sim.CmdSetAmmo{Slot: slot, Item: content.ItemID(st.Item)}, true
 	case "sell":
 		return sim.CmdSell{Item: content.ItemID(st.Item), Qty: st.Qty}, true
 	case "refine":
@@ -281,7 +290,7 @@ func (st Step) command(eng Engine) (sim.Command, bool) {
 	case "orbit":
 		return sim.CmdOrbit{Target: target.Entity, Range: st.Range}, true
 	case "warp":
-		return sim.CmdWarpTo{Target: target.Entity}, true
+		return sim.CmdWarpTo{Target: target.Entity, Range: st.Range}, true
 	case "align":
 		return sim.CmdAlignTo{Target: target.Entity}, true
 	case "lock":

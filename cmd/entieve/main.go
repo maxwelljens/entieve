@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/game"
@@ -36,6 +37,7 @@ Usage:
   entieve run       [--world ID] [--seed N] [--load save.json] [--save save.json]
   entieve validate  [--dir content/data]
   entieve simulate  [--world ID] [--seed N] [--ticks N] [--script steps.json] [--quiet]
+  entieve describe  <id>            (any content id: item, ship, module, npc, system, world)
   entieve version
 
 Run "entieve <subcommand> -h" for subcommand flags.`
@@ -56,6 +58,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return cmdValidate(args[1:], stdout, stderr)
 	case "simulate":
 		return cmdSimulate(args[1:], stdout, stderr)
+	case "describe":
+		return cmdDescribe(args[1:], stdout, stderr)
 	case "version":
 		fmt.Fprintf(stdout, "entieve %s\n", version)
 		return 0
@@ -219,6 +223,128 @@ func printReport(w io.Writer, s *sim.Sim, res *script.Result, ticks int64) {
 	for _, in := range grid {
 		fmt.Fprintf(w, "  %-10s %-28s dist %12.0f m\n", in.Kind, in.Name, in.Distance)
 	}
+}
+
+// cmdDescribe prints the definition of any content ID as pretty JSON —
+// introspection tooling for content authors and AI agents ("what exactly is
+// mod-emp-turret?"). Unknown IDs exit 1 with near-miss suggestions.
+func cmdDescribe(args []string, stdout, stderr io.Writer) int {
+	fs := newFlagSet("describe", stderr)
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if fs.NArg() != 1 {
+		fmt.Fprintln(stderr, "entieve describe: want exactly one content id")
+		return 2
+	}
+	id := fs.Arg(0)
+	c, err := content.Load(content.FS())
+	if err != nil {
+		fmt.Fprintf(stderr, "entieve describe: load content: %v\n", err)
+		return 1
+	}
+	def, err := describeLookup(c, id)
+	if err != nil {
+		fmt.Fprintf(stderr, "entieve describe: %v\n", err)
+		return 1
+	}
+	out, err := json.MarshalIndent(def, "", "  ")
+	if err != nil {
+		fmt.Fprintf(stderr, "entieve describe: %v\n", err)
+		return 1
+	}
+	fmt.Fprintln(stdout, string(out))
+	return 0
+}
+
+// describeLookup resolves an ID against every content kind (exact match) and
+// suggests near misses on failure.
+func describeLookup(c *content.Content, id string) (any, error) {
+	type bucket struct {
+		kind string
+		get  func(string) (any, bool)
+		list func() []string
+	}
+	buckets := []bucket{
+		{"item", func(s string) (any, bool) { d, ok := c.Item(content.ItemID(s)); return d, ok },
+			func() []string {
+				return ids(len(c.Items), func(yield func(string)) {
+					for k := range c.Items {
+						yield(string(k))
+					}
+				})
+			}},
+		{"ship", func(s string) (any, bool) { d, ok := c.Ship(content.ShipID(s)); return d, ok },
+			func() []string {
+				return ids(len(c.Ships), func(yield func(string)) {
+					for k := range c.Ships {
+						yield(string(k))
+					}
+				})
+			}},
+		{"module", func(s string) (any, bool) { d, ok := c.Module(content.ModuleID(s)); return d, ok },
+			func() []string {
+				return ids(len(c.Modules), func(yield func(string)) {
+					for k := range c.Modules {
+						yield(string(k))
+					}
+				})
+			}},
+		{"npc", func(s string) (any, bool) { d, ok := c.Npc(content.NpcID(s)); return d, ok },
+			func() []string {
+				return ids(len(c.NPCs), func(yield func(string)) {
+					for k := range c.NPCs {
+						yield(string(k))
+					}
+				})
+			}},
+		{"system", func(s string) (any, bool) { d, ok := c.System(content.SystemID(s)); return d, ok },
+			func() []string {
+				return ids(len(c.Systems), func(yield func(string)) {
+					for k := range c.Systems {
+						yield(string(k))
+					}
+				})
+			}},
+		{"world", func(s string) (any, bool) { d, ok := c.World(content.WorldID(s)); return d, ok },
+			func() []string {
+				return ids(len(c.Worlds), func(yield func(string)) {
+					for k := range c.Worlds {
+						yield(string(k))
+					}
+				})
+			}},
+	}
+	var all []string
+	for _, b := range buckets {
+		if def, ok := b.get(id); ok {
+			return def, nil
+		}
+		all = append(all, b.list()...)
+	}
+	// Near misses: prefix or substring matches make agent iteration fast.
+	var near []string
+	lower := strings.ToLower(id)
+	for _, cand := range all {
+		if strings.Contains(strings.ToLower(cand), lower) {
+			near = append(near, cand)
+		}
+	}
+	sort.Strings(near)
+	if len(near) > 8 {
+		near = near[:8]
+	}
+	if len(near) > 0 {
+		return nil, fmt.Errorf("unknown id %q (did you mean: %s?)", id, strings.Join(near, ", "))
+	}
+	return nil, fmt.Errorf("unknown id %q (%d known ids across items/ships/modules/npcs/systems/worlds)", id, len(all))
+}
+
+// ids collects a range-over-func style iterator into a slice.
+func ids(n int, each func(yield func(string))) []string {
+	out := make([]string, 0, n)
+	each(func(s string) { out = append(out, s) })
+	return out
 }
 
 func readSave(path string) (*sim.Save, error) {

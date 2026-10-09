@@ -150,6 +150,9 @@ func (s *Sim) loadSystem(id content.SystemID, entryAtCel content.CelID) error {
 			sh.ScrambledUntil = 0
 		}
 	}
+	// Positions are per-system: work recorded elsewhere must not aggro this
+	// system's guards.
+	s.lastPlayerWork.pos, s.lastPlayerWork.at = core.Vec2{}, playerWorkNever
 
 	// Pending respawn timers of THIS system reduce the fresh spawn counts so
 	// that a group never exceeds its declared Count across jumps.

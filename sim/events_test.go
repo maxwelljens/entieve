@@ -224,7 +224,7 @@ func TestInfoKinds(t *testing.T) {
 		{"Haven Rest", KindStation},
 		{"Gate to Beta", KindGate},
 		{"Fixture Star", KindStar},
-		{"Fixture Belt", KindAsteroid}, // belts have no dedicated constant
+		{"Fixture Belt", KindBelt}, // belt markers are landmarks (KindBelt)
 		{"Fixture Den", KindAnomaly},
 		{"Sterngrit Asteroid", KindAsteroid},
 	}

@@ -30,7 +30,13 @@ go test ./...                   # the whole test suite (headless, no GPU needed)
   your hangar.
 - **A star cluster.** Three systems of escalating danger — Solace, Penumbra,
   Gloam — connected by stargates, plus combat anomalies with boss rats and the
-  best loot.
+  best loot. Rats patrol their belts, defend their homes against miners and
+  shooters, and temperament follows security: high-sec rats are skittish,
+  null-sec rats fight to the death.
+- **Sensors with teeth.** The overview only shows what's on your grid
+  (250 km) — distant rocks and rats stay hidden until you approach. The
+  scanner window sweeps for anonymous long-range contacts ("Ship ×3"), and
+  warp-to-within (0/10/50 km) shapes your landings.
 - **Time acceleration** (1×–8×) because warp is long and life is short.
 
 Controls and concepts: [docs/GAMEPLAY.md](docs/GAMEPLAY.md).
@@ -59,6 +65,7 @@ Design contract: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ```sh
 go run ./cmd/entieve validate                 # lint all content, cross-check refs
+go run ./cmd/entieve describe mod-emp-turret  # introspect any content id (JSON)
 go run ./cmd/entieve simulate \
     --world world-showcase --ticks 36000 \
     --script scripts/showcase.json            # headless run + report

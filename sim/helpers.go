@@ -53,6 +53,11 @@ func (s *Sim) destroy(e ecs.Entity) {
 			delete(s.modTargets, k)
 		}
 	}
+	for k := range s.ammoPrefs {
+		if k.owner == uint64(e) {
+			delete(s.ammoPrefs, k)
+		}
+	}
 }
 
 // healToFull tops every layer up to its current maximum. Spawn sites call it
@@ -470,6 +475,67 @@ func (s *Sim) shiftModTargets(owner ecs.Entity, class string, removedIndex int) 
 
 // slotClasses is the canonical slot iteration order.
 var slotClasses = []string{content.SlotHigh, content.SlotMid, content.SlotLow}
+
+// landmarkKind reports whether an Info.Kind is a system landmark: the
+// star, planet, moon, station, gate, belt and anomaly markers. Landmarks
+// are always visible and warpable regardless of sensor range (see Info).
+func landmarkKind(kind string) bool {
+	switch kind {
+	case KindStar, KindPlanet, KindMoon, KindStation, KindGate, KindBelt, KindAnomaly:
+		return true
+	}
+	return false
+}
+
+// setAmmoPref records (item == "" clears) the preferred charge of one
+// weapon slot. Keys mirror modTargets: per owner/class/index, point
+// lookups only, so no map iteration order can leak into behavior.
+func (s *Sim) setAmmoPref(e ecs.Entity, slot SlotRef, item content.ItemID) {
+	k := modKey{owner: uint64(e), class: slot.Class, index: slot.Index}
+	if item == "" {
+		delete(s.ammoPrefs, k)
+		return
+	}
+	s.ammoPrefs[k] = item
+}
+
+// ammoPref returns the preferred charge of one weapon slot ("" = none).
+func (s *Sim) ammoPref(e ecs.Entity, slot SlotRef) content.ItemID {
+	return s.ammoPrefs[modKey{owner: uint64(e), class: slot.Class, index: slot.Index}]
+}
+
+// shiftAmmoPrefs drops the preferred charge of the module removed at
+// removedIndex and re-keys preferences of higher indexes in that slot
+// class. Collect-then-mutate keeps it independent of map iteration order
+// (mirrors shiftModTargets).
+func (s *Sim) shiftAmmoPrefs(owner ecs.Entity, class string, removedIndex int) {
+	type move struct {
+		key  modKey
+		item content.ItemID
+	}
+	var (
+		dels  []modKey
+		moves []move
+	)
+	for k, item := range s.ammoPrefs {
+		if k.owner != uint64(owner) || k.class != class {
+			continue
+		}
+		switch {
+		case k.index == removedIndex:
+			dels = append(dels, k)
+		case k.index > removedIndex:
+			dels = append(dels, k)
+			moves = append(moves, move{key: modKey{owner: k.owner, class: k.class, index: k.index - 1}, item: item})
+		}
+	}
+	for _, k := range dels {
+		delete(s.ammoPrefs, k)
+	}
+	for _, m := range moves {
+		s.ammoPrefs[m.key] = m.item
+	}
+}
 
 // recomputeFit recomputes all derived ship stats from the hull plus the
 // fitted passive modules: layer maxes, resists, capacitor capacity/tau,
