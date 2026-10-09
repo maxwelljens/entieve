@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Living NPCs: deterministic patrol around their spawn anchor, threat
+  response (proximity, damage, fire/mining near their home, intrusion
+  within 8 km), security temperament (high-sec skittish, null-sec
+  fight-to-the-death) and a pursuit leash with break-off.
+- Sensor visibility: the overview shows system landmarks plus everything
+  within a 250 km sensor radius — no more system-wide omniscience. The
+  scanner window sweeps for anonymous long-range contacts ("Ship ×3").
+- Ammo selection (`CmdSetAmmo`, right-click a weapon slot): preferred charge
+  with automatic fallback and a clean reset to auto.
+- Warp-to-within (`CmdWarpTo{Range}`, Selected Item 0/10/50 km control).
+- Overview scrolling with a draggable scrollbar, sort indicators and
+  per-kind filters.
+- Movable windows: drag by title bar, click-to-raise, close buttons,
+  non-overlapping defaults.
+- `entieve describe <id>` content introspection with near-miss suggestions
+  (AI-agent tooling).
+
+### Changed
+
+- UI typography is ~75% larger and padding +20%, with all chrome metrics
+  derived from type and spacing constants (no hand-tuned magic numbers).
+- Module tooltips, hover/pressed states, 40 px minimum hit areas,
+  right-aligned tabular number columns and soft window shadows.
+
+### Fixed
+
+- The overview no longer reveals every ship, rock and wreck in the system
+  from anywhere (EVE-grade sensor tension restored).
+- Rats are no longer inert: they patrol, notice intruders and defend their
+  belts against miners and shooters.
+
+### Added
+
 - Deterministic simulation core: fixed 60-tick timestep, golden-pinned
   SplitMix64 RNG, minimal deterministic ECS (`core`, `ecs`).
 - Data-driven content system: JSON schema for items, ships, modules, NPCs,

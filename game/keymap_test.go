@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -32,7 +33,7 @@ func TestKeyMapWellFormed(t *testing.T) {
 	required := []string{
 		"lock-nearest", "lock-selected", "approach", "orbit", "stop", "align",
 		"warp", "dock", "jump", "loot", "mine", "inventory", "fitting",
-		"market", "starmap", "help", "menu", "time-slower", "time-faster",
+		"scanner", "market", "starmap", "help", "menu", "time-slower", "time-faster",
 		"save", "load",
 	}
 	found := map[string]bool{}
@@ -77,5 +78,30 @@ func TestKeyMapConflictResolutions(t *testing.T) {
 	}
 	if got := find(ebiten.KeyF9, false, false); got != "load" {
 		t.Errorf("F9 = %q, want load", got)
+	}
+	// The scanner toggle (added with the sensors/visibility pass).
+	if got := find(ebiten.KeyC, false, false); got != "scanner" {
+		t.Errorf("C = %q, want scanner", got)
+	}
+}
+
+// TestMouseMapCoversNewGestures: the help overlay documents the ammo
+// right-click and overview wheel scrolling alongside the classic gestures.
+func TestMouseMapCoversNewGestures(t *testing.T) {
+	want := []string{
+		"cycle loaded charge",
+		"scroll the list",
+		"drag a title bar",
+	}
+	for _, w := range want {
+		found := false
+		for _, b := range MouseMap {
+			if strings.Contains(b.Desc, w) {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("MouseMap missing a line containing %q", w)
+		}
 	}
 }

@@ -10,8 +10,9 @@ Run it with:
 entieve run [--world world-default] [--seed N] [--save save.json] [--load save.json]
 ```
 
-The window opens at 1280×720 (resizable, vsync). Everything below is also
-available in-game via the help overlay (`H`).
+The window opens at 1280×720 (resizable, vsync, minimum 1024×700 — smaller
+windows clamp up rather than breaking the HUD layout). Everything below is
+also available in-game via the help overlay (`H`).
 
 ## Controls
 
@@ -29,13 +30,14 @@ in-game help overlay renders.
 | `Q` | Orbit selected — cycles 1k → 2.5k → 5k → 10k m |
 | `S` | Stop |
 | `W` | Align to selected |
-| `Z` | Warp to selected |
+| `Z` | Warp to selected at the chosen landing range (0 / 10 / 50 km) |
 | `D` | Dock (selected station, else nearest dockable one) |
 | `J` | Jump through gate (selected gate, else nearest) |
 | `L` | Loot nearest wreck |
 | `M` | Mine selected asteroid (first fitted mining laser) |
 | `I` | Toggle inventory (cargo + ore hold) |
 | `F` | Toggle fitting window |
+| `C` | Toggle scanner (slow off-grid sweep) |
 | `G` | Station services — jump to the Market tab (while docked) |
 | `N` | Toggle starmap |
 | `H` | Toggle help overlay |
@@ -50,12 +52,14 @@ in-game help overlay renders.
 
 | Input | Action |
 |---|---|
-| Left click | Select entity / press UI buttons; sort overview by clicking column headers |
+| Left click | Select entity / press UI buttons; drag a window's title bar to move it (click also raises it to the front) |
+| Left click | On an overview column header: sort (click again flips direction); on the overview ▾ button: kind filters |
 | `Ctrl` + left click | Lock target under cursor |
 | Left double-click | Approach entity; on empty space, fly straight toward that point |
 | Right click | Orbit target under cursor (2,500 m) |
+| Right click | On a weapon slot in the module rack: cycle the loaded charge (Auto → each cargo ammo of the weapon's class) |
 | Middle drag | Pan camera |
-| Wheel | Zoom (0.05× – 4×) |
+| Wheel | Zoom (0.05× – 4×); over the overview, scroll the table (drag the scrollbar thumb to fling) |
 
 **Resolved key conflicts** (documented decisions):
 
@@ -63,12 +67,34 @@ in-game help overlay renders.
   to **`Ctrl+S`**. `F9 = load` has no conflict and stays.
 - `M` is **mine** (EVE muscle memory); station services / market is **`G`**.
 - Lock-under-cursor uses **`Ctrl`+click** so `L` stays free for looting.
+- `C` is **scanner** (a new window; no legacy binding to displace).
+
+### Windows
+
+Every window has a **title bar**: drag it (mouse held + move) to reposition —
+positions are clamped to the screen and remembered for the session. Clicking a
+window raises it to the front; windows with a toggle key (`I`, `F`, `C`, `N`,
+`H`) carry a **[×]** close button whose key brings them back. The HUD panels
+(overview, selected item, log, modules) are draggable but not closable — they
+are always-on chrome. Default positions at 1280×720 never overlap: overview
+top-right, selected item top-left, fitting center-left (it never covers the
+overview), inventory center-right, scanner bottom-left above the log, starmap
+centered.
 
 ### Overview (top-right)
 
-A sortable table of everything on grid: icon, name, distance, velocity.
-Click a column header to sort (click again to flip direction), click a row to
-select. Colors: red = hostile, orange = neutral NPC, blue = station,
+A sortable, **scrollable** table of everything you can currently perceive:
+icon, name, distance, velocity. Click a column header to sort (click again to
+flip direction; the active column tints amber and shows ▲/▼), hover the wheel
+over it to scroll (rows clip to the panel, scrollbar thumb included), click a
+row to select. Numbers are right-aligned on fixed column anchors, so digits
+changing never shift the columns.
+
+The **▾ filter button** in the title bar toggles per-kind visibility — Ships /
+Asteroids / Wrecks / Stations & Gates / Celestials — remembered for the
+session. It filters presentation only; it never reveals hidden contacts.
+
+Colors: red = hostile, orange = neutral NPC, blue = station,
 green = gate, grey = asteroid, yellow = wreck, cyan = you.
 
 ## EVE concepts primer
@@ -97,10 +123,14 @@ tracking (scaled by signature radius), plus distance beyond optimal vs.
 falloff. Fast, small, transversal-moving targets are hard to hit; wrecking
 shots deal ×3 damage.
 
-**Warp rules.** `Z` (Warp To) makes you align first, then warp, landing within
-2,500 m of the target. Warp scramblers on the target block warp and cancel an
-ongoing warp. Sublight movement is limited by agility (align time ≈
-agility × 10 s); the afterburner multiplies speed while its cycle runs.
+**Warp rules.** `Z` (Warp To) makes you align first, then warp. The Selected
+Item window carries a **`0 | 10 | 50` km segmented control** that chooses the
+landing range: `0` lands on the target (within the sim's 2,500 m landing
+tolerance), `10`/`50` land that many meters short of it — the warp button
+always shows the current choice ("Warp to 10 km"). Warp scramblers on the
+target block warp and cancel an ongoing warp. Sublight movement is limited by
+agility (align time ≈ agility × 10 s); the afterburner multiplies speed while
+its cycle runs.
 
 **Mining.** Select an asteroid and press `M`: the first mining laser cycles,
 ore lands in the ore hold, and depleted asteroids vanish. Refine ore at a
@@ -108,6 +138,42 @@ station (Refine tab) or sell it raw.
 
 **Overview distances** follow EVE conventions: meters under 2 km
 (`1,250 m`), kilometers under 0.1 AU (`3.4 km`), AU beyond (`1.2 AU`).
+
+## Sensors and visibility
+
+Entieve has **no omniscience**: the client only ever shows what your ship
+could perceive. This is a deliberate design decision (documented anti-
+omniscience), enforced in the sim's read model and the renderer alike.
+
+- **Grid / landmark visibility.** System landmarks — the star, planets,
+  moons, station, gates, belt markers and anomalies — are always `Visible`;
+  they appear in the overview, on the starmap, and get in-world brackets.
+- **Sensor range.** Ships, asteroids and wrecks are `Visible` only within
+  **`sim.SensorRange` = 250 km** of your ship. Anything farther is off-grid:
+  it does not appear in the overview, cannot be picked by clicking, is not
+  drawn by the renderer, and Tab-locking / `D`/`J`/`L` nearest-target
+  helpers only ever consider perceivable entities.
+- **The Scanner (`C`).** A slow sweep with a **2-second cycle** and an
+  animated progress bar probes out to **3 × sensor range (750 km)**. It
+  reports **anonymous counts only** — e.g. `Ship ×3`, `Asteroid ×22`,
+  `Wreck ×2` — with *no names and no distances*, refreshed on each completed
+  sweep. You learn that something is out there, not what it is or where it
+  sits; you still have to fly there to see it. (Deliberate: the scanner is a
+  hint system, not a map.)
+- **Overview filters.** The overview's ▾ filter popup toggles whole kinds
+  (Ships / Asteroids / Wrecks / Stations & Gates / Celestials) on top of
+  visibility — a presentation filter that can hide visible things but never
+  reveal invisible ones. Choices persist for the session.
+- **Warp-to-range** (above) is likewise a UI choice only: `Z` and the warp
+  button issue the same `CmdWarpTo` with the selected landing range.
+
+**Ammo cycling.** Right-click a weapon slot in the module rack to cycle its
+loaded charge: **Auto → each ammo of that weapon's class that sits in your
+cargo → Auto** (the sim validates class and cargo, and logs every load).
+The module tooltip — hover any rack cell for 300 ms — shows the module name,
+slot, key stats (damage / optimal / tracking for guns, boost numbers for
+tanks and prop, yield for mining lasers) and the currently loaded charge.
+Non-weapons don't cycle.
 
 ## Currency
 

@@ -41,10 +41,10 @@ type evidence struct {
 	AIStatesSeen map[string]bool // sim.NpcAIState values entered by any NPC
 
 	// Behavioral observations accumulated on every tick.
-	IdlePatrolMoved      bool              // an idle NPC drifted > 50 m from its first-seen spot
-	SawVisibleAsteroids  bool              // rocks entered sensor range at some point
-	SawHiddenAsteroids   bool              // ...and were out of sensor range at some point
-	SawRangedWarpLanding bool              // player observed 15 km..120 km from a station
+	IdlePatrolMoved      bool // an idle NPC drifted > 50 m from its first-seen spot
+	SawVisibleAsteroids  bool // rocks entered sensor range at some point
+	SawHiddenAsteroids   bool // ...and were out of sensor range at some point
+	SawRangedWarpLanding bool // player observed 15 km..120 km from a station
 	npcFirstPos          map[uint64]core.Vec2
 
 	// Programmatic checks performed by the showcase harness itself.

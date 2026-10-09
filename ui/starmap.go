@@ -104,21 +104,26 @@ func securityColor(sec string) color.RGBA {
 	}
 }
 
+// starmapContent is the node/footer area below the starmap title bar.
+func starmapContent(r Rect) Rect {
+	return Rect{X: r.X + 1, Y: r.Y + titleBarH, W: r.W - 2, H: r.H - titleBarH - 1}
+}
+
 // DrawStarmap renders the starmap overlay (used by the game's map scene).
 func (u *UI) DrawStarmap(dst *ebiten.Image) {
 	reg := u.reg()
-	r := reg.Starmap
-	Panel(dst, r)
+	r := u.WindowRect(WinStarmap, reg)
 	title := "Starmap"
 	if u.c.Universe != nil {
 		title = "Starmap — " + u.c.Universe.Region + " / " + u.c.Universe.Constellation
 	}
-	PanelTitle(dst, r, title)
+	DrawWindow(dst, r, title, closableWindows[WinStarmap])
+	inner := starmapContent(r)
 
 	// Gate lines from every system's gate celestials.
 	byID := map[content.SystemID]MapNode{}
 	sysNodes := u.systemNodes()
-	proj := StarmapNodes(r, sysNodes)
+	proj := StarmapNodes(inner, sysNodes)
 	for i, s := range sysNodes {
 		byID[s.ID] = proj[i]
 	}
@@ -169,18 +174,18 @@ func (u *UI) DrawStarmap(dst *ebiten.Image) {
 		} else if s.ID == u.mapSel {
 			labelCol = ColText
 		}
-		TextCentered(dst, string(s.ID), n.X, n.Y+14, 10, labelCol)
+		TextCentered(dst, string(s.ID), n.X, n.Y+padLarge/2, FontSmall, labelCol)
 	}
 
 	// Selected-system info footer (starmap is informational; travel happens
 	// through the gates in-world).
-	foot := r.Bottom() - 64
-	vector.StrokeLine(dst, float32(r.X+8), float32(foot-8), float32(r.Right()-8), float32(foot-8),
-		1, ColBorder, false)
+	foot := r.Bottom() - 1 - pad - lineH(FontLarge) - 2*lineH(FontSmall)
+	vector.StrokeLine(dst, float32(r.X+pad), float32(foot-padSmall), float32(r.Right()-pad),
+		float32(foot-padSmall), 1, ColBorder, false)
 	if def, ok := u.c.System(u.mapSel); ok && u.mapSel != "" {
-		Text(dst, def.Name+"  ("+string(def.ID)+")", r.X+12, foot, 13, ColText)
+		Text(dst, def.Name+"  ("+string(def.ID)+")", r.X+pad, foot, FontLarge, ColText)
 		Text(dst, "security: "+def.Security+"   constellation: "+def.Constellation,
-			r.X+12, foot+18, 10, securityColor(def.Security))
+			r.X+pad, foot+lineH(FontLarge), FontSmall, securityColor(def.Security))
 		var conns []string
 		for i := range def.Celestials {
 			if g := def.Celestials[i].Gate; g != nil {
@@ -188,23 +193,27 @@ func (u *UI) DrawStarmap(dst *ebiten.Image) {
 			}
 		}
 		if len(conns) > 0 {
-			Text(dst, "gates to: "+joinIDs(conns), r.X+12, foot+34, 10, ColDim)
+			Text(dst, "gates to: "+joinIDs(conns), r.X+pad,
+				foot+lineH(FontLarge)+lineH(FontSmall), FontSmall, ColDim)
 		}
 	} else {
 		Text(dst, "Click a system for details. Travel: fly to a stargate and press J.",
-			r.X+12, foot, 11, ColDim)
+			r.X+pad, foot, FontSmall, ColDim)
 	}
 }
 
 // ClickStarmap selects the system node under the cursor; reports whether the
 // click landed inside the starmap panel.
 func (u *UI) ClickStarmap(x, y float64) bool {
-	reg := u.reg()
-	r := reg.Starmap
+	r := u.WindowRect(WinStarmap, u.reg())
 	if !r.Contains(x, y) {
 		return false
 	}
-	for _, n := range StarmapNodes(r, u.systemNodes()) {
+	inner := starmapContent(r)
+	if !inner.Contains(x, y) {
+		return true // title bar: chrome, consumed by the window
+	}
+	for _, n := range StarmapNodes(inner, u.systemNodes()) {
 		dx, dy := x-n.X, y-n.Y
 		if dx*dx+dy*dy <= 14*14 {
 			u.mapSel = n.ID

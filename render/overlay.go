@@ -231,11 +231,13 @@ func (r *Renderer) drawOverlay(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 				} else if o.info.Hostile {
 					nameCol = color.RGBA{255, 130, 130, 255}
 				}
-				w := Measure(o.info.Name, 11)
-				Text(dst, o.info.Name, sx-w/2, sy+half+5, 11, nameCol)
+				w := Measure(o.info.Name, LabelSize)
+				nameY := sy + half + 5*FontScale
+				Text(dst, o.info.Name, sx-w/2, nameY, LabelSize, nameCol)
 				dist := fmtDist(o.info.Distance)
-				wd := Measure(dist, 10)
-				Text(dst, dist, sx-wd/2, sy+half+18, 10, color.RGBA{135, 146, 163, 255})
+				wd := Measure(dist, LabelSizeSmall)
+				Text(dst, dist, sx-wd/2, nameY+labelLinePitch(LabelSize),
+					LabelSizeSmall, color.RGBA{135, 146, 163, 255})
 			}
 		}
 	}

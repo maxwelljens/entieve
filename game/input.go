@@ -40,6 +40,7 @@ var KeyMap = []Binding{
 	{Key: ebiten.KeyM, Action: "mine", Desc: "M — mine selected asteroid"},
 	{Key: ebiten.KeyI, Action: "inventory", Desc: "I — toggle inventory"},
 	{Key: ebiten.KeyF, Action: "fitting", Desc: "F — toggle fitting"},
+	{Key: ebiten.KeyC, Action: "scanner", Desc: "C — toggle scanner (off-grid sweep)"},
 	{Key: ebiten.KeyG, Action: "market", Desc: "G — station services / market tab (while docked)"},
 	{Key: ebiten.KeyN, Action: "starmap", Desc: "N — toggle starmap"},
 	{Key: ebiten.KeyH, Action: "help", Desc: "H — toggle help"},
@@ -65,10 +66,12 @@ type MouseBinding struct {
 
 // MouseMap documents the mouse controls (same single source as KeyMap).
 var MouseMap = []MouseBinding{
-	{Button: "Left click", Desc: "Select entity / press UI buttons"},
+	{Button: "Left click", Desc: "Select entity / press UI buttons; drag a title bar to move a window"},
+	{Button: "Left click", Mod: "on column header", Desc: "sort the overview (click again flips direction)"},
 	{Button: "Left click", Mod: "Ctrl", Desc: "Lock target under cursor"},
 	{Button: "Left double-click", Desc: "Approach entity; on empty space, fly straight toward the point"},
 	{Button: "Right click", Desc: "Orbit target under cursor (2,500 m)"},
+	{Button: "Right click", Mod: "on weapon slot", Desc: "cycle loaded charge (Auto → cargo ammo)"},
 	{Button: "Middle drag", Desc: "Pan camera"},
-	{Button: "Wheel", Desc: "Zoom (0.05x – 4x)"},
+	{Button: "Wheel", Desc: "Zoom (0.05x – 4x); over the overview, scroll the list"},
 }

@@ -43,3 +43,13 @@ func SortOverview(rows []sim.Info, col SortColumn, asc bool) {
 		return less(rows[j], rows[i])
 	})
 }
+
+// SortIndicator reports the ▲/▼ indicator state of a column header: show
+// is true on the active sort column, up for ascending order. Pure and
+// tested — the draw code renders it as a small triangle.
+func SortIndicator(col SortColumn, active bool, asc bool) (show, up bool) {
+	if !active {
+		return false, false
+	}
+	return true, asc
+}

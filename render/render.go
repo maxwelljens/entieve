@@ -19,6 +19,25 @@ import (
 // draw; zoomed in past it the sprites are big enough to identify directly.
 const labelZoomMax = 0.02
 
+// FontScale is the UI typography scale: ui.FontBase (21) is 1.75× the
+// legacy 12 px base, i.e. text everywhere is ~75% larger. render cannot
+// import ui (ui imports render), so the scale is mirrored here for the
+// in-world labels; ui's TestFontScaleMatchesRender pins both sides.
+const FontScale = 1.75
+
+// In-world label sizes, scaled by the same factor as the UI text (the old
+// hardcoded 11/10 px labels).
+const (
+	LabelSize      = 11 * FontScale // 19.25 — bracket name labels
+	LabelSizeSmall = 10 * FontScale // 17.5 — distance labels under names
+)
+
+// labelLinePitch is the line height between a name and its distance
+// (mirrors ui.LineH's ceil(size×1.35) factor).
+func labelLinePitch(size float64) float64 {
+	return math.Ceil(size * 1.35)
+}
+
 // starTileSize is the pixel size of one starfield tile.
 const starTileSize = 256
 
@@ -220,7 +239,10 @@ func (r *Renderer) Draw(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 	r.drawWarpTunnel(dst, cam, s, now)
 }
 
-// bucket classifies every grid entity into per-layer slices.
+// bucket classifies every perceivable grid entity into per-layer slices.
+// Info.Visible is the sensor gate: landmarks plus everything within
+// sim.SensorRange of the player; off-grid entities are never drawn (the
+// client has no omniscience — the Scanner reports them anonymously only).
 func (r *Renderer) bucket(s *sim.Sim, sys *content.SystemDef) {
 	r.bStar = r.bStar[:0]
 	r.bPlanet = r.bPlanet[:0]
@@ -230,6 +252,9 @@ func (r *Renderer) bucket(s *sim.Sim, sys *content.SystemDef) {
 	r.bWreck = r.bWreck[:0]
 	r.bShip = r.bShip[:0]
 	for _, inf := range s.Grid() {
+		if !inf.Visible {
+			continue
+		}
 		o := gridObj{info: inf, speedMult: 1}
 		if cel, ok := s.Celestials.Get(inf.Entity); ok {
 			o.radius = cel.Radius

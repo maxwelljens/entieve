@@ -105,8 +105,9 @@ func (sc *SpaceScene) Update(in ui.Input) error {
 		sc.pan.X += step
 	}
 
-	// Wheel zoom.
-	if in.Scroll != 0 {
+	// Wheel zoom — suppressed over any UI panel (the overview scrolls
+	// itself when hovered; chrome swallows the wheel elsewhere).
+	if in.Scroll != 0 && !g.u.PanelAt(in.MouseX, in.MouseY) {
 		sc.zoom = clampF(sc.zoom*math.Pow(zoomStep, in.Scroll), zoomMin, zoomMax)
 	}
 
@@ -165,12 +166,17 @@ func (sc *SpaceScene) doubleClick(x, y float64) bool {
 		math.Abs(x-sc.lastClickX) < 6 && math.Abs(y-sc.lastClickY) < 6
 }
 
-// pick returns the grid entity nearest the cursor within pickRadiusPx.
+// pick returns the perceivable grid entity nearest the cursor within
+// pickRadiusPx (off-grid entities cannot be clicked — the client never
+// sees what the sensors do not).
 func (sc *SpaceScene) pick(cam render.Camera, x, y float64) (sim.Info, bool) {
 	bestDist := pickRadiusPx * pickRadiusPx
 	var best sim.Info
 	found := false
 	for _, inf := range sc.g.s.Grid() {
+		if !inf.Visible {
+			continue
+		}
 		sx, sy := cam.WorldToScreen(inf.Pos)
 		dx, dy := sx-x, sy-y
 		if d := dx*dx + dy*dy; d < bestDist {

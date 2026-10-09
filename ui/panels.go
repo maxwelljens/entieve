@@ -4,6 +4,7 @@ import (
 	"image/color"
 
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -14,24 +15,24 @@ import (
 // ---------------------------------------------------------------------------
 
 func (u *UI) drawInventory(dst *ebiten.Image, s *sim.Sim, reg Regions) {
-	r := reg.Inventory
-	Panel(dst, r)
-	PanelTitle(dst, r, "Inventory")
+	r := u.WindowRect(WinInventory, reg)
+	DrawWindow(dst, r, WindowTitle(WinInventory), closableWindows[WinInventory])
+	contentY := r.Y + titleBarH
 	player := s.Player()
 
 	cargo, ok := s.Cargos.Get(player)
 	if !ok {
-		Text(dst, "No cargo hold", r.X+7, r.Y+28, 11, ColDim)
+		Text(dst, "No cargo hold", r.X+pad, contentY+pad, FontSmall, ColDim)
 		return
 	}
-	cargoSec := Rect{r.X + 6, r.Y + 26, r.W - 12, 116}
-	oreSec := Rect{r.X + 6, r.Y + 150, r.W - 12, 84}
+	cargoSec := Rect{X: r.X + pad, Y: contentY + pad, W: r.W - 2*pad, H: invCargoH}
+	oreSec := Rect{X: cargoSec.X, Y: cargoSec.Bottom() + pad, W: cargoSec.W, H: invOreH}
 	u.drawCargoSection(dst, cargoSec, "Cargo Hold", cargo.Stacks, cargo.Capacity, s)
 	u.drawCargoSection(dst, oreSec, "Ore Hold", cargo.Ore, cargo.OreCapacity, s)
 
 	if u.docked() {
 		Text(dst, "Docked — Station Services (G) moves items to your hangar.",
-			r.X+7, r.Bottom()-16, 9, ColAccent)
+			r.X+pad, oreSec.Bottom()+pad, FontTiny, ColAccent)
 	}
 }
 
@@ -39,43 +40,40 @@ func (u *UI) drawInventory(dst *ebiten.Image, s *sim.Sim, reg Regions) {
 func (u *UI) drawCargoSection(dst *ebiten.Image, sec Rect, title string,
 	stacks []content.CargoStack, capacity float64, s *sim.Sim) {
 
-	Text(dst, title, sec.X, sec.Y, 11, ColAccent)
+	Text(dst, title, sec.X, sec.Y, FontSmall, ColAccent)
 	used := 0.0
 	for _, st := range stacks {
 		if def, ok := s.Content.Item(st.Item); ok {
 			used += def.Volume * float64(st.Qty)
 		}
 	}
-	// volume meter + text on the header line
-	meterR := Rect{sec.X + sec.W - 130, sec.Y + 1, 130, 9}
 	if capacity > 0 {
-		Meter(dst, meterR, used/capacity, ColInfo)
 		TextRight(dst, FormatVolume(used)+" / "+FormatVolume(capacity),
-			sec.Right(), sec.Y+12, 9, ColDim)
+			sec.Right(), sec.Y, FontSmall, ColDim)
+		Meter(dst, Rect{X: sec.X, Y: sec.Y + invSecRowH, W: sec.W, H: invMeterH},
+			used/capacity, ColInfo)
 	}
 
-	maxRows := int((sec.H - 18) / 15)
+	maxRows := int((sec.H - invSecHeadH) / invSecRowH)
 	if len(stacks) == 0 {
-		Text(dst, "empty", sec.X+4, sec.Y+18, 10, ColDim)
+		Text(dst, "empty", sec.X+padSmall, sec.Y+invSecHeadH, FontSmall, ColDim)
 		return
 	}
 	for i, st := range stacks {
+		y := sec.Y + invSecHeadH + float64(i)*invSecRowH
 		if i >= maxRows {
-			Text(dst, "+ more...", sec.X+4, sec.Y+18+float64(maxRows)*15, 10, ColDim)
+			Text(dst, "+ more...", sec.X+padSmall, y, FontSmall, ColDim)
 			break
 		}
-		y := sec.Y + 18 + float64(i)*15
 		name := string(st.Item)
-		if def, ok := s.Content.Item(st.Item); ok {
-			name = def.Name
-		}
-		Text(dst, name, sec.X+4, y, 10, ColText)
 		vol := 0.0
 		if def, ok := s.Content.Item(st.Item); ok {
+			name = def.Name
 			vol = def.Volume * float64(st.Qty)
 		}
+		Text(dst, ellipsize(name, sec.W*0.6, FontSmall), sec.X+padSmall, y, FontSmall, ColText)
 		TextRight(dst, "×"+intStr(int64(st.Qty))+"  "+FormatVolume(vol),
-			sec.Right()-2, y, 10, ColDim)
+			NumberAnchor(Rect{X: sec.X, W: sec.W}), y, FontSmall, ColDim)
 	}
 }
 
@@ -84,8 +82,7 @@ func (u *UI) drawCargoSection(dst *ebiten.Image, sec Rect, title string,
 // ---------------------------------------------------------------------------
 
 func (u *UI) drawFitting(dst *ebiten.Image, s *sim.Sim, reg Regions) {
-	r := reg.Fitting
-	Panel(dst, r)
+	r := u.WindowRect(WinFitting, reg)
 	player := s.Player()
 	ship, hasShip := s.Ships.Get(player)
 	hullName, hullClass := "No ship", ""
@@ -98,7 +95,7 @@ func (u *UI) drawFitting(dst *ebiten.Image, s *sim.Sim, reg Regions) {
 	if hullClass != "" {
 		title += " (" + hullClass + ")"
 	}
-	PanelTitle(dst, r, title)
+	DrawWindow(dst, r, title, closableWindows[WinFitting])
 
 	fit, hasFit := s.Fittings.Get(player)
 	slots := content.Slots{}
@@ -114,7 +111,7 @@ func (u *UI) drawFitting(dst *ebiten.Image, s *sim.Sim, reg Regions) {
 
 	for row := 0; row < modRows; row++ {
 		rr := FittingSlotRow(r, row)
-		Text(dst, labels[row], rr.X, rr.Y+8, 10, ColHead)
+		Text(dst, labels[row], rr.X, rr.Y+(rr.H-lineH(FontTiny))/2, FontTiny, ColHead)
 		if !hasFit {
 			continue
 		}
@@ -137,22 +134,26 @@ func (u *UI) drawFitting(dst *ebiten.Image, s *sim.Sim, reg Regions) {
 			if def == nil {
 				border = withAlpha(ColBorder, 110)
 			}
+			if cell.Contains(u.mx, u.my) && def != nil {
+				border = withAlpha(ColAccent, 180) // hover
+			}
 			vector.DrawFilledRect(dst, float32(cell.X), float32(cell.Y), float32(cell.W), float32(cell.H),
 				bg, false)
 			vector.StrokeRect(dst, float32(cell.X)+0.5, float32(cell.Y)+0.5,
 				float32(cell.W)-1, float32(cell.H)-1, 1, border, false)
 			if def != nil {
-				TextCentered(dst, moduleLetter(def.Name), cell.X+cell.W/2, cell.Y+7, 13, moduleAccent(def.Kind))
-				// Unfit button.
-				ur := FittingUnfitRect(cell)
-				Button(dst, ur, "x", true)
+				TextCentered(dst, moduleLetter(def.Name), cell.X+cell.W/2,
+					cell.Y+(cell.H-lineH(FontLarge))/2, FontLarge, moduleAccent(def.Kind))
+				// Unfit button (small visual, see FittingUnfitRect note).
+				u.button(dst, FittingUnfitRect(cell), "x", true)
 			}
 		}
 	}
 
 	// Derived stats from the sim's own derived values.
 	stats := u.derivedStats(s, ship, hasShip)
-	y := FittingSlotRow(r, modRows-1).Bottom() + 8
+	y := FittingSlotRow(r, modRows-1).Bottom() + pad
+	rightAnchor := NumberAnchor(Rect{X: r.X, W: r.W - 1})
 	lines := [][2]string{
 		{"Shield " + intStr(int64(stats.shield)) +
 			"   Armor " + intStr(int64(stats.armor)) +
@@ -167,11 +168,11 @@ func (u *UI) drawFitting(dst *ebiten.Image, s *sim.Sim, reg Regions) {
 			"   Scan " + groupFloat(stats.scanRes, 0)},
 	}
 	for _, ln := range lines {
-		Text(dst, ln[0], r.X+7, y, 10, ColText)
+		Text(dst, ln[0], r.X+pad, y, FontSmall, ColText)
 		if ln[1] != "" {
-			TextRight(dst, ln[1], r.Right()-7, y, 10, ColDim)
+			TextRight(dst, ln[1], rightAnchor, y, FontSmall, ColDim)
 		}
-		y += 14
+		y += lineH(FontSmall)
 	}
 }
 
@@ -218,8 +219,7 @@ func (u *UI) derivedStats(s *sim.Sim, ship *sim.ShipState, hasShip bool) fitStat
 func pctStr(f float64) string { return FormatPct(f) }
 
 // clickFitting handles unfit clicks in the fitting window.
-func (u *UI) clickFitting(x, y float64, reg Regions) {
-	r := reg.Fitting
+func (u *UI) clickFitting(x, y float64, r Rect) {
 	fit, ok := u.s.Fittings.Get(u.s.Player())
 	if !ok {
 		return
@@ -246,12 +246,10 @@ func (u *UI) clickFitting(x, y float64, reg Regions) {
 // ---------------------------------------------------------------------------
 
 func (u *UI) drawLog(dst *ebiten.Image, reg Regions) {
-	r := reg.Log
-	Panel(dst, r)
-	PanelTitle(dst, r, "Log")
+	r := u.WindowRect(WinLog, reg)
+	DrawWindow(dst, r, WindowTitle(WinLog), false)
 
-	const lineH = 14.0
-	maxLines := int((r.H - 26) / lineH)
+	maxLines := int((r.H - titleBarH - 2*pad) / logLineH)
 	if maxLines < 1 {
 		return
 	}
@@ -259,12 +257,14 @@ func (u *UI) drawLog(dst *ebiten.Image, reg Regions) {
 	if start < 0 {
 		start = 0
 	}
-	y := r.Y + r.H - 6 - float64(len(u.log)-start)*lineH
+	timeW := render.Measure("[999:99]", FontSmall) + padSmall
+	y := r.Bottom() - pad - float64(len(u.log)-start)*logLineH
 	for i := start; i < len(u.log); i++ {
 		line := u.log[i]
-		Text(dst, "["+FormatTime(line.Time)+"]", r.X+5, y, 10, ColDim)
-		Text(dst, ellipsize(line.Text, r.W-46, 10), r.X+42, y, 10, severityColor(line.Sev))
-		y += lineH
+		Text(dst, "["+FormatTime(line.Time)+"]", r.X+pad, y, FontSmall, ColDim)
+		Text(dst, ellipsize(line.Text, r.W-2*pad-timeW, FontSmall),
+			r.X+pad+timeW, y, FontSmall, severityColor(line.Sev))
+		y += logLineH
 	}
 }
 

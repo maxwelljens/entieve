@@ -19,12 +19,13 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
-// Default window geometry.
+// Default window geometry. 1024×700 is the minimum supported window: the
+// layout tests pin every property at 1280×720 AND 1024×700.
 const (
 	defaultW = 1280
 	defaultH = 720
-	minW     = 800
-	minH     = 600
+	minW     = 1024
+	minH     = 700
 )
 
 // defaultSeed seeds a fresh simulation (replays/saves pin their own seed).
@@ -174,11 +175,7 @@ func (g *Game) Update() error {
 	}
 
 	// Fixed-timestep stepping at the current time acceleration.
-	tps := ebiten.ActualTPS()
-	if tps <= 0 || tps > 500 {
-		tps = 60
-	}
-	for i, n := 0, g.clock.Advance(1/tps); i < n; i++ {
+	for i, n := 0, g.clock.Advance(frameSec()); i < n; i++ {
 		g.s.Step()
 	}
 
@@ -287,17 +284,19 @@ func (g *Game) onEscape() error {
 
 func (g *Game) toggleMap() {
 	if _, ok := g.top().(*MapScene); ok {
-		g.pop()
+		g.pop() // OnLeave closes the starmap window
 		return
 	}
+	g.u.SetWindowOpen(ui.WinStarmap, true)
 	g.push(&MapScene{g: g})
 }
 
 func (g *Game) toggleHelp() {
 	if _, ok := g.top().(*HelpScene); ok {
-		g.pop()
+		g.pop() // OnLeave closes the help window
 		return
 	}
+	g.u.SetWindowOpen(ui.WinHelp, true)
 	g.push(&HelpScene{g: g})
 }
 
@@ -309,6 +308,16 @@ func (g *Game) toggleHelp() {
 var modifierKeys = []ebiten.Key{
 	ebiten.KeyShift, ebiten.KeyControl, ebiten.KeyAlt,
 	ebiten.KeyArrowUp, ebiten.KeyArrowDown, ebiten.KeyArrowLeft, ebiten.KeyArrowRight,
+}
+
+// frameSec returns the real seconds of one frame (for the fixed-timestep
+// clock and UI clocks), guarded against a stalled or unknown TPS.
+func frameSec() float64 {
+	tps := ebiten.ActualTPS()
+	if tps <= 0 || tps > 500 {
+		return 1.0 / 60.0
+	}
+	return 1.0 / tps
 }
 
 // buildInput snapshots ebiten input into a ui.Input (pure for the UI).
@@ -327,6 +336,7 @@ func (g *Game) buildInput() ui.Input {
 			inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft),
 			inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight),
 		},
+		RealSec: frameSec(),
 	}
 	for _, k := range modifierKeys {
 		if ebiten.IsKeyPressed(k) {
