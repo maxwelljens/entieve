@@ -1,0 +1,408 @@
+package sim
+
+import (
+	"encoding/json"
+	"sort"
+
+	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/core"
+	"github.com/entieve/entieve/ecs"
+)
+
+// buildSave assembles the Save struct from live state. The result may
+// alias live component slices; snapshot() deep-copies it through JSON.
+func (s *Sim) buildSave() (*Save, error) {
+	save := &Save{
+		World:    s.worldID,
+		System:   s.systemID,
+		Ticks:    s.ticks,
+		Seed:     s.seed,
+		RNGState: s.RNG.Snapshot(),
+		Wallet:   s.wallet,
+		Hangar:   *s.Hangar,
+		Market:   make(map[content.SystemID][]MarketStock, len(s.market)),
+		Respawn:  append([]RespawnTimer(nil), s.respawns...),
+	}
+	for sys, stock := range s.market {
+		save.Market[sys] = append([]MarketStock(nil), stock...)
+	}
+
+	for _, e := range s.allEntities() {
+		se := SavedEntity{ID: uint64(e)}
+		if v, ok := s.Names.Get(e); ok {
+			c := v.Value
+			se.Name = &c
+		}
+		if v, ok := s.Transforms.Get(e); ok {
+			c := *v
+			se.Transform = &c
+		}
+		if v, ok := s.Motions.Get(e); ok {
+			c := *v
+			se.Motion = &c
+		}
+		if v, ok := s.Ships.Get(e); ok {
+			c := *v
+			se.Ship = &c
+		}
+		if v, ok := s.Caps.Get(e); ok {
+			c := *v
+			se.Cap = &c
+		}
+		if v, ok := s.Cargos.Get(e); ok {
+			c := *v
+			se.Cargo = &c
+		}
+		if v, ok := s.Fittings.Get(e); ok {
+			c := *v
+			se.Fitting = &c
+		}
+		if v, ok := s.Targetings.Get(e); ok {
+			c := *v
+			se.Targeting = &c
+		}
+		if v, ok := s.Pilots.Get(e); ok {
+			c := *v
+			se.Pilot = &c
+		}
+		if v, ok := s.AIs.Get(e); ok {
+			c := SavedNpcAI{
+				Npc: v.Npc, State: v.State, Target: uint64(v.Target), Home: v.Home,
+			}
+			if v.Rand != nil {
+				c.RandState = v.Rand.Snapshot()
+			}
+			se.NPC = &c
+		}
+		if v, ok := s.Asteroids.Get(e); ok {
+			c := *v
+			se.Asteroid = &c
+		}
+		if v, ok := s.Celestials.Get(e); ok {
+			c := *v
+			se.Celestial = &c
+		}
+		if v, ok := s.Gates.Get(e); ok {
+			c := *v
+			se.Gate = &c
+		}
+		if v, ok := s.Stations.Get(e); ok {
+			c := *v
+			c.Services = append([]string(nil), v.Services...)
+			se.Station = &c
+		}
+		if v, ok := s.Docked.Get(e); ok {
+			c := *v
+			se.Docked = &c
+		}
+		if v, ok := s.Warps.Get(e); ok {
+			c := *v
+			se.Warp = &c
+		}
+		if v, ok := s.Wrecks.Get(e); ok {
+			c := *v
+			c.Loot = append([]content.CargoStack(nil), v.Loot...)
+			se.Wreck = &c
+		}
+		if v, ok := s.Intents.Get(e); ok {
+			c := *v
+			se.Intent = &c
+		}
+		save.Entities = append(save.Entities, se)
+	}
+
+	// Canonical entity order so hashes and reconstructions are stable.
+	sort.Slice(save.Entities, func(i, j int) bool {
+		return save.Entities[i].ID < save.Entities[j].ID
+	})
+
+	// Active module target bindings. The source is a map, so sort by
+	// owner/class/index to keep the serialization (and Hash) deterministic.
+	for k, t := range s.modTargets {
+		save.ModTargets = append(save.ModTargets, SavedModTarget{
+			Owner: k.owner, Class: k.class, Index: k.index, Target: uint64(t),
+		})
+	}
+	sort.Slice(save.ModTargets, func(i, j int) bool {
+		a, b := save.ModTargets[i], save.ModTargets[j]
+		if a.Owner != b.Owner {
+			return a.Owner < b.Owner
+		}
+		if a.Class != b.Class {
+			return a.Class < b.Class
+		}
+		return a.Index < b.Index
+	})
+
+	// Free-slot mirror in storage order (replayed verbatim by restore).
+	for _, f := range s.free {
+		save.FreeSlots = append(save.FreeSlots, SavedSlot{Index: f.idx, Generation: f.gen})
+	}
+
+	// Last docked station (respawn anchor) as an entity handle. A station
+	// outside the current grid has no handle: it saves as 0 and restores as
+	// the empty CelID, which resolves to nothing on both sides — keeping
+	// hash(restore(x)) == hash(x).
+	if s.lastStation != "" {
+		if e := s.stationAt(s.lastStation); !e.IsZero() {
+			save.LastStation = uint64(e)
+		}
+	}
+	return save, nil
+}
+
+// snapshot captures the full serializable state. The result is produced by a
+// JSON round-trip, which doubles as a deep copy (no aliasing with live sim
+// state) and guarantees the Save stays serializable.
+func (s *Sim) snapshot() (*Save, error) {
+	save, err := s.buildSave()
+	if err != nil {
+		return nil, err
+	}
+	// Deep copy through JSON.
+	raw, err := json.Marshal(save)
+	if err != nil {
+		return nil, err
+	}
+	var out Save
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// restore rebuilds the entire simulation from a snapshot.
+//
+// Entity handles are reproduced EXACTLY: the world's slot table (index +
+// generation of every live slot) and free-list storage order are replayed
+// from Save.FreeSlots, so post-restore World.Create calls hand out the same
+// handles a continued pre-snapshot run would — keeping Hash and behavior
+// identical across the round-trip. Pending events and queued commands are
+// dropped (they are not part of Save).
+func (s *Sim) restore(save *Save) error {
+	if save == nil {
+		return errf("sim: nil save")
+	}
+	// Work on a private deep copy: attach binds nested slices (cargo stacks,
+	// fitting runtimes, lock lists, wreck loot) and callers may legitimately
+	// restore several sims from one Save — stepping one must not mutate the
+	// others' source data. A JSON round-trip is the same fidelity as the
+	// on-disk format.
+	raw, err := json.Marshal(save)
+	if err != nil {
+		return errf("sim: save not serializable: %v", err)
+	}
+	var sv Save
+	if err := json.Unmarshal(raw, &sv); err != nil {
+		return errf("sim: save not deserializable: %v", err)
+	}
+	save = &sv
+	if _, ok := s.Content.System(save.System); !ok {
+		return errf("sim: save references unknown system %s", save.System)
+	}
+
+	// Canonicalize the saved entity order.
+	saved := append([]SavedEntity(nil), save.Entities...)
+	sort.Slice(saved, func(i, j int) bool { return saved[i].ID < saved[j].ID })
+
+	// Fresh world and stores.
+	s.World = ecs.New()
+	s.bindStores()
+	s.queue = nil
+	s.events = nil
+	s.deferLoot, s.deferEcon, s.deferTravel = nil, nil, nil
+	s.damage = nil
+	s.free = nil
+	s.modTargets = make(map[modKey]ecs.Entity)
+
+	// Slot table extent.
+	maxIdx := -1
+	for _, se := range saved {
+		if i := int(uint32(se.ID)); i > maxIdx {
+			maxIdx = i
+		}
+	}
+	for _, f := range save.FreeSlots {
+		if i := int(f.Index); i > maxIdx {
+			maxIdx = i
+		}
+	}
+	if maxIdx >= 1<<24 {
+		return errf("sim: save slot table too large (%d)", maxIdx)
+	}
+
+	// Phase A: materialize slots 0..maxIdx as generation-1 dummies.
+	handles := make([]ecs.Entity, maxIdx+1)
+	for i := range handles {
+		handles[i] = s.World.Create()
+	}
+
+	// Phase B: bump each live slot to its saved generation and attach the
+	// saved components. The transient free entry from each destroy is popped
+	// by the very next create, so the free list stays empty.
+	for _, se := range saved {
+		idx := uint32(se.ID)
+		gen := uint32(se.ID >> 32)
+		h := handles[idx]
+		for h.Generation() < gen {
+			s.World.Destroy(h)
+			h = s.World.Create()
+		}
+		if h != ecs.Entity(se.ID) {
+			return errf("sim: handle reconstruction mismatch for %d", se.ID)
+		}
+		handles[idx] = h
+		s.attach(h, se)
+	}
+
+	// Phase C: replay the free list in storage order so future creates
+	// reproduce the original handle sequence.
+	for _, f := range save.FreeSlots {
+		idx, gen := f.Index, f.Generation
+		if int(idx) > maxIdx {
+			return errf("sim: corrupt free list entry %d", idx)
+		}
+		h := handles[idx]
+		for h.Generation() < gen {
+			s.World.Destroy(h)
+			h = s.World.Create()
+		}
+		handles[idx] = h
+		s.World.Destroy(h)
+	}
+	for _, f := range save.FreeSlots {
+		s.free = append(s.free, freeSlot{idx: f.Index, gen: f.Generation})
+	}
+
+	// Scalars and auxiliary state.
+	s.worldID = save.World
+	s.systemID = save.System
+	s.ticks = save.Ticks
+	s.time = float64(save.Ticks) * DT
+	s.seed = save.Seed
+	s.wallet = save.Wallet
+	s.RNG = core.RestoreRNG(save.RNGState)
+	s.lastStation = ""
+	if save.LastStation != 0 {
+		if h := ecs.Entity(save.LastStation); s.World.Alive(h) {
+			if c, ok := s.Celestials.Get(h); ok {
+				s.lastStation = c.Cel
+			}
+		}
+	}
+	s.Hangar = cloneHangar(&save.Hangar)
+	s.respawns = append([]RespawnTimer(nil), save.Respawn...)
+
+	// Market: copy saved stock; rebuild missing entries from content.
+	s.market = initMarket(s.Content)
+	for sys, stock := range save.Market {
+		s.market[sys] = append([]MarketStock(nil), stock...)
+	}
+
+	for _, b := range save.ModTargets {
+		k := modKey{owner: b.Owner, class: b.Class, index: b.Index}
+		t := ecs.Entity(b.Target)
+		if !t.IsZero() && s.World.Alive(t) && s.World.Alive(ecs.Entity(b.Owner)) {
+			s.modTargets[k] = t
+		}
+	}
+
+	// Locate the player.
+	s.player = 0
+	for _, e := range sortedEntities(s.Pilots) {
+		if p, ok := s.Pilots.Get(e); ok && p.Player {
+			s.player = e
+			break
+		}
+	}
+	if s.player.IsZero() {
+		return errf("sim: save has no player entity")
+	}
+	return nil
+}
+
+// attach writes one saved entity's components back into the fresh stores.
+func (s *Sim) attach(e ecs.Entity, se SavedEntity) {
+	if se.Name != nil {
+		s.Names.Set(e, Name{Value: *se.Name})
+	}
+	if se.Transform != nil {
+		s.Transforms.Set(e, *se.Transform)
+	}
+	if se.Motion != nil {
+		s.Motions.Set(e, *se.Motion)
+	}
+	if se.Ship != nil {
+		s.Ships.Set(e, *se.Ship)
+	}
+	if se.Cap != nil {
+		s.Caps.Set(e, *se.Cap)
+	}
+	if se.Cargo != nil {
+		s.Cargos.Set(e, *se.Cargo)
+	}
+	if se.Fitting != nil {
+		s.Fittings.Set(e, *se.Fitting)
+	}
+	if se.Targeting != nil {
+		s.Targetings.Set(e, *se.Targeting)
+	}
+	if se.Pilot != nil {
+		s.Pilots.Set(e, *se.Pilot)
+	}
+	if se.NPC != nil {
+		s.AIs.Set(e, NpcAI{
+			Npc:    se.NPC.Npc,
+			State:  se.NPC.State,
+			Target: ecs.Entity(se.NPC.Target),
+			Home:   se.NPC.Home,
+			Rand:   core.RestoreRNG(se.NPC.RandState),
+		})
+	}
+	if se.Asteroid != nil {
+		s.Asteroids.Set(e, *se.Asteroid)
+	}
+	if se.Celestial != nil {
+		s.Celestials.Set(e, *se.Celestial)
+	}
+	if se.Gate != nil {
+		s.Gates.Set(e, *se.Gate)
+	}
+	if se.Station != nil {
+		st := *se.Station
+		st.Services = append([]string(nil), se.Station.Services...)
+		s.Stations.Set(e, st)
+	}
+	if se.Docked != nil {
+		s.Docked.Set(e, *se.Docked)
+	}
+	if se.Warp != nil {
+		s.Warps.Set(e, *se.Warp)
+	}
+	if se.Wreck != nil {
+		w := *se.Wreck
+		w.Loot = append([]content.CargoStack(nil), se.Wreck.Loot...)
+		s.Wrecks.Set(e, w)
+	}
+	if se.Intent != nil {
+		s.Intents.Set(e, *se.Intent)
+	}
+}
+
+// cloneHangar deep-copies a hangar (nil slices stay nil so JSON output —
+// and therefore Hash — is byte-identical across round-trips).
+func cloneHangar(h *Hangar) *Hangar {
+	out := &Hangar{}
+	out.Items = append([]content.CargoStack(nil), h.Items...)
+	if len(h.Ships) > 0 {
+		out.Ships = make([]StoredShip, len(h.Ships))
+		for i, sh := range h.Ships {
+			out.Ships[i] = StoredShip{
+				Hull:  sh.Hull,
+				Fit:   append([]content.ModuleID(nil), sh.Fit...),
+				Cargo: append([]content.CargoStack(nil), sh.Cargo...),
+			}
+		}
+	}
+	return out
+}

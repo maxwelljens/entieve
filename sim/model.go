@@ -329,6 +329,17 @@ type (
 
 	// CmdUnfitModule moves a fitted module to the hangar.
 	CmdUnfitModule struct{ Slot SlotRef }
+
+	// CmdTransfer moves item units between the player's storage holds.
+	// From/To are "cargo" (general hold), "ore" (ore hold) or "hangar"
+	// (station hangar; requires being docked at a station with the "fitting"
+	// service). The UI inventory panels drive it.
+	CmdTransfer struct {
+		Item content.ItemID
+		Qty  int
+		From string
+		To   string
+	}
 )
 
 func (CmdStop) isCommand()        {}
@@ -353,6 +364,7 @@ func (CmdRepair) isCommand()      {}
 func (CmdAssemble) isCommand()    {}
 func (CmdFitModule) isCommand()   {}
 func (CmdUnfitModule) isCommand() {}
+func (CmdTransfer) isCommand()    {}
 
 // ---------------------------------------------------------------------------
 // Events — the observation surface
@@ -488,6 +500,7 @@ type SavedEntity struct {
 	Docked    *Docked     `json:"docked,omitempty"`
 	Warp      *WarpDrive  `json:"warp,omitempty"`
 	Wreck     *Wreck      `json:"wreck,omitempty"`
+	Intent    *Intent     `json:"intent,omitempty"` // movement intent
 }
 
 // SavedNpcAI is NpcAI with serializable RNG state.
@@ -497,6 +510,21 @@ type SavedNpcAI struct {
 	Target    uint64        `json:"target"`
 	Home      core.Vec2     `json:"home"`
 	RandState uint64        `json:"rand_state"`
+}
+
+// SavedModTarget is an active-module target binding.
+type SavedModTarget struct {
+	Owner  uint64 `json:"owner"`
+	Class  string `json:"class"`
+	Index  int    `json:"index"`
+	Target uint64 `json:"target"`
+}
+
+// SavedSlot mirrors one ecs free-list entry (slot index + generation) so
+// restored worlds hand out identical future Entity handles.
+type SavedSlot struct {
+	Index      uint32 `json:"index"`
+	Generation uint32 `json:"generation"`
 }
 
 // Save is a full serializable simulation snapshot.
@@ -511,4 +539,14 @@ type Save struct {
 	Market   map[content.SystemID][]MarketStock `json:"market"`
 	Respawn  []RespawnTimer                     `json:"respawn"`
 	Entities []SavedEntity                      `json:"entities"`
+	// ModTargets are the active-module target bindings, kept sorted by
+	// owner/class/index so map iteration order never leaks into the
+	// canonical serialization (Hash).
+	ModTargets []SavedModTarget `json:"mod_targets,omitempty"`
+	// FreeSlots mirrors the ECS free list in storage order so restored
+	// worlds hand out identical future Entity handles.
+	FreeSlots []SavedSlot `json:"free_slots,omitempty"`
+	// LastStation is the entity handle of the last docked station (the
+	// respawn anchor); 0 when that station is not on the current grid.
+	LastStation uint64 `json:"last_station,omitempty"`
 }
