@@ -6,6 +6,7 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -256,4 +257,117 @@ func TestRackDrawSmoke(t *testing.T) {
 		t.Errorf("rack rect %v, want a bottom-right corner at (1270,710)", rect)
 	}
 	c.smoke(t)
+}
+
+// leftClick fires the widget-level left-button click ebitenui would fire
+// from input, then flushes the deferred event queue through an Update.
+func leftClick(c *chromeUI, t *testing.T, btn *widget.Button) {
+	t.Helper()
+	w := btn.GetWidget()
+	w.MouseButtonClickedEvent.Fire(&widget.WidgetMouseButtonClickedEventArgs{
+		Widget: w,
+		Button: ebiten.MouseButtonLeft,
+	})
+	c.update(t)
+}
+
+// TestRackLeftClickToggles is the command-wiring test for defect 3:
+// left-click enqueues CmdDeactivate for a running module and CmdActivate
+// for an idle one (target resolved from the locks), empty slots are inert,
+// and the active/inactive visual follows ModuleRuntime through Sync.
+func TestRackLeftClickToggles(t *testing.T) {
+	env, cmds := newChromeEnv(t)
+	r := NewRack(env)
+	c := newChromeUI(env)
+	c.addPanel(r.Container(), r)
+	c.frame(t, 1280, 720)
+
+	s := env.Sim
+	gun := r.cells[0][0] // EMP Turret, high slot 1 (a weapon)
+	miner := r.cells[0][1]
+	slot := sim.SlotRef{Class: content.SlotHigh, Index: 0}
+
+	// Empty slots are inert: no fitting, no enqueue.
+	if len(*cmds) != 0 {
+		t.Fatalf("precondition: %d commands already queued", len(*cmds))
+	}
+	leftClick(c, t, r.cells[2][3].btn)
+	if len(*cmds) != 0 {
+		t.Fatalf("empty slot enqueued %d commands, want 0", len(*cmds))
+	}
+
+	// Inactive weapon, no lock: CmdActivate with the zero (self) target.
+	leftClick(c, t, gun.btn)
+	if len(*cmds) != 1 {
+		t.Fatalf("idle click enqueued %d commands, want 1", len(*cmds))
+	}
+	act, ok := (*cmds)[0].(sim.CmdActivate)
+	if !ok {
+		t.Fatalf("command = %T, want sim.CmdActivate", (*cmds)[0])
+	}
+	if act.Slot != slot || act.Target != 0 {
+		t.Fatalf("CmdActivate = %+v, want {Slot:%+v Target:0}", act, slot)
+	}
+
+	// With locks, the activation targets the first lock that suits the
+	// module: a ship for the weapon, an asteroid for the miner.
+	var shipEnt, rockEnt = ecs.Entity(0), ecs.Entity(0)
+	for _, inf := range s.Grid() {
+		if inf.Kind == sim.KindShip && shipEnt == 0 {
+			shipEnt = inf.Entity
+		} else if inf.Kind == sim.KindAsteroid && rockEnt == 0 {
+			rockEnt = inf.Entity
+		}
+	}
+	tg, ok := s.Targetings.Get(s.Player())
+	if !ok {
+		t.Fatal("player has no targeting component")
+	}
+	tg.Locks = []sim.Lock{
+		{Target: rockEnt, Progress: 1}, // rock locked first: weapon skips it
+		{Target: shipEnt, Progress: 1},
+	}
+	r.Sync()
+
+	before := len(*cmds)
+	leftClick(c, t, gun.btn)
+	if len(*cmds) != before+1 {
+		t.Fatalf("locked weapon click enqueued %d commands, want 1", len(*cmds)-before)
+	}
+	if act, ok := (*cmds)[before].(sim.CmdActivate); !ok || act.Target != shipEnt {
+		t.Fatalf("weapon target = %+v (%T), want the locked ship", (*cmds)[before], (*cmds)[before])
+	}
+
+	before = len(*cmds)
+	leftClick(c, t, miner.btn)
+	if act, ok := (*cmds)[before].(sim.CmdActivate); !ok ||
+		act.Slot != (sim.SlotRef{Class: content.SlotHigh, Index: 1}) || act.Target != rockEnt {
+		t.Fatalf("miner command = %+v (%T), want CmdActivate on the locked rock", (*cmds)[before], (*cmds)[before])
+	}
+
+	// Active module: click enqueues CmdDeactivate, and the visual state
+	// (button Disabled = dim cell) follows the runtime through Sync.
+	fit, ok := s.Fittings.Get(s.Player())
+	if !ok {
+		t.Fatal("player has no fitting")
+	}
+	rt := &fit.HighRT[0]
+	rt.Active = true
+	r.Sync()
+	if gun.btn.GetWidget().Disabled {
+		t.Fatal("active module wears the inactive (dim) look")
+	}
+	before = len(*cmds)
+	leftClick(c, t, gun.btn)
+	if len(*cmds) != before+1 {
+		t.Fatalf("active click enqueued %d commands, want 1", len(*cmds)-before)
+	}
+	if de, ok := (*cmds)[before].(sim.CmdDeactivate); !ok || de.Slot != slot {
+		t.Fatalf("command = %+v (%T), want CmdDeactivate{Slot:%+v}", (*cmds)[before], (*cmds)[before], slot)
+	}
+	rt.Active = false
+	r.Sync()
+	if !gun.btn.GetWidget().Disabled {
+		t.Error("deactivated module lost the inactive (dim) look")
+	}
 }
