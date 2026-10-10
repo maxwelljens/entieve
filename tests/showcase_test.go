@@ -288,6 +288,69 @@ var rules = map[string]featureRule{
 	"determinism": func(c *content.Content, e *evidence) (bool, string) {
 		return e.DeterminismOK, "twin runs diverged"
 	},
+	"traffic-delivery": func(c *content.Content, e *evidence) (bool, string) {
+		if !e.kindSeen(sim.EvTraffic, sim.TrafficDelivered) {
+			return false, "no convoy delivery event"
+		}
+		if !e.eventRe(`price falls to`) {
+			return false, "no market price drift observed"
+		}
+		// The run must end with at least one good priced below its base —
+		// supply from deliveries actually moved the market, not just logs.
+		basePrice := func(sys content.SystemID, item content.ItemID) float64 {
+			if def, ok := c.System(sys); ok {
+				for _, o := range def.Market {
+					if o.Item == item {
+						return o.Price
+					}
+				}
+			}
+			if def, ok := c.Item(item); ok {
+				return def.BasePrice
+			}
+			return 0
+		}
+		if e.End != nil {
+			for sys, stock := range e.End.Market {
+				for _, st := range stock {
+					if b := basePrice(sys, st.Item); b > 0 && st.Price < b {
+						return true, ""
+					}
+				}
+			}
+		}
+		return false, "no market price ended below its base"
+	},
+	"traffic-attack": func(c *content.Content, e *evidence) (bool, string) {
+		for _, ev := range e.Events {
+			if ev.Kind == sim.EvTraffic && ev.Phase == sim.TrafficAttacked &&
+				ev.System == "sys-penumbra" {
+				return true, ""
+			}
+		}
+		return false, "no ambush rolled in the Penumbra legs"
+	},
+	"traffic-patrol": func(c *content.Content, e *evidence) (bool, string) {
+		response, escaped := false, false
+		for _, ev := range e.Events {
+			if ev.Kind != sim.EvTraffic || ev.System != "sys-penumbra" {
+				continue
+			}
+			switch ev.Phase {
+			case sim.TrafficPatrolResponse:
+				response = true
+			case sim.TrafficEscaped:
+				escaped = true
+			}
+		}
+		if !response {
+			return false, "no patrol response dispatched in Penumbra"
+		}
+		if !escaped {
+			return false, "patrol responded but the convoy never warped clear"
+		}
+		return true, ""
+	},
 }
 
 // TestShowcaseCoversEveryFeature is the game's end-to-end guarantee: the

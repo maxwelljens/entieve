@@ -83,6 +83,7 @@ func (s *Sim) storeLists() [][]ecs.Entity {
 		s.Pilots.Entities(), s.AIs.Entities(), s.Asteroids.Entities(),
 		s.Celestials.Entities(), s.Gates.Entities(), s.Stations.Entities(),
 		s.Docked.Entities(), s.Warps.Entities(), s.Wrecks.Entities(),
+		s.Traffic.Entities(), s.Patrols.Entities(),
 	}
 }
 

@@ -25,6 +25,12 @@ func (s *Sim) buildSave() (*Save, error) {
 		Market:   make(map[content.SystemID][]MarketStock, len(s.market)),
 		Respawn:  append([]RespawnTimer(nil), s.respawns...),
 	}
+	if s.trafficRNG != nil {
+		save.TrafficRNGState = s.trafficRNG.Snapshot()
+	}
+	if len(s.trafficLeaves) > 0 {
+		save.TrafficLeaves = append([]TrafficLeave(nil), s.trafficLeaves...)
+	}
 	for sys, stock := range s.market {
 		save.Market[sys] = append([]MarketStock(nil), stock...)
 	}
@@ -109,6 +115,19 @@ func (s *Sim) buildSave() (*Save, error) {
 		if v, ok := s.Intents.Get(e); ok {
 			c := *v
 			se.Intent = &c
+		}
+		if v, ok := s.Traffic.Get(e); ok {
+			c := *v
+			if v.Attack != nil {
+				ac := *v.Attack
+				ac.Raiders = append([]ecs.Entity(nil), v.Attack.Raiders...)
+				c.Attack = &ac
+			}
+			se.Traffic = &c
+		}
+		if v, ok := s.Patrols.Get(e); ok {
+			c := *v
+			se.Patrol = &c
 		}
 		save.Entities = append(save.Entities, se)
 	}
@@ -292,6 +311,7 @@ func (s *Sim) restore(save *Save) error {
 	s.standing = save.Standing
 	s.missions = append([]MissionState(nil), save.Missions...)
 	s.RNG = core.RestoreRNG(save.RNGState)
+	s.trafficRNG = core.RestoreRNG(save.TrafficRNGState)
 	s.lastStation = ""
 	if save.LastStation != 0 {
 		if h := ecs.Entity(save.LastStation); s.World.Alive(h) {
@@ -302,6 +322,7 @@ func (s *Sim) restore(save *Save) error {
 	}
 	s.Hangar = cloneHangar(&save.Hangar)
 	s.respawns = append([]RespawnTimer(nil), save.Respawn...)
+	s.trafficLeaves = append([]TrafficLeave(nil), save.TrafficLeaves...)
 
 	// Market: copy saved stock; rebuild missing entries from content.
 	s.market = initMarket(s.Content)
@@ -396,6 +417,18 @@ func (s *Sim) attach(e ecs.Entity, se SavedEntity) {
 	}
 	if se.Intent != nil {
 		s.Intents.Set(e, *se.Intent)
+	}
+	if se.Traffic != nil {
+		c := *se.Traffic
+		if se.Traffic.Attack != nil {
+			ac := *se.Traffic.Attack
+			ac.Raiders = append([]ecs.Entity(nil), se.Traffic.Attack.Raiders...)
+			c.Attack = &ac
+		}
+		s.Traffic.Set(e, c)
+	}
+	if se.Patrol != nil {
+		s.Patrols.Set(e, *se.Patrol)
 	}
 }
 

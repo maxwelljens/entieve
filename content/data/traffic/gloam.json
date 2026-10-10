@@ -1,0 +1,20 @@
+{
+  "system": "sys-gloam",
+  "routes": [
+    {
+      "from": "cel-gloam-belt",
+      "to": "cel-gate-penumbra",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "ore-glacierite", "qty": 400 },
+      "interval_ticks": 2400
+    },
+    {
+      "from": "cel-gate-penumbra",
+      "to": "cel-gloam-belt",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "charge-cap-cell", "qty": 200 },
+      "interval_ticks": 2400
+    }
+  ],
+  "raider": "npc-rat-hierarch"
+}

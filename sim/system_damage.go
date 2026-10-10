@@ -131,6 +131,18 @@ func (s *Sim) handleDeath(e, src ecs.Entity) {
 		}
 	}
 
+	// Convoy haulers carry their shipment instead of a rat loot table: the
+	// wreck gets the cargo (lootable through the normal CmdLoot path), and
+	// the destination market takes the lost-supply risk premium.
+	var tc *Traffic
+	if t, ok := s.Traffic.Get(e); ok {
+		tc = t
+		if tc.Qty > 0 && tc.Item != "" {
+			loot = addStacks(loot, tc.Item, tc.Qty)
+		}
+		s.trafficHaulerDestroyed(e, tc)
+	}
+
 	// Bounty: only kills attributed to the player pay out.
 	if def != nil && def.Bounty > 0 && src == s.player {
 		s.wallet += def.Bounty
@@ -149,7 +161,7 @@ func (s *Sim) handleDeath(e, src ecs.Entity) {
 		Text: name + " destroyed"})
 
 	if hasAI {
-		s.recordRespawn(ai)
+		s.recordRespawn(e, ai)
 		s.checkAnomalyCleared(ai)
 	}
 	s.destroy(e)
@@ -158,8 +170,13 @@ func (s *Sim) handleDeath(e, src ecs.Entity) {
 // recordRespawn queues a respawn timer for a dead (or fled) NPC when its
 // spawn group has RespawnSec > 0. The owning celestial and the respawn
 // cadence are re-derived from Home + the system definition so no extra
-// state needs persisting across save/load.
-func (s *Sim) recordRespawn(ai *NpcAI) {
+// state needs persisting across save/load. Traffic ambushers are skipped:
+// they are not members of any spawn group, and their deaths near a belt or
+// anomaly must not queue timers against that group.
+func (s *Sim) recordRespawn(e ecs.Entity, ai *NpcAI) {
+	if s.isTrafficRaider(e) {
+		return
+	}
 	cel := s.nearestCelestial(ai.Home)
 	if cel.IsZero() {
 		return

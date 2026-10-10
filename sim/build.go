@@ -261,6 +261,14 @@ func (s *Sim) spawnAsteroid(cel *content.CelestialDef, ad content.AsteroidDef) {
 // within spread) with its own forked RNG stream. It returns the entity, or
 // zero when the definition is missing/invalid.
 func (s *Sim) spawnNpc(id content.NpcID, celPos core.Vec2, spread float64) ecs.Entity {
+	return s.spawnNpcStream(id, celPos, spread, s.RNG)
+}
+
+// spawnNpcStream is spawnNpc drawing its spawn scatter from the given RNG
+// stream instead of the master stream. Traffic spawns use it so convoy
+// activity never consumes master-stream rolls (existing seed-pinned
+// outcomes stay put).
+func (s *Sim) spawnNpcStream(id content.NpcID, celPos core.Vec2, spread float64, rng *core.RNG) ecs.Entity {
 	def, ok := s.Content.Npc(id)
 	if !ok {
 		return 0
@@ -274,8 +282,8 @@ func (s *Sim) spawnNpc(id content.NpcID, celPos core.Vec2, spread float64) ecs.E
 		return 0
 	}
 
-	angle := s.RNG.Range(0, 2*math.Pi)
-	r := s.RNG.Range(0, spread)
+	angle := rng.Range(0, 2*math.Pi)
+	r := rng.Range(0, spread)
 	pos := celPos.Add(core.Vec2{X: math.Cos(angle) * r, Y: math.Sin(angle) * r})
 
 	e := s.create()

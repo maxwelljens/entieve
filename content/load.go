@@ -12,10 +12,10 @@ import (
 
 // Load reads game data from fsys.
 //
-// It walks items/, ships/, modules/, npcs/, systems/, worlds/, contracts/
-// plus universe.json under the filesystem root. Every JSON file may contain a
-// single object or an array of objects. universe.json must contain exactly
-// one UniverseDef whose "systems" field is empty (systems come from
+// It walks items/, ships/, modules/, npcs/, systems/, worlds/, contracts/,
+// traffic/ plus universe.json under the filesystem root. Every JSON file may
+// contain a single object or an array of objects. universe.json must contain
+// exactly one UniverseDef whose "systems" field is empty (systems come from
 // systems/*.json; the universe file only supplies region/constellation/
 // start_system).
 //
@@ -29,6 +29,7 @@ func Load(fsys fs.FS) (*Content, error) {
 		NPCs:      map[NpcID]*NpcDef{},
 		Systems:   map[SystemID]*SystemDef{},
 		Contracts: map[ContractID]*ContractDef{},
+		Traffic:   map[SystemID]*TrafficDef{},
 		Worlds:    map[WorldID]*WorldDef{},
 	}
 	l := &loader{c: c, defined: map[string]string{}}
@@ -54,6 +55,11 @@ func Load(fsys fs.FS) (*Content, error) {
 	loadObjects[ContractDef](l, fsys, "contracts", "contract",
 		func(d *ContractDef) string { return string(d.ID) },
 		func(d *ContractDef) { c.Contracts[d.ID] = d })
+	// Traffic defs are keyed by their system (one def per system), so the
+	// system ID doubles as the duplicate-detection identity.
+	loadObjects[TrafficDef](l, fsys, "traffic", "traffic",
+		func(d *TrafficDef) string { return string(d.System) },
+		func(d *TrafficDef) { c.Traffic[d.System] = d })
 
 	l.universe(fsys)
 
