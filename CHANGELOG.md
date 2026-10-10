@@ -43,6 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Warp travel is a process, not a jump: the align gate plus an
   accel → cruise → decel tunnel profile (distance-scaled cruise, minimum
   warp duration, no teleports) — scrams still cancel mid-warp.
+- The game shell hosts uikit end-to-end: all eleven panels, preserved
+  keymap, world input gated off chrome, save/load rebuilding the kit;
+  integration hooks close the last gaps (world-click selection drives the
+  Selected Item panel and overview highlight, chrome mounts on the root
+  overlay, Overview/Selected hide while docked, log history survives a
+  load). The legacy hand-drawn `ui/` package is retired — palette and type
+  scale are pinned by golden-value tests.
 - UI typography is ~75% larger and padding +20%, with all chrome metrics
   derived from type and spacing constants (no hand-tuned magic numbers).
 - Module tooltips, hover/pressed states, 40 px minimum hit areas,

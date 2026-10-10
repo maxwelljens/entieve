@@ -1,13 +1,16 @@
 // Command enui-spike is a standalone visual-evaluation demo for uikit, the
 // ebitenui-based interface layer: the world-showcase simulation rendered
-// through render, with the live Overview and Selected Item windows on top.
+// through render, with the live Overview, Selected Item, Market,
+// Inventory and Fitting windows on top.
 //
 // Run on a desktop with:
 //
 //	go run ./cmd/enui-spike
 //
-// Keys: Esc quits, +/– change time acceleration. Everything else (row
-// clicks, sort headers, window drag/resize, wheel paging) lives in the UI.
+// Keys: Esc quits, +/– change time acceleration, I toggles the
+// inventory, F the fitting window and G the market. Everything else
+// (row clicks, sort headers, window drag/resize, wheel scrolling) lives
+// in the UI.
 package main
 
 import (
@@ -15,6 +18,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/render"
@@ -48,6 +52,17 @@ type spike struct {
 	zoom  float64
 	accel int
 	acc   float64 // fixed-timestep accumulator (seconds)
+
+	// Station windows, toggled with I/F/G; remove closes them again.
+	market    *uikit.Market
+	inventory *uikit.Inventory
+	fitting   *uikit.Fitting
+	mkShown   bool
+	invShown  bool
+	fitShown  bool
+	mkRemove  widget.RemoveWindowFunc
+	invRemove widget.RemoveWindowFunc
+	fitRemove widget.RemoveWindowFunc
 }
 
 func main() {
@@ -67,19 +82,35 @@ func main() {
 	if err != nil {
 		log.Fatalf("uikit.NewKit: %v", err)
 	}
+	// The station windows ride the kit's window stack (same theme,
+	// stacking and input pump) through the AddWindow seam.
+	env := uikit.NewEnv(c, s, s.Queue)
+	g := &spike{
+		sim:       s,
+		ren:       render.New(c),
+		kit:       kit,
+		zoom:      zoomStart,
+		market:    uikit.NewMarket(env),
+		inventory: uikit.NewInventory(env),
+		fitting:   uikit.NewFitting(env),
+	}
+	g.mkRemove = kit.AddWindow(g.market.Win())
+	g.invRemove = kit.AddWindow(g.inventory.Win())
+	g.fitRemove = kit.AddWindow(g.fitting.Win())
+	g.mkShown, g.invShown, g.fitShown = true, true, true
 
 	ebiten.SetWindowTitle(titleBase)
 	ebiten.SetWindowSize(screenW, screenH)
 	ebiten.SetWindowResizable(true)
 
-	g := &spike{sim: s, ren: render.New(c), kit: kit, zoom: zoomStart}
 	if err := ebiten.RunGame(g); err != nil && !errors.Is(err, ebiten.Termination) {
 		log.Fatal(err)
 	}
 }
 
-// Update quits on Esc, handles time acceleration, syncs the kit and steps
-// the simulation on a fixed 60 tps timestep.
+// Update quits on Esc, handles time acceleration and window toggles,
+// syncs the kit and the station windows, and steps the simulation on a
+// fixed 60 tps timestep.
 func (g *spike) Update() error {
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 		return ebiten.Termination
@@ -95,6 +126,12 @@ func (g *spike) Update() error {
 			g.accel--
 			g.refreshTitle()
 		}
+	case inpututil.IsKeyJustPressed(ebiten.KeyI):
+		g.toggle(&g.invShown, &g.invRemove, g.inventory.Win())
+	case inpututil.IsKeyJustPressed(ebiten.KeyF):
+		g.toggle(&g.fitShown, &g.fitRemove, g.fitting.Win())
+	case inpututil.IsKeyJustPressed(ebiten.KeyG):
+		g.toggle(&g.mkShown, &g.mkRemove, g.market.Win())
 	}
 
 	// Ease the camera out toward the belt (frame-rate based, fine for a
@@ -105,6 +142,9 @@ func (g *spike) Update() error {
 	}
 
 	g.kit.Sync()
+	g.market.Sync()
+	g.inventory.Sync()
+	g.fitting.Sync()
 	if err := g.kit.Update(); err != nil {
 		return err
 	}
@@ -123,6 +163,17 @@ func (g *spike) Update() error {
 	}
 	g.sim.Events() // drain: the spike has no event log
 	return nil
+}
+
+// toggle shows or hides one of the station windows.
+func (g *spike) toggle(shown *bool, remove *widget.RemoveWindowFunc, win *widget.Window) {
+	if *shown {
+		(*remove)()
+		*shown = false
+		return
+	}
+	*remove = g.kit.AddWindow(win)
+	*shown = true
 }
 
 // Draw renders the world first, then the interface on top.
