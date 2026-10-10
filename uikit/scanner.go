@@ -128,6 +128,7 @@ func NewScanner(env Env) *Scanner {
 		widget.WindowOpts.MinSize(260, titleBarH+scanBodyH),
 		widget.WindowOpts.Location(image.Rect(10, 251, 10+scanW, 251+titleBarH+scanBodyH)),
 	)
+	makeEdgeResizable(s.win) // four-edge resize
 	return s
 }
 

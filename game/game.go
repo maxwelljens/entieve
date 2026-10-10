@@ -48,7 +48,7 @@ type Options struct {
 }
 
 // panelID identifies one toggleable interface window. The always-on
-// chrome (Overview, Selected Item, HUD, rack, log) and the docked station
+// chrome (Overview, Selected Item, HUD, rack) and the docked station
 // strip are managed separately.
 type panelID int
 
@@ -59,6 +59,7 @@ const (
 	pScanner
 	pMap
 	pHelp
+	pLog
 	pMenu
 	numPanels
 )
@@ -77,18 +78,19 @@ type Game struct {
 
 	// Anchored chrome panels, mounted directly on the kit's root overlay
 	// (Kit.AddContainer); the HUD and rack are hidden — not unmounted —
-	// while docked, the log rides both views.
+	// while docked.
 	hud  *uikit.Hud
 	rack *uikit.Rack
-	logP *uikit.LogPanel
 
-	// Window panels.
-	inv      *uikit.Inventory
-	fitt     *uikit.Fitting
-	mkt      *uikit.Market
-	scan     *uikit.Scanner
-	mp       *uikit.MapView
-	help     *uikit.HelpPanel
+	// Window panels (the log joined them: pLog below).
+	logP *uikit.LogPanel
+	inv  *uikit.Inventory
+	fitt *uikit.Fitting
+	mkt  *uikit.Market
+	scan *uikit.Scanner
+	mp   *uikit.MapView
+	help *uikit.HelpPanel
+
 	menuWin  *widget.Window
 	stationW *widget.Window
 	stName   *widget.Text
@@ -150,6 +152,10 @@ func New(opts Options) (*Game, error) {
 		w:    defaultW,
 		h:    defaultH,
 	}
+	// The log is open by default (it used to be non-closable chrome);
+	// the saved layout may override this once the first screen size
+	// lands (see applyLayout).
+	g.open[pLog] = true
 	if err := g.buildKit(); err != nil {
 		return nil, err
 	}
@@ -203,9 +209,10 @@ func (g *Game) Layout(width, height int) (int, int) {
 }
 
 // applySize records the screen size and — on the first real size —
-// (re)places the movable default window positions (user-dragged positions
-// survive later resizes). The root-overlay chrome anchors itself, so a
-// resize needs no refit from the game.
+// (re)places the movable default window positions and restores the
+// saved layout over them (user-dragged positions survive later
+// resizes). The root-overlay chrome anchors itself, so a resize needs
+// no refit from the game.
 func (g *Game) applySize(w, h int) {
 	if g.sized && w == g.w && h == g.h {
 		return
@@ -214,6 +221,7 @@ func (g *Game) applySize(w, h int) {
 	g.sized, g.w, g.h = true, w, h
 	if first {
 		g.placeDefaults(w, h)
+		g.applyLayout(w, h) // startup: read the sidecar once the screen is known
 	}
 }
 
@@ -261,6 +269,10 @@ func (g *Game) Update() error {
 		g.report(g.LoadGame(), "Game loaded")
 	}
 	if g.quit {
+		// Clean quit: persist the window layout so it survives the
+		// restart even without a manual save (best-effort — the loop is
+		// ending and there is nowhere left to report an error).
+		g.writeLayout()
 		return ebiten.Termination
 	}
 	return nil
@@ -316,6 +328,9 @@ func (g *Game) handleKeys(in Input) error {
 				g.open[pScanner] = !g.open[pScanner]
 			case k == ebiten.KeyG:
 				g.open[pMarket] = !g.open[pMarket]
+			case shift && k == ebiten.KeyL:
+				// Shift+L toggles the log window; plain L stays loot.
+				g.open[pLog] = !g.open[pLog]
 			case world:
 				g.worldKey(k, shift)
 			}
@@ -374,12 +389,15 @@ func (g *Game) syncMounts() {
 	g.setPanel(pScanner, g.open[pScanner] && !docked)
 	g.setPanel(pMap, g.open[pMap])
 	g.setPanel(pHelp, g.open[pHelp])
+	// The log is a normal window now: it rides both views (its history
+	// persists across mounts) and mounts before the Esc menu so the menu
+	// keeps the top of the draw order.
+	g.setPanel(pLog, g.open[pLog])
 	g.setPanel(pMenu, g.open[pMenu])
 
 	// The ship HUD and module rack are space chrome: hidden on the root
-	// overlay while docked (legacy parity). The log rides both views,
-	// and the kit's core windows (Overview / Selected Item) follow the
-	// same rule.
+	// overlay while docked (legacy parity), and the kit's core windows
+	// (Overview / Selected Item) follow the same rule.
 	g.setChromeVisible(!docked)
 	g.kit.SetCoreVisible(!docked)
 
@@ -452,6 +470,8 @@ func (g *Game) panelWindow(p panelID) *widget.Window {
 		return g.mp.Win()
 	case pHelp:
 		return g.help.Win()
+	case pLog:
+		return g.logP.Win()
 	case pMenu:
 		return g.menuWin
 	}
@@ -461,8 +481,9 @@ func (g *Game) panelWindow(p panelID) *widget.Window {
 // overUI reports whether the pointer sits on any interface panel: the
 // exact rects of every measurable panel (the kit's core windows, the
 // root-overlay chrome, the station and menu strips, all mounted toggle
-// windows) plus ebitenui's own hover flag, which covers what the game
-// cannot measure (rack tooltips, ephemeral windows). The hover flag only
+// windows — the log among them while it is open) plus ebitenui's own
+// hover flag, which covers what the game cannot measure (rack tooltips,
+// ephemeral windows). The hover flag only
 // refreshes in Draw, so it lags a frame behind the pointer — the exact
 // rects are the honest gate, the flag is a backstop.
 // ebitenui does not gate raw ebiten input, so world mouse handling must
@@ -488,9 +509,8 @@ func (g *Game) overUI(x, y float64) bool {
 	if g.rack != nil && hitWidget(pt, g.rack.Container().GetWidget()) {
 		return true
 	}
-	if g.logP != nil && hitWidget(pt, g.logP.Container().GetWidget()) {
-		return true
-	}
+	// The log is a mounted window like the rest: when it is closed the
+	// loop below skips it, so a closed log never gates the world.
 	for p := panelID(0); p < numPanels; p++ {
 		if g.mounted[p] == nil {
 			continue
@@ -530,9 +550,10 @@ func (g *Game) report(err error, okMsg string) {
 
 // buildKit constructs the kit, every panel and the root-overlay chrome
 // against the current sim. LoadGame re-runs it: panels hold sim
-// references, so a restore rebuilds the whole interface (selection and
-// window positions reset; the toggle intent in g.open survives, and
-// LoadGame carries the log history across).
+// references, so a restore rebuilds the whole interface (selection
+// resets; the toggle intent in g.open survives, LoadGame carries the
+// log history across, and LoadGame re-applies the saved window layout
+// after this returns).
 func (g *Game) buildKit() error {
 	kit, err := uikit.NewKit(g.opts.Content, g.s, g.s.Queue)
 	if err != nil {
@@ -561,7 +582,8 @@ func (g *Game) buildKit() error {
 	// Always-on chrome mounts straight onto the kit's root overlay — no
 	// full-screen wrapper windows: the HUD stretches across the root and
 	// anchors its own bar/target row, the rack takes the bottom-right
-	// corner and the log the bottom-left one.
+	// corner. (The log used to anchor here too; it is a window now and
+	// mounts through syncMounts like the other panels.)
 	kit.AddContainer(g.hud.Container(), widget.AnchorLayoutData{
 		StretchHorizontal: true,
 		StretchVertical:   true,
@@ -571,15 +593,10 @@ func (g *Game) buildKit() error {
 		VerticalPosition:   widget.AnchorLayoutPositionEnd,
 		Padding:            &widget.Insets{Right: 10, Bottom: 10},
 	})
-	kit.AddContainer(g.logP.Container(), widget.AnchorLayoutData{
-		HorizontalPosition: widget.AnchorLayoutPositionStart,
-		VerticalPosition:   widget.AnchorLayoutPositionEnd,
-		Padding:            &widget.Insets{Left: 10, Bottom: 10},
-	})
-	// Rack and log track hover so input.UIHovered covers their padding
-	// too. The HUD container must not: it spans the whole screen.
+	// Rack tracks hover so input.UIHovered covers its padding too. The
+	// HUD container must not: it spans the whole screen. (The log window
+	// gets hover tracking from the window chrome itself.)
 	g.rack.Container().GetWidget().TrackHover = true
-	g.logP.Container().GetWidget().TrackHover = true
 
 	// Panels are fresh: no mounts, no selection (documented).
 	g.mounted = [numPanels]widget.RemoveWindowFunc{}
@@ -606,6 +623,13 @@ func (g *Game) placeDefaults(w, h int) {
 	sp := g.kit.SelectedWindow()
 	if r := sp.GetContainer().GetWidget().Rect; r.Dx() > 0 {
 		sp.SetLocation(image.Rect(w-10-r.Dx(), 8, w-10, 8+r.Dy()))
+	}
+	// The log docks bottom-left: flush with the left/bottom margins, its
+	// default width fits the pocket left of the HUD bar (the 420 px bar
+	// starts at x=302 at the 1024 minimum) and its top clears the
+	// overview — so the default set stays pairwise disjoint.
+	if r := g.logP.Win().GetContainer().GetWidget().Rect; r.Dx() > 0 {
+		g.logP.Win().SetLocation(image.Rect(10, h-10-r.Dy(), 10+r.Dx(), h-10))
 	}
 	// Centre column, below the top row (Selected Item owns the top-right
 	// corner at 1024×700) and above the HUD bar.
@@ -801,7 +825,9 @@ func (g *Game) SavePath() string {
 }
 
 // SaveGame snapshots the sim to SavePath (default
-// os.UserConfigDir()/entieve/save.json).
+// os.UserConfigDir()/entieve/save.json) and writes the window-layout
+// sidecar next to it, so a restart keeps the layout even without a
+// second save.
 func (g *Game) SaveGame() error {
 	save, err := g.s.Snapshot()
 	if err != nil {
@@ -815,13 +841,16 @@ func (g *Game) SaveGame() error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		return err
+	}
+	return g.writeLayout()
 }
 
 // LoadGame restores the sim from SavePath mid-run and rebuilds the
-// interface against the restored sim (selection and window positions
-// reset; open windows stay open; the log history is carried across the
-// rebuild).
+// interface against the restored sim (selection resets; open windows
+// stay open; the log history is carried across the rebuild). The saved
+// window layout is restored after the rebuild, over the fresh defaults.
 func (g *Game) LoadGame() error {
 	data, err := os.ReadFile(g.SavePath())
 	if err != nil {
@@ -841,6 +870,7 @@ func (g *Game) LoadGame() error {
 		return err
 	}
 	g.logP.SetLines(lines)
+	g.applyLayout(g.w, g.h) // AFTER the rebuild: fresh windows, fresh mounts
 	if g.space != nil {
 		g.space.ResetView()
 	}

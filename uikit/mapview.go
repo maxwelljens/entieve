@@ -90,6 +90,7 @@ func NewMapView(env Env) *MapView {
 		// 1280×720); the integrator re-centers it on real layout.
 		widget.WindowOpts.Location(image.Rect(160, 80, 160+mapImgW+2*contentsPad, 80+titleBarH+mapImgH+2*contentsPad)),
 	)
+	makeEdgeResizable(m.win) // four-edge resize
 	return m
 }
 

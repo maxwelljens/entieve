@@ -28,8 +28,16 @@ func newSmokeGame(t *testing.T) *Game {
 }
 
 // newShowcaseGame builds a session over the world-showcase sim, the same
-// fixture the uikit panel tests drive.
+// fixture the uikit panel tests drive, on a fresh temp save path.
 func newShowcaseGame(t *testing.T) *Game {
+	t.Helper()
+	return newShowcaseGameAt(t, filepath.Join(t.TempDir(), "save.json"))
+}
+
+// newShowcaseGameAt builds the same session on an explicit save path —
+// several sessions can share one path to simulate restarts (and their
+// layout sidecars).
+func newShowcaseGameAt(t *testing.T, savePath string) *Game {
 	t.Helper()
 	c, err := content.Load(content.FS())
 	if err != nil {
@@ -43,7 +51,7 @@ func newShowcaseGame(t *testing.T) *Game {
 		Content:  c,
 		World:    wd,
 		Seed:     42,
-		SavePath: filepath.Join(t.TempDir(), "save.json"),
+		SavePath: savePath,
 	})
 	if err != nil {
 		t.Fatalf("game.New: %v", err)
@@ -68,9 +76,9 @@ func pump(t *testing.T, g *Game, w, h int) *ebiten.Image {
 }
 
 // mountedRects returns the screen rect of every visible panel: the kit's
-// core windows, the mounted toggle windows, the station strip and the
-// root-overlay chrome. Hidden panels are skipped — they never lay out and
-// keep a stale rect.
+// core windows, the mounted toggle windows (the log among them), the
+// station strip and the root-overlay chrome. Hidden panels are skipped —
+// they never lay out and keep a stale rect.
 func mountedRects(g *Game) []struct {
 	name string
 	rect image.Rectangle
@@ -99,7 +107,7 @@ func mountedRects(g *Game) []struct {
 		add("station", g.stationW.GetContainer().GetWidget())
 	}
 	// Root-overlay chrome: the HUD's visible children (the target-box row
-	// is hidden until something is locked), the rack and the log.
+	// is hidden until something is locked) and the rack.
 	if g.hud != nil && isVisible(g.hud.Container().GetWidget()) {
 		for i, ch := range g.hud.Container().Children() {
 			add("hud."+strconv.Itoa(i), ch.GetWidget())
@@ -107,9 +115,6 @@ func mountedRects(g *Game) []struct {
 	}
 	if g.rack != nil {
 		add("rack", g.rack.Container().GetWidget())
-	}
-	if g.logP != nil {
-		add("log", g.logP.Container().GetWidget())
 	}
 	return out
 }
@@ -129,6 +134,7 @@ var panelNames = map[panelID]string{
 	pScanner:   "scanner",
 	pMap:       "map",
 	pHelp:      "help",
+	pLog:       "log",
 	pMenu:      "menu",
 }
 

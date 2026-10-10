@@ -2,6 +2,7 @@ package uikit
 
 import (
 	"fmt"
+	"image"
 	"image/color"
 	"strconv"
 	"strings"
@@ -11,27 +12,46 @@ import (
 )
 
 // Log panel geometry: five visible lines like the legacy log window, a
-// 200-line history cap (older lines are dropped, not truncated in place).
+// 200-line history cap (older lines are dropped, not truncated in
+// place), and the window defaults. The log is a normal draggable/
+// resizable window docked bottom-left: the free pocket left of the HUD
+// bar is 292 px wide at the 1024×700 minimum (the 420 px bar starts at
+// x=302), so the default stays under it — with the defaults the window
+// never overlaps the HUD, rack or overview.
 const (
 	logViewLines = 5
 	logViewW     = 240
 	logViewH     = logViewLines * 23 // lines × lineH(FontSmall)
 	logMaxLines  = 200
+
+	logDefaultW = 288 // fits the bottom-left pocket (see above)
+	logDefaultH = 240
+	logMinW     = logViewW + 2*contentsPad             // text-area floor + body padding
+	logMinH     = titleBarH + logViewH + 2*contentsPad // + title bar
 )
 
-// LogPanel is the bottom-left combat/action log: a scrollable text area
-// whose lines carry a dim sim-time stamp and a severity color through
-// BBCode markup. It is push-driven — the integrator forwards sim.Events()
-// to Push each frame and may add its own lines with PushLine.
-type LogPanel struct {
-	env       Env
-	container *widget.Container
-	ta        *widget.TextArea
-	lines     []string
+// logDefaultRect is the construction-time placement (bottom-left pocket
+// at the 1024×700 minimum); the game re-anchors it to the real screen
+// on first layout, like every other movable window.
+func logDefaultRect() image.Rectangle {
+	return image.Rect(10, 700-10-logDefaultH, 10+logDefaultW, 700-10)
 }
 
-// NewLog builds the log panel over the given environment. Its container
-// anchors bottom-left in an anchor-layout root.
+// LogPanel is the combat/action log: a scrollable text area whose lines
+// carry a dim sim-time stamp and a severity color through BBCode markup,
+// inside a draggable/resizable window titled "Log". It is push-driven —
+// the integrator forwards sim.Events() to Push each frame and may add
+// its own lines with PushLine.
+type LogPanel struct {
+	env   Env
+	win   *widget.Window
+	ta    *widget.TextArea
+	lines []string
+}
+
+// NewLog builds the log panel over the given environment as a window on
+// the interface's window stack (WindowPanel): default logDefaultW ×
+// logDefaultH, bottom-left, edge-resize chrome attached.
 func NewLog(env Env) *LogPanel {
 	p := env.Pal
 	l := &LogPanel{env: env}
@@ -73,28 +93,31 @@ func NewLog(env Env) *LogPanel {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 		widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.MinSize(0, titleBarH),
-			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 		),
 	)
 	title.AddChild(titleText)
 
-	l.container = widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-		)),
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionEnd,
-			Padding:            &widget.Insets{Left: 10, Bottom: 10},
-		})),
+	l.win = widget.NewWindow(
+		widget.WindowOpts.Contents(body),
+		widget.WindowOpts.TitleBar(title, titleBarH),
+		widget.WindowOpts.Draggable(),
+		widget.WindowOpts.MinSize(logMinW, logMinH),
+		widget.WindowOpts.Location(logDefaultRect()),
 	)
-	l.container.AddChild(title, body)
+	makeEdgeResizable(l.win)
 	return l
 }
 
-// Container returns the log's root widget for the interface root (anchor
-// layout).
-func (l *LogPanel) Container() *widget.Container { return l.container }
+// Container returns the log window's root container. The log used to be
+// root-anchored chrome; the game now gates world input over this rect
+// through the normal window path (it is also reachable via Win).
+func (l *LogPanel) Container() *widget.Container {
+	return l.win.GetContainer().(*widget.Container)
+}
+
+// Win returns the log window for Kit.AddWindow: LogPanel is a
+// WindowPanel, mounted and toggled like every other window.
+func (l *LogPanel) Win() *widget.Window { return l.win }
 
 // Sync is a no-op: the log is push-driven so the integrator owns the sim
 // event drain (Push is the seam; draining here would swallow events other

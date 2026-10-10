@@ -44,6 +44,10 @@ type Kit struct {
 	sp   *selectedPanel
 	root *widget.Container
 
+	// chromes are the edge-resize chromes of the windows mounted on this
+	// kit (built-in + AddWindow); pumped every frame from Update/Draw.
+	chromes []*winChrome
+
 	// core visibility (hidden e.g. while docked in a station)
 	coreHidden bool
 }
@@ -71,6 +75,10 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	k.faces = newFaces(k.scale)
 	k.theme = NewTheme(k.palette, k.scale)
 
+	// One kit owns the live window set: drop the chrome index of any kit
+	// rebuilt by a save/load so its discarded windows can be collected.
+	chromeByWindow = map[*widget.Window]*winChrome{}
+
 	// Root container: transparent overlay over the world render; windows
 	// float above it. The theme rides the widget parent chain.
 	root := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
@@ -79,8 +87,13 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 
 	k.buildOverview()
 	k.buildSelected()
-	// AddWindow validates the window trees against the theme and makes the
-	// chrome persistent (the spike has no close affordance).
+	// The kit's own windows take the four-edge resize chrome here (panel
+	// windows attach theirs in their constructors and join through
+	// AddWindow below). AddWindow validates the window trees against the
+	// theme and makes the chrome persistent (the spike has no close
+	// affordance).
+	makeEdgeResizable(k.ov.win)
+	makeEdgeResizable(k.sp.win)
 	k.ui.AddWindow(k.ov.win)
 	k.ui.AddWindow(k.sp.win)
 
@@ -88,16 +101,20 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	return k, nil
 }
 
-// Update advances the UI (input, layout bookkeeping, deferred events).
-// Call it from ebiten.Game.Update.
+// Update advances the UI (input, layout bookkeeping, deferred events)
+// and pumps the window resize chrome. Call it from ebiten.Game.Update.
 func (k *Kit) Update() error {
 	k.ui.Update()
+	k.stepChromes()
 	return nil
 }
 
 // Draw renders the interface onto screen. Call it AFTER the world render.
 func (k *Kit) Draw(screen *ebiten.Image) {
 	k.ui.Draw(screen)
+	// Second chrome pass: the built-in title-bar drag moved rects during
+	// Render; recompute so the next frame's hit tests see clean geometry.
+	k.stepChromes()
 	k.ov.drawTints(screen, k)
 }
 
@@ -121,7 +138,7 @@ func (k *Kit) Select(e ecs.Entity) {
 }
 
 // Root returns the kit's root overlay container, for integrations that mount
-// always-on chrome (HUD, module rack, log) directly instead of windows.
+// always-on chrome (HUD, module rack) directly instead of windows.
 func (k *Kit) Root() widget.Containerer { return k.root }
 
 // AddContainer mounts an always-on panel container into the root overlay

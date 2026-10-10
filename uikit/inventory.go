@@ -133,10 +133,10 @@ func NewInventory(env Env) *Inventory {
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, titleBarH),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.Resizeable(),
 		widget.WindowOpts.MinSize(300, 440),
 		widget.WindowOpts.Location(image.Rect(396, 256, 696, 696)),
 	)
+	makeEdgeResizable(inv.win) // four-edge resize (replaces WindowOpts.Resizeable)
 	return inv
 }
 

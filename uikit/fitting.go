@@ -142,10 +142,10 @@ func NewFitting(env Env) *Fitting {
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, titleBarH),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.Resizeable(),
 		widget.WindowOpts.MinSize(300, 400),
 		widget.WindowOpts.Location(image.Rect(704, 8, 1008, 696)),
 	)
+	makeEdgeResizable(f.win) // four-edge resize (replaces WindowOpts.Resizeable)
 	return f
 }
 

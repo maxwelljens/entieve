@@ -111,10 +111,10 @@ func NewMarket(env Env) *Market {
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, titleBarH),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.Resizeable(),
 		widget.WindowOpts.MinSize(300, 240),
 		widget.WindowOpts.Location(image.Rect(396, 8, 696, 248)),
 	)
+	makeEdgeResizable(m.win) // four-edge resize (replaces WindowOpts.Resizeable)
 	return m
 }
 
