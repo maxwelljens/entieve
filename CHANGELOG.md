@@ -33,6 +33,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   palette) and the sim command seam. The evaluation spike shipped: resizable
   draggable windows, elastic overview columns with priority shrink and
   name-last ellipsis, sortable headers, visible-only sensor-gated rows.
+- Full uikit port: reusable column `Table` (scroll-container + per-row
+  containers — solving ebitenui's column/per-row-styling gaps), Overview,
+  Selected Item (context-gated actions), Market, Inventory (hold transfers),
+  Fitting (stats/resists/slots + fit/unfit/assemble), HUD (layer arcs,
+  capacitor, targets), module rack (cycle progress, stat tooltips,
+  right-click ammo cycling), BBCode combat log, scanner sweep, starmap,
+  help window.
+- Warp travel is a process, not a jump: the align gate plus an
+  accel → cruise → decel tunnel profile (distance-scaled cruise, minimum
+  warp duration, no teleports) — scrams still cancel mid-warp.
 - UI typography is ~75% larger and padding +20%, with all chrome metrics
   derived from type and spacing constants (no hand-tuned magic numbers).
 - Module tooltips, hover/pressed states, 40 px minimum hit areas,

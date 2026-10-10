@@ -283,49 +283,49 @@
     "target": "Penumbra Den"
   },
   {
-    "at_tick": 59400,
+    "at_tick": 59900,
     "action": "lock",
     "target": "Marauder",
     "note": "fight 3: the marauder webs us and hits us with its warp scrambler"
   },
   {
-    "at_tick": 59600,
+    "at_tick": 60100,
     "action": "orbit",
     "target": "Marauder",
     "range": 6000
   },
   {
-    "at_tick": 60200,
+    "at_tick": 61000,
     "action": "activate",
     "slot": "high0",
     "target": "Marauder"
   },
   {
-    "at_tick": 60260,
+    "at_tick": 61060,
     "action": "activate",
     "slot": "mid2",
     "target": "Marauder"
   },
   {
-    "at_tick": 60320,
+    "at_tick": 61120,
     "action": "activate",
     "slot": "high2",
     "target": "Marauder"
   },
   {
-    "at_tick": 61000,
+    "at_tick": 62000,
     "action": "lock",
     "target": "Hierarch",
     "note": "boss fight: the hierarch tanks, boosts and webs; it never flees"
   },
   {
-    "at_tick": 61300,
+    "at_tick": 62300,
     "action": "orbit",
     "target": "Hierarch",
     "range": 20000
   },
   {
-    "at_tick": 62100,
+    "at_tick": 63200,
     "action": "activate",
     "slot": "high0",
     "target": "Hierarch"

@@ -23,7 +23,7 @@ import (
 const (
 	showcaseWorldID = "world-showcase"
 	showcaseScript  = "scripts/showcase.json"
-	showcaseTicks   = 65_000 // ~18 sim minutes; covers the full script tour
+	showcaseTicks   = 66_000 // ~18.3 sim minutes; covers the full script tour
 	probeEveryTicks = 300    // 5 sim seconds (state vocabularies track every tick)
 )
 

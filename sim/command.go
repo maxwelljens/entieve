@@ -26,8 +26,11 @@ func (s *Sim) applyCommand(cmd Command) {
 	if p.IsZero() || !s.World.Alive(p) {
 		return
 	}
-	// Piloting commands are ignored while the warp drive is engaged (the
-	// warp state machine owns movement until it lands).
+	// While the warp drive is engaged the state machine owns movement:
+	// CmdStop is ignored (warp cannot be aborted by stopping), while course
+	// commands (manual/approach/orbit/align) are recorded as the intent and
+	// take effect the moment the drive releases the ship on landing — they
+	// never fight the align gate or the tunnel profile.
 	warping := s.Warps.Has(p)
 
 	switch c := cmd.(type) {
@@ -38,9 +41,6 @@ func (s *Sim) applyCommand(cmd Command) {
 		s.Intents.Set(p, Intent{Kind: IntentStop})
 
 	case CmdManualVel:
-		if warping {
-			return
-		}
 		dir := c.Dir.Norm()
 		if dir.IsZero() {
 			s.Intents.Set(p, Intent{Kind: IntentStop})
@@ -49,25 +49,16 @@ func (s *Sim) applyCommand(cmd Command) {
 		s.Intents.Set(p, Intent{Kind: IntentManual, Dir: dir, SpeedFrac: clamp(c.SpeedFrac, 0, 1)})
 
 	case CmdApproach:
-		if warping {
-			return
-		}
 		if s.validMoveTarget(c.Target) {
 			s.Intents.Set(p, Intent{Kind: IntentApproach, Target: c.Target})
 		}
 
 	case CmdOrbit:
-		if warping {
-			return
-		}
 		if s.validMoveTarget(c.Target) {
 			s.Intents.Set(p, Intent{Kind: IntentOrbit, Target: c.Target, Range: c.Range})
 		}
 
 	case CmdAlignTo:
-		if warping {
-			return
-		}
 		if s.validMoveTarget(c.Target) {
 			s.Intents.Set(p, Intent{Kind: IntentAlign, Target: c.Target})
 		}

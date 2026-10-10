@@ -221,6 +221,12 @@ type Docked struct{ At content.CelID }
 type WarpDrive struct {
 	Phase string // "" | "align" | "warp" | "land"
 	To    core.Vec2
+	// Dist is the total warp distance (m) of the current warp; Speed is the
+	// current along-vector speed (m/s) — presentation state for warp UI.
+	// Dist tracks the live distance to the landing point while aligning and
+	// freezes at the tunnel profile distance when the warp phase starts.
+	Dist  float64
+	Speed float64
 }
 
 // Wreck is the remains of a destroyed ship, holding rolled loot.
