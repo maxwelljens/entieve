@@ -371,3 +371,55 @@ func TestRackLeftClickToggles(t *testing.T) {
 		t.Error("deactivated module lost the inactive (dim) look")
 	}
 }
+
+// TestRackClickTargetsSelection pins the F-key parity seam: click
+// activation targets the player's SELECTED entity (via SetTargetPicker)
+// when it is locked and suits the module, falling back to the first
+// suiting lock when the selection is zero.
+func TestRackClickTargetsSelection(t *testing.T) {
+	env, cmds := newChromeEnv(t)
+	r := NewRack(env)
+	c := newChromeUI(env)
+	c.addPanel(r.Container(), r)
+	c.frame(t, 1280, 720)
+
+	s := env.Sim
+	var ships []ecs.Entity
+	for _, inf := range s.Grid() {
+		if inf.Kind == sim.KindShip {
+			ships = append(ships, inf.Entity)
+		}
+	}
+	if len(ships) < 2 {
+		t.Fatalf("fixture has %d ships, need >= 2", len(ships))
+	}
+	first, second := ships[0], ships[1]
+	tg, ok := s.Targetings.Get(s.Player())
+	if !ok {
+		t.Fatal("player has no targeting component")
+	}
+	tg.Locks = []sim.Lock{
+		{Target: first, Progress: 1},
+		{Target: second, Progress: 1},
+	}
+	selected := second
+	r.SetTargetPicker(func() ecs.Entity { return selected })
+	r.Sync()
+
+	gun := r.cells[0][0] // EMP Turret: a weapon
+	before := len(*cmds)
+	leftClick(c, t, gun.btn)
+	if act, ok := (*cmds)[before].(sim.CmdActivate); !ok || act.Target != second {
+		t.Fatalf("selected-target click = %+v (%T), want CmdActivate on the selected ship %d",
+			(*cmds)[before], (*cmds)[before], second)
+	}
+
+	// Selection cleared: fall back to the first suiting lock.
+	selected = 0
+	before = len(*cmds)
+	leftClick(c, t, gun.btn)
+	if act, ok := (*cmds)[before].(sim.CmdActivate); !ok || act.Target != first {
+		t.Fatalf("fallback click = %+v (%T), want CmdActivate on the first lock %d",
+			(*cmds)[before], (*cmds)[before], first)
+	}
+}

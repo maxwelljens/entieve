@@ -18,6 +18,7 @@ import (
 	enuiinput "github.com/ebitenui/ebitenui/input"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit"
@@ -565,6 +566,10 @@ func (g *Game) buildKit() error {
 
 	g.hud = uikit.NewHud(env)
 	g.rack = uikit.NewRack(env)
+	// Click-activation targets the player's selected entity first — the
+	// same source the F-key module toggles use — before falling back to
+	// the first suitable lock.
+	g.rack.SetTargetPicker(func() ecs.Entity { return kit.Selected() })
 	g.logP = uikit.NewLog(env)
 	g.inv = uikit.NewInventory(env)
 	g.fitt = uikit.NewFitting(env)

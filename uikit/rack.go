@@ -51,6 +51,11 @@ type Rack struct {
 	cells     [rackRows][rackMaxCells]*rackCell
 	ammoPref  map[sim.SlotRef]content.ItemID
 	measure   func(string) float64
+	// pick, when set (game wires Kit.Selected), names the entity the player
+	// currently has selected so click-activation targets it — the same
+	// source the F-key module toggles use — before falling back to the
+	// first suitable lock.
+	pick func() ecs.Entity
 }
 
 // rackCell is one slot: a cell column (button + cycle bar) plus its tooltip
@@ -215,6 +220,10 @@ func rackCellImages(p Palette) *widget.ButtonImage {
 // Container returns the rack's root widget for the interface root (anchor
 // layout).
 func (r *Rack) Container() *widget.Container { return r.container }
+
+// SetTargetPicker installs the source of the player's current selection so
+// click-activation targets the selected entity first (see clickTarget).
+func (r *Rack) SetTargetPicker(fn func() ecs.Entity) { r.pick = fn }
 
 // Sync refreshes every cell — module, active state, cycle progress and
 // tooltip — from the player's fitting. Call it once per frame before Update.
@@ -440,9 +449,10 @@ func (r *Rack) toggleModule(cell *rackCell) {
 }
 
 // clickTarget resolves the activation target for a click the way EVE's
-// "fire on the active target" works: the first fully-locked target that
-// suits the module — a ship for weapons, an asteroid for miners, any lock
-// for ewar — and the zero entity (self) for everything else. Without a
+// "fire on the active target" works: the player's selected entity when it
+// is fully locked and suits the module, else the first fully-locked target
+// that suits — a ship for weapons, an asteroid for miners, any lock for
+// ewar — and the zero entity (self) for everything else. Without a
 // suitable lock the sim refuses with a logged warning.
 func (r *Rack) clickTarget(def *content.ModuleDef) ecs.Entity {
 	s := r.env.Sim
@@ -452,6 +462,15 @@ func (r *Rack) clickTarget(def *content.ModuleDef) ecs.Entity {
 	tg, ok := s.Targetings.Get(s.Player())
 	if !ok {
 		return ecs.Entity(0)
+	}
+	if r.pick != nil {
+		if e := r.pick(); e != 0 && targetSuits(s, def, e) {
+			for _, l := range tg.Locks {
+				if l.Target == e && l.Progress >= 1 {
+					return e
+				}
+			}
+		}
 	}
 	for _, l := range tg.Locks {
 		if l.Progress < 1 {
@@ -473,6 +492,21 @@ func (r *Rack) clickTarget(def *content.ModuleDef) ecs.Entity {
 		}
 	}
 	return ecs.Entity(0)
+}
+
+// targetSuits reports whether entity e is a valid target class for def
+// (weapon→ship, mining→asteroid, ewar→anything, else self).
+func targetSuits(s *sim.Sim, def *content.ModuleDef, e ecs.Entity) bool {
+	switch {
+	case def.Weapon != nil:
+		return s.Ships.Has(e)
+	case def.Mining != nil:
+		return s.Asteroids.Has(e)
+	case def.Kind == content.KindStasisWeb || def.Kind == content.KindWarpScram:
+		return true
+	default:
+		return false
+	}
 }
 
 // cycleAmmo advances a weapon cell's charge preference one step and enqueues
