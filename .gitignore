@@ -18,3 +18,5 @@
 *~
 .idea/
 .vscode/
+# User-dropped art is local content (docs/ART.md). Force-add to track.
+assets/**/*.png
