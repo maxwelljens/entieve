@@ -28,6 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- UI platform decision: chrome migrates to `uikit/` on **ebitenui v0.7.3**
+  (pinned), keeping the EVE-dark theme (parity-tested against the legacy
+  palette) and the sim command seam. The evaluation spike shipped: resizable
+  draggable windows, elastic overview columns with priority shrink and
+  name-last ellipsis, sortable headers, visible-only sensor-gated rows.
 - UI typography is ~75% larger and padding +20%, with all chrome metrics
   derived from type and spacing constants (no hand-tuned magic numbers).
 - Module tooltips, hover/pressed states, 40 px minimum hit areas,

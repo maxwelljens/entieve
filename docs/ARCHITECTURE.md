@@ -416,6 +416,18 @@ timers, save/restore round-trip, determinism (Hash equality of twin runs).
 
 ## `render` / `ui` / `game` contract
 
+> **UI direction (2026-10):** the chrome is migrating from the hand-drawn `ui/`
+> package to `uikit/`, built on **ebitenui v0.7.3** (pinned in go.mod). The
+> spike (theme parity, resizable windows, elastic overview columns,
+> text/v2 interop) passed; the EVE-dark palette and type scale are preserved
+> by `TestThemeMatchesLegacyPalette`. Two upstream gaps shape the port:
+> `widget.List` cannot do columns, per-row styling, or scroll introspection —
+> so data tables use `widget.ScrollContainer` + per-row containers (we own the
+> scroll instance); custom graphics (HUD arcs, starmap) render into
+> `*ebiten.Image` shown via `widget.Graphic`. `uikit/Env` + `Panel`/`WindowPanel`
+> are the seam every chrome panel implements. `sim`/`content`/`script` and the
+> showcase suite are unaffected by the migration.
+
 - `render.Renderer` created with `(*content.Content)`; `Draw(dst *ebiten.Image,
   cam Camera, s *sim.Sim)` reads sim stores read-only. Vector art: ships as
   polygons per hull class, star glow, parallax starfield (seeded), grid dots,
