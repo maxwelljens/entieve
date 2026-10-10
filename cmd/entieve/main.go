@@ -37,7 +37,7 @@ Usage:
   entieve run       [--world ID] [--seed N] [--load save.json] [--save save.json]
   entieve validate  [--dir content/data]
   entieve simulate  [--world ID] [--seed N] [--ticks N] [--script steps.json] [--quiet]
-  entieve describe  <id>            (any content id: item, ship, module, npc, system, world)
+  entieve describe  <id>            (any content id: item, ship, module, npc, system, world, contract)
   entieve version
 
 Run "entieve <subcommand> -h" for subcommand flags.`
@@ -141,8 +141,8 @@ func cmdValidate(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "entieve validate: FAILED\n%v\n", err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "content OK: %d items, %d ships, %d modules, %d npcs, %d systems, %d worlds\n",
-		len(c.Items), len(c.Ships), len(c.Modules), len(c.NPCs), len(c.Systems), len(c.Worlds))
+	fmt.Fprintf(stdout, "content OK: %d items, %d ships, %d modules, %d npcs, %d systems, %d worlds, contracts: %d\n",
+		len(c.Items), len(c.Ships), len(c.Modules), len(c.NPCs), len(c.Systems), len(c.Worlds), len(c.Contracts))
 	return 0
 }
 
@@ -202,6 +202,27 @@ func printReport(w io.Writer, s *sim.Sim, res *script.Result, ticks int64) {
 	fmt.Fprintf(w, "\n== simulation report ==\n")
 	fmt.Fprintf(w, "ticks: %d (%.2fs sim time)\n", ticks, s.Time())
 	fmt.Fprintf(w, "wallet: %.2f cr\n", s.Wallet())
+	// Standing and the contract book next to the wallet: the read surface
+	// of the contracts loop (docs/GAMEPLAY.md, "Contracts & standing").
+	fmt.Fprintf(w, "standing: %.2f\n", s.Standing())
+	active := s.Missions()
+	var completed []string
+	for _, ev := range res.Events {
+		if ev.Kind == sim.EvMission && ev.Phase == sim.MissionCompleted {
+			completed = append(completed, ev.ID)
+		}
+	}
+	fmt.Fprintf(w, "missions: %d active, %d completed\n", len(active), len(completed))
+	for _, m := range active {
+		line := "  active " + string(m.ID)
+		if def, ok := s.Content.Contract(m.ID); ok {
+			line += fmt.Sprintf(" %g/%g", m.Progress, float64(def.Objective.Count))
+		}
+		fmt.Fprintln(w, line)
+	}
+	for _, id := range completed {
+		fmt.Fprintln(w, "  completed "+id)
+	}
 	fmt.Fprintf(w, "state hash: %016x\n", s.Hash())
 	fmt.Fprintf(w, "events: %d, steps run: %d, unresolved: %d\n",
 		len(res.Events), res.Ran, len(res.Unresolved))
@@ -314,6 +335,14 @@ func describeLookup(c *content.Content, id string) (any, error) {
 					}
 				})
 			}},
+		{"contract", func(s string) (any, bool) { d, ok := c.Contract(content.ContractID(s)); return d, ok },
+			func() []string {
+				return ids(len(c.Contracts), func(yield func(string)) {
+					for k := range c.Contracts {
+						yield(string(k))
+					}
+				})
+			}},
 	}
 	var all []string
 	for _, b := range buckets {
@@ -337,7 +366,7 @@ func describeLookup(c *content.Content, id string) (any, error) {
 	if len(near) > 0 {
 		return nil, fmt.Errorf("unknown id %q (did you mean: %s?)", id, strings.Join(near, ", "))
 	}
-	return nil, fmt.Errorf("unknown id %q (%d known ids across items/ships/modules/npcs/systems/worlds)", id, len(all))
+	return nil, fmt.Errorf("unknown id %q (%d known ids across items/ships/modules/npcs/systems/worlds/contracts)", id, len(all))
 }
 
 // ids collects a range-over-func style iterator into a slice.

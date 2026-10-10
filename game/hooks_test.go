@@ -170,7 +170,11 @@ func TestCoreWindowsDockFlow(t *testing.T) {
 	}
 
 	// Dock: the station scene flows SetCoreVisible(false) through
-	// syncMounts — both windows hide and stop gating the world.
+	// syncMounts — both windows hide and stop gating the world. Probe the
+	// overview's left margin: the station contract board now covers its
+	// centre while docked (a visible panel that gates correctly), so the
+	// hidden-overview check must run where only the overview itself
+	// could gate.
 	dockAt(t, g)
 	g.syncScenes()
 	g.syncMounts()
@@ -178,8 +182,9 @@ func TestCoreWindowsDockFlow(t *testing.T) {
 	if ov.IsVisible() || sp.IsVisible() {
 		t.Error("core windows visible while docked")
 	}
-	if x, y := centerOf(t, ov.Rect); g.overUI(x, y) {
-		t.Error("hidden overview still gates the world")
+	_, cy := centerOf(t, ov.Rect)
+	if g.overUI(float64(ov.Rect.Min.X), cy) {
+		t.Errorf("hidden overview still gates the world at (%v, %v)", ov.Rect.Min.X, cy)
 	}
 
 	// Undock: both come back and gate again.
