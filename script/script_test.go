@@ -212,3 +212,53 @@ func TestRunCommandMapping(t *testing.T) {
 }
 
 func contains(s, sub string) bool { return strings.Contains(s, sub) }
+
+// TestMissionActionsParse pins that accept-mission/abandon-mission are valid
+// DSL actions and require a contract id.
+func TestMissionActionsParse(t *testing.T) {
+	data := []byte(`[
+		{"at_tick": 10, "action": "accept-mission", "mission": "contract-solace-cleanup-1"},
+		{"at_tick": 90, "action": "abandon-mission", "mission": "contract-solace-cleanup-1"}
+	]`)
+	steps, err := Parse(data)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if len(steps) != 2 || steps[0].Action != "accept-mission" || steps[1].Action != "abandon-mission" {
+		t.Fatalf("unexpected steps: %+v", steps)
+	}
+	if steps[0].Mission != "contract-solace-cleanup-1" {
+		t.Fatalf("mission field = %q", steps[0].Mission)
+	}
+
+	for _, action := range []string{"accept-mission", "abandon-mission"} {
+		_, err := Parse([]byte(`[{"at_tick":0,"action":"` + action + `"}]`))
+		if err == nil || !contains(err.Error(), "mission id required") {
+			t.Fatalf("%s without mission: want %q error, got %v", action, "mission id required", err)
+		}
+	}
+}
+
+// TestMissionActionsDispatch pins the command mapping of both new actions.
+func TestMissionActionsDispatch(t *testing.T) {
+	steps := []Step{
+		{AtTick: 0, Action: "accept-mission", Mission: "contract-solace-cleanup-1"},
+		{AtTick: 1, Action: "abandon-mission", Mission: "contract-solace-cordite-1"},
+	}
+	f := &fakeEngine{}
+	res := Run(f, steps, 2, nil)
+	if len(res.Unresolved) != 0 || res.Ran != 2 {
+		t.Fatalf("Ran=%d unresolved=%+v", res.Ran, res.Unresolved)
+	}
+	if len(f.queued) != 2 {
+		t.Fatalf("queued %d commands, want 2", len(f.queued))
+	}
+	accept, ok := f.queued[0].(sim.CmdAcceptMission)
+	if !ok || accept.ID != "contract-solace-cleanup-1" {
+		t.Fatalf("queued[0] = %#v, want CmdAcceptMission(contract-solace-cleanup-1)", f.queued[0])
+	}
+	abandon, ok := f.queued[1].(sim.CmdAbandonMission)
+	if !ok || abandon.ID != "contract-solace-cordite-1" {
+		t.Fatalf("queued[1] = %#v, want CmdAbandonMission(contract-solace-cordite-1)", f.queued[1])
+	}
+}

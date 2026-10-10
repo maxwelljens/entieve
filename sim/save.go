@@ -19,6 +19,8 @@ func (s *Sim) buildSave() (*Save, error) {
 		Seed:     s.seed,
 		RNGState: s.RNG.Snapshot(),
 		Wallet:   s.wallet,
+		Standing: s.standing,
+		Missions: append([]MissionState(nil), s.missions...),
 		Hangar:   *s.Hangar,
 		Market:   make(map[content.SystemID][]MarketStock, len(s.market)),
 		Respawn:  append([]RespawnTimer(nil), s.respawns...),
@@ -210,8 +212,10 @@ func (s *Sim) restore(save *Save) error {
 	s.bindStores()
 	s.queue = nil
 	s.events = nil
-	s.deferLoot, s.deferEcon, s.deferTravel = nil, nil, nil
+	s.deferLoot, s.deferEcon, s.deferTravel, s.deferMission = nil, nil, nil, nil
 	s.damage = nil
+	s.pendingKills, s.pendingOre = nil, nil
+	s.dockedThisTick = ""
 	s.free = nil
 	s.modTargets = make(map[modKey]ecs.Entity)
 	// Preferences and the recent-player-work marker live outside the frozen
@@ -285,6 +289,8 @@ func (s *Sim) restore(save *Save) error {
 	s.time = float64(save.Ticks) * DT
 	s.seed = save.Seed
 	s.wallet = save.Wallet
+	s.standing = save.Standing
+	s.missions = append([]MissionState(nil), save.Missions...)
 	s.RNG = core.RestoreRNG(save.RNGState)
 	s.lastStation = ""
 	if save.LastStation != 0 {

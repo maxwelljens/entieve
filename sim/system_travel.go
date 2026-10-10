@@ -54,6 +54,7 @@ func (s *Sim) execDock(c CmdDock) {
 	s.Intents.Set(p, Intent{Kind: IntentStop})
 	s.Warps.Remove(p)
 	s.lastStation = cel.Cel
+	s.dockedThisTick = cel.Cel // mission auto-claim trigger (systemMission)
 	s.emit(Event{Kind: EvDocked, Actor: p, Target: c.Station,
 		Text: "Docked at " + s.nameOf(c.Station)})
 }

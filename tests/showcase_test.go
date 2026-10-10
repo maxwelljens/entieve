@@ -258,6 +258,30 @@ var rules = map[string]featureRule{
 	"warp-to-range": func(c *content.Content, e *evidence) (bool, string) {
 		return e.SawRangedWarpLanding, "player never landed at a ranged warp distance from a station"
 	},
+	"contract-loop": func(c *content.Content, e *evidence) (bool, string) {
+		if !e.kindSeen(sim.EvMission, sim.MissionAccepted) {
+			return false, "no contract accepted at the station board"
+		}
+		if !e.kindSeen(sim.EvMission, sim.MissionProgress) {
+			return false, "accepted contract never counted objective progress"
+		}
+		if !e.kindSeen(sim.EvMission, sim.MissionCompleted) {
+			return false, "no contract auto-claimed on docking at the offering station"
+		}
+		paid := false
+		for _, ev := range e.Events {
+			if ev.Kind == sim.EvMission && ev.Phase == sim.MissionCompleted && ev.Value > 0 {
+				paid = true
+			}
+		}
+		if !paid {
+			return false, "completed contract never transferred credits"
+		}
+		if e.Start == nil || e.End == nil || e.End.Standing <= e.Start.Standing {
+			return false, "contract completion never credited standing"
+		}
+		return true, ""
+	},
 	"save-restore": func(c *content.Content, e *evidence) (bool, string) {
 		return e.SaveRestoreOK, "save/restore round-trip failed"
 	},

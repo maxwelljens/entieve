@@ -32,20 +32,21 @@ type Engine interface {
 
 // Step is one scheduled command. JSON field names are the public script DSL.
 type Step struct {
-	AtTick int64   `json:"at_tick"`
-	Action string  `json:"action"`
-	Target string  `json:"target,omitempty"` // entity display name
-	Item   string  `json:"item,omitempty"`   // item/ship/module ID
-	Qty    int     `json:"qty,omitempty"`
-	Slot   string  `json:"slot,omitempty"`  // "high0", "mid1", "low2"...
-	Ship   string  `json:"ship,omitempty"`  // ship ID (assemble)
-	From   string  `json:"from,omitempty"`  // transfer source: "cargo"|"ore"|"hangar"
-	To     string  `json:"to,omitempty"`    // transfer destination: "cargo"|"ore"|"hangar"
-	Range  float64 `json:"range,omitempty"` // orbit range, m
-	DirX   float64 `json:"dir_x,omitempty"`
-	DirY   float64 `json:"dir_y,omitempty"`
-	Speed  float64 `json:"speed,omitempty"` // manual throttle 0..1
-	Note   string  `json:"note,omitempty"`  // ignored; documentation for humans
+	AtTick  int64   `json:"at_tick"`
+	Action  string  `json:"action"`
+	Target  string  `json:"target,omitempty"` // entity display name
+	Item    string  `json:"item,omitempty"`   // item/ship/module ID
+	Qty     int     `json:"qty,omitempty"`
+	Slot    string  `json:"slot,omitempty"`    // "high0", "mid1", "low2"...
+	Ship    string  `json:"ship,omitempty"`    // ship ID (assemble)
+	Mission string  `json:"mission,omitempty"` // contract ID (accept-mission/abandon-mission)
+	From    string  `json:"from,omitempty"`    // transfer source: "cargo"|"ore"|"hangar"
+	To      string  `json:"to,omitempty"`      // transfer destination: "cargo"|"ore"|"hangar"
+	Range   float64 `json:"range,omitempty"`   // orbit range, m
+	DirX    float64 `json:"dir_x,omitempty"`
+	DirY    float64 `json:"dir_y,omitempty"`
+	Speed   float64 `json:"speed,omitempty"` // manual throttle 0..1
+	Note    string  `json:"note,omitempty"`  // ignored; documentation for humans
 }
 
 // Valid action names.
@@ -56,7 +57,8 @@ var validActions = map[string]bool{
 	"dock": true, "undock": true, "jump": true,
 	"buy": true, "sell": true, "refine": true, "repair": true,
 	"assemble": true, "fit": true, "unfit": true, "transfer": true,
-	"setammo": true,
+	"setammo":        true,
+	"accept-mission": true, "abandon-mission": true,
 }
 
 // Parse decodes a JSON step array (an object with a "steps" array is also
@@ -99,6 +101,11 @@ var needsItem = map[string]bool{
 	"buy": true, "sell": true, "refine": true, "fit": true, "transfer": true,
 }
 
+// needsMission actions require a contract ID (Step.Mission).
+var needsMission = map[string]bool{
+	"accept-mission": true, "abandon-mission": true,
+}
+
 func (st Step) validate(i int) error {
 	need := func(cond bool, msg string) error {
 		if cond {
@@ -110,6 +117,9 @@ func (st Step) validate(i int) error {
 		return err
 	}
 	if err := need(needsItem[st.Action] && st.Item == "", "item id required"); err != nil {
+		return err
+	}
+	if err := need(needsMission[st.Action] && st.Mission == "", "mission id required"); err != nil {
 		return err
 	}
 	switch st.Action {
@@ -272,6 +282,10 @@ func (st Step) command(eng Engine) (sim.Command, bool) {
 		return sim.CmdRepair{}, true
 	case "undock":
 		return sim.CmdUndock{}, true
+	case "accept-mission":
+		return sim.CmdAcceptMission{ID: content.ContractID(st.Mission)}, true
+	case "abandon-mission":
+		return sim.CmdAbandonMission{ID: content.ContractID(st.Mission)}, true
 	case "assemble":
 		return sim.CmdAssemble{Ship: content.ShipID(st.Ship)}, true
 	case "activate":

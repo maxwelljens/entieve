@@ -113,10 +113,14 @@ func (s *Sim) mineCycle(e ecs.Entity, def *content.ModuleDef, slot SlotRef) {
 	}
 
 	// A completed mining cycle counts as recent player activity for the
-	// NPC aggro trigger (see systemNpc).
+	// NPC aggro trigger (see systemNpc) and, when it put ore in the hold,
+	// as progress toward mine contracts (see systemMission).
 	if e == s.player {
 		if tr, ok := s.Transforms.Get(e); ok {
 			s.recordPlayerWork(tr.Pos)
+		}
+		if vol > 0 {
+			s.pendingOre = append(s.pendingOre, pendingOreYield{item: ast.Ore, vol: vol})
 		}
 	}
 

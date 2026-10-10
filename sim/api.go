@@ -46,13 +46,15 @@ type Sim struct {
 	pendingPlayerRespawn bool
 
 	// Unowned simulation state (serialized through Snapshot's Save fields:
-	// ModTargets, FreeSlots and LastStation).
+	// ModTargets, FreeSlots, LastStation, Standing and Missions).
 	worldID     content.WorldID
 	systemID    content.SystemID
 	seed        int64
 	ticks       int64
 	time        float64
 	wallet      float64
+	standing    float64
+	missions    []MissionState
 	player      ecs.Entity
 	lastStation content.CelID
 	queue       []Command
@@ -80,10 +82,24 @@ type Sim struct {
 	}
 
 	// Per-tick working state (never snapshotted; always empty between Steps).
-	deferLoot   []CmdLoot
-	deferEcon   []Command
-	deferTravel []Command
-	damage      []pendingDamage
+	deferLoot    []CmdLoot
+	deferEcon    []Command
+	deferTravel  []Command
+	deferMission []Command
+	damage       []pendingDamage
+	// Mission objective observations queued by other systems this tick and
+	// folded into accepted contracts by systemMission (same Step).
+	pendingKills []content.NpcID
+	pendingOre   []pendingOreYield
+	// dockedThisTick is the station celestial the player docked at this Step
+	// ("" otherwise) — the auto-claim trigger for systemMission.
+	dockedThisTick content.CelID
+}
+
+// pendingOreYield is one mining cycle's yield recorded for mission tracking.
+type pendingOreYield struct {
+	item content.ItemID
+	vol  float64
 }
 
 // freeSlot mirrors one entry of the world's free list (slot index + the
@@ -174,7 +190,8 @@ func (s *Sim) Step() {
 	s.systemLoot()      // 11 loot
 	s.systemEconomy()   // 12 economy
 	s.systemTravel()    // 13 travel
-	s.systemRespawn()   // 14 respawn
+	s.systemMission()   // 14 mission (accept/abandon, objectives, auto-claim)
+	s.systemRespawn()   // 15 respawn
 	// Death respawn runs after all systems so that a cross-system clone-bay
 	// respawn can rebuild the grid without yanking entities out from under
 	// the systems still running this tick.
@@ -182,7 +199,7 @@ func (s *Sim) Step() {
 		s.pendingPlayerRespawn = false
 		s.respawnPlayer()
 	}
-	// 15 events: capped at emit time; nothing else to trim.
+	// 16 events: capped at emit time; nothing else to trim.
 	s.ticks++
 	// Time is derived from ticks (not accumulated) so that Time() is an
 	// exact function of the tick count — trivially identical across
@@ -228,6 +245,15 @@ func (s *Sim) System() *content.SystemDef {
 
 // Wallet returns the player's credit balance.
 func (s *Sim) Wallet() float64 { return s.wallet }
+
+// Standing returns the player's career standing (credited on contract
+// completion, gated by contract min_standing on acceptance).
+func (s *Sim) Standing() float64 { return s.standing }
+
+// Missions returns a copy of the player's accepted contracts and progress.
+func (s *Sim) Missions() []MissionState {
+	return append([]MissionState(nil), s.missions...)
+}
 
 // LoadSystem (re)builds the grid for the given system, placing the player
 // near the given celestial (gate arrivals, undock, world start). An empty

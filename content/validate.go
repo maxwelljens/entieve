@@ -3,6 +3,7 @@ package content
 import (
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 )
@@ -77,6 +78,7 @@ func (c *Content) Validate() error {
 	v.modules()
 	v.npcs()
 	v.systems()
+	v.contracts()
 	v.worlds()
 	v.universe()
 	if len(v.errs) == 0 {
@@ -591,6 +593,103 @@ func (v *validator) market(ctx string, sys *SystemDef, hasStation bool) {
 	if len(sys.Market) > 0 && !hasStation {
 		v.addf("%s: market orders present but no station exists", ctx)
 	}
+}
+
+// contracts cross-checks every mission-board contract: kind-specific
+// objective references (rat class, cargo item, stations), counts and reward.
+func (v *validator) contracts() {
+	for _, id := range keys(v.c.Contracts) {
+		ct := v.c.Contracts[id]
+		if id == "" {
+			v.addf("contracts: missing id (title %q)", ct.Title)
+			continue
+		}
+		ctx := "contracts/" + string(id)
+		if ct.Title == "" {
+			v.addf("%s: missing title", ctx)
+		}
+		switch ct.Kind {
+		case ContractKill, ContractDeliver, ContractMine:
+		default:
+			v.addf("%s: unknown kind %q (want kill|deliver|mine)", ctx, ct.Kind)
+		}
+		if ct.Level < 1 {
+			v.addf("%s: level %d must be >= 1", ctx, ct.Level)
+		}
+		if !v.isStation(ct.Station) {
+			v.addf("%s: offering station %q is not a station", ctx, ct.Station)
+		}
+		obj := &ct.Objective
+		if obj.Count < 1 {
+			v.addf("%s: count %d must be >= 1", ctx, obj.Count)
+		}
+		switch ct.Kind {
+		case ContractKill:
+			if _, ok := v.c.NPCs[obj.Target]; !ok {
+				v.addf("%s: unknown rat class %q", ctx, obj.Target)
+			}
+			if obj.Item != "" || obj.Destination != "" {
+				v.addf("%s: kill contract must not set item/destination", ctx)
+			}
+		case ContractDeliver:
+			if _, ok := v.c.Items[obj.Item]; !ok {
+				v.addf("%s: unknown cargo item %q", ctx, obj.Item)
+			} else if def := v.c.Items[obj.Item]; def.Volume > 0 {
+				units := float64(obj.Count) / def.Volume
+				if math.Abs(units-math.Round(units)) > 1e-6 {
+					v.addf("%s: count %d m³ is not a whole number of units (volume %v)", ctx, obj.Count, def.Volume)
+				}
+			}
+			if !v.isStation(obj.Destination) {
+				v.addf("%s: destination %q is not a station", ctx, obj.Destination)
+			} else if obj.Destination == ct.Station {
+				v.addf("%s: destination must differ from the offering station", ctx)
+			}
+			if obj.Target != "" {
+				v.addf("%s: deliver contract must not set target", ctx)
+			}
+		case ContractMine:
+			if def, ok := v.c.Items[obj.Item]; !ok {
+				v.addf("%s: unknown ore %q", ctx, obj.Item)
+			} else if def.Category != CatOre {
+				v.addf("%s: ore %q is not category ore", ctx, obj.Item)
+			}
+			if obj.Destination != "" || obj.Target != "" {
+				v.addf("%s: mine contract must not set target/destination", ctx)
+			}
+		}
+		rw := &ct.Reward
+		if rw.Credits < 0 {
+			v.addf("%s: negative credits %v", ctx, rw.Credits)
+		}
+		if rw.StandingGain < 0 {
+			v.addf("%s: negative standing_gain %v", ctx, rw.StandingGain)
+		}
+		if rw.Item != "" {
+			if _, ok := v.c.Items[rw.Item]; !ok {
+				v.addf("%s: reward references unknown item %q", ctx, rw.Item)
+			}
+			if rw.Qty < 1 {
+				v.addf("%s: reward item %q needs qty >= 1", ctx, rw.Item)
+			}
+		}
+	}
+}
+
+// isStation reports whether cel is a station celestial in any system.
+func (v *validator) isStation(cel CelID) bool {
+	if cel == "" {
+		return false
+	}
+	for _, id := range keys(v.c.Systems) {
+		for i := range v.c.Systems[id].Celestials {
+			c := &v.c.Systems[id].Celestials[i]
+			if c.ID == cel && c.Kind == CelStation {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (v *validator) worlds() {

@@ -12,8 +12,8 @@ import (
 
 // Load reads game data from fsys.
 //
-// It walks items/, ships/, modules/, npcs/, systems/, worlds/ plus
-// universe.json under the filesystem root. Every JSON file may contain a
+// It walks items/, ships/, modules/, npcs/, systems/, worlds/, contracts/
+// plus universe.json under the filesystem root. Every JSON file may contain a
 // single object or an array of objects. universe.json must contain exactly
 // one UniverseDef whose "systems" field is empty (systems come from
 // systems/*.json; the universe file only supplies region/constellation/
@@ -23,12 +23,13 @@ import (
 // and duplicate-ID errors accumulate, all reported in one joined error.
 func Load(fsys fs.FS) (*Content, error) {
 	c := &Content{
-		Items:   map[ItemID]*ItemDef{},
-		Ships:   map[ShipID]*ShipDef{},
-		Modules: map[ModuleID]*ModuleDef{},
-		NPCs:    map[NpcID]*NpcDef{},
-		Systems: map[SystemID]*SystemDef{},
-		Worlds:  map[WorldID]*WorldDef{},
+		Items:     map[ItemID]*ItemDef{},
+		Ships:     map[ShipID]*ShipDef{},
+		Modules:   map[ModuleID]*ModuleDef{},
+		NPCs:      map[NpcID]*NpcDef{},
+		Systems:   map[SystemID]*SystemDef{},
+		Contracts: map[ContractID]*ContractDef{},
+		Worlds:    map[WorldID]*WorldDef{},
 	}
 	l := &loader{c: c, defined: map[string]string{}}
 
@@ -50,6 +51,9 @@ func Load(fsys fs.FS) (*Content, error) {
 	loadObjects[WorldDef](l, fsys, "worlds", "world",
 		func(d *WorldDef) string { return string(d.ID) },
 		func(d *WorldDef) { c.Worlds[d.ID] = d })
+	loadObjects[ContractDef](l, fsys, "contracts", "contract",
+		func(d *ContractDef) string { return string(d.ID) },
+		func(d *ContractDef) { c.Contracts[d.ID] = d })
 
 	l.universe(fsys)
 

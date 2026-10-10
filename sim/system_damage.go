@@ -97,6 +97,12 @@ func (s *Sim) handleDeath(e, src ecs.Entity) {
 	name := s.nameOf(e)
 	pos, _ := s.posOf(e)
 
+	// Player-attributed NPC kills are counted toward kill contracts by
+	// systemMission later in this Step.
+	if hasAI && src == s.player {
+		s.pendingKills = append(s.pendingKills, ai.Npc)
+	}
+
 	var def *content.NpcDef
 	if hasAI {
 		def, _ = s.Content.Npc(ai.Npc)
