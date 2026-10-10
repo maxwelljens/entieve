@@ -10,6 +10,7 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -39,9 +40,11 @@ var (
 
 // Rack is the bottom-right module rack: one cell per slot showing the
 // module short name, an amber glow while active, a cycle progress bar and a
-// hover tooltip with the module's key stats. Right-clicking a weapon cell
-// cycles its loaded charge (Auto → the weapon's ammo-class charges sitting
-// in cargo → Auto) through sim.CmdSetAmmo.
+// hover tooltip with the module's key stats. Left-clicking a cell toggles
+// the module (enqueueing CmdActivate/CmdDeactivate; empty slots are inert).
+// Right-clicking a weapon cell cycles its loaded charge (Auto → the
+// weapon's ammo-class charges sitting in cargo → Auto) through
+// sim.CmdSetAmmo.
 type Rack struct {
 	env       Env
 	container *widget.Container
@@ -52,7 +55,9 @@ type Rack struct {
 
 // rackCell is one slot: a cell column (button + cycle bar) plus its tooltip
 // widgets. Cells are persistent, so a fitting change only rewrites their
-// label, tooltip and enabled state.
+// label, tooltip and enabled state. active mirrors ModuleRuntime.Active for
+// the click toggle (the visual rides the button's Disabled state: dim cell
+// while off, amber cell while running).
 type rackCell struct {
 	slot    sim.SlotRef
 	root    *widget.Container
@@ -62,6 +67,7 @@ type rackCell struct {
 	tipText *widget.Text
 	tips    []*widget.ToolTip // stable ToolTips value for fitted cells
 	module  content.ModuleID  // module currently shown ("" = empty slot)
+	active  bool              // runtime Active at the last Sync
 }
 
 // NewRack builds the module rack over the given environment. Its container
@@ -171,7 +177,10 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.MinSize(rackCellW, rackCellH),
 			widget.WidgetOpts.MouseButtonClickedHandler(func(a *widget.WidgetMouseButtonClickedEventArgs) {
-				if a.Button == ebiten.MouseButtonRight {
+				switch a.Button {
+				case ebiten.MouseButtonLeft:
+					r.toggleModule(cell)
+				case ebiten.MouseButtonRight:
 					r.cycleAmmo(cell)
 				}
 			}),
@@ -275,6 +284,7 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 	// early-returns on an unchanged label) and keeps the empty-slot case
 	// honest without a separate "first sync" flag.
 	cell.module = id
+	cell.active = active
 	cell.btn.SetText(r.shortName(def))
 	if def == nil {
 		cell.btn.GetWidget().ToolTips = nil
@@ -411,6 +421,58 @@ func (r *Rack) ammoCandidates(class string) []content.ItemID {
 	out := make([]content.ItemID, 0, len(ids)+1)
 	out = append(out, "")
 	return append(out, ids...)
+}
+
+// toggleModule enqueues the activation toggle for one cell: CmdDeactivate
+// while the module runs, CmdActivate otherwise. Empty slots are inert; the
+// sim validates everything else (capacitor, locks, ranges) and logs its
+// own refusals — the rack never mutates sim state.
+func (r *Rack) toggleModule(cell *rackCell) {
+	if cell.module == "" || r.env.Enqueue == nil {
+		return
+	}
+	if cell.active {
+		r.env.Enqueue(sim.CmdDeactivate{Slot: cell.slot})
+		return
+	}
+	def, _ := r.env.Content.Module(cell.module)
+	r.env.Enqueue(sim.CmdActivate{Slot: cell.slot, Target: r.clickTarget(def)})
+}
+
+// clickTarget resolves the activation target for a click the way EVE's
+// "fire on the active target" works: the first fully-locked target that
+// suits the module — a ship for weapons, an asteroid for miners, any lock
+// for ewar — and the zero entity (self) for everything else. Without a
+// suitable lock the sim refuses with a logged warning.
+func (r *Rack) clickTarget(def *content.ModuleDef) ecs.Entity {
+	s := r.env.Sim
+	if s == nil || def == nil {
+		return ecs.Entity(0)
+	}
+	tg, ok := s.Targetings.Get(s.Player())
+	if !ok {
+		return ecs.Entity(0)
+	}
+	for _, l := range tg.Locks {
+		if l.Progress < 1 {
+			continue
+		}
+		switch {
+		case def.Weapon != nil:
+			if s.Ships.Has(l.Target) {
+				return l.Target
+			}
+		case def.Mining != nil:
+			if s.Asteroids.Has(l.Target) {
+				return l.Target
+			}
+		case def.Kind == content.KindStasisWeb || def.Kind == content.KindWarpScram:
+			return l.Target
+		default:
+			return ecs.Entity(0) // self-targeted modules take no target
+		}
+	}
+	return ecs.Entity(0)
 }
 
 // cycleAmmo advances a weapon cell's charge preference one step and enqueues

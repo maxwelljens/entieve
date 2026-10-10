@@ -1,6 +1,9 @@
 package uikit
 
 import (
+	"image"
+	"image/color"
+	"math"
 	"testing"
 
 	"github.com/ebitenui/ebitenui"
@@ -225,8 +228,9 @@ func TestHudRingRedrawsOnDamage(t *testing.T) {
 }
 
 // TestHudTargetBoxes covers the top-center lock row: hidden with no locks,
-// one box per lock with name, lock progress and HP mini-bars, hidden again
-// when the locks drop.
+// one card per lock with name, distance, lock progress and layer fractions,
+// hidden again when the locks drop. The card state is the render input, so
+// pinning it pins what gets drawn.
 func TestHudTargetBoxes(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	h := NewHud(env)
@@ -268,28 +272,68 @@ func TestHudTargetBoxes(t *testing.T) {
 		t.Fatalf("locked targets hide the target row (visibility %d)", vis)
 	}
 	b0, b1, b2 := h.boxes[0], h.boxes[1], h.boxes[2]
-	if b0.name.Label != Ellipsize(ship.Name, hudBoxW-2*contentsPad, h.measure) {
-		t.Errorf("box 0 name = %q, want %q", b0.name.Label, ship.Name)
+
+	// Card 0: the ship target — name, distance, lock progress and the
+	// three real layer fractions.
+	wantName, wantDist := h.boxLabels(ship.Name, formatDistance(ship.Distance))
+	if b0.card.name != wantName {
+		t.Errorf("box 0 name = %q, want %q", b0.card.name, wantName)
 	}
-	if got, want := b0.lock.GetCurrent(), 420; got != want {
-		t.Errorf("box 0 lock = %d, want %d", got, want)
+	if b0.card.dist != wantDist || wantDist == "" {
+		t.Errorf("box 0 distance = %q, want the formatted %v", b0.card.dist, ship.Distance)
 	}
-	// A ship target reports its three layers; the asteroid reports the read
-	// model's single health fraction in the first bar.
-	if sh, ok := s.Ships.Get(ship.Entity); ok {
-		want := int(hudFrac(sh.Shield, sh.MaxShield) * hudCapMax)
-		if b0.layer[0].GetCurrent() != want {
-			t.Errorf("box 0 shield bar = %d, want %d", b0.layer[0].GetCurrent(), want)
-		}
+	if b0.card.lock != 0.42 {
+		t.Errorf("box 0 lock = %v, want 0.42", b0.card.lock)
 	}
-	if b1.lock.GetCurrent() != hudCapMax {
-		t.Errorf("box 1 lock = %d, want full", b1.lock.GetCurrent())
+	if !b0.card.ships {
+		t.Error("box 0 target is a ship but the card reports a single layer")
 	}
-	if b1.layer[0].GetCurrent() != int(rock.Health*hudCapMax) {
-		t.Errorf("box 1 health bar = %d, want %d", b1.layer[0].GetCurrent(), int(rock.Health*hudCapMax))
+	sh, ok := s.Ships.Get(ship.Entity)
+	if !ok {
+		t.Fatal("locked ship target has no ShipState")
+	}
+	want := [3]float64{
+		hudFrac(sh.Shield, sh.MaxShield),
+		hudFrac(sh.Armor, sh.MaxArmor),
+		hudFrac(sh.Structure, sh.MaxStructure),
+	}
+	if b0.card.layers != want {
+		t.Errorf("box 0 layers = %v, want %v", b0.card.layers, want)
+	}
+
+	// Card 1: the asteroid — full lock, a single health fraction.
+	if b1.card.lock != 1 {
+		t.Errorf("box 1 lock = %v, want 1", b1.card.lock)
+	}
+	if b1.card.ships {
+		t.Error("box 1 target is an asteroid but the card reports three layers")
+	}
+	if b1.card.layers[0] != rock.Health {
+		t.Errorf("box 1 health = %v, want %v", b1.card.layers[0], rock.Health)
+	}
+	if b1.card.dist == "" {
+		t.Error("box 1 distance empty")
 	}
 	if vis := b2.root.GetWidget().GetVisibility(); vis != widget.Visibility_Hide {
 		t.Errorf("third box visible with two locks (visibility %d)", vis)
+	}
+
+	// Repaint discipline: a state change repaints, an idle Sync does not.
+	if b0.draws == 0 {
+		t.Fatal("box 0 never painted its card image")
+	}
+	draws := b0.draws
+	h.Sync()
+	if b0.draws != draws {
+		t.Errorf("idle Sync repainted box 0 (%d → %d)", draws, b0.draws)
+	}
+	sh.Shield = sh.MaxShield * 0.5
+	h.Sync()
+	if b0.draws != draws+1 {
+		t.Errorf("damage did not repaint box 0 (draws %d, want %d)", b0.draws, draws+1)
+	}
+	if b0.drawn.layers[0] != 0.5 {
+		t.Errorf("repainted layer = %v, want 0.5", b0.drawn.layers[0])
 	}
 
 	tg.Locks = nil
@@ -340,4 +384,146 @@ func TestHudDrawSmoke(t *testing.T) {
 	}
 
 	c.smoke(t)
+}
+
+// ---------------------------------------------------------------------------
+// Design math: every piece of card/ring geometry is a pure function, pinned
+// here with exact values.
+// ---------------------------------------------------------------------------
+
+// TestTargetCardGeometry pins the whole card layout at the default size and
+// asserts the three layer bars tile the bars region with no gaps and no
+// overlaps.
+func TestTargetCardGeometry(t *testing.T) {
+	card := image.Rect(0, 0, hudBoxW, hudBoxH) // 132×78
+	if got := targetCardBody(card); got != image.Rect(4, 4, 128, 74) {
+		t.Errorf("body = %v, want (4,4)-(128,74)", got)
+	}
+	if got := targetCardText(card); got != image.Rect(4, 4, 128, 23) {
+		t.Errorf("name line = %v, want (4,4)-(128,23)", got)
+	}
+	if got := targetCardDist(card); got != image.Rect(4, 25, 128, 41) {
+		t.Errorf("distance line = %v, want (4,25)-(128,41)", got)
+	}
+	if got := targetCardLock(card); got != image.Rect(4, 42, 128, 44) {
+		t.Errorf("lock strip = %v, want (4,42)-(128,44)", got)
+	}
+	bars := targetCardBars(card)
+	if bars != image.Rect(4, 46, 128, 74) {
+		t.Fatalf("bars region = %v, want (4,46)-(128,74)", bars)
+	}
+
+	got := layerBars(bars)
+	want := [3]image.Rectangle{
+		image.Rect(4, 46, 128, 54),
+		image.Rect(4, 56, 128, 64),
+		image.Rect(4, 66, 128, 74),
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("layerBars[%d] = %v, want %v", i, got[i], want[i])
+		}
+	}
+	// Tiling invariants: full-width, stacked top-down, contiguous with the
+	// 2 px gap, covering the region exactly — no gaps, no overlaps.
+	for i, b := range got {
+		if b.Min.X != bars.Min.X || b.Max.X != bars.Max.X {
+			t.Errorf("bar %d spans x %d..%d, want %d..%d", i, b.Min.X, b.Max.X, bars.Min.X, bars.Max.X)
+		}
+		if i > 0 && b.Min.Y != got[i-1].Max.Y+hudBoxBarGap {
+			t.Errorf("bar %d starts at %d, want %d (previous end + gap)",
+				i, b.Min.Y, got[i-1].Max.Y+hudBoxBarGap)
+		}
+		if b.Dy() != got[0].Dy() && i < 2 {
+			t.Errorf("bar %d height %d != bar 0 height %d", i, b.Dy(), got[0].Dy())
+		}
+	}
+	if got[0].Min.Y != bars.Min.Y || got[2].Max.Y != bars.Max.Y {
+		t.Errorf("bars cover %d..%d, want %d..%d", got[0].Min.Y, got[2].Max.Y, bars.Min.Y, bars.Max.Y)
+	}
+	// Odd heights still tile: the last bar absorbs the remainder.
+	odd := layerBars(image.Rect(0, 0, 10, 30)) // (30-4)/3 = 8, remainder 2
+	wantOdd := [3]image.Rectangle{
+		image.Rect(0, 0, 10, 8),
+		image.Rect(0, 10, 10, 18),
+		image.Rect(0, 20, 10, 30),
+	}
+	if odd != wantOdd {
+		t.Errorf("layerBars(10x30) = %v, want %v", odd, wantOdd)
+	}
+}
+
+// TestBarFill pins the fraction→width mapping: exactly frac × width,
+// clamped at both ends.
+func TestBarFill(t *testing.T) {
+	bar := image.Rect(0, 0, 100, 8)
+	if got := barFill(bar, 0.37); got != image.Rect(0, 0, 37, 8) {
+		t.Errorf("barFill(0.37) = %v, want (0,0)-(37,8) — exactly 0.37×100", got)
+	}
+	if got := barFill(bar, 0); got != image.Rect(0, 0, 0, 8) {
+		t.Errorf("barFill(0) = %v, want empty", got)
+	}
+	if got := barFill(bar, 1.5); got != image.Rect(0, 0, 100, 8) {
+		t.Errorf("barFill(1.5) = %v, want full", got)
+	}
+	if got := barFill(bar, -0.2); got != image.Rect(0, 0, 0, 8) {
+		t.Errorf("barFill(-0.2) = %v, want empty", got)
+	}
+	// The real card bar: width 124, a quarter → 31 px exactly.
+	cardBar := image.Rect(4, 46, 128, 54)
+	if got := barFill(cardBar, 0.25); got != image.Rect(4, 46, 35, 54) {
+		t.Errorf("barFill(card, 0.25) = %v, want (4,46)-(35,54)", got)
+	}
+}
+
+// TestRingSweepAndTicks pins the ring math: sweep at 0/25/50/100 % is
+// 0/quarter/half/full, ticks sit at the quarter marks, and the depleted
+// track dims in RGB (never alpha).
+func TestRingSweepAndTicks(t *testing.T) {
+	for _, c := range []struct {
+		frac float64
+		want float64
+	}{
+		{0, 0},
+		{0.25, math.Pi / 2},
+		{0.5, math.Pi},
+		{1, 2 * math.Pi},
+		{1.7, 2 * math.Pi}, // clamped
+		{-3, 0},            // clamped
+	} {
+		if got := ringSweep(c.frac); got != c.want {
+			t.Errorf("ringSweep(%v) = %v, want %v", c.frac, got, c.want)
+		}
+	}
+	ticks := ringTicks()
+	want := [3]float64{math.Pi / 2, math.Pi, ringSweep(0.75)}
+	for i := range want {
+		if ticks[i] != want[i] {
+			t.Errorf("ringTicks()[%d] = %v, want %v", i, ticks[i], want[i])
+		}
+	}
+	for i := 1; i < len(ticks); i++ {
+		if d := ticks[i] - ticks[i-1]; math.Abs(d-math.Pi/2) > 1e-12 {
+			t.Errorf("tick spacing %d = %v, want π/2", i, d)
+		}
+	}
+
+	// The dim track: layer color scaled to 25 % in RGB at full alpha.
+	for _, c := range []struct {
+		name string
+		in   color.RGBA
+		want color.RGBA
+	}{
+		{"shield", color.RGBA{111, 168, 255, 255}, color.RGBA{27, 42, 63, 255}},
+		{"armor", color.RGBA{224, 163, 60, 255}, color.RGBA{56, 40, 15, 255}},
+		{"hull", color.RGBA{201, 206, 214, 255}, color.RGBA{50, 51, 53, 255}},
+	} {
+		got := ringTrackColor(c.in)
+		if got != c.want {
+			t.Errorf("ringTrackColor(%s) = %v, want %v", c.name, got, c.want)
+		}
+		if got.A != 255 {
+			t.Errorf("ringTrackColor(%s) alpha = %d, want 255 (dim in RGB, not alpha)", c.name, got.A)
+		}
+	}
 }
