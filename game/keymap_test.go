@@ -33,7 +33,7 @@ func TestKeyMapWellFormed(t *testing.T) {
 	required := []string{
 		"lock-nearest", "lock-selected", "approach", "orbit", "stop", "align",
 		"warp", "dock", "jump", "loot", "mine", "inventory", "fitting",
-		"scanner", "market", "starmap", "help", "menu", "time-slower", "time-faster",
+		"scanner", "market", "starmap", "help", "log", "menu", "time-slower", "time-faster",
 		"save", "load",
 	}
 	found := map[string]bool{}

@@ -37,6 +37,7 @@ var KeyMap = []Binding{
 	{Key: ebiten.KeyD, Action: "dock", Desc: "D — dock (selected station, else nearest)"},
 	{Key: ebiten.KeyJ, Action: "jump", Desc: "J — jump through gate (selected, else nearest)"},
 	{Key: ebiten.KeyL, Action: "loot", Desc: "L — loot nearest wreck"},
+	{Key: ebiten.KeyL, Shift: true, Action: "log", Desc: "Shift+L — toggle log window"},
 	{Key: ebiten.KeyM, Action: "mine", Desc: "M — mine selected asteroid"},
 	{Key: ebiten.KeyI, Action: "inventory", Desc: "I — toggle inventory"},
 	{Key: ebiten.KeyF, Action: "fitting", Desc: "F — toggle fitting"},

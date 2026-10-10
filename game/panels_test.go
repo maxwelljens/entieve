@@ -86,6 +86,31 @@ func TestToggleKeys(t *testing.T) {
 		}
 	}
 
+	// Shift+L toggles the log window (open by default); plain L keeps
+	// its loot binding and must not touch the log.
+	shiftL := Input{JustPressed: []ebiten.Key{ebiten.KeyL}, KeysDown: []ebiten.Key{ebiten.KeyShift}}
+	if !g.open[pLog] {
+		t.Fatal("log window must start open")
+	}
+	g.handleKeys(shiftL)
+	if g.open[pLog] {
+		t.Fatal("Shift+L did not close the log")
+	}
+	g.syncMounts()
+	if g.mounted[pLog] != nil {
+		t.Fatal("log window still mounted after close")
+	}
+	g.handleKeys(shiftL)
+	g.syncMounts()
+	if !g.open[pLog] || g.mounted[pLog] == nil {
+		t.Fatal("Shift+L did not re-open the log window")
+	}
+	beforeLog := g.open[pLog]
+	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyL}})
+	if g.open[pLog] != beforeLog {
+		t.Error("plain L toggled the log (loot binding broken)")
+	}
+
 	// N toggles the MapView scene + window.
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyN}})
 	if _, ok := g.top().(*MapScene); !ok || !g.open[pMap] {

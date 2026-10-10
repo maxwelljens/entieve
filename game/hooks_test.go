@@ -66,9 +66,10 @@ func TestWorldClickSelection(t *testing.T) {
 	}
 }
 
-// TestChromeOnRootOverlay: HUD, rack and log mount directly on the kit's
-// root overlay (no full-screen wrapper windows), rack and log track
-// hover, and their exact rects gate the world while empty space does not.
+// TestChromeOnRootOverlay: HUD and rack mount directly on the kit's
+// root overlay (no full-screen wrapper windows), the rack tracks hover,
+// and their exact rects gate the world while empty space does not. The
+// log moved off the root — it is a window now (see TestLogWindowGate).
 func TestChromeOnRootOverlay(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
@@ -83,19 +84,23 @@ func TestChromeOnRootOverlay(t *testing.T) {
 		}
 		mounted[c] = true
 	}
-	if len(kids) != 3 {
-		t.Errorf("root overlay has %d children, want exactly the three chrome panels", len(kids))
+	if len(kids) != 2 {
+		t.Errorf("root overlay has %d children, want exactly the HUD and rack", len(kids))
 	}
 	for name, c := range map[string]*widget.Container{
-		"hud": g.hud.Container(), "rack": g.rack.Container(), "log": g.logP.Container(),
+		"hud": g.hud.Container(), "rack": g.rack.Container(),
 	} {
 		if !mounted[c] {
 			t.Errorf("%s is not mounted on the root overlay", name)
 		}
 	}
+	if mounted[g.logP.Container()] {
+		t.Error("log still rides the root overlay (it is a window now)")
+	}
 
-	// Rack and log track hover so input.UIHovered gates their padding;
-	// the HUD container spans the whole screen and must not.
+	// The rack tracks hover so input.UIHovered covers its padding; the
+	// HUD container must not: it spans the whole screen. The log window
+	// container tracks hover through the window chrome itself.
 	if !g.rack.Container().GetWidget().TrackHover || !g.logP.Container().GetWidget().TrackHover {
 		t.Error("rack/log containers do not track hover")
 	}

@@ -1,10 +1,12 @@
 package uikit
 
 import (
+	"image"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/sim"
 )
 
@@ -76,20 +78,31 @@ func TestLogCapDropsOldest(t *testing.T) {
 	}
 }
 
-// TestLogDrawSmoke draws the log at both design sizes with content in it;
-// the panel must anchor bottom-left.
-func TestLogDrawSmoke(t *testing.T) {
+// TestLogWindowDrawSmoke draws the log window (it is a WindowPanel now,
+// not root-anchored chrome) at both design sizes; the default sits in
+// the bottom-left pocket and MinSize holds the window to logMinW×logMinH.
+func TestLogWindowDrawSmoke(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	l := NewLog(env)
 	l.PushLine(sim.SevInfo, "warp drive active")
 	l.Push([]sim.Event{{Severity: sim.SevDanger, Time: 3, Text: "shield collapse"}})
 	c := newChromeUI(env)
-	c.addPanel(l.Container(), l)
+	c.addWindow(l)
 	c.frame(t, 1280, 720)
 
-	rect := l.Container().GetWidget().Rect
-	if rect.Min.X < 9 || rect.Min.X > 11 || rect.Max.Y < 709 || rect.Max.Y > 711 {
-		t.Errorf("log rect %v, want a bottom-left corner at (10,710)", rect)
+	r := l.Win().GetContainer().GetWidget().Rect
+	if r != logDefaultRect() {
+		t.Errorf("log rect = %v, want the default %v", r, logDefaultRect())
 	}
+	if l.Container() != l.Win().GetContainer().(*widget.Container) {
+		t.Error("Container() does not return the window's root container")
+	}
+
+	// The window's MinSize is the resize floor (edge grips clamp to it).
+	l.Win().SetLocation(image.Rect(0, 0, 10, 10))
+	if r := l.Win().GetContainer().GetWidget().Rect; r.Dx() != logMinW || r.Dy() != logMinH {
+		t.Errorf("min clamp rect = %v, want %dx%d", r, logMinW, logMinH)
+	}
+	l.Win().SetLocation(logDefaultRect())
 	c.smoke(t)
 }

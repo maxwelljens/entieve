@@ -34,6 +34,7 @@ in-game help window renders.
 | `D` | Dock (selected station, else nearest dockable one) |
 | `J` | Jump through gate (selected gate, else nearest) |
 | `L` | Loot nearest wreck |
+| `Shift+L` | Toggle log window |
 | `M` | Mine selected asteroid (first fitted mining laser) |
 | `I` | Toggle inventory (cargo + ore hold) |
 | `F` | Toggle fitting window |
@@ -53,6 +54,7 @@ in-game help window renders.
 | Input | Action |
 |---|---|
 | Left click | Select entity / press UI buttons; drag a window's title bar to move it (click also raises it to the front) |
+| Left drag | On any window **edge or corner** (≈8 px grip): resize from all four sides — the opposite edge stays fixed, the window never shrinks past its minimum |
 | Left click | On an overview column header: sort (click again flips direction) |
 | `Ctrl` + left click | Lock target under cursor |
 | Left double-click | Approach entity; on empty space, fly straight toward that point |
@@ -75,29 +77,46 @@ window or the HUD chrome never reaches the world behind it.
 ### Windows
 
 The interface is a stack of **draggable, resizable windows** with title
-bars: drag a title bar to move a window, grab its right/bottom edge to
-resize, and click anywhere on a window to raise it to the front. Window
-positions are remembered for the session.
+bars: drag a title bar to move a window, grab **any edge or corner** to
+resize it (about an 8 px grip — all four edges and all four corners
+work; the opposite edge stays fixed and the window never shrinks below
+its minimum size), and click anywhere on a window to raise it to the
+front.
 
-Toggle keys open and close their window (`I`, `F`, `G`, `C`, `N`, `H`) —
-windows have no separate close button. Three panels are **always-on
-chrome** and cannot be closed or moved: the ship **HUD bar** (bottom
-center, with the target-box row at top center), the **module rack**
-(bottom right) and the **log** (bottom left). The **Overview** (top left)
-and **Selected Item** window (top right) stay open but are draggable —
-a click in space selects the target that **Selected Item** then shows
-and that every `selected`-targeted key acts on.
+Toggle keys open and close their window (`I`, `F`, `G`, `C`, `N`, `H`,
+`Shift+L`) — windows have no separate close button. Two panels are
+**always-on chrome** and cannot be closed or moved: the ship **HUD bar**
+(bottom center, with the target-box row at top center) and the
+**module rack** (bottom right). The **log** is a normal window now —
+bottom left by default, toggle with `Shift+L`, draggable and resizable
+like the rest. The **Overview** (top left) and **Selected Item** window
+(top right) stay open but are draggable — a click in space selects the
+target that **Selected Item** then shows and that every
+`selected`-targeted key acts on.
 
 Default positions: overview top-left, selected item top-right, scanner
 in the center column under the top row, log bottom-left, HUD
 bottom-center, module rack bottom-right, starmap and the Esc menu
-centered, help top-center; while docked the market and inventory fill the
-center column, the fitting window takes the right edge and the station
+centered, help top-center; while docked the market and inventory fill
+the center column, the fitting window takes the right edge and the station
 strip takes the top-left corner (the overview and selected item step
 aside while docked). The defaults never overlap: the in-space layout and
 the docked set are checked pairwise at both 1280×720 and the 1024×700
-minimum. Positions are remembered for the session — drag windows wherever
-you like; loading a save snaps them back to these defaults.
+minimum.
+
+**Your layout persists.** Every named window's position, size and
+open/closed state (overview, selected item, log, market, inventory,
+fitting, scanner, map, help) is saved to a sidecar file next to the
+save — `<save path>.layout.json`, e.g.
+`os.UserConfigDir()/entieve/save.json.layout.json` — whenever you save
+(`Ctrl+S` / menu **Save**) and again when you quit cleanly from the
+menu. It is read back on startup and after loading a save, so a
+favorite arrangement survives restarts and loads. Restored windows are
+clamped to their minimum size and to the screen (always fully
+on-screen); a missing, corrupt or partial sidecar simply falls back to
+the defaults, and unknown entries in the file are ignored. The layout
+sidecar is deliberately separate from the save itself — the simulation
+save format is unchanged for the CLI tools.
 
 ### Docked at a station
 
@@ -224,16 +243,21 @@ replays are unaffected.
 ## Save / load
 
 - **`Ctrl+S`** writes a full JSON snapshot (`sim.Snapshot()`) to
-  `os.UserConfigDir()/entieve/save.json` (override with `--save`).
+  `os.UserConfigDir()/entieve/save.json` (override with `--save`) and
+  the window layout alongside it (`save.json.layout.json`).
 - **`F9`** restores that snapshot mid-run and rebuilds the interface
-  against the restored world.
+  against the restored world, then re-applies the saved window layout.
 - `--load <file>` restores a save at startup.
 - The `Esc` menu offers the same Save / Load plus Resume and Quit.
+  Quitting from the menu also writes the layout, so your window
+  arrangement survives a restart even without saving the game.
 
 Saving is the only way progress persists: quitting from the menu does not
-autosave.
+autosave. (The window layout is the exception — it is written on every
+clean quit as well.)
 
 **Restoring mid-run rebuilds the interface**: the selection clears and
-window positions snap back to their defaults, while the log history
+window positions return to the layout saved with the game (their
+defaults, if there is no sidecar yet), while the log history
 carries across the rebuild — the simulation itself comes back exactly,
 including docked state and any windows you had open.

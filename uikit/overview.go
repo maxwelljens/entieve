@@ -54,8 +54,22 @@ func (k *Kit) panelEnv() Env {
 // AddWindow mounts an extra window on the kit's UI so it shares the
 // kit's theme, stacking and input pump. kit.go (owned by integration)
 // only builds the overview and selected panels; the station windows
-// join through this seam. The returned func closes the window again.
+// join through this seam. A window built with makeEdgeResizable joins
+// the kit's resize-chrome pump here. The returned func closes the
+// window again.
 func (k *Kit) AddWindow(w *widget.Window) widget.RemoveWindowFunc {
+	if ch, ok := chromeByWindow[w]; ok {
+		dup := false
+		for _, have := range k.chromes {
+			if have == ch {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			k.chromes = append(k.chromes, ch)
+		}
+	}
 	return k.ui.AddWindow(w)
 }
 
@@ -114,7 +128,9 @@ func (k *Kit) buildOverview() {
 		widget.WindowOpts.Contents(contents),
 		widget.WindowOpts.TitleBar(title, titleBarH),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.Resizeable(),
+		// Resize comes from the winchrome edge grips (all four edges),
+		// not widget.WindowOpts.Resizeable() — that one only stretches
+		// the bottom/right corner. Attached in NewKit.
 		widget.WindowOpts.MinSize(320, 240),
 		widget.WindowOpts.Location(image.Rect(8, 8, 388, 428)),
 	)
