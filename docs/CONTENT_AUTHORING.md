@@ -25,10 +25,13 @@ content/data/
 │   ├── weapons.json  tank.json  cap.json
 │   ├── propulsion.json  mining.json  ewar.json
 ├── npcs/rats.json           # npc-rat-* IDs
+│   └── guards.json          # npc-guard-* IDs (security patrol loadouts)
 ├── systems/                 # one system per file, sys-* IDs
 │   ├── solace.json  penumbra.json  gloam.json
 ├── contracts/               # mission-board offerings, contract-* IDs
 │   ├── solace.json  penumbra.json
+├── traffic/                 # living-universe convoys/patrols, one def per system
+│   ├── solace.json  penumbra.json  gloam.json
 └── worlds/                  # one world per file, world-* IDs
     ├── default.json  showcase.json
 ```
@@ -42,10 +45,12 @@ All IDs are kebab-case strings, cross-referenced everywhere:
 | Item        | `min-`, `ore-`, `charge-`, `loot-` | `min-ferrite` | global (all items share one map) |
 | Ship        | `ship-`     | `ship-sloop`         | global                 |
 | Module      | `mod-`      | `mod-emp-turret`     | global                 |
-| NPC         | `npc-rat-`  | `npc-rat-scuttler`   | global                 |
+| NPC (rat)   | `npc-rat-`  | `npc-rat-scuttler`   | global                 |
+| NPC (guard) | `npc-guard-` | `npc-guard-patrol`  | global (non-rat NPC loadouts: zero bounty, no loot; traffic patrols) |
 | System      | `sys-`      | `sys-solace`         | global                 |
 | Celestial   | `cel-`      | `cel-haven-rest`     | **unique within its system** (gate `to_cel` resolves inside the destination system; `cel-gate-penumbra` legitimately exists in both `sys-solace` and `sys-gloam`) |
 | Contract    | `contract-` | `contract-solace-cleanup-1` | global            |
+| Traffic     | *(no id)*   | keyed by `system`    | one def per system (`traffic/*.json`) |
 | World       | `world-`    | `world-showcase`     | global                 |
 
 Never invent new IDs for things listed in `docs/ARCHITECTURE.md`'s registry;
@@ -54,8 +59,8 @@ extend around them.
 ## File format
 
 Every JSON file under `items/`, `ships/`, `modules/`, `npcs/`, `systems/`,
-`contracts/`, `worlds/` may contain **either a single object or an array of
-objects**:
+`contracts/`, `traffic/`, `worlds/` may contain **either a single object or
+an array of objects**:
 
 ```json
 { "id": "min-ferrite", "name": "Ferrite", "category": "mineral", "volume": 0.01, "base_price": 6 }
@@ -477,6 +482,124 @@ level-1 completions) and pay `standing_gain: 0.15`. Expected loot is
 `chance × (min_qty+max_qty)/2 × base_price` summed over the rat's loot
 table.
 
+## Recipe 9: add NPC traffic (the living universe)
+
+Convoy routes, security patrols and rat ambushes are data-driven per
+system. Create `content/data/traffic/<system>.json` (a single object or an
+array, like every other dir — the def is **keyed by its `system` field**,
+no separate id):
+
+```json
+{
+  "system": "sys-solace",
+  "routes": [
+    { "from": "cel-haven-rest", "to": "cel-gate-penumbra",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "charge-emp", "qty": 600 },
+      "interval_ticks": 5400 },
+    { "from": "cel-gate-penumbra", "to": "cel-haven-rest",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "ore-cordite", "qty": 120 },
+      "interval_ticks": 5400 }
+  ],
+  "patrol": { "hulls": ["ship-npc-patrol"], "interval_ticks": 9000 },
+  "raider": "npc-rat-marauder"
+}
+```
+
+Fields:
+
+| Field | Meaning |
+|-------|---------|
+| `system` | the system this def configures (must exist; one def per system) |
+| `routes` | ≥ 1 one-way convoy legs. A hauler spawns at `from`, warps the leg through the normal align/cruise/decel profile, **delivers** `cargo` at `to` when `to` is a station, and despawns when `to` is a gate (leaves the system) or belt |
+| `routes[].from` / `to` | celestials **of this system**, kind `station`\|`gate`\|`belt`, and different from each other |
+| `routes[].hull` | an existing hull (civilian haulers: `ship-npc-hauler`); cargo `qty × volume` must fit its `cargo` |
+| `routes[].cargo` | `{ "item": ..., "qty": ... }` — existing item, `qty >= 1` |
+| `routes[].interval_ticks` | authored cadence **in ticks** (60 ticks = 1 s), `>= 1`; security scales it (table below) |
+| `patrol` | optional wing config: `hulls` (each needs an `npc-guard-*` def — `Content.GuardFor`), `interval_ticks >= 1`, security-scaled |
+| `raider` | the local ambush rat class. **Required when `security` is `low`/`null`**; must be an NPC that actually spawns in this system (belt/anomaly spawn groups). Leave unset in high security (ambush chance is 0) |
+
+Lifecycle: spawn at `from` (EvTraffic `departed`) → per-leg ambush roll at
+tunnel entry → deliver (`delivered`: exact integer stock + one supply price
+step down) or despawn at a gate/belt. Ambushed haulers burn away 20 s and
+then attempt the warp-out; scrambler/web-carrying raiders pin them until
+the patrol responds or they die. Outcomes: `destroyed` (wreck with the
+exact cargo, lootable via `CmdLoot`, plus a risk-premium price step up),
+`escaped`, or `saved`.
+
+Validation rejects: unknown/empty system, empty routes, endpoints outside
+the system or of the wrong kind, `from == to`, unknown hull/cargo/interval
+< 1/qty < 1, cargo volume exceeding the hull, missing raider in low/null,
+unknown or non-local raider, patrol hulls without a guard def.
+
+### Traffic calibration contract (the binding tables)
+
+Every constant is pinned by `sim.TestTrafficSecurityMathPinned`,
+`sim.TestTrafficSpawnRateBySecurity`, `sim.TestTrafficAttackChanceEmpirical`
+and `sim.TestTrafficMarket*`; the shipped TTK/DPS numbers are pinned by
+`content.TestConvoyTimeToKillPinned`. Future traffic content must land
+inside them. The single derived quantity is the **security status σ**:
+
+| `security` | σ |
+|------------|---|
+| `high` | 1.0 |
+| `low`  | 0.5 |
+| `null` | 0.0 |
+
+**Spawn cadence** — effective interval = `round(authored × 4^(1-σ))`:
+
+| security | multiplier | authored 5400 | authored 1800 | authored 9000 (patrol) |
+|----------|-----------|----------------|----------------|------------------------|
+| high | ×1 | 5400 t (90 s) | 1800 t | 9000 t (150 s) |
+| low  | ×2 | 10800 t (180 s) | 3600 t | 18000 t (300 s) |
+| null | ×4 | 21600 t (360 s) | 7200 t | *no patrols* |
+
+Schedules are stateless hashes (due when `(ticks + phase(key)) mod
+interval == 0`); a skipped attempt (live cap: 6 haulers, 4 patrols) never
+reschedules anything.
+
+**Ambush probability per transit leg** — `p = (1-σ)/3`:
+
+| security | p | shipped example |
+|----------|---|-----------------|
+| high | 0 | Solace convoys are never ambushed |
+| low  | 1/6 ≈ 16.7 % | Penumbra: ≈1 ambush per 6 legs |
+| null | 1/3 ≈ 33.3 % | Gloam: 1 ambush per 3 legs |
+
+Raiders: `1 + Intn(3)` ships of the def's `raider` class, spawned within
+3 km of the ambushed hauler. Flee math: the hauler burns 20 s before its
+warp-out, while a raider locks a sig-100 hauler in ≈15 s (scan 440) — so
+scramblers/webs bite before the escape attempt and pin it.
+
+**Patrol response** — cadence `round(authored / σ)` (none at σ = 0);
+ambush response delay `1800×(1-σ)` ticks, wing `floor(3σ)`:
+
+| security | response delay | wing |
+|----------|----------------|------|
+| high | 0 (same tick) | 3 ships |
+| low  | 900 t (15 s) | 1 ship |
+| null | never | 0 |
+
+**Market drift** — band and step, all derived from σ and the shipment's
+value share of its shelf ("turnover" = listed `qty × price` of that item
+at that system; a brand-new shelf counts as share 1):
+
+| quantity | formula | high | low | null |
+|----------|---------|------|-----|------|
+| price band | `0.05 × 4^(1-σ)` (half the 10 % sell cut, widened by insecurity) | ±5 % | ±10 % | ±20 % |
+| delivery step `k` | `share × band / 2.5` | 2 % | 4 % | 8 % |
+| attack step `k` | `2 × share × band / 2.5` (risk premium) | 4 % | 8 % | 16 % |
+| decay | halve distance-to-base every **3600 ticks** (60 s) | — | — | — |
+
+`price' = clamp(base·(1-band), base·(1+band), price·(1±k))` where `base`
+is the authored market order's price (else the item's `base_price`); a
+step that would leave the band clamps silently. Worked example (shipped):
+120 `ore-cordite` (48 each) delivered to Penumbra Port — no shelf yet, so
+share = 1, low band = 10 %, k = 1 × 10 %/2.5 = 4 %: 48 → **46.08**
+(the exact `EvMarket` "price falls to 46.08" line the showcase observes).
+Stock changes are always exact integers (units), never floats.
+
 ## Checklist before you finish
 
 1. **`go test ./content/...` is green** — the embedded real data must load
@@ -489,14 +612,16 @@ table.
    hull (high→mid→low order), belts reference ores, spawns reference NPCs,
    loot/market/cargo reference existing items-or-ships-or-modules,
    weapon `ammo_class` matches some ammo/charge, contract targets/destinations
-   are real NPCs/items/stations.
+   are real NPCs/items/stations; traffic endpoints/hulls/cargo/raiders
+   resolve inside their system (Recipe 9).
 5. **Reachability**: every system reachable from `start_system` via gates.
 6. **Balance rules of thumb**: small hull 300–800 total HP; frigates
    200k–400k; modules 10k–400k; minerals 5–60/unit; ores 20–120/unit;
    bounties 5k–250k; resists in [0,1); refine yields in (0,1] summing ≤ 1;
    weapons `shot_time > 0` with non-zero damage; active modules
    `activation_time > 0`; contract rewards inside the Recipe 8 payout
-   ratio table.
+   ratio table; traffic cadences/probabilities/market drift inside the
+   Recipe 9 calibration tables.
 7. **Every field filled** — no silent zeros where a real value belongs
    (only legitimate zeros: passive `activation_*`, `ore_hold: 0` on
-   non-barges, ammo-less `ammo_class: ""`).
+   non-barges, ammo-less `ammo_class: ""`, guard NPCs' `bounty: 0`).

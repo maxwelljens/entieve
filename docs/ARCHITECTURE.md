@@ -113,7 +113,9 @@ profile; turrets consume 1 charge/shot:
 `ship-cutlass` (brawler: 4 high, 3 mid, 4 low),
 `ship-barge` (mining: 2 high, 2 mid, 3 low, big ore hold),
 `ship-hauler` (industrial: 1 high, 2 mid, 4 low, huge cargo),
-`ship-rat-scuttler`, `ship-rat-marauder`, `ship-rat-hierarch` (NPC hulls).
+`ship-rat-scuttler`, `ship-rat-marauder`, `ship-rat-hierarch` (NPC hulls),
+`ship-npc-hauler` (civilian convoy freighter, unarmed),
+`ship-npc-patrol` (system security interceptor).
 
 **Modules** (`content/data/modules/*.json`, grouped by category):
 - weapons: `mod-emp-turret` (uses `charge-*` ammo class `light`),
@@ -132,7 +134,10 @@ profile; turrets consume 1 charge/shot:
 **NPCs** (`content/data/npcs/rats.json`):
 `npc-rat-scuttler`, `npc-rat-marauder`, `npc-rat-hierarch` — each refs a rat
 hull, fit, behavior (aggro range, orbit range, flee threshold), bounty, loot
-table.
+table. Guard loadouts (`content/data/npcs/guards.json`, prefix
+`npc-guard-`) are non-rat NPCs: zero bounty, no loot table, spawned by the
+traffic system rather than spawn groups — `npc-guard-patrol` (hull
+`ship-npc-patrol`, registered per patrol hull via `Content.GuardFor`).
 
 **Systems** (`content/data/systems/*.json`, one file per system):
 - `sys-solace` — starting system (constellation Loomfall). Star
@@ -172,6 +177,14 @@ pinned to one station (`station` = offering station; kinds `kill`, `deliver`,
   `min_standing` 0.2).
 Rewards are calibrated by the payout ratio table in
 `docs/CONTENT_AUTHORING.md` ("add a contract").
+
+**Traffic** (`content/data/traffic/*.json`, one def per system, keyed by
+its `system` field): convoy `routes` (station/gate/belt endpoints inside
+the system, hull, cargo item+qty, authored `interval_ticks`), an optional
+`patrol` wing (hulls + cadence), and — required in low/null security —
+the `raider` rat class that ambushes convoys (must spawn in that system).
+Cadences and probabilities derive from the system's security through the
+calibration tables in `docs/CONTENT_AUTHORING.md`.
 
 ### Struct summary (`content/model.go` is authoritative)
 
@@ -244,6 +257,16 @@ type ContractDef struct {                        // contracts/*.json
     // mine: Item (ore) + Count m³ mined into the hold.
     Reward struct{ Credits float64; Item ItemID; Qty int; StandingGain float64 }
 }
+type RouteCargo struct{ Item ItemID; Qty int }
+type RouteDef struct {                            // traffic/*.json
+    From, To CelID; Hull ShipID; Cargo RouteCargo
+    IntervalTicks int64                           // authored cadence; security scales it
+}
+type PatrolDef struct{ Hulls []ShipID; IntervalTicks int64 }
+type TrafficDef struct {                          // one def per system, keyed by system
+    System SystemID; Routes []RouteDef
+    Patrol *PatrolDef; Raider NpcID               // raider required when security is low|null
+}
 type WorldDef struct {
     ID WorldID; Name, Description string
     Start struct{ System SystemID; Position core.Vec2; Ship ShipID; Fit []ModuleID; Cargo []CargoStack; Wallet float64 }
@@ -252,7 +275,8 @@ type WorldDef struct {
 type Content struct {
     Items map[ItemID]*ItemDef; Ships map[ShipID]*ShipDef; Modules map[ModuleID]*ModuleDef
     NPCs map[NpcID]*NpcDef; Systems map[SystemID]*SystemDef
-    Contracts map[ContractID]*ContractDef; Universe *UniverseDef
+    Contracts map[ContractID]*ContractDef; Traffic map[SystemID]*TrafficDef
+    Universe *UniverseDef
     Worlds map[WorldID]*WorldDef
 }
 func Load(fsys fs.FS) (*Content, error)      // reads content/data/** JSON, embed.FS by default via content.FS
@@ -260,12 +284,18 @@ func LoadDir(dir string) (*Content, error)   // os.DirFS convenience for dev/hot
 func (c *Content) Validate() error           // aggregated cross-ref validation
 func (c *Content) Item(id ItemID) (*ItemDef, bool) // + Ship/Module/Npc/System/World/Contract accessors
 func (c *Content) Board(cel CelID) []*ContractDef   // a station's mission board, sorted by ID
+func (c *Content) TrafficFor(id SystemID) (*TrafficDef, bool) // a system's traffic config
+func (c *Content) GuardFor(hull ShipID) (*NpcDef, bool)       // npc-guard-* loadout for a patrol hull
 ```
 
 `Validate()` must catch at minimum: duplicate IDs; unknown references (fit
 modules, ship hulls in NPC defs, gate destinations both ways, market items,
 loot items, ore refine yields, ammo classes used by weapons, contract rat
-classes / cargo items / stations); slot overflow
+classes / cargo items / stations); traffic route endpoints inside the
+system (station/gate/belt kinds), hulls, cargo items (volume must fit the
+hull), intervals >= 1, non-empty route lists, raider presence for low/null
+security (a rat class spawned in that system), patrol hulls with an
+`npc-guard-*` definition; slot overflow
 in world fits and NPC fits; refine yields outside `[0,1]`; resists outside
 `[0,1]`; negative numbers; worlds referencing unknown systems; `world-showcase`
 present with a non-empty `scenario`.
@@ -292,6 +322,8 @@ Components (plain structs in `Store[T]`):
 | `Docked` | marker: entity is inside station (hidden from grid) |
 | `WarpDrive` | warp state machine (align → warp → land) |
 | `Wreck` | `Loot []CargoStack`, `BountyFor` |
+| `Traffic` | convoy hauler leg: origin/dest cel, cargo item+qty, phase, per-leg ambush roll consumed, warp retry time, live `Attack` state (raiders, flee/response clocks, outcome) |
+| `Patrol` | security patrol response state: `idle`/`respond`/`return` + incident hauler handle + warp retry time |
 | `Scannable`? | *(not used — reserved)* |
 | `Name` | display name string |
 
@@ -325,6 +357,13 @@ severity), `EvtDestroyed`, `EvtWarp{Phase}`, `EvtLooted`, `EvtDocked`,
 `EvMission{Phase, ID, Name}` reports the contract lifecycle with phases
 `"accepted" | "progress" | "ready" | "completed" | "abandoned" | "refused"`
 (ID/Name carry the contract ID and title; Value carries the payout).
+`EvTraffic{Phase, System, Cel, Item, Value, Text}` reports the
+living-universe convoy lifecycle with phases `"departed" | "delivered" |
+"attacked" | "destroyed" | "escaped" | "patrol-response"` (System carries
+the system ID, Cel the route endpoint / incident celestial, Item/Value the
+shipment). Market moves driven by traffic ride the existing `EvtMarket`
+kind with `System`/`Item`/`Value` (new price) and text
+`"Surplus — … price falls to …"` / `"Risk premium — … price rises to …"`.
 
 API (`sim/api.go`):
 
@@ -386,7 +425,10 @@ Systems (`sim/` internal, called by `Step` in this order):
     folds kill/ore objective observations, auto-claims ready contracts on
     docking at the claim station → wallet + standing),
 15. `respawn` (belt/anomaly NPC respawn timers),
-16. `events` (trim/cleanup).
+16. `traffic` (the living universe: convoy spawn/warp/deliver schedules,
+   per-leg ambush rolls, raider and patrol combat, market drift + premium
+   decay),
+17. `events` (trim/cleanup).
 
 The **contracts loop** ties the activities together: undock → accept a
 contract from a station board → count objectives from the existing flows
@@ -394,6 +436,56 @@ contract from a station board → count objectives from the existing flows
 destination station) → return to the claim station → payout + career
 standing (`Save.Standing` / `Save.Missions`, both persisted). Contracts are
 repeatable board jobs (v1: no expiry, no once-only claim).
+
+The **living universe** layer (`systemTraffic`, data in
+`content/data/traffic/`) runs the three interlocking systems the contracts
+economy sits on top of:
+
+- **NPC cargo traffic** — per-system convoy routes spawn haulers
+  (`ship-npc-hauler`) on security-scaled schedules, fly one-way legs
+  through the normal warp profile (align → tunnel → land), deliver cargo
+  at station endpoints (exact integer stock) and despawn at gates/belts
+  (v1: no cross-system NPC jumps). Live haulers are capped at 6 per
+  system, patrols at 4; schedules are stateless hashes (no timers to
+  persist). Haulers and patrols are ordinary entities: the player can
+  lock, shoot and loot them like anything else.
+- **Security patrols** (`npc-guard-*` loadouts on `ship-npc-patrol`) idle
+  on a guard circle 20–30 km east of the anchor station (outside the
+  8 km NPC guard radius so station traffic never trips them), and respond
+  to convoy ambushes: instant 3-ship wings in high security, a single
+  responder after 15 s in low security, nothing in null. Responding
+  patrols warp to the incident and fight raiders through the normal
+  lock/activate/turret/damage pipeline — NPC-vs-NPC combat reuses the
+  player pipeline with an explicit activation target (`npcActivate(e, ai,
+  target)`); only the *aggro* state machine remains player-centric.
+- **Sporadic attacks** — every convoy tunnel entry in low/null security
+  rolls `p = (1-σ)/3` (1-in-6 Penumbra, 1-in-3 Gloam, 0 high-sec); on a
+  hit, 1–3 raiders of the system's `raider` rat class drop in mid-leg
+  (renamed `<Name> Ambusher` so name-addressed scripts stay
+  unambiguous), the hauler is dragged out of warp and burns away for 20 s
+  before attempting its warp-out. Scramblers/webs pin it (lock ≈ 15 s vs
+  the 20 s flee), the patrol's arrival pulls the raiders' guns off the
+  convoy, and the incident resolves as **destroyed** (wreck with the
+  exact cargo, lootable via `CmdLoot`; risk-premium price step up),
+  **escaped** (warps clear and delivers anyway), or **saved** (all
+  raiders dead while the hauler lives). Raiding NPCs never queue respawn
+  timers against nearby spawn groups.
+- **Market memory** — deliveries add exact units of stock and step the
+  item's price DOWN one supply step; a lost inbound shipment steps the
+  destination system's price UP (risk premium). Steps are
+  `price' = clamp(base·(1±band), price·(1±k))` with `band = 0.05·4^(1-σ)`
+  and `k = share·band/2.5` (×2 for losses); deviating prices halve their
+  distance to base every 3,600 ticks. Prices can never leave the band.
+  All constants are derived/pinned in the calibration tables in
+  `docs/CONTENT_AUTHORING.md` ("traffic calibration contract").
+
+**Determinism**: all living-universe randomness (spawn scatter, ambush
+rolls, raider counts, patrol scatter) draws from a dedicated traffic RNG
+stream forked from the master stream at `New` (`Save.TrafficRNGState`) —
+traffic never consumes the player's combat rolls, so existing seed-pinned
+outcomes are untouched. Hauler legs/ambushes persist as `Traffic`/`Patrol`
+components and `Save.TrafficLeaves` (scheduled raider break-offs); prices
+persist in `Save.Market`.
 
 ### Turret formula (EVE-faithful)
 
@@ -456,7 +548,9 @@ death), bounty payout, wreck looting, mining + asteroid depletion + ore hold,
 cargo transfer, gate jump both directions, dock/undock, station repair,
 market buy/sell, refine, ship assembly/swap, module fit/unfit, respawn
 timers, save/restore round-trip, determinism (Hash equality of twin runs),
-contract accept → objective progress → auto-claim payout + standing.
+contract accept → objective progress → auto-claim payout + standing,
+NPC traffic delivery + market price drift, ambush on NPC traffic
+(Penumbra legs, showcase seed), security patrol response + convoy escape.
 
 ## `render` / `ui` / `game` contract
 

@@ -1,0 +1,30 @@
+{
+  "system": "sys-solace",
+  "routes": [
+    {
+      "from": "cel-haven-rest",
+      "to": "cel-gate-penumbra",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "charge-emp", "qty": 600 },
+      "interval_ticks": 5400
+    },
+    {
+      "from": "cel-gate-penumbra",
+      "to": "cel-haven-rest",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "ore-cordite", "qty": 120 },
+      "interval_ticks": 5400
+    },
+    {
+      "from": "cel-solace-belt",
+      "to": "cel-haven-rest",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "ore-sterngrit", "qty": 500 },
+      "interval_ticks": 7200
+    }
+  ],
+  "patrol": {
+    "hulls": ["ship-npc-patrol"],
+    "interval_ticks": 9000
+  }
+}

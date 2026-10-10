@@ -79,6 +79,7 @@ func (c *Content) Validate() error {
 	v.npcs()
 	v.systems()
 	v.contracts()
+	v.traffic()
 	v.worlds()
 	v.universe()
 	if len(v.errs) == 0 {
@@ -674,6 +675,131 @@ func (v *validator) contracts() {
 			}
 		}
 	}
+}
+
+// traffic cross-checks every system's living-universe traffic configuration:
+// route endpoints resolve inside the system, hulls/cargo/raiders exist, the
+// cargo fits the hull, and intervals are sane. Low/null systems must name a
+// raider class that actually spawns in that system.
+func (v *validator) traffic() {
+	for _, sys := range keys(v.c.Traffic) {
+		td := v.c.Traffic[sys]
+		if sys == "" {
+			v.addf("traffic: missing system")
+			continue
+		}
+		ctx := "traffic/" + string(sys)
+		sysDef, ok := v.c.Systems[sys]
+		if !ok {
+			v.addf("%s: unknown system %q", ctx, sys)
+			continue
+		}
+		if len(td.Routes) == 0 {
+			v.addf("%s: no routes (at least one route required)", ctx)
+		}
+		security := sysDef.Security
+		if security != "high" && td.Raider == "" {
+			v.addf("%s: security %q traffic requires a raider npc id", ctx, security)
+		}
+		if td.Raider != "" {
+			if _, ok := v.c.NPCs[td.Raider]; !ok {
+				v.addf("%s: unknown raider npc %q", ctx, td.Raider)
+			} else if !npcSpawnsInSystem(sysDef, td.Raider) {
+				v.addf("%s: raider %q is not spawned anywhere in this system", ctx, td.Raider)
+			}
+		}
+		for i, r := range td.Routes {
+			rctx := fmt.Sprintf("%s/routes[%d]", ctx, i)
+			if r.From == r.To {
+				v.addf("%s: from and to must differ", rctx)
+			}
+			for _, end := range []struct {
+				what string
+				id   CelID
+			}{{"from", r.From}, {"to", r.To}} {
+				if end.id == "" {
+					v.addf("%s: missing %s endpoint", rctx, end.what)
+					continue
+				}
+				cel := celestialIn(sysDef, end.id)
+				if cel == nil {
+					v.addf("%s: unknown %s endpoint %q (not a celestial of %s)", rctx, end.what, end.id, sys)
+					continue
+				}
+				switch cel.Kind {
+				case CelStation, CelGate, CelBelt:
+				default:
+					v.addf("%s: %s endpoint %q is kind %q (want station|gate|belt)", rctx, end.what, end.id, cel.Kind)
+				}
+			}
+			hull, ok := v.c.Ships[r.Hull]
+			if !ok {
+				v.addf("%s: unknown hull %q", rctx, r.Hull)
+			}
+			if r.IntervalTicks < 1 {
+				v.addf("%s: interval_ticks %d must be >= 1", rctx, r.IntervalTicks)
+			}
+			if r.Cargo.Qty < 1 {
+				v.addf("%s: cargo qty %d must be >= 1", rctx, r.Cargo.Qty)
+			}
+			item, ok := v.c.Items[r.Cargo.Item]
+			if !ok {
+				v.addf("%s: unknown cargo item %q", rctx, r.Cargo.Item)
+			} else if hull != nil && item.Volume > 0 {
+				if vol := item.Volume * float64(r.Cargo.Qty); vol > hull.Cargo {
+					v.addf("%s: cargo volume %v exceeds hull %s capacity %v", rctx, vol, hull.ID, hull.Cargo)
+				}
+			}
+		}
+		if td.Patrol != nil {
+			if len(td.Patrol.Hulls) == 0 {
+				v.addf("%s/patrol: no hulls (at least one required)", ctx)
+			}
+			for i, h := range td.Patrol.Hulls {
+				if _, ok := v.c.Ships[h]; !ok {
+					v.addf("%s/patrol: hulls[%d] unknown hull %q", ctx, i, h)
+					continue
+				}
+				if _, ok := v.c.GuardFor(h); !ok {
+					v.addf("%s/patrol: hulls[%d] %q has no npc-guard-* definition", ctx, i, h)
+				}
+			}
+			if td.Patrol.IntervalTicks < 1 {
+				v.addf("%s/patrol: interval_ticks %d must be >= 1", ctx, td.Patrol.IntervalTicks)
+			}
+		}
+	}
+}
+
+// celestialIn returns the celestial definition with the given ID inside sys.
+func celestialIn(sys *SystemDef, id CelID) *CelestialDef {
+	for i := range sys.Celestials {
+		if sys.Celestials[i].ID == id {
+			return &sys.Celestials[i]
+		}
+	}
+	return nil
+}
+
+// npcSpawnsInSystem reports whether npc appears in any spawn group (ambient
+// or anomaly) of the system.
+func npcSpawnsInSystem(sys *SystemDef, npc NpcID) bool {
+	for i := range sys.Celestials {
+		cel := &sys.Celestials[i]
+		for _, sp := range cel.Spawns {
+			if sp.NpcID == npc {
+				return true
+			}
+		}
+		if cel.Anomaly != nil {
+			for _, sp := range cel.Anomaly.Spawns {
+				if sp.NpcID == npc {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // isStation reports whether cel is a station celestial in any system.

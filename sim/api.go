@@ -41,6 +41,13 @@ type Sim struct {
 	Docked     *ecs.Store[Docked]
 	Warps      *ecs.Store[WarpDrive]
 	Wrecks     *ecs.Store[Wreck]
+	Traffic    *ecs.Store[Traffic]
+	Patrols    *ecs.Store[Patrol]
+
+	// trafficRNG is the living-universe RNG stream: convoy spawns, ambush
+	// rolls, raider counts and patrol scatter all draw here so traffic
+	// activity never shifts the master stream (player combat rolls).
+	trafficRNG *core.RNG
 
 	// pendingPlayerRespawn defers the death respawn to the end of a Step.
 	pendingPlayerRespawn bool
@@ -61,8 +68,10 @@ type Sim struct {
 	events      []Event
 	market      map[content.SystemID][]MarketStock
 	respawns    []RespawnTimer
-	modTargets  map[modKey]ecs.Entity
-	free        []freeSlot
+	// trafficLeaves are scheduled raider break-offs (persisted; see Save).
+	trafficLeaves []TrafficLeave
+	modTargets    map[modKey]ecs.Entity
+	free          []freeSlot
 
 	// ammoPrefs is the per-(owner, slot) preferred charge item set by
 	// CmdSetAmmo ("" entry = automatic). Point-looked-up only — never
@@ -140,6 +149,9 @@ func New(c *content.Content, w *content.WorldDef, seed int64) (*Sim, error) {
 		market:     initMarket(c),
 	}
 	s.lastPlayerWork.at = playerWorkNever
+	// Fork the living-universe stream from the fresh master state: same seed
+	// => same traffic stream, and drawing here never consumes master rolls.
+	s.trafficRNG = s.RNG.Fork(trafficStreamID)
 	s.bindStores()
 	if err := s.buildPlayer(w); err != nil {
 		return nil, err
@@ -172,6 +184,8 @@ func (s *Sim) bindStores() {
 	s.Docked = ecs.NewStore[Docked](w)
 	s.Warps = ecs.NewStore[WarpDrive](w)
 	s.Wrecks = ecs.NewStore[Wreck](w)
+	s.Traffic = ecs.NewStore[Traffic](w)
+	s.Patrols = ecs.NewStore[Patrol](w)
 }
 
 // Step advances the simulation by one tick (DT seconds). Queued commands are
@@ -192,6 +206,7 @@ func (s *Sim) Step() {
 	s.systemTravel()    // 13 travel
 	s.systemMission()   // 14 mission (accept/abandon, objectives, auto-claim)
 	s.systemRespawn()   // 15 respawn
+	s.systemTraffic()   // 16 traffic (convoys, ambushes, patrols, market drift)
 	// Death respawn runs after all systems so that a cross-system clone-bay
 	// respawn can rebuild the grid without yanking entities out from under
 	// the systems still running this tick.
@@ -199,7 +214,7 @@ func (s *Sim) Step() {
 		s.pendingPlayerRespawn = false
 		s.respawnPlayer()
 	}
-	// 16 events: capped at emit time; nothing else to trim.
+	// 17 events: capped at emit time; nothing else to trim.
 	s.ticks++
 	// Time is derived from ticks (not accumulated) so that Time() is an
 	// exact function of the tick count — trivially identical across
@@ -374,12 +389,16 @@ func (s *Sim) Info(e ecs.Entity) (Info, bool) {
 		}
 	}
 
-	// Hostility: an NPC in an aggro state.
+	// Hostility: an NPC in an aggro state, or a traffic raider mid-ambush
+	// (its AI state machine still reads idle while it hunts a convoy).
 	if ai, ok := s.AIs.Get(e); ok {
 		switch ai.State {
 		case NpcApproach, NpcOrbit, NpcFlee:
 			info.Hostile = true
 		}
+	}
+	if !info.Hostile && s.isTrafficRaider(e) {
+		info.Hostile = true
 	}
 
 	// Capability flags driving the Selected Item actions.

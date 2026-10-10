@@ -6,7 +6,11 @@
 // agents — add content by writing JSON files; see docs/CONTENT_AUTHORING.md.
 package content
 
-import "github.com/entieve/entieve/core"
+import (
+	"strings"
+
+	"github.com/entieve/entieve/core"
+)
 
 // Typed IDs. All IDs are kebab-case strings, globally unique per kind.
 type (
@@ -393,6 +397,41 @@ type ContractDef struct {
 	Description string            `json:"description"`
 }
 
+// RouteCargo is the shipment carried by one traffic route.
+type RouteCargo struct {
+	Item ItemID `json:"item"`
+	Qty  int    `json:"qty"`
+}
+
+// RouteDef is one one-way convoy leg inside a system: a hauler spawns at
+// From, warps the leg, delivers Cargo at To when To is a station, and
+// despawns (a gate endpoint means the hauler leaves the system).
+type RouteDef struct {
+	From          CelID      `json:"from"`
+	To            CelID      `json:"to"`
+	Hull          ShipID     `json:"hull"`
+	Cargo         RouteCargo `json:"cargo"`
+	IntervalTicks int64      `json:"interval_ticks"` // authored cadence; security scales it (docs/CONTENT_AUTHORING.md)
+}
+
+// PatrolDef configures a system's security patrols: the wing composition
+// and the authored spawn cadence (security scales it).
+type PatrolDef struct {
+	Hulls         []ShipID `json:"hulls"`
+	IntervalTicks int64    `json:"interval_ticks"`
+}
+
+// TrafficDef is one system's living-universe traffic configuration: convoy
+// routes, the patrol wing, and (in low/null security) the local rat class
+// that ambushes convoys. Loaded from content/data/traffic/, one def per
+// system; the system ID is the def's identity.
+type TrafficDef struct {
+	System SystemID   `json:"system"`
+	Routes []RouteDef `json:"routes"`
+	Patrol *PatrolDef `json:"patrol,omitempty"`
+	Raider NpcID      `json:"raider,omitempty"` // required when security is low|null
+}
+
 // Checkpoint documents one feature exercised by a showcase scenario.
 type Checkpoint struct {
 	Name    string `json:"name"`
@@ -427,6 +466,7 @@ type Content struct {
 	NPCs      map[NpcID]*NpcDef
 	Systems   map[SystemID]*SystemDef
 	Contracts map[ContractID]*ContractDef
+	Traffic   map[SystemID]*TrafficDef
 	Universe  *UniverseDef
 	Worlds    map[WorldID]*WorldDef
 }
@@ -448,6 +488,25 @@ func (c *Content) System(id SystemID) (*SystemDef, bool) { d, ok := c.Systems[id
 
 // World returns the world def for id.
 func (c *Content) World(id WorldID) (*WorldDef, bool) { d, ok := c.Worlds[id]; return d, ok }
+
+// TrafficFor returns the traffic configuration of the given system.
+func (c *Content) TrafficFor(id SystemID) (*TrafficDef, bool) {
+	d, ok := c.Traffic[id]
+	return d, ok
+}
+
+// GuardFor returns the npc-guard-* definition whose loadout uses the given
+// hull — the security-patrol registry (guards are NPCs that are not rats:
+// zero bounty, no loot table, spawned by the traffic system rather than
+// belt/anomaly spawn groups).
+func (c *Content) GuardFor(hull ShipID) (*NpcDef, bool) {
+	for _, id := range keys(c.NPCs) {
+		if strings.HasPrefix(string(id), "npc-guard-") && c.NPCs[id].Ship == hull {
+			return c.NPCs[id], true
+		}
+	}
+	return nil, false
+}
 
 // Contract returns the contract def for id.
 func (c *Content) Contract(id ContractID) (*ContractDef, bool) {

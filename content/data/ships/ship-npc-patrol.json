@@ -1,0 +1,32 @@
+{
+  "id": "ship-npc-patrol",
+  "name": "Patrol",
+  "class": "frigate",
+  "description": "System security interceptor: fast, well-gunned, and never far from the trade lanes.",
+  "slots": {
+    "high": 3,
+    "mid": 2,
+    "low": 2
+  },
+  "shield": 300,
+  "armor": 250,
+  "structure": 250,
+  "resists": {
+    "em": 0.2,
+    "thermal": 0.25,
+    "kinetic": 0.3,
+    "explosive": 0.25
+  },
+  "capacitor": 1500,
+  "recharge": 130,
+  "max_speed": 420,
+  "agility": 0.5,
+  "mass": 1500000,
+  "sig_radius": 45,
+  "cargo": 250,
+  "ore_hold": 0,
+  "warp_speed": 4.0,
+  "max_target_range": 45000,
+  "max_targets": 3,
+  "scan_resolution": 600
+}

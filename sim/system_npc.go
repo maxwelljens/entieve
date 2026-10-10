@@ -210,7 +210,7 @@ func (s *Sim) systemNpc() {
 			if s.time-start >= npcFleeSeconds {
 				s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: e,
 					Text: s.nameOf(e) + " retreats and escapes"})
-				s.recordRespawn(ai)
+				s.recordRespawn(e, ai)
 				s.destroy(e)
 			}
 			continue // no combat actions while fleeing
@@ -238,7 +238,7 @@ func (s *Sim) systemNpc() {
 		if ai.State == NpcApproach || ai.State == NpcOrbit {
 			if playerOnGrid {
 				s.npcEnsureLock(e, s.player)
-				s.npcActivate(e, ai)
+				s.npcActivate(e, ai, s.player)
 			}
 		}
 	}
@@ -351,10 +351,14 @@ func (s *Sim) npcEnsureLock(e, target ecs.Entity) {
 	tg.Locks = append(tg.Locks, Lock{Target: target})
 }
 
-// npcActivate runs the NPC's per-tick module activation policy: weapons and
-// ewar once the player is locked and in range, tank when damaged, cap
-// booster when low, afterburner while fleeing. Failures are silent (quiet).
-func (s *Sim) npcActivate(e ecs.Entity, ai *NpcAI) {
+// npcActivate runs the NPC's per-tick module activation policy against an
+// explicit target: weapons and ewar once the target is locked and in range,
+// tank when damaged, cap booster when low, afterburner while fleeing.
+// Failures are silent (quiet). systemNpc passes the player; the traffic
+// system passes the ambushed hauler or an attacking patrol, which is what
+// makes NPC-vs-NPC combat run through the normal lock/activate/turret/
+// damage pipeline.
+func (s *Sim) npcActivate(e ecs.Entity, ai *NpcAI, target ecs.Entity) {
 	fit, ok := s.Fittings.Get(e)
 	if !ok {
 		return
@@ -378,9 +382,9 @@ func (s *Sim) npcActivate(e ecs.Entity, ai *NpcAI) {
 			slot := SlotRef{Class: class, Index: i}
 			switch def.Kind {
 			case content.KindWeapon:
-				s.activate(e, slot, s.player, true)
+				s.activate(e, slot, target, true)
 			case content.KindStasisWeb, content.KindWarpScram:
-				s.activate(e, slot, s.player, true)
+				s.activate(e, slot, target, true)
 			case content.KindShieldBoost:
 				if ship != nil && ship.Shield < ship.MaxShield*0.9 {
 					s.activate(e, slot, 0, true)

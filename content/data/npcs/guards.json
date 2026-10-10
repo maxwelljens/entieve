@@ -1,0 +1,19 @@
+[
+  {
+    "id": "npc-guard-patrol",
+    "name": "Patrol",
+    "faction": "Loomfall Security",
+    "ship": "ship-npc-patrol",
+    "fit": [
+      "mod-rail-turret",
+      "mod-rail-turret",
+      "mod-rail-turret",
+      "mod-shield-boost"
+    ],
+    "aggro_range": 6000,
+    "orbit_range": 2500,
+    "flee_threshold": 0.25,
+    "bounty": 0,
+    "loot": []
+  }
+]

@@ -1,0 +1,32 @@
+{
+  "id": "ship-npc-hauler",
+  "name": "Convoy Hauler",
+  "class": "industrial",
+  "description": "A civilian freighter flying the trade lanes under convoy contract: fat hold, thick industrial tank, no guns. It runs, it does not fight.",
+  "slots": {
+    "high": 1,
+    "mid": 2,
+    "low": 4
+  },
+  "shield": 700,
+  "armor": 900,
+  "structure": 1200,
+  "resists": {
+    "em": 0.1,
+    "thermal": 0.15,
+    "kinetic": 0.35,
+    "explosive": 0.3
+  },
+  "capacitor": 2000,
+  "recharge": 170,
+  "max_speed": 175,
+  "agility": 2.0,
+  "mass": 14000000,
+  "sig_radius": 100,
+  "cargo": 7000,
+  "ore_hold": 0,
+  "warp_speed": 2.2,
+  "max_target_range": 30000,
+  "max_targets": 2,
+  "scan_resolution": 260
+}

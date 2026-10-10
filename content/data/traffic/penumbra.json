@@ -1,0 +1,38 @@
+{
+  "system": "sys-penumbra",
+  "routes": [
+    {
+      "from": "cel-penumbra-port",
+      "to": "cel-gate-solace",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "ore-lucidite", "qty": 200 },
+      "interval_ticks": 1800
+    },
+    {
+      "from": "cel-gate-solace",
+      "to": "cel-penumbra-port",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "ore-cordite", "qty": 150 },
+      "interval_ticks": 1800
+    },
+    {
+      "from": "cel-penumbra-port",
+      "to": "cel-gate-gloam",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "charge-emp", "qty": 400 },
+      "interval_ticks": 1800
+    },
+    {
+      "from": "cel-gate-gloam",
+      "to": "cel-penumbra-port",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "ore-lucidite", "qty": 120 },
+      "interval_ticks": 1800
+    }
+  ],
+  "patrol": {
+    "hulls": ["ship-npc-patrol"],
+    "interval_ticks": 9000
+  },
+  "raider": "npc-rat-marauder"
+}

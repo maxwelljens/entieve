@@ -235,6 +235,63 @@ type Wreck struct {
 	ExpiresAt float64
 }
 
+// Traffic phases (Traffic.Phase of a live convoy hauler).
+const (
+	// TrafficTransit is a hauler flying its one-way leg: warp out, retry on
+	// interruption, deliver (station) or despawn (gate/belt) on arrival.
+	TrafficTransit = "transit"
+)
+
+// Traffic outcome phases (TrafficAttack.Outcome).
+const (
+	TrafficOutcomeDestroyed = "destroyed"
+	TrafficOutcomeEscaped   = "escaped"
+	TrafficOutcomeSaved     = "saved"
+)
+
+// TrafficAttack is the live ambush state of one convoy hauler: the raiders
+// engaged with it, when the hauler last may flee, when the patrol response
+// is due (RespondAt < 0: never), and how the incident resolved ("" while
+// running).
+type TrafficAttack struct {
+	Raiders   []ecs.Entity `json:"raiders"`
+	Started   float64      `json:"started"`    // sim time of the ambush
+	FleeAt    float64      `json:"flee_at"`    // hauler burns away until this time, then warps out
+	RespondAt float64      `json:"respond_at"` // patrol response due (< 0: never)
+	Responded bool         `json:"responded"`
+	Outcome   string       `json:"outcome,omitempty"` // "" | destroyed | escaped | saved
+}
+
+// Traffic marks a convoy hauler and carries its one-way leg: origin,
+// destination, cargo, and the live ambush state (nil until attacked).
+type Traffic struct {
+	Origin content.CelID  `json:"origin"`
+	Dest   content.CelID  `json:"dest"`
+	Item   content.ItemID `json:"item"`
+	Qty    int            `json:"qty"`
+	Phase  string         `json:"phase"`
+	Rolled bool           `json:"rolled"` // the per-leg attack roll was consumed
+	Next   float64        `json:"next"`   // earliest next warp (re)attempt (sim time)
+	Attack *TrafficAttack `json:"attack,omitempty"`
+}
+
+// Patrol response states (Patrol.State).
+const (
+	PatrolIdle    = "idle"
+	PatrolRespond = "respond"
+	PatrolReturn  = "return"
+)
+
+// Patrol is the living-universe state of a security patrol ship: idling
+// around its anchor (driven by the NPC state machine), warping to an
+// incident to break up an ambush, or returning home. Incident is the
+// ambushed hauler's entity handle.
+type Patrol struct {
+	State    string     `json:"state"`
+	Incident ecs.Entity `json:"incident,omitempty"`
+	Next     float64    `json:"next"` // warp retry cooldown (sim time)
+}
+
 // ---------------------------------------------------------------------------
 // Commands — the player/agent control surface
 // ---------------------------------------------------------------------------
@@ -419,6 +476,19 @@ const (
 	EvCargoFull      EventKind = "cargo_full"
 	EvAnomalyCleared EventKind = "anomaly_cleared"
 	EvMission        EventKind = "mission"
+	EvTraffic        EventKind = "traffic"
+)
+
+// EvTraffic phases: "departed" | "delivered" | "attacked" | "destroyed" |
+// "escaped" | "patrol-response". Event.System carries the system ID and
+// Event.Cel the route endpoint / incident celestial.
+const (
+	TrafficDeparted       = "departed"
+	TrafficDelivered      = "delivered"
+	TrafficAttacked       = "attacked"
+	TrafficDestroyed      = "destroyed"
+	TrafficEscaped        = "escaped"
+	TrafficPatrolResponse = "patrol-response"
 )
 
 // EvMission phases: "accepted" | "progress" | "ready" | "completed" |
@@ -452,9 +522,11 @@ type Event struct {
 	Text     string  // human-readable log line
 	Value    float64 // credits, damage, volume... context-dependent
 	Item     content.ItemID
-	Phase    string // EvWarp phases: "start" | "land" | "scrammed"; EvMission phases above
-	ID       string // EvMission: contract ID
-	Name     string // EvMission: contract title
+	Phase    string           // EvWarp phases: "start" | "land" | "scrammed"; EvMission/EvTraffic phases above
+	ID       string           // EvMission: contract ID
+	Name     string           // EvMission: contract title
+	System   content.SystemID // EvTraffic/EvMarket: the system the move happened in
+	Cel      content.CelID    // EvTraffic: route endpoint / incident celestial
 }
 
 // ---------------------------------------------------------------------------
@@ -536,6 +608,14 @@ type RespawnTimer struct {
 	At     float64          `json:"at"`
 }
 
+// TrafficLeave schedules one ambushing NPC's break-off: at the saved sim
+// time the raider disengages and leaves, whether or not the hauler whose
+// ambush it was still exists.
+type TrafficLeave struct {
+	Entity ecs.Entity `json:"entity"`
+	At     float64    `json:"at"`
+}
+
 // SavedEntity is one entity's full component snapshot (nil = absent).
 type SavedEntity struct {
 	ID        uint64      `json:"id"` // raw ecs.Entity
@@ -556,7 +636,9 @@ type SavedEntity struct {
 	Docked    *Docked     `json:"docked,omitempty"`
 	Warp      *WarpDrive  `json:"warp,omitempty"`
 	Wreck     *Wreck      `json:"wreck,omitempty"`
-	Intent    *Intent     `json:"intent,omitempty"` // movement intent
+	Intent    *Intent     `json:"intent,omitempty"`  // movement intent
+	Traffic   *Traffic    `json:"traffic,omitempty"` // convoy hauler leg/ambush state
+	Patrol    *Patrol     `json:"patrol,omitempty"`  // security patrol response state
 }
 
 // SavedNpcAI is NpcAI with serializable RNG state.
@@ -600,7 +682,11 @@ type Save struct {
 	Ticks    int64            `json:"ticks"`
 	Seed     int64            `json:"seed"`
 	RNGState uint64           `json:"rng_state"`
-	Wallet   float64          `json:"wallet"`
+	// TrafficRNGState is the state of the living-universe RNG stream
+	// (traffic spawns, ambush rolls, patrol scatter), forked from the master
+	// stream so convoy activity never shifts the player's combat rolls.
+	TrafficRNGState uint64  `json:"traffic_rng_state"`
+	Wallet          float64 `json:"wallet"`
 	// Standing is the player's career standing (contract completion credit).
 	Standing float64 `json:"standing"`
 	// Missions are the contracts currently accepted (with progress).
@@ -608,7 +694,10 @@ type Save struct {
 	Hangar   Hangar                             `json:"hangar"`
 	Market   map[content.SystemID][]MarketStock `json:"market"`
 	Respawn  []RespawnTimer                     `json:"respawn"`
-	Entities []SavedEntity                      `json:"entities"`
+	// TrafficLeaves are scheduled raider break-offs (living-universe
+	// ambushes resolved before their raiders left the field).
+	TrafficLeaves []TrafficLeave `json:"traffic_leaves,omitempty"`
+	Entities      []SavedEntity  `json:"entities"`
 	// ModTargets are the active-module target bindings, kept sorted by
 	// owner/class/index so map iteration order never leaks into the
 	// canonical serialization (Hash).
