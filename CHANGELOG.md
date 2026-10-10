@@ -25,6 +25,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-overlapping defaults.
 - `entieve describe <id>` content introspection with near-miss suggestions
   (AI-agent tooling).
+- Contracts & Standing gameplay loop: data-driven station boards
+  (kill / deliver / mine), accept → progress → auto-claim on docking at the
+  claim station, standing-gated level-2 boards, payouts calibrated from
+  economy values (rat-value multiple, ore premium, hauling margin).
+- Drop-in art assets: name a PNG after a content ID in `assets/`
+  (hulls/ stations/ asteroids/ backgrounds/) and it renders — missing
+  files fall back to the procedural art (docs/ART.md).
+- Living universe: NPC convoys haul cargo along data-driven routes (real
+  warp profiles), guard patrols respond to incidents by security level,
+  markets remember traffic (deliveries drift prices down, ambushes up with
+  decay, clamped to security bands), and rats sporadically ambush convoys
+  in low-sec/null — the hauler dies (lootable cargo wreck), escapes, or is
+  saved by patrols; you can intervene (showcase checkpoints #49–51).
 
 ### Changed
 
