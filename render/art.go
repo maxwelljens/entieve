@@ -212,11 +212,28 @@ func strokeArc(dst *ebiten.Image, cx, cy, rad, start, end, width float32, col co
 }
 
 // colorScale converts a color to an ebiten.ColorScale.
+//
+// Entieve convention: color values are STRAIGHT (non-premultiplied) alpha —
+// every palette/overlay literal says "{r,g,b} at opacity a". ebiten's vector
+// compositor, like the GPU, expects premultiplied sources, so premultiply
+// here: a straight (111,168,255,55) must arrive as (24,36,55,55) and blend
+// at 22% opacity. Without this, low-alpha strokes composite nearly opaque
+// (src + dst·(1−α) with un-premultiplied src), which silently broke every
+// "dimmed" stroke — the static-looking HUD rings among them. Opaque colors
+// (A=0xffff) are unaffected.
 func colorScale(col color.Color) ebiten.ColorScale {
-	r, g, b, a := col.RGBA()
+	r, g, b, a := premul(col)
 	var cs ebiten.ColorScale
-	cs.Scale(float32(r)/0xffff, float32(g)/0xffff, float32(b)/0xffff, float32(a)/0xffff)
+	cs.Scale(r, g, b, a)
 	return cs
+}
+
+// premul converts a straight-alpha color to premultiplied 0..1 components,
+// the form ebiten's compositor expects (see colorScale).
+func premul(col color.Color) (r, g, b, a float32) {
+	cr, cg, cb, ca := col.RGBA()
+	fa := float32(ca) / 0xffff
+	return float32(cr) / 0xffff * fa, float32(cg) / 0xffff * fa, float32(cb) / 0xffff * fa, fa
 }
 
 // ---------------------------------------------------------------------------
