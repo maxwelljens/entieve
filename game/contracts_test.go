@@ -1,0 +1,484 @@
+package game
+
+import (
+	"image"
+	"strings"
+	"testing"
+
+	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/sim"
+	"github.com/hajimehoshi/ebiten/v2"
+)
+
+// ---------------------------------------------------------------------------
+// helpers
+// ---------------------------------------------------------------------------
+
+// dockedShowcaseGame builds the showcase session, docks at the current
+// system's station and pumps one frame so the contract board is laid out.
+func dockedShowcaseGame(t *testing.T, w, h int) *Game {
+	t.Helper()
+	g := newShowcaseGame(t)
+	g.applySize(w, h)
+	dockAt(t, g)
+	g.syncScenes()
+	g.syncMounts()
+	pump(t, g, w, h)
+	return g
+}
+
+// click fires the widget-level left click ebitenui would fire from input,
+// then flushes the deferred event queue through a kit update.
+func click(t *testing.T, g *Game, btn *widget.Button) {
+	t.Helper()
+	w := btn.GetWidget()
+	w.MouseButtonClickedEvent.Fire(&widget.WidgetMouseButtonClickedEventArgs{
+		Widget: w,
+		Button: ebiten.MouseButtonLeft,
+	})
+	if err := g.kit.Update(); err != nil {
+		t.Fatalf("kit.Update: %v", err)
+	}
+}
+
+// findRow returns the board row with the given contract id.
+func findRow(t *testing.T, rows []stationRow, id content.ContractID) stationRow {
+	t.Helper()
+	for _, r := range rows {
+		if r.id == id {
+			return r
+		}
+	}
+	t.Fatalf("no board row for %s", id)
+	return stationRow{}
+}
+
+// availLine returns one text line of an available row: 0 = title,
+// 1 = objective summary, 2 = reward.
+func availLine(t *testing.T, g *Game, id content.ContractID, line int) string {
+	t.Helper()
+	var row *widget.Container
+	for _, r := range g.stAvailRows {
+		if r.id == id {
+			row = r.root
+			break
+		}
+	}
+	if row == nil {
+		t.Fatalf("no available row for %s", id)
+	}
+	switch line {
+	case 0:
+		return row.Children()[0].(*widget.Container).Children()[0].(*widget.Text).Label
+	case 1:
+		return row.Children()[1].(*widget.Text).Label
+	default:
+		return row.Children()[2].(*widget.Container).Children()[0].(*widget.Text).Label
+	}
+}
+
+// activeTitle returns the first line of the i-th active row ("Title —
+// progress", or the empty-state / "+N more" note).
+func activeTitle(t *testing.T, g *Game, i int) string {
+	t.Helper()
+	kids := g.stActive.Children()
+	if i >= len(kids) {
+		t.Fatalf("only %d active rows", len(kids))
+	}
+	// Both contract rows and note rows are containers whose first child
+	// is the line's text widget.
+	return kids[i].(*widget.Container).Children()[0].(*widget.Text).Label
+}
+
+// setMissions swaps the sim's accepted contracts (save surgery) so tests
+// can drive progress and row caps without running combat.
+func setMissions(t *testing.T, g *Game, ms ...sim.MissionState) {
+	t.Helper()
+	sv, err := g.s.Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	sv.Missions = ms
+	if err := g.s.Restore(sv); err != nil {
+		t.Fatalf("Restore: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Pure row layout — the pin
+// ---------------------------------------------------------------------------
+
+// TestBoardRowRects pins the pure board row layout: exact rects for a
+// known inner, then the invariants (equal heights, equal gaps, pairwise
+// non-overlap, everything inside the inner rect) on the real section
+// rects at1280×720 and 1024×700 plus the window minimum.
+func TestBoardRowRects(t *testing.T) {
+	// Exact: 176 px of inner, 3 rows, gap 4 → 56 each.
+	inner := image.Rect(0, 0, boardInnerW, 176)
+	want := []image.Rectangle{
+		image.Rect(0, 0, boardInnerW, 56),
+		image.Rect(0, 60, boardInnerW, 116),
+		image.Rect(0, 120, boardInnerW, 176),
+	}
+	got := boardRowRects(inner, 3)
+	if len(got) != len(want) {
+		t.Fatalf("boardRowRects(_, 3) = %d rects, want %d", len(got), len(want))
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("row %d = %v, want %v", i, got[i], want[i])
+		}
+	}
+	if boardRowRects(inner, 0) != nil {
+		t.Error("n = 0 must produce no rows")
+	}
+	if rows := boardRowRects(image.Rect(0, 0, boardInnerW, 3), 5); rows != nil {
+		t.Errorf("degenerate inner produced %d rows, want nil", len(rows))
+	}
+
+	// Invariants at both design sizes and at the window minimum.
+	inners := map[string]image.Rectangle{}
+	for _, size := range [][2]int{{1280, 720}, {1024, 700}} {
+		g := dockedShowcaseGame(t, size[0], size[1])
+		inners[sectionName(size)] = g.stAvail.GetWidget().Rect
+	}
+	inners["window minimum"] = image.Rect(0, 0, stationMinW-2*boardPad, stationMinH-2*boardPad)
+
+	for name, r := range inners {
+		if r.Dy() == 0 {
+			t.Fatalf("%s: section never laid out", name)
+		}
+		for n := 0; n <= 8; n++ {
+			rows := boardRowRects(r, n)
+			if n == 0 {
+				if rows != nil {
+					t.Errorf("%s n=0: %d rows, want nil", name, len(rows))
+				}
+				continue
+			}
+			if len(rows) != n {
+				t.Fatalf("%s n=%d: got %d rows", name, n, len(rows))
+			}
+			for i, row := range rows {
+				if !row.In(r) {
+					t.Errorf("%s n=%d row %d = %v outside inner %v", name, n, i, row, r)
+				}
+				if i > 0 {
+					prev := rows[i-1]
+					if row.Min.Y-prev.Max.Y != boardRowGap {
+						t.Errorf("%s n=%d gap %d = %d, want %d",
+							name, n, i, row.Min.Y-prev.Max.Y, boardRowGap)
+					}
+					if row.Overlaps(prev) {
+						t.Errorf("%s n=%d row %d overlaps %v", name, n, i, prev)
+					}
+				}
+				if row.Dy() != rows[0].Dy() {
+					t.Errorf("%s n=%d row %d height %d, want %d (equal rows)",
+						name, n, i, row.Dy(), rows[0].Dy())
+				}
+			}
+		}
+	}
+}
+
+// sectionName labels the pumped geometry for failure messages.
+func sectionName(size [2]int) string {
+	switch size[0] {
+	case 1280:
+		return "1280×720"
+	default:
+		return "1024×700"
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Geometry: the window never overlaps the log or the market
+// ---------------------------------------------------------------------------
+
+// TestStationWindowGeometry pumps the docked board at both design sizes —
+// with the worst-case row set — and pins the window: on screen, above the
+// log, left of the market, and every row inside the window rect at the
+// rects boardRowRects produced.
+func TestStationWindowGeometry(t *testing.T) {
+	for _, size := range [][2]int{{1280, 720}, {1024, 700}} {
+		g := dockedShowcaseGame(t, size[0], size[1])
+
+		// Worst case: every contract accepted → 3 available rows plus the
+		// capped active section (1 contract + "+N more").
+		setMissions(t, g,
+			sim.MissionState{ID: "contract-solace-cleanup-1"},
+			sim.MissionState{ID: "contract-solace-cordite-1"},
+			sim.MissionState{ID: "contract-solace-supply-run-1"},
+			sim.MissionState{ID: "contract-penumbra-den-hunt-1"},
+			sim.MissionState{ID: "contract-penumbra-lucidite-1"},
+		)
+		g.syncMounts()
+		pump(t, g, size[0], size[1])
+
+		station := g.stationW.GetContainer().GetWidget().Rect
+		log := g.logP.Win().GetContainer().GetWidget().Rect
+		market := g.mkt.Win().GetContainer().GetWidget().Rect
+
+		if station.Min.X < 0 || station.Max.X > size[0] || station.Max.Y > size[1] {
+			t.Errorf("%dx%d: station window %v out of bounds", size[0], size[1], station)
+		}
+		if station.Max.Y > log.Min.Y {
+			t.Errorf("%dx%d: station window %v overlaps the log %v",
+				size[0], size[1], station, log)
+		}
+		if market.Dx() > 0 && station.Max.X > market.Min.X {
+			t.Errorf("%dx%d: station window %v overlaps the market %v",
+				size[0], size[1], station, market)
+		}
+
+		// Every row sits at the rect boardRowRects hands out, inside the window.
+		for _, sec := range []*widget.Container{g.stAvail, g.stActive} {
+			children := sec.Children()
+			want := boardRowRects(sec.GetWidget().Rect, len(children))
+			if len(want) != len(children) {
+				t.Fatalf("%dx%d: section %d children, %d rects",
+					size[0], size[1], len(children), len(want))
+			}
+			for i, ch := range children {
+				if ch.GetWidget().Rect != want[i] {
+					t.Errorf("%dx%d: row %d rect %v, want %v (boardRowRects)",
+						size[0], size[1], i, ch.GetWidget().Rect, want[i])
+				}
+				if !ch.GetWidget().Rect.In(station) {
+					t.Errorf("%dx%d: row %d %v outside the station window %v",
+						size[0], size[1], i, ch.GetWidget().Rect, station)
+				}
+				// The row's content must fit its rect — taller or wider
+				// content would bleed into the gap, the next row or the
+				// window edge.
+				pw, ph := ch.PreferredSize()
+				if ph > ch.GetWidget().Rect.Dy() {
+					t.Errorf("%dx%d: row %d content is %dpx tall, rect is %dpx",
+						size[0], size[1], i, ph, ch.GetWidget().Rect.Dy())
+				}
+				if pw > ch.GetWidget().Rect.Dx() {
+					t.Errorf("%dx%d: row %d content is %dpx wide, rect is %dpx",
+						size[0], size[1], i, pw, ch.GetWidget().Rect.Dx())
+				}
+			}
+		}
+	}
+}
+
+// TestStationBoardRendersShippedContent pins the rendered row text of the
+// shipped contracts: full objective/reward strings (no ellipsis — the row
+// columns are wide enough) and the gated requirement on the Penumbra board.
+func TestStationBoardRendersShippedContent(t *testing.T) {
+	g := dockedShowcaseGame(t, 1024, 700)
+
+	if got, want := availLine(t, g, "contract-solace-cleanup-1", 1), "Destroy 1× Scuttler"; got != want {
+		t.Errorf("cleanup summary = %q, want %q", got, want)
+	}
+	if got, want := availLine(t, g, "contract-solace-cleanup-1", 2), "40,000 ISK · +0.10 standing"; got != want {
+		t.Errorf("cleanup reward = %q, want %q", got, want)
+	}
+	if got, want := availLine(t, g, "contract-solace-supply-run-1", 1),
+		"Deliver 2 m³ EMP Charge to Penumbra Port"; got != want {
+		t.Errorf("supply summary = %q, want %q", got, want)
+	}
+	if got, want := availLine(t, g, "contract-solace-cordite-1", 1), "Mine 400 m³ Cordite Ore"; got != want {
+		t.Errorf("cordite summary = %q, want %q", got, want)
+	}
+	for _, id := range []content.ContractID{
+		"contract-solace-cleanup-1", "contract-solace-cordite-1", "contract-solace-supply-run-1",
+	} {
+		for line := 0; line < 3; line++ {
+			if s := availLine(t, g, id, line); strings.Contains(s, "…") {
+				t.Errorf("%s line %d ellipsized: %q", id, line, s)
+			}
+		}
+	}
+	// Active placeholder: nothing accepted yet.
+	if got := activeTitle(t, g, 0); got != "No active contracts." {
+		t.Errorf("empty active section = %q", got)
+	}
+
+	// The longest active line (deliver title + progress) must fit its
+	// column whole: no ellipsis, integer progress.
+	setMissions(t, g, sim.MissionState{ID: "contract-solace-supply-run-1"})
+	g.syncMounts()
+	pump(t, g, 1024, 700)
+	if got, want := activeTitle(t, g, 0), "Supply run to Penumbra Port — 0/2"; got != want {
+		t.Errorf("supply active line = %q, want %q", got, want)
+	}
+
+	// Gated board: dock at Penumbra Port (standing 0 < 0.20).
+	g.s.Docked.Set(g.s.Player(), sim.Docked{At: "cel-penumbra-port"})
+	g.syncScenes()
+	g.syncMounts()
+	pump(t, g, 1024, 700)
+	if len(g.stAvailRows) != 2 {
+		t.Fatalf("Penumbra board rows = %d, want 2", len(g.stAvailRows))
+	}
+	for _, r := range g.stAvailRows {
+		if !r.btn.GetWidget().Disabled {
+			t.Errorf("%s: gated Accept button is enabled", r.id)
+		}
+	}
+	// The requirement rides on the reward line and the reward stays whole.
+	row := g.stAvail.Children()[0].(*widget.Container)
+	line3 := row.Children()[2].(*widget.Container)
+	if got := line3.Children()[1].(*widget.Text).Label; got != "Requires standing 0.20" {
+		t.Errorf("gated requirement = %q", got)
+	}
+	if got := line3.Children()[0].(*widget.Text).Label; strings.Contains(got, "…") {
+		t.Errorf("gated reward ellipsized: %q", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Command emission: the UI only ever enqueues
+// ---------------------------------------------------------------------------
+
+// TestStationAcceptEmitsCommand: pressing Accept enqueues exactly
+// CmdAcceptMission{ID}; a standing-gated row enqueues nothing even when
+// its click event is forced past the disabled widget.
+func TestStationAcceptEmitsCommand(t *testing.T) {
+	g := dockedShowcaseGame(t, 1280, 720)
+	var got []sim.Command
+	g.env.Enqueue = func(c sim.Command) {
+		got = append(got, c)
+		g.s.Queue(c) // forward: the recorder observes, the sim executes
+	}
+
+	row := findRow(t, g.stAvailRows, "contract-solace-cleanup-1")
+	if row.btn.GetWidget().Disabled {
+		t.Fatal("ungated Accept button is disabled")
+	}
+	click(t, g, row.btn)
+	if len(got) != 1 {
+		t.Fatalf("Accept enqueued %d commands, want 1", len(got))
+	}
+	cmd, ok := got[0].(sim.CmdAcceptMission)
+	if !ok || cmd.ID != "contract-solace-cleanup-1" {
+		t.Fatalf("Accept enqueued %#v, want CmdAcceptMission{contract-solace-cleanup-1}", got[0])
+	}
+
+	// The command actually runs: docked, so the sim accepts it.
+	got = nil
+	g.s.Step()
+	if evs := g.s.Events(); findMissionPhase(evs, sim.MissionAccepted) == nil {
+		t.Fatalf("no accepted event after Step: %v", evs)
+	}
+	if ms := g.s.Missions(); len(ms) != 1 || ms[0].ID != "contract-solace-cleanup-1" {
+		t.Fatalf("missions = %+v, want the accepted one", ms)
+	}
+
+	// Gated rows (Penumbra Port, standing 0): disabled and silent.
+	g.s.Docked.Set(g.s.Player(), sim.Docked{At: "cel-penumbra-port"})
+	g.syncScenes()
+	g.syncMounts()
+	pump(t, g, 1280, 720)
+	gated := findRow(t, g.stAvailRows, "contract-penumbra-den-hunt-1")
+	if !gated.btn.GetWidget().Disabled {
+		t.Fatal("gated Accept button is enabled")
+	}
+	click(t, g, gated.btn) // widget-level: the disabled check drops it
+	gated.btn.ClickedEvent.Fire(&widget.ButtonClickedEventArgs{Button: gated.btn})
+	if err := g.kit.Update(); err != nil {
+		t.Fatalf("kit.Update: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("gated row enqueued %v, want nothing", got)
+	}
+}
+
+// TestStationAbandonEmitsCommand: pressing Abandon enqueues exactly
+// CmdAbandonMission{ID}.
+func TestStationAbandonEmitsCommand(t *testing.T) {
+	g := dockedShowcaseGame(t, 1280, 720)
+	setMissions(t, g, sim.MissionState{ID: "contract-solace-cleanup-1"})
+	g.syncMounts()
+	pump(t, g, 1280, 720)
+
+	var got []sim.Command
+	g.env.Enqueue = func(c sim.Command) { got = append(got, c) }
+	row := findRow(t, g.stActRows, "contract-solace-cleanup-1")
+	click(t, g, row.btn)
+	if len(got) != 1 {
+		t.Fatalf("Abandon enqueued %d commands, want 1", len(got))
+	}
+	cmd, ok := got[0].(sim.CmdAbandonMission)
+	if !ok || cmd.ID != "contract-solace-cleanup-1" {
+		t.Fatalf("Abandon enqueued %#v, want CmdAbandonMission{contract-solace-cleanup-1}", got[0])
+	}
+}
+
+// ---------------------------------------------------------------------------
+// State refresh: the EvMission path
+// ---------------------------------------------------------------------------
+
+// TestStationBoardRefreshesOnEvMission: a progress change followed by a
+// drained EvMission event updates the active row's progress text — and
+// without the event the row stays stale (the refresh is wired to the
+// event path, not to incidental pumping).
+func TestStationBoardRefreshesOnEvMission(t *testing.T) {
+	g := dockedShowcaseGame(t, 1280, 720)
+	setMissions(t, g, sim.MissionState{ID: "contract-solace-cordite-1", Progress: 0})
+	g.syncMounts()
+	pump(t, g, 1280, 720)
+	if got, want := activeTitle(t, g, 0), "Cordite order — 0/400"; got != want {
+		t.Fatalf("active row = %q, want %q", got, want)
+	}
+
+	// Progress changes in the sim without an event reaching the interface.
+	setMissions(t, g, sim.MissionState{ID: "contract-solace-cordite-1", Progress: 120})
+	pump(t, g, 1280, 720)
+	if got := activeTitle(t, g, 0); got != "Cordite order — 0/400" {
+		t.Fatalf("row refreshed without the EvMission path: %q", got)
+	}
+
+	g.onEvents([]sim.Event{{Kind: sim.EvMission, Phase: sim.MissionProgress}})
+	pump(t, g, 1280, 720)
+	if got, want := activeTitle(t, g, 0), "Cordite order — 120/400"; got != want {
+		t.Fatalf("after EvMission: row = %q, want %q", got, want)
+	}
+}
+
+// TestStationBoardRowCaps: beyond the visible caps the board collapses
+// into a "+N more" row instead of growing the window.
+func TestStationBoardRowCaps(t *testing.T) {
+	g := dockedShowcaseGame(t, 1024, 700)
+	setMissions(t, g,
+		sim.MissionState{ID: "contract-solace-cleanup-1"},
+		sim.MissionState{ID: "contract-solace-cordite-1"},
+		sim.MissionState{ID: "contract-solace-supply-run-1"},
+		sim.MissionState{ID: "contract-penumbra-den-hunt-1"},
+		sim.MissionState{ID: "contract-penumbra-lucidite-1"},
+	)
+	g.syncMounts()
+	pump(t, g, 1024, 700)
+
+	avail := g.stAvail.Children()
+	if len(avail) != availMaxRows {
+		t.Fatalf("available rows = %d, want %d", len(avail), availMaxRows)
+	}
+	act := g.stActive.Children()
+	if len(act) != actMaxRows {
+		t.Fatalf("active rows = %d, want %d", len(act), actMaxRows)
+	}
+	// capRows(5, 2) → one contract + a note for the other four.
+	if got := act[0].(*widget.Container).Children()[0].(*widget.Text).Label; !strings.Contains(got, "—") {
+		t.Errorf("first active row = %q, want a contract row", got)
+	}
+	if got := act[1].(*widget.Container).Children()[0].(*widget.Text).Label; got != "+4 more" {
+		t.Errorf("overflow row = %q, want \"+4 more\"", got)
+	}
+}
+
+// findMissionPhase returns the first mission event with the given phase.
+func findMissionPhase(evs []sim.Event, phase string) *sim.Event {
+	for i := range evs {
+		if evs[i].Kind == sim.EvMission && evs[i].Phase == phase {
+			return &evs[i]
+		}
+	}
+	return nil
+}

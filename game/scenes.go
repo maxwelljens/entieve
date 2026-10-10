@@ -209,7 +209,11 @@ func (g *Game) buildMenuWindow() *widget.Window {
 }
 
 // buildStationWindow constructs the docked station strip: the station
-// identity and the Undock action.
+// identity header (name + Undock) over the two contract-board sections —
+// Available contracts (this station's board) and Active contracts (every
+// accepted contract). The sections' rows are laid out by boardRowRects
+// (contracts.go); syncStationBoard rebuilds them and hugs the window to
+// the content height.
 func (g *Game) buildStationWindow() *widget.Window {
 	p := g.env.Pal
 	g.stName = widget.NewText(
@@ -218,18 +222,55 @@ func (g *Game) buildStationWindow() *widget.Window {
 	undock := g.newBtn("Undock", 150, menuBtnH, func() {
 		g.s.Queue(sim.CmdUndock{})
 	})
-	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
+	header := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
 			widget.RowLayoutOpts.Spacing(10),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(6)),
+		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+	)
+	header.AddChild(g.stName, undock)
+
+	g.stAvail = g.newBoardSection()
+	g.stActive = g.newBoardSection()
+	availHead := widget.NewText(
+		widget.TextOpts.Text("Available contracts", g.env.Face(uikit.StepSmall), solid(p.Accent)),
+	)
+	actHead := widget.NewText(
+		widget.TextOpts.Text("Active contracts", g.env.Face(uikit.StepSmall), solid(p.Accent)),
+	)
+
+	body := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Spacing(boardSpacing),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(boardPad)),
 		)),
 	)
-	body.AddChild(g.stName, undock)
-	return widget.NewWindow(
+	body.AddChild(header, availHead, g.stAvail, actHead, g.stActive)
+	g.stBody = body
+	g.stSig, g.stAvailRows, g.stActRows = "", nil, nil // fresh window: rebuild on next sync
+
+	win := widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.Location(image.Rect(10, 0, 340, 52)),
+		widget.WindowOpts.MinSize(stationMinW, stationMinH),
+		widget.WindowOpts.Location(image.Rect(stationX, stationY, stationX+stationWinW, stationY+stationMinH)),
+	)
+	// Bind the theme now: syncStationBoard sizes the window from the body's
+	// preferred size before the window is first mounted, and ebitenui
+	// validates (and themes) buttons during that measurement. Same palette
+	// and type scale as the kit's own theme.
+	win.GetContainer().GetWidget().SetTheme(g.env.Theme)
+	return win
+}
+
+// newBoardSection builds one contract-row section: a bare container whose
+// rows are placed by boardRowRects through the boardLayout layouter.
+func (g *Game) newBoardSection() *widget.Container {
+	return widget.NewContainer(
+		widget.ContainerOpts.Layout(boardLayout{}),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
 }
 

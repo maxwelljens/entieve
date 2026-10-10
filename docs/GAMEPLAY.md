@@ -98,11 +98,11 @@ Default positions: overview top-left, selected item top-right, scanner
 in the center column under the top row, log bottom-left, HUD
 bottom-center, module rack bottom-right, starmap and the Esc menu
 centered, help top-center; while docked the market and inventory fill
-the center column, the fitting window takes the right edge and the station
-strip takes the top-left corner (the overview and selected item step
-aside while docked). The defaults never overlap: the in-space layout and
-the docked set are checked pairwise at both 1280×720 and the 1024×700
-minimum.
+the center column, the fitting window takes the right edge and the
+Station window (contract board included) takes the top-left corner
+(overview and selected item step aside while docked). The defaults never
+overlap: the in-space layout and the docked set are checked pairwise at
+both 1280×720 and the 1024×700 minimum.
 
 **Your layout persists.** Every named window's position, size and
 open/closed state (overview, selected item, log, market, inventory,
@@ -121,8 +121,10 @@ save format is unchanged for the CLI tools.
 ### Docked at a station
 
 Docking (`D`) opens the **Market**, **Inventory** and **Fitting**
-windows plus a small **Station** strip with the **Undock** button, and
-hides the space chrome (HUD bar, module rack, scanner) together with the
+windows plus the **Station** window — the station identity, the
+**Undock** button and the contract board (see
+[Contracts & standing](#contracts--standing)) — and hides the space
+chrome (HUD bar, module rack, scanner) together with the
 **Overview** and **Selected Item** windows. Undocking closes the station
 windows that were closed before docking, restores the space chrome and
 the overview/selected pair, and resets the camera view. The log stays
@@ -216,7 +218,56 @@ Non-weapons don't cycle.
 
 The currency of Entieve is the **credit**, displayed as
 `12,345.67 cr`. You earn credits from NPC bounties, selling loot and market
-trades, and spend them on market buys.
+trades, and spend them on market buys. Contract boards quote payouts in the
+classic EVE notation for the same money — `40,000 ISK` *is* 40,000 credits —
+so a reward line on the board reads `40,000 ISK · +0.10 standing`.
+
+## Contracts & standing
+
+Every station with a contract office runs a **board** of contracts — the
+kind of repeatable work an EVE pilot knows: cull rats, haul cargo, mine
+ore. Boards are **per station**: while docked, the **Station** window
+shows two sections.
+
+**Available contracts** — the docked station's board. Each row shows the
+title, the objective (`Destroy 1× Scuttler`,
+`Deliver 2 m³ EMP Charge to Penumbra Port`, `Mine 400 m³ Cordite Ore`) and
+the reward (`40,000 ISK · +0.10 standing`). Press **Accept** to take it; a
+contract above your standing shows its requirement
+(`Requires standing 0.20`) with the button disabled, and an
+already-accepted one is marked **Accepted**.
+
+**Active contracts** — everything you have accepted, anywhere, with live
+progress (`Belt cleanup — 1/3`) and an **Abandon** button. Accepting and
+abandoning both happen while docked, at the station that issued the
+contract; abandoning costs only the progress made so far.
+
+**Lifecycle.** `accepted → progress → ready → auto-claimed`. Kills count
+rats of exactly the requested class, mining counts the requested ore
+mined into your hold while the contract is active, and a delivery wants
+its cargo sitting in your hold. The claim is automatic the moment you
+dock at the **claim station**: the offering station for kill and mining
+contracts, the destination for a delivery — which consumes the delivered
+cargo on the spot. There is **no expiry**: contracts wait on the board
+until taken, and completed or abandoned ones can be accepted again
+(boards are repeatable jobs).
+
+**Payouts** are calibrated against the live economy rather than vibes: a
+kill contract pays a multiple (2.0–3.0×) of its target's value — bounty
+plus expected loot — so rat work has the highest ceiling; a mining
+contract pays a flat ~2.0× premium over the ore's base value; a hauling
+contract pays 1.5× the cargo's value plus a flat fee per gate jump, which
+makes delivery the dependable-margin option.
+
+**Standing** is the career score the boards gate on: every completed
+contract raises it (`+0.10` on today's level-1 boards, `+0.15` on
+level-2), and level-2 boards require **0.20** standing — two level-1
+completions — before they hand out their orders.
+
+Note that Penumbra now has a station, **Penumbra Port**, which also
+serves as the local clone anchor: a pilot destroyed over Penumbra wakes
+up in the Port — their last in-system docking, or the system's first
+station otherwise — instead of being shipped back to Solace.
 
 ## The systems of Entieve
 
@@ -226,7 +277,8 @@ asteroid belt and a gate to Penumbra.
 
 **Penumbra** is low-security: NPCs are aggressive, the belt holds richer ore
 (cordite, lucidite), and an anomaly hides marauders plus a hierarch boss with
-the best loot.
+the best loot. Its station, **Penumbra Port**, runs the level-2 board and
+doubles as the local clone anchor (see Contracts & standing).
 
 **Gloam** is a dead-end frontier, deliberately dangerous: glacierite belt ore
 and heavy spawns including hierarchs. Travel system-to-system by flying to a

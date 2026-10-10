@@ -96,6 +96,16 @@ type Game struct {
 	stationW *widget.Window
 	stName   *widget.Text
 
+	// The station window's contract board (contracts.go): the body, the
+	// two row sections, the signature of the last rebuild and the
+	// actionable rows (Accept/Abandon buttons by contract id).
+	stBody      *widget.Container
+	stAvail     *widget.Container
+	stActive    *widget.Container
+	stSig       string
+	stAvailRows []stationRow
+	stActRows   []stationRow
+
 	// The docked station strip is the only game-built strip that still
 	// rides the window stack (the chrome above lives on the root overlay).
 	stMount widget.RemoveWindowFunc
@@ -341,12 +351,18 @@ func (g *Game) handleKeys(in Input) error {
 }
 
 // onEvents reacts to events the interface does not own (view resets on
-// travel).
+// travel, contract-board refresh on mission/dock transitions — the board
+// also re-syncs every frame while docked, see syncStationBoard).
 func (g *Game) onEvents(evs []sim.Event) {
 	for _, e := range evs {
 		switch e.Kind {
-		case sim.EvJumped, sim.EvDocked, sim.EvUndocked:
+		case sim.EvJumped:
 			g.space.ResetView()
+		case sim.EvDocked, sim.EvUndocked:
+			g.space.ResetView()
+			g.syncStationBoard() // the board follows the docked station
+		case sim.EvMission:
+			g.syncStationBoard() // accept / progress / ready / claim / refuse
 		}
 	}
 }
@@ -402,9 +418,11 @@ func (g *Game) syncMounts() {
 	g.setChromeVisible(!docked)
 	g.kit.SetCoreVisible(!docked)
 
-	// The station strip appears while docked.
+	// The station strip appears while docked; the contract board follows
+	// the docked station and the live mission state.
 	if docked {
 		g.syncStationLabel()
+		g.syncStationBoard()
 	}
 	g.setStrip(&g.stShown, &g.stMount, docked, g.stationW)
 }
