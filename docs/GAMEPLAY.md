@@ -11,13 +11,13 @@ entieve run [--world world-default] [--seed N] [--save save.json] [--load save.j
 ```
 
 The window opens at 1280×720 (resizable, vsync, minimum 1024×700 — smaller
-windows clamp up rather than breaking the HUD layout). Everything below is
-also available in-game via the help overlay (`H`).
+windows clamp up rather than breaking the HUD layout). Everything in the
+keyboard table below is also available in-game via the help window (`H`).
 
 ## Controls
 
 The key map below is generated from `game.KeyMap` — the same source the
-in-game help overlay renders.
+in-game help window renders.
 
 ### Keyboard
 
@@ -30,7 +30,7 @@ in-game help overlay renders.
 | `Q` | Orbit selected — cycles 1k → 2.5k → 5k → 10k m |
 | `S` | Stop |
 | `W` | Align to selected |
-| `Z` | Warp to selected at the chosen landing range (0 / 10 / 50 km) |
+| `Z` | Warp to selected (lands 10 km short of the target) |
 | `D` | Dock (selected station, else nearest dockable one) |
 | `J` | Jump through gate (selected gate, else nearest) |
 | `L` | Loot nearest wreck |
@@ -38,9 +38,9 @@ in-game help overlay renders.
 | `I` | Toggle inventory (cargo + ore hold) |
 | `F` | Toggle fitting window |
 | `C` | Toggle scanner (slow off-grid sweep) |
-| `G` | Station services — jump to the Market tab (while docked) |
+| `G` | Toggle market window (trade while docked) |
 | `N` | Toggle starmap |
-| `H` | Toggle help overlay |
+| `H` | Toggle help window |
 | `Esc` | Menu: Resume / Save / Load / Quit |
 | `[` or `-` | Time acceleration down (8 → 4 → 2 → 1×) |
 | `]` or `=` | Time acceleration up (1 → 2 → 4 → 8×) |
@@ -53,58 +53,82 @@ in-game help overlay renders.
 | Input | Action |
 |---|---|
 | Left click | Select entity / press UI buttons; drag a window's title bar to move it (click also raises it to the front) |
-| Left click | On an overview column header: sort (click again flips direction); on the overview ▾ button: kind filters |
+| Left click | On an overview column header: sort (click again flips direction) |
 | `Ctrl` + left click | Lock target under cursor |
 | Left double-click | Approach entity; on empty space, fly straight toward that point |
 | Right click | Orbit target under cursor (2,500 m) |
-| Right click | On a weapon slot in the module rack: cycle the loaded charge (Auto → each cargo ammo of the weapon's class) |
+| Right click | On a weapon cell in the module rack: cycle the loaded charge (Auto → each cargo ammo of the weapon's class) |
 | Middle drag | Pan camera |
-| Wheel | Zoom (0.05× – 4×); over the overview, scroll the table (drag the scrollbar thumb to fling) |
+| Wheel | Zoom (0.05× – 4×); over the overview, scroll the list |
+
+Mouse handling is fully context-aware: a click, drag or wheel over *any*
+window or the HUD chrome never reaches the world behind it.
 
 **Resolved key conflicts** (documented decisions):
 
 - `F1–F8` are high-slot modules (EVE-style), so the classic "F5 = save" moved
   to **`Ctrl+S`**. `F9 = load` has no conflict and stays.
-- `M` is **mine** (EVE muscle memory); station services / market is **`G`**.
+- `M` is **mine** (EVE muscle memory); the market window is **`G`**.
 - Lock-under-cursor uses **`Ctrl`+click** so `L` stays free for looting.
 - `C` is **scanner** (a new window; no legacy binding to displace).
 
 ### Windows
 
-Every window has a **title bar**: drag it (mouse held + move) to reposition —
-positions are clamped to the screen and remembered for the session. Clicking a
-window raises it to the front; windows with a toggle key (`I`, `F`, `C`, `N`,
-`H`) carry a **[×]** close button whose key brings them back. The HUD panels
-(overview, selected item, log, modules) are draggable but not closable — they
-are always-on chrome. Default positions at 1280×720 never overlap: overview
-top-right, selected item top-left, fitting center-left (it never covers the
-overview), inventory center-right, scanner bottom-left above the log, starmap
-centered.
+The interface is a stack of **draggable, resizable windows** with title
+bars: drag a title bar to move a window, grab its right/bottom edge to
+resize, and click anywhere on a window to raise it to the front. Window
+positions are remembered for the session.
 
-### Overview (top-right)
+Toggle keys open and close their window (`I`, `F`, `G`, `C`, `N`, `H`) —
+windows have no separate close button. Three panels are **always-on
+chrome** and cannot be closed or moved: the ship **HUD bar** (bottom
+center, with the target-box row at top center), the **module rack**
+(bottom right) and the **log** (bottom left). The **Overview** (top left)
+and **Selected Item** window (top right) stay open but are draggable —
+a click in space selects the target that **Selected Item** then shows
+and that every `selected`-targeted key acts on.
+
+Default positions: overview top-left, selected item top-right, scanner
+in the center column under the top row, log bottom-left, HUD
+bottom-center, module rack bottom-right, starmap and the Esc menu
+centered, help top-center; while docked the market and inventory fill the
+center column, the fitting window takes the right edge and the station
+strip takes the top-left corner (the overview and selected item step
+aside while docked). The defaults never overlap: the in-space layout and
+the docked set are checked pairwise at both 1280×720 and the 1024×700
+minimum. Positions are remembered for the session — drag windows wherever
+you like; loading a save snaps them back to these defaults.
+
+### Docked at a station
+
+Docking (`D`) opens the **Market**, **Inventory** and **Fitting**
+windows plus a small **Station** strip with the **Undock** button, and
+hides the space chrome (HUD bar, module rack, scanner) together with the
+**Overview** and **Selected Item** windows. Undocking closes the station
+windows that were closed before docking, restores the space chrome and
+the overview/selected pair, and resets the camera view. The log stays
+mounted while docked so its history comes with you.
+
+### Overview (top-left)
 
 A sortable, **scrollable** table of everything you can currently perceive:
-icon, name, distance, velocity. Click a column header to sort (click again to
+name, distance, kind, velocity. Click a column header to sort (click again to
 flip direction; the active column tints amber and shows ▲/▼), hover the wheel
 over it to scroll (rows clip to the panel, scrollbar thumb included), click a
 row to select. Numbers are right-aligned on fixed column anchors, so digits
 changing never shift the columns.
 
-The **▾ filter button** in the title bar toggles per-kind visibility — Ships /
-Asteroids / Wrecks / Stations & Gates / Celestials — remembered for the
-session. It filters presentation only; it never reveals hidden contacts.
-
-Colors: red = hostile, orange = neutral NPC, blue = station,
-green = gate, grey = asteroid, yellow = wreck, cyan = you.
+Rows tint **red for hostiles** and **blue for your own ship**; the Kind
+column names the rest (Ship, Asteroid, Wreck, Station, Gate, …).
 
 ## EVE concepts primer
 
 **Slots.** Hulls have **high**, **mid** and **low** slots. High slots hold
 weapons and mining lasers (toggled with `F1…F8`). Mid slots hold propulsion,
 ewar and capacitor modules. Low slots hold tank (armor/resist) modules. The
-fitting window (`F`) shows the hull, the slots and the derived stats; while
-docked, the station's *Fitting + Hangar* tab lets you **fit** modules from the
-hangar into their first free slot and **unfit** them back.
+fitting window (`F`) shows the hull, the slots and the derived stats; its
+**Hangar** section lets you **fit** modules from the hangar into their first
+free slot and **unfit** them back, and **assemble** stored hulls.
 
 **Damage layers.** Damage hits **shield → armor → structure**, each reduced by
 the ship's four **resists** (EM, thermal, kinetic, explosive). Entieve uses a
@@ -123,18 +147,16 @@ tracking (scaled by signature radius), plus distance beyond optimal vs.
 falloff. Fast, small, transversal-moving targets are hard to hit; wrecking
 shots deal ×3 damage.
 
-**Warp rules.** `Z` (Warp To) makes you align first, then warp. The Selected
-Item window carries a **`0 | 10 | 50` km segmented control** that chooses the
-landing range: `0` lands on the target (within the sim's 2,500 m landing
-tolerance), `10`/`50` land that many meters short of it — the warp button
-always shows the current choice ("Warp to 10 km"). Warp scramblers on the
-target block warp and cancel an ongoing warp. Sublight movement is limited by
-agility (align time ≈ agility × 10 s); the afterburner multiplies speed while
-its cycle runs.
+**Warp rules.** `Z` (Warp To) and the Selected Item window's warp button
+both warp to the selected target at a fixed **10 km landing range** (the
+sim's landing tolerance applies around the chosen point). Warp scramblers
+on the target block warp and cancel an ongoing warp. Sublight movement is
+limited by agility (align time ≈ agility × 10 s); the afterburner
+multiplies speed while its cycle runs.
 
 **Mining.** Select an asteroid and press `M`: the first mining laser cycles,
-ore lands in the ore hold, and depleted asteroids vanish. Refine ore at a
-station (Refine tab) or sell it raw.
+ore lands in the ore hold, and depleted asteroids vanish. Sell the ore at a
+station's market or stockpile it.
 
 **Overview distances** follow EVE conventions: meters under 2 km
 (`1,250 m`), kilometers under 0.1 AU (`3.4 km`), AU beyond (`1.2 AU`).
@@ -160,12 +182,8 @@ omniscience), enforced in the sim's read model and the renderer alike.
   sweep. You learn that something is out there, not what it is or where it
   sits; you still have to fly there to see it. (Deliberate: the scanner is a
   hint system, not a map.)
-- **Overview filters.** The overview's ▾ filter popup toggles whole kinds
-  (Ships / Asteroids / Wrecks / Stations & Gates / Celestials) on top of
-  visibility — a presentation filter that can hide visible things but never
-  reveal invisible ones. Choices persist for the session.
-- **Warp-to-range** (above) is likewise a UI choice only: `Z` and the warp
-  button issue the same `CmdWarpTo` with the selected landing range.
+- **Warp-to-range** is a UI choice only: `Z` and the warp button issue the
+  same `CmdWarpTo` with the same fixed 10 km landing range.
 
 **Ammo cycling.** Right-click a weapon slot in the module rack to cycle its
 loaded charge: **Auto → each ammo of that weapon's class that sits in your
@@ -179,12 +197,12 @@ Non-weapons don't cycle.
 
 The currency of Entieve is the **credit**, displayed as
 `12,345.67 cr`. You earn credits from NPC bounties, selling loot and market
-trades, and spend them on repairs, market buys and fees.
+trades, and spend them on market buys.
 
 ## The systems of Entieve
 
 You start in **Solace** (high-security, constellation *Loomfall*): a friendly
-star with *Haven Rest* station (repair / market / refine / fitting), an
+star with *Haven Rest* station (market, inventory and fitting), an
 asteroid belt and a gate to Penumbra.
 
 **Penumbra** is low-security: NPCs are aggressive, the belt holds richer ore
@@ -193,8 +211,8 @@ the best loot.
 
 **Gloam** is a dead-end frontier, deliberately dangerous: glacierite belt ore
 and heavy spawns including hierarchs. Travel system-to-system by flying to a
-stargate and pressing `J` — the starmap (`N`) shows the gate graph; clicking a
-system shows its security status and connections.
+stargate and pressing `J` — the starmap (`N`) shows the gate graph with your
+current system highlighted.
 
 ## Time acceleration
 
@@ -207,9 +225,15 @@ replays are unaffected.
 
 - **`Ctrl+S`** writes a full JSON snapshot (`sim.Snapshot()`) to
   `os.UserConfigDir()/entieve/save.json` (override with `--save`).
-- **`F9`** restores that snapshot mid-run and rebinds the UI.
+- **`F9`** restores that snapshot mid-run and rebuilds the interface
+  against the restored world.
 - `--load <file>` restores a save at startup.
 - The `Esc` menu offers the same Save / Load plus Resume and Quit.
 
 Saving is the only way progress persists: quitting from the menu does not
 autosave.
+
+**Restoring mid-run rebuilds the interface**: the selection clears and
+window positions snap back to their defaults, while the log history
+carries across the rebuild — the simulation itself comes back exactly,
+including docked state and any windows you had open.

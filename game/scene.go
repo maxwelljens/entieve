@@ -8,15 +8,28 @@ import (
 	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/ui"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
+// Input is one frame's snapshot of ebiten input, taken by Game and handed
+// to the top scene. ebitenui reads the raw input itself through
+// Kit.Update; scenes only see this pure snapshot.
+type Input struct {
+	MouseX, MouseY float64
+	JustPressed    []ebiten.Key
+	KeysDown       []ebiten.Key // held keys, for Shift/Ctrl modifiers
+	MouseButton    [3]bool      // held: [0] left, [1] right, [2] middle
+	JustClicked    [2]bool      // press edges: [0] left, [1] right
+	Scroll         float64
+}
+
 // Scene is one entry of the game's scene stack. Scenes are drawn bottom-up;
-// only the top scene receives Update.
+// only the top scene receives Update. The interface itself (uikit windows)
+// is pumped by Game regardless of scene — scenes only own world input and
+// overlay dimming.
 type Scene interface {
-	Update(input ui.Input) error
+	Update(input Input) error
 	Draw(dst *ebiten.Image)
 	OnEnter()
 	OnLeave()
@@ -34,7 +47,9 @@ const (
 	doubleClickWindow = 400 * time.Millisecond
 )
 
-// SpaceScene is the hub: world rendering, camera and world clicks.
+// SpaceScene is the hub: world rendering, camera and world clicks. Every
+// mouse interaction is suppressed while the pointer sits on any interface
+// panel (Game.overUI).
 type SpaceScene struct {
 	g    *Game
 	pan  core.Vec2 // camera offset from the player, world meters
@@ -82,13 +97,11 @@ func (sc *SpaceScene) panBy(dxPx, dyPx float64) {
 	sc.pan = sc.pan.Add(core.V(-dxPx/(zoomBase*sc.zoom), -dyPx/(zoomBase*sc.zoom)))
 }
 
-// Update handles camera controls and world clicks; the UI gets the input
-// first so panel clicks and UI keys are consumed there.
-func (sc *SpaceScene) Update(in ui.Input) error {
+// Update handles camera controls and world clicks. Keyboard panning runs
+// unconditionally; every mouse gesture is gated on the pointer being off
+// the interface (ebitenui does not gate raw input for us).
+func (sc *SpaceScene) Update(in Input) error {
 	g := sc.g
-	if err := g.u.Update(in); err != nil {
-		return err
-	}
 
 	// Arrow-key panning (screen space).
 	step := panSpeed / (zoomBase * sc.zoom)
@@ -105,16 +118,21 @@ func (sc *SpaceScene) Update(in ui.Input) error {
 		sc.pan.X += step
 	}
 
-	// Wheel zoom — suppressed over any UI panel (the overview scrolls
-	// itself when hovered; chrome swallows the wheel elsewhere).
-	if in.Scroll != 0 && !g.u.PanelAt(in.MouseX, in.MouseY) {
+	over := g.overUI(in.MouseX, in.MouseY)
+
+	// Wheel zoom — suppressed over any panel (the overview scrolls
+	// itself when hovered; the chrome strips swallow the wheel).
+	if in.Scroll != 0 && !over {
 		sc.zoom = clampF(sc.zoom*math.Pow(zoomStep, in.Scroll), zoomMin, zoomMax)
 	}
 
-	// Middle-drag panning.
+	// Middle-drag panning: a drag may start only off-panel, but an
+	// already-running drag keeps panning across panels.
 	if in.MouseButton[2] {
 		if !sc.middle {
-			sc.middle, sc.midX, sc.midY = true, in.MouseX, in.MouseY
+			if !over {
+				sc.middle, sc.midX, sc.midY = true, in.MouseX, in.MouseY
+			}
 		} else {
 			sc.panBy(in.MouseX-sc.midX, in.MouseY-sc.midY)
 			sc.midX, sc.midY = in.MouseX, in.MouseY
@@ -123,8 +141,8 @@ func (sc *SpaceScene) Update(in ui.Input) error {
 		sc.middle = false
 	}
 
-	// The UI owns clicks that land on its panels.
-	if g.u.PanelAt(in.MouseX, in.MouseY) {
+	// The interface owns every click that lands on a panel.
+	if over {
 		return nil
 	}
 	cam := sc.Camera(float64(g.w), float64(g.h))
@@ -134,10 +152,10 @@ func (sc *SpaceScene) Update(in ui.Input) error {
 		inf, picked := sc.pick(cam, in.MouseX, in.MouseY)
 		switch {
 		case ctrl && picked:
-			g.u.Select(inf.Entity)
+			g.setSelected(inf.Entity)
 			g.s.Queue(sim.CmdLock{Target: inf.Entity})
 		case picked:
-			g.u.Select(inf.Entity)
+			g.setSelected(inf.Entity)
 			if sc.doubleClick(in.MouseX, in.MouseY) {
 				g.s.Queue(sim.CmdApproach{Target: inf.Entity})
 			}
@@ -152,7 +170,7 @@ func (sc *SpaceScene) Update(in ui.Input) error {
 
 	if in.JustClicked[1] {
 		if inf, picked := sc.pick(cam, in.MouseX, in.MouseY); picked {
-			g.u.Select(inf.Entity)
+			g.setSelected(inf.Entity)
 			g.s.Queue(sim.CmdOrbit{Target: inf.Entity, Range: orbitDefaultRange})
 		}
 	}
@@ -195,13 +213,13 @@ func (sc *SpaceScene) manualToward(cam render.Camera, x, y float64) {
 	sc.g.s.Queue(sim.CmdManualVel{Dir: dir, SpeedFrac: 1})
 }
 
-// Draw renders the world, the UI panels and the selection highlight.
+// Draw renders the world only — Game draws the interface on top of every
+// scene afterwards.
 func (sc *SpaceScene) Draw(dst *ebiten.Image) {
 	g := sc.g
 	cam := sc.Camera(float64(g.w), float64(g.h))
-	g.ren.SetSelected(g.u.Selected)
+	g.ren.SetSelected(g.kit.Selected())
 	g.ren.Draw(dst, cam, g.s)
-	g.u.Draw(dst, cam, g.s)
 }
 
 // clampF bounds v to [lo, hi].

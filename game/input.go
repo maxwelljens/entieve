@@ -41,7 +41,7 @@ var KeyMap = []Binding{
 	{Key: ebiten.KeyI, Action: "inventory", Desc: "I — toggle inventory"},
 	{Key: ebiten.KeyF, Action: "fitting", Desc: "F — toggle fitting"},
 	{Key: ebiten.KeyC, Action: "scanner", Desc: "C — toggle scanner (off-grid sweep)"},
-	{Key: ebiten.KeyG, Action: "market", Desc: "G — station services / market tab (while docked)"},
+	{Key: ebiten.KeyG, Action: "market", Desc: "G — toggle market window (trade while docked)"},
 	{Key: ebiten.KeyN, Action: "starmap", Desc: "N — toggle starmap"},
 	{Key: ebiten.KeyH, Action: "help", Desc: "H — toggle help"},
 	{Key: ebiten.KeyEscape, Action: "menu", Desc: "Esc — menu (Resume / Save / Load / Quit)"},

@@ -1,0 +1,226 @@
+package game
+
+import (
+	"image"
+	"testing"
+
+	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/core"
+	"github.com/entieve/entieve/sim"
+)
+
+// TestWorldClickSelection: a world click feeds Kit.Select, so the
+// Selected Item panel and every selection-driven action read the same
+// fresh selection (no stale game-local copy; the Tab cycle-lock adopts
+// through the same seam).
+func TestWorldClickSelection(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	for i := 0; i < 60; i++ {
+		g.s.Step()
+	}
+	pump(t, g, 1280, 720)
+	sc := g.space
+
+	// A visible entity, then pan the camera so it lands on a clear
+	// off-panel point (the showcase grid starts spread far apart).
+	var target sim.Info
+	for _, inf := range g.s.Grid() {
+		if inf.Visible && inf.Entity != g.s.Player() {
+			target = inf
+			break
+		}
+	}
+	if target.Entity.IsZero() {
+		t.Fatal("no visible entity to click")
+	}
+	const clickX, clickY = 640.0, 500.0 // a clear off-panel point
+	cam := sc.Camera(1280, 720)
+	// Pan the camera so the target lands on that point: the camera
+	// center is player + pan, and screen = (world − center)·zoom + size/2.
+	center := core.V(
+		target.Pos.X-(clickX-640)/cam.Zoom,
+		target.Pos.Y-(clickY-360)/cam.Zoom,
+	)
+	sc.pan = center.Sub(sc.playerPos())
+	cam = sc.Camera(1280, 720)
+	cx, cy := cam.WorldToScreen(target.Pos)
+	if g.overUI(cx, cy) {
+		t.Fatalf("click target (%v, %v) sits on a panel", cx, cy)
+	}
+
+	g.kit.Select(0)
+	if err := sc.Update(Input{
+		MouseX: cx, MouseY: cy, JustClicked: [2]bool{true, false},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if g.kit.Selected() != target.Entity {
+		t.Fatalf("world click selected %v, want %v", g.kit.Selected(), target.Entity)
+	}
+	// The Selected Item panel resolves the same selection against the
+	// live grid — this is the state its buttons act on.
+	info, ok := g.selectedInfo()
+	if !ok || info.Entity != target.Entity {
+		t.Fatalf("selectedInfo = %v (ok=%v), want %v", info.Entity, ok, target.Entity)
+	}
+}
+
+// TestChromeOnRootOverlay: HUD, rack and log mount directly on the kit's
+// root overlay (no full-screen wrapper windows), rack and log track
+// hover, and their exact rects gate the world while empty space does not.
+func TestChromeOnRootOverlay(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+
+	kids := g.kit.Root().Children()
+	mounted := map[*widget.Container]bool{}
+	for _, ch := range kids {
+		c, ok := ch.(*widget.Container)
+		if !ok {
+			t.Fatalf("root child of type %T, want *widget.Container", ch)
+		}
+		mounted[c] = true
+	}
+	if len(kids) != 3 {
+		t.Errorf("root overlay has %d children, want exactly the three chrome panels", len(kids))
+	}
+	for name, c := range map[string]*widget.Container{
+		"hud": g.hud.Container(), "rack": g.rack.Container(), "log": g.logP.Container(),
+	} {
+		if !mounted[c] {
+			t.Errorf("%s is not mounted on the root overlay", name)
+		}
+	}
+
+	// Rack and log track hover so input.UIHovered gates their padding;
+	// the HUD container spans the whole screen and must not.
+	if !g.rack.Container().GetWidget().TrackHover || !g.logP.Container().GetWidget().TrackHover {
+		t.Error("rack/log containers do not track hover")
+	}
+	if g.hud.Container().GetWidget().TrackHover {
+		t.Error("HUD container tracks hover (it spans the whole screen)")
+	}
+
+	// overUI covers every chrome rect exactly: the HUD bar (the visible
+	// bottom child), the rack and the log.
+	hudGated := false
+	for _, ch := range g.hud.Container().Children() {
+		w := ch.GetWidget()
+		if w.IsVisible() && w.Rect.Dx() > 0 && w.Rect.Min.Y > 400 {
+			x, y := centerOf(t, w.Rect)
+			if !g.overUI(x, y) {
+				t.Errorf("hud bar: overUI(%v, %v) = false, want true", x, y)
+			}
+			hudGated = true
+		}
+	}
+	if !hudGated {
+		t.Error("no visible HUD bar laid out")
+	}
+	for _, p := range []struct {
+		name string
+		rect image.Rectangle
+	}{
+		{"rack", g.rack.Container().GetWidget().Rect},
+		{"log", g.logP.Container().GetWidget().Rect},
+	} {
+		x, y := centerOf(t, p.rect)
+		if !g.overUI(x, y) {
+			t.Errorf("%s: overUI(%v, %v) = false, want true", p.name, x, y)
+		}
+	}
+
+	// Empty space stays free: a full-screen wrapper window around the
+	// chrome would gate the whole screen.
+	if g.overUI(640, 500) {
+		t.Error("empty space is gated (a full-screen chrome wrapper window is back)")
+	}
+}
+
+// TestCoreWindowsDockFlow: the Overview/Selected Item rects gate world
+// input in space, SetCoreVisible hides both while docked (station
+// parity) and restores them on undock.
+func TestCoreWindowsDockFlow(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+
+	ov := g.kit.OverviewWindow().GetContainer().GetWidget()
+	sp := g.kit.SelectedWindow().GetContainer().GetWidget()
+	if !ov.IsVisible() || !sp.IsVisible() {
+		t.Fatal("core windows hidden in space")
+	}
+	for _, p := range []struct {
+		name string
+		w    *widget.Widget
+	}{
+		{"overview", ov}, {"selected", sp},
+	} {
+		x, y := centerOf(t, p.w.Rect)
+		if !g.overUI(x, y) {
+			t.Errorf("%s: overUI(%v, %v) = false, want true", p.name, x, y)
+		}
+	}
+
+	// Dock: the station scene flows SetCoreVisible(false) through
+	// syncMounts — both windows hide and stop gating the world.
+	dockAt(t, g)
+	g.syncScenes()
+	g.syncMounts()
+	pump(t, g, 1280, 720)
+	if ov.IsVisible() || sp.IsVisible() {
+		t.Error("core windows visible while docked")
+	}
+	if x, y := centerOf(t, ov.Rect); g.overUI(x, y) {
+		t.Error("hidden overview still gates the world")
+	}
+
+	// Undock: both come back and gate again.
+	g.s.Docked.Remove(g.s.Player())
+	g.syncScenes()
+	g.syncMounts()
+	pump(t, g, 1280, 720)
+	if !ov.IsVisible() || !sp.IsVisible() {
+		t.Fatal("core windows not restored after undock")
+	}
+	if x, y := centerOf(t, ov.Rect); !g.overUI(x, y) {
+		t.Error("overview does not gate the world after undock")
+	}
+}
+
+// TestLogHistorySurvivesLoad: Lines() round-trips through the save/load
+// rebuild — the log is captured before buildKit and restored after.
+func TestLogHistorySurvivesLoad(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	for i := 0; i < 30; i++ {
+		g.s.Step()
+	}
+	g.logP.PushLine(sim.SevInfo, "before the load")
+	g.logP.PushLine(sim.SevGood, "second line")
+	before := g.logP.Lines()
+	if len(before) < 2 {
+		t.Fatalf("log lines = %d, want the pushed lines", len(before))
+	}
+	oldLog := g.logP
+	if err := g.SaveGame(); err != nil {
+		t.Fatalf("SaveGame: %v", err)
+	}
+	if err := g.LoadGame(); err != nil {
+		t.Fatalf("LoadGame: %v", err)
+	}
+	if g.logP == oldLog {
+		t.Fatal("log panel was not rebuilt against the restored sim")
+	}
+	after := g.logP.Lines()
+	if len(after) != len(before) {
+		t.Fatalf("log lines after load = %d, want %d", len(after), len(before))
+	}
+	for i := range before {
+		if after[i] != before[i] {
+			t.Errorf("line %d after load = %q, want %q", i, after[i], before[i])
+		}
+	}
+}

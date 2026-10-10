@@ -1,238 +1,253 @@
 package game
 
 import (
+	"image"
+	"image/color"
+
+	eimage "github.com/ebitenui/ebitenui/image"
+	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/ui"
+	"github.com/entieve/entieve/uikit"
 	"github.com/hajimehoshi/ebiten/v2"
 )
+
+// Window chrome metrics for the game-built windows (menu, station):
+// mirrored from the uikit title-bar scale so they read as one theme.
+const (
+	winTitleH = 44
+	menuBtnW  = 220
+	menuBtnH  = 40 // minimum hit area
+)
+
+// nrgba converts a palette RGBA to an NRGBA with the given alpha.
+func nrgba(c color.RGBA, a uint8) color.NRGBA {
+	return color.NRGBA{R: c.R, G: c.G, B: c.B, A: a}
+}
+
+// solid converts a palette RGBA to a full-alpha NRGBA nine-slice color.
+func solid(c color.RGBA) color.NRGBA { return nrgba(c, c.A) }
+
+// bordered builds the body+edge nine-slice every uikit panel uses.
+func bordered(body, edge color.NRGBA, w int) *eimage.NineSlice {
+	return eimage.NewBorderedNineSliceColor(body, edge, w)
+}
 
 // ---------------------------------------------------------------------------
 // StationScene (pushed while docked)
 // ---------------------------------------------------------------------------
 
-// StationScene shows station services; the services panel itself is drawn
-// by the UI (it switches on the docked state), this scene adds the
-// undock control and routes input to the UI.
+// StationScene shows the station view: the world stays veiled behind it
+// and the station chrome (Market / Inventory / Fitting / Undock) rides the
+// uikit window stack. World input is off while it is on top.
 type StationScene struct{ g *Game }
 
-// OnEnter implements Scene.
-func (sc *StationScene) OnEnter() {}
+// stationPanels are the windows that auto-open on dock.
+var stationPanels = []panelID{pMarket, pInventory, pFitting}
 
-// OnLeave implements Scene.
-func (sc *StationScene) OnLeave() {}
-
-// Undock chrome metrics (40 px minimum hit area).
-const (
-	undockW   = 160.0
-	undockH   = 40.0
-	undockGap = 10.0
-)
-
-// UndockRect returns the undock button rect below the station panel.
-func UndockRect(reg ui.Regions) ui.Rect {
-	return ui.Rect{
-		X: reg.Station.X + reg.Station.W/2 - undockW/2,
-		Y: reg.Station.Bottom() + undockGap,
-		W: undockW,
-		H: undockH,
+// OnEnter implements Scene: remember which station windows were open and
+// surface the station services.
+func (sc *StationScene) OnEnter() {
+	g := sc.g
+	for _, p := range stationPanels {
+		g.stationPrior[p] = g.open[p]
+		g.open[p] = true
 	}
 }
 
-// Update routes input to the UI and handles the undock button.
-func (sc *StationScene) Update(in ui.Input) error {
-	if in.JustClicked[0] && UndockRect(sc.g.u.Layout()).Contains(in.MouseX, in.MouseY) {
-		sc.g.s.Queue(sim.CmdUndock{})
-		return nil
+// OnLeave implements Scene: restore the pre-dock window state (windows
+// that were closed before docking close again; already-open ones stay).
+func (sc *StationScene) OnLeave() {
+	g := sc.g
+	for _, p := range stationPanels {
+		if !g.stationPrior[p] {
+			g.open[p] = false
+		}
 	}
-	return sc.g.u.Update(in)
 }
 
-// Draw renders the undock button (panel is drawn by the UI pass).
+// Update is a no-op: buttons live in the interface, world input stays off
+// because this scene is on top.
+func (sc *StationScene) Update(in Input) error { return nil }
+
+// Draw veils the world behind the station view (legacy alpha).
 func (sc *StationScene) Draw(dst *ebiten.Image) {
-	ui.Button(dst, UndockRect(sc.g.u.Layout()), "Undock", true)
+	dimScreen(dst, sc.g.w, sc.g.h, 150)
 }
 
 // ---------------------------------------------------------------------------
 // MapScene (starmap overlay)
 // ---------------------------------------------------------------------------
 
-// MapScene shows the universe graph as a movable, closable window; travel
-// itself happens at stargates. The window state (position, [×], z-order)
-// lives in the UI.
+// MapScene shows the MapView window over a dimmed screen. The window is
+// modal, so no click leaks to the world or the panels underneath.
 type MapScene struct{ g *Game }
 
-// OnEnter implements Scene.
-func (sc *MapScene) OnEnter() {}
+// OnEnter implements Scene (the window follows the scene).
+func (sc *MapScene) OnEnter() { sc.g.open[pMap] = true }
 
-// OnLeave implements Scene (the window follows the scene: closing the
-// scene closes the window, and vice versa via Update below).
-func (sc *MapScene) OnLeave() { sc.g.u.SetWindowOpen(ui.WinStarmap, false) }
+// OnLeave implements Scene: closing the scene closes the window.
+func (sc *MapScene) OnLeave() { sc.g.open[pMap] = false }
 
-// Update handles window chrome first, then starmap node clicks.
-func (sc *MapScene) Update(in ui.Input) error {
-	u := sc.g.u
-	if !u.WindowOpen(ui.WinStarmap) {
-		sc.g.pop() // closed with the [×] button
-		return nil
-	}
-	if u.OverlayInput(in, ui.WinStarmap) {
-		return nil // title-bar drag / close consumed the press
-	}
-	if in.JustClicked[0] {
-		u.ClickStarmap(in.MouseX, in.MouseY)
-	}
-	return nil
-}
+// Update is a no-op: N / Esc close the scene, clicks stay in the window.
+func (sc *MapScene) Update(in Input) error { return nil }
 
-// Draw renders the starmap over a dimmed screen.
+// Draw renders the dimmed backdrop; the window itself is drawn by the kit.
 func (sc *MapScene) Draw(dst *ebiten.Image) {
 	dimScreen(dst, sc.g.w, sc.g.h, 170)
-	sc.g.u.DrawStarmap(dst)
 }
 
 // ---------------------------------------------------------------------------
 // HelpScene (key map overlay)
 // ---------------------------------------------------------------------------
 
-// HelpScene shows the full key map from KeyMap (the single source shared
-// with docs/GAMEPLAY.md) as a movable, closable window. It does not pause
-// the simulation.
+// HelpScene shows the key map from KeyMap (the single source shared with
+// docs/GAMEPLAY.md) as a modal, closable window. It does not pause the
+// simulation.
 type HelpScene struct{ g *Game }
 
 // OnEnter implements Scene.
-func (sc *HelpScene) OnEnter() {}
+func (sc *HelpScene) OnEnter() { sc.g.open[pHelp] = true }
 
 // OnLeave implements Scene.
-func (sc *HelpScene) OnLeave() { sc.g.u.SetWindowOpen(ui.WinHelp, false) }
+func (sc *HelpScene) OnLeave() { sc.g.open[pHelp] = false }
 
-// Update: closed globally via H or Esc; the title bar drags.
-func (sc *HelpScene) Update(in ui.Input) error {
-	u := sc.g.u
-	if !u.WindowOpen(ui.WinHelp) {
-		sc.g.pop() // closed with the [×] button
-		return nil
-	}
-	u.OverlayInput(in, ui.WinHelp)
-	return nil
-}
+// Update is a no-op: H / Esc close the scene.
+func (sc *HelpScene) Update(in Input) error { return nil }
 
-// Help overlay line metrics (derived from the ui typography scale).
-const (
-	helpGap   = 10.0
-	helpPitch = ui.FontTiny // line pitch helper: LineH(FontTiny)
-)
-
-// Draw renders the key map in two columns plus credits.
+// Draw renders the dimmed backdrop; the window is drawn by the kit.
 func (sc *HelpScene) Draw(dst *ebiten.Image) {
-	g := sc.g
-	dimScreen(dst, g.w, g.h, 180)
-	u := g.u
-	panel := u.WindowRect(ui.WinHelp, u.Layout())
-	content := ui.DrawWindow(dst, panel, ui.WindowTitle(ui.WinHelp), true)
-
-	pitch := ui.LineH(helpPitch)
-	perCol := (len(KeyMap) + 1) / 2
-	colW := (content.W - 3*helpGap) / 2
-	y := content.Y + helpGap
-	for i, b := range KeyMap {
-		col, row := i/perCol, i%perCol
-		x := content.X + helpGap + float64(col)*(colW+helpGap)
-		ui.Text(dst, b.Desc, x, y+float64(row)*pitch, ui.FontTiny, ui.ColText)
-	}
-	y += float64(perCol)*pitch + helpGap
-
-	ui.Text(dst, "Mouse", content.X+helpGap, y, ui.FontTiny, ui.ColAccent)
-	y += pitch
-	for _, b := range MouseMap {
-		line := b.Button
-		if b.Mod != "" {
-			line += " (" + b.Mod + ")"
-		}
-		line += " — " + b.Desc
-		ui.Text(dst, line, content.X+helpGap, y, ui.FontTiny, ui.ColText)
-		y += pitch
-	}
+	dimScreen(dst, sc.g.w, sc.g.h, 180)
 }
 
 // ---------------------------------------------------------------------------
 // MenuScene (Esc)
 // ---------------------------------------------------------------------------
 
+// menuItems are the Esc menu buttons, in draw order.
 var menuItems = []string{"Resume", "Save", "Load", "Quit"}
 
-// Menu chrome metrics.
-const (
-	menuBtnW = 220.0
-	menuBtnH = 40.0 // minimum hit area
-	menuGap  = 10.0
-	menuHead = 56.0 // room for the title bar + margin
-	menuFoot = 44.0
-)
+// MenuScene is the Esc menu: a small modal uikit window with Resume /
+// Save / Load / Quit. Scene and window toggle together.
+type MenuScene struct{ g *Game }
 
-// MenuScene is the small Esc menu: Resume / Save / Load / Quit.
-type MenuScene struct {
-	g    *Game
-	mx   float64
-	my   float64
-	down bool
-}
+// OnEnter implements Scene: mounts the menu window.
+func (sc *MenuScene) OnEnter() { sc.g.open[pMenu] = true }
 
-// OnEnter implements Scene.
-func (sc *MenuScene) OnEnter() {}
+// OnLeave implements Scene: unmounts the menu window.
+func (sc *MenuScene) OnLeave() { sc.g.open[pMenu] = false }
 
-// OnLeave implements Scene.
-func (sc *MenuScene) OnLeave() {}
+// Update is a no-op: the buttons run inside Kit.Update.
+func (sc *MenuScene) Update(in Input) error { return nil }
 
-// menuRects lays out the menu buttons centered on screen.
-func (sc *MenuScene) menuRects() []ui.Rect {
-	total := float64(len(menuItems))*menuBtnH + menuGap*float64(len(menuItems)-1)
-	y := float64(sc.g.h)/2 - total/2
-	out := make([]ui.Rect, len(menuItems))
-	for i := range out {
-		out[i] = ui.Rect{X: float64(sc.g.w)/2 - menuBtnW/2, Y: y, W: menuBtnW, H: menuBtnH}
-		y += menuBtnH + menuGap
-	}
-	return out
-}
-
-// Update handles menu button clicks and tracks the pointer for hover
-// feedback in Draw.
-func (sc *MenuScene) Update(in ui.Input) error {
-	sc.mx, sc.my, sc.down = in.MouseX, in.MouseY, in.MouseButton[0]
-	if !in.JustClicked[0] {
-		return nil
-	}
-	for i, r := range sc.menuRects() {
-		if !r.Contains(in.MouseX, in.MouseY) {
-			continue
-		}
-		switch menuItems[i] {
-		case "Resume":
-			sc.g.pop()
-		case "Save":
-			sc.g.report(sc.g.SaveGame(), "Game saved")
-		case "Load":
-			sc.g.report(sc.g.LoadGame(), "Game loaded")
-		case "Quit":
-			return ebiten.Termination
-		}
-		return nil
-	}
-	return nil
-}
-
-// Draw renders the dimmed menu.
+// Draw dims the screen behind the menu window.
 func (sc *MenuScene) Draw(dst *ebiten.Image) {
-	g := sc.g
-	rects := sc.menuRects()
-	top := rects[0].Y - menuHead
-	bottom := rects[len(rects)-1].Bottom() + menuFoot
-	dimScreen(dst, g.w, g.h, 170)
-	panel := ui.Rect{X: rects[0].X - helpGap, Y: top, W: rects[0].W + 2*helpGap, H: bottom - top}
-	ui.Panel(dst, panel)
-	ui.PanelTitle(dst, panel, "Menu — "+g.SavePath())
-	for i, r := range rects {
-		hover := r.Contains(sc.mx, sc.my)
-		ui.ButtonState(dst, r, menuItems[i], true, hover, hover && sc.down)
+	dimScreen(dst, sc.g.w, sc.g.h, 170)
+}
+
+// ---------------------------------------------------------------------------
+// Game-built windows (menu, station)
+// ---------------------------------------------------------------------------
+
+// titleBar builds a uikit-style title bar for a game-owned window.
+func (g *Game) titleBar(label string) *widget.Container {
+	p := g.env.Pal
+	title := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+	)
+	title.AddChild(widget.NewText(
+		widget.TextOpts.Text(label, g.env.Face(uikit.StepBase), solid(p.Accent)),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionStart,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			Padding:            widget.NewInsetsSimple(5),
+		})),
+	))
+	return title
+}
+
+// newBtn builds a themed button (the kit's PrimaryTheme styles it once
+// the window is mounted).
+func (g *Game) newBtn(label string, minW, minH int, clicked func()) *widget.Button {
+	return widget.NewButton(
+		widget.ButtonOpts.TextLabel(label),
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(minW, minH)),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
+	)
+}
+
+// buildMenuWindow constructs the Esc menu window: modal so no click leaks
+// past it while it is open.
+func (g *Game) buildMenuWindow() *widget.Window {
+	p := g.env.Pal
+	body := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Spacing(10),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(10)),
+		)),
+	)
+	actions := map[string]func(){
+		"Resume": func() { g.pop() },
+		"Save":   func() { g.report(g.SaveGame(), "Game saved") },
+		"Load":   func() { g.pendingLoad = true },
+		"Quit":   func() { g.quit = true },
+	}
+	for _, item := range menuItems {
+		item := item
+		body.AddChild(g.newBtn(item, menuBtnW, menuBtnH, actions[item]))
+	}
+	return widget.NewWindow(
+		widget.WindowOpts.Contents(body),
+		widget.WindowOpts.TitleBar(g.titleBar("Menu"), winTitleH),
+		widget.WindowOpts.Draggable(),
+		widget.WindowOpts.Modal(),
+		widget.WindowOpts.Location(image.Rect(0, 0,
+			int(menuBtnW)+20, int(4*menuBtnH+3*10+20)+winTitleH)),
+	)
+}
+
+// buildStationWindow constructs the docked station strip: the station
+// identity and the Undock action.
+func (g *Game) buildStationWindow() *widget.Window {
+	p := g.env.Pal
+	g.stName = widget.NewText(
+		widget.TextOpts.Text("Docked", g.env.Face(uikit.StepSmall), solid(p.Text)),
+	)
+	undock := g.newBtn("Undock", 150, menuBtnH, func() {
+		g.s.Queue(sim.CmdUndock{})
+	})
+	body := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(10),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(6)),
+		)),
+	)
+	body.AddChild(g.stName, undock)
+	return widget.NewWindow(
+		widget.WindowOpts.Contents(body),
+		widget.WindowOpts.Location(image.Rect(10, 0, 340, 52)),
+	)
+}
+
+// syncStationLabel refreshes the station strip's identity line.
+func (g *Game) syncStationLabel() {
+	name := "Station"
+	if d := g.s.System(); d != nil {
+		if at, ok := g.s.Docked.Get(g.s.Player()); ok {
+			for _, cel := range d.Celestials {
+				if cel.ID == at.At {
+					name = cel.Name
+					break
+				}
+			}
+		}
+	}
+	label := "Docked at " + name
+	if g.stName.Label != label {
+		g.stName.Label = label
 	}
 }

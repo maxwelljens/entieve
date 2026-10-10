@@ -416,17 +416,19 @@ timers, save/restore round-trip, determinism (Hash equality of twin runs).
 
 ## `render` / `ui` / `game` contract
 
-> **UI direction (2026-10):** the chrome is migrating from the hand-drawn `ui/`
-> package to `uikit/`, built on **ebitenui v0.7.3** (pinned in go.mod). The
-> spike (theme parity, resizable windows, elastic overview columns,
-> text/v2 interop) passed; the EVE-dark palette and type scale are preserved
-> by `TestThemeMatchesLegacyPalette`. Two upstream gaps shape the port:
-> `widget.List` cannot do columns, per-row styling, or scroll introspection —
-> so data tables use `widget.ScrollContainer` + per-row containers (we own the
-> scroll instance); custom graphics (HUD arcs, starmap) render into
-> `*ebiten.Image` shown via `widget.Graphic`. `uikit/Env` + `Panel`/`WindowPanel`
-> are the seam every chrome panel implements. `sim`/`content`/`script` and the
-> showcase suite are unaffected by the migration.
+> **UI platform (2026-10, complete):** the chrome lives in `uikit/`, built on
+> **ebitenui v0.7.3** (pinned in go.mod); the legacy hand-drawn `ui/` package
+> is retired (golden-value tests pin the EVE-dark palette and type scale).
+> Two upstream gaps shape the layer: `widget.List` cannot do columns,
+> per-row styling, or scroll introspection — so data tables use
+> `widget.ScrollContainer` + per-row containers (we own the scroll
+> instance); custom graphics (HUD arcs, starmap) render into `*ebiten.Image`
+> shown via `widget.Graphic`. `uikit.Env` + `Panel`/`WindowPanel` are the
+> seam every chrome panel implements; `Kit.Select/Root/AddContainer/
+> OverviewWindow/SelectedWindow/SetCoreVisible` are the integration hooks
+> the game shell drives (world-click selection, anchored chrome, dock-hide).
+> `sim`/`content`/`script` and the showcase suite are unaffected by the UI
+> layer.
 
 - `render.Renderer` created with `(*content.Content)`; `Draw(dst *ebiten.Image,
   cam Camera, s *sim.Sim)` reads sim stores read-only. Vector art: ships as
