@@ -58,6 +58,8 @@ type gridObj struct {
 	radius    float64 // celestial radius, m (0 if none)
 	facing    float64 // radians
 	hull      string  // hull class of ships
+	shipID    string  // hull content ID (assets/hulls/<shipID>.png)
+	ore       string  // asteroid ore ID (assets/asteroids/<ore>.png)
 	speedMult float64 // Motion.SpeedMultiplier (1 = none)
 }
 
@@ -208,6 +210,7 @@ func (r *Renderer) Draw(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 	now := s.Time()
 
 	dst.Fill(color.RGBA{2, 3, 6, 255})
+	r.drawBackdrop(dst, cam, sys)
 	r.drawNebula(dst, cam, sys)
 	r.drawStarfield(dst, cam, sys)
 	r.drawGrid(dst, cam)
@@ -263,9 +266,13 @@ func (r *Renderer) bucket(s *sim.Sim, sys *content.SystemDef) {
 			o.facing = tr.Facing
 		}
 		if sh, ok := s.Ships.Get(inf.Entity); ok {
+			o.shipID = string(sh.Hull)
 			if def, ok := r.c.Ship(sh.Hull); ok {
 				o.hull = def.Class
 			}
+		}
+		if a, ok := s.Asteroids.Get(inf.Entity); ok {
+			o.ore = string(a.Ore)
 		}
 		if m, ok := s.Motions.Get(inf.Entity); ok && m.SpeedMultiplier != 0 {
 			o.speedMult = m.SpeedMultiplier
@@ -292,6 +299,24 @@ func (r *Renderer) bucket(s *sim.Sim, sys *content.SystemDef) {
 // ---------------------------------------------------------------------------
 // Background layers
 // ---------------------------------------------------------------------------
+
+// drawBackdrop paints the optional per-system backdrop PNG
+// (assets/backgrounds/<system-id>.png) over the flat background fill and
+// under the nebula washes and starfield, covering the whole screen with the
+// aspect preserved. No file = no-op: the stock background draws as always.
+func (r *Renderer) drawBackdrop(dst *ebiten.Image, cam Camera, sys *content.SystemDef) {
+	if sys == nil {
+		return
+	}
+	img := spriteFor("backgrounds/" + string(sys.ID))
+	if img == nil {
+		return
+	}
+	b := img.Bounds()
+	s := math.Max(cam.ScreenW/float64(b.Dx()), cam.ScreenH/float64(b.Dy()))
+	drawSprite(dst, img, cam.ScreenW/2, cam.ScreenH/2,
+		float64(b.Dx())*s, float64(b.Dy())*s, 0)
+}
 
 // drawNebula paints the system palette's nebula washes (screen-anchored).
 func (r *Renderer) drawNebula(dst *ebiten.Image, cam Camera, sys *content.SystemDef) {
@@ -447,6 +472,23 @@ func (r *Renderer) drawAnomaly(dst *ebiten.Image, cam Camera, o gridObj, now flo
 		&vector.DrawPathOptions{AntiAlias: true, ColorScale: colorScale(color.RGBA{216, 180, 255, 200})})
 }
 
+// drawCelSprite draws the assets/stations/<cel>.png sprite for a static
+// celestial, fitted to the same px footprint its procedural art would get.
+// It reports whether a sprite existed — the caller then skips the
+// procedural branch (no file = always false, vector art untouched).
+func drawCelSprite(dst *ebiten.Image, sx, sy, px float64, cel content.CelID) bool {
+	if cel == "" {
+		return false
+	}
+	img := spriteFor("stations/" + string(cel))
+	if img == nil {
+		return false
+	}
+	dw, dh := fitSprite(img.Bounds().Dx(), img.Bounds().Dy(), px)
+	drawSprite(dst, img, sx, sy, dw, dh, 0)
+	return true
+}
+
 // drawStatic renders stations, stargates and other static celestials.
 func (r *Renderer) drawStatic(dst *ebiten.Image, cam Camera, o gridObj) {
 	sx, sy := cam.WorldToScreen(o.info.Pos)
@@ -454,6 +496,9 @@ func (r *Renderer) drawStatic(dst *ebiten.Image, cam Camera, o gridObj) {
 	switch o.info.Kind {
 	case sim.KindStation:
 		px := clamp(orDef(o.radius, 2500)*cam.Zoom, 14, 0.25*maxDim)
+		if drawCelSprite(dst, sx, sy, px, o.info.Cel) {
+			break
+		}
 		// Octagonal hub with spokes.
 		r.path.Reset()
 		for i := 0; i < 8; i++ {
@@ -484,6 +529,9 @@ func (r *Renderer) drawStatic(dst *ebiten.Image, cam Camera, o gridObj) {
 		}
 	case sim.KindGate:
 		px := clamp(orDef(o.radius, 1500)*cam.Zoom, 16, 0.3*maxDim)
+		if drawCelSprite(dst, sx, sy, px, o.info.Cel) {
+			break
+		}
 		img := r.glow(128, color.RGBA{80, 220, 130, 140})
 		drawGlowCentered(dst, img, sx, sy, px*2.4, true)
 		vector.StrokeCircle(dst, float32(sx), float32(sy), float32(px), 3,
@@ -498,6 +546,9 @@ func (r *Renderer) drawStatic(dst *ebiten.Image, cam Camera, o gridObj) {
 		}
 	default: // belts, unknown celestials: faint dust circle
 		px := clamp(orDef(o.radius, 4e4)*cam.Zoom, 20, 0.4*maxDim)
+		if drawCelSprite(dst, sx, sy, px, o.info.Cel) {
+			break
+		}
 		for i := 0; i < 12; i++ {
 			a := float64(i) / 12 * 2 * math.Pi
 			a2 := a + 0.22
@@ -511,6 +562,11 @@ func (r *Renderer) drawStatic(dst *ebiten.Image, cam Camera, o gridObj) {
 func (r *Renderer) drawRock(dst *ebiten.Image, cam Camera, o gridObj) {
 	sx, sy := cam.WorldToScreen(o.info.Pos)
 	px := clamp(70*cam.Zoom, 4, 60)
+	if img := spriteFor("asteroids/" + o.ore); img != nil {
+		dw, dh := fitSprite(img.Bounds().Dx(), img.Bounds().Dy(), px)
+		drawSprite(dst, img, sx, sy, dw, dh, 0)
+		return
+	}
 	r.poly = r.poly[:0]
 	for _, p := range rockPoly(uint64(o.info.Entity), 7) {
 		r.poly = append(r.poly, core.V(sx+p.X*px, sy+p.Y*px))
@@ -562,6 +618,11 @@ func (r *Renderer) drawShip(dst *ebiten.Image, cam Camera, o gridObj, now float6
 		r.fillPoly(dst, r.poly, color.RGBA{255, 180, 84, 170})
 	}
 
+	if img := spriteFor("hulls/" + o.shipID); img != nil {
+		dw, dh := fitSprite(img.Bounds().Dx(), img.Bounds().Dy(), sizePx)
+		drawSprite(dst, img, sx, sy, dw, dh, o.facing)
+		return
+	}
 	r.poly = r.poly[:0]
 	for _, p := range hullPoly(o.hull) {
 		q := p.Rotate(o.facing).Scale(sizePx)

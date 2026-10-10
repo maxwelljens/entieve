@@ -41,6 +41,15 @@ go test ./...                   # the whole test suite (headless, no GPU needed)
 
 Controls and concepts: [docs/GAMEPLAY.md](docs/GAMEPLAY.md).
 
+## Custom art
+
+Drop a PNG into `assets/` — `assets/hulls/ship-sloop.png`,
+`assets/stations/cel-haven-rest.png` — and the game draws it instead of the
+built-in vector art. No config: the file name is the content ID, any size
+works, and every missing file falls back to the procedural art, so an empty
+`assets/` plays exactly like the stock game. Convention, sizing and fallback
+rules: [docs/ART.md](docs/ART.md).
+
 ## Architecture
 
 ```
