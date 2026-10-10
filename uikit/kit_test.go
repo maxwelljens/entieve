@@ -7,18 +7,11 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
-	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
-
-// listSelectedArgs builds the event ebitenui fires when a list entry is
-// activated (PreviousEntry nil means "nothing was selected before").
-func listSelectedArgs(entry, prev any) *widget.ListEntrySelectedEventArgs {
-	return &widget.ListEntrySelectedEventArgs{Entry: entry, PreviousEntry: prev}
-}
 
 // newTestKit builds a Kit over the embedded content and world-showcase,
 // capturing every enqueued command.
@@ -42,6 +35,20 @@ func newTestKit(t *testing.T) (*Kit, *[]sim.Command) {
 		t.Fatalf("NewKit: %v", err)
 	}
 	return k, &cmds
+}
+
+// pumpKit runs one frame (Sync, Update, Draw) at the given screen size
+// and returns the rendered image: Update dispatches the deferred event
+// queue, Draw performs the widget layout pass.
+func pumpKit(t *testing.T, k *Kit, w, h int) *ebiten.Image {
+	t.Helper()
+	k.Sync()
+	if err := k.Update(); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	img := ebiten.NewImage(w, h)
+	k.Draw(img)
+	return img
 }
 
 // TestNewKitConstruction asserts every theme entry is populated and the
@@ -108,83 +115,27 @@ func TestNewKitConstruction(t *testing.T) {
 	}
 }
 
-// row builds a synthetic overview row for sorting tests.
-func row(name string, dist float64, kind string, vel float64) *Row {
-	return &Row{info: sim.Info{
-		Entity:   ecs.Entity(len(name)*1000 + int(dist)),
-		Name:     name,
-		Distance: dist,
-		Kind:     kind,
-		Vel:      core.V(vel, 0),
-	}}
-}
-
-func names(rows []*Row) []string {
-	out := make([]string, len(rows))
-	for i, r := range rows {
-		out[i] = r.info.Name
-	}
-	return out
-}
-
-// TestSortRows checks every column in both directions, including the
-// stability guarantee for equal keys.
-func TestSortRows(t *testing.T) {
-	base := func() []*Row {
-		return []*Row{
-			row("bravo", 10, "ship", 30),
-			row("alpha", 10, "asteroid", 30),
-			row("charlie", 5, "station", 10),
-		}
-	}
-	tests := []struct {
-		name string
-		col  SortColumn
-		asc  bool
-		want []string
-	}{
-		{"name asc", SortName, true, []string{"alpha", "bravo", "charlie"}},
-		{"name desc", SortName, false, []string{"charlie", "bravo", "alpha"}},
-		{"distance asc", SortDistance, true, []string{"charlie", "bravo", "alpha"}},
-		{"distance desc stable", SortDistance, false, []string{"bravo", "alpha", "charlie"}},
-		{"kind asc", SortKind, true, []string{"alpha", "bravo", "charlie"}},
-		{"velocity asc stable", SortVelocity, true, []string{"charlie", "bravo", "alpha"}},
-		{"velocity desc stable", SortVelocity, false, []string{"bravo", "alpha", "charlie"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rows := base()
-			sortRows(rows, tt.col, tt.asc)
-			got := names(rows)
-			for i := range got {
-				if got[i] != tt.want[i] {
-					t.Fatalf("order = %v, want %v", got, tt.want)
-				}
-			}
-		})
-	}
-}
-
-// TestRowActivationSelectsThenApproaches: first activation selects, a
-// second activation of the same row inside the double-click window
-// enqueues CmdApproach with the right target.
-func TestRowActivationSelectsThenApproaches(t *testing.T) {
+// TestOverviewRowClickSelectsThenApproaches: the overview Table's first
+// click selects, a repeat click inside the double-click window
+// additionally enqueues CmdApproach with the right target.
+func TestOverviewRowClickSelectsThenApproaches(t *testing.T) {
 	k, cmds := newTestKit(t)
-	r := &Row{info: sim.Info{Entity: ecs.Entity(777), Name: "Scuttler"}}
+	row := &ovRow{info: sim.Info{Entity: ecs.Entity(777), Name: "Scuttler"}}
+	k.ov.tbl.SetRows([]TableRow{
+		{Cells: []string{"Scuttler", "10 m", "Ship", "0 m/s"}, Data: row},
+	})
 
-	first := listSelectedArgs(r, nil)
-	k.entrySelected(first)
+	k.ov.tbl.rowClicked(0)
 	if k.Selected() != ecs.Entity(777) {
 		t.Fatalf("Selected() = %v, want 777", k.Selected())
 	}
 	if len(*cmds) != 0 {
-		t.Fatalf("first activation enqueued %d commands, want 0", len(*cmds))
+		t.Fatalf("first click enqueued %d commands, want 0", len(*cmds))
 	}
 
-	second := listSelectedArgs(r, r)
-	k.entrySelected(second)
+	k.ov.tbl.rowClicked(0)
 	if len(*cmds) != 1 {
-		t.Fatalf("second activation enqueued %d commands, want 1", len(*cmds))
+		t.Fatalf("repeat click enqueued %d commands, want 1", len(*cmds))
 	}
 	cmd, ok := (*cmds)[0].(sim.CmdApproach)
 	if !ok {
@@ -194,9 +145,12 @@ func TestRowActivationSelectsThenApproaches(t *testing.T) {
 		t.Fatalf("CmdApproach.Target = %v, want 777", cmd.Target)
 	}
 
-	// A different row within the window is just a selection.
-	other := &Row{info: sim.Info{Entity: ecs.Entity(778), Name: "Rock"}}
-	k.entrySelected(listSelectedArgs(other, r))
+	// A different row inside the window is just a selection.
+	k.ov.tbl.SetRows([]TableRow{
+		{Cells: []string{"Scuttler", "10 m", "Ship", "0 m/s"}, Data: row},
+		{Cells: []string{"Rock", "12 m", "Asteroid", "0 m/s"}, Data: &ovRow{info: sim.Info{Entity: ecs.Entity(778)}}},
+	})
+	k.ov.tbl.rowClicked(1)
 	if len(*cmds) != 1 {
 		t.Fatalf("selection of another row enqueued %d commands, want 1", len(*cmds))
 	}
@@ -210,9 +164,14 @@ func TestRowActivationSelectsThenApproaches(t *testing.T) {
 func TestSelectedButtonsEnqueueCommands(t *testing.T) {
 	k, cmds := newTestKit(t)
 
-	// No selection: approach/warp are guarded.
+	// No selection: the guarded handlers stay quiet.
 	k.approachSelected()
 	k.warpSelected()
+	k.lockSelected()
+	k.dockSelected()
+	k.jumpSelected()
+	k.lootSelected()
+	k.mineSelected()
 	if len(*cmds) != 0 {
 		t.Fatalf("no-selection click enqueued %d commands, want 0", len(*cmds))
 	}
@@ -221,8 +180,12 @@ func TestSelectedButtonsEnqueueCommands(t *testing.T) {
 	k.approachSelected()
 	k.warpSelected()
 	k.stopSelected()
-	if len(*cmds) != 3 {
-		t.Fatalf("enqueued %d commands, want 3", len(*cmds))
+	k.lockSelected()
+	k.dockSelected()
+	k.jumpSelected()
+	k.lootSelected()
+	if len(*cmds) != 7 {
+		t.Fatalf("enqueued %d commands, want 7", len(*cmds))
 	}
 	if c, ok := (*cmds)[0].(sim.CmdApproach); !ok || c.Target != ecs.Entity(42) {
 		t.Errorf("cmd[0] = %#v, want CmdApproach{42}", (*cmds)[0])
@@ -233,51 +196,121 @@ func TestSelectedButtonsEnqueueCommands(t *testing.T) {
 	if _, ok := (*cmds)[2].(sim.CmdStop); !ok {
 		t.Errorf("cmd[2] = %T, want sim.CmdStop", (*cmds)[2])
 	}
+	if c, ok := (*cmds)[3].(sim.CmdLock); !ok || c.Target != ecs.Entity(42) {
+		t.Errorf("cmd[3] = %#v, want CmdLock{42}", (*cmds)[3])
+	}
+	if c, ok := (*cmds)[4].(sim.CmdDock); !ok || c.Station != ecs.Entity(42) {
+		t.Errorf("cmd[4] = %#v, want CmdDock{42}", (*cmds)[4])
+	}
+	if c, ok := (*cmds)[5].(sim.CmdJump); !ok || c.Gate != ecs.Entity(42) {
+		t.Errorf("cmd[5] = %#v, want CmdJump{42}", (*cmds)[5])
+	}
+	if c, ok := (*cmds)[6].(sim.CmdLoot); !ok || c.Wreck != ecs.Entity(42) {
+		t.Errorf("cmd[6] = %#v, want CmdLoot{42}", (*cmds)[6])
+	}
+
+	// Mine needs a real asteroid and a fitted mining laser.
+	for _, info := range k.Sim.Grid() {
+		if info.Kind == sim.KindAsteroid {
+			k.selected = info.Entity
+			break
+		}
+	}
+	if k.selected != ecs.Entity(42) {
+		k.mineSelected()
+		if len(*cmds) != 8 {
+			t.Fatalf("mine enqueued %d commands total, want 8", len(*cmds))
+		}
+		if c, ok := (*cmds)[7].(sim.CmdMine); !ok || c.Asteroid != k.selected {
+			t.Errorf("cmd[7] = %#v, want CmdMine{%v}", (*cmds)[7], k.selected)
+		}
+	}
 }
 
-// TestOverviewMinSizeAndRefit covers the window min-size clamp and the
-// resize handler reflowing the elastic columns.
+// TestSelectedContextGating: with no selection every action is disabled;
+// with a live selection the context buttons follow the Info flags.
+func TestSelectedContextGating(t *testing.T) {
+	k, _ := newTestKit(t)
+	k.selected = 0
+	k.Sync()
+	for name, b := range map[string]*widget.Button{
+		"approach": k.sp.approach, "warp": k.sp.warp, "stop": k.sp.stop,
+		"lock": k.sp.lock, "dock": k.sp.dock, "jump": k.sp.jump,
+		"loot": k.sp.loot, "mine": k.sp.mine,
+	} {
+		if !b.GetWidget().Disabled {
+			t.Errorf("%s enabled with no selection", name)
+		}
+	}
+
+	// A warpable celestial: warp/lock flags come straight from Info.
+	var celestial, ship *sim.Info
+	for _, info := range k.Sim.Grid() {
+		i := info
+		if i.CanWarp && celestial == nil {
+			celestial = &i
+		}
+		if i.Kind == sim.KindShip && i.Entity != k.Sim.Player() && ship == nil {
+			ship = &i
+		}
+	}
+	if celestial == nil {
+		t.Fatal("no warpable celestial on the grid")
+	}
+	k.selected = celestial.Entity
+	k.Sync()
+	if k.sp.warp.GetWidget().Disabled {
+		t.Error("warp disabled for a warpable celestial")
+	}
+	if got, want := k.sp.dock.GetWidget().Disabled, !celestial.CanDock; got != want {
+		t.Errorf("dock Disabled = %v, want %v (Info.CanDock=%v)", got, want, celestial.CanDock)
+	}
+	if ship != nil {
+		k.selected = ship.Entity
+		k.Sync()
+		if got, want := k.sp.warp.GetWidget().Disabled, !ship.CanWarp; got != want {
+			t.Errorf("warp Disabled = %v, want %v (Info.CanWarp=%v)", got, want, ship.CanWarp)
+		}
+	}
+}
+
+// TestOverviewMinSizeAndRefit covers the window min-size clamp and a
+// resize reflowing the table's elastic columns.
 func TestOverviewMinSizeAndRefit(t *testing.T) {
 	k, _ := newTestKit(t)
-	k.Sync()
-	if err := k.Update(); err != nil {
-		t.Fatalf("Update: %v", err)
-	}
+	pumpKit(t, k, 1280, 720)
 
 	win := k.ov.win
 	win.SetLocation(image.Rect(0, 0, 100, 50))
+	pumpKit(t, k, 1280, 720)
 	r := win.GetContainer().GetWidget().Rect
 	if r.Dx() != 320 || r.Dy() != 240 {
 		t.Fatalf("min-size clamp rect = %v, want 320x240", r)
 	}
 
-	// Synthetic short rows so the natural fit is well under the width and
-	// the surplus goes entirely to Name (sum == avail, exactly).
-	k.ov.order = []*Row{
-		row("A", 1, "ship", 1),
-		row("B", 2, "ship", 2),
-	}
+	// Resize wide: the table refits its columns to the new width on the
+	// next Sync (layout happens in Draw, refit in the following Sync).
 	win.SetLocation(image.Rect(0, 0, 900, 600))
-	win.ResizeEvent.Fire(&widget.WindowChangedEventArgs{
-		Window: win,
-		Rect:   win.GetContainer().GetWidget().Rect,
-	})
-	if err := k.Update(); err != nil {
-		t.Fatalf("Update: %v", err)
-	}
+	pumpKit(t, k, 1280, 720) // lays the window out at the new size
+	k.Sync()                 // detects the new table width
+	k.Update()
+	k.Draw(ebiten.NewImage(1280, 720))
 
 	want := 900.0 - 2*contentsPad
+	if got := k.ov.tbl.root.GetWidget().Rect.Dx(); float64(got) != want {
+		t.Fatalf("table root width = %v, want %v (window width minus padding)", got, want)
+	}
 	sum := 0.0
-	for _, c := range k.ov.cols {
-		sum += c.Width
+	for _, w := range k.ov.tbl.widths {
+		sum += w
 	}
 	if math.Abs(sum-want) > 1e-6 {
-		t.Fatalf("fitted column sum = %v, want %v (window width minus padding)", sum, want)
+		t.Fatalf("fitted column sum = %v, want %v", sum, want)
 	}
-	for i, btn := range k.ov.btns {
-		// applyHeader tiles buttons with cumulative rounding.
-		want := int(math.Round(sumPrefix(k.ov.cols[:i+1]))) -
-			int(math.Round(sumPrefix(k.ov.cols[:i])))
+	for i, btn := range k.ov.tbl.hdrBtn {
+		// layoutCells tiles buttons with cumulative rounding.
+		want := int(math.Round(sumPrefix(k.ov.tbl.widths[:i+1]))) -
+			int(math.Round(sumPrefix(k.ov.tbl.widths[:i])))
 		if btn.GetWidget().MinWidth != want {
 			t.Errorf("header button %d MinWidth = %d, want %d",
 				i, btn.GetWidget().MinWidth, want)
@@ -286,35 +319,24 @@ func TestOverviewMinSizeAndRefit(t *testing.T) {
 }
 
 // sumPrefix adds the first n fitted column widths.
-func sumPrefix(cols []ColWidth) float64 {
+func sumPrefix(cols []float64) float64 {
 	s := 0.0
 	for _, c := range cols {
-		s += c.Width
+		s += c
 	}
 	return s
 }
 
 // TestDrawSmoke draws the kit at both design sizes headless: no panics,
-// both windows stay in bounds, and the windowed rows fit the list.
+// both windows stay in bounds and the overview table holds fitted rows.
 func TestDrawSmoke(t *testing.T) {
 	sizes := [][2]int{{1280, 720}, {1024, 700}}
 	for _, size := range sizes {
 		k, _ := newTestKit(t)
-		k.Sync()
-		if err := k.Update(); err != nil {
-			t.Fatalf("%dx%d Update: %v", size[0], size[1], err)
-		}
-		img := ebiten.NewImage(size[0], size[1])
-		k.Draw(img)
+		img := pumpKit(t, k, size[0], size[1])
+		img = pumpKit(t, k, size[0], size[1]) // second frame applies the fit
 
-		// A second frame exercises Sync after layout (page/refit paths).
-		k.Sync()
-		if err := k.Update(); err != nil {
-			t.Fatalf("%dx%d second Update: %v", size[0], size[1], err)
-		}
-		k.Draw(img)
-
-		if len(k.ov.order) == 0 {
+		if len(k.ov.tbl.rows) == 0 {
 			t.Fatalf("%dx%d: expected visible grid rows", size[0], size[1])
 		}
 		for _, w := range []struct {
@@ -330,30 +352,21 @@ func TestDrawSmoke(t *testing.T) {
 					size[0], size[1], w.name, w.rect)
 			}
 		}
-		// The virtualized page must fit inside the window: if it ever
-		// overflows, rows render past the panel and tints misalign.
-		lr := k.ov.list.GetWidget().Rect
+		// The scroll viewport must fit inside the window: if it ever
+		// overflows, rows render past the panel.
+		vr := k.ov.tbl.scroll.ViewRect()
 		wr := k.ov.win.GetContainer().GetWidget().Rect
-		if lr.Dy() > 0 && lr.Max.Y > wr.Max.Y {
-			t.Errorf("%dx%d: list rect %v overflows window %v",
-				size[0], size[1], lr, wr)
+		if vr.Dy() > 0 && vr.Max.Y > wr.Max.Y {
+			t.Errorf("%dx%d: scroll viewport %v overflows window %v",
+				size[0], size[1], vr, wr)
 		}
-		if len(k.ov.page) == 0 || k.ov.rowH <= 0 {
-			t.Fatalf("%dx%d: page=%d rowH=%v, want a fitted page",
-				size[0], size[1], len(k.ov.page), k.ov.rowH)
+		// Columns were fitted to the table width (not left natural).
+		if k.ov.tbl.fittedFor <= 0 {
+			t.Fatalf("%dx%d: table never fitted (fittedFor=%v)",
+				size[0], size[1], k.ov.tbl.fittedFor)
 		}
-
-		// A wheel-page rebuild must re-apply the selection that
-		// SetEntries silently dropped.
-		if len(k.ov.order) > k.ov.visibleN && k.ov.visibleN > 3 {
-			r := k.ov.page[3]
-			k.selected = r.info.Entity
-			k.ov.scrollBy(-3) // page forward
-			k.Sync()
-			if got := k.ov.list.SelectedEntry(); got != any(r) {
-				t.Errorf("%dx%d: selection not re-applied after page rebuild (%T)",
-					size[0], size[1], got)
-			}
+		if img == nil {
+			t.Fatal("no image")
 		}
 	}
 }

@@ -2,74 +2,86 @@ package uikit
 
 import (
 	"image/color"
+	"math"
 	"testing"
-
-	"github.com/entieve/entieve/ui"
 )
 
-// TestThemeMatchesLegacyPalette pins the uikit theme to the legacy ui
-// package while both layers coexist: any palette or type-scale drift in
-// either direction fails here. This is the only test file allowed to
-// import ui.
-func TestThemeMatchesLegacyPalette(t *testing.T) {
+// TestPaletteGoldenValues pins the canonical EVE-dark palette (ported from
+// the retired legacy ui/style.go — uikit is now the single source of truth).
+func TestPaletteGoldenValues(t *testing.T) {
 	p := DefaultPalette()
-	cases := []struct {
-		name string
-		got  color.RGBA
-		want color.RGBA
-	}{
-		{"ColBG", p.BG, ui.ColBG},
-		{"ColBGHard", p.BGHard, ui.ColBGHard},
-		{"ColBorder", p.Border, ui.ColBorder},
-		{"ColAccent", p.Accent, ui.ColAccent},
-		{"ColText", p.Text, ui.ColText},
-		{"ColDim", p.Dim, ui.ColDim},
-		{"ColHead", p.Head, ui.ColHead},
-		{"ColGood", p.Good, ui.ColGood},
-		{"ColWarn", p.Warn, ui.ColWarn},
-		{"ColDanger", p.Danger, ui.ColDanger},
-		{"ColInfo", p.Info, ui.ColInfo},
-		{"ColShield", p.Shield, ui.ColShield},
-		{"ColStruct", p.Struct, ui.ColStruct},
-		{"ColCell", p.Cell, ui.ColCell},
-		{"ColCap", p.Cap, ui.ColCap},
-		{"ColPlayer", p.Player, ui.ColPlayer},
-		{"ColHover", p.Hover, ui.ColHover},
-		{"ColHeadBg", p.HeadBg, ui.ColHeadBg},
+	want := map[string]string{
+		"BG": "#0a0e14ee", "BGHard": "#0a0e14", "Border": "#3a4452",
+		"Accent": "#ffb454", "Text": "#d8dee9", "Dim": "#7a8494",
+		"Head": "#5b677a", "Good": "#5fcf80", "Warn": "#e0a33c",
+		"Danger": "#e05555", "Info": "#8fb8e0", "Shield": "#6fa8ff",
+		"Struct": "#c9ced6", "Cell": "#141a24", "Cap": "#5fcf80",
+		"Player": "#7fe3ff", "Hover": "#ffb454", "HeadBg": "#131926",
 	}
-	for _, c := range cases {
-		if c.got != c.want {
-			t.Errorf("%s = %v, want %v", c.name, c.got, c.want)
+	got := map[string]string{
+		"BG": hexRGBA(p.BG), "BGHard": hexRGBA(p.BGHard), "Border": hexRGBA(p.Border),
+		"Accent": hexRGBA(p.Accent), "Text": hexRGBA(p.Text), "Dim": hexRGBA(p.Dim),
+		"Head": hexRGBA(p.Head), "Good": hexRGBA(p.Good), "Warn": hexRGBA(p.Warn),
+		"Danger": hexRGBA(p.Danger), "Info": hexRGBA(p.Info), "Shield": hexRGBA(p.Shield),
+		"Struct": hexRGBA(p.Struct), "Cell": hexRGBA(p.Cell), "Cap": hexRGBA(p.Cap),
+		"Player": hexRGBA(p.Player), "Hover": hexRGBA(p.Hover), "HeadBg": hexRGBA(p.HeadBg),
+	}
+	for name, w := range want {
+		if got[name] != w {
+			t.Errorf("%s = %s, want %s", name, got[name], w)
 		}
-	}
-
-	ts := DefaultTypeScale()
-	if ts.Base != float64(ui.FontBase) {
-		t.Errorf("TypeScale.Base = %v, want ui.FontBase = %v", ts.Base, ui.FontBase)
-	}
-	if ts.Small != float64(ui.FontSmall) {
-		t.Errorf("TypeScale.Small = %v, want ui.FontSmall = %v", ts.Small, ui.FontSmall)
-	}
-	if ts.Large != float64(ui.FontLarge) {
-		t.Errorf("TypeScale.Large = %v, want ui.FontLarge = %v", ts.Large, ui.FontLarge)
-	}
-	if ts.Tiny != float64(ui.FontTiny) {
-		t.Errorf("TypeScale.Tiny = %v, want ui.FontTiny = %v", ts.Tiny, ui.FontTiny)
 	}
 }
 
-// TestFormattersMatchLegacy pins the duplicated distance/speed formatters
-// to ui's, so overview cells cannot drift from the old HUD.
-func TestFormattersMatchLegacy(t *testing.T) {
-	distances := []float64{-5, 0, 42, 999, 1999, 2000, 12345, 1495999000, 1.496e10, 3e11}
-	for _, m := range distances {
-		if got, want := formatDistance(m), ui.FormatDistance(m); got != want {
+// hexRGBA formats a color as #rrggbb or #rrggbbaa (alpha != 255).
+func hexRGBA(c color.RGBA) string {
+	if c.A == 255 {
+		return "#" + hexByte(uint32(c.R)) + hexByte(uint32(c.G)) + hexByte(uint32(c.B))
+	}
+	return "#" + hexByte(uint32(c.R)) + hexByte(uint32(c.G)) + hexByte(uint32(c.B)) + hexByte(uint32(c.A))
+}
+
+func hexByte(v uint32) string {
+	const digits = "0123456789abcdef"
+	return string([]byte{digits[(v>>4)&0xf], digits[v&0xf]})
+}
+
+// TestTypeScaleGolden pins the type scale (21px base with 0.8/1.3/0.7 steps).
+func TestTypeScaleGolden(t *testing.T) {
+	ts := DefaultTypeScale()
+	for _, c := range []struct {
+		name string
+		got  float64
+		want float64
+	}{
+		{"Base", ts.Base, 21}, {"Small", ts.Small, 21 * 0.8},
+		{"Large", ts.Large, 21 * 1.3}, {"Tiny", ts.Tiny, 21 * 0.7},
+	} {
+		if math.Abs(c.got-c.want) > 1e-9 {
+			t.Errorf("%s = %v, want %v", c.name, c.got, c.want)
+		}
+	}
+}
+
+// TestFormattersGolden pins the number formatters to golden outputs (the
+// legacy ui package they were ported from has been retired).
+func TestFormattersGolden(t *testing.T) {
+	distances := map[float64]string{
+		-5: "0 m", 0: "0 m", 42: "42 m", 999: "999 m", 1999: "1,999 m",
+		2000: "2.0 km", 12345: "12.3 km", 1.495999e9: "1,495,999.0 km",
+		1.496e10: "0.1 AU", 3e11: "2.0 AU",
+	}
+	for m, want := range distances {
+		if got := formatDistance(m); got != want {
 			t.Errorf("formatDistance(%v) = %q, want %q", m, got, want)
 		}
 	}
-	speeds := []float64{-1, 0, 0.4, 127.6, 1234.5, 98765}
-	for _, v := range speeds {
-		if got, want := formatSpeed(v), ui.FormatSpeed(v); got != want {
+	speeds := map[float64]string{
+		-1: "0 m/s", 0: "0 m/s", 0.4: "0 m/s",
+		127.6: "128 m/s", 1234.5: "1,235 m/s", 98765: "98,765 m/s",
+	}
+	for v, want := range speeds {
+		if got := formatSpeed(v); got != want {
 			t.Errorf("formatSpeed(%v) = %q, want %q", v, got, want)
 		}
 	}

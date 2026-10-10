@@ -1,0 +1,448 @@
+package uikit
+
+import (
+	"image"
+	"math"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/sim"
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
+)
+
+// Rack geometry: three slot rows of cells sized so the widest row (high 4
+// slots is the widest in the hull roster) fits the 1024×700 minimum window
+// beside the centered HUD. Every cell is at least the 40 px minimum hit
+// area in both axes.
+const (
+	rackRows     = 3                      // high / mid / low
+	rackMaxCells = 4                      // widest slot row across every hull
+	rackCellW    = 50                     // cell width
+	rackCellH    = 40                     // cell height (minimum hit area)
+	rackCycleH   = 4                      // cycle bar height under a cell
+	rackLabelW   = 30                     // "High"/"Mid"/"Low" label column
+	rackCycleMax = 1000                   // cycle bar resolution (0.1 % steps)
+	rackRowGap   = 8                      // gap between slot rows
+	rackTipDelay = 300 * time.Millisecond // hover time before the tooltip
+)
+
+// rackClasses and rackRowLabels index the three slot rows.
+var (
+	rackClasses   = [rackRows]string{content.SlotHigh, content.SlotMid, content.SlotLow}
+	rackRowLabels = [rackRows]string{"High", "Mid", "Low"}
+)
+
+// Rack is the bottom-right module rack: one cell per slot showing the
+// module short name, an amber glow while active, a cycle progress bar and a
+// hover tooltip with the module's key stats. Right-clicking a weapon cell
+// cycles its loaded charge (Auto → the weapon's ammo-class charges sitting
+// in cargo → Auto) through sim.CmdSetAmmo.
+type Rack struct {
+	env       Env
+	container *widget.Container
+	cells     [rackRows][rackMaxCells]*rackCell
+	ammoPref  map[sim.SlotRef]content.ItemID
+	measure   func(string) float64
+}
+
+// rackCell is one slot: a cell column (button + cycle bar) plus its tooltip
+// widgets. Cells are persistent, so a fitting change only rewrites their
+// label, tooltip and enabled state.
+type rackCell struct {
+	slot    sim.SlotRef
+	root    *widget.Container
+	btn     *widget.Button
+	bar     *widget.ProgressBar
+	tip     *widget.ToolTip
+	tipText *widget.Text
+	tips    []*widget.ToolTip // stable ToolTips value for fitted cells
+	module  content.ModuleID  // module currently shown ("" = empty slot)
+}
+
+// NewRack builds the module rack over the given environment. Its container
+// anchors bottom-right in an anchor-layout root; Sync refreshes every cell
+// from the player's fitting.
+func NewRack(env Env) *Rack {
+	p := env.Pal
+	faceTiny := env.Face(StepTiny)
+	r := &Rack{env: env, ammoPref: map[sim.SlotRef]content.ItemID{}}
+	r.measure = func(s string) float64 {
+		w, _ := text.Measure(s, *faceTiny, 0)
+		return w
+	}
+
+	body := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Spacing(rackRowGap),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+	)
+	for row := 0; row < rackRows; row++ {
+		label := widget.NewText(
+			widget.TextOpts.Text(rackRowLabels[row], faceTiny, solid(p.Head)),
+			widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(rackLabelW, 0)),
+		)
+		rowBox := widget.NewContainer(
+			widget.ContainerOpts.Layout(widget.NewRowLayout(
+				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+				widget.RowLayoutOpts.Spacing(contentsPad),
+			)),
+		)
+		rowBox.AddChild(label)
+		for idx := 0; idx < rackMaxCells; idx++ {
+			cell := r.newCell(row, idx)
+			r.cells[row][idx] = cell
+			rowBox.AddChild(cell.root)
+		}
+		body.AddChild(rowBox)
+	}
+
+	titleText := widget.NewText(
+		widget.TextOpts.Text("Modules", env.Face(StepBase), solid(p.Accent)),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionStart,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			Padding:            widget.NewInsetsSimple(contentsPad),
+		})),
+	)
+	title := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+		widget.ContainerOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(0, titleBarH),
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+		),
+	)
+	title.AddChild(titleText)
+
+	r.container = widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionEnd,
+			VerticalPosition:   widget.AnchorLayoutPositionEnd,
+			Padding:            &widget.Insets{Right: 10, Bottom: 10},
+		})),
+	)
+	r.container.AddChild(title, body)
+	return r
+}
+
+// newCell builds one slot cell: a 50×40 button (short name, right-click
+// cycles a weapon's charge) with the cycle progress bar under it, plus the
+// hover tooltip shared by the cell's lifetime.
+func (r *Rack) newCell(row, idx int) *rackCell {
+	p := r.env.Pal
+	cell := &rackCell{slot: sim.SlotRef{Class: rackClasses[row], Index: idx}}
+
+	cell.tipText = widget.NewText(
+		widget.TextOpts.Text("", r.env.Face(StepSmall), solid(p.Text)),
+	)
+	tipBody := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 220), 1)),
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout(widget.AnchorLayoutOpts.Padding(
+			&widget.Insets{Left: 8, Right: 8, Top: 5, Bottom: 5},
+		))),
+	)
+	tipBody.AddChild(cell.tipText)
+	cell.tip = widget.NewToolTip(
+		widget.ToolTipOpts.Content(tipBody),
+		widget.ToolTipOpts.Delay(rackTipDelay),
+		widget.ToolTipOpts.Position(widget.TOOLTIP_POS_CURSOR_STICKY),
+		widget.ToolTipOpts.Offset(image.Point{X: 12, Y: 12}),
+	)
+	cell.tips = []*widget.ToolTip{cell.tip}
+
+	cell.btn = widget.NewButton(
+		widget.ButtonOpts.Image(rackCellImages(p)),
+		widget.ButtonOpts.TextFace(r.env.Face(StepTiny)),
+		widget.ButtonOpts.TextLabel(""),
+		widget.ButtonOpts.TextPosition(widget.TextPositionCenter, widget.TextPositionCenter),
+		widget.ButtonOpts.TextPadding(&widget.Insets{Left: 3, Right: 3, Top: 2, Bottom: 2}),
+		widget.ButtonOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(rackCellW, rackCellH),
+			widget.WidgetOpts.MouseButtonClickedHandler(func(a *widget.WidgetMouseButtonClickedEventArgs) {
+				if a.Button == ebiten.MouseButtonRight {
+					r.cycleAmmo(cell)
+				}
+			}),
+		),
+	)
+	cell.bar = widget.NewProgressBar(
+		widget.ProgressBarOpts.Values(0, rackCycleMax, 0),
+		widget.ProgressBarOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, rackCycleH)),
+	)
+	cell.root = widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+		)),
+	)
+	cell.root.AddChild(cell.btn, cell.bar)
+	return cell
+}
+
+// rackCellImages builds the cell chrome: an amber-tinted glow for active
+// modules and a dimmed cell for inactive/empty slots (the button's Disabled
+// state picks the look, so the theme's dim label rides along).
+func rackCellImages(p Palette) *widget.ButtonImage {
+	return &widget.ButtonImage{
+		Idle:         bordered(nrgba(p.Accent, 60), solid(p.Accent), 1),
+		Hover:        bordered(nrgba(p.Accent, 95), solid(p.Accent), 1),
+		Pressed:      bordered(nrgba(p.Accent, 110), nrgba(p.Accent, 220), 1),
+		PressedHover: bordered(nrgba(p.Accent, 110), solid(p.Accent), 1),
+		Disabled:     bordered(nrgba(p.Cell, 140), nrgba(p.Border, 110), 1),
+	}
+}
+
+// Container returns the rack's root widget for the interface root (anchor
+// layout).
+func (r *Rack) Container() *widget.Container { return r.container }
+
+// Sync refreshes every cell — module, active state, cycle progress and
+// tooltip — from the player's fitting. Call it once per frame before Update.
+func (r *Rack) Sync() {
+	s := r.env.Sim
+	if s == nil {
+		return
+	}
+	player := s.Player()
+	fit, hasFit := s.Fittings.Get(player)
+	now := s.Time()
+
+	// Slot counts: the hull's slots (empty cells still show), capped at the
+	// cells the rack was built with — mirrors ui's ModuleMaxCells clamp.
+	var slots content.Slots
+	if sh, ok := s.Ships.Get(player); ok {
+		if def, ok := r.env.Content.Ship(sh.Hull); ok {
+			slots = def.Slots
+		}
+	}
+	want := [rackRows]int{slots.High, slots.Mid, slots.Low}
+	filled := [rackRows]int{}
+	if hasFit {
+		filled = [rackRows]int{len(fit.High), len(fit.Mid), len(fit.Low)}
+	}
+	for row := 0; row < rackRows; row++ {
+		count := max(want[row], filled[row])
+		if count > rackMaxCells {
+			count = rackMaxCells
+		}
+		for idx, cell := range r.cells[row] {
+			shown := idx < count
+			showWidget(cell.root.GetWidget(), shown)
+			if !shown {
+				continue
+			}
+			var id content.ModuleID
+			var rt *sim.ModuleRuntime
+			if hasFit {
+				if defs := fit.Defs(rackClasses[row]); idx < len(defs) {
+					id = defs[idx]
+				}
+				if rts := fit.Runtimes(rackClasses[row]); idx < len(rts) {
+					rt = &rts[idx]
+				}
+			}
+			r.syncCell(cell, id, rt, now)
+		}
+	}
+}
+
+// syncCell rewrites one cell's label, tooltip, glow and cycle bar.
+func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRuntime, now float64) {
+	var def *content.ModuleDef
+	if id != "" {
+		def, _ = r.env.Content.Module(id)
+	}
+	active := rt != nil && rt.Active
+	progress := 0.0
+	if def != nil && active && rt.CycleEnds > 0 && def.ActivationTime > 0 {
+		// Same expression as the legacy rack: position inside the current
+		// cycle window (CycleEnds - ActivationTime .. CycleEnds).
+		progress = hudFrac01((now - (rt.CycleEnds - def.ActivationTime)) / def.ActivationTime)
+	}
+
+	// Rewriting label/tooltip/text every frame is cheap (Text.measure
+	// early-returns on an unchanged label) and keeps the empty-slot case
+	// honest without a separate "first sync" flag.
+	cell.module = id
+	cell.btn.SetText(r.shortName(def))
+	if def == nil {
+		cell.btn.GetWidget().ToolTips = nil
+		cell.tipText.Label = ""
+	} else {
+		cell.btn.GetWidget().ToolTips = cell.tips
+		cell.tipText.Label = strings.Join(r.tipLines(def, cell.slot), "\n")
+	}
+	cell.btn.GetWidget().Disabled = !active
+	cell.bar.SetCurrent(int(progress * rackCycleMax))
+}
+
+// showWidget shows or hides w only on a state change (a visibility flip
+// requests a parent relayout, so Sync must not spam it).
+func showWidget(w *widget.Widget, show bool) {
+	want := widget.Visibility_Show
+	if !show {
+		want = widget.Visibility_Hide
+	}
+	if w.GetVisibility() != want {
+		w.SetVisibility(want)
+	}
+}
+
+// shortName is the label drawn in a cell: the module's first word, ellipsized
+// to the cell (empty slots draw nothing).
+func (r *Rack) shortName(def *content.ModuleDef) string {
+	if def == nil {
+		return ""
+	}
+	name := def.Name
+	if i := strings.IndexByte(name, ' '); i > 0 {
+		name = name[:i]
+	}
+	return Ellipsize(name, rackCellW-6, r.measure)
+}
+
+// slotLabel renders a slot reference as "High slot 1".
+func (r *Rack) slotLabel(slot sim.SlotRef) string {
+	return kindLabel(slot.Class) + " slot " + strconv.Itoa(slot.Index+1)
+}
+
+// tipLines builds the cell tooltip body: name, slot, key stats and the
+// currently preferred charge. Local copy of ui.ModuleTipLines plus the
+// damage-mix line, since uikit must not import ui.
+func (r *Rack) tipLines(def *content.ModuleDef, slot sim.SlotRef) []string {
+	lines := []string{def.Name, r.slotLabel(slot)}
+	switch {
+	case def.Weapon != nil:
+		w := def.Weapon
+		lines = append(lines,
+			"Damage "+groupFloat(w.Damage.Total(), 1)+" per shot",
+			"Mix  EM "+groupFloat(w.Damage.EM, 1)+
+				"  TH "+groupFloat(w.Damage.Thermal, 1)+
+				"  KN "+groupFloat(w.Damage.Kinetic, 1)+
+				"  EX "+groupFloat(w.Damage.Explosive, 1),
+			"Optimal "+formatDistance(w.Optimal)+"  Falloff "+formatDistance(w.Falloff),
+			"Tracking "+groupFloat(w.Tracking, 2)+" rad/s",
+		)
+		if w.AmmoClass != "" {
+			lines = append(lines, "Charge: "+r.ammoName(r.ammoPref[slot]))
+		}
+	case def.Mining != nil:
+		m := def.Mining
+		lines = append(lines,
+			"Yields "+groupFloat(m.VolumePerCycle, 1)+" m³ / "+groupFloat(m.CycleTime, 1)+" s",
+		)
+	case def.Boost != nil:
+		b := def.Boost
+		cycle := ""
+		if def.ActivationTime > 0 {
+			cycle = " / " + groupFloat(def.ActivationTime, 1) + " s"
+		}
+		if b.ShieldBoostPerCycle > 0 {
+			lines = append(lines, "Shield +"+groupFloat(b.ShieldBoostPerCycle, 1)+" HP"+cycle)
+		}
+		if b.ArmorRepPerCycle > 0 {
+			lines = append(lines, "Armor +"+groupFloat(b.ArmorRepPerCycle, 1)+" HP"+cycle)
+		}
+		if b.SpeedMultiplier > 1 {
+			lines = append(lines, "Speed ×"+groupFloat(b.SpeedMultiplier, 2))
+		}
+		if b.WebStrength > 0 {
+			lines = append(lines, "Web −"+pctLabel(b.WebStrength)+" target speed")
+		}
+		if b.ScramDuration > 0 {
+			lines = append(lines, "Warp scramble "+groupFloat(b.ScramDuration, 1)+" s")
+		}
+		if b.CapRestore > 0 {
+			lines = append(lines, "Restores "+groupFloat(b.CapRestore, 1)+" GJ capacitor")
+		}
+	}
+	if def.ActivationCost > 0 {
+		lines = append(lines, "Uses "+groupFloat(def.ActivationCost, 1)+" GJ per cycle")
+	}
+	return lines
+}
+
+// ammoName renders a charge preference for the tooltip ("" = Auto).
+func (r *Rack) ammoName(id content.ItemID) string {
+	if id == "" {
+		return "Auto"
+	}
+	if def, ok := r.env.Content.Item(id); ok {
+		return def.Name
+	}
+	return string(id)
+}
+
+// ammoCandidates returns the charge choices for a weapon class: "" (Auto)
+// first, then every distinct cargo item of that ammo class ordered by item
+// id for determinism.
+func (r *Rack) ammoCandidates(class string) []content.ItemID {
+	var stacks []content.CargoStack
+	if s := r.env.Sim; s != nil {
+		if cg, ok := s.Cargos.Get(s.Player()); ok {
+			stacks = cg.Stacks
+		}
+	}
+	seen := map[content.ItemID]bool{}
+	var ids []content.ItemID
+	for _, st := range stacks {
+		if st.Qty <= 0 || seen[st.Item] {
+			continue
+		}
+		def, ok := r.env.Content.Item(st.Item)
+		if !ok || def.AmmoClass != class {
+			continue
+		}
+		seen[st.Item] = true
+		ids = append(ids, st.Item)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	out := make([]content.ItemID, 0, len(ids)+1)
+	out = append(out, "")
+	return append(out, ids...)
+}
+
+// cycleAmmo advances a weapon cell's charge preference one step and enqueues
+// CmdSetAmmo. Non-weapons, weapons without an ammo class and weapons with no
+// matching cargo charge are left alone.
+func (r *Rack) cycleAmmo(cell *rackCell) {
+	if cell.module == "" || r.env.Enqueue == nil {
+		return
+	}
+	def, ok := r.env.Content.Module(cell.module)
+	if !ok || def.Weapon == nil || def.Weapon.AmmoClass == "" {
+		return
+	}
+	cands := r.ammoCandidates(def.Weapon.AmmoClass)
+	if len(cands) < 2 { // only Auto: nothing to cycle to
+		return
+	}
+	next := cands[0]
+	for i, id := range cands {
+		if id == r.ammoPref[cell.slot] {
+			next = cands[(i+1)%len(cands)]
+			break
+		}
+	}
+	if next == r.ammoPref[cell.slot] {
+		return
+	}
+	r.ammoPref[cell.slot] = next
+	r.env.Enqueue(sim.CmdSetAmmo{Slot: cell.slot, Item: next})
+}
+
+// pctLabel renders a fraction as a rounded percentage ("45%").
+func pctLabel(f float64) string {
+	return strconv.FormatInt(int64(math.Round(f*100)), 10) + "%"
+}

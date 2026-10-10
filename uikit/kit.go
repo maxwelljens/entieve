@@ -1,14 +1,16 @@
-// Package uikit is the next-generation ebitenui-based UI layer for Entieve
-// and is the intended successor to the hand-rolled ui/ package.
+// Package uikit is Entieve's ebitenui-based UI layer (successor to the
+// retired hand-rolled ui/ package).
 //
-// The kit composes widgets from github.com/ebitenui/ebitenui over the same
-// EVE-dark look ui/ renders today (see theme.go, pinned to ui/style.go by
-// TestThemeMatchesLegacyPalette). It follows the engine's controllability
-// seam: it never mutates sim state — every player action becomes a
-// sim.Command handed to the enqueue callback.
+// The kit composes widgets from github.com/ebitenui/ebitenui (pinned
+// v0.7.3) in the canonical EVE-dark look: see theme.go, pinned to golden
+// values by TestPaletteGoldenValues. It follows the engine's
+// controllability seam: it never mutates sim state — every player action
+// becomes a sim.Command handed to the enqueue callback.
 //
 // Integration: call Sync every frame before Update, then Draw after the
-// world render.
+// world render. World clicks feed selection back through Kit.Select; always
+// on chrome mounts via AddContainer; the built-in windows are reachable via
+// OverviewWindow/SelectedWindow and can be hidden with SetCoreVisible.
 package uikit
 
 import (
@@ -38,8 +40,12 @@ type Kit struct {
 
 	selected ecs.Entity
 
-	ov *overview
-	sp *selectedPanel
+	ov   *overview
+	sp   *selectedPanel
+	root *widget.Container
+
+	// core visibility (hidden e.g. while docked in a station)
+	coreHidden bool
 }
 
 // NewKit builds the interface layer over loaded content and a live
@@ -68,6 +74,7 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	// Root container: transparent overlay over the world render; windows
 	// float above it. The theme rides the widget parent chain.
 	root := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
+	k.root = root
 	k.ui = &ebitenui.UI{Container: root, PrimaryTheme: k.theme}
 
 	k.buildOverview()
@@ -103,3 +110,49 @@ func (k *Kit) Sync() {
 
 // Selected returns the entity selected in the overview (zero if none).
 func (k *Kit) Selected() ecs.Entity { return k.selected }
+
+// Select sets the selected entity from outside the overview (a world click,
+// a keyboard cycle) so the Selected Item panel and the overview highlight
+// follow it. Idempotent.
+func (k *Kit) Select(e ecs.Entity) {
+	k.selected = e
+	k.ov.selectEntity(e)
+	k.Sync()
+}
+
+// Root returns the kit's root overlay container, for integrations that mount
+// always-on chrome (HUD, module rack, log) directly instead of windows.
+func (k *Kit) Root() widget.Containerer { return k.root }
+
+// AddContainer mounts an always-on panel container into the root overlay
+// with the given anchor layout data (widget.AnchorLayoutData).
+func (k *Kit) AddContainer(c widget.Containerer, layoutData any) {
+	c.GetWidget().LayoutData = layoutData
+	k.root.AddChild(c)
+}
+
+// OverviewWindow returns the built-in Overview window for hit-testing,
+// repositioning and visibility control.
+func (k *Kit) OverviewWindow() *widget.Window { return k.ov.win }
+
+// SelectedWindow returns the built-in Selected Item window.
+func (k *Kit) SelectedWindow() *widget.Window { return k.sp.win }
+
+// SetCoreVisible hides or shows the always-mounted chrome (Overview and
+// Selected Item), e.g. hide while docked in a station scene.
+func (k *Kit) SetCoreVisible(show bool) {
+	if k.coreHidden == !show {
+		return
+	}
+	k.coreHidden = !show
+	vis := widget.Visibility_Show
+	if !show {
+		vis = widget.Visibility_Hide
+	}
+	if c := k.ov.win.GetContainer(); c != nil {
+		c.GetWidget().SetVisibility(vis)
+	}
+	if c := k.sp.win.GetContainer(); c != nil {
+		c.GetWidget().SetVisibility(vis)
+	}
+}

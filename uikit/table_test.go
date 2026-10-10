@@ -1,0 +1,343 @@
+package uikit
+
+import (
+	"image/color"
+	"math"
+	"sort"
+	"testing"
+
+	"github.com/ebitenui/ebitenui"
+	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/sim"
+	"github.com/hajimehoshi/ebiten/v2"
+)
+
+// newTestEnv builds an Env over the embedded content and world-showcase,
+// capturing every enqueued command.
+func newTestEnv(t *testing.T) (Env, *[]sim.Command) {
+	t.Helper()
+	c, err := content.Load(content.FS())
+	if err != nil {
+		t.Fatalf("content.Load: %v", err)
+	}
+	wd, ok := c.World("world-showcase")
+	if !ok {
+		t.Fatal("world-showcase missing")
+	}
+	s, err := sim.New(c, wd, 42)
+	if err != nil {
+		t.Fatalf("sim.New: %v", err)
+	}
+	var cmds []sim.Command
+	return NewEnv(c, s, func(cmd sim.Command) { cmds = append(cmds, cmd) }), &cmds
+}
+
+// newPumpedTable builds a standalone table in its own UI and pumps one
+// frame so the deferred constructor handlers are registered and the
+// widget layout has run at 640×400.
+func newPumpedTable(t *testing.T, env Env, cols []Column) (*Table, *ebitenui.UI) {
+	t.Helper()
+	tbl := NewTable(env, cols)
+	ui := &ebitenui.UI{Container: tbl.Container(), PrimaryTheme: env.Theme}
+	ui.Update()
+	ui.Draw(ebiten.NewImage(640, 400))
+	return tbl, ui
+}
+
+// clickRow fires a real deferred click on row i and dispatches it on the
+// next UI pump (ebitenui queues both handlers and events until Update).
+func clickRow(ui *ebitenui.UI, tbl *Table, i int) {
+	tbl.rowCts[i].GetWidget().MouseButtonClickedEvent.Fire(&widget.WidgetMouseButtonClickedEventArgs{
+		Button: ebiten.MouseButtonLeft,
+	})
+	ui.Update()
+}
+
+// dataIDs extracts the int payloads of rows in display order.
+func dataIDs(rows []TableRow) []int {
+	out := make([]int, len(rows))
+	for i, r := range rows {
+		out[i], _ = r.Data.(int)
+	}
+	return out
+}
+
+func equalInts(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// TestTableSortAscDescStable covers the default lexicographic sort in
+// both directions, including the stability guarantee for equal keys.
+func TestTableSortAscDescStable(t *testing.T) {
+	env, _ := newTestEnv(t)
+	tbl := NewTable(env, []Column{{Key: "A", Title: "A"}, {Key: "B", Title: "B"}})
+	base := []TableRow{
+		{Cells: []string{"b", "1"}, Data: 0},
+		{Cells: []string{"a", "2"}, Data: 1},
+		{Cells: []string{"c", "3"}, Data: 2},
+		{Cells: []string{"a", "4"}, Data: 3},
+	}
+	tbl.SetRows(base)
+	tbl.SetSort("A", true)
+	if got, want := dataIDs(tbl.rows), []int{1, 3, 0, 2}; !equalInts(got, want) {
+		t.Errorf("asc order = %v, want %v", got, want)
+	}
+	tbl.SetSort("A", false)
+	if got, want := dataIDs(tbl.rows), []int{2, 0, 1, 3}; !equalInts(got, want) {
+		t.Errorf("desc order = %v, want %v (ties keep their input order)", got, want)
+	}
+	// The indicator suffix follows the active sort.
+	if got := tbl.indicator(0); got != " ▼" {
+		t.Errorf("active header indicator = %q, want %q", got, " ▼")
+	}
+	if got := tbl.indicator(1); got != "" {
+		t.Errorf("inactive header indicator = %q, want empty", got)
+	}
+}
+
+// TestTableSortFunc: a custom sort function overrides the default
+// lexicographic order (numeric instead of string comparison).
+func TestTableSortFunc(t *testing.T) {
+	env, _ := newTestEnv(t)
+	tbl := NewTable(env, []Column{{Key: "N", Title: "N"}})
+	tbl.SetRows([]TableRow{
+		{Cells: []string{"10"}, Data: 10},
+		{Cells: []string{"9"}, Data: 9},
+		{Cells: []string{"8"}, Data: 8},
+	})
+
+	tbl.SetSort("N", true)
+	if got, want := dataIDs(tbl.rows), []int{10, 8, 9}; !equalInts(got, want) {
+		t.Errorf("string order = %v, want %v", got, want)
+	}
+
+	tbl.SetSortFunc(func(key string, asc bool, rows []TableRow) {
+		sort.SliceStable(rows, func(i, j int) bool {
+			if asc {
+				return rows[i].Data.(int) < rows[j].Data.(int)
+			}
+			return rows[j].Data.(int) < rows[i].Data.(int)
+		})
+	})
+	tbl.SetSort("N", true)
+	if got, want := dataIDs(tbl.rows), []int{8, 9, 10}; !equalInts(got, want) {
+		t.Errorf("numeric order = %v, want %v", got, want)
+	}
+}
+
+// TestTableSelectVsActivate drives the real deferred-event path: a
+// click selects, a repeat click on the same row inside the window also
+// activates, a different row does not.
+func TestTableSelectVsActivate(t *testing.T) {
+	env, _ := newTestEnv(t)
+	tbl := NewTable(env, []Column{{Key: "A", Title: "A"}})
+	var selected, activated []int
+	tbl.OnSelect(func(r TableRow) { selected = append(selected, r.Data.(int)) })
+	tbl.OnActivate(func(r TableRow) { activated = append(activated, r.Data.(int)) })
+	tbl.SetRows([]TableRow{
+		{Cells: []string{"alpha"}, Data: 0},
+		{Cells: []string{"bravo"}, Data: 1},
+		{Cells: []string{"charlie"}, Data: 2},
+	})
+
+	ui := &ebitenui.UI{Container: tbl.Container(), PrimaryTheme: env.Theme}
+	ui.Update() // registers the deferred constructor handlers
+
+	clickRow(ui, tbl, 1)
+	if !equalInts(selected, []int{1}) || len(activated) != 0 {
+		t.Fatalf("first click: selected=%v activated=%v, want [1] []", selected, activated)
+	}
+	if tbl.selIdx != 1 {
+		t.Errorf("selIdx = %d, want 1", tbl.selIdx)
+	}
+
+	clickRow(ui, tbl, 1)
+	if !equalInts(selected, []int{1, 1}) || !equalInts(activated, []int{1}) {
+		t.Fatalf("repeat click: selected=%v activated=%v, want [1 1] [1]", selected, activated)
+	}
+
+	clickRow(ui, tbl, 2)
+	if !equalInts(selected, []int{1, 1, 2}) || !equalInts(activated, []int{1}) {
+		t.Fatalf("other row: selected=%v activated=%v, want [1 1 2] [1]", selected, activated)
+	}
+}
+
+// TestTableSetRowsKeepsSelection: SetRows updates widgets in place when
+// the row count is unchanged, keeps the selection by Data identity
+// across reorders, and clears it when the row is gone.
+func TestTableSetRowsKeepsSelection(t *testing.T) {
+	env, _ := newTestEnv(t)
+	tbl := NewTable(env, []Column{{Key: "A", Title: "A"}, {Key: "B", Title: "B"}})
+	rows := func() []TableRow {
+		return []TableRow{
+			{Cells: []string{"x", "1"}, Data: "x"},
+			{Cells: []string{"y", "2"}, Data: "y"},
+			{Cells: []string{"z", "3"}, Data: "z"},
+		}
+	}
+	tbl.SetRows(rows())
+	tbl.rowClicked(1) // select "y"
+	if tbl.selIdx != 1 {
+		t.Fatalf("selIdx = %d, want 1", tbl.selIdx)
+	}
+	ctr0 := tbl.rowCts[0]
+
+	// Same count: widgets are reused (diff-friendly) and labels refresh.
+	updated := rows()
+	updated[0].Cells[0] = "xx"
+	tbl.SetRows(updated)
+	if tbl.rowCts[0] != ctr0 {
+		t.Error("row widgets rebuilt despite an unchanged row count")
+	}
+	if got := tbl.texts[0][0].Label; got != "xx" {
+		t.Errorf("updated cell label = %q, want %q", got, "xx")
+	}
+	if tbl.selIdx != 1 || tbl.rows[tbl.selIdx].Data != "y" {
+		t.Errorf("selection moved to %d (%v), want the y row", tbl.selIdx, tbl.rows[tbl.selIdx].Data)
+	}
+
+	// Reordered: the selection follows its Data to the new index.
+	tbl.SetRows([]TableRow{rows()[2], rows()[0], rows()[1]})
+	if tbl.selIdx != 2 || tbl.rows[2].Data != "y" {
+		t.Errorf("after reorder selIdx = %d (%v), want 2 (y)", tbl.selIdx, tbl.rows[tbl.selIdx].Data)
+	}
+
+	// Gone: the selection clears.
+	tbl.SetRows([]TableRow{rows()[0], rows()[2]})
+	if tbl.selIdx != -1 {
+		t.Errorf("removed row left selIdx = %d, want -1", tbl.selIdx)
+	}
+}
+
+// TestTableRefitOnResize: the table refits its columns whenever its own
+// width changes (window resize/drag), keeping the fit exact.
+func TestTableRefitOnResize(t *testing.T) {
+	env, _ := newTestEnv(t)
+	tbl, ui := newPumpedTable(t, env, []Column{
+		{Key: "A", Title: "Name", Priority: 0},
+		{Key: "B", Title: "Value", Priority: 1, AlignRight: true},
+	})
+	tbl.SetRows([]TableRow{{Cells: []string{"alpha", "1"}, Data: 0}})
+	tbl.Sync()
+	if tbl.fittedFor != 640 {
+		t.Fatalf("fittedFor = %v, want 640", tbl.fittedFor)
+	}
+	if sum := sumPrefix(tbl.widths); math.Abs(sum-640) > 1e-6 {
+		t.Fatalf("column sum = %v, want 640", sum)
+	}
+
+	// A narrower draw resizes the root; Sync refits to it. All the
+	// surplus lives in the lowest-priority column, so that is the one
+	// that gives it back.
+	oldName := tbl.widths[0]
+	ui.Draw(ebiten.NewImage(400, 300))
+	tbl.Sync()
+	if tbl.fittedFor != 400 {
+		t.Fatalf("after resize fittedFor = %v, want 400", tbl.fittedFor)
+	}
+	if sum := sumPrefix(tbl.widths); math.Abs(sum-400) > 1e-6 {
+		t.Fatalf("after resize column sum = %v, want 400", sum)
+	}
+	if tbl.widths[0] == oldName {
+		t.Errorf("Name column width unchanged (%v) after a 240 px shrink", oldName)
+	}
+}
+
+// TestTableRightAlignAnchors: headers, right-aligned cells and left
+// cells share exact column boxes — every row's cell rect for a column
+// ends at the same x (fixed anchors, no per-row jitter), and the header
+// button tiles the same box.
+func TestTableRightAlignAnchors(t *testing.T) {
+	env, _ := newTestEnv(t)
+	tbl, ui := newPumpedTable(t, env, []Column{
+		{Key: "Name", Title: "Name", Priority: 0},
+		{Key: "Dist", Title: "Dist", Priority: 1, AlignRight: true},
+		{Key: "Vel", Title: "Vel", Priority: 2, AlignRight: true},
+	})
+	tbl.SetRows([]TableRow{
+		{Cells: []string{"a", "1,000 m", "100 m/s"}, Data: 0},
+		{Cells: []string{"a very long entity name", "10 m", "1 m/s"}, Data: 1},
+		{Cells: []string{"b", "2 m", "2 m/s"}, Data: 2},
+	})
+	tbl.Sync()
+	ui.Draw(ebiten.NewImage(640, 400)) // relayout with the new cells
+
+	for i, col := range tbl.cols {
+		// Header button and every cell occupy the same column box.
+		hdr := tbl.hdrBtn[i].GetWidget().Rect
+		first := tbl.texts[0][i].GetWidget().Rect
+		if hdr.Dx() != first.Dx() || hdr.Max.X != first.Max.X {
+			t.Errorf("column %s: header box %v != cell box %v", col.Title, hdr, first)
+		}
+		for r := 1; r < len(tbl.rows); r++ {
+			rect := tbl.texts[r][i].GetWidget().Rect
+			if rect.Dx() != first.Dx() || rect.Max.X != first.Max.X {
+				t.Errorf("column %s: row %d box %v, want anchor %v",
+					col.Title, r, rect, first)
+			}
+		}
+		// The fitted width is what the widget was pinned to.
+		want := tbl.hdrBtn[i].GetWidget().MinWidth
+		if tbl.texts[0][i].GetWidget().MinWidth != want {
+			t.Errorf("column %s: cell MinWidth %d != header %d",
+				col.Title, tbl.texts[0][i].GetWidget().MinWidth, want)
+		}
+	}
+}
+
+// TestTableTintAssignment: row backgrounds follow TableRow.Tint and the
+// selected row switches to the accent tint.
+func TestTableTintAssignment(t *testing.T) {
+	env, _ := newTestEnv(t)
+	tbl := NewTable(env, []Column{{Key: "A", Title: "A"}})
+	red := color.RGBA{255, 0, 0, 60}
+	blue := color.RGBA{0, 0, 255, 80}
+	tbl.SetRows([]TableRow{
+		{Cells: []string{"a"}, Tint: red, Data: 0},
+		{Cells: []string{"b"}, Data: 1},
+		{Cells: []string{"c"}, Tint: blue, Data: 2},
+	})
+	want := []color.RGBA{red, {}, blue}
+	for i, w := range want {
+		if tbl.applied[i] != w {
+			t.Errorf("row %d background = %v, want %v", i, tbl.applied[i], w)
+		}
+	}
+
+	tbl.rowClicked(0)
+	accent := withA(env.Pal.Accent, selectionAlpha)
+	if tbl.applied[0] != accent {
+		t.Errorf("selected row background = %v, want accent %v", tbl.applied[0], accent)
+	}
+	if tbl.applied[1] != want[1] || tbl.applied[2] != want[2] {
+		t.Errorf("selection repainted neighbours: %v %v", tbl.applied[1], tbl.applied[2])
+	}
+}
+
+// TestSelectDataExternal pins external selection (world clicks): the row
+// highlight follows SelectData and clears on nil.
+func TestSelectDataExternal(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	tbl := NewTable(env, []Column{{Key: "Name", Title: "Name", Width: 100}})
+	tbl.SetRows([]TableRow{
+		{Cells: []string{"Alpha"}, Data: "alpha"},
+		{Cells: []string{"Beta"}, Data: "beta"},
+	})
+	tbl.SelectData("beta")
+	if tbl.selIdx != 1 || tbl.selData != "beta" {
+		t.Fatalf("SelectData(beta): idx=%d data=%v, want 1/beta", tbl.selIdx, tbl.selData)
+	}
+	tbl.SelectData(nil)
+	if tbl.selIdx != -1 || tbl.selData != nil {
+		t.Fatalf("SelectData(nil): idx=%d data=%v, want -1/nil", tbl.selIdx, tbl.selData)
+	}
+}
