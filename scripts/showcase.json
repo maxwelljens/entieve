@@ -28,6 +28,12 @@
     "target": "Haven Rest"
   },
   {
+    "at_tick": 7230,
+    "action": "accept-mission",
+    "mission": "contract-solace-cleanup-1",
+    "note": "contract leg: take the kill contract off the Haven Rest board; the belt fight counts progress, the tick-51060 dock auto-claims it"
+  },
+  {
     "at_tick": 7260,
     "action": "repair"
   },

@@ -347,6 +347,52 @@ type UniverseDef struct {
 	Systems       []SystemDef `json:"systems"` // full inline systems also allowed; file-based systems merge in
 }
 
+// ContractID is the ID of a mission-board contract. IDs use the "contract-"
+// prefix (kebab-case, globally unique).
+type ContractID string
+
+// Contract kinds.
+const (
+	ContractKill    = "kill"
+	ContractDeliver = "deliver"
+	ContractMine    = "mine"
+)
+
+// ContractObjective is the per-kind objective block of a contract:
+// kill    -> Target (NPC id) + Count rats;
+// deliver -> Item + Count m³ delivered to Destination (a station);
+// mine    -> Item (ore) + Count m³ mined into the hold.
+type ContractObjective struct {
+	Target      NpcID  `json:"target,omitempty"`
+	Item        ItemID `json:"item,omitempty"`
+	Destination CelID  `json:"destination,omitempty"`
+	Count       int    `json:"count"`
+}
+
+// ContractReward is the payout block: credits on completion, an optional
+// bonus item (granted to the station hangar), and the career-standing gain.
+type ContractReward struct {
+	Credits      float64 `json:"credits"`
+	Item         ItemID  `json:"item,omitempty"`
+	Qty          int     `json:"qty,omitempty"`
+	StandingGain float64 `json:"standing_gain"`
+}
+
+// ContractDef is one mission-board offering, pinned to the station whose
+// board lists it (Station). Kill/mine contracts claim at Station; deliver
+// contracts claim at Objective.Destination.
+type ContractDef struct {
+	ID          ContractID        `json:"id"`
+	Title       string            `json:"title"`
+	Kind        string            `json:"kind"` // ContractKill | ContractDeliver | ContractMine
+	Level       int               `json:"level"`
+	MinStanding float64           `json:"min_standing"`
+	Station     CelID             `json:"station"`
+	Objective   ContractObjective `json:"objective"`
+	Reward      ContractReward    `json:"reward"`
+	Description string            `json:"description"`
+}
+
 // Checkpoint documents one feature exercised by a showcase scenario.
 type Checkpoint struct {
 	Name    string `json:"name"`
@@ -375,13 +421,14 @@ type StartDef struct {
 
 // Content is the fully loaded, cross-referenced game data.
 type Content struct {
-	Items    map[ItemID]*ItemDef
-	Ships    map[ShipID]*ShipDef
-	Modules  map[ModuleID]*ModuleDef
-	NPCs     map[NpcID]*NpcDef
-	Systems  map[SystemID]*SystemDef
-	Universe *UniverseDef
-	Worlds   map[WorldID]*WorldDef
+	Items     map[ItemID]*ItemDef
+	Ships     map[ShipID]*ShipDef
+	Modules   map[ModuleID]*ModuleDef
+	NPCs      map[NpcID]*NpcDef
+	Systems   map[SystemID]*SystemDef
+	Contracts map[ContractID]*ContractDef
+	Universe  *UniverseDef
+	Worlds    map[WorldID]*WorldDef
 }
 
 // Item returns the item def for id.
@@ -401,3 +448,21 @@ func (c *Content) System(id SystemID) (*SystemDef, bool) { d, ok := c.Systems[id
 
 // World returns the world def for id.
 func (c *Content) World(id WorldID) (*WorldDef, bool) { d, ok := c.Worlds[id]; return d, ok }
+
+// Contract returns the contract def for id.
+func (c *Content) Contract(id ContractID) (*ContractDef, bool) {
+	d, ok := c.Contracts[id]
+	return d, ok
+}
+
+// Board returns the contracts offered on the given station's mission board,
+// sorted by ID (deterministic order for UI and tests).
+func (c *Content) Board(cel CelID) []*ContractDef {
+	var out []*ContractDef
+	for _, id := range keys(c.Contracts) {
+		if c.Contracts[id].Station == cel {
+			out = append(out, c.Contracts[id])
+		}
+	}
+	return out
+}

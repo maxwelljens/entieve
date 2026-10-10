@@ -123,6 +123,22 @@
         "to_system": "sys-gloam",
         "to_cel": "cel-gate-penumbra"
       }
+    },
+    {
+      "id": "cel-penumbra-port",
+      "name": "Penumbra Port",
+      "kind": "station",
+      "position": {
+        "X": 2400000000,
+        "Y": 1800000000
+      },
+      "radius": 500,
+      "colors": [
+        "#8ea8c3"
+      ],
+      "station": {
+        "services": ["repair", "market", "refine", "fitting"]
+      }
     }
   ]
 }

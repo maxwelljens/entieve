@@ -360,32 +360,43 @@ type (
 		From string
 		To   string
 	}
+
+	// CmdAcceptMission accepts a contract from the offering station's
+	// mission board (requires being docked at that station with enough
+	// standing). Emitted refusals carry EvMission phase "refused".
+	CmdAcceptMission struct{ ID content.ContractID }
+
+	// CmdAbandonMission drops an accepted contract (docked at the offering
+	// station). Emitted refusals carry EvMission phase "refused".
+	CmdAbandonMission struct{ ID content.ContractID }
 )
 
-func (CmdStop) isCommand()        {}
-func (CmdManualVel) isCommand()   {}
-func (CmdApproach) isCommand()    {}
-func (CmdOrbit) isCommand()       {}
-func (CmdWarpTo) isCommand()      {}
-func (CmdAlignTo) isCommand()     {}
-func (CmdLock) isCommand()        {}
-func (CmdUnlock) isCommand()      {}
-func (CmdActivate) isCommand()    {}
-func (CmdDeactivate) isCommand()  {}
-func (CmdLoot) isCommand()        {}
-func (CmdMine) isCommand()        {}
-func (CmdDock) isCommand()        {}
-func (CmdUndock) isCommand()      {}
-func (CmdJump) isCommand()        {}
-func (CmdBuy) isCommand()         {}
-func (CmdSell) isCommand()        {}
-func (CmdRefine) isCommand()      {}
-func (CmdRepair) isCommand()      {}
-func (CmdAssemble) isCommand()    {}
-func (CmdFitModule) isCommand()   {}
-func (CmdUnfitModule) isCommand() {}
-func (CmdSetAmmo) isCommand()     {}
-func (CmdTransfer) isCommand()    {}
+func (CmdStop) isCommand()           {}
+func (CmdManualVel) isCommand()      {}
+func (CmdApproach) isCommand()       {}
+func (CmdOrbit) isCommand()          {}
+func (CmdWarpTo) isCommand()         {}
+func (CmdAlignTo) isCommand()        {}
+func (CmdLock) isCommand()           {}
+func (CmdUnlock) isCommand()         {}
+func (CmdActivate) isCommand()       {}
+func (CmdDeactivate) isCommand()     {}
+func (CmdLoot) isCommand()           {}
+func (CmdMine) isCommand()           {}
+func (CmdDock) isCommand()           {}
+func (CmdUndock) isCommand()         {}
+func (CmdJump) isCommand()           {}
+func (CmdBuy) isCommand()            {}
+func (CmdSell) isCommand()           {}
+func (CmdRefine) isCommand()         {}
+func (CmdRepair) isCommand()         {}
+func (CmdAssemble) isCommand()       {}
+func (CmdFitModule) isCommand()      {}
+func (CmdUnfitModule) isCommand()    {}
+func (CmdSetAmmo) isCommand()        {}
+func (CmdTransfer) isCommand()       {}
+func (CmdAcceptMission) isCommand()  {}
+func (CmdAbandonMission) isCommand() {}
 
 // ---------------------------------------------------------------------------
 // Events — the observation surface
@@ -407,6 +418,18 @@ const (
 	EvTargetLocked   EventKind = "target_locked"
 	EvCargoFull      EventKind = "cargo_full"
 	EvAnomalyCleared EventKind = "anomaly_cleared"
+	EvMission        EventKind = "mission"
+)
+
+// EvMission phases: "accepted" | "progress" | "ready" | "completed" |
+// "abandoned" | "refused".
+const (
+	MissionAccepted  = "accepted"
+	MissionProgress  = "progress"
+	MissionReady     = "ready"
+	MissionCompleted = "completed"
+	MissionAbandoned = "abandoned"
+	MissionRefused   = "refused"
 )
 
 // Severity classifies log importance for the UI.
@@ -429,7 +452,9 @@ type Event struct {
 	Text     string  // human-readable log line
 	Value    float64 // credits, damage, volume... context-dependent
 	Item     content.ItemID
-	Phase    string // EvWarp phases: "start" | "land" | "scrammed"
+	Phase    string // EvWarp phases: "start" | "land" | "scrammed"; EvMission phases above
+	ID       string // EvMission: contract ID
+	Name     string // EvMission: contract title
 }
 
 // ---------------------------------------------------------------------------
@@ -558,14 +583,28 @@ type SavedSlot struct {
 	Generation uint32 `json:"generation"`
 }
 
+// MissionState is one accepted contract's live progress: the contract ID and
+// how much of its objective has been counted (kills, m³ delivered/mined —
+// deliver counts stay 0 until the claim check at the destination). Phase is
+// derived: Progress < count is in-progress, otherwise ready to claim.
+// Persisted verbatim in Save.Missions.
+type MissionState struct {
+	ID       content.ContractID `json:"id"`
+	Progress float64            `json:"progress"`
+}
+
 // Save is a full serializable simulation snapshot.
 type Save struct {
-	World    content.WorldID                    `json:"world"`
-	System   content.SystemID                   `json:"system"`
-	Ticks    int64                              `json:"ticks"`
-	Seed     int64                              `json:"seed"`
-	RNGState uint64                             `json:"rng_state"`
-	Wallet   float64                            `json:"wallet"`
+	World    content.WorldID  `json:"world"`
+	System   content.SystemID `json:"system"`
+	Ticks    int64            `json:"ticks"`
+	Seed     int64            `json:"seed"`
+	RNGState uint64           `json:"rng_state"`
+	Wallet   float64          `json:"wallet"`
+	// Standing is the player's career standing (contract completion credit).
+	Standing float64 `json:"standing"`
+	// Missions are the contracts currently accepted (with progress).
+	Missions []MissionState                     `json:"missions,omitempty"`
 	Hangar   Hangar                             `json:"hangar"`
 	Market   map[content.SystemID][]MarketStock `json:"market"`
 	Respawn  []RespawnTimer                     `json:"respawn"`

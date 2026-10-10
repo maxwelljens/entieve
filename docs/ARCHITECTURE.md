@@ -143,7 +143,9 @@ table.
   charges).
 - `sys-penumbra` — low-security (NPCs aggressive). Belt `cel-penumbra-belt`
   (ore-cordite, ore-lucidite), anomaly `cel-penumbra-den` (marauders +
-  boss hierarch, best loot), gates → `sys-solace` and `sys-gloam`.
+  boss hierarch, best loot), station `cel-penumbra-port` (repair, market,
+  refine, fitting; hosts the level-2 contract board), gates → `sys-solace`
+  and `sys-gloam`.
 - `sys-gloam` — dead-end frontier, dangerous. Belt `cel-gloam-belt`
   (ore-glacierite), heavy spawns incl. `npc-rat-hierarch`.
 
@@ -158,6 +160,18 @@ system list with starmap positions, `start_system: "sys-solace"`.
   stocks, ores + loot in cargo, fat wallet, positioned in `sys-solace` near
   the belt. Its `scenario` block lists feature checkpoints (see
   "Showcase world" below).
+
+**Contracts** (`content/data/contracts/*.json`) — mission-board offerings
+pinned to one station (`station` = offering station; kinds `kill`, `deliver`,
+`mine`; objectives reference NPC IDs / cargo items / stations, validated):
+- `contract-solace-cleanup-1` (kill 1 scuttler), `contract-solace-supply-run-1`
+  (deliver 2 m³ charge-emp to `cel-penumbra-port`), `contract-solace-cordite-1`
+  (mine 400 m³ ore-cordite) — the `cel-haven-rest` board (level 1, standing 0).
+- `contract-penumbra-den-hunt-1` (kill 1 marauder), `contract-penumbra-lucidite-1`
+  (mine 500 m³ ore-lucidite) — the `cel-penumbra-port` board (level 2,
+  `min_standing` 0.2).
+Rewards are calibrated by the payout ratio table in
+`docs/CONTENT_AUTHORING.md` ("add a contract").
 
 ### Struct summary (`content/model.go` is authoritative)
 
@@ -221,6 +235,15 @@ type SystemDef struct {
     Market []MarketOrderDef   // station-bound orders (all stations in system share for now)
 }
 type UniverseDef struct { Region, Constellation string; StartSystem SystemID; Systems []struct{ID SystemID; Position core.Vec2} }
+type ContractDef struct {                        // contracts/*.json
+    ID ContractID; Title, Kind, Description string // Kind: "kill"|"deliver"|"mine"
+    Level int; MinStanding float64                 // board gate (career standing)
+    Station CelID                                 // offering station (the board)
+    Objective struct{ Target NpcID; Item ItemID; Destination CelID; Count int }
+    // kill: Target+Count rats; deliver: Item+Count m³ to Destination;
+    // mine: Item (ore) + Count m³ mined into the hold.
+    Reward struct{ Credits float64; Item ItemID; Qty int; StandingGain float64 }
+}
 type WorldDef struct {
     ID WorldID; Name, Description string
     Start struct{ System SystemID; Position core.Vec2; Ship ShipID; Fit []ModuleID; Cargo []CargoStack; Wallet float64 }
@@ -228,18 +251,21 @@ type WorldDef struct {
 }
 type Content struct {
     Items map[ItemID]*ItemDef; Ships map[ShipID]*ShipDef; Modules map[ModuleID]*ModuleDef
-    NPCs map[NpcID]*NpcDef; Systems map[SystemID]*SystemDef; Universe *UniverseDef
+    NPCs map[NpcID]*NpcDef; Systems map[SystemID]*SystemDef
+    Contracts map[ContractID]*ContractDef; Universe *UniverseDef
     Worlds map[WorldID]*WorldDef
 }
 func Load(fsys fs.FS) (*Content, error)      // reads content/data/** JSON, embed.FS by default via content.FS
 func LoadDir(dir string) (*Content, error)   // os.DirFS convenience for dev/hot-reload
 func (c *Content) Validate() error           // aggregated cross-ref validation
-func (c *Content) Item(id ItemID) (*ItemDef, bool) // + Ship/Module/Npc/System accessors
+func (c *Content) Item(id ItemID) (*ItemDef, bool) // + Ship/Module/Npc/System/World/Contract accessors
+func (c *Content) Board(cel CelID) []*ContractDef   // a station's mission board, sorted by ID
 ```
 
 `Validate()` must catch at minimum: duplicate IDs; unknown references (fit
 modules, ship hulls in NPC defs, gate destinations both ways, market items,
-loot items, ore refine yields, ammo classes used by weapons); slot overflow
+loot items, ore refine yields, ammo classes used by weapons, contract rat
+classes / cargo items / stations); slot overflow
 in world fits and NPC fits; refine yields outside `[0,1]`; resists outside
 `[0,1]`; negative numbers; worlds referencing unknown systems; `world-showcase`
 present with a non-empty `scenario`.
@@ -283,15 +309,22 @@ CmdDock{Station}, CmdUndock{}, CmdJump{Gate},
 CmdBuy{Item, Qty}, CmdSell{Item, Qty},
 CmdTransfer{Item, Qty, From, To}, // holds: "cargo" | "ore" | "hangar"
 CmdRefine{Item, Qty}, CmdRepair{}, CmdAssemble{ShipID},
-CmdFitModule{ModuleID, Slot SlotRef}, CmdUnfitModule{Slot SlotRef}
+CmdFitModule{ModuleID, Slot SlotRef}, CmdUnfitModule{Slot SlotRef},
+CmdAcceptMission{ID content.ContractID}, CmdAbandonMission{ID content.ContractID}
 ```
-(`Target ecs.Entity`; module index = flat slot index within its slot class.)
+(`Target ecs.Entity`; module index = flat slot index within its slot class.
+The two mission commands validate against the docked station's contract
+board — docked check, board check, `min_standing` check — and report
+refusals as `EvMission` phase `"refused"`.)
 
 Events (`sim/model.go`) — read via `(*Sim).Events() []Event` (drained each
 call) or `DrainEvents()`. Kinds: `EvtLog` (combat/mining/system log lines with
 severity), `EvtDestroyed`, `EvtWarp{Phase}`, `EvtLooted`, `EvtDocked`,
 `EvtUndocked`, `EvtJumped`, `EvtMarket`, `EvtModuleActive/Deactivated`,
 `EvtTargetLocked`, `EvtCargoFull`, `EvtAnomalyCleared`, …
+`EvMission{Phase, ID, Name}` reports the contract lifecycle with phases
+`"accepted" | "progress" | "ready" | "completed" | "abandoned" | "refused"`
+(ID/Name carry the contract ID and title; Value carries the payout).
 
 API (`sim/api.go`):
 
@@ -349,8 +382,18 @@ Systems (`sim/` internal, called by `Step` in this order):
 11. `loot` (loot command → cargo; bounty on NPC death → wallet),
 12. `economy` (buy/sell/refine/repair/fitting at station; wallet),
 13. `travel` (dock/undock/jump: swaps system content),
-14. `respawn` (belt/anomaly NPC respawn timers),
-15. `events` (trim/cleanup).
+14. `mission` (contract accept/abandon against the docked station's board,
+    folds kill/ore objective observations, auto-claims ready contracts on
+    docking at the claim station → wallet + standing),
+15. `respawn` (belt/anomaly NPC respawn timers),
+16. `events` (trim/cleanup).
+
+The **contracts loop** ties the activities together: undock → accept a
+contract from a station board → count objectives from the existing flows
+(rat kills by class, ore mined into the hold, cargo delivered to the
+destination station) → return to the claim station → payout + career
+standing (`Save.Standing` / `Save.Missions`, both persisted). Contracts are
+repeatable board jobs (v1: no expiry, no once-only claim).
 
 ### Turret formula (EVE-faithful)
 
@@ -412,7 +455,8 @@ land), sublight approach/orbit/manual piloting, NPC AI (aggro/orbit/flee/
 death), bounty payout, wreck looting, mining + asteroid depletion + ore hold,
 cargo transfer, gate jump both directions, dock/undock, station repair,
 market buy/sell, refine, ship assembly/swap, module fit/unfit, respawn
-timers, save/restore round-trip, determinism (Hash equality of twin runs).
+timers, save/restore round-trip, determinism (Hash equality of twin runs),
+contract accept → objective progress → auto-claim payout + standing.
 
 ## `render` / `ui` / `game` contract
 

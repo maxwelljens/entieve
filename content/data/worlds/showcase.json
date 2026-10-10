@@ -298,6 +298,11 @@
       "name": "Warp to within",
       "feature": "warp-to-range",
       "detail": "CmdWarpTo with Range > 0 lands that far short of the target (0 = on top): warp in at 50 km from a station and close the last gap yourself."
+    },
+    {
+      "name": "Contracts and standing loop",
+      "feature": "contract-loop",
+      "detail": "CmdAcceptMission (script action 'accept-mission') takes contract-solace-cleanup-1 off the Haven Rest board: EvMission 'accepted' on acceptance, 'progress' when the belt Scuttler dies (kills count by rat class), 'ready' when the objective is met, and 'completed' auto-claimed when the player docks at the offering station again — wallet +40,000 credits and Player.Standing +0.10 land in the same tick. Refused commands (not docked / wrong board / insufficient standing / unknown id) report EvMission phase 'refused'."
     }
   ]
 }

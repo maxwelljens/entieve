@@ -27,6 +27,8 @@ content/data/
 ├── npcs/rats.json           # npc-rat-* IDs
 ├── systems/                 # one system per file, sys-* IDs
 │   ├── solace.json  penumbra.json  gloam.json
+├── contracts/               # mission-board offerings, contract-* IDs
+│   ├── solace.json  penumbra.json
 └── worlds/                  # one world per file, world-* IDs
     ├── default.json  showcase.json
 ```
@@ -43,6 +45,7 @@ All IDs are kebab-case strings, cross-referenced everywhere:
 | NPC         | `npc-rat-`  | `npc-rat-scuttler`   | global                 |
 | System      | `sys-`      | `sys-solace`         | global                 |
 | Celestial   | `cel-`      | `cel-haven-rest`     | **unique within its system** (gate `to_cel` resolves inside the destination system; `cel-gate-penumbra` legitimately exists in both `sys-solace` and `sys-gloam`) |
+| Contract    | `contract-` | `contract-solace-cleanup-1` | global            |
 | World       | `world-`    | `world-showcase`     | global                 |
 
 Never invent new IDs for things listed in `docs/ARCHITECTURE.md`'s registry;
@@ -51,7 +54,8 @@ extend around them.
 ## File format
 
 Every JSON file under `items/`, `ships/`, `modules/`, `npcs/`, `systems/`,
-`worlds/` may contain **either a single object or an array of objects**:
+`contracts/`, `worlds/` may contain **either a single object or an array of
+objects**:
 
 ```json
 { "id": "min-ferrite", "name": "Ferrite", "category": "mineral", "volume": 0.01, "base_price": 6 }
@@ -400,6 +404,79 @@ too with a `detail` that says how to observe it (event names, commands).
 
 ---
 
+## Recipe 8: add a contract (mission board)
+
+Contracts are the motivation layer: `undock → accept → do the activity →
+dock at the claim station → credits + standing`. Each contract lives on one
+station's board (`station` = the offering station) and is loaded from
+`content/data/contracts/*.json` (object or array, like every other dir):
+
+```json
+{
+  "id": "contract-solace-cleanup-1",
+  "title": "Belt cleanup",
+  "kind": "kill",
+  "level": 1,
+  "min_standing": 0.0,
+  "station": "cel-haven-rest",
+  "objective": { "target": "npc-rat-scuttler", "count": 1 },
+  "reward": { "credits": 40000, "item": null, "standing_gain": 0.1 },
+  "description": "A Mire Corsairs scout is shadowing the ore haulers..."
+}
+```
+
+Fields:
+
+| Field | Meaning |
+|-------|---------|
+| `kind` | `kill` \| `deliver` \| `mine` (exactly three kinds) |
+| `level` | board tier, `>= 1` (flavor + doc convention) |
+| `min_standing` | player career standing required to accept |
+| `station` | offering station celestial ID — the board (must exist, kind `station`) |
+| `objective` | per-kind block (below) |
+| `reward.credits` | paid to the wallet on claim (must be `>= 0`) |
+| `reward.item` / `reward.qty` | optional bonus item granted to the station hangar (`qty >= 1` when set) |
+| `reward.standing_gain` | career standing credited on claim |
+
+Objective per kind (the validator rejects anything else):
+
+- `kill`: `{"target": "<npc-id>", "count": N}` — N rats of that exact class
+  killed **by the player**; kills of other classes never count.
+- `deliver`: `{"item": "<item-id>", "count": <m³>, "destination": "<station cel-id>"}` —
+  dock at the destination carrying at least `count` m³ of `item` in the hold
+  (count must be a whole number of units: `count / volume` is an integer);
+  the cargo is consumed on claim. Destination must exist and differ from
+  `station`.
+- `mine`: `{"item": "<ore-id>", "count": <m³>}` — `count` m³ of that ore
+  mined into the hold while the contract is accepted (transfers don't count).
+
+Lifecycle: `offered` (board) → `accepted` (`CmdAcceptMission`, docked at the
+offering station with standing ≥ `min_standing`) → `progress` → `ready` →
+`completed` — auto-claimed the moment you dock at the **claim station**
+(offering station for kill/mine, `objective.destination` for deliver), which
+pays `reward.credits`, grants standing and consumes deliver cargo — or
+`abandoned` (`CmdAbandonMission`, again from the offering station). No
+expiry; completed/abandoned contracts may be re-accepted (repeatable board
+jobs). Refusals emit `EvMission` phase `refused`.
+
+### Payout ratio table (the calibration contract)
+
+Rewards are derived from live economy values, never vibes. The ratio bands
+below are pinned by `content.TestContractPayoutRatios`; future mission
+content must land inside them:
+
+| Kind | Reference value | Payout rule | Shipped contracts |
+|------|-----------------|-------------|-------------------|
+| `kill` | `count × (bounty + Σ chance × avg_qty × base_price)` per target (bounty + expected loot) | **2.0–3.0 × reference** | cleanup-1: 1 × (7,500 + 7,350) = 14,850 → **40,000** (2.69×); den-hunt-1: 1 × (65,000 + 31,125) = 96,125 → **240,000** (2.50×) |
+| `mine` | `count(m³) × ore base_price` | **1.9–2.1 × reference** (2.0× ore premium) | cordite-1: 400 × 48 = 19,200 → **38,400** (2.00×); lucidite-1: 500 × 85 = 42,500 → **85,000** (2.00×) |
+| `deliver` | `units × item base_price`, `units = count(m³) / volume` | **1.5 × cargo value + 50,000 × gate jumps** (offer system → destination system) | supply-run-1: 200 × 120 = 24,000, 1 jump → 1.5 × 24,000 + 50,000 = **86,000** |
+
+Standing conventions: level-1 boards carry `min_standing: 0.0` and
+`standing_gain: 0.10`; level-2 boards gate at `min_standing: 0.2` (two
+level-1 completions) and pay `standing_gain: 0.15`. Expected loot is
+`chance × (min_qty+max_qty)/2 × base_price` summed over the rat's loot
+table.
+
 ## Checklist before you finish
 
 1. **`go test ./content/...` is green** — the embedded real data must load
@@ -411,13 +488,15 @@ too with a `detail` that says how to observe it (event names, commands).
 4. **Cross-references resolve**: gates both ways, fits exist and fit the
    hull (high→mid→low order), belts reference ores, spawns reference NPCs,
    loot/market/cargo reference existing items-or-ships-or-modules,
-   weapon `ammo_class` matches some ammo/charge.
+   weapon `ammo_class` matches some ammo/charge, contract targets/destinations
+   are real NPCs/items/stations.
 5. **Reachability**: every system reachable from `start_system` via gates.
 6. **Balance rules of thumb**: small hull 300–800 total HP; frigates
    200k–400k; modules 10k–400k; minerals 5–60/unit; ores 20–120/unit;
    bounties 5k–250k; resists in [0,1); refine yields in (0,1] summing ≤ 1;
    weapons `shot_time > 0` with non-zero damage; active modules
-   `activation_time > 0`.
+   `activation_time > 0`; contract rewards inside the Recipe 8 payout
+   ratio table.
 7. **Every field filled** — no silent zeros where a real value belongs
    (only legitimate zeros: passive `activation_*`, `ore_hold: 0` on
    non-barges, ammo-less `ammo_class: ""`).
