@@ -138,6 +138,10 @@ table. Guard loadouts (`content/data/npcs/guards.json`, prefix
 `npc-guard-`) are non-rat NPCs: zero bounty, no loot table, spawned by the
 traffic system rather than spawn groups — `npc-guard-patrol` (hull
 `ship-npc-patrol`, registered per patrol hull via `Content.GuardFor`).
+That same prefix classifies them as friendly: `NpcDef.IsGuard` gates the
+aggro state machine, so guards never *initiate* on the player (the
+proximity/intrusion/recent-work triggers are rat-only) — only
+player-sourced damage turns a patrol hostile.
 
 **Systems** (`content/data/systems/*.json`, one file per system):
 - `sys-solace` — starting system (constellation Loomfall). Star

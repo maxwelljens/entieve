@@ -22,7 +22,7 @@ const npcRetryCooldown = 3
 
 // npcGuardRange is the radius (m) around an NPC's Home within which an
 // interloper is noticed — guardians investigate anyone this close
-// (aggro trigger d).
+// (aggro trigger d; guards themselves never initiate, see systemNpc).
 const npcGuardRange = 8_000
 
 // npcWorkRange is the radius (m) around a recorded player weapon/mining
@@ -60,6 +60,15 @@ const npcPatrolMaxRadius = 2500
 //	    NPC's Home in the last 20 sim-seconds;
 //	(d) the player is within 8 km of the NPC's Home (guardians investigate
 //	    interlopers — belt/anomaly guards especially).
+//
+// Guards are the exception: security patrols (npc-guard-*, NpcDef.IsGuard)
+// are friendly and never initiate on the player — triggers (a), (c) and
+// (d) are skipped for them, so flying near a patrol's anchor (or doing
+// work there) can never open fire unprovoked. Only trigger (b),
+// player-sourced damage, turns a guard hostile (self-defense); its
+// incident response (convoy ambushes) is driven by the traffic system and
+// is unaffected. The threat triggers exist so pirate rats are not
+// passive, and apply to every non-guard NPC exactly as before.
 //
 // The pursuit leash is leash = npcLeashFactor * effAggro measured from the
 // NPC's Home: an engaged NPC chases/engages while the player stays inside
@@ -130,7 +139,12 @@ func (s *Sim) systemNpc() {
 			ship.Structure < ship.MaxStructure
 
 		// Aggro triggers (a)-(d); (b)-(d) only pull a non-pursuing NPC in.
-		aggroOK := playerOnGrid && effAggro > 0 && dist <= effAggro
+		// Guards never initiate on the player: for npc-guard-* the
+		// proximity (a), recent-work (c) and intrusion (d) triggers are
+		// skipped — friendly security only defends (b), while pirate rats
+		// keep the full threat response ("rats must not be passive").
+		isGuard := def.IsGuard()
+		aggroOK := !isGuard && playerOnGrid && effAggro > 0 && dist <= effAggro
 		if playerOnGrid && (ai.State == NpcIdle || ai.State == "" || ai.State == NpcReturn) {
 			// (b) source-blind damage would flip every NPC on the grid onto
 			// the player whenever anything else shot it (a patrol fighting
@@ -139,11 +153,13 @@ func (s *Sim) systemNpc() {
 			if damaged && ai.LastHitBy == s.player {
 				aggroOK = true
 			}
-			if s.recentPlayerWorkNear(ai.Home) {
-				aggroOK = true
-			}
-			if homeDist <= npcGuardRange {
-				aggroOK = true
+			if !isGuard {
+				if s.recentPlayerWorkNear(ai.Home) {
+					aggroOK = true
+				}
+				if homeDist <= npcGuardRange {
+					aggroOK = true
+				}
 			}
 		}
 		// Pursuit leash measured from Home: engagement requires the player
