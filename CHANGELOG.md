@@ -111,6 +111,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   locks the nearest target, one panel registry / credit formatter / kit
   env, the tests drive the real frame pipeline, and save completeness +
   RNG stream roles are pinned by reflection tests.
+- Log content clips and scrolls inside its window (it used to paint
+  thousands of pixels past the frame; wheel scrollback was dead). Auto
+  tails to the newest line.
+- The docked service trio can no longer stack: a saved layout that folds
+  windows together while restoring at a smaller size is detected and
+  re-tiled. Sidecar format bumped to v2 — existing `.layout.json` files
+  reset to defaults once.
+- Guard patrols are neutral: they no longer attack the player at close
+  range (the ~5 km unprovoked strike); they defend themselves if attacked
+  and keep answering convoy ambushes.
 - Module tooltips, hover/pressed states, 40 px minimum hit areas,
   right-aligned tabular number columns and soft window shadows.
 

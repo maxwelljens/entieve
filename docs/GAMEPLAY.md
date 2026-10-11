@@ -336,7 +336,9 @@ leg exactly like a player ship — align, tunnel, land — and deliver their
 cargo at the station endpoint, or leave the system at a gate. They are
 ordinary ships: lock one, shoot it, or just watch it work.
 
-**Guard patrols respond to incidents.** Security patrols (overview name
+**Guard patrols respond to incidents, never the player.** Patrols are
+friendly: they do not fire on you no matter how close you fly — they only
+defend themselves if you attack them first. Security patrols (overview name
 **Patrol**) circle their anchor station and warp to a convoy ambush when
 one breaks out, scaled by security: a three-ship wing lands on the spot
 in high-security space, a single responder arrives after about 15
