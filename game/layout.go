@@ -129,11 +129,16 @@ func (g *Game) readLayout() map[string]winLayout {
 // and help overlays, which only exist while their scene is up. Call it
 // after the kit is built and the first real screen size is known —
 // startup (first applySize) and after LoadGame's rebuild. A partial
-// sidecar only restores the windows it holds.
+// sidecar only restores the windows it holds, and each restored window
+// is flagged as the player's arrangement so the composed defaults never
+// overwrite it on a later resize (see placeIfVirgin).
 func (g *Game) applyLayout(screenW, screenH int) {
 	wins := g.readLayout()
 	if len(wins) == 0 {
 		return
+	}
+	if g.restored == nil {
+		g.restored = map[*widget.Window]bool{}
 	}
 	screen := image.Rect(0, 0, screenW, screenH)
 	for _, name := range layoutNames {
@@ -151,6 +156,10 @@ func (g *Game) applyLayout(screenW, screenH int) {
 		}
 		saved := image.Rect(e.X, e.Y, e.X+e.W, e.Y+e.H)
 		win.SetLocation(clampLayoutRect(saved, minSize, screen))
+		// Saved wins from here on: the window is the player's
+		// arrangement, so placeIfVirgin leaves it alone on every later
+		// viewport change (loading must never smash a moved layout).
+		g.restored[win] = true
 		if open != nil {
 			*open = e.Open
 		}

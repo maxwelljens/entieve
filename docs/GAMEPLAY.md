@@ -97,12 +97,19 @@ target that **Selected Item** then shows and that every
 Default positions: overview top-left, selected item top-right, scanner
 in the center column under the top row, log bottom-left, HUD
 bottom-center, module rack bottom-right, starmap and the Esc menu
-centered, help top-center; while docked the market and inventory fill
-the center column, the fitting window takes the right edge and the
-Station window (contract board included) takes the top-left corner
-(overview and selected item step aside while docked). The defaults never
+centered, help top-center. While docked the Station window (contract
+board included) takes the top-left corner (overview and selected item
+step aside) and the **service windows tile themselves to your viewport**:
+the market takes the full band beside the station — wide enough that its
+Item/Price/Qty columns render whole instead of ellipsized — and
+inventory and fitting share the row under it. The defaults never
 overlap: the in-space layout and the docked set are checked pairwise at
-both 1280×720 and the 1024×700 minimum.
+1024×700, 1280×720 and 1920×1080.
+
+**Resizing never stomps your arrangement.** Those composed defaults only
+ever apply to windows you have never touched: drag any window somewhere
+else, resize the game window, and it stays exactly where you put it
+while the untouched ones re-tile around it.
 
 **Your layout persists.** Every named window's position, size and
 open/closed state (overview, selected item, log, market, inventory,
@@ -114,9 +121,12 @@ menu. It is read back on startup and after loading a save, so a
 favorite arrangement survives restarts and loads. Restored windows are
 clamped to their minimum size and to the screen (always fully
 on-screen); a missing, corrupt or partial sidecar simply falls back to
-the defaults, and unknown entries in the file are ignored. The layout
-sidecar is deliberately separate from the save itself — the simulation
-save format is unchanged for the CLI tools.
+the defaults, and unknown entries in the file are ignored. **Your saved
+arrangement wins**: a window with a sidecar entry is never recomposed —
+the automatic tiling only fills in the windows the sidecar does not
+mention.
+The layout sidecar is deliberately separate from the save itself — the
+simulation save format is unchanged for the CLI tools.
 
 ### Docked at a station
 
@@ -125,10 +135,13 @@ windows plus the **Station** window — the station identity, the
 **Undock** button and the contract board (see
 [Contracts & standing](#contracts--standing)) — and hides the space
 chrome (HUD bar, module rack, scanner) together with the
-**Overview** and **Selected Item** windows. Undocking closes the station
-windows that were closed before docking, restores the space chrome and
-the overview/selected pair, and resets the camera view. The log stays
-mounted while docked so its history comes with you.
+**Overview** and **Selected Item** windows. The service windows **tile
+automatically at your viewport size** — market on top, inventory and
+fitting below — and any arrangement you saved or dragged wins over that
+tiling. Undocking closes the station windows that were closed before
+docking, restores the space chrome and the overview/selected pair, and
+resets the camera view. The log stays mounted while docked so its
+history comes with you.
 
 ### Overview (top-left)
 
@@ -218,9 +231,10 @@ Non-weapons don't cycle.
 
 The currency of Entieve is the **credit**, displayed as
 `12,345.67 cr`. You earn credits from NPC bounties, selling loot and market
-trades, and spend them on market buys. Contract boards quote payouts in the
-classic EVE notation for the same money — `40,000 ISK` *is* 40,000 credits —
-so a reward line on the board reads `40,000 ISK · +0.10 standing`.
+trades, and spend them on market buys. Every readout that quotes money uses
+that one format — the wallet on the HUD, the market title and the contract
+boards — so a reward line on the board reads
+`40,000.00 cr · +0.10 standing`.
 
 ## Contracts & standing
 
@@ -232,7 +246,7 @@ shows two sections.
 **Available contracts** — the docked station's board. Each row shows the
 title, the objective (`Destroy 1× Scuttler`,
 `Deliver 2 m³ EMP Charge to Penumbra Port`, `Mine 400 m³ Cordite Ore`) and
-the reward (`40,000 ISK · +0.10 standing`). Press **Accept** to take it; a
+the reward (`40,000.00 cr · +0.10 standing`). Press **Accept** to take it; a
 contract above your standing shows its requirement
 (`Requires standing 0.20`) with the button disabled, and an
 already-accepted one is marked **Accepted**.
@@ -284,6 +298,51 @@ doubles as the local clone anchor (see Contracts & standing).
 and heavy spawns including hierarchs. Travel system-to-system by flying to a
 stargate and pressing `J` — the starmap (`N`) shows the gate graph with your
 current system highlighted.
+
+## Living universe
+
+The systems keep moving while you do something else. Three overlapping
+systems run underneath the economy:
+
+**NPC convoys haul cargo on the lanes.** Each system runs freighters
+(along the trade routes — they appear in the overview as **Convoy
+Hauler**) on its own schedule: they spawn at the route's origin, warp the
+leg exactly like a player ship — align, tunnel, land — and deliver their
+cargo at the station endpoint, or leave the system at a gate. They are
+ordinary ships: lock one, shoot it, or just watch it work.
+
+**Guard patrols respond to incidents.** Security patrols (overview name
+**Patrol**) circle their anchor station and warp to a convoy ambush when
+one breaks out, scaled by security: a three-ship wing lands on the spot
+in high-security space, a single responder arrives after about 15
+seconds in low-security Penumbra, and null-sec Gloam has no patrols at
+all.
+
+**Rats ambush convoys in low-sec and null.** Every convoy transit in
+Penumbra has roughly a 1-in-6 chance of being jumped, Gloam about 1 in
+3, Solace never. On a hit, one to three raiders of that system's own rat
+class drop in mid-leg — renamed for the job, so a Marauder hitting a
+haul becomes a **Marauder Ambusher** in your overview. The hauler is
+dragged out of warp and burns for 20 seconds before attempting its
+warp-out; scramblers pin it, and the arriving patrols pull the raiders'
+guns off it. The incident ends one of three ways:
+
+- **destroyed** — the hauler dies leaving a **lootable cargo wreck**
+  holding the exact shipment (fly over it and press `L`);
+- **escaped** — it warps clear and delivers anyway;
+- **saved** — the raiders are all dead while the hauler still lives.
+
+You can intervene in any of them: strip the wreck, guard the convoy
+yourself, or let the rats do the work and take the loot.
+
+**Markets remember traffic.** A delivery books its exact units into the
+destination stock and nudges that item's price *down* (supply arrived);
+a shipment lost to an ambush steps the destination's price *up* — the
+risk premium. Both stay inside the system's security band, **±5% in
+high-sec, ±10% in low-sec, ±20% in null-sec**, and a deviating price
+decays halfway back to its base every minute, so lanes that run get
+cheaper, dangerous lanes get dearer, and nothing ever runs away with the
+economy.
 
 ## Time acceleration
 
