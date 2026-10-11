@@ -1,6 +1,8 @@
 package sim
 
 import (
+	"strconv"
+
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
 )
@@ -131,6 +133,12 @@ func holdLabel(hold string) string {
 		return "station hangar"
 	}
 	return hold
+}
+
+// kmLabel renders a metre distance as the kilometre figure the refusal
+// log lines quote ("150 km" for WarpMinRange).
+func kmLabel(m float64) string {
+	return strconv.FormatFloat(m/1000, 'f', -1, 64) + " km"
 }
 
 // execTransfer moves qty units of an item between the player's storage holds
@@ -328,7 +336,8 @@ func (s *Sim) cmdLock(target ecs.Entity) {
 // 0 — you cannot land short of a target you are already that close to (and
 // a landing point at the current position would stall the align phase).
 // The 2500 m landing tolerance (warpLandRange) applies around the landing
-// point, not the target.
+// point, not the target. The drive also refuses to engage inside
+// WarpMinRange (150 km) of the target at command time.
 func (s *Sim) beginWarp(target ecs.Entity, rangeM float64) {
 	p := s.player
 	if s.playerDocked() {
@@ -345,6 +354,12 @@ func (s *Sim) beginWarp(target ecs.Entity, rangeM float64) {
 	// Only celestial-tagged grid objects are warp destinations (CanWarp).
 	if _, ok := s.Celestials.Get(target); !ok {
 		s.log(SevWarning, p, "Cannot warp there")
+		return
+	}
+	// EVE's minimum warp range: the drive cannot engage a target the
+	// ship is already inside 150 km of (distance at command time).
+	if d := s.distBetween(p, target); d < WarpMinRange {
+		s.log(SevWarning, p, "Target within warp minimum range ("+kmLabel(WarpMinRange)+")")
 		return
 	}
 	if sh, ok := s.Ships.Get(p); ok && sh.ScrambledUntil > s.time {

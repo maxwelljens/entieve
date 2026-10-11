@@ -116,7 +116,7 @@ func (k *Kit) buildOverview() {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	title.AddChild(widget.NewText(
-		widget.TextOpts.Text("Overview", facePtr(k.faces.base), solid(k.palette.Accent)),
+		widget.TextOpts.Text("Overview", facePtr(k.faces.baseBold), solid(k.palette.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,

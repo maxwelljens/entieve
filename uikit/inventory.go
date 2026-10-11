@@ -121,7 +121,7 @@ func NewInventory(env Env) *Inventory {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	title.AddChild(widget.NewText(
-		widget.TextOpts.Text("Inventory", env.Face(StepBase), solid(p.Accent)),
+		widget.TextOpts.Text("Inventory", env.FaceBold(StepBase), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,

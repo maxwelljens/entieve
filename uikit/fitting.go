@@ -129,7 +129,7 @@ func NewFitting(env Env) *Fitting {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	f.title = widget.NewText(
-		widget.TextOpts.Text("Fitting", env.Face(StepBase), solid(p.Accent)),
+		widget.TextOpts.Text("Fitting", env.FaceBold(StepBase), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,

@@ -89,13 +89,16 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	k.buildSelected()
 	// The kit's own windows take the four-edge resize chrome here (panel
 	// windows attach theirs in their constructors and join through
-	// AddWindow below). AddWindow validates the window trees against the
-	// theme and makes the chrome persistent (the spike has no close
-	// affordance).
+	// AddWindow below). AddWindow — not the raw ui.AddWindow — so the
+	// overview and Selected Item chromes join k.chromes too: stepChromes
+	// is what pumps the edge grips, and a window left out of that list
+	// never resizes from its rect. It also validates the window trees
+	// against the theme and makes the chrome persistent (the spike has
+	// no close affordance).
 	makeEdgeResizable(k.ov.win)
 	makeEdgeResizable(k.sp.win)
-	k.ui.AddWindow(k.ov.win)
-	k.ui.AddWindow(k.sp.win)
+	k.AddWindow(k.ov.win)
+	k.AddWindow(k.sp.win)
 
 	k.Sync()
 	return k, nil

@@ -98,7 +98,7 @@ func NewMarket(env Env) *Market {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	m.title = widget.NewText(
-		widget.TextOpts.Text("Market", env.Face(StepBase), solid(p.Accent)),
+		widget.TextOpts.Text("Market", env.FaceBold(StepBase), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,

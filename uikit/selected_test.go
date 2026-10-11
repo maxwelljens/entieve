@@ -182,7 +182,7 @@ func TestSelectedLayoutMath(t *testing.T) {
 func TestSelectedLayoutDegenerate(t *testing.T) {
 	inv := selectedInventory{
 		nameH: 32, distH: 17,
-		bands: [][]float64{{120, 170, 70}, {60, 60, 60, 60, 60}, {300}, {300}},
+		bands: [][]float64{{120, 170, 70, 60}, {60, 60, 60, 60, 60}, {300}, {300}},
 		bandH: 40,
 		gap:   contentsPad,
 	}
@@ -200,36 +200,38 @@ func TestSelectedLayoutPinnedRects(t *testing.T) {
 	_, sp, _ := pumpSelected(t, 1024, 700, false, true)
 	got := selectedRects(sp)
 	want := []image.Rectangle{
-		image.Rect(13, 485, 383, 517),  // name
-		image.Rect(13, 522, 383, 539),  // dist
-		image.Rect(13, 544, 133, 577),  // Approach
-		image.Rect(138, 544, 308, 577), // Warp to 10 km
-		image.Rect(313, 544, 383, 577), // Stop
-		image.Rect(13, 582, 81, 615),   // Lock
-		image.Rect(86, 582, 157, 615),  // Dock
-		image.Rect(162, 582, 238, 615), // Jump
-		image.Rect(243, 582, 308, 615), // Loot
-		image.Rect(313, 582, 383, 615), // Mine
-		image.Rect(13, 620, 383, 653),  // Orbit
-		image.Rect(13, 658, 383, 691),  // Warp to within
+		image.Rect(13, 485, 383, 515),  // name
+		image.Rect(13, 520, 383, 537),  // dist
+		image.Rect(13, 542, 139, 575),  // Approach
+		image.Rect(144, 542, 226, 575), // Warp
+		image.Rect(231, 542, 306, 575), // Orbit
+		image.Rect(311, 542, 383, 575), // Stop
+		image.Rect(13, 580, 80, 613),   // Lock
+		image.Rect(85, 580, 157, 613),  // Dock
+		image.Rect(162, 580, 235, 613), // Jump
+		image.Rect(240, 580, 306, 613), // Loot
+		image.Rect(311, 580, 383, 613), // Mine
+		image.Rect(13, 618, 383, 651),  // Orbit range selector
+		image.Rect(13, 656, 383, 689),  // Warp to within selector
 	}
 	assertRectsEqual(t, "1024x700", got, want)
 
 	_, spMin, _ := pumpSelected(t, 1024, 700, true, false)
 	gotMin := selectedRects(spMin)
 	wantMin := []image.Rectangle{
-		image.Rect(5, 49, 295, 81),     // name
-		image.Rect(5, 86, 295, 86),     // dist (empty line, zero height)
-		image.Rect(5, 91, 98, 123),     // Approach
-		image.Rect(103, 91, 236, 123),  // Warp to 10 km
-		image.Rect(241, 91, 295, 123),  // Stop
-		image.Rect(5, 128, 57, 160),    // Lock
-		image.Rect(62, 128, 117, 160),  // Dock
-		image.Rect(122, 128, 181, 160), // Jump
-		image.Rect(186, 128, 236, 160), // Loot
-		image.Rect(241, 128, 295, 160), // Mine
-		image.Rect(5, 165, 295, 197),   // Orbit
-		image.Rect(5, 202, 295, 234),   // Warp to within
+		image.Rect(5, 49, 295, 79),     // name
+		image.Rect(5, 84, 295, 84),     // dist (empty line, zero height)
+		image.Rect(5, 89, 102, 121),    // Approach
+		image.Rect(107, 89, 171, 121),  // Warp
+		image.Rect(176, 89, 234, 121),  // Orbit
+		image.Rect(239, 89, 295, 121),  // Stop
+		image.Rect(5, 126, 57, 158),    // Lock
+		image.Rect(62, 126, 117, 158),  // Dock
+		image.Rect(122, 126, 179, 158), // Jump
+		image.Rect(184, 126, 234, 158), // Loot
+		image.Rect(239, 126, 295, 158), // Mine
+		image.Rect(5, 163, 295, 195),   // Orbit range selector
+		image.Rect(5, 200, 295, 232),   // Warp to within selector
 	}
 	assertRectsEqual(t, "min-300x240", gotMin, wantMin)
 }
@@ -289,121 +291,140 @@ func TestSelectedDistLineRelayout(t *testing.T) {
 		sp.body.GetWidget().Rect.Inset(contentsPad), selectedRects(sp), selectedBands[:], true)
 }
 
-// TestSelectedRangeControls walks the two cycling range controls: label
-// cycling with wraparound at both ends, the enqueued command carrying the
-// chosen range, the CanWarp gate, and the fact that they stay enabled
-// while every action button is disabled with no selection. The existing
-// action seam (Warp's fixed 10 km, Approach, Stop) is asserted unchanged.
+// TestSelectedRangeControls walks the pure selectors and the action
+// buttons: a selector click only cycles its own value — a full cycle
+// wraps exactly back to the start and enqueues nothing at any step, with
+// or without a target — while the Warp/Orbit ACTION buttons enqueue
+// exactly CmdWarpTo/CmdOrbit carrying the value the selector shows at
+// click time. Kit.WarpRange/Kit.OrbitRange read that same value back:
+// it is what the Z/Q keybinds act at (game pins that half).
 func TestSelectedRangeControls(t *testing.T) {
 	k, cmds := newTestKit(t)
 	pumpKit(t, k, 1280, 720)
 	pumpKit(t, k, 1280, 720)
 	sp := k.sp
 
-	if got, want := btnLabel(sp.orbit), "Orbit: 2,500 m »"; got != want {
-		t.Errorf("initial orbit label = %q, want %q", got, want)
+	if got, want := btnLabel(sp.orbitRange), "Orbit range: 2,500 m »"; got != want {
+		t.Errorf("initial orbit selector = %q, want %q", got, want)
 	}
 	if got, want := btnLabel(sp.warpRange), "Warp to within: 0 m »"; got != want {
-		t.Errorf("initial warp range label = %q, want %q", got, want)
+		t.Errorf("initial warp selector = %q, want %q", got, want)
 	}
 
-	// With no selection the actions are disabled but the selectors still
-	// cycle, and nothing is enqueued.
-	for _, b := range []*widget.Button{sp.approach, sp.warp, sp.stop, sp.lock, sp.dock, sp.jump, sp.loot, sp.mine} {
+	// No selection: every ACTION is disabled, both selectors stay enabled
+	// (they are state, not actions).
+	for name, b := range map[string]*widget.Button{
+		"approach": sp.approach, "warp": sp.warp, "orbit": sp.orbit, "stop": sp.stop,
+		"lock": sp.lock, "dock": sp.dock, "jump": sp.jump, "loot": sp.loot, "mine": sp.mine,
+	} {
 		if !b.GetWidget().Disabled {
-			t.Error("action button enabled with no selection")
+			t.Errorf("%s enabled with no selection", name)
 		}
 	}
-	if sp.orbit.GetWidget().Disabled || sp.warpRange.GetWidget().Disabled {
+	if sp.orbitRange.GetWidget().Disabled || sp.warpRange.GetWidget().Disabled {
 		t.Error("range selector disabled with no selection")
 	}
-	for i := 0; i < 6; i++ {
-		fireButton(k.ui, sp.orbit)
-		fireButton(k.ui, sp.warpRange)
-	}
-	if len(*cmds) != 0 {
-		t.Fatalf("cycling with no selection enqueued %d commands, want 0", len(*cmds))
-	}
-	if got, want := btnLabel(sp.orbit), "Orbit: 5,000 m »"; got != want {
-		t.Errorf("after 6 cycles orbit label = %q, want %q", got, want)
-	}
 
-	// A warpable target unlocks the action buttons.
-	var target sim.Info
-	for _, info := range k.Sim.Grid() {
-		if info.CanWarp {
-			target = info
-			break
+	// A full orbit cycle: five clicks walk every value and wrap exactly
+	// to the start. The selectors enqueue nothing, ever.
+	orbitWalk := []struct {
+		label string
+		rng   float64
+	}{
+		{"Orbit range: 5,000 m »", 5000},
+		{"Orbit range: 10,000 m »", 10000},
+		{"Orbit range: 20,000 m »", 20000},
+		{"Orbit range: 50,000 m »", 50000},
+		{"Orbit range: 2,500 m »", 2500}, // wraparound lands on the start
+	}
+	for i, want := range orbitWalk {
+		fireButton(k.ui, sp.orbitRange)
+		if got := btnLabel(sp.orbitRange); got != want.label {
+			t.Errorf("orbit selector click %d: label = %q, want %q", i+1, got, want.label)
+		}
+		if got := k.OrbitRange(); got != want.rng {
+			t.Errorf("orbit selector click %d: Kit.OrbitRange() = %v, want %v", i+1, got, want.rng)
 		}
 	}
+	warpWalk := []struct {
+		label string
+		rng   float64
+	}{
+		{"Warp to within: 10,000 m »", 10000},
+		{"Warp to within: 50,000 m »", 50000},
+		{"Warp to within: 0 m »", 0}, // wraparound lands on the start
+	}
+	for i, want := range warpWalk {
+		fireButton(k.ui, sp.warpRange)
+		if got := btnLabel(sp.warpRange); got != want.label {
+			t.Errorf("warp selector click %d: label = %q, want %q", i+1, got, want.label)
+		}
+		if got := k.WarpRange(); got != want.rng {
+			t.Errorf("warp selector click %d: Kit.WarpRange() = %v, want %v", i+1, got, want.rng)
+		}
+	}
+	if len(*cmds) != 0 {
+		t.Fatalf("cycling the selectors enqueued %d commands, want 0", len(*cmds))
+	}
+
+	// A warpable target far enough to engage unlocks the actions.
+	target := warpableTarget(t, k, sim.WarpMinRange)
 	k.Select(target.Entity)
 	pumpKit(t, k, 1280, 720)
 	if sp.warp.GetWidget().Disabled || sp.orbit.GetWidget().Disabled {
 		t.Fatal("warp/orbit disabled for a warpable target")
 	}
 
-	// Existing seam unchanged: Warp is still a fixed 10 km, Approach and
-	// Stop enqueue exactly what they always did.
+	// Selectors still cycle silently WITH a target: the old
+	// advance-then-enqueue behaviour is gone.
 	before := len(*cmds)
+	fireButton(k.ui, sp.warpRange)  // 0 -> 10,000
+	fireButton(k.ui, sp.orbitRange) // 2,500 -> 5,000
+	if len(*cmds) != before {
+		t.Fatalf("cycling with a target enqueued %d commands, want 0", len(*cmds))
+	}
+
+	// The action buttons carry the selector value AT CLICK TIME.
 	fireButton(k.ui, sp.warp)
-	fireButton(k.ui, sp.approach)
-	fireButton(k.ui, sp.stop)
-	if got := (*cmds)[before:]; len(got) != 3 {
-		t.Fatalf("existing actions enqueued %d commands, want 3", len(got))
+	fireButton(k.ui, sp.orbit)
+	if len(*cmds) != before+2 {
+		t.Fatalf("actions enqueued %d commands, want 2", len(*cmds)-before)
 	}
-	if c, ok := (*cmds)[before].(sim.CmdWarpTo); !ok || c.Range != 10000 || c.Target != target.Entity {
-		t.Errorf("Warp cmd = %#v, want CmdWarpTo{Range:10000}", (*cmds)[before])
+	wcmd, ok := (*cmds)[before].(sim.CmdWarpTo)
+	if !ok || wcmd.Target != target.Entity || wcmd.Range != k.WarpRange() {
+		t.Errorf("Warp action = %#v, want CmdWarpTo{Target:%v Range:%v}",
+			(*cmds)[before], target.Entity, k.WarpRange())
 	}
-	if c, ok := (*cmds)[before+1].(sim.CmdApproach); !ok || c.Target != target.Entity {
-		t.Errorf("Approach cmd = %#v, want CmdApproach", (*cmds)[before+1])
+	if wcmd.Range != 10000 {
+		t.Errorf("Warp action range = %v, want the selector's 10000", wcmd.Range)
 	}
-	if _, ok := (*cmds)[before+2].(sim.CmdStop); !ok {
-		t.Errorf("Stop cmd = %#v, want CmdStop", (*cmds)[before+2])
+	ocmd, ok := (*cmds)[before+1].(sim.CmdOrbit)
+	if !ok || ocmd.Target != target.Entity || ocmd.Range != k.OrbitRange() {
+		t.Errorf("Orbit action = %#v, want CmdOrbit{Target:%v Range:%v}",
+			(*cmds)[before+1], target.Entity, k.OrbitRange())
+	}
+	if ocmd.Range != 5000 {
+		t.Errorf("Orbit action range = %v, want the selector's 5000", ocmd.Range)
 	}
 	*cmds = (*cmds)[:before]
 
-	// Orbit: every click picks the next range (wraparound at the end of
-	// the cycle) and enqueues CmdOrbit at exactly that range.
-	orbitWants := []float64{10000, 20000, 50000, 2500} // started at 5,000 above
-	orbitLabels := []string{"Orbit: 10,000 m »", "Orbit: 20,000 m »", "Orbit: 50,000 m »", "Orbit: 2,500 m »"}
-	for i, wantRange := range orbitWants {
-		fireButton(k.ui, sp.orbit)
-		if len(*cmds) != i+1 {
-			t.Fatalf("orbit click %d: %d commands, want %d", i, len(*cmds), i+1)
-		}
-		c, ok := (*cmds)[i].(sim.CmdOrbit)
-		if !ok || c.Target != target.Entity || c.Range != wantRange {
-			t.Errorf("orbit click %d: cmd = %#v, want CmdOrbit{Target:%v Range:%v}",
-				i, (*cmds)[i], target.Entity, wantRange)
-		}
-		if got := btnLabel(sp.orbit); got != orbitLabels[i] {
-			t.Errorf("orbit click %d: label = %q, want %q", i, got, orbitLabels[i])
-		}
+	// The existing seam is unchanged: Approach and Stop enqueue exactly
+	// what they always did.
+	fireButton(k.ui, sp.approach)
+	fireButton(k.ui, sp.stop)
+	if len(*cmds) != 2 {
+		t.Fatalf("Approach/Stop enqueued %d commands, want 2", len(*cmds))
 	}
-	*cmds = (*cmds)[:0]
-
-	// Warp to within: same cycling, gated on Info.CanWarp, range carried
-	// into CmdWarpTo (0 lands on the target).
-	warpWants := []float64{10000, 50000, 0}
-	warpLabels := []string{"Warp to within: 10,000 m »", "Warp to within: 50,000 m »", "Warp to within: 0 m »"}
-	for i, wantRange := range warpWants {
-		fireButton(k.ui, sp.warpRange)
-		if len(*cmds) != i+1 {
-			t.Fatalf("warp range click %d: %d commands, want %d", i, len(*cmds), i+1)
-		}
-		c, ok := (*cmds)[i].(sim.CmdWarpTo)
-		if !ok || c.Target != target.Entity || c.Range != wantRange {
-			t.Errorf("warp range click %d: cmd = %#v, want CmdWarpTo{Target:%v Range:%v}",
-				i, (*cmds)[i], target.Entity, wantRange)
-		}
-		if got := btnLabel(sp.warpRange); got != warpLabels[i] {
-			t.Errorf("warp range click %d: label = %q, want %q", i, got, warpLabels[i])
-		}
+	if c, ok := (*cmds)[0].(sim.CmdApproach); !ok || c.Target != target.Entity {
+		t.Errorf("cmd = %#v, want CmdApproach", (*cmds)[0])
 	}
-	*cmds = (*cmds)[:0]
+	if _, ok := (*cmds)[1].(sim.CmdStop); !ok {
+		t.Errorf("cmd = %#v, want CmdStop", (*cmds)[1])
+	}
+	*cmds = (*cmds)[:before]
 
-	// A non-warpable target (an asteroid): the selector still cycles but
-	// CmdWarpTo is gated off, while CmdOrbit still goes through.
+	// A non-warpable target (an asteroid): the Warp action is gated off,
+	// the Orbit action still acts, and the selectors still cycle.
 	var rock sim.Info
 	for _, info := range k.Sim.Grid() {
 		if info.Kind == sim.KindAsteroid && !info.CanWarp {
@@ -411,20 +432,95 @@ func TestSelectedRangeControls(t *testing.T) {
 			break
 		}
 	}
+	if rock.Entity.IsZero() {
+		t.Fatal("fixture: no asteroid on the grid")
+	}
 	k.Select(rock.Entity)
 	pumpKit(t, k, 1280, 720)
+	if !sp.warp.GetWidget().Disabled {
+		t.Error("Warp action enabled for a non-warpable target")
+	}
 	fireButton(k.ui, sp.warpRange)
-	if len(*cmds) != 0 {
-		t.Errorf("warp-to-within on a non-warpable target enqueued %#v, want none", *cmds)
-	}
-	if got, want := btnLabel(sp.warpRange), "Warp to within: 10,000 m »"; got != want {
-		t.Errorf("warp range label = %q, want %q (the cycle still advances)", got, want)
-	}
 	fireButton(k.ui, sp.orbit)
 	if len(*cmds) != 1 {
-		t.Fatalf("orbit on an asteroid: %d commands, want 1", len(*cmds))
+		t.Fatalf("on an asteroid: %d commands, want 1 (the orbit action)", len(*cmds))
 	}
-	if c, ok := (*cmds)[0].(sim.CmdOrbit); !ok || c.Target != rock.Entity {
-		t.Errorf("cmd = %#v, want CmdOrbit for the asteroid", (*cmds)[0])
+	if c, ok := (*cmds)[0].(sim.CmdOrbit); !ok || c.Target != rock.Entity || c.Range != k.OrbitRange() {
+		t.Errorf("cmd = %#v, want CmdOrbit for the asteroid at the selector value", (*cmds)[0])
 	}
+	*cmds = (*cmds)[:before]
+}
+
+// warpableTarget picks a CanWarp grid entity at least min metres from the
+// player (the warp minimum gate), or fails the fixture.
+func warpableTarget(t *testing.T, k *Kit, min float64) sim.Info {
+	t.Helper()
+	for _, info := range k.Sim.Grid() {
+		if info.CanWarp && info.Distance >= min {
+			return info
+		}
+	}
+	t.Fatalf("fixture: no warpable target at least %v m away", min)
+	return sim.Info{}
+}
+
+// TestWarpMinimumRangeGate pins the UI half of EVE's 150 km rule: the
+// Warp action is disabled while the selected target sits inside
+// sim.WarpMinRange and says so in a hover hint, and unlocks again the
+// moment the target is far enough — the constant in sim is the only
+// source of the number.
+func TestWarpMinimumRangeGate(t *testing.T) {
+	k, _ := newTestKit(t)
+	pumpKit(t, k, 1280, 720)
+	pumpKit(t, k, 1280, 720)
+	sp := k.sp
+
+	target := warpableTarget(t, k, sim.WarpMinRange)
+	k.Select(target.Entity)
+	pumpKit(t, k, 1280, 720)
+	if sp.warp.GetWidget().Disabled {
+		t.Fatal("Warp disabled outside the minimum range")
+	}
+	if tips := sp.warp.GetWidget().ToolTips; len(tips) != 0 {
+		t.Errorf("Warp hint attached outside the minimum range: %d tooltips", len(tips))
+	}
+
+	// Park the target WarpMinRange-1000 m from the player: inside the
+	// gate. Info.Distance is computed live, so no step is needed.
+	tr, ok := k.Sim.Transforms.Get(target.Entity)
+	if !ok {
+		t.Fatal("target has no transform")
+	}
+	ply, _ := k.Sim.Transforms.Get(k.Sim.Player())
+	near := ply.Pos
+	near.X += sim.WarpMinRange - 1000
+	k.Sim.Transforms.Set(target.Entity, sim.Transform{Pos: near})
+	k.Sync()
+	if !sp.warp.GetWidget().Disabled {
+		t.Fatal("Warp enabled inside the minimum range")
+	}
+	if tips := sp.warp.GetWidget().ToolTips; len(tips) != 1 {
+		t.Fatalf("Warp hint not attached inside the minimum range: %d tooltips", len(tips))
+	}
+	if got, want := sp.warpTipText.Label, "Target within warp minimum range (150 km)"; got != want {
+		t.Errorf("Warp hint = %q, want %q", got, want)
+	}
+	// The hint quotes sim.WarpMinRange, not a literal.
+	if kmLabel(sim.WarpMinRange) != "150 km" {
+		t.Fatalf("kmLabel(%v) = %q, want 150 km", sim.WarpMinRange, kmLabel(sim.WarpMinRange))
+	}
+
+	// Exactly at the minimum the drive may engage (== is allowed).
+	at := ply.Pos
+	at.X += sim.WarpMinRange
+	k.Sim.Transforms.Set(target.Entity, sim.Transform{Pos: at})
+	k.Sync()
+	if sp.warp.GetWidget().Disabled {
+		t.Error("Warp disabled at exactly WarpMinRange")
+	}
+	// Selectors are state: they stay enabled through the gate.
+	if sp.warpRange.GetWidget().Disabled {
+		t.Error("warp selector disabled inside the minimum range")
+	}
+	_ = tr
 }

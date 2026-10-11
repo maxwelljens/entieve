@@ -119,7 +119,6 @@ type Game struct {
 	// Selection lives in the kit: world clicks, the Tab cycle-lock and
 	// the overview all feed Kit.Select, the game reads Kit.Selected.
 	tabIdx       int
-	orbitIdx     int
 	stationPrior [numPanels]bool
 
 	// placed is the last rect this session composed for each window,

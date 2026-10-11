@@ -6,18 +6,8 @@ import (
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit"
 	"github.com/hajimehoshi/ebiten/v2"
 )
-
-// OrbitRanges are the orbit ranges Q cycles through (meters) — the same
-// set the Selected Item Orbit control cycles (uikit.OrbitRanges).
-var OrbitRanges = uikit.OrbitRanges
-
-// warpRangeMeters is the fixed warp landing range: the Selected Item
-// window's Warp button and the Z key both land 10 km short of the target
-// (the legacy 0 | 10 | 50 km segmented control no longer exists).
-const warpRangeMeters = 10000
 
 // worldKey maps the in-space keyboard bindings to sim commands. It runs
 // only while the space or station scene is on top and Ctrl is not held
@@ -93,12 +83,12 @@ func (g *Game) doApproach() {
 	}
 }
 
-// doOrbit enqueues CmdOrbit at the next range of the Q cycle.
+// doOrbit enqueues CmdOrbit at the Selected Item orbit selector's
+// current range (Q): the selector is the only thing that changes a
+// range, the key and the Orbit button both act at Kit.OrbitRange().
 func (g *Game) doOrbit() {
 	if _, ok := g.selectedInfo(); ok {
-		rng := OrbitRanges[g.orbitIdx%len(OrbitRanges)]
-		g.orbitIdx = (g.orbitIdx + 1) % len(OrbitRanges)
-		g.s.Queue(sim.CmdOrbit{Target: g.selected(), Range: rng})
+		g.s.Queue(sim.CmdOrbit{Target: g.selected(), Range: g.kit.OrbitRange()})
 	}
 }
 
@@ -109,11 +99,12 @@ func (g *Game) doAlign() {
 	}
 }
 
-// doWarp warps to the selection at the fixed landing range (Z), gated on
-// the Info flag like the Selected Item window's button.
+// doWarp warps to the selection at the Selected Item warp selector's
+// current range (Z), gated on the Info flag like the Warp button; the
+// sim enforces sim.WarpMinRange on top of that.
 func (g *Game) doWarp() {
 	if info, ok := g.selectedInfo(); ok && info.CanWarp {
-		g.s.Queue(sim.CmdWarpTo{Target: g.selected(), Range: warpRangeMeters})
+		g.s.Queue(sim.CmdWarpTo{Target: g.selected(), Range: g.kit.WarpRange()})
 	}
 }
 

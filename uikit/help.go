@@ -117,7 +117,7 @@ func NewHelp(env Env, rows []KeyRow) *HelpPanel {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	titleBar.AddChild(widget.NewText(
-		widget.TextOpts.Text("Help — Entieve key map", env.Face(StepBase), solid(p.Accent)),
+		widget.TextOpts.Text("Help — Entieve key map", env.FaceBold(StepBase), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,

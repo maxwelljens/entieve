@@ -63,11 +63,12 @@ type TableRow struct {
 // anchors). Events in ebitenui are deferred to the next UI.Update, so
 // handlers registered here go live on the first update pump.
 type Table struct {
-	env     Env
-	cols    []Column
-	face    *text.Face
-	measure func(string) float64
-	rowH    float64
+	env         Env
+	cols        []Column
+	face        *text.Face
+	measure     func(string) float64 // cell width, regular weight
+	headMeasure func(string) float64 // header width, emphasis weight
+	rowH        float64
 
 	root    *widget.Container
 	header  *widget.Container
@@ -103,6 +104,10 @@ type Table struct {
 func NewTable(env Env, cols []Column) *Table {
 	p := env.Pal
 	face := env.Face(StepSmall)
+	// Headers draw in the emphasis weight (Turret Road Bold), so their
+	// widths are measured with it too — the fit and the drawn label have
+	// to agree or the header overflows its column.
+	headFace := env.FaceBold(StepSmall)
 	t := &Table{
 		env:    env,
 		cols:   append([]Column(nil), cols...),
@@ -111,6 +116,10 @@ func NewTable(env Env, cols []Column) *Table {
 	}
 	t.measure = func(s string) float64 {
 		w, _ := text.Measure(s, *face, 0)
+		return w
+	}
+	t.headMeasure = func(s string) float64 {
+		w, _ := text.Measure(s, *headFace, 0)
 		return w
 	}
 	m := (*face).Metrics()
@@ -149,7 +158,7 @@ func NewTable(env Env, cols []Column) *Table {
 		}
 		btn := widget.NewButton(
 			widget.ButtonOpts.TextLabel(c.Title),
-			widget.ButtonOpts.TextFace(face),
+			widget.ButtonOpts.TextFace(headFace),
 			widget.ButtonOpts.TextColor(&widget.ButtonTextColor{
 				Idle:     solid(p.Text),
 				Hover:    solid(p.Text),
@@ -249,7 +258,7 @@ func (t *Table) SetSortFunc(fn func(key string, asc bool, rows []TableRow)) {
 }
 
 // SetSort activates the given sort column and direction: it re-orders the
-// current rows, moves the ▲/▼ indicator and re-fits the header widths.
+// current rows, moves the ↑/↓ indicator and re-fits the header widths.
 func (t *Table) SetSort(key string, asc bool) {
 	t.sortKey, t.sortAsc = key, asc
 	t.applySort()
@@ -534,7 +543,7 @@ func (t *Table) applyWidths() {
 	natural := make([]ColWidth, len(t.cols))
 	prio := make([]int, len(t.cols))
 	for i, c := range t.cols {
-		w := t.measure(c.Title+t.indicator(i)) + 2*cellPad
+		w := t.headMeasure(c.Title+t.indicator(i)) + 2*cellPad
 		if c.Width > w {
 			w = c.Width
 		}
@@ -543,7 +552,7 @@ func (t *Table) applyWidths() {
 				w = m
 			}
 		}
-		min := t.measure(c.Title+t.indicator(i)) + 2*cellPad
+		min := t.headMeasure(c.Title+t.indicator(i)) + 2*cellPad
 		if c.MinWidth > min {
 			min = c.MinWidth
 		}
@@ -604,15 +613,16 @@ func (t *Table) layoutCells() {
 	t.body.RequestRelayout()
 }
 
-// indicator is the active sort column's arrow suffix.
+// indicator is the active sort column's arrow suffix. Turret Road ships
+// no U+25B2/U+25BC triangles, so the arrows are the ↑/↓ it does have.
 func (t *Table) indicator(i int) string {
 	if t.sortKey == "" || t.cols[i].Key != t.sortKey {
 		return ""
 	}
 	if t.sortAsc {
-		return " ▲"
+		return " ↑"
 	}
-	return " ▼"
+	return " ↓"
 }
 
 // cellOf returns row cell i ("" when the row is short).

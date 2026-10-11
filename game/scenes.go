@@ -156,7 +156,7 @@ func (g *Game) titleBar(label string) *widget.Container {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	title.AddChild(widget.NewText(
-		widget.TextOpts.Text(label, g.env.Face(uikit.StepBase), solid(p.Accent)),
+		widget.TextOpts.Text(label, g.env.FaceBold(uikit.StepBase), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,

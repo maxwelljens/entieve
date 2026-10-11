@@ -88,18 +88,24 @@ func DefaultTypeScale() TypeScale {
 	}
 }
 
-// kitFaces holds the four shared goregular faces (render.Face caches them),
-// boxed as text.Face for direct use with text.Measure and ebitenui widgets.
+// kitFaces holds the shared Turret Road faces (render.Face/FaceBold
+// cache them), boxed as text.Face for direct use with text.Measure and
+// ebitenui widgets: the regular weight is body text, Bold is the
+// emphasis weight (titles, headers, buttons, HUD readouts).
 type kitFaces struct {
-	base, small, large, tiny text.Face
+	base, small, large, tiny       text.Face
+	baseBold, smallBold, largeBold text.Face
 }
 
 func newFaces(ts TypeScale) kitFaces {
 	return kitFaces{
-		base:  render.Face(ts.Base),
-		small: render.Face(ts.Small),
-		large: render.Face(ts.Large),
-		tiny:  render.Face(ts.Tiny),
+		base:      render.Face(ts.Base),
+		small:     render.Face(ts.Small),
+		large:     render.Face(ts.Large),
+		tiny:      render.Face(ts.Tiny),
+		baseBold:  render.FaceBold(ts.Base),
+		smallBold: render.FaceBold(ts.Small),
+		largeBold: render.FaceBold(ts.Large),
 	}
 }
 
@@ -154,7 +160,7 @@ func NewTheme(p Palette, ts TypeScale) *widget.Theme {
 		ButtonTheme: &widget.ButtonParams{
 			Image:        buttonImage,
 			TextColor:    buttonText,
-			TextFace:     facePtr(f.small),
+			TextFace:     facePtr(f.smallBold), // buttons are emphasis text
 			TextPadding:  &widget.Insets{Left: 8, Right: 8, Top: 4, Bottom: 4},
 			TextPosition: &widget.TextPositioning{HTextPosition: widget.TextPositionCenter, VTextPosition: widget.TextPositionCenter},
 		},
@@ -207,7 +213,7 @@ func NewTheme(p Palette, ts TypeScale) *widget.Theme {
 			TabButton: &widget.ButtonParams{
 				Image:     buttonImage,
 				TextColor: buttonText,
-				TextFace:  facePtr(f.small),
+				TextFace:  facePtr(f.smallBold),
 				TextPadding: &widget.Insets{
 					Left: 10, Right: 10, Top: 4, Bottom: 4,
 				},
@@ -275,7 +281,7 @@ func newButtonParams(p Palette, f kitFaces) *widget.ButtonParams {
 			Pressed:  solid(p.Text),
 			Disabled: nrgba(p.Dim, 160),
 		},
-		TextFace:     facePtr(f.small),
+		TextFace:     facePtr(f.smallBold),
 		TextPadding:  &widget.Insets{Left: 8, Right: 8, Top: 4, Bottom: 4},
 		TextPosition: &widget.TextPositioning{HTextPosition: widget.TextPositionCenter, VTextPosition: widget.TextPositionCenter},
 	}

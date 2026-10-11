@@ -240,7 +240,7 @@ func TestStationLayoutMarketFitsColumns(t *testing.T) {
 	}
 	const cellPad = 5.0 // uikit's per-cell horizontal padding
 	natural := []float64{
-		measure("Item ▲") + 2*cellPad, // sorted column carries the ▲
+		measure("Item ↓") + 2*cellPad, // sorted column carries the ↓
 		measure("Price") + 2*cellPad,
 		measure("Qty") + 2*cellPad,
 	}

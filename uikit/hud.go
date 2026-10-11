@@ -235,17 +235,17 @@ func NewHud(env Env) *Hud {
 	mid.AddChild(h.shieldLbl, h.armorLbl, h.structLbl, capStack, capCaption)
 
 	h.speedLbl = widget.NewText(
-		widget.TextOpts.Text("", env.Face(StepBase), solid(p.Text)),
+		widget.TextOpts.Text("", env.FaceBold(StepBase), solid(p.Text)),
 		widget.TextOpts.Position(widget.TextPositionEnd, widget.TextPositionStart),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
 	h.timeLbl = widget.NewText(
-		widget.TextOpts.Text("", faceSmall, solid(p.Accent)),
+		widget.TextOpts.Text("", env.FaceBold(StepSmall), solid(p.Accent)),
 		widget.TextOpts.Position(widget.TextPositionEnd, widget.TextPositionStart),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
 	h.walletLbl = widget.NewText(
-		widget.TextOpts.Text("", faceSmall, solid(p.Good)),
+		widget.TextOpts.Text("", env.FaceBold(StepSmall), solid(p.Good)),
 		widget.TextOpts.Position(widget.TextPositionEnd, widget.TextPositionStart),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
@@ -369,7 +369,7 @@ func drawTargetCard(dst *ebiten.Image, c targetCard, env Env) {
 	// Name on the top line, distance on its own line under it — both
 	// ellipsized to their line as a safety net.
 	line := targetCardText(card)
-	drawCardText(dst, c.name, env.Face(StepSmall), line.Min.X, line.Min.Y, solid(p.Text))
+	drawCardText(dst, c.name, env.FaceBold(StepSmall), line.Min.X, line.Min.Y, solid(p.Text))
 	dl := targetCardDist(card)
 	drawCardText(dst, c.dist, env.Face(StepTiny), dl.Min.X, dl.Min.Y, solid(p.Dim))
 

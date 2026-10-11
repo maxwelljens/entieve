@@ -155,24 +155,79 @@ func TestWarpDurationScalesWithDistance(t *testing.T) {
 	}
 }
 
-// TestWarpShortHopNeverTeleports pins the clamp: even a 10 km warp spends
+// TestWarpShortHopNeverTeleports pins the clamp: even a 10 km hop spends
 // seconds in the tunnel and creeps along the warp vector instead of
-// jumping.
+// jumping. The drive refuses inside WarpMinRange (150 km), so the hop
+// starts just beyond it and lands WarpMinRange short of the station —
+// 160 km out, 10 km of travel, still no teleport.
 func TestWarpShortHopNeverTeleports(t *testing.T) {
 	s := newTestSim(t)
 	station := entityByName(s, "Haven Rest")
-	setPlayerPos(s, v(1e7+10000, 0)) // 10 km off the station
-	r := runWarp(s, CmdWarpTo{Target: station}, 1800)
+	stPos := gatePos(s, station)
+	start := stPos.Add(v(WarpMinRange+10000, 0)) // 160 km off the station
+	setPlayerPos(s, start)
+	r := runWarp(s, CmdWarpTo{Target: station, Range: WarpMinRange}, 1800)
 	if r.startTick < 0 || r.landTick < 0 {
-		t.Fatalf("10 km warp never landed: %v", r.evs)
+		t.Fatalf("short hop never landed: %v", r.evs)
 	}
 	if w := r.warpSeconds(); w < 2 {
 		t.Fatalf("10 km tunnel = %.2fs, that is a teleport (want >= 2s)", w)
 	} else if w > 30 {
 		t.Fatalf("10 km tunnel = %.2fs, far past the budget", w)
 	}
-	if d := s.distBetween(s.player, station); d > warpLandRange {
-		t.Fatalf("landed %v m from the station", d)
+	// Lands WarpMinRange short of the station, on the landing point.
+	if d := s.distBetween(s.player, station); math.Abs(d-WarpMinRange) > warpLandRange {
+		t.Fatalf("landed %v m from the station, want ≈ %d (WarpMinRange)", d, WarpMinRange)
+	}
+	land := stPos.Sub(stPos.Sub(start).Norm().Scale(WarpMinRange))
+	if d := playerPos(s).Dist(land); d > warpLandRange {
+		t.Fatalf("%v m from the landing point (want <= %d)", d, warpLandRange)
+	}
+}
+
+// TestCmdWarpToMinimumRangeBoundary pins EVE's 150 km rule at the exact
+// boundary: one metre inside WarpMinRange the command is refused — no
+// drive, no movement, no intent, and a SevWarning log line naming the
+// minimum — while a target at exactly WarpMinRange engages.
+func TestCmdWarpToMinimumRangeBoundary(t *testing.T) {
+	// 149,999 m: refused, state undisturbed.
+	s := newTestSim(t)
+	target := farCelestial(s, "Boundary Mark", v(1e7, 0))
+	setPlayerPos(s, v(1e7-(WarpMinRange-1), 0))
+	start := playerPos(s)
+	s.Queue(CmdWarpTo{Target: target, Range: 10000})
+	s.Step()
+	if s.Warps.Has(s.player) {
+		t.Fatal("warp drive engaged inside the minimum range")
+	}
+	if s.Intents.Has(s.player) {
+		t.Fatal("refusal left a movement intent behind")
+	}
+	if playerPos(s) != start {
+		t.Fatalf("refusal moved the ship: %v -> %v", start, playerPos(s))
+	}
+	evs := drain(s)
+	if ev := findEvent(evs, EvLog, "Target within warp minimum range (150 km)"); ev == nil {
+		t.Fatalf("no refusal log line: %v", evs)
+	} else if ev.Severity != SevWarning {
+		t.Errorf("refusal severity = %v, want SevWarning", ev.Severity)
+	}
+	if d := s.distBetween(s.player, target); d >= WarpMinRange {
+		t.Fatalf("fixture: target at %v m, want inside %d", d, WarpMinRange)
+	}
+
+	// 150,000 m exactly: the drive engages (align phase).
+	s2 := newTestSim(t)
+	target2 := farCelestial(s2, "Boundary Mark", v(1e7, 0))
+	setPlayerPos(s2, v(1e7-WarpMinRange, 0))
+	s2.Queue(CmdWarpTo{Target: target2})
+	s2.Step()
+	if !s2.Warps.Has(s2.player) {
+		evs := drain(s2)
+		t.Fatalf("warp refused at exactly WarpMinRange: %v", evs)
+	}
+	if wd, _ := s2.Warps.Get(s2.player); wd.Phase != "align" {
+		t.Errorf("phase = %q, want align", wd.Phase)
 	}
 }
 

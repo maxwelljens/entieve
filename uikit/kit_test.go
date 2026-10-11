@@ -190,8 +190,13 @@ func TestSelectedButtonsEnqueueCommands(t *testing.T) {
 	if c, ok := (*cmds)[0].(sim.CmdApproach); !ok || c.Target != ecs.Entity(42) {
 		t.Errorf("cmd[0] = %#v, want CmdApproach{42}", (*cmds)[0])
 	}
-	if c, ok := (*cmds)[1].(sim.CmdWarpTo); !ok || c.Target != ecs.Entity(42) || c.Range != 10000 {
-		t.Errorf("cmd[1] = %#v, want CmdWarpTo{42, 10000}", (*cmds)[1])
+	// The Warp action carries the warp selector's value (Kit.WarpRange,
+	// default WarpRanges[0] = 0) — not a range of its own.
+	if c, ok := (*cmds)[1].(sim.CmdWarpTo); !ok || c.Target != ecs.Entity(42) || c.Range != k.WarpRange() {
+		t.Errorf("cmd[1] = %#v, want CmdWarpTo{42, WarpRange %v}", (*cmds)[1], k.WarpRange())
+	}
+	if c, ok := (*cmds)[1].(sim.CmdWarpTo); !ok || c.Range != WarpRanges[0] {
+		t.Errorf("default WarpRange = %v, want WarpRanges[0] %v", k.WarpRange(), WarpRanges[0])
 	}
 	if _, ok := (*cmds)[2].(sim.CmdStop); !ok {
 		t.Errorf("cmd[2] = %T, want sim.CmdStop", (*cmds)[2])
@@ -268,8 +273,12 @@ func TestSelectedContextGating(t *testing.T) {
 	if ship != nil {
 		k.selected = ship.Entity
 		k.Sync()
-		if got, want := k.sp.warp.GetWidget().Disabled, !ship.CanWarp; got != want {
-			t.Errorf("warp Disabled = %v, want %v (Info.CanWarp=%v)", got, want, ship.CanWarp)
+		// Inside sim.WarpMinRange the drive cannot engage either, so the
+		// action reads disabled even with CanWarp set.
+		want := !ship.CanWarp || ship.Distance < sim.WarpMinRange
+		if got := k.sp.warp.GetWidget().Disabled; got != want {
+			t.Errorf("warp Disabled = %v, want %v (CanWarp=%v distance=%v WarpMinRange=%v)",
+				got, want, ship.CanWarp, ship.Distance, sim.WarpMinRange)
 		}
 	}
 }
