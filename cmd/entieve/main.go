@@ -201,7 +201,7 @@ func cmdSimulate(args []string, stdout, stderr io.Writer) int {
 func printReport(w io.Writer, s *sim.Sim, res *script.Result, ticks int64) {
 	fmt.Fprintf(w, "\n== simulation report ==\n")
 	fmt.Fprintf(w, "ticks: %d (%.2fs sim time)\n", ticks, s.Time())
-	fmt.Fprintf(w, "wallet: %.2f cr\n", s.Wallet())
+	fmt.Fprintf(w, "wallet: %.2f €\n", s.Wallet())
 	// Standing and the contract book next to the wallet: the read surface
 	// of the contracts loop (docs/GAMEPLAY.md, "Contracts & standing").
 	fmt.Fprintf(w, "standing: %.2f\n", s.Standing())
