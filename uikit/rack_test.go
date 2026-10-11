@@ -158,8 +158,9 @@ func TestRackActiveAndCycle(t *testing.T) {
 	}
 }
 
-// TestRackTooltipStats pins the hover tooltip to the module data: name,
-// slot, weapon/mining numbers and the currently preferred charge.
+// TestRackTooltipStats pins the hover tooltip to the module data: the
+// structured model carries the name, the slot line, every number the old
+// plain-text tooltip carried and the currently preferred charge.
 func TestRackTooltipStats(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	r := NewRack(env)
@@ -167,34 +168,96 @@ func TestRackTooltipStats(t *testing.T) {
 	c.addPanel(r.Container(), r)
 	c.frame(t, 1280, 720)
 
-	gun := r.cells[0][0].tipText.Label
-	for _, want := range []string{
-		"EMP Turret",
-		"High slot 1",
-		"Damage 24.0 per shot",
-		"Mix  EM 16.0  TH 5.0  KN 2.0  EX 1.0",
-		"Optimal 12.0 km  Falloff 6.0 km",
-		"Tracking 145.00 rad/s",
-		"Charge: Auto",
-		"Uses 2.0 GJ per cycle",
+	gun := r.cells[0][0].tip.view.Model()
+	if gun.Icon != "mod_weapon" || gun.Title != "EMP Turret" || gun.Sub != "High slot 1 · Weapon" {
+		t.Errorf("gun header = %q/%q/%q, want mod_weapon / EMP Turret / High slot 1 · Weapon",
+			gun.Icon, gun.Title, gun.Sub)
+	}
+	// Every line the plain-text tooltip had, as rows.
+	for _, want := range []struct{ sec, label, value string }{
+		{"DAMAGE", "Per shot", "24.0"},
+		{"DAMAGE", "Electro-magnetic", "16.0"},
+		{"DAMAGE", "Thermal", "5.0"},
+		{"DAMAGE", "Kinetic", "2.0"},
+		{"DAMAGE", "Explosive", "1.0"},
+		{"RANGE", "Optimal", "12.0 km"},
+		{"RANGE", "Falloff", "6.0 km"},
+		{"FIRING", "Tracking", "145.00 rad/s"},
+		{"CHARGE", "Loaded", "Auto"},
+		{"ACTIVATION", "Cycle", "3.0 s"},
+		{"ACTIVATION", "Cap use", "2.0 GJ"},
 	} {
-		if !strings.Contains(gun, want) {
-			t.Errorf("gun tooltip missing %q:\n%s", want, gun)
+		if got := tipValue(gun, want.sec, want.label); got != want.value {
+			t.Errorf("gun %s/%s = %q, want %q (sections %v)",
+				want.sec, want.label, got, want.value, tipSectionLabels(gun))
 		}
 	}
-	mining := r.cells[0][1].tipText.Label
-	if !strings.Contains(mining, "Mining Laser") || !strings.Contains(mining, "Yields ") ||
-		!strings.Contains(mining, "m³ / ") {
-		t.Errorf("mining tooltip wrong:\n%s", mining)
+	if len(gun.Hints) != 2 || gun.Hints[0] != "Right-click: cycle ammo" || gun.Hints[1] != "Click: activate" {
+		t.Errorf("gun hints = %q, want the ammo and activate footers", gun.Hints)
 	}
-	// Boost numbers on the shield booster (mid slot 2).
-	booster := r.cells[1][1].tipText.Label
-	if !strings.Contains(booster, "Shield Booster") || !strings.Contains(booster, "Shield +") {
-		t.Errorf("booster tooltip wrong:\n%s", booster)
+
+	// Mining laser: yield, cycle and capacitor draw — no charge section.
+	mining := r.cells[0][1].tip.view.Model()
+	if got := tipValue(mining, "YIELD", "Per cycle"); got != "100.0 m³" {
+		t.Errorf("miner yield = %q, want 100.0 m³", got)
 	}
+	if got := tipValue(mining, "ACTIVATION", "Cycle"); got != "30.0 s" {
+		t.Errorf("miner cycle = %q, want 30.0 s", got)
+	}
+	if tipSection(mining, "CHARGE") != nil {
+		t.Error("mining laser carries a CHARGE section")
+	}
+	if mining.Sub != "High slot 2 · Mining laser" {
+		t.Errorf("miner sub = %q", mining.Sub)
+	}
+
+	// Shield booster: the repair block, tinted as a gain, plus its cycle.
+	booster := r.cells[1][1].tip.view.Model()
+	rep := tipSection(booster, "REPAIR")
+	if rep == nil || len(rep.Rows) != 1 || rep.Rows[0].Value != "+60.0 HP" {
+		t.Fatalf("booster repair section = %+v, want Shield +60.0 HP", rep)
+	}
+	if rep.Rows[0].Tint != DefaultPalette().Good {
+		t.Errorf("repair value tint = %v, want ColGood", rep.Rows[0].Tint)
+	}
+	if got := tipValue(booster, "ACTIVATION", "Cycle"); got != "4.0 s" {
+		t.Errorf("booster cycle = %q, want 4.0 s", got)
+	}
+
+	// Stasis web: the signed target modifier is tinted by its sign.
+	web := r.cells[1][2].tip.view.Model()
+	eff := tipSection(web, "EFFECT")
+	if eff == nil || len(eff.Rows) != 1 || eff.Rows[0].Value != "−45%" {
+		t.Fatalf("web effect section = %+v, want Target speed −45%%", eff)
+	}
+	if eff.Rows[0].Tint != DefaultPalette().Danger {
+		t.Errorf("web value tint = %v, want ColDanger", eff.Rows[0].Tint)
+	}
+
+	// The ammo footer promises only what a right-click can deliver: strip
+	// the cargo of that weapon's charges and the hint goes with it (the
+	// charge block stays — it still reads Auto).
+	cg, ok := env.Sim.Cargos.Get(env.Sim.Player())
+	if !ok {
+		t.Fatal("player has no cargo")
+	}
+	cg.Stacks = nil
+	r.Sync()
+	gun = r.cells[0][0].tip.view.Model()
+	if len(gun.Hints) != 1 || gun.Hints[0] != "Click: activate" {
+		t.Errorf("disarmed gun hints = %q, want only the activate footer", gun.Hints)
+	}
+	if tipValue(gun, "CHARGE", "Loaded") != "Auto" {
+		t.Errorf("charge block = %+v, want Loaded Auto", tipSection(gun, "CHARGE"))
+	}
+
 	// Empty slots keep their tooltip empty (the widget drops the ToolTips).
-	if got := r.cells[2][2].tipText.Label; got != "" {
-		t.Errorf("empty slot tooltip = %q, want empty", got)
+	empty := r.cells[2][2]
+	if tips := empty.btn.GetWidget().ToolTips; len(tips) != 0 {
+		t.Errorf("empty slot has %d tooltips, want 0", len(tips))
+	}
+	if got := empty.tip.view; got != nil {
+		t.Error("empty slot built a tooltip panel")
 	}
 }
 
@@ -242,8 +305,8 @@ func TestRackRightClickCyclesAmmo(t *testing.T) {
 		}
 		// The tooltip follows the preference on the next Sync.
 		r.Sync()
-		if line := gun.tipText.Label; !strings.Contains(line, "Charge: "+r.ammoName(want)) {
-			t.Fatalf("tooltip after click %d lacks the charge line:\n%s", i, line)
+		if got := tipValue(gun.tip.view.Model(), "CHARGE", "Loaded"); got != r.ammoName(want) {
+			t.Fatalf("tooltip after click %d shows charge %q, want %q", i, got, r.ammoName(want))
 		}
 	}
 

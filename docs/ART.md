@@ -112,8 +112,8 @@ scale is unchanged — only the typeface and the emphasis face are new.
 
 | Weight | Role |
 |---|---|
-| Regular | body text: log lines, table cells, labels, tooltips, text input |
-| Bold | emphasis: window titles, table header sort buttons, buttons, HUD readouts (`render.FaceBold` / `Env.FaceBold`) |
+| Regular | body text: log lines, table cells, labels, tooltip rows and values, text input |
+| Bold | emphasis: window titles, table header sort buttons, buttons, HUD readouts, tooltip titles (`render.FaceBold` / `Env.FaceBold`) |
 | Light, Medium, ExtraLight, ExtraBold | shipped with the family in `render/fonts/`, not used by the UI |
 
 - **License — Turret Road, SIL Open Font License 1.1**: `Copyright 2018
@@ -126,3 +126,33 @@ scale is unchanged — only the typeface and the emphasis face are new.
   (`uikit/table.go`, `indicator`). Bold was chosen over Medium by rendering
   both at the 16.8 px button size: Medium sits too close to Regular to read
   as emphasis.
+
+## Tooltip anatomy
+
+Hover tips are structured panels, not text blobs. One content model
+(`uikit.TooltipModel` in `uikit/tooltip.go`) and one pure layout function
+turn data into fixed rects, and the panel draws exactly those rects — so
+what the layout tests pin is what ships. The same module builder feeds the
+rack cells, the Fitting window's module rows and the Warp gate hint.
+
+| Piece | Treatment |
+|---|---|
+| Icon | 20 px (`icons.Button`), the class glyph, manifest `nudge` applied, tinted ColText |
+| Title | **Bold** at the base step — the only bold line in a tooltip |
+| Sub line | Regular small, ColDim — `High slot 1 · Weapon` (slot · class) |
+| Hairline | 2 px ColAccent at low alpha (80), full content width |
+| Section label | Regular small, ColHead, stored uppercase (`DAMAGE`, `CHARGE`, `ACTIVATION`) |
+| Row | label ColDim left · value right-anchored on one shared x, ColText (or ColGood/ColDanger for a signed modifier) |
+| Hint footer | Regular tiny, ColDim — `Right-click: cycle ammo`, `Click: activate` |
+| Surface | the existing panel treatment: opaque `BGHard` fill, 1 px Border edge at 220, 8/5 px padding |
+
+Rules: content-sized up to 320 px wide; rows tile exactly; values never
+ellipsis (labels give way first); absent data never becomes a row — no
+"N/A" placeholders; hover keeps the shared 300 ms delay
+(`rackTipDelay`), the cursor-sticky position and a 12 px offset, and the
+drawn panel is clamped inside the window at all four edges.
+
+Geometry is pinned by `TestTipLayoutTilesAtBothWidths`,
+`TestTipFits320px` and `TestTipPlacementClamp`; the drawn panel by
+`TestTipPanelDrawSmoke` and, under `ENTIEVE_CAPTURE=1`,
+`TestTooltipCaptureFrame` (→ `/tmp/opencode/tooltip_capture.png`).

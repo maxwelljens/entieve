@@ -45,7 +45,8 @@ type selectedPanel struct {
 	// sits inside the warp minimum range (sim.WarpMinRange).
 	warpTip     *widget.ToolTip
 	warpTips    []*widget.ToolTip
-	warpTipText *widget.Text
+	warpTipView *tipView // structured "Warp unavailable" panel
+	warpTipKey  string   // reason the panel was built from ("" = none)
 
 	orbitIdx, warpRangeIdx int // cycle positions of the two selectors
 }
@@ -120,25 +121,10 @@ func (k *Kit) buildSelected() {
 	sp.warpRange = newBtn(warpRangeLabel(WarpRanges[0]), "", func(*widget.ButtonClickedEventArgs) { k.cycleWarpRange() })
 
 	// Hover hint for the Warp action while the target sits inside the
-	// warp minimum range: one ToolTip for the button's lifetime, label
-	// refreshed by syncSelected and attached only in that state (the
-	// module rack's tooltip pattern).
-	sp.warpTipText = widget.NewText(
-		widget.TextOpts.Text("", facePtr(k.faces.small), solid(p.Text)),
-	)
-	tipBody := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 220), 1)),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout(widget.AnchorLayoutOpts.Padding(
-			&widget.Insets{Left: 8, Right: 8, Top: 5, Bottom: 5},
-		))),
-	)
-	tipBody.AddChild(sp.warpTipText)
-	sp.warpTip = widget.NewToolTip(
-		widget.ToolTipOpts.Content(tipBody),
-		widget.ToolTipOpts.Delay(rackTipDelay), // the shared 300 ms hover delay
-		widget.ToolTipOpts.Position(widget.TOOLTIP_POS_CURSOR_STICKY),
-		widget.ToolTipOpts.Offset(image.Point{X: 12, Y: 12}),
-	)
+	// warp minimum range: one ToolTip for the button's lifetime, its
+	// panel refreshed by syncSelected and attached only in that state
+	// (the module rack's tooltip pattern).
+	sp.warpTip, sp.warpTipView = newTip(k.panelEnv(), TooltipModel{})
 	sp.warpTips = []*widget.ToolTip{sp.warpTip}
 
 	body := widget.NewContainer(
@@ -391,9 +377,18 @@ func (k *Kit) syncSelected() {
 	sp.loot.GetWidget().Disabled = noSel || !info.CanLoot
 	sp.mine.GetWidget().Disabled = noSel || !info.CanMine
 	if tooClose {
-		sp.warpTipText.Label = "Target within warp minimum range (" + kmLabel(sim.WarpMinRange) + ")"
+		reason := "Target within warp minimum range (" + kmLabel(sim.WarpMinRange) + ")"
+		if sp.warpTipKey != reason {
+			sp.warpTipKey = reason
+			sp.warpTipView.SetModel(TooltipModel{
+				Icon:  "act_warp",
+				Title: "Warp unavailable",
+				Sub:   reason,
+			})
+		}
 		sp.warp.GetWidget().ToolTips = sp.warpTips
 	} else {
+		sp.warpTipKey = ""
 		sp.warp.GetWidget().ToolTips = nil
 	}
 }
