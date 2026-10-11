@@ -270,9 +270,11 @@ func (t *Table) SetRows(rows []TableRow) {
 }
 
 // Sync re-fits the columns when the table's width changed (window
-// resize/drag). Owners call it once per frame; it is cheap when nothing
-// changed.
+// resize/drag) and re-pins the scroll offset to the current overflow
+// (viewport growth can make a scrolled list fit again). Owners call it
+// once per frame; it is cheap when nothing changed.
 func (t *Table) Sync() {
+	t.clampScroll()
 	avail := float64(t.root.GetWidget().Rect.Dx())
 	if avail > 0 && avail != t.fittedFor {
 		t.applyWidths()
@@ -369,6 +371,9 @@ func (t *Table) updateRows() {
 		}
 		t.updateBg(i)
 	}
+	// Row count changed → the content may no longer overflow: drop any
+	// leftover scroll offset now, before the next render positions rows.
+	t.clampScroll()
 }
 
 // newRow builds one clickable row container with one text widget per
@@ -479,19 +484,46 @@ func (t *Table) rowTint(i int) color.RGBA {
 	return t.rows[i].Tint
 }
 
-// scrollBy moves the viewport by notches wheel-notches of rows.
+// scrollBy moves the viewport by notches wheel-notches of rows. The wheel
+// convention is explicit: a positive notch is wheel up (ebiten's delta for
+// a wheel rolled towards the user), which scrolls towards the TOP of the
+// list — ScrollTop decreases towards 0 and earlier rows are revealed; a
+// negative notch scrolls towards the end of the list (ScrollTop grows
+// towards 1). ScrollTop is the 0..1 fraction of the content overflow, so
+// the step is wheelRows rows of that overflow.
 func (t *Table) scrollBy(notches float64) {
-	contentH := float64(t.body.GetWidget().Rect.Dy())
-	if contentH <= 0 {
-		_, h := t.body.PreferredSize()
-		contentH = float64(h)
-	}
-	over := contentH - float64(t.scroll.ViewRect().Dy())
+	over := t.scrollOverflow()
 	if over <= 0 {
+		// The rows fit the viewport: nothing to scroll and no stale
+		// offset — ebitenui would otherwise bottom-anchor the list.
+		t.scroll.ScrollTop = 0
 		return
 	}
-	top := t.scroll.ScrollTop + notches*wheelRows*t.rowH/over
+	top := t.scroll.ScrollTop - notches*wheelRows*t.rowH/over
 	t.scroll.ScrollTop = math.Max(0, math.Min(1, top))
+}
+
+// scrollOverflow is the scrollable distance in pixels: content height
+// minus viewport height. It is <= 0 exactly when the rows fit the
+// viewport, in which case the list is top-anchored (ScrollTop 0) — the
+// content height comes from the body's preferred size, the same value
+// renderContent positions with, so it stays correct between SetRows and
+// the next layout pass.
+func (t *Table) scrollOverflow() float64 {
+	_, h := t.body.PreferredSize()
+	return float64(h) - float64(t.scroll.ViewRect().Dy())
+}
+
+// clampScroll pins ScrollTop to the current overflow: 0 while the rows
+// fit the viewport (a leftover offset would bottom-anchor the list), else
+// within the 0..1 fraction. Rows are re-measured on every SetRows and the
+// viewport can grow on window resize, so both paths call this.
+func (t *Table) clampScroll() {
+	if over := t.scrollOverflow(); over <= 0 {
+		t.scroll.ScrollTop = 0
+		return
+	}
+	t.scroll.ScrollTop = math.Max(0, math.Min(1, t.scroll.ScrollTop))
 }
 
 // applyWidths measures the natural width of every column (header plus

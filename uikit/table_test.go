@@ -1,6 +1,7 @@
 package uikit
 
 import (
+	"fmt"
 	"image/color"
 	"math"
 	"sort"
@@ -339,5 +340,125 @@ func TestSelectDataExternal(t *testing.T) {
 	tbl.SelectData(nil)
 	if tbl.selIdx != -1 || tbl.selData != nil {
 		t.Fatalf("SelectData(nil): idx=%d data=%v, want -1/nil", tbl.selIdx, tbl.selData)
+	}
+}
+
+// fireWheel sends one wheel notch through the deferred event queue
+// (positive dy = wheel rolled towards the user = wheel up).
+func fireWheel(ui *ebitenui.UI, tbl *Table, dy float64) {
+	tbl.scroll.GetWidget().ScrolledEvent.Fire(&widget.WidgetScrolledEventArgs{Y: dy})
+	ui.Update()
+}
+
+// TestTableWheelScrollDirection pins the wheel convention: a positive
+// notch (wheel up) decreases ScrollTop towards the top of the list, a
+// negative notch increases it, each step is exactly wheelRows rows of the
+// measured overflow, and the offset stays clamped to 0..1.
+func TestTableWheelScrollDirection(t *testing.T) {
+	env, _ := newTestEnv(t)
+	tbl, ui := newPumpedTable(t, env, []Column{{Key: "A", Title: "A"}})
+	rows := make([]TableRow, 40)
+	for i := range rows {
+		rows[i] = TableRow{Cells: []string{fmt.Sprintf("row %d", i)}, Data: i}
+	}
+	tbl.SetRows(rows)
+	ui.Update()
+	ui.Draw(ebiten.NewImage(640, 400))
+
+	over := tbl.scrollOverflow()
+	if over <= 0 {
+		t.Fatalf("overflow = %v, want > 0 (40 rows must overflow the viewport)", over)
+	}
+	step := wheelRows * tbl.rowH / over
+
+	// Wheel up from mid-scroll: ScrollTop decreases by exactly one step.
+	tbl.scroll.ScrollTop = 0.5
+	fireWheel(ui, tbl, 1)
+	if got := tbl.scroll.ScrollTop; math.Abs(got-(0.5-step)) > 1e-9 {
+		t.Errorf("wheel up: ScrollTop = %v, want %v (0.5 - %v)", got, 0.5-step, step)
+	}
+	// Repeated wheel up stays monotonic (never climbs back).
+	for i := 0; i < 3; i++ {
+		before := tbl.scroll.ScrollTop
+		fireWheel(ui, tbl, 1)
+		if after := tbl.scroll.ScrollTop; after >= before {
+			t.Fatalf("wheel up step %d: ScrollTop %v -> %v, want strictly less", i, before, after)
+		}
+	}
+	// Wheel down reverses it: ScrollTop increases by the same step.
+	before := tbl.scroll.ScrollTop
+	fireWheel(ui, tbl, -1)
+	if got := tbl.scroll.ScrollTop; math.Abs(got-(before+step)) > 1e-9 {
+		t.Errorf("wheel down: ScrollTop = %v, want %v (%v + %v)", got, before+step, before, step)
+	}
+
+	// Clamping: never below 0, never above 1.
+	tbl.scroll.ScrollTop = 0
+	fireWheel(ui, tbl, 1)
+	if got := tbl.scroll.ScrollTop; got != 0 {
+		t.Errorf("wheel up at top: ScrollTop = %v, want 0", got)
+	}
+	tbl.scroll.ScrollTop = 1
+	fireWheel(ui, tbl, -1)
+	if got := tbl.scroll.ScrollTop; got != 1 {
+		t.Errorf("wheel down at bottom: ScrollTop = %v, want 1", got)
+	}
+}
+
+// TestTableRowsTopAnchored: rows start at the top of the viewport and a
+// leftover offset is dropped when the rows shrink back into view — the
+// list must never stay bottom-anchored.
+func TestTableRowsTopAnchored(t *testing.T) {
+	env, _ := newTestEnv(t)
+	tbl, ui := newPumpedTable(t, env, []Column{{Key: "A", Title: "A"}})
+	rows := func(n int) []TableRow {
+		out := make([]TableRow, n)
+		for i := range out {
+			out[i] = TableRow{Cells: []string{fmt.Sprintf("row %d", i)}, Data: i}
+		}
+		return out
+	}
+	pump := func() {
+		ui.Update()
+		ui.Draw(ebiten.NewImage(640, 400))
+	}
+
+	tbl.SetRows(rows(40))
+	pump()
+	if over := tbl.scrollOverflow(); over <= 0 {
+		t.Fatalf("overflow = %v, want > 0 for 40 rows", over)
+	}
+	view := tbl.scroll.ViewRect()
+
+	// Scrolled to the bottom: row 0 is pushed up out of the viewport.
+	tbl.scroll.ScrollTop = 1
+	pump()
+	if r0 := tbl.rowCts[0].GetWidget().Rect; r0.Max.Y > view.Min.Y {
+		t.Fatalf("bottom-scrolled fixture: row 0 = %v, want above view %v", r0, view)
+	}
+
+	// Rows shrink to two (they fit): the offset clears immediately and
+	// the rows re-anchor to the top of the viewport.
+	tbl.SetRows(rows(2))
+	pump()
+	if tbl.scroll.ScrollTop != 0 {
+		t.Errorf("ScrollTop after shrink = %v, want 0", tbl.scroll.ScrollTop)
+	}
+	if r0 := tbl.rowCts[0].GetWidget().Rect; r0.Min.Y != view.Min.Y {
+		t.Errorf("row 0 = %v, want top-anchored at view %v", r0, view)
+	}
+	r1 := tbl.rowCts[1].GetWidget().Rect
+	if r1.Min.Y < tbl.rowCts[0].GetWidget().Rect.Max.Y {
+		t.Errorf("row 1 %v overlaps row 0 %v", r1, tbl.rowCts[0].GetWidget().Rect)
+	}
+	if r1.Max.Y > view.Max.Y {
+		t.Errorf("row 1 = %v, exceeds view %v", r1, view)
+	}
+
+	// Rows that fit ignore the wheel: the offset can never go stale.
+	fireWheel(ui, tbl, -3)
+	fireWheel(ui, tbl, -3)
+	if tbl.scroll.ScrollTop != 0 {
+		t.Errorf("ScrollTop after wheel on a fitted list = %v, want 0", tbl.scroll.ScrollTop)
 	}
 }
