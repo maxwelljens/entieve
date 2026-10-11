@@ -2,7 +2,7 @@
   "id": "ship-rat-scuttler",
   "name": "Scuttler",
   "class": "rat",
-  "description": "A rattled-together corsair skiff. Fragile, fast, and everywhere in the Reach.",
+  "description": "An Old Works worker frame: it cuts rock, strips wrecks and hauls scrap. Fragile, fast, and everywhere.",
   "slots": {
     "high": 2,
     "mid": 1,

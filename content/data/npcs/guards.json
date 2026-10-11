@@ -2,7 +2,7 @@
   {
     "id": "npc-guard-patrol",
     "name": "Patrol",
-    "faction": "Loomfall Security",
+    "faction": "Charter Authority",
     "ship": "ship-npc-patrol",
     "fit": [
       "mod-rail-turret",

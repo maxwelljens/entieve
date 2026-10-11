@@ -2,7 +2,7 @@
   "id": "ship-rat-marauder",
   "name": "Marauder",
   "class": "rat",
-  "description": "A refitted corsair gunship with real tank and three rail mounts. Do not underestimate it.",
+  "description": "An Old Works assault frame: heavy plating, three rail mounts, and a habit of pinning whatever it jumps.",
   "slots": {
     "high": 3,
     "mid": 2,

@@ -1,14 +1,14 @@
 [
   {
     "id": "contract-penumbra-den-hunt-1",
-    "title": "Den hunt",
+    "title": "Gniazdo hunt",
     "kind": "kill",
     "level": 2,
     "min_standing": 0.2,
     "station": "cel-penumbra-port",
     "objective": { "target": "npc-rat-marauder", "count": 1 },
     "reward": { "credits": 240000, "item": null, "standing_gain": 0.15 },
-    "description": "A Marauder in the Penumbra Den is raiding the Port's shipping lanes. Prove yourself to the Port office (standing 0.20) and put it down."
+    "description": "A Marauder holds station in the Gniazdo and raids Przystań's shipping lanes. Prove yourself to the Przystań office (standing 0.20) and put it down."
   },
   {
     "id": "contract-penumbra-lucidite-1",
@@ -19,6 +19,6 @@
     "station": "cel-penumbra-port",
     "objective": { "item": "ore-lucidite", "count": 500 },
     "reward": { "credits": 85000, "item": null, "standing_gain": 0.15 },
-    "description": "The Port pays a premium on 500 m³ of lucidite from the Penumbra belt. Standing 0.20 required before they hand out the order."
+    "description": "Przystań pays a premium on 500 m³ of lucidite out of the Kuźnica belt. Standing 0.20 required before they hand out the order."
   }
 ]

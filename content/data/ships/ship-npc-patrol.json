@@ -1,8 +1,8 @@
 {
   "id": "ship-npc-patrol",
-  "name": "Patrol",
+  "name": "Custos",
   "class": "frigate",
-  "description": "System security interceptor: fast, well-gunned, and never far from the trade lanes.",
+  "description": "Charter patrol cutter: fast, well-gunned, and never far from the trade lanes.",
   "slots": {
     "high": 3,
     "mid": 2,

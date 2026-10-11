@@ -1,7 +1,7 @@
 {
   "id": "world-showcase",
   "name": "Showcase",
-  "description": "The test world: a fully fitted sloop near the Solace Belt whose scenario checkpoints exercise every Entieve feature. Driven headlessly by tests/showcase_test.go.",
+  "description": "The test world: a fully fitted Väktare near the Starogród Belt whose scenario checkpoints exercise every Entieve feature. Driven headlessly by tests/showcase_test.go.",
   "start": {
     "system": "sys-solace",
     "position": {
@@ -67,7 +67,7 @@
     {
       "name": "Fitting: one module of every kind",
       "feature": "fitting-all-kinds",
-      "detail": "Start fit fills the sloop's whole 3/3/2 rack: 3 high (mod-emp-turret, mod-mining-laser, mod-rocket-pod), 3 mid (mod-afterburner, mod-shield-boost, mod-stasis-web), 2 low (mod-armor-rep, mod-cap-recharger). Observe in the Fitting window or the sim Fitting store: High/Mid/Low hold 3/3/2 ModuleIDs; the remaining kinds (shield-extender, armor-plate, resist-coat, cap-booster, warp-scram) are exercised via module-fit/module-unfit below."
+      "detail": "Start fit fills the Väktare's whole 3/3/2 rack: 3 high (mod-emp-turret, mod-mining-laser, mod-rocket-pod), 3 mid (mod-afterburner, mod-shield-boost, mod-stasis-web), 2 low (mod-armor-rep, mod-cap-recharger). Observe in the Fitting window or the sim Fitting store: High/Mid/Low hold 3/3/2 ModuleIDs; the remaining kinds (shield-extender, armor-plate, resist-coat, cap-booster, warp-scram) are exercised via module-fit/module-unfit below."
     },
     {
       "name": "Module activation and cycles",
@@ -142,7 +142,7 @@
     {
       "name": "Warp scramble blocks escape",
       "feature": "warp-scram",
-      "detail": "npc-rat-marauder fits mod-warp-scram: once it locks you it activates the scrambler (log: 'Warp Scrambler activated on Sloop'), blocking and cancelling warp starts for scram_duration per cycle."
+      "detail": "npc-rat-marauder fits mod-warp-scram: once it locks you it activates the scrambler (log: 'Warp Scrambler activated on Väktare'), blocking and cancelling warp starts for scram_duration per cycle."
     },
     {
       "name": "Targeting lock and unlock",
@@ -172,7 +172,7 @@
     {
       "name": "NPC aggro",
       "feature": "npc-aggro",
-      "detail": "Approach a Solace belt rat within its aggro_range (20000 m): its bracket turns hostile red and it breaks orbit to come at you - EvtLog aggro line."
+      "detail": "Approach a Starogród belt rat within its aggro_range (20000 m): its bracket turns hostile red and it breaks orbit to come at you - EvtLog aggro line."
     },
     {
       "name": "NPC flee",
@@ -187,7 +187,7 @@
     {
       "name": "Bounty payout",
       "feature": "bounty",
-      "detail": "On NPC death the bounty lands in the wallet: scuttler 7,500 / marauder 65,000 / hierarch 250,000 credits - watch the wallet delta in EvtLog."
+      "detail": "On NPC death the bounty lands in the wallet: scuttler €7,500 / marauder €65,000 / hierarch €250,000 - watch the wallet delta in EvtLog."
     },
     {
       "name": "Wreck looting",
@@ -207,7 +207,7 @@
     {
       "name": "Ore hold vs cargo",
       "feature": "ore-hold",
-      "detail": "On the sloop (ore_hold 0) mined ore lands in cargo (400 m³); on ship-barge the same ore fills the dedicated 15,000 m³ ore hold instead - compare the Inventory window's two tabs."
+      "detail": "On the Väktare (ore_hold 0) mined ore lands in cargo (400 m³); on ship-barge the same ore fills the dedicated 16,500 m³ ore hold instead - compare the Inventory window's two tabs."
     },
     {
       "name": "Cargo transfer",
@@ -232,7 +232,7 @@
     {
       "name": "Station repair",
       "feature": "station-repair",
-      "detail": "Damage the ship, dock at Haven Rest (repair service), CmdRepair: shield/armor/structure snap back to hull maximum for a fee deducted from the wallet."
+      "detail": "Damage the ship, dock at Jernborg (repair service), CmdRepair: shield/armor/structure snap back to hull maximum for a fee deducted from the wallet."
     },
     {
       "name": "Market buy",
@@ -242,7 +242,7 @@
     {
       "name": "Market sell",
       "feature": "market-sell",
-      "detail": "CmdSell(loot-alloy-scrap, qty) at Haven Rest: EvtMarket, wallet increases by the order price, the station order qty is unchanged (it is a buy-side listing)."
+      "detail": "CmdSell(loot-alloy-scrap, qty) at Jernborg: EvtMarket, wallet increases by the order price, the station order qty is unchanged (it is a buy-side listing)."
     },
     {
       "name": "Refining ore",
@@ -267,7 +267,7 @@
     {
       "name": "NPC respawn timers",
       "feature": "npc-respawn",
-      "detail": "Clear a spawn (Solace belt 90 s, Penumbra belt 120 s; anomaly cel-penumbra-den 300 s): after respawn_sec the group is back - the log reports the respawn."
+      "detail": "Clear a spawn (Starogród belt 90 s, Kuźnica belt 120 s; anomaly cel-penumbra-den 300 s): after respawn_sec the group is back - the log reports the respawn."
     },
     {
       "name": "Save and restore",
@@ -302,22 +302,22 @@
     {
       "name": "Contracts and standing loop",
       "feature": "contract-loop",
-      "detail": "CmdAcceptMission (script action 'accept-mission') takes contract-solace-cleanup-1 off the Haven Rest board: EvMission 'accepted' on acceptance, 'progress' when the belt Scuttler dies (kills count by rat class), 'ready' when the objective is met, and 'completed' auto-claimed when the player docks at the offering station again — wallet +40,000 credits and Player.Standing +0.10 land in the same tick. Refused commands (not docked / wrong board / insufficient standing / unknown id) report EvMission phase 'refused'."
+      "detail": "CmdAcceptMission (script action 'accept-mission') takes contract-solace-cleanup-1 off the Jernborg board: EvMission 'accepted' on acceptance, 'progress' when the belt Scuttler dies (kills count by rat class), 'ready' when the objective is met, and 'completed' auto-claimed when the player docks at the offering station again — wallet +€40,000 and Player.Standing +0.10 land in the same tick. Refused commands (not docked / wrong board / insufficient standing / unknown id) report EvMission phase 'refused'."
     },
     {
       "name": "NPC traffic delivery and market drift",
       "feature": "traffic-delivery",
-      "detail": "Convoy haulers spawn on security-scaled schedules (content/data/traffic/), warp the leg through the align/cruise/decel profile, and deliver at stations: EvTraffic phase 'delivered' books stock (exact units) and takes the price one supply step down inside the ±5% high-sec band (EvMarket 'price falls to ...'). The delivered good ends the run priced below its base; premiums from ambushes halve every 3,600 ticks."
+      "detail": "Convoy haulers spawn on zone-scaled schedules (content/data/traffic/), warp the leg through the align/cruise/decel profile, and deliver at stations: EvTraffic phase 'delivered' books stock (exact units) and takes the price one supply step down inside the ±5% band (EvMarket 'price falls to ...'). The delivered good ends the run priced below its base; premiums from ambushes halve every 3,600 ticks."
     },
     {
       "name": "Ambush on NPC traffic",
       "feature": "traffic-attack",
-      "detail": "Every convoy tunnel entry in low/null security rolls the per-leg ambush chance (1-σ)/3 — 1-in-6 in Penumbra: on a hit, 1-3 'Ambusher' raiders spawn mid-leg (EvTraffic phase 'attacked', System sys-penumbra), the hauler is dragged out of warp and burns away for 20 s before attempting its warp-out; scramblers pin it, patrols respond after 15 s. Outcomes: destroyed (lootable cargo wreck + risk-premium price step up), escaped, or saved."
+      "detail": "Every convoy tunnel entry in the Fringe or Unincorporated rolls the per-leg ambush chance (1-σ)/3 — 1-in-6 in Kuźnica: on a hit, 1-3 'Ambusher' raiders spawn mid-leg (EvTraffic phase 'attacked', System sys-penumbra), the hauler is dragged out of warp and burns away for 20 s before attempting its warp-out; scramblers pin it, patrols respond after 15 s. Outcomes: destroyed (lootable cargo wreck + risk-premium price step up), escaped, or saved."
     },
     {
-      "name": "Security patrol response",
+      "name": "Charter patrol response",
       "feature": "traffic-patrol",
-      "detail": "The ambushed Penumbra convoy calls system security: EvTraffic phase 'patrol-response' (System sys-penumbra) dispatches a floor(3σ) wing from the patrol anchor, the patrol warps to the incident through the normal warp profile, locks the raiders with the real turret pipeline — and the pressure lets the convoy warp clear (EvTraffic phase 'escaped'). High-sec responds immediately with 3 ships, low-sec after 15 s with 1, null never."
+      "detail": "The ambushed Kuźnica convoy calls for its patrol wing: EvTraffic phase 'patrol-response' (System sys-penumbra) dispatches a floor(3σ) wing from the patrol anchor, the patrol warps to the incident through the normal warp profile, locks the raiders with the real turret pipeline — and the pressure lets the convoy warp clear (EvTraffic phase 'escaped'). Charter space responds immediately with 3 ships, the Fringe after 15 s with 1, Unincorporated never."
     }
   ]
 }

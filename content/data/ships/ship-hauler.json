@@ -1,6 +1,6 @@
 {
   "id": "ship-hauler",
-  "name": "Hauler",
+  "name": "Furman",
   "class": "industrial",
   "description": "A fat industrial hauler. One high slot, one big hold: it runs, it does not fight.",
   "slots": {
@@ -8,14 +8,14 @@
     "mid": 2,
     "low": 4
   },
-  "shield": 750,
-  "armor": 1050,
+  "shield": 700,
+  "armor": 1100,
   "structure": 1200,
   "resists": {
-    "em": 0.1,
-    "thermal": 0.15,
-    "kinetic": 0.35,
-    "explosive": 0.3
+    "em": 0.08,
+    "thermal": 0.13,
+    "kinetic": 0.37,
+    "explosive": 0.32
   },
   "capacitor": 2200,
   "recharge": 170,
@@ -23,7 +23,7 @@
   "agility": 2.4,
   "mass": 12000000,
   "sig_radius": 120,
-  "cargo": 6000,
+  "cargo": 7000,
   "ore_hold": 0,
   "warp_speed": 2.0,
   "max_target_range": 30000,

@@ -2,7 +2,7 @@
   "id": "ship-rat-hierarch",
   "name": "Hierarch",
   "class": "rat",
-  "description": "The command hull of a rat fleet: heavy tank, four turrets, and a crew that fights to the last.",
+  "description": "The Old Works overseer: heavy tank, four turrets, and nothing that can call it off - it fights to the last.",
   "slots": {
     "high": 4,
     "mid": 3,

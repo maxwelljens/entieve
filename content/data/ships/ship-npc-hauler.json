@@ -1,6 +1,6 @@
 {
   "id": "ship-npc-hauler",
-  "name": "Convoy Hauler",
+  "name": "Tabor",
   "class": "industrial",
   "description": "A civilian freighter flying the trade lanes under convoy contract: fat hold, thick industrial tank, no guns. It runs, it does not fight.",
   "slots": {

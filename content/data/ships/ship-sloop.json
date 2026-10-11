@@ -1,8 +1,8 @@
 {
   "id": "ship-sloop",
-  "name": "Sloop",
+  "name": "Väktare",
   "class": "frigate",
-  "description": "A quick, cheap combat frigate. The standard-issue hull for new pilots in the Thevek Reach.",
+  "description": "A quick, precise frigate: clean lock electronics and a capacitor that keeps up. The standard-issue hull for new pilots in Far Moravia.",
   "slots": {
     "high": 3,
     "mid": 3,
@@ -12,13 +12,13 @@
   "armor": 500,
   "structure": 600,
   "resists": {
-    "em": 0.15,
-    "thermal": 0.2,
-    "kinetic": 0.25,
-    "explosive": 0.3
+    "em": 0.18,
+    "thermal": 0.23,
+    "kinetic": 0.23,
+    "explosive": 0.26
   },
   "capacitor": 1800,
-  "recharge": 120,
+  "recharge": 110,
   "max_speed": 385,
   "agility": 0.45,
   "mass": 1200000,
@@ -26,7 +26,7 @@
   "cargo": 400,
   "ore_hold": 0,
   "warp_speed": 3.5,
-  "max_target_range": 45000,
+  "max_target_range": 55000,
   "max_targets": 4,
-  "scan_resolution": 620
+  "scan_resolution": 680
 }
