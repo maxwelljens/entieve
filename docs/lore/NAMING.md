@@ -1,12 +1,10 @@
 # Naming registry and rename spec
 
-**Status: DRAFT names for the author's review.** The `proposed name` column
-is a proposal produced from the rules in
-[AESTHETIC.md](AESTHETIC.md#the-naming-layers); nothing here is applied to
-`content/` yet. Renames are display-only: **ids stay frozen** — `sys-*`,
-`cel-*`, `ship-*`, `mod-*`, `ore-*`, `min-*`, `charge-*`, `loot-*`,
-`npc-*`, `contract-*`, `world-*` strings are implementation artifacts and
-keep their current slugs even when the slug embeds a retired name.
+**Status: APPROVED canon — author-approved on 2026-10-11.** The names below
+are binding for all content (they were reviewed as a draft and signed off).
+New rows are proposed from the rules in
+[AESTHETIC.md](AESTHETIC.md#the-naming-layers) and need author approval
+before use.
 
 Every entity in `content/data/**` appears below exactly once. Register new
 entities here in the same format before their content lands.

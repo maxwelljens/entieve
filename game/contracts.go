@@ -416,7 +416,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 }
 
 // objectiveSummary renders the contract's kind + objective, e.g.
-// "Destroy 1× Scuttler", "Deliver 2 m³ EMP Charge to Penumbra Port",
+// "Destroy 1× Scuttler", "Deliver 2 m³ EMP Charge to Przystań",
 // "Mine 400 m³ Cordite Ore".
 func objectiveSummary(c *content.Content, def *content.ContractDef) string {
 	switch def.Kind {
@@ -438,7 +438,7 @@ func objectiveSummary(c *content.Content, def *content.ContractDef) string {
 }
 
 // rewardText renders the board's reward line, e.g.
-// "40,000.00 cr · +0.10 standing" — the shared credit presentation
+// "€40,000.00 · +0.10 standing" — the shared money presentation
 // (uikit.FormatCredits), the one every readout uses.
 func rewardText(def *content.ContractDef) string {
 	s := uikit.FormatCredits(def.Reward.Credits)

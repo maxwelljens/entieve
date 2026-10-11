@@ -1,7 +1,7 @@
 [
   {
     "id": "npc-guard-patrol",
-    "name": "Patrol",
+    "name": "Custos",
     "faction": "Charter Authority",
     "ship": "ship-npc-patrol",
     "fit": [
