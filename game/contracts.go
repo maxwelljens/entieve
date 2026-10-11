@@ -438,7 +438,7 @@ func objectiveSummary(c *content.Content, def *content.ContractDef) string {
 }
 
 // rewardText renders the board's reward line, e.g.
-// "€40,000.00 · +0.10 standing" — the shared money presentation
+// "40,000.00 € · +0.10 standing" — the shared money presentation
 // (uikit.FormatCredits), the one every readout uses.
 func rewardText(def *content.ContractDef) string {
 	s := uikit.FormatCredits(def.Reward.Credits)

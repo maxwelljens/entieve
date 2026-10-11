@@ -74,7 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Penumbra Port → Przystań, the Den → Gniazdo, hulls → Väktare / Kosa /
   Havíř / Furman / Tabor / Custos, Loomfall → Kresy, the rat factions
   collapse into the Old Works — ids stay frozen), money displays as
-  `€1,234.56` / `50¢` instead of `12,345.67 cr`, world-facing zone text
+  `1,234.56 €` / `50¢` instead of `12,345.67 cr`, world-facing zone text
   says Charter space / the Fringe / Unincorporated instead of high-sec /
   low-sec / null-sec, and player death reads as escape pod plus insurer
   replacement. `docs/lore/` is now the named binding canon for content

@@ -380,7 +380,7 @@ func TestBountyPaidOnPlayerKillOnly(t *testing.T) {
 	if s.Wallet() != walletBefore+15000 {
 		t.Fatalf("wallet=%v want %v", s.Wallet(), walletBefore+15000)
 	}
-	if findEvent(evs, EvLog, "Bounty paid: €15,000.00") == nil {
+	if findEvent(evs, EvLog, "Bounty paid: 15,000.00 €") == nil {
 		t.Fatalf("missing bounty event: %v", evs)
 	}
 

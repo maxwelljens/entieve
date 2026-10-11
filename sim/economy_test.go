@@ -81,7 +81,7 @@ func TestBuyHullQtyDeliversEveryHull(t *testing.T) {
 	}
 	// Hulls report their display name in market text (itemName resolves
 	// items, modules and hulls alike).
-	if !hasEvent(evs, EvMarket, "Bought 3 x Ore Barge for €150,000.00") {
+	if !hasEvent(evs, EvMarket, "Bought 3 x Ore Barge for 150,000.00 €") {
 		t.Fatalf("missing buy event: %v", evs)
 	}
 
@@ -144,7 +144,7 @@ func TestBuyReducesStockAndWallet(t *testing.T) {
 	if hangarCount(s, "charge-emp") != 10 {
 		t.Fatalf("hangar=%d want 10", hangarCount(s, "charge-emp"))
 	}
-	if !hasEvent(evs, EvMarket, "Bought 10 x EMP Charge for €50.00") {
+	if !hasEvent(evs, EvMarket, "Bought 10 x EMP Charge for 50.00 €") {
 		t.Fatalf("missing buy event: %v", evs)
 	}
 }
@@ -223,7 +223,7 @@ func TestSellCreditsNinetyPercent(t *testing.T) {
 	if stockAfter != stockBefore+5 {
 		t.Fatalf("stock=%d want %d", stockAfter, stockBefore+5)
 	}
-	if !hasEvent(evs, EvMarket, "Sold 5 x EMP Charge for €22.50") {
+	if !hasEvent(evs, EvMarket, "Sold 5 x EMP Charge for 22.50 €") {
 		t.Fatalf("missing sell event: %v", evs)
 	}
 }
@@ -257,7 +257,7 @@ func TestSellFallsBackToHangar(t *testing.T) {
 	if hangarCount(s, "min-ferrite") != 0 {
 		t.Fatal("hangar not drained")
 	}
-	if !hasEvent(evs, EvMarket, "Sold 7 x Ferrite for €63.00") {
+	if !hasEvent(evs, EvMarket, "Sold 7 x Ferrite for 63.00 €") {
 		t.Fatalf("missing event: %v", evs)
 	}
 	// Nothing to sell warns.
@@ -348,7 +348,7 @@ func TestRepairCostsTwoCreditsPerHP(t *testing.T) {
 	if math.Abs(s.Wallet()-(walletBefore-500)) > 1e-9 { // (200+50)*2
 		t.Fatalf("wallet=%v want %v", s.Wallet(), walletBefore-500)
 	}
-	if !hasEvent(evs, EvLog, "Repaired 250.0 HP for €500.00") {
+	if !hasEvent(evs, EvLog, "Repaired 250.0 HP for 500.00 €") {
 		t.Fatalf("missing repair event: %v", evs)
 	}
 	// Already full: informational only.

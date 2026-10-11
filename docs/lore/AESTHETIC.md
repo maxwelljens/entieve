@@ -98,7 +98,7 @@ tag; the Old Works carry none — their castes predate the tags.
 
 ## Money strings
 
-Amounts display `€1,234.56`; anything under one euro displays `50¢`. In
+Amounts display `1,234.56 €`; anything under one euro displays `50¢`. In
 prose: "euro(s)" and "cent(s)". The full replacement spec for today's
 placeholder "credits" / "cr" strings — the mechanical mapping content passes
 will apply — is [NAMING.md — Money strings](NAMING.md#money-strings).
@@ -135,7 +135,7 @@ for mechanics (sizes, fallbacks, directories); this section binds the look.
 - MUST keep trait skew soft: flavour and stat skew only.
 - MUST keep the visual canon: amber-on-black, Turret Road, monochrome
   silhouettes, drop-in sprites.
-- MUST write amounts as `€1,234.56` / `50¢` in UI and logs, "euro(s)" /
+- MUST write amounts as `1,234.56 €` / `50¢` in UI and logs, "euro(s)" /
   "cent(s)" in prose.
 - NEVER use epic, mythic, destiny or chosen-one language in any content.
 - NEVER echo the retired placeholder names (see naming layers) in display

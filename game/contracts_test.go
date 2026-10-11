@@ -307,7 +307,7 @@ func TestStationBoardRendersShippedContent(t *testing.T) {
 	if got, want := availLine(t, g, "contract-solace-cleanup-1", 1), "Destroy 1× Scuttler"; got != want {
 		t.Errorf("cleanup summary = %q, want %q", got, want)
 	}
-	if got, want := availLine(t, g, "contract-solace-cleanup-1", 2), "€40,000.00 · +0.10 standing"; got != want {
+	if got, want := availLine(t, g, "contract-solace-cleanup-1", 2), "40,000.00 € · +0.10 standing"; got != want {
 		t.Errorf("cleanup reward = %q, want %q", got, want)
 	}
 	if got, want := availLine(t, g, "contract-solace-supply-run-1", 1),
@@ -371,11 +371,11 @@ func TestStationBoardRendersShippedContent(t *testing.T) {
 // widget-tree spelunking: with a single formatter there is nothing left
 // to cross-check. The formatter's own goldens live in uikit/hud_test.go.
 func TestBoardRewardUsesCanonicalCredits(t *testing.T) {
-	if got, want := uikit.FormatCredits(40000), "€40,000.00"; got != want {
+	if got, want := uikit.FormatCredits(40000), "40,000.00 €"; got != want {
 		t.Errorf("FormatCredits(40000) = %q, want %q", got, want)
 	}
 	def := content.ContractDef{Reward: content.ContractReward{Credits: 40000, StandingGain: 0.10}}
-	if got, want := rewardText(&def), "€40,000.00 · +0.10 standing"; got != want {
+	if got, want := rewardText(&def), "40,000.00 € · +0.10 standing"; got != want {
 		t.Errorf("rewardText = %q, want %q", got, want)
 	}
 }

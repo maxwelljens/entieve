@@ -184,7 +184,8 @@ Notes, price tags and accounting software all crossed over with the first
 wave; the second wave inherited the habit and kept it, because everyone
 prices in euro and converting on the frontier is worse.
 
-Amounts read `€1,234.56`; amounts under one euro read `50¢`. In prose use
+Amounts read `1,234.56 €` (the sign trails the amount); amounts under one
+euro read `50¢`. In prose use
 "euro(s)" and "cent(s)" — "forty thousand euro", "fifty cents". The full
 string convention, including what replaces today's placeholder "credits" /
 "cr" text, is specified in [NAMING.md](NAMING.md#money-strings).

@@ -262,12 +262,12 @@ unavailable". Non-weapons don't cycle.
 
 ## Currency
 
-The currency of Entieve is the **euro**, displayed as `€12,345.67`
-(anything under one euro shows as `50¢`). You earn euros from NPC bounties,
+The currency of Entieve is the **euro**, displayed as `12,345.67 €` (the
+sign trails the amount; anything under one euro shows as `50¢`). You earn euros from NPC bounties,
 selling loot and market trades, and spend them on market buys. Every readout
 that quotes money uses that one format — the wallet on the HUD, the market
 title and the contract boards — so a reward line on the board reads
-`€40,000.00 · +0.10 standing`.
+`40,000.00 € · +0.10 standing`.
 
 ## Contracts & standing
 
@@ -279,7 +279,7 @@ shows two sections.
 **Available contracts** — the docked station's board. Each row shows the
 title, the objective (`Destroy 1× Scuttler`,
 `Deliver 2 m³ EMP Charge to Przystań`, `Mine 400 m³ Cordite Ore`) and
-the reward (`€40,000.00 · +0.10 standing`). Press **Accept** to take it; a
+the reward (`40,000.00 € · +0.10 standing`). Press **Accept** to take it; a
 contract above your standing shows its requirement
 (`Requires standing 0.20`) with the button disabled, and an
 already-accepted one is marked **Accepted**.
