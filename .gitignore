@@ -20,3 +20,5 @@
 .vscode/
 # User-dropped art is local content (docs/ART.md). Force-add to track.
 assets/**/*.png
+# Font source archives are local material (TTFs ship in render/fonts/).
+assets/*.zip
