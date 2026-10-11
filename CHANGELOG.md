@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-12
+
 ### Added
 
 - Binding lore rulebook (`docs/lore/`): UNIVERSE, FACTIONS, AESTHETIC and
@@ -64,6 +66,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   footers — shared by the module rack, the Fitting window's module rows
   and the warp-gate hint. Tooltips clamp fully inside the window at every
   screen edge.
+
+- Deterministic simulation core: fixed 60-tick timestep, golden-pinned
+  SplitMix64 RNG, minimal deterministic ECS (`core`, `ecs`).
+- Data-driven content system: JSON schema for items, ships, modules, NPCs,
+  star systems and worlds with full cross-reference validation (`content`).
+- EVE-faithful simulation (`sim`): shield/armor/structure with four damage
+  types and resists, capacitor recharge curve, turret tracking formula with
+  wrecking shots and ammo damage profiles, targeting, warping, mining,
+  looting, NPC behavior, station services (repair, market, refine, fitting,
+  cargo transfer between holds and the station hangar), stargate travel,
+  respawns, escape-pod death respawn with insurer replacement (home
+  station across systems), exact
+  save/restore with handle reconstruction, state hashing.
+- Ebitengine client (`render`, `ui`, `game`): vector ships, starfield,
+  brackets, EVE-style overview, ship HUD, module rack, inventory, fitting,
+  station services, starmap, combat log, time acceleration (1x-8x).
+- Entiverse cluster: three star systems (Solace, Penumbra, Gloam) with
+  stations, belts, combat anomalies, stargates, markets and rat spawns.
+- Worlds: `world-default` (normal start) and `world-showcase` (test world
+  covering every feature).
+- Tooling: `entieve run | validate | simulate | version`, tick-scheduled
+  command scripts (`script`), headless simulation reports.
+- Test suite: unit tests per package, twin-run determinism checks, showcase
+  integration suite (`tests`).
+- Docs: README, architecture contract, gameplay guide, content-authoring
+  cookbook for AI agents.
 
 ### Changed
 
@@ -158,37 +186,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Module tooltips, hover/pressed states, 40 px minimum hit areas,
   right-aligned tabular number columns and soft window shadows.
 
-### Fixed
-
 - The overview no longer reveals every ship, rock and wreck in the system
   from anywhere (EVE-grade sensor tension restored).
 - Rats are no longer inert: they patrol, notice intruders and defend their
   belts against miners and shooters.
 
-### Added
-
-- Deterministic simulation core: fixed 60-tick timestep, golden-pinned
-  SplitMix64 RNG, minimal deterministic ECS (`core`, `ecs`).
-- Data-driven content system: JSON schema for items, ships, modules, NPCs,
-  star systems and worlds with full cross-reference validation (`content`).
-- EVE-faithful simulation (`sim`): shield/armor/structure with four damage
-  types and resists, capacitor recharge curve, turret tracking formula with
-  wrecking shots and ammo damage profiles, targeting, warping, mining,
-  looting, NPC behavior, station services (repair, market, refine, fitting,
-  cargo transfer between holds and the station hangar), stargate travel,
-  respawns, escape-pod death respawn with insurer replacement (home
-  station across systems), exact
-  save/restore with handle reconstruction, state hashing.
-- Ebitengine client (`render`, `ui`, `game`): vector ships, starfield,
-  brackets, EVE-style overview, ship HUD, module rack, inventory, fitting,
-  station services, starmap, combat log, time acceleration (1x-8x).
-- Entiverse cluster: three star systems (Solace, Penumbra, Gloam) with
-  stations, belts, combat anomalies, stargates, markets and rat spawns.
-- Worlds: `world-default` (normal start) and `world-showcase` (test world
-  covering every feature).
-- Tooling: `entieve run | validate | simulate | version`, tick-scheduled
-  command scripts (`script`), headless simulation reports.
-- Test suite: unit tests per package, twin-run determinism checks, showcase
-  integration suite (`tests`).
-- Docs: README, architecture contract, gameplay guide, content-authoring
-  cookbook for AI agents.
+[Unreleased]: https://github.com/entieve/entieve/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/entieve/entieve/releases/tag/v0.1.0
