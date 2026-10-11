@@ -262,12 +262,12 @@ unavailable". Non-weapons don't cycle.
 
 ## Currency
 
-The currency of Entieve is the **credit**, displayed as
-`12,345.67 cr`. You earn credits from NPC bounties, selling loot and market
-trades, and spend them on market buys. Every readout that quotes money uses
-that one format — the wallet on the HUD, the market title and the contract
-boards — so a reward line on the board reads
-`40,000.00 cr · +0.10 standing`.
+The currency of Entieve is the **euro**, displayed as `€12,345.67`
+(anything under one euro shows as `50¢`). You earn euros from NPC bounties,
+selling loot and market trades, and spend them on market buys. Every readout
+that quotes money uses that one format — the wallet on the HUD, the market
+title and the contract boards — so a reward line on the board reads
+`€40,000.00 · +0.10 standing`.
 
 ## Contracts & standing
 
@@ -278,8 +278,8 @@ shows two sections.
 
 **Available contracts** — the docked station's board. Each row shows the
 title, the objective (`Destroy 1× Scuttler`,
-`Deliver 2 m³ EMP Charge to Penumbra Port`, `Mine 400 m³ Cordite Ore`) and
-the reward (`40,000.00 cr · +0.10 standing`). Press **Accept** to take it; a
+`Deliver 2 m³ EMP Charge to Przystań`, `Mine 400 m³ Cordite Ore`) and
+the reward (`€40,000.00 · +0.10 standing`). Press **Accept** to take it; a
 contract above your standing shows its requirement
 (`Requires standing 0.20`) with the button disabled, and an
 already-accepted one is marked **Accepted**.
@@ -311,26 +311,36 @@ contract raises it (`+0.10` on today's level-1 boards, `+0.15` on
 level-2), and level-2 boards require **0.20** standing — two level-1
 completions — before they hand out their orders.
 
-Note that Penumbra now has a station, **Penumbra Port**, which also
-serves as the local clone anchor: a pilot destroyed over Penumbra wakes
-up in the Port — their last in-system docking, or the system's first
-station otherwise — instead of being shipped back to Solace.
+Note that Kuźnica now has a station, **Przystań**, so the insurer can hand
+over the replacement hull locally: a pilot destroyed over Kuźnica has their
+escape pod picked up at Przystań — their last in-system docking, or the
+system's first station otherwise — instead of being shipped back to
+Starogród. Death is paperwork; the log line `Respawned at <station> in a
+<hull>` is the insurer's replacement notice arriving.
 
 ## The systems of Entieve
 
-You start in **Solace** (high-security, constellation *Loomfall*): a friendly
-star with *Haven Rest* station (market, inventory and fitting), an
-asteroid belt and a gate to Penumbra.
+Three zones grade the map by **charter reach** — how far the Charter
+Authority's patrols, courts and insurers actually work: **Charter space**,
+**the Fringe** and **Unincorporated**, the lanes an EVE pilot would call
+high-sec, low-sec and null-sec.
 
-**Penumbra** is low-security: NPCs are aggressive, the belt holds richer ore
-(cordite, lucidite), and an anomaly hides marauders plus a hierarch boss with
-the best loot. Its station, **Penumbra Port**, runs the level-2 board and
-doubles as the local clone anchor (see Contracts & standing).
+You start in **Starogród** (Charter space, constellation *Kresy*): the
+first-wave heartland, safe lanes and working paperwork. *Jernborg* station
+(market, inventory and fitting) is the oldest town's berth, an asteroid
+belt sits close, and a gate runs on to Kuźnica.
 
-**Gloam** is a dead-end frontier, deliberately dangerous: glacierite belt ore
-and heavy spawns including hierarchs. Travel system-to-system by flying to a
-stargate and pressing `J` — the starmap (`N`) shows the gate graph with your
-current system highlighted.
+**Kuźnica** is the Fringe — the junction of the rush: NPCs are aggressive,
+the belt holds richer ore (cordite, lucidite), and the anomaly **Gniazdo**
+hides Marauders plus a Hierarch boss with the best loot. Its station,
+**Przystań**, is a freeport: it runs the level-2 board and doubles as the
+local insurance point (see Contracts & standing).
+
+**Pustkowie** is Unincorporated dead-end frontier — Old Works country,
+deliberately dangerous: glacierite belt ore and heavy spawns including
+Hierarchs, with no patrols at all. Travel system-to-system by flying to a
+stargate and pressing `J` — the starmap (`N`) shows the gate graph with
+your current system highlighted.
 
 ## Living universe
 
@@ -338,29 +348,28 @@ The systems keep moving while you do something else. Three overlapping
 systems run underneath the economy:
 
 **NPC convoys haul cargo on the lanes.** Each system runs freighters
-(along the trade routes — they appear in the overview as **Convoy
-Hauler**) on its own schedule: they spawn at the route's origin, warp the
-leg exactly like a player ship — align, tunnel, land — and deliver their
-cargo at the station endpoint, or leave the system at a gate. They are
-ordinary ships: lock one, shoot it, or just watch it work.
+(along the trade routes — they appear in the overview as **Tabor**) on
+its own schedule: they spawn at the route's origin, warp the leg exactly
+like a player ship — align, tunnel, land — and deliver their cargo at the
+station endpoint, or leave the system at a gate. They are ordinary ships:
+lock one, shoot it, or just watch it work.
 
 **Guard patrols respond to incidents, never the player.** Patrols are
 friendly: they do not fire on you no matter how close you fly — they only
-defend themselves if you attack them first. Security patrols (overview name
-**Patrol**) circle their anchor station and warp to a convoy ambush when
-one breaks out, scaled by security: a three-ship wing lands on the spot
-in high-security space, a single responder arrives after about 15
-seconds in low-security Penumbra, and null-sec Gloam has no patrols at
-all.
+defend themselves if you attack them first. Charter patrols (overview name
+**Custos**) circle their anchor station and warp to a convoy ambush when
+one breaks out, scaled by zone: a three-ship wing lands on the spot in
+Charter space, a single responder arrives after about 15 seconds in the
+Fringe, and Unincorporated Pustkowie has no patrols at all.
 
-**Rats ambush convoys in low-sec and null.** Every convoy transit in
-Penumbra has roughly a 1-in-6 chance of being jumped, Gloam about 1 in
-3, Solace never. On a hit, one to three raiders of that system's own rat
-class drop in mid-leg — renamed for the job, so a Marauder hitting a
-haul becomes a **Marauder Ambusher** in your overview. The hauler is
-dragged out of warp and burns for 20 seconds before attempting its
-warp-out; scramblers pin it, and the arriving patrols pull the raiders'
-guns off it. The incident ends one of three ways:
+**Rats ambush convoys in the Fringe and Unincorporated.** Every convoy
+transit in Kuźnica has roughly a 1-in-6 chance of being jumped, Pustkowie
+about 1 in 3, Starogród never. On a hit, one to three raiders of that
+system's own rat class drop in mid-leg — renamed for the job, so a
+Marauder hitting a haul becomes a **Marauder Ambusher** in your overview.
+The hauler is dragged out of warp and burns for 20 seconds before
+attempting its warp-out; scramblers pin it, and the arriving patrols pull
+the raiders' guns off it. The incident ends one of three ways:
 
 - **destroyed** — the hauler dies leaving a **lootable cargo wreck**
   holding the exact shipment (fly over it and press `L`);
@@ -373,11 +382,11 @@ yourself, or let the rats do the work and take the loot.
 **Markets remember traffic.** A delivery books its exact units into the
 destination stock and nudges that item's price *down* (supply arrived);
 a shipment lost to an ambush steps the destination's price *up* — the
-risk premium. Both stay inside the system's security band, **±5% in
-high-sec, ±10% in low-sec, ±20% in null-sec**, and a deviating price
-decays halfway back to its base every minute, so lanes that run get
-cheaper, dangerous lanes get dearer, and nothing ever runs away with the
-economy.
+risk premium. Both stay inside the system's charter-reach band, **±5% in
+Charter space, ±10% in the Fringe, ±20% in Unincorporated**, and a
+deviating price decays halfway back to its base every minute, so lanes
+that run get cheaper, dangerous lanes get dearer, and nothing ever runs
+away with the economy.
 
 ## Time acceleration
 

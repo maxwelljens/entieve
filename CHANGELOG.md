@@ -13,8 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   NAMING — the Far Moravia canon (frontier gold rush for the ores,
   first-wave European heritage, the Old Works machine swarms,
   charter-reach zones, the euro as old-world money, four-origin trait
-  matrix). NAMING.md holds the draft rename registry for every content
-  id; names await author review before the content pass.
+  matrix). NAMING.md holds the rename registry for every content id; the
+  names are author-approved and the re-theme entry under Changed applies
+  them.
 - Living NPCs: deterministic patrol around their spawn anchor, threat
   response (proximity, damage, fire/mining near their home, intrusion
   within 8 km), security temperament (high-sec skittish, null-sec
@@ -66,6 +67,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Far Moravia re-theme of content and docs, landing with the parallel
+  content/data and code rename workstreams: every display name follows the
+  author-approved `docs/lore/NAMING.md` registry (Solace / Penumbra /
+  Gloam → Starogród / Kuźnica / Pustkowie, Haven Rest → Jernborg,
+  Penumbra Port → Przystań, the Den → Gniazdo, hulls → Väktare / Kosa /
+  Havíř / Furman / Tabor / Custos, Loomfall → Kresy, the rat factions
+  collapse into the Old Works — ids stay frozen), money displays as
+  `€1,234.56` / `50¢` instead of `12,345.67 cr`, world-facing zone text
+  says Charter space / the Fringe / Unincorporated instead of high-sec /
+  low-sec / null-sec, and player death reads as escape pod plus insurer
+  replacement. `docs/lore/` is now the named binding canon for content
+  naming and voice across README, GAMEPLAY, ARCHITECTURE and
+  CONTENT_AUTHORING.
 - Typeface: **Turret Road** (SIL OFL 1.1 — six weights ship in
   `render/fonts/` with the license) — Regular for body text, Bold for
   window titles, table headers, buttons and HUD readouts. Table sort
@@ -162,7 +176,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wrecking shots and ammo damage profiles, targeting, warping, mining,
   looting, NPC behavior, station services (repair, market, refine, fitting,
   cargo transfer between holds and the station hangar), stargate travel,
-  respawns, clone-bay death respawn (home station across systems), exact
+  respawns, escape-pod death respawn with insurer replacement (home
+  station across systems), exact
   save/restore with handle reconstruction, state hashing.
 - Ebitengine client (`render`, `ui`, `game`): vector ships, starfield,
   brackets, EVE-style overview, ship HUD, module rack, inventory, fitting,

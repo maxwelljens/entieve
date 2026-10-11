@@ -9,6 +9,13 @@ need to touch engine code to add a system, ship, module, NPC, item, or world.
 The schema structs in `content/model.go` (and `content/model_npc.go`) are
 **authoritative** — when this doc and the structs disagree, the structs win.
 
+**Naming and voice are binding.** Every display name, faction string,
+description and log line you author MUST follow `docs/lore/AESTHETIC.md`
+(gritty corporate register) and `docs/lore/NAMING.md` (the name registry,
+the `€1,234.56` / `50¢` money strings, and the zone words Charter space /
+the Fringe / Unincorporated). Ids are frozen implementation slugs and stay
+as they are even when the slug embeds a retired name.
+
 ## Where things live
 
 ```
@@ -85,7 +92,7 @@ systems come only from `systems/*.json`.
 | Time            | seconds         | `"activation_time": 3`, `"respawn_sec": 90` |
 | Speed           | m/s             | `"max_speed": 385`             |
 | Mass            | kg              | `"mass": 1200000`              |
-| Currency        | credits         | `"base_price": 6`, bounties, wallets |
+| Currency        | euro            | `"base_price": 6`, bounties, wallets (display `€1,234.56` / `50¢`) |
 | Angles          | radians         | `"tracking": 0.45`             |
 | Fractions       | [0,1) resists, (0,1] yields | `"em": 0.15` |
 
@@ -109,15 +116,15 @@ Anything that resolves to none of the three is a validation error.
 ## Recipe 1: add a star system
 
 **1. Create `content/data/systems/<shortname>.json`** (full example — a
-complete, valid two-celestial system with a gate back to Solace):
+complete, valid two-celestial system with a gate back to Starogród):
 
 ```json
 {
   "id": "sys-cinder",
   "name": "Cinder",
   "security": "low",
-  "constellation": "Loomfall",
-  "region": "Thevek Reach",
+  "constellation": "Kresy",
+  "region": "Far Moravia",
   "position": { "X": 4.0, "Y": 2.5 },
   "palette": {
     "nebula1": "#1a0c0c",
@@ -152,7 +159,7 @@ complete, valid two-celestial system with a gate back to Solace):
     },
     {
       "id": "cel-gate-solace",
-      "name": "Solace Gate",
+      "name": "Starogród Gate",
       "kind": "gate",
       "position": { "X": 2000000000, "Y": -1400000000 },
       "radius": 2500,
@@ -235,7 +242,7 @@ Create `content/data/ships/ship-<name>.json` (one file per hull). Populate
 ```
 
 Balance rules of thumb: small hull total HP (shield+armor+structure) 300–800;
-frigate price 200k–400k credits (put the price on a market order — ships have
+frigate price 200k–400k euro (put the price on a market order — ships have
 no price field); resists each in `[0,1)`; align time = `agility * 10` s, so
 0.4 ≈ 4 s for a frigate, 2.4 ≈ 24 s for a hauler. Every hull needs ≥ 1 high
 slot unless it is an industrial/hauler.
@@ -287,8 +294,8 @@ Append to `content/data/npcs/rats.json`:
 ```json
 {
   "id": "npc-rat-interceptor",
-  "name": "Interceptor",
-  "faction": "Mire Corsairs",
+  "name": "Scuttler",
+  "faction": "Old Works",
   "ship": "ship-rat-scuttler",
   "fit": ["mod-rail-turret", "mod-rail-turret", "mod-afterburner"],
   "aggro_range": 25000,
@@ -305,8 +312,10 @@ Append to `content/data/npcs/rats.json`:
 Rules: `ship` must exist; the `fit` must exist module-by-module and fit the
 hull's slot counts (list high-slot modules first, then mid, then low);
 `aggro_range`/`orbit_range` in meters; `flee_threshold` is a structure
-fraction in [0,1] (0 = never flees); `bounty` in credits (rats: 5k–250k);
+fraction in [0,1] (0 = never flees); `bounty` in euro (rats: 5k–250k);
 each loot row: existing item, `chance` in [0,1], `1 <= min_qty <= max_qty`.
+Machine classes take an Old Works caste name (Scuttler above) while the id
+keeps its slug — ids are frozen (`docs/lore/NAMING.md`).
 Then reference it from a belt spawn or anomaly spawn (Recipe 1) — NPCs only
 exist where spawned.
 
@@ -355,7 +364,7 @@ Ammo (needs `damage` + `ammo_class`; ammo items are category `ammo`):
 ```
 
 `category` ∈ `mineral|ore|ammo|charge|loot`. Prices: minerals 5–60, ores
-20–120, ammo tens to hundreds of credits per unit.
+20–120, ammo tens to hundreds of euro per unit.
 
 ## Recipe 6: add a market listing
 
@@ -370,7 +379,7 @@ stations in that system (the system must have ≥ 1 station):
 
 - `item`: ItemID, **ShipID cast to ItemID** (e.g. `"ship-kestrel"`), or
   ModuleID — see "Market orders" above.
-- `qty`: finite stock, ≥ 1; `price`: credits per unit, ≥ 0.
+- `qty`: finite stock, ≥ 1; `price`: euro per unit, ≥ 0.
 - Put hull orders at their balance price (frigate 200k–400k) and module
   orders at the module's `price`.
 
@@ -380,7 +389,7 @@ stations in that system (the system must have ≥ 1 station):
 {
   "id": "world-speedrun",
   "name": "Speedrun",
-  "description": "A compact challenge world: kill the den, dock, repeat.",
+  "description": "A compact challenge world: kill the Gniazdo, dock, repeat.",
   "start": {
     "system": "sys-penumbra",
     "position": { "X": 1500000000, "Y": -800000000 },
@@ -412,7 +421,7 @@ too with a `detail` that says how to observe it (event names, commands).
 ## Recipe 8: add a contract (mission board)
 
 Contracts are the motivation layer: `undock → accept → do the activity →
-dock at the claim station → credits + standing`. Each contract lives on one
+dock at the claim station → euro + standing`. Each contract lives on one
 station's board (`station` = the offering station) and is loaded from
 `content/data/contracts/*.json` (object or array, like every other dir):
 
@@ -426,7 +435,7 @@ station's board (`station` = the offering station) and is loaded from
   "station": "cel-haven-rest",
   "objective": { "target": "npc-rat-scuttler", "count": 1 },
   "reward": { "credits": 40000, "item": null, "standing_gain": 0.1 },
-  "description": "A Mire Corsairs scout is shadowing the ore haulers..."
+  "description": "The Old Works are shadowing the ore haulers out of the Starogród belt. Cull the Scuttler and dock at Jernborg to collect the bounty office's fee."
 }
 ```
 
@@ -563,9 +572,9 @@ reschedules anything.
 
 | security | p | shipped example |
 |----------|---|-----------------|
-| high | 0 | Solace convoys are never ambushed |
-| low  | 1/6 ≈ 16.7 % | Penumbra: ≈1 ambush per 6 legs |
-| null | 1/3 ≈ 33.3 % | Gloam: 1 ambush per 3 legs |
+| high | 0 | Starogród convoys are never ambushed |
+| low  | 1/6 ≈ 16.7 % | Kuźnica: ≈1 ambush per 6 legs |
+| null | 1/3 ≈ 33.3 % | Pustkowie: 1 ambush per 3 legs |
 
 Raiders: `1 + Intn(3)` ships of the def's `raider` class, spawned within
 3 km of the ambushed hauler. Flee math: the hauler burns 20 s before its
@@ -595,7 +604,7 @@ at that system; a brand-new shelf counts as share 1):
 `price' = clamp(base·(1-band), base·(1+band), price·(1±k))` where `base`
 is the authored market order's price (else the item's `base_price`); a
 step that would leave the band clamps silently. Worked example (shipped):
-120 `ore-cordite` (48 each) delivered to Penumbra Port — no shelf yet, so
+120 `ore-cordite` (48 each) delivered to Przystań — no shelf yet, so
 share = 1, low band = 10 %, k = 1 × 10 %/2.5 = 4 %: 48 → **46.08**
 (the exact `EvMarket` "price falls to 46.08" line the showcase observes).
 Stock changes are always exact integers (units), never floats.
