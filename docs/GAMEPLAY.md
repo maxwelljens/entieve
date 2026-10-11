@@ -84,10 +84,15 @@ its minimum size), and click anywhere on a window to raise it to the
 front.
 
 Toggle keys open and close their window (`I`, `F`, `G`, `C`, `N`, `H`,
-`Shift+L`) — windows have no separate close button. Two panels are
+`Shift+L`) — windows have no separate close button. Icons (from
+[game-icons.net](https://game-icons.net), credited per-icon in
+`uikit/icons/CREDITS.md`) mark service titles, action buttons, overview
+kinds and contract types — monochrome glyphs tinted to the theme, and
+every icon keeps its text label. Two panels are
 **always-on chrome** and cannot be closed or moved: the ship **HUD bar**
 (bottom center, with the target-box row at top center) and the
-**module rack** (bottom right). The **log** is a normal window now —
+**module rack** (bottom right; each cell is a class-glyph tile with the
+module's name under it). The **log** is a normal window now —
 bottom left by default, toggle with `Shift+L`, draggable and resizable
 like the rest. The **Overview** (top left) and **Selected Item** window
 (top right) stay open but are draggable — a click in space selects the

@@ -43,6 +43,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuses closer targets and the Warp button gates with a hint. Orbit and
   warp distances are pure selectors ("Orbit range", "Warp to within")
   with separate action buttons; `Q`/`Z` act at the selectors' values.
+- Interface icons from **game-icons.net** (CC BY 3.0 — per-icon author
+  credits ship in `uikit/icons/CREDITS.md`, completeness pinned by test):
+  overview Kind column, Selected Item header and action buttons, HUD
+  target cards, module rack class tiles, service title bars, contract
+  rows, scanner contacts and fitting rows — monochrome silhouettes
+  tinted from the palette on a 16/20/24 px grid with per-icon optical
+  nudges. Consequences: Selected Item minimum width 300→450 px (icon
+  buttons), station column 384→394 px (contract titles keep their
+  budget).
 
 ### Changed
 
