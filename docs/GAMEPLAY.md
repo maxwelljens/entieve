@@ -128,11 +128,16 @@ clamped to their minimum size and to the screen (always fully
 on-screen) — the clamp is re-established whenever you resize the game
 window too, so a layout saved at a larger resolution can never strand a
 window off-screen — and only what no longer fits slides back in; a
-missing, corrupt or partial sidecar simply falls back to
+missing, corrupt, wrong-version or partial sidecar simply falls back to
 the defaults, and unknown entries in the file are ignored. **Your saved
 arrangement wins**: a window with a sidecar entry is never recomposed —
 the automatic tiling only fills in the windows the sidecar does not
-mention.
+mention. One carve-out keeps that promise honest for the docked
+services: if a saved market/inventory/fitting set comes back
+overlapping itself (a layout file from an older game version, or one
+saved at a resolution that no longer fits), the three re-tile to the
+current viewport instead of restoring the overlap — open/closed state
+is always honored either way.
 The layout sidecar is deliberately separate from the save itself — the
 simulation save format is unchanged for the CLI tools.
 
@@ -146,7 +151,9 @@ chrome (HUD bar, module rack, scanner) together with the
 **Overview** and **Selected Item** windows. The service windows **tile
 automatically at your viewport size** — market on top, inventory and
 fitting below — and any arrangement you saved or dragged wins over that
-tiling. Undocking closes the station windows that were closed before
+tiling (unless the saved set would come back overlapping itself, in
+which case the three re-tile — see **Your layout persists**).
+Undocking closes the station windows that were closed before
 docking, restores the space chrome and the overview/selected pair, and
 resets the camera view. The layout sidecar remembers that pre-dock
 state (not the dock-forced open flags), so quitting while docked does

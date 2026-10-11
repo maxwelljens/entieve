@@ -20,11 +20,18 @@ import (
 // restored rect is clamped to the window's MinSize and to the screen —
 // at restore time AND again on every later viewport change
 // (clampRestored), so shrinking the window after a restore can never
-// strand a restored window off-screen.
+// strand a restored window off-screen. A restored DOCKED-SERVICE trio
+// that would overlap itself after that clamping is treated as stale and
+// recomposed (reclaimServiceTrio) — see the rule there.
 
-// layoutVersion tags the sidecar format. A higher version in a file is
-// ignored wholesale rather than guessed at.
-const layoutVersion = 1
+// layoutVersion tags the sidecar format. Only the exact current version
+// is read: version 1 was written by builds whose restore clamp could
+// fold the market/inventory/fitting trio onto one rect (and whose
+// writeLayout then persisted that fold back), so v1 files fall back to
+// the defaults wholesale instead of pinning the mess; a higher version
+// is ignored for the usual forward-compat reason (never guess at an
+// unknown format).
+const layoutVersion = 2
 
 // winLayout is one persisted window: top-left corner, size and — for
 // the toggleable windows — whether it was open.
@@ -123,11 +130,26 @@ func (g *Game) writeLayout() error {
 			continue
 		}
 		r := win.GetContainer().GetWidget().Rect
+		w, h := r.Dx(), r.Dy()
+		// Never persist degenerate geometry: a zero rect round-trips to
+		// a zero rect and would be pinned as saved-wins forever. Grow
+		// (top-left held) to the window's MinSize — exactly what the
+		// read-side clamp would apply anyway.
+		minW, minH := 1, 1
+		if win.MinSize != nil {
+			minW, minH = max(win.MinSize.X, 1), max(win.MinSize.Y, 1)
+		}
+		if w < minW {
+			w = minW
+		}
+		if h < minH {
+			h = minH
+		}
 		f.Windows[name] = winLayout{
 			X:    r.Min.X,
 			Y:    r.Min.Y,
-			W:    r.Dx(),
-			H:    r.Dy(),
+			W:    w,
+			H:    h,
 			Open: g.persistOpen(name, open),
 		}
 	}
@@ -143,7 +165,9 @@ func (g *Game) writeLayout() error {
 }
 
 // readLayout loads the sidecar. Every failure mode — missing file, bad
-// JSON, a newer version — returns nil: defaults win and nothing crashes.
+// JSON, or a version that is not exactly the current one (stale
+// version-1 files predating the service-trio reclaim, and any newer
+// unknown format) — returns nil: defaults win and nothing crashes.
 func (g *Game) readLayout() map[string]winLayout {
 	data, err := os.ReadFile(g.layoutPath())
 	if err != nil {
@@ -153,7 +177,7 @@ func (g *Game) readLayout() map[string]winLayout {
 	if err := json.Unmarshal(data, &f); err != nil {
 		return nil
 	}
-	if f.Version > layoutVersion {
+	if f.Version != layoutVersion {
 		return nil
 	}
 	return f.Windows
@@ -243,9 +267,70 @@ func (g *Game) applyLayout(screenW, screenH int) {
 	syncOverlay(g.open[pHelp],
 		func(s Scene) bool { _, ok := s.(*HelpScene); return ok },
 		func() Scene { return &HelpScene{g: g} })
+	// Geometry is restored; now enforce the trio's tiling invariant.
+	g.reclaimServiceTrio(screenW, screenH)
 	// Apply restored open flags immediately (LoadGame rebuilt the mounts
 	// before this ran).
 	g.syncMounts()
+}
+
+// reclaimServiceTrio enforces the docked service trio's disjoint tiling
+// against a stale sidecar claim. The three services are ONE composed
+// unit (stationLayout tiles them by construction), but restoring their
+// saved rects is per-window: clamping a sidecar saved at a larger
+// viewport slides each entry into the screen independently and folds
+// them onto each other (both inventory and fitting land on the same
+// corner rect), and a sidecar already carrying stacked service rects —
+// written by a build that persisted such a fold — restores stacked.
+//
+// The rule: when the sidecar claims TWO OR MORE of the service windows
+// and their resulting on-screen rects are not pairwise disjoint, the
+// sidecar's service GEOMETRY is stale — all three restored flags are
+// dropped and the trio recomposes from stationLayout (saved-wins for
+// the geometry ends here). Open/closed flags are untouched: they are
+// per-window player intent and never part of the fold. A sidecar
+// claiming at most ONE service window keeps the existing per-window
+// contract (TestStationLayoutSavedWins): a hand-arranged single entry
+// wins even where it overlaps the composed defaults. A live player
+// drag of a never-sidecar'd window also stays put (placeIfVirgin still
+// refuses to touch it).
+//
+// The check runs from applyLayout (restore time) and clampRestored
+// (every viewport change), so a fold can neither be restored nor
+// re-created by shrinking the window — and writeLayout then persists
+// the composed rects, so the collapse cannot spread across sessions.
+// Pinned by TestStationTrioStackedSidecarReclaimed,
+// TestStationTrioClampFoldReclaimed and TestStationTrioShrinkFoldReclaimed.
+func (g *Game) reclaimServiceTrio(screenW, screenH int) {
+	trio := [3]*widget.Window{g.mkt.Win(), g.inv.Win(), g.fitt.Win()}
+	restoredCount := 0
+	for _, win := range trio {
+		if g.restored[win] {
+			restoredCount++
+		}
+	}
+	if restoredCount < 2 {
+		return // one (or zero) claimed entries: per-window saved-wins
+	}
+	overlap := false
+	for i := 0; i < len(trio) && !overlap; i++ {
+		ri := trio[i].GetContainer().GetWidget().Rect
+		for j := i + 1; j < len(trio); j++ {
+			if ri.Overlaps(trio[j].GetContainer().GetWidget().Rect) {
+				overlap = true
+			}
+		}
+	}
+	if !overlap {
+		return // the claim realizes a valid tiling: saved wins
+	}
+	lay := stationLayout(screenW, screenH, g.stationW.GetContainer().GetWidget().Rect.Dy())
+	for _, win := range trio {
+		g.restored[win] = false
+	}
+	g.placeIfVirgin(trio[0], lay.Market)
+	g.placeIfVirgin(trio[1], lay.Inventory)
+	g.placeIfVirgin(trio[2], lay.Fitting)
 }
 
 // clampRestored re-establishes the on-screen guarantee for the windows
@@ -255,7 +340,9 @@ func (g *Game) applyLayout(screenW, screenH int) {
 // arrangement survives (only what no longer fits slides back in), and
 // placeDefaults still never stomps it. Call it from applySize after the
 // defaults composed. Restored windows are tracked, so the placement
-// tracker keeps reading true afterwards.
+// tracker keeps reading true afterwards. The clamp is per-window, so
+// afterwards reclaimServiceTrio re-checks that shrinking did not fold
+// the restored service trio onto itself.
 func (g *Game) clampRestored(w, h int) {
 	screen := image.Rect(0, 0, w, h)
 	for win, restored := range g.restored {
@@ -272,6 +359,10 @@ func (g *Game) clampRestored(w, h int) {
 		}
 		g.placed[win] = win.GetContainer().GetWidget().Rect
 	}
+	// Clamping is per-window, so shrinking can fold restored service
+	// windows onto each other; re-enforce the trio's tiling afterwards
+	// (see reclaimServiceTrio).
+	g.reclaimServiceTrio(w, h)
 }
 
 // clampLayoutRect fits a restored rect onto the screen at min size:
