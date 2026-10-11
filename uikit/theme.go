@@ -330,8 +330,17 @@ func newSliderParams(p Palette) *widget.SliderParams {
 		Pressed: bordered(solid(p.Head), nrgba(p.Accent, 220), 1),
 	}
 	return &widget.SliderParams{
-		TrackPadding:    widget.NewInsetsSimple(0),
-		FixedHandleSize: constantutil.ConstantToPointer(6),
+		TrackPadding: widget.NewInsetsSimple(0),
+		// ebitenui sizes the handle with round(FixedHandleSize) floored at
+		// MinHandleSize (default 16) but POSITIONS it with FixedHandleSize
+		// alone: at the bottom of the travel a 6 px position plus the 16 px
+		// floor pushed the handle 10 px past the track — through the bottom
+		// edge of any window whose scrollbar sat at its end (the log's tail
+		// leaked 80 px past the frame that way). Pin both to the same value
+		// so size and position math agree; 16 matches what has always been
+		// rendered (the floor already won), so pixels do not change.
+		FixedHandleSize: constantutil.ConstantToPointer(16),
+		MinHandleSize:   constantutil.ConstantToPointer(16),
 		TrackOffset:     constantutil.ConstantToPointer(0),
 		PageSizeFunc:    func() int { return 1 },
 		TrackImage: &widget.SliderTrackImage{

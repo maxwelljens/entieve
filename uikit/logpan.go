@@ -56,8 +56,15 @@ func NewLog(env Env) *LogPanel {
 	p := env.Pal
 	l := &LogPanel{env: env}
 
-	// ScrollEnd keeps the view pinned to the newest line on every append;
-	// the theme supplies the scrollbar chrome.
+	// The text area is pinned to the body's single stretched grid cell
+	// (built below): RowLayout — the old body — stretches only in the
+	// cross axis, so the primary axis kept the TextArea's PREFERRED
+	// height, the whole history, and the rect leapt past the window on
+	// every relayout. The grid's stretched row takes the remaining space
+	// instead, the same bounded-viewport pattern uikit/table.go uses;
+	// MinSize stays as the content floor the window MinSize math is
+	// derived from. ScrollEnd keeps the view pinned to the newest line on
+	// every append; the theme supplies the scrollbar chrome.
 	l.ta = widget.NewTextArea(
 		widget.TextAreaOpts.ProcessBBCode(true),
 		widget.TextAreaOpts.ShowVerticalScrollbar(),
@@ -65,18 +72,19 @@ func NewLog(env Env) *LogPanel {
 		widget.TextAreaOpts.FontFace(env.Face(StepSmall)),
 		widget.TextAreaOpts.FontColor(solid(p.Text)),
 		widget.TextAreaOpts.ContainerOpts(widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+			widget.WidgetOpts.LayoutData(widget.GridLayoutData{}),
 			widget.WidgetOpts.MinSize(logViewW, logViewH),
 		)),
 	)
 
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(1),
+			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
 		)),
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.GridLayoutData{})),
 	)
 	body.AddChild(l.ta)
 
