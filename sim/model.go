@@ -190,6 +190,11 @@ type NpcAI struct {
 	Target ecs.Entity // current hostile (usually the player)
 	Home   core.Vec2  // spawn anchor
 	Rand   *core.RNG  // per-NPC stream (Fork'd); marshaled via Snapshot/RestoreRNG
+	// LastHitBy is the source of the most recent damage this ship took
+	// (aggro trigger (b): only player-attributed damage aggroes an NPC onto
+	// the player — third-party fire, e.g. a patrol during a convoy ambush,
+	// must not). Persisted with the rest of the NPC state (SavedNpcAI).
+	LastHitBy ecs.Entity
 }
 
 // Asteroid is a minable rock.
@@ -480,8 +485,8 @@ const (
 )
 
 // EvTraffic phases: "departed" | "delivered" | "attacked" | "destroyed" |
-// "escaped" | "patrol-response". Event.System carries the system ID and
-// Event.Cel the route endpoint / incident celestial.
+// "escaped" | "patrol-response" | "saved". Event.System carries the system ID
+// and Event.Cel the route endpoint / incident celestial.
 const (
 	TrafficDeparted       = "departed"
 	TrafficDelivered      = "delivered"
@@ -489,6 +494,11 @@ const (
 	TrafficDestroyed      = "destroyed"
 	TrafficEscaped        = "escaped"
 	TrafficPatrolResponse = "patrol-response"
+	// TrafficSaved is the "saved" outcome phase: the ambush resolved in the
+	// convoy's favour (every raider gone while the hauler lives). Same
+	// string as TrafficOutcomeSaved — the event phase and the
+	// TrafficAttack.Outcome value are one registry entry.
+	TrafficSaved = TrafficOutcomeSaved
 )
 
 // EvMission phases: "accepted" | "progress" | "ready" | "completed" |
@@ -648,6 +658,9 @@ type SavedNpcAI struct {
 	Target    uint64        `json:"target"`
 	Home      core.Vec2     `json:"home"`
 	RandState uint64        `json:"rand_state"`
+	// LastHitBy is NpcAI.LastHitBy as a handle (omitempty: a never-hit NPC
+	// serializes exactly as before the field existed).
+	LastHitBy uint64 `json:"last_hit_by,omitempty"`
 }
 
 // SavedModTarget is an active-module target binding.
@@ -708,4 +721,10 @@ type Save struct {
 	// LastStation is the entity handle of the last docked station (the
 	// respawn anchor); 0 when that station is not on the current grid.
 	LastStation uint64 `json:"last_station,omitempty"`
+	// LastStationCel is the respawn anchor as a celestial ID, persisted
+	// unconditionally: a player who saves while anchored in another system
+	// has no on-grid handle (LastStation 0) but must still respawn at that
+	// station on return. Restore prefers this field and falls back to the
+	// handle for saves written before it existed.
+	LastStationCel content.CelID `json:"last_station_cel,omitempty"`
 }

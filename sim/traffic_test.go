@@ -3,6 +3,7 @@ package sim
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/entieve/entieve/content"
@@ -661,6 +662,63 @@ func TestTrafficAttackSavedOutcome(t *testing.T) {
 	}
 	if firstPhase(evs, EvTraffic, TrafficDestroyed) != nil {
 		t.Fatal("saved hauler was destroyed")
+	}
+}
+
+// TestTrafficSavedOutcomeEmitsEvent: the "saved" outcome is observable like
+// destroyed/escaped — exactly one EvTraffic phase "saved" event at the
+// moment the raiders are gone, carrying the system, incident landmark and
+// shipment (F9).
+func TestTrafficSavedOutcomeEmitsEvent(t *testing.T) {
+	s := newTrafficSim(t)
+	var evs []Event
+	if !runUntil(t, s, &evs, 900, func() bool {
+		_, _, ok := findHauler(s, "cel-a-dock")
+		return ok
+	}) {
+		t.Fatal("no delivering hauler within 900 ticks")
+	}
+	e, tc, _ := findHauler(s, "cel-a-dock")
+	forceAmbushOn(t, s, e, tc, "null") // no patrol: the test plays the patrol
+	for _, r := range tc.Attack.Raiders {
+		s.damage = append(s.damage, pendingDamage{
+			src: s.player, dst: r, dmg: content.Damage{EM: 100000},
+		})
+	}
+	s.Step()
+	evs = append(evs, drain(s)...)
+
+	saved := firstPhase(evs, EvTraffic, TrafficSaved)
+	if saved == nil {
+		t.Fatalf("no saved event: %v", trafficTexts(evs))
+	}
+	if tc.Attack.Outcome != TrafficOutcomeSaved {
+		t.Fatalf("outcome=%q want saved", tc.Attack.Outcome)
+	}
+	if saved.Severity != SevGood {
+		t.Errorf("saved severity=%v want SevGood", saved.Severity)
+	}
+	if saved.System != s.systemID {
+		t.Errorf("saved system=%q want %q", saved.System, s.systemID)
+	}
+	if saved.Cel == "" {
+		t.Error("saved event carries no incident landmark")
+	}
+	if saved.Item != tc.Item || saved.Value != float64(tc.Qty) {
+		t.Errorf("saved shipment=%v/%v want %v/%v", saved.Item, saved.Value, tc.Item, tc.Qty)
+	}
+	if !strings.Contains(saved.Text, "Convoy hauler saved") {
+		t.Errorf("saved text=%q want the house \"Convoy hauler saved …\" line", saved.Text)
+	}
+
+	// The outcome fires once per incident.
+	if !runUntil(t, s, &evs, 6000, func() bool {
+		return firstPhase(evs, EvTraffic, TrafficDelivered) != nil
+	}) {
+		t.Fatalf("saved hauler never delivered: %v", trafficTexts(evs))
+	}
+	if n := countPhase(evs, EvTraffic, TrafficSaved); n != 1 {
+		t.Fatalf("%d saved events, want exactly 1", n)
 	}
 }
 

@@ -241,6 +241,9 @@ func celestialSpread(cel *content.CelestialDef) float64 {
 }
 
 // spawnAsteroid scatters one rock deterministically around its belt.
+// MASTER-STREAM role (spawn entropy): two draws per rock from s.RNG — the
+// master's only scatter consumer besides spawnNpcStream; see the RNG field
+// on Sim and rng_roles_test.go.
 func (s *Sim) spawnAsteroid(cel *content.CelestialDef, ad content.AsteroidDef) {
 	spread := celestialSpread(cel)
 	angle := s.RNG.Range(0, 2*math.Pi)
@@ -260,6 +263,9 @@ func (s *Sim) spawnAsteroid(cel *content.CelestialDef, ad content.AsteroidDef) {
 // spawnNpc creates a full NPC ship entity anchored at celPos (scattered
 // within spread) with its own forked RNG stream. It returns the entity, or
 // zero when the definition is missing/invalid.
+// MASTER-STREAM role (spawn entropy): it passes s.RNG, so every NPC a gate
+// jump, world load or respawn timer creates consumes two master rolls (see
+// rng_roles_test.go); the Fork seed below only reads the master state.
 func (s *Sim) spawnNpc(id content.NpcID, celPos core.Vec2, spread float64) ecs.Entity {
 	return s.spawnNpcStream(id, celPos, spread, s.RNG)
 }

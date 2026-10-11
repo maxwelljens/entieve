@@ -76,6 +76,7 @@ func (s *Sim) buildSave() (*Save, error) {
 		if v, ok := s.AIs.Get(e); ok {
 			c := SavedNpcAI{
 				Npc: v.Npc, State: v.State, Target: uint64(v.Target), Home: v.Home,
+				LastHitBy: uint64(v.LastHitBy),
 			}
 			if v.Rand != nil {
 				c.RandState = v.Rand.Snapshot()
@@ -160,10 +161,12 @@ func (s *Sim) buildSave() (*Save, error) {
 		save.FreeSlots = append(save.FreeSlots, SavedSlot{Index: f.idx, Generation: f.gen})
 	}
 
-	// Last docked station (respawn anchor) as an entity handle. A station
-	// outside the current grid has no handle: it saves as 0 and restores as
-	// the empty CelID, which resolves to nothing on both sides — keeping
-	// hash(restore(x)) == hash(x).
+	// Last docked station (respawn anchor). The celestial ID is always
+	// persisted (LastStationCel) so an off-grid anchor survives the
+	// round-trip; the handle (LastStation) is only set while the station is
+	// on the current grid and is kept for saves written before the ID field
+	// existed. Both sides derive the same pair, so hash(restore(x)) == hash(x).
+	save.LastStationCel = s.lastStation
 	if s.lastStation != "" {
 		if e := s.stationAt(s.lastStation); !e.IsZero() {
 			save.LastStation = uint64(e)
@@ -313,7 +316,12 @@ func (s *Sim) restore(save *Save) error {
 	s.RNG = core.RestoreRNG(save.RNGState)
 	s.trafficRNG = core.RestoreRNG(save.TrafficRNGState)
 	s.lastStation = ""
-	if save.LastStation != 0 {
+	// Prefer the always-persisted celestial ID; fall back to the legacy
+	// handle for saves written before LastStationCel existed (a handle that
+	// no longer resolves restores as the empty anchor, as before).
+	if save.LastStationCel != "" {
+		s.lastStation = save.LastStationCel
+	} else if save.LastStation != 0 {
 		if h := ecs.Entity(save.LastStation); s.World.Alive(h) {
 			if c, ok := s.Celestials.Get(h); ok {
 				s.lastStation = c.Cel
@@ -388,6 +396,9 @@ func (s *Sim) attach(e ecs.Entity, se SavedEntity) {
 			Target: ecs.Entity(se.NPC.Target),
 			Home:   se.NPC.Home,
 			Rand:   core.RestoreRNG(se.NPC.RandState),
+			// A handle absent from the save (never hit, or a pre-field save)
+			// restores as zero — the "no recorded attacker" state.
+			LastHitBy: ecs.Entity(se.NPC.LastHitBy),
 		})
 	}
 	if se.Asteroid != nil {

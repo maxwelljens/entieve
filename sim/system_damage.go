@@ -32,6 +32,13 @@ func (s *Sim) systemDamage() {
 		if !ok || deadSeen[d.dst] {
 			continue
 		}
+		// Record the damage source on NPCs: aggro trigger (b) only fires for
+		// player-attributed damage (systemNpc), so third-party fire — a
+		// patrol shooting raiders, one rat shooting another — can never flip
+		// an NPC onto the player.
+		if ai, ok := s.AIs.Get(d.dst); ok {
+			ai.LastHitBy = d.src
+		}
 		pen := applyDamageToShip(ship, d.dmg)
 		text := s.nameOf(d.src) + " hits " + s.nounOf(d.dst) + " for " + num(pen) + " damage"
 		if d.wrecking {

@@ -83,10 +83,12 @@ func warpProfileFor(d, v float64) warpProfile {
 // Warp start requires EVE's classic rule: the ship must point at the
 // destination (within warpAlignCos) AND reach 75% of its base max speed.
 // The align phase is flown by normal sublight movement (system 2) toward
-// WarpDrive.To. The warp phase then flies the three-segment tunnel profile
-// (warpProfile) straight along the warp vector — WarpSpeed AU/s converts at
-// 1.496e11 m per AU — and lands when within warpLandRange of the landing
-// point, snapping onto it with zero velocity.
+// WarpDrive.To, and lands straight through the same warpLandRange tolerance
+// when the landing point is already within it (backstop: a sub-tolerance hop
+// can never satisfy the gate). The warp phase then flies the three-segment
+// tunnel profile (warpProfile) straight along the warp vector — WarpSpeed
+// AU/s converts at 1.496e11 m per AU — and lands when within warpLandRange
+// of the landing point, snapping onto it with zero velocity.
 func (s *Sim) systemWarp() {
 	now := s.time
 	for _, e := range sortedEntities(s.Warps) {
@@ -126,8 +128,34 @@ func (s *Sim) systemWarp() {
 		toGo := wd.To.Sub(tr.Pos)
 		dist := toGo.Len()
 
+		// land releases the drive: snap onto the landing point, kill the
+		// velocity, stop the ship (a course command recorded while the drive
+		// was engaged survives — it only becomes effective now) and emit the
+		// landing event. Shared by the align backstop and the warp phase.
+		land := func() {
+			tr.Pos = wd.To
+			m.Vel = core.Vec2{}
+			if in, ok := s.Intents.Get(e); !ok || in.Kind == IntentAlign {
+				s.Intents.Set(e, Intent{Kind: IntentStop})
+			}
+			s.Warps.Remove(e)
+			s.emit(Event{Kind: EvWarp, Phase: "land", Actor: e, Text: "Warp complete"})
+		}
+
 		switch wd.Phase {
 		case "align":
+			// Backstop: a landing point within the landing tolerance of the
+			// ship (a sub-2.5 km hop, or a caller whose target is nearly
+			// coincident with the ship) can never satisfy the align gate —
+			// the ship reaches the point before 75% speed, or oscillates
+			// around it, and the drive would sit in "align" forever with
+			// CmdStop and re-warp refused. Land exactly like the warp phase
+			// does instead; the player path never gets here (CmdWarpTo
+			// refuses inside WarpMinRange).
+			if dist <= warpLandRange {
+				land()
+				continue
+			}
 			// EVE rule: 75% of base max speed and pointed at the destination.
 			speed := m.Vel.Len()
 			aligned := false
@@ -156,18 +184,7 @@ func (s *Sim) systemWarp() {
 
 		case "warp":
 			if dist <= warpLandRange {
-				// Land: snap onto the destination, release the ship. A
-				// course command recorded while the drive was engaged
-				// (manual/approach/orbit) survives — it only becomes
-				// effective now; otherwise stop dead on the landing point
-				// (the warp's own align intent becomes a stop).
-				tr.Pos = wd.To
-				m.Vel = core.Vec2{}
-				if in, ok := s.Intents.Get(e); !ok || in.Kind == IntentAlign {
-					s.Intents.Set(e, Intent{Kind: IntentStop})
-				}
-				s.Warps.Remove(e)
-				s.emit(Event{Kind: EvWarp, Phase: "land", Actor: e, Text: "Warp complete"})
+				land()
 				continue
 			}
 			// Dist is frozen at the profile distance when the tunnel
