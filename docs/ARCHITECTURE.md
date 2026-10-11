@@ -81,7 +81,10 @@ See package docs. Key invariants:
 All game data is JSON under `content/data/`, embedded with `go:embed`, loaded
 by `content.Load(fsys fs.FS) (*Content, error)` and validated by
 `(*Content).Validate() error` (aggregated multi-error). IDs are
-kebab-case strings, globally unique per kind, and cross-referenced.
+kebab-case strings, globally unique per kind, and cross-referenced. Display
+names and prose are canon, not free text: `docs/lore/NAMING.md` binds every
+name (ids stay frozen), money and zone words, and `docs/lore/AESTHETIC.md`
+binds the voice.
 
 ### ID registry (authoritative — content files MUST use these IDs)
 
@@ -144,7 +147,7 @@ proximity/intrusion/recent-work triggers are rat-only) — only
 player-sourced damage turns a patrol hostile.
 
 **Systems** (`content/data/systems/*.json`, one file per system):
-- `sys-solace` — starting system (constellation Loomfall). Star
+- `sys-solace` — starting system (constellation Kresy). Star
   `cel-solace-star`, planet `cel-solace-prime`, station `cel-haven-rest`
   (services: repair, market, refine, fitting), belt `cel-solace-belt`
   (ore-sterngrit, ore-cordite), gate `cel-gate-penumbra` → `sys-penumbra`,
@@ -162,7 +165,7 @@ player-sourced damage turns a patrol hostile.
 system list with starmap positions, `start_system: "sys-solace"`.
 
 **Worlds** (`content/data/worlds/*.json`) — playable scenarios:
-- `world-default` — normal game start (sloop, modest fit/cargo/wallet at
+- `world-default` — normal game start (a `ship-sloop`, modest fit/cargo/wallet at
   `sys-solace` near `cel-haven-rest`).
 - `world-showcase` — **the test world**: exercises *every* feature. Starts
   with a `ship-sloop` fitted with one of each module kind, full charge
@@ -197,7 +200,7 @@ type ItemDef struct {
     ID ItemID; Name, Description string
     Category string            // "mineral" | "ore" | "ammo" | "charge" | "loot"
     Volume float64             // m³
-    BasePrice float64          // ISK-analog "credits"
+    BasePrice float64          // ISK-analog "euro"
     RefineYield map[ItemID]float64 // ore only, fractions summing to <= 1
     Damage *Damage             // ammo only, applied per shot
     AmmoClass string           // ammo only, e.g. "light"; "" for non-ammo
@@ -463,7 +466,7 @@ economy sits on top of:
   player pipeline with an explicit activation target (`npcActivate(e, ai,
   target)`); only the *aggro* state machine remains player-centric.
 - **Sporadic attacks** — every convoy tunnel entry in low/null security
-  rolls `p = (1-σ)/3` (1-in-6 Penumbra, 1-in-3 Gloam, 0 high-sec); on a
+  rolls `p = (1-σ)/3` (1-in-6 Kuźnica, 1-in-3 Pustkowie, 0 high-sec); on a
   hit, 1–3 raiders of the system's `raider` rat class drop in mid-leg
   (renamed `<Name> Ambusher` so name-addressed scripts stay
   unambiguous), the hauler is dragged out of warp and burns away for 20 s
@@ -533,9 +536,10 @@ Layer order shield → armor → structure. Each layer has the ship's `Resists`
 Overflow damage carries to the next layer at full value (documented
 simplification of EVE's 50% bleed-through between shield/armor is NOT used —
 keep full carry-over, note it in `docs/GAMEPLAY.md`). Structure ≤ 0 → ship
-dies: the player wakes up pod-less in a fresh `ship-sloop` at the clone bay —
-the last docked station, or the home station in the universe's start system
-when the current system has none (EVE clone semantics; `EvtDestroyed` is
+dies: the player's escape pod gets clear and the insurer issues a
+replacement — a fresh `ship-sloop` handed over at the last docked station,
+or the home station in the universe's start system when the current system
+has none (insurance paperwork, not clone tech; `EvtDestroyed` is
 emitted, cargo is lost, wallet and hangar keep). NPC → `Wreck` with rolled
 loot + bounty credited to killer's wallet.
 
@@ -554,7 +558,7 @@ market buy/sell, refine, ship assembly/swap, module fit/unfit, respawn
 timers, save/restore round-trip, determinism (Hash equality of twin runs),
 contract accept → objective progress → auto-claim payout + standing,
 NPC traffic delivery + market price drift, ambush on NPC traffic
-(Penumbra legs, showcase seed), security patrol response + convoy escape.
+(Kuźnica legs, showcase seed), security patrol response + convoy escape.
 
 > **Sim hardening registry (2026-10, `fix/sim-hardening`).** Append-only
 > entries for the contract changes made by the fragility review:
