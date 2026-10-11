@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nudges. Consequences: Selected Item minimum width 300→450 px (icon
   buttons), station column 384→394 px (contract titles keep their
   budget).
+- Structured hover tooltips: class icon + bold title + dim subtitle +
+  sectioned stats with values right-anchored on one column + hint
+  footers — shared by the module rack, the Fitting window's module rows
+  and the warp-gate hint. Tooltips clamp fully inside the window at every
+  screen edge.
 
 ### Changed
 

@@ -252,10 +252,13 @@ omniscience), enforced in the sim's read model and the renderer alike.
 **Ammo cycling.** Right-click a weapon slot in the module rack to cycle its
 loaded charge: **Auto → each ammo of that weapon's class that sits in your
 cargo → Auto** (the sim validates class and cargo, and logs every load).
-The module tooltip — hover any rack cell for 300 ms — shows the module name,
-slot, key stats (damage / optimal / tracking for guns, boost numbers for
-tanks and prop, yield for mining lasers) and the currently loaded charge.
-Non-weapons don't cycle.
+The module tooltip — hover any rack cell for 300 ms — is a structured
+panel: class icon, **bold** module name, a dim `slot · class` line, then
+sectioned stats with values right-aligned on one column (damage mix,
+range, tracking, loaded charge + cargo count, cycle/capacitor) and
+footers for what the mouse does. The Fitting window's module rows show
+the same panel, and a warp inside 150 km explains itself as "Warp
+unavailable". Non-weapons don't cycle.
 
 ## Currency
 
