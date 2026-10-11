@@ -300,10 +300,10 @@ func TestSelectedRangeControls(t *testing.T) {
 	pumpKit(t, k, 1280, 720)
 	sp := k.sp
 
-	if got, want := btnLabel(sp.orbit), "Orbit: 2,500 m ▸"; got != want {
+	if got, want := btnLabel(sp.orbit), "Orbit: 2,500 m »"; got != want {
 		t.Errorf("initial orbit label = %q, want %q", got, want)
 	}
-	if got, want := btnLabel(sp.warpRange), "Warp to within: 0 m ▸"; got != want {
+	if got, want := btnLabel(sp.warpRange), "Warp to within: 0 m »"; got != want {
 		t.Errorf("initial warp range label = %q, want %q", got, want)
 	}
 
@@ -324,7 +324,7 @@ func TestSelectedRangeControls(t *testing.T) {
 	if len(*cmds) != 0 {
 		t.Fatalf("cycling with no selection enqueued %d commands, want 0", len(*cmds))
 	}
-	if got, want := btnLabel(sp.orbit), "Orbit: 5,000 m ▸"; got != want {
+	if got, want := btnLabel(sp.orbit), "Orbit: 5,000 m »"; got != want {
 		t.Errorf("after 6 cycles orbit label = %q, want %q", got, want)
 	}
 
@@ -365,7 +365,7 @@ func TestSelectedRangeControls(t *testing.T) {
 	// Orbit: every click picks the next range (wraparound at the end of
 	// the cycle) and enqueues CmdOrbit at exactly that range.
 	orbitWants := []float64{10000, 20000, 50000, 2500} // started at 5,000 above
-	orbitLabels := []string{"Orbit: 10,000 m ▸", "Orbit: 20,000 m ▸", "Orbit: 50,000 m ▸", "Orbit: 2,500 m ▸"}
+	orbitLabels := []string{"Orbit: 10,000 m »", "Orbit: 20,000 m »", "Orbit: 50,000 m »", "Orbit: 2,500 m »"}
 	for i, wantRange := range orbitWants {
 		fireButton(k.ui, sp.orbit)
 		if len(*cmds) != i+1 {
@@ -385,7 +385,7 @@ func TestSelectedRangeControls(t *testing.T) {
 	// Warp to within: same cycling, gated on Info.CanWarp, range carried
 	// into CmdWarpTo (0 lands on the target).
 	warpWants := []float64{10000, 50000, 0}
-	warpLabels := []string{"Warp to within: 10,000 m ▸", "Warp to within: 50,000 m ▸", "Warp to within: 0 m ▸"}
+	warpLabels := []string{"Warp to within: 10,000 m »", "Warp to within: 50,000 m »", "Warp to within: 0 m »"}
 	for i, wantRange := range warpWants {
 		fireButton(k.ui, sp.warpRange)
 		if len(*cmds) != i+1 {
@@ -417,7 +417,7 @@ func TestSelectedRangeControls(t *testing.T) {
 	if len(*cmds) != 0 {
 		t.Errorf("warp-to-within on a non-warpable target enqueued %#v, want none", *cmds)
 	}
-	if got, want := btnLabel(sp.warpRange), "Warp to within: 10,000 m ▸"; got != want {
+	if got, want := btnLabel(sp.warpRange), "Warp to within: 10,000 m »"; got != want {
 		t.Errorf("warp range label = %q, want %q (the cycle still advances)", got, want)
 	}
 	fireButton(k.ui, sp.orbit)

@@ -27,7 +27,7 @@ in-game help window renders.
 | `Shift+Tab` | Lock the currently selected target |
 | `F1` … `F8` | Toggle high-slot module 1…8 (activate/deactivate) |
 | `A` | Approach selected |
-| `Q` | Orbit selected — cycles 1k → 2.5k → 5k → 10k m |
+| `Q` | Orbit selected — cycles 2.5k → 5k → 10k → 20k → 50k m (the same set as the Selected Item Orbit control) |
 | `S` | Stop |
 | `W` | Align to selected |
 | `Z` | Warp to selected (lands 10 km short of the target) |
@@ -61,7 +61,7 @@ in-game help window renders.
 | Right click | Orbit target under cursor (2,500 m) |
 | Right click | On a weapon cell in the module rack: cycle the loaded charge (Auto → each cargo ammo of the weapon's class) |
 | Middle drag | Pan camera |
-| Wheel | Zoom (0.05× – 4×); over the overview, scroll the list |
+| Wheel | Zoom (0.05× – 4×); over a table (overview, market, inventory, fitting), scroll it — wheel up moves toward the top |
 
 Mouse handling is fully context-aware: a click, drag or wheel over *any*
 window or the HUD chrome never reaches the world behind it.
@@ -92,7 +92,10 @@ bottom left by default, toggle with `Shift+L`, draggable and resizable
 like the rest. The **Overview** (top left) and **Selected Item** window
 (top right) stay open but are draggable — a click in space selects the
 target that **Selected Item** then shows and that every
-`selected`-targeted key acts on.
+`selected`-targeted key acts on. Its action buttons (Approach, Warp, Stop,
+Lock, Dock, Jump, Loot, Mine) act on that selection; the **Orbit** and
+**Warp to within** buttons cycle ranges (2.5k–50k m / 0, 10k, 50k m) and
+issue the command at the range their label shows.
 
 Default positions: overview top-left, selected item top-right, scanner
 in the center column under the top row, log bottom-left, HUD
@@ -148,7 +151,8 @@ history comes with you.
 A sortable, **scrollable** table of everything you can currently perceive:
 name, distance, kind, velocity. Click a column header to sort (click again to
 flip direction; the active column tints amber and shows ▲/▼), hover the wheel
-over it to scroll (rows clip to the panel, scrollbar thumb included), click a
+over it to scroll (wheel up moves toward the top of the list; rows clip to
+the panel), click a
 row to select. Numbers are right-aligned on fixed column anchors, so digits
 changing never shift the columns.
 
@@ -216,8 +220,10 @@ omniscience), enforced in the sim's read model and the renderer alike.
   sweep. You learn that something is out there, not what it is or where it
   sits; you still have to fly there to see it. (Deliberate: the scanner is a
   hint system, not a map.)
-- **Warp-to-range** is a UI choice only: `Z` and the warp button issue the
-  same `CmdWarpTo` with the same fixed 10 km landing range.
+- **Warp-to-range**: `Z` and the Warp button land 10 km off the target.
+  The Selected Item **Warp to within** control cycles 0 / 10 / 50 km and
+  warps at the range its label shows — it is both the selector and the
+  trigger.
 
 **Ammo cycling.** Right-click a weapon slot in the module rack to cycle its
 loaded charge: **Auto → each ammo of that weapon's class that sits in your

@@ -10,12 +10,11 @@ import (
 )
 
 // Orbit ranges (m) the Orbit control cycles through, and warp landing
-// distances (m) the Warp-to-within control cycles through. Note these
-// differ from game's keybind cycles (game.OrbitRanges, warpRangeMeters):
-// the panel offers the wider EVE-style set (reported as a GAMEPLAY delta).
+// distances (m) the Warp-to-within control cycles through. Exported so
+// the game keybinds (Q / warp) cycle exactly the same sets.
 var (
-	orbitRanges = [...]float64{2500, 5000, 10000, 20000, 50000}
-	warpRanges  = [...]float64{0, 10000, 50000}
+	OrbitRanges = [...]float64{2500, 5000, 10000, 20000, 50000}
+	WarpRanges  = [...]float64{0, 10000, 50000}
 )
 
 // selectedPanel owns the "Selected Item" window: identity labels plus
@@ -74,8 +73,8 @@ func (k *Kit) buildSelected() {
 	sp.mine = newBtn("Mine", func(*widget.ButtonClickedEventArgs) { k.mineSelected() })
 	// Range selectors: always enabled (they pick a range, they do not act
 	// on the selection); the enqueue happens only against a live target.
-	sp.orbit = newBtn(orbitLabel(orbitRanges[0]), func(*widget.ButtonClickedEventArgs) { k.cycleOrbit() })
-	sp.warpRange = newBtn(warpRangeLabel(warpRanges[0]), func(*widget.ButtonClickedEventArgs) { k.cycleWarpRange() })
+	sp.orbit = newBtn(orbitLabel(OrbitRanges[0]), func(*widget.ButtonClickedEventArgs) { k.cycleOrbit() })
+	sp.warpRange = newBtn(warpRangeLabel(WarpRanges[0]), func(*widget.ButtonClickedEventArgs) { k.cycleWarpRange() })
 
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
@@ -333,23 +332,23 @@ func canLock(kind string) bool {
 // Range controls
 // ---------------------------------------------------------------------------
 
-// orbitLabel renders the Orbit control: "Orbit: 2,500 m ▸".
+// orbitLabel renders the Orbit control: "Orbit: 2,500 m »".
 func orbitLabel(rng float64) string {
-	return "Orbit: " + groupInt(int64(rng)) + " m ▸"
+	return "Orbit: " + groupInt(int64(rng)) + " m »"
 }
 
 // warpRangeLabel renders the warp-to-within control:
-// "Warp to within: 10,000 m ▸".
+// "Warp to within: 10,000 m »".
 func warpRangeLabel(rng float64) string {
-	return "Warp to within: " + groupInt(int64(rng)) + " m ▸"
+	return "Warp to within: " + groupInt(int64(rng)) + " m »"
 }
 
 // cycleOrbit picks the next orbit range (wraparound) and, when the
 // selection resolves on the grid, enqueues CmdOrbit at that range.
 func (k *Kit) cycleOrbit() {
 	sp := k.sp
-	sp.orbitIdx = (sp.orbitIdx + 1) % len(orbitRanges)
-	rng := orbitRanges[sp.orbitIdx]
+	sp.orbitIdx = (sp.orbitIdx + 1) % len(OrbitRanges)
+	rng := OrbitRanges[sp.orbitIdx]
 	sp.orbit.SetText(orbitLabel(rng))
 	if k.selected.IsZero() {
 		return
@@ -365,8 +364,8 @@ func (k *Kit) cycleOrbit() {
 // the same Info.CanWarp gate the Warp button uses.
 func (k *Kit) cycleWarpRange() {
 	sp := k.sp
-	sp.warpRangeIdx = (sp.warpRangeIdx + 1) % len(warpRanges)
-	rng := warpRanges[sp.warpRangeIdx]
+	sp.warpRangeIdx = (sp.warpRangeIdx + 1) % len(WarpRanges)
+	rng := WarpRanges[sp.warpRangeIdx]
 	sp.warpRange.SetText(warpRangeLabel(rng))
 	info, ok := k.Sim.Info(k.selected)
 	if k.selected.IsZero() || !ok || !info.CanWarp {

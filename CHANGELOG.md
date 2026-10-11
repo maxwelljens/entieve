@@ -19,10 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ammo selection (`CmdSetAmmo`, right-click a weapon slot): preferred charge
   with automatic fallback and a clean reset to auto.
 - Warp-to-within (`CmdWarpTo{Range}`, Selected Item 0/10/50 km control).
-- Overview scrolling with a draggable scrollbar, sort indicators and
-  per-kind filters.
-- Movable windows: drag by title bar, click-to-raise, close buttons,
-  non-overlapping defaults.
+- Overview as a sortable, scrollable table (mouse wheel, sensor-gated
+  rows); market, inventory and fitting share the same column table.
+- Movable, resizable windows: drag by title bar, resize from any edge or
+  corner, click-to-raise, composed overlap-free defaults; your arrangement
+  persists in a `.layout.json` sidecar beside the save.
 - `entieve describe <id>` content introspection with near-miss suggestions
   (AI-agent tooling).
 - Contracts & Standing gameplay loop: data-driven station boards
@@ -65,6 +66,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scale are pinned by golden-value tests.
 - UI typography is ~75% larger and padding +20%, with all chrome metrics
   derived from type and spacing constants (no hand-tuned magic numbers).
+
+### Fixed
+
+- Lock-on target cards render again (name, distance, three hp-proportional
+  layer bars — they collapsed to invisible 2 px notches).
+- Ship HUD rings visibly deplete with shield/armor/hull levels; the root
+  cause was repo-wide: straight-alpha colors were fed un-premultiplied to
+  the compositor, erasing all dimming (`render` premultiplies now).
+- Module rack cells toggle on left click (activate/deactivate, targeting
+  the selected entity like the F-keys); right-click ammo cycling unchanged.
+- Windows resize from every edge and corner (upstream could only grow
+  right/bottom); the log is a regular resizable window (`Shift+L`).
+- UI layout survives save and restart (geometry + open state in a sidecar
+  written on save and clean quit; corrupted files degrade to defaults).
+- Table wheel scrolling direction un-reversed; rows anchor to the top of
+  the viewport instead of the bottom.
+- Selected Item action buttons no longer overlap the selection; orbit
+  (2.5–50 km) and warp-to-within (0/10/50 km) ranges are now selectable.
+- Docked station windows tile to the viewport from content minimums
+  (market columns fit un-truncated at the design sizes) instead of piling
+  up at hard-coded positions; your saved arrangement still wins.
 - Module tooltips, hover/pressed states, 40 px minimum hit areas,
   right-aligned tabular number columns and soft window shadows.
 

@@ -6,11 +6,13 @@ import (
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// OrbitRanges are the fixed orbit ranges Q cycles through (meters).
-var OrbitRanges = [...]float64{1000, 2500, 5000, 10000}
+// OrbitRanges are the orbit ranges Q cycles through (meters) — the same
+// set the Selected Item Orbit control cycles (uikit.OrbitRanges).
+var OrbitRanges = uikit.OrbitRanges
 
 // warpRangeMeters is the fixed warp landing range: the Selected Item
 // window's Warp button and the Z key both land 10 km short of the target
