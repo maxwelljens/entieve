@@ -1,9 +1,9 @@
 {
   "id": "sys-gloam",
-  "name": "Gloam",
+  "name": "Pustkowie",
   "security": "null",
-  "constellation": "Loomfall",
-  "region": "Thevek Reach",
+  "constellation": "Kresy",
+  "region": "Far Moravia",
   "position": { "X": 11.5, "Y": -4.2 },
   "palette": {
     "nebula1": "#06070f",
@@ -14,7 +14,7 @@
   "celestials": [
     {
       "id": "cel-gloam-star",
-      "name": "Gloam",
+      "name": "Pustkowie",
       "kind": "star",
       "position": { "X": 0, "Y": 0 },
       "radius": 390000000,
@@ -22,7 +22,7 @@
     },
     {
       "id": "cel-gloam-belt",
-      "name": "Gloam Belt",
+      "name": "Pustkowie Belt",
       "kind": "belt",
       "position": { "X": -900000000, "Y": -1400000000 },
       "radius": 300000,
@@ -40,7 +40,7 @@
     },
     {
       "id": "cel-gate-penumbra",
-      "name": "Penumbra Gate",
+      "name": "Kuźnica Gate",
       "kind": "gate",
       "position": { "X": 2800000000, "Y": 1900000000 },
       "radius": 2500,

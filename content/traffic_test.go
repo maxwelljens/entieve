@@ -382,7 +382,7 @@ func TestConvoyTimeToKillPinned(t *testing.T) {
 				tc.raider, tc.raiders, got, tc.wantDPS)
 		}
 	}
-	// Pinned headline: one Penumbra marauder needs ~395 s of continuous fire
+	// Pinned headline: one Kuźnica marauder needs ~395 s of continuous fire
 	// to kill a convoy hauler; three raiders ~132 s. The escape and patrol
 	// windows (20 s flee, 15 s response) are measured against these.
 	ttk := ehp / (dps("npc-rat-marauder", "ship-npc-hauler"))

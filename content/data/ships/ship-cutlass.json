@@ -1,21 +1,21 @@
 {
   "id": "ship-cutlass",
-  "name": "Cutlass",
+  "name": "Kosa",
   "class": "destroyer",
-  "description": "A close-range brawler: extra guns and plating for pilots who like to brawl on top of their target.",
+  "description": "A yard-built close-range brawler: extra guns and thick plating for pilots who like to brawl on top of their target.",
   "slots": {
     "high": 4,
     "mid": 3,
     "low": 4
   },
-  "shield": 700,
-  "armor": 850,
-  "structure": 850,
+  "shield": 640,
+  "armor": 880,
+  "structure": 880,
   "resists": {
-    "em": 0.18,
-    "thermal": 0.22,
-    "kinetic": 0.28,
-    "explosive": 0.32
+    "em": 0.15,
+    "thermal": 0.21,
+    "kinetic": 0.3,
+    "explosive": 0.34
   },
   "capacitor": 2600,
   "recharge": 130,
@@ -23,7 +23,7 @@
   "agility": 0.7,
   "mass": 1800000,
   "sig_radius": 55,
-  "cargo": 450,
+  "cargo": 650,
   "ore_hold": 0,
   "warp_speed": 3.0,
   "max_target_range": 50000,

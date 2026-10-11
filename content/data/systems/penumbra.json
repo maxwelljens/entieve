@@ -1,9 +1,9 @@
 {
   "id": "sys-penumbra",
-  "name": "Penumbra",
+  "name": "Kuźnica",
   "security": "low",
-  "constellation": "Loomfall",
-  "region": "Thevek Reach",
+  "constellation": "Kresy",
+  "region": "Far Moravia",
   "position": {
     "X": 6.2,
     "Y": -1.8
@@ -17,7 +17,7 @@
   "celestials": [
     {
       "id": "cel-penumbra-star",
-      "name": "Penumbra",
+      "name": "Kuźnica",
       "kind": "star",
       "position": {
         "X": 0,
@@ -30,7 +30,7 @@
     },
     {
       "id": "cel-penumbra-belt",
-      "name": "Penumbra Belt",
+      "name": "Kuźnica Belt",
       "kind": "belt",
       "position": {
         "X": -1300000000,
@@ -64,7 +64,7 @@
     },
     {
       "id": "cel-penumbra-den",
-      "name": "Penumbra Den",
+      "name": "Gniazdo",
       "kind": "anomaly",
       "position": {
         "X": 1600000000,
@@ -92,7 +92,7 @@
     },
     {
       "id": "cel-gate-solace",
-      "name": "Solace Gate",
+      "name": "Starogród Gate",
       "kind": "gate",
       "position": {
         "X": -2600000000,
@@ -109,7 +109,7 @@
     },
     {
       "id": "cel-gate-gloam",
-      "name": "Gloam Gate",
+      "name": "Pustkowie Gate",
       "kind": "gate",
       "position": {
         "X": 3000000000,
@@ -126,7 +126,7 @@
     },
     {
       "id": "cel-penumbra-port",
-      "name": "Penumbra Port",
+      "name": "Przystań",
       "kind": "station",
       "position": {
         "X": 2400000000,

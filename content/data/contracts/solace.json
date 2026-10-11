@@ -8,18 +8,18 @@
     "station": "cel-haven-rest",
     "objective": { "target": "npc-rat-scuttler", "count": 1 },
     "reward": { "credits": 40000, "item": null, "standing_gain": 0.1 },
-    "description": "A Mire Corsairs scout is shadowing the ore haulers out of the Solace belts. Cull it and dock at Haven Rest to collect the bounty office's fee."
+    "description": "An Old Works Scuttler is shadowing the ore haulers out of the Starogród belt. Cull it, dock at Jernborg, and the bounty office settles the fee."
   },
   {
     "id": "contract-solace-supply-run-1",
-    "title": "Supply run to Penumbra Port",
+    "title": "Supply run to Przystań",
     "kind": "deliver",
     "level": 1,
     "min_standing": 0.0,
     "station": "cel-haven-rest",
     "objective": { "item": "charge-emp", "count": 2, "destination": "cel-penumbra-port" },
     "reward": { "credits": 86000, "item": null, "standing_gain": 0.1 },
-    "description": "Penumbra Port is low on EMP charges. Buy 200 rounds (2 m³) on the Haven Rest market and deliver them to the Port's hangar — one gate jump through low security. The cargo is the delivery: do not spend it on the way."
+    "description": "Przystań is short on EMP charges. Buy 200 rounds (2 m³) on the Jernborg market and carry them to the Przystań hangar — one gate jump into the Fringe. The cargo is the delivery: do not spend it on the way."
   },
   {
     "id": "contract-solace-cordite-1",
@@ -30,6 +30,6 @@
     "station": "cel-haven-rest",
     "objective": { "item": "ore-cordite", "count": 400 },
     "reward": { "credits": 38400, "item": null, "standing_gain": 0.1 },
-    "description": "Haven Rest's refinery needs 400 m³ of raw cordite. Fill the ore hold at the Solace belt and dock to turn the order in."
+    "description": "Jernborg's refinery needs 400 m³ of raw cordite. Fill the ore hold at the Starogród belt and dock to turn the order in."
   }
 ]

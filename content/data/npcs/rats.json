@@ -2,7 +2,7 @@
   {
     "id": "npc-rat-scuttler",
     "name": "Scuttler",
-    "faction": "Mire Corsairs",
+    "faction": "Old Works",
     "ship": "ship-rat-scuttler",
     "fit": ["mod-emp-turret", "mod-emp-turret", "mod-afterburner", "mod-armor-plate"],
     "aggro_range": 20000,
@@ -17,7 +17,7 @@
   {
     "id": "npc-rat-marauder",
     "name": "Marauder",
-    "faction": "Mire Corsairs",
+    "faction": "Old Works",
     "ship": "ship-rat-marauder",
     "fit": [
       "mod-rail-turret",
@@ -41,7 +41,7 @@
   {
     "id": "npc-rat-hierarch",
     "name": "Hierarch",
-    "faction": "Gloam Hierarchy",
+    "faction": "Old Works",
     "ship": "ship-rat-hierarch",
     "fit": [
       "mod-rail-turret",

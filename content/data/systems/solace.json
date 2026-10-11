@@ -1,9 +1,9 @@
 {
   "id": "sys-solace",
-  "name": "Solace",
+  "name": "Starogród",
   "security": "high",
-  "constellation": "Loomfall",
-  "region": "Thevek Reach",
+  "constellation": "Kresy",
+  "region": "Far Moravia",
   "position": { "X": 0, "Y": 0 },
   "palette": {
     "nebula1": "#0a1024",
@@ -14,7 +14,7 @@
   "celestials": [
     {
       "id": "cel-solace-star",
-      "name": "Solace",
+      "name": "Starogród",
       "kind": "star",
       "position": { "X": 0, "Y": 0 },
       "radius": 696000000,
@@ -22,7 +22,7 @@
     },
     {
       "id": "cel-solace-prime",
-      "name": "Solace Prime",
+      "name": "Starogród Prime",
       "kind": "planet",
       "position": { "X": 1400000000, "Y": -600000000 },
       "radius": 6371000,
@@ -30,7 +30,7 @@
     },
     {
       "id": "cel-haven-rest",
-      "name": "Haven Rest",
+      "name": "Jernborg",
       "kind": "station",
       "position": { "X": 520000000, "Y": 310000000 },
       "radius": 800,
@@ -41,7 +41,7 @@
     },
     {
       "id": "cel-solace-belt",
-      "name": "Solace Belt",
+      "name": "Starogród Belt",
       "kind": "belt",
       "position": { "X": -1100000000, "Y": 800000000 },
       "radius": 4000,
@@ -58,7 +58,7 @@
     },
     {
       "id": "cel-gate-penumbra",
-      "name": "Penumbra Gate",
+      "name": "Kuźnica Gate",
       "kind": "gate",
       "position": { "X": 2400000000, "Y": -1700000000 },
       "radius": 2500,

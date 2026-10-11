@@ -1,7 +1,7 @@
 {
   "id": "world-default",
   "name": "New Pilot",
-  "description": "The normal game start: a sloop with a modest fit parked outside Haven Rest station in Solace.",
+  "description": "The normal game start: a Väktare with a modest fit parked outside Jernborg station in Starogród.",
   "start": {
     "system": "sys-solace",
     "position": { "X": 540000000, "Y": 340000000 },
