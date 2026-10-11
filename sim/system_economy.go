@@ -10,7 +10,7 @@ import (
 	"github.com/entieve/entieve/ecs"
 )
 
-// repairCostPerHP is the station repair fee in credits per missing hit
+// repairCostPerHP is the station repair fee in euro per missing hit
 // point across shield, armor and structure (documented simplification).
 const repairCostPerHP = 2
 
@@ -137,7 +137,7 @@ func (s *Sim) execBuy(c CmdBuy) {
 		s.Hangar.Items = addStacks(s.Hangar.Items, c.Item, qty)
 	}
 	s.emit(Event{Kind: EvMarket, Severity: SevGood, Actor: s.player, Item: c.Item,
-		Text:  "Bought " + itoaN(qty) + " x " + s.itemName(c.Item) + " for " + credits(total) + " credits",
+		Text:  "Bought " + itoaN(qty) + " x " + s.itemName(c.Item) + " for " + euro(total),
 		Value: total})
 }
 
@@ -153,7 +153,7 @@ func (s *Sim) execSell(c CmdSell) {
 	}
 	price, listed := s.sellPrice(c.Item)
 	if _, isShip := s.Content.Ship(content.ShipID(c.Item)); isShip && !listed {
-		s.log(SevWarning, s.player, "No market for "+string(c.Item))
+		s.log(SevWarning, s.player, "No market for "+s.itemName(c.Item))
 		return
 	}
 	if price <= 0 {
@@ -205,7 +205,7 @@ func (s *Sim) execSell(c CmdSell) {
 		s.market[s.systemID][i].Qty += sold
 	}
 	s.emit(Event{Kind: EvMarket, Severity: SevGood, Actor: s.player, Item: c.Item,
-		Text:  "Sold " + itoaN(sold) + " x " + s.itemName(c.Item) + " for " + credits(proceeds) + " credits",
+		Text:  "Sold " + itoaN(sold) + " x " + s.itemName(c.Item) + " for " + euro(proceeds),
 		Value: proceeds})
 }
 
@@ -291,7 +291,7 @@ func (s *Sim) execRefine(c CmdRefine) {
 		Value: float64(qty)})
 }
 
-// execRepair restores all three layers to maximum for 2 credits per missing HP.
+// execRepair restores all three layers to maximum for 2 euro per missing HP.
 func (s *Sim) execRepair() {
 	if _, ok := s.stationAccess("repair"); !ok {
 		return
@@ -310,7 +310,7 @@ func (s *Sim) execRepair() {
 	cost := repairCostPerHP * missing
 	if s.wallet < cost {
 		s.emit(Event{Kind: EvLog, Severity: SevWarning, Actor: s.player,
-			Text:  "Insufficient funds for repairs (" + credits(cost) + " credits)",
+			Text:  "Insufficient funds for repairs (" + euro(cost) + ")",
 			Value: cost})
 		return
 	}
@@ -319,7 +319,7 @@ func (s *Sim) execRepair() {
 	ship.Armor = ship.MaxArmor
 	ship.Structure = ship.MaxStructure
 	s.emit(Event{Kind: EvLog, Severity: SevGood, Actor: s.player,
-		Text:  "Repaired " + num(missing) + " HP for " + credits(cost) + " credits",
+		Text:  "Repaired " + num(missing) + " HP for " + euro(cost),
 		Value: cost})
 }
 
@@ -455,7 +455,7 @@ func (s *Sim) execAssemble(c CmdAssemble) {
 		}
 	}
 	if storedIdx < 0 {
-		s.log(SevWarning, s.player, "No "+string(c.Ship)+" in the hangar")
+		s.log(SevWarning, s.player, "No "+s.itemName(content.ItemID(c.Ship))+" in the hangar")
 		return
 	}
 	newHull, ok := s.Content.Ship(c.Ship)

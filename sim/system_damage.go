@@ -154,7 +154,7 @@ func (s *Sim) handleDeath(e, src ecs.Entity) {
 	if def != nil && def.Bounty > 0 && src == s.player {
 		s.wallet += def.Bounty
 		s.emit(Event{Kind: EvLog, Severity: SevGood, Actor: s.player, Target: e,
-			Text: "Bounty paid: " + credits(def.Bounty) + " credits", Value: def.Bounty})
+			Text: "Bounty paid: " + euro(def.Bounty), Value: def.Bounty})
 	}
 
 	if len(loot) > 0 {

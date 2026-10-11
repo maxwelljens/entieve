@@ -94,3 +94,19 @@ func TestMapViewDrawSmoke(t *testing.T) {
 	c.addWindow(m)
 	c.smoke(t)
 }
+
+// TestZoneLabel pins the in-universe zone vocabulary of the map legend
+// (docs/lore/UNIVERSE.md — Zones): the code values never reach display
+// text, only the zone word plus its complementary status label.
+func TestZoneLabel(t *testing.T) {
+	for _, c := range []struct{ sec, want string }{
+		{"high", "Charter · secure"},
+		{"low", "Fringe · contested"},
+		{"null", "Unincorporated · no charter"},
+		{"", ""}, {"med", ""}, // unknown codes render nothing
+	} {
+		if got := zoneLabel(c.sec); got != c.want {
+			t.Errorf("zoneLabel(%q) = %q, want %q", c.sec, got, c.want)
+		}
+	}
+}

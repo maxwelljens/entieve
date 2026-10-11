@@ -79,8 +79,9 @@ func TestBuyHullQtyDeliversEveryHull(t *testing.T) {
 			t.Fatalf("unexpected stored hull %q", sh.Hull)
 		}
 	}
-	// Hulls report their raw ID in market text (itemName only resolves items).
-	if !hasEvent(evs, EvMarket, "Bought 3 x ship-barge for 150,000.00 credits") {
+	// Hulls report their display name in market text (itemName resolves
+	// items, modules and hulls alike).
+	if !hasEvent(evs, EvMarket, "Bought 3 x Ore Barge for €150,000.00") {
 		t.Fatalf("missing buy event: %v", evs)
 	}
 
@@ -114,7 +115,7 @@ func TestBuyHullQtyDeliversEveryHull(t *testing.T) {
 	s.Queue(CmdBuy{Item: "ship-barge", Qty: 1})
 	s.Step()
 	evs = drain(s)
-	if findEvent(evs, EvLog, "Out of stock: ship-barge") == nil {
+	if findEvent(evs, EvLog, "Out of stock: Ore Barge") == nil {
 		t.Fatalf("missing out-of-stock refusal: %v", evs)
 	}
 	if s.Wallet() != walletRefused || hangarHulls(s, "ship-barge") != hullsRefused {
@@ -143,7 +144,7 @@ func TestBuyReducesStockAndWallet(t *testing.T) {
 	if hangarCount(s, "charge-emp") != 10 {
 		t.Fatalf("hangar=%d want 10", hangarCount(s, "charge-emp"))
 	}
-	if !hasEvent(evs, EvMarket, "Bought 10 x EMP Charge for 50.00 credits") {
+	if !hasEvent(evs, EvMarket, "Bought 10 x EMP Charge for €50.00") {
 		t.Fatalf("missing buy event: %v", evs)
 	}
 }
@@ -222,7 +223,7 @@ func TestSellCreditsNinetyPercent(t *testing.T) {
 	if stockAfter != stockBefore+5 {
 		t.Fatalf("stock=%d want %d", stockAfter, stockBefore+5)
 	}
-	if !hasEvent(evs, EvMarket, "Sold 5 x EMP Charge for 22.50 credits") {
+	if !hasEvent(evs, EvMarket, "Sold 5 x EMP Charge for €22.50") {
 		t.Fatalf("missing sell event: %v", evs)
 	}
 }
@@ -256,7 +257,7 @@ func TestSellFallsBackToHangar(t *testing.T) {
 	if hangarCount(s, "min-ferrite") != 0 {
 		t.Fatal("hangar not drained")
 	}
-	if !hasEvent(evs, EvMarket, "Sold 7 x Ferrite for 63.00 credits") {
+	if !hasEvent(evs, EvMarket, "Sold 7 x Ferrite for €63.00") {
 		t.Fatalf("missing event: %v", evs)
 	}
 	// Nothing to sell warns.
@@ -347,7 +348,7 @@ func TestRepairCostsTwoCreditsPerHP(t *testing.T) {
 	if math.Abs(s.Wallet()-(walletBefore-500)) > 1e-9 { // (200+50)*2
 		t.Fatalf("wallet=%v want %v", s.Wallet(), walletBefore-500)
 	}
-	if !hasEvent(evs, EvLog, "Repaired 250.0 HP for 500.00 credits") {
+	if !hasEvent(evs, EvLog, "Repaired 250.0 HP for €500.00") {
 		t.Fatalf("missing repair event: %v", evs)
 	}
 	// Already full: informational only.

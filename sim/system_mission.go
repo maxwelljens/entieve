@@ -163,7 +163,7 @@ func (s *Sim) deliverUnits(def *content.ContractDef) int {
 	return int(math.Round(float64(def.Objective.Count) / vol))
 }
 
-// completeMission claims contract i: consumes the delivered cargo, credits
+// completeMission claims contract i: consumes the delivered cargo, pays
 // the reward (and bonus item to the hangar), adds standing, and drops the
 // mission from the active list.
 func (s *Sim) completeMission(i int, def *content.ContractDef) {
@@ -185,7 +185,7 @@ func (s *Sim) completeMission(i int, def *content.ContractDef) {
 	s.missions = append(s.missions[:i], s.missions[i+1:]...)
 
 	text := "Contract complete: " + def.Title + " — " +
-		credits(def.Reward.Credits) + " credits transferred"
+		euro(def.Reward.Credits) + " transferred"
 	if def.Reward.StandingGain > 0 {
 		text += ", standing +" + strconv.FormatFloat(def.Reward.StandingGain, 'f', 2, 64)
 	}

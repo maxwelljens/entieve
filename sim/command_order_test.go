@@ -169,7 +169,7 @@ func TestSameTickCommandOrdering(t *testing.T) {
 			if s.playerDocked() != c.wantDocked {
 				t.Fatalf("docked=%v want %v", s.playerDocked(), c.wantDocked)
 			}
-			// No row buys anything: a refused purchase must not move credits.
+			// No row buys anything: a refused purchase must not move funds.
 			if s.Wallet() != 100000 {
 				t.Fatalf("wallet=%v want 100000", s.Wallet())
 			}

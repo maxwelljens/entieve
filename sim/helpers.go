@@ -157,16 +157,27 @@ func (s *Sim) nounOf(e ecs.Entity) string {
 	return s.nameOf(e)
 }
 
-// credits formats a credit amount with thousands separators and two
-// decimals: 15000 -> "15,000.00".
-func credits(v float64) string {
+// euro formats an amount per docs/lore/NAMING.md (Money strings): thousands
+// separators, two decimals and the € prefix — 15000 -> "€15,000.00"; any
+// amount under one euro renders as bare cents — 0.5 -> "50¢"; zero stays
+// "€0.00". Same rounding as before (FormatFloat, 2 decimals) — only the
+// unit presentation is euro.
+func euro(v float64) string {
 	neg := v < 0
 	if neg {
 		v = -v
 	}
 	s := strconv.FormatFloat(v, 'f', 2, 64)
-	if i := strings.IndexByte(s, '.'); i > 3 {
-		intPart, frac := s[:i], s[i:]
+	i := strings.IndexByte(s, '.')
+	intPart, frac := s[:i], s[i:]
+	if intPart == "0" && frac != ".00" { // under one euro: bare cents, no decimals
+		cents := strings.TrimLeft(frac[1:], "0")
+		if neg {
+			return "-" + cents + "¢"
+		}
+		return cents + "¢"
+	}
+	if i > 3 {
 		var b strings.Builder
 		for i, c := range intPart {
 			if i > 0 && (len(intPart)-i)%3 == 0 {
@@ -174,12 +185,12 @@ func credits(v float64) string {
 			}
 			b.WriteRune(c)
 		}
-		s = b.String() + frac
+		intPart = b.String()
 	}
 	if neg {
-		s = "-" + s
+		return "-€" + intPart + frac
 	}
-	return s
+	return "€" + intPart + frac
 }
 
 // num formats a float for event text.

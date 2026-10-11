@@ -530,7 +530,7 @@ type Event struct {
 	Actor    ecs.Entity
 	Target   ecs.Entity
 	Text     string  // human-readable log line
-	Value    float64 // credits, damage, volume... context-dependent
+	Value    float64 // euro, damage, volume... context-dependent
 	Item     content.ItemID
 	Phase    string           // EvWarp phases: "start" | "land" | "scrammed"; EvMission/EvTraffic phases above
 	ID       string           // EvMission: contract ID

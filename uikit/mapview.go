@@ -157,6 +157,33 @@ func (m *MapView) drawMap(cur content.SystemID) {
 		w, _ := text.Measure(label, *face, 0)
 		render.Text(m.img, label, pt.x-w/2, pt.y+14, m.env.TS.Small, col)
 	}
+
+	// Zone legend: the node colors decoded in the canon's zone words with
+	// their complementary status labels (docs/lore/UNIVERSE.md — Zones).
+	for i, sec := range zoneSecs {
+		y := float64(mapImgH-mapPad) + float64(i)*16
+		vector.DrawFilledCircle(m.img, 12, float32(y)+6, 4, m.mapSecurity(sec), true)
+		render.Text(m.img, zoneLabel(sec), 24, y, m.env.TS.Tiny, m.env.Pal.Dim)
+	}
+}
+
+// zoneSecs are the security codes in canonical display order.
+var zoneSecs = []string{"high", "low", "null"}
+
+// zoneLabel renders a system's security code in the in-universe zone words
+// with the complementary status label the lore canonizes (UNIVERSE.md —
+// "Charter · secure", "Fringe · contested", "Unincorporated · no charter").
+// The code values themselves never reach display text.
+func zoneLabel(sec string) string {
+	switch sec {
+	case "high":
+		return "Charter · secure"
+	case "low":
+		return "Fringe · contested"
+	case "null":
+		return "Unincorporated · no charter"
+	}
+	return ""
 }
 
 // mapNodes lists every system in deterministic (id-sorted) order, merging
@@ -225,7 +252,7 @@ func (m *MapView) project(nodes []mapNode) []mapPoint {
 	return pts
 }
 
-// mapSecurity colors a system node by security status.
+// mapSecurity colors a system node by its zone.
 func (m *MapView) mapSecurity(sec string) color.RGBA {
 	switch sec {
 	case "high":
