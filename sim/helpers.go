@@ -158,9 +158,9 @@ func (s *Sim) nounOf(e ecs.Entity) string {
 }
 
 // euro formats an amount per docs/lore/NAMING.md (Money strings): thousands
-// separators, two decimals and the € prefix — 15000 -> "€15,000.00"; any
+// separators, two decimals and the € suffix — 15000 -> "15,000.00 €"; any
 // amount under one euro renders as bare cents — 0.5 -> "50¢"; zero stays
-// "€0.00". Same rounding as before (FormatFloat, 2 decimals) — only the
+// "0.00 €". Same rounding as before (FormatFloat, 2 decimals) — only the
 // unit presentation is euro.
 func euro(v float64) string {
 	neg := v < 0
@@ -188,9 +188,9 @@ func euro(v float64) string {
 		intPart = b.String()
 	}
 	if neg {
-		return "-€" + intPart + frac
+		return "-" + intPart + frac + " €"
 	}
-	return "€" + intPart + frac
+	return intPart + frac + " €"
 }
 
 // num formats a float for event text.

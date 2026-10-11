@@ -73,7 +73,7 @@ func TestEventsCombatUtilityAndWarpKinds(t *testing.T) {
 	if !hasEvent(all, EvDestroyed, "Rat Scuttler destroyed") {
 		t.Fatalf("missing EvDestroyed: %v", all)
 	}
-	if !hasEvent(all, EvLog, "Bounty paid: €15,000.00") {
+	if !hasEvent(all, EvLog, "Bounty paid: 15,000.00 €") {
 		t.Fatalf("missing bounty log: %v", all)
 	}
 

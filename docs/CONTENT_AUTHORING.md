@@ -12,7 +12,7 @@ The schema structs in `content/model.go` (and `content/model_npc.go`) are
 **Naming and voice are binding.** Every display name, faction string,
 description and log line you author MUST follow `docs/lore/AESTHETIC.md`
 (gritty corporate register) and `docs/lore/NAMING.md` (the name registry,
-the `€1,234.56` / `50¢` money strings, and the zone words Charter space /
+the `1,234.56 €` / `50¢` money strings, and the zone words Charter space /
 the Fringe / Unincorporated). Ids are frozen implementation slugs and stay
 as they are even when the slug embeds a retired name.
 
@@ -92,7 +92,7 @@ systems come only from `systems/*.json`.
 | Time            | seconds         | `"activation_time": 3`, `"respawn_sec": 90` |
 | Speed           | m/s             | `"max_speed": 385`             |
 | Mass            | kg              | `"mass": 1200000`              |
-| Currency        | euro            | `"base_price": 6`, bounties, wallets (display `€1,234.56` / `50¢`) |
+| Currency        | euro            | `"base_price": 6`, bounties, wallets (display `1,234.56 €` / `50¢`) |
 | Angles          | radians         | `"tracking": 0.45`             |
 | Fractions       | [0,1) resists, (0,1] yields | `"em": 0.15` |
 

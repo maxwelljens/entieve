@@ -175,16 +175,19 @@ and will be replaced in a later content pass; the mapping is mechanical:
 
 | Placeholder today | Replacement |
 |---|---|
-| `12,345.67 cr` | `€12,345.67` |
-| `40,000.00 cr · +0.10 standing` | `€40,000.00 · +0.10 standing` |
+| `12,345.67 cr` | `12,345.67 €` |
+| `40,000.00 cr · +0.10 standing` | `40,000.00 € · +0.10 standing` |
 | "credit" / "credits" in prose | "euro" / "euros" |
 | "40,000 credits" in prose | "forty thousand euro" |
 | any amount under one euro | `50¢` (cents sign: `99¢`, `50¢`, `1¢`) |
 | JSON keys `reward.credits`, `base_price`, `price`, `wallet` | unchanged — implementation, like `high`/`low`/`null` |
 
-Format: two decimals for euro amounts, thousands separators, `€` prefix;
-cents display bare with `¢` suffix and no decimals. UI and log strings use
-the symbol forms; prose uses the words.
+Format: two decimals for euro amounts, thousands separators, `€` **after**
+the amount with exactly one space — `12,345.67 €`; cents display bare with
+`¢` suffix and no decimals; the minus sign stays in front of the number
+(`-1,234.50 €`). UI and log strings use the symbol forms; prose uses the
+words. (Position rule: author amendment 2026-10-11 — the `€` suffix is canon
+like the rest of this file.)
 
 ## How to name new things
 
@@ -207,7 +210,7 @@ For future (human or AI) authors adding content:
 6. **Never rename an id.** Add a row here; leave the slug alone.
 7. **Register the entity here** in the exact table format: one row per id,
    `proposed name` as a draft, `origin` from the tag vocabulary.
-8. **Money and zones follow the specs**: `€1,234.56` / `50¢`, and Charter
+8. **Money and zones follow the specs**: `1,234.56 €` / `50¢`, and Charter
    space / the Fringe / Unincorporated — never high-sec/low-sec/null-sec in
    display text.
 9. **Prose follows** [AESTHETIC.md](AESTHETIC.md): plain, hard-edged, dry;
