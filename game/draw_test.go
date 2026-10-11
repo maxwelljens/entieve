@@ -1,9 +1,12 @@
 package game
 
 import (
+	"encoding/json"
 	"image"
+	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
@@ -59,16 +62,57 @@ func newShowcaseGameAt(t *testing.T, savePath string) *Game {
 	return g
 }
 
-// pump runs two full interface frames at the given size (Sync → Update →
-// Draw; the second frame settles layout) and returns the drawn image.
+// newShowcaseGameLoaded builds the same session restored from the save
+// file at path through Options.Save (the --load path), so a test can
+// restart a session exactly as a fresh process would — docked state,
+// wallet and all — on the same path (and its layout sidecar).
+func newShowcaseGameLoaded(t *testing.T, savePath string) *Game {
+	t.Helper()
+	c, err := content.Load(content.FS())
+	if err != nil {
+		t.Fatalf("content.Load: %v", err)
+	}
+	wd, ok := c.World("world-showcase")
+	if !ok {
+		t.Fatal("world-showcase missing from content")
+	}
+	data, err := os.ReadFile(savePath)
+	if err != nil {
+		t.Fatalf("read save: %v", err)
+	}
+	var save sim.Save
+	if err := json.Unmarshal(data, &save); err != nil {
+		t.Fatalf("parse save: %v", err)
+	}
+	g, err := New(Options{
+		Content:  c,
+		World:    wd,
+		Seed:     42,
+		Save:     &save,
+		SavePath: savePath,
+	})
+	if err != nil {
+		t.Fatalf("game.New(--load): %v", err)
+	}
+	return g
+}
+
+// pump runs two full frames at the given size through the PRODUCTION
+// pipeline — Game.Update (handleKeys → top scene → fixed-step sim →
+// event drain → syncScenes → syncPanels → syncMounts → kit pump →
+// staged load) followed by Game.Draw — and returns the drawn image (the
+// second frame settles layout). Driving a hand-assembled subset here
+// would let a reordered Update pass the whole suite; the ordering pins
+// below (mount reconciliation, same-frame event drain, staged load) live
+// on this seam. Manual sync calls before pump stay valid — Update runs
+// them again.
 func pump(t *testing.T, g *Game, w, h int) *ebiten.Image {
 	t.Helper()
 	g.applySize(w, h)
 	img := ebiten.NewImage(w, h)
 	for i := 0; i < 2; i++ {
-		g.syncPanels()
-		if err := g.kit.Update(); err != nil {
-			t.Fatalf("kit.Update: %v", err)
+		if err := g.Update(); err != nil {
+			t.Fatalf("Update frame %d: %v", i, err)
 		}
 		g.Draw(img)
 	}
@@ -254,4 +298,190 @@ func dockAt(t *testing.T, g *Game) {
 		}
 	}
 	t.Fatal("no station celestial in the starting system")
+}
+
+// ---------------------------------------------------------------------------
+// Frame-pipeline ordering pins. These drive the real Game.Update/Draw
+// (through pump's seam), so reordering the production pipeline fails
+// here instead of shipping behind a green suite.
+// ---------------------------------------------------------------------------
+
+// TestFrameReconcilesMounts: after one frame the mounted set equals
+// desired(open, docked) for every panel, and the dock/undock transition
+// itself (syncScenes → scene OnEnter/OnLeave → syncMounts) happens inside
+// that frame — no manual sync between the state change and the Update.
+func TestFrameReconcilesMounts(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+
+	check := func(stage string) {
+		t.Helper()
+		docked := g.s.Docked.Has(g.s.Player())
+		for p := panelID(0); p < numPanels; p++ {
+			want := panelDefs[p].want(g, docked)
+			if got := g.mounted[p] != nil; got != want {
+				t.Errorf("%s: %s mounted=%v, want %v (open=%v docked=%v)",
+					stage, panelNames[p], got, want, *panelDefs[p].open(g), docked)
+			}
+		}
+	}
+
+	// Space with mixed intent: one frame mounts inventory and log,
+	// leaves market closed, keeps the space-only scanner up.
+	g.open[pInventory], g.open[pMarket] = true, false
+	g.open[pScanner] = true
+	if err := g.Update(); err != nil {
+		t.Fatalf("space frame: %v", err)
+	}
+	check("space")
+	if g.mounted[pInventory] == nil || g.mounted[pMarket] != nil || g.mounted[pScanner] == nil {
+		t.Error("space mounts do not follow the intent the frame was given")
+	}
+
+	// Dock (state changes only): the frame pushes the station scene, so
+	// the services surface and the scanner drops without any manual sync.
+	dockAt(t, g)
+	if err := g.Update(); err != nil {
+		t.Fatalf("dock frame: %v", err)
+	}
+	check("docked")
+	if g.mounted[pScanner] != nil {
+		t.Error("scanner still mounted while docked")
+	}
+	for _, p := range stationPanels {
+		if g.mounted[p] == nil {
+			t.Errorf("station panel %s not surfaced by the dock frame", panelNames[p])
+		}
+	}
+	if !g.stShown {
+		t.Error("station strip not mounted by the dock frame")
+	}
+
+	// Undock: the frame pops the scene and restores the pre-dock intent
+	// — the market/fitting the player had closed close again, the
+	// inventory they had open stays, and the scanner comes back.
+	g.s.Docked.Remove(g.s.Player())
+	if err := g.Update(); err != nil {
+		t.Fatalf("undock frame: %v", err)
+	}
+	check("undocked")
+	if g.mounted[pScanner] == nil {
+		t.Error("scanner not restored by the undock frame")
+	}
+	if g.mounted[pInventory] == nil {
+		t.Error("pre-dock-open inventory closed by the undock frame")
+	}
+	for _, p := range []panelID{pMarket, pFitting} {
+		if g.mounted[p] != nil {
+			t.Errorf("station panel %s still mounted after the undock frame", panelNames[p])
+		}
+	}
+}
+
+// TestFrameDrainsSimEventSameFrame: an event produced by the sim step
+// inside Game.Update is in the log before that Update returns — the
+// drain is part of the frame, not a later one.
+func TestFrameDrainsSimEventSameFrame(t *testing.T) {
+	g := dockedShowcaseGame(t, 1280, 720)
+	if n := len(g.s.Missions()); n != 0 {
+		t.Fatalf("fixture: %d missions already accepted", n)
+	}
+	before := len(g.logP.Lines())
+	g.s.Queue(sim.CmdAcceptMission{ID: "contract-solace-cleanup-1"})
+
+	// Whichever frame's sim step runs the queued command must also drain
+	// its event into the log inside the same call.
+	stepped := false
+	for i := 0; i < 8 && !stepped; i++ {
+		if err := g.Update(); err != nil {
+			t.Fatalf("frame %d: %v", i, err)
+		}
+		if len(g.s.Missions()) == 0 {
+			continue // the frame's step has not run the command yet
+		}
+		stepped = true
+		lines := g.logP.Lines()
+		if len(lines) <= before {
+			t.Fatalf("mission accepted but its event never reached the log in that frame (%d → %d lines)",
+				before, len(lines))
+		}
+		if joined := strings.Join(lines[before:], "\n"); !strings.Contains(joined, "Contract accepted:") {
+			t.Errorf("log lines added by the frame do not carry the event: %q", lines[len(lines)-1])
+		}
+	}
+	if !stepped {
+		t.Fatal("queued mission never ran (no sim step in 8 frames)")
+	}
+}
+
+// TestPendingLoadSwapsKitAfterPump: the staged menu load rebuilds the
+// kit AFTER kit.Update returned. The probe below runs inside kit.Update
+// (ebitenui dispatches deferred button events at the end of ui.Update),
+// so it is the mid-pump observation point: it must still see the old
+// kit, and the new kit must exist once the frame is over.
+func TestPendingLoadSwapsKitAfterPump(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+	if err := g.SaveGame(); err != nil {
+		t.Fatalf("SaveGame: %v", err)
+	}
+	oldKit := g.kit
+
+	g.push(&MenuScene{g: g})
+	g.syncMounts()
+	if g.mounted[pMenu] == nil {
+		t.Fatal("menu window not mounted")
+	}
+	load := menuButton(t, g, "Load")
+
+	probed, sawOldKit := false, false
+	load.ClickedEvent.AddHandler(func(interface{}) {
+		probed, sawOldKit = true, g.kit == oldKit
+	})
+	load.ClickedEvent.Fire(&widget.ButtonClickedEventArgs{Button: load})
+
+	if err := g.Update(); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if !probed {
+		t.Fatal("Load click never dispatched (the probe must run inside kit.Update)")
+	}
+	if !sawOldKit {
+		t.Error("kit swapped while kit.Update was still pumping (staged load ran mid-pump)")
+	}
+	if g.kit == oldKit {
+		t.Fatal("staged load did not rebuild the kit after the pump")
+	}
+	if g.mounted[pMenu] == nil {
+		t.Error("menu not remounted by the rebuild")
+	}
+}
+
+// menuButton walks the Esc menu window for the button with the label.
+func menuButton(t *testing.T, g *Game, label string) *widget.Button {
+	t.Helper()
+	var found *widget.Button
+	var walk func(c *widget.Container)
+	walk = func(c *widget.Container) {
+		for _, ch := range c.Children() {
+			switch v := ch.(type) {
+			case *widget.Button:
+				if v.Text() != nil && v.Text().Label == label {
+					found = v
+				}
+			case *widget.Container:
+				walk(v)
+			}
+		}
+	}
+	ctr, ok := g.menuWin.GetContainer().(*widget.Container)
+	if !ok {
+		t.Fatalf("menu container is %T", g.menuWin.GetContainer())
+	}
+	walk(ctr)
+	if found == nil {
+		t.Fatalf("menu has no %q button", label)
+	}
+	return found
 }

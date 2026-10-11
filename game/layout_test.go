@@ -76,6 +76,219 @@ func TestClampLayoutRect(t *testing.T) {
 	}
 }
 
+// TestQuitWhileDockedPersistsPreDockIntent: while docked the three
+// station services are force-open by the scene, but the sidecar records
+// the PRE-dock intent — so the next session does not boot with the
+// market/inventory open in space — and a session restored while docked
+// still surfaces the services (the scene's force) with the intent
+// intact for undock.
+func TestQuitWhileDockedPersistsPreDockIntent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	g := newShowcaseGameAt(t, path)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+
+	// Pre-dock intent: fitting open, market/inventory closed.
+	g.open[pFitting] = true
+	g.syncMounts()
+
+	// Dock: the scene force-opens all three.
+	dockAt(t, g)
+	g.syncScenes()
+	g.syncMounts()
+	pump(t, g, 1280, 720)
+	for _, p := range stationPanels {
+		if !g.open[p] {
+			t.Fatalf("station panel %s not force-open while docked", panelNames[p])
+		}
+	}
+
+	// Save: the sidecar carries the intent, not the forced state.
+	if err := g.SaveGame(); err != nil {
+		t.Fatalf("SaveGame: %v", err)
+	}
+	doc := readDoc(t, g.layoutPath())
+	if doc.Windows["market"].Open {
+		t.Error("closed market persisted open (the dock force leaked into intent)")
+	}
+	if doc.Windows["inventory"].Open {
+		t.Error("closed inventory persisted open")
+	}
+	if !doc.Windows["fitting"].Open {
+		t.Error("pre-dock-open fitting persisted closed")
+	}
+
+	// Next session, restored while docked (the save carries the dock):
+	// the services surface again, and undock restores the intent.
+	g2 := newShowcaseGameLoaded(t, path)
+	g2.applySize(1280, 720)
+	pump(t, g2, 1280, 720)
+	if !g2.s.Docked.Has(g2.s.Player()) {
+		t.Fatal("fixture: the save did not carry the dock")
+	}
+	for _, p := range stationPanels {
+		if g2.mounted[p] == nil {
+			t.Errorf("station panel %s not surfaced on the docked restore", panelNames[p])
+		}
+	}
+	if !g2.open[pFitting] {
+		t.Error("pre-dock-open fitting closed by the restore")
+	}
+
+	g2.s.Docked.Remove(g2.s.Player())
+	g2.syncScenes()
+	g2.syncMounts()
+	pump(t, g2, 1280, 720)
+	if g2.open[pMarket] || g2.mounted[pMarket] != nil {
+		t.Error("market reopened in space (forced dock state persisted as intent)")
+	}
+	if g2.open[pInventory] || g2.mounted[pInventory] != nil {
+		t.Error("inventory reopened in space")
+	}
+	if !g2.open[pFitting] || g2.mounted[pFitting] == nil {
+		t.Error("pre-dock-open fitting lost by the dock round-trip")
+	}
+}
+
+// TestRestoredWindowsReclampOnResize: a sidecar written at 1920×1080
+// restores there, then the window shrinks to 1024×700. Restored windows
+// are re-clamped to the new screen on every applySize (not only at
+// restore time): each one ends up fully on-screen and at/above its
+// MinSize, keeps its restored flag (the arrangement stays the player's),
+// stays tracked, and writeLayout no longer persists off-screen coords.
+func TestRestoredWindowsReclampOnResize(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	if err := os.WriteFile(path+".layout.json", []byte(`{"version":1,"windows":{
+		"overview":{"x":1500,"y":780,"w":400,"h":300,"open":true},
+		"log":{"x":1400,"y":600,"w":360,"h":240,"open":true},
+		"market":{"x":1000,"y":400,"w":420,"h":300,"open":true}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	g := newShowcaseGameAt(t, path)
+	g.applySize(1920, 1080)
+	pump(t, g, 1920, 1080)
+	ov := g.kit.OverviewWindow()
+	if got := ov.GetContainer().GetWidget().Rect; got != image.Rect(1500, 780, 1900, 1080) {
+		t.Fatalf("restore at 1920: overview = %v, want (1500,780)-(1900,1080)", got)
+	}
+
+	g.applySize(1024, 700)
+	pump(t, g, 1024, 700)
+
+	// Exact clamp math for the overview (400×300 keeps its size, both
+	// coordinates slide to the 1024×700 screen).
+	if got, want := ov.GetContainer().GetWidget().Rect, image.Rect(624, 400, 1024, 700); got != want {
+		t.Errorf("overview after the shrink = %v, want the clamped %v", got, want)
+	}
+	if !g.restored[ov] {
+		t.Error("re-clamp dropped the restored flag (the arrangement would recompose)")
+	}
+	if got := g.placed[ov]; got != ov.GetContainer().GetWidget().Rect {
+		t.Errorf("tracker after re-clamp = %v, want the actual %v",
+			got, ov.GetContainer().GetWidget().Rect)
+	}
+
+	// Every persisted window: on-screen and at/above its MinSize.
+	screen := image.Rect(0, 0, 1024, 700)
+	for _, name := range layoutNames {
+		win, _ := g.layoutTarget(name)
+		if win == nil {
+			t.Fatalf("layout window %q does not resolve", name)
+		}
+		r := win.GetContainer().GetWidget().Rect
+		if r.Dx() == 0 && r.Dy() == 0 {
+			t.Errorf("%s: never laid out", name)
+			continue
+		}
+		if !r.In(screen) {
+			t.Errorf("%s: %v out of bounds at 1024×700", name, r)
+		}
+		if min := win.MinSize; min != nil && (r.Dx() < min.X || r.Dy() < min.Y) {
+			t.Errorf("%s: %v below MinSize %v", name, r, min)
+		}
+	}
+
+	// The sidecar must not carry the off-screen coordinates any more.
+	if err := g.writeLayout(); err != nil {
+		t.Fatalf("writeLayout: %v", err)
+	}
+	for name, e := range readDoc(t, g.layoutPath()).Windows {
+		if e.X < 0 || e.Y < 0 || e.X+e.W > 1024 || e.Y+e.H > 700 {
+			t.Errorf("sidecar %s entry %+v is off-screen after the shrink", name, e)
+		}
+	}
+
+	// Growing back keeps the clamped arrangement: restored windows are
+	// never recomposed, only clamped.
+	g.applySize(1920, 1080)
+	pump(t, g, 1920, 1080)
+	if got := ov.GetContainer().GetWidget().Rect; got != image.Rect(624, 400, 1024, 700) {
+		t.Errorf("overview after regrowing = %v, want the clamped rect kept", got)
+	}
+}
+
+// TestPlacementTrackerMatchesActualRects: after any compose or restore
+// g.placed holds each tracked window's REAL rect. A stale entry
+// misclassifies the window as player-moved and freezes its composition
+// forever — which is what the station board's content hug did when it
+// called SetLocation directly.
+func TestPlacementTrackerMatchesActualRects(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	g := newShowcaseGameAt(t, path)
+	assertTracked := func(stage string) {
+		t.Helper()
+		if len(g.placed) == 0 {
+			t.Fatalf("%s: nothing is tracked", stage)
+		}
+		for win, r := range g.placed {
+			if actual := win.GetContainer().GetWidget().Rect; actual != r {
+				t.Errorf("%s: tracked %v, actual %v — this window now reads as player-moved",
+					stage, r, actual)
+			}
+		}
+	}
+
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+	assertTracked("compose")
+
+	// Docked: the board's content hug recomposes the station column —
+	// through the tracker, so the invariant survives it.
+	dockAt(t, g)
+	g.syncScenes()
+	g.syncMounts()
+	pump(t, g, 1280, 720)
+	assertTracked("docked board hug")
+	station := g.stationW.GetContainer().GetWidget().Rect
+	if want := stationLayout(1280, 720, station.Dy()); station != want.Station {
+		t.Errorf("station = %v, want the composed %v", station, want.Station)
+	}
+	if g.placed[g.stationW] != station {
+		t.Errorf("station tracker = %v, want the actual %v", g.placed[g.stationW], station)
+	}
+
+	// Restore path: a fresh session over this session's sidecar tracks
+	// the rects it applied (including any MinSize growth).
+	if err := g.SaveGame(); err != nil {
+		t.Fatalf("SaveGame: %v", err)
+	}
+	g2 := newShowcaseGameAt(t, path)
+	g2.applySize(1280, 720)
+	pump(t, g2, 1280, 720)
+	if len(g2.restored) == 0 {
+		t.Fatal("fixture: nothing was restored from the sidecar")
+	}
+	if len(g2.placed) == 0 {
+		t.Fatal("restore left the placement tracker empty")
+	}
+	for win, r := range g2.placed {
+		if actual := win.GetContainer().GetWidget().Rect; actual != r {
+			t.Errorf("restore: tracked %v, actual %v", r, actual)
+		}
+	}
+}
+
 // TestLayoutSidecarFormat: SaveGame writes <SavePath>.layout.json with
 // version, one flat {x,y,w,h,open} entry per named window, and the
 // sim save file itself stays untouched by layout data.

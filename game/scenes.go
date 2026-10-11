@@ -44,6 +44,16 @@ type StationScene struct{ g *Game }
 // stationPanels are the windows that auto-open on dock.
 var stationPanels = []panelID{pMarket, pInventory, pFitting}
 
+// isStationPanel reports whether p is one of the dock-forced services.
+func isStationPanel(p panelID) bool {
+	for _, s := range stationPanels {
+		if s == p {
+			return true
+		}
+	}
+	return false
+}
+
 // OnEnter implements Scene: remember which station windows were open and
 // surface the station services.
 func (sc *StationScene) OnEnter() {

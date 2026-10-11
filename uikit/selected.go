@@ -390,13 +390,13 @@ func canLock(kind string) bool {
 
 // orbitLabel renders the Orbit selector: "Orbit range: 2,500 m »".
 func orbitLabel(rng float64) string {
-	return "Orbit range: " + groupInt(int64(rng)) + " m »"
+	return "Orbit range: " + FormatInt(int64(rng)) + " m »"
 }
 
 // warpRangeLabel renders the warp-to-within selector:
 // "Warp to within: 10,000 m »".
 func warpRangeLabel(rng float64) string {
-	return "Warp to within: " + groupInt(int64(rng)) + " m »"
+	return "Warp to within: " + FormatInt(int64(rng)) + " m »"
 }
 
 // WarpRange is the warp landing distance the Warp action and the Z key

@@ -8,12 +8,15 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// Window chrome: edge-grip resize for every window uikit builds.
+// Window chrome: edge-grip resize for every window a Kit mounts.
 //
 // ebitenui's windowOpts.Resizeable() only extends the container rect's
-// Max corner, so it resizes from the bottom/right edge alone.
-// makeEdgeResizable replaces it with an N/E/S/W grip (corners use both
-// axes) so the opposite edge always stays fixed and MinSize is honored.
+// Max corner, so it resizes from the bottom/right edge alone. The grip
+// replaces it with an N/E/S/W grip (corners use both axes) so the
+// opposite edge always stays fixed and MinSize is honored. The kit's
+// AddWindow attaches one chrome per mounted window (Kit.chromes) and
+// detaches it again through the remove func it returns, so only mounted
+// windows are ever pumped.
 //
 // The grip is classified from the WINDOW RECT in the chrome's per-frame
 // step, never from widget press events: a body widget that fills the
@@ -89,8 +92,8 @@ func resizeRect(start image.Rectangle, dx, dy int, edges edgeMask, minSize image
 	return r
 }
 
-// winChrome is one window's edge-resize state: attached by
-// makeEdgeResizable, pumped every frame by Kit.stepChromes.
+// winChrome is one window's edge-resize state: attached by Kit.AddWindow,
+// pumped every frame by Kit.stepChromes while that window stays mounted.
 type winChrome struct {
 	win    *widget.Window
 	held   bool            // left button state at the previous step
@@ -101,33 +104,13 @@ type winChrome struct {
 	origin image.Point     // cursor at press
 }
 
-// chromeByWindow indexes chrome by window so makeEdgeResizable is
-// idempotent and Kit.AddWindow can pick a mounted window's chrome up.
-// NewKit clears it: one kit owns the live windows, so discarded kits'
-// windows do not pile up across save/load rebuilds.
-var chromeByWindow = map[*widget.Window]*winChrome{}
-
-// makeEdgeResizable gives win four-edge plus corner grip resizing
-// (edgeGripPx bands, MinSize honored, ResizeEvent fired once per drag).
-// Call it once per window after widget.NewWindow; title-bar dragging
-// stays with the built-in Draggable() handling this coexists with.
-func makeEdgeResizable(win *widget.Window) *winChrome {
-	if ch, ok := chromeByWindow[win]; ok {
-		return ch
-	}
-	ch := &winChrome{win: win}
-	chromeByWindow[win] = ch
-	return ch
+// cancel drops any grip state without touching the rect: the window is
+// leaving the pump (unmounted, or hidden this frame) and must leave no
+// drag or cursor side effects behind.
+func (c *winChrome) cancel() {
+	c.armed, c.active = false, false
 }
 
-// gripStart reports the edges gripped when a press lands on p: the point
-// must sit in this window's own grip band AND on top of every other input
-// layer, so only the topmost window under the cursor ever starts a resize.
-// The layer test asks for LayerEventTypeWheel on purpose: a body's scroll
-// viewport elevates a layer that claims every event EXCEPT wheel
-// (ebitenui's ScrollContainer), so a mouse-eligible test would report
-// "covered" for a window's own body — exactly the defect this replaced —
-// while another window's layer (which claims wheel too) still blocks.
 // gripStart reports the edges gripped when a press lands on p: the point
 // must sit in this window's own grip band AND on top of every other input
 // layer, so only the topmost window under the cursor ever starts a resize.
@@ -166,10 +149,20 @@ func (c *winChrome) gripStart(p image.Point) edgeMask {
 // ResizeEvent fires (the child widget keeps the press). Releasing after a
 // drag fires ResizeEvent once with the final rect. cursor/pressed are
 // parameters so tests drive the math without ebiten input.
+//
+// A hidden window is never stepped into: its grip state drops instead of
+// applying rects (the idle branch already refused the cursor; an active
+// drag used to keep moving the invisible rect, which then read back as a
+// player-moved window).
 func (c *winChrome) step(cursor image.Point, pressed bool) {
 	wgt := c.win.GetContainer().GetWidget()
 	rising := pressed && !c.held
 	c.held = pressed
+
+	if !wgt.IsVisible() {
+		c.cancel()
+		return
+	}
 
 	switch {
 	case c.active:
@@ -202,7 +195,7 @@ func (c *winChrome) step(cursor image.Point, pressed bool) {
 		return
 	}
 
-	if pressed || !wgt.IsVisible() {
+	if pressed {
 		return
 	}
 	// Idle hover: advertise the resize cursor over an idle grip, using the
@@ -243,11 +236,12 @@ func setResizeCursor(e edgeMask) {
 	input.SetCursorShape(input.CURSOR_NSRESIZE)
 }
 
-// stepChromes pumps every window chrome registered with this kit. The
-// Kit calls it right after ui.Update (press events just fired, so the
-// new rect applies to this frame's render) and again after ui.Draw (the
-// built-in title drag moves the rect during Render; the recompute wipes
-// that drift before the next frame's hit tests).
+// stepChromes pumps the chrome of every window currently mounted on this
+// kit (Kit.chromes — an unmounted window's entry is gone, so it is never
+// stepped). The Kit calls it right after ui.Update (press events just
+// fired, so the new rect applies to this frame's render) and again after
+// ui.Draw (the built-in title drag moves the rect during Render; the
+// recompute wipes that drift before the next frame's hit tests).
 func (k *Kit) stepChromes() {
 	cursor := image.Point{}
 	cursor.X, cursor.Y = input.CursorPosition()

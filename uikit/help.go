@@ -139,7 +139,6 @@ func NewHelp(env Env, rows []KeyRow) *HelpPanel {
 		// top like the legacy help overlay; the integrator re-centers it.
 		widget.WindowOpts.Location(image.Rect(max(10, (1024-w)/2), helpStartY, max(10, (1024-w)/2)+w, helpStartY+wh)),
 	)
-	makeEdgeResizable(h.win) // four-edge resize
 	return h
 }
 

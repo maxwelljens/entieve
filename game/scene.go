@@ -8,6 +8,7 @@ import (
 	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
@@ -42,10 +43,15 @@ const (
 	zoomMax           = 4.0
 	zoomStep          = 1.15 // wheel notch factor
 	panSpeed          = 10.0 // screen px per arrow press
-	orbitDefaultRange = 2500.0
 	pickRadiusPx      = 18.0
 	doubleClickWindow = 400 * time.Millisecond
 )
+
+// orbitDefaultRange is the fixed range of a right-click orbit: the first
+// Selected Item orbit range, so the help overlay's number and the command
+// can never drift apart from uikit.OrbitRanges (pinned by
+// TestHelpRangeNumbersMatchExportedArrays).
+var orbitDefaultRange = uikit.OrbitRanges[0]
 
 // SpaceScene is the hub: world rendering, camera and world clicks. Every
 // mouse interaction is suppressed while the pointer sits on any interface

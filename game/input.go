@@ -1,6 +1,9 @@
 package game
 
-import "github.com/hajimehoshi/ebiten/v2"
+import (
+	"github.com/entieve/entieve/uikit"
+	"github.com/hajimehoshi/ebiten/v2"
+)
 
 // Binding documents one keyboard binding. KeyMap is the single source of
 // truth for the in-game help overlay (H) and docs/GAMEPLAY.md.
@@ -66,12 +69,15 @@ type MouseBinding struct {
 }
 
 // MouseMap documents the mouse controls (same single source as KeyMap).
+// Range numbers are derived from the selector arrays, never typed: the
+// right-click orbit flies at uikit.OrbitRanges[0] (scene.go), and the
+// pin in keymap_test checks the two agree.
 var MouseMap = []MouseBinding{
 	{Button: "Left click", Desc: "Select entity / press UI buttons; drag a title bar to move a window"},
 	{Button: "Left click", Mod: "on column header", Desc: "sort the overview (click again flips direction)"},
 	{Button: "Left click", Mod: "Ctrl", Desc: "Lock target under cursor"},
 	{Button: "Left double-click", Desc: "Approach entity; on empty space, fly straight toward the point"},
-	{Button: "Right click", Desc: "Orbit target under cursor (2,500 m)"},
+	{Button: "Right click", Desc: "Orbit target under cursor (" + uikit.FormatInt(int64(orbitDefaultRange)) + " m)"},
 	{Button: "Right click", Mod: "on weapon slot", Desc: "cycle loaded charge (Auto → cargo ammo)"},
 	{Button: "Middle drag", Desc: "Pan camera"},
 	{Button: "Wheel", Desc: "Zoom (0.05x – 4x); over the overview, scroll the list"},

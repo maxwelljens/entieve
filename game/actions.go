@@ -117,6 +117,10 @@ func (g *Game) lockSelected() {
 
 // cycleLock locks the next-nearest lockable entity (Tab): distance-ordered
 // cycling over every perceivable lockable on grid.
+//
+// The step is anchored to the CURRENT selection's position in the freshly
+// sorted list, not to a remembered index: distances re-sort between
+// presses, and a stale index would skip or repeat an entry.
 func (g *Game) cycleLock() {
 	var cands []sim.Info
 	player := g.s.Player()
@@ -129,12 +133,26 @@ func (g *Game) cycleLock() {
 		return
 	}
 	sort.SliceStable(cands, func(i, j int) bool { return cands[i].Distance < cands[j].Distance })
-	g.tabIdx++
-	if g.tabIdx < 0 || g.tabIdx >= len(cands) {
-		g.tabIdx = 0
+	next := nextLockIdx(cands, g.selected())
+	g.setSelected(cands[next].Entity)
+	g.s.Queue(sim.CmdLock{Target: cands[next].Entity})
+}
+
+// nextLockIdx is the Tab step over the distance-ordered candidate list:
+// the position after sel, wrapping to the nearest; no selection — or one
+// that is not a candidate (an entity that left the list, a station, an
+// empty selection) restarts the cycle at the nearest. Pure — unit-tested
+// by TestNextLockIdx (the showcase grid spawns no lockable entities, so
+// this is where the anchoring semantics are pinned exactly).
+func nextLockIdx(cands []sim.Info, sel ecs.Entity) int {
+	if !sel.IsZero() {
+		for i, c := range cands {
+			if c.Entity == sel {
+				return (i + 1) % len(cands)
+			}
+		}
 	}
-	g.setSelected(cands[g.tabIdx].Entity)
-	g.s.Queue(sim.CmdLock{Target: cands[g.tabIdx].Entity})
+	return 0
 }
 
 // canLock reports whether entities of this kind can be targeted.

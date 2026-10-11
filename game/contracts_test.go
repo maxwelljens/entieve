@@ -8,6 +8,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -339,38 +340,18 @@ func TestStationBoardRendersShippedContent(t *testing.T) {
 	}
 }
 
-// TestBoardRewardUsesCanonicalCredits: the payout line uses the same
-// credit presentation as the wallet, the HUD and the market title
-// ("12,345.00 cr") — not the old "40,000 ISK" one-off.
+// TestBoardRewardUsesCanonicalCredits: the payout line renders through
+// the exported formatter every credit readout shares (uikit.FormatCredits
+// — HUD wallet, market title, board reward). One golden call, no
+// widget-tree spelunking: with a single formatter there is nothing left
+// to cross-check. The formatter's own goldens live in uikit/hud_test.go.
 func TestBoardRewardUsesCanonicalCredits(t *testing.T) {
-	// Goldens mirror uikit's wallet formatter (uikit/hud_test.go).
-	for _, c := range []struct {
-		in   float64
-		want string
-	}{
-		{40000, "40,000.00 cr"},
-		{-1234.5, "-1,234.50 cr"},
-		{0.999, "1.00 cr"},
-		{0, "0.00 cr"},
-	} {
-		if got := creditsLabel(c.in); got != c.want {
-			t.Errorf("creditsLabel(%v) = %q, want %q", c.in, got, c.want)
-		}
+	if got, want := uikit.FormatCredits(40000), "40,000.00 cr"; got != want {
+		t.Errorf("FormatCredits(40000) = %q, want %q", got, want)
 	}
 	def := content.ContractDef{Reward: content.ContractReward{Credits: 40000, StandingGain: 0.10}}
 	if got, want := rewardText(&def), "40,000.00 cr · +0.10 standing"; got != want {
 		t.Errorf("rewardText = %q, want %q", got, want)
-	}
-
-	// Live equivalence: the market title is rendered by uikit's own
-	// formatCredits from the same wallet balance, so both formatters
-	// must agree on the running total.
-	g := dockedShowcaseGame(t, 1280, 720)
-	title := g.mkt.Win().GetContainer().(*widget.Container).
-		Children()[0].(*widget.Container).Children()[0].(*widget.Text).Label
-	if want := "Market — " + creditsLabel(g.s.Wallet()); title != want {
-		t.Errorf("market title = %q, want %q (creditsLabel differs from the wallet format)",
-			title, want)
 	}
 }
 
@@ -456,10 +437,11 @@ func TestStationAbandonEmitsCommand(t *testing.T) {
 // State refresh: the EvMission path
 // ---------------------------------------------------------------------------
 
-// TestStationBoardRefreshesOnEvMission: a progress change followed by a
-// drained EvMission event updates the active row's progress text — and
-// without the event the row stays stale (the refresh is wired to the
-// event path, not to incidental pumping).
+// TestStationBoardRefreshesOnEvMission: the active row follows mission
+// progress through both documented refresh paths — the per-frame board
+// sync while docked (syncStationBoard runs from syncMounts) and the
+// drained EvMission event, which must land without waiting for another
+// frame.
 func TestStationBoardRefreshesOnEvMission(t *testing.T) {
 	g := dockedShowcaseGame(t, 1280, 720)
 	setMissions(t, g, sim.MissionState{ID: "contract-solace-cordite-1", Progress: 0})
@@ -469,16 +451,22 @@ func TestStationBoardRefreshesOnEvMission(t *testing.T) {
 		t.Fatalf("active row = %q, want %q", got, want)
 	}
 
-	// Progress changes in the sim without an event reaching the interface.
+	// Progress changes in the sim: the next real frame's board sync
+	// picks it up (the board re-syncs every frame while docked).
 	setMissions(t, g, sim.MissionState{ID: "contract-solace-cordite-1", Progress: 120})
 	pump(t, g, 1280, 720)
-	if got := activeTitle(t, g, 0); got != "Cordite order — 0/400" {
-		t.Fatalf("row refreshed without the EvMission path: %q", got)
+	if got, want := activeTitle(t, g, 0), "Cordite order — 120/400"; got != want {
+		t.Fatalf("row after a frame = %q, want %q", got, want)
 	}
 
+	// The event path refreshes synchronously: no frame in between, the
+	// row must show the new progress right after the event drains.
+	setMissions(t, g, sim.MissionState{ID: "contract-solace-cordite-1", Progress: 240})
+	if got := activeTitle(t, g, 0); got != "Cordite order — 120/400" {
+		t.Fatalf("row changed before the event (fixture): %q", got)
+	}
 	g.onEvents([]sim.Event{{Kind: sim.EvMission, Phase: sim.MissionProgress}})
-	pump(t, g, 1280, 720)
-	if got, want := activeTitle(t, g, 0), "Cordite order — 120/400"; got != want {
+	if got, want := activeTitle(t, g, 0), "Cordite order — 240/400"; got != want {
 		t.Fatalf("after EvMission: row = %q, want %q", got, want)
 	}
 }

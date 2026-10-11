@@ -150,7 +150,6 @@ func NewFitting(env Env) *Fitting {
 		// (game/station_layout.go).
 		widget.WindowOpts.Location(image.Rect(709, 256, 1014, 690)),
 	)
-	makeEdgeResizable(f.win) // four-edge resize (replaces WindowOpts.Resizeable)
 	return f
 }
 
@@ -218,9 +217,9 @@ func (f *Fitting) statLines(ship *sim.ShipState, hasShip bool) string {
 	s := f.env.Sim
 	player := s.Player()
 	lines := []string{
-		"Shield " + groupInt(int64(ship.MaxShield)) +
-			" · Armor " + groupInt(int64(ship.MaxArmor)) +
-			" · Structure " + groupInt(int64(ship.MaxStructure)),
+		"Shield " + FormatInt(int64(ship.MaxShield)) +
+			" · Armor " + FormatInt(int64(ship.MaxArmor)) +
+			" · Structure " + FormatInt(int64(ship.MaxStructure)),
 	}
 	if cap, ok := s.Caps.Get(player); ok {
 		lines = append(lines, "Capacitor "+groupFloat(cap.Capacity, 1)+
@@ -241,7 +240,7 @@ func (f *Fitting) statLines(ship *sim.ShipState, hasShip bool) string {
 	}
 	if tg, ok := s.Targetings.Get(player); ok {
 		lines = append(lines, "Warp "+groupFloat(warp, 1)+" AU/s"+
-			" · Targets "+groupInt(int64(tg.MaxTargets))+
+			" · Targets "+FormatInt(int64(tg.MaxTargets))+
 			" · Scan "+groupFloat(tg.ScanRes, 0))
 	}
 	return joinLines(lines)
@@ -283,7 +282,7 @@ func (f *Fitting) slotRows(ship *sim.ShipState, hasShip bool) []TableRow {
 				name = itemLabel(f.env, content.ItemID(defs[i]))
 			}
 			rows = append(rows, TableRow{
-				Cells: []string{labels[class] + " " + groupInt(int64(i+1)), name},
+				Cells: []string{labels[class] + " " + FormatInt(int64(i+1)), name},
 				Data:  pick,
 			})
 		}
@@ -304,7 +303,7 @@ func (f *Fitting) hangarRows() []TableRow {
 			continue
 		}
 		rows = append(rows, TableRow{
-			Cells: []string{mod.Name, "×" + groupInt(int64(st.Qty))},
+			Cells: []string{mod.Name, "×" + FormatInt(int64(st.Qty))},
 			Data:  content.ModuleID(st.Item),
 		})
 	}

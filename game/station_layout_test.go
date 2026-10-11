@@ -249,7 +249,7 @@ func TestStationLayoutMarketFitsColumns(t *testing.T) {
 		if def, ok := g.opts.Content.Item(st.Item); ok {
 			name = def.Name
 		}
-		for i, cell := range []string{name, creditsLabel(st.Price), groupNum(int64(st.Qty))} {
+		for i, cell := range []string{name, uikit.FormatCredits(st.Price), uikit.FormatInt(int64(st.Qty))} {
 			if w := measure(cell) + 2*cellPad; w > natural[i] {
 				natural[i] = w
 			}

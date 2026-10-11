@@ -174,17 +174,20 @@ func TestHudSyncReadouts(t *testing.T) {
 		t.Errorf("time label = %q, want %q", h.timeLbl.Label, "×4 time")
 	}
 
-	// Wallet formatting (incl. the negative and carry cases).
+	// Wallet formatting (incl. the negative and carry cases) — the
+	// exported formatter every credit readout shares (HUD, market title,
+	// the station board's payout line).
 	for _, c := range []struct {
 		in   float64
 		want string
 	}{
+		{40000, "40,000.00 cr"},
 		{-1234.5, "-1,234.50 cr"},
 		{0.999, "1.00 cr"},
 		{0, "0.00 cr"},
 	} {
-		if got := h.creditsLabel(c.in); got != c.want {
-			t.Errorf("creditsLabel(%v) = %q, want %q", c.in, got, c.want)
+		if got := FormatCredits(c.in); got != c.want {
+			t.Errorf("FormatCredits(%v) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }

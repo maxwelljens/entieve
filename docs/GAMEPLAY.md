@@ -125,7 +125,10 @@ save — `<save path>.layout.json`, e.g.
 menu. It is read back on startup and after loading a save, so a
 favorite arrangement survives restarts and loads. Restored windows are
 clamped to their minimum size and to the screen (always fully
-on-screen); a missing, corrupt or partial sidecar simply falls back to
+on-screen) — the clamp is re-established whenever you resize the game
+window too, so a layout saved at a larger resolution can never strand a
+window off-screen — and only what no longer fits slides back in; a
+missing, corrupt or partial sidecar simply falls back to
 the defaults, and unknown entries in the file are ignored. **Your saved
 arrangement wins**: a window with a sidecar entry is never recomposed —
 the automatic tiling only fills in the windows the sidecar does not
@@ -145,8 +148,10 @@ automatically at your viewport size** — market on top, inventory and
 fitting below — and any arrangement you saved or dragged wins over that
 tiling. Undocking closes the station windows that were closed before
 docking, restores the space chrome and the overview/selected pair, and
-resets the camera view. The log stays mounted while docked so its
-history comes with you.
+resets the camera view. The layout sidecar remembers that pre-dock
+state (not the dock-forced open flags), so quitting while docked does
+not reopen the market and friends in space on the next boot. The log
+stays mounted while docked so its history comes with you.
 
 ### Overview (top-left)
 
