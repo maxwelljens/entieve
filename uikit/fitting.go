@@ -142,8 +142,13 @@ func NewFitting(env Env) *Fitting {
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, titleBarH),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.MinSize(300, 400),
-		widget.WindowOpts.Location(image.Rect(704, 8, 1008, 696)),
+		// Content floor: stat block, resist row and a full row of the
+		// slot and hangar tables (they scroll below that).
+		widget.WindowOpts.MinSize(300, 430),
+		// Fallback only: the composed rect at the 1024×700 minimum.
+		// The game recomposes from the real viewport at startup
+		// (game/station_layout.go).
+		widget.WindowOpts.Location(image.Rect(709, 256, 1014, 690)),
 	)
 	makeEdgeResizable(f.win) // four-edge resize (replaces WindowOpts.Resizeable)
 	return f

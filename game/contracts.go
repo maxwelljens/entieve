@@ -269,8 +269,10 @@ func (g *Game) rebuildStationBoard(m stationBoardModel) {
 		}
 	}
 	_, h := g.stBody.PreferredSize()
-	g.stationW.SetLocation(image.Rect(stationX, stationY,
-		stationX+stationWinW, stationY+max(h, stationMinH)))
+	// The station column is part of the composed docked layout — same
+	// source of truth as placeDefaults (stationLayout), so the board's
+	// content hug and the viewport composition can never disagree.
+	g.stationW.SetLocation(stationLayout(g.w, g.h, h).Station)
 }
 
 // buildContractRow renders one board row: text lines left, action button
@@ -329,30 +331,38 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 		return row, btn
 	}
 
-	// Three lines: title + Accept / summary / reward [+ requirement].
-	avail := boardContentW
+	// Three lines: title + Accept / summary [requirement] / reward. A
+	// gated row parks its standing requirement beside the objective
+	// (line 2) so line 3 gives the payout the whole row — the reward is
+	// the one string on a board row that must never ellipsize.
+	summaryW := float64(boardContentW)
 	if r.Require != "" {
 		reqW := g.textW(r.Require, uikit.StepTiny)
-		if capW := float64(boardContentW) - boardBtnGap - 40; reqW > capW {
+		if capW := summaryW - boardBtnGap - 40; reqW > capW {
 			r.Require = g.ellip(r.Require, uikit.StepTiny, capW)
 			reqW = g.textW(r.Require, uikit.StepTiny)
 		}
-		avail = int(float64(boardContentW) - reqW - boardBtnGap)
+		summaryW -= reqW + boardBtnGap
 	}
-	reward := widget.NewText(
-		widget.TextOpts.Text(g.ellip(r.Reward, uikit.StepTiny, float64(avail)), g.env.Face(uikit.StepTiny), solid(p.Good)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(avail, 0)),
+	var line2 widget.PreferredSizeLocateableWidget = widget.NewText(
+		widget.TextOpts.Text(g.ellip(r.Summary, uikit.StepTiny, summaryW), g.env.Face(uikit.StepTiny), solid(p.Dim)),
 	)
-	line3 := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
-		widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-		widget.RowLayoutOpts.Spacing(boardBtnGap),
-	)))
-	line3.AddChild(reward)
 	if r.Require != "" {
-		line3.AddChild(widget.NewText(
+		req := widget.NewText(
 			widget.TextOpts.Text(r.Require, g.env.Face(uikit.StepTiny), solid(p.Warn)),
-		))
+		)
+		ctr := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(boardBtnGap),
+		)))
+		ctr.AddChild(line2, req)
+		line2 = ctr
 	}
+
+	reward := widget.NewText(
+		widget.TextOpts.Text(g.ellip(r.Reward, uikit.StepTiny, float64(boardContentW)), g.env.Face(uikit.StepTiny), solid(p.Good)),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(boardContentW, 0)),
+	)
 
 	line1 := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
 		widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
@@ -367,13 +377,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 			widget.RowLayoutOpts.Padding(rowPad),
 		)),
 	)
-	row.AddChild(
-		line1,
-		widget.NewText(
-			widget.TextOpts.Text(g.ellip(r.Summary, uikit.StepTiny, float64(boardContentW)), g.env.Face(uikit.StepTiny), solid(p.Dim)),
-		),
-		line3,
-	)
+	row.AddChild(line1, line2, reward)
 	return row, btn
 }
 
@@ -400,15 +404,46 @@ func objectiveSummary(c *content.Content, def *content.ContractDef) string {
 }
 
 // rewardText renders the board's reward line, e.g.
-// "40,000 ISK · +0.10 standing" (ISK is the board's EVE-flavoured name
-// for credits — the wallet shows the same balance as "cr"; see
-// docs/GAMEPLAY.md).
+// "40,000.00 cr · +0.10 standing" — the same canonical credit
+// presentation the wallet/HUD and the market title use (creditsLabel).
 func rewardText(def *content.ContractDef) string {
-	s := groupNum(int64(math.Round(def.Reward.Credits))) + " ISK"
+	s := creditsLabel(def.Reward.Credits)
 	if def.Reward.StandingGain != 0 {
 		s += fmt.Sprintf(" · %+.2f standing", def.Reward.StandingGain)
 	}
 	return s
+}
+
+// creditsLabel renders a currency amount exactly the way the wallet and
+// the market title do — "12,345.00 cr" (uikit's formatCredits /
+// Hud.creditsLabel presentation; those live in uikit files this package
+// must not reach into, so the formatting is mirrored here and pinned by
+// TestBoardRewardUsesCanonicalCredits).
+func creditsLabel(v float64) string {
+	neg := v < 0
+	if neg {
+		v = -v
+	}
+	v = math.Round(v*100) / 100
+	ip := int64(v)
+	frac := int64(math.Round((v - float64(ip)) * 100))
+	if frac >= 100 { // carry from rounding, e.g. 0.999 -> 1.00
+		ip++
+		frac = 0
+	}
+	s := groupNum(ip) + "." + pad2(frac) + " cr"
+	if neg {
+		s = "-" + s
+	}
+	return s
+}
+
+// pad2 renders a 0..99 integer with a leading zero (mirrors uikit.pad2).
+func pad2(n int64) string {
+	if n < 10 {
+		return "0" + strconv.FormatInt(n, 10)
+	}
+	return strconv.FormatInt(n, 10)
 }
 
 // cargoProgress counts a deliver contract's objective cargo in the hold,

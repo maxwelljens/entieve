@@ -122,6 +122,14 @@ type Game struct {
 	orbitIdx     int
 	stationPrior [numPanels]bool
 
+	// placed is the last rect this session composed for each window,
+	// restored the windows positioned from the layout sidecar. A window
+	// is virgin — safe to (re)place when the viewport changes — while it
+	// carries no restored flag and still sits exactly where we last put
+	// it; anything else is the player's arrangement and is never stomped.
+	placed   map[*widget.Window]image.Rectangle
+	restored map[*widget.Window]bool
+
 	pendingLoad bool
 	quit        bool
 
@@ -206,8 +214,8 @@ func (g *Game) Run() error {
 }
 
 // Layout returns the logical screen size (clamped to the layout minimum so
-// the HUD regions always fit) and — on the first real size — (re)places the
-// movable default window positions.
+// the HUD regions always fit) and (re)places the movable default window
+// positions whenever that size changes (virgin windows only).
 func (g *Game) Layout(width, height int) (int, int) {
 	if width < minW {
 		width = minW
@@ -219,19 +227,21 @@ func (g *Game) Layout(width, height int) (int, int) {
 	return width, height
 }
 
-// applySize records the screen size and — on the first real size —
-// (re)places the movable default window positions and restores the
-// saved layout over them (user-dragged positions survive later
-// resizes). The root-overlay chrome anchors itself, so a resize needs
-// no refit from the game.
+// applySize records the screen size and — on every size change —
+// (re)places the movable default windows for the new viewport, then
+// restores the saved layout over them on the first real size
+// (user-dragged positions and sidecar entries survive later resizes:
+// placeDefaults only touches virgin windows, see placeIfVirgin). The
+// root-overlay chrome anchors itself, so a resize needs no refit from
+// the game.
 func (g *Game) applySize(w, h int) {
 	if g.sized && w == g.w && h == g.h {
 		return
 	}
 	first := !g.sized
 	g.sized, g.w, g.h = true, w, h
+	g.placeDefaults(w, h)
 	if first {
-		g.placeDefaults(w, h)
 		g.applyLayout(w, h) // startup: read the sidecar once the screen is known
 	}
 }
@@ -621,60 +631,91 @@ func (g *Game) buildKit() error {
 	// gets hover tracking from the window chrome itself.)
 	g.rack.Container().GetWidget().TrackHover = true
 
-	// Panels are fresh: no mounts, no selection (documented).
+	// Panels are fresh: no mounts, no selection (documented). The
+	// placement records belong to the old windows — drop them with the
+	// kit (a load rebuild re-composes the defaults, then applyLayout
+	// brings the player's saved arrangement back over them).
 	g.mounted = [numPanels]widget.RemoveWindowFunc{}
 	g.stShown = false
 	g.stMount = nil
+	g.placed = map[*widget.Window]image.Rectangle{}
+	g.restored = map[*widget.Window]bool{}
 
 	g.placeDefaults(g.w, g.h)
 	g.syncMounts()
 	return nil
 }
 
-// placeDefaults positions the movable windows for the current screen.
-// The kit's core windows are placed too: Overview top-left, Selected
-// Item top-right — the left column's bottom belongs to the log and the
-// bottom row to the HUD bar, so nothing overlaps at 1280×720 or at the
-// 1024×700 minimum. Scanner sits in the centre column under the top
-// row; map/menu are centered, help top-center, the station strip takes
-// the now-free top-left corner while docked.
+// placeDefaults (re)places every movable default window for the current
+// screen. The kit's core windows are placed too: Overview top-left,
+// Selected Item top-right — the left column's bottom belongs to the log
+// and the bottom row to the HUD bar, so nothing overlaps at 1280×720 or
+// at the 1024×700 minimum. Scanner sits in the centre column under the
+// top row; map/menu are centered, help top-center; the station strip
+// takes the now-free top-left corner while docked and the docked
+// service trio tiles the viewport beside it (stationLayout).
+//
+// Every placement goes through placeIfVirgin: a window the player
+// dragged, or one restored from the layout sidecar, keeps its
+// position — so recomposing on a viewport change never stomps an
+// arrangement.
 func (g *Game) placeDefaults(w, h int) {
+	place := g.placeIfVirgin
 	ov := g.kit.OverviewWindow()
 	if r := ov.GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		ov.SetLocation(image.Rect(8, 8, 8+r.Dx(), 8+r.Dy()))
+		place(ov, image.Rect(8, 8, 8+r.Dx(), 8+r.Dy()))
 	}
 	sp := g.kit.SelectedWindow()
 	if r := sp.GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		sp.SetLocation(image.Rect(w-10-r.Dx(), 8, w-10, 8+r.Dy()))
+		place(sp, image.Rect(w-10-r.Dx(), 8, w-10, 8+r.Dy()))
 	}
 	// The log docks bottom-left: flush with the left/bottom margins, its
 	// default width fits the pocket left of the HUD bar (the 420 px bar
 	// starts at x=302 at the 1024 minimum) and its top clears the
 	// overview — so the default set stays pairwise disjoint.
 	if r := g.logP.Win().GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		g.logP.Win().SetLocation(image.Rect(10, h-10-r.Dy(), 10+r.Dx(), h-10))
+		place(g.logP.Win(), image.Rect(10, h-10-r.Dy(), 10+r.Dx(), h-10))
 	}
 	// Centre column, below the top row (Selected Item owns the top-right
 	// corner at 1024×700) and above the HUD bar.
 	if r := g.scan.Win().GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		g.scan.Win().SetLocation(image.Rect(396, 276, 396+r.Dx(), 276+r.Dy()))
+		place(g.scan.Win(), image.Rect(396, 276, 396+r.Dx(), 276+r.Dy()))
 	}
 	center := func(win *widget.Window) {
 		r := win.GetContainer().GetWidget().Rect
 		if r.Dx() == 0 || r.Dy() == 0 {
 			return
 		}
-		win.SetLocation(image.Rect((w-r.Dx())/2, (h-r.Dy())/2, (w-r.Dx())/2+r.Dx(), (h-r.Dy())/2+r.Dy()))
+		place(win, image.Rect((w-r.Dx())/2, (h-r.Dy())/2, (w-r.Dx())/2+r.Dx(), (h-r.Dy())/2+r.Dy()))
 	}
 	center(g.mp.Win())
 	center(g.menuWin)
 	if r := g.help.Win().GetContainer().GetWidget().Rect; r.Dx() > 0 {
 		x := (w - r.Dx()) / 2
-		g.help.Win().SetLocation(image.Rect(x, 24, x+r.Dx(), 24+r.Dy()))
+		place(g.help.Win(), image.Rect(x, 24, x+r.Dx(), 24+r.Dy()))
 	}
-	if r := g.stationW.GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		g.stationW.SetLocation(image.Rect(10, 8, 10+r.Dx(), 8+r.Dy()))
+	// Docked set: the station's own column (content height) and the
+	// service trio composed for this viewport.
+	lay := stationLayout(w, h, g.stationW.GetContainer().GetWidget().Rect.Dy())
+	place(g.stationW, lay.Station)
+	place(g.mkt.Win(), lay.Market)
+	place(g.inv.Win(), lay.Inventory)
+	place(g.fitt.Win(), lay.Fitting)
+}
+
+// placeIfVirgin moves win to rect unless the player owns its position:
+// a window restored from the layout sidecar, or one that no longer sits
+// on the last rect we composed (only a drag/resize moves a window off
+// it — hidden and unmounted windows keep their rect).
+func (g *Game) placeIfVirgin(win *widget.Window, rect image.Rectangle) {
+	if g.restored[win] {
+		return
 	}
+	if prev, ok := g.placed[win]; ok && win.GetContainer().GetWidget().Rect != prev {
+		return // player-moved: never stomp it again
+	}
+	win.SetLocation(rect)
+	g.placed[win] = rect
 }
 
 // helpRows converts KeyMap into the help panel's row shape (the shared

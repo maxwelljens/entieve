@@ -133,8 +133,13 @@ func NewInventory(env Env) *Inventory {
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, titleBarH),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.MinSize(300, 440),
-		widget.WindowOpts.Location(image.Rect(396, 256, 696, 696)),
+		// Content floor: every fixed row plus a full row of each hold
+		// section (the sections scroll below that).
+		widget.WindowOpts.MinSize(300, 420),
+		// Fallback only: the composed rect at the 1024×700 minimum.
+		// The game recomposes from the real viewport at startup
+		// (game/station_layout.go).
+		widget.WindowOpts.Location(image.Rect(396, 256, 701, 690)),
 	)
 	makeEdgeResizable(inv.win) // four-edge resize (replaces WindowOpts.Resizeable)
 	return inv

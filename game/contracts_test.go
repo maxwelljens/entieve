@@ -72,9 +72,14 @@ func availLine(t *testing.T, g *Game, id content.ContractID, line int) string {
 	case 0:
 		return row.Children()[0].(*widget.Container).Children()[0].(*widget.Text).Label
 	case 1:
+		// Objective summary: a bare text on open rows, a
+		// summary|requirement container on gated ones.
+		if ctr, ok := row.Children()[1].(*widget.Container); ok {
+			return ctr.Children()[0].(*widget.Text).Label
+		}
 		return row.Children()[1].(*widget.Text).Label
 	default:
-		return row.Children()[2].(*widget.Container).Children()[0].(*widget.Text).Label
+		return row.Children()[2].(*widget.Text).Label
 	}
 }
 
@@ -276,7 +281,7 @@ func TestStationBoardRendersShippedContent(t *testing.T) {
 	if got, want := availLine(t, g, "contract-solace-cleanup-1", 1), "Destroy 1× Scuttler"; got != want {
 		t.Errorf("cleanup summary = %q, want %q", got, want)
 	}
-	if got, want := availLine(t, g, "contract-solace-cleanup-1", 2), "40,000 ISK · +0.10 standing"; got != want {
+	if got, want := availLine(t, g, "contract-solace-cleanup-1", 2), "40,000.00 cr · +0.10 standing"; got != want {
 		t.Errorf("cleanup reward = %q, want %q", got, want)
 	}
 	if got, want := availLine(t, g, "contract-solace-supply-run-1", 1),
@@ -324,12 +329,48 @@ func TestStationBoardRendersShippedContent(t *testing.T) {
 	}
 	// The requirement rides on the reward line and the reward stays whole.
 	row := g.stAvail.Children()[0].(*widget.Container)
-	line3 := row.Children()[2].(*widget.Container)
-	if got := line3.Children()[1].(*widget.Text).Label; got != "Requires standing 0.20" {
+	line2 := row.Children()[1].(*widget.Container)
+	if got := line2.Children()[1].(*widget.Text).Label; got != "Requires standing 0.20" {
 		t.Errorf("gated requirement = %q", got)
 	}
-	if got := line3.Children()[0].(*widget.Text).Label; strings.Contains(got, "…") {
+	// The reward owns line 3 on its own, so the payout never truncates.
+	if got := row.Children()[2].(*widget.Text).Label; strings.Contains(got, "…") {
 		t.Errorf("gated reward ellipsized: %q", got)
+	}
+}
+
+// TestBoardRewardUsesCanonicalCredits: the payout line uses the same
+// credit presentation as the wallet, the HUD and the market title
+// ("12,345.00 cr") — not the old "40,000 ISK" one-off.
+func TestBoardRewardUsesCanonicalCredits(t *testing.T) {
+	// Goldens mirror uikit's wallet formatter (uikit/hud_test.go).
+	for _, c := range []struct {
+		in   float64
+		want string
+	}{
+		{40000, "40,000.00 cr"},
+		{-1234.5, "-1,234.50 cr"},
+		{0.999, "1.00 cr"},
+		{0, "0.00 cr"},
+	} {
+		if got := creditsLabel(c.in); got != c.want {
+			t.Errorf("creditsLabel(%v) = %q, want %q", c.in, got, c.want)
+		}
+	}
+	def := content.ContractDef{Reward: content.ContractReward{Credits: 40000, StandingGain: 0.10}}
+	if got, want := rewardText(&def), "40,000.00 cr · +0.10 standing"; got != want {
+		t.Errorf("rewardText = %q, want %q", got, want)
+	}
+
+	// Live equivalence: the market title is rendered by uikit's own
+	// formatCredits from the same wallet balance, so both formatters
+	// must agree on the running total.
+	g := dockedShowcaseGame(t, 1280, 720)
+	title := g.mkt.Win().GetContainer().(*widget.Container).
+		Children()[0].(*widget.Container).Children()[0].(*widget.Text).Label
+	if want := "Market — " + creditsLabel(g.s.Wallet()); title != want {
+		t.Errorf("market title = %q, want %q (creditsLabel differs from the wallet format)",
+			title, want)
 	}
 }
 

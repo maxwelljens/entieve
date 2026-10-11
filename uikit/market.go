@@ -111,8 +111,11 @@ func NewMarket(env Env) *Market {
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, titleBarH),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.MinSize(300, 240),
-		widget.WindowOpts.Location(image.Rect(396, 8, 696, 248)),
+		widget.WindowOpts.MinSize(300, 240), // content floor: mirrored in game/station_layout.go
+		// Fallback only: the composed rect at the 1024×700 minimum.
+		// The game recomposes from the real viewport at startup
+		// (game/station_layout.go).
+		widget.WindowOpts.Location(image.Rect(396, 8, 1014, 248)),
 	)
 	makeEdgeResizable(m.win) // four-edge resize (replaces WindowOpts.Resizeable)
 	return m
