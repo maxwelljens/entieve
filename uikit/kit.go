@@ -44,9 +44,13 @@ type Kit struct {
 	sp   *selectedPanel
 	root *widget.Container
 
-	// chromes are the edge-resize chromes of the windows mounted on this
-	// kit (built-in + AddWindow); pumped every frame from Update/Draw.
-	chromes []*winChrome
+	// chromes is this kit's resize-chrome registry: one entry per window
+	// currently mounted through AddWindow, detached again by the remove
+	// func it returns. It lives on the kit (never in a package global) so
+	// two kits can pump side by side and an unmounted window — hidden
+	// mid-drag or closed — is never stepped again. Pumped every frame
+	// from Update/Draw.
+	chromes map[*widget.Window]*winChrome
 
 	// core visibility (hidden e.g. while docked in a station)
 	coreHidden bool
@@ -75,9 +79,9 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	k.faces = newFaces(k.scale)
 	k.theme = NewTheme(k.palette, k.scale)
 
-	// One kit owns the live window set: drop the chrome index of any kit
-	// rebuilt by a save/load so its discarded windows can be collected.
-	chromeByWindow = map[*widget.Window]*winChrome{}
+	// Per-kit chrome registry: a kit built by a save/load rebuild must
+	// not disturb any kit still pumping (they own disjoint windows).
+	k.chromes = map[*widget.Window]*winChrome{}
 
 	// Root container: transparent overlay over the world render; windows
 	// float above it. The theme rides the widget parent chain.
@@ -87,16 +91,11 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 
 	k.buildOverview()
 	k.buildSelected()
-	// The kit's own windows take the four-edge resize chrome here (panel
-	// windows attach theirs in their constructors and join through
-	// AddWindow below). AddWindow — not the raw ui.AddWindow — so the
-	// overview and Selected Item chromes join k.chromes too: stepChromes
-	// is what pumps the edge grips, and a window left out of that list
-	// never resizes from its rect. It also validates the window trees
-	// against the theme and makes the chrome persistent (the spike has
-	// no close affordance).
-	makeEdgeResizable(k.ov.win)
-	makeEdgeResizable(k.sp.win)
+	// The kit's own windows mount through AddWindow — not the raw
+	// ui.AddWindow — so their resize chrome joins k.chromes too (the
+	// kit's AddWindow is what attaches a chrome, see overview.go) and
+	// the window trees get validated against the theme. The chrome also
+	// makes the resize persistent: the spike has no close affordance.
 	k.AddWindow(k.ov.win)
 	k.AddWindow(k.sp.win)
 
@@ -133,11 +132,13 @@ func (k *Kit) Selected() ecs.Entity { return k.selected }
 
 // Select sets the selected entity from outside the overview (a world click,
 // a keyboard cycle) so the Selected Item panel and the overview highlight
-// follow it. Idempotent.
+// follow it. Idempotent. Sync runs first: the row objects are rebuilt from
+// the grid there, so a click on an entity that only just appeared (its row
+// not built yet) resolves to a highlight instead of clearing it.
 func (k *Kit) Select(e ecs.Entity) {
 	k.selected = e
-	k.ov.selectEntity(e)
 	k.Sync()
+	k.ov.selectEntity(e)
 }
 
 // Root returns the kit's root overlay container, for integrations that mount

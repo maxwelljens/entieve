@@ -246,6 +246,17 @@ func (t *Table) SelectData(v any) {
 // OnSelect registers the row-click callback (fires on every click).
 func (t *Table) OnSelect(fn func(row TableRow)) { t.onSelect = fn }
 
+// Selected returns the currently selected row in display order and
+// whether there is one. It reports the reconciled state: a row whose
+// Data vanished from the table since the click reports no selection, so
+// owners caching a selection across Syncs can revalidate against it.
+func (t *Table) Selected() (TableRow, bool) {
+	if t.selIdx < 0 || t.selIdx >= len(t.rows) {
+		return TableRow{}, false
+	}
+	return t.rows[t.selIdx], true
+}
+
 // OnActivate registers the row double-click callback: a second click on
 // the same row within doubleClickWindow of the first.
 func (t *Table) OnActivate(fn func(row TableRow)) { t.onActivate = fn }

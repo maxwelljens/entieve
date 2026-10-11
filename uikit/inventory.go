@@ -141,7 +141,6 @@ func NewInventory(env Env) *Inventory {
 		// (game/station_layout.go).
 		widget.WindowOpts.Location(image.Rect(396, 256, 701, 690)),
 	)
-	makeEdgeResizable(inv.win) // four-edge resize (replaces WindowOpts.Resizeable)
 	return inv
 }
 
@@ -155,6 +154,19 @@ func (inv *Inventory) selectFrom(hold string) func(TableRow) {
 		if id, ok := r.Data.(content.ItemID); ok {
 			inv.sel, inv.src, inv.hasSel = id, hold, true
 		}
+	}
+}
+
+// tableFor returns the section table inv.src names (the default keeps
+// the initial state pointed at cargo, which has no selection).
+func (inv *Inventory) tableFor(src string) *Table {
+	switch src {
+	case "ore":
+		return inv.ore
+	case "hangar":
+		return inv.hangar
+	default:
+		return inv.cargo
 	}
 }
 
@@ -172,12 +184,23 @@ func (inv *Inventory) Sync() {
 
 	inv.cargoLbl.Label = inv.section("Cargo", cargo, hasCargo)
 	inv.oreLbl.Label = inv.oreSection(cargo, hasCargo)
-	inv.hangLbl.Label = "Station hangar · " + groupInt(int64(len(inv.hangarRows()))) + " stacks"
+	inv.hangLbl.Label = "Station hangar · " + FormatInt(int64(len(inv.hangarRows()))) + " stacks"
 
-	inv.qtyLabel.Label = "Qty " + groupInt(int64(inv.qty()))
+	inv.qtyLabel.Label = "Qty " + FormatInt(int64(inv.qty()))
 	inv.cargo.Sync()
 	inv.ore.Sync()
 	inv.hangar.Sync()
+
+	// Revalidate the cached selection against the section it came from:
+	// a stack that left that hold must stop gating the actions (the
+	// click-time cache alone would keep them armed on a row that no
+	// longer exists).
+	inv.hasSel = false
+	if r, ok := inv.tableFor(inv.src).Selected(); ok {
+		if id, isItem := r.Data.(content.ItemID); isItem {
+			inv.sel, inv.hasSel = id, true
+		}
+	}
 
 	// Action gating: a selection in the source section (never its own
 	// destination), an ore hold for ore, and a docked player for the
@@ -224,7 +247,7 @@ func (inv *Inventory) rowsOf(stacks []content.CargoStack) []TableRow {
 			vol = def.Volume * float64(st.Qty)
 		}
 		rows = append(rows, TableRow{
-			Cells: []string{name, "×" + groupInt(int64(st.Qty)), formatVolume(vol)},
+			Cells: []string{name, "×" + FormatInt(int64(st.Qty)), formatVolume(vol)},
 			Data:  st.Item,
 		})
 	}
@@ -268,7 +291,7 @@ func (inv *Inventory) stepQty(delta int) {
 	if inv.qtyIdx >= len(qtySteps) {
 		inv.qtyIdx = len(qtySteps) - 1
 	}
-	inv.qtyLabel.Label = "Qty " + groupInt(int64(inv.qty()))
+	inv.qtyLabel.Label = "Qty " + FormatInt(int64(inv.qty()))
 }
 
 // qty is the current transfer/sell quantity.

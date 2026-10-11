@@ -17,7 +17,10 @@ import (
 // Robustness contract: a missing, corrupt, wrong-version or partial
 // sidecar degrades to the built-in defaults (never an error, never a
 // crash); unknown keys are ignored on read and dropped on write; every
-// restored rect is clamped to the window's MinSize and to the screen.
+// restored rect is clamped to the window's MinSize and to the screen —
+// at restore time AND again on every later viewport change
+// (clampRestored), so shrinking the window after a restore can never
+// strand a restored window off-screen.
 
 // layoutVersion tags the sidecar format. A higher version in a file is
 // ignored wholesale rather than guessed at.
@@ -39,21 +42,44 @@ type layoutFile struct {
 	Windows map[string]winLayout `json:"windows"`
 }
 
-// layoutNames are the persisted windows, in a stable write order.
-// Menu, station and the HUD/rack chrome are not user layout state.
-var layoutNames = []string{
-	"overview", "selected", "log", "market", "inventory",
-	"fitting", "scanner", "map", "help",
-}
+// layoutNames are the persisted windows, in a stable write order: the
+// two always-on core windows (geometry only — see layoutTarget) plus
+// every panel whose panelDef carries a sidecar name (the Esc menu is
+// scene-owned and stays out). Menu, station and the HUD/rack chrome are
+// not user layout state.
+var layoutNames = func() []string {
+	names := []string{"overview", "selected"}
+	for p := panelID(0); p < numPanels; p++ {
+		if panelDefs[p].name != "" {
+			names = append(names, panelDefs[p].name)
+		}
+	}
+	return names
+}()
 
 // layoutPath is the sidecar location: the resolved save path plus
 // .layout.json (e.g. …/entieve/save.json.layout.json).
 func (g *Game) layoutPath() string { return g.SavePath() + ".layout.json" }
 
+// panelByName resolves a sidecar name to its panel id (ok=false for the
+// core windows, the menu's empty key and unknown names).
+func panelByName(name string) (panelID, bool) {
+	if name == "" {
+		return 0, false
+	}
+	for p := panelID(0); p < numPanels; p++ {
+		if panelDefs[p].name == name {
+			return p, true
+		}
+	}
+	return 0, false
+}
+
 // layoutTarget resolves a persisted name to its window and — for the
 // toggleable windows — its open flag. overview/selected are always-on
 // core chrome (hidden while docked, never closed): nil flag, written as
-// open, geometry only on read. Unknown names resolve to nil and are
+// open, geometry only on read. Every other name comes from panelDefs;
+// unknown names (and the menu's empty key) resolve to nil and are
 // skipped by both sides.
 func (g *Game) layoutTarget(name string) (*widget.Window, *bool) {
 	switch name {
@@ -61,22 +87,29 @@ func (g *Game) layoutTarget(name string) (*widget.Window, *bool) {
 		return g.kit.OverviewWindow(), nil
 	case "selected":
 		return g.kit.SelectedWindow(), nil
-	case "log":
-		return g.logP.Win(), &g.open[pLog]
-	case "market":
-		return g.mkt.Win(), &g.open[pMarket]
-	case "inventory":
-		return g.inv.Win(), &g.open[pInventory]
-	case "fitting":
-		return g.fitt.Win(), &g.open[pFitting]
-	case "scanner":
-		return g.scan.Win(), &g.open[pScanner]
-	case "map":
-		return g.mp.Win(), &g.open[pMap]
-	case "help":
-		return g.help.Win(), &g.open[pHelp]
+	}
+	if p, ok := panelByName(name); ok {
+		return panelDefs[p].window(g), panelDefs[p].open(g)
 	}
 	return nil, nil
+}
+
+// persistOpen picks the open flag writeLayout records for a named
+// window: the core windows always write open, a toggleable one writes
+// its flag — except the three station services while the station scene
+// forces them open. Their sidecar entry carries the PRE-dock intent
+// (stationPrior), or quitting while docked would reopen them in space on
+// the next boot.
+func (g *Game) persistOpen(name string, open *bool) bool {
+	if open == nil {
+		return true
+	}
+	if g.s.Docked.Has(g.s.Player()) {
+		if p, ok := panelByName(name); ok && isStationPanel(p) {
+			return g.stationPrior[p]
+		}
+	}
+	return *open
 }
 
 // writeLayout persists every named window's geometry and open state
@@ -91,8 +124,11 @@ func (g *Game) writeLayout() error {
 		}
 		r := win.GetContainer().GetWidget().Rect
 		f.Windows[name] = winLayout{
-			X: r.Min.X, Y: r.Min.Y, W: r.Dx(), H: r.Dy(),
-			Open: open == nil || *open,
+			X:    r.Min.X,
+			Y:    r.Min.Y,
+			W:    r.Dx(),
+			H:    r.Dy(),
+			Open: g.persistOpen(name, open),
 		}
 	}
 	data, err := json.MarshalIndent(f, "", "  ")
@@ -132,6 +168,13 @@ func (g *Game) readLayout() map[string]winLayout {
 // sidecar only restores the windows it holds, and each restored window
 // is flagged as the player's arrangement so the composed defaults never
 // overwrite it on a later resize (see placeIfVirgin).
+//
+// While the station scene is running, the dock services' restored flags
+// are the pre-dock intent (persistOpen writes them that way): they are
+// adopted into stationPrior and the forced-open state is re-asserted.
+// When the scene is NOT running yet (booting a docked save), the intent
+// is left in the flags and StationScene.OnEnter picks it up as the
+// pre-dock state when it pushes.
 func (g *Game) applyLayout(screenW, screenH int) {
 	wins := g.readLayout()
 	if len(wins) == 0 {
@@ -140,7 +183,14 @@ func (g *Game) applyLayout(screenW, screenH int) {
 	if g.restored == nil {
 		g.restored = map[*widget.Window]bool{}
 	}
+	if g.placed == nil {
+		g.placed = map[*widget.Window]image.Rectangle{}
+	}
 	screen := image.Rect(0, 0, screenW, screenH)
+	dockedScene := g.s.Docked.Has(g.s.Player()) && g.findScene(func(s Scene) bool {
+		_, ok := s.(*StationScene)
+		return ok
+	})
 	for _, name := range layoutNames {
 		e, ok := wins[name]
 		if !ok {
@@ -156,12 +206,24 @@ func (g *Game) applyLayout(screenW, screenH int) {
 		}
 		saved := image.Rect(e.X, e.Y, e.X+e.W, e.Y+e.H)
 		win.SetLocation(clampLayoutRect(saved, minSize, screen))
+		// Track the rect actually applied (SetLocation may grow it), so
+		// the placement tracker never reports a restored window as
+		// player-moved — see placeIfVirgin and TestPlacementTracker.
+		g.placed[win] = win.GetContainer().GetWidget().Rect
 		// Saved wins from here on: the window is the player's
 		// arrangement, so placeIfVirgin leaves it alone on every later
 		// viewport change (loading must never smash a moved layout).
 		g.restored[win] = true
 		if open != nil {
 			*open = e.Open
+			if p, named := panelByName(name); named && dockedScene && isStationPanel(p) {
+				g.stationPrior[p] = e.Open // pre-dock intent, adopted
+			}
+		}
+	}
+	if dockedScene {
+		for _, p := range stationPanels {
+			g.open[p] = true // the scene forces its services open
 		}
 	}
 	// The map and help windows only exist through their overlay scenes
@@ -184,6 +246,32 @@ func (g *Game) applyLayout(screenW, screenH int) {
 	// Apply restored open flags immediately (LoadGame rebuilt the mounts
 	// before this ran).
 	g.syncMounts()
+}
+
+// clampRestored re-establishes the on-screen guarantee for the windows
+// restored from the sidecar whenever the viewport changes: their rects
+// are clamped to the new screen (and to MinSize) exactly like at restore
+// time, while the restored flag stays set — the player's relative
+// arrangement survives (only what no longer fits slides back in), and
+// placeDefaults still never stomps it. Call it from applySize after the
+// defaults composed. Restored windows are tracked, so the placement
+// tracker keeps reading true afterwards.
+func (g *Game) clampRestored(w, h int) {
+	screen := image.Rect(0, 0, w, h)
+	for win, restored := range g.restored {
+		if !restored {
+			continue
+		}
+		minSize := image.Point{X: 1, Y: 1}
+		if win.MinSize != nil {
+			minSize = *win.MinSize
+		}
+		r := win.GetContainer().GetWidget().Rect
+		if c := clampLayoutRect(r, minSize, screen); c != r {
+			win.SetLocation(c)
+		}
+		g.placed[win] = win.GetContainer().GetWidget().Rect
+	}
 }
 
 // clampLayoutRect fits a restored rect onto the screen at min size:

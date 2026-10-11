@@ -5,8 +5,6 @@ import (
 	"image"
 	"math"
 	"sort"
-	"strconv"
-	"strings"
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
@@ -271,8 +269,11 @@ func (g *Game) rebuildStationBoard(m stationBoardModel) {
 	_, h := g.stBody.PreferredSize()
 	// The station column is part of the composed docked layout — same
 	// source of truth as placeDefaults (stationLayout), so the board's
-	// content hug and the viewport composition can never disagree.
-	g.stationW.SetLocation(stationLayout(g.w, g.h, h).Station)
+	// content hug and the viewport composition can never disagree — and
+	// it goes through the placement tracker like every other composed
+	// rect: a direct SetLocation here would leave g.placed stale and the
+	// window would read as player-moved (never recomposed again).
+	g.placeIfVirgin(g.stationW, stationLayout(g.w, g.h, h).Station)
 }
 
 // buildContractRow renders one board row: text lines left, action button
@@ -412,46 +413,14 @@ func objectiveSummary(c *content.Content, def *content.ContractDef) string {
 }
 
 // rewardText renders the board's reward line, e.g.
-// "40,000.00 cr · +0.10 standing" — the same canonical credit
-// presentation the wallet/HUD and the market title use (creditsLabel).
+// "40,000.00 cr · +0.10 standing" — the shared credit presentation
+// (uikit.FormatCredits), the one every readout uses.
 func rewardText(def *content.ContractDef) string {
-	s := creditsLabel(def.Reward.Credits)
+	s := uikit.FormatCredits(def.Reward.Credits)
 	if def.Reward.StandingGain != 0 {
 		s += fmt.Sprintf(" · %+.2f standing", def.Reward.StandingGain)
 	}
 	return s
-}
-
-// creditsLabel renders a currency amount exactly the way the wallet and
-// the market title do — "12,345.00 cr" (uikit's formatCredits /
-// Hud.creditsLabel presentation; those live in uikit files this package
-// must not reach into, so the formatting is mirrored here and pinned by
-// TestBoardRewardUsesCanonicalCredits).
-func creditsLabel(v float64) string {
-	neg := v < 0
-	if neg {
-		v = -v
-	}
-	v = math.Round(v*100) / 100
-	ip := int64(v)
-	frac := int64(math.Round((v - float64(ip)) * 100))
-	if frac >= 100 { // carry from rounding, e.g. 0.999 -> 1.00
-		ip++
-		frac = 0
-	}
-	s := groupNum(ip) + "." + pad2(frac) + " cr"
-	if neg {
-		s = "-" + s
-	}
-	return s
-}
-
-// pad2 renders a 0..99 integer with a leading zero (mirrors uikit.pad2).
-func pad2(n int64) string {
-	if n < 10 {
-		return "0" + strconv.FormatInt(n, 10)
-	}
-	return strconv.FormatInt(n, 10)
 }
 
 // cargoProgress counts a deliver contract's objective cargo in the hold,
@@ -509,26 +478,6 @@ func celName(c *content.Content, id content.CelID) string {
 		}
 	}
 	return string(id)
-}
-
-// groupNum formats n with thousands separators: 40000 → "40,000".
-func groupNum(n int64) string {
-	s := strconv.FormatInt(n, 10)
-	neg := strings.HasPrefix(s, "-")
-	if neg {
-		s = s[1:]
-	}
-	var b strings.Builder
-	for i, c := range s {
-		if i > 0 && (len(s)-i)%3 == 0 {
-			b.WriteByte(',')
-		}
-		b.WriteRune(c)
-	}
-	if neg {
-		return "-" + b.String()
-	}
-	return b.String()
 }
 
 // ellip truncates s with "…" so it measures at most w in the given

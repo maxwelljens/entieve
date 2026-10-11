@@ -2,9 +2,12 @@ package game
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
+	"unicode"
 
+	"github.com/entieve/entieve/uikit"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -82,6 +85,54 @@ func TestKeyMapConflictResolutions(t *testing.T) {
 	// The scanner toggle (added with the sensors/visibility pass).
 	if got := find(ebiten.KeyC, false, false); got != "scanner" {
 		t.Errorf("C = %q, want scanner", got)
+	}
+}
+
+// TestHelpRangeNumbersMatchExportedArrays: no help text states a range
+// number of its own. Q/Z act at the Selected Item selectors' current
+// values, so their rows carry no digits at all (the stale numbers the
+// merge removed must not come back), and the one range number the mouse
+// table shows — the right-click orbit — is derived from
+// uikit.OrbitRanges (scene.go flies at the same value).
+func TestHelpRangeNumbersMatchExportedArrays(t *testing.T) {
+	for _, action := range []string{"orbit", "warp"} {
+		desc := ""
+		for _, b := range KeyMap {
+			if b.Action == action {
+				desc = b.Desc
+			}
+		}
+		if desc == "" {
+			t.Fatalf("no KeyMap binding for action %q", action)
+		}
+		if strings.IndexFunc(desc, unicode.IsDigit) >= 0 {
+			t.Errorf("%s: help text %q states a number; the key acts at the "+
+				"selector's value, so no range may be hardcoded", action, desc)
+		}
+	}
+
+	// Parse the number back out of the rendered mouse line: a hand-typed
+	// hint that disagrees with the array fails here.
+	const prefix, suffix = "Orbit target under cursor (", " m)"
+	hint := ""
+	for _, b := range MouseMap {
+		if strings.HasPrefix(b.Desc, prefix) {
+			hint = strings.TrimSuffix(strings.TrimPrefix(b.Desc, prefix), suffix)
+		}
+	}
+	if hint == "" {
+		t.Fatal("MouseMap has no right-click orbit line")
+	}
+	got, err := strconv.ParseFloat(strings.ReplaceAll(hint, ",", ""), 64)
+	if err != nil {
+		t.Fatalf("orbit hint %q is not a number: %v", hint, err)
+	}
+	if want := uikit.OrbitRanges[0]; got != want {
+		t.Errorf("right-click orbit hint = %v m, want OrbitRanges[0] = %v m", got, want)
+	}
+	if orbitDefaultRange != uikit.OrbitRanges[0] {
+		t.Errorf("orbitDefaultRange = %v, want OrbitRanges[0] = %v (the action and the help text share the array)",
+			orbitDefaultRange, uikit.OrbitRanges[0])
 	}
 }
 

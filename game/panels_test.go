@@ -52,6 +52,111 @@ func TestPanelMountAndSync(t *testing.T) {
 	}
 }
 
+// TestPanelsShareTheKitsEnv: the extra panels are built from the kit's
+// own environment (uikit.Kit.Env) — one theme/palette/face set per
+// session — and that theme is the one the kit's own windows carry. A
+// second uikit.NewEnv construction would hand the panels a different
+// theme than the kit pumps.
+func TestPanelsShareTheKitsEnv(t *testing.T) {
+	g := newShowcaseGame(t)
+	env := g.kit.Env()
+	if g.env.Theme != env.Theme {
+		t.Error("panel env theme is not the kit's theme")
+	}
+	if g.env.Theme != g.kit.OverviewWindow().GetContainer().GetWidget().GetTheme() {
+		t.Error("kit windows and the panels do not share one theme")
+	}
+	if g.env.Pal != env.Pal || g.env.TS != env.TS {
+		t.Error("panel env palette/type scale differs from the kit's")
+	}
+	if g.env.Sim != g.s || g.env.Content != g.opts.Content {
+		t.Error("panel env not bound to this session's sim/content")
+	}
+}
+
+// TestPanelDefsCoverEnum: every panelID has a complete panelDef row.
+// A forgotten row is silent in production — the id would never mount,
+// never persist and its want would read as "closed" — so the table is
+// checked against the enum (and against the sidecar name list) here.
+func TestPanelDefsCoverEnum(t *testing.T) {
+	// Pass 1: the table itself (no session needed) — a missing row is
+	// reported before anything tries to call into it.
+	seen := map[string]panelID{}
+	named := 0
+	for p := panelID(0); p < numPanels; p++ {
+		d := panelDefs[p]
+		if d.window == nil || d.open == nil || d.want == nil {
+			t.Errorf("panel %d (%s): incomplete panelDef (window=%v open=%v want=%v)",
+				p, panelNames[p], d.window != nil, d.open != nil, d.want != nil)
+			continue
+		}
+		if d.name == "" {
+			continue // not persisted (the Esc menu)
+		}
+		if prev, dup := seen[d.name]; dup {
+			t.Errorf("sidecar name %q used by both %s and %s", d.name, panelNames[prev], panelNames[p])
+		}
+		seen[d.name] = p
+		named++
+	}
+	if len(seen) != named {
+		t.Errorf("%d unique sidecar names, want %d", len(seen), named)
+	}
+	if t.Failed() {
+		// Report the broken table before anything calls into it (the
+		// first frame would panic on a nil mount rule).
+		t.FailNow()
+	}
+
+	// Pass 2: the rows against a live session — every id resolves a real
+	// window and flag, and its mount rule computes in both views.
+	g := newShowcaseGame(t)
+	for p := panelID(0); p < numPanels; p++ {
+		d := panelDefs[p]
+		if d.window == nil || d.open == nil || d.want == nil {
+			continue // reported above
+		}
+		if w := d.window(g); w == nil {
+			t.Errorf("panel %s: window() returned nil", panelNames[p])
+		}
+		if d.open(g) == nil {
+			t.Errorf("panel %s: open() returned nil", panelNames[p])
+		}
+		_ = d.want(g, false)
+		_ = d.want(g, true)
+	}
+
+	// layoutNames = the two core windows + every named panel, in enum
+	// order — the sidecar and the table cannot drift apart.
+	want := []string{"overview", "selected"}
+	for p := panelID(0); p < numPanels; p++ {
+		if panelDefs[p].name != "" {
+			want = append(want, panelDefs[p].name)
+		}
+	}
+	if len(layoutNames) != len(want) {
+		t.Fatalf("layoutNames = %v, want %v", layoutNames, want)
+	}
+	for i, name := range layoutNames {
+		if name != want[i] {
+			t.Errorf("layoutNames[%d] = %q, want %q", i, name, want[i])
+		}
+	}
+	// Every named panel resolves to a window and its own flag.
+	for _, name := range layoutNames {
+		win, open := g.layoutTarget(name)
+		if win == nil {
+			t.Errorf("layoutTarget(%q) resolved no window", name)
+		}
+		if name != "overview" && name != "selected" && open == nil {
+			t.Errorf("layoutTarget(%q) resolved no open flag", name)
+		}
+	}
+	if win, open := g.layoutTarget("no-such-panel"); win != nil || open != nil {
+		t.Errorf("layoutTarget(unknown) = (%v, %v), want (nil, nil)", win, open)
+	}
+}
+
 // TestToggleKeys: each toggle key opens and closes its panel, the
 // overlay keys push and pop their scenes, and the Esc menu is modal for
 // the other toggles.
@@ -459,6 +564,36 @@ func TestFrameUpdateAndWorldKeys(t *testing.T) {
 	g.quit = true
 	if err := g.Update(); !errors.Is(err, ebiten.Termination) {
 		t.Fatalf("quit Update error = %v, want ebiten.Termination", err)
+	}
+}
+
+// TestNextLockIdx pins the Tab cycle's anchoring semantics: the step is
+// the position after the SELECTED candidate in the freshly sorted list
+// (wrapping), and a selection outside the list restarts at the nearest —
+// a remembered index would skip or repeat entries once the distances
+// re-sort. The showcase grid spawns no lockable entities, so the pure
+// step is where this can be pinned exactly.
+func TestNextLockIdx(t *testing.T) {
+	cands := []sim.Info{{Entity: 10}, {Entity: 11}, {Entity: 12}}
+	cases := []struct {
+		name string
+		sel  ecs.Entity
+		want int
+	}{
+		{"no selection starts at the nearest", 0, 0},
+		{"advances from the first candidate", 10, 1},
+		{"advances from the middle", 11, 2},
+		{"wraps after the farthest", 12, 0},
+		{"non-candidate selection restarts", 99, 0},
+	}
+	for _, c := range cases {
+		if got := nextLockIdx(cands, c.sel); got != c.want {
+			t.Errorf("%s: nextLockIdx(_, %v) = %d, want %d", c.name, c.sel, got, c.want)
+		}
+	}
+	// A single candidate always wraps to itself.
+	if got := nextLockIdx(cands[:1], 10); got != 0 {
+		t.Errorf("single candidate: nextLockIdx = %d, want 0", got)
 	}
 }
 

@@ -484,7 +484,7 @@ func (h *Hud) Sync() {
 	}
 	h.speedLbl.Label = formatSpeed(speed)
 	h.timeLbl.Label = "×" + strconv.Itoa(h.timeScale) + " time"
-	h.walletLbl.Label = h.creditsLabel(s.Wallet())
+	h.walletLbl.Label = FormatCredits(s.Wallet())
 
 	// 4 — locked-target cards (name, distance, lock strip, layer bars).
 	var locks []sim.Lock
@@ -525,30 +525,6 @@ func (h *Hud) Sync() {
 		card.name, card.dist = h.boxLabels(card.name, card.dist)
 		h.setCard(box, card)
 	}
-}
-
-// creditsLabel renders a wallet balance as "10,000,000.00 cr".
-func (h *Hud) creditsLabel(v float64) string {
-	neg := v < 0
-	if neg {
-		v = -v
-	}
-	v = math.Round(v*100) / 100
-	ip := int64(v)
-	frac := int64(math.Round((v - float64(ip)) * 100))
-	if frac >= 100 { // carry from rounding, e.g. 0.999 -> 1.00
-		ip++
-		frac = 0
-	}
-	fs := strconv.FormatInt(frac, 10)
-	if frac < 10 {
-		fs = "0" + fs
-	}
-	s := groupInt(ip) + "." + fs + " cr"
-	if neg {
-		s = "-" + s
-	}
-	return s
 }
 
 // hudTrackDim scales a layer color down for the depleted remainder of its
@@ -645,5 +621,5 @@ func hudHP(v float64) string {
 	if v < 0 {
 		v = 0
 	}
-	return groupInt(int64(v + 0.5))
+	return FormatInt(int64(v + 0.5))
 }

@@ -51,26 +51,31 @@ func (k *Kit) panelEnv() Env {
 	}
 }
 
+// Env returns the environment this kit renders from — the same theme,
+// palette, faces and enqueue seam its own windows were built with. Panel
+// hosts construct their extra panels from this instead of calling
+// NewEnv with the same arguments (that built a second theme/face set the
+// kit never used).
+func (k *Kit) Env() Env { return k.panelEnv() }
+
 // AddWindow mounts an extra window on the kit's UI so it shares the
-// kit's theme, stacking and input pump. kit.go (owned by integration)
-// only builds the overview and selected panels; the station windows
-// join through this seam. A window built with makeEdgeResizable joins
-// the kit's resize-chrome pump here. The returned func closes the
-// window again.
+// kit's theme, stacking and input pump. Every mounted window gets the
+// four-edge resize chrome here (the registry is the kit's: see
+// Kit.chromes), and the returned func closes the window again —
+// detaching its chrome, so an unmounted window stops being pumped and a
+// drag interrupted by the unmount leaves no rect or cursor state behind.
 func (k *Kit) AddWindow(w *widget.Window) widget.RemoveWindowFunc {
-	if ch, ok := chromeByWindow[w]; ok {
-		dup := false
-		for _, have := range k.chromes {
-			if have == ch {
-				dup = true
-				break
-			}
-		}
-		if !dup {
-			k.chromes = append(k.chromes, ch)
-		}
+	if _, ok := k.chromes[w]; !ok {
+		k.chromes[w] = &winChrome{win: w}
 	}
-	return k.ui.AddWindow(w)
+	remove := k.ui.AddWindow(w)
+	return func() {
+		if ch, ok := k.chromes[w]; ok {
+			ch.cancel() // mid-drag unmount: drop the grip state first
+			delete(k.chromes, w)
+		}
+		remove()
+	}
 }
 
 // buildOverview constructs the Overview window around its Table.
@@ -130,7 +135,7 @@ func (k *Kit) buildOverview() {
 		widget.WindowOpts.Draggable(),
 		// Resize comes from the winchrome edge grips (all four edges),
 		// not widget.WindowOpts.Resizeable() — that one only stretches
-		// the bottom/right corner. Attached in NewKit.
+		// the bottom/right corner. Kit.AddWindow attaches the chrome.
 		widget.WindowOpts.MinSize(320, 240),
 		widget.WindowOpts.Location(image.Rect(8, 8, 388, 428)),
 	)
@@ -311,7 +316,7 @@ func formatDistance(m float64) string {
 	}
 	switch {
 	case m < 2e3:
-		return groupInt(int64(math.Round(m))) + " m"
+		return FormatInt(int64(math.Round(m))) + " m"
 	case m < 1.496e10: // 0.1 AU: EVE switches to AU here
 		return groupFloat(m/1000, 1) + " km"
 	default:
@@ -324,12 +329,12 @@ func formatSpeed(v float64) string {
 	if v < 0 {
 		v = 0
 	}
-	return groupInt(int64(math.Round(v))) + " m/s"
+	return FormatInt(int64(math.Round(v))) + " m/s"
 }
 
-// formatCredits renders an amount of currency as "12,345.00 cr"
+// FormatCredits renders an amount of currency as "12,345.00 cr"
 // (the currency of Entieve is the credit).
-func formatCredits(v float64) string {
+func FormatCredits(v float64) string {
 	neg := v < 0
 	if neg {
 		v = -v
@@ -341,7 +346,7 @@ func formatCredits(v float64) string {
 		ip++
 		frac = 0
 	}
-	s := groupInt(ip) + "." + pad2(frac) + " cr"
+	s := FormatInt(ip) + "." + pad2(frac) + " cr"
 	if neg {
 		s = "-" + s
 	}
@@ -367,8 +372,8 @@ func kindLabel(kind string) string {
 	return strings.ToUpper(string(r[0])) + string(r[1:])
 }
 
-// groupInt formats n with thousands separators: 12345 → "12,345".
-func groupInt(n int64) string {
+// FormatInt formats n with thousands separators: 12345 → "12,345".
+func FormatInt(n int64) string {
 	return addCommas(strconv.FormatInt(n, 10))
 }
 

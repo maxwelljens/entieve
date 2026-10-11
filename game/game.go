@@ -65,6 +65,81 @@ const (
 	numPanels
 )
 
+// panelDef is one toggleable panel's whole registration: the single
+// place a panel has to appear in for the frame, mount and persistence
+// paths to agree (the key bindings stay hand-written in handleKeys, the
+// dock-time trio in stationPanels).
+//
+//	name   sidecar key ("" = not persisted — the Esc menu is scene-owned
+//	       and must not reopen on the next boot)
+//	window the window backing the id
+//	open   the player's toggle flag (scene-driven for map/help/menu)
+//	want   the desired mount for this frame: (game, docked)
+//
+// syncMounts, panelWindow and the layout sidecar all read this table;
+// TestPanelDefsCoverEnum fails if an id has no row.
+type panelDef struct {
+	name   string
+	window func(*Game) *widget.Window
+	open   func(*Game) *bool
+	want   func(*Game, bool) bool
+}
+
+// panelDefs is indexed by panelID in enum order — syncMounts iterates
+// it, so the mount order follows the enum (the log lands before the Esc
+// menu, which keeps the top of the draw order).
+var panelDefs = [numPanels]panelDef{
+	pInventory: {
+		name:   "inventory",
+		window: func(g *Game) *widget.Window { return g.inv.Win() },
+		open:   func(g *Game) *bool { return &g.open[pInventory] },
+		want:   func(g *Game, docked bool) bool { return g.open[pInventory] },
+	},
+	pFitting: {
+		name:   "fitting",
+		window: func(g *Game) *widget.Window { return g.fitt.Win() },
+		open:   func(g *Game) *bool { return &g.open[pFitting] },
+		want:   func(g *Game, docked bool) bool { return g.open[pFitting] },
+	},
+	pMarket: {
+		name:   "market",
+		window: func(g *Game) *widget.Window { return g.mkt.Win() },
+		open:   func(g *Game) *bool { return &g.open[pMarket] },
+		want:   func(g *Game, docked bool) bool { return g.open[pMarket] },
+	},
+	pScanner: {
+		name:   "scanner",
+		window: func(g *Game) *widget.Window { return g.scan.Win() },
+		open:   func(g *Game) *bool { return &g.open[pScanner] },
+		// The scanner is space chrome: hidden while docked (legacy parity).
+		want: func(g *Game, docked bool) bool { return g.open[pScanner] && !docked },
+	},
+	pMap: {
+		name:   "map",
+		window: func(g *Game) *widget.Window { return g.mp.Win() },
+		open:   func(g *Game) *bool { return &g.open[pMap] },
+		want:   func(g *Game, docked bool) bool { return g.open[pMap] },
+	},
+	pHelp: {
+		name:   "help",
+		window: func(g *Game) *widget.Window { return g.help.Win() },
+		open:   func(g *Game) *bool { return &g.open[pHelp] },
+		want:   func(g *Game, docked bool) bool { return g.open[pHelp] },
+	},
+	pLog: {
+		name:   "log",
+		window: func(g *Game) *widget.Window { return g.logP.Win() },
+		open:   func(g *Game) *bool { return &g.open[pLog] },
+		want:   func(g *Game, docked bool) bool { return g.open[pLog] },
+	},
+	pMenu: {
+		name:   "", // not persisted: the Esc menu is pushed as a scene
+		window: func(g *Game) *widget.Window { return g.menuWin },
+		open:   func(g *Game) *bool { return &g.open[pMenu] },
+		want:   func(g *Game, docked bool) bool { return g.open[pMenu] },
+	},
+}
+
 // Game implements ebiten.Game and hosts the uikit interface.
 type Game struct {
 	opts  Options
@@ -73,7 +148,8 @@ type Game struct {
 	clock Clock
 
 	// kit owns the interface (Overview + Selected Item are built into it);
-	// env is the panel environment the extra panels are constructed from.
+	// env is the kit's own environment (Kit.Env) — one theme, palette and
+	// face set per session — that the extra panels are constructed from.
 	kit *uikit.Kit
 	env uikit.Env
 
@@ -118,7 +194,6 @@ type Game struct {
 
 	// Selection lives in the kit: world clicks, the Tab cycle-lock and
 	// the overview all feed Kit.Select, the game reads Kit.Selected.
-	tabIdx       int
 	stationPrior [numPanels]bool
 
 	// placed is the last rect this session composed for each window,
@@ -231,8 +306,10 @@ func (g *Game) Layout(width, height int) (int, int) {
 // restores the saved layout over them on the first real size
 // (user-dragged positions and sidecar entries survive later resizes:
 // placeDefaults only touches virgin windows, see placeIfVirgin). The
-// root-overlay chrome anchors itself, so a resize needs no refit from
-// the game.
+// restored windows are re-clamped to the new screen on every size change
+// (see clampRestored) so a sidecar written at a larger resolution can
+// never strand a window off-screen. The root-overlay chrome anchors
+// itself, so a resize needs no refit from the game.
 func (g *Game) applySize(w, h int) {
 	if g.sized && w == g.w && h == g.h {
 		return
@@ -243,6 +320,7 @@ func (g *Game) applySize(w, h int) {
 	if first {
 		g.applyLayout(w, h) // startup: read the sidecar once the screen is known
 	}
+	g.clampRestored(w, h)
 }
 
 // ---------------------------------------------------------------------------
@@ -405,21 +483,15 @@ func (g *Game) syncPanels() {
 
 // syncMounts reconciles the mounted window set with the desired state:
 // toggle intent, docked-only visibility and the chrome/core visibility.
+// The per-panel rule lives in panelDefs[p].want (one table), iterated in
+// enum order so the mount order — and the draw order it produces — is
+// stable.
 func (g *Game) syncMounts() {
 	docked := g.s.Docked.Has(g.s.Player())
 
-	g.setPanel(pInventory, g.open[pInventory])
-	g.setPanel(pFitting, g.open[pFitting])
-	g.setPanel(pMarket, g.open[pMarket])
-	// The scanner is space chrome: hidden while docked (legacy parity).
-	g.setPanel(pScanner, g.open[pScanner] && !docked)
-	g.setPanel(pMap, g.open[pMap])
-	g.setPanel(pHelp, g.open[pHelp])
-	// The log is a normal window now: it rides both views (its history
-	// persists across mounts) and mounts before the Esc menu so the menu
-	// keeps the top of the draw order.
-	g.setPanel(pLog, g.open[pLog])
-	g.setPanel(pMenu, g.open[pMenu])
+	for p := panelID(0); p < numPanels; p++ {
+		g.setPanel(p, panelDefs[p].want(g, docked))
+	}
 
 	// The ship HUD and module rack are space chrome: hidden on the root
 	// overlay while docked (legacy parity), and the kit's core windows
@@ -483,27 +555,13 @@ func (g *Game) setStrip(shown *bool, remove *widget.RemoveWindowFunc, want bool,
 	*remove, *shown = nil, false
 }
 
-// panelWindow returns the window backing a panel id.
+// panelWindow returns the window backing a panel id (nil for an id
+// outside the enum).
 func (g *Game) panelWindow(p panelID) *widget.Window {
-	switch p {
-	case pInventory:
-		return g.inv.Win()
-	case pFitting:
-		return g.fitt.Win()
-	case pMarket:
-		return g.mkt.Win()
-	case pScanner:
-		return g.scan.Win()
-	case pMap:
-		return g.mp.Win()
-	case pHelp:
-		return g.help.Win()
-	case pLog:
-		return g.logP.Win()
-	case pMenu:
-		return g.menuWin
+	if p < 0 || p >= numPanels {
+		return nil
 	}
-	return nil
+	return panelDefs[p].window(g)
 }
 
 // overUI reports whether the pointer sits on any interface panel: the
@@ -588,7 +646,10 @@ func (g *Game) buildKit() error {
 		return fmt.Errorf("game: uikit.NewKit: %w", err)
 	}
 	g.kit = kit
-	g.env = uikit.NewEnv(g.opts.Content, g.s, g.s.Queue)
+	// One environment per session: the kit's own theme, palette and face
+	// set, handed to every extra panel (uikit.NewEnv would build a second
+	// one the kit never uses).
+	g.env = kit.Env()
 	env := g.env
 
 	g.hud = uikit.NewHud(env)
@@ -633,10 +694,14 @@ func (g *Game) buildKit() error {
 	// Panels are fresh: no mounts, no selection (documented). The
 	// placement records belong to the old windows — drop them with the
 	// kit (a load rebuild re-composes the defaults, then applyLayout
-	// brings the player's saved arrangement back over them).
+	// brings the player's saved arrangement back over them). The dock
+	// prior goes too: it is mount bookkeeping for the panels being
+	// rebuilt (applyLayout re-adopts the persisted pre-dock intent for a
+	// docked restore).
 	g.mounted = [numPanels]widget.RemoveWindowFunc{}
 	g.stShown = false
 	g.stMount = nil
+	g.stationPrior = [numPanels]bool{}
 	g.placed = map[*widget.Window]image.Rectangle{}
 	g.restored = map[*widget.Window]bool{}
 
@@ -714,7 +779,10 @@ func (g *Game) placeIfVirgin(win *widget.Window, rect image.Rectangle) {
 		return // player-moved: never stomp it again
 	}
 	win.SetLocation(rect)
-	g.placed[win] = rect
+	// Read back what SetLocation actually applied: it grows a rect below
+	// MinSize, and the tracker must hold the real rect or the window
+	// would read as player-moved from here on.
+	g.placed[win] = win.GetContainer().GetWidget().Rect
 }
 
 // helpRows converts KeyMap into the help panel's row shape (the shared

@@ -117,7 +117,6 @@ func NewMarket(env Env) *Market {
 		// (game/station_layout.go).
 		widget.WindowOpts.Location(image.Rect(396, 8, 1014, 248)),
 	)
-	makeEdgeResizable(m.win) // four-edge resize (replaces WindowOpts.Resizeable)
 	return m
 }
 
@@ -137,8 +136,8 @@ func (m *Market) Sync() {
 		rows = append(rows, TableRow{
 			Cells: []string{
 				itemLabel(m.env, st.Item),
-				formatCredits(st.Price),
-				groupInt(int64(st.Qty)),
+				FormatCredits(st.Price),
+				FormatInt(int64(st.Qty)),
 			},
 			Data: st.Item,
 		})
@@ -146,9 +145,20 @@ func (m *Market) Sync() {
 	m.tbl.SetRows(rows)
 	m.tbl.Sync()
 
-	m.qtyLabel.Label = "Qty " + groupInt(int64(m.qty()))
+	// Revalidate the cached selection against the table itself: a row
+	// that left the board (sold out, station swapped) must stop reading
+	// as selected, or Buy/Sell would keep acting on an item the market
+	// no longer offers.
+	m.hasSel = false
+	if r, ok := m.tbl.Selected(); ok {
+		if id, isItem := r.Data.(content.ItemID); isItem {
+			m.sel, m.hasSel = id, true
+		}
+	}
+
+	m.qtyLabel.Label = "Qty " + FormatInt(int64(m.qty()))
 	if sys != nil {
-		m.title.Label = "Market — " + formatCredits(m.env.Sim.Wallet())
+		m.title.Label = "Market — " + FormatCredits(m.env.Sim.Wallet())
 	}
 	// Trades only happen docked at a station.
 	gated := !m.docked()
@@ -165,7 +175,7 @@ func (m *Market) stepQty(delta int) {
 	if m.qtyIdx >= len(qtySteps) {
 		m.qtyIdx = len(qtySteps) - 1
 	}
-	m.qtyLabel.Label = "Qty " + groupInt(int64(m.qty()))
+	m.qtyLabel.Label = "Qty " + FormatInt(int64(m.qty()))
 }
 
 // qty is the current trade quantity.

@@ -104,7 +104,6 @@ func NewLog(env Env) *LogPanel {
 		widget.WindowOpts.MinSize(logMinW, logMinH),
 		widget.WindowOpts.Location(logDefaultRect()),
 	)
-	makeEdgeResizable(l.win)
 	return l
 }
 

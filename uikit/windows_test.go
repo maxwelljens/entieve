@@ -168,6 +168,98 @@ func TestInventoryTransferAndSell(t *testing.T) {
 	}
 }
 
+// TestMarketSelectionRevalidatesOnSync: a selected order that leaves the
+// board stops reading as selected — the click-time cache alone would
+// keep Buy/Sell armed on an item the market no longer offers.
+func TestMarketSelectionRevalidatesOnSync(t *testing.T) {
+	env, cmds := newTestEnv(t)
+	m := NewMarket(env)
+	ui := newWindowUI(t, env, m.Win())
+	frame := func() { pumpWindow(t, ui, m.Sync, 1024, 700) }
+	frame()
+	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	frame()
+	clickRow(ui, m.tbl, 0)
+	frame()
+	if !m.hasSel {
+		t.Fatal("fixture: selection did not take")
+	}
+	item := m.sel
+
+	// Drop that order from the board (save surgery) and sync.
+	sv, err := env.Sim.Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	sys := env.Sim.System().ID
+	var kept []sim.MarketStock
+	for _, st := range sv.Market[sys] {
+		if st.Item != item {
+			kept = append(kept, st)
+		}
+	}
+	if len(kept) == len(sv.Market[sys]) {
+		t.Fatalf("fixture: selected item %s is not on the board", item)
+	}
+	sv.Market[sys] = kept
+	if err := env.Sim.Restore(sv); err != nil {
+		t.Fatalf("Restore: %v", err)
+	}
+	frame()
+
+	if m.hasSel {
+		t.Errorf("selection %s survived its row leaving the board", item)
+	}
+	if _, ok := m.tbl.Selected(); ok {
+		t.Error("table still reports a selection for a row that is gone")
+	}
+	m.buyClicked()
+	m.sellClicked()
+	if len(*cmds) != 0 {
+		t.Errorf("stale selection enqueued %d commands, want 0", len(*cmds))
+	}
+}
+
+// TestInventorySelectionRevalidatesOnSync: a stack that leaves the hold
+// it was selected in stops gating the transfer/sell actions.
+func TestInventorySelectionRevalidatesOnSync(t *testing.T) {
+	env, cmds := newTestEnv(t)
+	inv := NewInventory(env)
+	ui := newWindowUI(t, env, inv.Win())
+	frame := func() { pumpWindow(t, ui, inv.Sync, 1024, 700) }
+	frame()
+	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	frame()
+	clickRow(ui, inv.cargo, 0)
+	frame()
+	if !inv.hasSel {
+		t.Fatal("fixture: selection did not take")
+	}
+	if inv.toHangar.GetWidget().Disabled {
+		t.Fatal("fixture: To Hangar disabled for a cargo selection while docked")
+	}
+
+	// Empty the hold: the selected row disappears from its section.
+	cargo, ok := env.Sim.Cargos.Get(env.Sim.Player())
+	if !ok {
+		t.Fatal("player has no cargo hold")
+	}
+	cargo.Stacks = nil
+	frame()
+
+	if inv.hasSel {
+		t.Error("selection survived its stack leaving the hold")
+	}
+	if !inv.toHangar.GetWidget().Disabled {
+		t.Error("To Hangar still enabled with no selection")
+	}
+	inv.transfer("hangar")
+	inv.sellClicked()
+	if len(*cmds) != 0 {
+		t.Errorf("stale selection enqueued %d commands, want 0", len(*cmds))
+	}
+}
+
 // TestFittingActions walks the fitting flow: selection gating, unfit a
 // fitted slot, fit a hangar module into the freed slot and assemble an
 // owned ship.

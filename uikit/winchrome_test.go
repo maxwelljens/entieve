@@ -217,8 +217,8 @@ func useFakeMouse(t *testing.T) *fakeMouse {
 	return f
 }
 
-// newChromeTestWindow builds a minimal titled window with the resize
-// chrome attached, at a known rect.
+// newChromeTestWindow builds a minimal titled window with a resize
+// chrome, at a known rect.
 func newChromeTestWindow(t *testing.T) (*widget.Window, *winChrome) {
 	t.Helper()
 	env, _ := newTestEnv(t)
@@ -231,7 +231,9 @@ func newChromeTestWindow(t *testing.T) (*widget.Window, *winChrome) {
 		widget.WindowOpts.MinSize(320, 240),
 		widget.WindowOpts.Location(image.Rect(100, 100, 500, 400)),
 	)
-	ch := makeEdgeResizable(win)
+	// The kit attaches the chrome on AddWindow; this window is pumped by
+	// a bare UI instead, so the test holds the chrome directly.
+	ch := &winChrome{win: win}
 	// One pump on a real UI: layout gives the title bar and contents
 	// their rects and installs the window's input layer (the grip needs
 	// a topmost layer to test against).
@@ -349,16 +351,133 @@ func TestWinChromePressWithoutDragIsNoOp(t *testing.T) {
 	}
 }
 
-// TestWinChromeIsIdempotent: attaching the chrome twice keeps one state
-// and one set of handlers.
-func TestWinChromeIsIdempotent(t *testing.T) {
-	win, first := newChromeTestWindow(t)
-	again := makeEdgeResizable(win)
-	if again != first {
-		t.Fatal("makeEdgeResizable built a second chrome for the same window")
+// TestAddWindowChromeIsIdempotent: mounting a window twice keeps one
+// chrome (and one registry entry) — the second AddWindow reuses the
+// first one's attachment instead of stacking a second pump entry.
+func TestAddWindowChromeIsIdempotent(t *testing.T) {
+	k, _ := newTestKit(t) // NewKit mounts the overview and Selected Item
+	if len(k.chromes) != 2 {
+		t.Fatalf("kit starts with %d chromes, want 2 (overview + selected)", len(k.chromes))
 	}
-	if _, dup := chromeByWindow[win]; !dup {
-		t.Fatal("window not indexed in chromeByWindow")
+	log := NewLog(k.panelEnv())
+	first := k.AddWindow(log.Win())
+	if len(k.chromes) != 3 {
+		t.Fatalf("after one AddWindow: %d chromes, want 3", len(k.chromes))
+	}
+	again := k.AddWindow(log.Win())
+	if len(k.chromes) != 3 {
+		t.Fatalf("duplicate AddWindow grew the registry to %d chromes, want 3", len(k.chromes))
+	}
+	if ch := k.chromes[log.Win()]; ch == nil || ch.win != log.Win() {
+		t.Fatalf("log chrome = %v, want the window's own chrome", ch)
+	}
+	first()
+	again() // both handles are the same close path: still one detach
+	if _, ok := k.chromes[log.Win()]; ok {
+		t.Fatal("remove func left the log in the chrome registry")
+	}
+}
+
+// TestTwoKitsKeepTheirOwnGrips: the chrome registry lives on the kit,
+// so building a second kit (the save/load rebuild path) must not disturb
+// the first one's grips — the old package-global registry was cleared by
+// every NewKit, silently killing the first kit's windows.
+func TestTwoKitsKeepTheirOwnGrips(t *testing.T) {
+	k1, _ := newTestKit(t)
+	fm := useFakeMouse(t)
+	log1 := NewLog(k1.panelEnv())
+	k1.AddWindow(log1.Win())
+	log1.Win().SetLocation(image.Rect(10, 430, 10+logDefaultW, 430+logDefaultH))
+	pumpKit(t, k1, 1024, 700)
+	pumpKit(t, k1, 1024, 700)
+	before := len(k1.chromes)
+
+	k2, _ := newTestKit(t)
+	if len(k1.chromes) != before {
+		t.Fatalf("second NewKit changed the first kit's registry: %d → %d", before, len(k1.chromes))
+	}
+	if ch := k1.chromes[log1.Win()]; ch == nil {
+		t.Fatal("first kit lost its log chrome to the second kit")
+	}
+	if len(k2.chromes) != 2 {
+		t.Errorf("second kit has %d chromes, want 2 (its own overview + selected)", len(k2.chromes))
+	}
+
+	// The first kit still pumps it: a press in the log's grip band arms
+	// that kit's chrome (the second kit has no such window).
+	r := log1.Win().GetContainer().GetWidget().Rect
+	fm.at(r.Min.X+3, r.Min.Y+60)
+	fm.down()
+	pumpKit(t, k1, 1024, 700)
+	if ch := k1.chromes[log1.Win()]; ch == nil || !ch.armed {
+		t.Fatal("first kit no longer pumps the log's grip after a second kit was built")
+	}
+	fm.up()
+	pumpKit(t, k1, 1024, 700)
+}
+
+// TestUnmountMidDragLeavesNoSideEffects: a grip drag interrupted by a
+// hide (docked-style) or an unmount stops dead — the rect stops moving
+// under a still-held button and no ResizeEvent ever fires. The registry
+// entry goes with the unmount, so the window is not pumped any more.
+func TestUnmountMidDragLeavesNoSideEffects(t *testing.T) {
+	k, _ := newTestKit(t)
+	fm := useFakeMouse(t)
+	log := NewLog(k.panelEnv())
+	win := log.Win()
+	remove := k.AddWindow(win)
+	win.SetLocation(image.Rect(10, 430, 10+logDefaultW, 430+logDefaultH))
+	pumpKit(t, k, 1024, 700)
+	pumpKit(t, k, 1024, 700)
+	resizes := countResizes(win)
+
+	// Press in the left grip band and drag: the rect follows the cursor.
+	r := win.GetContainer().GetWidget().Rect
+	fm.at(r.Min.X+3, r.Min.Y+60)
+	fm.down()
+	pumpKit(t, k, 1024, 700) // rising edge: armed, no move yet
+	fm.at(r.Min.X+43, r.Min.Y+60)
+	pumpKit(t, k, 1024, 700) // active: the drag applies
+	dragged := win.GetContainer().GetWidget().Rect
+	if dragged == r {
+		t.Fatalf("fixture: the grip drag never moved the window (rect %v)", r)
+	}
+	if resizes.n != 0 {
+		t.Fatalf("ResizeEvent fired mid-drag (%d)", resizes.n)
+	}
+
+	// Hidden mid-drag: step refuses to move an invisible rect.
+	win.GetContainer().GetWidget().SetVisibility(widget.Visibility_Hide)
+	for i := 0; i < 3; i++ {
+		pumpKit(t, k, 1024, 700)
+	}
+	if got := win.GetContainer().GetWidget().Rect; got != dragged {
+		t.Errorf("hidden window moved mid-drag: %v → %v", dragged, got)
+	}
+
+	// Unmounted mid-drag (button still held): the chrome leaves the
+	// registry, so nothing pumps the window any more.
+	remove()
+	if _, ok := k.chromes[win]; ok {
+		t.Fatal("remove func left the window in the chrome registry")
+	}
+	for i := 0; i < 3; i++ {
+		pumpKit(t, k, 1024, 700)
+	}
+	if got := win.GetContainer().GetWidget().Rect; got != dragged {
+		t.Errorf("unmounted window moved while unmounted: %v → %v", dragged, got)
+	}
+
+	// Release after the unmount: still no ResizeEvent, still no move.
+	fm.up()
+	for i := 0; i < 2; i++ {
+		pumpKit(t, k, 1024, 700)
+	}
+	if got := win.GetContainer().GetWidget().Rect; got != dragged {
+		t.Errorf("rect moved on release: %v → %v", dragged, got)
+	}
+	if resizes.n != 0 {
+		t.Errorf("ResizeEvent fired for the interrupted drag (%d), want 0", resizes.n)
 	}
 }
 

@@ -51,6 +51,43 @@ func pumpKit(t *testing.T, k *Kit, w, h int) *ebiten.Image {
 	return img
 }
 
+// TestSelectHighlightsFreshEntity: a world click on an entity that only
+// just appeared in the grid — its overview row not built yet — still
+// lands the highlight. Select syncs the rows BEFORE resolving the
+// highlight; the other order updates the panel but clears the overview
+// selection.
+func TestSelectHighlightsFreshEntity(t *testing.T) {
+	k, _ := newTestKit(t)
+	k.Sync()
+
+	var fresh ecs.Entity
+	for _, info := range k.Sim.Grid() {
+		if info.Visible && info.Entity != k.Sim.Player() {
+			fresh = info.Entity
+			break
+		}
+	}
+	if fresh.IsZero() {
+		t.Fatal("fixture: no visible entity besides the player")
+	}
+	// The rows map is rebuilt by the next Sync, so dropping the entry is
+	// exactly the state of an entity that just became visible.
+	delete(k.ov.rows, fresh)
+
+	k.Select(fresh)
+	if k.Selected() != fresh {
+		t.Fatalf("Selected() = %v, want %v", k.Selected(), fresh)
+	}
+	row, ok := k.ov.tbl.Selected()
+	if !ok {
+		t.Fatal("fresh entity did not land an overview highlight")
+	}
+	got, isOvRow := row.Data.(*ovRow)
+	if !isOvRow || got.info.Entity != fresh {
+		t.Fatalf("highlighted row payload = %#v, want the ovRow of %v", row.Data, fresh)
+	}
+}
+
 // TestNewKitConstruction asserts every theme entry is populated and the
 // four type-scale faces exist at the expected sizes.
 func TestNewKitConstruction(t *testing.T) {
