@@ -102,10 +102,17 @@ func (s *Sim) execLoot(cmd CmdLoot) {
 	}
 }
 
-// itemName returns the display name of any item-like ID (items only; hulls
-// and modules fall back to their raw ID).
+// itemName returns the display name of any marketable id: items, modules
+// and hulls resolve through their content defs; unknown ids fall back to
+// the raw id (which is also what a genuinely unknown id should read as).
 func (s *Sim) itemName(id content.ItemID) string {
 	if d, ok := s.Content.Item(id); ok {
+		return d.Name
+	}
+	if d, ok := s.Content.Module(content.ModuleID(id)); ok {
+		return d.Name
+	}
+	if d, ok := s.Content.Ship(content.ShipID(id)); ok {
 		return d.Name
 	}
 	return string(id)

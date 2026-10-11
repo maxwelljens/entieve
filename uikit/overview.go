@@ -336,8 +336,9 @@ func formatSpeed(v float64) string {
 	return FormatInt(int64(math.Round(v))) + " m/s"
 }
 
-// FormatCredits renders an amount of currency as "12,345.00 cr"
-// (the currency of Entieve is the credit).
+// FormatCredits renders an amount of money per docs/lore/NAMING.md: the
+// euro with thousands separators and two decimals ("€12,345.67"), bare
+// cents under one euro ("50¢"), negatives as "-€…". Zero reads "€0.00".
 func FormatCredits(v float64) string {
 	neg := v < 0
 	if neg {
@@ -350,7 +351,12 @@ func FormatCredits(v float64) string {
 		ip++
 		frac = 0
 	}
-	s := FormatInt(ip) + "." + pad2(frac) + " cr"
+	var s string
+	if ip == 0 && frac != 0 { // under one euro: bare cents, no decimals
+		s = strconv.FormatInt(frac, 10) + "¢"
+	} else {
+		s = "€" + FormatInt(ip) + "." + pad2(frac)
+	}
 	if neg {
 		s = "-" + s
 	}

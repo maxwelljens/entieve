@@ -264,7 +264,7 @@ func (s *Sim) System() *content.SystemDef {
 	return sys
 }
 
-// Wallet returns the player's credit balance.
+// Wallet returns the player's euro balance.
 func (s *Sim) Wallet() float64 { return s.wallet }
 
 // Standing returns the player's career standing (credited on contract

@@ -1004,7 +1004,7 @@ func (s *Sim) marketPriceStep(sys content.SystemID, idx int, up bool, share floa
 	}
 	s.emit(Event{Kind: EvMarket, Severity: SevInfo, System: sys, Item: item, Value: p,
 		Text: verb + " — " + s.itemName(item) + " price " + direction + " " +
-			credits(p) + " at " + where})
+			euro(p) + " at " + where})
 }
 
 // ---------------------------------------------------------------------------

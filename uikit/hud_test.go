@@ -129,14 +129,14 @@ func TestHudSyncReadouts(t *testing.T) {
 	h.Sync()
 
 	// showcase start: sloop 500/500 shield, 500/500 armor, 600/600
-	// structure, cap 1800/1800 GJ, wallet 10,000,000 cr, speed 0.
+	// structure, cap 1800/1800 GJ, wallet €10,000,000.00, speed 0.
 	for _, c := range []struct{ name, got, want string }{
 		{"shield", h.shieldLbl.Label, "Shield 500/500"},
 		{"armor", h.armorLbl.Label, "Armor 500/500"},
 		{"structure", h.structLbl.Label, "Structure 600/600"},
 		{"speed", h.speedLbl.Label, formatSpeed(0)},
 		{"time", h.timeLbl.Label, "×1 time"},
-		{"wallet", h.walletLbl.Label, "10,000,000.00 cr"},
+		{"wallet", h.walletLbl.Label, "€10,000,000.00"},
 		{"capacitor", h.capValue.Label, "1,800.0/1,800.0 GJ"},
 	} {
 		if c.got != c.want {
@@ -174,17 +174,20 @@ func TestHudSyncReadouts(t *testing.T) {
 		t.Errorf("time label = %q, want %q", h.timeLbl.Label, "×4 time")
 	}
 
-	// Wallet formatting (incl. the negative and carry cases) — the
-	// exported formatter every credit readout shares (HUD, market title,
+	// Wallet formatting (incl. the negative, sub-euro and carry cases) —
+	// the exported formatter every money readout shares (HUD, market title,
 	// the station board's payout line).
 	for _, c := range []struct {
 		in   float64
 		want string
 	}{
-		{40000, "40,000.00 cr"},
-		{-1234.5, "-1,234.50 cr"},
-		{0.999, "1.00 cr"},
-		{0, "0.00 cr"},
+		{40000, "€40,000.00"},
+		{-1234.5, "-€1,234.50"},
+		{0.999, "€1.00"},
+		{0, "€0.00"},
+		{0.5, "50¢"},
+		{0.99, "99¢"},
+		{-0.5, "-50¢"},
 	} {
 		if got := FormatCredits(c.in); got != c.want {
 			t.Errorf("FormatCredits(%v) = %q, want %q", c.in, got, c.want)
