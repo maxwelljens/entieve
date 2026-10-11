@@ -34,6 +34,95 @@ func marketQty(s *Sim, item content.ItemID) (qty int, price float64, ok bool) {
 
 func hangarCount(s *Sim, item content.ItemID) int { return stacksCount(s.Hangar.Items, item) }
 
+// hangarHulls counts stored hulls of one type in the station hangar.
+func hangarHulls(s *Sim, hull content.ShipID) int {
+	n := 0
+	for _, sh := range s.Hangar.Ships {
+		if sh.Hull == hull {
+			n++
+		}
+	}
+	return n
+}
+
+// TestBuyHullQtyDeliversEveryHull pins the hull branch of CmdBuy: N hulls
+// cost N prices, take N units off the shelf and deliver N StoredShips (the
+// item branch stacks; sell takes hulls one per unit — the buy side must
+// match), and the qty > stock clamp plus the out-of-stock refusal stay
+// exactly as documented.
+func TestBuyHullQtyDeliversEveryHull(t *testing.T) {
+	s := newTestSim(t)
+	dockAtHaven(t, s)
+	s.wallet = 300000 // budget for three 50k hulls
+	stockBefore, price, _ := marketQty(s, "ship-barge")
+	if stockBefore < 3 {
+		t.Fatalf("fixture: stock=%d want >= 3", stockBefore)
+	}
+	walletBefore := s.Wallet()
+
+	// Qty 3: charge 3x, stock -3, three hulls delivered.
+	s.Queue(CmdBuy{Item: "ship-barge", Qty: 3})
+	s.Step()
+	evs := drain(s)
+	if s.Wallet() != walletBefore-3*price {
+		t.Fatalf("wallet=%v want %v (3 x %v)", s.Wallet(), walletBefore-3*price, price)
+	}
+	stockAfter, _, _ := marketQty(s, "ship-barge")
+	if stockAfter != stockBefore-3 {
+		t.Fatalf("stock=%d want %d", stockAfter, stockBefore-3)
+	}
+	if n := hangarHulls(s, "ship-barge"); n != 3 {
+		t.Fatalf("hangar holds %d hulls, want 3 (one per unit bought)", n)
+	}
+	for _, sh := range s.Hangar.Ships {
+		if sh.Hull != "ship-barge" {
+			t.Fatalf("unexpected stored hull %q", sh.Hull)
+		}
+	}
+	// Hulls report their raw ID in market text (itemName only resolves items).
+	if !hasEvent(evs, EvMarket, "Bought 3 x ship-barge for 150,000.00 credits") {
+		t.Fatalf("missing buy event: %v", evs)
+	}
+
+	// Qty above the shelf clamps to what is in stock: charge and deliver
+	// exactly the listed units, never a phantom hull. (Top the shelf back up
+	// so the clamp has something to work against.)
+	for i := range s.market["sys-a"] {
+		if s.market["sys-a"][i].Item == "ship-barge" {
+			s.market["sys-a"][i].Qty = 2
+		}
+	}
+	s.wallet = 300000
+	s.Queue(CmdBuy{Item: "ship-barge", Qty: 5})
+	s.Step()
+	evs = drain(s)
+	if s.Wallet() != 300000-2*price {
+		t.Fatalf("wallet=%v want %v (clamped to the 2 units on the shelf)",
+			s.Wallet(), 300000-2*price)
+	}
+	if n := hangarHulls(s, "ship-barge"); n != 5 {
+		t.Fatalf("hangar holds %d hulls, want 5", n)
+	}
+	stockAfter, _, _ = marketQty(s, "ship-barge")
+	if stockAfter != 0 {
+		t.Fatalf("stock=%d want 0", stockAfter)
+	}
+
+	// Empty shelf: refusal, nothing moves.
+	walletRefused := s.Wallet()
+	hullsRefused := hangarHulls(s, "ship-barge")
+	s.Queue(CmdBuy{Item: "ship-barge", Qty: 1})
+	s.Step()
+	evs = drain(s)
+	if findEvent(evs, EvLog, "Out of stock: ship-barge") == nil {
+		t.Fatalf("missing out-of-stock refusal: %v", evs)
+	}
+	if s.Wallet() != walletRefused || hangarHulls(s, "ship-barge") != hullsRefused {
+		t.Fatalf("refusal moved state: wallet=%v hulls=%d", s.Wallet(),
+			hangarHulls(s, "ship-barge"))
+	}
+}
+
 func TestBuyReducesStockAndWallet(t *testing.T) {
 	s := newTestSim(t)
 	dockAtHaven(t, s)

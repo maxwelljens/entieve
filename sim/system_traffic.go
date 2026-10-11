@@ -626,10 +626,10 @@ func (s *Sim) scheduleRaidersLeave(atk *TrafficAttack) {
 // ---------------------------------------------------------------------------
 
 // trafficDriveAttacks advances every live ambush: dispatches the patrol
-// response when it is due, resolves a raid with no raiders left as saved,
-// expires break-offs, and drives the raiders' weapons through the normal
-// NPC activation policy (target = engaged patrol if one is close, else the
-// hauler).
+// response when it is due, resolves a raid with no raiders left as saved
+// (emitting EvTraffic phase "saved"), expires break-offs, and drives the
+// raiders' weapons through the normal NPC activation policy (target =
+// engaged patrol if one is close, else the hauler).
 func (s *Sim) trafficDriveAttacks(sys *content.SystemDef, td *content.TrafficDef, sec string) {
 	for _, e := range sortedEntities(s.Traffic) {
 		tc, ok := s.Traffic.Get(e)
@@ -644,6 +644,10 @@ func (s *Sim) trafficDriveAttacks(sys *content.SystemDef, td *content.TrafficDef
 		}
 		if atk.Outcome == "" && !hasLiveRaiders(s, atk) {
 			atk.Outcome = TrafficOutcomeSaved
+			celID, celName := s.nearestLandmark(mustPos(s, e))
+			s.emit(Event{Kind: EvTraffic, Phase: TrafficSaved, Severity: SevGood, Actor: e,
+				System: s.systemID, Cel: celID, Item: tc.Item, Value: float64(tc.Qty),
+				Text: "Convoy hauler saved near " + celName})
 		}
 		s.trafficRaidersAct(tc, atk, e)
 	}
@@ -787,6 +791,15 @@ func (s *Sim) idlePatrol() ecs.Entity {
 	return 0
 }
 
+// patrolResponding reports whether e is a security patrol working an
+// incident (PatrolRespond). systemNpc skips its idle-patrol steering while
+// true, so the responder holds station on the fight instead of circling
+// home (patrolRespondStep owns its movement while it responds).
+func (s *Sim) patrolResponding(e ecs.Entity) bool {
+	p, ok := s.Patrols.Get(e)
+	return ok && p.State == PatrolRespond
+}
+
 // trafficDrivePatrols runs responding/returning patrols: warp to the
 // incident, lock and shoot raiders inside engagement range, then return to
 // the anchor and resume the idle guard circle. Only idle AI states are
@@ -829,6 +842,11 @@ func (s *Sim) patrolRespondStep(e ecs.Entity, p *Patrol, ai *NpcAI) {
 	if s.Warps.Has(e) {
 		return // warp state machine owns movement
 	}
+	// Hold station on the incident: systemNpc no longer runs the idle-patrol
+	// loop for a responding patrol, and a patrol intent left over from
+	// before the dispatch must not steer the ship back to its Home circle
+	// mid-fight (it would drift out of engagement range of the raiders).
+	s.Intents.Set(e, Intent{Kind: IntentStop})
 	// Closest live raider.
 	ep, ok := s.posOf(e)
 	if !ok {

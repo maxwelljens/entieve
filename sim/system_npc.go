@@ -53,7 +53,9 @@ const npcPatrolMaxRadius = 2500
 // on-grid player:
 //
 //	(a) the player is within the NPC's effective aggro range;
-//	(b) the NPC took damage;
+//	(b) the NPC took damage from the player (source-checked: third-party
+//	    fire — a patrol during a convoy ambush — never aggroes an NPC
+//	    onto the player);
 //	(c) the player fired a weapon or ran a mining cycle within 30 km of the
 //	    NPC's Home in the last 20 sim-seconds;
 //	(d) the player is within 8 km of the NPC's Home (guardians investigate
@@ -130,7 +132,11 @@ func (s *Sim) systemNpc() {
 		// Aggro triggers (a)-(d); (b)-(d) only pull a non-pursuing NPC in.
 		aggroOK := playerOnGrid && effAggro > 0 && dist <= effAggro
 		if playerOnGrid && (ai.State == NpcIdle || ai.State == "" || ai.State == NpcReturn) {
-			if damaged {
+			// (b) source-blind damage would flip every NPC on the grid onto
+			// the player whenever anything else shot it (a patrol fighting
+			// raiders, rat-on-rat fire), at any distance: the damage must
+			// have come from the player.
+			if damaged && ai.LastHitBy == s.player {
 				aggroOK = true
 			}
 			if s.recentPlayerWorkNear(ai.Home) {
@@ -153,8 +159,12 @@ func (s *Sim) systemNpc() {
 				ai.State = NpcApproach
 				ai.Target = s.player
 				s.log(SevWarning, e, s.nameOf(e)+" is attacking you")
-			} else {
-				// Guards never sit still: slow patrol around Home.
+			} else if !s.patrolResponding(e) {
+				// Guards never sit still: slow patrol around Home — but a
+				// patrol working an incident (PatrolRespond) holds station:
+				// steering it back to its Home circle mid-fight would drift
+				// it out of engagement range of the raiders it is covering
+				// (trafficDrivePatrols owns its movement while responding).
 				s.npcPatrol(e, ai, tr, def)
 			}
 

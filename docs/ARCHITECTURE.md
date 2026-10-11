@@ -552,6 +552,44 @@ contract accept → objective progress → auto-claim payout + standing,
 NPC traffic delivery + market price drift, ambush on NPC traffic
 (Penumbra legs, showcase seed), security patrol response + convoy escape.
 
+> **Sim hardening registry (2026-10, `fix/sim-hardening`).** Append-only
+> entries for the contract changes made by the fragility review:
+>
+> - **Events:** `EvTraffic` gains phase `"saved"` (`TrafficSaved` in the
+>   `sim/model.go` registry — the same string as `TrafficOutcomeSaved`),
+>   emitted exactly once when an ambush resolves with every raider gone and
+>   the hauler alive: `System` = current system, `Cel` = nearest landmark of
+>   the incident, `Item`/`Value` = shipment, `SevGood`, text
+>   `"Convoy hauler saved near …"`.
+> - **Save schema:** `Save.LastStationCel` (`last_station_cel`) always carries
+>   the respawn anchor as a celestial ID, so an anchor in another system
+>   (handle `LastStation` = 0) survives save/restore; restore prefers the
+>   celestial ID and falls back to the `LastStation` handle for saves written
+>   before the field. `SavedNpcAI` gains `last_hit_by` (`NpcAI.LastHitBy`),
+>   the damage source behind NPC aggro trigger (b).
+> - **Hash:** no degraded fallback — `Hash()` panics (`hashFail`) when the
+>   canonical Save cannot be serialized (non-finite float) instead of
+>   returning a partial-state fingerprint, so twin-run comparisons can never
+>   silently agree on two meaningless hashes.
+> - **Warp:** the `align` phase lands at `warpLandRange` (2.5 km) of the
+>   landing point exactly like the `warp` phase, so a sub-tolerance hop can no
+>   longer sit in `align` forever. Player path unchanged: `CmdWarpTo` still
+>   refuses inside `WarpMinRange` (150 km).
+> - **NPC engagement ownership:** aggro trigger (b) is source-checked
+>   (`NpcAI.LastHitBy == s.player` — third-party fire never aggroes an NPC
+>   onto the player), and a `PatrolRespond` patrol holds station: the
+>   idle-patrol loop skips it and `patrolRespondStep` stamps `IntentStop`
+>   while it works the incident.
+> - **RNG stream roles:** the master stream is documented (api.go) as exactly
+>   two roles — player combat rolls and spawn entropy (asteroid/NPC scatter +
+>   NPC fork seeds); `sim/rng_roles_test.go` pins its draw set.
+> - **Save completeness check:** `sim/save_completeness_test.go` classifies
+>   every `Sim` field as save-carried / derived / per-Step transient / explicit
+>   exception (`events`, `ammoPrefs`, `lastPlayerWork` — the last two reset on
+>   restore by design, pinned by `TestRestoreResetsDocumentedPreferences`) and
+>   fails on unclassified fields, unclaimed `Save` fields, or a transient that
+>   survives a Step boundary.
+
 ## `render` / `ui` / `game` contract
 
 > **Note (2026-10 — warp minimum + typeface).** (1) `sim.WarpMinRange =

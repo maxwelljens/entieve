@@ -19,8 +19,14 @@ import (
 type Sim struct {
 	Content *content.Content
 	World   *ecs.World
-	RNG     *core.RNG
-	Hangar  *Hangar
+	// RNG is the master stream. It carries exactly TWO roles — (1) player
+	// combat rolls (hit/damage rolls via rngFor) and (2) spawn entropy:
+	// asteroid and NPC scatter drawn in build.go plus the per-NPC Fork
+	// seeds. Every other subsystem isolates itself on a fork (trafficRNG);
+	// nothing may reach for s.RNG beyond those roles, and
+	// rng_roles_test.go pins the master's draw set.
+	RNG    *core.RNG
+	Hangar *Hangar
 
 	// Component stores (read surface).
 	Names      *ecs.Store[Name]

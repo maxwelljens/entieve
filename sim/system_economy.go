@@ -127,7 +127,12 @@ func (s *Sim) execBuy(c CmdBuy) {
 	stock.Qty -= qty
 
 	if hull, ok := s.Content.Ship(content.ShipID(c.Item)); ok {
-		s.Hangar.Ships = append(s.Hangar.Ships, StoredShip{Hull: hull.ID})
+		// Hulls are not stackable: one StoredShip per unit bought, so the
+		// wallet/stock debit (qty units) and the delivered hulls stay in
+		// lockstep — exactly how execSell takes them back out.
+		for range qty {
+			s.Hangar.Ships = append(s.Hangar.Ships, StoredShip{Hull: hull.ID})
+		}
 	} else {
 		s.Hangar.Items = addStacks(s.Hangar.Items, c.Item, qty)
 	}
