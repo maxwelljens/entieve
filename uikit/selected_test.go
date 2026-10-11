@@ -502,8 +502,10 @@ func TestWarpMinimumRangeGate(t *testing.T) {
 	if tips := sp.warp.GetWidget().ToolTips; len(tips) != 1 {
 		t.Fatalf("Warp hint not attached inside the minimum range: %d tooltips", len(tips))
 	}
-	if got, want := sp.warpTipText.Label, "Target within warp minimum range (150 km)"; got != want {
-		t.Errorf("Warp hint = %q, want %q", got, want)
+	if m := sp.warpTipView.Model(); m.Icon != "act_warp" || m.Title != "Warp unavailable" ||
+		m.Sub != "Target within warp minimum range (150 km)" {
+		t.Errorf("Warp hint = %q/%q/%q, want act_warp / Warp unavailable / the quoted reason",
+			m.Icon, m.Title, m.Sub)
 	}
 	// The hint quotes sim.WarpMinRange, not a literal.
 	if kmLabel(sim.WarpMinRange) != "150 km" {

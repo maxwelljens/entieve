@@ -32,6 +32,12 @@ type Fitting struct {
 	fitMod   *widget.Button
 	assemble *widget.Button
 
+	// slotTips / hangarTips are the two tables' per-row hover tooltips,
+	// indexed with the row (rows are positional): one shared module panel
+	// per row slot, rebuilt only when the row's module changes.
+	slotTips   []rowTip
+	hangarTips []rowTip
+
 	selSlot slotPick
 	hasSlot bool
 	selMod  content.ModuleID
@@ -183,6 +189,7 @@ func (f *Fitting) Sync() {
 	f.resists.Sync()
 	f.slots.Sync()
 	f.hangar.Sync()
+	f.syncRowTips()
 
 	// Action gating: unfit needs a fitted slot, fit needs a hangar
 	// module plus an empty slot of its class, assemble needs a ship.
@@ -195,6 +202,56 @@ func (f *Fitting) Sync() {
 	}
 	f.fitMod.GetWidget().Disabled = !modFits
 	f.assemble.GetWidget().Disabled = !f.hasShip
+}
+
+// syncRowTips attaches the shared module tooltip to both tables' module
+// rows: a filled slot quotes its slot in the sub line, a hangar module is
+// slotless (it isn't fitted yet). Rows that aren't modules — empty slots,
+// stored hulls — drop their tooltip. The panel comes from env.moduleTip,
+// the same builder the rack cells use, so a module reads identically in
+// both places; the fitting rows carry no charge and no click hints, since
+// neither is true of a table row.
+func (f *Fitting) syncRowTips() {
+	f.tableRowTips(f.slots, &f.slotTips, func(r TableRow) (string, TooltipModel) {
+		pick, ok := r.Data.(slotPick)
+		if !ok || pick.mod == "" {
+			return "", TooltipModel{}
+		}
+		def, ok := f.env.Content.Module(pick.mod)
+		if !ok {
+			return "", TooltipModel{}
+		}
+		return string(pick.mod) + "|" + slotLabel(pick.ref),
+			f.env.moduleTip(def, slotLabel(pick.ref), "", 0)
+	})
+	f.tableRowTips(f.hangar, &f.hangarTips, func(r TableRow) (string, TooltipModel) {
+		id, ok := r.Data.(content.ModuleID)
+		if !ok {
+			return "", TooltipModel{}
+		}
+		def, ok := f.env.Content.Module(id)
+		if !ok {
+			return "", TooltipModel{}
+		}
+		return string(id), f.env.moduleTip(def, "", "", 0)
+	})
+}
+
+// tableRowTips walks one table's rows and feeds each to model for its key
+// and panel. The tooltip cache indexes with the row, so a rebuilt row
+// widget re-attaches the tooltip it already has instead of rebuilding it.
+func (f *Fitting) tableRowTips(tbl *Table, cache *[]rowTip, model func(TableRow) (string, TooltipModel)) {
+	for i := 0; i < len(tbl.rows); i++ {
+		w := tbl.rowWidget(i)
+		if w == nil {
+			continue
+		}
+		key, m := model(tbl.rows[i])
+		for len(*cache) <= i {
+			*cache = append(*cache, rowTip{})
+		}
+		(*cache)[i].set(f.env, w.GetWidget(), key, m)
+	}
 }
 
 // statLines renders the derived ship statistics (mirrors

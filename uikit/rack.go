@@ -1,7 +1,6 @@
 package uikit
 
 import (
-	"image"
 	"image/color"
 	"math"
 	"sort"
@@ -78,17 +77,15 @@ type Rack struct {
 // ModuleRuntime.Active for the click toggle (the visual rides the button's
 // Disabled state: dim cell while off, amber cell while running).
 type rackCell struct {
-	slot    sim.SlotRef
-	root    *widget.Container
-	btn     *widget.Button
-	name    *widget.Text
-	bar     *widget.ProgressBar
-	tip     *widget.ToolTip
-	tipText *widget.Text
-	tips    []*widget.ToolTip // stable ToolTips value for fitted cells
-	module  content.ModuleID  // module currently shown ("" = empty slot)
-	icon    string            // glyph the tile currently shows ("" = none)
-	active  bool              // runtime Active at the last Sync
+	slot   sim.SlotRef
+	root   *widget.Container
+	btn    *widget.Button
+	name   *widget.Text
+	bar    *widget.ProgressBar
+	tip    rowTip           // structured hover tooltip (built on first fit)
+	module content.ModuleID // module currently shown ("" = empty slot)
+	icon   string           // glyph the tile currently shows ("" = none)
+	active bool             // runtime Active at the last Sync
 }
 
 // NewRack builds the module rack over the given environment. Its container
@@ -166,31 +163,13 @@ func NewRack(env Env) *Rack {
 
 // newCell builds one slot cell: a 50×40 icon tile (the module's class
 // glyph; right-click cycles a weapon's charge) over its name line and the
-// cycle progress bar, plus the hover tooltip shared by the cell's lifetime.
-// The glyph lives in the tile and the name under it, so the label keeps the
-// full cell width — an icon beside it would push the row past the HUD at
-// the 1024×700 minimum.
+// cycle progress bar. The cell's structured hover tooltip is built on its
+// first fit (see rowTip). The glyph lives in the tile and the name under
+// it, so the label keeps the full cell width — an icon beside it would
+// push the row past the HUD at the 1024×700 minimum.
 func (r *Rack) newCell(row, idx int) *rackCell {
 	p := r.env.Pal
 	cell := &rackCell{slot: sim.SlotRef{Class: rackClasses[row], Index: idx}}
-
-	cell.tipText = widget.NewText(
-		widget.TextOpts.Text("", r.env.Face(StepSmall), solid(p.Text)),
-	)
-	tipBody := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 220), 1)),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout(widget.AnchorLayoutOpts.Padding(
-			&widget.Insets{Left: 8, Right: 8, Top: 5, Bottom: 5},
-		))),
-	)
-	tipBody.AddChild(cell.tipText)
-	cell.tip = widget.NewToolTip(
-		widget.ToolTipOpts.Content(tipBody),
-		widget.ToolTipOpts.Delay(rackTipDelay),
-		widget.ToolTipOpts.Position(widget.TOOLTIP_POS_CURSOR_STICKY),
-		widget.ToolTipOpts.Offset(image.Point{X: 12, Y: 12}),
-	)
-	cell.tips = []*widget.ToolTip{cell.tip}
 
 	// The tile carries the glyph only: ebitenui lays a graphic button out
 	// as [text][graphic] with a fixed 10 px spacing, so the graphic
@@ -342,9 +321,10 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 		progress = hudFrac01((now - (rt.CycleEnds - def.ActivationTime)) / def.ActivationTime)
 	}
 
-	// Rewriting label/tooltip/text every frame is cheap (Text.measure
-	// early-returns on an unchanged label) and keeps the empty-slot case
-	// honest without a separate "first sync" flag.
+	// Rewriting the label every frame is cheap (Text.measure early-returns
+	// on an unchanged label) and keeps the empty-slot case honest without
+	// a separate "first sync" flag; the tooltip rebuilds only when its
+	// change key moves (module, charge or cargo count).
 	cell.module = id
 	cell.active = active
 	// Glyph + name: the tile shows the module's class, the line under it
@@ -367,11 +347,10 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 	}
 	cell.name.SetColor(nameCol)
 	if def == nil {
-		cell.btn.GetWidget().ToolTips = nil
-		cell.tipText.Label = ""
+		cell.tip.set(r.env, cell.btn.GetWidget(), "", TooltipModel{})
 	} else {
-		cell.btn.GetWidget().ToolTips = cell.tips
-		cell.tipText.Label = strings.Join(r.tipLines(def, cell.slot), "\n")
+		key, model := r.cellTip(def, cell.slot)
+		cell.tip.set(r.env, cell.btn.GetWidget(), key, model)
 	}
 	cell.btn.GetWidget().Disabled = !active
 	cell.bar.SetCurrent(int(progress * rackCycleMax))
@@ -402,65 +381,52 @@ func (r *Rack) shortName(def *content.ModuleDef) string {
 	return Ellipsize(name, rackCellW-6, r.measure)
 }
 
-// slotLabel renders a slot reference as "High slot 1".
-func (r *Rack) slotLabel(slot sim.SlotRef) string {
-	return kindLabel(slot.Class) + " slot " + strconv.Itoa(slot.Index+1)
+// cellTip builds one fitted cell's tooltip: the shared module model plus
+// what the rack alone knows — the slot, the preferred charge and its cargo
+// count, and the footer hints ("Right-click: cycle ammo", "Click:
+// activate"). The returned key covers every input the model reads, so Sync
+// rebuilds the panel only when it would actually change.
+func (r *Rack) cellTip(def *content.ModuleDef, slot sim.SlotRef) (string, TooltipModel) {
+	// The rack-only inputs: which charge this cell prefers, how many of it
+	// sit in cargo, and whether a right-click has anywhere to cycle to
+	// (Auto plus at least one cargo charge of the weapon's class).
+	charge, qty, cycleable := "", 0, false
+	if def.Weapon != nil && def.Weapon.AmmoClass != "" {
+		id := r.ammoPref[slot]
+		charge = r.ammoName(id)
+		qty = r.cargoQty(id)
+		cycleable = len(r.ammoCandidates(def.Weapon.AmmoClass)) > 1
+	}
+	var hints []string
+	if cycleable {
+		hints = append(hints, "Right-click: cycle ammo")
+	}
+	if def.ActivationTime > 0 {
+		hints = append(hints, "Click: activate")
+	}
+	key := string(def.ID) + "|" + charge + "|" + strconv.Itoa(qty) +
+		"|" + strconv.FormatBool(cycleable)
+	return key, r.env.moduleTip(def, slotLabel(slot), charge, qty, hints...)
 }
 
-// tipLines builds the cell tooltip body: name, slot, key stats and the
-// currently preferred charge. Local copy of ui.ModuleTipLines plus the
-// damage-mix line, since uikit must not import ui.
-func (r *Rack) tipLines(def *content.ModuleDef, slot sim.SlotRef) []string {
-	lines := []string{def.Name, r.slotLabel(slot)}
-	switch {
-	case def.Weapon != nil:
-		w := def.Weapon
-		lines = append(lines,
-			"Damage "+groupFloat(w.Damage.Total(), 1)+" per shot",
-			"Mix  EM "+groupFloat(w.Damage.EM, 1)+
-				"  TH "+groupFloat(w.Damage.Thermal, 1)+
-				"  KN "+groupFloat(w.Damage.Kinetic, 1)+
-				"  EX "+groupFloat(w.Damage.Explosive, 1),
-			"Optimal "+formatDistance(w.Optimal)+"  Falloff "+formatDistance(w.Falloff),
-			"Tracking "+groupFloat(w.Tracking, 2)+" rad/s",
-		)
-		if w.AmmoClass != "" {
-			lines = append(lines, "Charge: "+r.ammoName(r.ammoPref[slot]))
-		}
-	case def.Mining != nil:
-		m := def.Mining
-		lines = append(lines,
-			"Yields "+groupFloat(m.VolumePerCycle, 1)+" m³ / "+groupFloat(m.CycleTime, 1)+" s",
-		)
-	case def.Boost != nil:
-		b := def.Boost
-		cycle := ""
-		if def.ActivationTime > 0 {
-			cycle = " / " + groupFloat(def.ActivationTime, 1) + " s"
-		}
-		if b.ShieldBoostPerCycle > 0 {
-			lines = append(lines, "Shield +"+groupFloat(b.ShieldBoostPerCycle, 1)+" HP"+cycle)
-		}
-		if b.ArmorRepPerCycle > 0 {
-			lines = append(lines, "Armor +"+groupFloat(b.ArmorRepPerCycle, 1)+" HP"+cycle)
-		}
-		if b.SpeedMultiplier > 1 {
-			lines = append(lines, "Speed ×"+groupFloat(b.SpeedMultiplier, 2))
-		}
-		if b.WebStrength > 0 {
-			lines = append(lines, "Web −"+pctLabel(b.WebStrength)+" target speed")
-		}
-		if b.ScramDuration > 0 {
-			lines = append(lines, "Warp scramble "+groupFloat(b.ScramDuration, 1)+" s")
-		}
-		if b.CapRestore > 0 {
-			lines = append(lines, "Restores "+groupFloat(b.CapRestore, 1)+" GJ capacitor")
+// cargoQty counts the player's cargo stacks of one item (0 when the sim or
+// the cargo is gone).
+func (r *Rack) cargoQty(id content.ItemID) int {
+	s := r.env.Sim
+	if s == nil || id == "" {
+		return 0
+	}
+	cg, ok := s.Cargos.Get(s.Player())
+	if !ok {
+		return 0
+	}
+	qty := 0
+	for _, st := range cg.Stacks {
+		if st.Item == id {
+			qty += st.Qty
 		}
 	}
-	if def.ActivationCost > 0 {
-		lines = append(lines, "Uses "+groupFloat(def.ActivationCost, 1)+" GJ per cycle")
-	}
-	return lines
+	return qty
 }
 
 // ammoName renders a charge preference for the tooltip ("" = Auto).
