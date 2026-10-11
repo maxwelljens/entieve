@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Binding lore rulebook (`docs/lore/`): UNIVERSE, FACTIONS, AESTHETIC and
+  NAMING — the Far Moravia canon (frontier gold rush for the ores,
+  first-wave European heritage, the Old Works machine swarms,
+  charter-reach zones, the euro as old-world money, four-origin trait
+  matrix). NAMING.md holds the draft rename registry for every content
+  id; names await author review before the content pass.
 - Living NPCs: deterministic patrol around their spawn anchor, threat
   response (proximity, damage, fire/mining near their home, intrusion
   within 8 km), security temperament (high-sec skittish, null-sec
