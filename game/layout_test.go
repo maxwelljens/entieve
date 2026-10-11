@@ -158,7 +158,7 @@ func TestQuitWhileDockedPersistsPreDockIntent(t *testing.T) {
 // stays tracked, and writeLayout no longer persists off-screen coords.
 func TestRestoredWindowsReclampOnResize(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "save.json")
-	if err := os.WriteFile(path+".layout.json", []byte(`{"version":1,"windows":{
+	if err := os.WriteFile(path+".layout.json", []byte(`{"version":2,"windows":{
 		"overview":{"x":1500,"y":780,"w":400,"h":300,"open":true},
 		"log":{"x":1400,"y":600,"w":360,"h":240,"open":true},
 		"market":{"x":1000,"y":400,"w":420,"h":300,"open":true}}}`), 0o644); err != nil {
@@ -419,7 +419,7 @@ func TestLayoutCorruptAndPartialDegrade(t *testing.T) {
 	// log restores, everything else keeps its default, and the unknown
 	// key is ignored.
 	if err := os.WriteFile(path+".layout.json", []byte(
-		`{"version":1,"windows":{
+		`{"version":2,"windows":{
 			"log":{"x":500,"y":100,"w":300,"h":200,"open":false},
 			"future-window":{"x":9,"y":9,"w":10,"h":10,"open":true}}}`), 0o644); err != nil {
 		t.Fatal(err)

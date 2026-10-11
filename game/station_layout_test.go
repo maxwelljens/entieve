@@ -273,7 +273,7 @@ func TestStationLayoutSavedWins(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "save.json")
 	// Partial sidecar: only the market, at a hand-arranged spot.
 	if err := os.WriteFile(path+".layout.json", []byte(
-		`{"version":1,"windows":{
+		`{"version":2,"windows":{
 			"market":{"x":400,"y":380,"w":360,"h":300,"open":true}}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
