@@ -59,6 +59,21 @@ License 1.1` ("Copyright 2018 The Turret Road Project Authors"
 <https://github.com/noponies/turret-road>) ships with every binary
 ([`render/fonts/OFL.txt`](render/fonts/OFL.txt), [docs/ART.md](docs/ART.md)).
 
+## Icons
+
+The interface's glyphs come from
+[game-icons.net](https://game-icons.net) — monochrome silhouettes embedded in
+[`uikit/icons/`](uikit/icons), converted to white-alpha at load and tinted
+from the palette (16/20/24 px on the type grid). They mark kinds in the
+overview and HUD, actions on the Selected Item buttons, module classes on the
+rack, objectives on contract rows, and the service window titles.
+
+**License — CC BY 3.0**: every icon keeps its author credit — the full list
+(name, slug, author, source, license) is
+[`uikit/icons/CREDITS.md`](uikit/icons/CREDITS.md), and a test pins each PNG
+to both a manifest entry and a credits line. Required wording: *Icons made by
+{author}. Available on https://game-icons.net*.
+
 ## Architecture
 
 ```

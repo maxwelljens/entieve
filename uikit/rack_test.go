@@ -1,6 +1,8 @@
 package uikit
 
 import (
+	"image"
+	"image/color"
 	"strings"
 	"testing"
 
@@ -8,6 +10,7 @@ import (
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/icons"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -74,8 +77,16 @@ func TestRackConstruction(t *testing.T) {
 			if !ok {
 				t.Fatalf("module %s missing from content", id)
 			}
-			if got, want := r.cells[row][i].btn.Text().Label, r.shortName(def); got != want {
-				t.Errorf("cell(%d,%d) label = %q, want %q", row, i, got, want)
+			cell := r.cells[row][i]
+			// The name lives on the line under the tile now.
+			if got, want := cell.name.Label, r.shortName(def); got != want {
+				t.Errorf("cell(%d,%d) name = %q, want %q", row, i, got, want)
+			}
+			// The tile carries the module's class glyph (the same cached
+			// image the icon registry hands everyone else).
+			wantGlyph := icons.Get(ModuleIcon(def.Kind), IconButton, env.Pal.Text)
+			if cell.btn.GraphicImage() == nil || cell.btn.GraphicImage().Idle != wantGlyph {
+				t.Errorf("cell(%d,%d) tile glyph is not %s", row, i, ModuleIcon(def.Kind))
 			}
 		}
 	}
@@ -93,10 +104,13 @@ func TestRackConstruction(t *testing.T) {
 	if w := r.measure(long); w > rackCellW-6 {
 		t.Errorf("long shortName measures %v > cell width %d", w, rackCellW-6)
 	}
-	// Empty slots carry no label and no tooltip.
+	// Empty slots carry no name, no glyph and no tooltip.
 	empty := r.cells[2][3]
-	if lbl := empty.btn.Text().Label; lbl != "" {
-		t.Errorf("empty slot label = %q, want empty", lbl)
+	if lbl := empty.name.Label; lbl != "" {
+		t.Errorf("empty slot name = %q, want empty", lbl)
+	}
+	if g := empty.btn.GraphicImage(); g == nil || g.Idle != icons.Get(icons.Fallback, IconButton, color.RGBA{}) {
+		t.Error("empty slot tile should hold a transparent box, not a glyph")
 	}
 	if tips := empty.btn.GetWidget().ToolTips; len(tips) != 0 {
 		t.Errorf("empty slot has %d tooltips, want 0", len(tips))
@@ -421,5 +435,47 @@ func TestRackClickTargetsSelection(t *testing.T) {
 	if act, ok := (*cmds)[before].(sim.CmdActivate); !ok || act.Target != first {
 		t.Fatalf("fallback click = %+v (%T), want CmdActivate on the first lock %d",
 			(*cmds)[before], (*cmds)[before], first)
+	}
+}
+
+// TestRackCellStacksTileNameAndBar pins the cell column: the icon tile on
+// top (its 40 px hit area intact), the module's name under it and the
+// cycle bar at the bottom — three disjoint rects, all inside the cell.
+func TestRackCellStacksTileNameAndBar(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	r := NewRack(env)
+	c := newChromeUI(env)
+	c.addPanel(r.Container(), r)
+	c.frame(t, 1280, 720)
+
+	for row := range r.cells {
+		for idx, cell := range r.cells[row] {
+			if cell.root.GetWidget().GetVisibility() != widget.Visibility_Show {
+				continue // hidden slots have no rects to check
+			}
+			tile := cell.btn.GetWidget().Rect
+			name := cell.name.GetWidget().Rect
+			bar := cell.bar.GetWidget().Rect
+			root := cell.root.GetWidget().Rect
+			if tile.Dy() < rackCellH || tile.Dx() < rackCellW {
+				t.Errorf("cell(%d,%d) tile = %v, want at least %d×%d",
+					row, idx, tile, rackCellW, rackCellH)
+			}
+			if name.Dy() <= 0 {
+				t.Errorf("cell(%d,%d) name line = %v, want a measured line", row, idx, name)
+			}
+			for _, pair := range [][2]image.Rectangle{{tile, name}, {name, bar}, {tile, bar}} {
+				if pair[0].Overlaps(pair[1]) {
+					t.Errorf("cell(%d,%d): %v overlaps %v", row, idx, pair[0], pair[1])
+				}
+			}
+			if tile.Max.Y != name.Min.Y || name.Max.Y != bar.Min.Y {
+				t.Errorf("cell(%d,%d) stack = tile %v / name %v / bar %v, want contiguous",
+					row, idx, tile, name, bar)
+			}
+			if !tile.In(root) || !name.In(root) || !bar.In(root) {
+				t.Errorf("cell(%d,%d) children escape the cell %v", row, idx, root)
+			}
+		}
 	}
 }

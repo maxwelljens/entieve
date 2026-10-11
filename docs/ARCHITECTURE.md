@@ -622,6 +622,27 @@ NPC traffic delivery + market price drift, ambush on NPC traffic
 > `sim`/`content`/`script` and the showcase suite are unaffected by the UI
 > layer.
 
+> **Icon set (2026-10):** `uikit/icons/` embeds the interface's monochrome
+> glyph set — 512×512 transparent renders from
+> [game-icons.net](https://game-icons.net) (**CC BY 3.0**: every icon keeps
+> its author credit, `uikit/icons/CREDITS.md`, machine-readable in
+> `manifest.json` + `uikit/icons/icons_test.go`). `icons.Get(name, size,
+> tint)` converts a PNG to a white-alpha silhouette at load, draws it into a
+> fixed square box on the 16/20/24 size grid with the manifest's optional
+> optical `nudge`, tints it from the palette role and caches per
+> name+size+tint; unknown names resolve to the neutral gear (`icons.Fallback`),
+> never a missing-image artifact. The widget surface that grew with it:
+> `TableRow.Icons`/`TableRow.IconTint` (icon box + label cells in
+> left-aligned columns — right-aligned numeric anchors are untouched),
+> `uikit.NewTitleBar(env, label, icon)` (leading 24 px title-bar glyph),
+> `uikit.KindIcon` / `ModuleIcon` / `ContractIcon` (semantic name → kind),
+> `uikit.NewIcon` for shell-owned widgets (game contract rows, Undock), and
+> `uikit.IconInline/IconButton/IconTitle/IconGap/IconDisabledA` as the size
+> grid constants. Surfaces that carry icons: overview Kind column, Selected
+> Item header + action buttons, HUD target cards, scanner contacts, fitting
+> slot/hangar rows, contract board rows, service title bars, module-rack
+> tiles.
+
 - `render.Renderer` created with `(*content.Content)`; `Draw(dst *ebiten.Image,
   cam Camera, s *sim.Sim)` reads sim stores read-only. Vector art: ships as
   polygons per hull class, star glow, parallax starfield (seeded), grid dots,

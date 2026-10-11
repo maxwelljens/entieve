@@ -76,6 +76,34 @@ constants:
 The full sprite draw path and its tests live in `render/assets.go` and
 `render/assets_test.go`.
 
+## Interface icons
+
+The chrome carries a monochrome glyph set from
+[game-icons.net](https://game-icons.net) — kind markers in the overview and
+HUD, action glyphs on the Selected Item buttons, module classes on the rack
+tiles, objective kinds on contract rows, and a leading glyph on every service
+window title.
+
+- **Where**: `uikit/icons/*.png` (512×512 transparent renders) + the runtime
+  registry `uikit/icons/manifest.json`; loaded by `uikit/icons` via
+  `//go:embed`.
+- **License — CC BY 3.0**: each icon is credited to its author. The full
+  table (name, slug, author, source URL, license) is
+  [`uikit/icons/CREDITS.md`](../uikit/icons/CREDITS.md); a test pins every PNG
+  to a manifest entry *and* a credits line, so no art ships uncredited.
+  Required wording: *Icons made by {author}. Available on
+  https://game-icons.net*.
+- **Rendering**: a PNG becomes a white silhouette at load (RGB → white, alpha
+  preserved exactly), drawn into a fixed square box on the type grid —
+  16 px inline (table rows, target cards), 20 px buttons, 24 px title bars —
+  then tinted from the palette role at draw (ColText / ColDim / ColAccent /
+  ColDanger / ColInfo; disabled controls 40 % alpha) and cached per
+  name+size+tint. Icons are never multicolour and never stretch.
+- **Optical fit**: glyphs that sit off-centre in their frame carry a
+  per-icon `nudge` (fractions of the box) in `manifest.json`.
+- **Fallback**: an unknown name renders the neutral gear, so a new kind can
+  never show a missing-image artifact.
+
 ## Typeface
 
 The interface is set in **Turret Road**, embedded from `render/fonts/`

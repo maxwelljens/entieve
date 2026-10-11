@@ -18,7 +18,7 @@ import (
 
 // stationBoardWorstCaseH is the docked contract board's content height
 // with every section at its row cap: the station window then reads
-// (10,8)-(394,434), its worst case.
+// (10,8)-(404,434), its worst case.
 const stationBoardWorstCaseH = 426
 
 // logPocket is the log's default bottom-left pocket at any design size:
@@ -38,20 +38,20 @@ func logPocket(h int) image.Rectangle {
 // them; see the clearance note in station_layout.go.)
 func TestStationLayoutDisjoint1024(t *testing.T) {
 	checkStationLayout(t, 1024, 700, dockedLayout{
-		Station:   image.Rect(10, 8, 394, 434),
-		Market:    image.Rect(396, 8, 1014, 248),
-		Inventory: image.Rect(396, 256, 701, 690),
-		Fitting:   image.Rect(709, 256, 1014, 690),
+		Station:   image.Rect(10, 8, 404, 434),
+		Market:    image.Rect(406, 8, 1014, 248),
+		Inventory: image.Rect(406, 256, 706, 690),
+		Fitting:   image.Rect(714, 256, 1014, 690),
 	})
 }
 
 // TestStationLayoutDisjoint1280 pins the default window size.
 func TestStationLayoutDisjoint1280(t *testing.T) {
 	checkStationLayout(t, 1280, 720, dockedLayout{
-		Station:   image.Rect(10, 8, 394, 434),
-		Market:    image.Rect(396, 8, 1270, 248),
-		Inventory: image.Rect(396, 256, 829, 710),
-		Fitting:   image.Rect(837, 256, 1270, 710),
+		Station:   image.Rect(10, 8, 404, 434),
+		Market:    image.Rect(406, 8, 1270, 248),
+		Inventory: image.Rect(406, 256, 834, 710),
+		Fitting:   image.Rect(842, 256, 1270, 710),
 	})
 }
 
@@ -59,10 +59,10 @@ func TestStationLayoutDisjoint1280(t *testing.T) {
 // grows with the height, the bottom row keeps its content minimum.
 func TestStationLayoutDisjoint1920(t *testing.T) {
 	checkStationLayout(t, 1920, 1080, dockedLayout{
-		Station:   image.Rect(10, 8, 394, 434),
-		Market:    image.Rect(396, 8, 1910, 359),
-		Inventory: image.Rect(396, 367, 1149, 1070),
-		Fitting:   image.Rect(1157, 367, 1910, 1070),
+		Station:   image.Rect(10, 8, 404, 434),
+		Market:    image.Rect(406, 8, 1910, 359),
+		Inventory: image.Rect(406, 367, 1154, 1070),
+		Fitting:   image.Rect(1162, 367, 1910, 1070),
 	})
 }
 

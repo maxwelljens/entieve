@@ -68,18 +68,7 @@ func NewMapView(env Env) *MapView {
 	if u := env.Content.Universe; u != nil && (u.Region != "" || u.Constellation != "") {
 		title = "Starmap — " + u.Region + " / " + u.Constellation
 	}
-	titleBar := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-	)
-	titleBar.AddChild(widget.NewText(
-		widget.TextOpts.Text(title, env.FaceBold(StepBase), solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(contentsPad),
-		})),
-	))
+	titleBar, _ := NewTitleBar(env, title, "svc_map")
 
 	m.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),

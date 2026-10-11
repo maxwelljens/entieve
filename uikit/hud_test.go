@@ -416,6 +416,23 @@ func TestTargetCardGeometry(t *testing.T) {
 		t.Fatalf("bars region = %v, want (4,46)-(128,74)", bars)
 	}
 
+	// The kind glyph box leads the name line: 16 px, centred in the line,
+	// and the name text starts clear of it.
+	ic := targetCardIcon(card)
+	if ic != image.Rect(4, 5, 20, 21) {
+		t.Errorf("icon box = %v, want (4,5)-(20,21)", ic)
+	}
+	name := targetCardName(card)
+	if name != image.Rect(24, 4, 128, 23) {
+		t.Errorf("name region = %v, want (24,4)-(128,23)", name)
+	}
+	if ic.Overlaps(name) {
+		t.Errorf("icon %v overlaps the name region %v", ic, name)
+	}
+	if !ic.In(targetCardText(card)) {
+		t.Errorf("icon %v escapes the name line %v", ic, targetCardText(card))
+	}
+
 	got := layerBars(bars)
 	want := [3]image.Rectangle{
 		image.Rect(4, 46, 128, 54),

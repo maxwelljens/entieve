@@ -47,11 +47,24 @@ type Column struct {
 
 // TableRow is one displayed row: one cell string per Column, an optional
 // background tint (zero = none) and an opaque payload handed to the row
-// callbacks (e.g. sim.Info, content.ItemID).
+// callbacks (e.g. sim.Info, content.ItemID). Icons, when set, runs parallel
+// to Cells: an icon name per cell ("" = none) drawn in a fixed box to the
+// left of that cell's text. Right-aligned columns ignore it — numeric
+// anchors stay exact — so icons belong in the left-aligned cells.
 type TableRow struct {
-	Cells []string
-	Tint  color.RGBA
-	Data  any
+	Cells    []string
+	Icons    []string
+	IconTint color.RGBA // icon palette role; zero = ColText
+	Tint     color.RGBA
+	Data     any
+}
+
+// iconOf returns row cell i's icon name ("" when the row carries none).
+func iconOf(row TableRow, i int) string {
+	if i < 0 || i >= len(row.Icons) {
+		return ""
+	}
+	return row.Icons[i]
 }
 
 // Table is a sortable, scrollable column table: a header row of sort
@@ -80,6 +93,7 @@ type Table struct {
 
 	rows       []TableRow // display order (sorted)
 	texts      [][]*widget.Text
+	cells      [][]*tableCell // per-cell widget pair (nil for right-aligned)
 	rowCts     []*widget.Container
 	applied    []color.RGBA // background last painted per row widget
 	widths     []float64    // fitted column widths
@@ -374,7 +388,7 @@ func (t *Table) reconcileSelection() {
 func (t *Table) updateRows() {
 	if len(t.rowCts) != len(t.rows) {
 		t.body.RemoveChildren()
-		t.rowCts, t.texts, t.applied = nil, nil, nil
+		t.rowCts, t.texts, t.cells, t.applied = nil, nil, nil, nil
 		for i := range t.rows {
 			ctr := t.newRow(i)
 			t.rowCts = append(t.rowCts, ctr)
@@ -389,6 +403,7 @@ func (t *Table) updateRows() {
 				tx.Label = cell
 			}
 		}
+		t.updateIcon(i)
 		t.updateBg(i)
 	}
 	// Row count changed → the content may no longer overflow: drop any
@@ -396,7 +411,7 @@ func (t *Table) updateRows() {
 	t.clampScroll()
 }
 
-// newRow builds one clickable row container with one text widget per
+// newRow builds one clickable row container with one cell widget per
 // column. The click handler resolves the row by index at fire time, so
 // deferred events always hit the currently displayed row (widgets are
 // positional: row i's container never moves).
@@ -418,28 +433,77 @@ func (t *Table) newRow(i int) *widget.Container {
 		),
 	)
 	var texts []*widget.Text
+	var cells []*tableCell
 	for _, c := range t.cols {
-		align := widget.TextPositionStart
+		// Left-aligned cells are icon cells: a fixed icon box then the
+		// label, both inside the column box. Right-aligned cells stay
+		// plain text so their numeric anchors never move — and they keep
+		// the horizontal padding themselves, while an icon cell's lives
+		// on its container.
+		align, pad := widget.TextPositionStart, widget.Insets{
+			Top: entryPadV, Bottom: entryPadV,
+		}
 		if c.AlignRight {
 			align = widget.TextPositionEnd
+			pad = widget.Insets{Left: cellPad, Right: cellPad, Top: entryPadV, Bottom: entryPadV}
 		}
 		tx := widget.NewText(
 			widget.TextOpts.Text("", t.face, solid(t.env.Pal.Text)),
 			widget.TextOpts.Position(align, widget.TextPositionCenter),
-			widget.TextOpts.Padding(&widget.Insets{
-				Left: cellPad, Right: cellPad, Top: entryPadV, Bottom: entryPadV,
-			}),
+			widget.TextOpts.Padding(&pad),
 			widget.TextOpts.WidgetOpts(
 				widget.WidgetOpts.MinSize(0, int(t.rowH)),
 				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 			),
 		)
+		if c.AlignRight {
+			texts = append(texts, tx)
+			cells = append(cells, nil)
+			ctr.AddChild(tx)
+			continue
+		}
+		cell := widget.NewContainer(
+			widget.ContainerOpts.Layout(widget.NewRowLayout(
+				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+				widget.RowLayoutOpts.Spacing(IconGap),
+				widget.RowLayoutOpts.Padding(&widget.Insets{
+					Left: cellPad, Right: cellPad, Top: entryPadV, Bottom: entryPadV,
+				}),
+			)),
+			widget.ContainerOpts.WidgetOpts(
+				widget.WidgetOpts.MinSize(0, int(t.rowH)),
+				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+			),
+		)
+		box := newIconBox(IconInline)
+		cell.AddChild(box.Widget(), tx)
 		texts = append(texts, tx)
-		ctr.AddChild(tx)
+		cells = append(cells, &tableCell{ctr: cell, box: box})
+		ctr.AddChild(cell)
 	}
 	t.texts = append(t.texts, texts)
+	t.cells = append(t.cells, cells)
 	t.applied = append(t.applied, color.RGBA{})
 	return ctr
+}
+
+// tableCell pairs a left-aligned cell's container with its icon box.
+type tableCell struct {
+	ctr *widget.Container
+	box *iconBox
+}
+
+// cellRoot returns the widget that owns row r column j's box: the icon
+// cell container for left-aligned columns, the text itself otherwise. The
+// anchor (MinWidth/fitted width) is pinned on this widget.
+func (t *Table) cellRoot(r, j int) *widget.Widget {
+	if r < 0 || r >= len(t.cells) || j < 0 || j >= len(t.cells[r]) {
+		return nil
+	}
+	if c := t.cells[r][j]; c != nil {
+		return c.ctr.GetWidget()
+	}
+	return t.texts[r][j].GetWidget()
 }
 
 // rowWidget returns the i-th row container, or nil.
@@ -463,8 +527,10 @@ func (t *Table) rowClicked(i int) {
 	if prev != i {
 		if prev >= 0 {
 			t.updateBg(prev)
+			t.updateIcon(prev)
 		}
 		t.updateBg(i)
+		t.updateIcon(i)
 	}
 	if t.onSelect != nil {
 		t.onSelect(row)
@@ -476,6 +542,22 @@ func (t *Table) rowClicked(i int) {
 		}
 	}
 	t.last, t.hasLast, t.lastAt = row, true, now
+}
+
+// updateIcon refreshes one row's cell icons and their palette role. It runs
+// alongside updateBg: selection moves the icon tint to the accent just as it
+// moves the row background.
+func (t *Table) updateIcon(i int) {
+	if i < 0 || i >= len(t.rows) {
+		return
+	}
+	row := t.rows[i]
+	tint := t.iconTint(i, row)
+	for j, c := range t.cells[i] {
+		if c != nil {
+			c.box.Set(iconOf(row, j), tint)
+		}
+	}
 }
 
 // updateBg paints the row background (selection accent wins over the
@@ -559,7 +641,11 @@ func (t *Table) applyWidths() {
 			w = c.Width
 		}
 		for _, row := range t.rows {
-			if m := t.measure(cellOf(row, i)) + 2*cellPad; m > w {
+			m := t.measure(cellOf(row, i)) + 2*cellPad
+			if iconOf(row, i) != "" && !c.AlignRight {
+				m += IconInline + IconGap
+			}
+			if m > w {
 				w = m
 			}
 		}
@@ -605,16 +691,21 @@ func (t *Table) layoutCells() {
 
 		// Ellipsize against the float width: the int-rounded cell is up
 		// to half a pixel narrower, and rounding it down here would
-		// ellipsize text that measurably fits ("25%" -> "2…").
-		inner := t.widths[i] - 2*cellPad
-		if inner < 0 {
-			inner = 0
-		}
+		// ellipsize text that measurably fits ("25%" -> "2…"). An icon
+		// cell reserves its icon box out of the label's share.
 		for r := range t.rows {
+			inner := t.widths[i] - 2*cellPad
+			if t.cells[r][i] != nil && iconOf(t.rows[r], i) != "" {
+				inner -= IconInline + IconGap
+			}
+			if inner < 0 {
+				inner = 0
+			}
 			tx := t.texts[r][i]
 			tx.Label = Ellipsize(cellOf(t.rows[r], i), inner, t.measure)
-			tx.GetWidget().MinWidth = w
-			tx.GetWidget().LayoutData = widget.RowLayoutData{Stretch: true, MaxWidth: w}
+			root := t.cellRoot(r, i)
+			root.MinWidth = w
+			root.LayoutData = widget.RowLayoutData{Stretch: true, MaxWidth: w}
 		}
 	}
 	t.header.RequestRelayout()
@@ -667,6 +758,19 @@ func sameData(a, b any) bool {
 		return a == nil && b == nil
 	}
 	return reflect.DeepEqual(a, b)
+}
+
+// iconTint picks a row icon's palette role: the selected row wears the
+// accent, a row with its own tint (own ship → ColInfo, hostiles → ColDanger)
+// keeps it, everything else is primary text.
+func (t *Table) iconTint(i int, row TableRow) color.RGBA {
+	if i == t.selIdx {
+		return t.env.Pal.Accent
+	}
+	if row.IconTint.A != 0 {
+		return row.IconTint
+	}
+	return t.env.Pal.Text
 }
 
 // withA returns c with a replacement alpha channel.

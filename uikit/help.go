@@ -112,18 +112,7 @@ func NewHelp(env Env, rows []KeyRow) *HelpPanel {
 	}
 	body.AddChild(heading, blurb)
 
-	titleBar := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-	)
-	titleBar.AddChild(widget.NewText(
-		widget.TextOpts.Text("Help — Entieve key map", env.FaceBold(StepBase), solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(contentsPad),
-		})),
-	))
+	titleBar, _ := NewTitleBar(env, "Help — Entieve key map", "svc_help")
 
 	// Size the window to the content so a short key map never leaves the
 	// blurb floating in dead space.

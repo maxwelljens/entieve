@@ -2,6 +2,7 @@ package uikit
 
 import (
 	"image"
+	"image/color"
 	"math"
 	"sort"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/icons"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
@@ -25,11 +27,23 @@ const (
 	rackMaxCells = 4                      // widest slot row across every hull
 	rackCellW    = 50                     // cell width
 	rackCellH    = 40                     // cell height (minimum hit area)
+	rackNameH    = 16                     // name line under a tile (fits StepTiny)
 	rackCycleH   = 4                      // cycle bar height under a cell
 	rackLabelW   = 30                     // "High"/"Mid"/"Low" label column
 	rackCycleMax = 1000                   // cycle bar resolution (0.1 % steps)
 	rackRowGap   = 8                      // gap between slot rows
 	rackTipDelay = 300 * time.Millisecond // hover time before the tooltip
+	// rackIconSpacing is ebitenui's fixed spacing between a graphic
+	// button's text and graphic (widget/button.go hardcodes it).
+	rackIconSpacing = 10
+	// rackIconPad is the row padding that puts the glyph back in the
+	// tile's centre: the graphic row runs [empty text][spacing][glyph],
+	// so the row's far side has to pay for both the text box and the
+	// spacing (paddingRight = textWidth + rackIconSpacing). The empty
+	// text measures rackIconEmptyW in the shipped theme;
+	// TestIconsCaptureFrame pins the result to the drawn pixels.
+	rackIconPad    = 20
+	rackIconEmptyW = 10
 )
 
 // rackClasses and rackRowLabels index the three slot rows.
@@ -58,20 +72,22 @@ type Rack struct {
 	pick func() ecs.Entity
 }
 
-// rackCell is one slot: a cell column (button + cycle bar) plus its tooltip
-// widgets. Cells are persistent, so a fitting change only rewrites their
-// label, tooltip and enabled state. active mirrors ModuleRuntime.Active for
-// the click toggle (the visual rides the button's Disabled state: dim cell
-// while off, amber cell while running).
+// rackCell is one slot: a cell column (icon tile + name line + cycle bar)
+// plus its tooltip widgets. Cells are persistent, so a fitting change only
+// rewrites their name, glyph, tooltip and enabled state. active mirrors
+// ModuleRuntime.Active for the click toggle (the visual rides the button's
+// Disabled state: dim cell while off, amber cell while running).
 type rackCell struct {
 	slot    sim.SlotRef
 	root    *widget.Container
 	btn     *widget.Button
+	name    *widget.Text
 	bar     *widget.ProgressBar
 	tip     *widget.ToolTip
 	tipText *widget.Text
 	tips    []*widget.ToolTip // stable ToolTips value for fitted cells
 	module  content.ModuleID  // module currently shown ("" = empty slot)
+	icon    string            // glyph the tile currently shows ("" = none)
 	active  bool              // runtime Active at the last Sync
 }
 
@@ -148,9 +164,12 @@ func NewRack(env Env) *Rack {
 	return r
 }
 
-// newCell builds one slot cell: a 50×40 button (short name, right-click
-// cycles a weapon's charge) with the cycle progress bar under it, plus the
-// hover tooltip shared by the cell's lifetime.
+// newCell builds one slot cell: a 50×40 icon tile (the module's class
+// glyph; right-click cycles a weapon's charge) over its name line and the
+// cycle progress bar, plus the hover tooltip shared by the cell's lifetime.
+// The glyph lives in the tile and the name under it, so the label keeps the
+// full cell width — an icon beside it would push the row past the HUD at
+// the 1024×700 minimum.
 func (r *Rack) newCell(row, idx int) *rackCell {
 	p := r.env.Pal
 	cell := &rackCell{slot: sim.SlotRef{Class: rackClasses[row], Index: idx}}
@@ -173,14 +192,38 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 	)
 	cell.tips = []*widget.ToolTip{cell.tip}
 
+	// The tile carries the glyph only: ebitenui lays a graphic button out
+	// as [text][graphic] with a fixed 10 px spacing, so the graphic
+	// padding puts the (empty) text cell first and centers the glyph —
+	// paddingRight = paddingLeft + spacing is the centering condition.
+	// TestRackTileIconIsCentred pins the result to the tile.
 	cell.btn = widget.NewButton(
 		widget.ButtonOpts.Image(rackCellImages(p)),
-		widget.ButtonOpts.TextFace(r.env.Face(StepTiny)),
-		widget.ButtonOpts.TextLabel(""),
-		widget.ButtonOpts.TextPosition(widget.TextPositionCenter, widget.TextPositionCenter),
+		widget.ButtonOpts.Graphic(&widget.GraphicImage{
+			Idle:     rackGlyph("", color.RGBA{}),
+			Disabled: rackGlyph("", color.RGBA{}),
+		}),
+		widget.ButtonOpts.GraphicPadding(widget.Insets{Left: 0, Right: rackIconPad}),
 		widget.ButtonOpts.TextPadding(&widget.Insets{Left: 3, Right: 3, Top: 2, Bottom: 2}),
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.MinSize(rackCellW, rackCellH),
+			widget.WidgetOpts.MouseButtonClickedHandler(func(a *widget.WidgetMouseButtonClickedEventArgs) {
+				switch a.Button {
+				case ebiten.MouseButtonLeft:
+					r.toggleModule(cell)
+				case ebiten.MouseButtonRight:
+					r.cycleAmmo(cell)
+				}
+			}),
+		),
+	)
+	// The name line under the tile: the same click seam as the tile, so
+	// the whole cell stays clickable.
+	cell.name = widget.NewText(
+		widget.TextOpts.Text("", r.env.Face(StepTiny), solid(p.Dim)),
+		widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionCenter),
+		widget.TextOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(0, rackNameH),
 			widget.WidgetOpts.MouseButtonClickedHandler(func(a *widget.WidgetMouseButtonClickedEventArgs) {
 				switch a.Button {
 				case ebiten.MouseButtonLeft:
@@ -200,8 +243,18 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 		)),
 	)
-	cell.root.AddChild(cell.btn, cell.bar)
+	cell.root.AddChild(cell.btn, cell.name, cell.bar)
 	return cell
+}
+
+// rackGlyph resolves one tile image: the module's class glyph in the given
+// tint ("" = an empty slot, which gets a transparent box of the same size
+// so no cell ever changes size when a module is fitted).
+func rackGlyph(name string, tint color.RGBA) *ebiten.Image {
+	if name == "" {
+		return icons.Get(icons.Fallback, IconButton, color.RGBA{})
+	}
+	return icons.Get(name, IconButton, tint)
 }
 
 // rackCellImages builds the cell chrome: an amber-tinted glow for active
@@ -294,7 +347,25 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 	// honest without a separate "first sync" flag.
 	cell.module = id
 	cell.active = active
-	cell.btn.SetText(r.shortName(def))
+	// Glyph + name: the tile shows the module's class, the line under it
+	// keeps the short name (and the click seam) exactly where it was.
+	icon := ""
+	if def != nil {
+		icon = ModuleIcon(def.Kind)
+	}
+	if cell.icon != icon {
+		cell.icon = icon
+		cell.btn.SetGraphicImage(&widget.GraphicImage{
+			Idle:     rackGlyph(icon, r.env.Pal.Text),
+			Disabled: rackGlyph(icon, iconColor(r.env.Pal.Dim, IconDisabledA)),
+		})
+	}
+	cell.name.Label = r.shortName(def)
+	nameCol := r.env.Pal.Dim
+	if active {
+		nameCol = r.env.Pal.Text
+	}
+	cell.name.SetColor(nameCol)
 	if def == nil {
 		cell.btn.GetWidget().ToolTips = nil
 		cell.tipText.Label = ""

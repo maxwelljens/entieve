@@ -124,19 +124,8 @@ func NewFitting(env Env) *Fitting {
 		buttons,
 	)
 
-	title := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-	)
-	f.title = widget.NewText(
-		widget.TextOpts.Text("Fitting", env.FaceBold(StepBase), solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(contentsPad),
-		})),
-	)
-	title.AddChild(f.title)
+	title, fitTitle := NewTitleBar(env, "Fitting", "svc_fitting")
+	f.title = fitTitle
 
 	f.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
@@ -277,12 +266,17 @@ func (f *Fitting) slotRows(ship *sim.ShipState, hasShip bool) []TableRow {
 		for i := 0; i < n; i++ {
 			pick := slotPick{ref: sim.SlotRef{Class: class, Index: i}}
 			name := "(empty)"
+			icon := ""
 			if i < len(defs) {
 				pick.mod = defs[i]
 				name = itemLabel(f.env, content.ItemID(defs[i]))
+				if def, ok := f.env.Content.Module(defs[i]); ok {
+					icon = ModuleIcon(def.Kind)
+				}
 			}
 			rows = append(rows, TableRow{
 				Cells: []string{labels[class] + " " + FormatInt(int64(i+1)), name},
+				Icons: []string{"", icon},
 				Data:  pick,
 			})
 		}
@@ -304,6 +298,7 @@ func (f *Fitting) hangarRows() []TableRow {
 		}
 		rows = append(rows, TableRow{
 			Cells: []string{mod.Name, "×" + FormatInt(int64(st.Qty))},
+			Icons: []string{ModuleIcon(mod.Kind), ""},
 			Data:  content.ModuleID(st.Item),
 		})
 	}
@@ -314,6 +309,7 @@ func (f *Fitting) hangarRows() []TableRow {
 		}
 		rows = append(rows, TableRow{
 			Cells: []string{name, "×1"},
+			Icons: []string{"row_hull", ""},
 			Data:  ss.Hull,
 		})
 	}

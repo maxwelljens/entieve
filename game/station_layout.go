@@ -19,18 +19,18 @@ import "image"
 // module rack and the scanner are space chrome — syncMounts hides or
 // unmounts all three while docked — so their pockets are free for the
 // docked set; reserving them as well is arithmetically impossible at the
-// 1024×700 minimum: station 384×426 + log 288×240 + HUD bar 420×130 +
+// 1024×700 minimum: station 394×426 + log 288×240 + HUD bar 420×130 +
 // scanner 300×248 + the trio's content minimums (300×240, 300×420,
 // 300×430) leave ≈28,000 px² of slack, less than the screen margins
 // (≈32,000 px²) need, before a single gutter.
 //
-// Widths: the market band is the whole service width — 618 px at
-// 1024×700, 874 px at 1280×720, 1510 px at 1920×1080 — over the 560 px
+// Widths: the market band is the whole service width — 608 px at
+// 1024×700, 864 px at 1280×720, 1504 px at 1920×1080 — over the 560 px
 // the trade columns need to render un-truncated (the shipped boards
 // measure ≈357 px of natural column width, so even the minimum size
 // reads whole; the fixed 300 px rect the constructor used to carry was
 // what ellipsized them). The bottom row splits what is left in half:
-// 305 px per window at 1024, 433 px at 1280, 753 px at 1920.
+// 300 px per window at 1024, 428 px at 1280, 748 px at 1920.
 //
 // Validity: every rect is ≥ its window's MinSize at every viewport the
 // window system supports (Layout clamps to ≥1024×700), and the exact
@@ -72,7 +72,7 @@ type dockedLayout struct {
 func stationLayout(w, h, stationH int) dockedLayout {
 	// Bounding box of the service area: right of the station column,
 	// inside the top/side/bottom margins.
-	x0 := stationX + stationWinW + 2 // 396: station column + gutter
+	x0 := stationX + stationWinW + 2 // 406: station column + gutter
 	y0 := stationY                   // 8
 	x1 := w - 10
 	y1 := h - 10

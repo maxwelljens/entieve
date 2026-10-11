@@ -1,0 +1,271 @@
+{
+  "license": "CC BY 3.0",
+  "license_url": "https://creativecommons.org/licenses/by/3.0/",
+  "source": "https://game-icons.net",
+  "icons": {
+    "act_approach": {
+      "slug": "convergence-target",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/convergence-target.html",
+      "file": "convergence-target.png"
+    },
+    "act_dock": {
+      "slug": "entry-door",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/entry-door.html",
+      "file": "entry-door.png"
+    },
+    "act_jump": {
+      "slug": "jump-across",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/jump-across.html",
+      "file": "jump-across.png"
+    },
+    "act_lock": {
+      "slug": "crosshair",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/crosshair.html",
+      "file": "crosshair.png"
+    },
+    "act_loot": {
+      "slug": "open-chest",
+      "author": "Skoll",
+      "url": "https://game-icons.net/1x1/skoll/open-chest.html",
+      "file": "open-chest.png"
+    },
+    "act_mine": {
+      "slug": "mining",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/mining.html",
+      "file": "mining.png"
+    },
+    "act_orbit": {
+      "slug": "orbit",
+      "author": "Skoll",
+      "url": "https://game-icons.net/1x1/skoll/orbit.html",
+      "file": "orbit.png"
+    },
+    "act_stop": {
+      "slug": "stop-sign",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/stop-sign.html",
+      "file": "stop-sign.png"
+    },
+    "act_undock": {
+      "slug": "exit-door",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/exit-door.html",
+      "file": "exit-door.png"
+    },
+    "act_warp": {
+      "slug": "fast-forward-button",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/fast-forward-button.html",
+      "file": "fast-forward-button.png"
+    },
+    "ctr_deliver": {
+      "slug": "cardboard-box",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/cardboard-box.html",
+      "file": "cardboard-box.png"
+    },
+    "ctr_kill": {
+      "slug": "death-skull",
+      "author": "sbed",
+      "url": "https://game-icons.net/1x1/sbed/death-skull.html",
+      "file": "death-skull.png"
+    },
+    "ctr_mine": {
+      "slug": "mining",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/mining.html",
+      "file": "mining.png"
+    },
+    "kind_anomaly": {
+      "slug": "vortex",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/vortex.html",
+      "file": "vortex.png"
+    },
+    "kind_asteroid": {
+      "slug": "asteroid",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/asteroid.html",
+      "file": "asteroid.png",
+      "nudge": {
+        "dx": -0.03,
+        "dy": 0.0
+      }
+    },
+    "kind_belt": {
+      "slug": "stone-pile",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/stone-pile.html",
+      "file": "stone-pile.png",
+      "nudge": {
+        "dx": 0.0,
+        "dy": -0.05
+      }
+    },
+    "kind_gate": {
+      "slug": "portal",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/portal.html",
+      "file": "portal.png"
+    },
+    "kind_moon": {
+      "slug": "moon",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/moon.html",
+      "file": "moon.png"
+    },
+    "kind_planet": {
+      "slug": "ringed-planet",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/ringed-planet.html",
+      "file": "ringed-planet.png"
+    },
+    "kind_ship": {
+      "slug": "spaceship",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/spaceship.html",
+      "file": "spaceship.png"
+    },
+    "kind_star": {
+      "slug": "sun",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/sun.html",
+      "file": "sun.png"
+    },
+    "kind_station": {
+      "slug": "observatory",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/observatory.html",
+      "file": "observatory.png",
+      "nudge": {
+        "dx": 0.0,
+        "dy": -0.05
+      }
+    },
+    "kind_unknown": {
+      "slug": "cog",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/cog.html",
+      "file": "cog.png"
+    },
+    "kind_wreck": {
+      "slug": "sinking-ship",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/sinking-ship.html",
+      "file": "sinking-ship.png",
+      "nudge": {
+        "dx": 0.0,
+        "dy": -0.05
+      }
+    },
+    "mod_defense": {
+      "slug": "riot-shield",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/riot-shield.html",
+      "file": "riot-shield.png",
+      "nudge": {
+        "dx": -0.04,
+        "dy": 0.0
+      }
+    },
+    "mod_mining": {
+      "slug": "miner",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/miner.html",
+      "file": "miner.png"
+    },
+    "mod_scram": {
+      "slug": "anchor",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/anchor.html",
+      "file": "anchor.png"
+    },
+    "mod_utility": {
+      "slug": "spanner",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/spanner.html",
+      "file": "spanner.png"
+    },
+    "mod_weapon": {
+      "slug": "turret",
+      "author": "sbed",
+      "url": "https://game-icons.net/1x1/sbed/turret.html",
+      "file": "turret.png"
+    },
+    "mod_web": {
+      "slug": "spider-web",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/spider-web.html",
+      "file": "spider-web.png"
+    },
+    "row_hull": {
+      "slug": "iron-hulled-warship",
+      "author": "Cathelineau",
+      "url": "https://game-icons.net/1x1/cathelineau/iron-hulled-warship.html",
+      "file": "iron-hulled-warship.png",
+      "nudge": {
+        "dx": 0.0,
+        "dy": 0.03
+      }
+    },
+    "row_module": {
+      "slug": "gears",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/gears.html",
+      "file": "gears.png"
+    },
+    "svc_contracts": {
+      "slug": "scroll-quill",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/scroll-quill.html",
+      "file": "scroll-quill.png"
+    },
+    "svc_fitting": {
+      "slug": "gears",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/gears.html",
+      "file": "gears.png"
+    },
+    "svc_help": {
+      "slug": "help",
+      "author": "sbed",
+      "url": "https://game-icons.net/1x1/sbed/help.html",
+      "file": "help.png"
+    },
+    "svc_inventory": {
+      "slug": "light-backpack",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/light-backpack.html",
+      "file": "light-backpack.png"
+    },
+    "svc_log": {
+      "slug": "book-cover",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/book-cover.html",
+      "file": "book-cover.png"
+    },
+    "svc_map": {
+      "slug": "treasure-map",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/treasure-map.html",
+      "file": "treasure-map.png"
+    },
+    "svc_market": {
+      "slug": "coins",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/coins.html",
+      "file": "coins.png"
+    },
+    "svc_scanner": {
+      "slug": "radar-sweep",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/radar-sweep.html",
+      "file": "radar-sweep.png"
+    }
+  }
+}
