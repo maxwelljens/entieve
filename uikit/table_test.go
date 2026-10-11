@@ -273,14 +273,15 @@ func TestTableRightAlignAnchors(t *testing.T) {
 	ui.Draw(ebiten.NewImage(640, 400)) // relayout with the new cells
 
 	for i, col := range tbl.cols {
-		// Header button and every cell occupy the same column box.
+		// Header button and every cell occupy the same column box (the
+		// cell root: an icon cell's container, else the text itself).
 		hdr := tbl.hdrBtn[i].GetWidget().Rect
-		first := tbl.texts[0][i].GetWidget().Rect
+		first := tbl.cellRoot(0, i).Rect
 		if hdr.Dx() != first.Dx() || hdr.Max.X != first.Max.X {
 			t.Errorf("column %s: header box %v != cell box %v", col.Title, hdr, first)
 		}
 		for r := 1; r < len(tbl.rows); r++ {
-			rect := tbl.texts[r][i].GetWidget().Rect
+			rect := tbl.cellRoot(r, i).Rect
 			if rect.Dx() != first.Dx() || rect.Max.X != first.Max.X {
 				t.Errorf("column %s: row %d box %v, want anchor %v",
 					col.Title, r, rect, first)
@@ -288,9 +289,9 @@ func TestTableRightAlignAnchors(t *testing.T) {
 		}
 		// The fitted width is what the widget was pinned to.
 		want := tbl.hdrBtn[i].GetWidget().MinWidth
-		if tbl.texts[0][i].GetWidget().MinWidth != want {
+		if tbl.cellRoot(0, i).MinWidth != want {
 			t.Errorf("column %s: cell MinWidth %d != header %d",
-				col.Title, tbl.texts[0][i].GetWidget().MinWidth, want)
+				col.Title, tbl.cellRoot(0, i).MinWidth, want)
 		}
 	}
 }
@@ -460,5 +461,73 @@ func TestTableRowsTopAnchored(t *testing.T) {
 	fireWheel(ui, tbl, -3)
 	if tbl.scroll.ScrollTop != 0 {
 		t.Errorf("ScrollTop after wheel on a fitted list = %v, want 0", tbl.scroll.ScrollTop)
+	}
+}
+
+// TestIconCellLayoutAtDesignSizes pins the icon-cell geometry at both
+// design sizes and at the minimum window: the glyph box is the inline
+// square, the box and the label never overlap, both sit inside the column
+// box, the cell keeps the header's anchor, and right-aligned columns never
+// grow an icon box (their numeric anchors stay exact).
+func TestIconCellLayoutAtDesignSizes(t *testing.T) {
+	env, _ := newTestEnv(t)
+	tbl, ui := newPumpedTable(t, env, []Column{
+		{Key: "Name", Title: "Name", Priority: 0},
+		{Key: "Kind", Title: "Kind", Priority: 1},
+		{Key: "Dist", Title: "Dist", Priority: 2, AlignRight: true},
+	})
+	rows := []TableRow{
+		{Cells: []string{"Rock 1", "Asteroid", "1,200 m"},
+			Icons: []string{"", "kind_asteroid", ""}, Data: 0},
+		{Cells: []string{"A very long entity name indeed", "Ship", "10 m"},
+			Icons: []string{"", "kind_ship", ""}, Data: 1},
+		{Cells: []string{"Port", "Station", "2 m"},
+			Icons: []string{"", "kind_station", ""}, Data: 2},
+	}
+	for _, sz := range []struct {
+		tag  string
+		w, h int
+	}{
+		{"1280x720", 1280, 720},
+		{"1024x700", 1024, 700},
+		{"min-window", 320, 240},
+	} {
+		tbl.SetRows(rows)
+		tbl.Sync()
+		ui.Draw(ebiten.NewImage(sz.w, sz.h))
+		tbl.Sync()
+		ui.Draw(ebiten.NewImage(sz.w, sz.h))
+
+		hdr := tbl.hdrBtn[1].GetWidget().Rect
+		for r := range tbl.rows {
+			cell := tbl.cellRoot(r, 1)
+			icon := tbl.cells[r][1].box.Widget().GetWidget().Rect
+			label := tbl.texts[r][1].GetWidget().Rect
+
+			if icon.Dx() != IconInline || icon.Dy() != IconInline {
+				t.Errorf("%s: row %d icon box = %v, want %d×%d",
+					sz.tag, r, icon, IconInline, IconInline)
+			}
+			if icon.Overlaps(label) {
+				t.Errorf("%s: row %d icon %v overlaps the label %v", sz.tag, r, icon, label)
+			}
+			if icon.Max.X > label.Min.X {
+				t.Errorf("%s: row %d icon ends at x=%d, label starts at %d",
+					sz.tag, r, icon.Max.X, label.Min.X)
+			}
+			if !icon.In(cell.Rect) || !label.In(cell.Rect) {
+				t.Errorf("%s: row %d icon %v / label %v escape the cell %v",
+					sz.tag, r, icon, label, cell.Rect)
+			}
+			// The cell keeps the header's column anchor.
+			if cell.Rect.Dx() != hdr.Dx() || cell.Rect.Max.X != hdr.Max.X {
+				t.Errorf("%s: row %d cell %v, want the header box %v",
+					sz.tag, r, cell.Rect, hdr)
+			}
+			// Right-aligned columns carry no icon cell at all.
+			if tbl.cells[r][2] != nil {
+				t.Errorf("%s: row %d right-aligned column grew an icon cell", sz.tag, r)
+			}
+		}
 	}
 }

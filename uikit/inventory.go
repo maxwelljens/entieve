@@ -116,18 +116,7 @@ func NewInventory(env Env) *Inventory {
 		inv.hangLbl, inv.hangar.Container(),
 		qtyBar, xferBar)
 
-	title := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-	)
-	title.AddChild(widget.NewText(
-		widget.TextOpts.Text("Inventory", env.FaceBold(StepBase), solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(contentsPad),
-		})),
-	))
+	title, _ := NewTitleBar(env, "Inventory", "svc_inventory")
 
 	inv.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),

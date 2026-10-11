@@ -8,6 +8,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit"
+	"github.com/entieve/entieve/uikit/icons"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -186,6 +187,22 @@ func (g *Game) newBtn(label string, minW, minH int, clicked func()) *widget.Butt
 	)
 }
 
+// newIconBtn is newBtn with a 20 px icon beside the label (ebitenui's
+// TextAndImage path — the graphic trails the label, the theme's image
+// states are untouched, and the disabled icon draws at 40%).
+func (g *Game) newIconBtn(label, icon string, minW, minH int, clicked func()) *widget.Button {
+	p := g.env.Pal
+	dim := color.RGBA{R: p.Dim.R, G: p.Dim.G, B: p.Dim.B, A: uikit.IconDisabledA}
+	return widget.NewButton(
+		widget.ButtonOpts.TextAndImage(label, nil, &widget.GraphicImage{
+			Idle:     icons.Get(icon, uikit.IconButton, p.Text),
+			Disabled: icons.Get(icon, uikit.IconButton, dim),
+		}, nil),
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(minW, minH)),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
+	)
+}
+
 // buildMenuWindow constructs the Esc menu window: modal so no click leaks
 // past it while it is open.
 func (g *Game) buildMenuWindow() *widget.Window {
@@ -229,7 +246,7 @@ func (g *Game) buildStationWindow() *widget.Window {
 	g.stName = widget.NewText(
 		widget.TextOpts.Text("Docked", g.env.Face(uikit.StepSmall), solid(p.Text)),
 	)
-	undock := g.newBtn("Undock", 150, menuBtnH, func() {
+	undock := g.newIconBtn("Undock", "act_undock", 150, menuBtnH, func() {
 		g.s.Queue(sim.CmdUndock{})
 	})
 	header := widget.NewContainer(
@@ -239,7 +256,11 @@ func (g *Game) buildStationWindow() *widget.Window {
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
-	header.AddChild(g.stName, undock)
+	// The station strip is the contracts service's face: its leading glyph
+	// is the only "title" this window has (it owns no title bar).
+	glyph := uikit.NewIcon("svc_contracts", uikit.IconTitle, p.Accent)
+	glyph.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+	header.AddChild(glyph, g.stName, undock)
 
 	g.stAvail = g.newBoardSection()
 	g.stActive = g.newBoardSection()

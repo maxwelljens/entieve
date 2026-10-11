@@ -55,6 +55,23 @@ func findRow(t *testing.T, rows []stationRow, id content.ContractID) stationRow 
 	return stationRow{}
 }
 
+// rowTitleText digs the title text out of a row's first line: note rows
+// hold a bare text, contract rows hold a line container whose first cell is
+// either the text directly or the [icon, text] cell.
+func rowTitleText(w widget.PreferredSizeLocateableWidget) *widget.Text {
+	switch v := w.(type) {
+	case *widget.Text:
+		return v
+	case *widget.Container:
+		for _, k := range v.Children() {
+			if t := rowTitleText(k); t != nil {
+				return t
+			}
+		}
+	}
+	return nil
+}
+
 // availLine returns one text line of an available row: 0 = title,
 // 1 = objective summary, 2 = reward.
 func availLine(t *testing.T, g *Game, id content.ContractID, line int) string {
@@ -71,7 +88,11 @@ func availLine(t *testing.T, g *Game, id content.ContractID, line int) string {
 	}
 	switch line {
 	case 0:
-		return row.Children()[0].(*widget.Container).Children()[0].(*widget.Text).Label
+		title := rowTitleText(row.Children()[0])
+		if title == nil {
+			t.Fatalf("%s: no title text in the row", id)
+		}
+		return title.Label
 	case 1:
 		// Objective summary: a bare text on open rows, a
 		// summary|requirement container on gated ones.
@@ -92,9 +113,13 @@ func activeTitle(t *testing.T, g *Game, i int) string {
 	if i >= len(kids) {
 		t.Fatalf("only %d active rows", len(kids))
 	}
-	// Both contract rows and note rows are containers whose first child
-	// is the line's text widget.
-	return kids[i].(*widget.Container).Children()[0].(*widget.Text).Label
+	// Contract rows carry a line container (its first cell is the title
+	// text, behind the kind icon); note rows hold the text directly.
+	title := rowTitleText(kids[i])
+	if title == nil {
+		t.Fatalf("active row %d: no title text", i)
+	}
+	return title.Label
 }
 
 // setMissions swaps the sim's accepted contracts (save surgery) so tests
@@ -494,11 +519,19 @@ func TestStationBoardRowCaps(t *testing.T) {
 		t.Fatalf("active rows = %d, want %d", len(act), actMaxRows)
 	}
 	// capRows(5, 2) → one contract + a note for the other four.
-	if got := act[0].(*widget.Container).Children()[0].(*widget.Text).Label; !strings.Contains(got, "—") {
-		t.Errorf("first active row = %q, want a contract row", got)
+	first := ""
+	if title := rowTitleText(act[0]); title != nil {
+		first = title.Label
 	}
-	if got := act[1].(*widget.Container).Children()[0].(*widget.Text).Label; got != "+4 more" {
-		t.Errorf("overflow row = %q, want \"+4 more\"", got)
+	if !strings.Contains(first, "—") {
+		t.Errorf("first active row = %q, want a contract row", first)
+	}
+	over := ""
+	if title := rowTitleText(act[1]); title != nil {
+		over = title.Label
+	}
+	if over != "+4 more" {
+		t.Errorf("overflow row = %q, want \"+4 more\"", over)
 	}
 }
 

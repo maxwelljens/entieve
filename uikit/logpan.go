@@ -88,22 +88,8 @@ func NewLog(env Env) *LogPanel {
 	)
 	body.AddChild(l.ta)
 
-	titleText := widget.NewText(
-		widget.TextOpts.Text("Log", env.FaceBold(StepBase), solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(contentsPad),
-		})),
-	)
-	title := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(0, titleBarH),
-		),
-	)
-	title.AddChild(titleText)
+	title, _ := NewTitleBar(env, "Log", "svc_log")
+	title.GetWidget().MinHeight = titleBarH
 
 	l.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),

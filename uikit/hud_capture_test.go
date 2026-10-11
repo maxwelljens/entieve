@@ -34,6 +34,7 @@ func TestHudCaptureFrame(t *testing.T) {
 	if os.Getenv("ENTIEVE_CAPTURE") == "" {
 		t.Skip("set ENTIEVE_CAPTURE=1 to render a capture frame")
 	}
+	skipIfLoopRan(t)
 	outDir := os.Getenv("ENTIEVE_CAPTURE_DIR")
 	if outDir == "" {
 		outDir = "/tmp/opencode"
@@ -89,11 +90,7 @@ func TestHudCaptureFrame(t *testing.T) {
 	}
 
 	g := &hudCaptureGame{c: c, h: h, out: filepath.Join(outDir, "hud_capture.png")}
-	ebiten.SetWindowTitle("Entieve HUD capture")
-	ebiten.SetWindowSize(1280, 720)
-	if err := ebiten.RunGame(g); err != nil {
-		t.Skipf("cannot run capture game loop: %v", err)
-	}
+	runCaptureLoop(t, "Entieve HUD capture", g)
 	if g.err != nil {
 		t.Fatal(g.err)
 	}

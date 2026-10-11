@@ -93,19 +93,8 @@ func NewMarket(env Env) *Market {
 	body.AddChild(toolbar)
 	body.AddChild(m.tbl.Container())
 
-	title := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-	)
-	m.title = widget.NewText(
-		widget.TextOpts.Text("Market", env.FaceBold(StepBase), solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(contentsPad),
-		})),
-	)
-	title.AddChild(m.title)
+	title, marketTitle := NewTitleBar(env, "Market", "svc_market")
+	m.title = marketTitle
 
 	m.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),

@@ -23,8 +23,8 @@ import (
 const (
 	stationX     = 10 // window left/top edge (matches placeDefaults)
 	stationY     = 8
-	stationWinW  = 384 // window width; right edge 394, market starts at x=396
-	stationMinW  = 384 // window MinSize — the "minimum window" row-rect pin
+	stationWinW  = 394 // window width; right edge 404, market starts at x=406
+	stationMinW  = 394 // window MinSize — the "minimum window" row-rect pin
 	stationMinH  = 200
 	boardPad     = 6  // body padding
 	boardSpacing = 5  // vertical gap between body children
@@ -36,9 +36,9 @@ const (
 	availMaxRows = 3  // visible available rows ("+N more" beyond)
 	actMaxRows   = 2  // visible active rows ("+N more" beyond)
 
-	boardInnerW   = stationWinW - 2*boardPad                // body inner width: 372
-	boardContentW = boardInnerW - 2*boardRowPad             // row content width: 366
-	boardTextW    = boardContentW - boardBtnW - boardBtnGap // text column width: 268
+	boardInnerW   = stationWinW - 2*boardPad                // body inner width: 382
+	boardContentW = boardInnerW - 2*boardRowPad             // row content width: 376
+	boardTextW    = boardContentW - boardBtnW - boardBtnGap // text column width: 278
 )
 
 // boardRowRects tiles up to n contract rows inside inner: equal heights,
@@ -130,6 +130,7 @@ type boardRowModel struct {
 	Summary  string // line 2, available rows only
 	Reward   string // line 3, available rows only
 	Require  string // line 3 right, gated rows only
+	Icon     string // uikit icon name for the objective kind ("" = none)
 	Action   string // button label; "" for note rows
 	Disabled bool
 	Note     bool // "+N more" / empty-state row (no button)
@@ -179,6 +180,7 @@ func (g *Game) buildStationBoard() stationBoardModel {
 			Title:   def.Title,
 			Summary: objectiveSummary(c, def),
 			Reward:  rewardText(def),
+			Icon:    uikit.ContractIcon(def.Kind),
 			Action:  "Accept",
 		}
 		if accepted[def.ID] {
@@ -216,6 +218,7 @@ func (g *Game) buildStationBoard() stationBoardModel {
 		m.Active = append(m.Active, boardRowModel{
 			ID:     a.ms.ID,
 			Title:  a.def.Title + " — " + fmt.Sprintf("%d/%d", int(math.Round(have)), a.def.Objective.Count),
+			Icon:   uikit.ContractIcon(a.def.Kind),
 			Action: "Abandon",
 		})
 	}
@@ -321,10 +324,32 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	if active {
 		step = uikit.StepTiny
 	}
+	// The kind glyph leads the title; the title's fixed width gives back
+	// the icon box, so every row keeps the same total width whether it
+	// carries an icon or not (note rows never do).
+	titleW := boardTextW
+	if r.Icon != "" {
+		titleW -= uikit.IconInline + uikit.IconGap
+	}
 	title := widget.NewText(
-		widget.TextOpts.Text(g.ellip(r.Title, step, boardTextW), g.env.Face(step), solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(boardTextW, 0)),
+		widget.TextOpts.Text(g.ellip(r.Title, step, float64(titleW)), g.env.Face(step), solid(p.Accent)),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(titleW, 0)),
 	)
+	var titleCell widget.PreferredSizeLocateableWidget = title
+	if r.Icon != "" {
+		ctr := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(uikit.IconGap),
+		)))
+		icon := uikit.NewIcon(r.Icon, uikit.IconInline, p.Text)
+		// Centre the glyph in the line: the row is as tall as its
+		// button, and a top-flush icon reads as a misalignment.
+		for _, w := range []widget.PreferredSizeLocateableWidget{icon, ctr} {
+			w.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+		}
+		ctr.AddChild(icon, title)
+		titleCell = ctr
+	}
 
 	if active {
 		// One line: "Belt cleanup — 1/3" + Abandon.
@@ -336,7 +361,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 				widget.RowLayoutOpts.Padding(rowPad),
 			)),
 		)
-		row.AddChild(title, btn)
+		row.AddChild(titleCell, btn)
 		return row, btn
 	}
 
@@ -377,7 +402,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 		widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
 		widget.RowLayoutOpts.Spacing(boardBtnGap),
 	)))
-	line1.AddChild(title, btn)
+	line1.AddChild(titleCell, btn)
 
 	row := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(rowBG),

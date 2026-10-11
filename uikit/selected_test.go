@@ -123,7 +123,7 @@ func pumpSelected(t *testing.T, w, h int, minSize bool, selectTarget bool) (*Kit
 	k, _ := newTestKit(t)
 	pumpKit(t, k, w, h)
 	if minSize {
-		// SetLocation applies the window's MinSize clamp (300×240).
+		// SetLocation applies the window's MinSize clamp (450×240).
 		k.sp.win.SetLocation(image.Rect(0, 0, 10, 10))
 		pumpKit(t, k, w, h)
 	}
@@ -153,8 +153,8 @@ func TestSelectedLayoutMath(t *testing.T) {
 	}{
 		{"1280x720", 1280, 720, false, true},
 		{"1024x700", 1024, 700, false, true},
-		{"min-300x240", 1280, 720, true, true},
-		{"min-300x240-nosel", 1024, 700, true, false},
+		{"min-450x240", 1280, 720, true, true},
+		{"min-450x240-nosel", 1024, 700, true, false},
 	}
 	for _, tc := range cases {
 		_, sp, inner := pumpSelected(t, tc.w, tc.h, tc.minSize, tc.selected)
@@ -194,46 +194,46 @@ func TestSelectedLayoutDegenerate(t *testing.T) {
 }
 
 // TestSelectedLayoutPinnedRects pins the exact geometry at the 1024×700
-// design size (default window rect) and at the 300×240 minimum, so any
+// design size (default window rect) and at the 450×240 minimum, so any
 // drift in the design math shows up as a tuple diff.
 func TestSelectedLayoutPinnedRects(t *testing.T) {
 	_, sp, _ := pumpSelected(t, 1024, 700, false, true)
 	got := selectedRects(sp)
 	want := []image.Rectangle{
-		image.Rect(13, 485, 383, 515),  // name
-		image.Rect(13, 520, 383, 537),  // dist
-		image.Rect(13, 542, 139, 575),  // Approach
-		image.Rect(144, 542, 226, 575), // Warp
-		image.Rect(231, 542, 306, 575), // Orbit
-		image.Rect(311, 542, 383, 575), // Stop
-		image.Rect(13, 580, 80, 613),   // Lock
-		image.Rect(85, 580, 157, 613),  // Dock
-		image.Rect(162, 580, 235, 613), // Jump
-		image.Rect(240, 580, 306, 613), // Loot
-		image.Rect(311, 580, 383, 613), // Mine
-		image.Rect(13, 618, 383, 651),  // Orbit range selector
-		image.Rect(13, 656, 383, 689),  // Warp to within selector
+		image.Rect(13, 485, 453, 515),  // name (icon + label row)
+		image.Rect(13, 520, 453, 537),  // dist
+		image.Rect(13, 542, 149, 575),  // Approach
+		image.Rect(154, 542, 255, 575), // Warp
+		image.Rect(260, 542, 355, 575), // Orbit
+		image.Rect(360, 542, 453, 575), // Stop
+		image.Rect(13, 580, 95, 613),   // Lock
+		image.Rect(100, 580, 185, 613), // Dock
+		image.Rect(190, 580, 277, 613), // Jump
+		image.Rect(282, 580, 362, 613), // Loot
+		image.Rect(367, 580, 453, 613), // Mine
+		image.Rect(13, 618, 453, 651),  // Orbit range selector
+		image.Rect(13, 656, 453, 689),  // Warp to within selector
 	}
 	assertRectsEqual(t, "1024x700", got, want)
 
 	_, spMin, _ := pumpSelected(t, 1024, 700, true, false)
 	gotMin := selectedRects(spMin)
 	wantMin := []image.Rectangle{
-		image.Rect(5, 49, 295, 79),     // name
-		image.Rect(5, 84, 295, 84),     // dist (empty line, zero height)
-		image.Rect(5, 89, 102, 121),    // Approach
-		image.Rect(107, 89, 171, 121),  // Warp
-		image.Rect(176, 89, 234, 121),  // Orbit
-		image.Rect(239, 89, 295, 121),  // Stop
-		image.Rect(5, 126, 57, 158),    // Lock
-		image.Rect(62, 126, 117, 158),  // Dock
-		image.Rect(122, 126, 179, 158), // Jump
-		image.Rect(184, 126, 234, 158), // Loot
-		image.Rect(239, 126, 295, 158), // Mine
-		image.Rect(5, 163, 295, 195),   // Orbit range selector
-		image.Rect(5, 200, 295, 232),   // Warp to within selector
+		image.Rect(5, 49, 445, 79),     // name (icon + label row)
+		image.Rect(5, 84, 445, 84),     // dist (empty line, zero height)
+		image.Rect(5, 89, 141, 121),    // Approach
+		image.Rect(146, 89, 247, 121),  // Warp
+		image.Rect(252, 89, 347, 121),  // Orbit
+		image.Rect(352, 89, 445, 121),  // Stop
+		image.Rect(5, 126, 87, 158),    // Lock
+		image.Rect(92, 126, 177, 158),  // Dock
+		image.Rect(182, 126, 269, 158), // Jump
+		image.Rect(274, 126, 354, 158), // Loot
+		image.Rect(359, 126, 445, 158), // Mine
+		image.Rect(5, 163, 445, 195),   // Orbit range selector
+		image.Rect(5, 200, 445, 232),   // Warp to within selector
 	}
-	assertRectsEqual(t, "min-300x240", gotMin, wantMin)
+	assertRectsEqual(t, "min-450x240", gotMin, wantMin)
 }
 
 // assertRectsEqual diffs two rect tuples.
@@ -523,4 +523,37 @@ func TestWarpMinimumRangeGate(t *testing.T) {
 		t.Error("warp selector disabled inside the minimum range")
 	}
 	_ = tr
+}
+
+// TestSelectedButtonContentFitsItsCell: an icon+label action button never
+// asks for more width than its cell hands out, so the glyph+label group can
+// never bleed into its neighbour — at both design sizes and at the window
+// minimum (the whole reason the minimum grew with the icons).
+func TestSelectedButtonContentFitsItsCell(t *testing.T) {
+	cases := []struct {
+		tag     string
+		w, h    int
+		minSize bool
+	}{
+		{"1280x720", 1280, 720, false},
+		{"1024x700", 1024, 700, false},
+		{"min-450x240", 1024, 700, true},
+	}
+	for _, tc := range cases {
+		_, sp, _ := pumpSelected(t, tc.w, tc.h, tc.minSize, true)
+		for _, b := range []*widget.Button{
+			sp.approach, sp.warp, sp.orbit, sp.stop,
+			sp.lock, sp.dock, sp.jump, sp.loot, sp.mine,
+		} {
+			nat, _ := b.PreferredSize()
+			if cell := b.GetWidget().Rect.Dx(); nat > cell {
+				label := ""
+				if txt := b.Text(); txt != nil {
+					label = txt.Label
+				}
+				t.Errorf("%s: %q button content %d px > its %d px cell",
+					tc.tag, label, nat, cell)
+			}
+		}
+	}
 }

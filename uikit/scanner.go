@@ -42,6 +42,11 @@ type Scanner struct {
 	status *widget.Text
 	empty  *widget.Text
 	labels [scanMaxLines]*widget.Text
+	// Each contact line is a row: the kind glyph then the count label.
+	// Visibility flips on the row (so the icon and label disappear
+	// together) and on the label itself (the pool's own state).
+	contactRows [scanMaxLines]*widget.Container
+	contactIcon [scanMaxLines]*iconBox
 
 	base   time.Time // sweep clock origin (wall time)
 	prev   float64   // previous sweep phase (wrap detection)
@@ -94,7 +99,18 @@ func NewScanner(env Env) *Scanner {
 		lbl := widget.NewText(widget.TextOpts.Text("", env.Face(StepSmall), solid(p.Text)))
 		showWidget(lbl.GetWidget(), false)
 		s.labels[i] = lbl
-		lines.AddChild(lbl)
+		box := newIconBox(IconInline)
+		s.contactIcon[i] = box
+		row := widget.NewContainer(
+			widget.ContainerOpts.Layout(widget.NewRowLayout(
+				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+				widget.RowLayoutOpts.Spacing(IconGap),
+			)),
+		)
+		showWidget(row.GetWidget(), false)
+		row.AddChild(box.Widget(), lbl)
+		s.contactRows[i] = row
+		lines.AddChild(row)
 	}
 
 	body := widget.NewContainer(
@@ -108,18 +124,7 @@ func NewScanner(env Env) *Scanner {
 	body.AddChild(status, s.bar, s.empty)
 	body.AddChild(lines)
 
-	title := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-	)
-	title.AddChild(widget.NewText(
-		widget.TextOpts.Text("Scanner", env.FaceBold(StepBase), solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(contentsPad),
-		})),
-	))
+	title, _ := NewTitleBar(env, "Scanner", "svc_scanner")
 
 	s.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
@@ -157,12 +162,18 @@ func (s *Scanner) applyCounts() {
 	for i, lbl := range s.labels {
 		if empty || i >= len(s.counts) {
 			showWidget(lbl.GetWidget(), false)
+			showWidget(s.contactRows[i].GetWidget(), false)
 			continue
 		}
 		c := s.counts[i]
 		showWidget(lbl.GetWidget(), true)
+		showWidget(s.contactRows[i].GetWidget(), true)
 		lbl.Label = scanKindLabel(c.Kind, c.N)
-		lbl.SetColor(render.BracketColor(c.Kind, false))
+		// The glyph wears the same bracket color as the count, so the
+		// line reads as one unit.
+		col := render.BracketColor(c.Kind, false)
+		lbl.SetColor(col)
+		s.contactIcon[i].Set(KindIcon(c.Kind), col)
 	}
 }
 

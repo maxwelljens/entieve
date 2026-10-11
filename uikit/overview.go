@@ -149,12 +149,14 @@ func (o *overview) sync(k *Kit) {
 		if !info.Visible {
 			continue
 		}
-		var tint color.RGBA
+		var tint, iconTint color.RGBA
 		switch {
 		case info.Entity == k.Sim.Player():
 			tint = withA(k.palette.Player, 60)
+			iconTint = k.palette.Info // own ship wears ColInfo
 		case info.Hostile:
 			tint = withA(k.palette.Danger, 60)
+			iconTint = k.palette.Danger // hostiles wear ColDanger
 		}
 		order = append(order, TableRow{
 			Cells: []string{
@@ -163,8 +165,10 @@ func (o *overview) sync(k *Kit) {
 				kindLabel(info.Kind),
 				formatSpeed(info.Vel.Len()),
 			},
-			Tint: tint,
-			Data: o.rowFor(info),
+			Icons:    []string{"", "", KindIcon(info.Kind), ""},
+			IconTint: iconTint,
+			Tint:     tint,
+			Data:     o.rowFor(info),
 		})
 	}
 	// Prune row objects of entities that left the grid (selection

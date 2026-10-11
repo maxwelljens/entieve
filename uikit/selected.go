@@ -2,12 +2,14 @@ package uikit
 
 import (
 	"image"
+	"image/color"
 	"math"
 	"strconv"
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/icons"
 )
 
 // Orbit ranges (m) the Orbit selector cycles through, and warp landing
@@ -29,6 +31,10 @@ type selectedPanel struct {
 	body *widget.Container
 	name *widget.Text
 	dist *widget.Text
+
+	// kindIcon leads the name line: the selection's kind glyph at the
+	// title size, hidden while nothing is selected.
+	kindIcon *iconBox
 
 	approach, warp, orbit, stop *widget.Button
 	lock, dock, jump            *widget.Button
@@ -62,35 +68,56 @@ func (k *Kit) buildSelected() {
 	sp.dist = widget.NewText(
 		widget.TextOpts.Text("", facePtr(k.faces.tiny), solid(p.Dim)),
 	)
+	// The kind glyph leads the name line (icon box + label, one row).
+	sp.kindIcon = newIconBox(IconTitle)
+	nameRow := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(IconGap),
+		)),
+	)
+	nameRow.AddChild(sp.kindIcon.Widget(), sp.name)
 
-	newBtn := func(label string, clicked func(*widget.ButtonClickedEventArgs)) *widget.Button {
-		return widget.NewButton(
-			widget.ButtonOpts.TextLabel(label),
+	// Action buttons carry a 20 px icon beside their label (ebitenui's
+	// TextAndImage path: graphic after the label, themed image states
+	// unchanged); the two range selectors stay text-only — they are
+	// state, not actions.
+	newBtn := func(label, icon string, clicked func(*widget.ButtonClickedEventArgs)) *widget.Button {
+		opts := []widget.ButtonOpt{
 			widget.ButtonOpts.WidgetOpts(
 				widget.WidgetOpts.MinSize(0, 40),
 			),
 			widget.ButtonOpts.ClickedHandler(clicked),
-		)
+		}
+		if icon != "" {
+			opts = append(opts, widget.ButtonOpts.TextAndImage(label, nil, &widget.GraphicImage{
+				Idle:     icons.Get(icon, IconButton, p.Text),
+				Disabled: icons.Get(icon, IconButton, iconColor(p.Dim, IconDisabledA)),
+			}, nil))
+		} else {
+			opts = append(opts, widget.ButtonOpts.TextLabel(label))
+		}
+		return widget.NewButton(opts...)
 	}
 	// Core movement actions (kept from the spike). Warp and Orbit are
 	// the action half of the warp/orbit pair: they enqueue at the range
 	// their selector shows, never a range of their own.
-	sp.approach = newBtn("Approach", func(*widget.ButtonClickedEventArgs) { k.approachSelected() })
-	sp.warp = newBtn("Warp", func(*widget.ButtonClickedEventArgs) { k.warpSelected() })
-	sp.orbit = newBtn("Orbit", func(*widget.ButtonClickedEventArgs) { k.orbitSelected() })
-	sp.stop = newBtn("Stop", func(*widget.ButtonClickedEventArgs) { k.stopSelected() })
+	sp.approach = newBtn("Approach", "act_approach", func(*widget.ButtonClickedEventArgs) { k.approachSelected() })
+	sp.warp = newBtn("Warp", "act_warp", func(*widget.ButtonClickedEventArgs) { k.warpSelected() })
+	sp.orbit = newBtn("Orbit", "act_orbit", func(*widget.ButtonClickedEventArgs) { k.orbitSelected() })
+	sp.stop = newBtn("Stop", "act_stop", func(*widget.ButtonClickedEventArgs) { k.stopSelected() })
 	// Context actions, gated by the selection's sim.Info flags in
 	// syncSelected (disabled buttons take the theme's disabled look).
-	sp.lock = newBtn("Lock", func(*widget.ButtonClickedEventArgs) { k.lockSelected() })
-	sp.dock = newBtn("Dock", func(*widget.ButtonClickedEventArgs) { k.dockSelected() })
-	sp.jump = newBtn("Jump", func(*widget.ButtonClickedEventArgs) { k.jumpSelected() })
-	sp.loot = newBtn("Loot", func(*widget.ButtonClickedEventArgs) { k.lootSelected() })
-	sp.mine = newBtn("Mine", func(*widget.ButtonClickedEventArgs) { k.mineSelected() })
+	sp.lock = newBtn("Lock", "act_lock", func(*widget.ButtonClickedEventArgs) { k.lockSelected() })
+	sp.dock = newBtn("Dock", "act_dock", func(*widget.ButtonClickedEventArgs) { k.dockSelected() })
+	sp.jump = newBtn("Jump", "act_jump", func(*widget.ButtonClickedEventArgs) { k.jumpSelected() })
+	sp.loot = newBtn("Loot", "act_loot", func(*widget.ButtonClickedEventArgs) { k.lootSelected() })
+	sp.mine = newBtn("Mine", "act_mine", func(*widget.ButtonClickedEventArgs) { k.mineSelected() })
 	// Pure selectors: always enabled, they only cycle their own value —
 	// they never enqueue. The Warp/Orbit actions and the Z/Q keys read
 	// that value back through Kit.WarpRange / Kit.OrbitRange.
-	sp.orbitRange = newBtn(orbitLabel(OrbitRanges[0]), func(*widget.ButtonClickedEventArgs) { k.cycleOrbit() })
-	sp.warpRange = newBtn(warpRangeLabel(WarpRanges[0]), func(*widget.ButtonClickedEventArgs) { k.cycleWarpRange() })
+	sp.orbitRange = newBtn(orbitLabel(OrbitRanges[0]), "", func(*widget.ButtonClickedEventArgs) { k.cycleOrbit() })
+	sp.warpRange = newBtn(warpRangeLabel(WarpRanges[0]), "", func(*widget.ButtonClickedEventArgs) { k.cycleWarpRange() })
 
 	// Hover hint for the Warp action while the target sits inside the
 	// warp minimum range: one ToolTip for the button's lifetime, label
@@ -121,7 +148,7 @@ func (k *Kit) buildSelected() {
 		widget.ContainerOpts.Layout(&selectedLayouter{bands: selectedBands[:]}),
 	)
 	sp.body = body
-	body.AddChild(sp.name, sp.dist,
+	body.AddChild(nameRow, sp.dist,
 		sp.approach, sp.warp, sp.orbit, sp.stop,
 		sp.lock, sp.dock, sp.jump, sp.loot, sp.mine,
 		sp.orbitRange, sp.warpRange)
@@ -143,10 +170,11 @@ func (k *Kit) buildSelected() {
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, titleBarH),
 		widget.WindowOpts.Draggable(),
-		// Wide enough for the two button rows: the layout never wraps, so
-		// the min size must keep the content inside the panel.
-		widget.WindowOpts.MinSize(300, 240),
-		widget.WindowOpts.Location(image.Rect(8, 436, 388, 696)),
+		// The two action rows must hold icon + label whole: five
+		// TextAndImage buttons measure 447 px on the type grid, so the
+		// content floor (mirrored by the default rect below) is 450.
+		widget.WindowOpts.MinSize(450, 240),
+		widget.WindowOpts.Location(image.Rect(8, 436, 458, 696)),
 	)
 }
 
@@ -170,7 +198,7 @@ type selectedInventory struct {
 // band by band. Rows stack from the top of inner with inv.gap between
 // them; the text lines keep their measured height and the bands share
 // whatever height is left, capped at their natural height — so every rect
-// stays inside inner even at the 300×240 minimum. Cells within a band
+// stays inside inner even at the 450×240 minimum. Cells within a band
 // scale proportionally to their natural widths with exactly inv.gap
 // between them, which tiles the band edge to edge.
 func selectedLayout(inner image.Rectangle, inv selectedInventory) []image.Rectangle {
@@ -338,6 +366,9 @@ func (k *Kit) syncSelected() {
 	if ok {
 		name = info.Name
 		dist = formatDistance(info.Distance) + "  ·  " + kindLabel(info.Kind)
+		sp.kindIcon.Set(KindIcon(info.Kind), k.palette.Text)
+	} else {
+		sp.kindIcon.Set("", color.RGBA{})
 	}
 	if sp.name.Label != name || sp.dist.Label != dist {
 		sp.name.Label, sp.dist.Label = name, dist

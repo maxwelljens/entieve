@@ -39,6 +39,7 @@ func TestLogWindowCapture(t *testing.T) {
 	if os.Getenv("ENTIEVE_CAPTURE") == "" {
 		t.Skip("set ENTIEVE_CAPTURE=1 to render a capture frame")
 	}
+	skipIfLoopRan(t)
 	outDir := os.Getenv("ENTIEVE_CAPTURE_DIR")
 	if outDir == "" {
 		outDir = "/tmp/opencode"
@@ -53,11 +54,7 @@ func TestLogWindowCapture(t *testing.T) {
 	}
 
 	g := &logCaptureGame{c: c, l: l, env: env, out: filepath.Join(outDir, "log_capture.png")}
-	ebiten.SetWindowTitle("Entieve log capture")
-	ebiten.SetWindowSize(1280, 720)
-	if err := ebiten.RunGame(g); err != nil {
-		t.Skipf("cannot run capture game loop: %v", err)
-	}
+	runCaptureLoop(t, "Entieve log capture", g)
 	if g.err != nil {
 		t.Fatal(g.err)
 	}

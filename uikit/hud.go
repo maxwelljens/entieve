@@ -9,6 +9,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/icons"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -58,6 +59,25 @@ func targetCardBody(card image.Rectangle) image.Rectangle {
 func targetCardText(card image.Rectangle) image.Rectangle {
 	b := targetCardBody(card)
 	return image.Rect(b.Min.X, b.Min.Y, b.Max.X, b.Min.Y+hudBoxTextH)
+}
+
+// hudBoxIcon is the kind glyph box on a card's name line: the inline size
+// of the type grid, vertically centred in the line.
+const hudBoxIcon = IconInline
+
+// targetCardIcon returns the kind glyph box at the start of the name line.
+func targetCardIcon(card image.Rectangle) image.Rectangle {
+	b := targetCardBody(card)
+	y := b.Min.Y + (hudBoxTextH-hudBoxIcon)/2
+	return image.Rect(b.Min.X, y, b.Min.X+hudBoxIcon, y+hudBoxIcon)
+}
+
+// targetCardName returns the name text region: everything right of the
+// icon box, so the glyph and the label can never overlap.
+func targetCardName(card image.Rectangle) image.Rectangle {
+	ic := targetCardIcon(card)
+	line := targetCardText(card)
+	return image.Rect(ic.Max.X+IconGap, line.Min.Y, line.Max.X, line.Max.Y)
 }
 
 // targetCardDist returns the distance line under the name.
@@ -176,6 +196,8 @@ type hudBox struct {
 type targetCard struct {
 	name   string
 	dist   string
+	kind   string // semantic icon name for the target's kind ("" = none)
+	tint   color.RGBA
 	lock   float64    // 0..1 lock progress
 	layers [3]float64 // shield / armor / hull fractions (ships); health in [0] otherwise
 	ships  bool       // three layers (true) vs a single health fraction
@@ -341,11 +363,11 @@ func (h *Hud) paintBox(b *hudBox) {
 	drawTargetCard(b.img, b.card, h.env)
 }
 
-// boxLabels fits a card's text: the name to the name line, the distance
-// to its own line.
+// boxLabels fits a card's text: the name to the room right of the kind
+// glyph, the distance to its own line.
 func (h *Hud) boxLabels(name, dist string) (string, string) {
 	card := image.Rect(0, 0, hudBoxW, hudBoxH)
-	room := float64(targetCardText(card).Dx())
+	room := float64(targetCardName(card).Dx())
 	if room < hudBoxMinNameW {
 		room = hudBoxMinNameW
 	}
@@ -366,9 +388,15 @@ func drawTargetCard(dst *ebiten.Image, c targetCard, env Env) {
 	vector.StrokeRect(dst, 0.5, 0.5, float32(card.Dx()-1), float32(card.Dy()-1),
 		1, nrgba(p.Border, 200), true)
 
-	// Name on the top line, distance on its own line under it — both
-	// ellipsized to their line as a safety net.
-	line := targetCardText(card)
+	// Kind glyph leads the name line, then the name — the two rects come
+	// from the same pure geometry, so they can never overlap.
+	if c.kind != "" {
+		ic := targetCardIcon(card)
+		opts := &ebiten.DrawImageOptions{}
+		opts.GeoM.Translate(float64(ic.Min.X), float64(ic.Min.Y))
+		dst.DrawImage(icons.Get(c.kind, hudBoxIcon, c.tint), opts)
+	}
+	line := targetCardName(card)
 	drawCardText(dst, c.name, env.FaceBold(StepSmall), line.Min.X, line.Min.Y, solid(p.Text))
 	dl := targetCardDist(card)
 	drawCardText(dst, c.dist, env.Face(StepTiny), dl.Min.X, dl.Min.Y, solid(p.Dim))
@@ -504,9 +532,18 @@ func (h *Hud) Sync() {
 		showWidget(box.root.GetWidget(), true)
 		l := locks[i]
 		info, hasInfo := s.Info(l.Target)
-		card := targetCard{lock: hudFrac01(l.Progress), name: "…"}
+		card := targetCard{lock: hudFrac01(l.Progress), name: "…", tint: h.env.Pal.Text}
 		if hasInfo {
 			card.dist = formatDistance(info.Distance)
+			// The kind glyph leads the name line; hostiles wear
+			// ColDanger, the player's own ship ColInfo.
+			card.kind = KindIcon(info.Kind)
+			switch {
+			case info.Hostile:
+				card.tint = h.env.Pal.Danger
+			case info.Entity == player:
+				card.tint = h.env.Pal.Info
+			}
 			if sh, ok := s.Ships.Get(l.Target); ok {
 				// Ships report all three layers; other targets fall
 				// back to the read model's single health fraction.
