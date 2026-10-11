@@ -554,6 +554,18 @@ NPC traffic delivery + market price drift, ambush on NPC traffic
 
 ## `render` / `ui` / `game` contract
 
+> **Note (2026-10 — warp minimum + typeface).** (1) `sim.WarpMinRange =
+> 150_000` m is the exported single source of EVE's warp-engage rule:
+> `CmdWarpTo` refuses a target closer than that *at command time*
+> (command-refusal pattern, `SevWarning` "Target within warp minimum range
+> (150 km)"), and the Selected Item Warp action gates on the same
+> constant with a hover hint. (2) The interface typeface is **Turret Road**
+> (`render/fonts/*.ttf` + `OFL.txt`, SIL OFL 1.1, `//go:embed` in
+> `render/fonts.go`): Regular for body text, Bold via `render.FaceBold` /
+> `uikit.Env.FaceBold` for titles, table header sort buttons, buttons and
+> HUD readouts; `goregular` no longer appears in `render`. Turret Road has
+> no U+25B2/U+25BC glyphs, so table sort indicators are ↑/↓.
+
 > **UI platform (2026-10, complete):** the chrome lives in `uikit/`, built on
 > **ebitenui v0.7.3** (pinned in go.mod); the legacy hand-drawn `ui/` package
 > is retired (golden-value tests pin the EVE-dark palette and type scale).

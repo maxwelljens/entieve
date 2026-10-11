@@ -75,3 +75,26 @@ constants:
 
 The full sprite draw path and its tests live in `render/assets.go` and
 `render/assets_test.go`.
+
+## Typeface
+
+The interface is set in **Turret Road**, embedded from `render/fonts/`
+(TTFs + `OFL.txt`, `//go:embed` in `render/fonts.go`). The 21 px type
+scale is unchanged — only the typeface and the emphasis face are new.
+
+| Weight | Role |
+|---|---|
+| Regular | body text: log lines, table cells, labels, tooltips, text input |
+| Bold | emphasis: window titles, table header sort buttons, buttons, HUD readouts (`render.FaceBold` / `Env.FaceBold`) |
+| Light, Medium, ExtraLight, ExtraBold | shipped with the family in `render/fonts/`, not used by the UI |
+
+- **License — Turret Road, SIL Open Font License 1.1**: `Copyright 2018
+  The Turret Road Project Authors (https://github.com/noponies/turret-road)`.
+  The full `OFL.txt` travels in the same directory as the TTFs (and is
+  embedded with them), so any redistribution of the binary carries the
+  license.
+- **Glyph coverage**: Turret Road has no U+25B2/U+25BC triangles, so the
+  table sort indicators are the ↑/↓ arrows it does carry
+  (`uikit/table.go`, `indicator`). Bold was chosen over Medium by rendering
+  both at the 16.8 px button size: Medium sits too close to Regular to read
+  as emphasis.

@@ -27,10 +27,10 @@ in-game help window renders.
 | `Shift+Tab` | Lock the currently selected target |
 | `F1` … `F8` | Toggle high-slot module 1…8 (activate/deactivate) |
 | `A` | Approach selected |
-| `Q` | Orbit selected — cycles 2.5k → 5k → 10k → 20k → 50k m (the same set as the Selected Item Orbit control) |
+| `Q` | Orbit selected at the Selected Item **Orbit range** selector's value (2.5k → 5k → 10k → 20k → 50k m; the key never changes it) |
 | `S` | Stop |
 | `W` | Align to selected |
-| `Z` | Warp to selected (lands 10 km short of the target) |
+| `Z` | Warp to selected at the Selected Item **Warp to within** range (0/10/50 km); refused inside 150 km |
 | `D` | Dock (selected station, else nearest dockable one) |
 | `J` | Jump through gate (selected gate, else nearest) |
 | `L` | Loot nearest wreck |
@@ -92,10 +92,12 @@ bottom left by default, toggle with `Shift+L`, draggable and resizable
 like the rest. The **Overview** (top left) and **Selected Item** window
 (top right) stay open but are draggable — a click in space selects the
 target that **Selected Item** then shows and that every
-`selected`-targeted key acts on. Its action buttons (Approach, Warp, Stop,
-Lock, Dock, Jump, Loot, Mine) act on that selection; the **Orbit** and
-**Warp to within** buttons cycle ranges (2.5k–50k m / 0, 10k, 50k m) and
-issue the command at the range their label shows.
+`selected`-targeted key acts on. Its action buttons (Approach, Warp,
+Orbit, Stop, Lock, Dock, Jump, Loot, Mine) act on that selection; the two
+selectors — **Orbit range** (2.5k–50k m) and **Warp to within** (0/10/50 km)
+— are pure state: clicking one only cycles its value and never issues a
+command. Warp, Orbit, `Z` and `Q` all act at the range their selector
+currently shows.
 
 Default positions: overview top-left, selected item top-right, scanner
 in the center column under the top row, log bottom-left, HUD
@@ -185,12 +187,15 @@ tracking (scaled by signature radius), plus distance beyond optimal vs.
 falloff. Fast, small, transversal-moving targets are hard to hit; wrecking
 shots deal ×3 damage.
 
-**Warp rules.** `Z` (Warp To) and the Selected Item window's warp button
-both warp to the selected target at a fixed **10 km landing range** (the
-sim's landing tolerance applies around the chosen point). Warp scramblers
-on the target block warp and cancel an ongoing warp. Sublight movement is
-limited by agility (align time ≈ agility × 10 s); the afterburner
-multiplies speed while its cycle runs.
+**Warp rules.** `Z` and the Selected Item **Warp** button both warp to the
+selected target at the **Warp to within** selector's range (0 / 10 / 50 km;
+the sim's landing tolerance applies around the chosen point). The drive
+cannot engage a target closer than **`sim.WarpMinRange` = 150 km** (EVE's
+rule): inside that the command is refused with the log line "Target within
+warp minimum range (150 km)", and the Warp button is disabled and says the
+same on hover. Warp scramblers on the target block warp and cancel an
+ongoing warp. Sublight movement is limited by agility (align time ≈
+agility × 10 s); the afterburner multiplies speed while its cycle runs.
 
 **Mining.** Select an asteroid and press `M`: the first mining laser cycles,
 ore lands in the ore hold, and depleted asteroids vanish. Sell the ore at a
@@ -220,10 +225,12 @@ omniscience), enforced in the sim's read model and the renderer alike.
   sweep. You learn that something is out there, not what it is or where it
   sits; you still have to fly there to see it. (Deliberate: the scanner is a
   hint system, not a map.)
-- **Warp-to-range**: `Z` and the Warp button land 10 km off the target.
-  The Selected Item **Warp to within** control cycles 0 / 10 / 50 km and
-  warps at the range its label shows — it is both the selector and the
-  trigger.
+- **Warp-to-range**: `Z` and the Warp button land at the Selected Item
+  **Warp to within** selector's range (0 / 10 / 50 km). The selector is
+  pure state — clicking it only cycles the value; the Warp button (or `Z`)
+  fires at that value, and **Orbit range** / the Orbit button / `Q` follow
+  the same split. Both selectors start at their first entry, so the
+  default warp lands *on* the target and the default orbit is 2,500 m.
 
 **Ammo cycling.** Right-click a weapon slot in the module rack to cycle its
 loaded charge: **Auto → each ammo of that weapon's class that sits in your

@@ -81,7 +81,7 @@ func NewLog(env Env) *LogPanel {
 	body.AddChild(l.ta)
 
 	titleText := widget.NewText(
-		widget.TextOpts.Text("Log", env.Face(StepBase), solid(p.Accent)),
+		widget.TextOpts.Text("Log", env.FaceBold(StepBase), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,

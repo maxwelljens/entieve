@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ebitenui/ebitenui/event"
+	"github.com/ebitenui/ebitenui/input"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -166,6 +167,56 @@ func TestResizeRectEdgeMath(t *testing.T) {
 	}
 }
 
+// fakeMouse is ebitenui's CursorUpdater seam: a scripted cursor and left
+// button. Install it so the REAL pipeline (widget press/click events,
+// input layers, the chrome's step) runs off test input instead of ebiten.
+type fakeMouse struct {
+	x, y     int
+	pressed  bool
+	justDown bool
+	justUp   bool
+}
+
+func (f *fakeMouse) Update()                             {}
+func (f *fakeMouse) AfterUpdate()                        { f.justDown, f.justUp = false, false }
+func (f *fakeMouse) Draw(*ebiten.Image)                  {}
+func (f *fakeMouse) AfterDraw(*ebiten.Image)             {}
+func (f *fakeMouse) CursorPosition() (int, int)          { return f.x, f.y }
+func (f *fakeMouse) GetCursorImage(string) *ebiten.Image { return nil }
+func (f *fakeMouse) GetCursorOffset(string) image.Point  { return image.Point{} }
+func (f *fakeMouse) MouseButtonPressed(b ebiten.MouseButton) bool {
+	return b == ebiten.MouseButtonLeft && f.pressed
+}
+func (f *fakeMouse) MouseButtonJustPressed(b ebiten.MouseButton) bool {
+	return b == ebiten.MouseButtonLeft && f.justDown
+}
+func (f *fakeMouse) MouseButtonJustReleased(b ebiten.MouseButton) bool {
+	return b == ebiten.MouseButtonLeft && f.justUp
+}
+
+// at moves the scripted cursor (frame N-1 state must be settled first).
+func (f *fakeMouse) at(x, y int) { f.x, f.y = x, y }
+
+// down/up press and release the left button with one-frame edge pulses.
+func (f *fakeMouse) down() { f.pressed, f.justDown = true, true }
+func (f *fakeMouse) up()   { f.pressed, f.justUp = false, true }
+
+// useFakeMouse installs a scripted mouse for the test's duration.
+func useFakeMouse(t *testing.T) *fakeMouse {
+	t.Helper()
+	f := &fakeMouse{}
+	input.SetCursorUpdater(f)
+	// The cursor renderer would reach for ebiten's window cursor; there
+	// is no window in a test.
+	prevMgmt := input.CursorManagementEnabled
+	input.CursorManagementEnabled = false
+	t.Cleanup(func() {
+		input.SetCursorUpdater(nil)
+		input.CursorManagementEnabled = prevMgmt
+	})
+	return f
+}
+
 // newChromeTestWindow builds a minimal titled window with the resize
 // chrome attached, at a known rect.
 func newChromeTestWindow(t *testing.T) (*widget.Window, *winChrome) {
@@ -182,19 +233,20 @@ func newChromeTestWindow(t *testing.T) (*widget.Window, *winChrome) {
 	)
 	ch := makeEdgeResizable(win)
 	// One pump on a real UI: layout gives the title bar and contents
-	// their rects (press args are widget-relative).
+	// their rects and installs the window's input layer (the grip needs
+	// a topmost layer to test against).
 	ui := newWindowUI(t, env, win)
 	pumpWindow(t, ui, nil, 1280, 720)
 	return win, ch
 }
 
-// TestWinChromeGripDrag drives the chrome end to end without ebiten
-// input: a deferred press event starts the grip, step() applies the drag
-// math every frame (the win rect only moves through SetLocation), and
-// release fires ResizeEvent exactly once with the final rect.
+// TestWinChromeGripDrag drives the chrome end to end from the cursor and
+// button state alone: a press in the grip band arms the drag, step()
+// applies the drag math every frame (the win rect only moves through
+// SetLocation), and release fires ResizeEvent exactly once with the
+// final rect.
 func TestWinChromeGripDrag(t *testing.T) {
 	win, ch := newChromeTestWindow(t)
-	event.ExecuteDeferred() // flush the deferred handler registrations
 
 	// Count ResizeEvents.
 	resizes := 0
@@ -207,19 +259,15 @@ func TestWinChromeGripDrag(t *testing.T) {
 	})
 	event.ExecuteDeferred()
 
-	// Press on the left edge inside the title bar (title-relative offset
-	// 3 px in, 20 px down): this starts a left-grip resize, and the
-	// built-in Draggable() handler starts its title drag too — the
-	// chrome's absolute recompute must win.
-	win.TitleBar.GetWidget().MouseButtonPressedEvent.Fire(&widget.WidgetMouseButtonPressedEventArgs{
-		Widget:  win.TitleBar.GetWidget(),
-		Button:  ebiten.MouseButtonLeft,
-		OffsetX: 3,
-		OffsetY: 5,
-	})
-	event.ExecuteDeferred()
-	if !ch.active || ch.edges != edgeLeft|edgeTop {
-		t.Fatalf("press in top-left grip: active = %v edges = %b, want true / left|top", ch.active, ch.edges)
+	// Press on the left edge inside the title bar (3 px in, 5 px down):
+	// this arms a left|top grip, and the built-in Draggable() handler
+	// starts its title drag too — the chrome's absolute recompute wins.
+	ch.step(image.Point{X: 103, Y: 105}, true)
+	if !ch.armed || ch.edges != edgeLeft|edgeTop {
+		t.Fatalf("press in top-left grip: armed = %v edges = %b, want true / left|top", ch.armed, ch.edges)
+	}
+	if ch.active {
+		t.Fatal("grip became active before the cursor moved")
 	}
 
 	rect := win.GetContainer().GetWidget().Rect
@@ -250,8 +298,8 @@ func TestWinChromeGripDrag(t *testing.T) {
 	// counting.
 	ch.step(image.Point{X: 400, Y: 400}, false)
 	event.ExecuteDeferred()
-	if ch.active {
-		t.Error("still active after release")
+	if ch.active || ch.armed {
+		t.Error("still dragging after release")
 	}
 	if resizes != 1 {
 		t.Fatalf("ResizeEvent count = %d, want 1", resizes)
@@ -260,21 +308,44 @@ func TestWinChromeGripDrag(t *testing.T) {
 		t.Errorf("ResizeEvent rect = %v, want final %v", last, win.GetContainer().GetWidget().Rect)
 	}
 
-	// A press in the window interior does not start a resize (the title
+	// A press in the window interior does not arm a resize (the title
 	// drag / content widgets own it).
-	win.Contents.GetWidget().MouseButtonPressedEvent.Fire(&widget.WidgetMouseButtonPressedEventArgs{
-		Widget:  win.Contents.GetWidget(),
-		Button:  ebiten.MouseButtonLeft,
-		OffsetX: 200,
-		OffsetY: 100,
-	})
-	event.ExecuteDeferred()
-	if ch.active {
-		t.Error("interior press started a resize")
+	ch.step(image.Point{X: 300, Y: 300}, true)
+	if ch.armed || ch.active {
+		t.Error("interior press armed a resize")
 	}
-	ch.step(image.Point{X: 999, Y: 999}, true) // no-op: nothing active
+	ch.step(image.Point{X: 999, Y: 999}, false)
 	if resizes != 1 {
 		t.Errorf("ResizeEvent count after interior press = %d, want 1", resizes)
+	}
+}
+
+// TestWinChromePressWithoutDragIsNoOp: a press that starts in the grip
+// band and releases without moving never resizes and never fires
+// ResizeEvent — the press belongs to the child widget.
+func TestWinChromePressWithoutDragIsNoOp(t *testing.T) {
+	win, ch := newChromeTestWindow(t)
+	resizes := 0
+	win.ResizeEvent.AddHandler(func(interface{}) { resizes++ })
+	event.ExecuteDeferred()
+
+	start := win.GetContainer().GetWidget().Rect
+	ch.step(image.Point{X: start.Max.X - 3, Y: start.Max.Y - 3}, true) // bottom-right corner
+	if !ch.armed {
+		t.Fatal("corner press did not arm")
+	}
+	// Small jitter inside the press, then release: still no drag.
+	ch.step(image.Point{X: start.Max.X - 3, Y: start.Max.Y - 3}, true)
+	ch.step(image.Point{X: start.Max.X - 3, Y: start.Max.Y - 3}, false)
+	event.ExecuteDeferred()
+	if ch.armed || ch.active {
+		t.Error("chrome still dragging after a click")
+	}
+	if got := win.GetContainer().GetWidget().Rect; got != start {
+		t.Errorf("rect = %v, want unchanged %v", got, start)
+	}
+	if resizes != 0 {
+		t.Errorf("ResizeEvent count = %d, want 0 for a click", resizes)
 	}
 }
 
@@ -288,5 +359,243 @@ func TestWinChromeIsIdempotent(t *testing.T) {
 	}
 	if _, dup := chromeByWindow[win]; !dup {
 		t.Fatal("window not indexed in chromeByWindow")
+	}
+}
+
+// resizeCounter tallies ResizeEvent firings on one window.
+type resizeCounter struct {
+	n    int
+	last image.Rectangle
+}
+
+func countResizes(win *widget.Window) *resizeCounter {
+	c := &resizeCounter{}
+	win.ResizeEvent.AddHandler(func(a interface{}) {
+		if e, ok := a.(*widget.WindowChangedEventArgs); ok {
+			c.n++
+			c.last = e.Rect
+		}
+	})
+	return c
+}
+
+// dragAt runs a full press-drag-release through the REAL frame loop
+// (kit Sync/Update/Draw with a scripted mouse) starting at from and
+// ending at from+delta. It returns the window rect before the press.
+func dragAt(t *testing.T, k *Kit, fm *fakeMouse, win *widget.Window, from image.Point, dx, dy int) image.Rectangle {
+	t.Helper()
+	start := win.GetContainer().GetWidget().Rect
+	frame := func() { pumpKit(t, k, 1024, 700) }
+	fm.at(from.X, from.Y)
+	frame() // hover settles before the press
+	fm.down()
+	frame() // rising edge: the grip arms (no rect change yet)
+	fm.at(from.X+dx, from.Y+dy)
+	frame() // cursor moved: the drag is active and the rect applies
+	fm.up()
+	frame() // release: ResizeEvent fires (deferred)
+	frame() // dispatch the deferred ResizeEvent
+	return start
+}
+
+// TestOverviewLogEdgeGripsResize is the regression test for the two
+// windows whose bodies used to swallow grip presses: the overview's
+// table and the log's text area are scroll containers that elevate an
+// input layer over the 8 px grip band, so widget press events never
+// reached the chrome. Driven from the window rect in step, every edge
+// and corner resizes exactly like the pure resizeRect math — the press
+// points below are asserted to sit INSIDE those scroll viewports.
+func TestOverviewLogEdgeGripsResize(t *testing.T) {
+	k, _ := newTestKit(t)
+	fm := useFakeMouse(t)
+	log := NewLog(k.panelEnv())
+	k.AddWindow(log.Win())
+	// Park the Selected Item window clear of both test windows so the
+	// grip under test is the topmost layer at its own press point, and
+	// size the log to its minimum so the text area fills the body all
+	// the way to the bottom grip band.
+	k.sp.win.SetLocation(image.Rect(600, 436, 980, 696))
+	logTestRect := image.Rect(10, 690-logMinH, 10+logDefaultW, 690)
+	log.Win().SetLocation(logTestRect)
+	pumpKit(t, k, 1024, 700)
+	pumpKit(t, k, 1024, 700)
+
+	ovRes := countResizes(k.ov.win)
+	logRes := countResizes(log.Win())
+
+	ovView := k.ov.tbl.scroll.ViewRect()
+	taView := log.ta.GetWidget().Rect
+	ovRect := k.ov.win.GetContainer().GetWidget().Rect
+	logRect := log.Win().GetContainer().GetWidget().Rect
+	if !ovView.In(ovRect) || !taView.In(logRect) {
+		t.Fatalf("fixture: overview viewport %v not inside %v / log textarea %v not inside %v",
+			ovView, ovRect, taView, logRect)
+	}
+
+	cases := []struct {
+		name    string
+		win     *widget.Window
+		res     *resizeCounter
+		from    image.Point
+		dx, dy  int
+		edges   edgeMask
+		inBody  image.Rectangle // the press must sit in this full-bleed body
+		swallow bool            // the body's layer must swallow that press
+	}{
+		{"overview left edge through the table", k.ov.win, ovRes,
+			image.Point{ovRect.Min.X + 6, ovView.Min.Y + 12}, -40, 0, edgeLeft, ovView, true},
+		{"overview bottom edge through the table", k.ov.win, ovRes,
+			image.Point{(ovView.Min.X + ovView.Max.X) / 2, ovRect.Max.Y - 7}, 0, 30, edgeBottom, ovView, true},
+		{"overview right edge through the table", k.ov.win, ovRes,
+			image.Point{ovRect.Max.X - 7, ovView.Min.Y + 12}, 25, 0, edgeRight, ovView, true},
+		{"overview bottom-right corner through the table", k.ov.win, ovRes,
+			image.Point{ovRect.Max.X - 7, ovRect.Max.Y - 7}, 20, 18, edgeRight | edgeBottom, ovView, true},
+		{"overview top edge (title bar)", k.ov.win, ovRes,
+			image.Point{(ovRect.Min.X + ovRect.Max.X) / 2, ovRect.Min.Y + 4}, 0, -20, edgeTop, image.Rectangle{}, false},
+		// The log's body nests two paddings (5 px body + 4 px text-area
+		// scroll), so its inner scroll layer stops 9 px short of the
+		// window edge and never covers the grip band — the log's own
+		// failure was in step, not in press routing (see the header
+		// comment), so these cases pin the resize math over a
+		// text-area-filled body without the swallow requirement.
+		{"log left edge through the text area", log.Win(), logRes,
+			image.Point{logRect.Min.X + 6, taView.Min.Y + 12}, -35, 0, edgeLeft, taView, false},
+		{"log right edge through the text area", log.Win(), logRes,
+			image.Point{logRect.Max.X - 7, taView.Min.Y + 12}, 30, 0, edgeRight, taView, false},
+		{"log bottom edge through the text area", log.Win(), logRes,
+			image.Point{(taView.Min.X + taView.Max.X) / 2, logRect.Max.Y - 7}, 0, 40, edgeBottom, taView, false},
+		{"log top-left corner (title bar)", log.Win(), logRes,
+			image.Point{logRect.Min.X + 4, logRect.Min.Y + 4}, -12, -10, edgeLeft | edgeTop, image.Rectangle{}, false},
+	}
+
+	for _, tc := range cases {
+		before := tc.res.n
+		// Park the window under test back at its default rect so each
+		// case starts from a known geometry.
+		if tc.win == k.ov.win {
+			k.ov.win.SetLocation(image.Rect(8, 8, 388, 428))
+		} else {
+			log.Win().SetLocation(logTestRect)
+		}
+		pumpKit(t, k, 1024, 700)
+		rect := tc.win.GetContainer().GetWidget().Rect
+		if tc.inBody != (image.Rectangle{}) {
+			if !tc.from.In(rect) || !tc.from.In(tc.inBody) {
+				t.Fatalf("%s: press point %v not in window %v / body %v — "+
+					"the test would miss the full-bleed case", tc.name, tc.from, rect, tc.inBody)
+			}
+		}
+		// Root cause, asserted: where the body's elevated scroll layer
+		// covers the pixel, left-button presses never reach the
+		// TitleBar/Contents widgets the old route listened on.
+		if tc.swallow {
+			if l := tc.win.GetContainer().GetWidget().EffectiveInputLayer(); l.ActiveFor(tc.from.X, tc.from.Y, input.LayerEventTypeMouseButton) {
+				t.Fatalf("%s: press %v is NOT swallowed for mouse events — fixture no "+
+					"longer covers the defect", tc.name, tc.from)
+			}
+		}
+		start := dragAt(t, k, fm, tc.win, tc.from, tc.dx, tc.dy)
+		got := tc.win.GetContainer().GetWidget().Rect
+		want := resizeRect(start, tc.dx, tc.dy, tc.edges, windowMin(tc.win))
+		if got != want {
+			t.Errorf("%s: rect = %v, want resizeRect math %v", tc.name, got, want)
+		}
+		if tc.res.n != before+1 {
+			t.Errorf("%s: ResizeEvent count = %d, want %d", tc.name, tc.res.n, before+1)
+		} else if tc.res.last != want {
+			t.Errorf("%s: ResizeEvent rect = %v, want %v", tc.name, tc.res.last, want)
+		}
+	}
+}
+
+// TestRowClickNearGripEdgeDoesNotResize: a click that starts inside the
+// grip band but never drags is a no-op for the chrome — the table row
+// under the cursor still gets its click and selects.
+func TestRowClickNearGripEdgeDoesNotResize(t *testing.T) {
+	k, _ := newTestKit(t)
+	fm := useFakeMouse(t)
+	pumpKit(t, k, 1024, 700)
+	pumpKit(t, k, 1024, 700)
+
+	ovRes := countResizes(k.ov.win)
+	ovRect := k.ov.win.GetContainer().GetWidget().Rect
+	if len(k.ov.tbl.rowCts) == 0 {
+		t.Fatal("overview has no rows")
+	}
+	row := k.ov.tbl.rowCts[0].GetWidget().Rect
+	// Inside the 8 px left grip band AND over the row (the scroll
+	// viewport's layer sits above the window's, which is the case that
+	// used to eat the press).
+	from := image.Point{X: ovRect.Min.X + 6, Y: (row.Min.Y + row.Max.Y) / 2}
+	if !from.In(row) || edgesAt(from, ovRect, edgeGripPx)&edgeLeft == 0 {
+		t.Fatalf("fixture: press %v must sit in row %v and the left grip band of %v",
+			from, row, ovRect)
+	}
+
+	fm.at(from.X, from.Y)
+	pumpKit(t, k, 1024, 700)
+	fm.down()
+	pumpKit(t, k, 1024, 700)
+	if got := k.ov.win.GetContainer().GetWidget().Rect; got != ovRect {
+		t.Fatalf("press alone moved the window: %v -> %v", ovRect, got)
+	}
+	fm.up()
+	pumpKit(t, k, 1024, 700)
+	pumpKit(t, k, 1024, 700)
+
+	if got := k.ov.win.GetContainer().GetWidget().Rect; got != ovRect {
+		t.Errorf("click without drag resized the window: %v -> %v", ovRect, got)
+	}
+	if ovRes.n != 0 {
+		t.Errorf("ResizeEvent count = %d, want 0 for a click", ovRes.n)
+	}
+	wantSel := k.ov.tbl.rows[0].Data.(*ovRow).info.Entity
+	if got := k.Selected(); got != wantSel {
+		t.Errorf("selected = %v, want row 0 %v (the click reached the child)", got, wantSel)
+	}
+}
+
+// TestTopmostWindowWinsGrip: two windows' grip bands overlap at the same
+// pixel; only the topmost one (the later AddWindow) may start a resize.
+func TestTopmostWindowWinsGrip(t *testing.T) {
+	k, _ := newTestKit(t)
+	fm := useFakeMouse(t)
+	log := NewLog(k.panelEnv())
+	k.AddWindow(log.Win())
+	pumpKit(t, k, 1024, 700)
+	pumpKit(t, k, 1024, 700)
+
+	// Stack the log so its left band and the overview's right band
+	// share a pixel column.
+	ovRect := k.ov.win.GetContainer().GetWidget().Rect
+	logRect := image.Rect(ovRect.Max.X-4, 60, ovRect.Max.X-4+logDefaultW, 60+logDefaultH)
+	log.Win().SetLocation(logRect)
+	pumpKit(t, k, 1024, 700)
+
+	ovRes := countResizes(k.ov.win)
+	logRes := countResizes(log.Win())
+
+	ovView := k.ov.tbl.scroll.ViewRect()
+	from := image.Point{X: ovRect.Max.X - 2, Y: ovView.Min.Y + 12}
+	if edgesAt(from, ovRect, edgeGripPx)&edgeRight == 0 ||
+		edgesAt(from, log.Win().GetContainer().GetWidget().Rect, edgeGripPx)&edgeLeft == 0 {
+		t.Fatalf("fixture: %v must be in both windows' grip bands (ov %v, log %v)",
+			from, ovRect, log.Win().GetContainer().GetWidget().Rect)
+	}
+
+	start := dragAt(t, k, fm, k.ov.win, from, -30, 0)
+	ovGot := k.ov.win.GetContainer().GetWidget().Rect
+	logGot := log.Win().GetContainer().GetWidget().Rect
+	if ovGot != start {
+		t.Errorf("covered window resized: %v -> %v", start, ovGot)
+	}
+	if ovRes.n != 0 {
+		t.Errorf("covered window fired %d ResizeEvents, want 0", ovRes.n)
+	}
+	if want := resizeRect(logRect, -30, 0, edgeLeft, windowMin(log.Win())); logGot != want {
+		t.Errorf("topmost window rect = %v, want %v", logGot, want)
+	}
+	if logRes.n != 1 {
+		t.Errorf("topmost window ResizeEvent count = %d, want 1", logRes.n)
 	}
 }

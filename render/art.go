@@ -1,7 +1,6 @@
 package render
 
 import (
-	"bytes"
 	"image"
 	"image/color"
 	"math"
@@ -12,7 +11,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
-	"golang.org/x/image/font/gofont/goregular"
 )
 
 // ---------------------------------------------------------------------------
@@ -237,27 +235,8 @@ func premul(col color.Color) (r, g, b, a float32) {
 }
 
 // ---------------------------------------------------------------------------
-// Text (gofont via ebiten text/v2)
+// Text (ebiten text/v2 over the embedded faces — see fonts.go)
 // ---------------------------------------------------------------------------
-
-// faceCache holds shared goregular faces by pixel size. Rendering happens on
-// the game goroutine only, so no locking is needed.
-var faceCache = map[float64]*text.GoTextFace{}
-
-// Face returns a cached goregular face at the given pixel size.
-func Face(size float64) *text.GoTextFace {
-	if f, ok := faceCache[size]; ok {
-		return f
-	}
-	src, err := text.NewGoTextFaceSource(bytes.NewReader(goregular.TTF))
-	if err != nil {
-		// goregular is constant data; a parse failure means a broken build.
-		panic("render: parse goregular: " + err.Error())
-	}
-	f := &text.GoTextFace{Source: src, Size: size}
-	faceCache[size] = f
-	return f
-}
 
 // Text draws a left-top aligned string.
 func Text(dst *ebiten.Image, s string, x, y, size float64, col color.Color) {

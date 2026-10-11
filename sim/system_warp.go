@@ -12,6 +12,13 @@ import (
 // destination point).
 const warpLandRange = 2500
 
+// WarpMinRange is the minimum distance (m) between the ship and a warp
+// target at the moment the command is issued — EVE's rule: the warp
+// drive cannot engage anything closer than 150 km. CmdWarpTo refuses
+// inside it (command.go), and the UI disables the Warp action on the
+// same constant, so sim is the single source of the number.
+const WarpMinRange = 150_000
+
 // warpAlignCos is the cosine of the maximum facing error allowed for warp
 // start (~20°, EVE-ish "pointed at the destination").
 const warpAlignCos = 0.94 // cos(0.35 rad)

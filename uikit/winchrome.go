@@ -3,7 +3,6 @@ package uikit
 import (
 	"image"
 
-	"github.com/ebitenui/ebitenui/event"
 	"github.com/ebitenui/ebitenui/input"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -11,14 +10,22 @@ import (
 
 // Window chrome: edge-grip resize for every window uikit builds.
 //
-// ebitenui's widget.WindowOpts.Resizeable() only extends the container
-// rect's Max corner, so it resizes from the bottom/right edge alone.
+// ebitenui's windowOpts.Resizeable() only extends the container rect's
+// Max corner, so it resizes from the bottom/right edge alone.
 // makeEdgeResizable replaces it with an N/E/S/W grip (corners use both
-// axes) driven from the window's own title-bar/contents press events, so
-// the opposite edge always stays fixed and MinSize is honored. Title-bar
-// dragging keeps the built-in Draggable() handling; where a grip press
-// lands inside the title bar both run, and the chrome's absolute
-// recompute (step) wins every frame.
+// axes) so the opposite edge always stays fixed and MinSize is honored.
+//
+// The grip is classified from the WINDOW RECT in the chrome's per-frame
+// step, never from widget press events: a body widget that fills the
+// window (the overview's table, the log's text area) elevates its own
+// input layer over the 8 px grip band, so press events routed to
+// TitleBar/Contents never fire there and those windows could not be
+// resized from their own edges. step only needs the cursor and the button
+// state, which is also what makes the drag testable without ebiten input.
+// Title-bar dragging keeps the built-in Draggable() handling; while a grip
+// drag is active the chrome's absolute recompute wins every frame. The
+// grip never swallows the press: a click without a drag is a no-op here,
+// so clicking a table row inside the band still selects the row.
 
 // edgeGripPx is the grip band width per edge; a corner engages both axes.
 const edgeGripPx = 8
@@ -86,6 +93,8 @@ func resizeRect(start image.Rectangle, dx, dy int, edges edgeMask, minSize image
 // makeEdgeResizable, pumped every frame by Kit.stepChromes.
 type winChrome struct {
 	win    *widget.Window
+	held   bool            // left button state at the previous step
+	armed  bool            // press started in a grip band, waiting for a drag
 	active bool            // a grip drag is in flight
 	edges  edgeMask        // gripped edges
 	start  image.Rectangle // window rect at press
@@ -99,7 +108,7 @@ type winChrome struct {
 var chromeByWindow = map[*widget.Window]*winChrome{}
 
 // makeEdgeResizable gives win four-edge plus corner grip resizing
-// (edgeGripPx bands, MinSize honored, ResizeEvent fired on release).
+// (edgeGripPx bands, MinSize honored, ResizeEvent fired once per drag).
 // Call it once per window after widget.NewWindow; title-bar dragging
 // stays with the built-in Draggable() handling this coexists with.
 func makeEdgeResizable(win *widget.Window) *winChrome {
@@ -107,81 +116,111 @@ func makeEdgeResizable(win *widget.Window) *winChrome {
 		return ch
 	}
 	ch := &winChrome{win: win}
-	// Press points come from the event args (widget-relative), not the
-	// global cursor, so the seam stays testable without ebiten input.
-	// ebitenui only delivers these to the top-most input layer, which
-	// is what keeps a covered window from starting its own resize.
-	press := func(a *widget.WidgetMouseButtonPressedEventArgs) {
-		if a.Button != ebiten.MouseButtonLeft {
-			return
-		}
-		wgt := win.GetContainer().GetWidget()
-		if !wgt.IsVisible() {
-			return
-		}
-		p := image.Point{
-			X: a.Widget.Rect.Min.X + a.OffsetX,
-			Y: a.Widget.Rect.Min.Y + a.OffsetY,
-		}
-		e := edgesAt(p, wgt.Rect, edgeGripPx)
-		if e == 0 {
-			return // not a grip press: the title-bar drag owns it
-		}
-		ch.begin(wgt.Rect, p, e)
-	}
-	if tb := win.TitleBar; tb != nil {
-		tb.GetWidget().MouseButtonPressedEvent.AddHandler(event.WrapHandler(press))
-	}
-	win.Contents.GetWidget().MouseButtonPressedEvent.AddHandler(event.WrapHandler(press))
 	chromeByWindow[win] = ch
 	return ch
 }
 
-// begin starts a grip drag from the given window rect and cursor point.
-func (c *winChrome) begin(rect image.Rectangle, cursor image.Point, e edgeMask) {
-	c.active, c.edges, c.start, c.origin = true, e, rect, cursor
+// gripStart reports the edges gripped when a press lands on p: the point
+// must sit in this window's own grip band AND on top of every other input
+// layer, so only the topmost window under the cursor ever starts a resize.
+// The layer test asks for LayerEventTypeWheel on purpose: a body's scroll
+// viewport elevates a layer that claims every event EXCEPT wheel
+// (ebitenui's ScrollContainer), so a mouse-eligible test would report
+// "covered" for a window's own body — exactly the defect this replaced —
+// while another window's layer (which claims wheel too) still blocks.
+// gripStart reports the edges gripped when a press lands on p: the point
+// must sit in this window's own grip band AND on top of every other input
+// layer, so only the topmost window under the cursor ever starts a resize.
+// The layer test asks for LayerEventTypeWheel on purpose: a body's scroll
+// viewport elevates a layer that claims every event EXCEPT wheel
+// (ebitenui's ScrollContainer), so a mouse-eligible test would report
+// "covered" for a window's own body — exactly the defect this replaced —
+// while another window's layer (which claims wheel too) still blocks.
+func (c *winChrome) gripStart(p image.Point) edgeMask {
+	wgt := c.win.GetContainer().GetWidget()
+	if !wgt.IsVisible() {
+		return 0
+	}
+	e := edgesAt(p, wgt.Rect, edgeGripPx)
+	if e == 0 {
+		return 0
+	}
+	// A never-mounted window has no layer of its own — EffectiveInputLayer
+	// falls back to DefaultLayer, which passes anywhere, so reject that
+	// explicitly (its stale rect would fake grips across the screen).
+	layer := wgt.EffectiveInputLayer()
+	if layer == &input.DefaultLayer || !layer.ActiveFor(p.X, p.Y, input.LayerEventTypeWheel) {
+		return 0
+	}
+	return e
 }
 
-// step pumps one frame: an active grip drag applies its rect, fires
-// ResizeEvent on release, and — when idle — advertises the resize cursor
-// over an idle grip. The rect is recomputed in absolute terms from the
-// press every step, so the built-in title-bar drag (which also runs for
-// presses inside the title bar's 44 px) cannot double-move the window:
-// its Render-time offset is wiped on the next step. cursor/pressed are
+// step pumps one frame from the cursor and the left-button state.
+//
+// A press that begins in a grip band arms the drag; it becomes active as
+// soon as the cursor moves, and the rect is then recomputed in absolute
+// terms from the press every step — so the built-in title-bar drag (which
+// also runs for presses inside the title bar's 44 px) cannot double-move
+// the window: its Render-time offset is wiped on the next step. Releasing
+// without ever moving is a click, not a drag: nothing resizes and no
+// ResizeEvent fires (the child widget keeps the press). Releasing after a
+// drag fires ResizeEvent once with the final rect. cursor/pressed are
 // parameters so tests drive the math without ebiten input.
 func (c *winChrome) step(cursor image.Point, pressed bool) {
 	wgt := c.win.GetContainer().GetWidget()
-	if c.active {
-		r := resizeRect(c.start, cursor.X-c.origin.X, cursor.Y-c.origin.Y,
-			c.edges, windowMin(c.win))
-		if r != wgt.Rect {
-			c.win.SetLocation(r)
-		}
+	rising := pressed && !c.held
+	c.held = pressed
+
+	switch {
+	case c.active:
 		if !pressed {
 			c.active = false
 			c.win.ResizeEvent.Fire(&widget.WindowChangedEventArgs{
 				Window: c.win,
 				Rect:   wgt.Rect,
 			})
+			return
 		}
-		setResizeCursor(c.edges)
+		c.apply(cursor, wgt)
+		return
+
+	case c.armed:
+		if !pressed {
+			c.armed = false // click without drag: no-op, child keeps it
+			return
+		}
+		if cursor != c.origin {
+			c.armed, c.active = false, true
+			c.apply(cursor, wgt)
+		}
+		return
+
+	case rising:
+		if e := c.gripStart(cursor); e != 0 {
+			c.armed, c.edges, c.start, c.origin = true, e, wgt.Rect, cursor
+		}
 		return
 	}
+
 	if pressed || !wgt.IsVisible() {
 		return
 	}
-	// Idle hover: the same layer test ebitenui's own resize cursor used,
-	// so a grip covered by another window does not advertise resizing.
-	// A never-mounted window has no layer of its own — EffectiveInputLayer
-	// falls back to DefaultLayer, which passes anywhere, so reject that
-	// explicitly (its stale rect would fake grips across the screen).
-	layer := wgt.EffectiveInputLayer()
-	if layer == &input.DefaultLayer || !layer.ActiveFor(cursor.X, cursor.Y, input.LayerEventTypeAll) {
-		return
-	}
-	if e := edgesAt(cursor, wgt.Rect, edgeGripPx); e != 0 {
+	// Idle hover: advertise the resize cursor over an idle grip, using the
+	// same topmost-layer test as gripStart, so a grip covered by another
+	// window does not advertise resizing.
+	if e := c.gripStart(cursor); e != 0 {
 		setResizeCursor(e)
 	}
+}
+
+// apply moves the window to the rect the drag math asks for.
+func (c *winChrome) apply(cursor image.Point, wgt *widget.Widget) {
+	r := resizeRect(c.start, cursor.X-c.origin.X, cursor.Y-c.origin.Y,
+		c.edges, windowMin(c.win))
+	if r != wgt.Rect {
+		c.win.SetLocation(r)
+	}
+	setResizeCursor(c.edges)
 }
 
 // windowMin is the window's MinSize as a point (no MinSize → 1×1 floor
@@ -210,10 +249,10 @@ func setResizeCursor(e edgeMask) {
 // built-in title drag moves the rect during Render; the recompute wipes
 // that drift before the next frame's hit tests).
 func (k *Kit) stepChromes() {
-	cursor, _ := input.CursorPosition()
+	cursor := image.Point{}
+	cursor.X, cursor.Y = input.CursorPosition()
 	pressed := input.MouseButtonPressed(ebiten.MouseButtonLeft)
-	pt := image.Point{X: cursor}
 	for _, ch := range k.chromes {
-		ch.step(pt, pressed)
+		ch.step(cursor, pressed)
 	}
 }

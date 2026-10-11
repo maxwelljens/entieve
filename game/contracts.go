@@ -33,14 +33,14 @@ const (
 	boardRowGap  = 4  // gap between two board rows
 	boardRowPad  = 3  // horizontal padding inside a row
 	boardBtnGap  = 6  // text ↔ action button gap inside a row
-	boardBtnW    = 88 // action button width (fits the widest label, "Accepted")
+	boardBtnW    = 92 // action button width (fits the widest label, "Accepted", set in the emphasis face)
 	boardBtnH    = 40 // minimum hit area, like menuBtnH
 	availMaxRows = 3  // visible available rows ("+N more" beyond)
 	actMaxRows   = 2  // visible active rows ("+N more" beyond)
 
 	boardInnerW   = stationWinW - 2*boardPad                // body inner width: 372
 	boardContentW = boardInnerW - 2*boardRowPad             // row content width: 366
-	boardTextW    = boardContentW - boardBtnW - boardBtnGap // text column width: 272
+	boardTextW    = boardContentW - boardBtnW - boardBtnGap // text column width: 268
 )
 
 // boardRowRects tiles up to n contract rows inside inner: equal heights,
@@ -312,8 +312,16 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	})
 	btn.GetWidget().Disabled = r.Disabled
 
+	// The active line is title + progress ("Belt cleanup — 1/3") and only
+	// fits the title column at the tiny step in Turret Road (at small the
+	// em-dash suffix alone costs 56 px); available titles, which carry no
+	// suffix, stay at small.
+	step := uikit.StepSmall
+	if active {
+		step = uikit.StepTiny
+	}
 	title := widget.NewText(
-		widget.TextOpts.Text(g.ellip(r.Title, uikit.StepSmall, boardTextW), g.env.Face(uikit.StepSmall), solid(p.Accent)),
+		widget.TextOpts.Text(g.ellip(r.Title, step, boardTextW), g.env.Face(step), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(boardTextW, 0)),
 	)
 

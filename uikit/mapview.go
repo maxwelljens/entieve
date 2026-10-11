@@ -73,7 +73,7 @@ func NewMapView(env Env) *MapView {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	titleBar.AddChild(widget.NewText(
-		widget.TextOpts.Text(title, env.Face(StepBase), solid(p.Accent)),
+		widget.TextOpts.Text(title, env.FaceBold(StepBase), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,

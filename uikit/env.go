@@ -55,6 +55,22 @@ func (e Env) Face(step string) *text.Face {
 	}
 }
 
+// FaceBold returns the emphasis face for one type-scale step: window
+// titles, table header sort buttons, buttons and HUD readouts. Unknown
+// steps fall back to the base step's Bold.
+func (e Env) FaceBold(step string) *text.Face {
+	switch step {
+	case StepTiny:
+		return facePtr(e.faces.baseBold) // no tiny emphasis: titles/readouts are small and up
+	case StepSmall:
+		return facePtr(e.faces.smallBold)
+	case StepLarge:
+		return facePtr(e.faces.largeBold)
+	default:
+		return facePtr(e.faces.baseBold)
+	}
+}
+
 // Type-scale step names accepted by Env.Face.
 const (
 	StepTiny  = "tiny"

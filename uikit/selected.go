@@ -3,40 +3,52 @@ package uikit
 import (
 	"image"
 	"math"
+	"strconv"
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
 )
 
-// Orbit ranges (m) the Orbit control cycles through, and warp landing
-// distances (m) the Warp-to-within control cycles through. Exported so
-// the game keybinds (Q / warp) cycle exactly the same sets.
+// Orbit ranges (m) the Orbit selector cycles through, and warp landing
+// distances (m) the Warp-to-within selector cycles through. Exported so
+// the docs and tests can quote the exact sets.
 var (
 	OrbitRanges = [...]float64{2500, 5000, 10000, 20000, 50000}
 	WarpRanges  = [...]float64{0, 10000, 50000}
 )
 
 // selectedPanel owns the "Selected Item" window: identity labels plus
-// the command buttons that prove the enqueue seam.
+// the command buttons that prove the enqueue seam. The two range
+// controls are pure selectors (state, never commands); the Warp and
+// Orbit ACTION buttons beside Approach/Stop are what enqueue, at the
+// selector value the same frame — Kit.WarpRange/Kit.OrbitRange hand that
+// value to the keybinds, so panel and keyboard can never disagree.
 type selectedPanel struct {
 	win  *widget.Window
 	body *widget.Container
 	name *widget.Text
 	dist *widget.Text
 
-	approach, warp, stop *widget.Button
-	lock, dock, jump     *widget.Button
-	loot, mine           *widget.Button
-	orbit, warpRange     *widget.Button
+	approach, warp, orbit, stop *widget.Button
+	lock, dock, jump            *widget.Button
+	loot, mine                  *widget.Button
+	orbitRange, warpRange       *widget.Button
 
-	orbitIdx, warpRangeIdx int // cycle positions of the two range controls
+	// warpTip explains why Warp is disabled when the selected target
+	// sits inside the warp minimum range (sim.WarpMinRange).
+	warpTip     *widget.ToolTip
+	warpTips    []*widget.ToolTip
+	warpTipText *widget.Text
+
+	orbitIdx, warpRangeIdx int // cycle positions of the two selectors
 }
 
 // selectedBands lists the button cells in every band of the body, in
-// child order after the two text lines: movement, context actions and
-// the two range controls (one full-width cell each).
-var selectedBands = [...]int{3, 5, 1, 1}
+// child order after the two text lines: movement (approach, warp,
+// orbit, stop), context actions and the two range selectors (one
+// full-width cell each).
+var selectedBands = [...]int{4, 5, 1, 1}
 
 // buildSelected constructs the Selected Item window and its handlers.
 func (k *Kit) buildSelected() {
@@ -45,7 +57,7 @@ func (k *Kit) buildSelected() {
 	k.sp = sp
 
 	sp.name = widget.NewText(
-		widget.TextOpts.Text("No selection", facePtr(k.faces.large), solid(p.Text)),
+		widget.TextOpts.Text("No selection", facePtr(k.faces.largeBold), solid(p.Text)),
 	)
 	sp.dist = widget.NewText(
 		widget.TextOpts.Text("", facePtr(k.faces.tiny), solid(p.Dim)),
@@ -60,9 +72,12 @@ func (k *Kit) buildSelected() {
 			widget.ButtonOpts.ClickedHandler(clicked),
 		)
 	}
-	// Core movement actions (kept from the spike).
+	// Core movement actions (kept from the spike). Warp and Orbit are
+	// the action half of the warp/orbit pair: they enqueue at the range
+	// their selector shows, never a range of their own.
 	sp.approach = newBtn("Approach", func(*widget.ButtonClickedEventArgs) { k.approachSelected() })
-	sp.warp = newBtn("Warp to 10 km", func(*widget.ButtonClickedEventArgs) { k.warpSelected() })
+	sp.warp = newBtn("Warp", func(*widget.ButtonClickedEventArgs) { k.warpSelected() })
+	sp.orbit = newBtn("Orbit", func(*widget.ButtonClickedEventArgs) { k.orbitSelected() })
 	sp.stop = newBtn("Stop", func(*widget.ButtonClickedEventArgs) { k.stopSelected() })
 	// Context actions, gated by the selection's sim.Info flags in
 	// syncSelected (disabled buttons take the theme's disabled look).
@@ -71,10 +86,33 @@ func (k *Kit) buildSelected() {
 	sp.jump = newBtn("Jump", func(*widget.ButtonClickedEventArgs) { k.jumpSelected() })
 	sp.loot = newBtn("Loot", func(*widget.ButtonClickedEventArgs) { k.lootSelected() })
 	sp.mine = newBtn("Mine", func(*widget.ButtonClickedEventArgs) { k.mineSelected() })
-	// Range selectors: always enabled (they pick a range, they do not act
-	// on the selection); the enqueue happens only against a live target.
-	sp.orbit = newBtn(orbitLabel(OrbitRanges[0]), func(*widget.ButtonClickedEventArgs) { k.cycleOrbit() })
+	// Pure selectors: always enabled, they only cycle their own value —
+	// they never enqueue. The Warp/Orbit actions and the Z/Q keys read
+	// that value back through Kit.WarpRange / Kit.OrbitRange.
+	sp.orbitRange = newBtn(orbitLabel(OrbitRanges[0]), func(*widget.ButtonClickedEventArgs) { k.cycleOrbit() })
 	sp.warpRange = newBtn(warpRangeLabel(WarpRanges[0]), func(*widget.ButtonClickedEventArgs) { k.cycleWarpRange() })
+
+	// Hover hint for the Warp action while the target sits inside the
+	// warp minimum range: one ToolTip for the button's lifetime, label
+	// refreshed by syncSelected and attached only in that state (the
+	// module rack's tooltip pattern).
+	sp.warpTipText = widget.NewText(
+		widget.TextOpts.Text("", facePtr(k.faces.small), solid(p.Text)),
+	)
+	tipBody := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 220), 1)),
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout(widget.AnchorLayoutOpts.Padding(
+			&widget.Insets{Left: 8, Right: 8, Top: 5, Bottom: 5},
+		))),
+	)
+	tipBody.AddChild(sp.warpTipText)
+	sp.warpTip = widget.NewToolTip(
+		widget.ToolTipOpts.Content(tipBody),
+		widget.ToolTipOpts.Delay(rackTipDelay), // the shared 300 ms hover delay
+		widget.ToolTipOpts.Position(widget.TOOLTIP_POS_CURSOR_STICKY),
+		widget.ToolTipOpts.Offset(image.Point{X: 12, Y: 12}),
+	)
+	sp.warpTips = []*widget.ToolTip{sp.warpTip}
 
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
@@ -84,16 +122,16 @@ func (k *Kit) buildSelected() {
 	)
 	sp.body = body
 	body.AddChild(sp.name, sp.dist,
-		sp.approach, sp.warp, sp.stop,
+		sp.approach, sp.warp, sp.orbit, sp.stop,
 		sp.lock, sp.dock, sp.jump, sp.loot, sp.mine,
-		sp.orbit, sp.warpRange)
+		sp.orbitRange, sp.warpRange)
 
 	title := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	title.AddChild(widget.NewText(
-		widget.TextOpts.Text("Selected Item", facePtr(k.faces.base), solid(p.Accent)),
+		widget.TextOpts.Text("Selected Item", facePtr(k.faces.baseBold), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,
@@ -290,8 +328,9 @@ func (l *selectedLayouter) Layout(children []widget.PreferredSizeLocateableWidge
 // current selection: every action button is disabled while nothing is
 // selected, and the context actions additionally require their
 // sim.Info flag (dock/jump/loot/mine/warp), mirroring ui.ActionsFor.
-// The two range controls stay enabled — they pick a range, and the
-// enqueue is gated in their own handlers.
+// Warp additionally refuses targets inside sim.WarpMinRange (with the
+// hover hint saying so). The two range selectors stay enabled — they
+// are state, they never enqueue.
 func (k *Kit) syncSelected() {
 	sp := k.sp
 	info, ok := k.Sim.Info(k.selected)
@@ -308,14 +347,31 @@ func (k *Kit) syncSelected() {
 		sp.body.RequestRelayout()
 	}
 	noSel := !ok
+	// Too close to warp: the drive cannot engage inside WarpMinRange, so
+	// the action is gated off and the tooltip names the reason.
+	tooClose := ok && info.CanWarp && info.Distance < sim.WarpMinRange
 	sp.approach.GetWidget().Disabled = noSel
 	sp.stop.GetWidget().Disabled = noSel
-	sp.warp.GetWidget().Disabled = noSel || !info.CanWarp
+	sp.orbit.GetWidget().Disabled = noSel
+	sp.warp.GetWidget().Disabled = noSel || !info.CanWarp || tooClose
 	sp.lock.GetWidget().Disabled = noSel || !canLock(info.Kind)
 	sp.dock.GetWidget().Disabled = noSel || !info.CanDock
 	sp.jump.GetWidget().Disabled = noSel || !info.CanJump
 	sp.loot.GetWidget().Disabled = noSel || !info.CanLoot
 	sp.mine.GetWidget().Disabled = noSel || !info.CanMine
+	if tooClose {
+		sp.warpTipText.Label = "Target within warp minimum range (" + kmLabel(sim.WarpMinRange) + ")"
+		sp.warp.GetWidget().ToolTips = sp.warpTips
+	} else {
+		sp.warp.GetWidget().ToolTips = nil
+	}
+}
+
+// kmLabel renders a metre distance as the kilometre figure quoted in
+// hints ("150 km" for sim.WarpMinRange) — mirrors sim.kmLabel so the
+// panel and the refusal log line word it identically.
+func kmLabel(m float64) string {
+	return strconv.FormatFloat(m/1000, 'f', -1, 64) + " km"
 }
 
 // canLock mirrors ui.canLock: the entity kinds that can be targeted.
@@ -332,50 +388,45 @@ func canLock(kind string) bool {
 // Range controls
 // ---------------------------------------------------------------------------
 
-// orbitLabel renders the Orbit control: "Orbit: 2,500 m »".
+// orbitLabel renders the Orbit selector: "Orbit range: 2,500 m »".
 func orbitLabel(rng float64) string {
-	return "Orbit: " + groupInt(int64(rng)) + " m »"
+	return "Orbit range: " + groupInt(int64(rng)) + " m »"
 }
 
-// warpRangeLabel renders the warp-to-within control:
+// warpRangeLabel renders the warp-to-within selector:
 // "Warp to within: 10,000 m »".
 func warpRangeLabel(rng float64) string {
 	return "Warp to within: " + groupInt(int64(rng)) + " m »"
 }
 
-// cycleOrbit picks the next orbit range (wraparound) and, when the
-// selection resolves on the grid, enqueues CmdOrbit at that range.
+// WarpRange is the warp landing distance the Warp action and the Z key
+// both act at: the value the Selected Item warp selector currently
+// shows. One source of truth for the panel buttons and the keybind.
+func (k *Kit) WarpRange() float64 { return WarpRanges[k.sp.warpRangeIdx] }
+
+// OrbitRange is the orbit range the Orbit action and the Q key both act
+// at: the value the Selected Item orbit selector currently shows.
+func (k *Kit) OrbitRange() float64 { return OrbitRanges[k.sp.orbitIdx] }
+
+// cycleOrbit advances the orbit selector (wraparound). Pure state: it
+// enqueues nothing, ever — the Orbit button and Q act at OrbitRange().
 func (k *Kit) cycleOrbit() {
 	sp := k.sp
 	sp.orbitIdx = (sp.orbitIdx + 1) % len(OrbitRanges)
-	rng := OrbitRanges[sp.orbitIdx]
-	sp.orbit.SetText(orbitLabel(rng))
-	if k.selected.IsZero() {
-		return
-	}
-	if _, ok := k.Sim.Info(k.selected); !ok {
-		return
-	}
-	k.enqueue(sim.CmdOrbit{Target: k.selected, Range: rng})
+	sp.orbitRange.SetText(orbitLabel(OrbitRanges[sp.orbitIdx]))
 }
 
-// cycleWarpRange picks the next warp landing distance (wraparound) and,
-// when the selection is warpable, enqueues CmdWarpTo at that range —
-// the same Info.CanWarp gate the Warp button uses.
+// cycleWarpRange advances the warp-to-within selector (wraparound).
+// Pure state: it enqueues nothing, ever — the Warp button and Z act at
+// WarpRange().
 func (k *Kit) cycleWarpRange() {
 	sp := k.sp
 	sp.warpRangeIdx = (sp.warpRangeIdx + 1) % len(WarpRanges)
-	rng := WarpRanges[sp.warpRangeIdx]
-	sp.warpRange.SetText(warpRangeLabel(rng))
-	info, ok := k.Sim.Info(k.selected)
-	if k.selected.IsZero() || !ok || !info.CanWarp {
-		return
-	}
-	k.enqueue(sim.CmdWarpTo{Target: k.selected, Range: rng})
+	sp.warpRange.SetText(warpRangeLabel(WarpRanges[sp.warpRangeIdx]))
 }
 
 // ---------------------------------------------------------------------------
-// Action seam (unchanged behaviour)
+// Action seam
 // ---------------------------------------------------------------------------
 
 // approachSelected enqueues CmdApproach for the selected entity.
@@ -386,12 +437,25 @@ func (k *Kit) approachSelected() {
 	k.enqueue(sim.CmdApproach{Target: k.selected})
 }
 
-// warpSelected enqueues a 10 km warp to the selected entity.
+// warpSelected enqueues CmdWarpTo for the selected entity at the range
+// the warp selector currently shows (Kit.WarpRange — the same value Z
+// uses). The button is disabled without a valid, warpable, distant
+// enough target; this guard keeps the seam safe when driven directly.
 func (k *Kit) warpSelected() {
 	if k.selected.IsZero() {
 		return
 	}
-	k.enqueue(sim.CmdWarpTo{Target: k.selected, Range: 10000})
+	k.enqueue(sim.CmdWarpTo{Target: k.selected, Range: k.WarpRange()})
+}
+
+// orbitSelected enqueues CmdOrbit for the selected entity at the range
+// the orbit selector currently shows (Kit.OrbitRange — the same value Q
+// uses).
+func (k *Kit) orbitSelected() {
+	if k.selected.IsZero() {
+		return
+	}
+	k.enqueue(sim.CmdOrbit{Target: k.selected, Range: k.OrbitRange()})
 }
 
 // stopSelected enqueues CmdStop (cancels movement intent).

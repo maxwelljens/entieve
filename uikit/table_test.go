@@ -97,8 +97,8 @@ func TestTableSortAscDescStable(t *testing.T) {
 		t.Errorf("desc order = %v, want %v (ties keep their input order)", got, want)
 	}
 	// The indicator suffix follows the active sort.
-	if got := tbl.indicator(0); got != " ▼" {
-		t.Errorf("active header indicator = %q, want %q", got, " ▼")
+	if got := tbl.indicator(0); got != " ↓" {
+		t.Errorf("active header indicator = %q, want %q", got, " ↓")
 	}
 	if got := tbl.indicator(1); got != "" {
 		t.Errorf("inactive header indicator = %q, want empty", got)
