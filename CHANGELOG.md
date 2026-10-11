@@ -39,8 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decay, clamped to security bands), and rats sporadically ambush convoys
   in low-sec/null — the hauler dies (lootable cargo wreck), escapes, or is
   saved by patrols; you can intervene (showcase checkpoints #49–51).
+- Warp minimum engagement range (150 km, the EVE rule): `CmdWarpTo`
+  refuses closer targets and the Warp button gates with a hint. Orbit and
+  warp distances are pure selectors ("Orbit range", "Warp to within")
+  with separate action buttons; `Q`/`Z` act at the selectors' values.
 
 ### Changed
+
+- Typeface: **Turret Road** (SIL OFL 1.1 — six weights ship in
+  `render/fonts/` with the license) — Regular for body text, Bold for
+  window titles, table headers, buttons and HUD readouts. Table sort
+  indicators are ↑/↓ (the family has no triangles).
 
 - UI platform decision: chrome migrates to `uikit/` on **ebitenui v0.7.3**
   (pinned), keeping the EVE-dark theme (parity-tested against the legacy
@@ -87,6 +96,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docked station windows tile to the viewport from content minimums
   (market columns fit un-truncated at the design sizes) instead of piling
   up at hard-coded positions; your saved arrangement still wins.
+- Overview and log windows resize from every edge and corner like the
+  rest (their full-bleed bodies used to swallow the grip presses).
+- Warp controls no longer double-fire: picking a range is pure state and
+  one Warp button acts at it (the duplicate fixed "Warp to 10 km" button
+  is gone).
+- Market: buying N hulls delivers N hulls (was: charged for N, delivered
+  one); short warps no longer deadlock the drive in the align phase.
+- NPC aggro reacts to damage from the player only; responding patrols
+  hold station mid-fight; a saved convoy emits an event.
+- Review-driven hardening (27 findings, 2 seams): windows restored from a
+  saved layout re-clamp on viewport changes (no more off-screen strand),
+  quitting while docked no longer reopens service windows in space, Tab
+  locks the nearest target, one panel registry / credit formatter / kit
+  env, the tests drive the real frame pipeline, and save completeness +
+  RNG stream roles are pinned by reflection tests.
 - Module tooltips, hover/pressed states, 40 px minimum hit areas,
   right-aligned tabular number columns and soft window shadows.
 
