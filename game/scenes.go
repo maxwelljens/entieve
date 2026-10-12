@@ -281,7 +281,7 @@ func (g *Game) buildStationWindow() *widget.Window {
 	)
 	body.AddChild(header, availHead, g.stAvail, actHead, g.stActive)
 	g.stBody = body
-	g.stSig, g.stAvailRows, g.stActRows = "", nil, nil // fresh window: rebuild on next sync
+	g.stModel, g.stAvailRows, g.stActRows = stationBoardModel{}, nil, nil // fresh window: rebuild on next sync
 
 	win := widget.NewWindow(
 		widget.WindowOpts.Contents(body),

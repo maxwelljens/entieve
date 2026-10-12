@@ -210,47 +210,54 @@ func (f *Fitting) Sync() {
 // stored hulls — drop their tooltip. The panel comes from env.moduleTip,
 // the same builder the rack cells use, so a module reads identically in
 // both places; the fitting rows carry no charge and no click hints, since
-// neither is true of a table row.
+// neither is true of a table row. The model itself is built lazily by
+// rowTip.set — only when a row's tooltip is first attached or its key
+// moves.
 func (f *Fitting) syncRowTips() {
-	f.tableRowTips(f.slots, &f.slotTips, func(r TableRow) (string, TooltipModel) {
+	f.tableRowTips(f.slots, &f.slotTips, func(r TableRow) (string, func() TooltipModel) {
 		pick, ok := r.Data.(slotPick)
 		if !ok || pick.mod == "" {
-			return "", TooltipModel{}
+			return "", nil
 		}
 		def, ok := f.env.Content.Module(pick.mod)
 		if !ok {
-			return "", TooltipModel{}
+			return "", nil
 		}
-		return string(pick.mod) + "|" + slotLabel(pick.ref),
-			f.env.moduleTip(def, slotLabel(pick.ref), "", 0)
+		slot := slotLabel(pick.ref)
+		return string(pick.mod) + "|" + slot, func() TooltipModel {
+			return f.env.moduleTip(def, slot, "", 0)
+		}
 	})
-	f.tableRowTips(f.hangar, &f.hangarTips, func(r TableRow) (string, TooltipModel) {
+	f.tableRowTips(f.hangar, &f.hangarTips, func(r TableRow) (string, func() TooltipModel) {
 		id, ok := r.Data.(content.ModuleID)
 		if !ok {
-			return "", TooltipModel{}
+			return "", nil
 		}
 		def, ok := f.env.Content.Module(id)
 		if !ok {
-			return "", TooltipModel{}
+			return "", nil
 		}
-		return string(id), f.env.moduleTip(def, "", "", 0)
+		return string(id), func() TooltipModel {
+			return f.env.moduleTip(def, "", "", 0)
+		}
 	})
 }
 
 // tableRowTips walks one table's rows and feeds each to model for its key
-// and panel. The tooltip cache indexes with the row, so a rebuilt row
-// widget re-attaches the tooltip it already has instead of rebuilding it.
-func (f *Fitting) tableRowTips(tbl *Table, cache *[]rowTip, model func(TableRow) (string, TooltipModel)) {
+// and model builder. The tooltip cache indexes with the row, so a rebuilt
+// row widget re-attaches the tooltip it already has instead of rebuilding
+// it; model is only invoked when the slot's key actually moved.
+func (f *Fitting) tableRowTips(tbl *Table, cache *[]rowTip, model func(TableRow) (string, func() TooltipModel)) {
 	for i := 0; i < len(tbl.rows); i++ {
 		w := tbl.rowWidget(i)
 		if w == nil {
 			continue
 		}
-		key, m := model(tbl.rows[i])
+		key, build := model(tbl.rows[i])
 		for len(*cache) <= i {
 			*cache = append(*cache, rowTip{})
 		}
-		(*cache)[i].set(f.env, w.GetWidget(), key, m)
+		(*cache)[i].set(f.env, w.GetWidget(), key, build)
 	}
 }
 

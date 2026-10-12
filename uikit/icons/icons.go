@@ -73,8 +73,8 @@ type manifest struct {
 
 var (
 	loadOnce sync.Once
-	registry map[string]Entry        // semantic name -> record
-	silhou   map[string]*image.NRGBA // file -> white silhouette (decoded once)
+	registry map[string]Entry    // semantic name -> record
+	silhou   map[string]silShape // file -> decoded silhouette (alpha only)
 
 	mu    sync.Mutex
 	cache map[string]*ebiten.Image // name|size|tint -> rendered icon
@@ -95,7 +95,7 @@ func load() {
 			panic("icons: manifest.json is missing the fallback icon " + Fallback)
 		}
 		registry = m.Icons
-		silhou = map[string]*image.NRGBA{}
+		silhou = map[string]silShape{}
 		cache = map[string]*ebiten.Image{}
 	})
 }
@@ -142,9 +142,35 @@ func Get(name string, size int, tint color.RGBA) *ebiten.Image {
 	return img
 }
 
-// silhouette returns the white silhouette of one manifest file, decoding it
-// on first use (Get holds mu).
+// silShape is one decoded silhouette's alpha channel at its source size.
+// The white silhouette is RGB=255 + alpha, so the two RGB channels are a
+// constant that never carries data: caching alpha alone keeps the exact
+// same pixels for 1/4 the memory (512×512: 1 MiB → 256 KiB per file).
+type silShape struct {
+	w, h  int
+	alpha []byte
+}
+
+// silhouette returns the white silhouette of one manifest file: the alpha
+// channel is decoded on first use (Get holds mu) and the RGB=255 NRGBA is
+// rebuilt per call — callers scale it away immediately, so only the
+// compact alpha form lives for the life of the process.
 func silhouette(file string) *image.NRGBA {
+	s := silhouetteAlpha(file)
+	dst := image.NewNRGBA(image.Rect(0, 0, s.w, s.h))
+	for i, a := range s.alpha {
+		o := i * 4
+		dst.Pix[o+0] = 255
+		dst.Pix[o+1] = 255
+		dst.Pix[o+2] = 255
+		dst.Pix[o+3] = a
+	}
+	return dst
+}
+
+// silhouetteAlpha decodes one embedded PNG into its alpha channel once
+// (Get holds mu).
+func silhouetteAlpha(file string) silShape {
 	if s, ok := silhou[file]; ok {
 		return s
 	}
@@ -156,7 +182,12 @@ func silhouette(file string) *image.NRGBA {
 	if err != nil {
 		panic("icons: decode " + file + ": " + err.Error())
 	}
-	s := whiteSilhouette(src)
+	white := whiteSilhouette(src)
+	s := silShape{w: white.Bounds().Dx(), h: white.Bounds().Dy()}
+	s.alpha = make([]byte, s.w*s.h)
+	for i := range s.alpha {
+		s.alpha[i] = white.Pix[i*4+3]
+	}
 	silhou[file] = s
 	return s
 }

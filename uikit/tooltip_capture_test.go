@@ -47,7 +47,8 @@ func TestTooltipCaptureFrame(t *testing.T) {
 	if !ok {
 		t.Fatal("fixture: mod-emp-turret missing")
 	}
-	_, model := r.cellTip(def, sim.SlotRef{Class: content.SlotHigh, Index: 0})
+	_, build := r.cellTip(def, sim.SlotRef{Class: content.SlotHigh, Index: 0})
+	model := build()
 	body, view := newTipContent(env, model)
 
 	// Where the hover would land it: the cursor-sticky anchor is 12 px

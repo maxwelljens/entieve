@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"math"
+	"slices"
 	"sort"
 
 	"github.com/ebitenui/ebitenui/widget"
@@ -145,8 +146,14 @@ type stationBoardModel struct {
 	Active   []boardRowModel
 }
 
-// sig is the change detector for syncStationBoard.
-func (m stationBoardModel) sig() string { return fmt.Sprintf("%v", m) }
+// same is the change detector for syncStationBoard: field-wise equality
+// against the last rebuilt model (boardRowModel is comparable, so the
+// rows compare through slices.Equal). It replaces a fmt.Sprintf("%v", m)
+// signature that ran every docked frame just to detect no change.
+func (m stationBoardModel) same(o stationBoardModel) bool {
+	return m.Station == o.Station && m.Standing == o.Standing &&
+		slices.Equal(m.Avail, o.Avail) && slices.Equal(m.Active, o.Active)
+}
 
 func noteRow(text string) boardRowModel {
 	return boardRowModel{Title: text, Note: true}
@@ -242,8 +249,8 @@ func (g *Game) syncStationBoard() {
 		return
 	}
 	m := g.buildStationBoard()
-	if sig := m.sig(); sig != g.stSig {
-		g.stSig = sig
+	if !m.same(g.stModel) {
+		g.stModel = m
 		g.rebuildStationBoard(m)
 	}
 }

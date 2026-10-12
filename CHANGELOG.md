@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Per-frame interface garbage churn: panels that are not mounted no longer
+  run their `Sync` every frame (a panel Syncs when it mounts, so it still
+  draws current data in that same frame), `Table.SetRows` skips the column
+  re-measure/re-layout when no cell text or icon changed, and the rack /
+  fitting row tooltips build their model lazily when the hover key moves
+  instead of every frame. Settled Update-path allocation on the showcase
+  pump drops from ≈119 KB/frame to ≈14 KB/frame (−88 %).
+- Station contract board change detection compares the model fields
+  instead of `fmt.Sprintf("%v", …)` on every docked frame.
+
+### Changed
+
+- Icon silhouette cache now stores the alpha channel only instead of full
+  512×512 white NRGBA bitmaps: 38.0 MiB → 9.5 MiB resident for the same
+  pixels (RGB is a constant 255, so the white form is rebuilt per
+  size-cache miss).
+- Documented the upstream ebitenui v0.7.3 window-remount leak
+  (`docs/ARCHITECTURE.md`, "upstream window-remount leak"): ≈5.3 KB leak
+  per panel dock/toggle mount cycle — real but slow, deliberately not
+  mitigated because hiding-instead-of-unmounting would change input
+  gating and draw order.
+
+### Added
+
+- `TestMemoryFootprintPump`: headless 6,000-frame memory regression guard
+  over the production Update/Draw pipeline — the live heap must plateau
+  (under 10 MB growth between the 3,000- and 6,000-frame marks).
+
 ## [0.1.0] - 2026-10-12
 
 ### Added

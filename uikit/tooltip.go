@@ -467,8 +467,12 @@ type rowTip struct {
 }
 
 // set attaches the model for key to w (building the tooltip if this slot
-// has never had one) or drops the attachment when key is "".
-func (t *rowTip) set(env Env, w *widget.Widget, key string, m TooltipModel) {
+// has never had one) or drops the attachment when key is "". build is
+// only called when the tooltip is first built or when key moved — a
+// per-frame Sync must not pay for a model it throws away — and it always
+// derives the model from the inputs key summarizes, so what shows is
+// current, never stale.
+func (t *rowTip) set(env Env, w *widget.Widget, key string, build func() TooltipModel) {
 	if key == "" {
 		if t.tip != nil {
 			w.ToolTips = nil
@@ -477,10 +481,10 @@ func (t *rowTip) set(env Env, w *widget.Widget, key string, m TooltipModel) {
 		return
 	}
 	if t.tip == nil {
-		t.tip, t.view = newTip(env, m)
+		t.tip, t.view = newTip(env, build())
 		t.tips = []*widget.ToolTip{t.tip}
 	} else if t.key != key {
-		t.view.SetModel(m)
+		t.view.SetModel(build())
 	}
 	t.key = key
 	w.ToolTips = t.tips
