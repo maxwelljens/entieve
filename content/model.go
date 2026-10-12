@@ -158,6 +158,7 @@ type ShipDef struct {
 	Name           string  `json:"name"`
 	Class          string  `json:"class"` // "frigate"|"destroyer"|"barge"|"industrial"|"rat"
 	Description    string  `json:"description,omitempty"`
+	Origin         string  `json:"origin,omitempty"` // naming-layer heritage: "moravian"|"polish"|"nordic"|"latinate"|"old-works"
 	Slots          Slots   `json:"slots"`
 	Shield         float64 `json:"shield"`
 	Armor          float64 `json:"armor"`

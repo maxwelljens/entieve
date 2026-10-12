@@ -6,6 +6,7 @@ import "strings"
 type NpcDef struct {
 	ID            NpcID      `json:"id"`
 	Name          string     `json:"name"`
+	Description   string     `json:"description,omitempty"` // caste dossier prose (docs/lore voice)
 	Faction       string     `json:"faction"`
 	Ship          ShipID     `json:"ship"`
 	Fit           []ModuleID `json:"fit"`
