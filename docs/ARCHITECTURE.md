@@ -626,6 +626,30 @@ NPC traffic delivery + market price drift, ambush on NPC traffic
 > `sim`/`content`/`script` and the showcase suite are unaffected by the UI
 > layer.
 
+> **Note (2026-10 — upstream window-remount leak, documented not
+> "fixed"):** every `Kit.AddWindow` goes through ebitenui v0.7.3's
+> `UI.AddWindowQuietly` (`ui.go`), and `removeWindow` undoes none of what
+> it registers. Two things accumulate per mount cycle (measured in a
+> 20k-cycle kit mount/unmount loop, `HeapInuse` after GC): (1) the four
+> window event handlers `AddWindowQuietly` adds — context menu, focus,
+> tooltip, drag-and-drop — whose `RemoveHandlerFunc`s upstream drops,
+> ~0.2 KB/cycle; and (2) the big one:
+> `addWindow` calls `Container.Validate()`, which re-runs
+> `Button.initWidget()` for every button in the window on **every mount**
+> — a fresh internal container per button, re-adding the (persistent)
+> text/graphic children, whose `addChildInit` registers four more child
+> event handlers each time — and those handler closures keep every
+> generation's container alive. Net: **≈5.3 KB leaked per mount cycle**
+> (~19 MB/hour at one dock/toggle per second; single-digit MB per heavy
+> play-day). The handlers are idempotent, so this is memory only — no
+> behavioural drift. Not mitigated on purpose: keeping a closed panel
+> mounted-but-hidden would change visible semantics (a hidden window
+> keeps its rect and would keep gating world input in `overUI`, and mount
+> order feeds the draw stack), and forking ebitenui is out of scope.
+> Revisit upstream (`removeWindow` should remove handlers; `Validate`
+> should not rebuild buttons); `TestMemoryFootprintPump` watches the
+> steady-state heap, not this toggle-paced line.
+
 > **Icon set (2026-10):** `uikit/icons/` embeds the interface's monochrome
 > glyph set — 512×512 transparent renders from
 > [game-icons.net](https://game-icons.net) (**CC BY 3.0**: every icon keeps

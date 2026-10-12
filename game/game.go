@@ -75,14 +75,18 @@ const (
 //	window the window backing the id
 //	open   the player's toggle flag (scene-driven for map/help/menu)
 //	want   the desired mount for this frame: (game, docked)
+//	sync   refresh the panel's widgets from the sim (nil = static
+//	       content); run every frame while mounted and once when the
+//	       window mounts, so a freshly mounted panel draws current data
 //
-// syncMounts, panelWindow and the layout sidecar all read this table;
-// TestPanelDefsCoverEnum fails if an id has no row.
+// syncMounts, syncPanels, panelWindow and the layout sidecar all read
+// this table; TestPanelDefsCoverEnum fails if an id has no row.
 type panelDef struct {
 	name   string
 	window func(*Game) *widget.Window
 	open   func(*Game) *bool
 	want   func(*Game, bool) bool
+	sync   func(*Game)
 }
 
 // panelDefs is indexed by panelID in enum order — syncMounts iterates
@@ -94,18 +98,21 @@ var panelDefs = [numPanels]panelDef{
 		window: func(g *Game) *widget.Window { return g.inv.Win() },
 		open:   func(g *Game) *bool { return &g.open[pInventory] },
 		want:   func(g *Game, docked bool) bool { return g.open[pInventory] },
+		sync:   func(g *Game) { g.inv.Sync() },
 	},
 	pFitting: {
 		name:   "fitting",
 		window: func(g *Game) *widget.Window { return g.fitt.Win() },
 		open:   func(g *Game) *bool { return &g.open[pFitting] },
 		want:   func(g *Game, docked bool) bool { return g.open[pFitting] },
+		sync:   func(g *Game) { g.fitt.Sync() },
 	},
 	pMarket: {
 		name:   "market",
 		window: func(g *Game) *widget.Window { return g.mkt.Win() },
 		open:   func(g *Game) *bool { return &g.open[pMarket] },
 		want:   func(g *Game, docked bool) bool { return g.open[pMarket] },
+		sync:   func(g *Game) { g.mkt.Sync() },
 	},
 	pScanner: {
 		name:   "scanner",
@@ -113,30 +120,35 @@ var panelDefs = [numPanels]panelDef{
 		open:   func(g *Game) *bool { return &g.open[pScanner] },
 		// The scanner is space chrome: hidden while docked (legacy parity).
 		want: func(g *Game, docked bool) bool { return g.open[pScanner] && !docked },
+		sync: func(g *Game) { g.scan.Sync() },
 	},
 	pMap: {
 		name:   "map",
 		window: func(g *Game) *widget.Window { return g.mp.Win() },
 		open:   func(g *Game) *bool { return &g.open[pMap] },
 		want:   func(g *Game, docked bool) bool { return g.open[pMap] },
+		sync:   func(g *Game) { g.mp.Sync() },
 	},
 	pHelp: {
 		name:   "help",
 		window: func(g *Game) *widget.Window { return g.help.Win() },
 		open:   func(g *Game) *bool { return &g.open[pHelp] },
 		want:   func(g *Game, docked bool) bool { return g.open[pHelp] },
+		sync:   func(g *Game) { g.help.Sync() },
 	},
 	pLog: {
 		name:   "log",
 		window: func(g *Game) *widget.Window { return g.logP.Win() },
 		open:   func(g *Game) *bool { return &g.open[pLog] },
 		want:   func(g *Game, docked bool) bool { return g.open[pLog] },
+		sync:   func(g *Game) { g.logP.Sync() },
 	},
 	pMenu: {
 		name:   "", // not persisted: the Esc menu is pushed as a scene
 		window: func(g *Game) *widget.Window { return g.menuWin },
 		open:   func(g *Game) *bool { return &g.open[pMenu] },
 		want:   func(g *Game, docked bool) bool { return g.open[pMenu] },
+		sync:   nil, // scene-owned static buttons
 	},
 }
 
@@ -178,7 +190,7 @@ type Game struct {
 	stBody      *widget.Container
 	stAvail     *widget.Container
 	stActive    *widget.Container
-	stSig       string
+	stModel     stationBoardModel
 	stAvailRows []stationRow
 	stActRows   []stationRow
 
@@ -465,20 +477,28 @@ func (g *Game) syncScenes() {
 	}
 }
 
-// syncPanels refreshes every panel from the sim and adopts overview
-// selection changes made during the previous Kit.Update.
+// syncPanels refreshes the mounted panels from the sim and adopts
+// overview selection changes made during the previous Kit.Update. An
+// unmounted window's widgets are invisible, so their Sync is skipped —
+// they get a fresh Sync the moment setPanel mounts them (same frame,
+// before the first draw) instead of running every frame forever.
 func (g *Game) syncPanels() {
 	g.hud.SetTimeScale(g.clock.Mult())
 	g.kit.Sync()
 	g.hud.Sync()
 	g.rack.Sync()
-	g.logP.Sync()
-	g.inv.Sync()
-	g.fitt.Sync()
-	g.mkt.Sync()
-	g.scan.Sync()
-	g.mp.Sync()
-	g.help.Sync()
+	for p := panelID(0); p < numPanels; p++ {
+		if g.mounted[p] != nil {
+			g.syncPanel(p)
+		}
+	}
+}
+
+// syncPanel runs one panel's registered Sync (nil = nothing to sync).
+func (g *Game) syncPanel(p panelID) {
+	if s := panelDefs[p].sync; s != nil {
+		s(g)
+	}
 }
 
 // syncMounts reconciles the mounted window set with the desired state:
@@ -527,7 +547,18 @@ func setVisibility(w *widget.Widget, show bool) {
 	}
 }
 
-// setPanel mounts or unmounts one toggleable window.
+// setPanel mounts or unmounts one toggleable window. A mount runs the
+// panel's Sync immediately: syncPanels (which runs before syncMounts)
+// skipped it while unmounted, so this is what puts current data on the
+// window before this frame's draw.
+//
+// Note (upstream): every Kit.AddWindow leaks a little on ebitenui's side
+// — the four event handlers AddWindowQuietly never removes plus a
+// Container.Validate button rebuild, ≈5.3 KB per mount cycle (measured;
+// see docs/ARCHITECTURE.md, "upstream window-remount leak"). Unmounting
+// is still the right semantics: a hidden window would keep gating world
+// input and change the mount-order draw stack, so this is documented,
+// not "fixed" by hiding panels instead.
 func (g *Game) setPanel(p panelID, want bool) {
 	have := g.mounted[p] != nil
 	if want == have {
@@ -535,6 +566,7 @@ func (g *Game) setPanel(p panelID, want bool) {
 	}
 	if want {
 		g.mounted[p] = g.kit.AddWindow(g.panelWindow(p))
+		g.syncPanel(p)
 		return
 	}
 	g.mounted[p]()

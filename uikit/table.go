@@ -92,6 +92,7 @@ type Table struct {
 	body    *widget.Container
 
 	rows       []TableRow // display order (sorted)
+	rawRows    []TableRow // cell/icon content last applied to the widgets
 	texts      [][]*widget.Text
 	cells      [][]*tableCell // per-cell widget pair (nil for right-aligned)
 	rowCts     []*widget.Container
@@ -294,13 +295,18 @@ func (t *Table) SetSort(key string, asc bool) {
 
 // SetRows replaces the table's rows (a copy), applies the active sort,
 // keeps the selection when its row still exists and rebuilds or updates
-// the row widgets, refitting the columns to the new content.
+// the row widgets. The columns are re-fitted only when the row set, a
+// cell's text or an icon actually changed (or on the first fit): an
+// identical SetRows is a visual no-op and costs no measuring or layout.
 func (t *Table) SetRows(rows []TableRow) {
 	t.rows = append([]TableRow(nil), rows...)
 	t.applySort()
 	t.reconcileSelection()
-	t.updateRows()
-	t.applyWidths()
+	// t.widths is nil until the first fit — that one always lays out,
+	// whatever the rows are (the header buttons need their boxes).
+	if t.updateRows() || t.widths == nil {
+		t.applyWidths()
+	}
 }
 
 // Sync re-fits the columns when the table's width changed (window
@@ -384,11 +390,15 @@ func (t *Table) reconcileSelection() {
 }
 
 // updateRows creates the row widgets when the row count changed and
-// refreshes cell text and tints in place otherwise (diff-friendly).
-func (t *Table) updateRows() {
-	if len(t.rowCts) != len(t.rows) {
+// refreshes cell text and tints in place otherwise (diff-friendly). It
+// reports whether any cell text or icon changed — the input the column
+// refit needs; tints and selection repaint through updateBg/updateIcon
+// without touching the layout.
+func (t *Table) updateRows() bool {
+	changed := len(t.rowCts) != len(t.rows)
+	if changed {
 		t.body.RemoveChildren()
-		t.rowCts, t.texts, t.cells, t.applied = nil, nil, nil, nil
+		t.rowCts, t.texts, t.cells, t.applied, t.rawRows = nil, nil, nil, nil, nil
 		for i := range t.rows {
 			ctr := t.newRow(i)
 			t.rowCts = append(t.rowCts, ctr)
@@ -396,11 +406,25 @@ func (t *Table) updateRows() {
 		}
 	}
 	for i, row := range t.rows {
-		for j := range t.cols {
-			cell := cellOf(row, j)
-			if tx := t.texts[i][j]; tx.Label != cell {
-				// Raw cell; applyWidths ellipsizes it to the fitted column.
-				tx.Label = cell
+		if i >= len(t.rawRows) {
+			t.rawRows = append(t.rawRows, TableRow{})
+		}
+		// Diff against the raw cells/icons last applied (never against
+		// the widget labels: those hold the ellipsized form, so a
+		// truncated cell would read as "changed" forever).
+		prev := &t.rawRows[i]
+		if !sameCellsIcons(*prev, row, len(t.cols)) {
+			changed = true
+			*prev = TableRow{
+				Cells: append([]string(nil), row.Cells...),
+				Icons: append([]string(nil), row.Icons...),
+			}
+			for j := range t.cols {
+				cell := cellOf(row, j)
+				if tx := t.texts[i][j]; tx.Label != cell {
+					// Raw cell; applyWidths ellipsizes it to the fitted column.
+					tx.Label = cell
+				}
 			}
 		}
 		t.updateIcon(i)
@@ -409,6 +433,19 @@ func (t *Table) updateRows() {
 	// Row count changed → the content may no longer overflow: drop any
 	// leftover scroll offset now, before the next render positions rows.
 	t.clampScroll()
+	return changed
+}
+
+// sameCellsIcons reports whether row's cell text and icons across the
+// first n columns match the snapshot (an empty snapshot only matches an
+// all-empty row).
+func sameCellsIcons(applied, row TableRow, n int) bool {
+	for j := 0; j < n; j++ {
+		if cellOf(row, j) != cellOf(applied, j) || iconOf(row, j) != iconOf(applied, j) {
+			return false
+		}
+	}
+	return true
 }
 
 // newRow builds one clickable row container with one cell widget per

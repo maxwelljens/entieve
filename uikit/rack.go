@@ -347,10 +347,10 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 	}
 	cell.name.SetColor(nameCol)
 	if def == nil {
-		cell.tip.set(r.env, cell.btn.GetWidget(), "", TooltipModel{})
+		cell.tip.set(r.env, cell.btn.GetWidget(), "", nil)
 	} else {
-		key, model := r.cellTip(def, cell.slot)
-		cell.tip.set(r.env, cell.btn.GetWidget(), key, model)
+		key, build := r.cellTip(def, cell.slot)
+		cell.tip.set(r.env, cell.btn.GetWidget(), key, build)
 	}
 	cell.btn.GetWidget().Disabled = !active
 	cell.bar.SetCurrent(int(progress * rackCycleMax))
@@ -385,8 +385,10 @@ func (r *Rack) shortName(def *content.ModuleDef) string {
 // what the rack alone knows — the slot, the preferred charge and its cargo
 // count, and the footer hints ("Right-click: cycle ammo", "Click:
 // activate"). The returned key covers every input the model reads, so Sync
-// rebuilds the panel only when it would actually change.
-func (r *Rack) cellTip(def *content.ModuleDef, slot sim.SlotRef) (string, TooltipModel) {
+// only re-builds the panel when it would actually change — the builder is
+// invoked by rowTip.set exactly then (and on first attach), never as a
+// per-frame throwaway.
+func (r *Rack) cellTip(def *content.ModuleDef, slot sim.SlotRef) (string, func() TooltipModel) {
 	// The rack-only inputs: which charge this cell prefers, how many of it
 	// sit in cargo, and whether a right-click has anywhere to cycle to
 	// (Auto plus at least one cargo charge of the weapon's class).
@@ -406,7 +408,9 @@ func (r *Rack) cellTip(def *content.ModuleDef, slot sim.SlotRef) (string, Toolti
 	}
 	key := string(def.ID) + "|" + charge + "|" + strconv.Itoa(qty) +
 		"|" + strconv.FormatBool(cycleable)
-	return key, r.env.moduleTip(def, slotLabel(slot), charge, qty, hints...)
+	return key, func() TooltipModel {
+		return r.env.moduleTip(def, slotLabel(slot), charge, qty, hints...)
+	}
 }
 
 // cargoQty counts the player's cargo stacks of one item (0 when the sim or
