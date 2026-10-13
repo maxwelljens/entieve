@@ -120,7 +120,7 @@ func TestNpcHaulerLegRunsPlayerWarpProcess(t *testing.T) {
 			if warpDist <= warpLandRange {
 				t.Fatalf("warp engaged inside the landing tolerance (%v m) at t=%v", warpDist, s.time)
 			}
-			stepBound = warpProfileFor(warpDist, warpSpeed).peak * DT
+			stepBound = warpStepBound(warpDist, warpSpeed)
 		}
 		if phase == "align" && sawWarp {
 			t.Fatalf("align re-entered after the tunnel opened (t=%v)", s.time)
@@ -671,6 +671,44 @@ func TestWarpingNpcIsUntargetable(t *testing.T) {
 	for _, ev := range evs {
 		if ev.Kind == EvTargetLocked && ev.Actor == s.player && ev.Target == npc {
 			t.Fatal("lock completed on a warping target")
+		}
+	}
+
+	// On-grid portions of the warp (the accel slide out, the decel glide
+	// in) still carry the "warp" phase: the easing changed where the ship
+	// sits, not what the phase means. Sample into the glide — visibly on
+	// grid, within warpGridSpan of the landing point — and re-prove the
+	// refusal there: the phase -> lockability mapping is unchanged.
+	s.Warps.Remove(npc)
+	glideTo := mustPos(s, npc).Add(core.Vec2{X: 3e6})
+	if !s.warpToPoint(npc, glideTo) {
+		t.Fatal("re-warp refused")
+	}
+	inGlide := false
+	for i := 0; i < 900; i++ {
+		teleport(s, s.player, mustPos(s, npc).Add(core.Vec2{X: -2000}))
+		ph := warpPhaseOf(s, npc)
+		if ph == "warp" && mustPos(s, npc).Dist(glideTo) < warpGridSpan {
+			inGlide = true
+			break
+		}
+		if ph == "" {
+			break // landed before the glide window was observed
+		}
+		s.Step()
+		drain(s)
+	}
+	if !inGlide {
+		t.Fatalf("never observed the on-grid decel glide (phase=%q)", warpPhaseOf(s, npc))
+	}
+	s.Queue(CmdLock{Target: npc})
+	s.Step()
+	drain(s)
+	tg, _ = s.Targetings.Get(s.player)
+	for _, l := range tg.Locks {
+		if l.Target == npc {
+			t.Fatalf("lock took during the on-grid glide (phase %q): progress=%v",
+				warpPhaseOf(s, npc), l.Progress)
 		}
 	}
 }
