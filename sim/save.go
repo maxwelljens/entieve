@@ -193,6 +193,25 @@ func (s *Sim) buildSave() (*Save, error) {
 			save.LastStation = uint64(e)
 		}
 	}
+
+	// --- industry: jobs and station craft (the canonical orders jobs and
+	// craft are maintained in, re-asserted here so the serialization — and
+	// therefore Hash — never depends on insertion order) ---
+	if len(s.jobs) > 0 {
+		save.Jobs = append([]Job(nil), s.jobs...)
+		sort.Slice(save.Jobs, func(i, j int) bool { return save.Jobs[i].ID < save.Jobs[j].ID })
+	}
+	save.JobSeq = s.jobSeq
+	if len(s.craft) > 0 {
+		save.Craft = append([]SavedCraft(nil), s.craft...)
+		sort.Slice(save.Craft, func(i, j int) bool {
+			a, b := save.Craft[i], save.Craft[j]
+			if a.Station != b.Station {
+				return a.Station < b.Station
+			}
+			return a.Family < b.Family
+		})
+	}
 	return save, nil
 }
 
@@ -436,6 +455,40 @@ func (s *Sim) restore(save *Save) error {
 	if s.player.IsZero() {
 		return errf("sim: save has no player entity")
 	}
+
+	// --- industry: jobs and station craft (canonical orders replayed
+	// verbatim), plus the per-Step industry command bucket reset ---
+	s.deferIndustry = nil
+	s.jobSeq = save.JobSeq
+	for _, j := range save.Jobs {
+		if j.ID == 0 || j.Station == "" || j.Runs < 1 {
+			return errf("sim: save has invalid industry job %+v", j)
+		}
+		if j.State != JobRunning && j.State != JobDone {
+			return errf("sim: save job %d has invalid state %q", j.ID, j.State)
+		}
+		// The id counter must cover every saved job: restoring a save that
+		// would hand out a duplicate id fails loudly instead (and keeps
+		// hash(restore(x)) == hash(x) for everything that IS accepted).
+		if j.ID > save.JobSeq {
+			return errf("sim: save job %d exceeds JobSeq %d", j.ID, save.JobSeq)
+		}
+	}
+	s.jobs = append([]Job(nil), save.Jobs...)
+	sort.Slice(s.jobs, func(i, j int) bool { return s.jobs[i].ID < s.jobs[j].ID })
+	for i := 1; i < len(s.jobs); i++ {
+		if s.jobs[i-1].ID == s.jobs[i].ID {
+			return errf("sim: save has duplicate industry job id %d", s.jobs[i].ID)
+		}
+	}
+	s.craft = append([]SavedCraft(nil), save.Craft...)
+	sort.Slice(s.craft, func(i, j int) bool {
+		a, b := s.craft[i], s.craft[j]
+		if a.Station != b.Station {
+			return a.Station < b.Station
+		}
+		return a.Family < b.Family
+	})
 	return nil
 }
 

@@ -433,6 +433,19 @@ type (
 	// CmdAbandonMission drops an accepted contract (docked at the offering
 	// station). Emitted refusals carry EvMission phase "refused".
 	CmdAbandonMission struct{ ID content.ContractID }
+
+	// CmdStartJob starts a manufacturing job at the docked station (which
+	// must offer the industry service): Runs sequential runs of Recipe,
+	// materials committed up front. Emitted refusals are SevWarning
+	// "Industry: …" log lines (see Sim.StartJob).
+	CmdStartJob struct {
+		Recipe content.RecipeID
+		Runs   int
+	}
+
+	// CmdCollectJob delivers a finished job's output into the player's
+	// hangar (docked at the job's station, industry service).
+	CmdCollectJob struct{ ID uint64 }
 )
 
 func (CmdStop) isCommand()           {}
@@ -461,6 +474,8 @@ func (CmdSetAmmo) isCommand()        {}
 func (CmdTransfer) isCommand()       {}
 func (CmdAcceptMission) isCommand()  {}
 func (CmdAbandonMission) isCommand() {}
+func (CmdStartJob) isCommand()       {}
+func (CmdCollectJob) isCommand()     {}
 
 // ---------------------------------------------------------------------------
 // Events — the observation surface
@@ -927,4 +942,15 @@ type Save struct {
 	// station on return. Restore prefers this field and falls back to the
 	// handle for saves written before it existed.
 	LastStationCel content.CelID `json:"last_station_cel,omitempty"`
+
+	// --- industry (manufacturing jobs + station craft growth) ---
+	// Jobs are the station manufacturing jobs (running or awaiting
+	// collection), kept in ascending job-id order — the canonical
+	// iteration for restore, save and Hash.
+	Jobs []Job `json:"jobs,omitempty"`
+	// JobSeq is the next job id (the market's MarketSeq pattern).
+	JobSeq uint64 `json:"job_seq"`
+	// Craft is each station's per-family craft counter (completed runs +
+	// idle ticks), sorted by (station, family) — the CraftLevel input.
+	Craft []SavedCraft `json:"craft,omitempty"`
 }

@@ -17,6 +17,7 @@ func (s *Sim) runCommands() {
 	s.deferEcon = nil
 	s.deferTravel = nil
 	s.deferMission = nil
+	s.deferIndustry = nil
 	for _, cmd := range q {
 		s.applyCommand(cmd)
 	}
@@ -119,6 +120,9 @@ func (s *Sim) applyCommand(cmd Command) {
 
 	case CmdBuy, CmdSell, CmdRefine, CmdRepair, CmdAssemble, CmdFitModule, CmdUnfitModule:
 		s.deferEcon = append(s.deferEcon, c)
+
+	case CmdStartJob, CmdCollectJob:
+		s.deferIndustry = append(s.deferIndustry, c)
 	}
 }
 

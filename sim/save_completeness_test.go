@@ -90,6 +90,12 @@ var simFieldClasses = map[string]fieldClass{
 	"events":         {exempt: "drained by Events(), capped at emit time — observation surface, not sim state"},
 	"ammoPrefs":      {exempt: "frozen Save schema: per-slot charge preferences reset on restore (intentional)"},
 	"lastPlayerWork": {exempt: "frozen Save schema: the recent-work aggro marker resets on restore (intentional)"},
+
+	// --- industry (jobs + station craft growth) ---
+	"jobs":          {save: []string{"Jobs"}},
+	"jobSeq":        {save: []string{"JobSeq"}},
+	"craft":         {save: []string{"Craft"}},
+	"deferIndustry": {transient: true},
 }
 
 // TestSimSaveCompleteness puts "Hash covers every persistent field" behind

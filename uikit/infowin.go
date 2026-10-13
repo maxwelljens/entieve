@@ -3,7 +3,9 @@ package uikit
 import (
 	"image"
 	"image/color"
+	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -127,6 +129,8 @@ func (e Env) InfoRefOf(data any) (InfoRef, bool) {
 	switch v := data.(type) {
 	case InfoRef:
 		return v, e.infoRefExists(v)
+	case factoryRow: // the factory panel's recipe and job rows
+		return v.ref, e.infoRefExists(v.ref)
 	case content.ItemID:
 		return e.refOfID(string(v))
 	case content.ModuleID:
@@ -237,6 +241,111 @@ func refRow(label string, ref InfoRef, value string) infoRow {
 func valueRefRow(label, value string, ref InfoRef) infoRow {
 	r := ref
 	return infoRow{Label: label, Value: value, Ref: &r, RefOnValue: true}
+}
+
+// ---------------------------------------------------------------------------
+// Industry chain references (the MANUFACTURED FROM / USED IN sections)
+// ---------------------------------------------------------------------------
+
+// recipeFor returns the first recipe (canonical id order) producing id.
+// v1 ships exactly one recipe per product; the schema is a list, so "first
+// in canonical order" is the documented resolution.
+func (e Env) recipeFor(id string) *content.RecipeDef {
+	if e.Content == nil || id == "" {
+		return nil
+	}
+	for _, r := range e.Content.RecipesInOrder() {
+		if string(r.Product) == id {
+			return r
+		}
+	}
+	return nil
+}
+
+// recipesUsing returns every recipe consuming id as an input, canonical
+// order.
+func (e Env) recipesUsing(id string) []*content.RecipeDef {
+	if e.Content == nil || id == "" {
+		return nil
+	}
+	var out []*content.RecipeDef
+	for _, r := range e.Content.RecipesInOrder() {
+		for _, in := range r.Inputs {
+			if string(in.Item) == id {
+				out = append(out, r)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// chainName resolves a raw def id (item, module or ship) for display.
+func (e Env) chainName(id content.ItemID) string {
+	if d, ok := e.Content.Item(id); ok {
+		return d.Name
+	}
+	if d, ok := e.Content.Module(content.ModuleID(id)); ok {
+		return d.Name
+	}
+	if d, ok := e.Content.Ship(content.ShipID(id)); ok {
+		return d.Name
+	}
+	return string(id)
+}
+
+// chainVal is a per-run quantity cell ("×720", "×2.5"): whole numbers
+// take the grouped integer form, fractional recipe quantities keep their
+// decimals (RecipeInput.Qty is float).
+func chainVal(qty float64) string {
+	if qty == math.Trunc(qty) {
+		return "×" + FormatInt(int64(qty))
+	}
+	return "×" + strconv.FormatFloat(qty, 'g', -1, 64)
+}
+
+// manufacturedRows builds the MANUFACTURED FROM rows: this product's
+// recipe inputs as label-side link rows carrying their per-run quantity
+// ("Ferrite ×720"). A hull's recipe also reports its family and base time
+// (the craft curve the sim applies lives in the sim — this is the raw
+// recipe figure).
+func (e Env) manufacturedRows(id string) []infoRow {
+	r := e.recipeFor(id)
+	if r == nil {
+		return nil
+	}
+	var rows []infoRow
+	if _, isShip := e.Content.Ship(content.ShipID(id)); isShip {
+		rows = append(rows,
+			infoRow{Label: "Family", Value: spacedKind(r.Family)},
+			infoRow{Label: "Base time", Value: groupFloat(r.Time, 1) + " s"})
+	}
+	for _, in := range r.Inputs {
+		name := e.chainName(in.Item)
+		if ref, ok := e.refOfID(string(in.Item)); ok {
+			rows = append(rows, refRow(name, ref, chainVal(in.Qty)))
+			continue
+		}
+		rows = append(rows, infoRow{Label: name, Value: chainVal(in.Qty)})
+	}
+	return rows
+}
+
+// usedInRows builds the USED IN rows: every recipe consuming this def,
+// linked on its product. The value describes the LABELED definition (the
+// product's per-run output), so both sections read the same way: link on
+// the label, quantity of the linked def on the right.
+func (e Env) usedInRows(id string) []infoRow {
+	var rows []infoRow
+	for _, r := range e.recipesUsing(id) {
+		name := e.chainName(r.Product)
+		if ref, ok := e.refOfID(string(r.Product)); ok {
+			rows = append(rows, refRow(name, ref, chainVal(float64(r.Qty))))
+			continue
+		}
+		rows = append(rows, infoRow{Label: name, Value: chainVal(float64(r.Qty))})
+	}
+	return rows
 }
 
 // sectionsOf converts the shared tooltip sections (moduleTip's output)
@@ -395,6 +504,10 @@ func (e Env) shipPage(def *content.ShipDef) infoPage {
 		cargo = append(cargo, infoRow{Label: "Ore hold", Value: formatVolume(def.OreHold)})
 	}
 	addSection(&p, "CARGO", cargo)
+
+	// Manufacturing chain: only when a recipe actually references this def.
+	addSection(&p, "MANUFACTURED FROM", e.manufacturedRows(string(def.ID)))
+	addSection(&p, "USED IN", e.usedInRows(string(def.ID)))
 	return p
 }
 
@@ -438,6 +551,10 @@ func (e Env) modulePage(def *content.ModuleDef) infoPage {
 	if def.Price > 0 {
 		addSection(&p, "MARKET", []infoRow{{Label: "Price", Value: FormatCredits(def.Price)}})
 	}
+
+	// Manufacturing chain: only when a recipe actually references this def.
+	addSection(&p, "MANUFACTURED FROM", e.manufacturedRows(string(def.ID)))
+	addSection(&p, "USED IN", e.usedInRows(string(def.ID)))
 	return p
 }
 
@@ -505,6 +622,10 @@ func (e Env) itemPage(def *content.ItemDef) infoPage {
 			{Label: "Explosive", Value: groupFloat(d.Explosive, 1)},
 		})
 	}
+
+	// Manufacturing chain: only when a recipe actually references this def.
+	addSection(&p, "MANUFACTURED FROM", e.manufacturedRows(string(def.ID)))
+	addSection(&p, "USED IN", e.usedInRows(string(def.ID)))
 	return p
 }
 
