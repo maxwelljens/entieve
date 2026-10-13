@@ -35,10 +35,11 @@ import (
 // committed materials once), so a mid-job craft-up never re-times a job.
 //
 // Owner tags mirror the market API: StartJob/CollectJob take an opaque
-// owner (OwnerPlayer, OwnerSystem, or a future agent id) and only that
-// owner's job can be collected. Materials always come from the player's
-// storage and output always lands in the player's hangar — the player's
-// factory is what the agents commission from.
+// owner (OwnerPlayer, OwnerSystem, or an agent's `agent:<id>` tag) and
+// only that owner's job can be collected. Materials come from the player's
+// storage and output lands in the player's hangar — except for an agent
+// owner, whose bill and output move through the agent's own inventory
+// (the ledger-agent material seam in agent.go).
 // ---------------------------------------------------------------------------
 
 const (
@@ -273,8 +274,10 @@ func (s *Sim) jobCount(station StationID) int {
 // startJobCheck is StartJob's validation as a predicate: it returns the
 // resolved recipe and either ok, or the refusal reason StartJob logs.
 // Side-effect free — CanStartJob is the exported form the factory panel
-// gates its Start button on.
-func (s *Sim) startJobCheck(station StationID, recipe content.RecipeID, runs int) (*content.RecipeDef, string, bool) {
+// gates its Start button on. owner routes the material check: an agent
+// owner's bill comes out of the agent's inventory (the ledger-agent seam
+// in agent.go), everyone else's out of the player's storage.
+func (s *Sim) startJobCheck(station StationID, recipe content.RecipeID, runs int, owner string) (*content.RecipeDef, string, bool) {
 	rec, ok := s.Content.Recipes[recipe]
 	if !ok || rec == nil {
 		return nil, "Unknown recipe " + string(recipe), false
@@ -289,7 +292,11 @@ func (s *Sim) startJobCheck(station StationID, recipe content.RecipeID, runs int
 		return rec, "All job slots busy at " + s.stationName(station), false
 	}
 	for _, m := range s.JobMaterials(station, recipe, runs) {
-		if s.playerStock(m.Item) < m.Qty {
+		have := s.playerStock(m.Item)
+		if a := s.agentByOwner(owner); a != nil {
+			have = a.freeStock(m.Item)
+		}
+		if have < m.Qty {
 			return rec, "Not enough " + s.itemName(m.Item) + " to build " +
 				s.itemName(rec.Product), false
 		}
@@ -300,19 +307,22 @@ func (s *Sim) startJobCheck(station StationID, recipe content.RecipeID, runs int
 // CanStartJob reports whether StartJob would accept right now (no side
 // effects, no log lines) — the factory panel's gated Start button.
 func (s *Sim) CanStartJob(station StationID, recipe content.RecipeID, runs int) bool {
-	_, _, ok := s.startJobCheck(station, recipe, runs)
+	_, _, ok := s.startJobCheck(station, recipe, runs, OwnerPlayer)
 	return ok
 }
 
 // StartJob begins a manufacturing job at station for owner and returns its
 // id. Materials for every run are committed up front from the player's
-// storage (cargo → ore hold → hangar → stored hulls, the market's order);
-// refusals (unknown recipe, bad run count, no industry service, busy
-// slots, missing materials) log one SevWarning line and change nothing.
+// storage (cargo → ore hold → hangar → stored hulls, the market's order) —
+// except for an agent owner, whose bill is debited from the agent's own
+// inventory (and whose CollectJob delivers there): the ledger-agent
+// material seam, so agents never touch the player's hangar. Refusals
+// (unknown recipe, bad run count, no industry service, busy slots,
+// missing materials) log one SevWarning line and change nothing.
 // The player path is Queue(CmdStartJob{...}), which runs through
 // systemIndustry with the docked-station service gate.
 func (s *Sim) StartJob(station StationID, recipe content.RecipeID, runs int, owner string) (uint64, bool) {
-	rec, reason, ok := s.startJobCheck(station, recipe, runs)
+	rec, reason, ok := s.startJobCheck(station, recipe, runs, owner)
 	if !ok {
 		s.industryRefusal(reason)
 		return 0, false
@@ -321,18 +331,26 @@ func (s *Sim) StartJob(station StationID, recipe content.RecipeID, runs int, own
 	// Commit the materials: count first (checked above), then take, and
 	// roll the whole commit back on the impossible mismatch — never keep
 	// a partial commit (execSell's rule).
-	var committed []content.CargoStack
-	for _, m := range s.JobMaterials(station, recipe, runs) {
-		taken := s.takePlayerStock(m.Item, m.Qty)
-		if taken != m.Qty {
-			s.storePlayerStock(m.Item, taken)
-			for _, c := range committed {
-				s.storePlayerStock(c.Item, c.Qty)
-			}
-			s.industryRefusal("Material count mismatch")
-			return 0, false
+	materials := s.JobMaterials(station, recipe, runs)
+	agent := s.agentByOwner(owner)
+	if agent != nil {
+		for _, m := range materials { // freeStock >= m.Qty was just checked
+			takeInv(agent, m.Item, m.Qty)
 		}
-		committed = append(committed, m)
+	} else {
+		var committed []content.CargoStack
+		for _, m := range materials {
+			taken := s.takePlayerStock(m.Item, m.Qty)
+			if taken != m.Qty {
+				s.storePlayerStock(m.Item, taken)
+				for _, c := range committed {
+					s.storePlayerStock(c.Item, c.Qty)
+				}
+				s.industryRefusal("Material count mismatch")
+				return 0, false
+			}
+			committed = append(committed, m)
+		}
 	}
 
 	level := s.CraftLevel(station, rec.Family)
@@ -351,11 +369,12 @@ func (s *Sim) StartJob(station StationID, recipe content.RecipeID, runs int, own
 }
 
 // CollectJob delivers a finished job's output into the player's hangar and
-// frees its slot (hulls land as StoredShips — the storePlayerStock rule).
-// Only the job's own owner collects, and only JobDone jobs deliver; a job
-// whose recipe no longer loads is dropped with a warning rather than
-// blocking its slot forever (impossible with frozen content). The player
-// path is Queue(CmdCollectJob{ID}).
+// frees its slot (hulls land as StoredShips — the storePlayerStock rule);
+// an agent owner's output lands in the agent's inventory instead (the same
+// seam StartJob debits from). Only the job's own owner collects, and only
+// JobDone jobs deliver; a job whose recipe no longer loads is dropped with
+// a warning rather than blocking its slot forever (impossible with frozen
+// content). The player path is Queue(CmdCollectJob{ID}).
 func (s *Sim) CollectJob(station StationID, id uint64, owner string) bool {
 	for i := range s.jobs {
 		j := &s.jobs[i]
@@ -374,7 +393,11 @@ func (s *Sim) CollectJob(station StationID, id uint64, owner string) bool {
 		if j.State != JobDone {
 			return false
 		}
-		s.storePlayerStock(rec.Product, rec.Qty*j.Runs)
+		if a := s.agentByOwner(owner); a != nil {
+			addInv(a, rec.Product, rec.Qty*j.Runs)
+		} else {
+			s.storePlayerStock(rec.Product, rec.Qty*j.Runs)
+		}
 		s.jobs = append(s.jobs[:i], s.jobs[i+1:]...)
 		s.emit(Event{Kind: EvLog, Severity: SevGood, Actor: s.player, Item: rec.Product,
 			Text: "Industry: " + s.itemName(rec.Product) + " collected at " + s.stationName(station)})

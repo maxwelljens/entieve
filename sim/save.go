@@ -227,6 +227,24 @@ func (s *Sim) buildSave() (*Save, error) {
 			return a.Family < b.Family
 		})
 	}
+
+	// ---- ledger agents (system 18): roster in id order + upkeep ledgers ----
+	// Canonical order re-asserted here so the serialization — and therefore
+	// Hash — never depends on insertion order; per-agent keys (inventory,
+	// beliefs, margins) sort inside Agent.saved().
+	if len(s.agents) > 0 {
+		save.Agents = make([]SavedAgent, 0, len(s.agents))
+		for i := range s.agents {
+			save.Agents = append(save.Agents, s.agents[i].saved())
+		}
+		sort.Slice(save.Agents, func(i, j int) bool { return save.Agents[i].ID < save.Agents[j].ID })
+	}
+	if len(s.upkeep) > 0 {
+		save.Upkeep = make(map[StationID]float64, len(s.upkeep))
+		for st, v := range s.upkeep {
+			save.Upkeep[st] = v
+		}
+	}
 	return save, nil
 }
 
@@ -526,6 +544,53 @@ func (s *Sim) restore(save *Save) error {
 		}
 		return a.Family < b.Family
 	})
+
+	// ---- ledger agents (system 18): roster, beliefs, capital, wishes ----
+	// Resting-order ledgers are DERIVED from the restored books (a Save
+	// lands on Step boundaries, where agentSettle has run and every fill
+	// has settled), so an order book is the single source of truth for
+	// what still rests; duplicate ids fail loudly (the jobs pattern).
+	s.agents = nil
+	s.upkeep = nil
+	for _, sv := range save.Agents {
+		a, err := agentFromSaved(sv)
+		if err != nil {
+			return err
+		}
+		for i := range s.agents {
+			if s.agents[i].ID == a.ID {
+				return errf("sim: save has duplicate agent id %s", a.ID)
+			}
+		}
+		if sys, ok := s.stationSystem(a.Home); !ok || sys == "" {
+			return errf("sim: save agent %s references unknown home station %s", a.ID, a.Home)
+		}
+		s.agents = append(s.agents, a)
+	}
+	sort.Slice(s.agents, func(i, j int) bool { return s.agents[i].ID < s.agents[j].ID })
+	for i := range s.agents {
+		a := &s.agents[i]
+		tag := agentOwnerTag(a.ID)
+		for _, st := range s.stationsSorted() {
+			for _, o := range s.market[st].Orders {
+				if o.Owner != tag {
+					continue
+				}
+				a.Orders = append(a.Orders, AgentOrder{ID: o.ID, Station: st,
+					Side: o.Side, Item: o.Item, Price: o.Price, Qty: o.Qty})
+			}
+		}
+		sort.Slice(a.Orders, func(i, j int) bool { return a.Orders[i].ID < a.Orders[j].ID })
+	}
+	if len(save.Upkeep) > 0 {
+		s.upkeep = make(map[StationID]float64, len(save.Upkeep))
+		for st, v := range save.Upkeep {
+			if v < 0 {
+				return errf("sim: save upkeep ledger %s is negative", st)
+			}
+			s.upkeep[st] = v
+		}
+	}
 	return nil
 }
 

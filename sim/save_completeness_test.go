@@ -100,6 +100,10 @@ var simFieldClasses = map[string]fieldClass{
 	"jobSeq":        {save: []string{"JobSeq"}},
 	"craft":         {save: []string{"Craft"}},
 	"deferIndustry": {transient: true},
+
+	// --- ledger agents (system 18: roster + station upkeep ledgers) ---
+	"agents": {save: []string{"Agents"}},
+	"upkeep": {save: []string{"Upkeep"}},
 }
 
 // TestSimSaveCompleteness puts "Hash covers every persistent field" behind

@@ -263,14 +263,22 @@ func celestialSpread(cel *content.CelestialDef) float64 {
 // the BeltDef on first generation (every rock at its definition volume —
 // today's fresh-world semantics) and reusing the saved state thereafter.
 func (s *Sim) ensureBeltState(cel *content.CelestialDef) *BeltState {
+	return s.ensureBeltStateAt(s.systemID, cel)
+}
+
+// ensureBeltStateAt is ensureBeltState for an arbitrary system: the ledger
+// agents' miner leaning seeds belt state for systems the player has never
+// visited, so extraction there depletes (and regrows) persistent state
+// exactly like the loaded grid's.
+func (s *Sim) ensureBeltStateAt(sys content.SystemID, cel *content.CelestialDef) *BeltState {
 	if s.belts == nil {
 		s.belts = make(map[beltKey]*BeltState)
 	}
-	k := beltKey{System: s.systemID, Cel: cel.ID}
+	k := beltKey{System: sys, Cel: cel.ID}
 	if st := s.belts[k]; st != nil {
 		return st
 	}
-	st := &BeltState{System: s.systemID, Cel: cel.ID, GrownAt: s.ticks}
+	st := &BeltState{System: sys, Cel: cel.ID, GrownAt: s.ticks}
 	if cel.Belt != nil {
 		for _, ad := range cel.Belt.Asteroids {
 			for i := 0; i < ad.Count; i++ {
