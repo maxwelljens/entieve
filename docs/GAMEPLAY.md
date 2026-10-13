@@ -57,9 +57,9 @@ in-game help window renders.
 | Left drag | On any window **edge or corner** (≈8 px grip): resize from all four sides — the opposite edge stays fixed, the window never shrinks past its minimum |
 | Left click | On an overview column header: sort (click again flips direction) |
 | `Ctrl` + left click | Lock target under cursor |
-| Left double-click | Approach entity; on empty space, fly straight toward that point |
-| Right click | Orbit target under cursor (2,500 m) |
-| Right click | On a weapon cell in the module rack: cycle the loaded charge (Auto → each cargo ammo of the weapon's class) |
+| Left double-click | Show Info — open the item's details window directly, anywhere the item appears (rack, fitting, market, inventory, overview, scanner, contract rows); on empty space, fly straight toward that point |
+| Right click | Orbit target under cursor (2,500 m) — in the world; unchanged |
+| Right click | On an item anywhere it appears: flat context menu — **Show Info** first (always bold), then the surface's actions (grayed-but-visible when impossible); on a weapon cell in the module rack: Show Info / Show Info — `<charge>` / ─ / **Cycle charge** |
 | Middle drag | Pan camera |
 | Wheel | Zoom (0.05× – 4×); over a table (overview, market, inventory, fitting), scroll it — wheel up moves toward the top |
 
@@ -178,6 +178,41 @@ changing never shift the columns.
 Rows tint **red for hostiles** and **blue for your own ship**; the Kind
 column names the rest (Ship, Asteroid, Wreck, Station, Gate, …).
 
+## Inspecting items (Show Info)
+
+Anything you can see is inspectable. **Right-click** an item anywhere it
+appears — rack cell, fitting row, market row, inventory row, overview or
+scanner row, contract board row, contract objective label — for a flat
+context menu: **Show Info** first, always bold, then that surface's
+actions. Actions you cannot currently take are shown grayed, never
+hidden. **Double-click** the item to skip the menu and go straight to the
+details window. There is no keyboard key for this: inspecting is
+mouse-only.
+
+One reusable floating window, titled `<Name> — Info`, holds the details —
+dragable, resizable, closeable, non-modal. Show Info swaps its content
+instead of stacking windows, and the item references inside it (charges,
+ores, hulls) are themselves right-clickable. Its position and size
+persist in the layout sidecar, but it never opens on its own.
+
+Only fields that exist are shown, grouped per kind:
+
+| Kind | Sections |
+|---|---|
+| Hull | CONSTRUCTION (class · origin) / SLOTS / SURVIVAL / CAPACITOR / PROPULSION / SENSORS / CARGO |
+| Module | ACTIVATION / kind stat sections / CHARGES (compatible charges) / MARKET |
+| Item | PROPERTIES / MARKET / REFINES TO / DAMAGE |
+| Machine caste | dossier prose / DOSSIER (faction, hull, bounty) / BEHAVIOR / LOOT |
+
+Every window opens with the def's description prose. The menus per
+surface: rack cells — Show Info (module) / Show Info — `<charge>` / ─ /
+**Cycle charge**; fitting rows — Show Info / Fit / Unequip; market rows —
+Show Info / Buy / Sell (grayed while undocked); inventory rows — Show
+Info; overview and scanner rows — Show Info / Warp to / Orbit / Approach
+(the entity's hull or caste info plus the usual commands); contract board
+rows — Accept / Abandon (grayed when gated); contract objective labels —
+Show Info.
+
 ## EVE concepts primer
 
 **Slots.** Hulls have **high**, **mid** and **low** slots. High slots hold
@@ -249,9 +284,11 @@ omniscience), enforced in the sim's read model and the renderer alike.
   the same split. Both selectors start at their first entry, so the
   default warp lands *on* the target and the default orbit is 2,500 m.
 
-**Ammo cycling.** Right-click a weapon slot in the module rack to cycle its
-loaded charge: **Auto → each ammo of that weapon's class that sits in your
-cargo → Auto** (the sim validates class and cargo, and logs every load).
+**Ammo cycling.** Right-click a weapon cell in the module rack for its
+context menu: **Show Info** for the module, **Show Info —** the loaded
+charge, and **Cycle charge**, which steps the loaded charge **Auto → each
+ammo of that weapon's class that sits in your cargo → Auto** (the sim
+validates class and cargo, and logs every load).
 The module tooltip — hover any rack cell for 300 ms — is a structured
 panel: class icon, **bold** module name, a dim `slot · class` line, then
 sectioned stats with values right-aligned on one column (damage mix,
@@ -278,7 +315,8 @@ shows two sections.
 
 **Available contracts** — the docked station's board. Each row shows the
 title, the objective (`Destroy 1× Scuttler`,
-`Deliver 2 m³ EMP Charge to Przystań`, `Mine 400 m³ Cordite Ore`) and
+`Deliver 2 m³ EMP Charge to Przystań`, `Mine 400 m³ Cordite Ore` — every
+objective label right-clicks to **Show Info** on the item it names) and
 the reward (`40,000.00 € · +0.10 standing`). Press **Accept** to take it; a
 contract above your standing shows its requirement
 (`Requires standing 0.20`) with the button disabled, and an
