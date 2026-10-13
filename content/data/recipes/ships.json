@@ -1,0 +1,74 @@
+[
+  {
+    "id": "rec-ship-barge",
+    "product": "ship-barge",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 44700 }, { "item": "min-nickel", "qty": 7800 }, { "item": "min-cobalt", "qty": 5000 }],
+    "time": 240,
+    "family": "hulls"
+  },
+  {
+    "id": "rec-ship-cutlass",
+    "product": "ship-cutlass",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 28600 }, { "item": "min-nickel", "qty": 5000 }, { "item": "min-cobalt", "qty": 3200 }],
+    "time": 150,
+    "family": "hulls"
+  },
+  {
+    "id": "rec-ship-hauler",
+    "product": "ship-hauler",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 38800 }, { "item": "min-nickel", "qty": 6800 }, { "item": "min-cobalt", "qty": 4300 }],
+    "time": 200,
+    "family": "hulls"
+  },
+  {
+    "id": "rec-ship-npc-hauler",
+    "product": "ship-npc-hauler",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 35800 }, { "item": "min-nickel", "qty": 12500 }],
+    "time": 180,
+    "family": "hulls"
+  },
+  {
+    "id": "rec-ship-npc-patrol",
+    "product": "ship-npc-patrol",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 23900 }, { "item": "min-nickel", "qty": 4200 }, { "item": "min-silex", "qty": 1700 }],
+    "time": 130,
+    "family": "hulls"
+  },
+  {
+    "id": "rec-ship-rat-hierarch",
+    "product": "ship-rat-hierarch",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 54100 }, { "item": "min-nickel", "qty": 4700 }, { "item": "min-cobalt", "qty": 3000 }, { "item": "min-silex", "qty": 1900 }, { "item": "min-argon", "qty": 1100 }],
+    "time": 300,
+    "family": "hulls"
+  },
+  {
+    "id": "rec-ship-rat-marauder",
+    "product": "ship-rat-marauder",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 30900 }, { "item": "min-nickel", "qty": 5400 }, { "item": "min-cobalt", "qty": 3500 }],
+    "time": 160,
+    "family": "hulls"
+  },
+  {
+    "id": "rec-ship-rat-scuttler",
+    "product": "ship-rat-scuttler",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 19900 }, { "item": "min-silex", "qty": 2800 }],
+    "time": 120,
+    "family": "hulls"
+  },
+  {
+    "id": "rec-ship-sloop",
+    "product": "ship-sloop",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 20800 }, { "item": "min-nickel", "qty": 3700 }, { "item": "min-silex", "qty": 1500 }],
+    "time": 120,
+    "family": "hulls"
+  }
+]

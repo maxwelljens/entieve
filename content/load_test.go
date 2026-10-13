@@ -24,6 +24,7 @@ func TestLoadEmbedded(t *testing.T) {
 		{"NPCs", len(c.NPCs)},
 		{"Systems", len(c.Systems)},
 		{"Worlds", len(c.Worlds)},
+		{"Recipes", len(c.Recipes)},
 	}
 	for _, m := range maps {
 		if m.n == 0 {

@@ -31,8 +31,11 @@ var (
 		CelStar: true, CelPlanet: true, CelMoon: true, CelStation: true,
 		CelBelt: true, CelGate: true, CelAnomaly: true,
 	}
-	validServices   = map[string]bool{"repair": true, "market": true, "refine": true, "fitting": true}
+	validServices   = map[string]bool{"repair": true, "market": true, "refine": true, "fitting": true, "industry": true}
 	validSecurities = map[string]bool{"high": true, "low": true, "null": true}
+	// recipeFamilies is the craft-growth vocabulary of RecipeDef.Family
+	// (model.go constants are authoritative).
+	recipeFamilies = map[string]bool{FamilyHulls: true, FamilyModules: true, FamilyCharges: true}
 	// validOrigins is the hull heritage vocabulary of docs/lore/NAMING.md's
 	// origin column (lowercase in JSON). Empty origin is allowed here —
 	// shipped-data completeness is enforced by content/*_test.go, the same
@@ -83,6 +86,7 @@ func (c *Content) Validate() error {
 	v.items()
 	v.ships()
 	v.modules()
+	v.recipes()
 	v.npcs()
 	v.systems()
 	v.stationMarkets()
@@ -343,6 +347,86 @@ func (v *validator) ammoClassExists(class string) bool {
 	return false
 }
 
+// recipes cross-checks every manufacturing recipe: the rec- prefix, product
+// resolution (the market-order convention: item, then ship, then module —
+// and only ships/modules/ammo/charges may be products), mineral-only inputs
+// (the v1 two-tier rule), positive qty/time, the family vocabulary, and
+// completeness: every ship, module and ammo/charge item must be produced by
+// at least one recipe.
+func (v *validator) recipes() {
+	c := v.c
+	covered := map[ItemID]bool{}
+	for _, id := range keys(c.Recipes) {
+		r := c.Recipes[id]
+		if id == "" {
+			v.addf("recipes: missing id (product %q)", r.Product)
+			continue
+		}
+		ctx := "recipes/" + string(id)
+		if !strings.HasPrefix(string(id), "rec-") {
+			v.addf("%s: id must use the rec- prefix", ctx)
+		}
+		if r.Product == "" {
+			v.addf("%s: missing product", ctx)
+		} else {
+			covered[r.Product] = true
+			if it, ok := c.Items[r.Product]; ok {
+				if it.Category != CatAmmo && it.Category != CatCharge {
+					v.addf("%s: product %q is category %q; only ships, modules and ammo/charge items are manufactured",
+						ctx, r.Product, it.Category)
+				}
+			} else if _, isShip := c.Ships[ShipID(r.Product)]; !isShip {
+				if _, isMod := c.Modules[ModuleID(r.Product)]; !isMod {
+					v.addf("%s: product %q is not an item, ship, or module", ctx, r.Product)
+				}
+			}
+		}
+		if r.Qty < 1 {
+			v.addf("%s: qty %d must be >= 1", ctx, r.Qty)
+		}
+		if r.Time <= 0 {
+			v.addf("%s: time %v must be > 0", ctx, r.Time)
+		}
+		if !recipeFamilies[r.Family] {
+			v.addf("%s: unknown family %q (want hulls|modules|charges)", ctx, r.Family)
+		}
+		if len(r.Inputs) == 0 {
+			v.addf("%s: no inputs", ctx)
+		}
+		for i, in := range r.Inputs {
+			item, ok := c.Items[in.Item]
+			if !ok {
+				v.addf("%s: inputs[%d] references unknown item %q", ctx, i, in.Item)
+				continue
+			}
+			if item.Category != CatMineral {
+				v.addf("%s: inputs[%d] item %q is category %q; recipes take minerals only (ore refines via refine_yield)",
+					ctx, i, in.Item, item.Category)
+			}
+			if in.Qty <= 0 {
+				v.addf("%s: inputs[%d] qty %v must be > 0", ctx, i, in.Qty)
+			}
+		}
+	}
+	// Completeness: every manufactured product has at least one recipe.
+	for _, id := range keys(c.Ships) {
+		if !covered[ItemID(id)] {
+			v.addf("recipes: no recipe produces ship %q", id)
+		}
+	}
+	for _, id := range keys(c.Modules) {
+		if !covered[ItemID(id)] {
+			v.addf("recipes: no recipe produces module %q", id)
+		}
+	}
+	for _, id := range keys(c.Items) {
+		it := c.Items[id]
+		if (it.Category == CatAmmo || it.Category == CatCharge) && !covered[id] {
+			v.addf("recipes: no recipe produces item %q", id)
+		}
+	}
+}
+
 func (v *validator) npcs() {
 	for _, id := range keys(v.c.NPCs) {
 		n := v.c.NPCs[id]
@@ -496,7 +580,7 @@ func (v *validator) celestialBlocks(cctx string, sys *SystemDef, cel *CelestialD
 	if cel.Station != nil {
 		for _, s := range cel.Station.Services {
 			if !validServices[s] {
-				v.addf("%s: unknown station service %q (allowed: repair, market, refine, fitting)", cctx, s)
+				v.addf("%s: unknown station service %q (allowed: repair, market, refine, fitting, industry)", cctx, s)
 			}
 		}
 	}

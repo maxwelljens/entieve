@@ -13,10 +13,10 @@ import (
 // Load reads game data from fsys.
 //
 // It walks items/, ships/, modules/, npcs/, systems/, worlds/, contracts/,
-// traffic/ plus universe.json under the filesystem root. Every JSON file may
-// contain a single object or an array of objects. universe.json must contain
-// exactly one UniverseDef whose "systems" field is empty (systems come from
-// systems/*.json; the universe file only supplies region/constellation/
+// traffic/, recipes/ plus universe.json under the filesystem root. Every JSON
+// file may contain a single object or an array of objects. universe.json must
+// contain exactly one UniverseDef whose "systems" field is empty (systems come
+// from systems/*.json; the universe file only supplies region/constellation/
 // start_system).
 //
 // Errors never fail at the first problem: every parse error names its file
@@ -31,6 +31,7 @@ func Load(fsys fs.FS) (*Content, error) {
 		Contracts: map[ContractID]*ContractDef{},
 		Traffic:   map[SystemID]*TrafficDef{},
 		Worlds:    map[WorldID]*WorldDef{},
+		Recipes:   map[RecipeID]*RecipeDef{},
 	}
 	l := &loader{c: c, defined: map[string]string{}}
 
@@ -60,6 +61,9 @@ func Load(fsys fs.FS) (*Content, error) {
 	loadObjects[TrafficDef](l, fsys, "traffic", "traffic",
 		func(d *TrafficDef) string { return string(d.System) },
 		func(d *TrafficDef) { c.Traffic[d.System] = d })
+	loadObjects[RecipeDef](l, fsys, "recipes", "recipe",
+		func(d *RecipeDef) string { return string(d.ID) },
+		func(d *RecipeDef) { c.Recipes[d.ID] = d })
 
 	l.universe(fsys)
 

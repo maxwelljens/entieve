@@ -73,7 +73,7 @@ func baseContent() *Content {
 					{ID: "cel-a-star", Name: "Star", Kind: CelStar, Radius: 1e8},
 					{ID: "cel-a-station", Name: "Station", Kind: CelStation, Radius: 500,
 						Station: &StationDef{
-							Services: []string{"repair", "market", "refine", "fitting"},
+							Services: []string{"repair", "market", "refine", "fitting", "industry"},
 							Market: []MarketOrderDef{
 								{Item: "min-fer", Qty: 10, Price: 6},
 								{Item: "ship-hull", Qty: 2, Price: 350000},
@@ -96,6 +96,20 @@ func baseContent() *Content {
 				},
 				Scenario: checkpoints(10),
 			},
+		},
+		Recipes: map[RecipeID]*RecipeDef{
+			"rec-ship-hull": {ID: "rec-ship-hull", Product: "ship-hull", Qty: 1,
+				Inputs: []RecipeInput{{Item: "min-fer", Qty: 100}}, Time: 120, Family: FamilyHulls},
+			"rec-mod-gun": {ID: "rec-mod-gun", Product: "mod-gun", Qty: 1,
+				Inputs: []RecipeInput{{Item: "min-fer", Qty: 50}}, Time: 60, Family: FamilyModules},
+			"rec-mod-engine": {ID: "rec-mod-engine", Product: "mod-engine", Qty: 1,
+				Inputs: []RecipeInput{{Item: "min-fer", Qty: 60}}, Time: 45, Family: FamilyModules},
+			"rec-mod-plate": {ID: "rec-mod-plate", Product: "mod-plate", Qty: 1,
+				Inputs: []RecipeInput{{Item: "min-fer", Qty: 40}}, Time: 35, Family: FamilyModules},
+			"rec-charge-cell": {ID: "rec-charge-cell", Product: "charge-cell", Qty: 100,
+				Inputs: []RecipeInput{{Item: "min-fer", Qty: 500}}, Time: 45, Family: FamilyCharges},
+			"rec-charge-bolt": {ID: "rec-charge-bolt", Product: "charge-bolt", Qty: 100,
+				Inputs: []RecipeInput{{Item: "min-fer", Qty: 400}}, Time: 35, Family: FamilyCharges},
 		},
 		Universe: &UniverseDef{Region: "R", Constellation: "C", StartSystem: "sys-a"},
 	}
@@ -432,6 +446,108 @@ func TestValidateNegativeCases(t *testing.T) {
 				c.Worlds["world-showcase"].Scenario[3].Feature = ""
 			},
 			want: "checkpoint[3] missing feature",
+		},
+		{
+			name: "recipe missing id",
+			mutate: func(c *Content) {
+				c.Recipes[""] = &RecipeDef{Product: "ship-hull", Qty: 1,
+					Inputs: []RecipeInput{{Item: "min-fer", Qty: 1}}, Time: 10, Family: FamilyHulls}
+			},
+			want: "recipes: missing id",
+		},
+		{
+			name: "recipe id without rec prefix",
+			mutate: func(c *Content) {
+				c.Recipes["ship-hull-plan"] = &RecipeDef{ID: "ship-hull-plan", Product: "ship-hull", Qty: 1,
+					Inputs: []RecipeInput{{Item: "min-fer", Qty: 1}}, Time: 10, Family: FamilyHulls}
+			},
+			want: "id must use the rec- prefix",
+		},
+		{
+			name: "recipe product resolves to nothing",
+			mutate: func(c *Content) {
+				c.Recipes["rec-ghost"] = &RecipeDef{ID: "rec-ghost", Product: "ship-ghost", Qty: 1,
+					Inputs: []RecipeInput{{Item: "min-fer", Qty: 1}}, Time: 10, Family: FamilyHulls}
+			},
+			want: `product "ship-ghost" is not an item, ship, or module`,
+		},
+		{
+			name: "recipe product is loot",
+			mutate: func(c *Content) {
+				c.Recipes["rec-loot"] = &RecipeDef{ID: "rec-loot", Product: "loot-bit", Qty: 1,
+					Inputs: []RecipeInput{{Item: "min-fer", Qty: 1}}, Time: 10, Family: FamilyModules}
+			},
+			want: `product "loot-bit" is category "loot"`,
+		},
+		{
+			name: "recipe input is ore",
+			mutate: func(c *Content) {
+				c.Recipes["rec-ship-hull"].Inputs[0].Item = "ore-rock"
+			},
+			want: `inputs[0] item "ore-rock" is category "ore"`,
+		},
+		{
+			name: "recipe input unknown item",
+			mutate: func(c *Content) {
+				c.Recipes["rec-ship-hull"].Inputs[0].Item = "min-ghost"
+			},
+			want: `inputs[0] references unknown item "min-ghost"`,
+		},
+		{
+			name: "recipe input without qty",
+			mutate: func(c *Content) {
+				c.Recipes["rec-ship-hull"].Inputs[0].Qty = 0
+			},
+			want: "inputs[0] qty 0 must be > 0",
+		},
+		{
+			name: "recipe without inputs",
+			mutate: func(c *Content) {
+				c.Recipes["rec-ship-hull"].Inputs = nil
+			},
+			want: "rec-ship-hull: no inputs",
+		},
+		{
+			name: "recipe zero product qty",
+			mutate: func(c *Content) {
+				c.Recipes["rec-mod-gun"].Qty = 0
+			},
+			want: "qty 0 must be >= 1",
+		},
+		{
+			name: "recipe zero time",
+			mutate: func(c *Content) {
+				c.Recipes["rec-mod-gun"].Time = 0
+			},
+			want: "time 0 must be > 0",
+		},
+		{
+			name: "recipe unknown family",
+			mutate: func(c *Content) {
+				c.Recipes["rec-mod-gun"].Family = "weapons"
+			},
+			want: `unknown family "weapons" (want hulls|modules|charges)`,
+		},
+		{
+			name: "recipe missing product",
+			mutate: func(c *Content) {
+				c.Recipes["rec-mod-gun"].Product = ""
+			},
+			want: "rec-mod-gun: missing product",
+		},
+		{
+			name: "ship without recipe",
+			mutate: func(c *Content) {
+				delete(c.Recipes, "rec-ship-hull")
+			},
+			want: `no recipe produces ship "ship-hull"`,
+		},
+		{
+			name: "charge item without recipe",
+			mutate: func(c *Content) {
+				delete(c.Recipes, "rec-charge-bolt")
+			},
+			want: `no recipe produces item "charge-bolt"`,
 		},
 	}
 

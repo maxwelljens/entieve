@@ -290,7 +290,7 @@ type GateDef struct {
 // orders (the economy's initial endowment: the book seeds every station
 // starts with; ongoing flow is never conjured).
 type StationDef struct {
-	Services []string         `json:"services"` // "repair" | "market" | "refine" | "fitting"
+	Services []string         `json:"services"` // "repair" | "market" | "refine" | "fitting" | "industry"
 	Market   []MarketOrderDef `json:"market,omitempty"`
 }
 
@@ -479,6 +479,7 @@ type Content struct {
 	Traffic   map[SystemID]*TrafficDef
 	Universe  *UniverseDef
 	Worlds    map[WorldID]*WorldDef
+	Recipes   map[RecipeID]*RecipeDef
 }
 
 // Item returns the item def for id.
@@ -532,6 +533,59 @@ func (c *Content) Board(cel CelID) []*ContractDef {
 		if c.Contracts[id].Station == cel {
 			out = append(out, c.Contracts[id])
 		}
+	}
+	return out
+}
+
+// ---------------------------------------------------------------------------
+// Manufacturing: two-tier recipes (ore -> minerals -> products)
+// ---------------------------------------------------------------------------
+
+// RecipeID is the ID of a manufacturing recipe: kebab-case, "rec-" prefix,
+// globally unique, frozen once shipped (docs/CONTENT_AUTHORING.md).
+type RecipeID string
+
+// Recipe craft-growth families — the station skill-tracking keys. The
+// vocabulary stays small on purpose; new families are a schema change, not
+// free-form data.
+const (
+	FamilyHulls   = "hulls"
+	FamilyModules = "modules"
+	FamilyCharges = "charges"
+)
+
+// RecipeInput is one mineral consumed by a recipe run. v1 takes minerals
+// only: ore refines into minerals (ItemDef.RefineYield), minerals craft
+// into products (RecipeDef).
+type RecipeInput struct {
+	Item ItemID  `json:"item"`
+	Qty  float64 `json:"qty"`
+}
+
+// RecipeDef is one manufacturing recipe: minerals in, one product out.
+//
+// Product resolves the way a market order does — ItemID first, then ShipID
+// cast to ItemID, then ModuleID — and only ships, modules and ammo/charge
+// items may be products (ores, minerals and loot are never manufactured).
+// Qty is units produced per run; Time is seconds per run at craft level 0;
+// Family is one of the Family* constants above. Loaded from recipes/*.json;
+// the schema is a list so multiple recipes per product can exist later even
+// though v1 ships exactly one.
+type RecipeDef struct {
+	ID      RecipeID      `json:"id"`
+	Product ItemID        `json:"product"`
+	Qty     int           `json:"qty"`
+	Inputs  []RecipeInput `json:"inputs"`
+	Time    float64       `json:"time"`
+	Family  string        `json:"family"`
+}
+
+// RecipesInOrder returns every recipe sorted by ID — the canonical iteration
+// order for UI, sim and tests.
+func (c *Content) RecipesInOrder() []*RecipeDef {
+	out := make([]*RecipeDef, 0, len(c.Recipes))
+	for _, id := range keys(c.Recipes) {
+		out = append(out, c.Recipes[id])
 	}
 	return out
 }

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "rec-charge-ap",
+    "product": "charge-ap",
+    "qty": 100,
+    "inputs": [{ "item": "min-ferrite", "qty": 580 }, { "item": "min-nickel", "qty": 100 }, { "item": "min-cobalt", "qty": 60 }],
+    "time": 35,
+    "family": "charges"
+  },
+  {
+    "id": "rec-charge-cap-cell",
+    "product": "charge-cap-cell",
+    "qty": 100,
+    "inputs": [{ "item": "min-ferrite", "qty": 5910 }, { "item": "min-nickel", "qty": 700 }, { "item": "min-silex", "qty": 290 }, { "item": "min-argon", "qty": 170 }],
+    "time": 70,
+    "family": "charges"
+  },
+  {
+    "id": "rec-charge-emp",
+    "product": "charge-emp",
+    "qty": 100,
+    "inputs": [{ "item": "min-ferrite", "qty": 720 }, { "item": "min-argon", "qty": 60 }],
+    "time": 45,
+    "family": "charges"
+  },
+  {
+    "id": "rec-charge-fusion",
+    "product": "charge-fusion",
+    "qty": 100,
+    "inputs": [{ "item": "min-ferrite", "qty": 640 }, { "item": "min-cobalt", "qty": 150 }],
+    "time": 40,
+    "family": "charges"
+  },
+  {
+    "id": "rec-charge-plutonium",
+    "product": "charge-plutonium",
+    "qty": 100,
+    "inputs": [{ "item": "min-ferrite", "qty": 740 }, { "item": "min-nickel", "qty": 140 }, { "item": "min-silex", "qty": 60 }],
+    "time": 50,
+    "family": "charges"
+  }
+]

@@ -131,6 +131,11 @@ func withTraffic(mutate func(*TrafficDef)) *Content {
 		MaxSpeed: 300, Agility: 0.5, Mass: 1000000, SigRadius: 40,
 		Cargo: 100, WarpSpeed: 3, MaxTargetRange: 40000, MaxTargets: 2, ScanResolution: 500,
 	}
+	// The new hull is a manufactured product too: recipe completeness applies.
+	c.Recipes["rec-ship-guard"] = &RecipeDef{
+		ID: "rec-ship-guard", Product: "ship-guard", Qty: 1,
+		Inputs: []RecipeInput{{Item: "min-fer", Qty: 50}}, Time: 120, Family: FamilyHulls,
+	}
 	c.NPCs["npc-guard-test"] = &NpcDef{
 		ID: "npc-guard-test", Name: "Guard", Faction: "Test", Ship: "ship-guard",
 		Fit: []ModuleID{"mod-gun"}, AggroRange: 5000, OrbitRange: 1000,

@@ -137,7 +137,7 @@
         "#8ea8c3"
       ],
       "station": {
-        "services": ["repair", "market", "refine", "fitting"]
+        "services": ["repair", "market", "refine", "fitting", "industry"]
       }
     }
   ]

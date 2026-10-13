@@ -43,6 +43,8 @@ content/data/
 │   ├── solace.json  penumbra.json
 ├── traffic/                 # living-universe convoys/patrols, one def per system
 │   ├── solace.json  penumbra.json  gloam.json
+├── recipes/                 # manufacturing: minerals -> products, rec-* IDs
+│   ├── ships.json  modules.json  charges.json
 └── worlds/                  # one world per file, world-* IDs
     ├── default.json  showcase.json
 ```
@@ -62,6 +64,7 @@ All IDs are kebab-case strings, cross-referenced everywhere:
 | Celestial   | `cel-`      | `cel-haven-rest`     | **unique within its system** (gate `to_cel` resolves inside the destination system; `cel-gate-penumbra` legitimately exists in both `sys-solace` and `sys-gloam`) |
 | Contract    | `contract-` | `contract-solace-cleanup-1` | global            |
 | Traffic     | *(no id)*   | keyed by `system`    | one def per system (`traffic/*.json`) |
+| Recipe      | `rec-`      | `rec-ship-sloop`     | global (frozen once shipped) |
 | World       | `world-`    | `world-showcase`     | global                 |
 
 Never invent new IDs for things listed in `docs/ARCHITECTURE.md`'s registry;
@@ -70,8 +73,8 @@ extend around them.
 ## File format
 
 Every JSON file under `items/`, `ships/`, `modules/`, `npcs/`, `systems/`,
-`contracts/`, `traffic/`, `worlds/` may contain **either a single object or
-an array of objects**:
+`contracts/`, `traffic/`, `recipes/`, `worlds/` may contain **either a single
+object or an array of objects**:
 
 ```json
 { "id": "min-ferrite", "name": "Ferrite", "category": "mineral", "volume": 0.01, "base_price": 6 }
@@ -655,6 +658,97 @@ share = 1, low band = 10 %, k = 1 × 10 %/2.5 = 4 %: 48 → **46.08**
 (the exact `EvMarket` "price falls to 46.08" line the showcase observes).
 Stock changes are always exact integers (units), never floats.
 
+## Recipes (manufacturing)
+
+Manufacturing is the **second tier of a two-step economy** — the two-tier
+rule, enforced by the validator:
+
+| Tier | Input | Mechanism |
+|------|-------|-----------|
+| 1. Refining | `ore-*` | `refine_yield` on the ore turns it into `min-*` minerals at a `refine` station |
+| 2. Manufacturing | `min-*` minerals | `recipes/*.json` turns minerals into products at an `industry` station |
+
+Ore never goes straight into a product (recipes take minerals only), and
+`loot-*` is never a product — salvage stays salvage. Products are exactly:
+ships, modules, and `ammo`/`charge` items. Everything else — ores, minerals,
+loot — has no recipe.
+
+Recipes live in `content/data/recipes/` (arrays of objects, like every other
+dir; one themed file per product family):
+
+```json
+[
+  {
+    "id": "rec-ship-sloop",
+    "product": "ship-sloop",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 20800 }, { "item": "min-nickel", "qty": 3700 }, { "item": "min-silex", "qty": 1500 }],
+    "time": 120,
+    "family": "hulls"
+  }
+]
+```
+
+| Field | Meaning |
+|-------|---------|
+| `id` | `rec-` prefix + the product id — **frozen once shipped**, like every ID in the registry table above |
+| `product` | the ItemID / ShipID / ModuleID produced. Resolves like a market order: item first, then ship, then module. Unknown product, or a product in category `ore`/`mineral`/`loot`, is a validation error |
+| `qty` | units produced per run (1 for hulls and modules; charge runs are batched — shipped batches are 100) |
+| `inputs` | minerals only (`min-*` ids, category `mineral`), each `item` + `qty` in whole units |
+| `time` | seconds per run at craft level 0: **30–90 s** for charges/modules, **2–5 min** for hulls (session-visible timescale) |
+| `family` | craft-growth key for the future station skill tracking: `hulls` \| `modules` \| `charges` |
+
+v1 ships **exactly one recipe per product**, but the schema is a list:
+extra `rec-*` rows for the same product are legal data when the crafting
+sim grows multi-recipe support. Recipe iteration is canonical — always
+`Content.RecipesInOrder()`, sorted by ID (pinned by
+`content.TestRecipeIterationIsCanonical`).
+
+### The envelope (binding)
+
+Material cost per produced unit — `Σ(inputs.qty × mineral base_price) ÷ qty`
+— must land inside **55–75 % of the product's reference price**:
+
+- item products: `ItemDef.base_price`;
+- modules: `ModuleDef.price`;
+- hulls: the shipped market order price (hulls have no price field); hulls
+  that ship no order use the pinned reference table in
+  `content/balance_test.go`.
+
+Worked example (the `rec-ship-sloop` above): `20800 × 6 + 3700 × 14 +
+1500 × 34 = 227,600` against `ship-sloop`'s order price `350,000` →
+**65.0 %**, inside the band. `content.TestRecipeMaterialCostEnvelope` fails
+with the actual percentage when a recipe drifts out.
+
+Rounding: whole mineral units for charges/modules, hundreds/thousands for
+hull inputs. Two monotonicity rules complete the envelope, both test-pinned:
+every **hull** recipe costs more mineral value than every **module** recipe
+(`TestHullRecipesCostMoreThanModules`), and the hull ladder is strictly
+increasing — a barge burns more minerals than a sloop
+(`TestHullRecipeMaterialLadder`).
+
+### `family` vocabulary
+
+`hulls` | `modules` | `charges` — deliberately tiny. The family is the
+craft-growth key station skill tracking will hang off, so it groups by how
+the product is built, not by what it does. Adding a family is a schema
+change (the `Family*` constants in `content/model.go`), not free-form data;
+the validator rejects anything outside the three.
+
+### Binding voice
+
+Recipes carry **no display name of their own** — the UI shows the
+product's registered name (`ShipDef`/`ModuleDef`/`ItemDef` `name`, all in
+`docs/lore/NAMING.md`'s registry). If a recipe label, log line or progress
+string is ever authored for a recipe, it falls under the same binding rules
+as every other display string: `docs/lore/AESTHETIC.md`'s voice, the zone
+words from `docs/lore/NAMING.md`, and never a retired placeholder name.
+
+Manufacturing runs at stations offering the `industry` service (the closed
+set lives in `content/validate.go`: `repair | market | refine | fitting |
+industry`). Shipped, Przystań (`cel-penumbra-port`, the Kuźnica yard
+station) carries it.
+
 ## Checklist before you finish
 
 1. **`go test ./content/...` is green** — the embedded real data must load
@@ -668,7 +762,10 @@ Stock changes are always exact integers (units), never floats.
    loot/market/cargo reference existing items-or-ships-or-modules,
    weapon `ammo_class` matches some ammo/charge, contract targets/destinations
    are real NPCs/items/stations; traffic endpoints/hulls/cargo/raiders
-   resolve inside their system (Recipe 9).
+   resolve inside their system (Recipe 9); every recipe product resolves,
+   its inputs are minerals, and every ship/module/ammo/charge product is
+   covered by at least one recipe
+   [Recipes (manufacturing)](#recipes-manufacturing).
 5. **Reachability**: every system reachable from `start_system` via gates.
 6. **Balance rules of thumb**: small hull 300–800 total HP; frigates
    200k–400k; modules 10k–400k; minerals 5–60/unit; ores 20–120/unit;
@@ -676,7 +773,9 @@ Stock changes are always exact integers (units), never floats.
    weapons `shot_time > 0` with non-zero damage; active modules
    `activation_time > 0`; contract rewards inside the Recipe 8 payout
    ratio table; traffic cadences/probabilities/market drift inside the
-   Recipe 9 calibration tables.
+   Recipe 9 calibration tables; recipe material cost inside the 55–75 %
+   envelope with hull recipes costing more than module recipes
+   [Recipes (manufacturing)](#recipes-manufacturing).
 7. **Every field filled** — no silent zeros where a real value belongs
    (only legitimate zeros: passive `activation_*`, `ore_hold: 0` on
    non-barges, ammo-less `ammo_class: ""`, guard NPCs' `bounty: 0`).
