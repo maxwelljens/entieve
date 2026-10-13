@@ -140,6 +140,8 @@ func (m *Menu) Hover(pt image.Point) {
 // consumes the gesture (the menu is modal), closes, and runs the pressed
 // entry's Action — after the close, so an action that opens another menu
 // wins. Disabled entries and separators only close.
+// Constraint: menu-opening actions would re-enter the second poll in the
+// same frame (Kit.Update polls again after the host's MenuInput pass).
 func (m *Menu) Click(pt image.Point) bool {
 	if !m.open {
 		return false
@@ -272,6 +274,41 @@ func (m *Menu) Draw(dst *ebiten.Image) {
 	}
 }
 
+// pressEdge reports a mouse press edge for menu dismissal/activation.
+// Production polls ebiten directly; headless tests cannot generate OS
+// mouse events, so the edge read goes through this indirection.
+// SetPressEdgeForTest swaps it — tests only; the default is the real poll.
+var pressEdge = func(b ebiten.MouseButton) bool {
+	return inpututil.IsMouseButtonJustPressed(b)
+}
+
+// SetPressEdgeForTest overrides the menu's press-edge poll for a headless
+// test and returns a restore func. Test-only seam: never call it from
+// production code. Cursor position has its own seam, SetPollCursorForTest.
+func SetPressEdgeForTest(f func(ebiten.MouseButton) bool) func() {
+	prev := pressEdge
+	pressEdge = f
+	return func() { pressEdge = prev }
+}
+
+// pollCursor is the menu's cursor read: live off ebiten, NOT ebitenui's
+// input.CursorPosition() — that one is a cache refreshed only inside
+// UI.Update, which Kit.Update deliberately skips while a menu is open
+// (modality), so the cached value freezes at the open anchor and every
+// hit test lands 5px above row 0. Headless tests cannot move the OS
+// cursor, so the read goes through this indirection.
+// SetPollCursorForTest swaps it — tests only; the default is the real poll.
+var pollCursor = ebiten.CursorPosition
+
+// SetPollCursorForTest overrides the menu's live cursor poll for a
+// headless test and returns a restore func. Test-only seam: never call
+// it from production code.
+func SetPollCursorForTest(f func() (int, int)) func() {
+	prev := pollCursor
+	pollCursor = f
+	return func() { pollCursor = prev }
+}
+
 // MenuInput polls the host's pointer and Esc key for the context menu.
 // It must run BEFORE scene and key handling (Game.Update calls it first):
 // it returns whether a menu owned this frame's input, which the host
@@ -289,15 +326,15 @@ func (m *Menu) poll() bool {
 	if m == nil || !m.open {
 		return false
 	}
-	x, y := input.CursorPosition()
+	// Live read: ebitenui's cursor cache is stale by design while open.
+	x, y := pollCursor()
 	pt := image.Pt(x, y)
 	m.Hover(pt)
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 		m.Esc()
 		return true
 	}
-	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) ||
-		inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight) {
+	if pressEdge(ebiten.MouseButtonLeft) || pressEdge(ebiten.MouseButtonRight) {
 		m.Click(pt)
 		return true
 	}
