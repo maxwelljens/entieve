@@ -1,0 +1,99 @@
+{
+  "id": "sys-rudnik",
+  "name": "Rudnik",
+  "security": "high",
+  "constellation": "Kresy",
+  "region": "Far Moravia",
+  "position": { "X": -3.8, "Y": 1.6 },
+  "palette": {
+    "nebula1": "#0a1424",
+    "nebula2": "#1a2a44",
+    "nebula3": "#2a2440",
+    "star": "#ffd28a"
+  },
+  "celestials": [
+    {
+      "id": "cel-rudnik-star",
+      "name": "Rudnik",
+      "kind": "star",
+      "position": { "X": 0, "Y": 0 },
+      "radius": 640000000,
+      "colors": ["#fff0d0"]
+    },
+    {
+      "id": "cel-rudnik-prime",
+      "name": "Rudnik Prime",
+      "kind": "planet",
+      "position": { "X": 1500000000, "Y": -700000000 },
+      "radius": 6371000,
+      "colors": ["#6f8f6a"]
+    },
+    {
+      "id": "cel-halda",
+      "name": "Halda",
+      "kind": "station",
+      "position": { "X": 620000000, "Y": 430000000 },
+      "radius": 800,
+      "colors": ["#c9d4e8"],
+      "station": {
+        "services": ["market", "repair"],
+        "market": [
+          { "item": "mod-mining-laser", "qty": 20, "price": 175000 },
+          { "item": "mod-afterburner", "qty": 12, "price": 155000 },
+          { "item": "mod-armor-rep", "qty": 10, "price": 210000 },
+          { "item": "mod-armor-plate", "qty": 15, "price": 120000 },
+          { "item": "charge-emp", "qty": 3000, "price": 120 },
+          { "item": "charge-cap-cell", "qty": 600, "price": 1000 },
+          { "item": "ore-sterngrit", "qty": 4000, "price": 22, "side": "buy" },
+          { "item": "ore-cordite", "qty": 3000, "price": 43, "side": "buy" },
+          { "item": "ore-lucidite", "qty": 1500, "price": 76, "side": "buy" },
+          { "item": "min-ferrite", "qty": 20000, "price": 5, "side": "buy" },
+          { "item": "min-nickel", "qty": 6000, "price": 12, "side": "buy" }
+        ]
+      }
+    },
+    {
+      "id": "cel-rudnik-belt",
+      "name": "Rudnik Belt",
+      "kind": "belt",
+      "position": { "X": -1200000000, "Y": 950000000 },
+      "radius": 300000,
+      "colors": ["#8f8475"],
+      "belt": {
+        "asteroids": [
+          { "ore": "ore-sterngrit", "count": 14, "volume": 3000 },
+          { "ore": "ore-cordite", "count": 12, "volume": 5500 },
+          { "ore": "ore-lucidite", "count": 6, "volume": 9000 }
+        ]
+      },
+      "spawns": [
+        { "npc_id": "npc-guard-patrol", "count": 2, "respawn_sec": 300 },
+        { "npc_id": "npc-rat-scuttler", "count": 3, "respawn_sec": 90 }
+      ]
+    },
+    {
+      "id": "cel-gate-solace",
+      "name": "Starogród Gate",
+      "kind": "gate",
+      "position": { "X": -2700000000, "Y": -1500000000 },
+      "radius": 2500,
+      "colors": ["#ffd28a"],
+      "gate": {
+        "to_system": "sys-solace",
+        "to_cel": "cel-gate-rudnik"
+      }
+    },
+    {
+      "id": "cel-gate-mlynow",
+      "name": "Młynów Gate",
+      "kind": "gate",
+      "position": { "X": 2600000000, "Y": 1700000000 },
+      "radius": 2500,
+      "colors": ["#8fd8c0"],
+      "gate": {
+        "to_system": "sys-mlynow",
+        "to_cel": "cel-gate-rudnik"
+      }
+    }
+  ]
+}

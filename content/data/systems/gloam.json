@@ -49,6 +49,18 @@
         "to_system": "sys-penumbra",
         "to_cel": "cel-gate-gloam"
       }
+    },
+    {
+      "id": "cel-gate-glusza",
+      "name": "Głusza Gate",
+      "kind": "gate",
+      "position": { "X": -2500000000, "Y": 1700000000 },
+      "radius": 2500,
+      "colors": ["#a8b8ff"],
+      "gate": {
+        "to_system": "sys-glusza",
+        "to_cel": "cel-gate-gloam"
+      }
     }
   ]
 }

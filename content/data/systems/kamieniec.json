@@ -1,0 +1,106 @@
+{
+  "id": "sys-kamieniec",
+  "name": "Kamieniec",
+  "security": "low",
+  "constellation": "Kresy",
+  "region": "Far Moravia",
+  "position": { "X": 8.6, "Y": 2.4 },
+  "palette": {
+    "nebula1": "#0c1220",
+    "nebula2": "#1c2638",
+    "nebula3": "#2e3442",
+    "star": "#ffe8c0"
+  },
+  "celestials": [
+    {
+      "id": "cel-kamieniec-star",
+      "name": "Kamieniec",
+      "kind": "star",
+      "position": { "X": 0, "Y": 0 },
+      "radius": 560000000,
+      "colors": ["#fff4dc"]
+    },
+    {
+      "id": "cel-kamieniec-prime",
+      "name": "Kamieniec Prime",
+      "kind": "planet",
+      "position": { "X": -1600000000, "Y": -600000000 },
+      "radius": 6371000,
+      "colors": ["#7f8a94"]
+    },
+    {
+      "id": "cel-doki",
+      "name": "Doki",
+      "kind": "station",
+      "position": { "X": 1200000000, "Y": 1400000000 },
+      "radius": 850,
+      "colors": ["#c9d4e8"],
+      "station": {
+        "services": ["market", "fitting", "industry"],
+        "market": [
+          { "item": "ship-sloop", "qty": 6, "price": 402500 },
+          { "item": "ship-cutlass", "qty": 5, "price": 552000 },
+          { "item": "ship-barge", "qty": 4, "price": 862500 },
+          { "item": "ship-hauler", "qty": 4, "price": 747500 },
+          { "item": "ship-npc-patrol", "qty": 3, "price": 440000 },
+          { "item": "mod-rail-turret", "qty": 10, "price": 368000 },
+          { "item": "mod-shield-boost", "qty": 10, "price": 264500 },
+          { "item": "mod-warp-scram", "qty": 8, "price": 276000 },
+          { "item": "mod-rocket-pod", "qty": 12, "price": 207000 },
+          { "item": "charge-emp", "qty": 5000, "price": 144 },
+          { "item": "charge-fusion", "qty": 5000, "price": 132 },
+          { "item": "ore-cordite", "qty": 5000, "price": 41, "side": "buy" },
+          { "item": "ore-lucidite", "qty": 3000, "price": 72, "side": "buy" },
+          { "item": "min-ferrite", "qty": 25000, "price": 5, "side": "buy" },
+          { "item": "min-nickel", "qty": 8000, "price": 12, "side": "buy" }
+        ]
+      },
+      "spawns": [
+        { "npc_id": "npc-guard-patrol", "count": 1, "respawn_sec": 600 }
+      ]
+    },
+    {
+      "id": "cel-kamieniec-belt",
+      "name": "Kamieniec Belt",
+      "kind": "belt",
+      "position": { "X": -900000000, "Y": 1300000000 },
+      "radius": 290000,
+      "colors": ["#8f8475"],
+      "belt": {
+        "asteroids": [
+          { "ore": "ore-sterngrit", "count": 12, "volume": 3000 },
+          { "ore": "ore-cordite", "count": 10, "volume": 4000 },
+          { "ore": "ore-lucidite", "count": 4, "volume": 5500 }
+        ]
+      },
+      "spawns": [
+        { "npc_id": "npc-rat-scuttler", "count": 3, "respawn_sec": 120 },
+        { "npc_id": "npc-rat-marauder", "count": 2, "respawn_sec": 300 }
+      ]
+    },
+    {
+      "id": "cel-gate-penumbra",
+      "name": "Kuźnica Gate",
+      "kind": "gate",
+      "position": { "X": 2900000000, "Y": -1800000000 },
+      "radius": 2500,
+      "colors": ["#9fd0ff"],
+      "gate": {
+        "to_system": "sys-penumbra",
+        "to_cel": "cel-gate-kamieniec"
+      }
+    },
+    {
+      "id": "cel-gate-glusza",
+      "name": "Głusza Gate",
+      "kind": "gate",
+      "position": { "X": 2700000000, "Y": 1900000000 },
+      "radius": 2500,
+      "colors": ["#ff9f8a"],
+      "gate": {
+        "to_system": "sys-glusza",
+        "to_cel": "cel-gate-kamieniec"
+      }
+    }
+  ]
+}

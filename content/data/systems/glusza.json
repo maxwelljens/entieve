@@ -1,0 +1,100 @@
+{
+  "id": "sys-glusza",
+  "name": "Głusza",
+  "security": "null",
+  "constellation": "Kresy",
+  "region": "Far Moravia",
+  "position": { "X": 12.4, "Y": 1.2 },
+  "palette": {
+    "nebula1": "#050810",
+    "nebula2": "#101a22",
+    "nebula3": "#182830",
+    "star": "#9fd8ff"
+  },
+  "celestials": [
+    {
+      "id": "cel-glusza-star",
+      "name": "Głusza",
+      "kind": "star",
+      "position": { "X": 0, "Y": 0 },
+      "radius": 410000000,
+      "colors": ["#d6e6ff"]
+    },
+    {
+      "id": "cel-glusza-prime",
+      "name": "Głusza Prime",
+      "kind": "planet",
+      "position": { "X": 1500000000, "Y": -900000000 },
+      "radius": 6371000,
+      "colors": ["#5f6f7a"]
+    },
+    {
+      "id": "cel-kantor",
+      "name": "Kantor",
+      "kind": "station",
+      "position": { "X": -700000000, "Y": 1000000000 },
+      "radius": 700,
+      "colors": ["#d8c8b0"],
+      "station": {
+        "services": ["market"],
+        "market": [
+          { "item": "mod-rail-turret", "qty": 8, "price": 416000 },
+          { "item": "mod-emp-turret", "qty": 8, "price": 325000 },
+          { "item": "mod-shield-boost", "qty": 8, "price": 299000 },
+          { "item": "mod-warp-scram", "qty": 6, "price": 336000 },
+          { "item": "charge-emp", "qty": 4000, "price": 168 },
+          { "item": "charge-plutonium", "qty": 3000, "price": 182 },
+          { "item": "charge-cap-cell", "qty": 600, "price": 1300 },
+          { "item": "loot-alloy-scrap", "qty": 500, "price": 3200, "side": "buy" },
+          { "item": "loot-navdata", "qty": 80, "price": 20000, "side": "buy" },
+          { "item": "loot-iced-core", "qty": 4, "price": 72000, "side": "buy" },
+          { "item": "charge-plutonium", "qty": 2000, "price": 104, "side": "buy" },
+          { "item": "charge-emp", "qty": 3000, "price": 96, "side": "buy" }
+        ]
+      }
+    },
+    {
+      "id": "cel-glusza-belt",
+      "name": "Głusza Belt",
+      "kind": "belt",
+      "position": { "X": -1000000000, "Y": -1500000000 },
+      "radius": 310000,
+      "colors": ["#9db8d0"],
+      "belt": {
+        "asteroids": [
+          { "ore": "ore-glacierite", "count": 12, "volume": 8500 },
+          { "ore": "ore-lucidite", "count": 6, "volume": 7000 }
+        ]
+      },
+      "spawns": [
+        { "npc_id": "npc-rat-scuttler", "count": 3, "respawn_sec": 90 },
+        { "npc_id": "npc-rat-marauder", "count": 2, "respawn_sec": 180 },
+        { "npc_id": "npc-rat-hierarch", "count": 1, "respawn_sec": 600 }
+      ]
+    },
+    {
+      "id": "cel-gate-kamieniec",
+      "name": "Kamieniec Gate",
+      "kind": "gate",
+      "position": { "X": 2600000000, "Y": -1700000000 },
+      "radius": 2500,
+      "colors": ["#ff9f8a"],
+      "gate": {
+        "to_system": "sys-kamieniec",
+        "to_cel": "cel-gate-glusza"
+      }
+    },
+    {
+      "id": "cel-gate-gloam",
+      "name": "Pustkowie Gate",
+      "kind": "gate",
+      "position": { "X": 2400000000, "Y": 2000000000 },
+      "radius": 2500,
+      "colors": ["#a8b8ff"],
+      "gate": {
+        "to_system": "sys-gloam",
+        "to_cel": "cel-gate-glusza"
+      }
+    }
+  ]
+}

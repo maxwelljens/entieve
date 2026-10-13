@@ -139,6 +139,40 @@
       "station": {
         "services": ["repair", "market", "refine", "fitting", "industry"]
       }
+    },
+    {
+      "id": "cel-gate-mlynow",
+      "name": "Młynów Gate",
+      "kind": "gate",
+      "position": {
+        "X": -1800000000,
+        "Y": -2100000000
+      },
+      "radius": 2500,
+      "colors": [
+        "#c9a8ff"
+      ],
+      "gate": {
+        "to_system": "sys-mlynow",
+        "to_cel": "cel-gate-penumbra"
+      }
+    },
+    {
+      "id": "cel-gate-kamieniec",
+      "name": "Kamieniec Gate",
+      "kind": "gate",
+      "position": {
+        "X": 900000000,
+        "Y": 2700000000
+      },
+      "radius": 2500,
+      "colors": [
+        "#9fd0ff"
+      ],
+      "gate": {
+        "to_system": "sys-kamieniec",
+        "to_cel": "cel-gate-penumbra"
+      }
     }
   ]
 }
