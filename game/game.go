@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	enuiinput "github.com/ebitenui/ebitenui/input"
 	"github.com/ebitenui/ebitenui/widget"
@@ -219,6 +220,18 @@ type Game struct {
 	pendingLoad bool
 	quit        bool
 
+	// menuModal latches the frame's context-menu state: Game.Update
+	// samples it (Kit.MenuInput) before any scene or key handling, so a
+	// menu that is up — or that consumed this frame's click/Esc — gates
+	// world input (overUI) and the key switches for the whole frame.
+	menuModal bool
+
+	// objClick is the contract-objective label's double-click state.
+	objClick struct {
+		id content.ContractID
+		at time.Time
+	}
+
 	scenes []Scene
 	space  *SpaceScene
 	w, h   int // logical screen size (Layout)
@@ -343,6 +356,11 @@ func (g *Game) applySize(w, h int) {
 // drains events into the log and the scene reactions, then syncs and
 // advances the interface.
 func (g *Game) Update() error {
+	// The context menu owns its frame: sample it before anything reads
+	// input (it may consume this frame's Esc or click), then gate the
+	// scene and key switches on the latch.
+	g.menuModal = g.kit.MenuInput()
+
 	in := g.buildInput()
 
 	if err := g.handleKeys(in); err != nil {
@@ -405,6 +423,12 @@ func (g *Game) handleKeys(in Input) error {
 	for _, k := range in.JustPressed {
 		switch {
 		case k == ebiten.KeyEscape:
+			// A context menu that was up this frame consumed the Esc
+			// (Kit.MenuInput closed it) — it must not also push the menu
+			// scene behind the dismissed popup.
+			if g.menuModal {
+				continue
+			}
 			if err := g.onEscape(); err != nil {
 				return err
 			}
@@ -425,7 +449,10 @@ func (g *Game) handleKeys(in Input) error {
 			switch {
 			case menuOpen:
 				// The Esc menu is modal: nothing else toggles while it
-				// is open (save/load/time above still work).
+			// is open (save/load/time above still work).
+			case g.menuModal:
+				// So is a context menu: it owns this frame's keys until
+				// the click or Esc that dismisses it has been spent.
 			case k == ebiten.KeyN:
 				g.toggleMap()
 			case k == ebiten.KeyH:
@@ -611,10 +638,27 @@ func (g *Game) overUI(x, y float64) bool {
 		return true
 	}
 	pt := image.Point{X: int(x), Y: int(y)}
+	// The context menu gates in two deterministic parts: its popup rect,
+	// which uikit exposes (an ebitenui-drawn popup would be invisible to
+	// this rect test), and the frame latch — a menu that was up when the
+	// frame's input was sampled owns every gesture on it, so the click
+	// that dismisses the popup cannot also act in the world.
+	if r, open := g.kit.MenuRect(); open && pt.In(r) {
+		return true
+	}
+	if g.menuModal {
+		return true
+	}
 	if hitWidget(pt, g.kit.OverviewWindow().GetContainer().GetWidget()) {
 		return true
 	}
 	if hitWidget(pt, g.kit.SelectedWindow().GetContainer().GetWidget()) {
+		return true
+	}
+	// The Show Info window is a normal (non-modal) window, but only while
+	// it is up: closed it is unmounted AND hidden, and a hidden widget
+	// keeps its last rect (hitWidget checks visibility).
+	if hitWidget(pt, g.kit.InfoWindow().GetContainer().GetWidget()) {
 		return true
 	}
 	if g.hud != nil && isVisible(g.hud.Container().GetWidget()) {
@@ -790,6 +834,10 @@ func (g *Game) placeDefaults(w, h int) {
 		x := (w - r.Dx()) / 2
 		place(g.help.Win(), image.Rect(x, 24, x+r.Dx(), 24+r.Dy()))
 	}
+	// The Show Info window floats: centered like the other on-demand
+	// overlays (its sidecar rect wins once the player has one, and it is
+	// hidden until the first Show anyway).
+	center(g.kit.InfoWindow())
 	// Docked set: the station's own column (content height) and the
 	// service trio composed for this viewport.
 	lay := stationLayout(w, h, g.stationW.GetContainer().GetWidget().Rect.Dy())

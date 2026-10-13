@@ -67,17 +67,43 @@ func NewFitting(env Env) *Fitting {
 			f.selSlot, f.hasSlot = sp, true
 		}
 	})
+	// Double-click shows the fitted module; right-click opens the row
+	// menu — the row under the cursor becomes the selection first, so the
+	// Fit/Unefit entries drive the very same handlers (and gating) as the
+	// toolbar buttons.
+	f.slots.OnActivate(func(r TableRow) { showInfoData(f.env, r.Data) })
+	f.slots.OnMenu(func(r TableRow, at image.Point) {
+		pick, ok := r.Data.(slotPick)
+		if !ok {
+			return
+		}
+		f.selSlot, f.hasSlot = pick, true
+		f.slots.SelectData(r.Data)
+		f.Sync() // re-gate Fit/Unefit on the clicked row before the menu reads it
+		ref, hasRef := f.env.InfoRefOf(pick)
+		f.env.OpenMenu([]MenuEntry{
+			showInfoMenuEntry(f.env, ref, hasRef),
+			MenuSep,
+			{Label: "Fit module", Disabled: f.fitMod.GetWidget().Disabled, Action: f.fitClicked},
+			{Label: "Unefit slot", Disabled: f.unfit.GetWidget().Disabled, Action: f.unfitClicked},
+		}, at)
+	})
 	f.hangar = NewTable(env, []Column{
 		{Key: "Item", Title: "Hangar", Priority: 1},
 		{Key: "Qty", Title: "Qty", Priority: 0, AlignRight: true},
 	})
-	f.hangar.OnSelect(func(r TableRow) {
-		switch id := r.Data.(type) {
-		case content.ModuleID:
-			f.selMod, f.hasMod = id, true
-		case content.ShipID:
-			f.selShip, f.hasShip = id, true
-		}
+	f.hangar.OnSelect(f.selectHangar)
+	f.hangar.OnActivate(func(r TableRow) { showInfoData(f.env, r.Data) })
+	f.hangar.OnMenu(func(r TableRow, at image.Point) {
+		f.selectHangar(r)
+		f.hangar.SelectData(r.Data)
+		f.Sync()
+		ref, hasRef := f.env.InfoRefOf(r.Data)
+		f.env.OpenMenu([]MenuEntry{
+			showInfoMenuEntry(f.env, ref, hasRef),
+			MenuSep,
+			{Label: "Fit module", Disabled: f.fitMod.GetWidget().Disabled, Action: f.fitClicked},
+		}, at)
 	})
 
 	f.stats = widget.NewText(
@@ -378,6 +404,17 @@ func (f *Fitting) hangarRows() []TableRow {
 		})
 	}
 	return rows
+}
+
+// selectHangar records the hangar row's payload as the pending fit or
+// assemble target (the selection callback and the row menu share it).
+func (f *Fitting) selectHangar(r TableRow) {
+	switch id := r.Data.(type) {
+	case content.ModuleID:
+		f.selMod, f.hasMod = id, true
+	case content.ShipID:
+		f.selShip, f.hasShip = id, true
+	}
 }
 
 // unfitClicked enqueues CmdUnfitModule for the selected fitted slot.

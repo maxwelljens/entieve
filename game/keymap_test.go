@@ -136,11 +136,13 @@ func TestHelpRangeNumbersMatchExportedArrays(t *testing.T) {
 	}
 }
 
-// TestMouseMapCoversNewGestures: the help overlay documents the ammo
-// right-click and overview wheel scrolling alongside the classic gestures.
+// TestMouseMapCoversNewGestures: the help overlay documents the context
+// menu (including the module menu that carries Cycle charge) and
+// overview wheel scrolling alongside the classic gestures.
 func TestMouseMapCoversNewGestures(t *testing.T) {
 	want := []string{
-		"cycle loaded charge",
+		"context menu",
+		"Cycle charge",
 		"scroll the list",
 		"drag a title bar",
 	}

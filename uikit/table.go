@@ -1,6 +1,7 @@
 package uikit
 
 import (
+	"image"
 	"image/color"
 	"math"
 	"reflect"
@@ -104,6 +105,7 @@ type Table struct {
 	sortFn     func(key string, asc bool, rows []TableRow)
 	onSelect   func(row TableRow)
 	onActivate func(row TableRow)
+	onMenu     func(row TableRow, at image.Point)
 
 	selIdx  int // selected row index, -1 = none
 	selData any // Data of the selected row (identity across rebuilds)
@@ -275,6 +277,11 @@ func (t *Table) Selected() (TableRow, bool) {
 // OnActivate registers the row double-click callback: a second click on
 // the same row within doubleClickWindow of the first.
 func (t *Table) OnActivate(fn func(row TableRow)) { t.onActivate = fn }
+
+// OnMenu registers the row right-click callback: it receives the row and
+// the click position in screen space (the context-menu anchor). Rows are
+// hit at row granularity — cells are not individually hit-testable.
+func (t *Table) OnMenu(fn func(row TableRow, at image.Point)) { t.onMenu = fn }
 
 // SetSortFunc overrides how rows are ordered for a column key: fn must
 // order rows in place (stable). The default orders lexicographically by
@@ -463,8 +470,11 @@ func (t *Table) newRow(i int) *widget.Container {
 			// when the columns underfill it.
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 			widget.WidgetOpts.MouseButtonClickedHandler(func(args *widget.WidgetMouseButtonClickedEventArgs) {
-				if args.Button == ebiten.MouseButtonLeft {
+				switch args.Button {
+				case ebiten.MouseButtonLeft:
 					t.rowClicked(i)
+				case ebiten.MouseButtonRight:
+					t.rowMenu(i, ClickPoint(args))
 				}
 			}),
 		),
@@ -579,6 +589,17 @@ func (t *Table) rowClicked(i int) {
 		}
 	}
 	t.last, t.hasLast, t.lastAt = row, true, now
+}
+
+// rowMenu resolves the right-clicked row (by index, the same way
+// rowClicked does) and hands it to the owner's menu builder with the
+// click position. A right-click selects nothing — the menu acts on the
+// row it was opened on.
+func (t *Table) rowMenu(i int, at image.Point) {
+	if i < 0 || i >= len(t.rows) || t.onMenu == nil {
+		return
+	}
+	t.onMenu(t.rows[i], at)
 }
 
 // updateIcon refreshes one row's cell icons and their palette role. It runs

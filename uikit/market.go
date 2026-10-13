@@ -48,6 +48,26 @@ func NewMarket(env Env) *Market {
 			m.sel, m.hasSel = id, true
 		}
 	})
+	// Double-click shows the order's item; right-click opens the row menu
+	// on the row under the cursor (which becomes the trade target, so Buy
+	// and Sell act on what was clicked — they drive the very same handlers
+	// as the toolbar buttons).
+	m.tbl.OnActivate(func(r TableRow) { m.showInfo(r.Data) })
+	m.tbl.OnMenu(func(r TableRow, at image.Point) {
+		id, ok := r.Data.(content.ItemID)
+		if !ok {
+			return
+		}
+		m.sel, m.hasSel = id, true
+		m.tbl.SelectData(r.Data)
+		gated := !m.docked()
+		m.env.OpenMenu([]MenuEntry{
+			{Label: "Show Info", Bold: true, Action: func() { m.showInfo(r.Data) }},
+			MenuSep,
+			{Label: "Buy", Disabled: gated, Action: m.buyClicked},
+			{Label: "Sell", Disabled: gated, Action: m.sellClicked},
+		}, at)
+	})
 
 	m.qtyLabel = widget.NewText(
 		widget.TextOpts.Text("Qty 1", env.Face(StepSmall), solid(p.Accent)),
@@ -189,6 +209,14 @@ func (m *Market) sellClicked() {
 		return
 	}
 	m.env.Enqueue(sim.CmdSell{Item: m.sel, Qty: m.qty()})
+}
+
+// showInfo opens the row's item in the Show Info window (no-op for an
+// id the content does not know).
+func (m *Market) showInfo(data any) {
+	if ref, ok := m.env.InfoRefOf(data); ok {
+		m.env.ShowInfo(ref)
+	}
 }
 
 // itemLabel resolves a market/hangar ID to a display name (items, ships

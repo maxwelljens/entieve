@@ -25,7 +25,7 @@ func TestPanelMountAndSync(t *testing.T) {
 			"hud": g.hud, "rack": g.rack, "log": g.logP, "inventory": g.inv,
 			"fitting": g.fitt, "market": g.mkt, "scanner": g.scan,
 			"map": g.mp, "help": g.help, "menu": g.menuWin,
-			"station": g.stationW, "kit": g.kit,
+			"station": g.stationW, "kit": g.kit, "infowin": g.kit.InfoWindow(),
 		} {
 			if v == nil {
 				t.Fatalf("%dx%d: panel %s is nil", size[0], size[1], name)
@@ -126,9 +126,10 @@ func TestPanelDefsCoverEnum(t *testing.T) {
 		_ = d.want(g, true)
 	}
 
-	// layoutNames = the two core windows + every named panel, in enum
-	// order — the sidecar and the table cannot drift apart.
-	want := []string{"overview", "selected"}
+	// layoutNames = the two core windows + the Show Info window + every
+	// named panel, in enum order — the sidecar and the table cannot
+	// drift apart.
+	want := []string{"overview", "selected", "infowin"}
 	for p := panelID(0); p < numPanels; p++ {
 		if panelDefs[p].name != "" {
 			want = append(want, panelDefs[p].name)
@@ -142,13 +143,15 @@ func TestPanelDefsCoverEnum(t *testing.T) {
 			t.Errorf("layoutNames[%d] = %q, want %q", i, name, want[i])
 		}
 	}
-	// Every named panel resolves to a window and its own flag.
+	// Every named panel resolves to a window; the two core windows and
+	// the Show Info window are geometry-only (no open flag — infowin is
+	// written closed and never restores open).
 	for _, name := range layoutNames {
 		win, open := g.layoutTarget(name)
 		if win == nil {
 			t.Errorf("layoutTarget(%q) resolved no window", name)
 		}
-		if name != "overview" && name != "selected" && open == nil {
+		if name != "overview" && name != "selected" && name != "infowin" && open == nil {
 			t.Errorf("layoutTarget(%q) resolved no open flag", name)
 		}
 	}

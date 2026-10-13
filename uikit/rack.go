@@ -1,6 +1,7 @@
 package uikit
 
 import (
+	"image"
 	"image/color"
 	"math"
 	"sort"
@@ -54,10 +55,12 @@ var (
 // Rack is the bottom-right module rack: one cell per slot showing the
 // module short name, an amber glow while active, a cycle progress bar and a
 // hover tooltip with the module's key stats. Left-clicking a cell toggles
-// the module (enqueueing CmdActivate/CmdDeactivate; empty slots are inert).
-// Right-clicking a weapon cell cycles its loaded charge (Auto → the
-// weapon's ammo-class charges sitting in cargo → Auto) through
-// sim.CmdSetAmmo.
+// the module (enqueueing CmdActivate/CmdDeactivate; empty slots are inert)
+// and a second click inside the double-click window additionally opens Show
+// Info. Right-clicking a cell opens its context menu — Show Info, the
+// loaded charge as a second ref, and Cycle charge, which walks the old
+// direct right-click's CmdSetAmmo step (Auto → the weapon's ammo-class
+// charges sitting in cargo → Auto).
 type Rack struct {
 	env       Env
 	container *widget.Container
@@ -69,6 +72,10 @@ type Rack struct {
 	// source the F-key module toggles use — before falling back to the
 	// first suitable lock.
 	pick func() ecs.Entity
+
+	// double-click bookkeeping (second click on a cell shows info)
+	lastCell *rackCell
+	lastAt   time.Time
 }
 
 // rackCell is one slot: a cell column (icon tile + name line + cycle bar)
@@ -189,9 +196,9 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 			widget.WidgetOpts.MouseButtonClickedHandler(func(a *widget.WidgetMouseButtonClickedEventArgs) {
 				switch a.Button {
 				case ebiten.MouseButtonLeft:
-					r.toggleModule(cell)
+					r.cellClicked(cell)
 				case ebiten.MouseButtonRight:
-					r.cycleAmmo(cell)
+					r.cellMenu(cell, ClickPoint(a))
 				}
 			}),
 		),
@@ -206,9 +213,9 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 			widget.WidgetOpts.MouseButtonClickedHandler(func(a *widget.WidgetMouseButtonClickedEventArgs) {
 				switch a.Button {
 				case ebiten.MouseButtonLeft:
-					r.toggleModule(cell)
+					r.cellClicked(cell)
 				case ebiten.MouseButtonRight:
-					r.cycleAmmo(cell)
+					r.cellMenu(cell, ClickPoint(a))
 				}
 			}),
 		),
@@ -383,31 +390,25 @@ func (r *Rack) shortName(def *content.ModuleDef) string {
 
 // cellTip builds one fitted cell's tooltip: the shared module model plus
 // what the rack alone knows — the slot, the preferred charge and its cargo
-// count, and the footer hints ("Right-click: cycle ammo", "Click:
+// count — and the footer hints ("Right-click: module menu", "Click:
 // activate"). The returned key covers every input the model reads, so Sync
 // only re-builds the panel when it would actually change — the builder is
 // invoked by rowTip.set exactly then (and on first attach), never as a
 // per-frame throwaway.
 func (r *Rack) cellTip(def *content.ModuleDef, slot sim.SlotRef) (string, func() TooltipModel) {
-	// The rack-only inputs: which charge this cell prefers, how many of it
-	// sit in cargo, and whether a right-click has anywhere to cycle to
-	// (Auto plus at least one cargo charge of the weapon's class).
-	charge, qty, cycleable := "", 0, false
+	// The rack-only inputs: which charge this cell prefers and how many of
+	// it sit in cargo (the menu behind the hint shows the cycle action).
+	charge, qty := "", 0
 	if def.Weapon != nil && def.Weapon.AmmoClass != "" {
 		id := r.ammoPref[slot]
 		charge = r.ammoName(id)
 		qty = r.cargoQty(id)
-		cycleable = len(r.ammoCandidates(def.Weapon.AmmoClass)) > 1
 	}
-	var hints []string
-	if cycleable {
-		hints = append(hints, "Right-click: cycle ammo")
-	}
+	hints := []string{"Right-click: module menu"}
 	if def.ActivationTime > 0 {
 		hints = append(hints, "Click: activate")
 	}
-	key := string(def.ID) + "|" + charge + "|" + strconv.Itoa(qty) +
-		"|" + strconv.FormatBool(cycleable)
+	key := string(def.ID) + "|" + charge + "|" + strconv.Itoa(qty)
 	return key, func() TooltipModel {
 		return r.env.moduleTip(def, slotLabel(slot), charge, qty, hints...)
 	}
@@ -471,6 +472,59 @@ func (r *Rack) ammoCandidates(class string) []content.ItemID {
 	out := make([]content.ItemID, 0, len(ids)+1)
 	out = append(out, "")
 	return append(out, ids...)
+}
+
+// cellClicked handles a cell's left click. The click toggles — that is
+// this surface's documented action ("Click: activate" in the tooltip),
+// so every click fires it — and a repeat inside the double-click window
+// additionally opens Show Info, mirroring the tables' activate-on-repeat
+// pattern (the second click is never swallowed).
+func (r *Rack) cellClicked(cell *rackCell) {
+	r.toggleModule(cell)
+	now := time.Now()
+	if r.lastCell == cell && now.Sub(r.lastAt) < doubleClickWindow {
+		r.lastCell, r.lastAt = nil, time.Time{} // the gesture is spent
+		r.showCellInfo(cell)
+		return
+	}
+	r.lastCell, r.lastAt = cell, now
+}
+
+// showCellInfo opens the cell's module in the Show Info window.
+func (r *Rack) showCellInfo(cell *rackCell) {
+	if cell.module == "" {
+		return
+	}
+	r.env.ShowInfo(ModuleRef(cell.module))
+}
+
+// cellMenu opens the cell's context menu at the click position: Show Info
+// first (bold, per the menu convention), the loaded charge as a second
+// ref when one is preferred, then Cycle charge — the same CmdSetAmmo walk
+// the direct right-click used to do, gated exactly where it could no-op.
+func (r *Rack) cellMenu(cell *rackCell, at image.Point) {
+	if cell.module == "" {
+		return // empty slot: nothing to show or cycle
+	}
+	def, _ := r.env.Content.Module(cell.module)
+	entries := []MenuEntry{
+		{Label: "Show Info", Bold: true, Action: func() { r.showCellInfo(cell) }},
+	}
+	if id := r.ammoPref[cell.slot]; id != "" {
+		entries = append(entries, MenuEntry{
+			Label:  "Show Info — " + r.ammoName(id),
+			Action: func() { r.env.ShowInfo(ItemRef(id)) },
+		})
+	}
+	if def != nil && def.Weapon != nil && def.Weapon.AmmoClass != "" {
+		cycleable := len(r.ammoCandidates(def.Weapon.AmmoClass)) > 1 && r.env.Enqueue != nil
+		entries = append(entries, MenuSep, MenuEntry{
+			Label:    "Cycle charge",
+			Disabled: !cycleable,
+			Action:   func() { r.cycleAmmo(cell) },
+		})
+	}
+	r.env.OpenMenu(entries, at)
 }
 
 // toggleModule enqueues the activation toggle for one cell: CmdDeactivate

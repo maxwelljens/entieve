@@ -1,6 +1,8 @@
 package uikit
 
 import (
+	"image"
+
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
@@ -10,6 +12,32 @@ import (
 // EnqueueFunc delivers player intent to the simulation. Chrome panels never
 // mutate sim state — every action becomes a sim.Command.
 type EnqueueFunc func(sim.Command)
+
+// services is the session's shared interaction state: the context menu
+// and the Show Info window (and, when a Kit hosts them, how to mount and
+// raise the window). Every Env copied from one source points at the same
+// *services, so all panels of a session open the same menu and swap the
+// same window.
+type services struct {
+	menu *Menu
+	info *InfoWin
+	// show/close are the Kit-hosted Show Info lifecycle (mount + raise /
+	// unmount). A bare NewEnv leaves them nil and Show falls back to the
+	// window's own show/hide — a test harness mounts it by hand.
+	show  func(InfoRef)
+	close func()
+}
+
+// newServices builds the menu and info window bound to env. The returned
+// services is what the environment's svc slot must point at — every Env
+// copy made afterwards shares it.
+func newServices(env Env) *services {
+	s := &services{}
+	env.svc = s // the menu and window reach the shared state through env
+	s.menu = NewMenu(env)
+	s.info = NewInfoWin(env)
+	return s
+}
 
 // Env is the dependency bundle every chrome panel receives: theme, palette,
 // type scale, faces, content and the command seam. Build it once with
@@ -23,13 +51,14 @@ type Env struct {
 	Enqueue EnqueueFunc
 
 	faces kitFaces
+	svc   *services
 }
 
 // NewEnv builds the EVE-dark environment (theme + faces) for the given sim.
 func NewEnv(c *content.Content, s *sim.Sim, enqueue EnqueueFunc) Env {
 	p := DefaultPalette()
 	ts := DefaultTypeScale()
-	return Env{
+	env := Env{
 		Content: c,
 		Sim:     s,
 		Theme:   NewTheme(p, ts),
@@ -38,6 +67,46 @@ func NewEnv(c *content.Content, s *sim.Sim, enqueue EnqueueFunc) Env {
 		Enqueue: enqueue,
 		faces:   newFaces(ts),
 	}
+	env.svc = newServices(env)
+	return env
+}
+
+// Menu returns the environment's context menu (nil in a bare Env literal).
+func (e Env) Menu() *Menu {
+	if e.svc == nil {
+		return nil
+	}
+	return e.svc.menu
+}
+
+// OpenMenu opens the context menu with the given entries at at (the click
+// position in screen space). It replaces any menu already up.
+func (e Env) OpenMenu(entries []MenuEntry, at image.Point) {
+	if m := e.Menu(); m != nil {
+		m.Open(entries, at)
+	}
+}
+
+// ShowInfo opens (or swaps) the session's Show Info window on ref. With a
+// Kit hosting the window this mounts it and raises it to the top of the
+// window stack; in a bare environment it only fills and reveals the window.
+func (e Env) ShowInfo(ref InfoRef) {
+	if e.svc == nil {
+		return
+	}
+	if e.svc.show != nil {
+		e.svc.show(ref)
+		return
+	}
+	e.svc.info.Show(ref)
+}
+
+// InfoWindow returns the session's Show Info window panel.
+func (e Env) InfoWindow() *InfoWin {
+	if e.svc == nil {
+		return nil
+	}
+	return e.svc.info
 }
 
 // Face returns the text face for one type-scale step ("tiny", "small",

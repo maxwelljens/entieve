@@ -596,6 +596,11 @@ func TestOverviewLogEdgeGripsResize(t *testing.T) {
 		} else {
 			log.Win().SetLocation(logTestRect)
 		}
+		// These cases press and release inside table rows, and a repeat
+		// click opens Show Info — a floating window that would block the
+		// next grip (a window's input layer does not care about
+		// visibility). Park it closed alongside the windows above.
+		k.CloseInfo()
 		pumpKit(t, k, 1024, 700)
 		rect := tc.win.GetContainer().GetWidget().Rect
 		if tc.inBody != (image.Rectangle{}) {

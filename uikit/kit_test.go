@@ -152,10 +152,12 @@ func TestNewKitConstruction(t *testing.T) {
 	}
 }
 
-// TestOverviewRowClickSelectsThenApproaches: the overview Table's first
-// click selects, a repeat click inside the double-click window
-// additionally enqueues CmdApproach with the right target.
-func TestOverviewRowClickSelectsThenApproaches(t *testing.T) {
+// TestOverviewRowClickSelectsThenShowsInfo: the overview Table's first
+// click selects; a repeat click inside the double-click window opens
+// Show Info on the row's definition — the old approach-on-activate moved
+// to the world scene (and the row's context menu), and a row with no
+// definition (a celestial) changes nothing.
+func TestOverviewRowClickSelectsThenShowsInfo(t *testing.T) {
 	k, cmds := newTestKit(t)
 	row := &ovRow{info: sim.Info{Entity: ecs.Entity(777), Name: "Scuttler"}}
 	k.ov.tbl.SetRows([]TableRow{
@@ -170,29 +172,50 @@ func TestOverviewRowClickSelectsThenApproaches(t *testing.T) {
 		t.Fatalf("first click enqueued %d commands, want 0", len(*cmds))
 	}
 
+	// Repeat click: no approach command (that verb lives on the world
+	// scene and in the row menu now), and an entity without a definition
+	// opens no window.
 	k.ov.tbl.rowClicked(0)
-	if len(*cmds) != 1 {
-		t.Fatalf("repeat click enqueued %d commands, want 1", len(*cmds))
+	if len(*cmds) != 0 {
+		t.Fatalf("repeat click enqueued %d commands, want 0", len(*cmds))
 	}
-	cmd, ok := (*cmds)[0].(sim.CmdApproach)
-	if !ok {
-		t.Fatalf("command type = %T, want sim.CmdApproach", (*cmds)[0])
-	}
-	if cmd.Target != ecs.Entity(777) {
-		t.Fatalf("CmdApproach.Target = %v, want 777", cmd.Target)
+	if k.InfoOpen() {
+		t.Fatal("an entity with no definition opened Show Info")
 	}
 
-	// A different row inside the window is just a selection.
-	k.ov.tbl.SetRows([]TableRow{
-		{Cells: []string{"Scuttler", "10 m", "Ship", "0 m/s"}, Data: row},
-		{Cells: []string{"Rock", "12 m", "Asteroid", "0 m/s"}, Data: &ovRow{info: sim.Info{Entity: ecs.Entity(778)}}},
-	})
-	k.ov.tbl.rowClicked(1)
-	if len(*cmds) != 1 {
-		t.Fatalf("selection of another row enqueued %d commands, want 1", len(*cmds))
+	// A real grid entity with a definition resolves (the player's own
+	// hull always does): the repeat click swaps the window in.
+	var target sim.Info
+	for _, inf := range k.Sim.Grid() {
+		if !inf.Visible {
+			continue
+		}
+		if _, ok := k.panelEnv().InfoRefFor(inf.Entity); ok {
+			target = inf
+			break
+		}
 	}
-	if k.Selected() != ecs.Entity(778) {
-		t.Fatalf("Selected() = %v, want 778", k.Selected())
+	if target.Entity.IsZero() {
+		t.Fatal("fixture: no visible entity with a definition")
+	}
+	k.ov.tbl.SetRows([]TableRow{
+		{Cells: []string{target.Name}, Data: &ovRow{info: target}},
+	})
+	k.ov.tbl.rowClicked(0)
+	k.ov.tbl.rowClicked(0)
+	if !k.InfoOpen() {
+		t.Fatal("double-click on a resolvable row did not open Show Info")
+	}
+	ref, ok := k.panelEnv().InfoRefFor(target.Entity)
+	if !ok {
+		t.Fatalf("fixture: %v (%s) resolves to no definition", target.Entity, target.Kind)
+	}
+	page, _ := k.panelEnv().infoPageFor(ref)
+	if got, want := k.svc.info.TitleText(), page.Title+" — Info"; got != want {
+		t.Errorf("info title = %q, want %q", got, want)
+	}
+	if r := k.InfoWindow().GetContainer().GetWidget().Rect; r.Dx() == 0 {
+		t.Error("info window never laid out")
 	}
 }
 
