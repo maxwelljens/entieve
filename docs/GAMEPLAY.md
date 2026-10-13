@@ -57,7 +57,7 @@ in-game help window renders.
 | Left drag | On any window **edge or corner** (≈8 px grip): resize from all four sides — the opposite edge stays fixed, the window never shrinks past its minimum |
 | Left click | On an overview column header: sort (click again flips direction) |
 | `Ctrl` + left click | Lock target under cursor |
-| Left double-click | Show Info — open the item's details window directly, anywhere the item appears (rack, fitting, market, inventory, overview, scanner, contract rows); on empty space, fly straight toward that point |
+| Left double-click | Show Info — open the item's details window directly, anywhere the item appears (rack, fitting, market, inventory, overview, contract rows); on empty space, fly straight toward that point |
 | Right click | Orbit target under cursor (2,500 m) — in the world; unchanged |
 | Right click | On an item anywhere it appears: flat context menu — **Show Info** first (always bold), then the surface's actions (grayed-but-visible when impossible); on a weapon cell in the module rack: Show Info / Show Info — `<charge>` / ─ / **Cycle charge** |
 | Middle drag | Pan camera |
@@ -208,7 +208,7 @@ Every window opens with the def's description prose. The menus per
 surface: rack cells — Show Info (module) / Show Info — `<charge>` / ─ /
 **Cycle charge**; fitting rows — Show Info / Fit / Unequip; market rows —
 Show Info / Buy / Sell (grayed while undocked); inventory rows — Show
-Info; overview and scanner rows — Show Info / Warp to / Orbit / Approach
+Info; overview rows — Show Info / Warp to / Orbit / Approach / Lock target
 (the entity's hull or caste info plus the usual commands); contract board
 rows — Accept / Abandon (grayed when gated); contract objective labels —
 Show Info.

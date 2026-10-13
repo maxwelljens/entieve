@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Show Info** item inspection: right-click any item anywhere it appears
-  (rack, fitting, market, inventory, overview, scanner, contract rows) for
+  (rack, fitting, market, inventory, overview, contract rows) for
   a flat EVE-style context menu — bold **Show Info** first, then the
   surface's actions, grayed-but-visible when currently impossible — and
   one reusable floating `<Name> — Info` window (dragable, resizable,

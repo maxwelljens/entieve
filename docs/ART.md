@@ -143,7 +143,7 @@ rack cells, the Fitting window's module rows and the Warp gate hint.
 | Hairline | 2 px ColAccent at low alpha (80), full content width |
 | Section label | Regular small, ColHead, stored uppercase (`DAMAGE`, `CHARGE`, `ACTIVATION`) |
 | Row | label ColDim left · value right-anchored on one shared x, ColText (or ColGood/ColDanger for a signed modifier) |
-| Hint footer | Regular tiny, ColDim — `Right-click: cycle ammo`, `Click: activate` |
+| Hint footer | Regular tiny, ColDim — `Right-click: module menu`, `Click: activate` |
 | Surface | the existing panel treatment: opaque `BGHard` fill, 1 px Border edge at 220, 8/5 px padding |
 
 Rules: content-sized up to 320 px wide; rows tile exactly; values never
