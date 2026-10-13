@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Show Info** item inspection: right-click any item anywhere it appears
+  (rack, fitting, market, inventory, overview, scanner, contract rows) for
+  a flat EVE-style context menu — bold **Show Info** first, then the
+  surface's actions, grayed-but-visible when currently impossible — and
+  one reusable floating `<Name> — Info` window (dragable, resizable,
+  non-modal; its rect persists in the layout sidecar but it never opens on
+  its own) showing each def's description prose and per-kind content: hull
+  construction / slots / survival / capacitor / propulsion / sensors /
+  cargo; module activation / kind stats / charges / market; item
+  properties / market / refines-to / damage; machine caste dossier /
+  behavior / loot. Double-click an item to skip the menu and go straight
+  to the window.
+- `TestMemoryFootprintPump`: headless 6,000-frame memory regression guard
+  over the production Update/Draw pipeline — the live heap must plateau
+  (under 10 MB growth between the 3,000- and 6,000-frame marks).
+
+### Changed
+
+- Rack right-click now opens the context menu instead of cycling the
+  loaded charge directly; quick charge-cycling is the menu's **Cycle
+  charge** entry. World right-click (orbit under cursor) is unchanged.
+- Content: NPC caste dossier prose (`NpcDef.Description`) and hull origin
+  tags (`ShipDef.Origin`) — both shown by the Show Info window.
+- Icon silhouette cache now stores the alpha channel only instead of full
+  512×512 white NRGBA bitmaps: 38.0 MiB → 9.5 MiB resident for the same
+  pixels (RGB is a constant 255, so the white form is rebuilt per
+  size-cache miss).
+- Documented the upstream ebitenui v0.7.3 window-remount leak
+  (`docs/ARCHITECTURE.md`, "upstream window-remount leak"): ≈5.3 KB leak
+  per panel dock/toggle mount cycle — real but slow, deliberately not
+  mitigated because hiding-instead-of-unmounting would change input
+  gating and draw order.
+
 ### Fixed
 
 - Per-frame interface garbage churn: panels that are not mounted no longer
@@ -18,24 +53,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pump drops from ≈119 KB/frame to ≈14 KB/frame (−88 %).
 - Station contract board change detection compares the model fields
   instead of `fmt.Sprintf("%v", …)` on every docked frame.
-
-### Changed
-
-- Icon silhouette cache now stores the alpha channel only instead of full
-  512×512 white NRGBA bitmaps: 38.0 MiB → 9.5 MiB resident for the same
-  pixels (RGB is a constant 255, so the white form is rebuilt per
-  size-cache miss).
-- Documented the upstream ebitenui v0.7.3 window-remount leak
-  (`docs/ARCHITECTURE.md`, "upstream window-remount leak"): ≈5.3 KB leak
-  per panel dock/toggle mount cycle — real but slow, deliberately not
-  mitigated because hiding-instead-of-unmounting would change input
-  gating and draw order.
-
-### Added
-
-- `TestMemoryFootprintPump`: headless 6,000-frame memory regression guard
-  over the production Update/Draw pipeline — the live heap must plateau
-  (under 10 MB growth between the 3,000- and 6,000-frame marks).
 
 ## [0.1.0] - 2026-10-12
 

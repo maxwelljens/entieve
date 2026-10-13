@@ -95,6 +95,9 @@ Controls and concepts: [docs/GAMEPLAY.md](docs/GAMEPLAY.md).
 - **Visibility.** The overview shows only the 250 km grid; the scanner sweeps
   for anonymous long-range contacts; warp-to-within (0/10/50 km) shapes
   landings.
+- **Show Info.** Right-click any item where it appears for a flat EVE-style
+  context menu (bold **Show Info** first) and one floating `<Name> — Info`
+  window — description prose, stats, charges, market data, loot.
 - **Time acceleration** (1×–8×).
 
 ## Custom art

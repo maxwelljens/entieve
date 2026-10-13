@@ -207,6 +207,7 @@ type ItemDef struct {
 }
 type ShipDef struct {
     ID ShipID; Name, Class, Description string
+    Origin string                  // naming-layer heritage: "moravian"|"polish"|"nordic"|"latinate"|"old-works"
     Slots struct{ High, Mid, Low int }
     Shield, Armor, Structure float64   // raw HP per layer
     Resists Resists                    // per-layer? No: single Resists struct applied to all layers (keep simple), fields EM/Thermal/Kinetic/Explosive in [0,1)
@@ -229,7 +230,7 @@ type ModuleDef struct {
     Boost  *BoostAttrs         // ShieldBoostPerCycle / ArmorRepPerCycle float64; SpeedMultiplier float64; WebStrength float64; ScramDuration float64; CapRestore float64
 }
 type NpcDef struct {
-    ID NpcID; Name, Faction string
+    ID NpcID; Name, Faction, Description string // Description: machine-caste dossier prose
     Ship ShipID; Fit []ModuleID
     AggroRange, OrbitRange float64
     FleeThreshold float64      // structure fraction 0..1
@@ -670,6 +671,21 @@ NPC traffic delivery + market price drift, ambush on NPC traffic
 > Item header + action buttons, HUD target cards, scanner contacts, fitting
 > slot/hangar rows, contract board rows, service title bars, module-rack
 > tiles.
+
+> **Show Info (2026-10):** `uikit/menu.go` is the flat EVE-style popup
+> context-menu primitive (first entry "Show Info", bold; the other entries
+> are the surface's context actions, grayed-but-visible when currently
+> impossible) and `uikit/infowin.go` is the one reusable floating details
+> window (`<Name> — Info`) with per-kind content builders (hull / module /
+> item / machine caste); item references inside the window are themselves
+> right-clickable (Show Info swaps the window's content). Content schema
+> gains `NpcDef.Description` (dossier prose — the window is its first UI
+> consumer) and `ShipDef.Origin` (naming-layer heritage tag). The layout
+> sidecar's `"infowin"` entry is geometry only — the rect is persisted but
+> the window is never restored open. The popup is custom rather than
+> ebitenui's own context-menu windows because those bypass the
+> deterministic world-input gate: the menu rect joins `Game.overUI`'s
+> exact-rect list, so a click over the popup can never reach world input.
 
 - `render.Renderer` created with `(*content.Content)`; `Draw(dst *ebiten.Image,
   cam Camera, s *sim.Sim)` reads sim stores read-only. Vector art: ships as
