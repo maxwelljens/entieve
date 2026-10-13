@@ -38,6 +38,9 @@
       "station": {
         "services": ["market", "repair"],
         "market": [
+          { "item": "ship-npc-patrol", "qty": 3, "price": 400000 },
+          { "item": "mod-rail-turret", "qty": 12, "price": 320000 },
+          { "item": "mod-shield-boost", "qty": 8, "price": 230000 },
           { "item": "mod-mining-laser", "qty": 20, "price": 175000 },
           { "item": "mod-afterburner", "qty": 12, "price": 155000 },
           { "item": "mod-armor-rep", "qty": 10, "price": 210000 },

@@ -38,6 +38,7 @@
       "station": {
         "services": ["market", "refine", "industry"],
         "market": [
+          { "item": "ship-npc-patrol", "qty": 3, "price": 440000 },
           { "item": "mod-mining-laser", "qty": 15, "price": 201250 },
           { "item": "mod-rail-turret", "qty": 10, "price": 368000 },
           { "item": "mod-shield-boost", "qty": 10, "price": 264500 },

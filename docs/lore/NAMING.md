@@ -51,7 +51,7 @@ entities here in the same format before their content lands.
 | `cel-solace-prime` | Solace Prime | Starogród Prime | place | "<system> Prime" convention |
 | `cel-solace-belt` | Solace Belt | Starogród Belt | place | "<system> Belt" convention |
 | `cel-haven-rest` | Haven Rest | **Jernborg** | Nordic | Danish/Norwegian *jern* "iron" + *borg* "fort"; oldest town, Nordic trace |
-| `cel-gate-penumbra` | Penumbra Gate | Kuźnica Gate | place | gates named for the destination; two instances share this id (`sys-solace`, `sys-gloam`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory) |
+| `cel-gate-penumbra` | Penumbra Gate | Kuźnica Gate | place | gates named for the destination; four instances share this id (`sys-solace`, `sys-gloam`, `sys-mlynow`, `sys-kamieniec`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory) |
 | `cel-penumbra-star` | Penumbra | Kuźnica | place | |
 | `cel-penumbra-belt` | Penumbra Belt | Kuźnica Belt | place | |
 | `cel-penumbra-den` | Penumbra Den | **Gniazdo** | place | "nest" (Polish); the Old Works anomaly in the system |
