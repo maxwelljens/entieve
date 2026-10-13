@@ -571,7 +571,7 @@ type RecipeInput struct {
 // Product resolves the way a market order does — ItemID first, then ShipID
 // cast to ItemID, then ModuleID — and only ships, modules and ammo/charge
 // items may be products (ores, minerals and loot are never manufactured).
-// Qty is units produced per run; Time is seconds per run at craft level 0;
+// Qty is units produced per run; Time is seconds per run at craft level 1 (the baseline; craft levels discount it);
 // Family is one of the Family* constants above. Loaded from recipes/*.json;
 // the schema is a list so multiple recipes per product can exist later even
 // though v1 ships exactly one.

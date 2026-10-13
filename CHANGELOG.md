@@ -64,12 +64,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wishes whenever two stations' prices differ by more than the round-trip
   fee load (`MaxCost` = spread − fees), exposed via `Sim.HaulWishes()`; the
   fulfillment seam (`Sim.FulfillHaul`) pays the hauling cost from the
-  owning agent's free capital and drops the wish — a money sink. The
-  seam's contract is wish-driven convoys: cargo debited from the agent's
-  stock at spawn, delivered as agent-owned asks at the destination at the
-  agent's reservation price, coexisting with authored interval lanes (the
-  logistics-side spawn is the in-flight wiring; `FulfillHaul` is still the
-  stub seam in this tree).
+  owning agent's free capital and drops the wish — a money sink. Wish-driven
+  convoys are live: cargo debited from the agent's stock at spawn, delivered
+  as agent-owned asks at the destination at the agent's reservation price,
+  coexisting with authored interval lanes — one validated shipment per
+  60-tick poll, settled through `FulfillHaul` at 2.5 € per m³ per transit
+  leg on delivery (lost shipments drop the wish unpaid).
 
 ### Changed
 

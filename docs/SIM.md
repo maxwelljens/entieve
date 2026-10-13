@@ -277,12 +277,13 @@ owning agent's stock at spawn**, delivered as **agent-owned asks at the
 destination at the agent's reservation price**, and the **hauling cost is
 paid by the agent** (charged against its free capital — resting-order
 escrow is untouchable — and burned, a money sink). Authored interval lanes
-coexist with the wish lane. *Implementation note:* in the tree documented
-here the seam is `Sim.HaulWishes()` / `Sim.FulfillHaul` (`sim/api.go`) —
-`FulfillHaul` already charges the cost and drops the wish, while
-`sim/system_traffic.go` does not yet spawn the wish-driven convoys
-themselves; treat the paragraph above as the seam's contract and the
-traffic file as the place the wiring lands.
+coexist with the wish lane. *Landed:* `sim/system_traffic.go`'s wish poll
+(`trafficSpawnWishHaulers`) consumes the seam — one validated shipment per
+60-tick poll after the authored lanes, sourced from the owning agent's own
+asks and stock (all-or-nothing), owner-tagged through the journey ledger,
+delivered as asks at `belief × (1 + margin)`, and settled through
+`FulfillHaul` at **2.5 € per m³ per transit leg**, charged on delivery —
+a lost shipment drops the wish unpaid.
 
 ## 5. Price formation
 
