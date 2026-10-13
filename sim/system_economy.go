@@ -14,9 +14,49 @@ import (
 // point across shield, armor and structure (documented simplification).
 const repairCostPerHP = 2
 
-// sellRatio is the fraction of the listed/base price credited on sale
-// (EVE's 1% broker-ish margin simplified to a flat 10% cut).
-const sellRatio = 0.9
+// ---------------------------------------------------------------------------
+// Market constants — the institutional load on every trade (EVE-like,
+// tunable, stateless). Together a round trip costs 5.5% of trade value,
+// inside the 5-11% target band.
+// ---------------------------------------------------------------------------
+
+const (
+	// MarketBrokerFee is charged on the placed value of a buy order at
+	// placement (EVE's broker fee). It is not refunded on cancel — the
+	// escrow itself is, in full, for whatever never trades.
+	MarketBrokerFee = 0.03
+	// MarketSalesTax is charged on the executed value of a sell at
+	// execution (EVE's sales tax).
+	MarketSalesTax = 0.025
+	// marketTickDigits is EVE's price-tick rule: every order price carries
+	// four significant figures (48 ticks in 0.01 steps, 195000 in 100s).
+	marketTickDigits = 4
+)
+
+// quantizeTick rounds a price onto the 4-significant-figure tick grid: the
+// only price an order may rest at. Non-positive prices pass through
+// untouched (they are refused at placement).
+func quantizeTick(p float64) float64 {
+	if p <= 0 || math.IsNaN(p) || math.IsInf(p, 0) {
+		return p
+	}
+	q, err := strconv.ParseFloat(strconv.FormatFloat(p, 'g', marketTickDigits, 64), 64)
+	if err != nil || q <= 0 {
+		return p
+	}
+	return q
+}
+
+// tickDown returns the next tick strictly below p: the undercut step a
+// fresh seller (convoy supply) lists at.
+func tickDown(p float64) float64 {
+	q := quantizeTick(p)
+	if q <= 0 {
+		return q
+	}
+	step := math.Pow(10, math.Floor(math.Log10(q))-(marketTickDigits-1))
+	return quantizeTick(q - step)
+}
 
 // systemEconomy executes deferred station-service commands (only while
 // docked at a station offering the required service).
@@ -62,39 +102,222 @@ func (s *Sim) stationAccess(svc string) (ecs.Entity, bool) {
 	return st, true
 }
 
-// marketIndex returns the index of the order for item in the current
-// system's stock (-1 when unlisted).
-func (s *Sim) marketIndex(item content.ItemID) int {
-	stock := s.market[s.systemID]
-	for i := range stock {
-		if stock[i].Item == item {
-			return i
+// ---------------------------------------------------------------------------
+// Market — per-station continuous double auction (the price former)
+// ---------------------------------------------------------------------------
+
+// dockedStationID returns the celestial id of the station the player is
+// docked at ("" when docked nowhere) — the station stationAccess just
+// validated for the market service.
+func (s *Sim) dockedStationID() StationID {
+	d, ok := s.Docked.Get(s.player)
+	if !ok {
+		return ""
+	}
+	return d.At
+}
+
+// stationSystem resolves a station celestial id to the system it lives in.
+// Station ids are unique universe-wide (content validation), so sorted
+// iteration never changes the answer — only keeps the lookup reproducible.
+func (s *Sim) stationSystem(station StationID) (content.SystemID, bool) {
+	ids := make([]content.SystemID, 0, len(s.Content.Systems))
+	for id := range s.Content.Systems {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	for _, id := range ids {
+		for _, cel := range s.Content.Systems[id].Celestials {
+			if cel.ID == station && cel.Station != nil {
+				return id, true
+			}
 		}
 	}
-	return -1
+	return "", false
 }
 
-// sellPrice returns the unit sale price of an item/ship and whether a market
-// order lists it. Unlisted items fall back to ItemDef.BasePrice, unlisted
-// modules to ModuleDef.Price; unlisted ships cannot be sold (the schema has
-// no ship base price — documented).
-func (s *Sim) sellPrice(item content.ItemID) (float64, bool) {
-	if i := s.marketIndex(item); i >= 0 {
-		return s.market[s.systemID][i].Price, true
+// hasMarketService reports whether a content station offers the market
+// service (the sim-component helper reads live Station components; this is
+// the definition side, for celestials that may be off-grid).
+func hasMarketService(st *content.StationDef) bool {
+	for _, svc := range st.Services {
+		if svc == "market" {
+			return true
+		}
 	}
-	if def, ok := s.Content.Item(item); ok {
-		return def.BasePrice, false
-	}
-	if def, ok := s.Content.Module(content.ModuleID(item)); ok {
-		return def.Price, false
-	}
-	if _, ok := s.Content.Ship(content.ShipID(item)); ok {
-		return 0, false // ships must be listed to be sold
-	}
-	return 0, false
+	return false
 }
 
-// execBuy purchases from the station market while docked.
+// marketPrice is the price ladder for an item at a book: last trade price,
+// then best ask, then best bid, then the def base price (ItemDef.BasePrice
+// falling back to ModuleDef.Price; ships have no base price and report 0).
+func (s *Sim) marketPrice(book *MarketBook, item content.ItemID) float64 {
+	if book != nil {
+		if p, ok := book.lastPrice(item); ok {
+			return p
+		}
+		if o, ok := book.bestAsk(item); ok {
+			return o.Price
+		}
+		if o, ok := book.bestBid(item); ok {
+			return o.Price
+		}
+	}
+	return s.marketBasePrice(item)
+}
+
+// marketVoice emits the market's price line when an execution or a
+// posting moved an item's displayed price: "price falls to" under surplus
+// supply, "price rises to" under demand, both stamped with the station.
+func (s *Sim) marketVoice(book *MarketBook, item content.ItemID, before float64, where string) {
+	after := s.marketPrice(book, item)
+	if before <= 0 || after <= 0 || after == before {
+		return
+	}
+	verb, direction := "Surplus", "falls to"
+	if after > before {
+		verb, direction = "Demand", "rises to"
+	}
+	s.emit(Event{Kind: EvMarket, Severity: SevInfo, System: book.System, Item: item, Value: after,
+		Text: verb + " — " + s.itemName(item) + " price " + direction + " " +
+			euro(after) + " at " + where})
+}
+
+// matchValue sums the executed quantity and value of a fill set.
+func matchValue(ms []match) (qty int, value float64) {
+	for _, m := range ms {
+		qty += m.qty
+		value += m.order.Price * float64(m.qty)
+	}
+	return qty, value
+}
+
+// settle applies a fill set to the book, settles the RESTING side's
+// obligations (a player's filled bid receives its goods into the hangar, a
+// player's filled ask is paid the proceeds minus the sales tax) and
+// records the last trade on the price ladder. The incoming side settles
+// itself in execBuy/execSell/PlaceOrder. Returns quantity and value.
+func (s *Sim) settle(book *MarketBook, ms []match) (int, float64) {
+	qty, value := matchValue(ms)
+	if qty == 0 {
+		return 0, 0
+	}
+	book.applyMatches(ms)
+	if book.Lasts == nil {
+		book.Lasts = map[content.ItemID]float64{}
+	}
+	// Last traded unit: price-time priority's final (worst) fill.
+	book.Lasts[ms[0].order.Item] = ms[len(ms)-1].order.Price
+	for _, m := range ms {
+		if m.order.Owner != OwnerPlayer {
+			continue
+		}
+		if m.order.Side == OrderBuy {
+			s.storePlayerStock(m.order.Item, m.qty)
+			v := m.order.Price * float64(m.qty)
+			s.emit(Event{Kind: EvMarket, Severity: SevGood, Actor: s.player, Item: m.order.Item,
+				Text: "Bought " + itoaN(m.qty) + " x " + s.itemName(m.order.Item) + " for " +
+					euro(v), Value: v})
+			continue
+		}
+		v := m.order.Price * float64(m.qty)
+		tax := MarketSalesTax * v
+		received := v - tax
+		s.wallet += received
+		s.emit(Event{Kind: EvMarket, Severity: SevGood, Actor: s.player, Item: m.order.Item,
+			Text: "Sold " + itoaN(m.qty) + " x " + s.itemName(m.order.Item) + " for " +
+				euro(received) + " (" + euro(tax) + " sales tax)",
+			Value: received})
+	}
+	return qty, value
+}
+
+// marketWithdraw removes up to qty units of item from a station's asks in
+// price-time order — the origin-side fulfillment of a shipment (a convoy
+// takes what the origin station had for sale). It is a transfer, not a
+// trade: no trade price prints at the origin. Returns the units taken and
+// what they cost (0 when the station carries no stock of it).
+func (s *Sim) marketWithdraw(station StationID, item content.ItemID, qty int) (int, float64) {
+	book := s.market[station]
+	if book == nil || qty <= 0 {
+		return 0, 0
+	}
+	ms := book.matchCrossing(OrderBuy, item, qty, 0)
+	taken, paid := matchValue(ms)
+	book.applyMatches(ms)
+	return taken, paid
+}
+
+// playerStock counts the units of item the player can sell: general hold,
+// ore hold, hangar stacks, then stored hulls (one unit per hull).
+func (s *Sim) playerStock(item content.ItemID) int {
+	n := 0
+	if cargo, ok := s.Cargos.Get(s.player); ok {
+		n += stacksCount(cargo.Stacks, item) + stacksCount(cargo.Ore, item)
+	}
+	n += stacksCount(s.Hangar.Items, item)
+	for _, sh := range s.Hangar.Ships {
+		if sh.Hull == content.ShipID(item) {
+			n++
+		}
+	}
+	return n
+}
+
+// takePlayerStock removes up to qty units in sell order — general hold,
+// ore hold, hangar, stored hulls (one StoredShip per hull, the route
+// execSell has always taken) — and returns how many it got.
+func (s *Sim) takePlayerStock(item content.ItemID, qty int) int {
+	taken := 0
+	if cargo, ok := s.Cargos.Get(s.player); ok && taken < qty {
+		var n int
+		cargo.Stacks, n = takeStacks(cargo.Stacks, item, qty-taken)
+		taken += n
+	}
+	if cargo, ok := s.Cargos.Get(s.player); ok && taken < qty {
+		var n int
+		cargo.Ore, n = takeStacks(cargo.Ore, item, qty-taken)
+		taken += n
+	}
+	if taken < qty {
+		var n int
+		s.Hangar.Items, n = takeStacks(s.Hangar.Items, item, qty-taken)
+		taken += n
+	}
+	if taken < qty {
+		kept := s.Hangar.Ships[:0]
+		for _, sh := range s.Hangar.Ships {
+			if taken < qty && sh.Hull == content.ShipID(item) {
+				taken++
+				continue
+			}
+			kept = append(kept, sh)
+		}
+		s.Hangar.Ships = kept
+	}
+	return taken
+}
+
+// storePlayerStock puts units into the station hangar: the delivery side
+// of a purchase and the refund of a cancelled sell order (hulls become
+// fresh StoredShips — market goods never carry a fit).
+func (s *Sim) storePlayerStock(item content.ItemID, qty int) {
+	if qty <= 0 {
+		return
+	}
+	if hull, ok := s.Content.Ship(content.ShipID(item)); ok {
+		for range qty {
+			s.Hangar.Ships = append(s.Hangar.Ships, StoredShip{Hull: hull.ID})
+		}
+		return
+	}
+	s.Hangar.Items = addStacks(s.Hangar.Items, item, qty)
+}
+
+// execBuy fills CmdBuy as an immediate-or-cancel market order against the
+// docked station's book: price-time priority at the resting orders'
+// prices, a broker fee on the executed value, nothing rests — whatever
+// the book cannot fill simply stays with the buyer (never conjured).
 func (s *Sim) execBuy(c CmdBuy) {
 	if _, ok := s.stationAccess("market"); !ok {
 		return
@@ -103,46 +326,39 @@ func (s *Sim) execBuy(c CmdBuy) {
 		s.log(SevWarning, s.player, "Invalid quantity")
 		return
 	}
-	i := s.marketIndex(c.Item)
-	if i < 0 {
+	station := s.dockedStationID()
+	book := s.market[station]
+	var ms []match
+	if book != nil {
+		ms = book.matchCrossing(OrderBuy, c.Item, c.Qty, 0)
+	}
+	if len(ms) == 0 {
 		s.log(SevWarning, s.player, s.itemName(c.Item)+" is not sold here")
 		return
 	}
-	stock := &s.market[s.systemID][i]
-	if stock.Qty <= 0 {
-		s.log(SevWarning, s.player, "Out of stock: "+s.itemName(c.Item))
-		return
-	}
-	qty := c.Qty
-	if qty > stock.Qty {
-		qty = stock.Qty
-	}
-	total := stock.Price * float64(qty)
-	if s.wallet < total {
+	qty, cost := matchValue(ms)
+	fee := MarketBrokerFee * cost
+	if s.wallet < cost+fee {
 		s.emit(Event{Kind: EvMarket, Severity: SevWarning, Actor: s.player, Item: c.Item,
-			Text: "Insufficient funds for " + s.itemName(c.Item), Value: total})
+			Text: "Insufficient funds for " + s.itemName(c.Item), Value: cost + fee})
 		return
 	}
-	s.wallet -= total
-	stock.Qty -= qty
-
-	if hull, ok := s.Content.Ship(content.ShipID(c.Item)); ok {
-		// Hulls are not stackable: one StoredShip per unit bought, so the
-		// wallet/stock debit (qty units) and the delivered hulls stay in
-		// lockstep — exactly how execSell takes them back out.
-		for range qty {
-			s.Hangar.Ships = append(s.Hangar.Ships, StoredShip{Hull: hull.ID})
-		}
-	} else {
-		s.Hangar.Items = addStacks(s.Hangar.Items, c.Item, qty)
-	}
+	before := s.marketPrice(book, c.Item)
+	s.wallet -= cost + fee
+	s.settle(book, ms)
+	s.storePlayerStock(c.Item, qty)
 	s.emit(Event{Kind: EvMarket, Severity: SevGood, Actor: s.player, Item: c.Item,
-		Text:  "Bought " + itoaN(qty) + " x " + s.itemName(c.Item) + " for " + euro(total),
-		Value: total})
+		Text: "Bought " + itoaN(qty) + " x " + s.itemName(c.Item) + " for " + euro(cost) +
+			" (" + euro(fee) + " broker fee)",
+		Value: cost})
+	s.marketVoice(book, c.Item, before, s.stationName(station))
 }
 
-// execSell sells from cargo (general hold first, then ore hold), then the
-// hangar; stored hulls sell one at a time.
+// execSell fills CmdSell as an immediate-or-cancel market order: it takes
+// only what the station's bids actually buy (nothing rests), credits the
+// bids' prices minus the sales tax, and removes exactly the filled
+// quantity from the general hold, then the ore hold, then the hangar —
+// stored hulls sell one at a time.
 func (s *Sim) execSell(c CmdSell) {
 	if _, ok := s.stationAccess("market"); !ok {
 		return
@@ -151,62 +367,183 @@ func (s *Sim) execSell(c CmdSell) {
 		s.log(SevWarning, s.player, "Invalid quantity")
 		return
 	}
-	price, listed := s.sellPrice(c.Item)
-	if _, isShip := s.Content.Ship(content.ShipID(c.Item)); isShip && !listed {
-		s.log(SevWarning, s.player, "No market for "+s.itemName(c.Item))
-		return
-	}
-	if price <= 0 {
-		s.log(SevWarning, s.player, "Cannot sell "+s.itemName(c.Item))
-		return
-	}
-
-	remaining := c.Qty
-	sold := 0
-	if cargo, ok := s.Cargos.Get(s.player); ok && remaining > 0 {
-		var n int
-		cargo.Stacks, n = takeStacks(cargo.Stacks, c.Item, remaining)
-		remaining -= n
-		sold += n
-	}
-	if cargo, ok := s.Cargos.Get(s.player); ok && remaining > 0 {
-		var n int
-		cargo.Ore, n = takeStacks(cargo.Ore, c.Item, remaining)
-		remaining -= n
-		sold += n
-	}
-	if remaining > 0 {
-		var n int
-		s.Hangar.Items, n = takeStacks(s.Hangar.Items, c.Item, remaining)
-		remaining -= n
-		sold += n
-	}
-	// Stored hulls: one hull per unit.
-	if remaining > 0 {
-		kept := s.Hangar.Ships[:0]
-		for _, sh := range s.Hangar.Ships {
-			if remaining > 0 && sh.Hull == content.ShipID(c.Item) {
-				remaining--
-				sold++
-				continue
-			}
-			kept = append(kept, sh)
-		}
-		s.Hangar.Ships = kept
-	}
-	if sold == 0 {
+	station := s.dockedStationID()
+	book := s.market[station]
+	avail := s.playerStock(c.Item)
+	if avail == 0 {
 		s.log(SevWarning, s.player, "Nothing to sell")
 		return
 	}
-
-	proceeds := sellRatio * price * float64(sold)
-	s.wallet += proceeds
-	if i := s.marketIndex(c.Item); i >= 0 {
-		s.market[s.systemID][i].Qty += sold
+	var ms []match
+	if book != nil {
+		ms = book.matchCrossing(OrderSell, c.Item, min(c.Qty, avail), 0)
 	}
+	if len(ms) == 0 {
+		s.log(SevWarning, s.player, "No buy orders for "+s.itemName(c.Item))
+		return
+	}
+	qty, _ := matchValue(ms)
+	if taken := s.takePlayerStock(c.Item, qty); taken != qty {
+		// Cannot happen: the count and the take run back-to-back in one
+		// tick. Restore what was taken and refuse rather than credit
+		// money for goods the player does not have.
+		s.storePlayerStock(c.Item, taken)
+		s.log(SevWarning, s.player, "Sell count mismatch")
+		return
+	}
+	before := s.marketPrice(book, c.Item)
+	_, proceeds := s.settle(book, ms)
+	// Institutional load on the sell side: broker fee on the placed value
+	// plus the sales tax on execution (both come out of the proceeds).
+	fee := MarketBrokerFee * proceeds
+	tax := MarketSalesTax * proceeds
+	received := proceeds - tax - fee
+	s.wallet += received
 	s.emit(Event{Kind: EvMarket, Severity: SevGood, Actor: s.player, Item: c.Item,
-		Text:  "Sold " + itoaN(sold) + " x " + s.itemName(c.Item) + " for " + euro(proceeds),
-		Value: proceeds})
+		Text: "Sold " + itoaN(qty) + " x " + s.itemName(c.Item) + " for " + euro(received) +
+			" (" + euro(fee) + " broker fee, " + euro(tax) + " sales tax)",
+		Value: received})
+	s.marketVoice(book, c.Item, before, s.stationName(station))
+}
+
+// PlaceOrder posts a (limit) order on a station's book — the seam agents
+// and later workstreams build on. It crosses every resting order it can
+// first (price-time priority, always at the RESTING order's price) and
+// only the unfilled remainder rests, so a book never crosses itself.
+//
+// Escrow: a player's buy debits wallet by price×qty + broker fee up front
+// and refunds the escrow of whatever never trades (the fee stays, EVE's
+// rule); a player's sell escrows the goods themselves (hulls are refused —
+// a fitted hull cannot ride in an order). Any other owner is the system
+// side: no wallet, no inventory, the book just moves.
+func (s *Sim) PlaceOrder(station StationID, side OrderSide, item content.ItemID, qty int, price float64, owner string) (OrderResult, bool) {
+	res := OrderResult{}
+	if qty <= 0 || price <= 0 {
+		return res, false
+	}
+	if side != OrderBuy && side != OrderSell {
+		return res, false
+	}
+	sys, ok := s.stationSystem(station)
+	if !ok {
+		return res, false
+	}
+	book := s.market[station]
+	if book == nil {
+		book = &MarketBook{System: sys, Lasts: map[content.ItemID]float64{}}
+		s.market[station] = book
+	}
+	limit := quantizeTick(price)
+	ms := book.matchCrossing(side, item, qty, limit)
+	filled, cost := matchValue(ms)
+	rest := qty - filled
+	res.Filled = filled
+	res.Cost = cost
+	res.Remaining = rest
+
+	if owner == OwnerPlayer {
+		if side == OrderBuy {
+			escrow := limit * float64(qty)
+			fee := MarketBrokerFee * escrow
+			if s.wallet < escrow+fee {
+				return OrderResult{}, false
+			}
+			s.wallet -= escrow + fee
+			res.Fee = fee
+			// Escrow covered every fill (at or below the limit) and the
+			// resting remainder: only the price improvement is surplus.
+			res.Refund = escrow - cost - limit*float64(rest)
+			s.wallet += res.Refund
+		} else {
+			if _, isShip := s.Content.Ship(content.ShipID(item)); isShip {
+				return OrderResult{}, false // fitted hulls cannot be escrowed
+			}
+			fee := MarketBrokerFee * limit * float64(qty)
+			if s.wallet < fee {
+				return OrderResult{}, false
+			}
+			if taken := s.takePlayerStock(item, qty); taken != qty {
+				s.storePlayerStock(item, taken)
+				return OrderResult{}, false
+			}
+			// Broker fee rides on the placed value (EVE charges it at
+			// placement, both sides, and keeps it on cancel).
+			s.wallet -= fee
+			res.Fee = fee
+		}
+	}
+
+	if filled > 0 {
+		qtyFilled, value := s.settle(book, ms)
+		if owner == OwnerPlayer {
+			if side == OrderBuy {
+				s.storePlayerStock(item, qtyFilled)
+				s.emit(Event{Kind: EvMarket, Severity: SevGood, Actor: s.player, Item: item,
+					Text: "Bought " + itoaN(qtyFilled) + " x " + s.itemName(item) + " for " +
+						euro(value) + " (" + euro(res.Fee) + " broker fee)",
+					Value: value})
+			} else {
+				tax := MarketSalesTax * value
+				received := value - tax
+				s.wallet += received
+				s.emit(Event{Kind: EvMarket, Severity: SevGood, Actor: s.player, Item: item,
+					Text: "Sold " + itoaN(qtyFilled) + " x " + s.itemName(item) + " for " +
+						euro(received) + " (" + euro(tax) + " sales tax)",
+					Value: received})
+			}
+		}
+	}
+	if rest > 0 {
+		s.marketSeq++
+		res.ID = s.marketSeq
+		book.Orders = append(book.Orders, MarketStock{
+			Item: item, Price: limit, Qty: rest, Side: side,
+			Owner: owner, Station: station, ID: res.ID,
+		})
+		book.sortOrders()
+		if owner == OwnerPlayer {
+			verb := "sell"
+			if side == OrderBuy {
+				verb = "buy"
+			}
+			s.emit(Event{Kind: EvMarket, Severity: SevInfo, Actor: s.player, Item: item,
+				Text: "Placed " + verb + " order: " + itoaN(rest) + " x " +
+					s.itemName(item) + " at " + euro(limit)})
+		}
+	}
+	return res, true
+}
+
+// CancelOrder removes a resting order of the given owner from a station's
+// book and settles its escrow: a buy's unspent wallet escrow comes back,
+// a player's sell gets its goods into the station hangar. It reports
+// whether an order was found and owned by owner.
+func (s *Sim) CancelOrder(station StationID, id uint64, owner string) bool {
+	book := s.market[station]
+	if book == nil || id == 0 {
+		return false
+	}
+	idx := -1
+	for i := range book.Orders {
+		if book.Orders[i].ID == id {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 || book.Orders[idx].Owner != owner {
+		return false
+	}
+	o := book.Orders[idx]
+	if owner == OwnerPlayer {
+		if o.Side == OrderBuy {
+			s.wallet += o.Price * float64(o.Qty)
+		} else {
+			s.storePlayerStock(o.Item, o.Qty)
+		}
+	}
+	book.Orders = append(book.Orders[:idx], book.Orders[idx+1:]...)
+	book.sortOrders()
+	return true
 }
 
 // execRefine converts ore units into minerals via RefineYield at a refine

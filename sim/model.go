@@ -7,6 +7,8 @@
 package sim
 
 import (
+	"sort"
+
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/ecs"
@@ -603,11 +605,188 @@ type StoredShip struct {
 	Cargo []content.CargoStack `json:"cargo"`
 }
 
-// MarketStock is remaining stock of one market order.
+// ---------------------------------------------------------------------------
+// Market — per-station continuous double auction
+// ---------------------------------------------------------------------------
+
+// StationID addresses a station's order book by the station's celestial
+// ID. Books are keyed universe-wide by it (content validation rejects a
+// station id used by two systems).
+type StationID = content.CelID
+
+// OrderSide is one half of an order book.
+type OrderSide string
+
+const (
+	OrderSell OrderSide = "sell" // ask: offer to sell (rests high)
+	OrderBuy  OrderSide = "buy"  // bid: offer to buy (rests low)
+)
+
+// Order-owner tags. The player's own orders escrow wallet/inventory at
+// placement; every other owner (station founding orders, convoy supply,
+// future agents) is the system side of the trade.
+const (
+	OwnerPlayer = "player"
+	OwnerSystem = "system"
+)
+
+// MarketStock is one resting order on a station's book. Qty keeps its old
+// "remaining stock" reading: the unfilled remainder of the order.
 type MarketStock struct {
-	Item  content.ItemID `json:"item"`
-	Price float64        `json:"price"`
-	Qty   int            `json:"qty"`
+	Item    content.ItemID `json:"item"`
+	Price   float64        `json:"price"`
+	Qty     int            `json:"qty"`
+	Side    OrderSide      `json:"side"`
+	Owner   string         `json:"owner,omitempty"` // opaque ledger tag ("" reads as the system side)
+	Station StationID      `json:"station"`         // book the order rests on
+	ID      uint64         `json:"id"`              // arrival id: the price-time priority tiebreak
+}
+
+// SavedLastTrade is one station/item last trade price — the price ladder's
+// top rung, persisted per book alongside the orders.
+type SavedLastTrade struct {
+	System  content.SystemID `json:"system"`
+	Station StationID        `json:"station"`
+	Item    content.ItemID   `json:"item"`
+	Price   float64          `json:"price"`
+}
+
+// MarketBook is one station's order book. Orders stay in canonical order —
+// item ascending, asks before bids, asks by price ascending, bids by price
+// descending, arrival id breaking ties — so every read and every save is a
+// pure function of state. Lasts is the last trade price per item (the top
+// rung of the price ladder); it is point-looked-up only, never iterated.
+type MarketBook struct {
+	System content.SystemID
+	Orders []MarketStock
+	Lasts  map[content.ItemID]float64
+}
+
+// sortOrders puts the book into canonical order (see MarketBook).
+func (b *MarketBook) sortOrders() {
+	sideRank := func(s OrderSide) int {
+		if s == OrderSell {
+			return 0
+		}
+		return 1
+	}
+	sort.Slice(b.Orders, func(i, j int) bool { return orderLess(b.Orders[i], b.Orders[j], sideRank) })
+}
+
+// orderLess is the canonical book order: (item, side, price, id). Asks
+// rank first and sort ascending, bids rank second and sort descending, so
+// the front of each side is that side's best price.
+func orderLess(a, c MarketStock, sideRank func(OrderSide) int) bool {
+	if a.Item != c.Item {
+		return a.Item < c.Item
+	}
+	ra, rc := sideRank(a.Side), sideRank(c.Side)
+	if ra != rc {
+		return ra < rc
+	}
+	if a.Price != c.Price {
+		if ra == 0 { // ask: best (lowest) first
+			return a.Price < c.Price
+		}
+		return a.Price > c.Price // bid: best (highest) first
+	}
+	return a.ID < c.ID
+}
+
+// bestAsk returns the cheapest sell order for item (price-time priority).
+func (b *MarketBook) bestAsk(item content.ItemID) (MarketStock, bool) {
+	return b.best(item, OrderSell)
+}
+
+// bestBid returns the highest buy order for item (price-time priority).
+func (b *MarketBook) bestBid(item content.ItemID) (MarketStock, bool) {
+	return b.best(item, OrderBuy)
+}
+
+func (b *MarketBook) best(item content.ItemID, side OrderSide) (MarketStock, bool) {
+	for _, o := range b.Orders { // canonical: the first match is the best
+		if o.Item == item && o.Side == side {
+			return o, true
+		}
+	}
+	return MarketStock{}, false
+}
+
+// match is one executed trade fragment against a resting order: the
+// resting order's price always wins, qty is what the resting order had.
+type match struct {
+	order MarketStock
+	qty   int
+}
+
+// matchCrossing walks the opposite side for item in price-time priority
+// and returns the resting orders an incoming order would cross, with the
+// quantity taken from each. limit is the worst price the incoming order
+// accepts; <= 0 means a market order (no price limit).
+func (b *MarketBook) matchCrossing(side OrderSide, item content.ItemID, qty int, limit float64) []match {
+	var out []match
+	for _, o := range b.Orders {
+		if o.Item != item || o.Side == side || o.Qty <= 0 {
+			continue
+		}
+		if limit > 0 {
+			if side == OrderBuy && o.Price > limit {
+				continue
+			}
+			if side == OrderSell && o.Price < limit {
+				continue
+			}
+		}
+		n := min(qty, o.Qty)
+		out = append(out, match{order: o, qty: n})
+		qty -= n
+		if qty <= 0 {
+			break
+		}
+	}
+	return out
+}
+
+// applyMatches decrements the matched resting orders by their fills and
+// drops the exhausted ones, keeping the book canonical.
+func (b *MarketBook) applyMatches(ms []match) {
+	if len(ms) == 0 {
+		return
+	}
+	filled := make(map[uint64]int, len(ms))
+	for _, m := range ms {
+		filled[m.order.ID] += m.qty
+	}
+	kept := b.Orders[:0]
+	for _, o := range b.Orders {
+		if n := filled[o.ID]; n > 0 {
+			o.Qty -= n
+			filled[o.ID] = 0
+		}
+		if o.Qty > 0 {
+			kept = append(kept, o)
+		}
+	}
+	b.Orders = kept
+	b.sortOrders()
+}
+
+// lastPrice returns the item's last trade price (the ladder's top rung).
+func (b *MarketBook) lastPrice(item content.ItemID) (float64, bool) {
+	p, ok := b.Lasts[item]
+	return p, ok
+}
+
+// OrderResult reports what one PlaceOrder did: how much of the order
+// executed on arrival, at what value, what fees were charged and what
+// escrow came back, and the resting remainder's arrival id.
+type OrderResult struct {
+	ID        uint64  // arrival id of the resting remainder (0 when fully filled)
+	Filled    int     // units executed on arrival
+	Cost      float64 // executed value (before fees and tax)
+	Fee       float64 // broker fee charged at placement (player buy side)
+	Refund    float64 // escrow returned: unfilled remainder + price improvement
+	Remaining int     // units resting after placement
 }
 
 // RespawnTimer is a pending NPC respawn.
@@ -688,6 +867,12 @@ type MissionState struct {
 	Progress float64            `json:"progress"`
 }
 
+// saveSchemaV2 is the save-schema version written since the per-station
+// market tranche (v0.2.0 era): order books, order ids, last-trade prices.
+// Restore rejects any other value — the clean-break policy for pre-v2
+// saves, which carried per-system stock lists with drifting prices.
+const saveSchemaV2 = 2
+
 // Save is a full serializable simulation snapshot.
 type Save struct {
 	World    content.WorldID  `json:"world"`
@@ -703,10 +888,25 @@ type Save struct {
 	// Standing is the player's career standing (contract completion credit).
 	Standing float64 `json:"standing"`
 	// Missions are the contracts currently accepted (with progress).
-	Missions []MissionState                     `json:"missions,omitempty"`
-	Hangar   Hangar                             `json:"hangar"`
-	Market   map[content.SystemID][]MarketStock `json:"market"`
-	Respawn  []RespawnTimer                     `json:"respawn"`
+	Missions []MissionState `json:"missions,omitempty"`
+	Hangar   Hangar         `json:"hangar"`
+	// Schema is the save-schema version (saveSchemaV2): Restore rejects any
+	// other value, so pre-v2 saves — which carried per-system stock lists
+	// and drifting prices instead of per-station order books — fail loudly
+	// instead of restoring into a different market.
+	Schema int `json:"schema"`
+	// Market carries every resting order, grouped by the system its station
+	// lives in; each order names its own station, side, owner and arrival
+	// id. Canonical order: station id ascending, then the book's canonical
+	// order — the per-station books of the v2 market schema.
+	Market map[content.SystemID][]MarketStock `json:"market"`
+	// MarketLasts is the last trade price per (station, item), sorted by
+	// station then item: the rung of the price ladder the orders cannot
+	// reconstruct (an all-filled book still remembers its last trade).
+	MarketLasts []SavedLastTrade `json:"market_lasts,omitempty"`
+	// MarketSeq is the next order arrival id (price-time priority clock).
+	MarketSeq uint64         `json:"market_seq"`
+	Respawn   []RespawnTimer `json:"respawn"`
 	// TrafficLeaves are scheduled raider break-offs (living-universe
 	// ambushes resolved before their raiders left the field).
 	TrafficLeaves []TrafficLeave `json:"traffic_leaves,omitempty"`

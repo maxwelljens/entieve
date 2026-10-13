@@ -2,6 +2,9 @@ package uikit
 
 import (
 	"image"
+	"slices"
+	"sort"
+	"strconv"
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
@@ -11,9 +14,13 @@ import (
 // qtySteps are the trade quantity stepper's steps (1 / 10 / 100).
 var qtySteps = [...]int{1, 10, 100}
 
-// Market is the station market window: an Item/Price/Qty table over a
-// quantity stepper and the Buy/Sell actions. Trade is only possible
-// while the player is docked, so both buttons are disabled in space.
+// Market is the station market window: the docked station's order book as
+// rows — items ascending, asks (price ascending) above bids (price
+// descending) — over a quantity stepper and the Buy/Sell actions, which
+// execute as market orders against that book. The title carries the
+// selected item's displayed price (last trade, best ask, best bid, base)
+// and the fee schedule. Trade is only possible while the player is docked,
+// so both buttons are disabled in space.
 type Market struct {
 	env Env
 	win *widget.Window
@@ -31,18 +38,75 @@ type Market struct {
 	hasSel bool
 }
 
+// feePct renders a fee rate as a percentage ("3%", "2.5%").
+func feePct(rate float64) string {
+	return strconv.FormatFloat(rate*100, 'g', -1, 64) + "%"
+}
+
+// sortBookOrders puts mixed orders into canonical display order: item
+// ascending, asks before bids, asks by price ascending, bids by price
+// descending. Stable, so equal prices keep arrival (price-time) order.
+func sortBookOrders(orders []sim.MarketStock) {
+	sort.SliceStable(orders, func(i, j int) bool {
+		a, b := orders[i], orders[j]
+		if a.Item != b.Item {
+			return a.Item < b.Item
+		}
+		if a.Side != b.Side {
+			return a.Side == sim.OrderSell
+		}
+		if a.Price != b.Price {
+			if a.Side == sim.OrderSell {
+				return a.Price < b.Price
+			}
+			return a.Price > b.Price
+		}
+		return false
+	})
+}
+
 // NewMarket builds the Market window over the shared environment. Mount
 // it on a Kit with Kit.AddWindow and call Sync every frame.
 func NewMarket(env Env) *Market {
 	m := &Market{env: env}
 	p := env.Pal
 
-	m.tbl = NewTable(env, []Column{
+	cols := []Column{
 		{Key: "Item", Title: "Item", Priority: 0},
 		{Key: "Price", Title: "Price", Priority: 1, AlignRight: true},
 		{Key: "Qty", Title: "Qty", Priority: 2, AlignRight: true},
-	})
+		{Key: "Side", Title: "Side", Priority: 3},
+	}
+	m.tbl = NewTable(env, cols)
 	m.tbl.SetSort("Item", true)
+	// Sync builds rows in canonical book order; the Item sort key keeps
+	// that order (reversing on a second click), any other header click
+	// falls back to plain cell sorting.
+	m.tbl.SetSortFunc(func(key string, asc bool, rows []TableRow) {
+		if key == "Item" {
+			if !asc {
+				slices.Reverse(rows)
+			}
+			return
+		}
+		idx := -1
+		for i, c := range cols {
+			if c.Key == key {
+				idx = i
+				break
+			}
+		}
+		if idx < 0 {
+			return
+		}
+		sort.SliceStable(rows, func(a, b int) bool {
+			x, y := rows[a].Cells[idx], rows[b].Cells[idx]
+			if asc {
+				return x < y
+			}
+			return y < x
+		})
+	})
 	m.tbl.OnSelect(func(r TableRow) {
 		if id, ok := r.Data.(content.ItemID); ok {
 			m.sel, m.hasSel = id, true
@@ -132,23 +196,71 @@ func NewMarket(env Env) *Market {
 // Win returns the market window for Kit.AddWindow.
 func (m *Market) Win() *widget.Window { return m.win }
 
+// orders returns the orders the window shows: the docked station's own
+// book when it offers the market, else every station's book in the
+// current system (the undocked fallback view).
+func (m *Market) orders() []sim.MarketStock {
+	if st := m.env.Sim.DockedMarket(); st != "" {
+		return m.env.Sim.BookOrders(st)
+	}
+	sys := m.env.Sim.System()
+	if sys == nil {
+		return nil
+	}
+	return m.env.Sim.Market(sys.ID)
+}
+
+// priceOf quotes an item's displayed price for the shown view: the
+// docked station's full ladder (last trade, best ask, best bid, base)
+// when docked at a market station, else the shown orders' own ladder
+// (best ask, then best bid, then the def base price) — the undocked
+// fallback view has no station ladder to read.
+func (m *Market) priceOf(item content.ItemID) float64 {
+	station := m.env.Sim.DockedMarket()
+	if station != "" {
+		return m.env.Sim.MarketPrice(station, item)
+	}
+	ask, bid := -1.0, -1.0
+	for _, o := range m.orders() {
+		if o.Item != item {
+			continue
+		}
+		if o.Side == sim.OrderSell {
+			if ask < 0 || o.Price < ask {
+				ask = o.Price
+			}
+		} else if o.Price > bid {
+			bid = o.Price
+		}
+	}
+	if ask >= 0 {
+		return ask
+	}
+	if bid >= 0 {
+		return bid
+	}
+	return m.env.Sim.MarketPrice(station, item) // def base price
+}
+
 // Sync refreshes the rows, the wallet readout and the docked gating
 // from the simulation. Call it every frame before Kit.Update.
 func (m *Market) Sync() {
-	sys := m.env.Sim.System()
-	var stock []sim.MarketStock
-	if sys != nil {
-		stock = m.env.Sim.Market(sys.ID)
-	}
-	rows := make([]TableRow, 0, len(stock))
-	for _, st := range stock {
+	orders := m.orders()
+	sortBookOrders(orders)
+	rows := make([]TableRow, 0, len(orders))
+	for _, o := range orders {
+		side := "Ask"
+		if o.Side == sim.OrderBuy {
+			side = "Bid"
+		}
 		rows = append(rows, TableRow{
 			Cells: []string{
-				itemLabel(m.env, st.Item),
-				FormatCredits(st.Price),
-				FormatInt(int64(st.Qty)),
+				itemLabel(m.env, o.Item),
+				FormatCredits(o.Price),
+				FormatInt(int64(o.Qty)),
+				side,
 			},
-			Data: st.Item,
+			Data: o.Item,
 		})
 	}
 	m.tbl.SetRows(rows)
@@ -166,8 +278,16 @@ func (m *Market) Sync() {
 	}
 
 	m.qtyLabel.Label = "Qty " + FormatInt(int64(m.qty()))
+	sys := m.env.Sim.System()
 	if sys != nil {
-		m.title.Label = "Market — " + FormatCredits(m.env.Sim.Wallet())
+		label := "Market — " + FormatCredits(m.env.Sim.Wallet())
+		if m.hasSel {
+			// Selected: the book's price voice for this item (last trade,
+			// best ask, best bid, then base) and the fee schedule.
+			label = "Market — " + itemLabel(m.env, m.sel) + " " + FormatCredits(m.priceOf(m.sel)) +
+				" · fee " + feePct(sim.MarketBrokerFee) + "+" + feePct(sim.MarketSalesTax)
+		}
+		m.title.Label = label
 	}
 	// Trades only happen docked at a station.
 	gated := !m.docked()

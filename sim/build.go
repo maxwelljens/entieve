@@ -9,24 +9,42 @@ import (
 	"github.com/entieve/entieve/ecs"
 )
 
-// initMarket seeds per-system market stock from the content definitions in
-// deterministic (sorted system ID) order.
-func initMarket(c *content.Content) map[content.SystemID][]MarketStock {
-	m := make(map[content.SystemID][]MarketStock, len(c.Systems))
+// initMarket seeds every station's founding book from the content
+// definitions, in deterministic order (sorted system ID, celestial order
+// within a system). Founding prices are quantized to the price tick so the
+// never-crossed invariant starts true for every book. The second result is
+// the next free order id (one arrival id per seeded order).
+func initMarket(c *content.Content) (map[StationID]*MarketBook, uint64) {
+	m := make(map[StationID]*MarketBook, len(c.Systems))
 	ids := make([]content.SystemID, 0, len(c.Systems))
 	for id := range c.Systems {
 		ids = append(ids, id)
 	}
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	seq := uint64(0)
 	for _, id := range ids {
 		sys := c.Systems[id]
-		stock := make([]MarketStock, 0, len(sys.Market))
-		for _, o := range sys.Market {
-			stock = append(stock, MarketStock{Item: o.Item, Price: o.Price, Qty: o.Qty})
+		for _, cel := range sys.Celestials {
+			if cel.Station == nil || len(cel.Station.Market) == 0 {
+				continue
+			}
+			book := &MarketBook{System: id, Lasts: map[content.ItemID]float64{}}
+			for _, o := range cel.Station.Market {
+				seq++
+				side := OrderSell
+				if o.Side == "buy" {
+					side = OrderBuy
+				}
+				book.Orders = append(book.Orders, MarketStock{
+					Item: o.Item, Price: quantizeTick(o.Price), Qty: o.Qty,
+					Side: side, Owner: OwnerSystem, Station: cel.ID, ID: seq,
+				})
+			}
+			book.sortOrders()
+			m[cel.ID] = book
 		}
-		m[id] = stock
 	}
-	return m
+	return m, seq
 }
 
 // buildFitting partitions a flat module list (high slots first, then mid,

@@ -286,9 +286,12 @@ type GateDef struct {
 	ToCel    CelID    `json:"to_cel"`
 }
 
-// StationDef lists station services.
+// StationDef lists station services and the station's founding market
+// orders (the economy's initial endowment: the book seeds every station
+// starts with; ongoing flow is never conjured).
 type StationDef struct {
-	Services []string `json:"services"` // "repair" | "market" | "refine" | "fitting"
+	Services []string         `json:"services"` // "repair" | "market" | "refine" | "fitting"
+	Market   []MarketOrderDef `json:"market,omitempty"`
 }
 
 // Celestial kinds.
@@ -323,12 +326,15 @@ type CelestialDef struct {
 	Spawns   []SpawnDef  `json:"spawns,omitempty"` // ambient spawns at this celestial
 }
 
-// MarketOrderDef is a station market listing (infinite restock is NOT used;
-// Qty is finite and depletes with purchases).
+// MarketOrderDef is one founding order on a station's book (infinite
+// restock is NOT used; Qty is finite and depletes with trades). Side
+// selects the book half: "sell" (an ask — the default when omitted) or
+// "buy" (a bid).
 type MarketOrderDef struct {
 	Item  ItemID  `json:"item"`
 	Qty   int     `json:"qty"`
 	Price float64 `json:"price"`
+	Side  string  `json:"side,omitempty"` // "" | "sell" | "buy"
 }
 
 // SystemDef is a complete star system.
@@ -341,7 +347,10 @@ type SystemDef struct {
 	Position      core.Vec2         `json:"position"`          // starmap plane (ly)
 	Palette       map[string]string `json:"palette,omitempty"` // rendering colors, e.g. {"nebula1":"#123456","star":"#ffdd88"}
 	Celestials    []CelestialDef    `json:"celestials"`
-	Market        []MarketOrderDef  `json:"market,omitempty"`
+	// Market is the pre-v2 system-level market block. Founding orders live
+	// on StationDef.Market now: Validate rejects any system-level block.
+	// The field is kept only so legacy schema readers still compile.
+	Market []MarketOrderDef `json:"market,omitempty"`
 }
 
 // UniverseDef ties systems together.

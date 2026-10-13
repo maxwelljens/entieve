@@ -16,11 +16,12 @@ import (
 //	σ (security status)   high = 1, low = 0.5, null = 0
 //	spawn interval        authored x 4^(1-σ)          -> x1, x2, x4
 //	per-leg attack chance (1-σ)/3                     -> 0, 1/6, 1/3
-//	price band             0.05 x 4^(1-σ)             -> ±5%, ±10%, ±20%
-//	drift step             share x band / 2.5 (x2 for a lost shipment)
-//	decay                  premium halved every marketDecayTicks
 //	patrol cadence         authored / σ (σ = 0: no patrols)
 //	patrol response        delay 1800x(1-σ) ticks, wing floor(3σ)
+//
+// Prices are NOT in this table anymore: the per-station order books are the
+// only price former (see system_economy.go). Deliveries post supply on the
+// destination's book; a lost shipment is an event-only supply-risk signal.
 // ---------------------------------------------------------------------------
 
 const (
@@ -60,19 +61,6 @@ const (
 	trafficPatrolAnchorScatter = 5000.0
 	trafficPatrolScatter       = 2000.0
 	trafficPatrolEngageRange   = 12000.0
-
-	// trafficBandBase is the high-sec price band: half of the market's own
-	// round-trip friction (the 10% sell cut, sellRatio 0.9) — beyond that a
-	// delivery could be arbitured. Bands widen with insecurity via 4^(1-σ).
-	trafficBandBase = 0.05
-	// trafficDriftDiv scales one full-shelf drift step to band/2.5 (2% in
-	// high-sec); share scales it down for deliveries that only nibble the
-	// shelf. Attack steps are double supply steps.
-	trafficDriftDiv = 2.5
-
-	// marketDecayTicks is the halving schedule: every 60 sim seconds a
-	// deviating price closes half the remaining distance to its base.
-	marketDecayTicks = 3600
 )
 
 // ---------------------------------------------------------------------------
@@ -104,12 +92,6 @@ func trafficSpawnInterval(interval int64, security string) int64 {
 // 0 in high-sec, 1/6 in low-sec, 1/3 in null.
 func trafficAttackChance(security string) float64 {
 	return (1 - securitySigma(security)) / 3
-}
-
-// trafficBand is the max |price/base − 1| allowed at a system's market:
-// 0.05 x 4^(1-σ) => ±5% high, ±10% low, ±20% null.
-func trafficBand(security string) float64 {
-	return trafficBandBase * math.Pow(4, 1-securitySigma(security))
 }
 
 // trafficPatrolInterval scales the authored patrol cadence by 1/σ (police
@@ -178,8 +160,8 @@ func trafficDue(ticks int64, key string, interval int64) bool {
 // profile; each tunnel entry rolls the per-leg ambush chance; live ambushes
 // drive raiders (real lock/activate/turret/damage pipeline), dispatch the
 // patrol response, and resolve into destroyed / escaped / saved outcomes;
-// deliveries and losses move station market stock and prices inside the
-// security band; premiums decay halving every marketDecayTicks.
+// a delivered shipment posts supply on the destination station's book (the
+// order books form prices — see system_economy.go).
 //
 // Runs after every other system: warp landings, deaths and NPC state are
 // already settled for the tick, and any intents set here fly next tick's
@@ -202,7 +184,6 @@ func (s *Sim) systemTraffic() {
 	s.trafficDriveAttacks(sys, td, sec)
 	s.trafficDrivePatrols()
 	s.trafficExpireLeaves()
-	s.marketDecay()
 }
 
 // trafficExpireLeaves runs scheduled raider break-offs: at the booked time
@@ -529,9 +510,9 @@ func (s *Sim) trafficEscaped(e ecs.Entity, tc *Traffic) {
 }
 
 // trafficArrive resolves a completed leg: a station endpoint delivers the
-// cargo into the system market (stock up, price one supply step down); any
-// other endpoint despawns the hauler (it leaves the system through a gate
-// or finishes its run at a belt).
+// cargo as supply on that station's own book; any other endpoint despawns
+// the hauler (it leaves the system through a gate or finishes its run at a
+// belt).
 func (s *Sim) trafficArrive(sys *content.SystemDef, e ecs.Entity, tc *Traffic) {
 	dest := sysCelestial(sys, tc.Dest)
 	if dest == nil {
@@ -545,27 +526,37 @@ func (s *Sim) trafficArrive(sys *content.SystemDef, e ecs.Entity, tc *Traffic) {
 	s.destroy(e)
 }
 
-// trafficDeliver books the shipment: stock increases by exactly qty units
-// and the item's price takes one supply step down, clamped into the
-// security band.
+// trafficDeliver posts the shipment as supply on the destination station's
+// book. Its cost basis is the shipment's provenance: units fulfilled from
+// the origin station's own asks (a station origin debits its book — the
+// goods listed here are the goods that left there) at their weighted
+// price, or the def base price when the origin carries nothing to draw
+// from (gates and belts ship ex nihilo today; the logistics workstream
+// owns that removal). The ask lists one tick under min(cost basis, best
+// ask), so arriving supply always improves the displayed price — and a
+// posting that crosses the destination's bids executes immediately at the
+// resting bid (never-crossed invariant), only the remainder resting.
 func (s *Sim) trafficDeliver(sys *content.SystemDef, e ecs.Entity, tc *Traffic, dest *content.CelestialDef) {
-	cargoValue := float64(tc.Qty) * s.marketBasePrice(s.systemID, tc.Item)
-	idx := s.marketIndex(tc.Item)
-	share := 1.0
-	if idx >= 0 {
-		// Turnover is the item's own shelf: its listed value at this system.
-		share = trafficShare(cargoValue, float64(s.market[s.systemID][idx].Qty)*s.market[s.systemID][idx].Price)
-	} else {
-		// First shipment of an unlisted good opens the shelf at base price.
-		if base := s.marketBasePrice(s.systemID, tc.Item); base > 0 {
-			s.market[s.systemID] = append(s.market[s.systemID],
-				MarketStock{Item: tc.Item, Price: base, Qty: 0})
-			idx = len(s.market[s.systemID]) - 1
+	item, qty := tc.Item, tc.Qty
+	costBasis := s.marketBasePrice(item)
+	if origin := sysCelestial(sys, tc.Origin); origin != nil && origin.Station != nil {
+		if taken, paid := s.marketWithdraw(origin.ID, item, qty); taken > 0 {
+			costBasis = paid / float64(taken)
 		}
 	}
-	if idx >= 0 {
-		s.market[s.systemID][idx].Qty += tc.Qty // exact integer units
-		s.marketPriceStep(s.systemID, idx, false, share, sys.Security, dest.Name)
+	book := s.market[dest.ID]
+	before := s.marketPrice(book, item)
+	if dest.Station != nil && hasMarketService(dest.Station) {
+		price := costBasis
+		if book != nil {
+			if ask, ok := book.bestAsk(item); ok && ask.Price < price {
+				price = ask.Price
+			}
+		}
+		if post := tickDown(price); post > 0 {
+			s.PlaceOrder(dest.ID, OrderSell, item, qty, post, OwnerSystem)
+			book = s.market[dest.ID] // placement may have created the book
+		}
 	}
 
 	vol := s.itemVolume(tc.Item) * float64(tc.Qty)
@@ -577,26 +568,27 @@ func (s *Sim) trafficDeliver(sys *content.SystemDef, e ecs.Entity, tc *Traffic, 
 		System: sys.ID, Cel: tc.Dest, Item: tc.Item, Value: float64(tc.Qty),
 		Text: "Convoy delivery — " + volStr + " m³ " + s.itemName(tc.Item) +
 			" received at " + dest.Name})
+	s.marketVoice(book, item, before, dest.Name)
 	s.destroy(e)
 }
 
 // trafficHaulerDestroyed resolves a lost convoy hauler (raider kill or
 // player kill): the shipment turns into a lootable wreck (the caller adds
-// the cargo), the destination market takes one risk-premium step up, and a
-// running ambush resolves as destroyed with a scheduled raider break-off.
+// the cargo) and the loss is announced as an event-only supply-risk
+// signal. No price moves — the book is the price former, and a shipment
+// that never arrived never touched it.
 func (s *Sim) trafficHaulerDestroyed(e ecs.Entity, tc *Traffic) {
-	sec, destName := "", ""
+	destName := ""
 	if sys := s.System(); sys != nil {
-		sec = sys.Security
 		if d := sysCelestial(sys, tc.Dest); d != nil {
 			destName = d.Name
 		}
 	}
-	if idx := s.marketIndex(tc.Item); idx >= 0 && destName != "" {
-		cargoValue := float64(tc.Qty) * s.marketBasePrice(s.systemID, tc.Item)
-		share := trafficShare(cargoValue,
-			float64(s.market[s.systemID][idx].Qty)*s.market[s.systemID][idx].Price)
-		s.marketPriceStep(s.systemID, idx, true, share, sec, destName)
+	if destName != "" {
+		s.emit(Event{Kind: EvMarket, Severity: SevWarning, System: s.systemID, Item: tc.Item,
+			Value: float64(tc.Qty),
+			Text: "Risk premium — " + s.itemName(tc.Item) +
+				" shipment lost en route to " + destName})
 	}
 
 	nearID, nearName := s.nearestLandmark(mustPos(s, e))
@@ -899,44 +891,14 @@ func (s *Sim) patrolReturnStep(e ecs.Entity, p *Patrol, ai *NpcAI) {
 }
 
 // ---------------------------------------------------------------------------
-// Market drift
+// Market hooks — the book does the pricing; traffic only posts supply
 // ---------------------------------------------------------------------------
 
-// marketDecay halves every deviating price's distance to base once per
-// marketDecayTicks (the pinned halving schedule). Silent by design: only
-// traffic-driven moves emit events.
-func (s *Sim) marketDecay() {
-	if (s.ticks+1)%marketDecayTicks != 0 {
-		return
-	}
-	ids := make([]content.SystemID, 0, len(s.market))
-	for id := range s.market {
-		ids = append(ids, id)
-	}
-	sortSystemIDs(ids)
-	for _, id := range ids {
-		stock := s.market[id]
-		for i := range stock {
-			base := s.marketBasePrice(id, stock[i].Item)
-			if base <= 0 {
-				continue
-			}
-			stock[i].Price = base + (stock[i].Price-base)*0.5
-		}
-	}
-}
-
-// marketBasePrice returns the un-drifted reference price of an item at a
-// system: the authored market order's price, else the item's base price
-// (modules fall back to their authored price).
-func (s *Sim) marketBasePrice(sys content.SystemID, item content.ItemID) float64 {
-	if sysDef, ok := s.Content.System(sys); ok {
-		for _, o := range sysDef.Market {
-			if o.Item == item {
-				return o.Price
-			}
-		}
-	}
+// marketBasePrice returns the reference (def base) price of an item: the
+// item's base price, else the module's authored price (ships have no base
+// price in the schema — documented). It is the price ladder's last rung
+// and a shipment's cost basis when its origin carries no book to draw from.
+func (s *Sim) marketBasePrice(item content.ItemID) float64 {
 	if def, ok := s.Content.Item(item); ok {
 		return def.BasePrice
 	}
@@ -944,67 +906,6 @@ func (s *Sim) marketBasePrice(sys content.SystemID, item content.ItemID) float64
 		return def.Price
 	}
 	return 0
-}
-
-// trafficShare is the cargo's value share of the station's turnover for
-// that commodity (its shelf value), capped at 1. A shelf that does not
-// exist yet counts as fully created by the shipment.
-func trafficShare(cargoValue, shelfValue float64) float64 {
-	if shelfValue <= 0 {
-		return 1
-	}
-	v := cargoValue / shelfValue
-	if v > 1 {
-		return 1
-	}
-	if v < 0 {
-		return 0
-	}
-	return v
-}
-
-// marketPriceStep moves one order's price by one drift step:
-//
-//	price' = clamp(base·(1±band), price·(1±k))
-//	k      = share · band / 2.5, doubled for a lost shipment (risk premium)
-//
-// A step that would leave the band clamps silently (no event, no change).
-func (s *Sim) marketPriceStep(sys content.SystemID, idx int, up bool, share float64, security, where string) {
-	stock := s.market[sys]
-	if idx < 0 || idx >= len(stock) {
-		return
-	}
-	item := stock[idx].Item
-	base := s.marketBasePrice(sys, item)
-	if base <= 0 {
-		return
-	}
-	band := trafficBand(security)
-	k := share * band / trafficDriftDiv
-	if up {
-		k *= 2
-	}
-	if k <= 0 {
-		return
-	}
-	p := stock[idx].Price
-	if up {
-		p *= 1 + k
-	} else {
-		p *= 1 - k
-	}
-	p = clamp(p, base*(1-band), base*(1+band))
-	if p == stock[idx].Price {
-		return
-	}
-	stock[idx].Price = p
-	verb, direction := "Surplus", "falls to"
-	if up {
-		verb, direction = "Risk premium", "rises to"
-	}
-	s.emit(Event{Kind: EvMarket, Severity: SevInfo, System: sys, Item: item, Value: p,
-		Text: verb + " — " + s.itemName(item) + " price " + direction + " " +
-			euro(p) + " at " + where})
 }
 
 // ---------------------------------------------------------------------------
@@ -1108,6 +1009,16 @@ func mustPos(s *Sim, e ecs.Entity) core.Vec2 {
 
 // sortSystemIDs orders system IDs ascending (deterministic map iteration).
 func sortSystemIDs(ids []content.SystemID) {
+	for i := 1; i < len(ids); i++ {
+		for j := i; j > 0 && ids[j] < ids[j-1]; j-- {
+			ids[j], ids[j-1] = ids[j-1], ids[j]
+		}
+	}
+}
+
+// sortStationIDs orders station IDs ascending — the canonical iteration
+// order over the per-station market books (deterministic map iteration).
+func sortStationIDs(ids []StationID) {
 	for i := 1; i < len(ids); i++ {
 		for j := i; j > 0 && ids[j] < ids[j-1]; j-- {
 			ids[j], ids[j-1] = ids[j-1], ids[j]

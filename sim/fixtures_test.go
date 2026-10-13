@@ -168,13 +168,27 @@ func testContent() *content.Content {
 		}
 	}
 
+	stationA := station("cel-station-a", "Haven Rest", core.Vec2{X: 1e7}, "repair", "market", "refine", "fitting")
+	// The fixture's founding orders live on the station (v2 market schema):
+	// asks that seed supply and standing bids that seed demand — never
+	// crossing (every bid strictly below its ask).
+	stationA.Station.Market = []content.MarketOrderDef{
+		{Item: "charge-emp", Qty: 100, Price: 5},
+		{Item: "charge-cap-cell", Qty: 50, Price: 10},
+		{Item: "min-ferrite", Qty: 500, Price: 10},
+		{Item: "mod-armor-plate", Qty: 10, Price: 1000},
+		{Item: "ship-barge", Qty: 3, Price: 50000},
+		{Item: "charge-emp", Qty: 40, Price: 4, Side: "buy"},
+		{Item: "min-ferrite", Qty: 200, Price: 9, Side: "buy"},
+	}
+
 	sysA := &content.SystemDef{
 		ID: "sys-a", Name: "Fixture Prime", Security: "high",
 		Constellation: "Test", Region: "Test",
 		Celestials: []content.CelestialDef{
 			{ID: "cel-star-a", Name: "Fixture Star", Kind: content.CelStar,
 				Position: core.Vec2{}, Radius: 1e8},
-			station("cel-station-a", "Haven Rest", core.Vec2{X: 1e7}, "repair", "market", "refine", "fitting"),
+			stationA,
 			{ID: "cel-belt-a", Name: "Fixture Belt", Kind: content.CelBelt,
 				Position: core.Vec2{X: 2e7, Y: 1e7}, Radius: 2000,
 				Belt: &content.BeltDef{Asteroids: []content.AsteroidDef{
@@ -192,13 +206,6 @@ func testContent() *content.Content {
 				Position: core.Vec2{X: 3e7}, Radius: 300,
 				Gate: &content.GateDef{ToSystem: "sys-b", ToCel: "cel-gate-a"},
 			},
-		},
-		Market: []content.MarketOrderDef{
-			{Item: "charge-emp", Qty: 100, Price: 5},
-			{Item: "charge-cap-cell", Qty: 50, Price: 10},
-			{Item: "min-ferrite", Qty: 500, Price: 10},
-			{Item: "mod-armor-plate", Qty: 10, Price: 1000},
-			{Item: "ship-barge", Qty: 3, Price: 50000},
 		},
 	}
 

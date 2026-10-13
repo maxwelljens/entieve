@@ -13,17 +13,19 @@ import (
 // alias live component slices; snapshot() deep-copies it through JSON.
 func (s *Sim) buildSave() (*Save, error) {
 	save := &Save{
-		World:    s.worldID,
-		System:   s.systemID,
-		Ticks:    s.ticks,
-		Seed:     s.seed,
-		RNGState: s.RNG.Snapshot(),
-		Wallet:   s.wallet,
-		Standing: s.standing,
-		Missions: append([]MissionState(nil), s.missions...),
-		Hangar:   *s.Hangar,
-		Market:   make(map[content.SystemID][]MarketStock, len(s.market)),
-		Respawn:  append([]RespawnTimer(nil), s.respawns...),
+		World:     s.worldID,
+		System:    s.systemID,
+		Ticks:     s.ticks,
+		Seed:      s.seed,
+		RNGState:  s.RNG.Snapshot(),
+		Wallet:    s.wallet,
+		Standing:  s.standing,
+		Missions:  append([]MissionState(nil), s.missions...),
+		Hangar:    *s.Hangar,
+		Schema:    s.schema,
+		Market:    make(map[content.SystemID][]MarketStock, len(s.market)),
+		MarketSeq: s.marketSeq,
+		Respawn:   append([]RespawnTimer(nil), s.respawns...),
 	}
 	if s.trafficRNG != nil {
 		save.TrafficRNGState = s.trafficRNG.Snapshot()
@@ -31,8 +33,27 @@ func (s *Sim) buildSave() (*Save, error) {
 	if len(s.trafficLeaves) > 0 {
 		save.TrafficLeaves = append([]TrafficLeave(nil), s.trafficLeaves...)
 	}
-	for sys, stock := range s.market {
-		save.Market[sys] = append([]MarketStock(nil), stock...)
+
+	// Market books: stations ascending, each book in its canonical order,
+	// grouped under the book's system — the canonical serialization the
+	// Hash fingerprints. Books with no orders and no trades contribute
+	// nothing (an empty book and no book are the same state).
+	for _, st := range s.stationsSorted() {
+		book := s.market[st]
+		if book == nil || (len(book.Orders) == 0 && len(book.Lasts) == 0) {
+			continue
+		}
+		save.Market[book.System] = append(save.Market[book.System], book.Orders...)
+		lasts := make([]content.ItemID, 0, len(book.Lasts))
+		for item := range book.Lasts {
+			lasts = append(lasts, item)
+		}
+		sort.Slice(lasts, func(i, j int) bool { return lasts[i] < lasts[j] })
+		for _, item := range lasts {
+			save.MarketLasts = append(save.MarketLasts, SavedLastTrade{
+				System: book.System, Station: st, Item: item, Price: book.Lasts[item],
+			})
+		}
 	}
 
 	for _, e := range s.allEntities() {
@@ -221,6 +242,13 @@ func (s *Sim) restore(save *Save) error {
 		return errf("sim: save not deserializable: %v", err)
 	}
 	save = &sv
+	// Clean break: the market tranche bumped the schema to v2, so pre-v2
+	// saves (per-system stock lists, drifting prices) are rejected outright
+	// instead of restoring into a different market.
+	if save.Schema != saveSchemaV2 {
+		return errf("sim: save schema %d is not supported (want %d): pre-v2 saves are rejected",
+			save.Schema, saveSchemaV2)
+	}
 	if _, ok := s.Content.System(save.System); !ok {
 		return errf("sim: save references unknown system %s", save.System)
 	}
@@ -332,10 +360,61 @@ func (s *Sim) restore(save *Save) error {
 	s.respawns = append([]RespawnTimer(nil), save.Respawn...)
 	s.trafficLeaves = append([]TrafficLeave(nil), save.TrafficLeaves...)
 
-	// Market: copy saved stock; rebuild missing entries from content.
-	s.market = initMarket(s.Content)
-	for sys, stock := range save.Market {
-		s.market[sys] = append([]MarketStock(nil), stock...)
+	// Market: rebuild the per-station books from the saved orders (systems
+	// in sorted order — map iteration order never reaches sim state) and
+	// the last-trade rungs of the price ladder. Books are wholly saved
+	// state: nothing is re-seeded from content here.
+	s.market = make(map[StationID]*MarketBook)
+	s.marketSeq = save.MarketSeq
+	s.schema = save.Schema
+	sysIDs := make([]content.SystemID, 0, len(save.Market))
+	for sys := range save.Market {
+		sysIDs = append(sysIDs, sys)
+	}
+	sortSystemIDs(sysIDs)
+	bookFor := func(station StationID, sys content.SystemID) (*MarketBook, error) {
+		book := s.market[station]
+		if book == nil {
+			book = &MarketBook{System: sys, Lasts: map[content.ItemID]float64{}}
+			s.market[station] = book
+			return book, nil
+		}
+		if book.System != sys {
+			return nil, errf("sim: save has station %s orders under both %s and %s",
+				station, book.System, sys)
+		}
+		return book, nil
+	}
+	for _, sys := range sysIDs {
+		for _, o := range save.Market[sys] {
+			if o.Side != OrderBuy && o.Side != OrderSell {
+				return errf("sim: save order %d has invalid side %q", o.ID, o.Side)
+			}
+			if o.Qty <= 0 {
+				return errf("sim: save order %d has non-positive qty %d", o.ID, o.Qty)
+			}
+			book, err := bookFor(o.Station, sys)
+			if err != nil {
+				return err
+			}
+			if o.Owner == "" {
+				o.Owner = OwnerSystem
+			}
+			book.Orders = append(book.Orders, o)
+		}
+	}
+	for _, lt := range save.MarketLasts {
+		if lt.Price <= 0 {
+			continue // a zero/negative "last price" is no price at all
+		}
+		book, err := bookFor(lt.Station, lt.System)
+		if err != nil {
+			return err
+		}
+		book.Lasts[lt.Item] = lt.Price
+	}
+	for _, book := range s.market { // per-book canonical order (order-independent)
+		book.sortOrders()
 	}
 
 	for _, b := range save.ModTargets {

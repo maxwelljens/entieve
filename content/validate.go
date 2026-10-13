@@ -85,6 +85,7 @@ func (c *Content) Validate() error {
 	v.modules()
 	v.npcs()
 	v.systems()
+	v.stationMarkets()
 	v.contracts()
 	v.traffic()
 	v.worlds()
@@ -437,7 +438,6 @@ func (v *validator) systems() {
 			v.addf("%s: unknown security %q (want high|low|null)", ctx, sys.Security)
 		}
 
-		hasStation := false
 		seenCel := map[CelID]bool{}
 		for i := range sys.Celestials {
 			cel := &sys.Celestials[i]
@@ -460,13 +460,10 @@ func (v *validator) systems() {
 				v.addf("%s: negative radius %v", cctx, cel.Radius)
 			}
 			v.celestialBlocks(cctx, sys, cel)
-			if cel.Kind == CelStation {
-				hasStation = true
-			}
 			v.spawns(cctx, cel.Spawns)
 		}
 
-		v.market(ctx, sys, hasStation)
+		v.market(ctx, sys)
 	}
 }
 
@@ -582,27 +579,84 @@ func (v *validator) spawns(ctx string, spawns []SpawnDef) {
 	}
 }
 
-func (v *validator) market(ctx string, sys *SystemDef, hasStation bool) {
-	for _, o := range sys.Market {
-		// Orders resolve item first, then a ship ID (ships are listed on
-		// the market by casting ShipID to ItemID — see
-		// docs/CONTENT_AUTHORING.md), then a module ID.
-		if _, ok := v.c.Items[o.Item]; !ok {
-			if _, isShip := v.c.Ships[ShipID(o.Item)]; !isShip {
-				if _, isMod := v.c.Modules[ModuleID(o.Item)]; !isMod {
-					v.addf("%s: market order for %q is not an item, ship, or module", ctx, o.Item)
+// market validates the founding orders that seed station books. Orders
+// live ONLY on stations since the v2 market schema: a system-level block
+// is rejected, station orders need the market service, both sides must
+// name a valid side, and the founding book must open never-crossed (every
+// bid strictly below every ask for the same item).
+func (v *validator) market(ctx string, sys *SystemDef) {
+	if len(sys.Market) > 0 {
+		v.addf("%s: system-level market block is not allowed (founding orders live on station.market)", ctx)
+	}
+	for i := range sys.Celestials {
+		cel := &sys.Celestials[i]
+		if cel.Station == nil || len(cel.Station.Market) == 0 {
+			continue
+		}
+		cctx := ctx + "/" + string(cel.ID)
+		if !slices.Contains(cel.Station.Services, "market") {
+			v.addf("%s: market orders on a station without the market service", cctx)
+		}
+		// Best founding ask/bid per item, for the never-crossed seed check.
+		ask := map[ItemID]float64{}
+		bid := map[ItemID]float64{}
+		for _, o := range cel.Station.Market {
+			// Orders resolve item first, then a ship ID (ships are listed on
+			// the market by casting ShipID to ItemID — see
+			// docs/CONTENT_AUTHORING.md), then a module ID.
+			if _, ok := v.c.Items[o.Item]; !ok {
+				if _, isShip := v.c.Ships[ShipID(o.Item)]; !isShip {
+					if _, isMod := v.c.Modules[ModuleID(o.Item)]; !isMod {
+						v.addf("%s: market order for %q is not an item, ship, or module", cctx, o.Item)
+					}
 				}
 			}
+			if o.Qty < 1 {
+				v.addf("%s: market order %q qty %d must be >= 1", cctx, o.Item, o.Qty)
+			}
+			if o.Price < 0 {
+				v.addf("%s: market order %q price %v must be >= 0", cctx, o.Item, o.Price)
+			}
+			switch o.Side {
+			case "", "sell":
+				if p, ok := ask[o.Item]; !ok || o.Price < p {
+					ask[o.Item] = o.Price
+				}
+			case "buy":
+				if p, ok := bid[o.Item]; !ok || o.Price > p {
+					bid[o.Item] = o.Price
+				}
+			default:
+				v.addf("%s: market order %q has unknown side %q (sell|buy)", cctx, o.Item, o.Side)
+			}
 		}
-		if o.Qty < 1 {
-			v.addf("%s: market order %q qty %d must be >= 1", ctx, o.Item, o.Qty)
-		}
-		if o.Price < 0 {
-			v.addf("%s: market order %q price %v must be >= 0", ctx, o.Item, o.Price)
+		// Never-crossed invariant starts at seeding: a founding bid at or
+		// above the founding ask would trade against itself.
+		for _, item := range keys(bid) {
+			if a, ok := ask[item]; ok && bid[item] >= a {
+				v.addf("%s: founding bid %v for %q crosses its ask %v", cctx, bid[item], item, a)
+			}
 		}
 	}
-	if len(sys.Market) > 0 && !hasStation {
-		v.addf("%s: market orders present but no station exists", ctx)
+}
+
+// stationMarkets checks the station celestial ids the market books are
+// keyed by: two systems sharing a station id would silently share one book.
+func (v *validator) stationMarkets() {
+	seen := map[CelID]SystemID{}
+	for _, id := range keys(v.c.Systems) {
+		for i := range v.c.Systems[id].Celestials {
+			cel := &v.c.Systems[id].Celestials[i]
+			if cel.Kind != CelStation {
+				continue
+			}
+			if prev, dup := seen[cel.ID]; dup {
+				v.addf("systems/%s: station id %q is already used by system %s (station markets are keyed by celestial id)",
+					id, cel.ID, prev)
+				continue
+			}
+			seen[cel.ID] = id
+		}
 	}
 }
 

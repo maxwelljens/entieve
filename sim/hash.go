@@ -31,10 +31,12 @@ func (hh *hasher) bytes(bs []byte) {
 // It is computed as FNV-1a over the canonical Save serialization, which by
 // construction contains every piece of persistent state: seed, world and
 // system, ticks (Time is an exact function of ticks), wallet, RNG stream
-// states (master + every NPC fork), every component of every entity, market
-// stock, respawn timers, the hangar, the free-slot mirror, the respawn
-// anchor and active module target bindings. Pending events and queued
-// commands are intentionally excluded (Save does not carry them).
+// states (master + every NPC fork), every component of every entity, the
+// per-station market books (orders with station/side/owner/arrival id, the
+// last-trade rungs and the next order id), respawn timers, the hangar, the
+// free-slot mirror, the respawn anchor and active module target bindings.
+// Pending events and queued commands are intentionally excluded (Save does
+// not carry them).
 //
 // Because hash() and Restore() share the same canonical serialization, a
 // snapshot -> restore round-trip preserves Hash() exactly, and continued
