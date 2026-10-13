@@ -265,6 +265,15 @@ type WarpDrive struct {
 	// freezes at the tunnel profile distance when the warp phase starts.
 	Dist  float64
 	Speed float64
+	// Traveled is the tunnel progress of the warp phase (m): the distance
+	// flown through the warp profile, integrated with exactly the
+	// arithmetic the position itself used to carry. The on-grid position is
+	// read back from it through warpDisplayRemaining, so the accel/decel
+	// segments show as grid slides while every phase boundary and the
+	// landing tick stay on the pre-easing timeline. Zero at warp start;
+	// heals from the projected remaining distance for saves written before
+	// it existed (those carry tunnel-trajectory positions).
+	Traveled float64
 }
 
 // Wreck is the remains of a destroyed ship, holding rolled loot.
