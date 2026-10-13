@@ -325,6 +325,12 @@ type Traffic struct {
 	// empty DestSys reads as the spawn system (pre-cross-system saves).
 	DestSys content.SystemID `json:"dsys,omitempty"`
 	DestCel content.CelID    `json:"dcel,omitempty"`
+	// Owner is the shipment's principal: the opaque market owner tag of
+	// the agent whose haul wish spawned it ("agent:<id>"), "" for an
+	// authored lane. It rides every park/resume (TrafficJourney.Owner) so
+	// a wish convoy settles against its agent's ledger wherever it
+	// delivers — and a destroyed one drops that wish there.
+	Owner string `json:"owner,omitempty"`
 }
 
 // TrafficJourney is a shipment parked between grids: it hopped a gate (or
@@ -342,6 +348,10 @@ type TrafficJourney struct {
 	Hull    content.ShipID   `json:"hull"`
 	Rolled  bool             `json:"rolled"` // the parked leg's ambush roll was consumed
 	Next    float64          `json:"next"`   // warp retry cooldown (sim time)
+	// Owner is the parked shipment's principal (Traffic.Owner): set for a
+	// wish convoy, "" for an authored lane. Same wire rule as every other
+	// journey field — carried verbatim, zero value for pre-owner saves.
+	Owner string `json:"owner,omitempty"`
 }
 
 // Patrol response states (Patrol.State).

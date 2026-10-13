@@ -162,9 +162,11 @@ const (
 const ownerAgentPrefix = "agent:"
 
 // HaulWish is one cross-node arbitrage request a trader/industrialist
-// appends when the spread between two stations' prices exceeds fees: the
-// logistics workstream consumes these, the agent layer only produces and
-// exposes them (FulfillHaul is the minimal stub seam).
+// appends when the spread between two stations' prices exceeds fees. The
+// agent layer produces them and keeps the committed one alive until it is
+// settled: system_traffic.go consumes wishes (goods sourced at spawn,
+// delivered as agent-owned asks, settled through FulfillHaul). A wish is
+// one shipment — never partial.
 type HaulWish struct {
 	Owner    string
 	From, To StationID
@@ -190,7 +192,8 @@ type AgentOrder struct {
 // Agent is one ledger agent (see the file header for the rule shapes).
 // State per the approved design: ID, Home, Capital, Inventory, Beliefs,
 // Margin, Wishes — plus Role (the bootstrap leaning), Start (the
-// order-size denominator) and Orders (the resting-order ledger).
+// order-size denominator), Orders (the resting-order ledger) and InFlight
+// (the wishes a convoy is already carrying).
 type Agent struct {
 	ID        string
 	Home      StationID
@@ -202,6 +205,12 @@ type Agent struct {
 	Margin    map[content.ItemID]float64
 	Wishes    []HaulWish
 	Orders    []AgentOrder
+	// InFlight are wishes already riding a convoy hauler: their goods left
+	// Inventory at spawn, so the behavior pass can rebuild the wish list
+	// from live spreads without losing the commitment (retainInFlight puts
+	// the committed copy back). Cleared on delivery (FulfillHaul) and on
+	// loss (the goods are gone, the wish is dropped unpaid).
+	InFlight []HaulWish
 }
 
 // AgentView is the read-only roster view (system 18's reader surface).
@@ -396,12 +405,15 @@ func takeInv(a *Agent, item content.ItemID, qty int) {
 	a.Inventory[item] -= qty
 }
 
-// ownOrder returns the agent's lowest-id resting order for a side/item.
+// ownOrder returns the agent's lowest-id resting HOME order for a
+// side/item. Deliveries listed at other stations (haul-wish cargo that
+// arrived at its market) are not home shouts: quoting must neither cross
+// nor reprice them — they rest until sold.
 func (a *Agent) ownOrder(side OrderSide, item content.ItemID) (AgentOrder, bool) {
 	var best AgentOrder
 	found := false
 	for _, o := range a.Orders {
-		if o.Side != side || o.Item != item {
+		if o.Side != side || o.Item != item || o.Station != a.Home {
 			continue
 		}
 		if !found || o.ID < best.ID {
@@ -411,13 +423,13 @@ func (a *Agent) ownOrder(side OrderSide, item content.ItemID) (AgentOrder, bool)
 	return best, found
 }
 
-// ownQuote returns the agent's lowest-id resting order for an item
+// ownQuote returns the agent's lowest-id resting HOME order for an item
 // (either side) — the previous shout the ZIP momentum term reads.
 func (a *Agent) ownQuote(item content.ItemID) (AgentOrder, bool) {
 	var best AgentOrder
 	found := false
 	for _, o := range a.Orders {
-		if o.Item != item {
+		if o.Item != item || o.Station != a.Home {
 			continue
 		}
 		if !found || o.ID < best.ID {
@@ -944,7 +956,11 @@ func (s *Sim) agentApplyQuotes(a *Agent, quotes []agentQuote) {
 	if len(a.Orders) > 0 {
 		var keep []AgentOrder
 		for _, o := range a.Orders {
-			if desired[quoteKey{o.Side, o.Item}] {
+			// A listing at another station is haul-wish cargo that
+			// arrived at its market: the pass never retracts it (its
+			// units are escrowed there until sold), it only owns the
+			// quotes on its own book.
+			if desired[quoteKey{o.Side, o.Item}] || o.Station != a.Home {
 				keep = append(keep, o)
 				continue
 			}
@@ -1091,6 +1107,168 @@ func (s *Sim) agentDrawOre(a *Agent, p agentPlan) {
 // Haul wishes (the logistics seam)
 // ---------------------------------------------------------------------------
 
+// sortWishes orders wishes canonically (From, To, Item) — the list order
+// HaulWishes() exposes and every rebuild re-asserts.
+func sortWishes(ws []HaulWish) {
+	sort.Slice(ws, func(i, j int) bool {
+		if ws[i].From != ws[j].From {
+			return ws[i].From < ws[j].From
+		}
+		if ws[i].To != ws[j].To {
+			return ws[i].To < ws[j].To
+		}
+		return ws[i].Item < ws[j].Item
+	})
+}
+
+// sameWishShipment reports whether two wishes are one shipment (owner,
+// ends, item, quantity). MaxCost is deliberately ignored: it is recomputed
+// from live spreads on every pass, while the commitment stands.
+func sameWishShipment(a, b HaulWish) bool {
+	return a.Owner == b.Owner && a.From == b.From && a.To == b.To &&
+		a.Item == b.Item && a.Qty == b.Qty
+}
+
+// inFlightFor finds the committed shipment of qty units of item bound for
+// station: the hauler/journey side carries only the cargo and the final
+// destination (Traffic.Owner + Item/Qty/DestCel), so that is the match key.
+func (a *Agent) inFlightFor(item content.ItemID, qty int, to StationID) (HaulWish, bool) {
+	for _, w := range a.InFlight {
+		if w.Item == item && w.Qty == qty && w.To == to {
+			return w, true
+		}
+	}
+	return HaulWish{}, false
+}
+
+// beginShipment commits a wish to the hauler now carrying its goods.
+func (a *Agent) beginShipment(w HaulWish) { a.InFlight = append(a.InFlight, w) }
+
+// dropInFlight releases a committed shipment — delivery (after FulfillHaul
+// paid) or loss (unpaid). No-op when nothing matches.
+func (a *Agent) dropInFlight(w HaulWish) {
+	kept := a.InFlight[:0]
+	for _, x := range a.InFlight {
+		if !sameWishShipment(x, w) {
+			kept = append(kept, x)
+		}
+	}
+	a.InFlight = kept
+}
+
+// dropWish removes a wish from the pending list WITHOUT payment: the loss
+// path (its goods were debited at spawn and never arrived). Any rebuilt
+// twin of the same shipment goes with it.
+func (a *Agent) dropWish(w HaulWish) {
+	kept := a.Wishes[:0]
+	for _, x := range a.Wishes {
+		if !sameWishShipment(x, w) {
+			kept = append(kept, x)
+		}
+	}
+	a.Wishes = kept
+}
+
+// retainInFlight re-asserts committed shipments in a freshly rebuilt wish
+// list: the pass recomputes wishes from live spreads, but one already
+// riding a hauler stays pending until it delivers or is lost. The
+// committed copy wins any collision with a rebuilt twin, so FulfillHaul's
+// field-exact match still finds it.
+func retainInFlight(a *Agent, out []HaulWish) []HaulWish {
+	if len(a.InFlight) == 0 {
+		return out
+	}
+	kept := make([]HaulWish, 0, len(out)+len(a.InFlight))
+	for _, w := range out {
+		dup := false
+		for _, f := range a.InFlight {
+			if sameWishShipment(w, f) {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			kept = append(kept, w)
+		}
+	}
+	kept = append(kept, a.InFlight...)
+	sortWishes(kept)
+	return kept
+}
+
+// agentHaulAsk is the ask price a delivered haul-wish lists at: the
+// agent's EWMA belief for the item marked up by its current ZIP margin
+// (the opening margin until a pass sets one) — the same reservation×(1+µ)
+// rule agentQuotes posts with, so a convoy delivery prices off the
+// AGENT's beliefs and never off the system's one-tick-under-basis rule.
+// Returns 0 for an item with no valuation at all (no belief, no base
+// price — the caller then falls back to the convoy rule).
+func (s *Sim) agentHaulAsk(a *Agent, item content.ItemID) float64 {
+	v := s.agentBelief(a, item)
+	if v <= 0 {
+		return 0
+	}
+	µ, ok := a.Margin[item]
+	if !ok || µ <= 0 {
+		µ = zipMarginInit
+	}
+	return quantizeTick(v * (1 + clamp(µ, zipMarginMin, zipMarginMax)))
+}
+
+// haulSourceGoods moves a wish shipment's cargo out of the agent's stock
+// at SPAWN time: the agent's own resting asks at the origin go first
+// (cancelled whole — the surplus stays free in its stock), the remainder
+// comes out of free stock. False when the agent cannot cover the full
+// quantity: a wish is one shipment, never a partial, and nothing is
+// mutated before the check passes.
+func (s *Sim) haulSourceGoods(a *Agent, w HaulWish) bool {
+	if w.Qty <= 0 {
+		return false
+	}
+	avail := a.freeStock(w.Item)
+	orders := append([]AgentOrder(nil), a.Orders...) // snapshot: dropOrder compacts in place
+	for _, o := range orders {                       // ascending id: canonical
+		if avail >= w.Qty {
+			break
+		}
+		if o.Station != w.From || o.Side != OrderSell || o.Item != w.Item {
+			continue
+		}
+		if !s.CancelOrder(w.From, o.ID, agentOwnerTag(a.ID)) {
+			continue
+		}
+		a.dropOrder(o.ID) // ledger first: agentSettle must never see it as a fill
+		avail += o.Qty
+	}
+	if avail < w.Qty {
+		return false
+	}
+	takeInv(a, w.Item, w.Qty)
+	return true
+}
+
+// haulPlaceAgentAsk lists a delivered wish shipment at its destination
+// station under the agent's owner tag: the cargo re-enters the agent's
+// stock and is escrowed straight into the ask (the ledger keeps it, so
+// agentSettle credits the agent when it fills). An immediately crossing
+// fill settles like any other agent sell — proceeds in (net of the sales
+// tax), units out.
+func (s *Sim) haulPlaceAgentAsk(a *Agent, station StationID, item content.ItemID,
+	qty int, price float64) {
+	addInv(a, item, qty)
+	res, ok := s.PlaceOrder(station, OrderSell, item, qty, price, agentOwnerTag(a.ID))
+	if !ok { // price <= 0 or no such station: the cargo stays as stock
+		return
+	}
+	takeInv(a, item, res.Filled)
+	a.Capital += res.Cost * (1 - MarketSalesTax)
+	if res.Remaining > 0 {
+		a.Orders = append(a.Orders, AgentOrder{ID: res.ID, Station: station,
+			Side: OrderSell, Item: item, Price: price, Qty: res.Remaining})
+		sort.Slice(a.Orders, func(i, j int) bool { return a.Orders[i].ID < a.Orders[j].ID })
+	}
+}
+
 // stationItemPrice is a station's displayed price for an item ONLY when
 // that station's book actually has data for it (trade, ask or bid) —
 // data-less stations must not manufacture a spread off the base price.
@@ -1116,7 +1294,9 @@ func (s *Sim) stationItemPrice(station StationID, item content.ItemID) (float64,
 // dearest data-bearing stations differ by more than the round-trip fee
 // load it appends a HaulWish for the gap (MaxCost = spread − fees — what
 // is left for the hauler). Miners produce no wishes; the list is rebuilt,
-// never accumulated, so it cannot grow without bound.
+// never accumulated, so it cannot grow without bound — except that a wish
+// already riding a hauler is re-asserted verbatim (retainInFlight), since
+// its commitment outlives the spread that spawned it.
 func (s *Sim) agentUpdateWishes(a *Agent) {
 	set := map[content.ItemID]bool{}
 	for item := range a.Inventory {
@@ -1126,7 +1306,9 @@ func (s *Sim) agentUpdateWishes(a *Agent) {
 		set[o.Item] = true
 	}
 	if len(set) == 0 {
-		a.Wishes = nil
+		// Nothing left to quote or hold — but a shipment already on the
+		// road stays pending until it delivers (or is lost).
+		a.Wishes = retainInFlight(a, nil)
 		return
 	}
 	items := make([]content.ItemID, 0, len(set))
@@ -1166,21 +1348,17 @@ func (s *Sim) agentUpdateWishes(a *Agent) {
 		if hi-lo <= fees {
 			continue // spread inside cost + fees: nothing to haul
 		}
+		maxCost := hi - lo - fees
+		if maxCost > a.freeCapital() {
+			continue // cannot fund the haul: skipped now, pruned by this rebuild
+		}
 		out = append(out, HaulWish{
 			Owner: agentOwnerTag(a.ID), From: loStation, To: hiStation,
-			Item: item, Qty: qty, MaxCost: hi - lo - fees,
+			Item: item, Qty: qty, MaxCost: maxCost,
 		})
 	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].From != out[j].From {
-			return out[i].From < out[j].From
-		}
-		if out[i].To != out[j].To {
-			return out[i].To < out[j].To
-		}
-		return out[i].Item < out[j].Item
-	})
-	a.Wishes = out
+	sortWishes(out)
+	a.Wishes = retainInFlight(a, out)
 }
 
 // ---------------------------------------------------------------------------
@@ -1312,9 +1490,9 @@ type SavedAgentVal struct {
 }
 
 // SavedAgent is one agent's canonical Save form: sorted inventory
-// (CargoStack), beliefs and margins, wishes verbatim. Resting-order
-// ledgers are derived from the saved books on restore (Step-boundary
-// invariant), so they carry no field.
+// (CargoStack), beliefs and margins, wishes and the shipments already on
+// the road verbatim. Resting-order ledgers are derived from the saved
+// books on restore (Step-boundary invariant), so they carry no field.
 type SavedAgent struct {
 	ID        string               `json:"id"`
 	Home      StationID            `json:"home"`
@@ -1325,6 +1503,7 @@ type SavedAgent struct {
 	Beliefs   []SavedAgentVal      `json:"beliefs,omitempty"`
 	Margin    []SavedAgentVal      `json:"margin,omitempty"`
 	Wishes    []HaulWish           `json:"wishes,omitempty"`
+	InFlight  []HaulWish           `json:"in_flight,omitempty"`
 }
 
 // saved converts live state to the canonical Save form (sorted keys).
@@ -1355,6 +1534,9 @@ func (a Agent) saved() SavedAgent {
 	}
 	if len(a.Wishes) > 0 {
 		sv.Wishes = append([]HaulWish(nil), a.Wishes...)
+	}
+	if len(a.InFlight) > 0 {
+		sv.InFlight = append([]HaulWish(nil), a.InFlight...)
 	}
 	return sv
 }
@@ -1395,11 +1577,21 @@ func agentFromSaved(sv SavedAgent) (Agent, error) {
 		}
 		a.Margin[m.Item] = m.Val
 	}
-	for _, w := range sv.Wishes {
-		if w.Qty < 0 || w.MaxCost < 0 || w.Owner == "" {
-			return Agent{}, errf("sim: save agent %s has an invalid haul wish", sv.ID)
-		}
+	if !validWishList(sv.Wishes) || !validWishList(sv.InFlight) {
+		return Agent{}, errf("sim: save agent %s has an invalid haul wish", sv.ID)
 	}
 	a.Wishes = append([]HaulWish(nil), sv.Wishes...)
+	a.InFlight = append([]HaulWish(nil), sv.InFlight...)
 	return a, nil
+}
+
+// validWishList is the trust-boundary check on a saved wish list: a save
+// is user-editable, so anything no live run could produce is rejected.
+func validWishList(ws []HaulWish) bool {
+	for _, w := range ws {
+		if w.Qty < 0 || w.MaxCost < 0 || w.Owner == "" {
+			return false
+		}
+	}
+	return true
 }

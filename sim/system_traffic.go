@@ -2,6 +2,7 @@ package sim
 
 import (
 	"math"
+	"sort"
 
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/core"
@@ -39,6 +40,17 @@ import (
 // ever touches the origin book. Cross-system hauls park the shipment as a
 // journey (Save.TrafficJourneys) when they cross a gate or when the grid
 // rebuilds under them, and continue when the destination system loads.
+//
+// Haul-wish convoys (the consumption seam for agent.go's HaulWish) are the
+// second spawn path: on a slow stateless poll the system walks the agents'
+// canonical wish list and launches the first wish this grid can serve.
+// Their provenance is the AGENT's own stock (its resting asks at the
+// origin first, then free stock — debited at spawn like every other
+// shipment), they share trafficMaxLive and the journey ledger with the
+// authored lanes, and their Traffic.Owner tag rides every park/resume so
+// delivery lists the cargo at the agent's OWN ask and settles the fee
+// through FulfillHaul. Authored lanes schedule first; wishes only fill
+// what is left of the cap.
 // ---------------------------------------------------------------------------
 
 const (
@@ -78,6 +90,24 @@ const (
 	trafficPatrolAnchorScatter = 5000.0
 	trafficPatrolScatter       = 2000.0
 	trafficPatrolEngageRange   = 12000.0
+
+	// trafficWishInterval is the wish-consumption poll cadence (ticks) —
+	// stateless like every traffic schedule (trafficDue), so a skipped
+	// attempt never reschedules anything. One shipment per poll: convoys
+	// trickle in where the spread justifies them instead of grabbing the
+	// whole live cap at once.
+	trafficWishInterval = 60
+
+	// trafficHaulFee pins what a haul-wish shipment pays its hauler:
+	//
+	//	cost = trafficHaulFee × transit legs × cargo volume (m³)
+	//
+	// i.e. 2.5 € per m³ per leg (250 € moves 100 m³ one leg). Freight is
+	// volume-priced, so bulky low-value cargo only moves when its spread
+	// really pays, and zero-volume cargo (modules, hulls) rides free. The
+	// fee is a pure sink: FulfillHaul debits the agent's free capital and
+	// credits nothing.
+	trafficHaulFee = 2.5
 )
 
 // ---------------------------------------------------------------------------
@@ -203,6 +233,8 @@ func (s *Sim) systemTraffic() {
 		s.trafficSpawnHaulers(sys, td, sec)
 		s.trafficSpawnPatrol(sys, td, sec)
 	}
+	// Wishes fill what is left of the live cap (authored lanes schedule first).
+	s.trafficSpawnWishHaulers(sys)
 	s.trafficDriveHaulers(sys, td, sec)
 	s.trafficDriveAttacks(sys, td, sec)
 	s.trafficDrivePatrols()
@@ -412,6 +444,224 @@ func (s *Sim) marketAskQty(station StationID, item content.ItemID) int {
 	return n
 }
 
+// ---------------------------------------------------------------------------
+// Haul-wish convoys (the wish-consumption seam)
+// ---------------------------------------------------------------------------
+
+// trafficSpawnWishHaulers walks every agent's pending haul wishes in
+// canonical order (agents ascending, each list in (From, To, Item) order)
+// and launches the first one this grid can actually serve — one shipment
+// per poll, the cap shared with the authored lanes. Attempts that fail a
+// check leave the wish pending and draw no entropy, exactly like a skipped
+// authored schedule (the poll itself is stateless: trafficDue).
+func (s *Sim) trafficSpawnWishHaulers(sys *content.SystemDef) {
+	if s.Traffic.Len() >= trafficMaxLive {
+		return
+	}
+	if !trafficDue(s.ticks, string(sys.ID)+"|wish", trafficWishInterval) {
+		return
+	}
+	for _, w := range s.HaulWishes() {
+		if s.trafficShipWish(sys, w) {
+			return
+		}
+	}
+}
+
+// trafficShipWish tries to launch one wish as a real convoy. Re-validates
+// the opportunity against live state before anything mutates: the haul
+// starts on this grid (its origin station is here), the gate path exists,
+// the net spread still covers the pinned haul cost and stays inside the
+// wish's MaxCost, and the agent can fund the fee. Only then are the goods
+// sourced out of the agent's stock and the hauler built — the same
+// scatter draws, in the same order, as an authored spawn (2 draws).
+func (s *Sim) trafficShipWish(sys *content.SystemDef, w HaulWish) bool {
+	a := s.agentByOwner(w.Owner)
+	if a == nil || w.Qty <= 0 {
+		return false
+	}
+	if _, shipping := a.inFlightFor(w.Item, w.Qty, w.To); shipping {
+		return false // one shipment per wish
+	}
+	fromSys, ok := s.stationSystem(w.From)
+	if !ok || fromSys != sys.ID {
+		return false // origins only spawn where their station's grid is loaded
+	}
+	from := sysCelestial(sys, w.From)
+	toSys, ok := s.stationSystem(w.To)
+	if !ok {
+		return false
+	}
+	destDef, ok := s.Content.System(toSys)
+	if !ok {
+		return false
+	}
+	to := sysCelestial(destDef, w.To)
+	if to == nil || to.Station == nil {
+		return false
+	}
+	target := w.To
+	if toSys != sys.ID {
+		if target = s.trafficNextHop(sys.ID, toSys); target == "" {
+			return false // no gate path: the wish can never ship
+		}
+	}
+	legs := s.trafficWishLegs(w.From, w.To)
+	if legs == 0 {
+		return false
+	}
+	hull := s.wishHullFor(s.itemVolume(w.Item) * float64(w.Qty))
+	if hull == nil {
+		return false // no hold in the content takes the shipment
+	}
+	cost := s.trafficWishCost(w)
+	// Re-validate the spread against the books (before the sourcing mutates
+	// them): the net spread must still cover the haul, and the haul must
+	// still fit the budget the wish was authored with.
+	lo := s.MarketPrice(w.From, w.Item)
+	hi := s.MarketPrice(w.To, w.Item)
+	net := hi - lo - (MarketBrokerFee+MarketSalesTax)*lo
+	if cost > w.MaxCost || net < cost || a.freeCapital() < cost {
+		return false
+	}
+	// Source the goods last: the agent's own asks at the origin first,
+	// then free stock (never a partial, never conjured).
+	if !s.haulSourceGoods(a, w) {
+		return false
+	}
+
+	spread := from.Radius
+	if spread < 1000 {
+		spread = 1000
+	}
+	angle := s.trafficRNG.Range(0, 2*math.Pi)
+	rad := s.trafficRNG.Range(0, spread)
+	pos := from.Position.Add(core.Vec2{X: math.Cos(angle) * rad, Y: math.Sin(angle) * rad})
+
+	e := s.createHauler(hull, pos, angle, Traffic{
+		Origin: w.From, Dest: target, DestSys: toSys, DestCel: w.To,
+		Item: w.Item, Qty: w.Qty, Basis: lo, Owner: w.Owner,
+		Phase: TrafficTransit,
+	})
+	a.beginShipment(w)
+	s.emit(Event{Kind: EvTraffic, Phase: TrafficDeparted, Severity: SevInfo, Actor: e,
+		System: sys.ID, Cel: w.From, Item: w.Item, Value: float64(w.Qty),
+		Text: "Convoy hauler departs " + from.Name + " bound for " + to.Name})
+	return true
+}
+
+// trafficWishLegs counts the transit legs of a station-to-station haul:
+// one warp per system on the gate path (origin → first gate, gate → gate,
+// …, last gate → destination). 0 when either end is no station or the two
+// systems are unconnected — a haul that can never run.
+func (s *Sim) trafficWishLegs(from, to StationID) int {
+	fromSys, ok := s.stationSystem(from)
+	if !ok {
+		return 0
+	}
+	toSys, ok := s.stationSystem(to)
+	if !ok {
+		return 0
+	}
+	if fromSys == toSys {
+		return 1
+	}
+	legs := 1
+	cur := fromSys
+	for i := 0; i < len(s.Content.Systems); i++ { // bounded: each step enters a new system
+		gate := s.trafficNextHop(cur, toSys)
+		if gate == "" {
+			return 0
+		}
+		def, ok := s.Content.System(cur)
+		if !ok {
+			return 0
+		}
+		cel := sysCelestial(def, gate)
+		if cel == nil || cel.Gate == nil {
+			return 0
+		}
+		cur = cel.Gate.ToSystem
+		legs++
+		if cur == toSys {
+			return legs
+		}
+	}
+	return 0
+}
+
+// trafficWishCost is the fee a wish shipment owes on delivery (the pin in
+// trafficHaulFee): transit legs × cargo volume × rate. Pure function of
+// content and the wish, so spawn and delivery compute the same number.
+func (s *Sim) trafficWishCost(w HaulWish) float64 {
+	legs := s.trafficWishLegs(w.From, w.To)
+	return trafficHaulFee * float64(legs) * s.itemVolume(w.Item) * float64(w.Qty)
+}
+
+// wishHullFor picks the hull a wish convoy flies: the first ship id in
+// canonical order whose hold takes the shipment (content-derived, no RNG —
+// every run picks the same hull), nil when no hull fits.
+func (s *Sim) wishHullFor(vol float64) *content.ShipDef {
+	ids := make([]content.ShipID, 0, len(s.Content.Ships))
+	for id := range s.Content.Ships {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	for _, id := range ids {
+		if d, ok := s.Content.Ship(id); ok && d.Cargo >= vol {
+			return d
+		}
+	}
+	return nil
+}
+
+// trafficLoseWish drops the wish a lost/stranded shipment was carrying:
+// the goods were debited at spawn and never arrived, so the agent is NOT
+// paid (no FulfillHaul) and the wish leaves the list — the next behavior
+// pass rebuilds from live spreads anyway. Authored shipments (Owner "")
+// are untouched.
+func (s *Sim) trafficLoseWish(tc *Traffic) {
+	if tc.Owner == "" {
+		return
+	}
+	dest := tc.DestCel
+	if dest == "" { // pre-cross-system Traffic: the leg target is the destination
+		dest = tc.Dest
+	}
+	a := s.agentByOwner(tc.Owner)
+	if a == nil {
+		return
+	}
+	if w, ok := a.inFlightFor(tc.Item, tc.Qty, StationID(dest)); ok {
+		a.dropInFlight(w)
+		a.dropWish(w)
+	}
+}
+
+// trafficLoseJourney is trafficLoseWish for a parked shipment that can no
+// longer continue (see trafficJourneyLost).
+func (s *Sim) trafficLoseJourney(j TrafficJourney) {
+	if j.Owner == "" {
+		return
+	}
+	tc := Traffic{Owner: j.Owner, Item: j.Item, Qty: j.Qty,
+		Dest: j.DestCel, DestCel: j.DestCel}
+	s.trafficLoseWish(&tc)
+}
+
+// trafficSettleWish closes a delivered wish shipment: the pinned haul fee
+// is charged through FulfillHaul (free capital, a sink) and the wish drops
+// from the agent's list; the in-flight commitment is released either way,
+// so a shipment can never settle twice.
+func (s *Sim) trafficSettleWish(a *Agent, tc *Traffic, dest StationID) {
+	w, ok := a.inFlightFor(tc.Item, tc.Qty, dest)
+	if !ok {
+		return
+	}
+	s.FulfillHaul(w, s.trafficWishCost(w))
+	a.dropInFlight(w)
+}
+
 // trafficSpawnPatrol fires the patrol schedule: one guard ship per attempt,
 // rotating through the configured hull palette by attempt index. Null
 // security never spawns patrols.
@@ -521,7 +771,8 @@ func (s *Sim) trafficDriveHaulers(sys *content.SystemDef, td *content.TrafficDef
 		// Not in warp: arrived, or due for a (re)attempt.
 		dest := s.celEntity(tc.Dest)
 		if dest.IsZero() {
-			s.destroy(e) // destination vanished (shouldn't happen): drop the leg
+			s.trafficLoseWish(tc) // destination vanished (shouldn't happen): drop the leg
+			s.destroy(e)
 			continue
 		}
 		if s.distBetween(e, dest) <= warpLandRange {
@@ -645,6 +896,7 @@ func (s *Sim) trafficEscaped(e ecs.Entity, tc *Traffic) {
 func (s *Sim) trafficArrive(sys *content.SystemDef, e ecs.Entity, tc *Traffic) {
 	dest := sysCelestial(sys, tc.Dest)
 	if dest == nil {
+		s.trafficLoseWish(tc)
 		s.destroy(e)
 		return
 	}
@@ -656,6 +908,7 @@ func (s *Sim) trafficArrive(sys *content.SystemDef, e ecs.Entity, tc *Traffic) {
 		s.trafficDeliver(sys, e, tc, dest)
 		return
 	}
+	s.trafficLoseWish(tc) // a wish never routes to a belt/gate end (To is a station)
 	s.destroy(e)
 }
 
@@ -668,12 +921,14 @@ func (s *Sim) trafficHop(sys *content.SystemDef, e ecs.Entity, tc *Traffic, gate
 	if gate.Gate == nil {
 		// A cross-system leg always ends at a gate (route validation):
 		// nothing sane to do otherwise — drop the leg as before.
+		s.trafficLoseWish(tc)
 		s.destroy(e)
 		return
 	}
 	nextSys := gate.Gate.ToSystem
 	nextDef, ok := s.Content.System(nextSys)
 	if !ok {
+		s.trafficLoseWish(tc)
 		s.destroy(e)
 		return
 	}
@@ -689,6 +944,7 @@ func (s *Sim) trafficHop(sys *content.SystemDef, e ecs.Entity, tc *Traffic, gate
 	s.trafficJourneys = append(s.trafficJourneys, TrafficJourney{
 		System: nextSys, At: at, DestSys: tc.DestSys, DestCel: tc.DestCel,
 		Item: tc.Item, Qty: tc.Qty, Basis: tc.Basis, Hull: hull,
+		Owner: tc.Owner,
 	})
 	s.emit(Event{Kind: EvTraffic, Phase: TrafficJumped, Severity: SevInfo, Actor: e,
 		System: sys.ID, Cel: gate.ID, Item: tc.Item, Value: float64(tc.Qty),
@@ -724,7 +980,7 @@ func (s *Sim) trafficParkGrid() {
 		s.trafficJourneys = append(s.trafficJourneys, TrafficJourney{
 			System: s.systemID, At: tr.Pos, DestSys: tc.DestSys, DestCel: destCel,
 			Item: tc.Item, Qty: tc.Qty, Basis: tc.Basis, Hull: hull,
-			Rolled: tc.Rolled, Next: tc.Next,
+			Rolled: tc.Rolled, Next: tc.Next, Owner: tc.Owner,
 		})
 	}
 }
@@ -776,7 +1032,7 @@ func (s *Sim) trafficResumeJourneys(sys *content.SystemDef) {
 func (s *Sim) spawnResumedHauler(sys *content.SystemDef, hull *content.ShipDef, j TrafficJourney, target content.CelID) {
 	e := s.createHauler(hull, j.At, 0, Traffic{
 		Dest: target, DestSys: j.DestSys, DestCel: j.DestCel,
-		Item: j.Item, Qty: j.Qty, Basis: j.Basis,
+		Item: j.Item, Qty: j.Qty, Basis: j.Basis, Owner: j.Owner,
 		Phase: TrafficTransit, Rolled: j.Rolled, Next: j.Next,
 	})
 	nearID, nearName := s.nearestLandmark(j.At)
@@ -790,7 +1046,8 @@ func (s *Sim) spawnResumedHauler(sys *content.SystemDef, hull *content.ShipDef, 
 }
 
 // trafficJourneyLost announces a parked shipment that can no longer
-// continue — honest loss: an event, no book movement, no re-spawn.
+// continue — honest loss: an event, no book movement, no re-spawn. A wish
+// shipment goes with it: goods already debited, no payment, wish dropped.
 func (s *Sim) trafficJourneyLost(sys *content.SystemDef, j TrafficJourney, destSys content.SystemID) {
 	destName := string(j.DestCel)
 	if def, ok := s.Content.System(destSys); ok {
@@ -800,6 +1057,7 @@ func (s *Sim) trafficJourneyLost(sys *content.SystemDef, j TrafficJourney, destS
 		Value: float64(j.Qty),
 		Text: "Risk premium — " + s.itemName(j.Item) +
 			" shipment lost en route to " + destName})
+	s.trafficLoseJourney(j)
 }
 
 // trafficNextHop returns the gate celestial id in `from` that begins the
@@ -856,15 +1114,20 @@ func (s *Sim) trafficNextHop(from, dest content.SystemID) content.CelID {
 }
 
 // trafficDeliver posts the shipment as supply on the destination station's
-// book at its spawn-time cost basis: units fulfilled from the origin
-// station's asks were debited when the hauler spawned (their weighted
-// price IS the basis), belt and gate (import) shipments carry the item's
-// base price — so no withdrawal happens here, and a shipment that never
-// arrived needs no reversal (its goods left the origin book at spawn). The
-// ask lists one tick under min(cost basis, best
-// ask), so arriving supply always improves the displayed price — and a
-// posting that crosses the destination's bids executes immediately at the
-// resting bid (never-crossed invariant), only the remainder resting.
+// book. An AUTHORED shipment lists at its spawn-time cost basis: units
+// fulfilled from the origin station's asks were debited when the hauler
+// spawned (their weighted price IS the basis), belt and gate (import)
+// shipments carry the item's base price — so no withdrawal happens here,
+// and a shipment that never arrived needs no reversal (its goods left the
+// origin book at spawn). The ask lists one tick under min(cost basis,
+// best ask), so arriving supply always improves the displayed price — and
+// a posting that crosses the destination's bids executes immediately at
+// the resting bid (never-crossed invariant), only the remainder resting.
+//
+// A WISH shipment (Traffic.Owner set) lists at the agent's OWN ask
+// instead — its EWMA belief marked up by its ZIP margin, posted under its
+// owner tag — and then settles its wish through FulfillHaul (the pinned
+// haul fee). The market voice runs on both.
 func (s *Sim) trafficDeliver(sys *content.SystemDef, e ecs.Entity, tc *Traffic, dest *content.CelestialDef) {
 	item, qty := tc.Item, tc.Qty
 	costBasis := tc.Basis
@@ -875,17 +1138,29 @@ func (s *Sim) trafficDeliver(sys *content.SystemDef, e ecs.Entity, tc *Traffic, 
 	}
 	book := s.market[dest.ID]
 	before := s.marketPrice(book, item)
+	agent := s.agentByOwner(tc.Owner)
 	if dest.Station != nil && hasMarketService(dest.Station) {
-		price := costBasis
-		if book != nil {
-			if ask, ok := book.bestAsk(item); ok && ask.Price < price {
-				price = ask.Price
+		agentAsk := 0.0
+		if agent != nil {
+			agentAsk = s.agentHaulAsk(agent, item)
+		}
+		if agentAsk > 0 {
+			// Wish shipment: the cargo lists at the agent's reservation
+			// ask (belief × margin), owned by the agent — not one tick
+			// under the convoy's basis.
+			s.haulPlaceAgentAsk(agent, dest.ID, item, qty, agentAsk)
+		} else {
+			price := costBasis
+			if book != nil {
+				if ask, ok := book.bestAsk(item); ok && ask.Price < price {
+					price = ask.Price
+				}
+			}
+			if post := tickDown(price); post > 0 {
+				s.PlaceOrder(dest.ID, OrderSell, item, qty, post, OwnerSystem)
 			}
 		}
-		if post := tickDown(price); post > 0 {
-			s.PlaceOrder(dest.ID, OrderSell, item, qty, post, OwnerSystem)
-			book = s.market[dest.ID] // placement may have created the book
-		}
+		book = s.market[dest.ID] // placement may have created the book
 	}
 
 	vol := s.itemVolume(tc.Item) * float64(tc.Qty)
@@ -898,6 +1173,9 @@ func (s *Sim) trafficDeliver(sys *content.SystemDef, e ecs.Entity, tc *Traffic, 
 		Text: "Convoy delivery — " + volStr + " m³ " + s.itemName(tc.Item) +
 			" received at " + dest.Name})
 	s.marketVoice(book, item, before, dest.Name)
+	if agent != nil {
+		s.trafficSettleWish(agent, tc, dest.ID)
+	}
 	s.destroy(e)
 }
 
@@ -909,6 +1187,10 @@ func (s *Sim) trafficDeliver(sys *content.SystemDef, e ecs.Entity, tc *Traffic, 
 // the hauler spawned, and a shipment that never arrived never touched the
 // destination book.
 func (s *Sim) trafficHaulerDestroyed(e ecs.Entity, tc *Traffic) {
+	// A wish shipment dies with its hauler: the goods were debited at
+	// spawn (they ride the wreck), so the agent is never paid and its
+	// wish is dropped — the events below are the existing loss signals.
+	s.trafficLoseWish(tc)
 	destName := ""
 	if sys := s.System(); sys != nil {
 		if d := sysCelestial(sys, tc.Dest); d != nil {
