@@ -95,6 +95,14 @@ type Sim struct {
 	// factionEndowment; only respawn requisitions debit it.
 	factionLedger map[string]float64
 
+	// --- industry (see system_industry.go): manufacturing jobs and the
+	// per-station craft counters. jobs keeps ascending job-id order,
+	// craft keeps (station, family) order — both are canonical iteration
+	// orders for save/hash; jobSeq is the next job id.
+	jobs   []Job
+	jobSeq uint64
+	craft  []SavedCraft
+
 	// ammoPrefs is the per-(owner, slot) preferred charge item set by
 	// CmdSetAmmo ("" entry = automatic). Point-looked-up only — never
 	// iterated by behavior, so map order cannot leak into the simulation.
@@ -125,6 +133,10 @@ type Sim struct {
 	// dockedThisTick is the station celestial the player docked at this Step
 	// ("" otherwise) — the auto-claim trigger for systemMission.
 	dockedThisTick content.CelID
+	// deferIndustry carries this Step's industry commands (CmdStartJob,
+	// CmdCollectJob) to systemIndustry, the way deferEcon carries the
+	// station-service commands to systemEconomy.
+	deferIndustry []Command
 }
 
 // pendingOreYield is one mining cycle's yield recorded for mission tracking.
@@ -232,6 +244,7 @@ func (s *Sim) Step() {
 	s.systemMission()   // 14 mission (accept/abandon, objectives, auto-claim)
 	s.systemRespawn()   // 15 respawn
 	s.systemTraffic()   // 16 traffic (convoys, ambushes, patrols, book supply)
+	s.systemIndustry()  // 17 industry (manufacturing jobs, craft growth)
 	// Death respawn runs after all systems so that a cross-system clone-bay
 	// respawn can rebuild the grid without yanking entities out from under
 	// the systems still running this tick.
@@ -239,7 +252,7 @@ func (s *Sim) Step() {
 		s.pendingPlayerRespawn = false
 		s.respawnPlayer()
 	}
-	// 17 events: capped at emit time; nothing else to trim.
+	// 18 events: capped at emit time; nothing else to trim.
 	s.ticks++
 	// Time is derived from ticks (not accumulated) so that Time() is an
 	// exact function of the tick count — trivially identical across
@@ -516,3 +529,32 @@ func (s *Sim) DockedMarket() StationID {
 	}
 	return ""
 }
+
+// --- industry (system 17) ---
+
+// DockedIndustry returns the station the player is docked at when it
+// offers the industry service ("" otherwise) — the station the factory
+// panel reads jobs, craft levels and job gating from.
+func (s *Sim) DockedIndustry() StationID {
+	e := s.dockedStation()
+	if e.IsZero() {
+		return ""
+	}
+	st, ok := s.Stations.Get(e)
+	if !ok || !hasService(st, "industry") {
+		return ""
+	}
+	if c, ok := s.Celestials.Get(e); ok {
+		return c.Cel
+	}
+	return ""
+}
+
+// IndustrySlots is how many jobs one station runs concurrently (the
+// industrySlots design constant, for the factory panel's slot readout).
+func IndustrySlots() int { return industrySlots }
+
+// PlayerStock is the units of item the player can spend: general hold, ore
+// hold, hangar stacks, then stored hulls — the have side of the factory
+// panel's have/need column and exactly what StartJob commits from.
+func (s *Sim) PlayerStock(item content.ItemID) int { return s.playerStock(item) }

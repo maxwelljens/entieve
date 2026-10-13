@@ -34,7 +34,8 @@ func (hh *hasher) bytes(bs []byte) {
 // states (master + every NPC fork), every component of every entity, the
 // per-station market books (orders with station/side/owner/arrival id, the
 // last-trade rungs and the next order id), respawn timers, the hangar, the
-// free-slot mirror, the respawn anchor and active module target bindings.
+// free-slot mirror, the respawn anchor, active module target bindings, the
+// manufacturing jobs and the per-station craft counters.
 // Pending events and queued commands are intentionally excluded (Save does
 // not carry them).
 //

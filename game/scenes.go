@@ -56,12 +56,17 @@ func isStationPanel(p panelID) bool {
 }
 
 // OnEnter implements Scene: remember which station windows were open and
-// surface the station services.
+// surface the station services. The factory is the industry service's
+// panel: it surfaces on its own when the docked station offers industry
+// (B toggles it from there on).
 func (sc *StationScene) OnEnter() {
 	g := sc.g
 	for _, p := range stationPanels {
 		g.stationPrior[p] = g.open[p]
 		g.open[p] = true
+	}
+	if g.s.DockedIndustry() != "" {
+		g.open[pFactory] = true
 	}
 }
 

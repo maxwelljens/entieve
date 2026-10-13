@@ -58,6 +58,7 @@ const (
 	pInventory panelID = iota
 	pFitting
 	pMarket
+	pFactory
 	pScanner
 	pMap
 	pHelp
@@ -114,6 +115,16 @@ var panelDefs = [numPanels]panelDef{
 		open:   func(g *Game) *bool { return &g.open[pMarket] },
 		want:   func(g *Game, docked bool) bool { return g.open[pMarket] },
 		sync:   func(g *Game) { g.mkt.Sync() },
+	},
+	pFactory: {
+		name:   "factory",
+		window: func(g *Game) *widget.Window { return g.fact.Win() },
+		open:   func(g *Game) *bool { return &g.open[pFactory] },
+		// The factory is a station service: it only mounts while docked
+		// (the scanner's docked counterpart). Its own gating (industry
+		// service, materials, slots) lives inside the panel.
+		want: func(g *Game, docked bool) bool { return g.open[pFactory] && docked },
+		sync: func(g *Game) { g.fact.Sync() },
 	},
 	pScanner: {
 		name:   "scanner",
@@ -177,6 +188,7 @@ type Game struct {
 	inv  *uikit.Inventory
 	fitt *uikit.Fitting
 	mkt  *uikit.Market
+	fact *uikit.Factory
 	scan *uikit.Scanner
 	mp   *uikit.MapView
 	help *uikit.HelpPanel
@@ -465,6 +477,8 @@ func (g *Game) handleKeys(in Input) error {
 				g.open[pScanner] = !g.open[pScanner]
 			case k == ebiten.KeyG:
 				g.open[pMarket] = !g.open[pMarket]
+			case k == ebiten.KeyB:
+				g.open[pFactory] = !g.open[pFactory]
 			case shift && k == ebiten.KeyL:
 				// Shift+L toggles the log window; plain L stays loot.
 				g.open[pLog] = !g.open[pLog]
@@ -738,6 +752,7 @@ func (g *Game) buildKit() error {
 	g.inv = uikit.NewInventory(env)
 	g.fitt = uikit.NewFitting(env)
 	g.mkt = uikit.NewMarket(env)
+	g.fact = uikit.NewFactory(env)
 	g.scan = uikit.NewScanner(env)
 	g.mp = uikit.NewMapView(env)
 	g.help = uikit.NewHelp(env, helpRows())
@@ -830,6 +845,11 @@ func (g *Game) placeDefaults(w, h int) {
 	}
 	center(g.mp.Win())
 	center(g.menuWin)
+	// The factory window has no composed slot in the docked service trio
+	// (the 1024×700 minimum has no room for a fourth window), so it
+	// floats centered like the other on-demand overlays — the player
+	// drags it where they want and the layout sidecar remembers.
+	center(g.fact.Win())
 	if r := g.help.Win().GetContainer().GetWidget().Rect; r.Dx() > 0 {
 		x := (w - r.Dx()) / 2
 		place(g.help.Win(), image.Rect(x, 24, x+r.Dx(), 24+r.Dy()))

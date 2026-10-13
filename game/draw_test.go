@@ -175,6 +175,7 @@ var panelNames = map[panelID]string{
 	pInventory: "inventory",
 	pFitting:   "fitting",
 	pMarket:    "market",
+	pFactory:   "factory",
 	pScanner:   "scanner",
 	pMap:       "map",
 	pHelp:      "help",

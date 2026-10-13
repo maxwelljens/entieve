@@ -23,8 +23,8 @@ func TestPanelMountAndSync(t *testing.T) {
 		// Every panel must be constructed by New.
 		for name, v := range map[string]any{
 			"hud": g.hud, "rack": g.rack, "log": g.logP, "inventory": g.inv,
-			"fitting": g.fitt, "market": g.mkt, "scanner": g.scan,
-			"map": g.mp, "help": g.help, "menu": g.menuWin,
+			"fitting": g.fitt, "market": g.mkt, "factory": g.fact,
+			"scanner": g.scan, "map": g.mp, "help": g.help, "menu": g.menuWin,
 			"station": g.stationW, "kit": g.kit, "infowin": g.kit.InfoWindow(),
 		} {
 			if v == nil {
@@ -35,6 +35,7 @@ func TestPanelMountAndSync(t *testing.T) {
 		// Mount everything: every toggle window, the overlays and the
 		// docked station services.
 		g.open[pInventory], g.open[pFitting], g.open[pMarket] = true, true, true
+		g.open[pFactory] = true
 		g.open[pScanner], g.open[pMap], g.open[pHelp] = true, true, true
 		g.push(&MenuScene{g: g})
 		dockAt(t, g)
