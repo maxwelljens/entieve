@@ -13,8 +13,12 @@ The schema structs in `content/model.go` (and `content/model_npc.go`) are
 description and log line you author MUST follow `docs/lore/AESTHETIC.md`
 (gritty corporate register) and `docs/lore/NAMING.md` (the name registry,
 the `1,234.56 €` / `50¢` money strings, and the zone words Charter space /
-the Fringe / Unincorporated). Ids are frozen implementation slugs and stay
-as they are even when the slug embeds a retired name.
+the Fringe / Unincorporated). That covers the structured lore fields too:
+hull `origin` tags are copied from NAMING.md's registry, and NPC
+`description` prose MUST read in AESTHETIC's voice — see
+[Lore fields](#lore-fields-hull-origin-and-npc-description) below. Ids are
+frozen implementation slugs and stay as they are even when the slug embeds
+a retired name.
 
 ## Where things live
 
@@ -97,6 +101,36 @@ systems come only from `systems/*.json`.
 | Fractions       | [0,1) resists, (0,1] yields | `"em": 0.15` |
 
 Positions are `core.Vec2` JSON: `{"X": ..., "Y": ...}` (Y grows downward).
+
+## Lore fields: hull `origin` and NPC `description`
+
+Two schema fields carry lore into the UI. Both are single-line JSON strings
+on one line each, next to `name`:
+
+| Field | Struct | Shape | Source of truth |
+|-------|--------|-------|-----------------|
+| `origin` | `ShipDef` (`ships/*.json`) | one lowercase tag: `moravian` \| `polish` \| `nordic` \| `latinate` \| `old-works` | the `origin` column of `docs/lore/NAMING.md` — copy it, never invent |
+| `description` | `NpcDef` (`npcs/*.json`) | one plain single-line string, 1–2 sentences | `docs/lore/AESTHETIC.md` voice; caste framing per `docs/lore/FACTIONS.md` |
+
+**`origin`** is the hull's heritage tag from AESTHETIC's naming layers and
+trait matrix: exactly one origin per hull, and the Old Works machine hulls
+(`ship-rat-*`) are always `old-works` (their castes predate the heritage
+tags). Register the hull's row in `docs/lore/NAMING.md` first and copy its
+`origin` value. The schema accepts an omitted origin so fixtures and test
+worlds stay small, but the validator rejects any tag outside the vocabulary
+(`content/validate.go`) and `TestShippedHullsCarryOrigin` requires every
+shipped hull to carry one.
+
+**`description`** on an NPC is dossier prose: what the machine is and does
+from the frontier's working perspective — how it behaves, what it does to a
+hull, when it shows up. NOT stat recitation (the UI shows stats
+separately), NOT human corsairs: machine castes are framed as equipment,
+per AESTHETIC's voice rules, with no epic language and no retired
+placeholder names (Solace, Penumbra, Gloam, Haven Rest, Thevek Reach,
+Loomfall, Mire Corsairs, Gloam Hierarchy). One or two sentences, same
+shape as a ship/module `description`. Shipped NPCs must all have one
+(`TestShippedNpcsCarryDescription`, enforced the same way as the contract
+title/description rule).
 
 ## Market orders: the ship-order convention
 
@@ -221,6 +255,7 @@ Create `content/data/ships/ship-<name>.json` (one file per hull). Populate
   "name": "Kestrel",
   "class": "frigate",
   "description": "A nimble escort frigate with a strong shield bias.",
+  "origin": "nordic",
   "slots": { "high": 2, "mid": 4, "low": 2 },
   "shield": 260,
   "armor": 140,
@@ -246,6 +281,12 @@ frigate price 200k–400k euro (put the price on a market order — ships have
 no price field); resists each in `[0,1)`; align time = `agility * 10` s, so
 0.4 ≈ 4 s for a frigate, 2.4 ≈ 24 s for a hauler. Every hull needs ≥ 1 high
 slot unless it is an industrial/hauler.
+
+`origin` must be one of `moravian | polish | nordic | latinate | old-works`
+(Old Works machine hulls are `old-works`) — register the hull in
+`docs/lore/NAMING.md` and copy the row's origin column, per
+[Lore fields](#lore-fields-hull-origin-and-npc-description). The validator
+rejects unknown tags; shipped hulls may not omit the field.
 
 ## Recipe 3: add a module
 
@@ -295,6 +336,7 @@ Append to `content/data/npcs/rats.json`:
 {
   "id": "npc-rat-interceptor",
   "name": "Scuttler",
+  "description": "Old Works worker frame: it strips what the swarm can carry off, and it does not care who is standing in the way.",
   "faction": "Old Works",
   "ship": "ship-rat-scuttler",
   "fit": ["mod-rail-turret", "mod-rail-turret", "mod-afterburner"],
@@ -314,6 +356,10 @@ hull's slot counts (list high-slot modules first, then mid, then low);
 `aggro_range`/`orbit_range` in meters; `flee_threshold` is a structure
 fraction in [0,1] (0 = never flees); `bounty` in euro (rats: 5k–250k);
 each loot row: existing item, `chance` in [0,1], `1 <= min_qty <= max_qty`.
+`description` is required on shipped NPCs: 1–2 sentences of dossier prose
+about the machine — what it does and how it behaves, no stat recitation,
+AESTHETIC's voice, no retired placeholder names (see
+[Lore fields](#lore-fields-hull-origin-and-npc-description)).
 Machine classes take an Old Works caste name (Scuttler above) while the id
 keeps its slug — ids are frozen (`docs/lore/NAMING.md`).
 Then reference it from a belt spawn or anomaly spawn (Recipe 1) — NPCs only
@@ -634,3 +680,6 @@ Stock changes are always exact integers (units), never floats.
 7. **Every field filled** — no silent zeros where a real value belongs
    (only legitimate zeros: passive `activation_*`, `ore_hold: 0` on
    non-barges, ammo-less `ammo_class: ""`, guard NPCs' `bounty: 0`).
+   Every shipped hull carries an `origin` from the vocabulary and every
+   shipped NPC a `description` (both test-enforced — see
+   [Lore fields](#lore-fields-hull-origin-and-npc-description)).

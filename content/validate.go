@@ -33,6 +33,13 @@ var (
 	}
 	validServices   = map[string]bool{"repair": true, "market": true, "refine": true, "fitting": true}
 	validSecurities = map[string]bool{"high": true, "low": true, "null": true}
+	// validOrigins is the hull heritage vocabulary of docs/lore/NAMING.md's
+	// origin column (lowercase in JSON). Empty origin is allowed here —
+	// shipped-data completeness is enforced by content/*_test.go, the same
+	// way contract descriptions are.
+	validOrigins = map[string]bool{
+		"moravian": true, "polish": true, "nordic": true, "latinate": true, "old-works": true,
+	}
 	// activeKinds run cycles (used by the balance sanity tests).
 	activeKinds = map[string]bool{
 		KindWeapon: true, KindShieldBoost: true, KindArmorRep: true,
@@ -149,6 +156,9 @@ func (v *validator) ships() {
 		ctx := "ships/" + string(id)
 		if s.Name == "" {
 			v.addf("%s: missing name", ctx)
+		}
+		if s.Origin != "" && !validOrigins[s.Origin] {
+			v.addf("%s: unknown origin %q (want moravian|polish|nordic|latinate|old-works)", ctx, s.Origin)
 		}
 		if s.Shield < 0 {
 			v.addf("%s: negative shield %v", ctx, s.Shield)

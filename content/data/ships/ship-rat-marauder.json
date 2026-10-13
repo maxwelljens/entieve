@@ -3,6 +3,7 @@
   "name": "Marauder",
   "class": "rat",
   "description": "An Old Works assault frame: heavy plating, three rail mounts, and a habit of pinning whatever it jumps.",
+  "origin": "old-works",
   "slots": {
     "high": 3,
     "mid": 2,

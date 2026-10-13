@@ -3,6 +3,7 @@
   "name": "Tabor",
   "class": "industrial",
   "description": "A civilian freighter flying the trade lanes under convoy contract: fat hold, thick industrial tank, no guns. It runs, it does not fight.",
+  "origin": "polish",
   "slots": {
     "high": 1,
     "mid": 2,

@@ -3,6 +3,7 @@
   "name": "Kosa",
   "class": "destroyer",
   "description": "A yard-built close-range brawler: extra guns and thick plating for pilots who like to brawl on top of their target.",
+  "origin": "polish",
   "slots": {
     "high": 4,
     "mid": 3,

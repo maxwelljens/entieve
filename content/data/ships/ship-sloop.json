@@ -3,6 +3,7 @@
   "name": "Väktare",
   "class": "frigate",
   "description": "A quick, precise frigate: clean lock electronics and a capacitor that keeps up. The standard-issue hull for new pilots in Far Moravia.",
+  "origin": "nordic",
   "slots": {
     "high": 3,
     "mid": 3,

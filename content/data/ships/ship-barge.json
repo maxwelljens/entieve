@@ -3,6 +3,7 @@
   "name": "Havíř",
   "class": "barge",
   "description": "A slow, sturdy mining barge with a huge ore hold. Strip belts, warp home, repeat.",
+  "origin": "moravian",
   "slots": {
     "high": 2,
     "mid": 2,
