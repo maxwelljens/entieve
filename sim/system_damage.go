@@ -11,6 +11,45 @@ import (
 // wreckExpiry is the seconds a wreck stays on the grid before despawning.
 const wreckExpiry = 300
 
+// wreckReclaimFraction is the share of a destroyed hull's recipe input bill
+// that comes back as reclaimed material on its wreck (floor per input,
+// mineral items only).
+const wreckReclaimFraction = 0.4
+
+// hullRecipe returns the manufacturing recipe producing the given hull
+// (canonical: recipes are scanned in RecipeID order, so the answer is a
+// pure function of content). Nil when the hull has no recipe.
+func hullRecipe(c *content.Content, hull content.ShipID) *content.RecipeDef {
+	for _, r := range c.RecipesInOrder() {
+		if r.Product == content.ItemID(hull) {
+			return r
+		}
+	}
+	return nil
+}
+
+// reclaimedMinerals is the wreck-reprocessing yield of one hull: the floor
+// of wreckReclaimFraction of every mineral input of its recipe, e.g. a
+// Scuttler (19,900 min-ferrite + 2,800 min-silex) reclaims 7,960 + 1,120.
+// Pure math — no RNG, no market movement.
+func reclaimedMinerals(c *content.Content, hull content.ShipID) []content.CargoStack {
+	rec := hullRecipe(c, hull)
+	if rec == nil {
+		return nil
+	}
+	var out []content.CargoStack
+	for _, in := range rec.Inputs {
+		def, ok := c.Item(in.Item)
+		if !ok || def.Category != content.CatMineral {
+			continue
+		}
+		if q := math.Floor(wreckReclaimFraction * in.Qty); q >= 1 {
+			out = append(out, content.CargoStack{Item: in.Item, Qty: int(q)})
+		}
+	}
+	return out
+}
+
 // systemDamage applies queued damage: shield -> armor -> structure with the
 // ship's resists, then resolves deaths.
 //
@@ -148,6 +187,16 @@ func (s *Sim) handleDeath(e, src ecs.Entity) {
 			loot = addStacks(loot, tc.Item, tc.Qty)
 		}
 		s.trafficHaulerDestroyed(e, tc)
+	}
+
+	// Wreck reprocessing: a destroyed ship whose hull has a manufacturing
+	// recipe returns part of its mineral bill as reclaimed material, so
+	// wrecks are organic material sources without conjuring products.
+	// (Fitted modules are not reprocessed in v1 — documented simplification.)
+	if sh, ok := s.Ships.Get(e); ok {
+		for _, st := range reclaimedMinerals(s.Content, sh.Hull) {
+			loot = addStacks(loot, st.Item, st.Qty)
+		}
 	}
 
 	// Bounty: only kills attributed to the player pay out.

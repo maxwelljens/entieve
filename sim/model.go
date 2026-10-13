@@ -203,6 +203,37 @@ type NpcAI struct {
 type Asteroid struct {
 	Ore       content.ItemID
 	Remaining float64 // m³ left
+	// Belt and Index address the rock's persistent belt-state slot
+	// ((system, belt celestial, def-order index)). The state mirrors
+	// Remaining while the rock is on the grid, so depletion survives
+	// save/restore and system reloads (Save.Belts).
+	Belt  content.CelID
+	Index int
+}
+
+// BeltRock is one rock's persistent belt state: the volume remaining
+// against the definition volume it was seeded with (Volume is the
+// regrowth cap, persisted so the state is self-contained).
+type BeltRock struct {
+	Ore       content.ItemID `json:"ore"`
+	Remaining float64        `json:"remaining"`
+	Volume    float64        `json:"volume"`
+}
+
+// BeltState is one belt's persistent state. Rocks are in BeltDef order
+// (the flat rock index spawnCelestial iterates); GrownAt is the tick the
+// regrowth window last advanced (see systemBelts).
+type BeltState struct {
+	System  content.SystemID `json:"system"`
+	Cel     content.CelID    `json:"cel"`
+	Rocks   []BeltRock       `json:"rocks,omitempty"`
+	GrownAt int64            `json:"grown_at"`
+}
+
+// beltKey addresses one belt's persistent state universe-wide.
+type beltKey struct {
+	System content.SystemID
+	Cel    content.CelID
 }
 
 // Celestial marks a static grid object.
@@ -927,4 +958,18 @@ type Save struct {
 	// station on return. Restore prefers this field and falls back to the
 	// handle for saves written before it existed.
 	LastStationCel content.CelID `json:"last_station_cel,omitempty"`
+
+	// ---- world metabolism: persistent belts + faction ledgers ----
+
+	// Belts is every belt's persistent per-rock remaining volume, in
+	// canonical order: system id ascending, then celestial id ascending
+	// (rocks in BeltDef order). Seeded from the BeltDef on first
+	// generation, decremented by mining and rat requisitions, regrown by
+	// the 600-tick window — belt depletion survives reloads.
+	Belts []BeltState `json:"belts,omitempty"`
+	// FactionLedger is the per-faction requisition balance NPC replacements
+	// draw on when they buy hulls, modules, charges or ore through a
+	// station book (a real sink: only respawn requisitions debit it).
+	// Map keys marshal sorted, so the serialization stays canonical.
+	FactionLedger map[string]float64 `json:"faction_ledger,omitempty"`
 }

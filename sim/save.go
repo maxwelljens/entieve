@@ -193,6 +193,22 @@ func (s *Sim) buildSave() (*Save, error) {
 			save.LastStation = uint64(e)
 		}
 	}
+
+	// ---- world metabolism: persistent belts + faction ledgers ----
+	// Canonical order: system id ascending, then celestial id ascending
+	// (beltKeys), rocks verbatim in def order — map iteration order never
+	// reaches the serialization the Hash fingerprints.
+	for _, k := range s.beltKeys() {
+		st := *s.belts[k]
+		st.Rocks = append([]BeltRock(nil), s.belts[k].Rocks...)
+		save.Belts = append(save.Belts, st)
+	}
+	if len(s.factionLedger) > 0 {
+		save.FactionLedger = make(map[string]float64, len(s.factionLedger))
+		for f, v := range s.factionLedger {
+			save.FactionLedger[f] = v
+		}
+	}
 	return save, nil
 }
 
@@ -435,6 +451,28 @@ func (s *Sim) restore(save *Save) error {
 	}
 	if s.player.IsZero() {
 		return errf("sim: save has no player entity")
+	}
+
+	// ---- world metabolism: persistent belts + faction ledgers ----
+	// sv is this function's private deep copy, so the state may bind its
+	// slices directly. A save written before the belts existed restores as
+	// no belt state: the next system load re-seeds from the BeltDef (the
+	// pre-feature refill semantics).
+	s.belts = make(map[beltKey]*BeltState, len(save.Belts))
+	for i := range save.Belts {
+		st := save.Belts[i]
+		if _, dup := s.belts[beltKey{st.System, st.Cel}]; dup {
+			return errf("sim: save has duplicate belt state for %s/%s", st.System, st.Cel)
+		}
+		s.belts[beltKey{st.System, st.Cel}] = &st
+	}
+	if len(save.FactionLedger) > 0 {
+		s.factionLedger = make(map[string]float64, len(save.FactionLedger))
+		for f, v := range save.FactionLedger {
+			s.factionLedger[f] = v
+		}
+	} else {
+		s.factionLedger = nil
 	}
 	return nil
 }
