@@ -197,9 +197,14 @@ func recipeReferencePrice(t *testing.T, c *Content, product ItemID) float64 {
 	}
 	if _, ok := c.Ships[ShipID(product)]; ok {
 		for _, sysID := range keys(c.Systems) {
-			for _, o := range c.Systems[sysID].Market {
-				if o.Item == product {
-					return o.Price
+			for _, cel := range c.Systems[sysID].Celestials {
+				if cel.Station == nil {
+					continue
+				}
+				for _, o := range cel.Station.Market {
+					if o.Item == product {
+						return o.Price
+					}
 				}
 			}
 		}
