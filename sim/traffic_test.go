@@ -1198,6 +1198,37 @@ func TestTrafficPersistenceMidWarpAndMidAttack(t *testing.T) {
 		}
 		continuation(t, s, save, 1200)
 	})
+
+	// Mid-warp insertion: raiders inside their warp-in tunnel (the off-grid
+	// insertion runs the player's warp process, so its phase state must
+	// survive a snapshot like any other warp).
+	t.Run("mid-insertion", func(t *testing.T) {
+		s := newTrafficSim(t)
+		var evs []Event
+		if !runUntil(t, s, &evs, 900, func() bool {
+			_, _, ok := findHauler(s, "cel-a-dock")
+			return ok
+		}) {
+			t.Fatal("no hauler within 900 ticks")
+		}
+		e, tc, _ := findHauler(s, "cel-a-dock")
+		forceAmbushOn(t, s, e, tc, "null")
+		if !runUntil(t, s, &evs, 600, func() bool {
+			for _, r := range aliveRaiders(s) {
+				if wd, ok := s.Warps.Get(r); ok && wd.Phase == "warp" {
+					return true
+				}
+			}
+			return false
+		}) {
+			t.Fatal("no raider inside its warp-in tunnel within 600 ticks")
+		}
+		save, err := s.Snapshot()
+		if err != nil {
+			t.Fatalf("snapshot: %v", err)
+		}
+		continuation(t, s, save, 900)
+	})
 }
 
 // TestTrafficTwinRunsIdentical: same content, world and seed => identical

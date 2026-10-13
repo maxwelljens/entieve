@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/core"
 )
 
 const (
@@ -108,9 +109,23 @@ func (s *Sim) respawnTimer(t RespawnTimer) bool {
 	}
 	charges := s.buyChargeBasket(def, station)
 
-	e := s.spawnNpc(t.Npc, cel.Position, celestialSpread(cel))
+	// The replacement flies in: it spawns off-grid on the anchor's +X axis
+	// (WarpMinRange out, the undock side) and warps onto the exact spot a
+	// static spawn would have used — the scatter rolls are taken around the
+	// insertion point, then carried back, so the placement rolls and their
+	// count are unchanged. Respawn still SPEAKS at timer time ("respawned
+	// near …"); the hull is simply still in warp when it does.
+	insert := core.Vec2{X: WarpMinRange}
+	e := s.spawnNpc(t.Npc, cel.Position.Add(insert), celestialSpread(cel))
 	if e.IsZero() {
 		return false
+	}
+	if tr, ok := s.Transforms.Get(e); ok {
+		// Land exactly on today's static placement (insert + scatter − insert).
+		s.warpToPoint(e, tr.Pos.Sub(insert))
+	}
+	if ai, ok := s.AIs.Get(e); ok {
+		ai.Home = cel.Position // the anchor, not the off-grid insertion point
 	}
 	// The hull carries exactly what the requisition bought — the free
 	// default grant is replaced, possibly by no charges at all.

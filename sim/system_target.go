@@ -31,6 +31,14 @@ func (s *Sim) systemTargeting() {
 			if !s.World.Alive(l.Target) || s.Docked.Has(l.Target) {
 				continue // target gone or off-grid
 			}
+			// A ship in warp cannot be locked or held by a lock: the rule is
+			// symmetric (the player's warp drive drops locks the same way),
+			// so a warping NPC — and a warping player — is untargetable and
+			// unattackable until it lands. Align-phase ships stay lockable:
+			// that is where scrams interrupt the warp start.
+			if wd, ok := s.Warps.Get(l.Target); ok && wd.Phase == "warp" {
+				continue
+			}
 			tp, ok := s.posOf(l.Target)
 			if !ok {
 				continue
