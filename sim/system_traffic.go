@@ -829,8 +829,18 @@ func (s *Sim) trafficRollAmbush(e ecs.Entity, tc *Traffic, td *content.TrafficDe
 	s.startAmbush(e, tc, td, sec)
 }
 
-// startAmbush drops 1-3 raiders of the system's local rat class onto the
-// hauler mid-leg, interrupts its warp, and schedules the patrol response.
+// startAmbush drops 1-3 raiders of the system's local rat class into the
+// fight mid-leg, interrupts the hauler's warp, and schedules the patrol
+// response.
+//
+// Raider insertion is a warp-in from off-grid, not a pop-in: they spawn on
+// the hauler's warp path ahead of it (WarpMinRange out — "the tunnel",
+// entered off-grid) and run the player's own align/tunnel/decel process
+// onto the fight grid, landing on the scatter slots their spawn rolls would
+// have given them around the hauler. Same scatter draws, same count as
+// dropping them on the hauler — the insertion only moves where the rolls
+// are measured from. A fresh spawn has zero velocity, so the align gate
+// opens at 0.75 × Agility × 10 s (systemMovement's align law).
 func (s *Sim) startAmbush(e ecs.Entity, tc *Traffic, td *content.TrafficDef, sec string) {
 	def, ok := s.Content.Npc(td.Raider)
 	if !ok {
@@ -840,10 +850,23 @@ func (s *Sim) startAmbush(e ecs.Entity, tc *Traffic, td *content.TrafficDef, sec
 	if !ok {
 		return
 	}
+	// The insertion point sits off-grid on the hauler's side of the fight:
+	// along its warp vector when it is in warp, else along the leg toward
+	// its destination. Pure geometry — no RNG draws.
+	var dir core.Vec2
+	if wd, ok := s.Warps.Get(e); ok {
+		dir = wd.To.Sub(pos)
+	} else if dp, ok := s.posOf(s.celEntity(tc.Dest)); ok {
+		dir = dp.Sub(pos)
+	}
+	if dir.IsZero() {
+		dir = core.Vec2{X: 1}
+	}
+	base := pos.Add(dir.Norm().Scale(WarpMinRange))
 	n := trafficMinRaiders + s.trafficRNG.Intn(trafficMaxRaiders-trafficMinRaiders+1)
 	raiders := make([]ecs.Entity, 0, n)
 	for i := 0; i < n; i++ {
-		r := s.spawnNpcStream(td.Raider, pos, trafficAmbushSpread, s.trafficRNG)
+		r := s.spawnNpcStream(td.Raider, base, trafficAmbushSpread, s.trafficRNG)
 		if r.IsZero() {
 			continue
 		}
@@ -854,6 +877,21 @@ func (s *Sim) startAmbush(e ecs.Entity, tc *Traffic, td *content.TrafficDef, sec
 	}
 	if len(raiders) == 0 {
 		return
+	}
+	for _, r := range raiders {
+		rp, ok := s.Transforms.Get(r)
+		if !ok {
+			continue
+		}
+		// Home is the fight grid (what a hauler-side spawn used), never the
+		// off-grid insertion point: patrol circle, aggro and leash all keep
+		// measuring from the ambush site.
+		if ai, ok := s.AIs.Get(r); ok {
+			ai.Home = pos
+		}
+		// Land on this raider's own scatter slot around the fight: the
+		// roll produced (base + offset); the fight grid carries the offset.
+		s.warpToPoint(r, pos.Add(rp.Pos.Sub(base)))
 	}
 	s.Warps.Remove(e)
 	s.Intents.Set(e, Intent{Kind: IntentStop})
@@ -1474,7 +1512,12 @@ func (s *Sim) patrolRespondStep(e ecs.Entity, p *Patrol, ai *NpcAI) {
 		return
 	}
 	if bestD > trafficPatrolEngageRange {
-		if tp, ok := s.posOf(target); ok && s.time >= p.Next && s.warpToPoint(e, tp) {
+		// The sortie warps to the INCIDENT (the ambushed hauler's position),
+		// not to a live raider: a raider mid-warp-in moves faster than any
+		// lock and would drag the patrol into stale-point hop chasing. The
+		// raiders land on the same fight grid, so the first warp closes the
+		// distance to the engagement range in one align + tunnel.
+		if ip, ok := s.posOf(p.Incident); ok && s.time >= p.Next && s.warpToPoint(e, ip) {
 			p.Next = s.time + trafficWarpRetrySec
 		}
 		return

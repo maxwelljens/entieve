@@ -233,7 +233,10 @@ func TestRespawnTimerExpiresAndSpawns(t *testing.T) {
 	if len(s.respawns) != 0 {
 		t.Fatalf("timer did not fire: %+v", s.respawns)
 	}
-	// The respawned NPC sits near the anomaly.
+	// The replacement warps in from off-grid: it exists (and has spoken)
+	// at timer time, but it takes align + tunnel to land at the anchor.
+	// Wait out the slide, then it sits near the anomaly.
+	stepN(s, 60*20)
 	home := v(5e6, 5e6)
 	found := false
 	for _, e := range sortedEntities(s.AIs) {
@@ -291,6 +294,9 @@ func TestRespawnTimerSurvivesJump(t *testing.T) {
 	if len(s.respawns) != 0 {
 		t.Fatalf("timer did not fire on return: %+v", s.respawns)
 	}
+	// The replacement warps in from off-grid: wait out the align + tunnel
+	// slide before looking for it near the anchor.
+	stepN(s, 60*20)
 	home := v(5e6, 5e6)
 	found := false
 	for _, e := range sortedEntities(s.AIs) {
