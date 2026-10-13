@@ -6,11 +6,13 @@ import (
 	"math"
 	"slices"
 	"sort"
+	"time"
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit"
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
@@ -323,6 +325,34 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	})
 	btn.GetWidget().Disabled = r.Disabled
 
+	// The row's context menu: the same action, the same gating, through
+	// the same command. A right-click on the objective label (wired
+	// below) replaces this menu: handlers run parent-first, so the
+	// child's OpenMenu lands last and wins.
+	attachRowMenu := func(ctr *widget.Container) {
+		ctr.GetWidget().MouseButtonClickedEvent.AddHandler(func(args any) {
+			a, ok := args.(*widget.WidgetMouseButtonClickedEventArgs)
+			if !ok || a.Button != ebiten.MouseButtonRight {
+				return
+			}
+			label, disabled := "Accept", r.Disabled
+			enqueue := func() { g.env.Enqueue(sim.CmdAcceptMission{ID: r.ID}) }
+			if active {
+				label = "Abandon"
+				enqueue = func() { g.env.Enqueue(sim.CmdAbandonMission{ID: r.ID}) }
+			}
+			g.env.OpenMenu([]uikit.MenuEntry{{
+				Label:    label,
+				Disabled: disabled,
+				Action: func() {
+					if !disabled {
+						enqueue()
+					}
+				},
+			}}, uikit.ClickPoint(a))
+		})
+	}
+
 	// The active line is title + progress ("Belt cleanup — 1/3") and only
 	// fits the title column at the tiny step in Turret Road (at small the
 	// em-dash suffix alone costs 56 px); available titles, which carry no
@@ -369,6 +399,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 			)),
 		)
 		row.AddChild(titleCell, btn)
+		attachRowMenu(row)
 		return row, btn
 	}
 
@@ -400,6 +431,30 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 		line2 = ctr
 	}
 
+	// The objective label is its own gesture target: right-click opens
+	// Show Info on the objective's def (the caste it asks you to kill,
+	// the item it wants), double-click swaps the window. It sits INSIDE
+	// the row and child handlers run after the parent's, so this Show
+	// Info menu replaces the row's Accept menu when the click lands here.
+	if ref, showable := g.objectiveRef(r.ID); showable {
+		line2.GetWidget().MouseButtonClickedEvent.AddHandler(func(args any) {
+			a, ok := args.(*widget.WidgetMouseButtonClickedEventArgs)
+			if !ok {
+				return
+			}
+			switch a.Button {
+			case ebiten.MouseButtonRight:
+				g.env.OpenMenu([]uikit.MenuEntry{
+					{Label: "Show Info", Bold: true, Action: func() { g.env.ShowInfo(ref) }},
+				}, uikit.ClickPoint(a))
+			case ebiten.MouseButtonLeft:
+				if g.objectiveDouble(r.ID) {
+					g.env.ShowInfo(ref)
+				}
+			}
+		})
+	}
+
 	reward := widget.NewText(
 		widget.TextOpts.Text(g.ellip(r.Reward, uikit.StepTiny, float64(boardContentW)), g.env.Face(uikit.StepTiny), solid(p.Good)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(boardContentW, 0)),
@@ -419,7 +474,39 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 		)),
 	)
 	row.AddChild(line1, line2, reward)
+	attachRowMenu(row)
 	return row, btn
+}
+
+// objectiveRef resolves a contract's objective to the definition its
+// Show Info window reads: a kill contract links its caste, deliver/mine
+// contracts their item. The ref is validated against the loaded content
+// (a stale save ref shows nothing rather than a hollow window).
+func (g *Game) objectiveRef(id content.ContractID) (uikit.InfoRef, bool) {
+	def, ok := g.opts.Content.Contract(id)
+	if !ok {
+		return uikit.InfoRef{}, false
+	}
+	var ref uikit.InfoRef
+	switch {
+	case def.Objective.Target != "":
+		ref = uikit.NpcRef(def.Objective.Target)
+	case def.Objective.Item != "":
+		ref = uikit.ItemRef(def.Objective.Item)
+	default:
+		return uikit.InfoRef{}, false
+	}
+	return g.env.InfoRefOf(ref)
+}
+
+// objectiveDouble is the objective label's double-click window (the
+// tables' activate timing): two clicks on the same contract's objective
+// inside the window open Show Info.
+func (g *Game) objectiveDouble(id content.ContractID) bool {
+	now := time.Now()
+	ok := g.objClick.id == id && now.Sub(g.objClick.at) < doubleClickWindow
+	g.objClick.id, g.objClick.at = id, now
+	return ok
 }
 
 // objectiveSummary renders the contract's kind + objective, e.g.

@@ -53,6 +53,18 @@ func NewInventory(env Env) *Inventory {
 	inv.ore.OnSelect(inv.selectFrom("ore"))
 	inv.hangar = NewTable(env, cols)
 	inv.hangar.OnSelect(inv.selectFrom("hangar"))
+	// Inventory rows carry no other action: double-click swaps the Show
+	// Info window, right-click opens the one-entry menu.
+	attachInfo := func(t *Table) {
+		t.OnActivate(func(r TableRow) { showInfoData(env, r.Data) })
+		t.OnMenu(func(r TableRow, at image.Point) {
+			ref, ok := env.InfoRefOf(r.Data)
+			env.OpenMenu([]MenuEntry{showInfoMenuEntry(env, ref, ok)}, at)
+		})
+	}
+	attachInfo(inv.cargo)
+	attachInfo(inv.ore)
+	attachInfo(inv.hangar)
 
 	newLabel := func(s string) *widget.Text {
 		return widget.NewText(

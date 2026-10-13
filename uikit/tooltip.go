@@ -29,7 +29,7 @@ import (
 //	│   Electro-magnetic       16.0  ColDim label · value on the shared x
 //	│   Tracking              145.0  values ColText (or their tint)
 //	│ ─────────────────────────────
-//	│ Right-click: cycle ammo        hint footer, ColDim, tiny step
+//	│ Right-click: module menu      hint footer, ColDim, tiny step
 //	└────────────────────────────────┘
 //
 // The panel draws itself straight onto the screen from those rects (no
@@ -551,34 +551,23 @@ func tipSub(slotText, kind string) string {
 	return slotText + " · " + word
 }
 
-// moduleTip builds the shared module tooltip model — the rack cells and the
-// Fitting window's module rows both come through here, so the two can never
-// disagree about a module's numbers.
-//
-//	slotText   sub-line slot text ("" = slotless, e.g. a hangar row)
-//	charge     loaded charge name ("" = unknown: no CHARGE section is
-//	           guessed rather than shown wrong)
-//	chargeQty  charge count in cargo (0 = no count row)
-//	hints      the consumer's footer lines — the rack knows what a click
-//	           does, the fitting table does not
-//
-// Every row is driven by what the ModuleDef actually carries; a field the
-// def doesn't set simply never becomes a row (never "N/A").
-func (e Env) moduleTip(def *content.ModuleDef, slotText, charge string, chargeQty int, hints ...string) TooltipModel {
+// moduleSections builds every stat section a module's def carries EXCEPT
+// ACTIVATION: the weapon/mining blocks, the active-effect families and
+// the passive bonuses, plus the loaded-charge block when the caller
+// knows the instance's charge. It is the shared body behind moduleTip
+// (rack + fitting tooltips) and the Show Info window's module page — one
+// builder, two renderers, so the two surfaces can never disagree about a
+// module's numbers. An unset field never becomes a row (never "N/A").
+func (e Env) moduleSections(def *content.ModuleDef, charge string, chargeQty int) []TooltipSection {
 	if def == nil {
-		return TooltipModel{}
+		return nil
 	}
-	m := TooltipModel{
-		Icon:  ModuleIcon(def.Kind),
-		Title: def.Name,
-		Sub:   tipSub(slotText, def.Kind),
-		Hints: hints,
-	}
+	var secs []TooltipSection
 
 	switch {
 	case def.Weapon != nil:
 		w := def.Weapon
-		m.Sections = append(m.Sections,
+		secs = append(secs,
 			TooltipSection{Label: "DAMAGE", Rows: []TooltipRow{
 				{Label: "Per shot", Value: groupFloat(w.Damage.Total(), 1)},
 				{Label: "Electro-magnetic", Value: groupFloat(w.Damage.EM, 1)},
@@ -599,10 +588,10 @@ func (e Env) moduleTip(def *content.ModuleDef, slotText, charge string, chargeQt
 			if chargeQty > 0 {
 				rows = append(rows, TooltipRow{Label: "In cargo", Value: FormatInt(int64(chargeQty))})
 			}
-			m.Sections = append(m.Sections, TooltipSection{Label: "CHARGE", Rows: rows})
+			secs = append(secs, TooltipSection{Label: "CHARGE", Rows: rows})
 		}
 	case def.Mining != nil:
-		m.Sections = append(m.Sections, TooltipSection{Label: "YIELD", Rows: []TooltipRow{
+		secs = append(secs, TooltipSection{Label: "YIELD", Rows: []TooltipRow{
 			{Label: "Per cycle", Value: groupFloat(def.Mining.VolumePerCycle, 1) + " m³"},
 		}})
 	}
@@ -618,15 +607,15 @@ func (e Env) moduleTip(def *content.ModuleDef, slotText, charge string, chargeQt
 			if b.ArmorRepPerCycle > 0 {
 				rows = append(rows, TooltipRow{Label: "Armor", Value: signed(b.ArmorRepPerCycle, 1) + " HP", Tint: goodTint})
 			}
-			m.Sections = append(m.Sections, TooltipSection{Label: "REPAIR", Rows: rows})
+			secs = append(secs, TooltipSection{Label: "REPAIR", Rows: rows})
 		}
 		if b.CapRestore > 0 {
-			m.Sections = append(m.Sections, TooltipSection{Label: "CAPACITOR", Rows: []TooltipRow{
+			secs = append(secs, TooltipSection{Label: "CAPACITOR", Rows: []TooltipRow{
 				{Label: "Restored", Value: signed(b.CapRestore, 1) + " GJ", Tint: goodTint},
 			}})
 		}
 		if b.SpeedMultiplier > 1 {
-			m.Sections = append(m.Sections, TooltipSection{Label: "PROPULSION", Rows: []TooltipRow{
+			secs = append(secs, TooltipSection{Label: "PROPULSION", Rows: []TooltipRow{
 				{Label: "Speed", Value: "×" + groupFloat(b.SpeedMultiplier, 2), Tint: goodTint},
 			}})
 		}
@@ -639,7 +628,7 @@ func (e Env) moduleTip(def *content.ModuleDef, slotText, charge string, chargeQt
 			if b.ScramDuration > 0 {
 				rows = append(rows, TooltipRow{Label: "Warp scramble", Value: groupFloat(b.ScramDuration, 1) + " s"})
 			}
-			m.Sections = append(m.Sections, TooltipSection{Label: "EFFECT", Rows: rows})
+			secs = append(secs, TooltipSection{Label: "EFFECT", Rows: rows})
 		}
 	}
 	if ps := def.Passive; ps != nil {
@@ -675,9 +664,36 @@ func (e Env) moduleTip(def *content.ModuleDef, slotText, charge string, chargeQt
 			}
 		}
 		if len(rows) > 0 {
-			m.Sections = append(m.Sections, TooltipSection{Label: "BONUSES", Rows: rows})
+			secs = append(secs, TooltipSection{Label: "BONUSES", Rows: rows})
 		}
 	}
+	return secs
+}
+
+// moduleTip builds the shared module tooltip model — the rack cells and the
+// Fitting window's module rows both come through here, so the two can never
+// disagree about a module's numbers.
+//
+//	slotText   sub-line slot text ("" = slotless, e.g. a hangar row)
+//	charge     loaded charge name ("" = unknown: no CHARGE section is
+//	           guessed rather than shown wrong)
+//	chargeQty  charge count in cargo (0 = no count row)
+//	hints      the consumer's footer lines — the rack knows what a click
+//	           does, the fitting table does not
+//
+// Every row is driven by what the ModuleDef actually carries; a field the
+// def doesn't set simply never becomes a row (never "N/A").
+func (e Env) moduleTip(def *content.ModuleDef, slotText, charge string, chargeQty int, hints ...string) TooltipModel {
+	if def == nil {
+		return TooltipModel{}
+	}
+	m := TooltipModel{
+		Icon:  ModuleIcon(def.Kind),
+		Title: def.Name,
+		Sub:   tipSub(slotText, def.Kind),
+		Hints: hints,
+	}
+	m.Sections = e.moduleSections(def, charge, chargeQty)
 	if def.ActivationTime > 0 || def.ActivationCost > 0 {
 		var rows []TooltipRow
 		if def.ActivationTime > 0 {

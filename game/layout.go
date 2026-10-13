@@ -50,12 +50,12 @@ type layoutFile struct {
 }
 
 // layoutNames are the persisted windows, in a stable write order: the
-// two always-on core windows (geometry only — see layoutTarget) plus
-// every panel whose panelDef carries a sidecar name (the Esc menu is
-// scene-owned and stays out). Menu, station and the HUD/rack chrome are
-// not user layout state.
+// two always-on core windows plus the Show Info window (geometry only —
+// see layoutTarget) plus every panel whose panelDef carries a sidecar
+// name (the Esc menu is scene-owned and stays out). Menu, station and
+// the HUD/rack chrome are not user layout state.
 var layoutNames = func() []string {
-	names := []string{"overview", "selected"}
+	names := []string{"overview", "selected", "infowin"}
 	for p := panelID(0); p < numPanels; p++ {
 		if panelDefs[p].name != "" {
 			names = append(names, panelDefs[p].name)
@@ -84,16 +84,18 @@ func panelByName(name string) (panelID, bool) {
 
 // layoutTarget resolves a persisted name to its window and — for the
 // toggleable windows — its open flag. overview/selected are always-on
-// core chrome (hidden while docked, never closed): nil flag, written as
-// open, geometry only on read. Every other name comes from panelDefs;
-// unknown names (and the menu's empty key) resolve to nil and are
-// skipped by both sides.
+// core chrome (hidden while docked, never closed) and infowin is the Show
+// Info window (geometry only, see persistOpen): nil flag, geometry on
+// read. Every other name comes from panelDefs; unknown names (and the
+// menu's empty key) resolve to nil and are skipped by both sides.
 func (g *Game) layoutTarget(name string) (*widget.Window, *bool) {
 	switch name {
 	case "overview":
 		return g.kit.OverviewWindow(), nil
 	case "selected":
 		return g.kit.SelectedWindow(), nil
+	case "infowin":
+		return g.kit.InfoWindow(), nil
 	}
 	if p, ok := panelByName(name); ok {
 		return panelDefs[p].window(g), panelDefs[p].open(g)
@@ -104,10 +106,14 @@ func (g *Game) layoutTarget(name string) (*widget.Window, *bool) {
 // persistOpen picks the open flag writeLayout records for a named
 // window: the core windows always write open, a toggleable one writes
 // its flag — except the three station services while the station scene
-// forces them open. Their sidecar entry carries the PRE-dock intent
-// (stationPrior), or quitting while docked would reopen them in space on
-// the next boot.
+// forces them open (their sidecar entry carries the PRE-dock intent, or
+// quitting while docked would reopen them in space on the next boot) and
+// the Show Info window, which is geometry-only: it always writes closed
+// and never restores open — it appears on demand, never at boot.
 func (g *Game) persistOpen(name string, open *bool) bool {
+	if name == "infowin" {
+		return false
+	}
 	if open == nil {
 		return true
 	}

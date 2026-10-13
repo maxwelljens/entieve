@@ -52,6 +52,14 @@ type Kit struct {
 	// from Update/Draw.
 	chromes map[*widget.Window]*winChrome
 
+	// svc is the shared interaction state every panel built from this
+	// kit's Env reaches: the context menu and the Show Info window.
+	svc *services
+
+	// infoRemove unmounts the Show Info window (nil = closed). Show
+	// remounts it, which is also what raises it to the top of the stack.
+	infoRemove widget.RemoveWindowFunc
+
 	// core visibility (hidden e.g. while docked in a station)
 	coreHidden bool
 }
@@ -83,6 +91,13 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	// not disturb any kit still pumping (they own disjoint windows).
 	k.chromes = map[*widget.Window]*winChrome{}
 
+	// Shared interaction services first: panelEnv hands them to every
+	// panel (menu + Show Info), and the kit takes over the window's
+	// lifecycle (mount/raise on Show, unmount on Close).
+	k.svc = newServices(k.panelEnv())
+	k.svc.show = k.ShowInfo
+	k.svc.info.onClose = k.CloseInfo
+
 	// Root container: transparent overlay over the world render; windows
 	// float above it. The theme rides the widget parent chain.
 	root := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
@@ -105,8 +120,18 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 
 // Update advances the UI (input, layout bookkeeping, deferred events)
 // and pumps the window resize chrome. Call it from ebiten.Game.Update.
+//
+// The context menu owns its frame while it is up: its own input is
+// polled here (the host's earlier MenuInput pass already spent the
+// frame's click/Esc — this one is the fallback for hosts that do not
+// drive it) and ui.Update is skipped, so the click or Esc that
+// dismisses the popup never reaches the widgets underneath.
 func (k *Kit) Update() error {
-	k.ui.Update()
+	k.svc.menu.poll()
+	menuBlocked := k.svc.menu.takeBlocked()
+	if !k.svc.menu.IsOpen() && !menuBlocked {
+		k.ui.Update()
+	}
 	k.stepChromes()
 	return nil
 }
@@ -118,6 +143,9 @@ func (k *Kit) Draw(screen *ebiten.Image) {
 	// Render; recompute so the next frame's hit tests see clean geometry.
 	k.stepChromes()
 	k.ov.drawTints(screen, k)
+	// The context menu paints last: it is always the topmost pixels,
+	// above every window and tooltip.
+	k.svc.menu.Draw(screen)
 }
 
 // Sync refreshes every row and label from the simulation. Call it every
@@ -125,6 +153,7 @@ func (k *Kit) Draw(screen *ebiten.Image) {
 func (k *Kit) Sync() {
 	k.ov.sync(k)
 	k.syncSelected()
+	k.svc.info.Sync()
 }
 
 // Selected returns the entity selected in the overview (zero if none).
@@ -158,6 +187,42 @@ func (k *Kit) OverviewWindow() *widget.Window { return k.ov.win }
 
 // SelectedWindow returns the built-in Selected Item window.
 func (k *Kit) SelectedWindow() *widget.Window { return k.sp.win }
+
+// InfoWindow returns the Show Info window (the layout sidecar and the
+// world-input gate resolve it through here). It is not mounted until the
+// first Show.
+func (k *Kit) InfoWindow() *widget.Window { return k.svc.info.Win() }
+
+// InfoOpen reports whether the Show Info window is up.
+func (k *Kit) InfoOpen() bool { return k.svc.info.IsOpen() }
+
+// ShowInfo fills the Show Info window with ref's details and raises it:
+// the previous mount (if any) is removed and the window re-added, which
+// puts it on top of the window stack. Unresolvable refs change nothing —
+// the window keeps whatever it already showed rather than going hollow.
+// The remount rides the documented ebitenui window-remount leak (a few
+// KB per raise) — the price of a deterministic top-of-stack without
+// ebitenui's own relayering.
+func (k *Kit) ShowInfo(ref InfoRef) {
+	if !k.svc.info.Show(ref) {
+		return
+	}
+	if k.infoRemove != nil {
+		k.infoRemove()
+		k.infoRemove = nil
+	}
+	k.infoRemove = k.AddWindow(k.svc.info.Win())
+}
+
+// CloseInfo closes the Show Info window: unmount (its rect survives for
+// the sidecar) and hide.
+func (k *Kit) CloseInfo() {
+	if k.infoRemove != nil {
+		k.infoRemove()
+		k.infoRemove = nil
+	}
+	k.svc.info.hide()
+}
 
 // SetCoreVisible hides or shows the always-mounted chrome (Overview and
 // Selected Item), e.g. hide while docked in a station scene.

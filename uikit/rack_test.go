@@ -192,8 +192,8 @@ func TestRackTooltipStats(t *testing.T) {
 				want.sec, want.label, got, want.value, tipSectionLabels(gun))
 		}
 	}
-	if len(gun.Hints) != 2 || gun.Hints[0] != "Right-click: cycle ammo" || gun.Hints[1] != "Click: activate" {
-		t.Errorf("gun hints = %q, want the ammo and activate footers", gun.Hints)
+	if len(gun.Hints) != 2 || gun.Hints[0] != "Right-click: module menu" || gun.Hints[1] != "Click: activate" {
+		t.Errorf("gun hints = %q, want the menu and activate footers", gun.Hints)
 	}
 
 	// Mining laser: yield, cycle and capacitor draw — no charge section.
@@ -234,9 +234,10 @@ func TestRackTooltipStats(t *testing.T) {
 		t.Errorf("web value tint = %v, want ColDanger", eff.Rows[0].Tint)
 	}
 
-	// The ammo footer promises only what a right-click can deliver: strip
-	// the cargo of that weapon's charges and the hint goes with it (the
-	// charge block stays — it still reads Auto).
+	// The menu footer promises what a right-click opens (the module menu
+	// carries Cycle charge, gated to where it can act): stripping the
+	// cargo of that weapon's charges disarms Cycle charge but keeps the
+	// menu — Show Info still works (the charge block stays, reads Auto).
 	cg, ok := env.Sim.Cargos.Get(env.Sim.Player())
 	if !ok {
 		t.Fatal("player has no cargo")
@@ -244,8 +245,8 @@ func TestRackTooltipStats(t *testing.T) {
 	cg.Stacks = nil
 	r.Sync()
 	gun = r.cells[0][0].tip.view.Model()
-	if len(gun.Hints) != 1 || gun.Hints[0] != "Click: activate" {
-		t.Errorf("disarmed gun hints = %q, want only the activate footer", gun.Hints)
+	if len(gun.Hints) != 2 || gun.Hints[0] != "Right-click: module menu" || gun.Hints[1] != "Click: activate" {
+		t.Errorf("disarmed gun hints = %q, want the menu and activate footers", gun.Hints)
 	}
 	if tipValue(gun, "CHARGE", "Loaded") != "Auto" {
 		t.Errorf("charge block = %+v, want Loaded Auto", tipSection(gun, "CHARGE"))
@@ -262,9 +263,12 @@ func TestRackTooltipStats(t *testing.T) {
 }
 
 // TestRackRightClickCyclesAmmo is the command-wiring test: right-clicking
-// the EMP turret walks Auto → the four light charges in cargo (item-id
-// order) → Auto, each step enqueuing one CmdSetAmmo; non-weapon cells
-// never enqueue.
+// the EMP turret opens its context menu (Show Info first and bold, then
+// the charge ref, a separator and Cycle charge), and picking Cycle charge
+// walks Auto → the four light charges in cargo (item-id order) → Auto,
+// each step enqueuing exactly one CmdSetAmmo — the same command the old
+// direct right-click issued. Non-weapon cells never enqueue (their menu
+// has no cycle entry at all).
 func TestRackRightClickCyclesAmmo(t *testing.T) {
 	env, cmds := newChromeEnv(t)
 	r := NewRack(env)
@@ -286,19 +290,35 @@ func TestRackRightClickCyclesAmmo(t *testing.T) {
 
 	gun := r.cells[0][0] // EMP Turret, high slot 1
 	slot := sim.SlotRef{Class: content.SlotHigh, Index: 0}
+
+	// The first menu: Show Info leads (bold), then the separator and
+	// Cycle charge (no charge preferred yet → no charge-ref row).
+	rightClick(c, t, gun.btn)
+	m := env.Menu()
+	if !m.IsOpen() {
+		t.Fatal("rack right-click opened no menu")
+	}
+	if ents := m.Entries(); len(ents) != 3 ||
+		ents[0].Label != "Show Info" || !ents[0].Bold || ents[0].Disabled ||
+		!ents[1].Sep ||
+		ents[2].Label != "Cycle charge" || ents[2].Disabled {
+		t.Fatalf("rack menu entries = %+v", ents)
+	}
+	m.Esc()
+
 	wantItems := []content.ItemID{"charge-ap", "charge-emp", "charge-fusion", "charge-plutonium", ""}
 	for i, want := range wantItems {
 		before := len(*cmds)
-		rightClick(c, t, gun.btn)
+		pickMenuEntry(t, c, env, gun.btn, "Cycle charge")
 		if len(*cmds) != before+1 {
-			t.Fatalf("click %d enqueued %d commands, want 1", i, len(*cmds)-before)
+			t.Fatalf("step %d enqueued %d commands, want 1", i, len(*cmds)-before)
 		}
 		cmd, ok := (*cmds)[before].(sim.CmdSetAmmo)
 		if !ok {
-			t.Fatalf("click %d command = %T, want sim.CmdSetAmmo", i, (*cmds)[before])
+			t.Fatalf("step %d command = %T, want sim.CmdSetAmmo", i, (*cmds)[before])
 		}
 		if cmd.Slot != slot || cmd.Item != want {
-			t.Fatalf("click %d = CmdSetAmmo%+v, want {Slot:%+v Item:%q}", i, cmd, slot, want)
+			t.Fatalf("step %d = CmdSetAmmo%+v, want {Slot:%+v Item:%q}", i, cmd, slot, want)
 		}
 		if r.ammoPref[slot] != want {
 			t.Fatalf("local ammo mirror = %q, want %q", r.ammoPref[slot], want)
@@ -306,14 +326,29 @@ func TestRackRightClickCyclesAmmo(t *testing.T) {
 		// The tooltip follows the preference on the next Sync.
 		r.Sync()
 		if got := tipValue(gun.tip.view.Model(), "CHARGE", "Loaded"); got != r.ammoName(want) {
-			t.Fatalf("tooltip after click %d shows charge %q, want %q", i, got, r.ammoName(want))
+			t.Fatalf("tooltip after step %d shows charge %q, want %q", i, got, r.ammoName(want))
 		}
 	}
+	// With a charge preferred, the menu carries its Show Info ref too.
+	r.ammoPref[slot] = "charge-fusion"
+	rightClick(c, t, gun.btn)
+	if ents := env.Menu().Entries(); len(ents) != 4 || ents[1].Label != "Show Info — "+r.ammoName("charge-fusion") {
+		t.Fatalf("menu with a preferred charge = %+v", ents)
+	}
+	env.Menu().Esc()
+	r.ammoPref[slot] = ""
 
-	// The mining laser and the ammo-less rocket pod never cycle.
+	// The mining laser and the ammo-less rocket pod never enqueue: their
+	// menus carry no Cycle charge entry to press.
 	for _, idx := range []int{1, 2} {
 		before := len(*cmds)
 		rightClick(c, t, r.cells[0][idx].btn)
+		for _, e := range env.Menu().Entries() {
+			if e.Label == "Cycle charge" {
+				t.Fatalf("non-weapon cell %d menu offers Cycle charge", idx)
+			}
+		}
+		env.Menu().Click(env.Menu().RowRect(0).Min) // any press closes it
 		if len(*cmds) != before {
 			t.Fatalf("non-weapon cell %d enqueued %d commands", idx, len(*cmds)-before)
 		}

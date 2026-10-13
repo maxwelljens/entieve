@@ -48,6 +48,7 @@ func (k *Kit) panelEnv() Env {
 		TS:      k.scale,
 		Enqueue: k.enqueue,
 		faces:   k.faces,
+		svc:     k.svc,
 	}
 }
 
@@ -97,9 +98,17 @@ func (k *Kit) buildOverview() {
 			k.selected = row.info.Entity
 		}
 	})
+	// Double-click shows the row's definition (an NPC caste, a hull, an
+	// asteroid's ore — the old behaviour, approach-on-activate, moved to
+	// the world scene and the menu); right-click opens the entity menu.
 	tbl.OnActivate(func(r TableRow) {
 		if row, ok := r.Data.(*ovRow); ok {
-			k.enqueue(sim.CmdApproach{Target: row.info.Entity})
+			showInfoData(k.panelEnv(), row.info.Entity)
+		}
+	})
+	tbl.OnMenu(func(r TableRow, at image.Point) {
+		if row, ok := r.Data.(*ovRow); ok {
+			k.entityMenu(row.info.Entity, at)
 		}
 	})
 	o.tbl = tbl
@@ -139,6 +148,38 @@ func (k *Kit) buildOverview() {
 		widget.WindowOpts.MinSize(320, 240),
 		widget.WindowOpts.Location(image.Rect(8, 8, 388, 428)),
 	)
+}
+
+// entityMenu opens a grid entity's context menu at at: Show Info first,
+// then the Selected Item window's own actions — every entry queues the
+// sim command its button queues (CmdWarpTo/CmdOrbit/CmdApproach/CmdLock),
+// at the row's entity and at the range selectors' current value. A
+// right-click never moves the selection; entries the sim would refuse
+// (self-targeting, unwarpageable, unlockable kinds) show grayed.
+func (k *Kit) entityMenu(e ecs.Entity, at image.Point) {
+	env := k.panelEnv()
+	ref, hasRef := env.InfoRefFor(e)
+	entries := []MenuEntry{showInfoMenuEntry(env, ref, hasRef)}
+	info, hasInfo := k.Sim.Info(e)
+	if hasInfo {
+		self := e == k.Sim.Player()
+		tooClose := info.Distance < sim.WarpMinRange
+		entries = append(entries, MenuSep,
+			MenuEntry{Label: "Warp to", Disabled: self || !info.CanWarp || tooClose, Action: func() {
+				k.enqueue(sim.CmdWarpTo{Target: e, Range: k.WarpRange()})
+			}},
+			MenuEntry{Label: "Orbit", Disabled: self, Action: func() {
+				k.enqueue(sim.CmdOrbit{Target: e, Range: k.OrbitRange()})
+			}},
+			MenuEntry{Label: "Approach", Disabled: self, Action: func() {
+				k.enqueue(sim.CmdApproach{Target: e})
+			}},
+			MenuEntry{Label: "Lock target", Disabled: self || !canLock(info.Kind), Action: func() {
+				k.enqueue(sim.CmdLock{Target: e})
+			}},
+		)
+	}
+	env.OpenMenu(entries, at)
 }
 
 // sync refreshes the rows from the sim: visible grid entities only, with
