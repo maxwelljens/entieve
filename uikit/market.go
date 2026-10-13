@@ -77,7 +77,10 @@ func NewMarket(env Env) *Market {
 		{Key: "Qty", Title: "Qty", Priority: 2, AlignRight: true},
 		{Key: "Side", Title: "Side", Priority: 3},
 	}
-	m.tbl = NewTable(env, cols)
+	// Contents face: the order book is names, prices and quantities —
+	// Source Code Pro lines the columns up (title, toolbar and buttons
+	// stay Turret Road).
+	m.tbl = NewTable(env, cols, ContentsFace(env.FaceMono(StepSmall)))
 	m.tbl.SetSort("Item", true)
 	// Sync builds rows in canonical book order; the Item sort key keeps
 	// that order (reversing on a second click), any other header click

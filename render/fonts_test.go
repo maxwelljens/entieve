@@ -5,12 +5,16 @@ import (
 	"testing"
 
 	"golang.org/x/image/font/sfnt"
+
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 // TestEmbeddedFontFamily pins the font payload: Turret Road ships as six
-// weights plus its OFL.txt inside the embedded directory (the license
-// travels with the fonts), both faces the UI builds parse, and every
-// glyph the interface actually draws is covered.
+// weights plus its SIL OFL notice, and Source Code Pro (the mono contents
+// face) as its two variable TTFs plus SourceCodePro_LICENCE.txt — all
+// inside the embedded directory, so the licenses travel with the fonts
+// (the binary carries them too), and every glyph the interface actually
+// draws is covered.
 //
 // Turret Road has no U+25B2/U+25BC triangles — the sort indicators are
 // the ↑/↓ arrows it does carry (uikit/table.go indicator()).
@@ -30,6 +34,7 @@ func TestEmbeddedFontFamily(t *testing.T) {
 	want := []string{
 		"TurretRoad-Bold.ttf", "TurretRoad-ExtraBold.ttf", "TurretRoad-ExtraLight.ttf",
 		"TurretRoad-Light.ttf", "TurretRoad-Medium.ttf", "TurretRoad-Regular.ttf",
+		"SourceCodePro-Italic-VariableFont_wght.ttf", "SourceCodePro-VariableFont_wght.ttf",
 	}
 	if len(ttfs) != len(want) {
 		t.Fatalf("embedded TTFs = %v, want %v", ttfs, want)
@@ -45,21 +50,57 @@ func TestEmbeddedFontFamily(t *testing.T) {
 			t.Errorf("embedded font %s missing (have %v)", w, ttfs)
 		}
 	}
-	if len(others) != 1 || others[0] != "OFL.txt" {
-		t.Errorf("files beside the TTFs = %v, want [OFL.txt] (the license travels with the fonts)", others)
+	// Each family's license travels in the same directory as its TTFs
+	// (and with the binary). Turret Road's notice has gone by two names
+	// across checkouts (OFL.txt, TurretRoad_LICENC.txt) — either counts.
+	turretLic := ""
+	for _, cand := range []string{"OFL.txt", "TurretRoad_LICENC.txt"} {
+		for _, o := range others {
+			if o == cand {
+				turretLic = cand
+			}
+		}
+	}
+	if turretLic == "" {
+		t.Errorf("Turret Road license missing beside the TTFs (have %v)", others)
+	}
+	found := false
+	for _, o := range others {
+		if o == "SourceCodePro_LICENCE.txt" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("license file SourceCodePro_LICENCE.txt missing beside the TTFs (have %v)", others)
 	}
 
 	// The OFL notice itself: license name and copyright line.
-	lic, err := fontFS.ReadFile("fonts/OFL.txt")
+	if turretLic != "" {
+		lic, err := fontFS.ReadFile("fonts/" + turretLic)
+		if err != nil {
+			t.Fatalf("embedded %s: %v", turretLic, err)
+		}
+		for _, want := range []string{
+			"SIL Open Font License, Version 1.1",
+			"Copyright 2018 The Turret Road Project Authors",
+		} {
+			if !strings.Contains(string(lic), want) {
+				t.Errorf("%s missing %q", turretLic, want)
+			}
+		}
+	}
+
+	// Source Code Pro's notice: same license, Adobe's copyright.
+	scp, err := fontFS.ReadFile("fonts/SourceCodePro_LICENCE.txt")
 	if err != nil {
-		t.Fatalf("embedded OFL.txt: %v", err)
+		t.Fatalf("embedded SourceCodePro_LICENCE.txt: %v", err)
 	}
 	for _, want := range []string{
 		"SIL Open Font License, Version 1.1",
-		"Copyright 2018 The Turret Road Project Authors",
+		"Copyright 2010, 2012 Adobe Systems Incorporated",
 	} {
-		if !strings.Contains(string(lic), want) {
-			t.Errorf("OFL.txt missing %q", want)
+		if !strings.Contains(string(scp), want) {
+			t.Errorf("SourceCodePro_LICENCE.txt missing %q", want)
 		}
 	}
 }
@@ -107,6 +148,84 @@ func TestFaceWeightsParseAndDiffer(t *testing.T) {
 		}
 		if k == 0 {
 			t.Errorf("body face has no glyph for %q", r)
+		}
+	}
+}
+
+// TestMonoFaceResolvesAndCovers pins the tabular contents face: Source
+// Code Pro parses through text/v2 at the sizes the tables draw at,
+// shapes headless as a real monospace (uniform digit advances — the
+// column-alignment contract; the variable font's default Regular
+// instance is what text/v2 draws), is a different source than the
+// display face, and covers every glyph the inventory and market rows
+// draw: row punctuation, the €/¢ currency marks, and the Polish/Czech
+// diacritics the system and item names carry (Młynów, Kuźnica…).
+//
+// The sort indicators (↑/↓) are deliberately absent from the probe:
+// they live in the header buttons, which keep the display face.
+func TestMonoFaceResolvesAndCovers(t *testing.T) {
+	const small = 16.8 // the table contents step (0.8 × the 21 px base)
+	f := MonoFace(small)
+	if f.Size != small {
+		t.Errorf("MonoFace(%v).Size = %v, want %v", small, f.Size, small)
+	}
+	if MonoFace(small) != f {
+		t.Error("MonoFace is not cached per size")
+	}
+	if MonoFace(21) == f {
+		t.Error("MonoFace(21) returned the 16.8 px face: the cache ignores size")
+	}
+	if f.Source == Face(small).Source {
+		t.Fatal("MonoFace shares its source with the display face: Source Code Pro did not load")
+	}
+
+	// text/v2 shapes the default variable instance without variation
+	// settings: every digit has the same advance, and a name with
+	// diacritics measures to a real width.
+	d1, _ := text.Measure("1", f, 0)
+	d4, _ := text.Measure("1111", f, 0)
+	d0, _ := text.Measure("0000", f, 0)
+	if d1 <= 0 {
+		t.Fatalf("mono face measures %q to width %v, want > 0", "1", d1)
+	}
+	if d4 != 4*d1 || d0 != d4 {
+		t.Errorf("digit advances not uniform: %q=%v %q=%v %q=%v — not a monospace default instance",
+			"1", d1, "1111", d4, "0000", d0)
+	}
+	if w, _ := text.Measure("Młynów 12,345.67 €", f, 0); w <= d4 {
+		t.Errorf("diacritic name measures %v, want more than %q (%v)", w, "1111", d4)
+	}
+
+	var buf sfnt.Buffer
+	raw, err := fontFS.ReadFile(monoFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mf, err := sfnt.Parse(raw)
+	if err != nil {
+		t.Fatalf("parse %s: %v", monoFile, err)
+	}
+	runes := []rune{}
+	for c := rune(0x20); c < 0x7f; c++ {
+		runes = append(runes, c) // ASCII: every label, number and key
+	}
+	// Row punctuation beyond ASCII: prices ("12,345.67 €", "50¢"), the
+	// volume unit ("123.4 m³"), the qty prefix ("×1,234") and the
+	// ellipsis/column dash the row text can draw.
+	for _, r := range []rune("€¢×³·—–…") {
+		runes = append(runes, r)
+	}
+	// Polish and Czech diacritics in the names rows list, both cases.
+	for _, r := range []rune("ąćęłńóśźżĄĆĘŁŃÓŚŹŻčďěňřšťůžČĎĚŇŘŠŤŮŽ") {
+		runes = append(runes, r)
+	}
+	for _, r := range runes {
+		k, err := mf.GlyphIndex(&buf, r)
+		if err != nil {
+			t.Fatalf("glyph lookup %q: %v", r, err)
+		}
+		if k == 0 {
+			t.Errorf("mono face has no glyph for %q", r)
 		}
 	}
 }

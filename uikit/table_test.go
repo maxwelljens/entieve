@@ -36,10 +36,10 @@ func newTestEnv(t *testing.T) (Env, *[]sim.Command) {
 
 // newPumpedTable builds a standalone table in its own UI and pumps one
 // frame so the deferred constructor handlers are registered and the
-// widget layout has run at 640×400.
-func newPumpedTable(t *testing.T, env Env, cols []Column) (*Table, *ebitenui.UI) {
+// widget layout has run at 640×400. Options pass through to NewTable.
+func newPumpedTable(t *testing.T, env Env, cols []Column, opts ...TableOption) (*Table, *ebitenui.UI) {
 	t.Helper()
-	tbl := NewTable(env, cols)
+	tbl := NewTable(env, cols, opts...)
 	ui := &ebitenui.UI{Container: tbl.Container(), PrimaryTheme: env.Theme}
 	ui.Update()
 	ui.Draw(ebiten.NewImage(640, 400))

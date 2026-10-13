@@ -106,13 +106,15 @@ window title.
 
 ## Typeface
 
-The interface is set in **Turret Road**, embedded from `render/fonts/`
-(TTFs + `OFL.txt`, `//go:embed` in `render/fonts.go`). The 21 px type
-scale is unchanged — only the typeface and the emphasis face are new.
+The interface is set in **Turret Road** (the display face) with **Source
+Code Pro** as the mono face for tabular contents; both are embedded from
+`render/fonts/` (TTFs + their license files, `//go:embed` in
+`render/fonts.go`). The 21 px type scale is unchanged — only the
+typefaces and the emphasis face are new.
 
 | Weight | Role |
 |---|---|
-| Regular | body text: log lines, table cells, labels, tooltip rows and values, text input |
+| Regular | body text: log lines, labels, tooltip rows and values, text input, table cells (outside the mono tables below) |
 | Bold | emphasis: window titles, table header sort buttons, buttons, HUD readouts, tooltip titles (`render.FaceBold` / `Env.FaceBold`) |
 | Light, Medium, ExtraLight, ExtraBold | shipped with the family in `render/fonts/`, not used by the UI |
 
@@ -126,6 +128,30 @@ scale is unchanged — only the typeface and the emphasis face are new.
   (`uikit/table.go`, `indicator`). Bold was chosen over Medium by rendering
   both at the 16.8 px button size: Medium sits too close to Regular to read
   as emphasis.
+
+**Source Code Pro** is the second family — the **tabular contents** face.
+The inventory window's three hold tables and the market window's order
+book draw every row cell in it: item names, quantities, volumes and
+prices alike (`render.MonoFace` / `Env.FaceMono`, opted into per table
+with the `uikit.ContentsFace` table option). It ships as a variable TTF
+and is drawn at its default Regular instance — `text/v2` applies no
+variation settings, and none are wanted: monospace is the point, digits
+and listed entries line the columns up. Everything around the rows stays
+Turret Road: window titles, section labels, the table header sort
+buttons, buttons and the stepper readouts.
+
+- **Rule of thumb**: display font (Turret Road) for chrome and prose —
+  titles, labels, buttons, tooltips, logs; mono (Source Code Pro) for
+  tabular data — numbers and listed entries in tables.
+- **License — Source Code Pro, SIL Open Font License 1.1**: `Copyright
+  2010, 2012 Adobe Systems Incorporated (http://www.adobe.com/), with
+  Reserved Font Name 'Source'`. The full `SourceCodePro_LICENCE.txt`
+  travels in `render/fonts/` beside the two variable TTFs (embedded with
+  them), so any redistribution of the binary carries the license.
+- **Glyph coverage**: digits, `€`/`¢`, `×`/`³` and the Polish/Czech
+  diacritics the listed names carry are probed over the embedded TTF in
+  `render/fonts_test.go` (`TestMonoFaceResolvesAndCovers`); the sort
+  indicators stay Turret Road's ↑/↓ — only the row cells change face.
 
 ## Tooltip anatomy
 
