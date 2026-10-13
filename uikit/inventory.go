@@ -46,12 +46,15 @@ func NewInventory(env Env) *Inventory {
 		{Key: "Vol", Title: "m³", Priority: 2, AlignRight: true},
 	}
 	// One selection callback per section: the source hold of the next
-	// transfer is whichever table the row was clicked in.
-	inv.cargo = NewTable(env, cols)
+	// transfer is whichever table the row was clicked in. Contents face:
+	// these rows are names, quantities and volumes — Source Code Pro
+	// lines the columns up (section labels and buttons stay Turret Road).
+	mono := ContentsFace(env.FaceMono(StepSmall))
+	inv.cargo = NewTable(env, cols, mono)
 	inv.cargo.OnSelect(inv.selectFrom("cargo"))
-	inv.ore = NewTable(env, cols)
+	inv.ore = NewTable(env, cols, mono)
 	inv.ore.OnSelect(inv.selectFrom("ore"))
-	inv.hangar = NewTable(env, cols)
+	inv.hangar = NewTable(env, cols, mono)
 	inv.hangar.OnSelect(inv.selectFrom("hangar"))
 	// Inventory rows carry no other action: double-click swaps the Show
 	// Info window, right-click opens the one-entry menu.

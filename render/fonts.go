@@ -1,19 +1,23 @@
 package render
 
-// Text faces: Turret Road, the typeface Entieve ships with.
+// Text faces: Turret Road is the display typeface Entieve ships with,
+// Source Code Pro the mono face for tabular contents.
 //
-// The TTFs and their OFL.txt live in render/fonts/ and are embedded as
-// one directory, so the license travels with the fonts inside the binary
-// as well as in the repo (see docs/ART.md). Rendering happens on the game
-// goroutine only, so the parse and face caches need no locking.
+// The TTFs and their license files live in render/fonts/ and are embedded
+// as one directory, so the licenses travel with the fonts inside the
+// binary as well as in the repo (see docs/ART.md). Rendering happens on
+// the game goroutine only, so the parse and face caches need no locking.
 //
 // Weight → role (the 21 px type scale is unchanged — only the typeface
 // and the emphasis face are new):
 //
-//	Regular  body text: log lines, table cells, labels, tooltips, input
+//	Regular  body text: log lines, labels, tooltips, input, table cells
+//	         outside the mono tables (see Mono below)
 //	Bold     emphasis: window titles, table header sort buttons, buttons,
 //	         HUD readouts — Medium sat too close to Regular at the 16.8 px
 //	         button size to read as emphasis (compared by eye, see ART.md)
+//	Mono     tabular contents: inventory and market table rows, where
+//	         monospaced digits and entries line the columns up (MonoFace)
 //
 // Turret Road has no U+25B2/U+25BC triangles, so the table sort
 // indicators are the ↑/↓ arrows it does carry (uikit/table.go).
@@ -28,11 +32,16 @@ import (
 //go:embed fonts
 var fontFS embed.FS
 
-// The three weights the interface draws with.
+// The weights the interface draws with, plus the mono contents face.
 const (
 	regularFile  = "fonts/TurretRoad-Regular.ttf"
 	emphasisFile = "fonts/TurretRoad-Medium.ttf"
 	lightFile    = "fonts/TurretRoad-Light.ttf"
+	// monoFile is Source Code Pro, the tabular contents face. It is a
+	// variable font (wght axis); text/v2's GoTextFace draws the default
+	// instance (Regular 400) — exactly the weight table contents need,
+	// and nothing the interface asks a variation for.
+	monoFile = "fonts/SourceCodePro-VariableFont_wght.ttf"
 )
 
 // faceKey identifies one cached face: weight file + pixel size.
@@ -86,3 +95,10 @@ func Face(size float64) *text.GoTextFace { return face(regularFile, size) }
 // pixel size: window titles, table header sort buttons, buttons and HUD
 // emphasis. Additive — Face is unchanged, callers opt in per role.
 func FaceBold(size float64) *text.GoTextFace { return face(emphasisFile, size) }
+
+// MonoFace returns the tabular contents face (Source Code Pro Regular —
+// the variable font's default instance) at the given pixel size: table
+// rows that carry numbers and listed entries (inventory, market), where
+// monospaced cells line the columns up. Additive — Face is unchanged,
+// callers opt in per table (uikit's ContentsFace option).
+func MonoFace(size float64) *text.GoTextFace { return face(monoFile, size) }

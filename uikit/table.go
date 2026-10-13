@@ -70,6 +70,9 @@ func iconOf(row TableRow, i int) string {
 
 // Table is a sortable, scrollable column table: a header row of sort
 // buttons over a widget.ScrollContainer of per-row widget.Containers.
+// Cells draw in the contents face — the display body face by default,
+// the mono contents face via ContentsFace — while the header sort
+// buttons always keep the emphasis face.
 //
 // Unlike widget.List it owns its scroll instance (ScrollTop is readable),
 // every row is a real container (full per-row background tinting) and the
@@ -80,7 +83,7 @@ type Table struct {
 	env         Env
 	cols        []Column
 	face        *text.Face
-	measure     func(string) float64 // cell width, regular weight
+	measure     func(string) float64 // cell width, contents face
 	headMeasure func(string) float64 // header width, emphasis weight
 	rowH        float64
 
@@ -115,22 +118,41 @@ type Table struct {
 	lastAt  time.Time
 }
 
+// TableOption adjusts a table at construction; a table built without
+// options is the display-font table.
+type TableOption func(*Table)
+
+// ContentsFace draws every row cell — labels and values alike — in the
+// given face instead of the display face, and measures the columns with
+// it (Source Code Pro via Env.FaceMono in the inventory and market
+// windows: monospaced cells line the columns up). Only the contents move:
+// the header sort buttons keep the emphasis face.
+func ContentsFace(face *text.Face) TableOption {
+	return func(t *Table) { t.face = face }
+}
+
 // NewTable builds a table with the given columns over the shared
 // environment (faces and palette). Rows arrive via SetRows; embed it in a
-// window with Container().
-func NewTable(env Env, cols []Column) *Table {
+// window with Container(). Options apply at construction — ContentsFace
+// moves the row cells (and the column fit) to another face.
+func NewTable(env Env, cols []Column, opts ...TableOption) *Table {
 	p := env.Pal
-	face := env.Face(StepSmall)
+	t := &Table{
+		env:    env,
+		cols:   append([]Column(nil), cols...),
+		face:   env.Face(StepSmall), // cell face: display body by default
+		selIdx: -1,
+	}
+	for _, opt := range opts {
+		opt(t)
+	}
+	// The cell measure and the row height follow t.face (set above or by
+	// an option), so the fitted column widths and the drawn cells agree.
+	face := t.face
 	// Headers draw in the emphasis weight (Turret Road Bold), so their
 	// widths are measured with it too — the fit and the drawn label have
 	// to agree or the header overflows its column.
 	headFace := env.FaceBold(StepSmall)
-	t := &Table{
-		env:    env,
-		cols:   append([]Column(nil), cols...),
-		face:   face,
-		selIdx: -1,
-	}
 	t.measure = func(s string) float64 {
 		w, _ := text.Measure(s, *face, 0)
 		return w

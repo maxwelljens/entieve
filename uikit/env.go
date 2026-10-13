@@ -5,6 +5,7 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
@@ -137,6 +138,24 @@ func (e Env) FaceBold(step string) *text.Face {
 		return facePtr(e.faces.largeBold)
 	default:
 		return facePtr(e.faces.baseBold)
+	}
+}
+
+// FaceMono returns the mono contents face (Source Code Pro Regular, the
+// variable font's default instance) for one type-scale step: the row
+// cells of tables whose contents are numbers and listed entries
+// (inventory, market) — monospaced cells line the columns up. Unknown
+// steps fall back to base.
+func (e Env) FaceMono(step string) *text.Face {
+	switch step {
+	case StepTiny:
+		return facePtr(render.MonoFace(e.TS.Tiny))
+	case StepSmall:
+		return facePtr(render.MonoFace(e.TS.Small))
+	case StepLarge:
+		return facePtr(render.MonoFace(e.TS.Large))
+	default:
+		return facePtr(render.MonoFace(e.TS.Base))
 	}
 }
 
