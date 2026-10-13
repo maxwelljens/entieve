@@ -23,13 +23,36 @@ func dockAtHaven(t *testing.T, s *Sim) []Event {
 	return evs
 }
 
+// marketQty returns the best ask's remaining qty and price for an item in
+// sys-a (the station's founding supply; asks rank before bids canonically).
 func marketQty(s *Sim, item content.ItemID) (qty int, price float64, ok bool) {
 	for _, st := range s.Market("sys-a") {
-		if st.Item == item {
+		if st.Item == item && st.Side == OrderSell {
 			return st.Qty, st.Price, true
 		}
 	}
 	return 0, 0, false
+}
+
+// bidPrice returns an item's best standing bid in sys-a (0 when the
+// station bids nothing for it).
+func bidPrice(s *Sim, item content.ItemID) float64 {
+	for _, st := range s.Market("sys-a") {
+		if st.Item == item && st.Side == OrderBuy {
+			return st.Price // canonical order: best bid first
+		}
+	}
+	return 0
+}
+
+// bidQty returns the qty resting on an item's best bid in sys-a.
+func bidQty(s *Sim, item content.ItemID) int {
+	for _, st := range s.Market("sys-a") {
+		if st.Item == item && st.Side == OrderBuy {
+			return st.Qty
+		}
+	}
+	return 0
 }
 
 func hangarCount(s *Sim, item content.ItemID) int { return stacksCount(s.Hangar.Items, item) }
@@ -60,12 +83,14 @@ func TestBuyHullQtyDeliversEveryHull(t *testing.T) {
 	}
 	walletBefore := s.Wallet()
 
-	// Qty 3: charge 3x, stock -3, three hulls delivered.
+	// Qty 3: charge 3x plus the broker fee, stock -3, three hulls delivered.
 	s.Queue(CmdBuy{Item: "ship-barge", Qty: 3})
 	s.Step()
 	evs := drain(s)
-	if s.Wallet() != walletBefore-3*price {
-		t.Fatalf("wallet=%v want %v (3 x %v)", s.Wallet(), walletBefore-3*price, price)
+	cost, fee := 3*price, MarketBrokerFee*(3*price)
+	if s.Wallet() != walletBefore-(cost+fee) {
+		t.Fatalf("wallet=%v want %v (3 x %v + %v broker fee)", s.Wallet(),
+			walletBefore-(cost+fee), cost, fee)
 	}
 	stockAfter, _, _ := marketQty(s, "ship-barge")
 	if stockAfter != stockBefore-3 {
@@ -85,21 +110,21 @@ func TestBuyHullQtyDeliversEveryHull(t *testing.T) {
 		t.Fatalf("missing buy event: %v", evs)
 	}
 
-	// Qty above the shelf clamps to what is in stock: charge and deliver
-	// exactly the listed units, never a phantom hull. (Top the shelf back up
-	// so the clamp has something to work against.)
-	for i := range s.market["sys-a"] {
-		if s.market["sys-a"][i].Item == "ship-barge" {
-			s.market["sys-a"][i].Qty = 2
-		}
+	// Qty above the ask clamps to what the book holds (immediate-or-cancel):
+	// charge and deliver exactly the resting units, never a phantom hull.
+	// (Top the ask back up — the founding ask was exhausted by the first
+	// buy — so the clamp has something to work against.)
+	if _, ok := s.PlaceOrder(StationID("cel-station-a"), OrderSell, "ship-barge", 2, price, OwnerSystem); !ok {
+		t.Fatal("fixture: could not reseed the ask")
 	}
 	s.wallet = 300000
 	s.Queue(CmdBuy{Item: "ship-barge", Qty: 5})
 	s.Step()
 	evs = drain(s)
-	if s.Wallet() != 300000-2*price {
-		t.Fatalf("wallet=%v want %v (clamped to the 2 units on the shelf)",
-			s.Wallet(), 300000-2*price)
+	cost, fee = 2*price, MarketBrokerFee*(2*price)
+	if s.Wallet() != 300000-(cost+fee) {
+		t.Fatalf("wallet=%v want %v (clamped to the 2 units on the ask, %v + %v fee)",
+			s.Wallet(), 300000-(cost+fee), cost, fee)
 	}
 	if n := hangarHulls(s, "ship-barge"); n != 5 {
 		t.Fatalf("hangar holds %d hulls, want 5", n)
@@ -109,14 +134,14 @@ func TestBuyHullQtyDeliversEveryHull(t *testing.T) {
 		t.Fatalf("stock=%d want 0", stockAfter)
 	}
 
-	// Empty shelf: refusal, nothing moves.
+	// Empty book: refusal, nothing moves (mirrors the unlisted refusal).
 	walletRefused := s.Wallet()
 	hullsRefused := hangarHulls(s, "ship-barge")
 	s.Queue(CmdBuy{Item: "ship-barge", Qty: 1})
 	s.Step()
 	evs = drain(s)
-	if findEvent(evs, EvLog, "Out of stock: Ore Barge") == nil {
-		t.Fatalf("missing out-of-stock refusal: %v", evs)
+	if findEvent(evs, EvLog, "Ore Barge is not sold here") == nil {
+		t.Fatalf("missing empty-book refusal: %v", evs)
 	}
 	if s.Wallet() != walletRefused || hangarHulls(s, "ship-barge") != hullsRefused {
 		t.Fatalf("refusal moved state: wallet=%v hulls=%d", s.Wallet(),
@@ -134,8 +159,9 @@ func TestBuyReducesStockAndWallet(t *testing.T) {
 	s.Step()
 	evs := drain(s)
 
-	if s.Wallet() != walletBefore-price*10 {
-		t.Fatalf("wallet=%v want %v", s.Wallet(), walletBefore-price*10)
+	if s.Wallet() != walletBefore-(price*10+MarketBrokerFee*(price*10)) {
+		t.Fatalf("wallet=%v want %v", s.Wallet(),
+			walletBefore-(price*10+MarketBrokerFee*(price*10)))
 	}
 	qtyAfter, _, _ := marketQty(s, "charge-emp")
 	if qtyAfter != qtyBefore-10 {
@@ -189,56 +215,81 @@ func TestBuyInsufficientFundsRejected(t *testing.T) {
 	if qtyAfter != qtyBefore {
 		t.Fatalf("stock=%d want unchanged %d @ %v", qtyAfter, qtyBefore, price)
 	}
-	// One barge (50k) is affordable and lands in the hangar.
+	// One barge (50k + broker fee) is affordable and lands in the hangar.
 	s.Queue(CmdBuy{Item: "ship-barge", Qty: 1})
 	s.Step()
 	drain(s)
-	if s.Wallet() != 50000 || len(s.Hangar.Ships) != 1 {
-		t.Fatalf("wallet=%v ships=%d", s.Wallet(), len(s.Hangar.Ships))
+	want := 100000 - (50000 + MarketBrokerFee*50000)
+	if s.Wallet() != want || len(s.Hangar.Ships) != 1 {
+		t.Fatalf("wallet=%v want %v ships=%d", s.Wallet(), want, len(s.Hangar.Ships))
 	}
 	if s.Hangar.Ships[0].Hull != "ship-barge" {
 		t.Fatalf("hangar ship=%s", s.Hangar.Ships[0].Hull)
 	}
 }
 
-func TestSellCreditsNinetyPercent(t *testing.T) {
+// TestSellFillsBidMinusTax pins the sell side of the double auction: the
+// player sells into the station's standing BID at the bid's price (the
+// resting order's price wins), pays the sales tax on execution, and the
+// bid — not some shelf — absorbs the goods.
+func TestSellFillsBidMinusTax(t *testing.T) {
 	s := newTestSim(t)
 	dockAtHaven(t, s)
 	walletBefore := s.Wallet()
-	stockBefore, price, _ := marketQty(s, "charge-emp")
+	bid := bidPrice(s, "charge-emp")
+	if bid <= 0 {
+		t.Fatal("fixture: no standing bid for charge-emp")
+	}
+	bidBefore := bidQty(s, "charge-emp")
 	ammoBefore := cargoCount(s, "charge-emp")
 
 	s.Queue(CmdSell{Item: "charge-emp", Qty: 5})
 	s.Step()
 	evs := drain(s)
 
-	want := 0.9 * price * 5
-	if math.Abs(s.Wallet()-(walletBefore+want)) > 1e-9 {
-		t.Fatalf("wallet=%v want %v", s.Wallet(), walletBefore+want)
+	proceeds := bid * 5
+	fee := MarketBrokerFee * proceeds
+	tax := MarketSalesTax * proceeds
+	received := proceeds - tax - fee
+	if s.Wallet() != walletBefore+(received) {
+		t.Fatalf("wallet=%v want %v (bid %v x 5, %v broker fee, %v sales tax)", s.Wallet(),
+			walletBefore+received, bid, fee, tax)
 	}
 	if cargoCount(s, "charge-emp") != ammoBefore-5 {
 		t.Fatal("cargo not reduced")
 	}
-	stockAfter, _, _ := marketQty(s, "charge-emp")
-	if stockAfter != stockBefore+5 {
-		t.Fatalf("stock=%d want %d", stockAfter, stockBefore+5)
+	if got := bidQty(s, "charge-emp"); got != bidBefore-5 {
+		t.Fatalf("bid qty=%d want %d (the bid absorbed the sale)", got, bidBefore-5)
 	}
-	if !hasEvent(evs, EvMarket, "Sold 5 x EMP Charge for 22.50 €") {
+	// The ask side is untouched: selling never restocks supply.
+	if qty, _, _ := marketQty(s, "charge-emp"); qty == 0 {
+		t.Fatal("selling consumed the ask side")
+	}
+	if !hasEvent(evs, EvMarket, "Sold 5 x EMP Charge for "+euro(received)) {
 		t.Fatalf("missing sell event: %v", evs)
 	}
 }
 
-func TestSellUnlistedItemUsesBasePrice(t *testing.T) {
+// TestSellWithoutBidsRefuses: an item nobody bids on cannot be sold. The
+// book is the price former — there is no shelf to restock and no base
+// price to conjure a sale from (the old unlisted-base-price sale is gone
+// with the per-system stock list).
+func TestSellWithoutBidsRefuses(t *testing.T) {
 	s := newTestSim(t)
 	dockAtHaven(t, s)
-	giveCargo(s, "min-nickel", 3) // unlisted: BasePrice 12
+	giveCargo(s, "min-nickel", 3) // nobody bids on nickel here
 	walletBefore := s.Wallet()
 	s.Queue(CmdSell{Item: "min-nickel", Qty: 3})
 	s.Step()
-	drain(s)
-	want := 0.9 * 12 * 3
-	if math.Abs(s.Wallet()-(walletBefore+want)) > 1e-9 {
-		t.Fatalf("wallet=%v want %v", s.Wallet(), walletBefore+want)
+	evs := drain(s)
+	if findEvent(evs, EvLog, "No buy orders for Nickel") == nil {
+		t.Fatalf("expected no-bids refusal: %v", evs)
+	}
+	if s.Wallet() != walletBefore {
+		t.Fatalf("wallet=%v want unchanged", s.Wallet())
+	}
+	if cargoCount(s, "min-nickel") != 3 {
+		t.Fatal("refusal moved cargo")
 	}
 }
 
@@ -247,17 +298,27 @@ func TestSellFallsBackToHangar(t *testing.T) {
 	dockAtHaven(t, s)
 	s.Hangar.Items = addStacks(s.Hangar.Items, "min-ferrite", 7)
 	walletBefore := s.Wallet()
+	bid := bidPrice(s, "min-ferrite")
+	if bid <= 0 {
+		t.Fatal("fixture: no standing bid for min-ferrite")
+	}
 	s.Queue(CmdSell{Item: "min-ferrite", Qty: 7})
 	s.Step()
 	evs := drain(s)
-	// Listed at 10 -> 0.9*10*7 = 63.
-	if math.Abs(s.Wallet()-(walletBefore+63)) > 1e-9 {
-		t.Fatalf("wallet=%v want %v", s.Wallet(), walletBefore+63)
+	// Sold into the station's bid at 9, minus the broker fee and the 2.5%
+	// sales tax (both come out of the proceeds).
+	proceeds := bid * 7
+	fee := MarketBrokerFee * proceeds
+	tax := MarketSalesTax * proceeds
+	received := proceeds - tax - fee
+	if s.Wallet() != walletBefore+received {
+		t.Fatalf("wallet=%v want %v (bid %v x 7, %v broker fee, %v sales tax)", s.Wallet(),
+			walletBefore+received, bid, fee, tax)
 	}
 	if hangarCount(s, "min-ferrite") != 0 {
 		t.Fatal("hangar not drained")
 	}
-	if !hasEvent(evs, EvMarket, "Sold 7 x Ferrite for 63.00 €") {
+	if !hasEvent(evs, EvMarket, "Sold 7 x Ferrite for "+euro(received)) {
 		t.Fatalf("missing event: %v", evs)
 	}
 	// Nothing to sell warns.

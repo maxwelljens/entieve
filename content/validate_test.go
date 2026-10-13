@@ -72,14 +72,16 @@ func baseContent() *Content {
 				Celestials: []CelestialDef{
 					{ID: "cel-a-star", Name: "Star", Kind: CelStar, Radius: 1e8},
 					{ID: "cel-a-station", Name: "Station", Kind: CelStation, Radius: 500,
-						Station: &StationDef{Services: []string{"repair", "market", "refine", "fitting"}}},
+						Station: &StationDef{
+							Services: []string{"repair", "market", "refine", "fitting"},
+							Market: []MarketOrderDef{
+								{Item: "min-fer", Qty: 10, Price: 6},
+								{Item: "ship-hull", Qty: 2, Price: 350000},
+							},
+						}},
 					{ID: "cel-a-belt", Name: "Belt", Kind: CelBelt, Radius: 1000,
 						Belt:   &BeltDef{Asteroids: []AsteroidDef{{Ore: "ore-rock", Count: 3, Volume: 1000}}},
 						Spawns: []SpawnDef{{NpcID: "npc-rat", Count: 1, RespawnSec: 60}}},
-				},
-				Market: []MarketOrderDef{
-					{Item: "min-fer", Qty: 10, Price: 6},
-					{Item: "ship-hull", Qty: 2, Price: 350000},
 				},
 			},
 		},
@@ -97,6 +99,12 @@ func baseContent() *Content {
 		},
 		Universe: &UniverseDef{Region: "R", Constellation: "C", StartSystem: "sys-a"},
 	}
+}
+
+// stationMarket returns the founding-order list of baseContent's station
+// (the market orders live on the station since the v2 market schema).
+func stationMarket(c *Content) *[]MarketOrderDef {
+	return &c.Systems["sys-a"].Celestials[1].Station.Market
 }
 
 // checkpoints builds n valid, uniquely named scenario checkpoints.
@@ -214,8 +222,8 @@ func TestValidateNegativeCases(t *testing.T) {
 		{
 			name: "unknown market item",
 			mutate: func(c *Content) {
-				c.Systems["sys-a"].Market = append(c.Systems["sys-a"].Market,
-					MarketOrderDef{Item: "item-ghost", Qty: 1, Price: 10})
+				m := stationMarket(c)
+				*m = append(*m, MarketOrderDef{Item: "item-ghost", Qty: 1, Price: 10})
 			},
 			want: "is not an item, ship, or module",
 		},
@@ -278,14 +286,6 @@ func TestValidateNegativeCases(t *testing.T) {
 					append(c.Systems["sys-a"].Celestials[1].Station.Services, "banking")
 			},
 			want: "unknown station service \"banking\"",
-		},
-		{
-			name: "market without station",
-			mutate: func(c *Content) {
-				sys := c.Systems["sys-a"]
-				sys.Celestials = append(sys.Celestials[:1], sys.Celestials[2:]...)
-			},
-			want: "market orders present but no station exists",
 		},
 		{
 			name: "weapon ammo class matches nothing",
@@ -365,16 +365,59 @@ func TestValidateNegativeCases(t *testing.T) {
 		{
 			name: "market qty below one",
 			mutate: func(c *Content) {
-				c.Systems["sys-a"].Market[0].Qty = 0
+				(*stationMarket(c))[0].Qty = 0
 			},
 			want: "qty 0 must be >= 1",
 		},
 		{
 			name: "negative market price",
 			mutate: func(c *Content) {
-				c.Systems["sys-a"].Market[0].Price = -5
+				(*stationMarket(c))[0].Price = -5
 			},
 			want: "price -5 must be >= 0",
+		},
+		{
+			name: "system-level market block rejected",
+			mutate: func(c *Content) {
+				c.Systems["sys-a"].Market = []MarketOrderDef{{Item: "min-fer", Qty: 1, Price: 6}}
+			},
+			want: "system-level market block is not allowed",
+		},
+		{
+			name: "market orders without market service",
+			mutate: func(c *Content) {
+				c.Systems["sys-a"].Celestials[1].Station.Services = []string{"repair"}
+			},
+			want: "without the market service",
+		},
+		{
+			name: "unknown market side",
+			mutate: func(c *Content) {
+				m := stationMarket(c)
+				*m = append(*m, MarketOrderDef{Item: "charge-bolt", Qty: 1, Price: 5, Side: "hold"})
+			},
+			want: `unknown side "hold"`,
+		},
+		{
+			name: "crossing founding orders",
+			mutate: func(c *Content) {
+				m := stationMarket(c)
+				*m = append(*m, MarketOrderDef{Item: "min-fer", Qty: 5, Price: 6, Side: "buy"})
+			},
+			want: "crosses its ask",
+		},
+		{
+			name: "station id shared across systems",
+			mutate: func(c *Content) {
+				sysB := *c.Systems["sys-a"]
+				sysB.ID = "sys-b"
+				sysB.Celestials = []CelestialDef{
+					{ID: "cel-a-station", Name: "Impostor", Kind: CelStation, Radius: 500,
+						Station: &StationDef{Services: []string{"market"}}},
+				}
+				c.Systems["sys-b"] = &sysB
+			},
+			want: "is already used by system sys-a",
 		},
 		{
 			name: "module kind missing attribute block",

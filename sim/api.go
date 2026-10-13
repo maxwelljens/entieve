@@ -72,8 +72,13 @@ type Sim struct {
 	lastStation content.CelID
 	queue       []Command
 	events      []Event
-	market      map[content.SystemID][]MarketStock
-	respawns    []RespawnTimer
+	// market holds one order book per station (station celestial id →
+	// book), keyed universe-wide; stations sort by id for every read that
+	// iterates (sortStationIDs). marketSeq is the next order arrival id.
+	market    map[StationID]*MarketBook
+	marketSeq uint64
+	schema    int
+	respawns  []RespawnTimer
 	// trafficLeaves are scheduled raider break-offs (persisted; see Save).
 	trafficLeaves []TrafficLeave
 	modTargets    map[modKey]ecs.Entity
@@ -82,14 +87,14 @@ type Sim struct {
 	// ammoPrefs is the per-(owner, slot) preferred charge item set by
 	// CmdSetAmmo ("" entry = automatic). Point-looked-up only — never
 	// iterated by behavior, so map order cannot leak into the simulation.
-	// Documented limitation: not part of Save (the save schema is frozen),
-	// so preferences reset on Restore.
+	// Documented limitation: not part of Save (the schema is versioned by
+	// Save.Schema), so preferences reset on Restore.
 	ammoPrefs map[modKey]content.ItemID
 
 	// lastPlayerWork is where/when the player last fired a weapon or
 	// completed a mining cycle — the recent-activity aggro trigger for NPCs
 	// (see systemNpc). at == playerWorkNever means "never this run"; like
-	// ammoPrefs it is intentionally outside the frozen Save schema and
+	// ammoPrefs it is intentionally outside the versioned Save schema and
 	// resets on Restore.
 	lastPlayerWork struct {
 		pos core.Vec2
@@ -141,6 +146,7 @@ func New(c *content.Content, w *content.WorldDef, seed int64) (*Sim, error) {
 		return nil, errf("sim: world %s starts with unknown ship %s", w.ID, w.Start.Ship)
 	}
 
+	books, seq := initMarket(c)
 	s := &Sim{
 		Content:    c,
 		World:      ecs.New(),
@@ -152,7 +158,9 @@ func New(c *content.Content, w *content.WorldDef, seed int64) (*Sim, error) {
 		wallet:     w.Start.Wallet,
 		modTargets: make(map[modKey]ecs.Entity),
 		ammoPrefs:  make(map[modKey]content.ItemID),
-		market:     initMarket(c),
+		market:     books,
+		marketSeq:  seq,
+		schema:     saveSchemaV2,
 	}
 	s.lastPlayerWork.at = playerWorkNever
 	// Fork the living-universe stream from the fresh master state: same seed
@@ -212,7 +220,7 @@ func (s *Sim) Step() {
 	s.systemTravel()    // 13 travel
 	s.systemMission()   // 14 mission (accept/abandon, objectives, auto-claim)
 	s.systemRespawn()   // 15 respawn
-	s.systemTraffic()   // 16 traffic (convoys, ambushes, patrols, market drift)
+	s.systemTraffic()   // 16 traffic (convoys, ambushes, patrols, book supply)
 	// Death respawn runs after all systems so that a cross-system clone-bay
 	// respawn can rebuild the grid without yanking entities out from under
 	// the systems still running this tick.
@@ -437,11 +445,63 @@ func (s *Sim) Snapshot() (*Save, error) { return s.snapshot() }
 // Restore replaces simulation state from a snapshot.
 func (s *Sim) Restore(save *Save) error { return s.restore(save) }
 
-// Market returns a copy of the market stock of the given system (empty when
-// the system has no orders).
+// stationsSorted returns every station book id in ascending order — the
+// canonical iteration order for anything that walks the markets (never
+// map order).
+func (s *Sim) stationsSorted() []StationID {
+	ids := make([]StationID, 0, len(s.market))
+	for id := range s.market {
+		ids = append(ids, id)
+	}
+	sortStationIDs(ids)
+	return ids
+}
+
+// Market returns every resting order of the given system: its stations'
+// books concatenated in ascending station order, each in canonical book
+// order (item ascending; asks before bids; best price first, then
+// arrival). Empty when the system's markets hold no orders.
 func (s *Sim) Market(id content.SystemID) []MarketStock {
-	stock := s.market[id]
-	out := make([]MarketStock, len(stock))
-	copy(out, stock)
+	var out []MarketStock
+	for _, st := range s.stationsSorted() {
+		book := s.market[st]
+		if book == nil || book.System != id {
+			continue
+		}
+		out = append(out, book.Orders...)
+	}
 	return out
+}
+
+// BookOrders returns one station's resting orders in canonical book order
+// (nil when the station holds no orders).
+func (s *Sim) BookOrders(station StationID) []MarketStock {
+	book := s.market[station]
+	if book == nil {
+		return nil
+	}
+	return append([]MarketStock(nil), book.Orders...)
+}
+
+// MarketPrice is the item's displayed price at a station: the price
+// ladder — last trade price, best ask, best bid, then the def base price.
+func (s *Sim) MarketPrice(station StationID, item content.ItemID) float64 {
+	return s.marketPrice(s.market[station], item)
+}
+
+// DockedMarket returns the station the player is docked at when it offers
+// the market service ("" otherwise) — the book a market view shows.
+func (s *Sim) DockedMarket() StationID {
+	e := s.dockedStation()
+	if e.IsZero() {
+		return ""
+	}
+	st, ok := s.Stations.Get(e)
+	if !ok || !hasService(st, "market") {
+		return ""
+	}
+	if c, ok := s.Celestials.Get(e); ok {
+		return c.Cel
+	}
+	return ""
 }

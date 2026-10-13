@@ -202,15 +202,8 @@ func forceAmbushOn(t *testing.T, s *Sim, e ecs.Entity, tc *Traffic, security str
 	}
 }
 
-// marketQtyIn returns the stock and price of an item in a system's market.
-func marketQtyIn(s *Sim, sys content.SystemID, item content.ItemID) (int, float64) {
-	for _, st := range s.market[sys] {
-		if st.Item == item {
-			return st.Qty, st.Price
-		}
-	}
-	return 0, 0
-}
+// ordersIn returns every resting order of a system (the flattened books).
+func ordersIn(s *Sim, sys content.SystemID) []MarketStock { return s.Market(sys) }
 
 // playerCargoCount counts units of an item in the player's general cargo.
 func playerCargoCount(s *Sim, item content.ItemID) int {
@@ -297,15 +290,9 @@ func TestTrafficSecurityMathPinned(t *testing.T) {
 			t.Errorf("trafficAttackChance(%q) = %v, want %v", tc.sec, got, tc.want)
 		}
 	}
-	// price band 0.05 * 4^(1-sigma): 5%, 10%, 20%
-	for _, tc := range []struct {
-		sec  string
-		want float64
-	}{{"high", 0.05}, {"low", 0.10}, {"null", 0.20}} {
-		if got := trafficBand(tc.sec); got != tc.want {
-			t.Errorf("trafficBand(%q) = %v, want %v", tc.sec, got, tc.want)
-		}
-	}
+	// price band: DELETED with the market-memory mechanism — the books
+	// form prices in no band (retargeted to book behavior in
+	// TestTrafficMarketBooksFormPrices).
 	// patrol cadence 1/sigma: x1, x2, disabled
 	if got, ok := trafficPatrolInterval(9000, "high"); !ok || got != 9000 {
 		t.Errorf("patrol interval high = %d/%v, want 9000/true", got, ok)
@@ -384,19 +371,36 @@ func TestTrafficLifecycleDeliveryOrder(t *testing.T) {
 	if s.World.Alive(delivered.Actor) {
 		t.Fatal("hauler still alive after delivery")
 	}
-	// Stock: exactly +100 units (first delivery: 500 -> 600).
-	qty, price := marketQtyIn(s, "sys-a", "min-ferrite")
-	if qty != 600 {
-		t.Fatalf("stock = %d, want 600 (exact integer units)", qty)
+	// Provenance: the 100 units were fulfilled from Haven Rest's ask
+	// (500 -> 400) and list as supply on Dock Two's book — one tick under
+	// the 10.00 € cost basis, so the displayed price fell (500 -> 400
+	// withdrawal is a transfer, never a trade).
+	originQty, originPrice := askAt(s, "cel-station-a", "min-ferrite")
+	if originQty != 400 || originPrice != 10 {
+		t.Fatalf("origin ask = %d @ %v, want 400 @ 10 (the shipment came from there)",
+			originQty, originPrice)
 	}
-	// Price: one supply step down: share = 1000/(500*10) = 0.2, band = 0.05,
-	// k = share*band/2.5 = 0.004 -> 10 * 0.996 = 9.96.
-	if diff := price - 9.96; diff > 1e-9 || diff < -1e-9 {
-		t.Fatalf("price = %v, want 9.96", price)
+	dockQty, dockPrice := askAt(s, "cel-a-dock", "min-ferrite")
+	if dockQty != 100 {
+		t.Fatalf("destination ask qty = %d, want 100 (exact integer units)", dockQty)
+	}
+	if dockPrice != 9.99 {
+		t.Fatalf("destination ask price = %v, want 9.99 (one tick under the cost basis)", dockPrice)
 	}
 	if !hasEvent(evs, EvMarket, "price falls to") {
 		t.Fatalf("no price-falls market event; events=%v", trafficTexts(evs))
 	}
+}
+
+// askAt returns the best ask's qty and price for an item at a station's
+// book (0, 0 when the station keeps no ask for it).
+func askAt(s *Sim, station StationID, item content.ItemID) (int, float64) {
+	for _, st := range s.BookOrders(station) {
+		if st.Item == item && st.Side == OrderSell {
+			return st.Qty, st.Price
+		}
+	}
+	return 0, 0
 }
 
 // TestTrafficSpawnRateBySecurity pins the spawn-rate derivation with exact
@@ -546,7 +550,9 @@ func TestTrafficAttackDestroyedOutcome(t *testing.T) {
 	// Force with "null" security: no patrol response, so this pins the pure
 	// destroyed branch (raiders kill -> wreck -> break-off).
 	forceAmbushOn(t, s, e, tc, "null")
-	_, priceBefore := marketQtyIn(s, "sys-a", tc.Item)
+	// Event-only risk signal: a shipment that never arrived must not move
+	// a price (the book is the price former), but the loss must speak.
+	beforeOrders := ordersIn(s, "sys-a")
 	holdBefore := playerCargoCount(s, tc.Item)
 
 	// Kill it with the raiders' damage through the real pipeline.
@@ -579,16 +585,14 @@ func TestTrafficAttackDestroyedOutcome(t *testing.T) {
 		t.Fatalf("player looted %d, want exactly %d", got, tc.Qty)
 	}
 
-	// Risk premium: the item's price moved up (bounded by the band).
-	_, priceAfter := marketQtyIn(s, "sys-a", tc.Item)
-	if priceAfter <= priceBefore {
-		t.Fatalf("price %v did not rise after the loss (was %v)", priceAfter, priceBefore)
+	// The books never saw the lost shipment: no order moved, no price was
+	// invented — the loss speaks as an event-only supply-risk signal.
+	if after := ordersIn(s, "sys-a"); !reflect.DeepEqual(beforeOrders, after) {
+		t.Fatalf("a lost shipment touched the books:\n before=%v\n after=%v",
+			beforeOrders, after)
 	}
-	if priceAfter > 10*1.05+1e-9 {
-		t.Fatalf("price %v above the high-sec band", priceAfter)
-	}
-	if !hasEvent(evs, EvMarket, "price rises to") {
-		t.Fatalf("no risk-premium market event: %v", trafficTexts(evs))
+	if !hasEvent(evs, EvMarket, "shipment lost en route to") {
+		t.Fatalf("no supply-risk market event: %v", trafficTexts(evs))
 	}
 
 	// The raiders break off ~20 s after the incident resolves. The hauler's
@@ -931,64 +935,66 @@ func TestTrafficPlayerCanEngageConvoy(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Market
+// Market — the per-station books are the price former (retargeted from the
+// deleted band / drift / decay mechanism)
 // ---------------------------------------------------------------------------
 
-// TestTrafficMarketDriftMath pins both drift directions, the band clamps and
-// the stock exactness through direct step applications.
-func TestTrafficMarketDriftMath(t *testing.T) {
-	s := newTrafficSim(t)
-	idx := s.marketIndex("min-ferrite")
-	if idx < 0 {
-		t.Fatal("min-ferrite not listed in sys-a")
+// TestTrafficDeliveriesTickTheBookDown pins the delivery posting rule: each
+// convoy delivery lists one tick under the destination's prevailing ask
+// (one tick under the cost basis on an empty book), so repeated supply
+// ratchets the price down with no band, no decay and no shelf.
+func TestTrafficDeliveriesTickTheBookDown(t *testing.T) {
+	c := trafficContent()
+	// Only the non-delivering route runs on a schedule; deliveries are
+	// spawned by hand so the tick bookkeeping stays exact.
+	c.Traffic["sys-a"].Routes = c.Traffic["sys-a"].Routes[1:]
+	s, err := New(c, testWorld(), 9)
+	if err != nil {
+		t.Fatal(err)
 	}
-	base := s.marketBasePrice("sys-a", "min-ferrite") // authored order price 10
-	if base != 10 {
-		t.Fatalf("base = %v, want 10", base)
-	}
-	band := trafficBand("high") // 0.05
+	td, _ := s.Content.TrafficFor("sys-a")
 
-	// Delivery step: price' = price * (1 - share*band/2.5); share 0.2 ->
-	// 10 -> 9.96.
-	s.marketPriceStep("sys-a", idx, false, 0.2, "high", "Test")
-	if p := s.market["sys-a"][idx].Price; !closeTo(p, 9.96) {
-		t.Fatalf("after supply step price = %v, want 9.96", p)
+	deliver := func() {
+		t.Helper()
+		s.spawnTrafficHauler(s.System(), td, content.RouteDef{
+			From: "cel-station-a", To: "cel-a-dock", Hull: "ship-convoy",
+			Cargo:         content.RouteCargo{Item: "min-ferrite", Qty: 100},
+			IntervalTicks: 1 << 30, // never on any reachable schedule
+		})
+		var evs []Event
+		if !runUntil(t, s, &evs, 3000, func() bool {
+			return firstPhase(evs, EvTraffic, TrafficDelivered) != nil
+		}) {
+			t.Fatal("delivery never landed")
+		}
 	}
-	// Attack step doubles the coefficient: 9.96 * (1 + 2*0.2*band/2.5).
-	s.marketPriceStep("sys-a", idx, true, 0.2, "high", "Test")
-	want := 9.96 * (1 + 0.2*2*band/trafficDriftDiv)
-	if p := s.market["sys-a"][idx].Price; !closeTo(p, want) {
-		t.Fatalf("after premium step price = %v, want %v", p, want)
+
+	// First delivery: empty destination book, cost basis 10.00 (the origin
+	// ask) -> the ask lists at 9.99, one tick under it.
+	deliver()
+	if qty, price := askAt(s, "cel-a-dock", "min-ferrite"); qty != 100 || price != 9.99 {
+		t.Fatalf("after 1st delivery ask = %d @ %v, want 100 @ 9.99", qty, price)
 	}
-	// Clamps: hammer both directions — price never leaves the band and pins
-	// exactly to its edge.
-	for i := 0; i < 100; i++ {
-		s.marketPriceStep("sys-a", idx, true, 1, "high", "Test")
+	if qty, price := askAt(s, "cel-station-a", "min-ferrite"); qty != 400 || price != 10 {
+		t.Fatalf("origin ask = %d @ %v, want 400 @ 10 (provenance debit)", qty, price)
 	}
-	hi := base * (1 + band)
-	if p := s.market["sys-a"][idx].Price; !closeTo(p, hi) {
-		t.Fatalf("clamped high price = %v, want band edge %v", p, hi)
+	// Second delivery: undercuts the prevailing 9.99 ask by one tick (the
+	// tick grid narrows below 10: 4 significant figures means 9.99 -> 9.989).
+	deliver()
+	if qty, price := askAt(s, "cel-a-dock", "min-ferrite"); qty != 100 || price != 9.989 {
+		t.Fatalf("after 2nd delivery ask = %d @ %v, want 100 @ 9.989 (one tick down)", qty, price)
 	}
-	for i := 0; i < 200; i++ {
-		s.marketPriceStep("sys-a", idx, false, 1, "high", "Test")
-	}
-	lo := base * (1 - band)
-	if p := s.market["sys-a"][idx].Price; !closeTo(p, lo) {
-		t.Fatalf("clamped low price = %v, want band edge %v", p, lo)
-	}
-	// Stock stays an exact integer through steps (drift never moves units).
-	if q, _ := marketQtyIn(s, "sys-a", "min-ferrite"); q != 500 {
-		t.Fatalf("stock = %d, want 500", q)
+	if qty, price := askAt(s, "cel-station-a", "min-ferrite"); qty != 300 || price != 10 {
+		t.Fatalf("origin ask = %d @ %v, want 300 @ 10", qty, price)
 	}
 }
 
-// TestTrafficMarketDecayHalving pins the premium decay schedule: after
-// exactly 3600 ticks the deviation from base halves; after 7200 it is a
-// quarter (silent — only traffic-driven moves emit events).
-func TestTrafficMarketDecayHalving(t *testing.T) {
+// TestTrafficNoDecayWithoutTrades retargets the deleted halving schedule:
+// with no further deliveries and no trades, a posted ask keeps its exact
+// price past two old decay boundaries (7200 ticks). The book has no band,
+// no decay and no drift — only trades and postings move prices.
+func TestTrafficNoDecayWithoutTrades(t *testing.T) {
 	c := trafficContent()
-	// One manually launched delivery, then only the non-delivering route, so
-	// no further supply steps interleave with the decay schedule.
 	c.Traffic["sys-a"].Routes = c.Traffic["sys-a"].Routes[1:]
 	s, err := New(c, testWorld(), 9)
 	if err != nil {
@@ -998,67 +1004,39 @@ func TestTrafficMarketDecayHalving(t *testing.T) {
 	s.spawnTrafficHauler(s.System(), td, content.RouteDef{
 		From: "cel-station-a", To: "cel-a-dock", Hull: "ship-convoy",
 		Cargo:         content.RouteCargo{Item: "min-ferrite", Qty: 100},
-		IntervalTicks: 1 << 30, // never on any reachable schedule
+		IntervalTicks: 1 << 30,
 	})
-
 	var evs []Event
 	if !runUntil(t, s, &evs, 3000, func() bool {
 		return firstPhase(evs, EvTraffic, TrafficDelivered) != nil
 	}) {
 		t.Fatal("seed delivery never landed")
 	}
-	const base = 10.0
-	if _, p := marketQtyIn(s, "sys-a", "min-ferrite"); !closeTo(p, 9.96) {
-		t.Fatalf("post-delivery price = %v, want 9.96", p)
+	if _, price := askAt(s, "cel-a-dock", "min-ferrite"); price != 9.99 {
+		t.Fatalf("post-delivery price = %v, want 9.99", price)
 	}
 
-	// Step exactly to the first decay boundary (ticks+1 divisible by 3600):
-	// after that Step, Ticks() == 3600 and the premium halved once.
-	for s.Ticks()%marketDecayTicks != 0 {
+	// Two old halving windows: a decayed price would read 9.995 then
+	// 9.9975 — the book must not move at all.
+	const oldDecayTicks = 3600
+	for s.Ticks() != 2*oldDecayTicks {
 		s.Step()
 		drain(s)
 	}
-	if _, p := marketQtyIn(s, "sys-a", "min-ferrite"); !closeTo(p, base+(9.96-base)*0.5) {
-		t.Fatalf("after first halving price = %v, want 9.98", p)
-	}
-	for s.Ticks() != 2*marketDecayTicks {
-		s.Step()
-		drain(s)
-	}
-	if _, p := marketQtyIn(s, "sys-a", "min-ferrite"); !closeTo(p, base+(9.96-base)*0.25) {
-		t.Fatalf("after second halving price = %v, want 9.99", p)
+	if qty, price := askAt(s, "cel-a-dock", "min-ferrite"); qty != 100 || price != 9.99 {
+		t.Fatalf("after 7200 idle ticks ask = %d @ %v, want 100 @ 9.99 (no decay)", qty, price)
 	}
 }
 
-// TestTrafficMarketSoakBounded pushes repeated drift steps through 1000
-// ticks: prices must never leave the security band and stock must stay an
-// exact integer throughout.
-func TestTrafficMarketSoakBounded(t *testing.T) {
-	// Only the non-delivering route: the soak pins band bounds and stock
-	// exactness under drift pressure, not under live deliveries.
-	c := trafficContent()
-	c.Traffic["sys-a"].Routes = c.Traffic["sys-a"].Routes[1:]
-	s, err := New(c, testWorld(), 13)
-	if err != nil {
-		t.Fatal(err)
-	}
-	idx := s.marketIndex("min-ferrite")
-	base := s.marketBasePrice("sys-a", "min-ferrite")
-	band := trafficBand("high")
-	for i := 0; i < 1000; i++ {
-		if i%7 == 0 {
-			s.marketPriceStep("sys-a", idx, i%2 == 0, 1, "high", "Soak")
-		}
+// TestTrafficSoakBooksNeverCross retargets the old band soak: live traffic
+// for thousands of ticks must never let a book cross itself — canonical
+// order, positive quantities, and every bid strictly below every ask.
+func TestTrafficSoakBooksNeverCross(t *testing.T) {
+	s := newTrafficSim(t)
+	for i := 0; i < 3000; i++ {
 		s.Step()
 		drain(s)
-		p := s.market["sys-a"][idx].Price
-		if p < base*(1-band)-1e-9 || p > base*(1+band)+1e-9 {
-			t.Fatalf("tick %d: price %v outside band [%v, %v]", i, p,
-				base*(1-band), base*(1+band))
-		}
-		if q, _ := marketQtyIn(s, "sys-a", "min-ferrite"); q != 500 {
-			t.Fatalf("tick %d: stock %d is not the exact integer 500", i, q)
-		}
+		assertBooksSane(t, s)
 	}
 }
 

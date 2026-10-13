@@ -47,6 +47,14 @@ func TestSaveSchemaRoundTripsNewFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("snapshot: %v", err)
 	}
+	// The market tranche's clean break: this is a v2 save (per-station
+	// order books), and the version rides on every snapshot.
+	if save.Schema != saveSchemaV2 || saveSchemaV2 != 2 {
+		t.Fatalf("Save.Schema = %d (const %d), want 2", save.Schema, saveSchemaV2)
+	}
+	if save.MarketSeq != s.marketSeq {
+		t.Fatalf("MarketSeq = %d, want %d", save.MarketSeq, s.marketSeq)
+	}
 
 	// The synthetic meta entity is gone.
 	for _, se := range save.Entities {

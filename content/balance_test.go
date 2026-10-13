@@ -134,8 +134,14 @@ func TestSolaceMarketHasShipAndWeapon(t *testing.T) {
 	if !ok {
 		t.Fatal("sys-solace missing")
 	}
+	var founding []MarketOrderDef
+	for _, cel := range solace.Celestials {
+		if cel.Station != nil {
+			founding = append(founding, cel.Station.Market...)
+		}
+	}
 	var ships, weapons int
-	for _, o := range solace.Market {
+	for _, o := range founding {
 		if _, isItem := c.Items[o.Item]; isItem {
 			continue
 		}
