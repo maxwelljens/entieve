@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-13
+
 ### Added
 
 - **Show Info** item inspection: right-click any item anywhere it appears
@@ -70,59 +72,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   coexisting with authored interval lanes — one validated shipment per
   60-tick poll, settled through `FulfillHaul` at 2.5 € per m³ per transit
   leg on delivery (lost shipments drop the wish unpaid).
-
-### Changed
-
-- Rack right-click now opens the context menu instead of cycling the
-  loaded charge directly; quick charge-cycling is the menu's **Cycle
-  charge** entry. World right-click (orbit under cursor) is unchanged.
-- Content: NPC caste dossier prose (`NpcDef.Description`) and hull origin
-  tags (`ShipDef.Origin`) — both shown by the Show Info window.
-- Icon silhouette cache now stores the alpha channel only instead of full
-  512×512 white NRGBA bitmaps: 38.0 MiB → 9.5 MiB resident for the same
-  pixels (RGB is a constant 255, so the white form is rebuilt per
-  size-cache miss).
-- Documented the upstream ebitenui v0.7.3 window-remount leak
-  (`docs/ARCHITECTURE.md`, "upstream window-remount leak"): ≈5.3 KB leak
-  per panel dock/toggle mount cycle — real but slow, deliberately not
-  mitigated because hiding-instead-of-unmounting would change input
-  gating and draw order.
-- **Per-station order books replace market memory.** Every station runs
-  its own continuous double auction (never-crossed matching, price-time
-  priority, 4-significant-figure price ticks); the old per-system
-  "market memory" model (price bands, supply steps, halving decay) is
-  gone — the book is the only price former. Player Buy/Sell are
-  immediate-or-cancel market orders against the docked station's book; a
-  3 % broker fee rides buys at placement, a 2.5 % sales tax rides sells at
-  execution, and placed orders escrow wallet or goods in full.
-  **Save schema v2** (`Save.Schema` = 2) is a clean break: pre-v2 saves
-  are rejected instead of restoring into a different market.
-- **Convoys carry real cargo.** Route cargo is sourced at spawn, never
-  conjured: a station origin withdraws the units from that station's own
-  asks (the weighted price paid is the shipment's cost basis), a belt
-  origin draws the persistent belt state (a dry belt ships nothing), and a
-  gate origin is the economy's one sanctioned import — the named world
-  boundary, undebited supply at the destination. Deliveries post as asks
-  on the destination's book one tick under `min(cost basis, best ask)`;
-  a destroyed hauler's goods are destroyed with it (lootable wreck, no
-  reversal of the origin) and the loss surfaces as an event-only
-  risk-premium line, never a price step.
-
-### Fixed
-
-- Per-frame interface garbage churn: panels that are not mounted no longer
-  run their `Sync` every frame (a panel Syncs when it mounts, so it still
-  draws current data in that same frame), `Table.SetRows` skips the column
-  re-measure/re-layout when no cell text or icon changed, and the rack /
-  fitting row tooltips build their model lazily when the hover key moves
-  instead of every frame. Settled Update-path allocation on the showcase
-  pump drops from ≈119 KB/frame to ≈14 KB/frame (−88 %).
-- Station contract board change detection compares the model fields
-  instead of `fmt.Sprintf("%v", …)` on every docked frame.
-
-## [0.1.0] - 2026-10-12
-
-### Added
 
 - Binding lore rulebook (`docs/lore/`): UNIVERSE, FACTIONS, AESTHETIC and
   NAMING — the Far Moravia canon (frontier gold rush for the ores,
@@ -208,6 +157,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Rack right-click now opens the context menu instead of cycling the
+  loaded charge directly; quick charge-cycling is the menu's **Cycle
+  charge** entry. World right-click (orbit under cursor) is unchanged.
+- Content: NPC caste dossier prose (`NpcDef.Description`) and hull origin
+  tags (`ShipDef.Origin`) — both shown by the Show Info window.
+- Icon silhouette cache now stores the alpha channel only instead of full
+  512×512 white NRGBA bitmaps: 38.0 MiB → 9.5 MiB resident for the same
+  pixels (RGB is a constant 255, so the white form is rebuilt per
+  size-cache miss).
+- Documented the upstream ebitenui v0.7.3 window-remount leak
+  (`docs/ARCHITECTURE.md`, "upstream window-remount leak"): ≈5.3 KB leak
+  per panel dock/toggle mount cycle — real but slow, deliberately not
+  mitigated because hiding-instead-of-unmounting would change input
+  gating and draw order.
+- **Per-station order books replace market memory.** Every station runs
+  its own continuous double auction (never-crossed matching, price-time
+  priority, 4-significant-figure price ticks); the old per-system
+  "market memory" model (price bands, supply steps, halving decay) is
+  gone — the book is the only price former. Player Buy/Sell are
+  immediate-or-cancel market orders against the docked station's book; a
+  3 % broker fee rides buys at placement, a 2.5 % sales tax rides sells at
+  execution, and placed orders escrow wallet or goods in full.
+  **Save schema v2** (`Save.Schema` = 2) is a clean break: pre-v2 saves
+  are rejected instead of restoring into a different market.
+- **Convoys carry real cargo.** Route cargo is sourced at spawn, never
+  conjured: a station origin withdraws the units from that station's own
+  asks (the weighted price paid is the shipment's cost basis), a belt
+  origin draws the persistent belt state (a dry belt ships nothing), and a
+  gate origin is the economy's one sanctioned import — the named world
+  boundary, undebited supply at the destination. Deliveries post as asks
+  on the destination's book one tick under `min(cost basis, best ask)`;
+  a destroyed hauler's goods are destroyed with it (lootable wreck, no
+  reversal of the origin) and the loss surfaces as an event-only
+  risk-premium line, never a price step.
+
 - Far Moravia re-theme of content and docs, landing with the parallel
   content/data and code rename workstreams: every display name follows the
   author-approved `docs/lore/NAMING.md` registry (Solace / Penumbra /
@@ -252,6 +236,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   derived from type and spacing constants (no hand-tuned magic numbers).
 
 ### Fixed
+
+- Per-frame interface garbage churn: panels that are not mounted no longer
+  run their `Sync` every frame (a panel Syncs when it mounts, so it still
+  draws current data in that same frame), `Table.SetRows` skips the column
+  re-measure/re-layout when no cell text or icon changed, and the rack /
+  fitting row tooltips build their model lazily when the hover key moves
+  instead of every frame. Settled Update-path allocation on the showcase
+  pump drops from ≈119 KB/frame to ≈14 KB/frame (−88 %).
+- Station contract board change detection compares the model fields
+  instead of `fmt.Sprintf("%v", …)` on every docked frame.
+
+## [0.1.0] - 2026-10-12
 
 - Lock-on target cards render again (name, distance, three hp-proportional
   layer bars — they collapsed to invisible 2 px notches).
@@ -304,5 +300,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rats are no longer inert: they patrol, notice intruders and defend their
   belts against miners and shooters.
 
-[Unreleased]: https://github.com/entieve/entieve/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/entieve/entieve/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/entieve/entieve/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/entieve/entieve/releases/tag/v0.1.0
