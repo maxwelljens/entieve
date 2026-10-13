@@ -11,14 +11,18 @@ here), [AESTHETIC.md](AESTHETIC.md) (how everything sounds and looks),
 
 Far Moravia is the region Entieve is set in: a frontier gold-rush district —
 small, industrial, and a long way from anywhere that matters. The playable
-map is one constellation of it, **Kresy** ("the borderlands"), three systems
-on two stargates:
+map is one constellation of it, **Kresy** ("the borderlands"): seven
+systems on the ring of stargates:
 
 | System | Zone | What it is |
 |---|---|---|
 | **Starogród** | Charter space | the first-wave heartland; the safe lanes |
+| **Rudnik** | Charter space | the ore-works country; the ring's mining anchor |
 | **Kuźnica** | the Fringe | the junction of the rush: yards, richer ore, a freeport |
+| **Młynów** | the Fringe | the refinery step of the chain |
+| **Kamieniec** | the Fringe | shipyard country; the depot at the ring's edge |
 | **Pustkowie** | Unincorporated | the dead-end frontier — Old Works country |
+| **Głusza** | Unincorporated | the hush: one freeport and not much else |
 
 Everything else in Far Moravia is off the map: other districts, other
 constellations, other rushes. Mention them if you must; name nothing.
@@ -117,8 +121,12 @@ zones:
 | System | Zone |
 |---|---|
 | Starogród | Charter space |
+| Rudnik | Charter space |
 | Kuźnica | the Fringe |
+| Młynów | the Fringe |
+| Kamieniec | the Fringe |
 | Pustkowie | Unincorporated |
+| Głusza | Unincorporated |
 
 UI copy uses the zone words with a complementary status label — "Charter ·
 secure", "Fringe · contested", "Unincorporated · no charter". The values

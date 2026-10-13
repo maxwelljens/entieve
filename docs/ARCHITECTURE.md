@@ -29,15 +29,15 @@ library. **Unit tests use only the standard `testing` package.**
 | `content/`    | Data schema (`model.go`), JSON loading (`load.go`), cross-reference validation (`validate.go`), embedded game data (`data/`). |
 | `sim/`        | The deterministic game simulation: components, commands, events, systems. Headless — never imports Ebitengine. |
 | `render/`     | Draws `sim` state: starfield, grid, ships (vector art), brackets, effects. |
-| `ui/`         | EVE-style windows: overview, HUD (cap/shield/armor/structure), module rack, selected item, inventory, fitting, station services, starmap, combat log. |
-| `game/`       | Ebiten `Game` implementation, scene stack (menu / space / station / starmap), input→`sim` commands, camera, time acceleration, save/load wiring. |
+| `uikit/`      | The UI platform (ebitenui v0.7.3): EVE-style windows — overview, HUD, module rack, selected item, inventory, fitting, factory, station services, starmap, log — plus the Show Info window (`infowin.go`), the flat context menu (`menu.go`) and the icon set (`icons/`). The legacy hand-drawn `ui/` package is retired. |
+| `game/`       | Ebiten `Game` implementation, scene stack (menu / space / station / starmap), input→`sim` commands, camera, time acceleration, save/load wiring, the factory panel wiring. |
 | `cmd/entieve` | CLI entrypoint: `run` (play), `validate` (content lint), `simulate` (headless run with report), `version`. |
 
 Dependency direction (never invert):
 
 ```
-cmd/entieve → game → {render, ui} → sim → content → (core, ecs)
-                          └──────────→ content
+cmd/entieve → game → {render, uikit} → sim → content → (core, ecs)
+                          └────────────→ content
 ```
 
 `sim` is fully playable/testable with no window: an AI agent drives the game
@@ -146,20 +146,36 @@ aggro state machine, so guards never *initiate* on the player (the
 proximity/intrusion/recent-work triggers are rat-only) — only
 player-sourced damage turns a patrol hostile.
 
-**Systems** (`content/data/systems/*.json`, one file per system):
-- `sys-solace` — starting system (constellation Kresy). Star
-  `cel-solace-star`, planet `cel-solace-prime`, station `cel-haven-rest`
-  (services: repair, market, refine, fitting), belt `cel-solace-belt`
-  (ore-sterngrit, ore-cordite), gate `cel-gate-penumbra` → `sys-penumbra`,
-  rat spawns (scuttler), market orders (all player ships + core modules +
-  charges).
-- `sys-penumbra` — low-security (NPCs aggressive). Belt `cel-penumbra-belt`
-  (ore-cordite, ore-lucidite), anomaly `cel-penumbra-den` (marauders +
-  boss hierarch, best loot), station `cel-penumbra-port` (repair, market,
-  refine, fitting; hosts the level-2 contract board), gates → `sys-solace`
-  and `sys-gloam`.
-- `sys-gloam` — dead-end frontier, dangerous. Belt `cel-gloam-belt`
-  (ore-glacierite), heavy spawns incl. `npc-rat-hierarch`.
+**Systems** (`content/data/systems/*.json`, one file per system; display
+names are registered in `docs/lore/NAMING.md` — the ids below are frozen):
+- `sys-solace` — **Starogród**, starting system (constellation Kresy,
+  Charter space). Star `cel-solace-star`, planet `cel-solace-prime`,
+  station `cel-haven-rest` (Jernborg; services: repair, market, refine,
+  fitting), belt `cel-solace-belt` (ore-sterngrit, ore-cordite), gates
+  `cel-gate-penumbra` → `sys-penumbra` and `cel-gate-rudnik` → `sys-rudnik`,
+  rat spawns (scuttler), founding market orders on `cel-haven-rest`'s book
+  (all player ships + core modules + charges).
+- `sys-rudnik` — **Rudnik**, Charter space, the ring's ore anchor. Station
+  `cel-halda` (Halda, mining outpost: market, repair), belt
+  `cel-rudnik-belt`, gates → `sys-solace` and `sys-mlynow`.
+- `sys-penumbra` — **Kuźnica**, the Fringe junction (NPCs aggressive).
+  Belt `cel-penumbra-belt` (ore-cordite, ore-lucidite), anomaly
+  `cel-penumbra-den` (Gniazdo: marauders + boss hierarch, best loot),
+  station `cel-penumbra-port` (Przystań, freeport: repair, market, refine,
+  fitting, industry; hosts the level-2 contract board), gates → `sys-solace`,
+  `sys-gloam`, `sys-mlynow`, `sys-kamieniec`.
+- `sys-mlynow` — **Młynów**, the Fringe. Station `cel-huta` (Huta, refinery
+  platform: market, refine, industry), belt `cel-mlynow-belt`, gates →
+  `sys-rudnik` and `sys-penumbra`.
+- `sys-kamieniec` — **Kamieniec**, the Fringe. Station `cel-doki` (Doki,
+  shipyard & depot: market, fitting, industry), belt `cel-kamieniec-belt`,
+  gates → `sys-penumbra` and `sys-glusza`.
+- `sys-gloam` — **Pustkowie**, Unincorporated dead-end frontier, dangerous.
+  Belt `cel-gloam-belt` (ore-glacierite), heavy spawns incl.
+  `npc-rat-hierarch`; no station; gates → `sys-penumbra` and `sys-glusza`.
+- `sys-glusza` — **Głusza**, Unincorporated. Station `cel-kantor` (Kantor,
+  freeport: market), belt `cel-glusza-belt`, gates → `sys-kamieniec` and
+  `sys-gloam`.
 
 **Universe** (`content/data/universe.json`): region/constellation names,
 system list with starmap positions, `start_system: "sys-solace"`.
@@ -186,8 +202,10 @@ Rewards are calibrated by the payout ratio table in
 `docs/CONTENT_AUTHORING.md` ("add a contract").
 
 **Traffic** (`content/data/traffic/*.json`, one def per system, keyed by
-its `system` field): convoy `routes` (station/gate/belt endpoints inside
-the system, hull, cargo item+qty, authored `interval_ticks`), an optional
+its `system` field): convoy `routes` (station/gate/belt endpoints;
+`to_system` marks a cross-system lane and the validator checks the gate
+path; hull, cargo item+qty, authored
+`interval_ticks`), an optional
 `patrol` wing (hulls + cadence), and — required in low/null security —
 the `raider` rat class that ambushes convoys (must spawn in that system).
 Cadences and probabilities derive from the system's security through the
@@ -241,21 +259,22 @@ type CelestialDef struct {
     ID CelID; Name string
     Kind string                // "star"|"planet"|"moon"|"station"|"belt"|"gate"|"anomaly"
     Position core.Vec2; Radius float64
-    Gate *struct{ ToSystem SystemID; ToCel CelID }
-    Station *struct{ Services []string }            // "repair"|"market"|"refine"|"fitting"
+    Gate *GateDef              // {ToSystem SystemID; ToCel CelID}
+    Station *StationDef        // {Services []string; Market []MarketOrderDef}
     Belt *struct{ Asteroids []struct{ Ore ItemID; Count int; Volume float64 } }
     Anomaly *struct{ Spawns []SpawnDef; RespawnSec float64 }
     Spawns []SpawnDef          // ambient spawns for any celestial: {NpcID, Count, RespawnSec}
 }
-type MarketOrderDef struct    // station market listing: {ItemID or ShipID, Qty, Price}
+type MarketOrderDef       // one FOUNDING order on a station's book: {ItemID or ShipID or ModuleID, Qty, Price, Side "sell"|"buy"}
 type SystemDef struct {
     ID SystemID; Name, Security string; Constellation, Region string
     Position core.Vec2        // starmap plane (ly)
-    Palette struct{ Nebula [3]string; Star string } // hex colors for rendering
+    Palette map[string]string // hex colors for rendering
     Celestials []CelestialDef
-    Market []MarketOrderDef   // station-bound orders (all stations in system share for now)
+    // Founding market orders live on StationDef.Market (per station, per
+    // book); a system-level Market block is rejected by Validate.
 }
-type UniverseDef struct { Region, Constellation string; StartSystem SystemID; Systems []struct{ID SystemID; Position core.Vec2} }
+type UniverseDef struct { Region, Constellation string; StartSystem SystemID; Systems []SystemDef }
 type ContractDef struct {                        // contracts/*.json
     ID ContractID; Title, Kind, Description string // Kind: "kill"|"deliver"|"mine"
     Level int; MinStanding float64                 // board gate (career standing)
@@ -267,13 +286,21 @@ type ContractDef struct {                        // contracts/*.json
 }
 type RouteCargo struct{ Item ItemID; Qty int }
 type RouteDef struct {                            // traffic/*.json
-    From, To CelID; Hull ShipID; Cargo RouteCargo
+    From, To CelID; ToSystem SystemID; Hull ShipID; Cargo RouteCargo
+    // ToSystem names the destination system for a cross-system lane
+    // (empty = this def's own system); the validator checks the gate path.
     IntervalTicks int64                           // authored cadence; security scales it
 }
 type PatrolDef struct{ Hulls []ShipID; IntervalTicks int64 }
 type TrafficDef struct {                          // one def per system, keyed by system
     System SystemID; Routes []RouteDef
     Patrol *PatrolDef; Raider NpcID               // raider required when security is low|null
+}
+type RecipeDef struct {                           // recipes/*.json (rec-* ids)
+    ID RecipeID; Product ItemID; Qty int           // minerals in, one ship/module/charge out
+    Inputs []struct{ Item ItemID; Qty float64 }
+    Time float64                                   // seconds per run at craft L1
+    Family string                                  // "hulls" | "modules" | "charges"
 }
 type WorldDef struct {
     ID WorldID; Name, Description string
@@ -299,8 +326,9 @@ func (c *Content) GuardFor(hull ShipID) (*NpcDef, bool)       // npc-guard-* loa
 `Validate()` must catch at minimum: duplicate IDs; unknown references (fit
 modules, ship hulls in NPC defs, gate destinations both ways, market items,
 loot items, ore refine yields, ammo classes used by weapons, contract rat
-classes / cargo items / stations); traffic route endpoints inside the
-system (station/gate/belt kinds), hulls, cargo items (volume must fit the
+classes / cargo items / stations); traffic route endpoints (station/gate/belt
+kinds — `to_system` lanes must have a gate path to the destination),
+hulls, cargo items (volume must fit the
 hull), intervals >= 1, non-empty route lists, raider presence for low/null
 security (a rat class spawned in that system), patrol hulls with an
 `npc-guard-*` definition; slot overflow
@@ -309,6 +337,10 @@ in world fits and NPC fits; refine yields outside `[0,1]`; resists outside
 present with a non-empty `scenario`.
 
 ## `sim` contract (`sim/model.go`, `sim/api.go`)
+
+See `docs/SIM.md` for the whole-simulation reference (tick anatomy, world
+metabolism, ledger agents, price formation); this section is the binding
+surface.
 
 Components (plain structs in `Store[T]`):
 
@@ -350,28 +382,33 @@ CmdBuy{Item, Qty}, CmdSell{Item, Qty},
 CmdTransfer{Item, Qty, From, To}, // holds: "cargo" | "ore" | "hangar"
 CmdRefine{Item, Qty}, CmdRepair{}, CmdAssemble{ShipID},
 CmdFitModule{ModuleID, Slot SlotRef}, CmdUnfitModule{Slot SlotRef},
-CmdAcceptMission{ID content.ContractID}, CmdAbandonMission{ID content.ContractID}
+CmdAcceptMission{ID content.ContractID}, CmdAbandonMission{ID content.ContractID},
+CmdStartJob{Recipe content.RecipeID, Runs int}, CmdCollectJob{ID uint64} // industry (system 17)
 ```
 (`Target ecs.Entity`; module index = flat slot index within its slot class.
 The two mission commands validate against the docked station's contract
 board — docked check, board check, `min_standing` check — and report
-refusals as `EvMission` phase `"refused"`.)
+refusals as `EvMission` phase `"refused"`. The two industry commands ride
+`deferIndustry` to `systemIndustry` and report refusals as `SevWarning`
+"Industry: …" log lines.)
 
 Events (`sim/model.go`) — read via `(*Sim).Events() []Event` (drained each
-call) or `DrainEvents()`. Kinds: `EvtLog` (combat/mining/system log lines with
-severity), `EvtDestroyed`, `EvtWarp{Phase}`, `EvtLooted`, `EvtDocked`,
-`EvtUndocked`, `EvtJumped`, `EvtMarket`, `EvtModuleActive/Deactivated`,
-`EvtTargetLocked`, `EvtCargoFull`, `EvtAnomalyCleared`, …
+call) or `DrainEvents()`. Kinds: `EvLog` (combat/mining/system log lines
+with severity), `EvDestroyed`, `EvWarp{Phase}`, `EvLooted`, `EvDocked`,
+`EvUndocked`, `EvJumped`, `EvMarket`, `EvModule`, `EvTargetLocked`,
+`EvCargoFull`, `EvAnomalyCleared`, `EvMission`, `EvTraffic`.
 `EvMission{Phase, ID, Name}` reports the contract lifecycle with phases
 `"accepted" | "progress" | "ready" | "completed" | "abandoned" | "refused"`
 (ID/Name carry the contract ID and title; Value carries the payout).
 `EvTraffic{Phase, System, Cel, Item, Value, Text}` reports the
-living-universe convoy lifecycle with phases `"departed" | "delivered" |
-"attacked" | "destroyed" | "escaped" | "patrol-response"` (System carries
-the system ID, Cel the route endpoint / incident celestial, Item/Value the
-shipment). Market moves driven by traffic ride the existing `EvtMarket`
-kind with `System`/`Item`/`Value` (new price) and text
-`"Surplus — … price falls to …"` / `"Risk premium — … price rises to …"`.
+living-universe convoy lifecycle with phases `"departed" | "jumped" |
+"delivered" | "attacked" | "destroyed" | "escaped" | "patrol-response" |
+"saved"` (System carries the system ID, Cel the route endpoint / incident
+celestial, Item/Value the shipment). Book moves print on the existing
+`EvMarket` kind with `System`/`Item`/`Value` (new displayed price) and
+text `"Surplus — … price falls to …"` / `"Demand — … price rises to …"`;
+a shipment lost en route is an event-only signal
+(`"Risk premium — …"`), never a price step.
 
 API (`sim/api.go`):
 
@@ -415,7 +452,8 @@ tempers this: high = 0.4× aggro range and flee at ≥35% structure, low =
 1.0×, null = 1.3× and never flee. Aggroed NPCs pursue up to 2.5× their
 effective aggro range from home before breaking off.
 
-Systems (`sim/` internal, called by `Step` in this order):
+Systems (`sim/` internal, called by `Step` in this order; the full
+anatomy lives in `docs/SIM.md`):
 1. `command` (apply queued commands to intent),
 2. `movement` (accel toward desired velocity per agility; web effect),
 3. `warp` (align → warp → land state machine),
@@ -424,19 +462,30 @@ Systems (`sim/` internal, called by `Step` in this order):
 6. `weapons` (turret math below, ammo consumption),
 7. `damage` (shield → armor → structure with resists; death → wreck),
 8. `capacitor` (recharge curve),
-9. `mining` (cycle yields into ore hold; asteroid depletion),
+9. `mining` (cycle yields into ore hold; persistent belt-state decrement),
 10. `npc` (state machine: idle→approach→orbit→fire→flee; uses Fork'd RNG),
 11. `loot` (loot command → cargo; bounty on NPC death → wallet),
-12. `economy` (buy/sell/refine/repair/fitting at station; wallet),
+12. `economy` (buy/sell/refine/repair/fitting at station; the per-station
+    order books; wallet),
 13. `travel` (dock/undock/jump: swaps system content),
 14. `mission` (contract accept/abandon against the docked station's board,
     folds kill/ore objective observations, auto-claims ready contracts on
     docking at the claim station → wallet + standing),
-15. `respawn` (belt/anomaly NPC respawn timers),
+15. `respawn` (funded NPC replacement timers — requisitioned through books
+    and ledgers, see "world metabolism" in `docs/SIM.md`),
 16. `traffic` (the living universe: convoy spawn/warp/deliver schedules,
-   per-leg ambush rolls, raider and patrol combat, market drift + premium
-   decay),
-17. `events` (trim/cleanup).
+    real-cargo provenance, per-leg ambush rolls, raider and patrol combat,
+    cross-system journey parking/resume, book supply),
+17. `industry` (manufacturing jobs from recipes, craft growth and idle
+    decay),
+18. `agents` (the ledger economy: settle resting fills every tick, the
+    agent behavior pass every 300 ticks, the station upkeep cycle every
+    3600 ticks).
+
+After all systems, the **deferred player death respawn** runs (so a
+cross-system clone-bay respawn can rebuild the grid without yanking
+entities out from under the systems still running this tick); events are
+capped at emit time, so there is no end-of-Step event system.
 
 The **contracts loop** ties the activities together: undock → accept a
 contract from a station board → count objectives from the existing flows
@@ -452,11 +501,19 @@ economy sits on top of:
 - **NPC cargo traffic** — per-system convoy routes spawn haulers
   (`ship-npc-hauler`) on security-scaled schedules, fly one-way legs
   through the normal warp profile (align → tunnel → land), deliver cargo
-  at station endpoints (exact integer stock) and despawn at gates/belts
-  (v1: no cross-system NPC jumps). Live haulers are capped at 6 per
-  system, patrols at 4; schedules are stateless hashes (no timers to
-  persist). Haulers and patrols are ordinary entities: the player can
-  lock, shoot and loot them like anything else.
+  at station endpoints and despawn at same-system gates/belts. Cargo is
+  **sourced at spawn, never conjured**: a station origin withdraws the
+  units from that station's own asks (weighted price = cost basis), a belt
+  origin draws the persistent belt state, a gate origin is the economy's
+  one sanctioned import (the named world boundary — undebited supply at
+  the destination). Cross-system legs (`to_system` lanes) hop gates and
+  **multi-hop journeys exist**: a hauler that crossed a gate — or whose
+  grid was rebuilt under it — parks as a journey (`Save.TrafficJourneys`)
+  with its provenance and destination intact, and flies again when its
+  system loads next. Live haulers are capped at 6 per system, patrols at
+  4; schedules are stateless hashes (no timers to persist). Haulers and
+  patrols are ordinary entities: the player can lock, shoot and loot them
+  like anything else.
 - **Security patrols** (`npc-guard-*` loadouts on `ship-npc-patrol`) idle
   on a guard circle 20–30 km east of the anchor station (outside the
   8 km NPC guard radius so station traffic never trips them), and respond
@@ -466,25 +523,27 @@ economy sits on top of:
   lock/activate/turret/damage pipeline — NPC-vs-NPC combat reuses the
   player pipeline with an explicit activation target (`npcActivate(e, ai,
   target)`); only the *aggro* state machine remains player-centric.
-- **Sporadic attacks** — every convoy tunnel entry in low/null security
-  rolls `p = (1-σ)/3` (1-in-6 Kuźnica, 1-in-3 Pustkowie, 0 high-sec); on a
+- **Sporadic attacks** — every convoy tunnel entry in the Fringe or
+  Unincorporated rolls `p = (1-σ)/3` (1-in-6 Kuźnica, 1-in-3 Pustkowie, 0
+  in Charter space); on a
   hit, 1–3 raiders of the system's `raider` rat class drop in mid-leg
   (renamed `<Name> Ambusher` so name-addressed scripts stay
   unambiguous), the hauler is dragged out of warp and burns away for 20 s
   before attempting its warp-out. Scramblers/webs pin it (lock ≈ 15 s vs
   the 20 s flee), the patrol's arrival pulls the raiders' guns off the
   convoy, and the incident resolves as **destroyed** (wreck with the
-  exact cargo, lootable via `CmdLoot`; risk-premium price step up),
+  exact cargo, lootable via `CmdLoot`, and the loss prints the event-only
+  risk-premium line),
   **escaped** (warps clear and delivers anyway), or **saved** (all
   raiders dead while the hauler lives). Raiding NPCs never queue respawn
   timers against nearby spawn groups.
-- **Market memory** — deliveries add exact units of stock and step the
-  item's price DOWN one supply step; a lost inbound shipment steps the
-  destination system's price UP (risk premium). Steps are
-  `price' = clamp(base·(1±band), price·(1±k))` with `band = 0.05·4^(1-σ)`
-  and `k = share·band/2.5` (×2 for losses); deviating prices halve their
-  distance to base every 3,600 ticks. Prices can never leave the band.
-  All constants are derived/pinned in the calibration tables in
+- **Order-book pricing** — the per-station order books are the only price
+  former (the old per-system "market memory" band/decay model is gone).
+  A delivery posts the exact units as supply on the destination station's
+  book at one tick under `min(cost basis, best ask)`, so arriving supply
+  always improves the displayed price; a lost inbound shipment is an
+  event-only supply-risk signal ("Risk premium — …"), never a price step.
+  All traffic constants are derived/pinned in the calibration tables in
   `docs/CONTENT_AUTHORING.md` ("traffic calibration contract").
 
 **Determinism**: all living-universe randomness (spawn scatter, ambush
@@ -494,6 +553,22 @@ traffic never consumes the player's combat rolls, so existing seed-pinned
 outcomes are untouched. Hauler legs/ambushes persist as `Traffic`/`Patrol`
 components and `Save.TrafficLeaves` (scheduled raider break-offs); prices
 persist in `Save.Market`.
+
+**Save schema v2** (`Save.Schema` = 2, `saveSchemaV2`; `Restore` rejects
+anything else — the clean break of the per-station market tranche, v0.2.0
+era). The living-economy fields riding it: `Market` / `MarketLasts` /
+`MarketSeq` (per-station books and the price-time clock), `Belts`
+(persistent belt state), `FactionLedger` (respawn requisition money),
+`Jobs` / `JobSeq` / `Craft` (manufacturing jobs and station craft
+counters), `Agents` / `Upkeep` (ledger agents and station upkeep
+ledgers), `TrafficJourneys` (shipments parked between grids). All lists
+serialize in canonical order and map keys marshal sorted;
+`Sim.Hash()` is FNV-1a over the full canonical Save JSON
+(`sim/hash.go`), with no degraded fallback (it panics on a
+non-serializable state instead of fingerprinting partial state).
+`sim/save_completeness_test.go` classifies every `Sim` field as
+save-carried / derived / per-Step transient / documented exception and
+fails on unclassified additions.
 
 ### Turret formula (EVE-faithful)
 
@@ -509,7 +584,7 @@ chance = 0.5 ^ ( (angularVel / (tracking * (sigRadius/40000))) ^2
   `0.01 * chance` tail (classic EVE wrecking mechanic approximated as: if
   `roll < 0.01` always wrecking ×3).
 - Ammo modifies the volley's `Damage` mix; dry guns (no charges) do not fire
-  and emit `EvtLog` once per cycle.
+  and emit `EvLog` once per cycle.
 
 ### Capacitor curve (EVE-faithful)
 
@@ -528,7 +603,7 @@ Peak recharge ≈ 25% of Capacity. Applied per tick.
 - Warp: `CmdWarpTo` → align (rotate/accelerate toward vector) → `WarpDrive`
   accel/decel profile with `WarpSpeed` AU/s → land within 2500 m of target.
   `mod-warp-scram` on the target blocks warp start and cancels warp
-  (`EvtLog` "warp scrambled").
+  (`EvLog` "warp scrambled").
 
 ### Damage
 
@@ -540,7 +615,7 @@ keep full carry-over, note it in `docs/GAMEPLAY.md`). Structure ≤ 0 → ship
 dies: the player's escape pod gets clear and the insurer issues a
 replacement — a fresh `ship-sloop` handed over at the last docked station,
 or the home station in the universe's start system when the current system
-has none (insurance paperwork, not clone tech; `EvtDestroyed` is
+has none (insurance paperwork, not clone tech; `EvDestroyed` is
 emitted, cargo is lost, wallet and hangar keep). NPC → `Wreck` with rolled
 loot + bounty credited to killer's wallet.
 
@@ -558,7 +633,7 @@ cargo transfer, gate jump both directions, dock/undock, station repair,
 market buy/sell, refine, ship assembly/swap, module fit/unfit, respawn
 timers, save/restore round-trip, determinism (Hash equality of twin runs),
 contract accept → objective progress → auto-claim payout + standing,
-NPC traffic delivery + market price drift, ambush on NPC traffic
+NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 (Kuźnica legs, showcase seed), security patrol response + convoy escape.
 
 > **Sim hardening registry (2026-10, `fix/sim-hardening`).** Append-only
@@ -599,7 +674,7 @@ NPC traffic delivery + market price drift, ambush on NPC traffic
 >   fails on unclassified fields, unclaimed `Save` fields, or a transient that
 >   survives a Step boundary.
 
-## `render` / `ui` / `game` contract
+## `render` / `uikit` / `game` contract
 
 > **Note (2026-10 — warp minimum + typeface).** (1) `sim.WarpMinRange =
 > 150_000` m is the exported single source of EVE's warp-engage rule:
@@ -693,23 +768,22 @@ NPC traffic delivery + market price drift, ambush on NPC traffic
   brackets (EVE-style corner brackets colored by standing: red NPC, blue
   celestial, white player), warp tunnel lines, mining beam, muzzle flash,
   wreck icons.
-- `ui` widgets are pure layout+input over `*sim.Sim` state; window chrome
+- `uikit` widgets are pure layout+input over `*sim.Sim` state; window chrome
   EVE-dark (near-black panels, amber/white text, mono-ish gofont).
   Windows: Overview (table: icon, name, distance, velocity — sortable),
   Selected Item (actions: approach/orbit/warp/lock/dock/jump/loot), HUD
   (shield/armor/structure arcs, capacitor bar, speed, targeting list),
   Module rack (high/mid/low rows, F1–F8 activates high, deactivated state
   shown), Inventory (cargo + ore hold), Fitting (hull slots + stats),
-  Station services (repair/market/refine/fitting tabs), Starmap (system
-  graph, current system highlighted, click to set autopilot? — no autopilot:
-  click selects, gates are used in-system), Combat log (event feed).
-- `game`: scene stack. Space scene is the hub. Keys: `Tab` target
-  closest, `F1..F8` high modules, `A` approach, `Q` orbit at range,
-  `S` stop, `W` align, `X` approach & loot? — keep documented in
-  `docs/GAMEPLAY.md` and shown in an in-game help overlay (`F1`?). Final key
-  map lives in `game/input.go` and must be documented in `docs/GAMEPLAY.md`.
+  Factory (manufacturing jobs, craft levels and material counts at a
+  docked `industry` station), Station services (repair/market/refine/
+  fitting tabs), Starmap (system graph, current system highlighted —
+  click selects, gates are used in-system), Log (event feed).
+- `game`: scene stack. Space scene is the hub. The keyboard map is
+  `game.KeyMap` (`game/input.go`, the single source shared with the
+  in-game help overlay `H`) and is documented in `docs/GAMEPLAY.md`.
 - Save/load: `game` writes `Save` JSON to
-  `os.UserConfigDir()/entieve/save.json` on `F5` and loads on `F9` (also
+  `os.UserConfigDir()/entieve/save.json` on `Ctrl+S` and loads on `F9` (also
   `--load` CLI flag).
 
 ## Testing policy

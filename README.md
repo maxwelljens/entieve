@@ -1,7 +1,7 @@
 # Entieve
 
 Entieve is a single-player 2D space sandbox in Go (Ebitengine). You fly one
-ship through a three-system star cluster: you take jobs, mine asteroids, fight
+ship through a seven-system star cluster: you take jobs, mine asteroids, fight
 rats, haul ore, trade, and spend the money on ships and modules. The rules are
 modelled on EVE Online — four damage types, shield/armor/structure, capacitor,
 turret tracking — and the whole thing runs locally on your machine.
@@ -37,11 +37,14 @@ acceleration runs 1× to 8× to shorten the trips.
 at the top, cargo and ore hold in the middle, the fitting window on the right.*
 
 Docking opens the station services: repair, market, refine, fitting and
-hangar. Contracts give you specific work — destroy a named rat, mine a volume
-of ore, deliver cargo to another system — and pay money and standing on
-completion. The market has finite stock: buying empties it, selling fills it,
-and prices move when deliveries arrive or surplus builds up. Refining turns ore
-into minerals; the hangar stores ships and modules between trips.
+hangar — and, at industry stations, the factory. Contracts give you
+specific work — destroy a named rat, mine a volume of ore, deliver cargo to
+another system — and pay money and standing on completion. The market is an
+order book: buying and selling take the best resting prices, with a broker
+fee on buys and a sales tax on sells, and prices move only when real goods
+trade hands — your trades, the agents' trades, or a convoy's fresh supply
+arriving. Refining turns ore into minerals; the hangar stores ships and
+modules between trips.
 
 Fitting is slot-based: high slots take turrets and mining lasers, mid slots
 take propulsion and electronic warfare, low slots take tank and repair. The
@@ -85,13 +88,22 @@ Controls and concepts: [docs/GAMEPLAY.md](docs/GAMEPLAY.md).
   carry-over.
 - **Capacitor** with EVE's recharge curve (peak at ~25%), boosters with
   charges, active tank that competes for the same cap as the guns.
-- **Sandbox economy.** Stations run repair, market, refine and fitting; the
-  market holds finite stock; ore refines into minerals; ships and modules live
-  in the hangar.
-- **Three systems** in the Far Moravia frontier — Starogród, Kuźnica,
-  Pustkowie — with escalating danger, stargates between them, and combat
-  anomalies with boss rats. Rat temperament follows charter reach: Charter
-  space rats are skittish, Unincorporated rats fight to the death.
+- **Order-book economy.** Stations run repair, market, refine, fitting and
+  (at industry stations) the factory; each market is a real order book with
+  a broker fee, sales tax and escrow; ore refines into minerals; ships and
+  modules live in the hangar. A roster of traders, miners and industrialist
+  agents trades, mines and manufactures alongside you, and convoys haul
+  real cargo between the systems.
+- **Manufacturing.** Two-tier production — ore refines into minerals,
+  recipes turn minerals into hulls, modules and charges — run as timed jobs
+  at industry stations (factory window, `B`), with station craft that grows
+  with every completed run.
+- **Seven systems** in the Far Moravia frontier — the Kresy ring: Starogród
+  and Rudnik (Charter space), Kuźnica, Młynów and Kamieniec (the Fringe),
+  Pustkowie and Głusza (Unincorporated) — with escalating danger, stargates
+  between them, and combat anomalies with boss rats. Rat temperament
+  follows charter reach: Charter space rats are skittish, Unincorporated
+  rats fight to the death.
 - **Visibility.** The overview shows only the 250 km grid; the scanner sweeps
   for anonymous long-range contacts; warp-to-within (0/10/50 km) shapes
   landings.
@@ -136,21 +148,25 @@ to both a manifest entry and a credits line. Required wording: *Icons made by
 ## Architecture
 
 ```
-cmd/entieve → game → {render, ui} → sim → content → (core, ecs)
+cmd/entieve → game → {render, uikit} → sim → content → (core, ecs)
 ```
 
 - [`sim/`](sim) is a fully deterministic fixed-timestep simulation
   (60 ticks/s) with **no rendering dependency**. Everything is driven through
   `sim.Command` values and observed through `sim.Event` values — the same
   interface that lets tests and AI agents play the game headlessly.
-- [`content/`](content) is data-driven: ships, modules, items, NPCs, star
-  systems and worlds are JSON under `content/data/`, loaded, cross-validated
-  and embedded into the binary.
+- [`content/`](content) is data-driven: ships, modules, items, NPCs, recipes,
+  star systems and worlds are JSON under `content/data/`, loaded,
+  cross-validated and embedded into the binary.
 - [`ecs/`](ecs) is a minimal deterministic ECS; [`core/`](core) has the
   vector math and a golden-pinned SplitMix64 PRNG so twin runs are bit-identical.
-- [`render/`](render), [`ui/`](ui), [`game/`](game) are the Ebitengine client.
+- [`render/`](render), [`uikit/`](uikit), [`game/`](game) are the Ebitengine
+  client.
 
-Design notes: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Design notes: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (the binding
+contract) and [docs/SIM.md](docs/SIM.md) (the simulation reference:
+tick anatomy, world metabolism, the ledger-agent economy, price
+formation).
 
 ## Tooling (humans and AI agents alike)
 
