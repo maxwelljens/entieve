@@ -120,7 +120,7 @@ typefaces and the emphasis face are new.
 
 - **License — Turret Road, SIL Open Font License 1.1**: `Copyright 2018
   The Turret Road Project Authors (https://github.com/noponies/turret-road)`.
-  The full `TurretRoad_LICENC.txt` travels in the same directory as the TTFs (and is
+  The full `TurretRoad_LICENCE.txt` travels in the same directory as the TTFs (and is
   embedded with them), so any redistribution of the binary carries the
   license.
 - **Glyph coverage**: Turret Road has no U+25B2/U+25BC triangles, so the

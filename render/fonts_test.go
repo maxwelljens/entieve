@@ -51,10 +51,9 @@ func TestEmbeddedFontFamily(t *testing.T) {
 		}
 	}
 	// Each family's license travels in the same directory as its TTFs
-	// (and with the binary). Turret Road's notice has gone by two names
-	// across checkouts (OFL.txt, TurretRoad_LICENC.txt) — either counts.
+	// (and with the binary), under its canonical per-family name.
 	turretLic := ""
-	for _, cand := range []string{"OFL.txt", "TurretRoad_LICENC.txt"} {
+	for _, cand := range []string{"TurretRoad_LICENCE.txt"} {
 		for _, o := range others {
 			if o == cand {
 				turretLic = cand
