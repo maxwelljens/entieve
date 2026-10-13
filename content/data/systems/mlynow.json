@@ -1,0 +1,103 @@
+{
+  "id": "sys-mlynow",
+  "name": "Młynów",
+  "security": "low",
+  "constellation": "Kresy",
+  "region": "Far Moravia",
+  "position": { "X": 1.4, "Y": 3.6 },
+  "palette": {
+    "nebula1": "#12101e",
+    "nebula2": "#26203a",
+    "nebula3": "#3a2a3c",
+    "star": "#ffc46b"
+  },
+  "celestials": [
+    {
+      "id": "cel-mlynow-star",
+      "name": "Młynów",
+      "kind": "star",
+      "position": { "X": 0, "Y": 0 },
+      "radius": 480000000,
+      "colors": ["#ffe2b0"]
+    },
+    {
+      "id": "cel-mlynow-prime",
+      "name": "Młynów Prime",
+      "kind": "planet",
+      "position": { "X": 1700000000, "Y": 800000000 },
+      "radius": 6371000,
+      "colors": ["#8a7f5f"]
+    },
+    {
+      "id": "cel-huta",
+      "name": "Huta",
+      "kind": "station",
+      "position": { "X": 1900000000, "Y": -1100000000 },
+      "radius": 900,
+      "colors": ["#e0cfa8"],
+      "station": {
+        "services": ["market", "refine", "industry"],
+        "market": [
+          { "item": "mod-mining-laser", "qty": 15, "price": 201250 },
+          { "item": "mod-rail-turret", "qty": 10, "price": 368000 },
+          { "item": "mod-shield-boost", "qty": 10, "price": 264500 },
+          { "item": "mod-resist-coat", "qty": 10, "price": 189750 },
+          { "item": "charge-fusion", "qty": 4000, "price": 132 },
+          { "item": "charge-ap", "qty": 4000, "price": 114 },
+          { "item": "charge-cap-cell", "qty": 800, "price": 1200 },
+          { "item": "ore-cordite", "qty": 6000, "price": 41, "side": "buy" },
+          { "item": "ore-sterngrit", "qty": 5000, "price": 21, "side": "buy" },
+          { "item": "ore-lucidite", "qty": 3000, "price": 72, "side": "buy" },
+          { "item": "min-ferrite", "qty": 30000, "price": 5, "side": "buy" },
+          { "item": "min-cobalt", "qty": 8000, "price": 18, "side": "buy" },
+          { "item": "min-silex", "qty": 6000, "price": 28, "side": "buy" }
+        ]
+      },
+      "spawns": [
+        { "npc_id": "npc-guard-patrol", "count": 1, "respawn_sec": 600 }
+      ]
+    },
+    {
+      "id": "cel-mlynow-belt",
+      "name": "Młynów Belt",
+      "kind": "belt",
+      "position": { "X": -1100000000, "Y": -1400000000 },
+      "radius": 280000,
+      "colors": ["#7c6f63"],
+      "belt": {
+        "asteroids": [
+          { "ore": "ore-cordite", "count": 10, "volume": 4500 },
+          { "ore": "ore-sterngrit", "count": 8, "volume": 2500 }
+        ]
+      },
+      "spawns": [
+        { "npc_id": "npc-rat-scuttler", "count": 3, "respawn_sec": 120 },
+        { "npc_id": "npc-rat-marauder", "count": 1, "respawn_sec": 300 }
+      ]
+    },
+    {
+      "id": "cel-gate-rudnik",
+      "name": "Rudnik Gate",
+      "kind": "gate",
+      "position": { "X": 2500000000, "Y": 2000000000 },
+      "radius": 2500,
+      "colors": ["#8fd8c0"],
+      "gate": {
+        "to_system": "sys-rudnik",
+        "to_cel": "cel-gate-mlynow"
+      }
+    },
+    {
+      "id": "cel-gate-penumbra",
+      "name": "Kuźnica Gate",
+      "kind": "gate",
+      "position": { "X": -2800000000, "Y": 600000000 },
+      "radius": 2500,
+      "colors": ["#c9a8ff"],
+      "gate": {
+        "to_system": "sys-penumbra",
+        "to_cel": "cel-gate-mlynow"
+      }
+    }
+  ]
+}

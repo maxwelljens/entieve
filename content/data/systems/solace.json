@@ -94,6 +94,18 @@
         "to_system": "sys-penumbra",
         "to_cel": "cel-gate-solace"
       }
+    },
+    {
+      "id": "cel-gate-rudnik",
+      "name": "Rudnik Gate",
+      "kind": "gate",
+      "position": { "X": -2400000000, "Y": 900000000 },
+      "radius": 2500,
+      "colors": ["#ffd28a"],
+      "gate": {
+        "to_system": "sys-rudnik",
+        "to_cel": "cel-gate-solace"
+      }
     }
   ]
 }
