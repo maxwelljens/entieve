@@ -2,6 +2,7 @@
   {
     "id": "npc-rat-scuttler",
     "name": "Scuttler",
+    "description": "Old Works worker caste: it cuts ore from the belts and strips wrecks for mass to feed replication, and it does not care who is standing in the way. Small bounty, small salvage — and there is always another one.",
     "faction": "Old Works",
     "ship": "ship-rat-scuttler",
     "fit": ["mod-emp-turret", "mod-emp-turret", "mod-afterburner", "mod-armor-plate"],
@@ -17,6 +18,7 @@
   {
     "id": "npc-rat-marauder",
     "name": "Marauder",
+    "description": "Old Works assault caste: it jumps traffic on the lanes, pins the hull it means to take, and holds it there for the swarm to strip. Freighters schedule around it; the ones that do not get written off.",
     "faction": "Old Works",
     "ship": "ship-rat-marauder",
     "fit": [
@@ -41,6 +43,7 @@
   {
     "id": "npc-rat-hierarch",
     "name": "Hierarch",
+    "description": "Old Works overseer: it directs the swarm on site — which frames strip, which hold the target, which chase — and stays on the grid until it comes apart. It does not break off, and it does not talk.",
     "faction": "Old Works",
     "ship": "ship-rat-hierarch",
     "fit": [

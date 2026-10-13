@@ -3,6 +3,7 @@
   "name": "Furman",
   "class": "industrial",
   "description": "A fat industrial hauler. One high slot, one big hold: it runs, it does not fight.",
+  "origin": "polish",
   "slots": {
     "high": 1,
     "mid": 2,

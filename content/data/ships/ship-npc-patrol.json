@@ -3,6 +3,7 @@
   "name": "Custos",
   "class": "frigate",
   "description": "Charter patrol cutter: fast, well-gunned, and never far from the trade lanes.",
+  "origin": "latinate",
   "slots": {
     "high": 3,
     "mid": 2,

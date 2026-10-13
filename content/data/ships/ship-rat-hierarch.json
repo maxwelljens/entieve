@@ -3,6 +3,7 @@
   "name": "Hierarch",
   "class": "rat",
   "description": "The Old Works overseer: heavy tank, four turrets, and nothing that can call it off - it fights to the last.",
+  "origin": "old-works",
   "slots": {
     "high": 4,
     "mid": 3,

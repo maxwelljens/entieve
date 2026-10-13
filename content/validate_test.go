@@ -241,6 +241,15 @@ func TestValidateNegativeCases(t *testing.T) {
 			want: "negative shield -1",
 		},
 		{
+			// Empty origin stays allowed (see TestBaseContentIsValid); the
+			// vocabulary itself is checked whenever a hull sets one.
+			name: "unknown hull origin",
+			mutate: func(c *Content) {
+				c.Ships["ship-hull"].Origin = "martian"
+			},
+			want: "unknown origin \"martian\"",
+		},
+		{
 			name: "loot chance out of range",
 			mutate: func(c *Content) {
 				c.NPCs["npc-rat"].Loot[0].Chance = 1.5
