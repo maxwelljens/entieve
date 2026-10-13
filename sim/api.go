@@ -599,8 +599,9 @@ func (s *Sim) Agents() []AgentView {
 
 // HaulWishes returns every agent's pending haul wishes, agents in
 // ascending id order and each agent's list in its canonical (From, To,
-// Item) order — the logistics workstream's consumption seam (see §6 of
-// the agent design; FulfillHaul is the stub for now).
+// Item) order — the logistics consumption seam (system_traffic.go). A wish
+// still riding a convoy stays pending until it is fulfilled or lost, so it
+// appears here too (Agent.InFlight marks the committed ones).
 func (s *Sim) HaulWishes() []HaulWish {
 	var out []HaulWish
 	for i := range s.agents {
@@ -610,10 +611,10 @@ func (s *Sim) HaulWishes() []HaulWish {
 }
 
 // FulfillHaul acknowledges a haul wish: it pays cost from the owning
-// agent's FREE capital (resting-order escrow is untouchable; the payment
-// is a sink — no hauler ledger exists yet) and drops the wish from the
-// agent's list. Stub: the logistics workstream wires the real delivery;
-// returns false when the owner/wish is unknown or cost is negative.
+// agent's FREE capital (resting-order escrow is untouched; the payment is
+// a sink — the haul fee has no ledger on the far side) and drops the wish
+// from the agent's list, releasing its in-flight commitment. Returns false
+// when the owner/wish is unknown or cost is negative.
 func (s *Sim) FulfillHaul(wish HaulWish, cost float64) bool {
 	if cost < 0 || wish.Owner == "" {
 		return false
@@ -636,5 +637,6 @@ func (s *Sim) FulfillHaul(wish HaulWish, cost float64) bool {
 	}
 	a.Capital -= min(cost, a.freeCapital())
 	a.Wishes = append(a.Wishes[:idx], a.Wishes[idx+1:]...)
+	a.dropInFlight(wish)
 	return true
 }
