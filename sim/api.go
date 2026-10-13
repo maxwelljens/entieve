@@ -103,6 +103,16 @@ type Sim struct {
 	jobSeq uint64
 	craft  []SavedCraft
 
+	// --- ledger agents (system 18; see agent.go) ---
+	// agents is the deterministic roster in ascending id order (canonical
+	// iteration — maps never reach behavior). Empty outside agentWorlds
+	// (the showcase tour and test fixtures), which also gates upkeep.
+	agents []Agent
+	// upkeep is the per-station maintenance ledger system 18's upkeep
+	// cycle spends and burns (Save.Upkeep), seeded once per station and
+	// never refilled.
+	upkeep map[StationID]float64
+
 	// ammoPrefs is the per-(owner, slot) preferred charge item set by
 	// CmdSetAmmo ("" entry = automatic). Point-looked-up only — never
 	// iterated by behavior, so map order cannot leak into the simulation.
@@ -196,6 +206,12 @@ func New(c *content.Content, w *content.WorldDef, seed int64) (*Sim, error) {
 	if err := s.LoadSystem(w.Start.System, ""); err != nil {
 		return nil, err
 	}
+	// World gate: only free-play worlds carry the ledger-agent roster (the
+	// showcase tour and fixtures run without agents — and therefore
+	// without upkeep). Restore replaces the roster from the Save.
+	if agentWorlds[w.ID] {
+		s.spawnAgents()
+	}
 	return s, nil
 }
 
@@ -245,6 +261,7 @@ func (s *Sim) Step() {
 	s.systemRespawn()   // 15 respawn
 	s.systemTraffic()   // 16 traffic (convoys, ambushes, patrols, book supply)
 	s.systemIndustry()  // 17 industry (manufacturing jobs, craft growth)
+	s.systemAgent()     // 18 agents (ledger economy: settle, behavior pass, upkeep)
 	// Death respawn runs after all systems so that a cross-system clone-bay
 	// respawn can rebuild the grid without yanking entities out from under
 	// the systems still running this tick.
@@ -252,7 +269,7 @@ func (s *Sim) Step() {
 		s.pendingPlayerRespawn = false
 		s.respawnPlayer()
 	}
-	// 18 events: capped at emit time; nothing else to trim.
+	// 19 events: capped at emit time; nothing else to trim.
 	s.ticks++
 	// Time is derived from ticks (not accumulated) so that Time() is an
 	// exact function of the tick count — trivially identical across
@@ -558,3 +575,61 @@ func IndustrySlots() int { return industrySlots }
 // hold, hangar stacks, then stored hulls — the have side of the factory
 // panel's have/need column and exactly what StartJob commits from.
 func (s *Sim) PlayerStock(item content.ItemID) int { return s.playerStock(item) }
+
+// --- ledger agents (system 18) ---
+
+// Agents returns the roster in canonical (ascending id) order: the
+// read-only view of every ledger agent (empty in worlds without agents).
+func (s *Sim) Agents() []AgentView {
+	out := make([]AgentView, 0, len(s.agents))
+	for i := range s.agents {
+		a := &s.agents[i]
+		out = append(out, AgentView{
+			ID: a.ID, Home: a.Home, Role: a.Role, Capital: a.Capital,
+			Dormant: a.Capital < dormantCapital,
+		})
+	}
+	return out
+}
+
+// HaulWishes returns every agent's pending haul wishes, agents in
+// ascending id order and each agent's list in its canonical (From, To,
+// Item) order — the logistics workstream's consumption seam (see §6 of
+// the agent design; FulfillHaul is the stub for now).
+func (s *Sim) HaulWishes() []HaulWish {
+	var out []HaulWish
+	for i := range s.agents {
+		out = append(out, s.agents[i].Wishes...)
+	}
+	return out
+}
+
+// FulfillHaul acknowledges a haul wish: it pays cost from the owning
+// agent's FREE capital (resting-order escrow is untouchable; the payment
+// is a sink — no hauler ledger exists yet) and drops the wish from the
+// agent's list. Stub: the logistics workstream wires the real delivery;
+// returns false when the owner/wish is unknown or cost is negative.
+func (s *Sim) FulfillHaul(wish HaulWish, cost float64) bool {
+	if cost < 0 || wish.Owner == "" {
+		return false
+	}
+	a := s.agentByOwner(wish.Owner)
+	if a == nil {
+		return false
+	}
+	idx := -1
+	for i := range a.Wishes {
+		w := a.Wishes[i]
+		if w.From == wish.From && w.To == wish.To && w.Item == wish.Item &&
+			w.Qty == wish.Qty && w.MaxCost == wish.MaxCost {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return false
+	}
+	a.Capital -= min(cost, a.freeCapital())
+	a.Wishes = append(a.Wishes[:idx], a.Wishes[idx+1:]...)
+	return true
+}

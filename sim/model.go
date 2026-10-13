@@ -998,4 +998,17 @@ type Save struct {
 	// Craft is each station's per-family craft counter (completed runs +
 	// idle ticks), sorted by (station, family) — the CraftLevel input.
 	Craft []SavedCraft `json:"craft,omitempty"`
+
+	// ---- ledger agents (system 18) ----
+
+	// Agents is the roster in ascending id order: capital, inventory,
+	// EWMA beliefs, ZIP margins and haul wishes per agent (inventory,
+	// beliefs and margins serialized as sorted (item, value) pairs).
+	// Resting-order ledgers are derived from Market on restore — a Save
+	// lands on Step boundaries, where every fill has settled.
+	Agents []SavedAgent `json:"agents,omitempty"`
+	// Upkeep is the per-station maintenance ledger (money sink) behind
+	// the periodic repair/rearm basket. Map keys marshal sorted, so the
+	// serialization stays canonical.
+	Upkeep map[StationID]float64 `json:"upkeep,omitempty"`
 }

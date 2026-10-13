@@ -35,7 +35,9 @@ func (hh *hasher) bytes(bs []byte) {
 // per-station market books (orders with station/side/owner/arrival id, the
 // last-trade rungs and the next order id), respawn timers, the hangar, the
 // free-slot mirror, the respawn anchor, active module target bindings, the
-// manufacturing jobs and the per-station craft counters.
+// manufacturing jobs, the per-station craft counters, the ledger agents
+// (roster, capital, inventory, beliefs, margins and haul wishes) and the
+// per-station upkeep ledgers.
 // Pending events and queued commands are intentionally excluded (Save does
 // not carry them).
 //
