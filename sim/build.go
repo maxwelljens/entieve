@@ -216,10 +216,11 @@ func (s *Sim) spawnCelestial(cel *content.CelestialDef, pending map[string]int) 
 		s.Gates.Set(e, Stargate{ToSystem: cel.Gate.ToSystem, ToCel: cel.Gate.ToCel})
 	}
 	if cel.Belt != nil {
-		for _, ad := range cel.Belt.Asteroids {
-			for i := 0; i < ad.Count; i++ {
-				s.spawnAsteroid(cel, ad)
-			}
+		// Rocks come from the persistent belt state: seeded from the def on
+		// first generation, afterwards the saved (depleted/regrown) volumes.
+		st := s.ensureBeltState(cel)
+		for i, rock := range st.Rocks {
+			s.spawnAsteroid(cel, rock, i)
 		}
 	}
 	for _, sp := range cel.Spawns {
@@ -258,24 +259,53 @@ func celestialSpread(cel *content.CelestialDef) float64 {
 	return 1000
 }
 
-// spawnAsteroid scatters one rock deterministically around its belt.
+// ensureBeltState returns the persistent state of one belt, seeding it from
+// the BeltDef on first generation (every rock at its definition volume —
+// today's fresh-world semantics) and reusing the saved state thereafter.
+func (s *Sim) ensureBeltState(cel *content.CelestialDef) *BeltState {
+	if s.belts == nil {
+		s.belts = make(map[beltKey]*BeltState)
+	}
+	k := beltKey{System: s.systemID, Cel: cel.ID}
+	if st := s.belts[k]; st != nil {
+		return st
+	}
+	st := &BeltState{System: s.systemID, Cel: cel.ID, GrownAt: s.ticks}
+	if cel.Belt != nil {
+		for _, ad := range cel.Belt.Asteroids {
+			for i := 0; i < ad.Count; i++ {
+				st.Rocks = append(st.Rocks, BeltRock{Ore: ad.Ore, Remaining: ad.Volume, Volume: ad.Volume})
+			}
+		}
+	}
+	s.belts[k] = st
+	return st
+}
+
+// spawnAsteroid scatters one rock deterministically around its belt, from
+// its persistent belt-state volume.
 // MASTER-STREAM role (spawn entropy): two draws per rock from s.RNG — the
 // master's only scatter consumer besides spawnNpcStream; see the RNG field
-// on Sim and rng_roles_test.go.
-func (s *Sim) spawnAsteroid(cel *content.CelestialDef, ad content.AsteroidDef) {
+// on Sim and rng_roles_test.go. The rolls are ALWAYS consumed, even when
+// the rock's persisted volume is exhausted and no entity is created, so a
+// depleting belt never shifts the master stream's scatter sequence.
+func (s *Sim) spawnAsteroid(cel *content.CelestialDef, rock BeltRock, index int) {
 	spread := celestialSpread(cel)
 	angle := s.RNG.Range(0, 2*math.Pi)
 	r := s.RNG.Range(0, spread)
+	if rock.Remaining <= beltDepletedEpsilon {
+		return // depleted: state-only until regrowth brings it back
+	}
 	pos := cel.Position.Add(core.Vec2{X: math.Cos(angle) * r, Y: math.Sin(angle) * r})
 
 	name := "Asteroid"
-	if def, ok := s.Content.Item(ad.Ore); ok {
+	if def, ok := s.Content.Item(rock.Ore); ok {
 		name = def.Name + " Asteroid"
 	}
 	e := s.create()
 	s.Names.Set(e, Name{Value: name})
 	s.Transforms.Set(e, Transform{Pos: pos, Facing: angle})
-	s.Asteroids.Set(e, Asteroid{Ore: ad.Ore, Remaining: ad.Volume})
+	s.Asteroids.Set(e, Asteroid{Ore: rock.Ore, Remaining: rock.Remaining, Belt: cel.ID, Index: index})
 }
 
 // spawnNpc creates a full NPC ship entity anchored at celPos (scattered

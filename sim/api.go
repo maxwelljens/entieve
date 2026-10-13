@@ -84,6 +84,17 @@ type Sim struct {
 	modTargets    map[modKey]ecs.Entity
 	free          []freeSlot
 
+	// belts is the persistent world-metabolism belt state: per-rock
+	// remaining volume keyed by (system, belt celestial), seeded from the
+	// BeltDef on first generation and restored from Save.Belts. Mining and
+	// rat requisitions keep it in sync with the live asteroid entities;
+	// systemBelts applies the regrowth window.
+	belts map[beltKey]*BeltState
+	// factionLedger is the per-faction requisition money behind NPC
+	// replacements (Save.FactionLedger), lazily seeded with
+	// factionEndowment; only respawn requisitions debit it.
+	factionLedger map[string]float64
+
 	// ammoPrefs is the per-(owner, slot) preferred charge item set by
 	// CmdSetAmmo ("" entry = automatic). Point-looked-up only — never
 	// iterated by behavior, so map order cannot leak into the simulation.

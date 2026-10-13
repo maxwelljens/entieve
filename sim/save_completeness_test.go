@@ -74,6 +74,10 @@ var simFieldClasses = map[string]fieldClass{
 	"modTargets":    {save: []string{"ModTargets"}},
 	"free":          {save: []string{"FreeSlots"}},
 
+	// World metabolism: persistent belt state and requisition ledgers.
+	"belts":         {save: []string{"Belts"}},
+	"factionLedger": {save: []string{"FactionLedger"}},
+
 	// Per-Step transients (asserted empty at Step boundaries).
 	"queue":                {transient: true},
 	"deferLoot":            {transient: true},
