@@ -24,6 +24,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TestMemoryFootprintPump`: headless 6,000-frame memory regression guard
   over the production Update/Draw pipeline — the live heap must plateau
   (under 10 MB growth between the 3,000- and 6,000-frame marks).
+- **Manufacturing (industry).** Two-tier recipes (`content/data/recipes/`,
+  `rec-*`): minerals in, ships/modules/charges out. Timed jobs at stations
+  with the `industry` service (`CmdStartJob`/`CmdCollectJob`, two
+  concurrent slots per station, materials committed up front), the
+  **factory** window (`B`, dock-only; surfaces automatically at industry
+  stations) with its have/need material column, and per-station **craft
+  growth** — `L = min(5, 1 + floor(sqrt(runs)/2))` per recipe family, each
+  level 4 % faster and 2 % leaner, decaying one run-equivalent per 3,600
+  idle ticks.
+- **World metabolism.** Belt state is persistent (`Save.Belts`): rocks
+  deplete as they are mined and regrow +1 % of their definition volume per
+  600-tick window, capped at it, across save/restore and system reloads.
+  Wreck reprocessing reclaims `floor(0.4 × hull-recipe mineral inputs)` on
+  a destroyed ship's wreck (the value-added burns off). NPC replacement is
+  **market-funded**: guards requisition hull, fit and charges from the
+  respawn station's book against a per-faction ledger (`Save.FactionLedger`),
+  rats pay belt ore or buy local ore asks; an unfunded requisition re-queues
+  instead of spawning nothing-for-free.
+- **The Kresy ring.** Four new systems — Rudnik (Charter space), Młynów and
+  Kamieniec (the Fringe), Głusza (Unincorporated) — with four new nodes:
+  Halda (Rudnik's mining outpost), Huta (Młynów's refinery platform), Doki
+  (Kamieniec's shipyard & depot) and Kantor (Głusza's freeport). The map is
+  seven systems.
+- **Ledger agents.** A 24-agent roster (6 industrialists, 9 traders, 9
+  miners — world-gated to `world-default`) with capital, inventory, EWMA
+  trade-price beliefs and ZIP margins. Valuation backward-imputs recipe
+  inputs to their products' fee-net value (Menger/Wieser fixpoint), quotes
+  rest at `V·(1±µ)` with Widrow-Hoff margin updates (β = 0.25, α = 0.05),
+  and agents act where the margin is positive. Fills settle every tick,
+  the behavior pass every 300 ticks, station upkeep (repair/rearm basket +
+  maintenance-fee money sink) every 3,600 ticks.
+- **Cross-system and multi-hop convoys.** Traffic routes gain `to_system`
+  lanes (the validator checks the gate path); a hauler that hops a gate —
+  or whose grid is rebuilt under it — parks as a journey
+  (`Save.TrafficJourneys`) with its provenance and destination intact and
+  flies again when its system loads next.
+- **Haul wishes.** Traders and industrialists append cross-node arbitrage
+  wishes whenever two stations' prices differ by more than the round-trip
+  fee load (`MaxCost` = spread − fees), exposed via `Sim.HaulWishes()`; the
+  fulfillment seam (`Sim.FulfillHaul`) pays the hauling cost from the
+  owning agent's free capital and drops the wish — a money sink. The
+  seam's contract is wish-driven convoys: cargo debited from the agent's
+  stock at spawn, delivered as agent-owned asks at the destination at the
+  agent's reservation price, coexisting with authored interval lanes (the
+  logistics-side spawn is the in-flight wiring; `FulfillHaul` is still the
+  stub seam in this tree).
 
 ### Changed
 
@@ -41,6 +87,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   per panel dock/toggle mount cycle — real but slow, deliberately not
   mitigated because hiding-instead-of-unmounting would change input
   gating and draw order.
+- **Per-station order books replace market memory.** Every station runs
+  its own continuous double auction (never-crossed matching, price-time
+  priority, 4-significant-figure price ticks); the old per-system
+  "market memory" model (price bands, supply steps, halving decay) is
+  gone — the book is the only price former. Player Buy/Sell are
+  immediate-or-cancel market orders against the docked station's book; a
+  3 % broker fee rides buys at placement, a 2.5 % sales tax rides sells at
+  execution, and placed orders escrow wallet or goods in full.
+  **Save schema v2** (`Save.Schema` = 2) is a clean break: pre-v2 saves
+  are rejected instead of restoring into a different market.
+- **Convoys carry real cargo.** Route cargo is sourced at spawn, never
+  conjured: a station origin withdraws the units from that station's own
+  asks (the weighted price paid is the shipment's cost basis), a belt
+  origin draws the persistent belt state (a dry belt ships nothing), and a
+  gate origin is the economy's one sanctioned import — the named world
+  boundary, undebited supply at the destination. Deliveries post as asks
+  on the destination's book one tick under `min(cost basis, best ask)`;
+  a destroyed hauler's goods are destroyed with it (lootable wreck, no
+  reversal of the origin) and the loss surfaces as an event-only
+  risk-premium line, never a price step.
 
 ### Fixed
 

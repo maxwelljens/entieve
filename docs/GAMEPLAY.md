@@ -40,6 +40,7 @@ in-game help window renders.
 | `F` | Toggle fitting window |
 | `C` | Toggle scanner (slow off-grid sweep) |
 | `G` | Toggle market window (trade while docked) |
+| `B` | Toggle factory window (manufacture while docked) |
 | `N` | Toggle starmap |
 | `H` | Toggle help window |
 | `Esc` | Menu: Resume / Save / Load / Quit |
@@ -83,7 +84,7 @@ work; the opposite edge stays fixed and the window never shrinks below
 its minimum size), and click anywhere on a window to raise it to the
 front.
 
-Toggle keys open and close their window (`I`, `F`, `G`, `C`, `N`, `H`,
+Toggle keys open and close their window (`I`, `F`, `G`, `B`, `C`, `N`, `H`,
 `Shift+L`) — windows have no separate close button. Icons (from
 [game-icons.net](https://game-icons.net), credited per-icon in
 `uikit/icons/CREDITS.md`) mark service titles, action buttons, overview
@@ -123,7 +124,7 @@ while the untouched ones re-tile around it.
 
 **Your layout persists.** Every named window's position, size and
 open/closed state (overview, selected item, log, market, inventory,
-fitting, scanner, map, help) is saved to a sidecar file next to the
+fitting, factory, scanner, map, help) is saved to a sidecar file next to the
 save — `<save path>.layout.json`, e.g.
 `os.UserConfigDir()/entieve/save.json.layout.json` — whenever you save
 (`Ctrl+S` / menu **Save**) and again when you quit cleanly from the
@@ -153,7 +154,9 @@ windows plus the **Station** window — the station identity, the
 **Undock** button and the contract board (see
 [Contracts & standing](#contracts--standing)) — and hides the space
 chrome (HUD bar, module rack, scanner) together with the
-**Overview** and **Selected Item** windows. The service windows **tile
+**Overview** and **Selected Item** windows. At a station with the
+industry service the **Factory** window (`B`) surfaces automatically
+too (see [The factory](#the-factory)). The service windows **tile
 automatically at your viewport size** — market on top, inventory and
 fitting below — and any arrangement you saved or dragged wins over that
 tiling (unless the saved set would come back overlapping itself, in
@@ -356,6 +359,56 @@ system's first station otherwise — instead of being shipped back to
 Starogród. Death is paperwork; the log line `Respawned at <station> in a
 <hull>` is the insurer's replacement notice arriving.
 
+## The factory
+
+Manufacturing is a station service like any other. Press **`B`** for the
+**Factory** window — docked at a station with the **industry** service it
+opens there like the other service windows (Przystań, Huta at Młynów, Doki
+at Kamieniec), and it only ever mounts while docked.
+
+The factory turns **minerals into products**: pick a recipe — a hull, a
+module or a batch of charges — set the number of **runs**, and press start.
+The materials for every run are committed up front from your stock (the
+have/need column shows exactly what you hold against what the job eats),
+the job occupies one of the station's two slots, and a timer runs. Collect
+the output into your hangar when it is done. Ore is not a factory input:
+it refines into minerals at a refinery first — the two-tier chain.
+
+Stations get better at their own work: every completed run raises that
+station's **craft** in the recipe's family (hulls, modules, charges), up
+to five levels. Higher craft means faster jobs and less material per run.
+Unused craft decays slowly, so a station left idle slides back — and a
+job already running is never re-timed by a mid-job level-up.
+
+## The economy
+
+Every station's market is an **order book**: your Buy and Sell are market
+orders that take the best resting prices at that station and fill only
+what the book actually holds — nothing is conjured for you. A **broker
+fee** (3 % of the value) rides every buy, a **sales tax** (2.5 %) rides
+every sell; the market window shows the fill and the fee line by line.
+Prices are displayed on a ladder — last
+trade, best ask, best bid, then the item's base price — and they move
+only when real goods trade hands.
+
+The book is not yours alone. A roster of **economy agents** — traders,
+miners and industrialists with their own capital, stock and beliefs —
+works every market station in the cluster: miners cut rock and sell ore,
+industrialists buy minerals and run factory jobs, traders quote between
+the two. They post real orders, pay the same fees you do, and when a
+spread between two stations is worth the freight they post **haul
+wishes** that the convoy traffic works off — cargo bought at one station,
+delivered and sold at another. Agents live in the normal game
+(`world-default`); the showcase tour runs without them.
+
+The rest of the ring buys and sells too. Convoy haulers carry real cargo
+sourced from the stations and belts they serve — and the goods you shoot
+down stay shot down. Guard and rat replacements are **requisitioned**
+from the same economy: the Charter's patrols buy their replacement hulls,
+fits and ammo on the local books, machine castes pay for theirs in belt
+ore. Nothing spawns from nowhere, and every euro in the ring is spent
+somewhere.
+
 ## The systems of Entieve
 
 Three zones grade the map by **charter reach** — how far the Charter
@@ -363,27 +416,39 @@ Authority's patrols, courts and insurers actually work: **Charter space**,
 **the Fringe** and **Unincorporated**, the lanes an EVE pilot would call
 high-sec, low-sec and null-sec.
 
-You start in **Starogród** (Charter space, constellation *Kresy*): the
+The playable map is one constellation, **Kresy** ("the borderlands") — the
+Kresy ring: seven systems out from Starogród.
+
+**Charter space.** You start in **Starogród** (constellation *Kresy*): the
 first-wave heartland, safe lanes and working paperwork. *Jernborg* station
 (market, inventory and fitting) is the oldest town's berth, an asteroid
-belt sits close, and a gate runs on to Kuźnica.
+belt sits close, and gates run on to Kuźnica and Rudnik. **Rudnik** is the
+ring's ore country — Polish for "ore-works" — anchored by its mining
+outpost **Halda** (market and repairs), with gates back to Starogród and
+on to Młynów.
 
-**Kuźnica** is the Fringe — the junction of the rush: NPCs are aggressive,
-the belt holds richer ore (cordite, lucidite), and the anomaly **Gniazdo**
-hides Marauders plus a Hierarch boss with the best loot. Its station,
-**Przystań**, is a freeport: it runs the level-2 board and doubles as the
-local insurance point (see Contracts & standing).
+**The Fringe.** **Kuźnica** is the junction of the rush — four gates, NPCs
+aggressive, the belt holding richer ore (cordite, lucidite), and the
+anomaly **Gniazdo** hiding Marauders plus a Hierarch boss with the best
+loot. Its station, **Przystań**, is a freeport: it runs the level-2 board,
+doubles as the local insurance point (see Contracts & standing) and builds
+things (see The factory). **Młynów** is the refinery step of the chain —
+its platform **Huta** refines and manufactures (market, refine, industry).
+**Kamieniec** is the shipyard country: **Doki**, its depot (market,
+fitting, industry), and the lane on to Głusza.
 
-**Pustkowie** is Unincorporated dead-end frontier — Old Works country,
-deliberately dangerous: glacierite belt ore and heavy spawns including
-Hierarchs, with no patrols at all. Travel system-to-system by flying to a
-stargate and pressing `J` — the starmap (`N`) shows the gate graph with
-your current system highlighted.
+**Unincorporated.** **Pustkowie** is the dead-end frontier — Old Works
+country, deliberately dangerous: glacierite belt ore and heavy spawns
+including Hierarchs, with no patrols and no station at all. **Głusza** is
+quiet in the wrong way; its Unincorporated freeport **Kantor** runs a
+market and little else. Travel system-to-system by flying to a stargate
+and pressing `J` — the starmap (`N`) shows the gate graph with your
+current system highlighted.
 
 ## Living universe
 
-The systems keep moving while you do something else. Three overlapping
-systems run underneath the economy:
+The systems keep moving while you do something else. Overlapping systems
+run underneath the economy:
 
 **NPC convoys haul cargo on the lanes.** Each system runs freighters
 (along the trade routes — they appear in the overview as **Tabor**) on
@@ -417,14 +482,17 @@ the raiders' guns off it. The incident ends one of three ways:
 You can intervene in any of them: strip the wreck, guard the convoy
 yourself, or let the rats do the work and take the loot.
 
-**Markets remember traffic.** A delivery books its exact units into the
-destination stock and nudges that item's price *down* (supply arrived);
-a shipment lost to an ambush steps the destination's price *up* — the
-risk premium. Both stay inside the system's charter-reach band, **±5% in
-Charter space, ±10% in the Fringe, ±20% in Unincorporated**, and a
-deviating price decays halfway back to its base every minute, so lanes
-that run get cheaper, dangerous lanes get dearer, and nothing ever runs
-away with the economy.
+**Deliveries land in the market.** A convoy's cargo is real: it is bought
+from the origin station's own stock (or drawn from the belt, or imported
+from outside the ring) at spawn and posted as fresh supply on the
+destination station's order book when it arrives — listed just under the
+local cost basis — which is why lanes that run get cheaper. A shipment
+lost to an ambush touches no book at all: the loss surfaces as a log line
+("Risk premium — …") and, if you are quick, a lootable cargo wreck with
+the exact shipment. Prices form in the books alone (see
+[The economy](#the-economy)); nothing drifts or decays behind your back.
+Convoys also run multi-system lanes: a hauler bound for a station in
+another system hops the gates and finishes its run there.
 
 ## Time acceleration
 

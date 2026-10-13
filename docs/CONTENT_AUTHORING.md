@@ -245,7 +245,8 @@ Both must be clean. Typical failures and their fixes:
 | `systems/sys-cinder: gate destination celestial ...`  | typo in `to_cel`, or the destination file doesn't define it |
 | `no reciprocal gate in ... pointing back to ...`      | add/fix the return gate in the other system |
 | `systems/sys-x: unreachable from start system ...`    | no gate path from `sys-solace` — chain gates from a reachable system |
-| `market orders present but no station exists`         | add a station celestial with `"station": {"services": [...]}` |
+| `system-level market block is not allowed ...`        | founding orders belong on the station's own `"station": {"market": [...]}` block |
+| `market orders on a station without the market service` | add `"market"` to that station's `"services"` |
 
 ## Recipe 2: add a ship
 
@@ -417,20 +418,30 @@ Ammo (needs `damage` + `ammo_class`; ammo items are category `ammo`):
 
 ## Recipe 6: add a market listing
 
-Orders live on the **system** (`systems/*.json` → `market`), shared by all
-stations in that system (the system must have ≥ 1 station):
+Founding orders live on the **station** (the station celestial's `station`
+block → `market`) — one order book per station, so list them where the
+trade should happen (the system must have ≥ 1 station):
 
 ```json
-"market": [
-  { "item": "mod-flak-turret", "qty": 15, "price": 275000 }
-]
+"station": {
+  "services": ["repair", "market", "refine", "fitting"],
+  "market": [
+    { "item": "mod-flak-turret", "qty": 15, "price": 275000 }
+  ]
+}
 ```
 
 - `item`: ItemID, **ShipID cast to ItemID** (e.g. `"ship-kestrel"`), or
   ModuleID — see "Market orders" above.
 - `qty`: finite stock, ≥ 1; `price`: euro per unit, ≥ 0.
+- `side`: `"sell"` (an ask — the default when omitted) or `"buy"` (a bid).
 - Put hull orders at their balance price (frigate 200k–400k) and module
   orders at the module's `price`.
+
+These are the book's **founding** endowment: finite, depleting with trades
+(no infinite restock). Ongoing flow — convoy deliveries, agent orders,
+respawn requisitions — is never conjured from data; it comes through the
+economy (see `docs/SIM.md`).
 
 ## Recipe 7: add a world / scenario checkpoint
 
@@ -451,7 +462,7 @@ stations in that system (the system must have ≥ 1 station):
     {
       "name": "Clear the den",
       "feature": "npc-death",
-      "detail": "Warp to cel-penumbra-den, kill all 5 rats; EvtDestroyed x5."
+      "detail": "Warp to cel-penumbra-den, kill all 5 rats; EvDestroyed x5."
     }
   ]
 }
@@ -571,7 +582,8 @@ Fields:
 |-------|---------|
 | `system` | the system this def configures (must exist; one def per system) |
 | `routes` | ≥ 1 one-way convoy legs. A hauler spawns at `from`, warps the leg through the normal align/cruise/decel profile, **delivers** `cargo` at `to` when `to` is a station, and despawns when `to` is a gate (leaves the system) or belt |
-| `routes[].from` / `to` | celestials **of this system**, kind `station`\|`gate`\|`belt`, and different from each other |
+| `routes[].from` / `to` | celestials (of this system when the leg is in-system), kind `station`\|`gate`\|`belt`, and different from each other |
+| `routes[].to_system` | optional: the destination system of a **cross-system lane** (empty = this def's own system). `to` must then exist in that system, and the validator checks there is a **gate path** between the two. Cross-system hauls hop the gate and continue from the journey ledger (they survive save/restore and grid rebuilds) |
 | `routes[].hull` | an existing hull (civilian haulers: `ship-npc-hauler`); cargo `qty × volume` must fit its `cargo` |
 | `routes[].cargo` | `{ "item": ..., "qty": ... }` — existing item, `qty >= 1` |
 | `routes[].interval_ticks` | authored cadence **in ticks** (60 ticks = 1 s), `>= 1`; security scales it (table below) |
@@ -579,23 +591,27 @@ Fields:
 | `raider` | the local ambush rat class. **Required when `security` is `low`/`null`**; must be an NPC that actually spawns in this system (belt/anomaly spawn groups). Leave unset in high security (ambush chance is 0) |
 
 Lifecycle: spawn at `from` (EvTraffic `departed`) → per-leg ambush roll at
-tunnel entry → deliver (`delivered`: exact integer stock + one supply price
-step down) or despawn at a gate/belt. Ambushed haulers burn away 20 s and
+tunnel entry → deliver (`delivered`: the shipment posts as supply on the
+destination station's book, one tick under `min(cost basis, best ask)`) or
+despawn at a gate/belt. Ambushed haulers burn away 20 s and
 then attempt the warp-out; scrambler/web-carrying raiders pin them until
 the patrol responds or they die. Outcomes: `destroyed` (wreck with the
-exact cargo, lootable via `CmdLoot`, plus a risk-premium price step up),
-`escaped`, or `saved`.
+exact cargo, lootable via `CmdLoot`, plus an event-only risk-premium
+line), `escaped`, or `saved`.
 
-Validation rejects: unknown/empty system, empty routes, endpoints outside
-the system or of the wrong kind, `from == to`, unknown hull/cargo/interval
-< 1/qty < 1, cargo volume exceeding the hull, missing raider in low/null,
-unknown or non-local raider, patrol hulls without a guard def.
+Validation rejects: unknown/empty system, empty routes, endpoints of the
+wrong kind, `to_system` without a gate path, `from == to`, unknown
+hull/cargo/interval < 1/qty < 1, cargo volume exceeding the hull, missing
+raider in low/null, unknown or non-local raider, patrol hulls without a
+guard def.
 
 ### Traffic calibration contract (the binding tables)
 
 Every constant is pinned by `sim.TestTrafficSecurityMathPinned`,
 `sim.TestTrafficSpawnRateBySecurity`, `sim.TestTrafficAttackChanceEmpirical`
-and `sim.TestTrafficMarket*`; the shipped TTK/DPS numbers are pinned by
+and the book-behavior tests `sim.TestTrafficDeliveriesTickTheBookDown` /
+`sim.TestTrafficNoDecayWithoutTrades` / `sim.TestTrafficSoakBooksNeverCross`;
+the shipped TTK/DPS numbers are pinned by
 `content.TestConvoyTimeToKillPinned`. Future traffic content must land
 inside them. The single derived quantity is the **security status σ**:
 
@@ -639,24 +655,21 @@ ambush response delay `1800×(1-σ)` ticks, wing `floor(3σ)`:
 | low  | 900 t (15 s) | 1 ship |
 | null | never | 0 |
 
-**Market drift** — band and step, all derived from σ and the shipment's
-value share of its shelf ("turnover" = listed `qty × price` of that item
-at that system; a brand-new shelf counts as share 1):
-
-| quantity | formula | high | low | null |
-|----------|---------|------|-----|------|
-| price band | `0.05 × 4^(1-σ)` (half the 10 % sell cut, widened by insecurity) | ±5 % | ±10 % | ±20 % |
-| delivery step `k` | `share × band / 2.5` | 2 % | 4 % | 8 % |
-| attack step `k` | `2 × share × band / 2.5` (risk premium) | 4 % | 8 % | 16 % |
-| decay | halve distance-to-base every **3600 ticks** (60 s) | — | — | — |
-
-`price' = clamp(base·(1-band), base·(1+band), price·(1±k))` where `base`
-is the authored market order's price (else the item's `base_price`); a
-step that would leave the band clamps silently. Worked example (shipped):
-120 `ore-cordite` (48 each) delivered to Przystań — no shelf yet, so
-share = 1, low band = 10 %, k = 1 × 10 %/2.5 = 4 %: 48 → **46.08**
-(the exact `EvMarket` "price falls to 46.08" line the showcase observes).
-Stock changes are always exact integers (units), never floats.
+**Delivery pricing** — the per-station order book is the price former (the
+old per-system price band / decay model is **deleted**; there is no drift
+to calibrate). A delivered shipment posts as an ask on the destination
+station's book at **one tick under `min(cost basis, best ask)`** — cost
+basis being the weighted price the origin's asks were withdrawn at, or the
+item's `base_price` for belt/gate (import) shipments — so arriving supply
+always improves the displayed price, and a posting that crosses the
+destination's bids executes immediately at the resting bid (never-crossed
+invariant). Stock changes are always exact integers (units), never floats.
+A shipment lost in an ambush touches no book at all: it surfaces only as
+the event line `Risk premium — <item> shipment lost en route to <station>`
+(a supply-risk signal, not a price step). Worked example (shipped): 600
+`charge-emp` imported through a gate land as a 600-unit ask one tick under
+its base price (`4.999 €` for a `5.00 €` base). The mechanics behind all
+of this are documented in [SIM.md](SIM.md).
 
 ## Recipes (manufacturing)
 
@@ -695,8 +708,8 @@ dir; one themed file per product family):
 | `product` | the ItemID / ShipID / ModuleID produced. Resolves like a market order: item first, then ship, then module. Unknown product, or a product in category `ore`/`mineral`/`loot`, is a validation error |
 | `qty` | units produced per run (1 for hulls and modules; charge runs are batched — shipped batches are 100) |
 | `inputs` | minerals only (`min-*` ids, category `mineral`), each `item` + `qty` in whole units |
-| `time` | seconds per run at craft level 0: **30–90 s** for charges/modules, **2–5 min** for hulls (session-visible timescale) |
-| `family` | craft-growth key for the future station skill tracking: `hulls` \| `modules` \| `charges` |
+| `time` | seconds per run at the craft-L1 baseline (each craft level above L1 cuts 4 %): **30–90 s** for charges/modules, **2–5 min** for hulls (session-visible timescale) |
+| `family` | the station craft-growth key (`CraftLevel` in `sim`): `hulls` \| `modules` \| `charges` |
 
 v1 ships **exactly one recipe per product**, but the schema is a list:
 extra `rec-*` rows for the same product are legal data when the crafting
@@ -730,8 +743,9 @@ increasing — a barge burns more minerals than a sloop
 ### `family` vocabulary
 
 `hulls` | `modules` | `charges` — deliberately tiny. The family is the
-craft-growth key station skill tracking will hang off, so it groups by how
-the product is built, not by what it does. Adding a family is a schema
+craft-growth key a station's `CraftLevel` hangs off (`docs/SIM.md`,
+"world metabolism"), so it groups by how the product is built, not by what
+it does. Adding a family is a schema
 change (the `Family*` constants in `content/model.go`), not free-form data;
 the validator rejects anything outside the three.
 
@@ -746,8 +760,8 @@ words from `docs/lore/NAMING.md`, and never a retired placeholder name.
 
 Manufacturing runs at stations offering the `industry` service (the closed
 set lives in `content/validate.go`: `repair | market | refine | fitting |
-industry`). Shipped, Przystań (`cel-penumbra-port`, the Kuźnica yard
-station) carries it.
+industry`). Shipped, Przystań (`cel-penumbra-port`, the Kuźnica freeport),
+Huta (`cel-huta`, Młynów) and Doki (`cel-doki`, Kamieniec) carry it.
 
 ## Checklist before you finish
 
@@ -772,7 +786,7 @@ station) carries it.
    bounties 5k–250k; resists in [0,1); refine yields in (0,1] summing ≤ 1;
    weapons `shot_time > 0` with non-zero damage; active modules
    `activation_time > 0`; contract rewards inside the Recipe 8 payout
-   ratio table; traffic cadences/probabilities/market drift inside the
+   ratio table; traffic cadences/probabilities inside the
    Recipe 9 calibration tables; recipe material cost inside the 55–75 %
    envelope with hull recipes costing more than module recipes
    [Recipes (manufacturing)](#recipes-manufacturing).
