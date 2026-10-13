@@ -300,8 +300,10 @@ type TrafficAttack struct {
 	Outcome   string       `json:"outcome,omitempty"` // "" | destroyed | escaped | saved
 }
 
-// Traffic marks a convoy hauler and carries its one-way leg: origin,
-// destination, cargo, and the live ambush state (nil until attacked).
+// Traffic marks a convoy hauler and carries its shipment: the current leg
+// (Origin/Dest), the route's final destination (DestSys/DestCel), the
+// spawn-time provenance (Item/Qty/Basis), and the live ambush state (nil
+// until attacked).
 type Traffic struct {
 	Origin content.CelID  `json:"origin"`
 	Dest   content.CelID  `json:"dest"`
@@ -311,6 +313,35 @@ type Traffic struct {
 	Rolled bool           `json:"rolled"` // the per-leg attack roll was consumed
 	Next   float64        `json:"next"`   // earliest next warp (re)attempt (sim time)
 	Attack *TrafficAttack `json:"attack,omitempty"`
+	// Basis is the shipment's cost basis (€/unit), fixed when the cargo is
+	// SOURCED at spawn: the origin station's weighted ask price, or the
+	// item's base price for belt and gate (import) origins. The origin book
+	// (or belt state) was already debited then, so delivery only posts and
+	// a loss never reverses anything.
+	Basis float64 `json:"basis,omitempty"`
+	// DestSys/DestCel are the route's FINAL destination (system +
+	// celestial); Dest is the current leg's target — a next-hop gate while
+	// DestSys is still ahead, the destination itself on the last leg. An
+	// empty DestSys reads as the spawn system (pre-cross-system saves).
+	DestSys content.SystemID `json:"dsys,omitempty"`
+	DestCel content.CelID    `json:"dcel,omitempty"`
+}
+
+// TrafficJourney is a shipment parked between grids: it hopped a gate (or
+// the grid was rebuilt under it) and flies again when System loads next.
+// Park order is the canonical serialization order (Save.TrafficJourneys);
+// a resumed journey spawns a hauler at At carrying the recorded provenance.
+type TrafficJourney struct {
+	System  content.SystemID `json:"system"` // system the continuation flies in
+	At      core.Vec2        `json:"at"`     // spawn position there (entry gate or mid-leg)
+	DestSys content.SystemID `json:"dsys"`   // final destination system
+	DestCel content.CelID    `json:"dcel"`   // final destination celestial (in DestSys)
+	Item    content.ItemID   `json:"item"`
+	Qty     int              `json:"qty"`
+	Basis   float64          `json:"basis"` // cost basis carried from spawn-time sourcing
+	Hull    content.ShipID   `json:"hull"`
+	Rolled  bool             `json:"rolled"` // the parked leg's ambush roll was consumed
+	Next    float64          `json:"next"`   // warp retry cooldown (sim time)
 }
 
 // Patrol response states (Patrol.State).
@@ -532,11 +563,15 @@ const (
 	EvTraffic        EventKind = "traffic"
 )
 
-// EvTraffic phases: "departed" | "delivered" | "attacked" | "destroyed" |
-// "escaped" | "patrol-response" | "saved". Event.System carries the system ID
-// and Event.Cel the route endpoint / incident celestial.
+// EvTraffic phases: "departed" | "jumped" | "delivered" | "attacked" |
+// "destroyed" | "escaped" | "patrol-response" | "saved". Event.System carries
+// the system ID and Event.Cel the route endpoint / incident celestial.
 const (
-	TrafficDeparted       = "departed"
+	TrafficDeparted = "departed"
+	// TrafficJumped is the cross-system gate hop: the hauler vanished
+	// through the gate and its shipment parked as a journey (see
+	// Save.TrafficJourneys) for the far system to continue.
+	TrafficJumped         = "jumped"
 	TrafficDelivered      = "delivered"
 	TrafficAttacked       = "attacked"
 	TrafficDestroyed      = "destroyed"
@@ -998,4 +1033,10 @@ type Save struct {
 	// Craft is each station's per-family craft counter (completed runs +
 	// idle ticks), sorted by (station, family) — the CraftLevel input.
 	Craft []SavedCraft `json:"craft,omitempty"`
+
+	// ---- logistics: shipments parked between grids ----
+	// TrafficJourneys are convoys waiting to continue in another system
+	// (a gate hop, or the grid rebuilt under them mid-leg), in park order —
+	// the canonical serialization (Hash) of the journey ledger.
+	TrafficJourneys []TrafficJourney `json:"traffic_journeys,omitempty"`
 }

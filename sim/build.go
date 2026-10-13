@@ -146,6 +146,9 @@ func (s *Sim) loadSystem(id content.SystemID, entryAtCel content.CelID) error {
 	if !ok {
 		return errf("sim: unknown system %s", id)
 	}
+	// Live convoys survive the rebuild as parked journeys (their cargo was
+	// sourced at spawn — the grid going away must not destroy it silently).
+	s.trafficParkGrid()
 	for _, e := range s.allEntities() {
 		if e != s.player {
 			s.destroy(e)

@@ -26,11 +26,44 @@ import (
 func trafficContent() *content.Content {
 	c := testContent()
 	sysA := c.Systems["sys-a"]
+	// Provenance backstops for the soak tests: a deep second min-ferrite
+	// ask behind Haven Rest's 500-unit founding ask (spawn-time route
+	// withdrawals would exhaust it after five shipments) — the 500 ask
+	// stays first in price-time order, so the lifecycle/tick-down pins
+	// (500 -> 400 -> 300) still read it — and a founding charge-emp ask on
+	// Dock Two, the origin of the non-delivering route (station origins
+	// must carry the stock they ship; it never spawns ex nihilo).
+	for i := range sysA.Celestials {
+		if sysA.Celestials[i].ID == "cel-station-a" {
+			sysA.Celestials[i].Station.Market = append(sysA.Celestials[i].Station.Market,
+				content.MarketOrderDef{Item: "min-ferrite", Qty: 100000, Price: 10})
+			break
+		}
+	}
 	sysA.Celestials = append(sysA.Celestials, content.CelestialDef{
 		ID: "cel-a-dock", Name: "Dock Two", Kind: content.CelStation,
 		Position: core.Vec2{X: 1.5e7, Y: -5e6}, Radius: 500,
-		Station: &content.StationDef{Services: []string{"repair", "market"}},
+		Station: &content.StationDef{
+			Services: []string{"repair", "market"},
+			Market: []content.MarketOrderDef{
+				{Item: "charge-emp", Qty: 100000, Price: 5},
+			},
+		},
 	})
+	// The sys-b belt must outlast the soak tests' spawn-time ore draws:
+	// drawBeltOre debits belt volume per belt-origin shipment, and the
+	// founding 50 m³ would dry (and deplete the rock) long before the
+	// pinned departure counts.
+	sysB := c.Systems["sys-b"]
+	for i := range sysB.Celestials {
+		bel := sysB.Celestials[i].Belt
+		if bel == nil {
+			continue
+		}
+		for j := range bel.Asteroids {
+			bel.Asteroids[j].Volume = 100000
+		}
+	}
 
 	c.Ships["ship-convoy"] = &content.ShipDef{
 		ID: "ship-convoy", Name: "Convoy Hauler", Class: "industrial",
@@ -345,7 +378,13 @@ func TestTrafficSecurityMathPinned(t *testing.T) {
 func TestTrafficLifecycleDeliveryOrder(t *testing.T) {
 	s := newTrafficSim(t)
 	var evs []Event
+	originAtSpawn := -1
 	if !runUntil(t, s, &evs, 3000, func() bool {
+		// Provenance is booked at SPAWN: the moment the first hauler
+		// departs, Haven Rest's ask must already carry the withdrawal.
+		if originAtSpawn < 0 && firstPhase(evs, EvTraffic, TrafficDeparted) != nil {
+			originAtSpawn, _ = askAt(s, "cel-station-a", "min-ferrite")
+		}
 		return firstPhase(evs, EvTraffic, TrafficDelivered) != nil
 	}) {
 		t.Fatalf("no delivery within 3000 ticks; events=%v", trafficTexts(evs))
@@ -371,13 +410,17 @@ func TestTrafficLifecycleDeliveryOrder(t *testing.T) {
 	if s.World.Alive(delivered.Actor) {
 		t.Fatal("hauler still alive after delivery")
 	}
-	// Provenance: the 100 units were fulfilled from Haven Rest's ask
-	// (500 -> 400) and list as supply on Dock Two's book — one tick under
-	// the 10.00 € cost basis, so the displayed price fell (500 -> 400
-	// withdrawal is a transfer, never a trade).
-	originQty, originPrice := askAt(s, "cel-station-a", "min-ferrite")
-	if originQty != 400 || originPrice != 10 {
-		t.Fatalf("origin ask = %d @ %v, want 400 @ 10 (the shipment came from there)",
+	// Provenance: the 100 units were fulfilled from Haven Rest's ask AT
+	// SPAWN (500 -> 400 — the withdrawal is a transfer, never a trade) and
+	// list as supply on Dock Two's book — one tick under the 10.00 € cost
+	// basis, so the displayed price fell.
+	if originAtSpawn != 400 {
+		t.Fatalf("origin ask at spawn = %d, want 400 (the shipment was sourced there)", originAtSpawn)
+	}
+	// Delivery never touches the origin again: no reversal, no second
+	// debit (a later scheduled spawn may have drawn another shipment).
+	if originQty, originPrice := askAt(s, "cel-station-a", "min-ferrite"); originQty > 400 || originPrice != 10 {
+		t.Fatalf("origin ask after delivery = %d @ %v, want <= 400 @ 10 (no delivery-time debit)",
 			originQty, originPrice)
 	}
 	dockQty, dockPrice := askAt(s, "cel-a-dock", "min-ferrite")

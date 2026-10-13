@@ -13,12 +13,12 @@ import (
 // ---------------------------------------------------------------------------
 
 // TestEmbeddedTrafficValid runs structural checks over every shipped
-// traffic def: endpoints live in their system, cargo fits the hull, and the
-// security/raider/patrol rules hold.
+// traffic def: endpoints live in their (destination) system, cargo fits
+// the hull, and the security/raider/patrol rules hold.
 func TestEmbeddedTrafficValid(t *testing.T) {
 	c := MustLoad()
-	if len(c.Traffic) != 3 {
-		t.Fatalf("traffic defs = %d, want 3 (solace, penumbra, gloam)", len(c.Traffic))
+	if len(c.Traffic) != 7 {
+		t.Fatalf("traffic defs = %d, want 7 (solace, penumbra, gloam + the Kresy ring: rudnik, mlynow, kamieniec, glusza)", len(c.Traffic))
 	}
 	for _, sys := range keys(c.Traffic) {
 		td := c.Traffic[sys]
@@ -41,16 +41,30 @@ func TestEmbeddedTrafficValid(t *testing.T) {
 			if r.Cargo.Qty < 1 {
 				t.Errorf("%s/routes[%d]: cargo qty %d < 1", ctx, i, r.Cargo.Qty)
 			}
-			for _, end := range []CelID{r.From, r.To} {
-				cel := celestialIn(sysDef, end)
+			// `from` lives in this system; `to` lives in to_system (cross-
+			// system lanes) or, by default, in this system.
+			toSys, toSysDef := sys, sysDef
+			if r.ToSystem != "" && r.ToSystem != sys {
+				toSys, toSysDef = r.ToSystem, c.Systems[r.ToSystem]
+			}
+			for _, end := range []struct {
+				id  CelID
+				sys SystemID
+				def *SystemDef
+			}{{r.From, sys, sysDef}, {r.To, toSys, toSysDef}} {
+				if end.def == nil {
+					t.Errorf("%s/routes[%d]: endpoint %q not in %s (unknown system)", ctx, i, end.id, end.sys)
+					continue
+				}
+				cel := celestialIn(end.def, end.id)
 				if cel == nil {
-					t.Errorf("%s/routes[%d]: endpoint %q not in %s", ctx, i, end, sys)
+					t.Errorf("%s/routes[%d]: endpoint %q not in %s", ctx, i, end.id, end.sys)
 					continue
 				}
 				switch cel.Kind {
 				case CelStation, CelGate, CelBelt:
 				default:
-					t.Errorf("%s/routes[%d]: endpoint %q is kind %q", ctx, i, end, cel.Kind)
+					t.Errorf("%s/routes[%d]: endpoint %q is kind %q", ctx, i, end.id, cel.Kind)
 				}
 			}
 			hull, ok := c.Ships[r.Hull]

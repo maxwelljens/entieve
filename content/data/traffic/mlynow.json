@@ -1,0 +1,26 @@
+{
+  "system": "sys-mlynow",
+  "routes": [
+    {
+      "from": "cel-huta",
+      "to": "cel-halda",
+      "to_system": "sys-rudnik",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "charge-fusion", "qty": 400 },
+      "interval_ticks": 7200
+    },
+    {
+      "from": "cel-huta",
+      "to": "cel-doki",
+      "to_system": "sys-kamieniec",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "charge-ap", "qty": 400 },
+      "interval_ticks": 7200
+    }
+  ],
+  "patrol": {
+    "hulls": ["ship-npc-patrol"],
+    "interval_ticks": 9000
+  },
+  "raider": "npc-rat-marauder"
+}

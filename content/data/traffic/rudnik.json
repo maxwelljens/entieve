@@ -1,0 +1,21 @@
+{
+  "system": "sys-rudnik",
+  "routes": [
+    {
+      "from": "cel-rudnik-belt",
+      "to": "cel-huta",
+      "to_system": "sys-mlynow",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "ore-sterngrit", "qty": 500 },
+      "interval_ticks": 7200
+    },
+    {
+      "from": "cel-rudnik-belt",
+      "to": "cel-haven-rest",
+      "to_system": "sys-solace",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "ore-cordite", "qty": 400 },
+      "interval_ticks": 7200
+    }
+  ]
+}

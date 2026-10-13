@@ -22,6 +22,23 @@ import (
 // Prices are NOT in this table anymore: the per-station order books are the
 // only price former (see system_economy.go). Deliveries post supply on the
 // destination's book; a lost shipment is an event-only supply-risk signal.
+//
+// Cargo provenance — route cargo is SOURCED at spawn, never conjured:
+//   - station origin  → marketWithdraw from that station's own asks (the
+//     weighted price paid becomes the shipment's cost basis);
+//   - belt origin     → the volume is drawn from the persistent belt state
+//     (dry belt → no shipment this cycle);
+//   - gate origin     → the world boundary: shipments arriving from outside
+//     the simulated region spawn undeighted and post as supply only at the
+//     destination. This is the economy's one sanctioned import — everything
+//     inside the ring is conserved.
+//
+// An origin without the stock spawns nothing this cycle (an informational
+// event, never a conjured unit). The debited goods ride the hauler's hold;
+// a destroyed hauler takes them to the wreck (lootable) and no reversal
+// ever touches the origin book. Cross-system hauls park the shipment as a
+// journey (Save.TrafficJourneys) when they cross a gate or when the grid
+// rebuilds under them, and continue when the destination system loads.
 // ---------------------------------------------------------------------------
 
 const (
@@ -155,13 +172,16 @@ func trafficDue(ticks int64, key string, interval int64) bool {
 // The system
 // ---------------------------------------------------------------------------
 
-// systemTraffic advances the living-universe layer: convoy haulers spawn on
-// their security-scaled schedules and fly one-way legs through the warp
-// profile; each tunnel entry rolls the per-leg ambush chance; live ambushes
-// drive raiders (real lock/activate/turret/damage pipeline), dispatch the
-// patrol response, and resolve into destroyed / escaped / saved outcomes;
-// a delivered shipment posts supply on the destination station's book (the
-// order books form prices — see system_economy.go).
+// systemTraffic advances the living-universe layer: parked journeys resume
+// in this grid, convoy haulers spawn on their security-scaled schedules
+// (cargo sourced at spawn — see the provenance contract in this file's
+// header) and fly their legs through the warp profile; each tunnel entry
+// rolls the per-leg ambush chance; live ambushes drive raiders (real
+// lock/activate/turret/damage pipeline), dispatch the patrol response, and
+// resolve into destroyed / escaped / saved outcomes; a delivered shipment
+// posts supply on the destination station's book (the order books form
+// prices — see system_economy.go), while a cross-system hauler that
+// reaches a gate parks its shipment for the far system to continue.
 //
 // Runs after every other system: warp landings, deaths and NPC state are
 // already settled for the tick, and any intents set here fly next tick's
@@ -171,6 +191,9 @@ func (s *Sim) systemTraffic() {
 	if sys == nil {
 		return
 	}
+	// Shipments waiting in this grid (gate hops, reloads) fly on before
+	// fresh spawns: they are owed cargo, and they count against the live cap.
+	s.trafficResumeJourneys(sys)
 	var td *content.TrafficDef
 	if t, ok := s.Content.TrafficFor(sys.ID); ok {
 		td = t
@@ -216,7 +239,8 @@ func (s *Sim) trafficExpireLeaves() {
 // ---------------------------------------------------------------------------
 
 // trafficSpawnHaulers fires each route's spawn attempt when its schedule is
-// due and the live cap allows.
+// due and the live cap allows. A due attempt whose origin carries no stock
+// fires nothing (trafficSource emits the event and draws no entropy).
 func (s *Sim) trafficSpawnHaulers(sys *content.SystemDef, td *content.TrafficDef, sec string) {
 	if s.Traffic.Len() >= trafficMaxLive {
 		return
@@ -234,17 +258,43 @@ func (s *Sim) trafficSpawnHaulers(sys *content.SystemDef, td *content.TrafficDef
 }
 
 // spawnTrafficHauler creates one convoy hauler at the route's origin
-// celestial and kicks off its leg through the warp profile.
+// celestial and kicks off its first leg. The cargo is sourced out of the
+// world BEFORE the ship exists (trafficSource): an origin without the
+// stock spawns nothing this cycle — route cargo is never conjured. The
+// first leg ends at the route's destination (same system) or at the
+// next-hop gate toward it (cross-system route).
 func (s *Sim) spawnTrafficHauler(sys *content.SystemDef, td *content.TrafficDef, r content.RouteDef) {
 	hull, ok := s.Content.Ship(r.Hull)
 	if !ok {
 		return
 	}
 	from := sysCelestial(sys, r.From)
-	to := sysCelestial(sys, r.To)
-	if from == nil || to == nil {
+	if from == nil {
 		return
 	}
+	destSys := r.ToSystem
+	if destSys == "" {
+		destSys = sys.ID
+	}
+	destDef, ok := s.Content.System(destSys)
+	if !ok {
+		return
+	}
+	to := sysCelestial(destDef, r.To)
+	if to == nil {
+		return
+	}
+	target := r.To
+	if destSys != sys.ID {
+		if target = s.trafficNextHop(sys.ID, destSys); target == "" {
+			return
+		}
+	}
+	basis, ok := s.trafficSource(sys, from, r.Cargo)
+	if !ok {
+		return
+	}
+
 	spread := from.Radius
 	if spread < 1000 {
 		spread = 1000
@@ -253,9 +303,22 @@ func (s *Sim) spawnTrafficHauler(sys *content.SystemDef, td *content.TrafficDef,
 	rad := s.trafficRNG.Range(0, spread)
 	pos := from.Position.Add(core.Vec2{X: math.Cos(angle) * rad, Y: math.Sin(angle) * rad})
 
+	e := s.createHauler(hull, pos, angle, Traffic{
+		Origin: r.From, Dest: target, DestSys: destSys, DestCel: r.To,
+		Item: r.Cargo.Item, Qty: r.Cargo.Qty, Basis: basis, Phase: TrafficTransit,
+	})
+	s.emit(Event{Kind: EvTraffic, Phase: TrafficDeparted, Severity: SevInfo, Actor: e,
+		System: sys.ID, Cel: r.From, Item: r.Cargo.Item, Value: float64(r.Cargo.Qty),
+		Text: "Convoy hauler departs " + from.Name + " bound for " + to.Name})
+}
+
+// createHauler builds a convoy hauler entity: ship, hold carrying exactly
+// the shipment, targeting, and the Traffic component (spawn state or a
+// resumed journey's continuation state).
+func (s *Sim) createHauler(hull *content.ShipDef, pos core.Vec2, facing float64, tc Traffic) ecs.Entity {
 	e := s.create()
 	s.Names.Set(e, Name{Value: hull.Name})
-	s.Transforms.Set(e, Transform{Pos: pos, Facing: angle})
+	s.Transforms.Set(e, Transform{Pos: pos, Facing: facing})
 	s.Motions.Set(e, Motion{
 		Mass: hull.Mass, MaxSpeed: hull.MaxSpeed, Agility: hull.Agility,
 		SigRadius: hull.SigRadius, SpeedMultiplier: 1, WebFactor: 1,
@@ -267,22 +330,86 @@ func (s *Sim) spawnTrafficHauler(sys *content.SystemDef, td *content.TrafficDef,
 	})
 	s.Caps.Set(e, Capacitor{Current: hull.Capacitor, Capacity: hull.Capacitor, Tau: hull.Recharge})
 	s.Cargos.Set(e, Cargo{
-		Stacks:      []content.CargoStack{{Item: r.Cargo.Item, Qty: r.Cargo.Qty}},
+		Stacks:      []content.CargoStack{{Item: tc.Item, Qty: tc.Qty}},
 		Capacity:    hull.Cargo,
 		OreCapacity: hull.OreHold,
 	})
 	s.Targetings.Set(e, Targeting{
 		MaxTargets: hull.MaxTargets, MaxRange: hull.MaxTargetRange, ScanRes: hull.ScanResolution,
 	})
-	s.Traffic.Set(e, Traffic{
-		Origin: r.From, Dest: r.To, Item: r.Cargo.Item, Qty: r.Cargo.Qty,
-		Phase: TrafficTransit,
-	})
+	s.Traffic.Set(e, tc)
 	s.recomputeFit(e)
 	s.healToFull(e)
-	s.emit(Event{Kind: EvTraffic, Phase: TrafficDeparted, Severity: SevInfo, Actor: e,
-		System: sys.ID, Cel: r.From, Item: r.Cargo.Item, Value: float64(r.Cargo.Qty),
-		Text: "Convoy hauler departs " + from.Name + " bound for " + to.Name})
+	return e
+}
+
+// trafficSource draws a route's cargo out of the world at SPAWN time and
+// returns its cost basis (see the provenance contract in the header). An
+// origin without the stock spawns nothing this cycle.
+func (s *Sim) trafficSource(sys *content.SystemDef, from *content.CelestialDef, cargo content.RouteCargo) (float64, bool) {
+	switch {
+	case from.Station != nil:
+		// The availability check and the withdrawal run back-to-back in one
+		// tick — nothing mutates the book between them, so the take is
+		// always the full shipment (no partial draw to leak).
+		if s.marketAskQty(from.ID, cargo.Item) < cargo.Qty {
+			s.noStockToShip(sys, from, cargo)
+			return 0, false
+		}
+		taken, paid := s.marketWithdraw(from.ID, cargo.Item, cargo.Qty)
+		if taken < cargo.Qty { // unreachable: see above
+			s.noStockToShip(sys, from, cargo)
+			return 0, false
+		}
+		return paid / float64(taken), true
+	case from.Belt != nil:
+		need := s.itemVolume(cargo.Item) * float64(cargo.Qty)
+		if !s.beltOreAvailable(sys.ID, need) {
+			s.noStockToShip(sys, from, cargo)
+			return 0, false
+		}
+		if !s.drawBeltOre(sys.ID, need) { // dry run passed: cannot fail
+			s.noStockToShip(sys, from, cargo)
+			return 0, false
+		}
+		return s.marketBasePrice(cargo.Item), true
+	case from.Gate != nil:
+		// Import boundary: goods arriving from outside the simulated region.
+		// Nothing is debited anywhere — the gate is where the ring's
+		// conservation stops, and the shipment posts as supply at the
+		// destination like every other convoy delivery.
+		return s.marketBasePrice(cargo.Item), true
+	default:
+		// Stars/planets carry no stock (route validation rejects them as
+		// endpoints anyway): never conjure.
+		s.noStockToShip(sys, from, cargo)
+		return 0, false
+	}
+}
+
+// noStockToShip announces a spawn attempt skipped for want of stock: the
+// route's origin simply does not carry the cargo right now.
+func (s *Sim) noStockToShip(sys *content.SystemDef, from *content.CelestialDef, cargo content.RouteCargo) {
+	s.emit(Event{Kind: EvLog, Severity: SevInfo, System: sys.ID, Cel: from.ID,
+		Item: cargo.Item, Value: float64(cargo.Qty),
+		Text: "no " + s.itemName(cargo.Item) + " to ship from " + from.Name})
+}
+
+// marketAskQty sums a station's resting asks for an item — the dry run
+// before the spawn-time provenance withdrawal (marketWithdraw takes asks
+// in price-time order, so a covered check always yields a full take).
+func (s *Sim) marketAskQty(station StationID, item content.ItemID) int {
+	book := s.market[station]
+	if book == nil {
+		return 0
+	}
+	n := 0
+	for _, o := range book.Orders {
+		if o.Item == item && o.Side == OrderSell {
+			n += o.Qty
+		}
+	}
+	return n
 }
 
 // trafficSpawnPatrol fires the patrol schedule: one guard ship per attempt,
@@ -365,8 +492,8 @@ func (s *Sim) spawnPatrolShip(sys *content.SystemDef, hull content.ShipID) ecs.E
 
 // trafficDriveHaulers runs every live convoy hauler: burn away during the
 // ambush window, roll the per-leg ambush at tunnel entry, mark escapes,
-// deliver (or despawn at a gate/belt) on arrival, and (re)issue the leg
-// warp on cooldown.
+// hop the gate (cross-system leg), deliver, or despawn at a same-system
+// gate/belt on arrival, and (re)issue the leg warp on cooldown.
 func (s *Sim) trafficDriveHaulers(sys *content.SystemDef, td *content.TrafficDef, sec string) {
 	for _, e := range sortedEntities(s.Traffic) {
 		tc, ok := s.Traffic.Get(e)
@@ -509,14 +636,20 @@ func (s *Sim) trafficEscaped(e ecs.Entity, tc *Traffic) {
 	s.scheduleRaidersLeave(atk)
 }
 
-// trafficArrive resolves a completed leg: a station endpoint delivers the
-// cargo as supply on that station's own book; any other endpoint despawns
-// the hauler (it leaves the system through a gate or finishes its run at a
-// belt).
+// trafficArrive resolves a completed leg. A station endpoint delivers the
+// cargo as supply on that station's own book; a leg whose route's final
+// destination is in another system hops through the gate it reached (the
+// shipment parks as a journey for the far system); any other endpoint
+// despawns the hauler (it leaves the system through a same-system gate or
+// finishes its run at a belt).
 func (s *Sim) trafficArrive(sys *content.SystemDef, e ecs.Entity, tc *Traffic) {
 	dest := sysCelestial(sys, tc.Dest)
 	if dest == nil {
 		s.destroy(e)
+		return
+	}
+	if tc.DestSys != "" && tc.DestSys != sys.ID {
+		s.trafficHop(sys, e, tc, dest)
 		return
 	}
 	if dest.Station != nil {
@@ -526,23 +659,219 @@ func (s *Sim) trafficArrive(sys *content.SystemDef, e ecs.Entity, tc *Traffic) {
 	s.destroy(e)
 }
 
+// trafficHop completes a cross-system leg: the hauler jumps through the
+// gate it reached and the shipment parks as a journey (Save.TrafficJourneys)
+// in the far system — it flies on when that grid loads next. The far-system
+// leg is a NEW leg: its ambush roll is unconsumed (per-leg risk under the
+// destination's own security), and any live ambush dies with this grid.
+func (s *Sim) trafficHop(sys *content.SystemDef, e ecs.Entity, tc *Traffic, gate *content.CelestialDef) {
+	if gate.Gate == nil {
+		// A cross-system leg always ends at a gate (route validation):
+		// nothing sane to do otherwise — drop the leg as before.
+		s.destroy(e)
+		return
+	}
+	nextSys := gate.Gate.ToSystem
+	nextDef, ok := s.Content.System(nextSys)
+	if !ok {
+		s.destroy(e)
+		return
+	}
+	entry := sysCelestial(nextDef, gate.Gate.ToCel)
+	var at core.Vec2
+	if entry != nil {
+		at = entry.Position
+	}
+	hull := content.ShipID("")
+	if sh, ok := s.Ships.Get(e); ok {
+		hull = sh.Hull
+	}
+	s.trafficJourneys = append(s.trafficJourneys, TrafficJourney{
+		System: nextSys, At: at, DestSys: tc.DestSys, DestCel: tc.DestCel,
+		Item: tc.Item, Qty: tc.Qty, Basis: tc.Basis, Hull: hull,
+	})
+	s.emit(Event{Kind: EvTraffic, Phase: TrafficJumped, Severity: SevInfo, Actor: e,
+		System: sys.ID, Cel: gate.ID, Item: tc.Item, Value: float64(tc.Qty),
+		Text: "Convoy hauler jumps through " + gate.Name + " to " + nextDef.Name})
+	s.destroy(e)
+}
+
+// trafficParkGrid parks every live convoy hauler just before the grid is
+// rebuilt (see loadSystem): the shipment keeps its provenance and final
+// destination as a journey record, so cargo sourced at spawn can never
+// vanish silently with the grid — it flies again when its system loads. A
+// live ambush does not survive the reload (its raiders die with the grid);
+// the hauler continues its leg, and the roll it already consumed stays
+// consumed.
+func (s *Sim) trafficParkGrid() {
+	for _, e := range sortedEntities(s.Traffic) {
+		tc, ok := s.Traffic.Get(e)
+		if !ok {
+			continue
+		}
+		tr, ok := s.Transforms.Get(e)
+		if !ok {
+			continue
+		}
+		hull := content.ShipID("")
+		if sh, ok := s.Ships.Get(e); ok {
+			hull = sh.Hull
+		}
+		destCel := tc.DestCel
+		if destCel == "" { // pre-cross-system Traffic: the leg target was the destination
+			destCel = tc.Dest
+		}
+		s.trafficJourneys = append(s.trafficJourneys, TrafficJourney{
+			System: s.systemID, At: tr.Pos, DestSys: tc.DestSys, DestCel: destCel,
+			Item: tc.Item, Qty: tc.Qty, Basis: tc.Basis, Hull: hull,
+			Rolled: tc.Rolled, Next: tc.Next,
+		})
+	}
+}
+
+// trafficResumeJourneys respawns every journey waiting in the active grid.
+// Journeys of other systems stay parked (they do not tick while the player
+// is away — the respawn-timer rule applies to shipments too). A journey
+// whose route can no longer resolve on this grid resolves as a lost
+// shipment (event, no book movement, no re-spawn: the origin was debited
+// at spawn) — content is static, so this is a backstop.
+func (s *Sim) trafficResumeJourneys(sys *content.SystemDef) {
+	if len(s.trafficJourneys) == 0 {
+		return
+	}
+	kept := make([]TrafficJourney, 0, len(s.trafficJourneys))
+	for i := range s.trafficJourneys {
+		j := s.trafficJourneys[i]
+		if j.System != s.systemID {
+			kept = append(kept, j)
+			continue
+		}
+		destSys := j.DestSys
+		if destSys == "" { // pre-cross-system saves: the journey ends here
+			destSys = j.System
+		}
+		target := j.DestCel
+		if destSys != s.systemID {
+			if target = s.trafficNextHop(s.systemID, destSys); target == "" {
+				s.trafficJourneyLost(sys, j, destSys)
+				continue
+			}
+		} else if sysCelestial(sys, target) == nil {
+			s.trafficJourneyLost(sys, j, destSys)
+			continue
+		}
+		hull, ok := s.Content.Ship(j.Hull)
+		if !ok {
+			s.trafficJourneyLost(sys, j, destSys)
+			continue
+		}
+		s.spawnResumedHauler(sys, hull, j, target)
+	}
+	s.trafficJourneys = kept
+}
+
+// spawnResumedHauler re-creates a parked shipment's hauler at its recorded
+// position with its provenance intact and announces the continuation. No
+// RNG draws: the parked position is exact.
+func (s *Sim) spawnResumedHauler(sys *content.SystemDef, hull *content.ShipDef, j TrafficJourney, target content.CelID) {
+	e := s.createHauler(hull, j.At, 0, Traffic{
+		Dest: target, DestSys: j.DestSys, DestCel: j.DestCel,
+		Item: j.Item, Qty: j.Qty, Basis: j.Basis,
+		Phase: TrafficTransit, Rolled: j.Rolled, Next: j.Next,
+	})
+	nearID, nearName := s.nearestLandmark(j.At)
+	destName := string(j.DestCel)
+	if destDef, ok := s.Content.System(j.DestSys); ok {
+		destName = celIDOrName(destDef, j.DestCel)
+	}
+	s.emit(Event{Kind: EvTraffic, Phase: TrafficDeparted, Severity: SevInfo, Actor: e,
+		System: sys.ID, Cel: nearID, Item: j.Item, Value: float64(j.Qty),
+		Text: "Convoy hauler departs " + nearName + " bound for " + destName})
+}
+
+// trafficJourneyLost announces a parked shipment that can no longer
+// continue — honest loss: an event, no book movement, no re-spawn.
+func (s *Sim) trafficJourneyLost(sys *content.SystemDef, j TrafficJourney, destSys content.SystemID) {
+	destName := string(j.DestCel)
+	if def, ok := s.Content.System(destSys); ok {
+		destName = def.Name
+	}
+	s.emit(Event{Kind: EvMarket, Severity: SevWarning, System: sys.ID, Item: j.Item,
+		Value: float64(j.Qty),
+		Text: "Risk premium — " + s.itemName(j.Item) +
+			" shipment lost en route to " + destName})
+}
+
+// trafficNextHop returns the gate celestial id in `from` that begins the
+// shortest stargate path toward `dest` ("" when dest == from or no gate
+// path exists). Breadth-first over the gate graph; ties break on celestial
+// definition order, so the walk is deterministic.
+func (s *Sim) trafficNextHop(from, dest content.SystemID) content.CelID {
+	if from == dest || s.Content == nil {
+		return ""
+	}
+	if _, ok := s.Content.System(from); !ok {
+		return ""
+	}
+	if _, ok := s.Content.System(dest); !ok {
+		return ""
+	}
+	// BFS from `from`; parent records the gate that first reached each
+	// system (level order ⇒ the parent chain is a shortest path).
+	seen := map[content.SystemID]bool{from: true}
+	parentSys := map[content.SystemID]content.SystemID{}
+	parentGate := map[content.SystemID]content.CelID{}
+	queue := []content.SystemID{from}
+	for len(queue) > 0 && !seen[dest] {
+		u := queue[0]
+		queue = queue[1:]
+		uDef, ok := s.Content.System(u)
+		if !ok {
+			continue
+		}
+		for i := range uDef.Celestials {
+			cel := &uDef.Celestials[i]
+			if cel.Gate == nil {
+				continue
+			}
+			v := cel.Gate.ToSystem
+			if seen[v] {
+				continue
+			}
+			seen[v] = true
+			parentSys[v] = u
+			parentGate[v] = cel.ID
+			queue = append(queue, v)
+		}
+	}
+	if !seen[dest] {
+		return ""
+	}
+	// Walk the parent chain back to `from`: the last step is its gate.
+	cur := dest
+	for cur != from && parentSys[cur] != from {
+		cur = parentSys[cur]
+	}
+	return parentGate[cur]
+}
+
 // trafficDeliver posts the shipment as supply on the destination station's
-// book. Its cost basis is the shipment's provenance: units fulfilled from
-// the origin station's own asks (a station origin debits its book — the
-// goods listed here are the goods that left there) at their weighted
-// price, or the def base price when the origin carries nothing to draw
-// from (gates and belts ship ex nihilo today; the logistics workstream
-// owns that removal). The ask lists one tick under min(cost basis, best
+// book at its spawn-time cost basis: units fulfilled from the origin
+// station's asks were debited when the hauler spawned (their weighted
+// price IS the basis), belt and gate (import) shipments carry the item's
+// base price — so no withdrawal happens here, and a shipment that never
+// arrived needs no reversal (its goods left the origin book at spawn). The
+// ask lists one tick under min(cost basis, best
 // ask), so arriving supply always improves the displayed price — and a
 // posting that crosses the destination's bids executes immediately at the
 // resting bid (never-crossed invariant), only the remainder resting.
 func (s *Sim) trafficDeliver(sys *content.SystemDef, e ecs.Entity, tc *Traffic, dest *content.CelestialDef) {
 	item, qty := tc.Item, tc.Qty
-	costBasis := s.marketBasePrice(item)
-	if origin := sysCelestial(sys, tc.Origin); origin != nil && origin.Station != nil {
-		if taken, paid := s.marketWithdraw(origin.ID, item, qty); taken > 0 {
-			costBasis = paid / float64(taken)
-		}
+	costBasis := tc.Basis
+	if costBasis <= 0 {
+		// Pre-provenance saves carry no basis: fall back to the ladder's
+		// last rung, exactly as a belt/gate shipment would.
+		costBasis = s.marketBasePrice(item)
 	}
 	book := s.market[dest.ID]
 	before := s.marketPrice(book, item)
@@ -574,9 +903,11 @@ func (s *Sim) trafficDeliver(sys *content.SystemDef, e ecs.Entity, tc *Traffic, 
 
 // trafficHaulerDestroyed resolves a lost convoy hauler (raider kill or
 // player kill): the shipment turns into a lootable wreck (the caller adds
-// the cargo) and the loss is announced as an event-only supply-risk
-// signal. No price moves — the book is the price former, and a shipment
-// that never arrived never touched it.
+// the cargo — the goods sourced at spawn are destroyed unless someone
+// loots them back) and the loss is announced as an event-only supply-risk
+// signal. No reversal and no re-spawn: the origin book was debited when
+// the hauler spawned, and a shipment that never arrived never touched the
+// destination book.
 func (s *Sim) trafficHaulerDestroyed(e ecs.Entity, tc *Traffic) {
 	destName := ""
 	if sys := s.System(); sys != nil {
@@ -983,6 +1314,15 @@ func sysCelestial(sys *content.SystemDef, id content.CelID) *content.CelestialDe
 		}
 	}
 	return nil
+}
+
+// celIDOrName returns a celestial's display name inside sys (its ID when
+// the celestial no longer exists).
+func celIDOrName(sys *content.SystemDef, id content.CelID) string {
+	if cel := sysCelestial(sys, id); cel != nil {
+		return cel.Name
+	}
+	return string(id)
 }
 
 // nearestLandmark returns the ID and name of the landmark celestial closest
