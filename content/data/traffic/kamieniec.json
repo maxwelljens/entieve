@@ -1,0 +1,34 @@
+{
+  "system": "sys-kamieniec",
+  "routes": [
+    {
+      "from": "cel-doki",
+      "to": "cel-kantor",
+      "to_system": "sys-glusza",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "charge-emp", "qty": 500 },
+      "interval_ticks": 7200
+    },
+    {
+      "from": "cel-doki",
+      "to": "cel-kantor",
+      "to_system": "sys-glusza",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "charge-fusion", "qty": 500 },
+      "interval_ticks": 7200
+    },
+    {
+      "from": "cel-doki",
+      "to": "cel-penumbra-port",
+      "to_system": "sys-penumbra",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "charge-emp", "qty": 500 },
+      "interval_ticks": 7200
+    }
+  ],
+  "patrol": {
+    "hulls": ["ship-npc-patrol"],
+    "interval_ticks": 9000
+  },
+  "raider": "npc-rat-marauder"
+}

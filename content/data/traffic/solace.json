@@ -19,7 +19,7 @@
       "from": "cel-solace-belt",
       "to": "cel-haven-rest",
       "hull": "ship-npc-hauler",
-      "cargo": { "item": "ore-sterngrit", "qty": 500 },
+      "cargo": { "item": "ore-sterngrit", "qty": 100 },
       "interval_ticks": 7200
     }
   ],

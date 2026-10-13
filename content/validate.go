@@ -861,17 +861,36 @@ func (v *validator) traffic() {
 			if r.From == r.To {
 				v.addf("%s: from and to must differ", rctx)
 			}
+			// Cross-system rule: to_system must exist, `to` must be one of
+			// its celestials, and stargate links must connect this system to
+			// it — otherwise the shipment could never finish its journey.
+			toSys, toSysDef := sys, sysDef
+			if r.ToSystem != "" && r.ToSystem != sys {
+				td2, ok := v.c.Systems[r.ToSystem]
+				if !ok {
+					v.addf("%s: unknown to_system %q", rctx, r.ToSystem)
+					td2 = nil
+				} else if !gatePathExists(v.c, sys, r.ToSystem) {
+					v.addf("%s: no gate path from %s to %s", rctx, sys, r.ToSystem)
+				}
+				toSys, toSysDef = r.ToSystem, td2
+			}
 			for _, end := range []struct {
 				what string
 				id   CelID
-			}{{"from", r.From}, {"to", r.To}} {
+				sys  SystemID
+				def  *SystemDef
+			}{{"from", r.From, sys, sysDef}, {"to", r.To, toSys, toSysDef}} {
 				if end.id == "" {
 					v.addf("%s: missing %s endpoint", rctx, end.what)
 					continue
 				}
-				cel := celestialIn(sysDef, end.id)
+				if end.def == nil {
+					continue // unknown to_system, already reported
+				}
+				cel := celestialIn(end.def, end.id)
 				if cel == nil {
-					v.addf("%s: unknown %s endpoint %q (not a celestial of %s)", rctx, end.what, end.id, sys)
+					v.addf("%s: unknown %s endpoint %q (not a celestial of %s)", rctx, end.what, end.id, end.sys)
 					continue
 				}
 				switch cel.Kind {
@@ -927,6 +946,37 @@ func celestialIn(sys *SystemDef, id CelID) *CelestialDef {
 		}
 	}
 	return nil
+}
+
+// gatePathExists reports whether stargate links connect from to dest: a
+// breadth-first walk over the gate graph in canonical celestial order
+// (deterministic; ties cannot change reachability).
+func gatePathExists(c *Content, from, dest SystemID) bool {
+	if from == dest {
+		return true
+	}
+	seen := map[SystemID]bool{from: true}
+	queue := []SystemID{from}
+	for len(queue) > 0 {
+		u := queue[0]
+		queue = queue[1:]
+		def, ok := c.Systems[u]
+		if !ok {
+			continue
+		}
+		for i := range def.Celestials {
+			g := def.Celestials[i].Gate
+			if g == nil || seen[g.ToSystem] {
+				continue
+			}
+			if g.ToSystem == dest {
+				return true
+			}
+			seen[g.ToSystem] = true
+			queue = append(queue, g.ToSystem)
+		}
+	}
+	return false
 }
 
 // npcSpawnsInSystem reports whether npc appears in any spawn group (ambient

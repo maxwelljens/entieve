@@ -71,8 +71,10 @@ var simFieldClasses = map[string]fieldClass{
 	"schema":        {save: []string{"Schema"}},
 	"respawns":      {save: []string{"Respawn"}},
 	"trafficLeaves": {save: []string{"TrafficLeaves"}},
-	"modTargets":    {save: []string{"ModTargets"}},
-	"free":          {save: []string{"FreeSlots"}},
+	// --- logistics: shipments parked between grids (gate hops / reloads) ---
+	"trafficJourneys": {save: []string{"TrafficJourneys"}},
+	"modTargets":      {save: []string{"ModTargets"}},
+	"free":            {save: []string{"FreeSlots"}},
 
 	// World metabolism: persistent belt state and requisition ledgers.
 	"belts":         {save: []string{"Belts"}},

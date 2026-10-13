@@ -245,6 +245,13 @@ func (s *Sim) buildSave() (*Save, error) {
 			save.Upkeep[st] = v
 		}
 	}
+	// --- logistics: shipments parked between grids (gate hops and grid
+	// reloads). One grouped block: park order is deterministic (see
+	// trafficParkGrid / trafficHop), so the slice is its own canonical
+	// serialization — map iteration never reaches it. ---
+	if len(s.trafficJourneys) > 0 {
+		save.TrafficJourneys = append([]TrafficJourney(nil), s.trafficJourneys...)
+	}
 	return save, nil
 }
 
@@ -591,6 +598,10 @@ func (s *Sim) restore(save *Save) error {
 			s.upkeep[st] = v
 		}
 	}
+
+	// --- logistics: shipments parked between grids, replayed verbatim
+	// (park order is the canonical serialization — see buildSave). ---
+	s.trafficJourneys = append([]TrafficJourney(nil), save.TrafficJourneys...)
 	return nil
 }
 

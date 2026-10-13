@@ -81,8 +81,13 @@ type Sim struct {
 	respawns  []RespawnTimer
 	// trafficLeaves are scheduled raider break-offs (persisted; see Save).
 	trafficLeaves []TrafficLeave
-	modTargets    map[modKey]ecs.Entity
-	free          []freeSlot
+	// trafficJourneys is the ledger of shipments parked between grids: a
+	// hauler that crossed a gate (or whose grid was rebuilt under it) keeps
+	// its cargo provenance and final destination here and flies again when
+	// its system loads next (Save.TrafficJourneys — see save.go).
+	trafficJourneys []TrafficJourney
+	modTargets      map[modKey]ecs.Entity
+	free            []freeSlot
 
 	// belts is the persistent world-metabolism belt state: per-rock
 	// remaining volume keyed by (system, belt celestial), seeded from the

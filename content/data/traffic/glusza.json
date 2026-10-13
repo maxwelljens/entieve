@@ -1,0 +1,14 @@
+{
+  "system": "sys-glusza",
+  "routes": [
+    {
+      "from": "cel-glusza-belt",
+      "to": "cel-doki",
+      "to_system": "sys-kamieniec",
+      "hull": "ship-npc-hauler",
+      "cargo": { "item": "ore-lucidite", "qty": 300 },
+      "interval_ticks": 7200
+    }
+  ],
+  "raider": "npc-rat-hierarch"
+}

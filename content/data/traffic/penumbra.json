@@ -2,7 +2,7 @@
   "system": "sys-penumbra",
   "routes": [
     {
-      "from": "cel-penumbra-port",
+      "from": "cel-penumbra-belt",
       "to": "cel-gate-solace",
       "hull": "ship-npc-hauler",
       "cargo": { "item": "ore-lucidite", "qty": 200 },
@@ -16,7 +16,7 @@
       "interval_ticks": 1800
     },
     {
-      "from": "cel-penumbra-port",
+      "from": "cel-gate-kamieniec",
       "to": "cel-gate-gloam",
       "hull": "ship-npc-hauler",
       "cargo": { "item": "charge-emp", "qty": 400 },

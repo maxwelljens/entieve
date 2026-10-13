@@ -413,12 +413,16 @@ type RouteCargo struct {
 	Qty  int    `json:"qty"`
 }
 
-// RouteDef is one one-way convoy leg inside a system: a hauler spawns at
-// From, warps the leg, delivers Cargo at To when To is a station, and
-// despawns (a gate endpoint means the hauler leaves the system).
+// RouteDef is one one-way convoy leg: a hauler spawns at From, warps the
+// leg (first to the next-hop gate when the route crosses systems), delivers
+// Cargo at To when To is a station, and despawns when To is a same-system
+// gate (the hauler leaves the system) or belt. ToSystem names the
+// destination system; empty means this def's own system — the original
+// in-system routes.
 type RouteDef struct {
 	From          CelID      `json:"from"`
 	To            CelID      `json:"to"`
+	ToSystem      SystemID   `json:"to_system,omitempty"`
 	Hull          ShipID     `json:"hull"`
 	Cargo         RouteCargo `json:"cargo"`
 	IntervalTicks int64      `json:"interval_ticks"` // authored cadence; security scales it (docs/CONTENT_AUTHORING.md)
