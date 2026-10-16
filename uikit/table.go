@@ -53,13 +53,17 @@ type Column struct {
 // callbacks (e.g. sim.Info, content.ItemID). Icons, when set, runs parallel
 // to Cells: an icon name per cell ("" = none) drawn in a fixed box to the
 // left of that cell's text. Right-aligned columns ignore it — numeric
-// anchors stay exact — so icons belong in the left-aligned cells.
+// anchors stay exact — so icons belong in the left-aligned cells. Spec is
+// the row's declared interactions (RowSpec): the table applies it through
+// the installer — right-click menu, lazy tooltip, strict double-click
+// Show Info — so surfaces declare data instead of wiring handlers.
 type TableRow struct {
 	Cells    []string
 	Icons    []string
 	IconTint color.RGBA // icon palette role; zero = ColText
 	Tint     color.RGBA
 	Data     any
+	Spec     RowSpec
 }
 
 // iconOf returns row cell i's icon name ("" when the row carries none).
@@ -97,27 +101,24 @@ type Table struct {
 	scroll  *widget.ScrollContainer
 	body    *widget.Container
 
-	rows       []TableRow // display order (sorted)
-	rawRows    []TableRow // cell/icon content last applied to the widgets
-	texts      [][]*widget.Text
-	cells      [][]*tableCell // per-cell widget pair (nil for right-aligned)
-	rowCts     []*widget.Container
-	applied    []color.RGBA // background last painted per row widget
-	widths     []float64    // fitted column widths
-	fittedFor  float64      // available width the fit was computed for
-	sortKey    string
-	sortAsc    bool
-	sortFn     func(key string, asc bool, rows []TableRow)
-	onSelect   func(row TableRow)
-	onActivate func(row TableRow)
-	onMenu     func(row TableRow, at image.Point)
+	rows      []TableRow // display order (sorted)
+	rawRows   []TableRow // cell/icon content last applied to the widgets
+	texts     [][]*widget.Text
+	cells     [][]*tableCell // per-cell widget pair (nil for right-aligned)
+	rowCts    []*widget.Container
+	applied   []color.RGBA // background last painted per row widget
+	tips      []rowTip     // per-row tooltip slot (the spec's Tip data)
+	widths    []float64    // fitted column widths
+	fittedFor float64      // available width the fit was computed for
+	sortKey   string
+	sortAsc   bool
+	sortFn    func(key string, asc bool, rows []TableRow)
+	onSelect  func(row TableRow)
 
 	selIdx  int // selected row index, -1 = none
 	selData any // Data of the selected row (identity across rebuilds)
 
-	last    TableRow
-	hasLast bool
-	lastAt  time.Time
+	dbl RowDouble // double-click bookkeeping: the installer's half
 }
 
 // TableOption adjusts a table at construction; a table built without
@@ -302,14 +303,9 @@ func (t *Table) Selected() (TableRow, bool) {
 	return t.rows[t.selIdx], true
 }
 
-// OnActivate registers the row double-click callback: a second click on
-// the same row within doubleClickWindow of the first.
-func (t *Table) OnActivate(fn func(row TableRow)) { t.onActivate = fn }
-
-// OnMenu registers the row right-click callback: it receives the row and
-// the click position in screen space (the context-menu anchor). Rows are
-// hit at row granularity — cells are not individually hit-testable.
-func (t *Table) OnMenu(fn func(row TableRow, at image.Point)) { t.onMenu = fn }
+// OnActivate and OnMenu are retired: a row's double-click and menu now
+// derive from its TableRow.Spec through the installer (rowspec.go), so
+// surfaces declare data instead of wiring handlers.
 
 // SetSortFunc overrides how rows are ordered for a column key: fn must
 // order rows in place (stable). The default orders lexicographically by
@@ -433,7 +429,7 @@ func (t *Table) updateRows() bool {
 	changed := len(t.rowCts) != len(t.rows)
 	if changed {
 		t.body.RemoveChildren()
-		t.rowCts, t.texts, t.cells, t.applied, t.rawRows = nil, nil, nil, nil, nil
+		t.rowCts, t.texts, t.cells, t.applied, t.rawRows, t.tips = nil, nil, nil, nil, nil, nil
 		for i := range t.rows {
 			ctr := t.newRow(i)
 			t.rowCts = append(t.rowCts, ctr)
@@ -464,6 +460,12 @@ func (t *Table) updateRows() bool {
 		}
 		t.updateIcon(i)
 		t.updateBg(i)
+		// The installer's tooltip half: attach the row's declared Tip to
+		// its widget (rowTip rebuilds the panel only when the key moves;
+		// a spec with no Tip drops any attachment).
+		if i < len(t.tips) {
+			t.tips[i].set(t.env, t.rowCts[i].GetWidget(), row.Spec.Tip.Key, row.Spec.Tip.Build)
+		}
 	}
 	// Row count changed → the content may no longer overflow: drop any
 	// leftover scroll offset now, before the next render positions rows.
@@ -569,6 +571,7 @@ func (t *Table) newRow(i int) *widget.Container {
 	t.texts = append(t.texts, texts)
 	t.cells = append(t.cells, cells)
 	t.applied = append(t.applied, color.RGBA{})
+	t.tips = append(t.tips, rowTip{})
 	return ctr
 }
 
@@ -600,8 +603,9 @@ func (t *Table) rowWidget(i int) *widget.Container {
 }
 
 // rowClicked selects the row and, on a repeat click inside the
-// double-click window, also activates it (the spike's timing state —
-// ebitenui has no double-click event).
+// double-click window, runs the installer's double-click half against
+// the row's declared spec — strictly, only a resolvable Ref opens Show
+// Info (the spike's timing state — ebitenui has no double-click event).
 func (t *Table) rowClicked(i int) {
 	if i < 0 || i >= len(t.rows) {
 		return
@@ -620,24 +624,19 @@ func (t *Table) rowClicked(i int) {
 	if t.onSelect != nil {
 		t.onSelect(row)
 	}
-	now := time.Now()
-	if t.hasLast && sameRow(t.last, row) && now.Sub(t.lastAt) < doubleClickWindow {
-		if t.onActivate != nil {
-			t.onActivate(row)
-		}
-	}
-	t.last, t.hasLast, t.lastAt = row, true, now
+	t.dbl.Click(t.env, row.Spec)
 }
 
 // rowMenu resolves the right-clicked row (by index, the same way
-// rowClicked does) and hands it to the owner's menu builder with the
-// click position. A right-click selects nothing — the menu acts on the
-// row it was opened on.
+// rowClicked does) and opens its declared menu — the installer derives
+// the shape from the row's RowSpec. A right-click selects nothing — the
+// menu acts on the row it was opened on (its Actions carry that row's
+// payload), so the highlight never moves.
 func (t *Table) rowMenu(i int, at image.Point) {
-	if i < 0 || i >= len(t.rows) || t.onMenu == nil {
+	if i < 0 || i >= len(t.rows) {
 		return
 	}
-	t.onMenu(t.rows[i], at)
+	t.env.OpenRowMenu(t.rows[i].Spec, at)
 }
 
 // updateIcon refreshes one row's cell icons and their palette role. It runs
@@ -829,23 +828,6 @@ func cellOf(row TableRow, i int) string {
 		return ""
 	}
 	return row.Cells[i]
-}
-
-// sameRow reports whether two rows are the same logical row for the
-// double-click window: Data first, cell contents as the nil-Data fallback.
-func sameRow(a, b TableRow) bool {
-	if a.Data != nil || b.Data != nil {
-		return sameData(a.Data, b.Data)
-	}
-	if len(a.Cells) != len(b.Cells) {
-		return false
-	}
-	for i := range a.Cells {
-		if a.Cells[i] != b.Cells[i] {
-			return false
-		}
-	}
-	return true
 }
 
 // sameData compares row payloads safely for any dynamic type.

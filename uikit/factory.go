@@ -85,29 +85,17 @@ func NewFactory(env Env) *Factory {
 	f.jobs.SetSort("Product", true)
 	f.jobs.SetSortFunc(canonicalFirst("Product", jobCols))
 
-	attachInfo := func(t *Table) {
+	attachSelect := func(t *Table) {
 		t.OnSelect(func(r TableRow) {
 			if row, ok := r.Data.(factoryRow); ok {
 				f.sel, f.hasSel = row, true
 			}
 		})
-		t.OnActivate(func(r TableRow) { showInfoData(env, r.Data) })
-		t.OnMenu(func(r TableRow, at image.Point) {
-			ref, ok := env.InfoRefOf(r.Data)
-			row, isRow := r.Data.(factoryRow)
-			if isRow {
-				f.sel, f.hasSel = row, true
-				t.SelectData(r.Data)
-			}
-			entries := []MenuEntry{showInfoMenuEntry(env, ref, ok)}
-			if isRow {
-				entries = append(entries, MenuSep, f.rowAction(row))
-			}
-			env.OpenMenu(entries, at)
-		})
 	}
-	attachInfo(f.recipes)
-	attachInfo(f.jobs)
+	attachSelect(f.recipes)
+	attachSelect(f.jobs)
+	// Show Info, double-click and the Start/Collect action derive from
+	// the rows' RowSpec (rowSpec), built in Sync — no hand wiring.
 
 	f.craftLbl = widget.NewText(
 		widget.TextOpts.Text("Craft", env.Face(StepTiny), solid(p.Accent)),
@@ -231,6 +219,7 @@ func (f *Factory) Sync() {
 	recRows := make([]TableRow, 0, len(f.env.Content.Recipes))
 	for _, rec := range f.env.Content.RecipesInOrder() {
 		mats := s.JobMaterials(station, rec.ID, runs)
+		row := factoryRow{recipe: rec.ID, ref: f.productRef(rec.Product)}
 		recRows = append(recRows, TableRow{
 			Cells: []string{
 				itemLabel(f.env, rec.Product),
@@ -239,7 +228,8 @@ func (f *Factory) Sync() {
 				f.inputsCell(mats),
 			},
 			Icons: []string{productIcon(f.env, rec.Product), "", "", ""},
-			Data:  factoryRow{recipe: rec.ID, ref: f.productRef(rec.Product)},
+			Data:  row,
+			Spec:  f.rowSpec(row),
 		})
 	}
 	f.recipes.SetRows(recRows)
@@ -249,6 +239,7 @@ func (f *Factory) Sync() {
 	jobs := s.Jobs(station)
 	jobRows := make([]TableRow, 0, len(jobs))
 	for _, j := range jobs {
+		row := factoryRow{job: j.ID, ref: f.productRef(f.productOfJob(j))}
 		jobRows = append(jobRows, TableRow{
 			Cells: []string{
 				itemLabel(f.env, f.productOfJob(j)),
@@ -257,7 +248,8 @@ func (f *Factory) Sync() {
 				jobStateLabel(j.State),
 			},
 			Icons: []string{productIcon(f.env, f.productOfJob(j)), "", "", ""},
-			Data:  factoryRow{job: j.ID, ref: f.productRef(f.productOfJob(j))},
+			Data:  row,
+			Spec:  f.rowSpec(row),
 		})
 	}
 	f.jobs.SetRows(jobRows)
@@ -410,18 +402,26 @@ func (f *Factory) collectReadyFor(row factoryRow) bool {
 	return false
 }
 
-// rowAction is a row's context-menu action entry (Start for a recipe,
+// rowSpec is one factory row's declared interactions: the product's
+// Show Info (grayed when the id no longer resolves) plus its one action
+// (Start for a recipe, Collect for a job) with the same gate as the
+// toolbar button.
+func (f *Factory) rowSpec(row factoryRow) RowSpec {
+	return RowSpec{Ref: &row.ref, Actions: f.rowActions(row)}
+}
+
+// rowActions is a row's context-menu action entry (Start for a recipe,
 // Collect for a job) with the same gate as the toolbar button.
-func (f *Factory) rowAction(row factoryRow) MenuEntry {
+func (f *Factory) rowActions(row factoryRow) []RowAction {
 	switch {
 	case row.recipe != "":
-		return MenuEntry{Label: "Start", Disabled: !f.startReadyFor(row),
-			Action: func() { f.startWith(row) }}
+		return []RowAction{{Label: "Start", Disabled: !f.startReadyFor(row),
+			Do: func() { f.startWith(row) }}}
 	case row.job != 0:
-		return MenuEntry{Label: "Collect", Disabled: !f.collectReadyFor(row),
-			Action: func() { f.collectWith(row) }}
+		return []RowAction{{Label: "Collect", Disabled: !f.collectReadyFor(row),
+			Do: func() { f.collectWith(row) }}}
 	}
-	return MenuEntry{Label: "Start", Disabled: true, Action: func() {}}
+	return []RowAction{{Label: "Start", Disabled: true, Do: func() {}}}
 }
 
 // stepQty moves the quantity stepper one step (clamped).

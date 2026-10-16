@@ -41,11 +41,12 @@ func entry(t *testing.T, env Env, label string) MenuEntry {
 	return MenuEntry{}
 }
 
-// TestMarketRowMenu: right-clicking a market row opens the menu on it
-// (Show Info first and bold, then Buy/Sell driving the toolbar's own
-// handlers), Buy and Sell read disabled while undocked and enabled once
-// docked, pressing Buy enqueues CmdBuy for the clicked row at the stepper
-// quantity, and a double-click opens Show Info on the row's item.
+// TestMarketRowMenu: a market row's RowSpec declares Show Info plus the
+// row-targeted Buy/Sell (grayed while undocked, armed once docked), and
+// right-clicking opens exactly that menu — pressing Buy enqueues CmdBuy
+// for the clicked row at the stepper quantity — and a double-click opens
+// Show Info on the row's item (right-click itself moves no selection: the
+// actions carry the row's payload).
 func TestMarketRowMenu(t *testing.T) {
 	env, cmds := newTestEnv(t)
 	m := NewMarket(env)
@@ -74,14 +75,30 @@ func TestMarketRowMenu(t *testing.T) {
 		t.Fatalf("undocked menu Buy enqueued %d commands, want 0", len(*cmds))
 	}
 
-	// The clicked row became the trade target.
-	if !m.hasSel || m.sel != wantItem {
-		t.Fatalf("right-click selection = %v/%v, want %s", m.hasSel, m.sel, wantItem)
+	// The declared data behind that menu: the row's RowSpec carries
+	// Buy/Sell gated from the same docked state, targeting this row's
+	// item — no click-time selection side effect.
+	spec := m.tbl.rows[0].Spec
+	if ref, ok := env.InfoRefOf(wantItem); !ok || spec.Ref == nil || *spec.Ref != ref {
+		t.Fatalf("row Ref = %v (%v), want the row item's ref for %s", spec.Ref, ok, wantItem)
+	}
+	if len(spec.Actions) != 2 {
+		t.Fatalf("row actions = %+v, want Buy and Sell", spec.Actions)
+	}
+	for i, want := range []string{"Buy", "Sell"} {
+		if got := spec.Actions[i]; got.Label != want || !got.Disabled {
+			t.Errorf("action %d = %+v, want %s grayed while undocked", i, got, want)
+		}
 	}
 
-	// Docked: the same menu, now armed.
+	// Docked: the same menu, now armed — data and entries agree.
 	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
 	frame()
+	for i, a := range m.tbl.rows[0].Spec.Actions {
+		if a.Disabled {
+			t.Errorf("action %d (%s) still grayed after the docked frame", i, a.Label)
+		}
+	}
 	rightClickRow(t, ui, m.tbl, 0)
 	if e := entry(t, env, "Buy"); e.Disabled {
 		t.Fatal("Buy still disabled while docked")
@@ -117,10 +134,12 @@ func TestMarketRowMenu(t *testing.T) {
 	}
 }
 
-// TestOverviewEntityMenu: the overview's right-click menu leads with
-// Show Info (disabled for entities without a def) and offers exactly the
-// verbs the Selected Item window enqueues — warp/orbit at the selectors'
-// values, approach and lock — gated the way those buttons gate.
+// TestOverviewEntityMenu: every overview row declares the four entity
+// verbs in its RowSpec (the data assertion), and that spec's menu leads
+// with Show Info (disabled for entities without a def) and offers
+// exactly the verbs the Selected Item window enqueues — warp/orbit at
+// the selectors' values, approach and lock — gated the way those
+// buttons gate.
 func TestOverviewEntityMenu(t *testing.T) {
 	k, cmds := newTestKit(t)
 	env := k.panelEnv()
@@ -141,7 +160,29 @@ func TestOverviewEntityMenu(t *testing.T) {
 		t.Fatal("fixture: no warpable celestial")
 	}
 
-	k.entityMenu(celestial.Entity, image.Point{X: 100, Y: 100})
+	// The declared data: every built row carries the four verbs in the
+	// entity menu's order (the same overviewSpec function declares them).
+	wantLabels := []string{"Warp to", "Orbit", "Approach", "Lock target"}
+	for _, r := range k.ov.tbl.rows {
+		if len(r.Spec.Actions) != len(wantLabels) {
+			t.Fatalf("overview row %v declares %d actions, want %d (%v)",
+				r.Cells, len(r.Spec.Actions), len(wantLabels), r.Spec.Actions)
+		}
+		for i, want := range wantLabels {
+			if got := r.Spec.Actions[i].Label; got != want {
+				t.Errorf("overview row %v action %d = %q, want %q", r.Cells, i, got, want)
+			}
+		}
+		if r.Spec.Ref == nil {
+			t.Errorf("overview row %v declares no Ref", r.Cells)
+		}
+	}
+	celSpec := k.overviewSpec(&ovRow{info: celestial})
+	if celSpec.Ref == nil {
+		t.Fatal("celestial row declares no Ref (its Show Info entry must exist, grayed)")
+	}
+
+	env.OpenRowMenu(celSpec, image.Point{X: 100, Y: 100})
 	m := env.Menu()
 	if !m.IsOpen() {
 		t.Fatal("entity menu did not open")
@@ -177,7 +218,8 @@ func TestOverviewEntityMenu(t *testing.T) {
 	if ship.Entity.IsZero() {
 		t.Skip("showcase grid has no visible ship")
 	}
-	k.entityMenu(ship.Entity, image.Point{X: 100, Y: 100})
+	shipSpec := k.overviewSpec(&ovRow{info: ship})
+	env.OpenRowMenu(shipSpec, image.Point{X: 100, Y: 100})
 	if e := entry(t, env, "Warp to"); !e.Disabled {
 		t.Error("Warp to enabled for a non-warpable ship")
 	}
@@ -188,7 +230,7 @@ func TestOverviewEntityMenu(t *testing.T) {
 		t.Error("Show Info disabled for a ship with a hull def")
 	}
 	pressMenuEntry(t, env, "Lock target")
-	k.entityMenu(ship.Entity, image.Point{X: 100, Y: 100}) // the menu closed with the press
+	env.OpenRowMenu(shipSpec, image.Point{X: 100, Y: 100}) // the menu closed with the press
 	pressMenuEntry(t, env, "Show Info")
 	if len(*cmds) != 2 {
 		t.Fatalf("Lock target enqueued %d commands, want 2", len(*cmds))
@@ -201,9 +243,11 @@ func TestOverviewEntityMenu(t *testing.T) {
 	}
 }
 
-// TestInventoryAndFittingMenus: the inventory's rows carry one Show Info
-// entry (and the double-click swap); a fitting slot row carries Show Info
-// plus the Fit/Unefit actions driving the toolbar's handlers and gating.
+// TestInventoryAndFittingMenus: the inventory's rows declare Show Info
+// only (one-entry menu, double-click swap); a fitting slot row declares
+// Show Info plus Fit/Unefit gated on that row — the menu's actions carry
+// the clicked row's payload, so Unefit arms for a filled slot and Fit
+// does not.
 func TestInventoryAndFittingMenus(t *testing.T) {
 	env, cmds := newTestEnv(t)
 

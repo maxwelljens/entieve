@@ -132,25 +132,15 @@ func NewMarket(env Env) *Market {
 			m.sel, m.hasSel = id, true
 		}
 	})
-	// Double-click shows the order's item; right-click opens the row menu
-	// on the row under the cursor (which becomes the trade target, so Buy
-	// and Sell act on what was clicked — they drive the very same handlers
-	// as the toolbar buttons).
-	m.tbl.OnActivate(func(r TableRow) { m.showInfo(r.Data) })
-	m.tbl.OnMenu(func(r TableRow, at image.Point) {
-		id, ok := r.Data.(content.ItemID)
-		if !ok {
-			return
+	// Double-click (Show Info) and the right-click menu (Show Info +
+	// Buy/Sell) derive from each row's declared RowSpec — built in Sync,
+	// where the docked gate and the row's own item are known. The menu's
+	// actions carry the clicked row's payload, so Buy/Sell always trade
+	// the row they were opened on — no click-time selection side effects.
+	m.tbl.OnSelect(func(r TableRow) {
+		if id, ok := r.Data.(content.ItemID); ok {
+			m.sel, m.hasSel = id, true
 		}
-		m.sel, m.hasSel = id, true
-		m.tbl.SelectData(r.Data)
-		gated := !m.docked()
-		m.env.OpenMenu([]MenuEntry{
-			{Label: "Show Info", Bold: true, Action: func() { m.showInfo(r.Data) }},
-			MenuSep,
-			{Label: "Buy", Disabled: gated, Action: m.buyClicked},
-			{Label: "Sell", Disabled: gated, Action: m.sellClicked},
-		}, at)
 	})
 
 	m.qtyLabel = widget.NewText(
@@ -267,12 +257,16 @@ func (m *Market) priceOf(item content.ItemID) float64 {
 func (m *Market) Sync() {
 	orders := m.orders()
 	sortBookOrders(orders)
+	// Trades only happen docked at a station — the same gate feeds the
+	// buttons below and every row's declared Buy/Sell actions.
+	gated := !m.docked()
 	rows := make([]TableRow, 0, len(orders))
 	for _, o := range orders {
 		side := "Ask"
 		if o.Side == sim.OrderBuy {
 			side = "Bid"
 		}
+		item := o.Item
 		rows = append(rows, TableRow{
 			Cells: []string{
 				itemLabel(m.env, o.Item),
@@ -281,6 +275,13 @@ func (m *Market) Sync() {
 				side,
 			},
 			Data: o.Item,
+			Spec: RowSpec{
+				Ref: m.env.rowRef(o.Item),
+				Actions: []RowAction{
+					{Label: "Buy", Disabled: gated, Do: func() { m.buyRow(item) }},
+					{Label: "Sell", Disabled: gated, Do: func() { m.sellRow(item) }},
+				},
+			},
 		})
 	}
 	m.tbl.SetRows(rows)
@@ -309,8 +310,7 @@ func (m *Market) Sync() {
 		}
 		m.title.Label = label
 	}
-	// Trades only happen docked at a station.
-	gated := !m.docked()
+	// Trades only happen docked at a station (the gate declared above).
 	m.buy.GetWidget().Disabled = gated
 	m.sell.GetWidget().Disabled = gated
 }
@@ -335,7 +335,8 @@ func (m *Market) docked() bool {
 	return m.env.Sim.Docked.Has(m.env.Sim.Player())
 }
 
-// buyClicked enqueues CmdBuy for the selected order and quantity.
+// buyClicked enqueues CmdBuy for the selected order and quantity (the
+// toolbar's own button acts on the left-click selection).
 func (m *Market) buyClicked() {
 	if !m.docked() || !m.hasSel {
 		return
@@ -351,12 +352,22 @@ func (m *Market) sellClicked() {
 	m.env.Enqueue(sim.CmdSell{Item: m.sel, Qty: m.qty()})
 }
 
-// showInfo opens the row's item in the Show Info window (no-op for an
-// id the content does not know).
-func (m *Market) showInfo(data any) {
-	if ref, ok := m.env.InfoRefOf(data); ok {
-		m.env.ShowInfo(ref)
+// buyRow/sellRow are the row menu's trade actions: they act on the row
+// the menu was opened on (its item, captured in the row's RowSpec) with
+// the toolbar's own docked gate, so a right-clicked row trades itself
+// without ever becoming the window's selection.
+func (m *Market) buyRow(item content.ItemID) {
+	if !m.docked() {
+		return
 	}
+	m.env.Enqueue(sim.CmdBuy{Item: item, Qty: m.qty()})
+}
+
+func (m *Market) sellRow(item content.ItemID) {
+	if !m.docked() {
+		return
+	}
+	m.env.Enqueue(sim.CmdSell{Item: item, Qty: m.qty()})
 }
 
 // itemLabel resolves a market/hangar ID to a display name (items, ships

@@ -136,39 +136,56 @@ func TestTableSortFunc(t *testing.T) {
 }
 
 // TestTableSelectVsActivate drives the real deferred-event path: a
-// click selects, a repeat click on the same row inside the window also
-// activates, a different row does not.
+// click selects, a repeat click on the same row inside the window runs
+// the row's declared double-click — Show Info, strictly, from its
+// RowSpec.Ref — and a different row (its own ref) does not fire on one
+// click.
 func TestTableSelectVsActivate(t *testing.T) {
 	env, _ := newTestEnv(t)
 	tbl := NewTable(env, []Column{{Key: "A", Title: "A"}})
-	var selected, activated []int
+	var selected []int
 	tbl.OnSelect(func(r TableRow) { selected = append(selected, r.Data.(int)) })
-	tbl.OnActivate(func(r TableRow) { activated = append(activated, r.Data.(int)) })
+	refBravo := ModuleRef("mod-mining-laser")
+	refCharlie := ModuleRef("mod-afterburner")
 	tbl.SetRows([]TableRow{
-		{Cells: []string{"alpha"}, Data: 0},
-		{Cells: []string{"bravo"}, Data: 1},
-		{Cells: []string{"charlie"}, Data: 2},
+		{Cells: []string{"alpha"}, Data: 0, Spec: RowSpec{Ref: ptrRef(ModuleRef("mod-emp-turret"))}},
+		{Cells: []string{"bravo"}, Data: 1, Spec: RowSpec{Ref: &refBravo}},
+		{Cells: []string{"charlie"}, Data: 2, Spec: RowSpec{Ref: &refCharlie}},
 	})
 
 	ui := &ebitenui.UI{Container: tbl.Container(), PrimaryTheme: env.Theme}
 	ui.Update() // registers the deferred constructor handlers
 
 	clickRow(ui, tbl, 1)
-	if !equalInts(selected, []int{1}) || len(activated) != 0 {
-		t.Fatalf("first click: selected=%v activated=%v, want [1] []", selected, activated)
+	if !equalInts(selected, []int{1}) {
+		t.Fatalf("first click: selected=%v, want [1]", selected)
 	}
 	if tbl.selIdx != 1 {
 		t.Errorf("selIdx = %d, want 1", tbl.selIdx)
 	}
-
-	clickRow(ui, tbl, 1)
-	if !equalInts(selected, []int{1, 1}) || !equalInts(activated, []int{1}) {
-		t.Fatalf("repeat click: selected=%v activated=%v, want [1 1] [1]", selected, activated)
+	if env.InfoWindow().IsOpen() {
+		t.Fatal("a single click opened Show Info (the swap is a double-click)")
 	}
 
+	// Repeat click: the double-click half fires Show Info on the row's ref.
+	clickRow(ui, tbl, 1)
+	if !equalInts(selected, []int{1, 1}) {
+		t.Fatalf("repeat click: selected=%v, want [1 1]", selected)
+	}
+	if !env.InfoWindow().IsOpen() {
+		t.Fatal("repeat click did not open Show Info")
+	}
+	if ref, _ := env.InfoWindow().Ref(); ref != refBravo {
+		t.Fatalf("Show Info ref = %v, want the repeated row's %v", ref, refBravo)
+	}
+
+	// A different row selects but does not fire the held gesture.
 	clickRow(ui, tbl, 2)
-	if !equalInts(selected, []int{1, 1, 2}) || !equalInts(activated, []int{1}) {
-		t.Fatalf("other row: selected=%v activated=%v, want [1 1 2] [1]", selected, activated)
+	if !equalInts(selected, []int{1, 1, 2}) {
+		t.Fatalf("other row: selected=%v, want [1 1 2]", selected)
+	}
+	if ref, _ := env.InfoWindow().Ref(); ref != refBravo {
+		t.Errorf("Show Info ref after one click on another row = %v, want it held at %v", ref, refBravo)
 	}
 }
 

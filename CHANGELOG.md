@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Row interactions declare one seam** (`uikit.RowSpec`): every listed
+  row — market, inventory, fitting, rack, overview, factory, the
+  contract board and Show Info's chain links — now declares its
+  interactions as data (`Ref` for Show Info, `Actions` for its verbs,
+  `Tip` for its hover panel), and one installer derives the context menu
+  (bold **Show Info** first, `MenuSep`, grayed-but-visible actions), the
+  lazy tooltip and strict double-click Show Info from that declaration,
+  replacing the five hand-wired surfaces (24 wiring sites). User-visible
+  consequences: a second click on a rack cell inside the double-click
+  window opens Show Info **without also toggling** the module (the old
+  toggle+info dual gesture; a lone click still toggles exactly once),
+  right-clicking a row no longer silently moves the window's selection
+  (menu actions target the row they were opened on — the market's
+  Buy/Sell, fitting's Fit/Unefit and the factory's Start/Collect enqueue
+  for the clicked row directly), and a stored ship's fit entry in the
+  Fitting hangar now stays grayed instead of arming from a stale module
+  selection. Menu shapes, gating rules, tooltip anatomy and the menu's
+  world-input latch are unchanged.
+
 ### Added
 
 - **Resolution-independent UI.** Every visible length — window floors and

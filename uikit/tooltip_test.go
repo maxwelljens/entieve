@@ -659,7 +659,7 @@ func TestFittingRowTooltips(t *testing.T) {
 	if got := f.slots.rowWidget(fitted).GetWidget().ToolTips; len(got) != 1 {
 		t.Fatalf("fitted slot row carries %d tooltips, want 1", len(got))
 	}
-	m := f.slotTips[fitted].view.Model()
+	m := f.slots.tips[fitted].view.Model()
 	if m.Title != "EMP Turret" || m.Sub != "High slot 1 · Weapon" {
 		t.Errorf("slot row tooltip = %q/%q, want EMP Turret / High slot 1 · Weapon", m.Title, m.Sub)
 	}
@@ -702,7 +702,7 @@ func TestFittingRowTooltips(t *testing.T) {
 			if !ok {
 				t.Fatalf("hangar module %s missing from content", data)
 			}
-			hm := f.hangarTips[i].view.Model()
+			hm := f.hangar.tips[i].view.Model()
 			if hm.Title != def.Name || hm.Sub != tipSub("", def.Kind) {
 				t.Errorf("hangar module tooltip = %q/%q, want %q/%q",
 					hm.Title, hm.Sub, def.Name, tipSub("", def.Kind))

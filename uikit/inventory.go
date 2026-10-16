@@ -57,18 +57,10 @@ func NewInventory(env Env) *Inventory {
 	inv.ore.OnSelect(inv.selectFrom("ore"))
 	inv.hangar = NewTable(env, cols, mono)
 	inv.hangar.OnSelect(inv.selectFrom("hangar"))
-	// Inventory rows carry no other action: double-click swaps the Show
-	// Info window, right-click opens the one-entry menu.
-	attachInfo := func(t *Table) {
-		t.OnActivate(func(r TableRow) { showInfoData(env, r.Data) })
-		t.OnMenu(func(r TableRow, at image.Point) {
-			ref, ok := env.InfoRefOf(r.Data)
-			env.OpenMenu([]MenuEntry{showInfoMenuEntry(env, ref, ok)}, at)
-		})
-	}
-	attachInfo(inv.cargo)
-	attachInfo(inv.ore)
-	attachInfo(inv.hangar)
+	// Inventory rows carry no other action: their RowSpec declares the
+	// Show Info ref only (built in rowsOf), so double-click swaps the
+	// Show Info window and right-click opens the one-entry menu — through
+	// the installer, not hand wiring.
 
 	newLabel := func(s string) *widget.Text {
 		return widget.NewText(
@@ -254,6 +246,8 @@ func (inv *Inventory) rowsOf(stacks []content.CargoStack) []TableRow {
 		rows = append(rows, TableRow{
 			Cells: []string{name, "×" + FormatInt(int64(st.Qty)), formatVolume(vol)},
 			Data:  st.Item,
+			// The whole interaction surface: Show Info only.
+			Spec: RowSpec{Ref: inv.env.rowRef(st.Item)},
 		})
 	}
 	return rows
