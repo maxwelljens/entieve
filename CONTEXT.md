@@ -30,6 +30,7 @@ names the *modules and seams* we build that vocabulary into.
 | **Anchor** | which edges of the viewport a floating Screen hangs its design-unit default rect on: centred, a fixed design coordinate, bottom-left insets, or top-centred |
 | **Row** | one listed entry in a table; its interactions derive from its **RowSpec** |
 | **RowSpec** | the row's declared data: `Ref` (what it *is*, for Show Info) + `Actions` (typed intents it offers). One installer applies menu, tooltip and double-click uniformly |
+| **Rich row** | a `TableRow` carrying a **line stack** (`Stack []RowLine`) instead of one text per column: runs of cells with their own step/colour/width, `Icons[0]` boxing with line 1, `Spec.Actions` drawn as trailing buttons (1–2, grayed-not-hidden) and a per-line `Ref` for the installer — the contract board's row form (`widgets.StackRow` builds one, `widgets.StackLayout` tiles a section of them) |
 | **Theme** | faces + scaled metrics + palette — the visual constants a widget draws itself with (the seam interface and its implementation live together in `uikit/theme`); a Theme-only widget takes it alone |
 | **ContentView** | the read-only seam: defs + observable sim state as screens see it, implemented over `*content.Content` + `*sim.Sim` — screens never see the simulation |
 | **ActionSink** | the write seam: screens emit typed **intents** (`Buy{Item,Qty}`, `StartJob{…}`) through `Do(Intent)`; the game executes them (`Game.Do`); later the AI surface will emit the same ones |

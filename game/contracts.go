@@ -29,15 +29,19 @@ const (
 	stationWinW  = 394 // window width; right edge 404, market starts at x=406
 	stationMinW  = 394 // window MinSize — the "minimum window" row-rect pin
 	stationMinH  = 200
-	boardPad     = 6  // body padding
-	boardSpacing = 5  // vertical gap between body children
-	boardRowGap  = 4  // gap between two board rows
-	boardRowPad  = 3  // horizontal padding inside a row
-	boardBtnGap  = 6  // text ↔ action button gap inside a row
-	boardBtnW    = 92 // action button width (fits the widest label, "Accepted", set in the emphasis face)
-	boardBtnH    = 40 // minimum hit area, like menuBtnH
-	availMaxRows = 3  // visible available rows ("+N more" beyond)
-	actMaxRows   = 2  // visible active rows ("+N more" beyond)
+	boardPad     = 6 // body padding
+	boardSpacing = 5 // vertical gap between body children
+	boardRowGap  = 4 // gap between two board rows
+
+	// The rows themselves are rich rows of the table module, which owns
+	// their metrics (widgets.Rich*): the board's column budgets below
+	// derive from them, so a rendered row and its ellipsis budgets can
+	// never drift apart.
+	boardRowPad  = widgets.RichPad  // horizontal padding inside a row
+	boardBtnGap  = widgets.RichGap  // text ↔ action button gap inside a row
+	boardBtnW    = widgets.RichBtnW // action button width (fits the widest label, "Accepted", set in the emphasis face)
+	availMaxRows = 3                // visible available rows ("+N more" beyond)
+	actMaxRows   = 2                // visible active rows ("+N more" beyond)
 
 	boardInnerW   = stationWinW - 2*boardPad                // body inner width: 382
 	boardContentW = boardInnerW - 2*boardRowPad             // row content width: 376
@@ -49,59 +53,15 @@ const (
 // pairwise disjoint and fully inside inner. n <= 0 (or an inner too small
 // to hold even one pixel-high row) returns no rects.
 //
-// The station board sections size themselves to their rows, so the
-// runtime rects come out at exactly the natural row height; the fill
-// semantics keep the invariants for any inner rect the tests throw at it
-// (design sizes, window minimum, degenerate n).
+// The tiling itself is the table module's row stack (widgets.StackRects
+// at the board's gap — the layout newBoardSection installs); this
+// wrapper is the pure pin the geometry tests assert against, in the
+// board's own units. The station board sections size themselves to their
+// rows, so the runtime rects come out at exactly the natural row height;
+// the fill semantics keep the invariants for any inner rect the tests
+// throw at it (design sizes, window minimum, degenerate n).
 func boardRowRects(inner image.Rectangle, n int) []image.Rectangle {
-	if n <= 0 || inner.Dx() <= 0 || inner.Dy() <= 0 {
-		return nil
-	}
-	gap := theme.Px(boardRowGap)
-	if (inner.Dy()-(n-1)*gap)/n < 1 {
-		gap = 0 // degenerate: no room for gaps, stack 1px rows
-	}
-	h := (inner.Dy() - (n-1)*gap) / n
-	if h < 1 {
-		return nil // not even one row fits
-	}
-	rows := make([]image.Rectangle, n)
-	y := inner.Min.Y
-	for i := range rows {
-		rows[i] = image.Rect(inner.Min.X, y, inner.Max.X, y+h)
-		y += h + gap
-	}
-	return rows
-}
-
-// boardLayout is the ebitenui Layouter behind the two board sections: it
-// reports the section height from its rows and places them with
-// boardRowRects — the pure function above IS the layout.
-type boardLayout struct{}
-
-// PreferredSize reports the widest row and the stacked section height.
-// The width matters: a zero-width preferred rect is "empty" in Go's
-// image.Rectangle, and the parent RowLayout's preferred-size union would
-// then drop the section's height entirely (the window would come out
-// shorter than its rows).
-func (boardLayout) PreferredSize(ws []widget.PreferredSizeLocateableWidget) (int, int) {
-	w, h := 0, 0
-	for _, c := range ws {
-		cw, ch := c.PreferredSize()
-		if cw > w {
-			w = cw
-		}
-		if ch > h {
-			h = ch
-		}
-	}
-	return w, len(ws)*h + (len(ws)-1)*theme.Px(boardRowGap)
-}
-
-func (boardLayout) Layout(ws []widget.PreferredSizeLocateableWidget, rect image.Rectangle) {
-	for i, r := range boardRowRects(rect, len(ws)) {
-		ws[i].SetLocation(r)
-	}
+	return widgets.StackRects(inner, n, theme.Px(boardRowGap))
 }
 
 // capRows splits n rows into the visible count and the hidden remainder:
@@ -115,8 +75,11 @@ func capRows(n, cap int) (show, hidden int) {
 	return cap - 1, n - (cap - 1)
 }
 
-// stationRow is one rendered board row's action handle (its contract id,
-// button and root container) so tests can find, read and press it.
+// stationRow is one rendered board row's action handle — its contract id
+// plus the two things widgets.StackRow rendered (the root the section
+// tiles, the trailing action button) — so tests can find, read and press
+// it. The row itself is a rich row built by the table module; only this
+// handle over it lives here.
 type stationRow struct {
 	id   content.ContractID
 	btn  *widget.Button
@@ -288,115 +251,96 @@ func (g *Game) rebuildStationBoard(m stationBoardModel) {
 	g.placeIfVirgin(g.stationW, stationLayout(g.w, g.h, h).Station)
 }
 
-// buildContractRow renders one board row: text lines left, action button
-// right. Note rows render their text alone, vertically centred. Returns a
-// nil button for note rows.
+// buildContractRow renders one board row as a rich row of the table
+// module (widgets.NewStackRow): the line stack below, the kind icon
+// leading line 1 and the row's own RowSpec.Actions drawn as its trailing
+// button — the declaration carries the same action, gating and command
+// the context menu runs, so button and menu can never disagree on the
+// verb. The row's context menu rides the RowSpec seam: a right-click on
+// the objective label (wired by the builder, as that stack line's Ref)
+// replaces this menu — handlers run parent-first, so the child's
+// OpenMenu lands last and wins. Returns a nil button for note rows.
 func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container, *widget.Button) {
 	p := g.env.Pal()
-	rowBG := bordered(nrgba(p.Cell, 160), nrgba(p.Border, 140), 1)
-	rowPad := &widget.Insets{Left: theme.Px(boardRowPad), Right: theme.Px(boardRowPad)}
-
-	if r.Note {
-		row := widget.NewContainer(
-			widget.ContainerOpts.BackgroundImage(rowBG),
-			widget.ContainerOpts.Layout(widget.NewRowLayout(
-				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Padding(rowPad),
-			)),
-		)
-		row.AddChild(widget.NewText(
-			widget.TextOpts.Text(g.ellip(r.Title, theme.StepTiny, float64(theme.Px(boardContentW))), g.env.Face(theme.StepTiny), solid(p.Dim)),
-			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-				Position: widget.RowLayoutPositionCenter,
-			})),
-		))
-		return row, nil
+	row := widgets.TableRow{}
+	if r.Icon != "" {
+		row.Icons = []string{r.Icon}
 	}
-
-	btn := g.newBtn(r.Action, boardBtnW, boardBtnH, func() {
-		if r.Disabled { // gated/accepted rows emit nothing
+	// The menu's declaration (the seam's verbs the RowSpec test pins:
+	// Accept / Abandon, grayed at the gate) and the button's copy of it:
+	// the button wears the model's own label on top, "Accepted" marking a
+	// taken contract — the board marker GAMEPLAY documents and no menu
+	// entry reads. Note rows declare nothing: no button, no menu.
+	menuSpec := widgets.RowSpec{}
+	if !r.Note {
+		menuSpec = g.contractRowSpec(r, active)
+		row.Spec = menuSpec
+		if r.Action != "" && r.Action != menuSpec.Actions[0].Label {
+			row.Spec.Actions = append([]widgets.RowAction(nil), menuSpec.Actions...)
+			row.Spec.Actions[0].Label = r.Action
+		}
+		row.Stack = g.boardRowStack(r, active)
+	} else {
+		// "+N more" / empty state: one dim line, no verbs, no menu.
+		row.Stack = []widgets.RowLine{{Segs: []widgets.RowSeg{{
+			Text: g.ellip(r.Title, theme.StepTiny, float64(theme.Px(boardContentW))),
+			Tint: p.Dim,
+			Step: theme.StepTiny,
+		}}}}
+	}
+	sr := widgets.NewStackRow(g.env, row, g.env.Face(theme.StepSmall))
+	// The board's own row strip: the bordered translucent band every
+	// board row has worn (the table paints its row tints; this chrome is
+	// the board's). The builder already bound the session's widget theme
+	// to the row, so setting the strip may validate buttons and all
+	// before the row joins the window.
+	sr.Root.SetBackgroundImage(bordered(nrgba(p.Cell, 160), nrgba(p.Border, 140), 1))
+	sr.Root.GetWidget().MouseButtonClickedEvent.AddHandler(func(args any) {
+		a, ok := args.(*widget.WidgetMouseButtonClickedEventArgs)
+		if !ok || a.Button != ebiten.MouseButtonRight {
 			return
 		}
-		if active {
-			g.env.Do(widgets.Abandon{Contract: r.ID})
-			return
-		}
-		g.env.Do(widgets.Accept{Contract: r.ID})
+		g.env.OpenRowMenu(menuSpec, widgets.ClickPoint(a))
 	})
-	btn.GetWidget().Disabled = r.Disabled
-
-	// The row's context menu, through the RowSpec seam: the same action,
-	// the same gating, the same command as the button. A right-click on
-	// the objective label (wired below) replaces this menu: handlers run
-	// parent-first, so the child's OpenMenu lands last and wins.
-	spec := g.contractRowSpec(r, active)
-	attachRowMenu := func(ctr *widget.Container) {
-		ctr.GetWidget().MouseButtonClickedEvent.AddHandler(func(args any) {
-			a, ok := args.(*widget.WidgetMouseButtonClickedEventArgs)
-			if !ok || a.Button != ebiten.MouseButtonRight {
-				return
-			}
-			g.env.OpenRowMenu(spec, widgets.ClickPoint(a))
-		})
+	if len(sr.Buttons) == 0 {
+		return sr.Root, nil
 	}
+	return sr.Root, sr.Buttons[0]
+}
 
+// boardRowStack is one contract row's lines: the title over the objective
+// summary, the gated standing requirement and the reward on an available
+// row — the reward owns line 3 alone, so the payout is the one string on
+// a board row that must never ellipsize — and just the title + progress
+// line on an active one. The title keeps its fixed width (the ellipsis
+// budget the row reserves, icon box included), so every row measures the
+// same with or without a glyph.
+func (g *Game) boardRowStack(r boardRowModel, active bool) []widgets.RowLine {
+	p := g.env.Pal()
 	// The active line is title + progress ("Belt cleanup — 1/3") and only
-	// fits the title column at the tiny step in IBM Plex Sans (at small the
-	// em-dash suffix alone costs 56 px); available titles, which carry no
-	// suffix, stay at small.
+	// fits the title column at the tiny step in IBM Plex Sans (at small
+	// the em-dash suffix alone costs 56 px); available titles, which
+	// carry no suffix, stay at small.
 	step := theme.StepSmall
 	if active {
 		step = theme.StepTiny
 	}
-	// The kind glyph leads the title; the title's fixed width gives back
-	// the icon box, so every row keeps the same total width whether it
-	// carries an icon or not (note rows never do).
-	// Scaled ONCE here: the fixed width below (MinSize + ellip budget)
-	// reads it in live px, and the icon reserve matches the drawn
-	// Px(icon box) + Px(gap) of the row it mirrors.
 	titleW := theme.Px(boardTextW)
 	if r.Icon != "" {
 		titleW -= theme.Px(theme.IconInline) + theme.Px(theme.IconGap)
 	}
-	title := widget.NewText(
-		widget.TextOpts.Text(g.ellip(r.Title, step, float64(titleW)), g.env.Face(step), solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(titleW, 0)),
-	)
-	var titleCell widget.PreferredSizeLocateableWidget = title
-	if r.Icon != "" {
-		ctr := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(theme.IconGap)),
-		)))
-		icon := theme.NewIcon(r.Icon, theme.IconInline, p.Text)
-		// Centre the glyph in the line: the row is as tall as its
-		// button, and a top-flush icon reads as a misalignment.
-		for _, w := range []widget.PreferredSizeLocateableWidget{icon, ctr} {
-			w.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
-		}
-		ctr.AddChild(icon, title)
-		titleCell = ctr
-	}
-
+	lines := []widgets.RowLine{{Segs: []widgets.RowSeg{{
+		Text: g.ellip(r.Title, step, float64(titleW)),
+		Tint: p.Accent,
+		Step: step,
+		MinW: titleW,
+	}}}}
 	if active {
-		// One line: "Belt cleanup — 1/3" + Abandon.
-		row := widget.NewContainer(
-			widget.ContainerOpts.BackgroundImage(rowBG),
-			widget.ContainerOpts.Layout(widget.NewRowLayout(
-				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(theme.Px(boardBtnGap)),
-				widget.RowLayoutOpts.Padding(rowPad),
-			)),
-		)
-		row.AddChild(titleCell, btn)
-		attachRowMenu(row)
-		return row, btn
+		return lines // one line: "Belt cleanup — 1/3" + Abandon
 	}
 
-	// Three lines: title + Accept / summary [requirement] / reward. A
-	// gated row parks its standing requirement beside the objective
-	// (line 2) so line 3 gives the payout the whole row — the reward is
-	// the one string on a board row that must never ellipsize.
+	// A gated row parks its standing requirement beside the objective
+	// (line 2) so line 3 gives the payout the whole row.
 	summaryW := float64(theme.Px(boardContentW))
 	if r.Require != "" {
 		reqW := g.textW(r.Require, theme.StepTiny)
@@ -406,65 +350,32 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 		}
 		summaryW -= reqW + float64(theme.Px(boardBtnGap))
 	}
-	var line2 widget.PreferredSizeLocateableWidget = widget.NewText(
-		widget.TextOpts.Text(g.ellip(r.Summary, theme.StepTiny, summaryW), g.env.Face(theme.StepTiny), solid(p.Dim)),
-	)
+	summary := widgets.RowLine{Segs: []widgets.RowSeg{{
+		Text: g.ellip(r.Summary, theme.StepTiny, summaryW),
+		Tint: p.Dim,
+		Step: theme.StepTiny,
+	}}}
 	if r.Require != "" {
-		req := widget.NewText(
-			widget.TextOpts.Text(r.Require, g.env.Face(theme.StepTiny), solid(p.Warn)),
-		)
-		ctr := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(boardBtnGap)),
-		)))
-		ctr.AddChild(line2, req)
-		line2 = ctr
-	}
-
-	// The objective label is its own gesture target: its RowSpec declares
-	// Show Info on the objective's def (the caste it asks you to kill, the
-	// item it wants), so right-click opens that menu and double-click swaps
-	// the window — the installer's halves, strictly. It sits INSIDE the
-	// row and child handlers run after the parent's, so this Show Info
-	// menu replaces the row's Accept menu when the click lands here.
-	if ref, showable := g.objectiveRef(r.ID); showable {
-		spec := widgets.RowSpec{Ref: &ref}
-		var dbl widgets.RowDouble // one board build's gesture state
-		line2.GetWidget().MouseButtonClickedEvent.AddHandler(func(args any) {
-			a, ok := args.(*widget.WidgetMouseButtonClickedEventArgs)
-			if !ok {
-				return
-			}
-			switch a.Button {
-			case ebiten.MouseButtonRight:
-				g.env.OpenRowMenu(spec, widgets.ClickPoint(a))
-			case ebiten.MouseButtonLeft:
-				dbl.Click(g.env, g.env, spec)
-			}
+		summary.Segs = append(summary.Segs, widgets.RowSeg{
+			Text: r.Require, Tint: p.Warn, Step: theme.StepTiny,
 		})
 	}
-
-	reward := widget.NewText(
-		widget.TextOpts.Text(g.ellip(r.Reward, theme.StepTiny, float64(theme.Px(boardContentW))), g.env.Face(theme.StepTiny), solid(p.Good)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(boardContentW), 0)),
-	)
-
-	line1 := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
-		widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-		widget.RowLayoutOpts.Spacing(theme.Px(boardBtnGap)),
-	)))
-	line1.AddChild(titleCell, btn)
-
-	row := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(rowBG),
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Padding(rowPad),
-		)),
-	)
-	row.AddChild(line1, line2, reward)
-	attachRowMenu(row)
-	return row, btn
+	// The objective label is its own gesture target: its Ref declares
+	// Show Info on the objective's def (the caste it asks you to kill,
+	// the item it wants), so right-click opens that menu and double-click
+	// swaps the window — the installer's halves, strictly. It sits INSIDE
+	// the row and child handlers run after the parent's, so this Show
+	// Info menu replaces the row's Accept menu when the click lands here.
+	if ref, showable := g.objectiveRef(r.ID); showable {
+		summary.Ref = &ref
+	}
+	lines = append(lines, summary, widgets.RowLine{Segs: []widgets.RowSeg{{
+		Text: g.ellip(r.Reward, theme.StepTiny, float64(theme.Px(boardContentW))),
+		Tint: p.Good,
+		Step: theme.StepTiny,
+		MinW: theme.Px(boardContentW),
+	}}})
+	return lines
 }
 
 // contractRowSpec is one board row's declared interactions: the same

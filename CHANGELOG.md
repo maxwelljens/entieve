@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The contract board folds onto the table module** (`widgets.StackRow`,
+  `widgets.StackLayout`): the table gains a modest rich-row capability —
+  a `TableRow` may carry a **line stack** (`Stack []RowLine`) instead of
+  one text per column: each line a run of cells (`RowSeg`, own type-scale
+  step, colour and minimum width), the row's `Icons[0]` boxing with line
+  1's first cell, and its `RowSpec.Actions` drawn as trailing buttons
+  (1–2, `Disabled` grayed and silent — one declaration feeding the
+  button, the context menu and the gate alike), with a per-line `Ref`
+  that joins the shared installer (right-click menu with the bold-first
+  Show Info, strict double-click). Everything else — change-gated
+  rebuilds (a rich row's stack and its buttons' labels/gates are
+  snapshotted like plain cells, so an identical `SetRows` stays a no-op),
+  column fitting, sorting, selection and `TipData` tooltips — applies to
+  rich rows as to plain ones. The station contract board now declares
+  `TableRow` values and renders them through `widgets.NewStackRow`: the
+  bespoke `boardLayout` layouter and the hand-built row widget tree it
+  laid out are deleted — the equal-height stack behind them moves to
+  `widgets.StackLayout` (the pure `boardRowRects` pin stays as the
+  geometry tests' subject), and what survives beside it is only the
+  contract-id/button/root handle the board's tests press. The look is
+  preserved rect for rect — same window chrome, title line, row order,
+  strings (the Accepted marker button and the menu's Accept/Abandon verb
+  split included), button gating, objective-label Show Info and
+  Accept/Abandon dispatch — pinned by the new `TestBoardOnTableRowRects`
+  against the pre-port geometry, with the board's golden strings and
+  mouse-flow tests passing byte-untouched.
 - **`uikit` split into three modules with an enforced import direction**
   (`uikit/theme`, `uikit/widgets`, `uikit/screens`): the flat package
   became `theme` (visual constants and their plumbing — `Palette`,

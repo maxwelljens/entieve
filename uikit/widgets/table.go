@@ -58,6 +58,11 @@ type Column struct {
 // the row's declared interactions (RowSpec): the table applies it through
 // the installer — right-click menu, lazy tooltip, strict double-click
 // Show Info — so surfaces declare data instead of wiring handlers.
+//
+// Stack, when set, makes the row RICH: it renders as that line stack
+// instead of one text per column (see the rich-row section below), with
+// Icons[0] leading its first line and Spec.Actions drawn as trailing
+// buttons beside it. Cells stay the row's sort/measure source either way.
 type TableRow struct {
 	Cells    []string
 	Icons    []string
@@ -65,6 +70,7 @@ type TableRow struct {
 	Tint     color.RGBA
 	Data     any
 	Spec     RowSpec
+	Stack    []RowLine
 }
 
 // iconOf returns row cell i's icon name ("" when the row carries none).
@@ -73,6 +79,292 @@ func iconOf(row TableRow, i int) string {
 		return ""
 	}
 	return row.Icons[i]
+}
+
+// ---------------------------------------------------------------------------
+// Rich rows: line stacks, leading icons and trailing action buttons
+// ---------------------------------------------------------------------------
+
+// Rich-row geometry (design units, scaled by theme.Px): the line stack's
+// own metrics — the look the contract board established and every rich
+// row keeps. Plain cells keep cellPad/entryPadV above; a row is either
+// rich or plain, never a mix.
+const (
+	// RichPad is the horizontal padding inside a rich row.
+	RichPad = 3
+	// RichGap is the gap between the cells of a line, and between a
+	// line's last cell and the trailing action buttons.
+	RichGap = 6
+	// RichBtnW is the trailing action button box: the widest label the
+	// RowSpec seam renders ("Accepted") in the emphasis face, so every
+	// button — gated or not — measures the same and the line stays flush
+	// with the row's right edge.
+	RichBtnW = 92
+	// RichBtnH is that button's minimum hit area (menuBtnH).
+	RichBtnH = 40
+)
+
+// RowSeg is one text run inside a line of a rich row: its own type-scale
+// step ("" = the row's default face), colour (zero = the palette's text
+// colour) and minimum width in LIVE pixels (0 = the text's own width,
+// already scaled by the caller like every widget minimum here).
+type RowSeg struct {
+	Text string
+	Tint color.RGBA
+	Step string
+	MinW int
+}
+
+// RowLine is one line of a rich row's stack: a run of cells drawn left to
+// right, plus the line's own Ref. A ref'd line is its own gesture target —
+// the installer's line half applies to it (right-click menu with the
+// bold-first Show Info, double-click opens it strictly), exactly like a
+// chain ref in the Show Info window — while the row itself keeps its own
+// menu from Spec.
+type RowLine struct {
+	Segs []RowSeg
+	Ref  *InfoRef
+}
+
+// StackRow is one rendered rich row: the container the owner tiles (a
+// table body, a board section), its trailing action buttons (nil when the
+// row declares none) and the icon box leading line 1 (nil without an
+// icon). The handles the owner needs afterwards: a table's selection tint
+// moves the icon, a board's test surface reads the button.
+type StackRow struct {
+	Root    *widget.Container
+	Buttons []*widget.Button
+	Icon    *theme.IconBox
+}
+
+// NewStackRow builds a rich row's widget tree from its TableRow: a
+// vertical run of lines (Padding RichPad; a lone line centres itself in
+// the strip, the way a plain row centres its text), each line a
+// horizontal run of its cells (Spacing RichGap), the row's icon boxing
+// with the first cell of line 1 (the icon's own IconGap) and its
+// RowSpec.Actions rendered as trailing buttons on line 1 (RichBtnW×H,
+// Disabled grayed and silent — the grayed-not-hidden convention).
+//
+// Only the LINES are wired here: a line carrying a Ref gets the shared
+// installer's line half (right-click menu, double-click Show Info).
+// Root-level clicks belong to the owner — a table selects and opens the
+// row menu, a board only opens the menu — because a child's handler runs
+// after its parent's, so the line's menu wins over the row's exactly as
+// the seam prescribes.
+//
+// face is the default face for cells that name no step (the table's own
+// cell face; nil = the small display step). Cell text arrives ready to
+// draw: owners ellipsize against the width they measured, the builder
+// never re-fits a stack (its lines are not columns).
+func NewStackRow(env Seams, row TableRow, face *text.Face) *StackRow {
+	p := env.Pal()
+	out := &StackRow{}
+	cellFace := func(step string) *text.Face {
+		if step == "" {
+			if face != nil {
+				return face
+			}
+			return env.Face(theme.StepSmall)
+		}
+		return env.Face(step)
+	}
+	seg := func(s RowSeg) *widget.Text {
+		col := s.Tint
+		if col.A == 0 {
+			col = p.Text
+		}
+		opts := []widget.TextOpt{
+			widget.TextOpts.Text(s.Text, cellFace(s.Step), theme.Solid(col)),
+		}
+		if s.MinW > 0 {
+			opts = append(opts, widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(s.MinW, 0)))
+		}
+		return widget.NewText(opts...)
+	}
+	// A ref'd line is its own gesture target (the installer's line half).
+	// The double-click state is per line: like every surface, one build's
+	// clicks have to arm against the line they landed on.
+	wire := func(w *widget.Widget, spec RowSpec) {
+		var dbl RowDouble
+		w.MouseButtonClickedEvent.AddHandler(func(args any) {
+			a, ok := args.(*widget.WidgetMouseButtonClickedEventArgs)
+			if !ok {
+				return
+			}
+			switch a.Button {
+			case ebiten.MouseButtonRight:
+				OpenRowMenu(env, env, spec, ClickPoint(a))
+			case ebiten.MouseButtonLeft:
+				dbl.Click(env, env, spec)
+			}
+		})
+	}
+
+	// A lone line centres itself in the strip (the stretched row a board
+	// section hands a "+N more" note); a stack tiles from the top.
+	dir := widget.DirectionHorizontal
+	if len(row.Stack) > 1 {
+		dir = widget.DirectionVertical
+	}
+	root := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
+		widget.RowLayoutOpts.Direction(dir),
+		widget.RowLayoutOpts.Padding(&widget.Insets{
+			Left: theme.Px(RichPad), Right: theme.Px(RichPad),
+		}),
+	)))
+	// A rich row owns buttons, and ebitenui validates a button against a
+	// theme ("Image is required") — which can happen the moment the row's
+	// strip or tint is set, before it has joined any window. Bind the
+	// session's widget theme here: the same object the surface's windows
+	// ride, rebuilt together with them.
+	root.GetWidget().SetTheme(env.WidgetTheme())
+	out.Root = root
+
+	iconTint := p.Text
+	if row.IconTint.A != 0 {
+		iconTint = row.IconTint
+	}
+	for li, line := range row.Stack {
+		var cells []widget.PreferredSizeLocateableWidget
+		// The row's icon (Icons[0]) leads line 1: it boxes with that
+		// line's first cell at the icon gap and centres in the line —
+		// the row can be as tall as its button, and a top-flush glyph
+		// reads as a misalignment.
+		inBox := 0
+		if li == 0 && iconOf(row, 0) != "" {
+			box := theme.NewIconBox(theme.IconInline)
+			box.Set(iconOf(row, 0), iconTint)
+			out.Icon = box
+			lead := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
+				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+				widget.RowLayoutOpts.Spacing(theme.Px(theme.IconGap)),
+			)))
+			for _, w := range []widget.PreferredSizeLocateableWidget{box.Widget(), lead} {
+				w.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+			}
+			lead.AddChild(box.Widget())
+			if len(line.Segs) > 0 {
+				lead.AddChild(seg(line.Segs[0]))
+				inBox = 1
+			}
+			cells = append(cells, lead)
+		}
+		for i, s := range line.Segs {
+			if i < inBox {
+				continue // already drawn inside the icon box
+			}
+			cells = append(cells, seg(s))
+		}
+		if li == 0 {
+			for i, a := range row.Spec.Actions {
+				if i == 2 {
+					break // a row offers at most two trailing buttons
+				}
+				action := a
+				btn := widget.NewButton(
+					widget.ButtonOpts.TextLabel(action.Label),
+					widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(
+						theme.Px(RichBtnW), theme.Px(RichBtnH))),
+					widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+						// Grayed rows emit nothing — belt and braces
+						// with the disabled widget (a harness may fire
+						// the click event straight past the gate).
+						if !action.Disabled && action.Intent != nil {
+							env.Do(action.Intent)
+						}
+					}),
+				)
+				btn.GetWidget().Disabled = action.Disabled
+				out.Buttons = append(out.Buttons, btn)
+				cells = append(cells, btn)
+			}
+		}
+
+		var lineW widget.PreferredSizeLocateableWidget
+		if len(cells) == 1 {
+			lineW = cells[0] // a lone cell draws as itself (the plain row's own text)
+		} else {
+			ctr := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
+				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+				widget.RowLayoutOpts.Spacing(theme.Px(RichGap)),
+			)))
+			ctr.AddChild(cells...)
+			lineW = ctr
+		}
+		if dir == widget.DirectionHorizontal {
+			// The line centres itself in the strip it is the only child of.
+			lineW.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+		}
+		root.AddChild(lineW)
+		if line.Ref != nil {
+			wire(lineW.GetWidget(), RowSpec{Ref: line.Ref})
+		}
+	}
+	return out
+}
+
+// StackLayout tiles a section's rows the way a board section stacks its
+// rich rows: equal heights, Gap pixels apart, the first row flush with
+// the top — every row pairwise disjoint and fully inside the rect. A
+// section reports the tallest row times the count as its preferred
+// height (a zero-width preferred rect would be dropped by the parent's
+// union, shortening the window below its rows), so a "+N more" note
+// never shrinks its section and rows stretch together when the window
+// floors. n <= 0 lays out nothing.
+//
+// Plain table bodies keep their spacing-0 natural tiling: every plain
+// row is one rowH tall, so the two agree wherever they could both apply.
+type StackLayout struct{ Gap int }
+
+// PreferredSize is the stack: widest row by n rows of the tallest, gaps
+// included.
+func (l StackLayout) PreferredSize(ws []widget.PreferredSizeLocateableWidget) (int, int) {
+	if len(ws) == 0 {
+		return 0, 0
+	}
+	w, h := 0, 0
+	for _, c := range ws {
+		cw, ch := c.PreferredSize()
+		if cw > w {
+			w = cw
+		}
+		if ch > h {
+			h = ch
+		}
+	}
+	return w, len(ws)*h + (len(ws)-1)*l.Gap
+}
+
+// Layout places every row at its StackRects slot.
+func (l StackLayout) Layout(ws []widget.PreferredSizeLocateableWidget, rect image.Rectangle) {
+	for i, r := range StackRects(rect, len(ws), l.Gap) {
+		ws[i].SetLocation(r)
+	}
+}
+
+// StackRects is the pure tiling behind StackLayout: n equal-height rows
+// inside inner, gap pixels apart, the first flush with inner's top.
+// n <= 0 (or an inner too small to hold even one pixel-high row) returns
+// no rects; when the inner cannot hold the gaps too, they collapse to
+// zero rather than the rows.
+func StackRects(inner image.Rectangle, n, gap int) []image.Rectangle {
+	if n <= 0 || inner.Dx() <= 0 || inner.Dy() <= 0 {
+		return nil
+	}
+	if (inner.Dy()-(n-1)*gap)/n < 1 {
+		gap = 0 // degenerate: no room for gaps, stack 1px rows
+	}
+	h := (inner.Dy() - (n-1)*gap) / n
+	if h < 1 {
+		return nil // not even one row fits
+	}
+	rows := make([]image.Rectangle, n)
+	y := inner.Min.Y
+	for i := range rows {
+		rows[i] = image.Rect(inner.Min.X, y, inner.Max.X, y+h)
+		y += h + gap
+	}
+	return rows
 }
 
 // Table is a sortable, scrollable column table: a header row of sort
@@ -105,10 +397,11 @@ type Table struct {
 	body    *widget.Container
 
 	Rows      []TableRow // display order (sorted)
-	rawRows   []TableRow // cell/icon content last applied to the widgets
+	rawRows   []TableRow // cell/icon/stack content last applied to the widgets
 	Texts     [][]*widget.Text
 	Cells     [][]*tableCell // per-cell widget pair (nil for right-aligned)
 	RowCts    []*widget.Container
+	rich      []*StackRow  // rich row handles (nil at plain rows), parallel to RowCts
 	applied   []color.RGBA // background last painted per row widget
 	Tips      []RowTip     // per-row tooltip slot (the spec's Tip data)
 	widths    []float64    // fitted column widths
@@ -425,16 +718,18 @@ func (t *Table) reconcileSelection() {
 	}
 }
 
-// updateRows creates the row widgets when the row count changed and
-// refreshes cell text and tints in place otherwise (diff-friendly). It
-// reports whether any cell text or icon changed — the input the column
-// refit needs; tints and selection repaint through updateBg/updateIcon
-// without touching the layout.
+// updateRows creates the row widgets when the row count changed — or when
+// a rich row's rendered content (its line stack, cells, icon, or the label
+// and gate of a trailing action) moved — and refreshes cell text and tints
+// in place otherwise (diff-friendly). It reports whether any cell text,
+// icon or stack changed — the input the column refit needs; tints and
+// selection repaint through updateBg/updateIcon without touching the
+// layout.
 func (t *Table) updateRows() bool {
-	changed := len(t.RowCts) != len(t.Rows)
+	changed := len(t.RowCts) != len(t.Rows) || t.stackMoved()
 	if changed {
 		t.body.RemoveChildren()
-		t.RowCts, t.Texts, t.Cells, t.applied, t.rawRows, t.Tips = nil, nil, nil, nil, nil, nil
+		t.RowCts, t.Texts, t.Cells, t.rich, t.applied, t.rawRows, t.Tips = nil, nil, nil, nil, nil, nil, nil
 		for i := range t.Rows {
 			ctr := t.newRow(i)
 			t.RowCts = append(t.RowCts, ctr)
@@ -445,21 +740,25 @@ func (t *Table) updateRows() bool {
 		if i >= len(t.rawRows) {
 			t.rawRows = append(t.rawRows, TableRow{})
 		}
-		// Diff against the raw cells/icons last applied (never against
-		// the widget labels: those hold the ellipsized form, so a
+		// Diff against the raw cells/icons/stack last applied (never
+		// against the widget labels: those hold the ellipsized form, so a
 		// truncated cell would read as "changed" forever).
 		prev := &t.rawRows[i]
-		if !sameCellsIcons(*prev, row, len(t.cols)) {
+		cellsMoved := !sameCellsIcons(*prev, row, len(t.cols))
+		if cellsMoved || !sameStack(*prev, row) {
 			changed = true
-			*prev = TableRow{
-				Cells: append([]string(nil), row.Cells...),
-				Icons: append([]string(nil), row.Icons...),
-			}
-			for j := range t.cols {
-				cell := cellOf(row, j)
-				if tx := t.Texts[i][j]; tx.Label != cell {
-					// Raw cell; applyWidths ellipsizes it to the fitted column.
-					tx.Label = cell
+			*prev = snapshotRow(row)
+			// Plain rows patch their labels in place (widgets survive);
+			// a rich row draws its own stack — when it moved, the rebuild
+			// above already replaced its widgets, and its cells are only
+			// ever the fit/sort source.
+			if i >= len(t.rich) || t.rich[i] == nil {
+				for j := range t.cols {
+					cell := cellOf(row, j)
+					if tx := t.Texts[i][j]; tx.Label != cell {
+						// Raw cell; applyWidths ellipsizes it to the fitted column.
+						tx.Label = cell
+					}
 				}
 			}
 		}
@@ -478,6 +777,76 @@ func (t *Table) updateRows() bool {
 	return changed
 }
 
+// stackMoved reports whether any RICH row's rendered content differs from
+// the applied snapshot — the change gate that keeps an identical SetRows
+// a no-op while a moved stack (or the label/gate of one of its trailing
+// buttons) earns a rebuild. Plain rows — no stack on either side — never
+// move here: their cells refresh in place inside updateRows; a row that
+// gained or dropped its stack does, so its widgets follow the form.
+func (t *Table) stackMoved() bool {
+	for i, row := range t.Rows {
+		if i >= len(t.rawRows) {
+			continue
+		}
+		prev := t.rawRows[i]
+		if len(prev.Stack) == 0 && len(row.Stack) == 0 {
+			continue
+		}
+		if !sameCellsIcons(prev, row, len(t.cols)) || !sameStack(prev, row) {
+			return true
+		}
+	}
+	return false
+}
+
+// snapshotRow copies the parts of a row its widgets render from — cell
+// text, icons and, for a rich row, its line stack plus the label and gate
+// of each trailing action — so the diff compares against data the caller
+// can no longer mutate (rows arrive by value over shared slices).
+func snapshotRow(row TableRow) TableRow {
+	s := TableRow{
+		Cells: append([]string(nil), row.Cells...),
+		Icons: append([]string(nil), row.Icons...),
+	}
+	if len(row.Stack) > 0 {
+		s.Stack = copyStack(row.Stack)
+		s.Spec.Actions = append([]RowAction(nil), row.Spec.Actions...)
+	}
+	return s
+}
+
+// sameStack reports whether a row's line stack (and, when it is rich, the
+// label and gate of each trailing action button) still matches the
+// snapshot. A plain row carries no stack and always matches.
+func sameStack(applied, row TableRow) bool {
+	if !reflect.DeepEqual(applied.Stack, row.Stack) {
+		return false
+	}
+	if len(row.Stack) == 0 {
+		return true
+	}
+	if len(applied.Spec.Actions) != len(row.Spec.Actions) {
+		return false
+	}
+	for i, a := range row.Spec.Actions {
+		if applied.Spec.Actions[i].Label != a.Label || applied.Spec.Actions[i].Disabled != a.Disabled {
+			return false
+		}
+	}
+	return true
+}
+
+// copyStack deep-copies a row's line stack (segment runs included) so the
+// snapshot can never be edited through the caller's slices.
+func copyStack(s []RowLine) []RowLine {
+	out := make([]RowLine, len(s))
+	for i, l := range s {
+		out[i] = l
+		out[i].Segs = append([]RowSeg(nil), l.Segs...)
+	}
+	return out
+}
+
 // sameCellsIcons reports whether row's cell text and icons across the
 // first n columns match the snapshot (an empty snapshot only matches an
 // all-empty row).
@@ -491,10 +860,14 @@ func sameCellsIcons(applied, row TableRow, n int) bool {
 }
 
 // newRow builds one clickable row container with one cell widget per
-// column. The click handler resolves the row by index at fire time, so
-// deferred events always hit the currently displayed row (widgets are
-// positional: row i's container never moves).
+// column — or, for a rich row, its line stack. The click handler resolves
+// the row by index at fire time, so deferred events always hit the
+// currently displayed row (widgets are positional: row i's container never
+// moves).
 func (t *Table) newRow(i int) *widget.Container {
+	if len(t.Rows[i].Stack) > 0 {
+		return t.newStackRow(i)
+	}
 	ctr := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
@@ -504,14 +877,7 @@ func (t *Table) newRow(i int) *widget.Container {
 			// Full width: the row background covers the whole strip even
 			// when the columns underfill it.
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-			widget.WidgetOpts.MouseButtonClickedHandler(func(args *widget.WidgetMouseButtonClickedEventArgs) {
-				switch args.Button {
-				case ebiten.MouseButtonLeft:
-					t.rowClicked(i)
-				case ebiten.MouseButtonRight:
-					t.rowMenu(i, ClickPoint(args))
-				}
-			}),
+			widget.WidgetOpts.MouseButtonClickedHandler(t.rowHandler(i)),
 		),
 	)
 	var texts []*widget.Text
@@ -575,9 +941,45 @@ func (t *Table) newRow(i int) *widget.Container {
 	}
 	t.Texts = append(t.Texts, texts)
 	t.Cells = append(t.Cells, cells)
+	t.rich = append(t.rich, nil)
 	t.applied = append(t.applied, color.RGBA{})
 	t.Tips = append(t.Tips, RowTip{})
 	return ctr
+}
+
+// newStackRow builds a rich row: its line stack through the shared
+// builder, wired with the same root click handling every row form gets —
+// left selects (and runs the installer's double-click half against the
+// row's spec), right opens the row's declared menu. The lines themselves
+// are wired by the builder.
+func (t *Table) newStackRow(i int) *widget.Container {
+	sr := NewStackRow(NewSeams(t.th, t.cv, t.as), t.Rows[i], t.Face)
+	click := t.rowHandler(i)
+	sr.Root.GetWidget().LayoutData = widget.RowLayoutData{Stretch: true}
+	sr.Root.GetWidget().MouseButtonClickedEvent.AddHandler(func(args any) {
+		if a, ok := args.(*widget.WidgetMouseButtonClickedEventArgs); ok {
+			click(a)
+		}
+	})
+	t.Texts = append(t.Texts, nil)
+	t.Cells = append(t.Cells, nil)
+	t.rich = append(t.rich, sr)
+	t.applied = append(t.applied, color.RGBA{})
+	t.Tips = append(t.Tips, RowTip{})
+	return sr.Root
+}
+
+// rowHandler is the root click wiring every row form shares (resolved by
+// index at fire time, like the row widgets themselves).
+func (t *Table) rowHandler(i int) widget.WidgetMouseButtonClickedHandlerFunc {
+	return func(args *widget.WidgetMouseButtonClickedEventArgs) {
+		switch args.Button {
+		case ebiten.MouseButtonLeft:
+			t.rowClicked(i)
+		case ebiten.MouseButtonRight:
+			t.rowMenu(i, ClickPoint(args))
+		}
+	}
 }
 
 // tableCell pairs a left-aligned cell's container with its icon box.
@@ -646,7 +1048,8 @@ func (t *Table) rowMenu(i int, at image.Point) {
 
 // updateIcon refreshes one row's cell icons and their palette role. It runs
 // alongside updateBg: selection moves the icon tint to the accent just as it
-// moves the row background.
+// moves the row background. A rich row's icon leads its line 1 (Icons[0]
+// through the StackRow handle).
 func (t *Table) updateIcon(i int) {
 	if i < 0 || i >= len(t.Rows) {
 		return
@@ -657,6 +1060,9 @@ func (t *Table) updateIcon(i int) {
 		if c != nil {
 			c.Box.Set(iconOf(row, j), tint)
 		}
+	}
+	if i < len(t.rich) && t.rich[i] != nil && t.rich[i].Icon != nil {
+		t.rich[i].Icon.Set(iconOf(row, 0), tint)
 	}
 }
 
@@ -792,8 +1198,13 @@ func (t *Table) layoutCells() {
 		// Ellipsize against the float width: the int-rounded cell is up
 		// to half a pixel narrower, and rounding it down here would
 		// ellipsize text that measurably fits ("25%" -> "2…"). An icon
-		// cell reserves its icon box out of the label's share.
+		// cell reserves its icon box out of the label's share. Rich rows
+		// own their lines end to end — no per-column text widget, no
+		// column anchor to pin; they stretch across the row instead.
 		for r := range t.Rows {
+			if r < len(t.rich) && t.rich[r] != nil {
+				continue
+			}
 			inner := t.widths[i] - 2*float64(theme.Px(cellPad))
 			if t.Cells[r][i] != nil && iconOf(t.Rows[r], i) != "" {
 				inner -= float64(theme.Px(theme.IconInline) + theme.Px(theme.IconGap))
