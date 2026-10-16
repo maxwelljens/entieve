@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -52,6 +53,47 @@ func TestKeyMapWellFormed(t *testing.T) {
 	for _, a := range required {
 		if !found[a] {
 			t.Errorf("action %q missing from KeyMap", a)
+		}
+	}
+}
+
+// TestKeyMapScreenRowsDeriveFromSpec: the screen toggles in KeyMap are
+// the Screen spec's rows — one binding per keyed row, byte-identical to
+// its declaration, no other binding claims a screen action, and the help
+// overlay renders exactly those rows. A new keyed Screen shows up in the
+// help window without touching this file.
+func TestKeyMapScreenRowsDeriveFromSpec(t *testing.T) {
+	derived := screenBindings(screens)
+	for _, b := range derived {
+		if n := countBinding(KeyMap, b); n != 1 {
+			t.Errorf("screen binding %+v appears %d times in KeyMap, want 1", b, n)
+		}
+	}
+	screenActions := map[string]bool{}
+	for _, s := range screens {
+		if s.Key != keyNone {
+			screenActions[s.Action] = true
+		}
+	}
+	rows := 0
+	for _, b := range KeyMap {
+		if screenActions[b.Action] {
+			rows++
+		}
+	}
+	if rows != len(derived) {
+		t.Errorf("KeyMap carries %d screen rows, want %d", rows, len(derived))
+	}
+	// helpRows splits KeyMap on the em dash: the spec's text lands whole.
+	help := helpRows()
+	for _, b := range derived {
+		key, desc, ok := strings.Cut(b.Desc, " — ")
+		if !ok {
+			t.Errorf("binding %q does not read \"key — description\"", b.Desc)
+			continue
+		}
+		if !slices.Contains(help, uikit.KeyRow{Key: key, Desc: desc}) {
+			t.Errorf("help rows lack the spec's row %q — %q", key, desc)
 		}
 	}
 }

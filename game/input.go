@@ -19,9 +19,21 @@ type Binding struct {
 	Desc   string // help-overlay text
 }
 
-// KeyMap lists every keyboard binding. No (Key, Shift, Ctrl) combination
+// KeyMap lists every keyboard binding: the world bindings (the ship, the
+// camera, the session) followed by one row per keyed Screen, derived from
+// the Screen spec — the toggle rows move with their screen, and the help
+// overlay renders these same strings. No (Key, Shift, Ctrl) combination
 // appears twice (tested); several keys may share an action.
-var KeyMap = []Binding{
+//
+// It is assigned in init (screens.go) from the spec: the rows' Build
+// closures reach session code that reads this very map, so a package-level
+// initializer would be circular.
+var KeyMap []Binding
+
+// worldKeyMap is the hand-written half of KeyMap: bindings that belong to
+// the world and the session, not to a window. The screen toggles
+// (screens.go) follow it in KeyMap.
+var worldKeyMap = []Binding{
 	{Key: ebiten.KeyTab, Action: "lock-nearest", Desc: "Tab — cycle-lock nearest target"},
 	{Key: ebiten.KeyTab, Shift: true, Action: "lock-selected", Desc: "Shift+Tab — lock selected target"},
 	{Key: ebiten.KeyF1, Action: "high-1", Desc: "F1 — toggle high slot 1"},
@@ -40,17 +52,7 @@ var KeyMap = []Binding{
 	{Key: ebiten.KeyD, Action: "dock", Desc: "D — dock (selected station, else nearest)"},
 	{Key: ebiten.KeyJ, Action: "jump", Desc: "J — jump through gate (selected, else nearest)"},
 	{Key: ebiten.KeyL, Action: "loot", Desc: "L — loot nearest wreck"},
-	{Key: ebiten.KeyL, Shift: true, Action: "log", Desc: "Shift+L — toggle log window"},
 	{Key: ebiten.KeyM, Action: "mine", Desc: "M — mine selected asteroid"},
-	{Key: ebiten.KeyI, Action: "inventory", Desc: "I — toggle inventory"},
-	{Key: ebiten.KeyF, Action: "fitting", Desc: "F — toggle fitting"},
-	{Key: ebiten.KeyC, Action: "scanner", Desc: "C — toggle scanner (off-grid sweep)"},
-	{Key: ebiten.KeyG, Action: "market", Desc: "G — toggle market window (trade while docked)"},
-	{Key: ebiten.KeyB, Action: "factory", Desc: "B — toggle factory window (manufacture while docked)"},
-	{Key: ebiten.KeyN, Action: "starmap", Desc: "N — toggle starmap"},
-	{Key: ebiten.KeyH, Action: "help", Desc: "H — toggle help"},
-	{Key: ebiten.KeyP, Action: "settings", Desc: "P — toggle settings (UI scale, fullscreen, layout)"},
-	{Key: ebiten.KeyEscape, Action: "menu", Desc: "Esc — menu (Resume / Save / Load / Quit)"},
 	{Key: ebiten.KeyBracketLeft, Action: "time-slower", Desc: "[ — time acceleration down"},
 	{Key: ebiten.KeyMinus, Action: "time-slower", Desc: "- — time acceleration down"},
 	{Key: ebiten.KeyBracketRight, Action: "time-faster", Desc: "] — time acceleration up"},

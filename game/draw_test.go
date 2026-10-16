@@ -170,18 +170,16 @@ func chromeShown(g *Game) bool {
 		isVisible(g.rack.Container().GetWidget())
 }
 
-// panelNames labels the panel ids for test output.
-var panelNames = map[panelID]string{
-	pInventory: "inventory",
-	pFitting:   "fitting",
-	pMarket:    "market",
-	pFactory:   "factory",
-	pScanner:   "scanner",
-	pMap:       "map",
-	pHelp:      "help",
-	pLog:       "log",
-	pMenu:      "menu",
-}
+// panelNames labels the panel ids for test output — derived from the
+// Screen spec (the sidecar key, or the lowercased title for the screen
+// that is not persisted).
+var panelNames = func() map[panelID]string {
+	m := make(map[panelID]string, len(screens))
+	for _, s := range screens {
+		m[s.ID] = screenLabel(s)
+	}
+	return m
+}()
 
 // assertInBounds fails the test if any mounted window sticks out of the
 // screen.
