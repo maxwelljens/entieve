@@ -42,8 +42,11 @@ func bordered(body, edge color.NRGBA, w int) *eimage.NineSlice {
 // uikit window stack. World input is off while it is on top.
 type StationScene struct{ g *Game }
 
-// stationPanels are the windows that auto-open on dock.
-var stationPanels = []panelID{pMarket, pInventory, pFitting}
+// stationPanels are the windows that auto-open on dock: every Screen row
+// flagged ForcedDockOpen (the station trio), in spec order — the same
+// set layout.go persists the PRE-dock intent for and station_layout.go
+// composes. Assigned in init from the spec (screens.go), like panelDefs.
+var stationPanels []panelID
 
 // isStationPanel reports whether p is one of the dock-forced services.
 func isStationPanel(p panelID) bool {

@@ -26,6 +26,8 @@ names the *modules and seams* we build that vocabulary into.
 | Term | Meaning |
 |---|---|
 | **Screen** | a window the player can open: declared as one **Screen spec** row (id, title, icon, key, default rect, dock policy, sync, build) from which the registries derive |
+| **DockPolicy** | where a Screen's window lives: `floating` (composed by `placeDefaults` from its declared rect), `station` (a member of the docked trio: `stationLayout` owns its rect and the scene force-opens it), `transient` (scene-owned, never persisted — the Esc menu) |
+| **Anchor** | which edges of the viewport a floating Screen hangs its design-unit default rect on: centred, a fixed design coordinate, bottom-left insets, or top-centred |
 | **Row** | one listed entry in a table; its interactions derive from its **RowSpec** |
 | **RowSpec** | the row's declared data: `Ref` (what it *is*, for Show Info) + `Actions` (typed intents it offers). One installer applies menu, tooltip and double-click uniformly |
 | **Theme** | faces + scaled metrics (the visual constants; `uikit/theme`) |

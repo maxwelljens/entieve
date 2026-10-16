@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One Screen spec per window** (`game/screens.go`): every window the
+  player can open — inventory, fitting, market, factory, scanner,
+  starmap, help, log, settings and the Esc menu — is now one
+  declarative `Screen` row (id, title, icon, key, design-unit default
+  rect + anchor, dock policy, modal, mount rule, sidecar name, sync,
+  build) from which the window registries derive: the `panelDef` table
+  `syncMounts`/`syncPanels` walk, `KeyMap`'s toggle rows and the help
+  overlay text rendered from them, the layout sidecar's name list,
+  `placeDefaults`, the docked station trio (composition + the scene's
+  force-open set) and the tests' panel label map. Adding a window is one
+  row plus its builder — it used to touch eight wiring sites. The table
+  is validated when a session starts (`screenSpecErrors`: duplicate
+  id/key/action/name, zero title, an unknown icon, help text without a
+  key, a transient screen carrying a sidecar name, a station row outside
+  the composition, `SpaceOnly`+`DockedOnly` together, …), and the tests
+  drive the same rule with deliberately broken rows. Behaviour is
+  unchanged except the help overlay's row order: the screen toggles now
+  form one block after the world bindings (same rows, same text). Also
+  removed the dead `Game.objClick` double-click latch (its only user
+  moved to `uikit.RowDouble` in the RowSpec pass above).
+
 - **Row interactions declare one seam** (`uikit.RowSpec`): every listed
   row — market, inventory, fitting, rack, overview, factory, the
   contract board and Show Info's chain links — now declares its

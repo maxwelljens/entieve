@@ -3,6 +3,7 @@ package game
 import (
 	"image"
 
+	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/uikit"
 )
 
@@ -66,6 +67,44 @@ type dockedLayout struct {
 	Market    image.Rectangle
 	Inventory image.Rectangle
 	Fitting   image.Rectangle
+}
+
+// forName pairs a station-composition screen's sidecar name with its
+// composed rect (ok=false for anything the composition does not cover —
+// screenSpecErrors rejects such a row before a session can be built).
+func (d dockedLayout) forName(name string) (image.Rectangle, bool) {
+	switch name {
+	case "market":
+		return d.Market, true
+	case "inventory":
+		return d.Inventory, true
+	case "fitting":
+		return d.Fitting, true
+	}
+	return image.Rectangle{}, false
+}
+
+// stationWins returns the station-composition screens' windows, in spec
+// order — the membership is the Screen spec's ForcedDockOpen set
+// (stationPanels, scenes.go), the rects from stationLayout.
+func (g *Game) stationWins() []*widget.Window {
+	wins := make([]*widget.Window, 0, len(stationPanels))
+	for _, id := range stationPanels {
+		wins = append(wins, g.screenWin[id])
+	}
+	return wins
+}
+
+// composeStation places every station-composition screen (the trio —
+// stationPanels) at the rect stationLayout pairs with its sidecar name,
+// through the placement tracker (placeIfVirgin), so a player-arranged or
+// restored service window keeps its rect.
+func (g *Game) composeStation(lay dockedLayout) {
+	for _, id := range stationPanels {
+		if r, ok := lay.forName(panelDefs[id].name); ok {
+			g.placeIfVirgin(g.screenWin[id], r)
+		}
+	}
 }
 
 // stationLayout composes the docked set for a w×h viewport. stationH is

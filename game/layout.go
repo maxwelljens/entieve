@@ -61,18 +61,12 @@ type layoutFile struct {
 
 // layoutNames are the persisted windows, in a stable write order: the
 // two always-on core windows plus the Show Info window (geometry only —
-// see layoutTarget) plus every panel whose panelDef carries a sidecar
-// name (the Esc menu is scene-owned and stays out). Menu, station and
-// the HUD/rack chrome are not user layout state.
-var layoutNames = func() []string {
-	names := []string{"overview", "selected", "infowin"}
-	for p := panelID(0); p < numPanels; p++ {
-		if panelDefs[p].name != "" {
-			names = append(names, panelDefs[p].name)
-		}
-	}
-	return names
-}()
+// see layoutTarget) plus every Screen row that carries a sidecar name
+// (the Esc menu is scene-owned and stays out). Menu, station and the
+// HUD/rack chrome are not user layout state.
+//
+// Assigned in init from the spec (screens.go), like panelDefs.
+var layoutNames []string
 
 // layoutPath is the sidecar location: the resolved save path plus
 // .layout.json (e.g. …/entieve/save.json.layout.json).
@@ -328,9 +322,9 @@ func (g *Game) applyLayout(screenW, screenH int) {
 // Pinned by TestStationTrioStackedSidecarReclaimed,
 // TestStationTrioClampFoldReclaimed and TestStationTrioShrinkFoldReclaimed.
 func (g *Game) reclaimServiceTrio(screenW, screenH int) {
-	trio := [3]*widget.Window{g.mkt.Win(), g.inv.Win(), g.fitt.Win()}
+	wins := g.stationWins()
 	restoredCount := 0
-	for _, win := range trio {
+	for _, win := range wins {
 		if g.restored[win] {
 			restoredCount++
 		}
@@ -339,10 +333,10 @@ func (g *Game) reclaimServiceTrio(screenW, screenH int) {
 		return // one (or zero) claimed entries: per-window saved-wins
 	}
 	overlap := false
-	for i := 0; i < len(trio) && !overlap; i++ {
-		ri := trio[i].GetContainer().GetWidget().Rect
-		for j := i + 1; j < len(trio); j++ {
-			if ri.Overlaps(trio[j].GetContainer().GetWidget().Rect) {
+	for i := 0; i < len(wins) && !overlap; i++ {
+		ri := wins[i].GetContainer().GetWidget().Rect
+		for j := i + 1; j < len(wins); j++ {
+			if ri.Overlaps(wins[j].GetContainer().GetWidget().Rect) {
 				overlap = true
 			}
 		}
@@ -351,12 +345,10 @@ func (g *Game) reclaimServiceTrio(screenW, screenH int) {
 		return // the claim realizes a valid tiling: saved wins
 	}
 	lay := stationLayout(screenW, screenH, g.stationW.GetContainer().GetWidget().Rect.Dy())
-	for _, win := range trio {
+	for _, win := range wins {
 		g.restored[win] = false
 	}
-	g.placeIfVirgin(trio[0], lay.Market)
-	g.placeIfVirgin(trio[1], lay.Inventory)
-	g.placeIfVirgin(trio[2], lay.Fitting)
+	g.composeStation(lay)
 }
 
 // clampRestored re-establishes the on-screen guarantee for the windows

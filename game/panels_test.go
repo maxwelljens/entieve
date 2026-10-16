@@ -75,38 +75,32 @@ func TestPanelsShareTheKitsEnv(t *testing.T) {
 	}
 }
 
-// TestPanelDefsCoverEnum: every panelID has a complete panelDef row.
-// A forgotten row is silent in production — the id would never mount,
-// never persist and its want would read as "closed" — so the table is
-// checked against the enum (and against the sidecar name list) here.
+// TestPanelDefsCoverEnum: the Screen spec covers the enum — one row per
+// panel id, in enum order, well formed (the full malformed-row matrix is
+// TestScreenSpecRejectsMalformedRows) — and every derived registry entry
+// resolves against a live session. A forgotten row is silent in
+// production — the id would never mount, never persist and its want would
+// read as "closed" — so the table is checked against the enum (and
+// against the sidecar name list) here.
 func TestPanelDefsCoverEnum(t *testing.T) {
-	// Pass 1: the table itself (no session needed) — a missing row is
+	// Pass 1: the spec table itself (no session needed) — a broken row is
 	// reported before anything tries to call into it.
-	seen := map[string]panelID{}
-	named := 0
-	for p := panelID(0); p < numPanels; p++ {
-		d := panelDefs[p]
-		if d.window == nil || d.open == nil || d.want == nil {
-			t.Errorf("panel %d (%s): incomplete panelDef (window=%v open=%v want=%v)",
-				p, panelNames[p], d.window != nil, d.open != nil, d.want != nil)
-			continue
+	if probs := screenSpecErrors(screens); len(probs) > 0 {
+		for _, p := range probs {
+			t.Errorf("screen spec: %s", p)
 		}
-		if d.name == "" {
-			continue // not persisted (the Esc menu)
-		}
-		if prev, dup := seen[d.name]; dup {
-			t.Errorf("sidecar name %q used by both %s and %s", d.name, panelNames[prev], panelNames[p])
-		}
-		seen[d.name] = p
-		named++
+		t.FailNow() // the first frame would panic on a missing builder
 	}
-	if len(seen) != named {
-		t.Errorf("%d unique sidecar names, want %d", len(seen), named)
+	if panelID(len(screens)) != numPanels {
+		t.Fatalf("%d Screen rows for %d panel ids", len(screens), numPanels)
 	}
-	if t.Failed() {
-		// Report the broken table before anything calls into it (the
-		// first frame would panic on a nil mount rule).
-		t.FailNow()
+	for i, s := range screens {
+		if s.ID != panelID(i) {
+			t.Fatalf("screens[%d].ID = %d, want %d (the enum is the spec's order)", i, s.ID, i)
+		}
+	}
+	if panelID(len(panelDefs)) != numPanels {
+		t.Fatalf("panelDefs has %d rows, want %d (one per id)", len(panelDefs), numPanels)
 	}
 
 	// Pass 2: the rows against a live session — every id resolves a real
@@ -114,9 +108,6 @@ func TestPanelDefsCoverEnum(t *testing.T) {
 	g := newShowcaseGame(t)
 	for p := panelID(0); p < numPanels; p++ {
 		d := panelDefs[p]
-		if d.window == nil || d.open == nil || d.want == nil {
-			continue // reported above
-		}
 		if w := d.window(g); w == nil {
 			t.Errorf("panel %s: window() returned nil", panelNames[p])
 		}

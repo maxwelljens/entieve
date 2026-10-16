@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	enuiinput "github.com/ebitenui/ebitenui/input"
 	"github.com/ebitenui/ebitenui/widget"
@@ -59,7 +58,10 @@ type Options struct {
 
 // panelID identifies one toggleable interface window. The always-on
 // chrome (Overview, Selected Item, HUD, rack) and the docked station
-// strip are managed separately.
+// strip are managed separately. The enum is the compile-time half of the
+// Screen spec: rows are declared in this order (game/screens.go), and
+// TestScreenSpecMatchesRegistries pins the two together — the ids, their
+// count (numPanels) and the table order.
 type panelID int
 
 const (
@@ -75,110 +77,6 @@ const (
 	pMenu
 	numPanels
 )
-
-// panelDef is one toggleable panel's whole registration: the single
-// place a panel has to appear in for the frame, mount and persistence
-// paths to agree (the key bindings stay hand-written in handleKeys, the
-// dock-time trio in stationPanels).
-//
-//	name   sidecar key ("" = not persisted — the Esc menu is scene-owned
-//	       and must not reopen on the next boot)
-//	window the window backing the id
-//	open   the player's toggle flag (scene-driven for map/help/menu)
-//	want   the desired mount for this frame: (game, docked)
-//	sync   refresh the panel's widgets from the sim (nil = static
-//	       content); run every frame while mounted and once when the
-//	       window mounts, so a freshly mounted panel draws current data
-//
-// syncMounts, syncPanels, panelWindow and the layout sidecar all read
-// this table; TestPanelDefsCoverEnum fails if an id has no row.
-type panelDef struct {
-	name   string
-	window func(*Game) *widget.Window
-	open   func(*Game) *bool
-	want   func(*Game, bool) bool
-	sync   func(*Game)
-}
-
-// panelDefs is indexed by panelID in enum order — syncMounts iterates
-// it, so the mount order follows the enum (the log lands before the Esc
-// menu, which keeps the top of the draw order).
-var panelDefs = [numPanels]panelDef{
-	pInventory: {
-		name:   "inventory",
-		window: func(g *Game) *widget.Window { return g.inv.Win() },
-		open:   func(g *Game) *bool { return &g.open[pInventory] },
-		want:   func(g *Game, docked bool) bool { return g.open[pInventory] },
-		sync:   func(g *Game) { g.inv.Sync() },
-	},
-	pFitting: {
-		name:   "fitting",
-		window: func(g *Game) *widget.Window { return g.fitt.Win() },
-		open:   func(g *Game) *bool { return &g.open[pFitting] },
-		want:   func(g *Game, docked bool) bool { return g.open[pFitting] },
-		sync:   func(g *Game) { g.fitt.Sync() },
-	},
-	pMarket: {
-		name:   "market",
-		window: func(g *Game) *widget.Window { return g.mkt.Win() },
-		open:   func(g *Game) *bool { return &g.open[pMarket] },
-		want:   func(g *Game, docked bool) bool { return g.open[pMarket] },
-		sync:   func(g *Game) { g.mkt.Sync() },
-	},
-	pFactory: {
-		name:   "factory",
-		window: func(g *Game) *widget.Window { return g.fact.Win() },
-		open:   func(g *Game) *bool { return &g.open[pFactory] },
-		// The factory is a station service: it only mounts while docked
-		// (the scanner's docked counterpart). Its own gating (industry
-		// service, materials, slots) lives inside the panel.
-		want: func(g *Game, docked bool) bool { return g.open[pFactory] && docked },
-		sync: func(g *Game) { g.fact.Sync() },
-	},
-	pScanner: {
-		name:   "scanner",
-		window: func(g *Game) *widget.Window { return g.scan.Win() },
-		open:   func(g *Game) *bool { return &g.open[pScanner] },
-		// The scanner is space chrome: hidden while docked (legacy parity).
-		want: func(g *Game, docked bool) bool { return g.open[pScanner] && !docked },
-		sync: func(g *Game) { g.scan.Sync() },
-	},
-	pMap: {
-		name:   "map",
-		window: func(g *Game) *widget.Window { return g.mp.Win() },
-		open:   func(g *Game) *bool { return &g.open[pMap] },
-		want:   func(g *Game, docked bool) bool { return g.open[pMap] },
-		sync:   func(g *Game) { g.mp.Sync() },
-	},
-	pHelp: {
-		name:   "help",
-		window: func(g *Game) *widget.Window { return g.help.Win() },
-		open:   func(g *Game) *bool { return &g.open[pHelp] },
-		want:   func(g *Game, docked bool) bool { return g.open[pHelp] },
-		sync:   func(g *Game) { g.help.Sync() },
-	},
-	pLog: {
-		name:   "log",
-		window: func(g *Game) *widget.Window { return g.logP.Win() },
-		open:   func(g *Game) *bool { return &g.open[pLog] },
-		want:   func(g *Game, docked bool) bool { return g.open[pLog] },
-		sync:   func(g *Game) { g.logP.Sync() },
-	},
-	pSettings: {
-		name:   "settings",
-		window: func(g *Game) *widget.Window { return g.sett.Win() },
-		open:   func(g *Game) *bool { return &g.open[pSettings] },
-		want:   func(g *Game, docked bool) bool { return g.open[pSettings] },
-		sync:   func(g *Game) { g.sett.Sync() },
-	},
-	pMenu: {
-		name:   "", // not persisted: the Esc menu is pushed as a scene
-		window: func(g *Game) *widget.Window { return g.menuWin },
-		open:   func(g *Game) *bool { return &g.open[pMenu] },
-		want:   func(g *Game, docked bool) bool { return g.open[pMenu] },
-		sync:   nil, // scene-owned static buttons
-	},
-}
 
 // Game implements ebiten.Game and hosts the uikit interface.
 type Game struct {
@@ -215,8 +113,13 @@ type Game struct {
 
 	// The settings window (uikit/settings.go): UI scale stepper,
 	// fullscreen toggle, reset-layout. Like every panel it is rebuilt by
-	// buildKit, so its live state is re-read from g in Sync.
-	sett *uikit.Settings
+	// buildKit, so its live state is re-read from g in Sync. The action
+	// bundle rides a field (filled by buildKit) instead of being spelled
+	// inside the Screen row: naming stepUIScale/applyScale there would
+	// make the spec table depend on the rebuild path that reads it — an
+	// initialization cycle, see screens.go.
+	sett        *uikit.Settings
+	settActions uikit.SettingsActions
 
 	// The station window's contract board (contracts.go): the body, the
 	// two row sections, the signature of the last rebuild and the
@@ -237,6 +140,10 @@ type Game struct {
 	// mounted is its current AddWindow handle (nil = unmounted).
 	open    [numPanels]bool
 	mounted [numPanels]widget.RemoveWindowFunc
+
+	// screenWin is every Screen row's built window (Build's return
+	// value), refreshed with the kit — panelDefs resolves ids through it.
+	screenWin [numPanels]*widget.Window
 
 	// Selection lives in the kit: world clicks, the Tab cycle-lock and
 	// the overview all feed Kit.Select, the game reads Kit.Selected.
@@ -259,12 +166,6 @@ type Game struct {
 	// world input (overUI) and the key switches for the whole frame.
 	menuModal bool
 
-	// objClick is the contract-objective label's double-click state.
-	objClick struct {
-		id content.ContractID
-		at time.Time
-	}
-
 	scenes []Scene
 	space  *SpaceScene
 	w, h   int // logical screen size (Layout), in device pixels
@@ -281,6 +182,9 @@ type Game struct {
 
 // New builds a game session from options.
 func New(opts Options) (*Game, error) {
+	if probs := screenSpecErrors(screens); len(probs) > 0 {
+		return nil, fmt.Errorf("game: screen spec: %s", strings.Join(probs, "; "))
+	}
 	if opts.Content == nil {
 		return nil, errors.New("game: Options.Content is required")
 	}
@@ -492,9 +396,10 @@ func (g *Game) Update() error {
 }
 
 // handleKeys maps the global keyboard bindings: the KeyMap semantics the
-// legacy shell had (Esc menu, N map, H help, Ctrl+S / F9, time
-// acceleration) plus the panel toggles and, while no overlay scene is on
-// top, the world action keys.
+// legacy shell had (Esc menu, Ctrl+S / F9, time acceleration), the scene
+// overlays (N map, H help — their rows are Modal, i.e. scene-owned), the
+// panel toggles the Screen spec declares and, while no overlay scene is
+// on top, the world action keys.
 func (g *Game) handleKeys(in Input) error {
 	ctrl := held(in.KeysDown, ebiten.KeyControl)
 	shift := held(in.KeysDown, ebiten.KeyShift)
@@ -542,23 +447,13 @@ func (g *Game) handleKeys(in Input) error {
 				g.toggleMap()
 			case k == ebiten.KeyH:
 				g.toggleHelp()
-			case k == ebiten.KeyP:
-				g.open[pSettings] = !g.open[pSettings]
-			case k == ebiten.KeyI:
-				g.open[pInventory] = !g.open[pInventory]
-			case k == ebiten.KeyF:
-				g.open[pFitting] = !g.open[pFitting]
-			case k == ebiten.KeyC:
-				g.open[pScanner] = !g.open[pScanner]
-			case k == ebiten.KeyG:
-				g.open[pMarket] = !g.open[pMarket]
-			case k == ebiten.KeyB:
-				g.open[pFactory] = !g.open[pFactory]
-			case shift && k == ebiten.KeyL:
-				// Shift+L toggles the log window; plain L stays loot.
-				g.open[pLog] = !g.open[pLog]
-			case world:
-				g.worldKey(k, shift)
+			default:
+				// Every other keyed Screen flips its own flag from the
+				// spec (a Modal row is scene-owned and never reaches
+				// pressScreen); an unclaimed key belongs to the world.
+				if !g.pressScreen(k, shift) && world {
+					g.worldKey(k, shift)
+				}
 			}
 		}
 	}
@@ -709,7 +604,7 @@ func (g *Game) panelWindow(p panelID) *widget.Window {
 	if p < 0 || p >= numPanels {
 		return nil
 	}
-	return panelDefs[p].window(g)
+	return g.screenWin[p]
 }
 
 // overUI reports whether the pointer sits on any interface panel: the
@@ -823,27 +718,27 @@ func (g *Game) buildKit() error {
 	// same source the F-key module toggles use — before falling back to
 	// the first suitable lock.
 	g.rack.SetTargetPicker(func() ecs.Entity { return kit.Selected() })
-	g.logP = uikit.NewLog(env)
-	g.inv = uikit.NewInventory(env)
-	g.fitt = uikit.NewFitting(env)
-	g.mkt = uikit.NewMarket(env)
-	g.fact = uikit.NewFactory(env)
-	g.scan = uikit.NewScanner(env)
-	g.mp = uikit.NewMapView(env)
-	g.help = uikit.NewHelp(env, helpRows())
-	g.sett = uikit.NewSettings(env, uikit.SettingsActions{
+
+	// One pass over the Screen spec: each row builds its window (and the
+	// panel handle it lives in) and carries its modal flag. The settings
+	// actions are assembled here — see Game.settActions for why the row
+	// reaches them through a field.
+	g.settActions = uikit.SettingsActions{
 		UIScale:       func() float64 { return g.uiScale },
 		StepScale:     func(delta int) { g.stepUIScale(delta) },
 		Fullscreen:    func() bool { return g.fullscreen },
 		SetFullscreen: func(on bool) { g.setFullscreen(on) },
 		ResetLayout:   func() { g.resetLayout() },
-	})
-	g.menuWin = g.buildMenuWindow()
+	}
+	g.screenWin = [numPanels]*widget.Window{}
+	for _, s := range screens {
+		win := s.Build(g)
+		g.screenWin[s.ID] = win
+		if s.Modal {
+			win.Modal = true
+		}
+	}
 	g.stationW = g.buildStationWindow()
-
-	// The map and help windows are modal overlays while their scene is up.
-	g.mp.Win().Modal = true
-	g.help.Win().Modal = true
 
 	// Always-on chrome mounts straight onto the kit's root overlay — no
 	// full-screen wrapper windows: the HUD stretches across the root and
@@ -887,10 +782,12 @@ func (g *Game) buildKit() error {
 // screen. The kit's core windows are placed too: Overview top-left,
 // Selected Item top-right — the left column's bottom belongs to the log
 // and the bottom row to the HUD bar, so nothing overlaps at 1280×720 or
-// at the 1024×700 minimum. Scanner sits in the centre column under the
-// top row; map/menu are centered, help top-center; the station strip
-// takes the now-free top-left corner while docked and the docked
-// service trio tiles the viewport beside it (stationLayout).
+// at the 1024×700 minimum. Every Screen row then places itself from its
+// declared DefaultRect + Anchor (anchorRect): the log's bottom-left
+// pocket, the scanner in the centre column under the top row, the
+// on-demand overlays centred, help top-center — and the station strip
+// takes the now-free top-left corner while docked, with the docked
+// service trio (DockStation rows) tiled beside it by stationLayout.
 //
 // Every placement goes through placeIfVirgin: a window the player
 // dragged, or one restored from the layout sidecar, keeps its
@@ -910,52 +807,33 @@ func (g *Game) placeDefaults(w, h int) {
 		m, edge := uikit.Px(8), w-uikit.Px(10)
 		place(sp, image.Rect(edge-r.Dx(), m, edge, m+r.Dy()))
 	}
-	// The log docks bottom-left: flush with the left/bottom margins, its
-	// default width fits the pocket left of the HUD bar (the 420 px bar
-	// starts at x=302 at the 1024 minimum) and its top clears the
-	// overview — so the default set stays pairwise disjoint.
-	if r := g.logP.Win().GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		m := uikit.Px(10)
-		place(g.logP.Win(), image.Rect(m, h-m-r.Dy(), m+r.Dx(), h-m))
-	}
-	// Centre column, below the top row (Selected Item owns the top-right
-	// corner at 1024×700) and above the HUD bar.
-	if r := g.scan.Win().GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		x, y := uikit.Px(396), uikit.Px(276)
-		place(g.scan.Win(), image.Rect(x, y, x+r.Dx(), y+r.Dy()))
-	}
-	center := func(win *widget.Window) {
-		r := win.GetContainer().GetWidget().Rect
-		if r.Dx() == 0 || r.Dy() == 0 {
-			return
+	// The screens themselves: declared geometry, one rule per row. The
+	// log's default width fits the pocket left of the HUD bar (the 420 px
+	// bar starts at x=302 at the 1024 minimum) and its top clears the
+	// overview, so the default set stays pairwise disjoint.
+	for _, s := range screens {
+		if s.DockPolicy == DockStation {
+			continue // composed below, with the station strip
 		}
-		place(win, image.Rect((w-r.Dx())/2, (h-r.Dy())/2, (w-r.Dx())/2+r.Dx(), (h-r.Dy())/2+r.Dy()))
-	}
-	center(g.mp.Win())
-	center(g.menuWin)
-	// The factory window has no composed slot in the docked service trio
-	// (the 1024×700 minimum has no room for a fourth window), so it
-	// floats centered like the other on-demand overlays — the player
-	// drags it where they want and the layout sidecar remembers.
-	center(g.fact.Win())
-	// The settings window floats with the other on-demand overlays too
-	// (reset-layout recomposes it here as well).
-	center(g.sett.Win())
-	if r := g.help.Win().GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		x, y := (w-r.Dx())/2, uikit.Px(24)
-		place(g.help.Win(), image.Rect(x, y, x+r.Dx(), y+r.Dy()))
+		win := g.screenWin[s.ID]
+		r := win.GetContainer().GetWidget().Rect
+		if r.Dx() <= 0 || r.Dy() <= 0 {
+			continue // never laid out: there is nothing to position
+		}
+		place(win, anchorRect(s.DefaultRect, s.Anchor, r.Dx(), r.Dy(), w, h))
 	}
 	// The Show Info window floats: centered like the other on-demand
 	// overlays (its sidecar rect wins once the player has one, and it is
-	// hidden until the first Show anyway).
-	center(g.kit.InfoWindow())
+	// hidden until the first Show anyway). It is a geometry-only sidecar
+	// special, not a Screen row — see layoutTarget.
+	if r := g.kit.InfoWindow().GetContainer().GetWidget().Rect; r.Dx() > 0 && r.Dy() > 0 {
+		place(g.kit.InfoWindow(), centerRect(r.Dx(), r.Dy(), w, h))
+	}
 	// Docked set: the station's own column (content height) and the
-	// service trio composed for this viewport.
+	// service trio composed for this viewport (membership from the spec).
 	lay := stationLayout(w, h, g.stationW.GetContainer().GetWidget().Rect.Dy())
 	place(g.stationW, lay.Station)
-	place(g.mkt.Win(), lay.Market)
-	place(g.inv.Win(), lay.Inventory)
-	place(g.fitt.Win(), lay.Fitting)
+	g.composeStation(lay)
 }
 
 // placeIfVirgin moves win to rect unless the player owns its position:
