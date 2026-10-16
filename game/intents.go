@@ -1,9 +1,8 @@
 package game
 
 import (
+	"github.com/entieve/entieve/uikit/widgets"
 	"strings"
-
-	"github.com/entieve/entieve/uikit"
 )
 
 // The write seam (CONTEXT.md: ActionSink): every screen expresses "do
@@ -18,15 +17,15 @@ import (
 // executor (Kit.RunIntent), which maps intents onto commands through the
 // single shared table (uikit's commandFor) and queues them on the
 // game's enqueue tail.
-func (g *Game) Do(i uikit.Intent) {
+func (g *Game) Do(i widgets.Intent) {
 	switch v := i.(type) {
-	case uikit.Toggle:
+	case widgets.Toggle:
 		g.toggleScreen(v.Screen)
-	case uikit.Save:
+	case widgets.Save:
 		g.report(g.SaveGame(), "Game saved")
-	case uikit.Load:
+	case widgets.Load:
 		g.pendingLoad = true
-	case uikit.Quit:
+	case widgets.Quit:
 		g.quit = true
 	default:
 		g.kit.RunIntent(i)

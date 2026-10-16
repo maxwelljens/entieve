@@ -22,7 +22,8 @@ import (
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit"
+	uikit "github.com/entieve/entieve/uikit/screens"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -59,7 +60,7 @@ type Options struct {
 // panelID identifies one toggleable interface window. The always-on
 // chrome (Overview, Selected Item, HUD, rack) and the docked station
 // strip are managed separately. The enum is the compile-time half of the
-// Screen spec: rows are declared in this order (game/screens.go), and
+// Screen spec: rows are declared in this order (game/uikit.go), and
 // TestScreenSpecMatchesRegistries pins the two together — the ids, their
 // count (numPanels) and the table order.
 type panelID int
@@ -117,13 +118,13 @@ type Game struct {
 	stationW *widget.Window
 	stName   *widget.Text
 
-	// The settings window (uikit/settings.go): UI scale stepper,
+	// The settings window (uikit/screens/settings.go): UI scale stepper,
 	// fullscreen toggle, reset-layout. Like every panel it is rebuilt by
 	// buildKit, so its live state is re-read from g in Sync. The action
 	// bundle rides a field (filled by buildKit) instead of being spelled
 	// inside the Screen row: naming stepUIScale/applyScale there would
 	// make the spec table depend on the rebuild path that reads it — an
-	// initialization cycle, see screens.go.
+	// initialization cycle, see uikit.go.
 	sett        *uikit.Settings
 	settActions uikit.SettingsActions
 
@@ -179,7 +180,7 @@ type Game struct {
 
 	// Resolution independence: dev is the display's device scale factor
 	// (window px → device px, see Layout) and uiScale the persisted user
-	// setting; their product is what uikit.SetScale installs as the global
+	// setting; their product is what theme.SetScale installs as the global
 	// UI scale, before the interface is built and again on every change.
 	dev        float64
 	uiScale    float64
@@ -228,7 +229,7 @@ func New(opts Options) (*Game, error) {
 		g.dev = 1
 	}
 	g.loadSettings() // <SavePath>.settings.json: ui_scale, fullscreen
-	uikit.SetScale(g.uiScale * g.dev)
+	theme.SetScale(g.uiScale * g.dev)
 	g.w = int(math.Round(float64(defaultW) * g.dev))
 	g.h = int(math.Round(float64(defaultH) * g.dev))
 	// The log is open by default (it used to be non-closable chrome);
@@ -307,7 +308,7 @@ func (g *Game) deviceScale() float64 {
 // monitor, so text rasterizes at its final size — crisp on HiDPI instead
 // of rendered-small-and-upscaled by the OS. ebiten reports cursor
 // positions in these same Layout units, and every UI metric is scaled
-// into them (uikit.Px = uiScale × device), so grips, menu rows and
+// into them (theme.Px = uiScale × device), so grips, menu rows and
 // overUI rects all agree with the cursor by construction.
 func (g *Game) Layout(width, height int) (int, int) {
 	if width < minW {
@@ -761,7 +762,7 @@ func (g *Game) buildKit() error {
 	kit.AddContainer(g.rack.Container(), widget.AnchorLayoutData{
 		HorizontalPosition: widget.AnchorLayoutPositionEnd,
 		VerticalPosition:   widget.AnchorLayoutPositionEnd,
-		Padding:            &widget.Insets{Right: uikit.Px(10), Bottom: uikit.Px(10)},
+		Padding:            &widget.Insets{Right: theme.Px(10), Bottom: theme.Px(10)},
 	})
 	// Rack tracks hover so input.UIHovered covers its padding too. The
 	// HUD container must not: it spans the whole screen. (The log window
@@ -808,12 +809,12 @@ func (g *Game) placeDefaults(w, h int) {
 	// these are exactly the historical pixels (the layout tests pin them).
 	ov := g.kit.OverviewWindow()
 	if r := ov.GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		m := uikit.Px(8)
+		m := theme.Px(8)
 		place(ov, image.Rect(m, m, m+r.Dx(), m+r.Dy()))
 	}
 	sp := g.kit.SelectedWindow()
 	if r := sp.GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		m, edge := uikit.Px(8), w-uikit.Px(10)
+		m, edge := theme.Px(8), w-theme.Px(10)
 		place(sp, image.Rect(edge-r.Dx(), m, edge, m+r.Dy()))
 	}
 	// The screens themselves: declared geometry, one rule per row. The

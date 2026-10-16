@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/uikit"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
@@ -235,7 +235,7 @@ func TestStationLayoutMarketFitsColumns(t *testing.T) {
 		t.Fatal("no current system")
 	}
 	measure := func(s string) float64 {
-		w, _ := text.Measure(s, *g.env.Face(uikit.StepSmall), 0)
+		w, _ := text.Measure(s, *g.env.Face(theme.StepSmall), 0)
 		return w
 	}
 	const cellPad = 5.0 // uikit's per-cell horizontal padding
@@ -249,7 +249,7 @@ func TestStationLayoutMarketFitsColumns(t *testing.T) {
 		if def, ok := g.opts.Content.Item(st.Item); ok {
 			name = def.Name
 		}
-		for i, cell := range []string{name, uikit.FormatCredits(st.Price), uikit.FormatInt(int64(st.Qty))} {
+		for i, cell := range []string{name, theme.FormatCredits(st.Price), theme.FormatInt(int64(st.Qty))} {
 			if w := measure(cell) + 2*cellPad; w > natural[i] {
 				natural[i] = w
 			}

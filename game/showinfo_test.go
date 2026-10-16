@@ -8,7 +8,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -29,7 +29,7 @@ func rightClick(t *testing.T, g *Game, w *widget.Widget) {
 
 // menuEntry returns the open menu's entry with the label (fails when the
 // menu is down or the entry is missing).
-func menuEntry(t *testing.T, g *Game, label string) uikit.MenuEntry {
+func menuEntry(t *testing.T, g *Game, label string) widgets.MenuEntry {
 	t.Helper()
 	m := g.kit.Menu()
 	if !m.IsOpen() {
@@ -41,7 +41,7 @@ func menuEntry(t *testing.T, g *Game, label string) uikit.MenuEntry {
 		}
 	}
 	t.Fatalf("menu has no %q entry: %+v", label, m.Entries())
-	return uikit.MenuEntry{}
+	return widgets.MenuEntry{}
 }
 
 // pressMenuEntry picks the labelled entry in the open menu (fails when
@@ -160,11 +160,11 @@ func TestContractObjectiveShowInfo(t *testing.T) {
 	}
 	switch def.Kind {
 	case content.ContractKill:
-		if got, _ := g.env.InfoWindow().Ref(); got != uikit.NpcRef(def.Objective.Target) {
+		if got, _ := g.env.InfoWindow().Ref(); got != widgets.NpcRef(def.Objective.Target) {
 			t.Errorf("info ref = %v, want the objective caste %s", got, def.Objective.Target)
 		}
 	default:
-		if got, _ := g.env.InfoWindow().Ref(); got != uikit.ItemRef(def.Objective.Item) {
+		if got, _ := g.env.InfoWindow().Ref(); got != widgets.ItemRef(def.Objective.Item) {
 			t.Errorf("info ref = %v, want the objective item %s", got, def.Objective.Item)
 		}
 	}
@@ -204,7 +204,7 @@ func TestInfoWindowSidecarGeometryOnly(t *testing.T) {
 	// The player's arrangement: a moved, resized, shown window.
 	want := image.Rect(500, 180, 940, 680)
 	g.kit.InfoWindow().SetLocation(want)
-	g.kit.ShowInfo(uikit.ModuleRef("mod-emp-turret"))
+	g.kit.ShowInfo(widgets.ModuleRef("mod-emp-turret"))
 	pump(t, g, 1280, 720)
 	if !g.kit.InfoOpen() {
 		t.Fatal("fixture: window did not open")
@@ -295,7 +295,7 @@ func TestContextMenuGatesWorldInput(t *testing.T) {
 	}
 
 	m := g.kit.Menu()
-	m.Open([]uikit.MenuEntry{{Label: "Show Info", Bold: true}}, image.Pt(600, 300))
+	m.Open([]widgets.MenuEntry{{Label: "Show Info", Bold: true}}, image.Pt(600, 300))
 	r := m.Rect()
 	if r.Empty() {
 		t.Fatal("open menu exposes no rect")

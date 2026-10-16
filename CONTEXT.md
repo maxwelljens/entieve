@@ -30,11 +30,12 @@ names the *modules and seams* we build that vocabulary into.
 | **Anchor** | which edges of the viewport a floating Screen hangs its design-unit default rect on: centred, a fixed design coordinate, bottom-left insets, or top-centred |
 | **Row** | one listed entry in a table; its interactions derive from its **RowSpec** |
 | **RowSpec** | the row's declared data: `Ref` (what it *is*, for Show Info) + `Actions` (typed intents it offers). One installer applies menu, tooltip and double-click uniformly |
-| **Theme** | faces + scaled metrics + palette — the visual constants a widget draws itself with (`uikit/seams.go` over `uikit/theme.go`); a Theme-only widget takes it alone |
+| **Theme** | faces + scaled metrics + palette — the visual constants a widget draws itself with (the seam interface and its implementation live together in `uikit/theme`); a Theme-only widget takes it alone |
 | **ContentView** | the read-only seam: defs + observable sim state as screens see it, implemented over `*content.Content` + `*sim.Sim` — screens never see the simulation |
 | **ActionSink** | the write seam: screens emit typed **intents** (`Buy{Item,Qty}`, `StartJob{…}`) through `Do(Intent)`; the game executes them (`Game.Do`); later the AI surface will emit the same ones |
-| **Seams** | the union `Theme` + `ContentView` + `ActionSink` — the constructor param of a screen that draws, reads *and* acts (`uikit.Seams`; the dissolved `Env` is only this alias) |
-| **Session** | one host's environment: the three seams plus its shared context menu and Show Info window (`uikit.Session`, from `Kit.Env` / `NewEnv`) |
+| **Seams** | the union `Theme` + `ContentView` + `ActionSink` — the constructor param of a screen that draws, reads *and* acts (`uikit/widgets.Seams`; the dissolved `Env` is only this alias) |
+| **Session** | one host's environment: the three seams plus its shared context menu and Show Info window (`uikit/screens.Session`, from `Kit.Env` / `NewEnv`) |
+| **uikit modules** | `uikit/theme` (visual constants + the Theme seam) ← `uikit/widgets` (mechanics: table, menu, tooltip, rowspec, intents, seams) ← `uikit/screens` (the panels + Kit): each layer imports only downward, pinned by `TestImportDirection` |
 | **Deep module** | a module whose interface is small and whose implementation absorbs complexity (the goal of every seam here) |
 
 ## Vocabulary rules

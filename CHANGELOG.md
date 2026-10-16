@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`uikit` split into three modules with an enforced import direction**
+  (`uikit/theme`, `uikit/widgets`, `uikit/screens`): the flat package
+  became `theme` (visual constants and their plumbing — `Palette`,
+  `TypeScale`, the `Px`/`SetScale`/`Scale` funnel, faces and the `Theme`
+  seam with its implementation, chrome constants, draw helpers, icon
+  maps, display formatters) ← `widgets` (reusable mechanics — table,
+  menu, tooltip, rowspec, the `Intent` vocabulary and `commandFor`, the
+  `ContentView`/`ActionSink`/`Seams` seam interfaces, the `InfoRef` row
+  data and its resolvers) ← `screens` (every panel plus the `Kit` shell,
+  the session/`NewEnv` wiring and the window-resize chrome). Each layer
+  imports only downward (`screens → widgets → theme`, plus `uikit/icons`
+  and `render` as before); `widgets` can never import `screens`, and the
+  compiler's acyclicity plus a new parsing test
+  (`uikit/widgets.TestImportDirection`) pin the rule. Names that now
+  span packages are exported at their new home (e.g. `uikit.Px` →
+  `theme.Px`, `theme.ContentsPad`, `widgets.RowRef`, `widgets.OpenRowMenu`)
+  and call sites updated; a handful of table/tooltip test seams
+  (`…ForTest` hooks, exported layout fields) let the screen suites assert
+  widget geometry across the seam. Behaviour is unchanged — same menus,
+  tooltips, double-clicks and golden pins, and `TestMarketRunsOnStubView`
+  now lives with the screens it proves seam-only.
 - **The `Env` god-context dissolved into three narrow seams — `Theme`,
   `ContentView`, `ActionSink`** (`uikit/seams.go`, `uikit/intents.go`).
   Every screen constructor now takes exactly the subset it uses: a

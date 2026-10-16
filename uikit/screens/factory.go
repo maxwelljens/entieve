@@ -1,0 +1,474 @@
+package screens
+
+import (
+	"image"
+	"slices"
+	"sort"
+	"strconv"
+
+	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/icons"
+	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
+)
+
+// Factory is the station factory window: the manufacturing recipe board
+// (product name + icon, family, per-run time at the docked station's
+// current craft level, inputs with have/need counts) over the quantity
+// stepper and the Start action, plus the station's job list with per-job
+// progress and the Collect action — in the market panel's shape (two
+// tables, one toolbar each, rows wired for Show Info).
+//
+// Gating follows the game's menu convention: controls stay VISIBLE and
+// gray out (widget Disabled) when the player is undocked, the station
+// offers no industry service, the materials are short or the slots are
+// full — never hidden. Every action enqueues a sim.Command (the kit never
+// mutates sim state); the sim logs the refusal line if a gated action
+// still gets through.
+type Factory struct {
+	th  theme.Theme
+	cv  widgets.ContentView
+	as  widgets.ActionSink
+	win *widget.Window
+
+	recipes *widgets.Table
+	jobs    *widgets.Table
+
+	craftLbl *widget.Text
+	jobsLbl  *widget.Text
+	qtyLabel *widget.Text
+	qtyBar   *widget.Container // stepper row: relaid when the readout changes
+	title    *widget.Text
+
+	minus, plus *widget.Button
+	start       *widget.Button
+	collect     *widget.Button
+
+	qtyIdx int
+	sel    factoryRow
+	hasSel bool
+}
+
+// factoryRow is the factory tables' row payload: the recipe id (recipe
+// rows) or job id (job rows) plus the product ref both resolve Show Info
+// through (InfoRefOf handles the type; see infowin.go).
+type factoryRow struct {
+	recipe content.RecipeID
+	job    uint64
+	ref    widgets.InfoRef
+}
+
+// InfoRefOf resolves the row payload inside the seam's Show Info
+// resolver (widgets/infoRefPayload): the row already carries its ref.
+func (r factoryRow) InfoRefOf(cv widgets.ContentView) (widgets.InfoRef, bool) {
+	return r.ref, widgets.InfoRefExists(cv, r.ref)
+}
+
+// NewFactory builds the Factory window over the shared environment. Mount
+// it on a Kit with Kit.AddWindow and call Sync every frame.
+func NewFactory(env widgets.Seams) *Factory {
+	f := &Factory{th: env, cv: env, as: env}
+	p := env.Pal()
+
+	recipeCols := []widgets.Column{
+		{Key: "Product", Title: "Product", Priority: 0},
+		{Key: "Family", Title: "Family", Priority: 1},
+		{Key: "Time", Title: "Time", Priority: 2, AlignRight: true},
+		{Key: "Inputs", Title: "Inputs", Priority: 3},
+	}
+	f.recipes = widgets.NewTable(env, recipeCols)
+	jobCols := []widgets.Column{
+		{Key: "Product", Title: "Product", Priority: 0},
+		{Key: "Runs", Title: "Runs", Priority: 3, AlignRight: true},
+		{Key: "Progress", Title: "Progress", Priority: 2, AlignRight: true},
+		{Key: "State", Title: "State", Priority: 1},
+	}
+	f.jobs = widgets.NewTable(env, jobCols)
+
+	// Canonical display order: the sim's own RecipesInOrder / job-id
+	// order (reversing on a second header click, any other header click
+	// falls back to plain cell sorting — the market table's rule).
+	f.recipes.SetSort("Product", true)
+	f.recipes.SetSortFunc(canonicalFirst("Product", recipeCols))
+	f.jobs.SetSort("Product", true)
+	f.jobs.SetSortFunc(canonicalFirst("Product", jobCols))
+
+	attachSelect := func(t *widgets.Table) {
+		t.OnSelect(func(r widgets.TableRow) {
+			if row, ok := r.Data.(factoryRow); ok {
+				f.sel, f.hasSel = row, true
+			}
+		})
+	}
+	attachSelect(f.recipes)
+	attachSelect(f.jobs)
+	// Show Info, double-click and the Start/Collect action derive from
+	// the rows' RowSpec (rowSpec), built in Sync — no hand wiring.
+
+	f.craftLbl = widget.NewText(
+		widget.TextOpts.Text("Craft", env.Face(theme.StepTiny), theme.Solid(p.Accent)),
+	)
+	f.jobsLbl = widget.NewText(
+		widget.TextOpts.Text("Jobs", env.Face(theme.StepTiny), theme.Solid(p.Accent)),
+	)
+	f.qtyLabel = widget.NewText(
+		widget.TextOpts.Text("Qty 1", env.FaceMono(theme.StepSmall), theme.Solid(p.Accent)),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+			Position: widget.RowLayoutPositionCenter,
+		})),
+	)
+
+	newBtn := func(label string, clicked func()) *widget.Button {
+		return widget.NewButton(
+			widget.ButtonOpts.TextLabel(label),
+			widget.ButtonOpts.WidgetOpts(
+				widget.WidgetOpts.MinSize(theme.Px(40), theme.Px(40)),
+				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+			),
+			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
+		)
+	}
+	f.minus = newBtn("-", func() { f.stepQty(-1) })
+	f.plus = newBtn("+", func() { f.stepQty(1) })
+	f.start = newBtn("Start", f.startClicked)
+	f.collect = newBtn("Collect", f.collectClicked)
+
+	startBar := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
+		)),
+	)
+	startBar.AddChild(f.minus, f.qtyLabel, f.plus, f.start)
+	f.qtyBar = startBar
+	collectBar := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
+		)),
+	)
+	collectBar.AddChild(f.collect)
+
+	// Body: craft/readout lines over the two table sections and their
+	// toolbars; the grid gives each table its bounded cell (their own
+	// preferred height never grows the window).
+	body := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(1),
+			widget.GridLayoutOpts.Stretch([]bool{true},
+				[]bool{false, true, false, false, true, false}),
+			widget.GridLayoutOpts.Spacing(0, theme.Px(4)),
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
+		)),
+	)
+	body.AddChild(f.craftLbl, f.recipes.Container(), startBar,
+		f.jobsLbl, f.jobs.Container(), collectBar)
+
+	title, factoryTitle := theme.NewTitleBar(env, "Factory", "row_module")
+	f.title = factoryTitle
+
+	f.win = widget.NewWindow(
+		widget.WindowOpts.Contents(body),
+		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
+		widget.WindowOpts.Draggable(),
+		// Content floor: the craft line, a few rows of each table and
+		// both toolbars.
+		widget.WindowOpts.MinSize(theme.Px(360), theme.Px(430)),
+		// Fallback only: the composed rect at the 1024×700 minimum (the
+		// game re-centers it from placeDefaults).
+		widget.WindowOpts.Location(image.Rect(theme.Px(332), theme.Px(130), theme.Px(732), theme.Px(560))),
+	)
+	return f
+}
+
+// Win returns the factory window for Kit.AddWindow.
+func (f *Factory) Win() *widget.Window { return f.win }
+
+// canonicalFirst is the market table's sort rule: the given key keeps the
+// rows in the order Sync delivered them (canonical sim order), any other
+// column sorts its cells lexicographically.
+func canonicalFirst(key string, cols []widgets.Column) func(string, bool, []widgets.TableRow) {
+	return func(k string, asc bool, rows []widgets.TableRow) {
+		if k == key {
+			if !asc {
+				slices.Reverse(rows)
+			}
+			return
+		}
+		idx := -1
+		for i, c := range cols {
+			if c.Key == k {
+				idx = i
+				break
+			}
+		}
+		if idx < 0 {
+			return
+		}
+		sort.SliceStable(rows, func(a, b int) bool {
+			x, y := rows[a].Cells[idx], rows[b].Cells[idx]
+			if asc {
+				return x < y
+			}
+			return y < x
+		})
+	}
+}
+
+// Sync refreshes the recipe board, the job list and every gate from the
+// simulation. Call it every frame before Kit.Update.
+func (f *Factory) Sync() {
+	s := f.cv
+	station := s.DockedIndustry()
+	runs := f.qty()
+
+	// Recipe board: the content's canonical order, one row per recipe.
+	recRows := make([]widgets.TableRow, 0, len(f.cv.Defs().Recipes))
+	for _, rec := range f.cv.Defs().RecipesInOrder() {
+		mats := s.JobMaterials(station, rec.ID, runs)
+		row := factoryRow{recipe: rec.ID, ref: f.productRef(rec.Product)}
+		recRows = append(recRows, widgets.TableRow{
+			Cells: []string{
+				itemLabel(f.cv, rec.Product),
+				rec.Family,
+				theme.GroupFloat(s.JobDuration(station, rec.ID, 1), 1) + " s",
+				f.inputsCell(mats),
+			},
+			Icons: []string{productIcon(f.cv, rec.Product), "", "", ""},
+			Data:  row,
+			Spec:  f.rowSpec(row),
+		})
+	}
+	f.recipes.SetRows(recRows)
+	f.recipes.Sync()
+
+	// Job list: the docked station's own jobs, in job-id order.
+	jobs := s.Jobs(station)
+	jobRows := make([]widgets.TableRow, 0, len(jobs))
+	for _, j := range jobs {
+		row := factoryRow{job: j.ID, ref: f.productRef(f.productOfJob(j))}
+		jobRows = append(jobRows, widgets.TableRow{
+			Cells: []string{
+				itemLabel(f.cv, f.productOfJob(j)),
+				theme.FormatInt(int64(j.Runs)),
+				f.progressOf(j),
+				jobStateLabel(j.State),
+			},
+			Icons: []string{productIcon(f.cv, f.productOfJob(j)), "", "", ""},
+			Data:  row,
+			Spec:  f.rowSpec(row),
+		})
+	}
+	f.jobs.SetRows(jobRows)
+	f.jobs.Sync()
+
+	// Revalidate the cached selection against the rows themselves (a
+	// recipe/job that left a table must stop gating the actions).
+	f.hasSel = false
+	if r, ok := f.recipes.Selected(); ok {
+		if row, isRow := r.Data.(factoryRow); isRow && row.recipe != "" {
+			f.sel, f.hasSel = row, true
+		}
+	}
+	if r, ok := f.jobs.Selected(); ok {
+		if row, isRow := r.Data.(factoryRow); isRow && row.job != 0 {
+			f.sel, f.hasSel = row, true
+		}
+	}
+	if !f.hasSel {
+		f.sel = factoryRow{} // a vanished row must stop gating the actions
+	}
+
+	// Readouts and gates (visible-but-grayed, never hidden).
+	slots := sim.IndustrySlots()
+	if station != "" {
+		f.craftLbl.Label = "Craft — hulls L" + theme.FormatInt(int64(s.CraftLevel(station, content.FamilyHulls))) +
+			" · modules L" + theme.FormatInt(int64(s.CraftLevel(station, content.FamilyModules))) +
+			" · charges L" + theme.FormatInt(int64(s.CraftLevel(station, content.FamilyCharges)))
+	} else {
+		f.craftLbl.Label = "Craft — no industry service here"
+	}
+	slotsUsed := len(jobs)
+	f.jobsLbl.Label = "Jobs — " + theme.FormatInt(int64(slotsUsed)) + "/" + theme.FormatInt(int64(slots)) + " slots"
+
+	setStepperValue(f.qtyBar, f.qtyLabel, "Qty "+theme.FormatInt(int64(runs)))
+	f.start.GetWidget().Disabled = !f.startReadyFor(f.sel)
+	f.collect.GetWidget().Disabled = !f.collectReadyFor(f.sel)
+
+	slotsLbl := theme.FormatInt(int64(slotsUsed)) + "/" + theme.FormatInt(int64(slots)) + " jobs"
+	if f.hasSel && f.sel.recipe != "" {
+		if rec, ok := f.cv.Defs().Recipes[f.sel.recipe]; ok {
+			f.title.Label = "Factory — " + itemLabel(f.cv, rec.Product) + " " +
+				theme.GroupFloat(s.JobDuration(station, rec.ID, 1), 1) + " s · " + slotsLbl
+			return
+		}
+	}
+	f.title.Label = "Factory — " + slotsLbl
+}
+
+// inputsCell renders the have/need line of a job's materials: one
+// "Name have/need" pair per input, joined by the table's ellipsis rules.
+func (f *Factory) inputsCell(mats []content.CargoStack) string {
+	if len(mats) == 0 {
+		return "—"
+	}
+	out := ""
+	for i, m := range mats {
+		if i > 0 {
+			out += " · "
+		}
+		name := string(m.Item)
+		if def, ok := f.cv.Defs().Item(m.Item); ok {
+			name = def.Name
+		}
+		out += name + " " + theme.FormatInt(int64(f.cv.PlayerStock(m.Item))) +
+			"/" + theme.FormatInt(int64(m.Qty))
+	}
+	return out
+}
+
+// productRef resolves a recipe's product for the row's Show Info entry.
+func (f *Factory) productRef(product content.ItemID) widgets.InfoRef {
+	ref, _ := widgets.RefOfID(f.cv, string(product))
+	return ref
+}
+
+// productOfJob resolves a job's recipe product ("" when the recipe no
+// longer loads — the sim keeps such jobs collectable-guarded).
+func (f *Factory) productOfJob(j sim.Job) content.ItemID {
+	if rec, ok := f.cv.Defs().Recipes[j.Recipe]; ok {
+		return rec.Product
+	}
+	return ""
+}
+
+// progressOf renders a job's progress: "100%" once done, else the elapsed
+// fraction of its clock window.
+func (f *Factory) progressOf(j sim.Job) string {
+	if j.State == sim.JobDone {
+		return "100%"
+	}
+	span := j.DoneAt - j.StartedAt
+	if span <= 0 {
+		return "100%"
+	}
+	pct := (f.cv.Time() - j.StartedAt) / span
+	if pct < 0 {
+		pct = 0
+	}
+	if pct > 1 {
+		pct = 1
+	}
+	return strconv.Itoa(int(pct*100)) + "%"
+}
+
+// jobStateLabel is the jobs table's State cell.
+func jobStateLabel(state sim.JobState) string {
+	if state == sim.JobDone {
+		return "Ready"
+	}
+	return "Running"
+}
+
+// productIcon picks a recipe/job row's product glyph: hulls, module
+// classes, and the neutral gear for plain items (charges, minerals).
+func productIcon(cv widgets.ContentView, product content.ItemID) string {
+	if _, ok := cv.Defs().Ship(content.ShipID(product)); ok {
+		return "row_hull"
+	}
+	if def, ok := cv.Defs().Module(content.ModuleID(product)); ok {
+		return theme.ModuleIcon(def.Kind)
+	}
+	if _, ok := cv.Defs().Item(product); ok {
+		return icons.Fallback
+	}
+	return ""
+}
+
+// startReadyFor is the Start gate for one recipe row: the sim would accept
+// it right now at the stepper quantity (CanStartJob covers the industry
+// service, the slots and the materials).
+func (f *Factory) startReadyFor(row factoryRow) bool {
+	if row.recipe == "" {
+		return false
+	}
+	return f.cv.CanStartJob(f.cv.DockedIndustry(), row.recipe, f.qty())
+}
+
+// collectReadyFor is the Collect gate for one job row: the docked
+// station's own, finished, player-owned job.
+func (f *Factory) collectReadyFor(row factoryRow) bool {
+	if row.job == 0 {
+		return false
+	}
+	for _, j := range f.cv.Jobs(f.cv.DockedIndustry()) {
+		if j.ID == row.job {
+			return j.State == sim.JobDone && j.Owner == sim.OwnerPlayer
+		}
+	}
+	return false
+}
+
+// rowSpec is one factory row's declared interactions: the product's
+// Show Info (grayed when the id no longer resolves) plus its one action
+// (Start for a recipe, Collect for a job) with the same gate as the
+// toolbar button.
+func (f *Factory) rowSpec(row factoryRow) widgets.RowSpec {
+	return widgets.RowSpec{Ref: &row.ref, Actions: f.rowActions(row)}
+}
+
+// rowActions is a row's context-menu action entry (Start for a recipe,
+// Collect for a job) with the same gate as the toolbar button.
+func (f *Factory) rowActions(row factoryRow) []widgets.RowAction {
+	switch {
+	case row.recipe != "":
+		return []widgets.RowAction{{Label: "Start", Disabled: !f.startReadyFor(row),
+			Intent: widgets.StartJob{Recipe: row.recipe, Runs: f.qty()}}}
+	case row.job != 0:
+		return []widgets.RowAction{{Label: "Collect", Disabled: !f.collectReadyFor(row),
+			Intent: widgets.CollectJob{Job: row.job}}}
+	}
+	return []widgets.RowAction{{Label: "Start", Disabled: true}}
+}
+
+// stepQty moves the quantity stepper one step (clamped).
+func (f *Factory) stepQty(delta int) {
+	f.qtyIdx += delta
+	if f.qtyIdx < 0 {
+		f.qtyIdx = 0
+	}
+	if f.qtyIdx >= len(qtySteps) {
+		f.qtyIdx = len(qtySteps) - 1
+	}
+	setStepperValue(f.qtyBar, f.qtyLabel, "Qty "+theme.FormatInt(int64(f.qty())))
+}
+
+// qty is the current run count the stepper drives.
+func (f *Factory) qty() int { return qtySteps[f.qtyIdx] }
+
+// startClicked emits StartJob for the selected recipe and quantity.
+func (f *Factory) startClicked() { f.startWith(f.sel) }
+
+// startWith emits StartJob for one recipe row (gated even when called
+// directly, the market buttons' rule).
+func (f *Factory) startWith(row factoryRow) {
+	if !f.startReadyFor(row) {
+		return
+	}
+	f.as.Do(widgets.StartJob{Recipe: row.recipe, Runs: f.qty()})
+}
+
+// collectClicked emits CollectJob for the selected job.
+func (f *Factory) collectClicked() { f.collectWith(f.sel) }
+
+// collectWith emits CollectJob for one job row (gated even when called
+// directly).
+func (f *Factory) collectWith(row factoryRow) {
+	if !f.collectReadyFor(row) {
+		return
+	}
+	f.as.Do(widgets.CollectJob{Job: row.job})
+}

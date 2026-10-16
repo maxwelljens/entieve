@@ -7,8 +7,9 @@ import (
 	"strings"
 
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/uikit"
 	"github.com/entieve/entieve/uikit/icons"
+	uikit "github.com/entieve/entieve/uikit/screens"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -27,8 +28,8 @@ import (
 // the whole table (New refuses to build on a bad spec, the tests drive it
 // with deliberately broken rows).
 //
-// Default geometry is DESIGN units (uikit.Px scales them — see the Px
-// funnel, uikit/scale.go) written against the 1280×720 design viewport
+// Default geometry is DESIGN units (theme.Px scales them — see the Px
+// funnel, uikit/theme/scale.go) written against the 1280×720 design viewport
 // (defaultW×defaultH).
 
 // DockPolicy says where a screen's window lives:
@@ -381,13 +382,13 @@ func anchorRect(d image.Rectangle, a Anchor, dw, dh, w, h int) image.Rectangle {
 	var x, y int
 	switch a {
 	case AnchorFixed:
-		x, y = uikit.Px(d.Min.X), uikit.Px(d.Min.Y)
+		x, y = theme.Px(d.Min.X), theme.Px(d.Min.Y)
 	case AnchorBottomLeft:
-		x = uikit.Px(d.Min.X)
-		y = h - uikit.Px(defaultH-d.Max.Y) - dh
+		x = theme.Px(d.Min.X)
+		y = h - theme.Px(defaultH-d.Max.Y) - dh
 	case AnchorTopCenter:
 		r := centerRect(dw, dh, w, h)
-		x, y = r.Min.X, uikit.Px(d.Min.Y)
+		x, y = r.Min.X, theme.Px(d.Min.Y)
 	default: // AnchorCenter: the viewport decides both axes.
 		return centerRect(dw, dh, w, h)
 	}

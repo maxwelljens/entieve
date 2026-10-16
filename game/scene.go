@@ -8,7 +8,7 @@ import (
 	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit"
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )

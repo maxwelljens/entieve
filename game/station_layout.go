@@ -4,7 +4,7 @@ import (
 	"image"
 
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/uikit"
+	"github.com/entieve/entieve/uikit/theme"
 )
 
 // Docked service-window composition (docs/GAMEPLAY.md, "Docked at a
@@ -117,26 +117,26 @@ func stationLayout(w, h, stationH int) dockedLayout {
 	// inside the top/side/bottom margins.
 	// Design constants × the current scale (once per quantity): the
 	// viewport (w, h) already arrives in live px.
-	x0 := uikit.Px(stationX + stationWinW + 2) // 406: station column + gutter
-	y0 := uikit.Px(stationY)                   // 8
-	x1 := w - uikit.Px(10)
-	y1 := h - uikit.Px(10)
+	x0 := theme.Px(stationX + stationWinW + 2) // 406: station column + gutter
+	y0 := theme.Px(stationY)                   // 8
+	x1 := w - theme.Px(10)
+	y1 := h - theme.Px(10)
 
 	// The market takes the top band: a third of the free height, clamped
 	// between its own minimum and whatever leaves the bottom row its
 	// content minimum. The bottom row (inventory | fitting) gets the
 	// rest, so it can never come back below max(inventory, fitting).
-	avail := (y1 - y0) - uikit.Px(dockGutter)
-	// The floors mirror the uikit windows' own uikit.Px(min) MinSizes, so
+	avail := (y1 - y0) - theme.Px(dockGutter)
+	// The floors mirror the uikit windows' own theme.Px(min) MinSizes, so
 	// they scale the same way or the clamp would fight the window system.
-	bottomMin := max(uikit.Px(inventoryMinH), uikit.Px(fittingMinH))
-	mktH := clampInt(avail/3, uikit.Px(marketMinH), max(uikit.Px(marketMinH), avail-bottomMin))
+	bottomMin := max(theme.Px(inventoryMinH), theme.Px(fittingMinH))
+	mktH := clampInt(avail/3, theme.Px(marketMinH), max(theme.Px(marketMinH), avail-bottomMin))
 
-	by := y0 + mktH + uikit.Px(dockGutter)
-	invW := ((x1 - x0) - uikit.Px(dockGutter)) / 2
+	by := y0 + mktH + theme.Px(dockGutter)
+	invW := ((x1 - x0) - theme.Px(dockGutter)) / 2
 	return dockedLayout{
-		Station: image.Rect(uikit.Px(stationX), uikit.Px(stationY),
-			uikit.Px(stationX+stationWinW), uikit.Px(stationY)+max(stationH, uikit.Px(stationMinH))),
+		Station: image.Rect(theme.Px(stationX), theme.Px(stationY),
+			theme.Px(stationX+stationWinW), theme.Px(stationY)+max(stationH, theme.Px(stationMinH))),
 		Market:    image.Rect(x0, y0, x1, y0+mktH),
 		Inventory: image.Rect(x0, by, x0+invW, y1),
 		Fitting:   image.Rect(x0+invW+dockGutter, by, x1, y1),

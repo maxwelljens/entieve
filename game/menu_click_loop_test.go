@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/ebitenui/ebitenui/input"
-	"github.com/entieve/entieve/uikit"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -145,13 +145,13 @@ func TestMenuClickDispatchesThroughUpdateLoop(t *testing.T) {
 
 	// The press-edge seam: armed only for the click frame below.
 	clickEdge := false
-	defer uikit.SetPressEdgeForTest(func(b ebiten.MouseButton) bool {
+	defer widgets.SetPressEdgeForTest(func(b ebiten.MouseButton) bool {
 		return b == ebiten.MouseButtonLeft && clickEdge
 	})()
 
 	// The menu's live-cursor seam: Menu.poll reads the scripted raw
 	// position, exactly as production reads ebiten's cursor.
-	defer uikit.SetPollCursorForTest(func() (int, int) { return mm.x, mm.y })()
+	defer widgets.SetPollCursorForTest(func() (int, int) { return mm.x, mm.y })()
 
 	frame := func() {
 		t.Helper()

@@ -23,7 +23,7 @@ import (
 	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit"
+	"github.com/entieve/entieve/uikit/screens"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -48,15 +48,15 @@ var accelLevels = []int{1, 2, 5, 10, 30}
 type spike struct {
 	sim   *sim.Sim
 	ren   *render.Renderer
-	kit   *uikit.Kit
+	kit   *screens.Kit
 	zoom  float64
 	accel int
 	acc   float64 // fixed-timestep accumulator (seconds)
 
 	// Station windows, toggled with I/F/G; remove closes them again.
-	market    *uikit.Market
-	inventory *uikit.Inventory
-	fitting   *uikit.Fitting
+	market    *screens.Market
+	inventory *screens.Inventory
+	fitting   *screens.Fitting
 	mkShown   bool
 	invShown  bool
 	fitShown  bool
@@ -78,21 +78,21 @@ func main() {
 	if err != nil {
 		log.Fatalf("sim.New: %v", err)
 	}
-	kit, err := uikit.NewKit(c, s, s.Queue)
+	kit, err := screens.NewKit(c, s, s.Queue)
 	if err != nil {
-		log.Fatalf("uikit.NewKit: %v", err)
+		log.Fatalf("screens.NewKit: %v", err)
 	}
 	// The station windows ride the kit's window stack (same theme,
 	// stacking and input pump) through the AddWindow seam.
-	env := uikit.NewEnv(c, s, s.Queue)
+	env := screens.NewEnv(c, s, s.Queue)
 	g := &spike{
 		sim:       s,
 		ren:       render.New(c),
 		kit:       kit,
 		zoom:      zoomStart,
-		market:    uikit.NewMarket(env),
-		inventory: uikit.NewInventory(env),
-		fitting:   uikit.NewFitting(env),
+		market:    screens.NewMarket(env),
+		inventory: screens.NewInventory(env),
+		fitting:   screens.NewFitting(env),
 	}
 	g.mkRemove = kit.AddWindow(g.market.Win())
 	g.invRemove = kit.AddWindow(g.inventory.Win())

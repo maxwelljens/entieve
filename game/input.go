@@ -1,7 +1,7 @@
 package game
 
 import (
-	"github.com/entieve/entieve/uikit"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -25,14 +25,14 @@ type Binding struct {
 // overlay renders these same strings. No (Key, Shift, Ctrl) combination
 // appears twice (tested); several keys may share an action.
 //
-// It is assigned in init (screens.go) from the spec: the rows' Build
+// It is assigned in init (uikit.go) from the spec: the rows' Build
 // closures reach session code that reads this very map, so a package-level
 // initializer would be circular.
 var KeyMap []Binding
 
 // worldKeyMap is the hand-written half of KeyMap: bindings that belong to
 // the world and the session, not to a window. The screen toggles
-// (screens.go) follow it in KeyMap.
+// (uikit.go) follow it in KeyMap.
 var worldKeyMap = []Binding{
 	{Key: ebiten.KeyTab, Action: "lock-nearest", Desc: "Tab — cycle-lock nearest target"},
 	{Key: ebiten.KeyTab, Shift: true, Action: "lock-selected", Desc: "Shift+Tab — lock selected target"},
@@ -76,13 +76,13 @@ type MouseBinding struct {
 // Range numbers are derived from the selector arrays, never typed: the
 // right-click orbit flies at uikit.OrbitRanges[0] (scene.go), and the
 // pin in keymap_test checks the two agree. Right-click on a UI surface
-// opens the context menu (uikit/menu.go) instead of acting directly.
+// opens the context menu (uikit/widgets/menu.go) instead of acting directly.
 var MouseMap = []MouseBinding{
 	{Button: "Left click", Desc: "Select entity / press UI buttons; drag a title bar to move a window"},
 	{Button: "Left click", Mod: "on column header", Desc: "sort the overview (click again flips direction)"},
 	{Button: "Left click", Mod: "Ctrl", Desc: "Lock target under cursor"},
 	{Button: "Left double-click", Desc: "Show Info on an overview or table row; approach an entity under the cursor; on empty space, fly straight toward the point"},
-	{Button: "Right click", Desc: "Orbit target under cursor (" + uikit.FormatInt(int64(orbitDefaultRange)) + " m)"},
+	{Button: "Right click", Desc: "Orbit target under cursor (" + theme.FormatInt(int64(orbitDefaultRange)) + " m)"},
 	{Button: "Right click", Mod: "on a UI row or rack cell", Desc: "open the context menu (Show Info, plus the row's actions)"},
 	{Button: "Right click", Mod: "on weapon slot", Desc: "open the module menu (Cycle charge walks Auto → cargo ammo)"},
 	{Button: "Middle drag", Desc: "Pan camera"},
