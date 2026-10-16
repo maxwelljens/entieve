@@ -15,7 +15,7 @@ import (
 // fields empty), so every fixture below registers its own def in the
 // test's freshly loaded content and code against it.
 
-func fixtureShip(t *testing.T, env Env, id content.ShipID, def *content.ShipDef) *content.ShipDef {
+func fixtureShip(t *testing.T, env *testEnv, id content.ShipID, def *content.ShipDef) *content.ShipDef {
 	t.Helper()
 	def.ID = id
 	if def.Name == "" {
@@ -28,7 +28,7 @@ func fixtureShip(t *testing.T, env Env, id content.ShipID, def *content.ShipDef)
 	return def
 }
 
-func fixtureModule(t *testing.T, env Env, id content.ModuleID, def *content.ModuleDef) *content.ModuleDef {
+func fixtureModule(t *testing.T, env *testEnv, id content.ModuleID, def *content.ModuleDef) *content.ModuleDef {
 	t.Helper()
 	def.ID = id
 	if def.Name == "" {
@@ -41,7 +41,7 @@ func fixtureModule(t *testing.T, env Env, id content.ModuleID, def *content.Modu
 	return def
 }
 
-func fixtureItem(t *testing.T, env Env, id content.ItemID, def *content.ItemDef) *content.ItemDef {
+func fixtureItem(t *testing.T, env *testEnv, id content.ItemID, def *content.ItemDef) *content.ItemDef {
 	t.Helper()
 	def.ID = id
 	if def.Name == "" {
@@ -54,7 +54,7 @@ func fixtureItem(t *testing.T, env Env, id content.ItemID, def *content.ItemDef)
 	return def
 }
 
-func fixtureNpc(t *testing.T, env Env, id content.NpcID, def *content.NpcDef) *content.NpcDef {
+func fixtureNpc(t *testing.T, env *testEnv, id content.NpcID, def *content.NpcDef) *content.NpcDef {
 	t.Helper()
 	def.ID = id
 	if def.Name == "" {
@@ -136,7 +136,7 @@ func TestInfoPageHull(t *testing.T) {
 		OreHold:        150,
 		Description:    "A heritage hull with a full stat sheet.",
 	})
-	page, ok := env.infoPageFor(ShipRef("ship-fixture-full"))
+	page, ok := infoPageFor(env, ShipRef("ship-fixture-full"))
 	if !ok {
 		t.Fatal("full hull did not resolve")
 	}
@@ -183,7 +183,7 @@ func TestInfoPageHull(t *testing.T) {
 		Agility: 8,
 		Mass:    2e7,
 	})
-	bare, ok := env.infoPageFor(ShipRef("ship-fixture-bare"))
+	bare, ok := infoPageFor(env, ShipRef("ship-fixture-bare"))
 	if !ok {
 		t.Fatal("bare hull did not resolve")
 	}
@@ -227,7 +227,7 @@ func TestInfoPageModule(t *testing.T) {
 			AmmoClass: "light",
 		},
 	})
-	page, ok := env.infoPageFor(ModuleRef("mod-fixture-weapon"))
+	page, ok := infoPageFor(env, ModuleRef("mod-fixture-weapon"))
 	if !ok {
 		t.Fatal("module did not resolve")
 	}
@@ -277,7 +277,7 @@ func TestInfoPageModule(t *testing.T) {
 		if r.RefOnValue {
 			t.Errorf("charge row %+v links on the wrong side", r)
 		}
-		if !env.infoRefExists(*r.Ref) {
+		if !infoRefExists(env, *r.Ref) {
 			t.Errorf("charge ref %s does not resolve", r.Ref)
 		}
 		links++
@@ -293,7 +293,7 @@ func TestInfoPageModule(t *testing.T) {
 		Kind:    content.KindCapRecharger,
 		Passive: &content.PassiveAttrs{Capacitor: 120},
 	})
-	p2, _ := env.infoPageFor(ModuleRef("mod-fixture-passive"))
+	p2, _ := infoPageFor(env, ModuleRef("mod-fixture-passive"))
 	if sectionOf(p2, "CHARGES") != nil || sectionOf(p2, "MARKET") != nil || sectionOf(p2, "DAMAGE") != nil {
 		t.Errorf("passive page carries weapon/market blocks: %v", sectionLabels(p2))
 	}
@@ -330,7 +330,7 @@ func TestInfoPageItem(t *testing.T) {
 		Damage:    &content.Damage{EM: 10, Thermal: 4, Kinetic: 3, Explosive: 2},
 	})
 
-	page, ok := env.infoPageFor(ItemRef("ore-fixture-vein"))
+	page, ok := infoPageFor(env, ItemRef("ore-fixture-vein"))
 	if !ok {
 		t.Fatal("ore did not resolve")
 	}
@@ -351,7 +351,7 @@ func TestInfoPageItem(t *testing.T) {
 		t.Fatal("no REFINES TO section")
 	}
 	trit, _ := rowOf(y, "Fixture Tritanium")
-	if trit.Ref == nil || !env.infoRefExists(*trit.Ref) {
+	if trit.Ref == nil || !infoRefExists(env, *trit.Ref) {
 		t.Errorf("tritanium yield row = %+v, want a link to the loaded item", trit)
 	}
 	if trit.Value != "60%" {
@@ -363,12 +363,12 @@ func TestInfoPageItem(t *testing.T) {
 	}
 
 	// The ammo's damage profile renders as the tooltip's damage rows.
-	ap, _ := env.infoPageFor(ItemRef("ammo-fixture-lance"))
+	ap, _ := infoPageFor(env, ItemRef("ammo-fixture-lance"))
 	if r := mustRow(t, ap, "DAMAGE", "Per shot"); r.Value != "19.0" {
 		t.Errorf("ammo per shot = %+v, want 19.0", r)
 	}
 	// A plain mineral has no damage block.
-	mineral, _ := env.infoPageFor(ItemRef("min-fixture-trit"))
+	mineral, _ := infoPageFor(env, ItemRef("min-fixture-trit"))
 	if sectionOf(mineral, "DAMAGE") != nil || sectionOf(mineral, "REFINES TO") != nil {
 		t.Errorf("mineral page = %v, want properties/market only", sectionLabels(mineral))
 	}
@@ -399,7 +399,7 @@ func TestInfoPageCaste(t *testing.T) {
 			{Item: "min-fixture-scrap", Chance: 0.4, MinQty: 1, MaxQty: 3},
 		},
 	})
-	page, ok := env.infoPageFor(NpcRef("npc-fixture-talkative"))
+	page, ok := infoPageFor(env, NpcRef("npc-fixture-talkative"))
 	if !ok {
 		t.Fatal("caste did not resolve")
 	}
@@ -442,7 +442,7 @@ func TestInfoPageCaste(t *testing.T) {
 		Ship:   "ship-fixture-rat",
 		Bounty: 5000,
 	})
-	silentPage, _ := env.infoPageFor(NpcRef("npc-fixture-silent"))
+	silentPage, _ := infoPageFor(env, NpcRef("npc-fixture-silent"))
 	if silentPage.Prose != "" {
 		t.Errorf("empty Description rendered prose %q", silentPage.Prose)
 	}

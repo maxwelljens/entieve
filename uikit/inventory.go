@@ -12,7 +12,9 @@ import (
 // Item/Qty/m³ tables with per-section totals, a quantity stepper and
 // transfer/sell actions (CmdTransfer / CmdSell).
 type Inventory struct {
-	env Env
+	th  Theme
+	cv  ContentView
+	as  ActionSink
 	win *widget.Window
 
 	cargo, ore, hangar *Table
@@ -37,9 +39,9 @@ type Inventory struct {
 
 // NewInventory builds the Inventory window over the shared environment.
 // Mount it on a Kit with Kit.AddWindow and call Sync every frame.
-func NewInventory(env Env) *Inventory {
-	inv := &Inventory{env: env}
-	p := env.Pal
+func NewInventory(env Seams) *Inventory {
+	inv := &Inventory{th: env, cv: env, as: env}
+	p := env.Pal()
 
 	cols := []Column{
 		{Key: "Item", Title: "Item", Priority: 0},
@@ -170,11 +172,11 @@ func (inv *Inventory) tableFor(src string) *Table {
 // Sync refreshes the three sections, their totals and the action
 // gating. Call it every frame before Kit.Update.
 func (inv *Inventory) Sync() {
-	s := inv.env.Sim
+	s := inv.cv
 	player := s.Player()
 
-	var cargo *sim.Cargo
-	cargo, hasCargo := s.Cargos.Get(player)
+	var cargo sim.Cargo
+	cargo, hasCargo := s.Cargo(player)
 	inv.cargo.SetRows(inv.cargoRows(cargo, hasCargo))
 	inv.ore.SetRows(inv.oreRows(cargo, hasCargo))
 	inv.hangar.SetRows(inv.rowsOf(inv.hangarRows()))
@@ -202,7 +204,7 @@ func (inv *Inventory) Sync() {
 	// Action gating: a selection in the source section (never its own
 	// destination), an ore hold for ore, and a docked player for the
 	// hangar side and for selling.
-	docked := s.Docked.Has(player)
+	docked := s.PlayerDocked()
 	oreOK := hasCargo && cargo.OreCapacity > 0
 	inv.toCargo.GetWidget().Disabled = !inv.hasSel || inv.src == "cargo"
 	inv.toOre.GetWidget().Disabled = !inv.hasSel || inv.src == "ore" || !oreOK
@@ -212,7 +214,7 @@ func (inv *Inventory) Sync() {
 
 // cargoRows renders the general cargo hold (empty when the ship has
 // none).
-func (inv *Inventory) cargoRows(cargo *sim.Cargo, hasCargo bool) []TableRow {
+func (inv *Inventory) cargoRows(cargo sim.Cargo, hasCargo bool) []TableRow {
 	if !hasCargo {
 		return nil
 	}
@@ -220,7 +222,7 @@ func (inv *Inventory) cargoRows(cargo *sim.Cargo, hasCargo bool) []TableRow {
 }
 
 // oreRows renders the dedicated ore hold (empty when the hull has none).
-func (inv *Inventory) oreRows(cargo *sim.Cargo, hasCargo bool) []TableRow {
+func (inv *Inventory) oreRows(cargo sim.Cargo, hasCargo bool) []TableRow {
 	if !hasCargo || cargo.OreCapacity <= 0 {
 		return nil
 	}
@@ -229,38 +231,35 @@ func (inv *Inventory) oreRows(cargo *sim.Cargo, hasCargo bool) []TableRow {
 
 // hangarRows is the station hangar's stacks (for the section total).
 func (inv *Inventory) hangarRows() []content.CargoStack {
-	if inv.env.Sim.Hangar == nil {
-		return nil
-	}
-	return inv.env.Sim.Hangar.Items
+	return inv.cv.HangarItems()
 }
 
 // rowsOf converts stacks to Item/Qty/m³ table rows.
 func (inv *Inventory) rowsOf(stacks []content.CargoStack) []TableRow {
 	rows := make([]TableRow, 0, len(stacks))
 	for _, st := range stacks {
-		vol, name := 0.0, itemLabel(inv.env, st.Item)
-		if def, ok := inv.env.Content.Item(st.Item); ok {
+		vol, name := 0.0, itemLabel(inv.cv, st.Item)
+		if def, ok := inv.cv.Defs().Item(st.Item); ok {
 			vol = def.Volume * float64(st.Qty)
 		}
 		rows = append(rows, TableRow{
 			Cells: []string{name, "×" + FormatInt(int64(st.Qty)), formatVolume(vol)},
 			Data:  st.Item,
 			// The whole interaction surface: Show Info only.
-			Spec: RowSpec{Ref: inv.env.rowRef(st.Item)},
+			Spec: RowSpec{Ref: rowRef(inv.cv, st.Item)},
 		})
 	}
 	return rows
 }
 
 // section renders a section header with used/capacity totals.
-func (inv *Inventory) section(title string, cargo *sim.Cargo, hasCargo bool) string {
+func (inv *Inventory) section(title string, cargo sim.Cargo, hasCargo bool) string {
 	if !hasCargo {
 		return title + " · no cargo hold"
 	}
 	used := 0.0
 	for _, st := range cargo.Stacks {
-		if def, ok := inv.env.Content.Item(st.Item); ok {
+		if def, ok := inv.cv.Defs().Item(st.Item); ok {
 			used += def.Volume * float64(st.Qty)
 		}
 	}
@@ -268,13 +267,13 @@ func (inv *Inventory) section(title string, cargo *sim.Cargo, hasCargo bool) str
 }
 
 // oreSection renders the ore hold header with used/capacity totals.
-func (inv *Inventory) oreSection(cargo *sim.Cargo, hasCargo bool) string {
+func (inv *Inventory) oreSection(cargo sim.Cargo, hasCargo bool) string {
 	if !hasCargo || cargo.OreCapacity <= 0 {
 		return "Ore hold · not fitted"
 	}
 	used := 0.0
 	for _, st := range cargo.Ore {
-		if def, ok := inv.env.Content.Item(st.Item); ok {
+		if def, ok := inv.cv.Defs().Item(st.Item); ok {
 			used += def.Volume * float64(st.Qty)
 		}
 	}
@@ -303,16 +302,16 @@ func (inv *Inventory) transfer(to string) {
 		return
 	}
 	// The hangar side needs a docked player (sim validates the rest).
-	if (inv.src == "hangar" || to == "hangar") && !inv.env.Sim.Docked.Has(inv.env.Sim.Player()) {
+	if (inv.src == "hangar" || to == "hangar") && !inv.cv.PlayerDocked() {
 		return
 	}
 	if to == "ore" {
-		cargo, ok := inv.env.Sim.Cargos.Get(inv.env.Sim.Player())
+		cargo, ok := inv.cv.Cargo(inv.cv.Player())
 		if !ok || cargo.OreCapacity <= 0 {
 			return
 		}
 	}
-	inv.env.Enqueue(sim.CmdTransfer{
+	inv.as.Do(Transfer{
 		Item: inv.sel,
 		Qty:  inv.qty(),
 		From: inv.src,
@@ -320,10 +319,10 @@ func (inv *Inventory) transfer(to string) {
 	})
 }
 
-// sellClicked enqueues CmdSell for the selected stack (docked only).
+// sellClicked emits Sell for the selected stack (docked only).
 func (inv *Inventory) sellClicked() {
-	if !inv.hasSel || !inv.env.Sim.Docked.Has(inv.env.Sim.Player()) {
+	if !inv.hasSel || !inv.cv.PlayerDocked() {
 		return
 	}
-	inv.env.Enqueue(sim.CmdSell{Item: inv.sel, Qty: inv.qty()})
+	inv.as.Do(Sell{Item: inv.sel, Qty: inv.qty()})
 }

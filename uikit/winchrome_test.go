@@ -359,7 +359,7 @@ func TestAddWindowChromeIsIdempotent(t *testing.T) {
 	if len(k.chromes) != 2 {
 		t.Fatalf("kit starts with %d chromes, want 2 (overview + selected)", len(k.chromes))
 	}
-	log := NewLog(k.panelEnv())
+	log := NewLog(k.Env())
 	first := k.AddWindow(log.Win())
 	if len(k.chromes) != 3 {
 		t.Fatalf("after one AddWindow: %d chromes, want 3", len(k.chromes))
@@ -385,7 +385,7 @@ func TestAddWindowChromeIsIdempotent(t *testing.T) {
 func TestTwoKitsKeepTheirOwnGrips(t *testing.T) {
 	k1, _ := newTestKit(t)
 	fm := useFakeMouse(t)
-	log1 := NewLog(k1.panelEnv())
+	log1 := NewLog(k1.Env())
 	k1.AddWindow(log1.Win())
 	log1.Win().SetLocation(image.Rect(10, 430, 10+logDefaultW, 430+logDefaultH))
 	pumpKit(t, k1, 1024, 700)
@@ -423,7 +423,7 @@ func TestTwoKitsKeepTheirOwnGrips(t *testing.T) {
 func TestUnmountMidDragLeavesNoSideEffects(t *testing.T) {
 	k, _ := newTestKit(t)
 	fm := useFakeMouse(t)
-	log := NewLog(k.panelEnv())
+	log := NewLog(k.Env())
 	win := log.Win()
 	remove := k.AddWindow(win)
 	win.SetLocation(image.Rect(10, 430, 10+logDefaultW, 430+logDefaultH))
@@ -527,7 +527,7 @@ func dragAt(t *testing.T, k *Kit, fm *fakeMouse, win *widget.Window, from image.
 func TestOverviewLogEdgeGripsResize(t *testing.T) {
 	k, _ := newTestKit(t)
 	fm := useFakeMouse(t)
-	log := NewLog(k.panelEnv())
+	log := NewLog(k.Env())
 	k.AddWindow(log.Win())
 	// Park the Selected Item window clear of both test windows so the
 	// grip under test is the topmost layer at its own press point, and
@@ -684,7 +684,7 @@ func TestRowClickNearGripEdgeDoesNotResize(t *testing.T) {
 func TestTopmostWindowWinsGrip(t *testing.T) {
 	k, _ := newTestKit(t)
 	fm := useFakeMouse(t)
-	log := NewLog(k.panelEnv())
+	log := NewLog(k.Env())
 	k.AddWindow(log.Win())
 	pumpKit(t, k, 1024, 700)
 	pumpKit(t, k, 1024, 700)

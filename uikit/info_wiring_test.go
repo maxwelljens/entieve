@@ -26,7 +26,7 @@ func rightClickRow(t *testing.T, ui *ebitenui.UI, tbl *Table, i int) {
 }
 
 // entry returns the menu entry with the label (fails when missing).
-func entry(t *testing.T, env Env, label string) MenuEntry {
+func entry(t *testing.T, env Session, label string) MenuEntry {
 	t.Helper()
 	m := env.Menu()
 	if !m.IsOpen() {
@@ -142,7 +142,7 @@ func TestMarketRowMenu(t *testing.T) {
 // buttons gate.
 func TestOverviewEntityMenu(t *testing.T) {
 	k, cmds := newTestKit(t)
-	env := k.panelEnv()
+	env := k.Env()
 	k.Sync()
 
 	// A warpable celestial (landmarks resolve to no def → Show Info

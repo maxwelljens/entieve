@@ -36,28 +36,13 @@ type overview struct {
 	rows map[ecs.Entity]*ovRow // persistent row objects keyed by entity
 }
 
-// panelEnv packages the kit's live state as the Env its panels are
-// built from (kit.go owns the kit's construction; this shares its
-// theme, palette and enqueue seam instead of building a second one).
-func (k *Kit) panelEnv() Env {
-	return Env{
-		Content: k.Content,
-		Sim:     k.Sim,
-		Theme:   k.theme,
-		Pal:     k.palette,
-		TS:      k.scale,
-		Enqueue: k.enqueue,
-		faces:   k.faces,
-		svc:     k.svc,
-	}
-}
-
-// Env returns the environment this kit renders from — the same theme,
-// palette, faces and enqueue seam its own windows were built with. Panel
+// Env returns this kit's session — the three seams (one Theme, the
+// read-only view, the installed ActionSink) plus the shared popup
+// services, the same values its own windows were built from. Panel
 // hosts construct their extra panels from this instead of calling
-// NewEnv with the same arguments (that built a second theme/face set the
-// kit never used).
-func (k *Kit) Env() Env { return k.panelEnv() }
+// NewEnv with the same arguments (that built a second theme/face set
+// the kit never used).
+func (k *Kit) Env() Session { return k.sess }
 
 // AddWindow mounts an extra window on the kit's UI so it shares the
 // kit's theme, stacking and input pump. Every mounted window gets the
@@ -84,7 +69,7 @@ func (k *Kit) buildOverview() {
 	o := &overview{rows: map[ecs.Entity]*ovRow{}}
 	k.ov = o
 
-	tbl := NewTable(k.panelEnv(), []Column{
+	tbl := NewTable(k.Env(), []Column{
 		{Key: "Name", Title: "Name", Priority: 0},
 		{Key: "Distance", Title: "Distance", Priority: 1, AlignRight: true},
 		{Key: "Kind", Title: "Kind", Priority: 2},
@@ -108,7 +93,7 @@ func (k *Kit) buildOverview() {
 	// Body: the table fills its grid cell exactly, so the scroll
 	// viewport is bounded by the window no matter how tall the rows are.
 	contents := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(k.palette.BG), nrgba(k.palette.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(bordered(solid(k.th.Pal().BG), nrgba(k.th.Pal().Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
@@ -118,11 +103,11 @@ func (k *Kit) buildOverview() {
 	contents.AddChild(tbl.Container())
 
 	title := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(k.palette.BGHard), nrgba(k.palette.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(bordered(solid(k.th.Pal().BGHard), nrgba(k.th.Pal().Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	title.AddChild(widget.NewText(
-		widget.TextOpts.Text("Overview", facePtr(k.faces.baseBold), solid(k.palette.Accent)),
+		widget.TextOpts.Text("Overview", k.th.FaceBold(StepBase), solid(k.th.Pal().Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,
@@ -152,26 +137,21 @@ func (k *Kit) buildOverview() {
 // unlockable kinds) show grayed. The installer turns this data into the
 // menu; a right-click never moves the selection.
 func (k *Kit) overviewSpec(row *ovRow) RowSpec {
-	env := k.panelEnv()
 	e := row.info.Entity
-	spec := RowSpec{Ref: env.rowRef(row)}
-	info, hasInfo := k.Sim.Info(e)
+	spec := RowSpec{Ref: rowRef(k.cv, row)}
+	info, hasInfo := k.cv.Info(e)
 	if hasInfo {
-		self := e == k.Sim.Player()
+		self := e == k.cv.Player()
 		tooClose := info.Distance < sim.WarpMinRange
+		// The verbs are intents: the executor reads the warp/orbit range
+		// from the Selected Item selectors when they fire.
 		spec.Actions = []RowAction{
-			{Label: "Warp to", Disabled: self || !info.CanWarp || tooClose, Do: func() {
-				k.enqueue(sim.CmdWarpTo{Target: e, Range: k.WarpRange()})
-			}},
-			{Label: "Orbit", Disabled: self, Do: func() {
-				k.enqueue(sim.CmdOrbit{Target: e, Range: k.OrbitRange()})
-			}},
-			{Label: "Approach", Disabled: self, Do: func() {
-				k.enqueue(sim.CmdApproach{Target: e})
-			}},
-			{Label: "Lock target", Disabled: self || !canLock(info.Kind), Do: func() {
-				k.enqueue(sim.CmdLock{Target: e})
-			}},
+			{Label: "Warp to", Disabled: self || !info.CanWarp || tooClose,
+				Intent: WarpTo{Entity: e}},
+			{Label: "Orbit", Disabled: self, Intent: Orbit{Entity: e}},
+			{Label: "Approach", Disabled: self, Intent: Approach{Entity: e}},
+			{Label: "Lock target", Disabled: self || !canLock(info.Kind),
+				Intent: Lock{Entity: e}},
 		}
 	}
 	return spec
@@ -181,18 +161,18 @@ func (k *Kit) overviewSpec(row *ovRow) RowSpec {
 // hostile/player tints, then lets the table sort and diff the widgets.
 func (o *overview) sync(k *Kit) {
 	order := make([]TableRow, 0, 32)
-	for _, info := range k.Sim.Grid() {
+	for _, info := range k.cv.Grid() {
 		if !info.Visible {
 			continue
 		}
 		var tint, iconTint color.RGBA
 		switch {
-		case info.Entity == k.Sim.Player():
-			tint = withA(k.palette.Player, 60)
-			iconTint = k.palette.Info // own ship wears ColInfo
+		case info.Entity == k.cv.Player():
+			tint = withA(k.th.Pal().Player, 60)
+			iconTint = k.th.Pal().Info // own ship wears ColInfo
 		case info.Hostile:
-			tint = withA(k.palette.Danger, 60)
-			iconTint = k.palette.Danger // hostiles wear ColDanger
+			tint = withA(k.th.Pal().Danger, 60)
+			iconTint = k.th.Pal().Danger // hostiles wear ColDanger
 		}
 		row := o.rowFor(info)
 		order = append(order, TableRow{

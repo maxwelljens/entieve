@@ -30,9 +30,11 @@ names the *modules and seams* we build that vocabulary into.
 | **Anchor** | which edges of the viewport a floating Screen hangs its design-unit default rect on: centred, a fixed design coordinate, bottom-left insets, or top-centred |
 | **Row** | one listed entry in a table; its interactions derive from its **RowSpec** |
 | **RowSpec** | the row's declared data: `Ref` (what it *is*, for Show Info) + `Actions` (typed intents it offers). One installer applies menu, tooltip and double-click uniformly |
-| **Theme** | faces + scaled metrics (the visual constants; `uikit/theme`) |
-| **ContentView** | the read-only seam: defs + observable sim state as screens see it |
-| **ActionSink** | the write seam: screens emit typed **intents** (`Buy{Item,Qty}`, `StartJob{…}`); the game executes them; later the AI surface will emit the same ones |
+| **Theme** | faces + scaled metrics + palette — the visual constants a widget draws itself with (`uikit/seams.go` over `uikit/theme.go`); a Theme-only widget takes it alone |
+| **ContentView** | the read-only seam: defs + observable sim state as screens see it, implemented over `*content.Content` + `*sim.Sim` — screens never see the simulation |
+| **ActionSink** | the write seam: screens emit typed **intents** (`Buy{Item,Qty}`, `StartJob{…}`) through `Do(Intent)`; the game executes them (`Game.Do`); later the AI surface will emit the same ones |
+| **Seams** | the union `Theme` + `ContentView` + `ActionSink` — the constructor param of a screen that draws, reads *and* acts (`uikit.Seams`; the dissolved `Env` is only this alias) |
+| **Session** | one host's environment: the three seams plus its shared context menu and Show Info window (`uikit.Session`, from `Kit.Env` / `NewEnv`) |
 | **Deep module** | a module whose interface is small and whose implementation absorbs complexity (the goal of every seam here) |
 
 ## Vocabulary rules

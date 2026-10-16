@@ -291,7 +291,7 @@ func (g *Game) rebuildStationBoard(m stationBoardModel) {
 // right. Note rows render their text alone, vertically centred. Returns a
 // nil button for note rows.
 func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container, *widget.Button) {
-	p := g.env.Pal
+	p := g.env.Pal()
 	rowBG := bordered(nrgba(p.Cell, 160), nrgba(p.Border, 140), 1)
 	rowPad := &widget.Insets{Left: uikit.Px(boardRowPad), Right: uikit.Px(boardRowPad)}
 
@@ -313,14 +313,14 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	}
 
 	btn := g.newBtn(r.Action, boardBtnW, boardBtnH, func() {
-		if r.Disabled { // gated/accepted rows enqueue nothing
+		if r.Disabled { // gated/accepted rows emit nothing
 			return
 		}
 		if active {
-			g.env.Enqueue(sim.CmdAbandonMission{ID: r.ID})
+			g.env.Do(uikit.Abandon{Contract: r.ID})
 			return
 		}
-		g.env.Enqueue(sim.CmdAcceptMission{ID: r.ID})
+		g.env.Do(uikit.Accept{Contract: r.ID})
 	})
 	btn.GetWidget().Disabled = r.Disabled
 
@@ -438,7 +438,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 			case ebiten.MouseButtonRight:
 				g.env.OpenRowMenu(spec, uikit.ClickPoint(a))
 			case ebiten.MouseButtonLeft:
-				dbl.Click(g.env, spec)
+				dbl.Click(g.env, g.env, spec)
 			}
 		})
 	}
@@ -472,18 +472,14 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 // has no def of its own, so the row declares no Ref (its menu is the
 // single action entry, exactly as before).
 func (g *Game) contractRowSpec(r boardRowModel, active bool) uikit.RowSpec {
-	label, enqueue := "Accept", func() { g.env.Enqueue(sim.CmdAcceptMission{ID: r.ID}) }
+	label, intent := "Accept", uikit.Intent(uikit.Accept{Contract: r.ID})
 	if active {
-		label, enqueue = "Abandon", func() { g.env.Enqueue(sim.CmdAbandonMission{ID: r.ID}) }
+		label, intent = "Abandon", uikit.Abandon{Contract: r.ID}
 	}
 	return uikit.RowSpec{Actions: []uikit.RowAction{{
 		Label:    label,
 		Disabled: r.Disabled,
-		Do: func() {
-			if !r.Disabled {
-				enqueue()
-			}
-		},
+		Intent:   intent,
 	}}}
 }
 

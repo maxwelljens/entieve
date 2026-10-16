@@ -390,7 +390,7 @@ func TestBoardRewardUsesCanonicalCredits(t *testing.T) {
 func TestStationAcceptEmitsCommand(t *testing.T) {
 	g := dockedShowcaseGame(t, 1280, 720)
 	var got []sim.Command
-	g.env.Enqueue = func(c sim.Command) {
+	g.enqueue = func(c sim.Command) {
 		got = append(got, c)
 		g.s.Queue(c) // forward: the recorder observes, the sim executes
 	}
@@ -446,7 +446,7 @@ func TestStationAbandonEmitsCommand(t *testing.T) {
 	pump(t, g, 1280, 720)
 
 	var got []sim.Command
-	g.env.Enqueue = func(c sim.Command) { got = append(got, c) }
+	g.enqueue = func(c sim.Command) { got = append(got, c) }
 	row := findRow(t, g.stActRows, "contract-solace-cleanup-1")
 	click(t, g, row.btn)
 	if len(got) != 1 {

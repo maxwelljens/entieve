@@ -163,8 +163,8 @@ func (b *iconBox) Name() string { return b.name }
 // (icon == "" draws the bar text-only) beside the accent title. Returns the
 // bar for WindowOpts.TitleBar and the title text, which windows that retitle
 // keep a handle on.
-func NewTitleBar(env Env, label, icon string) (*widget.Container, *widget.Text) {
-	p := env.Pal
+func NewTitleBar(d Theme, label, icon string) (*widget.Container, *widget.Text) {
+	p := d.Pal()
 	title := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
@@ -183,7 +183,7 @@ func NewTitleBar(env Env, label, icon string) (*widget.Container, *widget.Text) 
 		titlePad = contentsPad + IconTitle + IconGap
 	}
 	txt := widget.NewText(
-		widget.TextOpts.Text(label, env.FaceBold(StepBase), solid(p.Accent)),
+		widget.TextOpts.Text(label, d.FaceBold(StepBase), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,

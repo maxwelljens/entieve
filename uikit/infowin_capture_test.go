@@ -36,7 +36,7 @@ func TestInfoWindowCaptureFrame(t *testing.T) {
 	}
 
 	k, _ := newTestKit(t)
-	env := k.panelEnv()
+	env := &testEnv{Session: k.Env(), Sim: k.Sim, Content: k.Content}
 	fm := useFakeMouse(t)
 
 	// A hull page with every block (the content stream authors the

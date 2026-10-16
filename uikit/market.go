@@ -38,7 +38,9 @@ func setStepperValue(bar *widget.Container, lbl *widget.Text, s string) {
 // and the fee schedule. Trade is only possible while the player is docked,
 // so both buttons are disabled in space.
 type Market struct {
-	env Env
+	th  Theme
+	cv  ContentView
+	as  ActionSink
 	win *widget.Window
 
 	tbl      *Table
@@ -84,9 +86,9 @@ func sortBookOrders(orders []sim.MarketStock) {
 
 // NewMarket builds the Market window over the shared environment. Mount
 // it on a Kit with Kit.AddWindow and call Sync every frame.
-func NewMarket(env Env) *Market {
-	m := &Market{env: env}
-	p := env.Pal
+func NewMarket(env Seams) *Market {
+	m := &Market{th: env, cv: env, as: env}
+	p := env.Pal()
 
 	cols := []Column{
 		{Key: "Item", Title: "Item", Priority: 0},
@@ -210,14 +212,14 @@ func (m *Market) Win() *widget.Window { return m.win }
 // book when it offers the market, else every station's book in the
 // current system (the undocked fallback view).
 func (m *Market) orders() []sim.MarketStock {
-	if st := m.env.Sim.DockedMarket(); st != "" {
-		return m.env.Sim.BookOrders(st)
+	if st := m.cv.DockedMarket(); st != "" {
+		return m.cv.BookOrders(st)
 	}
-	sys := m.env.Sim.System()
+	sys := m.cv.System()
 	if sys == nil {
 		return nil
 	}
-	return m.env.Sim.Market(sys.ID)
+	return m.cv.Market(sys.ID)
 }
 
 // priceOf quotes an item's displayed price for the shown view: the
@@ -226,9 +228,9 @@ func (m *Market) orders() []sim.MarketStock {
 // (best ask, then best bid, then the def base price) — the undocked
 // fallback view has no station ladder to read.
 func (m *Market) priceOf(item content.ItemID) float64 {
-	station := m.env.Sim.DockedMarket()
+	station := m.cv.DockedMarket()
 	if station != "" {
-		return m.env.Sim.MarketPrice(station, item)
+		return m.cv.MarketPrice(station, item)
 	}
 	ask, bid := -1.0, -1.0
 	for _, o := range m.orders() {
@@ -249,7 +251,7 @@ func (m *Market) priceOf(item content.ItemID) float64 {
 	if bid >= 0 {
 		return bid
 	}
-	return m.env.Sim.MarketPrice(station, item) // def base price
+	return m.cv.MarketPrice(station, item) // def base price
 }
 
 // Sync refreshes the rows, the wallet readout and the docked gating
@@ -269,17 +271,17 @@ func (m *Market) Sync() {
 		item := o.Item
 		rows = append(rows, TableRow{
 			Cells: []string{
-				itemLabel(m.env, o.Item),
+				itemLabel(m.cv, o.Item),
 				FormatCredits(o.Price),
 				FormatInt(int64(o.Qty)),
 				side,
 			},
 			Data: o.Item,
 			Spec: RowSpec{
-				Ref: m.env.rowRef(o.Item),
+				Ref: rowRef(m.cv, o.Item),
 				Actions: []RowAction{
-					{Label: "Buy", Disabled: gated, Do: func() { m.buyRow(item) }},
-					{Label: "Sell", Disabled: gated, Do: func() { m.sellRow(item) }},
+					{Label: "Buy", Disabled: gated, Intent: Buy{Item: item, Qty: m.qty()}},
+					{Label: "Sell", Disabled: gated, Intent: Sell{Item: item, Qty: m.qty()}},
 				},
 			},
 		})
@@ -299,13 +301,13 @@ func (m *Market) Sync() {
 	}
 
 	setStepperValue(m.qtyBar, m.qtyLabel, "Qty "+FormatInt(int64(m.qty())))
-	sys := m.env.Sim.System()
+	sys := m.cv.System()
 	if sys != nil {
-		label := "Market — " + FormatCredits(m.env.Sim.Wallet())
+		label := "Market — " + FormatCredits(m.cv.Wallet())
 		if m.hasSel {
 			// Selected: the book's price voice for this item (last trade,
 			// best ask, best bid, then base) and the fee schedule.
-			label = "Market — " + itemLabel(m.env, m.sel) + " " + FormatCredits(m.priceOf(m.sel)) +
+			label = "Market — " + itemLabel(m.cv, m.sel) + " " + FormatCredits(m.priceOf(m.sel)) +
 				" · fee " + feePct(sim.MarketBrokerFee) + "+" + feePct(sim.MarketSalesTax)
 		}
 		m.title.Label = label
@@ -332,54 +334,38 @@ func (m *Market) qty() int { return qtySteps[m.qtyIdx] }
 
 // docked reports whether the player is docked (the trade precondition).
 func (m *Market) docked() bool {
-	return m.env.Sim.Docked.Has(m.env.Sim.Player())
+	return m.cv.PlayerDocked()
 }
 
-// buyClicked enqueues CmdBuy for the selected order and quantity (the
-// toolbar's own button acts on the left-click selection).
+// buyClicked emits Buy for the selected order and quantity (the
+// toolbar's own button acts on the left-click selection). The row menu's
+// trade verbs ride each row's RowSpec intents — same gate, same payload,
+// on the row they were opened on.
 func (m *Market) buyClicked() {
 	if !m.docked() || !m.hasSel {
 		return
 	}
-	m.env.Enqueue(sim.CmdBuy{Item: m.sel, Qty: m.qty()})
+	m.as.Do(Buy{Item: m.sel, Qty: m.qty()})
 }
 
-// sellClicked enqueues CmdSell for the selected order and quantity.
+// sellClicked emits Sell for the selected order and quantity.
 func (m *Market) sellClicked() {
 	if !m.docked() || !m.hasSel {
 		return
 	}
-	m.env.Enqueue(sim.CmdSell{Item: m.sel, Qty: m.qty()})
-}
-
-// buyRow/sellRow are the row menu's trade actions: they act on the row
-// the menu was opened on (its item, captured in the row's RowSpec) with
-// the toolbar's own docked gate, so a right-clicked row trades itself
-// without ever becoming the window's selection.
-func (m *Market) buyRow(item content.ItemID) {
-	if !m.docked() {
-		return
-	}
-	m.env.Enqueue(sim.CmdBuy{Item: item, Qty: m.qty()})
-}
-
-func (m *Market) sellRow(item content.ItemID) {
-	if !m.docked() {
-		return
-	}
-	m.env.Enqueue(sim.CmdSell{Item: item, Qty: m.qty()})
+	m.as.Do(Sell{Item: m.sel, Qty: m.qty()})
 }
 
 // itemLabel resolves a market/hangar ID to a display name (items, ships
 // and modules are all addressable as IDs; mirrors ui.UI.itemName).
-func itemLabel(env Env, id content.ItemID) string {
-	if def, ok := env.Content.Item(id); ok {
+func itemLabel(cv ContentView, id content.ItemID) string {
+	if def, ok := cv.Defs().Item(id); ok {
 		return def.Name
 	}
-	if def, ok := env.Content.Ship(content.ShipID(id)); ok {
+	if def, ok := cv.Defs().Ship(content.ShipID(id)); ok {
 		return def.Name
 	}
-	if def, ok := env.Content.Module(content.ModuleID(id)); ok {
+	if def, ok := cv.Defs().Module(content.ModuleID(id)); ok {
 		return def.Name
 	}
 	return string(id)

@@ -63,7 +63,9 @@ var (
 // and Cycle charge, which walks the old direct right-click's CmdSetAmmo
 // step (Auto → the weapon's ammo-class charges sitting in cargo → Auto).
 type Rack struct {
-	env       Env
+	th        Theme
+	cv        ContentView
+	as        ActionSink
 	container *widget.Container
 	cells     [rackRows][rackMaxCells]*rackCell
 	ammoPref  map[sim.SlotRef]content.ItemID
@@ -99,13 +101,13 @@ type rackCell struct {
 	active bool             // runtime Active at the last Sync
 }
 
-// NewRack builds the module rack over the given environment. Its container
+// NewRack builds the module rack over the given seams. Its container
 // anchors bottom-right in an anchor-layout root; Sync refreshes every cell
 // from the player's fitting.
-func NewRack(env Env) *Rack {
-	p := env.Pal
+func NewRack(env Seams) *Rack {
+	p := env.Pal()
 	faceTiny := env.Face(StepTiny)
-	r := &Rack{env: env, ammoPref: map[sim.SlotRef]content.ItemID{}}
+	r := &Rack{th: env, cv: env, as: env, ammoPref: map[sim.SlotRef]content.ItemID{}}
 	r.measure = func(s string) float64 {
 		w, _ := text.Measure(s, *faceTiny, 0)
 		return w
@@ -179,7 +181,7 @@ func NewRack(env Env) *Rack {
 // it, so the label keeps the full cell width — an icon beside it would
 // push the row past the HUD at the 1024×700 minimum.
 func (r *Rack) newCell(row, idx int) *rackCell {
-	p := r.env.Pal
+	p := r.th.Pal()
 	cell := &rackCell{slot: sim.SlotRef{Class: rackClasses[row], Index: idx}}
 
 	// The tile carries the glyph only: ebitenui lays a graphic button out
@@ -200,12 +202,12 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 			widget.WidgetOpts.MouseButtonClickedHandler(func(a *widget.WidgetMouseButtonClickedEventArgs) {
 				switch a.Button {
 				case ebiten.MouseButtonLeft:
-					if r.dbl.Click(r.env, cell.spec) {
+					if r.dbl.Click(r.cv, r.as, cell.spec) {
 						return // double-click: Show Info opened, the click does not toggle
 					}
 					r.toggleModule(cell)
 				case ebiten.MouseButtonRight:
-					r.env.OpenRowMenu(cell.spec, ClickPoint(a))
+					openRowMenu(r.cv, r.menuSink(), cell.spec, ClickPoint(a))
 				}
 			}),
 		),
@@ -213,19 +215,19 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 	// The name line under the tile: the same click seam as the tile, so
 	// the whole cell stays clickable.
 	cell.name = widget.NewText(
-		widget.TextOpts.Text("", r.env.Face(StepTiny), solid(p.Dim)),
+		widget.TextOpts.Text("", r.th.Face(StepTiny), solid(p.Dim)),
 		widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionCenter),
 		widget.TextOpts.WidgetOpts(
 			widget.WidgetOpts.MinSize(0, Px(rackNameH)),
 			widget.WidgetOpts.MouseButtonClickedHandler(func(a *widget.WidgetMouseButtonClickedEventArgs) {
 				switch a.Button {
 				case ebiten.MouseButtonLeft:
-					if r.dbl.Click(r.env, cell.spec) {
+					if r.dbl.Click(r.cv, r.as, cell.spec) {
 						return // double-click: Show Info opened, the click does not toggle
 					}
 					r.toggleModule(cell)
 				case ebiten.MouseButtonRight:
-					r.env.OpenRowMenu(cell.spec, ClickPoint(a))
+					openRowMenu(r.cv, r.menuSink(), cell.spec, ClickPoint(a))
 				}
 			}),
 		),
@@ -278,19 +280,19 @@ func (r *Rack) SetTargetPicker(fn func() ecs.Entity) { r.pick = fn }
 // Sync refreshes every cell — module, active state, cycle progress and
 // tooltip — from the player's fitting. Call it once per frame before Update.
 func (r *Rack) Sync() {
-	s := r.env.Sim
+	s := r.cv
 	if s == nil {
 		return
 	}
 	player := s.Player()
-	fit, hasFit := s.Fittings.Get(player)
+	fit, hasFit := s.Fitting(player)
 	now := s.Time()
 
 	// Slot counts: the hull's slots (empty cells still show), capped at the
 	// cells the rack was built with — mirrors ui's ModuleMaxCells clamp.
 	var slots content.Slots
-	if sh, ok := s.Ships.Get(player); ok {
-		if def, ok := r.env.Content.Ship(sh.Hull); ok {
+	if sh, ok := s.ShipState(player); ok {
+		if def, ok := r.cv.Defs().Ship(sh.Hull); ok {
 			slots = def.Slots
 		}
 	}
@@ -329,7 +331,7 @@ func (r *Rack) Sync() {
 func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRuntime, now float64) {
 	var def *content.ModuleDef
 	if id != "" {
-		def, _ = r.env.Content.Module(id)
+		def, _ = r.cv.Defs().Module(id)
 	}
 	active := rt != nil && rt.Active
 	progress := 0.0
@@ -354,21 +356,21 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 	if cell.icon != icon {
 		cell.icon = icon
 		cell.btn.SetGraphicImage(&widget.GraphicImage{
-			Idle:     rackGlyph(icon, r.env.Pal.Text),
-			Disabled: rackGlyph(icon, iconColor(r.env.Pal.Dim, IconDisabledA)),
+			Idle:     rackGlyph(icon, r.th.Pal().Text),
+			Disabled: rackGlyph(icon, iconColor(r.th.Pal().Dim, IconDisabledA)),
 		})
 	}
 	cell.name.Label = r.shortName(def)
-	nameCol := r.env.Pal.Dim
+	nameCol := r.th.Pal().Dim
 	if active {
-		nameCol = r.env.Pal.Text
+		nameCol = r.th.Pal().Text
 	}
 	cell.name.SetColor(nameCol)
 	// Declared interactions: the menu and double-click read cell.spec at
 	// fire time, the tooltip attaches from the same data (rebuilding only
 	// when its change key moves).
 	cell.spec = r.cellSpec(cell, def)
-	cell.tip.set(r.env, cell.btn.GetWidget(), cell.spec.Tip.Key, cell.spec.Tip.Build)
+	cell.tip.set(r.th, cell.btn.GetWidget(), cell.spec.Tip.Key, cell.spec.Tip.Build)
 	cell.btn.GetWidget().Disabled = !active
 	cell.bar.SetCurrent(int(progress * rackCycleMax))
 }
@@ -415,16 +417,31 @@ func (r *Rack) cellSpec(cell *rackCell, def *content.ModuleDef) RowSpec {
 		spec.SecRef = &secondary
 	}
 	if def.Weapon != nil && def.Weapon.AmmoClass != "" {
-		cycleable := len(r.ammoCandidates(def.Weapon.AmmoClass)) > 1 && r.env.Enqueue != nil
+		next, advances := cycleNext(r.ammoCandidates(def.Weapon.AmmoClass), r.ammoPref[cell.slot])
+		cycleable := advances && r.as != nil
 		spec.Actions = []RowAction{{
 			Label:    "Cycle charge",
 			Disabled: !cycleable,
-			Do:       func() { r.cycleAmmo(cell) },
+			Intent:   CycleCharge{Slot: cell.slot, Item: next},
 		}}
 	}
 	key, build := r.cellTip(def, cell.slot)
 	spec.Tip = TipData{Key: key, Build: build}
 	return spec
+}
+
+// menuSink is the sink the row menu dispatches through: a Cycle charge
+// intent also advances the rack's own preferred-charge mirror on its way
+// out. The mirror is presentation state the sim keeps private (its pref
+// is unexported), and both the cell's SecRef and the cycle order read it
+// — so the rack updates it exactly when its own menu fires the intent.
+func (r *Rack) menuSink() ActionSink {
+	return sinkFunc(func(i Intent) {
+		if cc, ok := i.(CycleCharge); ok {
+			r.ammoPref[cc.Slot] = cc.Item
+		}
+		r.as.Do(i)
+	})
 }
 
 // cellTip builds one fitted cell's tooltip: the shared module model plus
@@ -449,18 +466,18 @@ func (r *Rack) cellTip(def *content.ModuleDef, slot sim.SlotRef) (string, func()
 	}
 	key := string(def.ID) + "|" + charge + "|" + strconv.Itoa(qty)
 	return key, func() TooltipModel {
-		return r.env.moduleTip(def, slotLabel(slot), charge, qty, hints...)
+		return moduleTip(def, slotLabel(slot), charge, qty, hints...)
 	}
 }
 
 // cargoQty counts the player's cargo stacks of one item (0 when the sim or
 // the cargo is gone).
 func (r *Rack) cargoQty(id content.ItemID) int {
-	s := r.env.Sim
+	s := r.cv
 	if s == nil || id == "" {
 		return 0
 	}
-	cg, ok := s.Cargos.Get(s.Player())
+	cg, ok := s.Cargo(s.Player())
 	if !ok {
 		return 0
 	}
@@ -478,7 +495,7 @@ func (r *Rack) ammoName(id content.ItemID) string {
 	if id == "" {
 		return "Auto"
 	}
-	if def, ok := r.env.Content.Item(id); ok {
+	if def, ok := r.cv.Defs().Item(id); ok {
 		return def.Name
 	}
 	return string(id)
@@ -489,8 +506,8 @@ func (r *Rack) ammoName(id content.ItemID) string {
 // id for determinism.
 func (r *Rack) ammoCandidates(class string) []content.ItemID {
 	var stacks []content.CargoStack
-	if s := r.env.Sim; s != nil {
-		if cg, ok := s.Cargos.Get(s.Player()); ok {
+	if s := r.cv; s != nil {
+		if cg, ok := s.Cargo(s.Player()); ok {
 			stacks = cg.Stacks
 		}
 	}
@@ -500,7 +517,7 @@ func (r *Rack) ammoCandidates(class string) []content.ItemID {
 		if st.Qty <= 0 || seen[st.Item] {
 			continue
 		}
-		def, ok := r.env.Content.Item(st.Item)
+		def, ok := r.cv.Defs().Item(st.Item)
 		if !ok || def.AmmoClass != class {
 			continue
 		}
@@ -513,20 +530,20 @@ func (r *Rack) ammoCandidates(class string) []content.ItemID {
 	return append(out, ids...)
 }
 
-// toggleModule enqueues the activation toggle for one cell: CmdDeactivate
-// while the module runs, CmdActivate otherwise. Empty slots are inert; the
+// toggleModule emits the activation toggle for one cell: Deactivate
+// while the module runs, Activate otherwise. Empty slots are inert; the
 // sim validates everything else (capacitor, locks, ranges) and logs its
 // own refusals — the rack never mutates sim state.
 func (r *Rack) toggleModule(cell *rackCell) {
-	if cell.module == "" || r.env.Enqueue == nil {
+	if cell.module == "" || r.as == nil {
 		return
 	}
 	if cell.active {
-		r.env.Enqueue(sim.CmdDeactivate{Slot: cell.slot})
+		r.as.Do(Deactivate{Slot: cell.slot})
 		return
 	}
-	def, _ := r.env.Content.Module(cell.module)
-	r.env.Enqueue(sim.CmdActivate{Slot: cell.slot, Target: r.clickTarget(def)})
+	def, _ := r.cv.Defs().Module(cell.module)
+	r.as.Do(Activate{Slot: cell.slot, Target: r.clickTarget(def)})
 }
 
 // clickTarget resolves the activation target for a click the way EVE's
@@ -536,11 +553,11 @@ func (r *Rack) toggleModule(cell *rackCell) {
 // ewar — and the zero entity (self) for everything else. Without a
 // suitable lock the sim refuses with a logged warning.
 func (r *Rack) clickTarget(def *content.ModuleDef) ecs.Entity {
-	s := r.env.Sim
+	s := r.cv
 	if s == nil || def == nil {
 		return ecs.Entity(0)
 	}
-	tg, ok := s.Targetings.Get(s.Player())
+	tg, ok := s.Targeting(s.Player())
 	if !ok {
 		return ecs.Entity(0)
 	}
@@ -559,11 +576,11 @@ func (r *Rack) clickTarget(def *content.ModuleDef) ecs.Entity {
 		}
 		switch {
 		case def.Weapon != nil:
-			if s.Ships.Has(l.Target) {
+			if _, ok := s.ShipState(l.Target); ok {
 				return l.Target
 			}
 		case def.Mining != nil:
-			if s.Asteroids.Has(l.Target) {
+			if _, ok := s.Asteroid(l.Target); ok {
 				return l.Target
 			}
 		case def.Kind == content.KindStasisWeb || def.Kind == content.KindWarpScram:
@@ -577,12 +594,14 @@ func (r *Rack) clickTarget(def *content.ModuleDef) ecs.Entity {
 
 // targetSuits reports whether entity e is a valid target class for def
 // (weapon→ship, mining→asteroid, ewar→anything, else self).
-func targetSuits(s *sim.Sim, def *content.ModuleDef, e ecs.Entity) bool {
+func targetSuits(s ContentView, def *content.ModuleDef, e ecs.Entity) bool {
 	switch {
 	case def.Weapon != nil:
-		return s.Ships.Has(e)
+		_, ok := s.ShipState(e)
+		return ok
 	case def.Mining != nil:
-		return s.Asteroids.Has(e)
+		_, ok := s.Asteroid(e)
+		return ok
 	case def.Kind == content.KindStasisWeb || def.Kind == content.KindWarpScram:
 		return true
 	default:
@@ -590,33 +609,22 @@ func targetSuits(s *sim.Sim, def *content.ModuleDef, e ecs.Entity) bool {
 	}
 }
 
-// cycleAmmo advances a weapon cell's charge preference one step and enqueues
-// CmdSetAmmo. Non-weapons, weapons without an ammo class and weapons with no
-// matching cargo charge are left alone.
-func (r *Rack) cycleAmmo(cell *rackCell) {
-	if cell.module == "" || r.env.Enqueue == nil {
-		return
+// cycleNext is the next charge a "Cycle charge" press loads: the entry
+// after pref in cands (wrapping), or the first entry when pref is not a
+// candidate at all. ok is false when there is nothing to cycle to (a
+// single candidate). The rack mirrors the result on dispatch (see
+// NewRack) and the intent carries it, so the menu's press and the
+// declared payload cannot disagree.
+func cycleNext(cands []content.ItemID, pref content.ItemID) (content.ItemID, bool) {
+	if len(cands) < 2 {
+		return "", false
 	}
-	def, ok := r.env.Content.Module(cell.module)
-	if !ok || def.Weapon == nil || def.Weapon.AmmoClass == "" {
-		return
-	}
-	cands := r.ammoCandidates(def.Weapon.AmmoClass)
-	if len(cands) < 2 { // only Auto: nothing to cycle to
-		return
-	}
-	next := cands[0]
 	for i, id := range cands {
-		if id == r.ammoPref[cell.slot] {
-			next = cands[(i+1)%len(cands)]
-			break
+		if id == pref {
+			return cands[(i+1)%len(cands)], true
 		}
 	}
-	if next == r.ammoPref[cell.slot] {
-		return
-	}
-	r.ammoPref[cell.slot] = next
-	r.env.Enqueue(sim.CmdSetAmmo{Slot: cell.slot, Item: next})
+	return cands[0], true
 }
 
 // pctLabel renders a fraction as a rounded percentage ("45%").

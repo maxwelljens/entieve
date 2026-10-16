@@ -18,8 +18,8 @@ import (
 //	├─ Ref/SecRef  → right-click: "Show Info" (bold, first), then the
 //	│                secondary ref "Show Info — <name>"; grayed when the
 //	│                def is not loaded. Double-click opens Ref, strictly.
-//	├─ Actions     → right-click: MenuSep then the row's verbs, grayed
-//	│                when disabled (never hidden).
+//	├─ Actions     → right-click: MenuSep then the row's verbs as typed
+//	│                intents, grayed when disabled (never hidden).
 //	└─ Tip         → hover: the lazy tooltip (rowTip — built on first
 //	                   attach, rebuilt only when its change key moves).
 //
@@ -33,12 +33,12 @@ import (
 
 // RowAction is one verb a row offers in its context menu: the label as
 // it reads, the gate as it stood when the spec was declared, and the
-// payload. Landing 4 retypes Do into a typed intent through ActionSink,
-// so these field names and the installer API are the stable surface.
+// payload — a typed intent the row's ActionSink executes. These field
+// names and the installer API are the stable surface of the seam.
 type RowAction struct {
 	Label    string
 	Disabled bool
-	Do       func()
+	Intent   Intent
 }
 
 // TipData is a row's tooltip payload: the change key plus the lazy model
@@ -53,7 +53,7 @@ type TipData struct {
 
 // RowSpec is one Row's declared interaction data (CONTEXT.md): what the
 // row IS (Ref, optionally SecRef — drives Show Info), what it OFFERS
-// (Actions — its verbs, as data) and how it describes itself on hover
+// (Actions — its verbs, as intents) and how it describes itself on hover
 // (Tip). The zero spec wires nothing: no menu, no tooltip, no
 // double-click — an anonymous row (scanner contact, note row, the
 // resists strip) simply carries none.
@@ -73,8 +73,8 @@ type RowSpec struct {
 // rowRef resolves a row payload to the spec's Ref. The ref is declared
 // whether or not it resolves: an unresolvable one earns a grayed Show
 // Info entry instead of vanishing.
-func (e Env) rowRef(data any) *InfoRef {
-	ref, _ := e.InfoRefOf(data)
+func rowRef(cv ContentView, data any) *InfoRef {
+	ref, _ := cv.InfoRefOf(data)
 	return &ref
 }
 
@@ -88,20 +88,28 @@ func ptrRef(r InfoRef) *InfoRef { return &r }
 //	[Show Info — <name>]  the secondary ref, when SecRef is set
 //	[───────────]         MenuSep, only between a non-empty info group
 //	                      and a non-empty action group
-//	[action ...]          the Actions, grayed when disabled
+//	[action ...]          the Actions, grayed when disabled — each one
+//	                      emitting its intent through the sink
 //
 // An empty spec yields no entries at all (an empty rack slot, a note
 // row: no popup, not an empty one).
-func (e Env) rowMenuEntries(spec RowSpec) []MenuEntry {
+func rowMenuEntries(cv ContentView, as ActionSink, spec RowSpec) []MenuEntry {
 	var info, verbs []MenuEntry
 	if spec.Ref != nil {
-		info = append(info, e.showInfoEntry(*spec.Ref, true))
+		info = append(info, showInfoEntry(cv, as, *spec.Ref, true))
 	}
 	if spec.SecRef != nil {
-		info = append(info, e.showInfoEntry(*spec.SecRef, false))
+		info = append(info, showInfoEntry(cv, as, *spec.SecRef, false))
 	}
 	for _, a := range spec.Actions {
-		verbs = append(verbs, MenuEntry{Label: a.Label, Disabled: a.Disabled, Action: a.Do})
+		action := a
+		verbs = append(verbs, MenuEntry{Label: action.Label, Disabled: action.Disabled, Action: func() {
+			// Grayed rows emit nothing — belt and braces with the menu's
+			// own disabled gate (a harness may press the closure directly).
+			if !action.Disabled && action.Intent != nil {
+				as.Do(action.Intent)
+			}
+		}})
 	}
 	entries := info
 	if len(info) > 0 && len(verbs) > 0 {
@@ -112,30 +120,31 @@ func (e Env) rowMenuEntries(spec RowSpec) []MenuEntry {
 
 // showInfoEntry is one Show Info menu entry for ref: bold when it leads
 // the menu, labelled "Show Info — <name>" as a secondary ref, grayed
-// (never hidden) when the def is not loaded.
-func (e Env) showInfoEntry(ref InfoRef, primary bool) MenuEntry {
+// (never hidden) when the def is not loaded. Pressing it emits
+// ShowInfo{Ref} through the sink.
+func showInfoEntry(cv ContentView, as ActionSink, ref InfoRef, primary bool) MenuEntry {
 	label := "Show Info"
 	if !primary {
-		label += " — " + e.chainName(content.ItemID(ref.ID))
+		label += " — " + chainName(cv, content.ItemID(ref.ID))
 	}
-	ok := e.infoRefExists(ref)
+	ok := infoRefExists(cv, ref)
 	return MenuEntry{Label: label, Bold: primary, Disabled: !ok, Action: func() {
 		if ok {
-			e.ShowInfo(ref)
+			as.Do(ShowInfo{Ref: ref})
 		}
 	}}
 }
 
-// OpenRowMenu is the installer's right-click half: it derives the
-// spec's menu and opens it at at (the click position). A spec with
-// nothing to offer opens no menu at all — the world-input gate the menu
-// exposes (MenuRect) never sees an empty popup.
-func (e Env) OpenRowMenu(spec RowSpec, at image.Point) {
-	entries := e.rowMenuEntries(spec)
+// openRowMenu is the installer's right-click half: it derives the spec's
+// menu and mounts it through the sink (OpenMenu) at at — the click
+// position. A spec with nothing to offer opens no menu at all — the
+// world-input gate the menu exposes (MenuRect) never sees an empty popup.
+func openRowMenu(cv ContentView, as ActionSink, spec RowSpec, at image.Point) {
+	entries := rowMenuEntries(cv, as, spec)
 	if len(entries) == 0 {
 		return
 	}
-	e.OpenMenu(entries, at)
+	as.Do(OpenMenu{Entries: entries, At: at})
 }
 
 // RowDouble is one row's (or one surface's) double-click bookkeeping —
@@ -155,16 +164,16 @@ type RowDouble struct {
 
 // Click runs one left click through the double-click rule (see
 // RowDouble): true = the gesture completed and Show Info opened.
-func (d *RowDouble) Click(env Env, spec RowSpec) bool {
+func (d *RowDouble) Click(cv ContentView, as ActionSink, spec RowSpec) bool {
 	now := time.Now()
 	ref, fire := InfoRef{}, false
-	if spec.Ref != nil && env.infoRefExists(*spec.Ref) {
+	if spec.Ref != nil && infoRefExists(cv, *spec.Ref) {
 		ref = *spec.Ref
 		fire = d.armed && d.ref == ref && now.Sub(d.at) < doubleClickWindow
 	}
 	d.ref, d.at, d.armed = ref, now, true
 	if fire {
-		env.ShowInfo(ref)
+		as.Do(ShowInfo{Ref: ref})
 		d.armed = false // the gesture is spent
 	}
 	return fire

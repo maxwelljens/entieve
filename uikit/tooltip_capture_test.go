@@ -55,7 +55,7 @@ func TestTooltipCaptureFrame(t *testing.T) {
 	// right/below the cell, the panel trailing left, clamped into the
 	// window (the same rule tipView draws itself by).
 	cell := r.cells[0][0].btn.GetWidget().Rect
-	size := env.tipSize(model)
+	size := tipSize(env, model)
 	raw := image.Rect(cell.Min.X+12-size.X, cell.Min.Y+12, cell.Min.X+12, cell.Min.Y+12+size.Y)
 	at := clampTipRect(raw, image.Rect(0, 0, 1280, 720)).Min
 	body.GetWidget().LayoutData = widget.AnchorLayoutData{

@@ -29,7 +29,7 @@ type KeyRow struct {
 // HelpPanel is the key-map window: the rows render as a two-column table
 // above a short "Sensors and visibility" blurb.
 type HelpPanel struct {
-	env   Env
+	th    Theme
 	win   *widget.Window
 	blurb *widget.Text
 }
@@ -37,10 +37,10 @@ type HelpPanel struct {
 // NewHelp builds the help window over the given environment and key map.
 // The window sizes itself to the rows; Sync is a no-op (the content is
 // static for the panel's lifetime).
-func NewHelp(env Env, rows []KeyRow) *HelpPanel {
-	p := env.Pal
-	h := &HelpPanel{env: env}
-	faceTiny := env.Face(StepTiny)
+func NewHelp(d Theme, rows []KeyRow) *HelpPanel {
+	p := d.Pal()
+	h := &HelpPanel{th: d}
+	faceTiny := d.Face(StepTiny)
 
 	newRow := func(k KeyRow) *widget.Container {
 		key := widget.NewText(
@@ -86,7 +86,7 @@ func NewHelp(env Env, rows []KeyRow) *HelpPanel {
 	)
 	columns.AddChild(left, right)
 
-	heading := widget.NewText(widget.TextOpts.Text("Sensors and visibility", env.Face(StepSmall), solid(p.Accent)))
+	heading := widget.NewText(widget.TextOpts.Text("Sensors and visibility", h.th.Face(StepSmall), solid(p.Accent)))
 	blurb := widget.NewText(
 		widget.TextOpts.Text(
 			"Entieve has no omniscience: the client only shows what your ship could perceive. "+
@@ -112,7 +112,7 @@ func NewHelp(env Env, rows []KeyRow) *HelpPanel {
 	}
 	body.AddChild(heading, blurb)
 
-	titleBar, _ := NewTitleBar(env, "Help — Entieve key map", "svc_help")
+	titleBar, _ := NewTitleBar(d, "Help — Entieve key map", "svc_help")
 
 	// Size the window to the content so a short key map never leaves the
 	// blurb floating in dead space (bw/bh arrive already scaled; the

@@ -18,7 +18,7 @@ import (
 
 const factoryStation = content.CelID("cel-haven-rest")
 
-func factoryEnv(t *testing.T) (Env, *[]sim.Command) {
+func factoryEnv(t *testing.T) (*testEnv, *[]sim.Command) {
 	t.Helper()
 	c, err := content.Load(content.FS())
 	if err != nil {
@@ -43,7 +43,8 @@ func factoryEnv(t *testing.T) (Env, *[]sim.Command) {
 		t.Fatalf("sim.New: %v", err)
 	}
 	var cmds []sim.Command
-	return NewEnv(c, s, func(cmd sim.Command) { cmds = append(cmds, cmd) }), &cmds
+	sess := NewEnv(c, s, func(cmd sim.Command) { cmds = append(cmds, cmd) })
+	return &testEnv{Session: sess, Sim: s, Content: c}, &cmds
 }
 
 // giveItem stacks qty units of an item into the player's general cargo.
@@ -69,7 +70,7 @@ func recipeRowFor(f *Factory, product content.ItemID) int {
 		if !ok {
 			continue
 		}
-		if rec, ok := f.env.Content.Recipes[row.recipe]; ok && rec.Product == product {
+		if rec, ok := f.cv.Defs().Recipes[row.recipe]; ok && rec.Product == product {
 			return i
 		}
 	}
@@ -300,7 +301,7 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 	env, _ := newChromeEnv(t)
 
 	// Product page (charge): MANUFACTURED FROM with label-side links.
-	page, ok := env.infoPageFor(ItemRef("charge-emp"))
+	page, ok := infoPageFor(env, ItemRef("charge-emp"))
 	if !ok {
 		t.Fatal("charge page did not resolve")
 	}
@@ -326,7 +327,7 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 	}
 
 	// Input page (mineral): USED IN links every consuming product.
-	page, ok = env.infoPageFor(ItemRef("min-ferrite"))
+	page, ok = infoPageFor(env, ItemRef("min-ferrite"))
 	if !ok {
 		t.Fatal("mineral page did not resolve")
 	}
@@ -351,7 +352,7 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 	}
 
 	// Hull page: family + base time above the input links.
-	page, ok = env.infoPageFor(ShipRef("ship-barge"))
+	page, ok = infoPageFor(env, ShipRef("ship-barge"))
 	if !ok {
 		t.Fatal("hull page did not resolve")
 	}
@@ -369,7 +370,7 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 	}
 
 	// Module page: manufactured from its minerals.
-	page, ok = env.infoPageFor(ModuleRef("mod-emp-turret"))
+	page, ok = infoPageFor(env, ModuleRef("mod-emp-turret"))
 	if !ok {
 		t.Fatal("module page did not resolve")
 	}
@@ -378,7 +379,7 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 	}
 
 	// No recipe touches it → neither section renders (never "N/A").
-	page, ok = env.infoPageFor(ItemRef("loot-alloy-scrap"))
+	page, ok = infoPageFor(env, ItemRef("loot-alloy-scrap"))
 	if !ok {
 		t.Fatal("loot page did not resolve")
 	}
@@ -399,7 +400,7 @@ func rowIn(t *testing.T, s *infoSection, label string) infoRow {
 
 // fixtureRecipe registers a recipe in the session's content (the shipped
 // stream stays read-only; tests patch their own copy).
-func fixtureRecipe(t *testing.T, env Env, id content.RecipeID, def *content.RecipeDef) {
+func fixtureRecipe(t *testing.T, env *testEnv, id content.RecipeID, def *content.RecipeDef) {
 	t.Helper()
 	def.ID = id
 	if env.Content.Recipes == nil {
@@ -426,7 +427,7 @@ func TestInfoPageChainFixture(t *testing.T) {
 		Time:   12, Family: content.FamilyCharges,
 	})
 
-	page, ok := env.infoPageFor(ItemRef(gadget.ID))
+	page, ok := infoPageFor(env, ItemRef(gadget.ID))
 	if !ok {
 		t.Fatal("gadget page did not resolve")
 	}
@@ -438,7 +439,7 @@ func TestInfoPageChainFixture(t *testing.T) {
 		t.Errorf("input ref = %v, want the part", r.Ref)
 	}
 
-	page, ok = env.infoPageFor(ItemRef(part.ID))
+	page, ok = infoPageFor(env, ItemRef(part.ID))
 	if !ok {
 		t.Fatal("part page did not resolve")
 	}

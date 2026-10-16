@@ -4,8 +4,11 @@
 // The kit composes widgets from github.com/ebitenui/ebitenui (pinned
 // v0.7.3) in the canonical EVE-dark look: see theme.go, pinned to golden
 // values by TestPaletteGoldenValues. It follows the engine's
-// controllability seam: it never mutates sim state — every player action
-// becomes a sim.Command handed to the enqueue callback.
+// controllability seam: it never mutates sim state. Every screen takes
+// exactly the seams it uses — Theme, ContentView, ActionSink (seams.go) —
+// and expresses every action as a typed intent (intents.go); the host
+// installs the executor (Kit.SetSink), whose commands ride the enqueue
+// callback.
 //
 // Integration: call Sync every frame before Update, then Draw after the
 // world render. World clicks feed selection back through Kit.Select; always
@@ -15,6 +18,7 @@ package uikit
 
 import (
 	"errors"
+	"image"
 
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/widget"
@@ -25,17 +29,28 @@ import (
 )
 
 // Kit is the ebitenui-based interface layer. It never mutates sim state:
-// every player action becomes a sim.Command through enqueue.
+// every screen action becomes a typed intent on the ActionSink, which
+// maps onto a sim.Command through enqueue.
 type Kit struct {
-	// Content and Sim are the read surfaces the kit renders from.
+	// Content and Sim are the kit's construction inputs: hosts and tests
+	// fixture-write through them. The panels this kit builds read through
+	// the seams below (th, cv) and emit through the sink — no screen
+	// touches the simulation itself.
 	Content *content.Content
 	Sim     *sim.Sim
 
-	ui      *ebitenui.UI
-	theme   *widget.Theme
-	palette Palette
-	scale   TypeScale
-	faces   kitFaces
+	ui *ebitenui.UI
+
+	// The three seams every panel is built from and emits through: th is
+	// the session's one Theme, cv its read-only view, sink the executor
+	// the host installed (SetSink) — reached through Kit.seams' stable
+	// forwarder, so a panel built before SetSink still lands on it.
+	th   Theme
+	cv   ContentView
+	sink ActionSink
+	exec *exec // uikit's built-in executor (RunIntent)
+	sess Session
+
 	enqueue func(sim.Command)
 
 	selected ecs.Entity
@@ -77,27 +92,37 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	if enqueue == nil {
 		return nil, errors.New("uikit: nil enqueue callback")
 	}
+	// Scaled once here: every face, line height and metric derived from
+	// the Theme follows the current UI scale (rebuild the kit to change
+	// it — see game.applyUIScale).
 	k := &Kit{
 		Content: c,
 		Sim:     s,
 		enqueue: enqueue,
-		palette: DefaultPalette(),
-		// Scaled once here: every face, line height and metric derived
-		// from k.scale follows the current UI scale (rebuild the kit to
-		// change it — see game.applyUIScale).
-		scale: scaleTypeScale(DefaultTypeScale()),
+		th:      newTheme(DefaultPalette(), scaleTypeScale(DefaultTypeScale())),
 	}
-	k.faces = newFaces(k.scale)
-	k.theme = NewTheme(k.palette, k.scale)
+	k.cv = newView(c, s)
+	// The built-in executor: session intents on the kit's own services,
+	// command intents on enqueue at the selectors' current ranges.
+	k.exec = &exec{
+		show:   k.ShowInfo,
+		open:   func(entries []MenuEntry, at image.Point) { k.svc.menu.Open(entries, at) },
+		queue:  enqueue,
+		ranges: func() (float64, float64) { return k.WarpRange(), k.OrbitRange() },
+	}
+	k.sink = sinkFunc(k.RunIntent)
 
 	// Per-kit chrome registry: a kit built by a save/load rebuild must
 	// not disturb any kit still pumping (they own disjoint windows).
 	k.chromes = map[*widget.Window]*winChrome{}
 
-	// Shared interaction services first: panelEnv hands them to every
+	// Shared interaction services first: Kit.Env hands them to every
 	// panel (menu + Show Info), and the kit takes over the window's
 	// lifecycle (mount/raise on Show, unmount on Close).
-	k.svc = newServices(k.panelEnv())
+	k.svc = &services{}
+	k.sess = &session{Seams: k.seams(), svc: k.svc}
+	k.svc.menu = NewMenu(k.sess)
+	k.svc.info = NewInfoWin(k.sess)
 	k.svc.show = k.ShowInfo
 	k.svc.info.onClose = k.CloseInfo
 
@@ -105,7 +130,7 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	// float above it. The theme rides the widget parent chain.
 	root := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
 	k.root = root
-	k.ui = &ebitenui.UI{Container: root, PrimaryTheme: k.theme}
+	k.ui = &ebitenui.UI{Container: root, PrimaryTheme: k.th.WidgetTheme()}
 
 	k.buildOverview()
 	k.buildSelected()
@@ -158,6 +183,34 @@ func (k *Kit) Sync() {
 	k.syncSelected()
 	k.svc.info.Sync()
 }
+
+// seams packages the kit's three seams for the panels it builds: the
+// sink rides a stable forwarder, so a host that installs its executor
+// afterwards (SetSink) reaches every panel built from this kit.
+func (k *Kit) seams() Seams {
+	return seams{
+		Theme:       k.th,
+		ContentView: k.cv,
+		ActionSink: sinkFunc(func(i Intent) {
+			k.sink.Do(i)
+		}),
+	}
+}
+
+// SetSink installs the host's ActionSink — the game hands itself over so
+// every screen's intent lands on Game.Do. nil keeps the current sink.
+func (k *Kit) SetSink(s ActionSink) {
+	if s != nil {
+		k.sink = s
+	}
+}
+
+// RunIntent executes one intent on the kit's own behalf: session intents
+// (Show Info, the context menu) run on the kit's services, every other
+// intent maps onto the sim command it dispatches to (commandFor) and
+// rides the enqueue tail. Game.Do delegates here for whatever it does
+// not handle itself.
+func (k *Kit) RunIntent(i Intent) { k.exec.Do(i) }
 
 // Selected returns the entity selected in the overview (zero if none).
 func (k *Kit) Selected() ecs.Entity { return k.selected }

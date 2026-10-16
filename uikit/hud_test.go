@@ -8,7 +8,6 @@ import (
 
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -16,23 +15,9 @@ import (
 // newChromeEnv builds the environment shared by the chrome tests: the
 // embedded content, world-showcase at seed 42 and a command-capturing
 // enqueue. (kit_test's newTestKit drives the whole Kit instead.)
-func newChromeEnv(t *testing.T) (Env, *[]sim.Command) {
+func newChromeEnv(t *testing.T) (*testEnv, *[]sim.Command) {
 	t.Helper()
-	c, err := content.Load(content.FS())
-	if err != nil {
-		t.Fatalf("content.Load: %v", err)
-	}
-	wd, ok := c.World("world-showcase")
-	if !ok {
-		t.Fatal("world-showcase missing")
-	}
-	s, err := sim.New(c, wd, 42)
-	if err != nil {
-		t.Fatalf("sim.New: %v", err)
-	}
-	var cmds []sim.Command
-	env := NewEnv(c, s, func(cmd sim.Command) { cmds = append(cmds, cmd) })
-	return env, &cmds
+	return newTestEnv(t)
 }
 
 // chromeUI is the shared chrome test harness: an interface root (anchor
@@ -50,7 +35,7 @@ func newChromeUI(env Env) *chromeUI {
 	root := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
 	return &chromeUI{
 		env:  env,
-		ui:   &ebitenui.UI{Container: root, PrimaryTheme: env.Theme},
+		ui:   &ebitenui.UI{Container: root, PrimaryTheme: env.WidgetTheme()},
 		root: root,
 	}
 }

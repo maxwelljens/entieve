@@ -26,7 +26,9 @@ import (
 // mutates sim state); the sim logs the refusal line if a gated action
 // still gets through.
 type Factory struct {
-	env Env
+	th  Theme
+	cv  ContentView
+	as  ActionSink
 	win *widget.Window
 
 	recipes *Table
@@ -58,9 +60,9 @@ type factoryRow struct {
 
 // NewFactory builds the Factory window over the shared environment. Mount
 // it on a Kit with Kit.AddWindow and call Sync every frame.
-func NewFactory(env Env) *Factory {
-	f := &Factory{env: env}
-	p := env.Pal
+func NewFactory(env Seams) *Factory {
+	f := &Factory{th: env, cv: env, as: env}
+	p := env.Pal()
 
 	recipeCols := []Column{
 		{Key: "Product", Title: "Product", Priority: 0},
@@ -211,23 +213,23 @@ func canonicalFirst(key string, cols []Column) func(string, bool, []TableRow) {
 // Sync refreshes the recipe board, the job list and every gate from the
 // simulation. Call it every frame before Kit.Update.
 func (f *Factory) Sync() {
-	s := f.env.Sim
+	s := f.cv
 	station := s.DockedIndustry()
 	runs := f.qty()
 
 	// Recipe board: the content's canonical order, one row per recipe.
-	recRows := make([]TableRow, 0, len(f.env.Content.Recipes))
-	for _, rec := range f.env.Content.RecipesInOrder() {
+	recRows := make([]TableRow, 0, len(f.cv.Defs().Recipes))
+	for _, rec := range f.cv.Defs().RecipesInOrder() {
 		mats := s.JobMaterials(station, rec.ID, runs)
 		row := factoryRow{recipe: rec.ID, ref: f.productRef(rec.Product)}
 		recRows = append(recRows, TableRow{
 			Cells: []string{
-				itemLabel(f.env, rec.Product),
+				itemLabel(f.cv, rec.Product),
 				rec.Family,
 				groupFloat(s.JobDuration(station, rec.ID, 1), 1) + " s",
 				f.inputsCell(mats),
 			},
-			Icons: []string{productIcon(f.env, rec.Product), "", "", ""},
+			Icons: []string{productIcon(f.cv, rec.Product), "", "", ""},
 			Data:  row,
 			Spec:  f.rowSpec(row),
 		})
@@ -242,12 +244,12 @@ func (f *Factory) Sync() {
 		row := factoryRow{job: j.ID, ref: f.productRef(f.productOfJob(j))}
 		jobRows = append(jobRows, TableRow{
 			Cells: []string{
-				itemLabel(f.env, f.productOfJob(j)),
+				itemLabel(f.cv, f.productOfJob(j)),
 				FormatInt(int64(j.Runs)),
 				f.progressOf(j),
 				jobStateLabel(j.State),
 			},
-			Icons: []string{productIcon(f.env, f.productOfJob(j)), "", "", ""},
+			Icons: []string{productIcon(f.cv, f.productOfJob(j)), "", "", ""},
 			Data:  row,
 			Spec:  f.rowSpec(row),
 		})
@@ -290,8 +292,8 @@ func (f *Factory) Sync() {
 
 	slotsLbl := FormatInt(int64(slotsUsed)) + "/" + FormatInt(int64(slots)) + " jobs"
 	if f.hasSel && f.sel.recipe != "" {
-		if rec, ok := f.env.Content.Recipes[f.sel.recipe]; ok {
-			f.title.Label = "Factory — " + itemLabel(f.env, rec.Product) + " " +
+		if rec, ok := f.cv.Defs().Recipes[f.sel.recipe]; ok {
+			f.title.Label = "Factory — " + itemLabel(f.cv, rec.Product) + " " +
 				groupFloat(s.JobDuration(station, rec.ID, 1), 1) + " s · " + slotsLbl
 			return
 		}
@@ -311,10 +313,10 @@ func (f *Factory) inputsCell(mats []content.CargoStack) string {
 			out += " · "
 		}
 		name := string(m.Item)
-		if def, ok := f.env.Content.Item(m.Item); ok {
+		if def, ok := f.cv.Defs().Item(m.Item); ok {
 			name = def.Name
 		}
-		out += name + " " + FormatInt(int64(f.env.Sim.PlayerStock(m.Item))) +
+		out += name + " " + FormatInt(int64(f.cv.PlayerStock(m.Item))) +
 			"/" + FormatInt(int64(m.Qty))
 	}
 	return out
@@ -322,14 +324,14 @@ func (f *Factory) inputsCell(mats []content.CargoStack) string {
 
 // productRef resolves a recipe's product for the row's Show Info entry.
 func (f *Factory) productRef(product content.ItemID) InfoRef {
-	ref, _ := f.env.refOfID(string(product))
+	ref, _ := refOfID(f.cv, string(product))
 	return ref
 }
 
 // productOfJob resolves a job's recipe product ("" when the recipe no
 // longer loads — the sim keeps such jobs collectable-guarded).
 func (f *Factory) productOfJob(j sim.Job) content.ItemID {
-	if rec, ok := f.env.Content.Recipes[j.Recipe]; ok {
+	if rec, ok := f.cv.Defs().Recipes[j.Recipe]; ok {
 		return rec.Product
 	}
 	return ""
@@ -345,7 +347,7 @@ func (f *Factory) progressOf(j sim.Job) string {
 	if span <= 0 {
 		return "100%"
 	}
-	pct := (f.env.Sim.Time() - j.StartedAt) / span
+	pct := (f.cv.Time() - j.StartedAt) / span
 	if pct < 0 {
 		pct = 0
 	}
@@ -365,14 +367,14 @@ func jobStateLabel(state sim.JobState) string {
 
 // productIcon picks a recipe/job row's product glyph: hulls, module
 // classes, and the neutral gear for plain items (charges, minerals).
-func productIcon(env Env, product content.ItemID) string {
-	if _, ok := env.Content.Ship(content.ShipID(product)); ok {
+func productIcon(cv ContentView, product content.ItemID) string {
+	if _, ok := cv.Defs().Ship(content.ShipID(product)); ok {
 		return "row_hull"
 	}
-	if def, ok := env.Content.Module(content.ModuleID(product)); ok {
+	if def, ok := cv.Defs().Module(content.ModuleID(product)); ok {
 		return ModuleIcon(def.Kind)
 	}
-	if _, ok := env.Content.Item(product); ok {
+	if _, ok := cv.Defs().Item(product); ok {
 		return icons.Fallback
 	}
 	return ""
@@ -385,7 +387,7 @@ func (f *Factory) startReadyFor(row factoryRow) bool {
 	if row.recipe == "" {
 		return false
 	}
-	return f.env.Sim.CanStartJob(f.env.Sim.DockedIndustry(), row.recipe, f.qty())
+	return f.cv.CanStartJob(f.cv.DockedIndustry(), row.recipe, f.qty())
 }
 
 // collectReadyFor is the Collect gate for one job row: the docked
@@ -394,7 +396,7 @@ func (f *Factory) collectReadyFor(row factoryRow) bool {
 	if row.job == 0 {
 		return false
 	}
-	for _, j := range f.env.Sim.Jobs(f.env.Sim.DockedIndustry()) {
+	for _, j := range f.cv.Jobs(f.cv.DockedIndustry()) {
 		if j.ID == row.job {
 			return j.State == sim.JobDone && j.Owner == sim.OwnerPlayer
 		}
@@ -416,12 +418,12 @@ func (f *Factory) rowActions(row factoryRow) []RowAction {
 	switch {
 	case row.recipe != "":
 		return []RowAction{{Label: "Start", Disabled: !f.startReadyFor(row),
-			Do: func() { f.startWith(row) }}}
+			Intent: StartJob{Recipe: row.recipe, Runs: f.qty()}}}
 	case row.job != 0:
 		return []RowAction{{Label: "Collect", Disabled: !f.collectReadyFor(row),
-			Do: func() { f.collectWith(row) }}}
+			Intent: CollectJob{Job: row.job}}}
 	}
-	return []RowAction{{Label: "Start", Disabled: true, Do: func() {}}}
+	return []RowAction{{Label: "Start", Disabled: true}}
 }
 
 // stepQty moves the quantity stepper one step (clamped).
@@ -439,26 +441,26 @@ func (f *Factory) stepQty(delta int) {
 // qty is the current run count the stepper drives.
 func (f *Factory) qty() int { return qtySteps[f.qtyIdx] }
 
-// startClicked enqueues CmdStartJob for the selected recipe and quantity.
+// startClicked emits StartJob for the selected recipe and quantity.
 func (f *Factory) startClicked() { f.startWith(f.sel) }
 
-// startWith enqueues the start of one recipe row (gated even when called
+// startWith emits StartJob for one recipe row (gated even when called
 // directly, the market buttons' rule).
 func (f *Factory) startWith(row factoryRow) {
 	if !f.startReadyFor(row) {
 		return
 	}
-	f.env.Enqueue(sim.CmdStartJob{Recipe: row.recipe, Runs: f.qty()})
+	f.as.Do(StartJob{Recipe: row.recipe, Runs: f.qty()})
 }
 
-// collectClicked enqueues CmdCollectJob for the selected job.
+// collectClicked emits CollectJob for the selected job.
 func (f *Factory) collectClicked() { f.collectWith(f.sel) }
 
-// collectWith enqueues the collect of one job row (gated even when called
+// collectWith emits CollectJob for one job row (gated even when called
 // directly).
 func (f *Factory) collectWith(row factoryRow) {
 	if !f.collectReadyFor(row) {
 		return
 	}
-	f.env.Enqueue(sim.CmdCollectJob{ID: row.job})
+	f.as.Do(CollectJob{Job: row.job})
 }

@@ -31,7 +31,7 @@ type SettingsActions struct {
 // of its displayed state is re-read from the actions in Sync — including
 // right after a live scale change rebuilt it under itself.
 type Settings struct {
-	env Env
+	th  Theme
 	act SettingsActions
 	win *widget.Window
 
@@ -43,9 +43,9 @@ type Settings struct {
 
 // NewSettings builds the Settings window over the shared environment.
 // Mount it on a Kit with Kit.AddWindow and call Sync every frame.
-func NewSettings(env Env, act SettingsActions) *Settings {
-	p := env.Pal
-	s := &Settings{env: env, act: act}
+func NewSettings(d Theme, act SettingsActions) *Settings {
+	p := d.Pal()
+	s := &Settings{th: d, act: act}
 
 	newBtn := func(label string, clicked func()) *widget.Button {
 		return widget.NewButton(
@@ -64,7 +64,7 @@ func NewSettings(env Env, act SettingsActions) *Settings {
 	// stepping) and its row relays out on change (setStepperValue) —
 	// otherwise a wider value would draw under the + button.
 	s.scaleVal = widget.NewText(
-		widget.TextOpts.Text("1×", env.FaceMono(StepSmall), solid(p.Accent)),
+		widget.TextOpts.Text("1×", s.th.FaceMono(StepSmall), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 			Position: widget.RowLayoutPositionCenter,
 		})),
@@ -72,7 +72,7 @@ func NewSettings(env Env, act SettingsActions) *Settings {
 	minus := newBtn("-", func() { act.StepScale(-1) })
 	plus := newBtn("+", func() { act.StepScale(+1) })
 	scaleLbl := widget.NewText(
-		widget.TextOpts.Text("UI scale", env.Face(StepSmall), solid(p.Text)),
+		widget.TextOpts.Text("UI scale", s.th.Face(StepSmall), solid(p.Text)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 			Position: widget.RowLayoutPositionCenter,
 		})),
@@ -108,7 +108,7 @@ func NewSettings(env Env, act SettingsActions) *Settings {
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { act.ResetLayout() }),
 	)
 	hint := widget.NewText(
-		widget.TextOpts.Text("Applies immediately · P closes", env.Face(StepTiny), solid(p.Dim)),
+		widget.TextOpts.Text("Applies immediately · P closes", s.th.Face(StepTiny), solid(p.Dim)),
 	)
 
 	body := widget.NewContainer(
@@ -121,7 +121,7 @@ func NewSettings(env Env, act SettingsActions) *Settings {
 	)
 	body.AddChild(s.scaleRow, s.fsBtn, resetBtn, hint)
 
-	title, _ := NewTitleBar(env, "Settings", "")
+	title, _ := NewTitleBar(d, "Settings", "")
 
 	s.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),

@@ -19,7 +19,9 @@ type slotPick struct {
 // a four-type resist table, the high/mid/low slot rows, the hangar's
 // modules and ships, and the Unfit/Fit/Assemble actions.
 type Fitting struct {
-	env Env
+	th  Theme
+	cv  ContentView
+	as  ActionSink
 	win *widget.Window
 
 	title   *widget.Text // title bar: hull name and class
@@ -46,9 +48,9 @@ type Fitting struct {
 
 // NewFitting builds the Fitting window over the shared environment.
 // Mount it on a Kit with Kit.AddWindow and call Sync every frame.
-func NewFitting(env Env) *Fitting {
-	f := &Fitting{env: env}
-	p := env.Pal
+func NewFitting(env Seams) *Fitting {
+	f := &Fitting{th: env, cv: env, as: env}
+	p := env.Pal()
 
 	f.resists = NewTable(env, []Column{
 		{Key: "EM", Title: "EM", Priority: 0, AlignRight: true},
@@ -151,13 +153,13 @@ func (f *Fitting) Win() *widget.Window { return f.win }
 // hangar rows and the action gating. Call it every frame before
 // Kit.Update.
 func (f *Fitting) Sync() {
-	s := f.env.Sim
+	s := f.cv
 	player := s.Player()
 
-	ship, hasShip := s.Ships.Get(player)
+	ship, hasShip := s.ShipState(player)
 	hullName, hullClass := "No ship", ""
 	if hasShip {
-		if def, ok := f.env.Content.Ship(ship.Hull); ok {
+		if def, ok := f.cv.Defs().Ship(ship.Hull); ok {
 			hullName, hullClass = def.Name, def.Class
 		}
 	}
@@ -202,7 +204,7 @@ func (f *Fitting) fitReady(mod content.ModuleID, slot slotPick) bool {
 	if mod == "" || slot.mod != "" {
 		return false
 	}
-	def, ok := f.env.Content.Module(mod)
+	def, ok := f.cv.Defs().Module(mod)
 	return ok && def.Slot == slot.ref.Class
 }
 
@@ -212,35 +214,35 @@ func unequipReady(slot slotPick) bool { return slot.mod != "" }
 
 // statLines renders the derived ship statistics (mirrors
 // ui.derivedStats, which reads the sim's own fit-computed values).
-func (f *Fitting) statLines(ship *sim.ShipState, hasShip bool) string {
+func (f *Fitting) statLines(ship sim.ShipState, hasShip bool) string {
 	if !hasShip {
 		return "No ship"
 	}
-	s := f.env.Sim
+	s := f.cv
 	player := s.Player()
 	lines := []string{
 		"Shield " + FormatInt(int64(ship.MaxShield)) +
 			" · Armor " + FormatInt(int64(ship.MaxArmor)) +
 			" · Structure " + FormatInt(int64(ship.MaxStructure)),
 	}
-	if cap, ok := s.Caps.Get(player); ok {
+	if cap, ok := s.Capacitor(player); ok {
 		lines = append(lines, "Capacitor "+groupFloat(cap.Capacity, 1)+
 			" GJ · recharge "+groupFloat(cap.Tau, 1)+" s")
 	}
-	if m, ok := s.Motions.Get(player); ok {
+	if m, ok := s.Motion(player); ok {
 		lines = append(lines, "Speed "+formatSpeed(m.MaxSpeed)+
 			" · Align "+groupFloat(m.Agility*10, 1)+" s"+
 			" · Sig "+groupFloat(m.SigRadius, 0)+" m")
 	}
-	if cg, ok := s.Cargos.Get(player); ok {
+	if cg, ok := s.Cargo(player); ok {
 		lines = append(lines, "Cargo "+formatVolume(cg.Capacity)+
 			" · Ore hold "+formatVolume(cg.OreCapacity))
 	}
 	warp := 0.0
-	if def, ok := f.env.Content.Ship(ship.Hull); ok {
+	if def, ok := f.cv.Defs().Ship(ship.Hull); ok {
 		warp = def.WarpSpeed
 	}
-	if tg, ok := s.Targetings.Get(player); ok {
+	if tg, ok := s.Targeting(player); ok {
 		lines = append(lines, "Warp "+groupFloat(warp, 1)+" AU/s"+
 			" · Targets "+FormatInt(int64(tg.MaxTargets))+
 			" · Scan "+groupFloat(tg.ScanRes, 0))
@@ -250,15 +252,15 @@ func (f *Fitting) statLines(ship *sim.ShipState, hasShip bool) string {
 
 // slotRows renders one row per hull slot: filled slots carry the module
 // name, empty ones read "(empty)".
-func (f *Fitting) slotRows(ship *sim.ShipState, hasShip bool) []TableRow {
+func (f *Fitting) slotRows(ship sim.ShipState, hasShip bool) []TableRow {
 	if !hasShip {
 		return nil
 	}
-	hull, ok := f.env.Content.Ship(ship.Hull)
+	hull, ok := f.cv.Defs().Ship(ship.Hull)
 	if !ok {
 		return nil
 	}
-	fit, hasFit := f.env.Sim.Fittings.Get(f.env.Sim.Player())
+	fit, hasFit := f.cv.Fitting(f.cv.Player())
 	classes := []string{content.SlotHigh, content.SlotMid, content.SlotLow}
 	labels := map[string]string{content.SlotHigh: "High", content.SlotMid: "Mid", content.SlotLow: "Low"}
 	counts := map[string]int{
@@ -282,8 +284,8 @@ func (f *Fitting) slotRows(ship *sim.ShipState, hasShip bool) []TableRow {
 			icon := ""
 			if i < len(defs) {
 				pick.mod = defs[i]
-				name = itemLabel(f.env, content.ItemID(defs[i]))
-				if def, ok := f.env.Content.Module(defs[i]); ok {
+				name = itemLabel(f.cv, content.ItemID(defs[i]))
+				if def, ok := f.cv.Defs().Module(defs[i]); ok {
 					icon = ModuleIcon(def.Kind)
 				}
 			}
@@ -307,24 +309,24 @@ func (f *Fitting) slotRows(ship *sim.ShipState, hasShip bool) []TableRow {
 // moves.
 func (f *Fitting) slotSpec(pick slotPick) RowSpec {
 	spec := RowSpec{
-		Ref: f.env.rowRef(pick),
+		Ref: rowRef(f.cv, pick),
 		Actions: []RowAction{
 			{Label: "Fit module", Disabled: !f.hasMod || !f.fitReady(f.selMod, pick),
-				Do: func() { f.fitInto(pick) }},
+				Intent: Fit{Module: f.selMod, Slot: pick.ref}},
 			{Label: "Unefit slot", Disabled: !unequipReady(pick),
-				Do: func() { f.unfitInto(pick) }},
+				Intent: Unequip{Slot: pick.ref}},
 		},
 	}
 	if pick.mod == "" {
 		return spec // empty slot: no tooltip (and a grayed Fit/Unefit pair)
 	}
-	def, ok := f.env.Content.Module(pick.mod)
+	def, ok := f.cv.Defs().Module(pick.mod)
 	if !ok {
 		return spec
 	}
 	slot := slotLabel(pick.ref)
 	spec.Tip = TipData{Key: string(pick.mod) + "|" + slot, Build: func() TooltipModel {
-		return f.env.moduleTip(def, slot, "", 0)
+		return moduleTip(def, slot, "", 0)
 	}}
 	return spec
 }
@@ -332,12 +334,9 @@ func (f *Fitting) slotSpec(pick slotPick) RowSpec {
 // hangarRows renders the hangar's fit-able modules and stored ships
 // (other hangar items live in the Inventory window).
 func (f *Fitting) hangarRows() []TableRow {
-	if f.env.Sim.Hangar == nil {
-		return nil
-	}
 	var rows []TableRow
-	for _, st := range f.env.Sim.Hangar.Items {
-		mod, ok := f.env.Content.Module(content.ModuleID(st.Item))
+	for _, st := range f.cv.HangarItems() {
+		mod, ok := f.cv.Defs().Module(content.ModuleID(st.Item))
 		if !ok || st.Qty <= 0 {
 			continue
 		}
@@ -349,9 +348,9 @@ func (f *Fitting) hangarRows() []TableRow {
 			Spec:  f.hangarSpec(id),
 		})
 	}
-	for _, ss := range f.env.Sim.Hangar.Ships {
+	for _, ss := range f.cv.HangarShips() {
 		name := string(ss.Hull)
-		if def, ok := f.env.Content.Ship(ss.Hull); ok {
+		if def, ok := f.cv.Defs().Ship(ss.Hull); ok {
 			name = def.Name
 		}
 		rows = append(rows, TableRow{
@@ -371,19 +370,19 @@ func (f *Fitting) hangarRows() []TableRow {
 // (stored hulls carry none: they aren't fitted yet).
 func (f *Fitting) hangarSpec(data any) RowSpec {
 	spec := RowSpec{
-		Ref: f.env.rowRef(data),
+		Ref: rowRef(f.cv, data),
 	}
 	mod, isMod := data.(content.ModuleID)
 	spec.Actions = []RowAction{
 		{Label: "Fit module", Disabled: !f.fitReady(mod, f.selSlot),
-			Do: func() { f.fitFrom(mod) }},
+			Intent: Fit{Module: mod, Slot: f.selSlot.ref}},
 	}
-	def, ok := f.env.Content.Module(mod)
+	def, ok := f.cv.Defs().Module(mod)
 	if !isMod || !ok {
 		return spec
 	}
 	spec.Tip = TipData{Key: string(mod), Build: func() TooltipModel {
-		return f.env.moduleTip(def, "", "", 0)
+		return moduleTip(def, "", "", 0)
 	}}
 	return spec
 }
@@ -399,48 +398,37 @@ func (f *Fitting) selectHangar(r TableRow) {
 	}
 }
 
-// unfitInto enqueues CmdUnfitModule for one slot row — the slot menu's
-// Unefit action carries the row it was opened on; the toolbar fits the
-// selection through unfitClicked.
-func (f *Fitting) unfitInto(pick slotPick) {
-	if !unequipReady(pick) {
-		return
-	}
-	f.env.Enqueue(sim.CmdUnfitModule{Slot: pick.ref})
-}
-
-// fitInto enqueues CmdFitModule for one slot row: the selected hangar
-// module into the right-clicked slot (the toolbar's fitClicked targets
-// the selected slot instead).
+// fitInto emits Fit for one slot row: the selected hangar module into
+// the right-clicked slot (the toolbar's fitClicked targets the selected
+// slot instead).
 func (f *Fitting) fitInto(pick slotPick) {
 	if !f.hasMod || !f.fitReady(f.selMod, pick) {
 		return
 	}
-	f.env.Enqueue(sim.CmdFitModule{Item: f.selMod, Slot: pick.ref})
+	f.as.Do(Fit{Module: f.selMod, Slot: pick.ref})
 }
 
-// fitFrom enqueues CmdFitModule for one hangar row's module into the
-// selected slot — the hangar menu's Fit action.
+// fitFrom emits Fit for one hangar row's module into the selected slot.
 func (f *Fitting) fitFrom(mod content.ModuleID) {
 	if !f.fitReady(mod, f.selSlot) {
 		return
 	}
-	f.env.Enqueue(sim.CmdFitModule{Item: mod, Slot: f.selSlot.ref})
+	f.as.Do(Fit{Module: mod, Slot: f.selSlot.ref})
 }
 
-// unfitClicked enqueues CmdUnfitModule for the selected fitted slot.
-func (f *Fitting) unfitClicked() { f.unfitInto(f.selSlot) }
+// unfitClicked emits Unequip for the selected fitted slot.
+func (f *Fitting) unfitClicked() { f.as.Do(Unequip{Slot: f.selSlot.ref}) }
 
-// fitClicked enqueues CmdFitModule: the selected hangar module into the
-// selected empty slot of its class.
+// fitClicked emits Fit: the selected hangar module into the selected
+// empty slot of its class.
 func (f *Fitting) fitClicked() { f.fitFrom(f.selMod) }
 
-// assembleClicked enqueues CmdAssemble for the selected hangar ship.
+// assembleClicked emits Assemble for the selected hangar ship.
 func (f *Fitting) assembleClicked() {
 	if !f.hasShip {
 		return
 	}
-	f.env.Enqueue(sim.CmdAssemble{Ship: f.selShip})
+	f.as.Do(Assemble{Ship: f.selShip})
 }
 
 // joinLines concatenates stat lines with newlines (widget.Text renders

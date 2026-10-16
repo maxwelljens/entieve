@@ -6,7 +6,6 @@ import (
 
 	eimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit"
 	"github.com/entieve/entieve/uikit/icons"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -169,7 +168,7 @@ func (sc *MenuScene) Draw(dst *ebiten.Image) {
 
 // titleBar builds a uikit-style title bar for a game-owned window.
 func (g *Game) titleBar(label string) *widget.Container {
-	p := g.env.Pal
+	p := g.env.Pal()
 	title := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
@@ -200,7 +199,7 @@ func (g *Game) newBtn(label string, minW, minH int, clicked func()) *widget.Butt
 // TextAndImage path — the graphic trails the label, the theme's image
 // states are untouched, and the disabled icon draws at 40%).
 func (g *Game) newIconBtn(label, icon string, minW, minH int, clicked func()) *widget.Button {
-	p := g.env.Pal
+	p := g.env.Pal()
 	dim := color.RGBA{R: p.Dim.R, G: p.Dim.G, B: p.Dim.B, A: uikit.IconDisabledA}
 	return widget.NewButton(
 		widget.ButtonOpts.TextAndImage(label, nil, &widget.GraphicImage{
@@ -215,7 +214,7 @@ func (g *Game) newIconBtn(label, icon string, minW, minH int, clicked func()) *w
 // buildMenuWindow constructs the Esc menu window: modal so no click leaks
 // past it while it is open.
 func (g *Game) buildMenuWindow() *widget.Window {
-	p := g.env.Pal
+	p := g.env.Pal()
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -224,11 +223,14 @@ func (g *Game) buildMenuWindow() *widget.Window {
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(uikit.Px(10))),
 		)),
 	)
+	// The menu's verbs are intents too: Resume closes the menu screen
+	// itself (Toggle{Menu}), the rest are the game-level intents Game.Do
+	// executes — one dispatch path for buttons and screens alike.
 	actions := map[string]func(){
-		"Resume": func() { g.pop() },
-		"Save":   func() { g.report(g.SaveGame(), "Game saved") },
-		"Load":   func() { g.pendingLoad = true },
-		"Quit":   func() { g.quit = true },
+		"Resume": func() { g.Do(uikit.Toggle{Screen: "Menu"}) },
+		"Save":   func() { g.Do(uikit.Save{}) },
+		"Load":   func() { g.Do(uikit.Load{}) },
+		"Quit":   func() { g.Do(uikit.Quit{}) },
 	}
 	for _, item := range menuItems {
 		item := item
@@ -251,12 +253,12 @@ func (g *Game) buildMenuWindow() *widget.Window {
 // (contracts.go); syncStationBoard rebuilds them and hugs the window to
 // the content height.
 func (g *Game) buildStationWindow() *widget.Window {
-	p := g.env.Pal
+	p := g.env.Pal()
 	g.stName = widget.NewText(
 		widget.TextOpts.Text("Docked", g.env.Face(uikit.StepSmall), solid(p.Text)),
 	)
 	undock := g.newIconBtn("Undock", "act_undock", 150, menuBtnH, func() {
-		g.s.Queue(sim.CmdUndock{})
+		g.Do(uikit.Undock{})
 	})
 	header := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -301,7 +303,7 @@ func (g *Game) buildStationWindow() *widget.Window {
 	// preferred size before the window is first mounted, and ebitenui
 	// validates (and themes) buttons during that measurement. Same palette
 	// and type scale as the kit's own theme.
-	win.GetContainer().GetWidget().SetTheme(g.env.Theme)
+	win.GetContainer().GetWidget().SetTheme(g.env.WidgetTheme())
 	return win
 }
 

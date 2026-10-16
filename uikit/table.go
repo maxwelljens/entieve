@@ -86,7 +86,9 @@ func iconOf(row TableRow, i int) string {
 // anchors). Events in ebitenui are deferred to the next UI.Update, so
 // handlers registered here go live on the first update pump.
 type Table struct {
-	env         Env
+	th          Theme
+	cv          ContentView
+	as          ActionSink
 	cols        []Column
 	face        *text.Face
 	measure     func(string) float64 // cell width, contents face
@@ -127,21 +129,23 @@ type TableOption func(*Table)
 
 // ContentsFace draws every row cell — labels and values alike — in the
 // given face instead of the display face, and measures the columns with
-// it (IBM Plex Mono via Env.FaceMono in the inventory and market
+// it (IBM Plex Mono via Theme.FaceMono in the inventory and market
 // windows: monospaced cells line the columns up). Only the contents move:
 // the header sort buttons keep the emphasis face.
 func ContentsFace(face *text.Face) TableOption {
 	return func(t *Table) { t.face = face }
 }
 
-// NewTable builds a table with the given columns over the shared
-// environment (faces and palette). Rows arrive via SetRows; embed it in a
+// NewTable builds a table with the given columns over the table's three
+// seams (faces, the row refs, the row-menu sink). Rows arrive via SetRows; embed it in a
 // window with Container(). Options apply at construction — ContentsFace
 // moves the row cells (and the column fit) to another face.
-func NewTable(env Env, cols []Column, opts ...TableOption) *Table {
-	p := env.Pal
+func NewTable(env Seams, cols []Column, opts ...TableOption) *Table {
+	p := env.Pal()
 	t := &Table{
-		env:    env,
+		th:     env,
+		cv:     env,
+		as:     env,
 		cols:   append([]Column(nil), cols...),
 		face:   env.Face(StepSmall), // cell face: display body by default
 		selIdx: -1,
@@ -464,7 +468,7 @@ func (t *Table) updateRows() bool {
 		// its widget (rowTip rebuilds the panel only when the key moves;
 		// a spec with no Tip drops any attachment).
 		if i < len(t.tips) {
-			t.tips[i].set(t.env, t.rowCts[i].GetWidget(), row.Spec.Tip.Key, row.Spec.Tip.Build)
+			t.tips[i].set(t.th, t.rowCts[i].GetWidget(), row.Spec.Tip.Key, row.Spec.Tip.Build)
 		}
 	}
 	// Row count changed → the content may no longer overflow: drop any
@@ -535,7 +539,7 @@ func (t *Table) newRow(i int) *widget.Container {
 			pad = widget.Insets{Left: Px(cellPad), Top: Px(entryPadV), Bottom: Px(entryPadV)}
 		}
 		tx := widget.NewText(
-			widget.TextOpts.Text("", t.face, solid(t.env.Pal.Text)),
+			widget.TextOpts.Text("", t.face, solid(t.th.Pal().Text)),
 			widget.TextOpts.Position(align, widget.TextPositionCenter),
 			widget.TextOpts.Padding(&pad),
 			widget.TextOpts.WidgetOpts(
@@ -624,7 +628,7 @@ func (t *Table) rowClicked(i int) {
 	if t.onSelect != nil {
 		t.onSelect(row)
 	}
-	t.dbl.Click(t.env, row.Spec)
+	t.dbl.Click(t.cv, t.as, row.Spec)
 }
 
 // rowMenu resolves the right-clicked row (by index, the same way
@@ -636,7 +640,7 @@ func (t *Table) rowMenu(i int, at image.Point) {
 	if i < 0 || i >= len(t.rows) {
 		return
 	}
-	t.env.OpenRowMenu(t.rows[i].Spec, at)
+	openRowMenu(t.cv, t.as, t.rows[i].Spec, at)
 }
 
 // updateIcon refreshes one row's cell icons and their palette role. It runs
@@ -673,7 +677,7 @@ func (t *Table) updateBg(i int) {
 // rowTint is the background the row should show right now.
 func (t *Table) rowTint(i int) color.RGBA {
 	if i == t.selIdx {
-		return withA(t.env.Pal.Accent, selectionAlpha)
+		return withA(t.th.Pal().Accent, selectionAlpha)
 	}
 	if i < 0 || i >= len(t.rows) {
 		return color.RGBA{}
@@ -843,12 +847,12 @@ func sameData(a, b any) bool {
 // keeps it, everything else is primary text.
 func (t *Table) iconTint(i int, row TableRow) color.RGBA {
 	if i == t.selIdx {
-		return t.env.Pal.Accent
+		return t.th.Pal().Accent
 	}
 	if row.IconTint.A != 0 {
 		return row.IconTint
 	}
-	return t.env.Pal.Text
+	return t.th.Pal().Text
 }
 
 // withA returns c with a replacement alpha channel.

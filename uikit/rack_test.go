@@ -84,7 +84,7 @@ func TestRackConstruction(t *testing.T) {
 			}
 			// The tile carries the module's class glyph (the same cached
 			// image the icon registry hands everyone else).
-			wantGlyph := icons.Get(ModuleIcon(def.Kind), IconButton, env.Pal.Text)
+			wantGlyph := icons.Get(ModuleIcon(def.Kind), IconButton, env.Pal().Text)
 			if cell.btn.GraphicImage() == nil || cell.btn.GraphicImage().Idle != wantGlyph {
 				t.Errorf("cell(%d,%d) tile glyph is not %s", row, i, ModuleIcon(def.Kind))
 			}

@@ -68,7 +68,7 @@ func pressMenuEntry(t *testing.T, g *Game, label string) {
 func TestContractRowContextMenu(t *testing.T) {
 	g := dockedShowcaseGame(t, 1280, 720)
 	var got []sim.Command
-	g.env.Enqueue = func(c sim.Command) { got = append(got, c) }
+	g.enqueue = func(c sim.Command) { got = append(got, c) }
 
 	// Ungated available row: one enabled Accept entry.
 	row := findRow(t, g.stAvailRows, "contract-solace-cleanup-1")
@@ -137,7 +137,7 @@ func TestContractRowContextMenu(t *testing.T) {
 func TestContractObjectiveShowInfo(t *testing.T) {
 	g := dockedShowcaseGame(t, 1280, 720)
 	var got []sim.Command
-	g.env.Enqueue = func(c sim.Command) { got = append(got, c) }
+	g.enqueue = func(c sim.Command) { got = append(got, c) }
 
 	row := findRow(t, g.stAvailRows, "contract-solace-cleanup-1")
 	if len(row.root.Children()) < 2 {

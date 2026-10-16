@@ -86,10 +86,16 @@ type Game struct {
 	clock Clock
 
 	// kit owns the interface (Overview + Selected Item are built into it);
-	// env is the kit's own environment (Kit.Env) — one theme, palette and
-	// face set per session — that the extra panels are constructed from.
+	// env is the kit's own session (Kit.Env) — the three seams and the
+	// popup services, one theme/view/sink per session — that the extra
+	// panels are constructed from.
 	kit *uikit.Kit
-	env uikit.Env
+	env uikit.Session
+
+	// enqueue is the executor's tail onto the sim: the intent dispatch
+	// queues every command through it (tests swap it to observe what a
+	// button fired). It defaults to g.s.Queue in New.
+	enqueue func(sim.Command)
 
 	// Anchored chrome panels, mounted directly on the kit's root overlay
 	// (Kit.AddContainer); the HUD and rack are hidden — not unmounted —
@@ -213,6 +219,7 @@ func New(opts Options) (*Game, error) {
 		s:    s,
 		ren:  render.New(opts.Content),
 	}
+	g.enqueue = s.Queue
 	// Scale before anything is built: the device factor (pinned by tests,
 	// read from the display in Run) times the persisted user UI scale is
 	// the global uikit scale every metric and face below is built against.
@@ -701,14 +708,16 @@ func (g *Game) report(err error, okMsg string) {
 // log history across, and LoadGame re-applies the saved window layout
 // after this returns).
 func (g *Game) buildKit() error {
-	kit, err := uikit.NewKit(g.opts.Content, g.s, g.s.Queue)
+	kit, err := uikit.NewKit(g.opts.Content, g.s, func(cmd sim.Command) { g.enqueue(cmd) })
 	if err != nil {
 		return fmt.Errorf("game: uikit.NewKit: %w", err)
 	}
 	g.kit = kit
-	// One environment per session: the kit's own theme, palette and face
-	// set, handed to every extra panel (uikit.NewEnv would build a second
-	// one the kit never uses).
+	// The write seam is installed before anything is built from it: every
+	// screen's intent lands on Game.Do. One session per build — the kit's
+	// own theme, view and sink, handed to every extra panel (uikit.NewEnv
+	// would build a second one the kit never uses).
+	kit.SetSink(g)
 	g.env = kit.Env()
 	env := g.env
 

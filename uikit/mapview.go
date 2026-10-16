@@ -38,7 +38,8 @@ type mapPoint struct {
 // a widget.Graphic, with the current system highlighted in accent. The
 // image is redrawn only when the current system changes.
 type MapView struct {
-	env     Env
+	th      Theme
+	cv      ContentView
 	win     *widget.Window
 	img     *ebiten.Image
 	gfx     *widget.Graphic
@@ -49,9 +50,12 @@ type MapView struct {
 
 // NewMapView builds the starmap window (draggable, fixed size) over the
 // given environment. Call Sync after construction to paint the graph.
-func NewMapView(env Env) *MapView {
-	p := env.Pal
-	m := &MapView{env: env}
+func NewMapView(env interface {
+	Theme
+	ContentView
+}) *MapView {
+	p := env.Pal()
+	m := &MapView{th: env, cv: env}
 	m.img = ebiten.NewImage(Px(mapImgW), Px(mapImgH))
 	m.gfx = widget.NewGraphic(widget.GraphicOpts.Image(m.img))
 
@@ -65,7 +69,7 @@ func NewMapView(env Env) *MapView {
 	body.AddChild(m.gfx)
 
 	title := "Starmap"
-	if u := env.Content.Universe; u != nil && (u.Region != "" || u.Constellation != "") {
+	if u := env.Defs().Universe; u != nil && (u.Region != "" || u.Constellation != "") {
 		title = "Starmap — " + u.Region + " / " + u.Constellation
 	}
 	titleBar, _ := NewTitleBar(env, title, "svc_map")
@@ -88,11 +92,11 @@ func (m *MapView) Win() *widget.Window { return m.win }
 // Sync repaints the graph when the current system changes (first sync
 // always paints).
 func (m *MapView) Sync() {
-	if m.env.Sim == nil || m.env.Content == nil {
+	if m.cv == nil || m.cv.Defs() == nil {
 		return
 	}
 	cur := content.SystemID("")
-	if sys := m.env.Sim.System(); sys != nil {
+	if sys := m.cv.System(); sys != nil {
 		cur = sys.ID
 	}
 	if m.drawn && cur == m.system {
@@ -119,7 +123,7 @@ func (m *MapView) drawMap(cur content.SystemID) {
 
 	// Gate edges from every system's gate celestials.
 	for _, n := range nodes {
-		def, ok := m.env.Content.System(n.id)
+		def, ok := m.cv.Defs().System(n.id)
 		if !ok {
 			continue
 		}
@@ -135,7 +139,7 @@ func (m *MapView) drawMap(cur content.SystemID) {
 			}
 			var col color.Color = color.RGBA{90, 100, 118, 160}
 			if n.id == cur || g.ToSystem == cur {
-				col = nrgba(m.env.Pal.Accent, 170)
+				col = nrgba(m.th.Pal().Accent, 170)
 			}
 			vector.StrokeLine(m.img, float32(a.x), float32(a.y),
 				float32(b.x), float32(b.y), float32(s), col, true)
@@ -143,22 +147,22 @@ func (m *MapView) drawMap(cur content.SystemID) {
 	}
 
 	// System nodes, highlighted current system, then labels.
-	face := m.env.Face(StepSmall)
+	face := m.th.Face(StepSmall)
 	for i, n := range nodes {
 		pt := pts[i]
 		rad := float32(5 * s)
 		if n.id == cur {
 			rad = float32(7 * s)
-			vector.StrokeCircle(m.img, float32(pt.x), float32(pt.y), float32(12*s), float32(1.5*s), m.env.Pal.Accent, true)
+			vector.StrokeCircle(m.img, float32(pt.x), float32(pt.y), float32(12*s), float32(1.5*s), m.th.Pal().Accent, true)
 		}
 		vector.DrawFilledCircle(m.img, float32(pt.x), float32(pt.y), rad, m.mapSecurity(n.security), true)
 		label := string(n.id)
-		col := m.env.Pal.Dim
+		col := m.th.Pal().Dim
 		if n.id == cur {
-			col = m.env.Pal.Accent
+			col = m.th.Pal().Accent
 		}
 		w, _ := text.Measure(label, *face, 0)
-		render.Text(m.img, label, pt.x-w/2, pt.y+14*s, m.env.TS.Small, col)
+		render.Text(m.img, label, pt.x-w/2, pt.y+14*s, m.th.TS().Small, col)
 	}
 
 	// Zone legend: the node colors decoded in the canon's zone words with
@@ -166,7 +170,7 @@ func (m *MapView) drawMap(cur content.SystemID) {
 	for i, sec := range zoneSecs {
 		y := float64(Px(mapImgH-mapPad)) + float64(i)*16*s
 		vector.DrawFilledCircle(m.img, float32(12*s), float32(y)+float32(6*s), float32(4*s), m.mapSecurity(sec), true)
-		render.Text(m.img, zoneLabel(sec), 24*s, y, m.env.TS.Tiny, m.env.Pal.Dim)
+		render.Text(m.img, zoneLabel(sec), 24*s, y, m.th.TS().Tiny, m.th.Pal().Dim)
 	}
 }
 
@@ -192,7 +196,7 @@ func zoneLabel(sec string) string {
 // mapNodes lists every system in deterministic (id-sorted) order, merging
 // the inline universe systems with the file-based ones.
 func (m *MapView) mapNodes() []mapNode {
-	c := m.env.Content
+	c := m.cv.Defs()
 	var out []mapNode
 	seen := map[content.SystemID]bool{}
 	if c.Universe != nil {
@@ -263,12 +267,12 @@ func (m *MapView) project(nodes []mapNode) []mapPoint {
 func (m *MapView) mapSecurity(sec string) color.RGBA {
 	switch sec {
 	case "high":
-		return m.env.Pal.Good
+		return m.th.Pal().Good
 	case "low":
-		return m.env.Pal.Warn
+		return m.th.Pal().Warn
 	case "null":
-		return m.env.Pal.Danger
+		return m.th.Pal().Danger
 	default:
-		return m.env.Pal.Dim
+		return m.th.Pal().Dim
 	}
 }

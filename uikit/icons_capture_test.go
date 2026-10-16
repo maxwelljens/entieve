@@ -73,7 +73,7 @@ func TestIconsCaptureFrame(t *testing.T) {
 			break
 		}
 	}
-	r := NewRack(k.panelEnv())
+	r := NewRack(k.Env())
 	k.AddContainer(r.Container(), widget.AnchorLayoutData{
 		HorizontalPosition: widget.AnchorLayoutPositionEnd,
 		VerticalPosition:   widget.AnchorLayoutPositionEnd,
