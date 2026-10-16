@@ -1,25 +1,25 @@
 package render
 
-// Text faces: Turret Road is the display typeface Entieve ships with,
-// Source Code Pro the mono face for tabular contents.
+// Text faces: IBM Plex Sans is the display typeface Entieve ships with,
+// IBM Plex Mono the mono face for tabular contents.
 //
 // The TTFs and their license files live in render/fonts/ and are embedded
 // as one directory, so the licenses travel with the fonts inside the
 // binary as well as in the repo (see docs/ART.md). Rendering happens on
 // the game goroutine only, so the parse and face caches need no locking.
 //
-// Weight → role (the 21 px type scale is unchanged — only the typeface
-// and the emphasis face are new):
+// Weight → role (20 px type scale — Plex's line box runs ~19 % taller
+// than the face it replaced, so the base came down one pixel):
 //
 //	Regular  body text: log lines, labels, tooltips, input, table cells
 //	         outside the mono tables (see Mono below)
 //	Bold     emphasis: window titles, table header sort buttons, buttons,
-//	         HUD readouts — Medium sat too close to Regular at the 16.8 px
+//	         HUD readouts — Medium sat too close to Regular at the 16 px
 //	         button size to read as emphasis (compared by eye, see ART.md)
 //	Mono     tabular contents: inventory and market table rows, where
 //	         monospaced digits and entries line the columns up (MonoFace)
 //
-// Turret Road has no U+25B2/U+25BC triangles, so the table sort
+// IBM Plex Sans has no U+25B2/U+25BC triangles, so the table sort
 // indicators are the ↑/↓ arrows it does carry (uikit/table.go).
 
 import (
@@ -34,14 +34,13 @@ var fontFS embed.FS
 
 // The weights the interface draws with, plus the mono contents face.
 const (
-	regularFile  = "fonts/TurretRoad-Regular.ttf"
-	emphasisFile = "fonts/TurretRoad-Medium.ttf"
-	lightFile    = "fonts/TurretRoad-Light.ttf"
-	// monoFile is Source Code Pro, the tabular contents face. It is a
-	// variable font (wght axis); text/v2's GoTextFace draws the default
-	// instance (Regular 400) — exactly the weight table contents need,
-	// and nothing the interface asks a variation for.
-	monoFile = "fonts/SourceCodePro-VariableFont_wght.ttf"
+	regularFile  = "fonts/IBMPlexSans-Regular.ttf"
+	emphasisFile = "fonts/IBMPlexSans-Medium.ttf"
+	lightFile    = "fonts/IBMPlexSans-Light.ttf"
+	// monoFile is IBM Plex Mono, the tabular contents face: a static
+	// Regular 400 TTF — exactly the weight table contents need, and
+	// nothing the interface asks a variation for.
+	monoFile = "fonts/IBMPlexMono-Regular.ttf"
 )
 
 // faceKey identifies one cached face: weight file + pixel size.
@@ -87,18 +86,19 @@ func face(file string, size float64) *text.GoTextFace {
 	return f
 }
 
-// Face returns the body face (Turret Road Regular) at the given pixel
+// Face returns the body face (IBM Plex Sans Regular) at the given pixel
 // size: everything the interface writes by default.
 func Face(size float64) *text.GoTextFace { return face(regularFile, size) }
 
-// FaceBold returns the emphasis face (Turret Road Bold) at the given
-// pixel size: window titles, table header sort buttons, buttons and HUD
-// emphasis. Additive — Face is unchanged, callers opt in per role.
+// FaceBold returns the emphasis face (emphasisFile, the emphasis weight
+// of IBM Plex Sans) at the given pixel size: window titles, table header
+// sort buttons, buttons and HUD emphasis. Additive — Face is unchanged,
+// callers opt in per role.
 func FaceBold(size float64) *text.GoTextFace { return face(emphasisFile, size) }
 
-// MonoFace returns the tabular contents face (Source Code Pro Regular —
-// the variable font's default instance) at the given pixel size: table
-// rows that carry numbers and listed entries (inventory, market), where
-// monospaced cells line the columns up. Additive — Face is unchanged,
-// callers opt in per table (uikit's ContentsFace option).
+// MonoFace returns the tabular contents face (IBM Plex Mono Regular) at
+// the given pixel size: table rows that carry numbers and listed entries
+// (inventory, market), where monospaced cells line the columns up.
+// Additive — Face is unchanged, callers opt in per table (uikit's
+// ContentsFace option).
 func MonoFace(size float64) *text.GoTextFace { return face(monoFile, size) }

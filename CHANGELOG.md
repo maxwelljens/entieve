@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **New typefaces: IBM Plex Sans (display) and IBM Plex Mono (tabular).**
+  Turret Road and Source Code Pro are replaced wholesale in
+  `render/fonts/` — IBM Plex Sans ships Light/Regular/Medium/Bold, IBM
+  Plex Mono a single static Regular — role for role: `render.Face`
+  (body), `render.FaceBold` (emphasis), `render.MonoFace` (inventory and
+  market table rows). Plex sets ~19 % taller at the same size, so
+  `uikit.DefaultTypeScale`'s base moves 21 → 20 px (Small 16.8 → 16,
+  Large 27.3 → 26, Tiny 14.7 → 14). Glyph coverage (ASCII, `€`/`¢`,
+  `×`/`³`, the Polish/Czech diacritics, the ↑/↓ sort indicators) and
+  uniform mono digit advances stay pinned in `render/fonts_test.go`;
+  both SIL OFL 1.1 notices ship embedded beside the TTFs.
+
 - **Row interactions declare one seam** (`uikit.RowSpec`): every listed
   row — market, inventory, fitting, rack, overview, factory, the
   contract board and Show Info's chain links — now declares its
