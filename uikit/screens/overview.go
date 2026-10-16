@@ -1,0 +1,258 @@
+package screens
+
+import (
+	"image"
+	"image/color"
+	"sort"
+
+	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/ecs"
+	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
+	"github.com/hajimehoshi/ebiten/v2"
+)
+
+// ovRow is the overview's persistent per-entity row payload: the pointer
+// identity doubles as the Table's stable selection/activation key while
+// info refreshes every sync (distances tick, flags change).
+type ovRow struct {
+	info sim.Info
+}
+
+// InfoRefOf resolves the row payload inside the seam's Show Info
+// resolver (widgets/infoRefPayload): the entity behind the row.
+func (r *ovRow) InfoRefOf(cv widgets.ContentView) (widgets.InfoRef, bool) {
+	return widgets.InfoRefFor(cv, r.info.Entity)
+}
+
+// overview owns the Overview window: a WindowPanel whose body is a
+// Table of the visible grid.
+type overview struct {
+	win  *widget.Window
+	tbl  *widgets.Table
+	rows map[ecs.Entity]*ovRow // persistent row objects keyed by entity
+}
+
+// Env returns this kit's session — the three seams (one Theme, the
+// read-only view, the installed ActionSink) plus the shared popup
+// services, the same values its own windows were built from. Panel
+// hosts construct their extra panels from this instead of calling
+// NewEnv with the same arguments (that built a second theme/face set
+// the kit never used).
+func (k *Kit) Env() Session { return k.sess }
+
+// AddWindow mounts an extra window on the kit's UI so it shares the
+// kit's theme, stacking and input pump. Every mounted window gets the
+// four-edge resize chrome here (the registry is the kit's: see
+// Kit.chromes), and the returned func closes the window again —
+// detaching its chrome, so an unmounted window stops being pumped and a
+// drag interrupted by the unmount leaves no rect or cursor state behind.
+func (k *Kit) AddWindow(w *widget.Window) widget.RemoveWindowFunc {
+	if _, ok := k.chromes[w]; !ok {
+		k.chromes[w] = &winChrome{win: w}
+	}
+	remove := k.ui.AddWindow(w)
+	return func() {
+		if ch, ok := k.chromes[w]; ok {
+			ch.cancel() // mid-drag unmount: drop the grip state first
+			delete(k.chromes, w)
+		}
+		remove()
+	}
+}
+
+// buildOverview constructs the Overview window around its Table.
+func (k *Kit) buildOverview() {
+	o := &overview{rows: map[ecs.Entity]*ovRow{}}
+	k.ov = o
+
+	tbl := widgets.NewTable(k.Env(), []widgets.Column{
+		{Key: "Name", Title: "Name", Priority: 0},
+		{Key: "Distance", Title: "Distance", Priority: 1, AlignRight: true},
+		{Key: "Kind", Title: "Kind", Priority: 2},
+		{Key: "Velocity", Title: "Velocity", Priority: 3, AlignRight: true},
+	})
+	// Typed sort: string cells would order "1.2 AU" before "42 m".
+	tbl.SetSortFunc(sortOverview)
+	tbl.SetSort("Distance", true)
+	tbl.OnSelect(func(r widgets.TableRow) {
+		if row, ok := r.Data.(*ovRow); ok {
+			k.selected = row.info.Entity
+		}
+	})
+	// Double-click shows the row's definition (an NPC caste, a hull, an
+	// asteroid's ore — the old behaviour, approach-on-activate, moved to
+	// the world scene and the menu); right-click opens the entity menu.
+	// Both derive from the row's declared RowSpec (overviewSpec), built
+	// per row in sync.
+	o.tbl = tbl
+
+	// Body: the table fills its grid cell exactly, so the scroll
+	// viewport is bounded by the window no matter how tall the rows are.
+	contents := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(k.th.Pal().BG), theme.NRGBA(k.th.Pal().Border, 200), 1)),
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(1),
+			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
+		)),
+	)
+	contents.AddChild(tbl.Container())
+
+	title := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(k.th.Pal().BGHard), theme.NRGBA(k.th.Pal().Border, 200), 1)),
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+	)
+	title.AddChild(widget.NewText(
+		widget.TextOpts.Text("Overview", k.th.FaceBold(theme.StepBase), theme.Solid(k.th.Pal().Accent)),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionStart,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			Padding:            widget.NewInsetsSimple(theme.Px(theme.ContentsPad)),
+		})),
+	))
+
+	o.win = widget.NewWindow(
+		widget.WindowOpts.Contents(contents),
+		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
+		widget.WindowOpts.Draggable(),
+		// Resize comes from the winchrome edge grips (all four edges),
+		// not widget.WindowOpts.Resizeable() — that one only stretches
+		// the bottom/right corner. Kit.AddWindow attaches the chrome.
+		widget.WindowOpts.MinSize(theme.Px(320), theme.Px(240)),
+		widget.WindowOpts.Location(image.Rect(theme.Px(8), theme.Px(8), theme.Px(388), theme.Px(428))),
+	)
+}
+
+// overviewSpec is one overview row's declared interactions: Show Info on
+// what the entity IS (declared even when it resolves to nothing — the
+// entry shows grayed, first and bold), then the Selected Item window's
+// own verbs as row actions — every entry queues the sim command its
+// button queues (CmdWarpTo/CmdOrbit/CmdApproach/CmdLock), at the row's
+// entity and at the range selectors' current value (read at press).
+// Entries the sim would refuse (self-targeting, unwarpageable,
+// unlockable kinds) show grayed. The installer turns this data into the
+// menu; a right-click never moves the selection.
+func (k *Kit) overviewSpec(row *ovRow) widgets.RowSpec {
+	e := row.info.Entity
+	spec := widgets.RowSpec{Ref: widgets.RowRef(k.cv, row)}
+	info, hasInfo := k.cv.Info(e)
+	if hasInfo {
+		self := e == k.cv.Player()
+		tooClose := info.Distance < sim.WarpMinRange
+		// The verbs are intents: the executor reads the warp/orbit range
+		// from the Selected Item selectors when they fire.
+		spec.Actions = []widgets.RowAction{
+			{Label: "Warp to", Disabled: self || !info.CanWarp || tooClose,
+				Intent: widgets.WarpTo{Entity: e}},
+			{Label: "Orbit", Disabled: self, Intent: widgets.Orbit{Entity: e}},
+			{Label: "Approach", Disabled: self, Intent: widgets.Approach{Entity: e}},
+			{Label: "Lock target", Disabled: self || !canLock(info.Kind),
+				Intent: widgets.Lock{Entity: e}},
+		}
+	}
+	return spec
+}
+
+// sync refreshes the rows from the sim: visible grid entities only, with
+// hostile/player tints, then lets the table sort and diff the widgets.
+func (o *overview) sync(k *Kit) {
+	order := make([]widgets.TableRow, 0, 32)
+	for _, info := range k.cv.Grid() {
+		if !info.Visible {
+			continue
+		}
+		var tint, iconTint color.RGBA
+		switch {
+		case info.Entity == k.cv.Player():
+			tint = widgets.WithA(k.th.Pal().Player, 60)
+			iconTint = k.th.Pal().Info // own ship wears ColInfo
+		case info.Hostile:
+			tint = widgets.WithA(k.th.Pal().Danger, 60)
+			iconTint = k.th.Pal().Danger // hostiles wear ColDanger
+		}
+		row := o.rowFor(info)
+		order = append(order, widgets.TableRow{
+			Cells: []string{
+				info.Name,
+				theme.FormatDistance(info.Distance),
+				theme.KindLabel(info.Kind),
+				theme.FormatSpeed(info.Vel.Len()),
+			},
+			Icons:    []string{"", "", theme.KindIcon(info.Kind), ""},
+			IconTint: iconTint,
+			Tint:     tint,
+			Data:     row,
+			Spec:     k.overviewSpec(row),
+		})
+	}
+	// Prune row objects of entities that left the grid (selection
+	// identity survives because it lives on the *ovRow, not the index).
+	if len(o.rows) != len(order) {
+		fresh := make(map[ecs.Entity]*ovRow, len(order))
+		for _, r := range order {
+			row := r.Data.(*ovRow)
+			fresh[row.info.Entity] = row
+		}
+		o.rows = fresh
+	}
+	o.tbl.SetRows(order)
+	o.tbl.Sync()
+}
+
+// rowFor returns the persistent row object for an entity, refreshing its
+// info snapshot.
+func (o *overview) rowFor(info sim.Info) *ovRow {
+	r := o.rows[info.Entity]
+	if r == nil {
+		r = &ovRow{}
+		o.rows[info.Entity] = r
+	}
+	r.info = info
+	return r
+}
+
+// selectEntity syncs the row highlight to an externally chosen selection
+// (a world click or keyboard cycle). Unknown entities clear the highlight.
+func (o *overview) selectEntity(e ecs.Entity) {
+	if r, ok := o.rows[e]; ok {
+		o.tbl.SelectData(r)
+		return
+	}
+	o.tbl.SelectData(nil)
+}
+
+// drawTints is the kit.go Draw seam: the Table paints row tints itself
+// now (per-row backgrounds), so there is no post-draw tint pass left.
+func (o *overview) drawTints(screen *ebiten.Image, k *Kit) {}
+
+// sortOverview orders overview rows stably by their typed Info values;
+// equal keys keep their previous relative order.
+func sortOverview(key string, asc bool, rows []widgets.TableRow) {
+	less := func(a, b widgets.TableRow) bool {
+		ia, okA := a.Data.(*ovRow)
+		ib, okB := b.Data.(*ovRow)
+		if !okA || !okB {
+			return false
+		}
+		switch key {
+		case "Name":
+			return ia.info.Name < ib.info.Name
+		case "Distance":
+			return ia.info.Distance < ib.info.Distance
+		case "Kind":
+			return ia.info.Kind < ib.info.Kind
+		case "Velocity":
+			return ia.info.Vel.Len() < ib.info.Vel.Len()
+		default:
+			return false
+		}
+	}
+	sort.SliceStable(rows, func(i, j int) bool {
+		if asc {
+			return less(rows[i], rows[j])
+		}
+		return less(rows[j], rows[i])
+	})
+}

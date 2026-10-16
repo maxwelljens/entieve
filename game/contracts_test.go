@@ -8,7 +8,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -366,12 +366,12 @@ func TestStationBoardRendersShippedContent(t *testing.T) {
 }
 
 // TestBoardRewardUsesCanonicalCredits: the payout line renders through
-// the exported formatter every credit readout shares (uikit.FormatCredits
+// the exported formatter every credit readout shares (theme.FormatCredits
 // — HUD wallet, market title, board reward). One golden call, no
 // widget-tree spelunking: with a single formatter there is nothing left
-// to cross-check. The formatter's own goldens live in uikit/hud_test.go.
+// to cross-check. The formatter's own goldens live in uikit/?/hud_test.go.
 func TestBoardRewardUsesCanonicalCredits(t *testing.T) {
-	if got, want := uikit.FormatCredits(40000), "40,000.00 €"; got != want {
+	if got, want := theme.FormatCredits(40000), "40,000.00 €"; got != want {
 		t.Errorf("FormatCredits(40000) = %q, want %q", got, want)
 	}
 	def := content.ContractDef{Reward: content.ContractReward{Credits: 40000, StandingGain: 0.10}}

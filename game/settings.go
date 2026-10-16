@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/uikit"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -27,7 +27,7 @@ import (
 // reported to the log).
 //
 // ui_scale is the USER half of the global scale: the installed UI scale
-// is uiScale × the display's device factor (see Game.Run / uikit.SetScale).
+// is uiScale × the display's device factor (see Game.Run / theme.SetScale).
 
 // uiScaleSteps is the settings window's UI-scale ladder — the stepper
 // steps through these and only these values, and a persisted ui_scale is
@@ -132,7 +132,7 @@ func (g *Game) applyUIScale(s float64) {
 // layout there is (the sidecar is applied later by the first applySize).
 func (g *Game) applyScale(preserveLayout bool) {
 	s := g.uiScale * g.deviceScale()
-	if s == uikit.Scale() {
+	if s == theme.Scale() {
 		return // nothing changed (a fresh Game installs its scale in New)
 	}
 	lines := g.logP.Lines()
@@ -142,7 +142,7 @@ func (g *Game) applyScale(preserveLayout bool) {
 			g.report(err, "")
 		}
 	}
-	uikit.SetScale(s)
+	theme.SetScale(s)
 	if err := g.buildKit(); err != nil {
 		g.report(err, "")
 		return

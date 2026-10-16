@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/uikit"
+	"github.com/entieve/entieve/uikit/theme"
 )
 
 // Window-layout persistence: a JSON sidecar next to the save file,
@@ -35,8 +35,8 @@ import (
 // unknown format).
 //
 // Scale independence: every rect field is persisted in DESIGN units —
-// the pixel layout at UI scale 1 (current px ÷ uikit.Scale() on write,
-// uikit.Px on read). Version-2 files were all written at scale 1, where
+// the pixel layout at UI scale 1 (current px ÷ theme.Scale() on write,
+// theme.Px on read). Version-2 files were all written at scale 1, where
 // design unit == pixel, so they load seamlessly at any scale: one saved
 // arrangement works at 0.75× and at 2.5×, and a session that changes
 // scale mid-run round-trips through the same convention (applyScale).
@@ -65,7 +65,7 @@ type layoutFile struct {
 // (the Esc menu is scene-owned and stays out). Menu, station and the
 // HUD/rack chrome are not user layout state.
 //
-// Assigned in init from the spec (screens.go), like panelDefs.
+// Assigned in init from the spec (uikit.go), like panelDefs.
 var layoutNames []string
 
 // layoutPath is the sidecar location: the resolved save path plus
@@ -135,7 +135,7 @@ func (g *Game) persistOpen(name string, open *bool) bool {
 // so SaveGame can report them; the clean-quit path is best-effort.
 func (g *Game) writeLayout() error {
 	f := layoutFile{Version: layoutVersion, Windows: map[string]winLayout{}}
-	s := uikit.Scale()
+	s := theme.Scale()
 	for _, name := range layoutNames {
 		win, open := g.layoutTarget(name)
 		if win == nil {
@@ -247,8 +247,8 @@ func (g *Game) applyLayout(screenW, screenH int) {
 		}
 		// Sidecar rects are DESIGN units: × current scale back into live
 		// px (at scale 1 this is the exact historical pixel rect).
-		x, y := uikit.Px(e.X), uikit.Px(e.Y)
-		saved := image.Rect(x, y, x+uikit.Px(e.W), y+uikit.Px(e.H))
+		x, y := theme.Px(e.X), theme.Px(e.Y)
+		saved := image.Rect(x, y, x+theme.Px(e.W), y+theme.Px(e.H))
 		win.SetLocation(clampLayoutRect(saved, minSize, screen))
 		// Track the rect actually applied (SetLocation may grow it), so
 		// the placement tracker never reports a restored window as

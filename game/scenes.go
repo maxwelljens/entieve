@@ -6,8 +6,9 @@ import (
 
 	eimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/uikit"
 	"github.com/entieve/entieve/uikit/icons"
+	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -44,7 +45,7 @@ type StationScene struct{ g *Game }
 // stationPanels are the windows that auto-open on dock: every Screen row
 // flagged ForcedDockOpen (the station trio), in spec order — the same
 // set layout.go persists the PRE-dock intent for and station_layout.go
-// composes. Assigned in init from the spec (screens.go), like panelDefs.
+// composes. Assigned in init from the spec (uikit.go), like panelDefs.
 var stationPanels []panelID
 
 // isStationPanel reports whether p is one of the dock-forced services.
@@ -174,11 +175,11 @@ func (g *Game) titleBar(label string) *widget.Container {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	title.AddChild(widget.NewText(
-		widget.TextOpts.Text(label, g.env.FaceBold(uikit.StepBase), solid(p.Accent)),
+		widget.TextOpts.Text(label, g.env.FaceBold(theme.StepBase), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(uikit.Px(5)),
+			Padding:            widget.NewInsetsSimple(theme.Px(5)),
 		})),
 	))
 	return title
@@ -190,7 +191,7 @@ func (g *Game) newBtn(label string, minW, minH int, clicked func()) *widget.Butt
 	return widget.NewButton(
 		widget.ButtonOpts.TextLabel(label),
 		// minW/minH arrive as DESIGN units (callers pass the raw consts).
-		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(uikit.Px(minW), uikit.Px(minH))),
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(minW), theme.Px(minH))),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
 	)
 }
@@ -200,13 +201,13 @@ func (g *Game) newBtn(label string, minW, minH int, clicked func()) *widget.Butt
 // states are untouched, and the disabled icon draws at 40%).
 func (g *Game) newIconBtn(label, icon string, minW, minH int, clicked func()) *widget.Button {
 	p := g.env.Pal()
-	dim := color.RGBA{R: p.Dim.R, G: p.Dim.G, B: p.Dim.B, A: uikit.IconDisabledA}
+	dim := color.RGBA{R: p.Dim.R, G: p.Dim.G, B: p.Dim.B, A: theme.IconDisabledA}
 	return widget.NewButton(
 		widget.ButtonOpts.TextAndImage(label, nil, &widget.GraphicImage{
-			Idle:     icons.Get(icon, uikit.Px(uikit.IconButton), p.Text),
-			Disabled: icons.Get(icon, uikit.Px(uikit.IconButton), dim),
+			Idle:     icons.Get(icon, theme.Px(theme.IconButton), p.Text),
+			Disabled: icons.Get(icon, theme.Px(theme.IconButton), dim),
 		}, nil),
-		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(uikit.Px(minW), uikit.Px(minH))),
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(minW), theme.Px(minH))),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
 	)
 }
@@ -219,18 +220,18 @@ func (g *Game) buildMenuWindow() *widget.Window {
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(uikit.Px(10)),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(uikit.Px(10))),
+			widget.RowLayoutOpts.Spacing(theme.Px(10)),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(10))),
 		)),
 	)
 	// The menu's verbs are intents too: Resume closes the menu screen
 	// itself (Toggle{Menu}), the rest are the game-level intents Game.Do
 	// executes — one dispatch path for buttons and screens alike.
 	actions := map[string]func(){
-		"Resume": func() { g.Do(uikit.Toggle{Screen: "Menu"}) },
-		"Save":   func() { g.Do(uikit.Save{}) },
-		"Load":   func() { g.Do(uikit.Load{}) },
-		"Quit":   func() { g.Do(uikit.Quit{}) },
+		"Resume": func() { g.Do(widgets.Toggle{Screen: "Menu"}) },
+		"Save":   func() { g.Do(widgets.Save{}) },
+		"Load":   func() { g.Do(widgets.Load{}) },
+		"Quit":   func() { g.Do(widgets.Quit{}) },
 	}
 	for _, item := range menuItems {
 		item := item
@@ -238,11 +239,11 @@ func (g *Game) buildMenuWindow() *widget.Window {
 	}
 	return widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.TitleBar(g.titleBar("Menu"), uikit.Px(winTitleH)),
+		widget.WindowOpts.TitleBar(g.titleBar("Menu"), theme.Px(winTitleH)),
 		widget.WindowOpts.Draggable(),
 		widget.WindowOpts.Modal(),
 		widget.WindowOpts.Location(image.Rect(0, 0,
-			uikit.Px(int(menuBtnW)+20), uikit.Px(int(4*menuBtnH+3*10+20)+winTitleH))),
+			theme.Px(int(menuBtnW)+20), theme.Px(int(4*menuBtnH+3*10+20)+winTitleH))),
 	)
 }
 
@@ -255,39 +256,39 @@ func (g *Game) buildMenuWindow() *widget.Window {
 func (g *Game) buildStationWindow() *widget.Window {
 	p := g.env.Pal()
 	g.stName = widget.NewText(
-		widget.TextOpts.Text("Docked", g.env.Face(uikit.StepSmall), solid(p.Text)),
+		widget.TextOpts.Text("Docked", g.env.Face(theme.StepSmall), solid(p.Text)),
 	)
 	undock := g.newIconBtn("Undock", "act_undock", 150, menuBtnH, func() {
-		g.Do(uikit.Undock{})
+		g.Do(widgets.Undock{})
 	})
 	header := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(uikit.Px(10)),
+			widget.RowLayoutOpts.Spacing(theme.Px(10)),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
 	// The station strip is the contracts service's face: its leading glyph
 	// is the only "title" this window has (it owns no title bar).
-	glyph := uikit.NewIcon("svc_contracts", uikit.IconTitle, p.Accent)
+	glyph := theme.NewIcon("svc_contracts", theme.IconTitle, p.Accent)
 	glyph.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
 	header.AddChild(glyph, g.stName, undock)
 
 	g.stAvail = g.newBoardSection()
 	g.stActive = g.newBoardSection()
 	availHead := widget.NewText(
-		widget.TextOpts.Text("Available contracts", g.env.Face(uikit.StepSmall), solid(p.Accent)),
+		widget.TextOpts.Text("Available contracts", g.env.Face(theme.StepSmall), solid(p.Accent)),
 	)
 	actHead := widget.NewText(
-		widget.TextOpts.Text("Active contracts", g.env.Face(uikit.StepSmall), solid(p.Accent)),
+		widget.TextOpts.Text("Active contracts", g.env.Face(theme.StepSmall), solid(p.Accent)),
 	)
 
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(uikit.Px(boardSpacing)),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(uikit.Px(boardPad))),
+			widget.RowLayoutOpts.Spacing(theme.Px(boardSpacing)),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(boardPad))),
 		)),
 	)
 	body.AddChild(header, availHead, g.stAvail, actHead, g.stActive)
@@ -296,8 +297,8 @@ func (g *Game) buildStationWindow() *widget.Window {
 
 	win := widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.MinSize(uikit.Px(stationMinW), uikit.Px(stationMinH)),
-		widget.WindowOpts.Location(image.Rect(uikit.Px(stationX), uikit.Px(stationY), uikit.Px(stationX+stationWinW), uikit.Px(stationY+stationMinH))),
+		widget.WindowOpts.MinSize(theme.Px(stationMinW), theme.Px(stationMinH)),
+		widget.WindowOpts.Location(image.Rect(theme.Px(stationX), theme.Px(stationY), theme.Px(stationX+stationWinW), theme.Px(stationY+stationMinH))),
 	)
 	// Bind the theme now: syncStationBoard sizes the window from the body's
 	// preferred size before the window is first mounted, and ebitenui

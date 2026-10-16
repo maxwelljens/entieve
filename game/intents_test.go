@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit"
+	"github.com/entieve/entieve/uikit/widgets"
 )
 
-// Intent → handler dispatch (uikit/intents.go + Game.Do): the intents a
+// Intent → handler dispatch (uikit/widgets/intents.go + Game.Do): the intents a
 // screen emits reach the very handlers the old buttons and keys drove,
 // through the sink buildKit installs (Kit.SetSink).
 
@@ -25,7 +25,7 @@ func TestDoHandlesHostIntents(t *testing.T) {
 	if !g.open[pMarket] {
 		t.Fatal("fixture: market not open while docked")
 	}
-	g.Do(uikit.Toggle{Screen: "Market"})
+	g.Do(widgets.Toggle{Screen: "Market"})
 	if g.open[pMarket] {
 		t.Error("Toggle did not close the Market screen")
 	}
@@ -33,7 +33,7 @@ func TestDoHandlesHostIntents(t *testing.T) {
 	if g.mounted[pMarket] != nil {
 		t.Error("closed Market screen stayed mounted (setPanel handler not reached)")
 	}
-	g.Do(uikit.Toggle{Screen: "market"}) // the title matches case-insensitively
+	g.Do(widgets.Toggle{Screen: "market"}) // the title matches case-insensitively
 	if !g.open[pMarket] {
 		t.Error("second Toggle did not reopen the Market screen")
 	}
@@ -43,11 +43,11 @@ func TestDoHandlesHostIntents(t *testing.T) {
 	}
 
 	// A Modal row pushes/pops its scene, the way its key does.
-	g.Do(uikit.Toggle{Screen: "Starmap"})
+	g.Do(widgets.Toggle{Screen: "Starmap"})
 	if _, ok := g.top().(*MapScene); !ok {
 		t.Errorf("top scene = %T, want *MapScene", g.top())
 	}
-	g.Do(uikit.Toggle{Screen: "Starmap"})
+	g.Do(widgets.Toggle{Screen: "Starmap"})
 	if _, ok := g.top().(*MapScene); ok {
 		t.Error("second Starmap toggle did not pop the scene")
 	}
@@ -55,16 +55,16 @@ func TestDoHandlesHostIntents(t *testing.T) {
 	// The Esc menu's verbs: Save writes the session's save file (the
 	// same handler Ctrl+S runs), Load defers to the post-pump rebuild,
 	// Quit latches the loop's termination flag.
-	g.Do(uikit.Save{})
+	g.Do(widgets.Save{})
 	if _, err := os.Stat(g.SavePath()); err != nil {
 		t.Errorf("Save intent did not write %s: %v", g.SavePath(), err)
 	}
-	g.Do(uikit.Load{})
+	g.Do(widgets.Load{})
 	if !g.pendingLoad {
 		t.Error("Load intent did not arm the deferred load")
 	}
 	g.pendingLoad = false
-	g.Do(uikit.Quit{})
+	g.Do(widgets.Quit{})
 	if !g.quit {
 		t.Error("Quit intent did not latch the quit flag")
 	}
@@ -80,7 +80,7 @@ func TestDoDelegatesToTheKitExecutor(t *testing.T) {
 	g.enqueue = func(c sim.Command) { got = append(got, c) }
 
 	// Undock: exactly what the station strip's Undock button queues.
-	g.Do(uikit.Undock{})
+	g.Do(widgets.Undock{})
 	if len(got) != 1 {
 		t.Fatalf("Undock queued %#v, want the single CmdUndock", got)
 	}
@@ -89,16 +89,16 @@ func TestDoDelegatesToTheKitExecutor(t *testing.T) {
 	}
 
 	// Show Info: exactly what the menu's Show Info entries open.
-	g.Do(uikit.ShowInfo{Ref: uikit.ItemRef("charge-emp")})
+	g.Do(widgets.ShowInfo{Ref: widgets.ItemRef("charge-emp")})
 	if !g.kit.InfoOpen() {
 		t.Fatal("ShowInfo intent did not open the window")
 	}
-	if ref, _ := g.env.InfoWindow().Ref(); ref != uikit.ItemRef("charge-emp") {
+	if ref, _ := g.env.InfoWindow().Ref(); ref != widgets.ItemRef("charge-emp") {
 		t.Errorf("info ref = %v, want charge-emp", ref)
 	}
 
 	// OpenMenu: exactly what the row installer's popup mounts.
-	g.Do(uikit.OpenMenu{Entries: []uikit.MenuEntry{{Label: "Stub"}}, At: image.Pt(5, 6)})
+	g.Do(widgets.OpenMenu{Entries: []widgets.MenuEntry{{Label: "Stub"}}, At: image.Pt(5, 6)})
 	m := g.kit.Menu()
 	if !m.IsOpen() || m.Rect().Min != (image.Pt(5, 6)) {
 		t.Errorf("menu open=%v origin=%v, want open at the intent's point",

@@ -11,7 +11,7 @@ import (
 
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
@@ -25,13 +25,13 @@ import (
 //     rects the cursor runs in,
 //   - P mounts the settings window and the sidecar records it.
 //
-// Every test that touches the global scale restores it: uikit.SetScale
+// Every test that touches the global scale restores it: theme.SetScale
 // is process-wide and the baseline suite runs at scale 1.
 
 // resetScale restores the identity scale when the test ends.
 func resetScale(t *testing.T) {
 	t.Helper()
-	t.Cleanup(func() { uikit.SetScale(1) })
+	t.Cleanup(func() { theme.SetScale(1) })
 }
 
 // newScaleGameAt builds the showcase session on savePath with an explicit
@@ -159,12 +159,12 @@ func TestApplyUIScaleLiveRelayout(t *testing.T) {
 	if before == (image.Rectangle{}) {
 		t.Fatal("overview has no rect before the scale change")
 	}
-	faceBefore, _ := text.Measure("Entieve", *g.env.FaceBold(uikit.StepBase), 0)
+	faceBefore, _ := text.Measure("Entieve", *g.env.FaceBold(theme.StepBase), 0)
 	g.logP.PushLine(sim.SevInfo, "kept across the rebuild")
 
 	g.applyUIScale(1.5)
 
-	if got := uikit.Scale(); got != 1.5 {
+	if got := theme.Scale(); got != 1.5 {
 		t.Fatalf("global scale after change = %v, want 1.5", got)
 	}
 	if g.uiScale != 1.5 {
@@ -181,7 +181,7 @@ func TestApplyUIScaleLiveRelayout(t *testing.T) {
 	// Faces rebuilt at the new scale. Glyph advances quantize per size
 	// (text/v2 hinting), so "1.5×" holds to a couple of percent, not bit
 	// exactly — the point is the measure GREW with the rebuild.
-	faceAfter, _ := text.Measure("Entieve", *g.env.FaceBold(uikit.StepBase), 0)
+	faceAfter, _ := text.Measure("Entieve", *g.env.FaceBold(theme.StepBase), 0)
 	if math.Abs(faceAfter-1.5*faceBefore) > 0.03*faceAfter {
 		t.Errorf("face measure after change = %v, want ≈%v (1.5× ±3%%)", faceAfter, 1.5*faceBefore)
 	}
@@ -250,7 +250,7 @@ func TestLayoutSidecarDesignUnitsAcrossScales(t *testing.T) {
 	}
 
 	for _, sc := range []float64{1.5, 2.0} {
-		uikit.SetScale(sc)
+		theme.SetScale(sc)
 		g.applyLayout(2560, 1440) // wide enough that nothing clamps
 		got := ov.GetContainer().GetWidget().Rect
 		want := image.Rect(
@@ -260,7 +260,7 @@ func TestLayoutSidecarDesignUnitsAcrossScales(t *testing.T) {
 			t.Errorf("scale %v: overview restored as %v, want %v (design × scale)", sc, got, want)
 		}
 	}
-	uikit.SetScale(1)
+	theme.SetScale(1)
 	g.applyLayout(1280, 720)
 	if got := ov.GetContainer().GetWidget().Rect; got != design {
 		t.Errorf("back at scale 1: overview = %v, want %v", got, design)
@@ -285,7 +285,7 @@ func TestLayoutReturnsDevicePixelsAndOverUIAgrees(t *testing.T) {
 	resetScale(t)
 	g := newScaleGameAt(t, filepath.Join(t.TempDir(), "save.json"), 1.5)
 
-	if got := uikit.Scale(); got != 1.5 {
+	if got := theme.Scale(); got != 1.5 {
 		t.Fatalf("global scale with DeviceScale 1.5 = %v, want 1.5 (uiScale 1 × device)", got)
 	}
 	w, h := g.Layout(1024, 700)

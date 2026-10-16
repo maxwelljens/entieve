@@ -8,7 +8,7 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/entieve/entieve/uikit"
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 

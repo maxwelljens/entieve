@@ -10,7 +10,8 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit"
+	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
@@ -56,7 +57,7 @@ func boardRowRects(inner image.Rectangle, n int) []image.Rectangle {
 	if n <= 0 || inner.Dx() <= 0 || inner.Dy() <= 0 {
 		return nil
 	}
-	gap := uikit.Px(boardRowGap)
+	gap := theme.Px(boardRowGap)
 	if (inner.Dy()-(n-1)*gap)/n < 1 {
 		gap = 0 // degenerate: no room for gaps, stack 1px rows
 	}
@@ -94,7 +95,7 @@ func (boardLayout) PreferredSize(ws []widget.PreferredSizeLocateableWidget) (int
 			h = ch
 		}
 	}
-	return w, len(ws)*h + (len(ws)-1)*uikit.Px(boardRowGap)
+	return w, len(ws)*h + (len(ws)-1)*theme.Px(boardRowGap)
 }
 
 func (boardLayout) Layout(ws []widget.PreferredSizeLocateableWidget, rect image.Rectangle) {
@@ -188,7 +189,7 @@ func (g *Game) buildStationBoard() stationBoardModel {
 			Title:   def.Title,
 			Summary: objectiveSummary(c, def),
 			Reward:  rewardText(def),
-			Icon:    uikit.ContractIcon(def.Kind),
+			Icon:    theme.ContractIcon(def.Kind),
 			Action:  "Accept",
 		}
 		if accepted[def.ID] {
@@ -226,7 +227,7 @@ func (g *Game) buildStationBoard() stationBoardModel {
 		m.Active = append(m.Active, boardRowModel{
 			ID:     a.ms.ID,
 			Title:  a.def.Title + " — " + fmt.Sprintf("%d/%d", int(math.Round(have)), a.def.Objective.Count),
-			Icon:   uikit.ContractIcon(a.def.Kind),
+			Icon:   theme.ContractIcon(a.def.Kind),
 			Action: "Abandon",
 		})
 	}
@@ -293,7 +294,7 @@ func (g *Game) rebuildStationBoard(m stationBoardModel) {
 func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container, *widget.Button) {
 	p := g.env.Pal()
 	rowBG := bordered(nrgba(p.Cell, 160), nrgba(p.Border, 140), 1)
-	rowPad := &widget.Insets{Left: uikit.Px(boardRowPad), Right: uikit.Px(boardRowPad)}
+	rowPad := &widget.Insets{Left: theme.Px(boardRowPad), Right: theme.Px(boardRowPad)}
 
 	if r.Note {
 		row := widget.NewContainer(
@@ -304,7 +305,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 			)),
 		)
 		row.AddChild(widget.NewText(
-			widget.TextOpts.Text(g.ellip(r.Title, uikit.StepTiny, float64(uikit.Px(boardContentW))), g.env.Face(uikit.StepTiny), solid(p.Dim)),
+			widget.TextOpts.Text(g.ellip(r.Title, theme.StepTiny, float64(theme.Px(boardContentW))), g.env.Face(theme.StepTiny), solid(p.Dim)),
 			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 				Position: widget.RowLayoutPositionCenter,
 			})),
@@ -317,10 +318,10 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 			return
 		}
 		if active {
-			g.env.Do(uikit.Abandon{Contract: r.ID})
+			g.env.Do(widgets.Abandon{Contract: r.ID})
 			return
 		}
-		g.env.Do(uikit.Accept{Contract: r.ID})
+		g.env.Do(widgets.Accept{Contract: r.ID})
 	})
 	btn.GetWidget().Disabled = r.Disabled
 
@@ -335,7 +336,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 			if !ok || a.Button != ebiten.MouseButtonRight {
 				return
 			}
-			g.env.OpenRowMenu(spec, uikit.ClickPoint(a))
+			g.env.OpenRowMenu(spec, widgets.ClickPoint(a))
 		})
 	}
 
@@ -343,9 +344,9 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	// fits the title column at the tiny step in IBM Plex Sans (at small the
 	// em-dash suffix alone costs 56 px); available titles, which carry no
 	// suffix, stay at small.
-	step := uikit.StepSmall
+	step := theme.StepSmall
 	if active {
-		step = uikit.StepTiny
+		step = theme.StepTiny
 	}
 	// The kind glyph leads the title; the title's fixed width gives back
 	// the icon box, so every row keeps the same total width whether it
@@ -353,9 +354,9 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	// Scaled ONCE here: the fixed width below (MinSize + ellip budget)
 	// reads it in live px, and the icon reserve matches the drawn
 	// Px(icon box) + Px(gap) of the row it mirrors.
-	titleW := uikit.Px(boardTextW)
+	titleW := theme.Px(boardTextW)
 	if r.Icon != "" {
-		titleW -= uikit.Px(uikit.IconInline) + uikit.Px(uikit.IconGap)
+		titleW -= theme.Px(theme.IconInline) + theme.Px(theme.IconGap)
 	}
 	title := widget.NewText(
 		widget.TextOpts.Text(g.ellip(r.Title, step, float64(titleW)), g.env.Face(step), solid(p.Accent)),
@@ -365,9 +366,9 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	if r.Icon != "" {
 		ctr := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(uikit.Px(uikit.IconGap)),
+			widget.RowLayoutOpts.Spacing(theme.Px(theme.IconGap)),
 		)))
-		icon := uikit.NewIcon(r.Icon, uikit.IconInline, p.Text)
+		icon := theme.NewIcon(r.Icon, theme.IconInline, p.Text)
 		// Centre the glyph in the line: the row is as tall as its
 		// button, and a top-flush icon reads as a misalignment.
 		for _, w := range []widget.PreferredSizeLocateableWidget{icon, ctr} {
@@ -383,7 +384,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 			widget.ContainerOpts.BackgroundImage(rowBG),
 			widget.ContainerOpts.Layout(widget.NewRowLayout(
 				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(uikit.Px(boardBtnGap)),
+				widget.RowLayoutOpts.Spacing(theme.Px(boardBtnGap)),
 				widget.RowLayoutOpts.Padding(rowPad),
 			)),
 		)
@@ -396,25 +397,25 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	// gated row parks its standing requirement beside the objective
 	// (line 2) so line 3 gives the payout the whole row — the reward is
 	// the one string on a board row that must never ellipsize.
-	summaryW := float64(uikit.Px(boardContentW))
+	summaryW := float64(theme.Px(boardContentW))
 	if r.Require != "" {
-		reqW := g.textW(r.Require, uikit.StepTiny)
-		if capW := summaryW - float64(uikit.Px(boardBtnGap)) - float64(uikit.Px(40)); reqW > capW {
-			r.Require = g.ellip(r.Require, uikit.StepTiny, capW)
-			reqW = g.textW(r.Require, uikit.StepTiny)
+		reqW := g.textW(r.Require, theme.StepTiny)
+		if capW := summaryW - float64(theme.Px(boardBtnGap)) - float64(theme.Px(40)); reqW > capW {
+			r.Require = g.ellip(r.Require, theme.StepTiny, capW)
+			reqW = g.textW(r.Require, theme.StepTiny)
 		}
-		summaryW -= reqW + float64(uikit.Px(boardBtnGap))
+		summaryW -= reqW + float64(theme.Px(boardBtnGap))
 	}
 	var line2 widget.PreferredSizeLocateableWidget = widget.NewText(
-		widget.TextOpts.Text(g.ellip(r.Summary, uikit.StepTiny, summaryW), g.env.Face(uikit.StepTiny), solid(p.Dim)),
+		widget.TextOpts.Text(g.ellip(r.Summary, theme.StepTiny, summaryW), g.env.Face(theme.StepTiny), solid(p.Dim)),
 	)
 	if r.Require != "" {
 		req := widget.NewText(
-			widget.TextOpts.Text(r.Require, g.env.Face(uikit.StepTiny), solid(p.Warn)),
+			widget.TextOpts.Text(r.Require, g.env.Face(theme.StepTiny), solid(p.Warn)),
 		)
 		ctr := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(uikit.Px(boardBtnGap)),
+			widget.RowLayoutOpts.Spacing(theme.Px(boardBtnGap)),
 		)))
 		ctr.AddChild(line2, req)
 		line2 = ctr
@@ -427,8 +428,8 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	// row and child handlers run after the parent's, so this Show Info
 	// menu replaces the row's Accept menu when the click lands here.
 	if ref, showable := g.objectiveRef(r.ID); showable {
-		spec := uikit.RowSpec{Ref: &ref}
-		var dbl uikit.RowDouble // one board build's gesture state
+		spec := widgets.RowSpec{Ref: &ref}
+		var dbl widgets.RowDouble // one board build's gesture state
 		line2.GetWidget().MouseButtonClickedEvent.AddHandler(func(args any) {
 			a, ok := args.(*widget.WidgetMouseButtonClickedEventArgs)
 			if !ok {
@@ -436,7 +437,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 			}
 			switch a.Button {
 			case ebiten.MouseButtonRight:
-				g.env.OpenRowMenu(spec, uikit.ClickPoint(a))
+				g.env.OpenRowMenu(spec, widgets.ClickPoint(a))
 			case ebiten.MouseButtonLeft:
 				dbl.Click(g.env, g.env, spec)
 			}
@@ -444,13 +445,13 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	}
 
 	reward := widget.NewText(
-		widget.TextOpts.Text(g.ellip(r.Reward, uikit.StepTiny, float64(uikit.Px(boardContentW))), g.env.Face(uikit.StepTiny), solid(p.Good)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(uikit.Px(boardContentW), 0)),
+		widget.TextOpts.Text(g.ellip(r.Reward, theme.StepTiny, float64(theme.Px(boardContentW))), g.env.Face(theme.StepTiny), solid(p.Good)),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(boardContentW), 0)),
 	)
 
 	line1 := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
 		widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-		widget.RowLayoutOpts.Spacing(uikit.Px(boardBtnGap)),
+		widget.RowLayoutOpts.Spacing(theme.Px(boardBtnGap)),
 	)))
 	line1.AddChild(titleCell, btn)
 
@@ -471,12 +472,12 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 // active one), the same gating, through the same command — a contract
 // has no def of its own, so the row declares no Ref (its menu is the
 // single action entry, exactly as before).
-func (g *Game) contractRowSpec(r boardRowModel, active bool) uikit.RowSpec {
-	label, intent := "Accept", uikit.Intent(uikit.Accept{Contract: r.ID})
+func (g *Game) contractRowSpec(r boardRowModel, active bool) widgets.RowSpec {
+	label, intent := "Accept", widgets.Intent(widgets.Accept{Contract: r.ID})
 	if active {
-		label, intent = "Abandon", uikit.Abandon{Contract: r.ID}
+		label, intent = "Abandon", widgets.Abandon{Contract: r.ID}
 	}
-	return uikit.RowSpec{Actions: []uikit.RowAction{{
+	return widgets.RowSpec{Actions: []widgets.RowAction{{
 		Label:    label,
 		Disabled: r.Disabled,
 		Intent:   intent,
@@ -487,19 +488,19 @@ func (g *Game) contractRowSpec(r boardRowModel, active bool) uikit.RowSpec {
 // Show Info window reads: a kill contract links its caste, deliver/mine
 // contracts their item. The ref is validated against the loaded content
 // (a stale save ref shows nothing rather than a hollow window).
-func (g *Game) objectiveRef(id content.ContractID) (uikit.InfoRef, bool) {
+func (g *Game) objectiveRef(id content.ContractID) (widgets.InfoRef, bool) {
 	def, ok := g.opts.Content.Contract(id)
 	if !ok {
-		return uikit.InfoRef{}, false
+		return widgets.InfoRef{}, false
 	}
-	var ref uikit.InfoRef
+	var ref widgets.InfoRef
 	switch {
 	case def.Objective.Target != "":
-		ref = uikit.NpcRef(def.Objective.Target)
+		ref = widgets.NpcRef(def.Objective.Target)
 	case def.Objective.Item != "":
-		ref = uikit.ItemRef(def.Objective.Item)
+		ref = widgets.ItemRef(def.Objective.Item)
 	default:
-		return uikit.InfoRef{}, false
+		return widgets.InfoRef{}, false
 	}
 	return g.env.InfoRefOf(ref)
 }
@@ -528,9 +529,9 @@ func objectiveSummary(c *content.Content, def *content.ContractDef) string {
 
 // rewardText renders the board's reward line, e.g.
 // "40,000.00 € · +0.10 standing" — the shared money presentation
-// (uikit.FormatCredits), the one every readout uses.
+// (theme.FormatCredits), the one every readout uses.
 func rewardText(def *content.ContractDef) string {
-	s := uikit.FormatCredits(def.Reward.Credits)
+	s := theme.FormatCredits(def.Reward.Credits)
 	if def.Reward.StandingGain != 0 {
 		s += fmt.Sprintf(" · %+.2f standing", def.Reward.StandingGain)
 	}
@@ -598,7 +599,7 @@ func celName(c *content.Content, id content.CelID) string {
 // type-scale step (single line: board rows never wrap).
 func (g *Game) ellip(s, step string, w float64) string {
 	face := g.env.Face(step)
-	return uikit.Ellipsize(s, w, func(x string) float64 {
+	return widgets.Ellipsize(s, w, func(x string) float64 {
 		tw, _ := text.Measure(x, *face, 0)
 		return tw
 	})
