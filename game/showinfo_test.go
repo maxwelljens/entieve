@@ -245,6 +245,39 @@ func TestInfoWindowSidecarGeometryOnly(t *testing.T) {
 	}
 }
 
+// TestContractRowSpecData pins the board rows' declared data (the
+// RowSpec the seam derives the menu from): one action — Accept on an
+// available row, Abandon on an active one — carrying the model's gate,
+// no Ref (a contract has no def of its own to show), and the objective
+// label's Ref pointing at the objective's def.
+func TestContractRowSpecData(t *testing.T) {
+	g := dockedShowcaseGame(t, 1280, 720)
+
+	avail := boardRowModel{ID: "contract-solace-cleanup-1"}
+	spec := g.contractRowSpec(avail, false)
+	if spec.Ref != nil || spec.SecRef != nil {
+		t.Errorf("contract row declares refs %v/%v, want none (nothing to show)", spec.Ref, spec.SecRef)
+	}
+	if len(spec.Actions) != 1 || spec.Actions[0].Label != "Accept" || spec.Actions[0].Disabled {
+		t.Fatalf("ungated available row = %+v, want one enabled Accept", spec.Actions)
+	}
+	gated := boardRowModel{ID: "contract-penumbra-den-hunt-1", Disabled: true}
+	if a := g.contractRowSpec(gated, false).Actions[0]; !a.Disabled {
+		t.Error("standing-gated row's Accept is not grayed")
+	}
+	active := g.contractRowSpec(avail, true)
+	if len(active.Actions) != 1 || active.Actions[0].Label != "Abandon" || active.Actions[0].Disabled {
+		t.Errorf("active row = %+v, want one enabled Abandon", active.Actions)
+	}
+
+	// The objective label (line 2) declares the objective's def as its
+	// Ref — Show Info, strictly, through the installer.
+	ref, ok := g.objectiveRef("contract-solace-cleanup-1")
+	if !ok || !ref.Valid() {
+		t.Fatalf("objective ref = %v (%v), want a valid ref", ref, ok)
+	}
+}
+
 // TestContextMenuGatesWorldInput: while a menu is up its popup rect
 // deterministically gates the world (the rect uikit exposes), and the
 // frame latch gates everything else for the frame a dismiss gesture is

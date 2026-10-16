@@ -101,16 +101,8 @@ func (k *Kit) buildOverview() {
 	// Double-click shows the row's definition (an NPC caste, a hull, an
 	// asteroid's ore — the old behaviour, approach-on-activate, moved to
 	// the world scene and the menu); right-click opens the entity menu.
-	tbl.OnActivate(func(r TableRow) {
-		if row, ok := r.Data.(*ovRow); ok {
-			showInfoData(k.panelEnv(), row.info.Entity)
-		}
-	})
-	tbl.OnMenu(func(r TableRow, at image.Point) {
-		if row, ok := r.Data.(*ovRow); ok {
-			k.entityMenu(row.info.Entity, at)
-		}
-	})
+	// Both derive from the row's declared RowSpec (overviewSpec), built
+	// per row in sync.
 	o.tbl = tbl
 
 	// Body: the table fills its grid cell exactly, so the scroll
@@ -150,36 +142,39 @@ func (k *Kit) buildOverview() {
 	)
 }
 
-// entityMenu opens a grid entity's context menu at at: Show Info first,
-// then the Selected Item window's own actions — every entry queues the
-// sim command its button queues (CmdWarpTo/CmdOrbit/CmdApproach/CmdLock),
-// at the row's entity and at the range selectors' current value. A
-// right-click never moves the selection; entries the sim would refuse
-// (self-targeting, unwarpageable, unlockable kinds) show grayed.
-func (k *Kit) entityMenu(e ecs.Entity, at image.Point) {
+// overviewSpec is one overview row's declared interactions: Show Info on
+// what the entity IS (declared even when it resolves to nothing — the
+// entry shows grayed, first and bold), then the Selected Item window's
+// own verbs as row actions — every entry queues the sim command its
+// button queues (CmdWarpTo/CmdOrbit/CmdApproach/CmdLock), at the row's
+// entity and at the range selectors' current value (read at press).
+// Entries the sim would refuse (self-targeting, unwarpageable,
+// unlockable kinds) show grayed. The installer turns this data into the
+// menu; a right-click never moves the selection.
+func (k *Kit) overviewSpec(row *ovRow) RowSpec {
 	env := k.panelEnv()
-	ref, hasRef := env.InfoRefFor(e)
-	entries := []MenuEntry{showInfoMenuEntry(env, ref, hasRef)}
+	e := row.info.Entity
+	spec := RowSpec{Ref: env.rowRef(row)}
 	info, hasInfo := k.Sim.Info(e)
 	if hasInfo {
 		self := e == k.Sim.Player()
 		tooClose := info.Distance < sim.WarpMinRange
-		entries = append(entries, MenuSep,
-			MenuEntry{Label: "Warp to", Disabled: self || !info.CanWarp || tooClose, Action: func() {
+		spec.Actions = []RowAction{
+			{Label: "Warp to", Disabled: self || !info.CanWarp || tooClose, Do: func() {
 				k.enqueue(sim.CmdWarpTo{Target: e, Range: k.WarpRange()})
 			}},
-			MenuEntry{Label: "Orbit", Disabled: self, Action: func() {
+			{Label: "Orbit", Disabled: self, Do: func() {
 				k.enqueue(sim.CmdOrbit{Target: e, Range: k.OrbitRange()})
 			}},
-			MenuEntry{Label: "Approach", Disabled: self, Action: func() {
+			{Label: "Approach", Disabled: self, Do: func() {
 				k.enqueue(sim.CmdApproach{Target: e})
 			}},
-			MenuEntry{Label: "Lock target", Disabled: self || !canLock(info.Kind), Action: func() {
+			{Label: "Lock target", Disabled: self || !canLock(info.Kind), Do: func() {
 				k.enqueue(sim.CmdLock{Target: e})
 			}},
-		)
+		}
 	}
-	env.OpenMenu(entries, at)
+	return spec
 }
 
 // sync refreshes the rows from the sim: visible grid entities only, with
@@ -199,6 +194,7 @@ func (o *overview) sync(k *Kit) {
 			tint = withA(k.palette.Danger, 60)
 			iconTint = k.palette.Danger // hostiles wear ColDanger
 		}
+		row := o.rowFor(info)
 		order = append(order, TableRow{
 			Cells: []string{
 				info.Name,
@@ -209,7 +205,8 @@ func (o *overview) sync(k *Kit) {
 			Icons:    []string{"", "", KindIcon(info.Kind), ""},
 			IconTint: iconTint,
 			Tint:     tint,
-			Data:     o.rowFor(info),
+			Data:     row,
+			Spec:     k.overviewSpec(row),
 		})
 	}
 	// Prune row objects of entities that left the grid (selection

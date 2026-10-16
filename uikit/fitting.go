@@ -32,11 +32,9 @@ type Fitting struct {
 	fitMod   *widget.Button
 	assemble *widget.Button
 
-	// slotTips / hangarTips are the two tables' per-row hover tooltips,
-	// indexed with the row (rows are positional): one shared module panel
-	// per row slot, rebuilt only when the row's module changes.
-	slotTips   []rowTip
-	hangarTips []rowTip
+	// Row interactions (menus, tooltips, double-click) all derive from
+	// the two tables' rowspecs — see slotRows/hangarRows; the tooltip
+	// cache lives in the Table now (one installer, one rowTip slot).
 
 	selSlot slotPick
 	hasSlot bool
@@ -67,44 +65,16 @@ func NewFitting(env Env) *Fitting {
 			f.selSlot, f.hasSlot = sp, true
 		}
 	})
-	// Double-click shows the fitted module; right-click opens the row
-	// menu — the row under the cursor becomes the selection first, so the
-	// Fit/Unefit entries drive the very same handlers (and gating) as the
-	// toolbar buttons.
-	f.slots.OnActivate(func(r TableRow) { showInfoData(f.env, r.Data) })
-	f.slots.OnMenu(func(r TableRow, at image.Point) {
-		pick, ok := r.Data.(slotPick)
-		if !ok {
-			return
-		}
-		f.selSlot, f.hasSlot = pick, true
-		f.slots.SelectData(r.Data)
-		f.Sync() // re-gate Fit/Unefit on the clicked row before the menu reads it
-		ref, hasRef := f.env.InfoRefOf(pick)
-		f.env.OpenMenu([]MenuEntry{
-			showInfoMenuEntry(f.env, ref, hasRef),
-			MenuSep,
-			{Label: "Fit module", Disabled: f.fitMod.GetWidget().Disabled, Action: f.fitClicked},
-			{Label: "Unefit slot", Disabled: f.unfit.GetWidget().Disabled, Action: f.unfitClicked},
-		}, at)
-	})
+	// Double-click (Show Info) and the right-click menu (Show Info +
+	// Fit/Unefit, gated on the clicked row — the menu's actions carry its
+	// payload, so no click-time selection dance) come from the rows'
+	// RowSpec, built in slotRows/hangarRows.
+
 	f.hangar = NewTable(env, []Column{
 		{Key: "Item", Title: "Hangar", Priority: 1},
 		{Key: "Qty", Title: "Qty", Priority: 0, AlignRight: true},
 	})
 	f.hangar.OnSelect(f.selectHangar)
-	f.hangar.OnActivate(func(r TableRow) { showInfoData(f.env, r.Data) })
-	f.hangar.OnMenu(func(r TableRow, at image.Point) {
-		f.selectHangar(r)
-		f.hangar.SelectData(r.Data)
-		f.Sync()
-		ref, hasRef := f.env.InfoRefOf(r.Data)
-		f.env.OpenMenu([]MenuEntry{
-			showInfoMenuEntry(f.env, ref, hasRef),
-			MenuSep,
-			{Label: "Fit module", Disabled: f.fitMod.GetWidget().Disabled, Action: f.fitClicked},
-		}, at)
-	})
 
 	f.stats = widget.NewText(
 		widget.TextOpts.Text("", env.Face(StepTiny), solid(p.Text)),
@@ -215,77 +185,30 @@ func (f *Fitting) Sync() {
 	f.resists.Sync()
 	f.slots.Sync()
 	f.hangar.Sync()
-	f.syncRowTips()
 
 	// Action gating: unfit needs a fitted slot, fit needs a hangar
-	// module plus an empty slot of its class, assemble needs a ship.
-	f.unfit.GetWidget().Disabled = !f.hasSlot || f.selSlot.mod == ""
-	modFits := f.hasMod && f.hasSlot && f.selSlot.mod == ""
-	if modFits {
-		if def, ok := f.env.Content.Module(f.selMod); !ok || def.Slot != f.selSlot.ref.Class {
-			modFits = false
-		}
-	}
-	f.fitMod.GetWidget().Disabled = !modFits
+	// module plus an empty slot of its class, assemble needs a ship —
+	// the same fitReady/unequipReady rules the row menus read.
+	f.unfit.GetWidget().Disabled = !f.hasSlot || !unequipReady(f.selSlot)
+	f.fitMod.GetWidget().Disabled = !f.hasMod || !f.fitReady(f.selMod, f.selSlot)
 	f.assemble.GetWidget().Disabled = !f.hasShip
 }
 
-// syncRowTips attaches the shared module tooltip to both tables' module
-// rows: a filled slot quotes its slot in the sub line, a hangar module is
-// slotless (it isn't fitted yet). Rows that aren't modules — empty slots,
-// stored hulls — drop their tooltip. The panel comes from env.moduleTip,
-// the same builder the rack cells use, so a module reads identically in
-// both places; the fitting rows carry no charge and no click hints, since
-// neither is true of a table row. The model itself is built lazily by
-// rowTip.set — only when a row's tooltip is first attached or its key
-// moves.
-func (f *Fitting) syncRowTips() {
-	f.tableRowTips(f.slots, &f.slotTips, func(r TableRow) (string, func() TooltipModel) {
-		pick, ok := r.Data.(slotPick)
-		if !ok || pick.mod == "" {
-			return "", nil
-		}
-		def, ok := f.env.Content.Module(pick.mod)
-		if !ok {
-			return "", nil
-		}
-		slot := slotLabel(pick.ref)
-		return string(pick.mod) + "|" + slot, func() TooltipModel {
-			return f.env.moduleTip(def, slot, "", 0)
-		}
-	})
-	f.tableRowTips(f.hangar, &f.hangarTips, func(r TableRow) (string, func() TooltipModel) {
-		id, ok := r.Data.(content.ModuleID)
-		if !ok {
-			return "", nil
-		}
-		def, ok := f.env.Content.Module(id)
-		if !ok {
-			return "", nil
-		}
-		return string(id), func() TooltipModel {
-			return f.env.moduleTip(def, "", "", 0)
-		}
-	})
+// fitReady reports whether mod fits into slot: a real module into a real
+// empty slot of its class. The toolbar's Fit button and both row menus
+// (slot rows, hangar rows) gate through this one rule, so the seam keeps
+// them from drifting apart.
+func (f *Fitting) fitReady(mod content.ModuleID, slot slotPick) bool {
+	if mod == "" || slot.mod != "" {
+		return false
+	}
+	def, ok := f.env.Content.Module(mod)
+	return ok && def.Slot == slot.ref.Class
 }
 
-// tableRowTips walks one table's rows and feeds each to model for its key
-// and model builder. The tooltip cache indexes with the row, so a rebuilt
-// row widget re-attaches the tooltip it already has instead of rebuilding
-// it; model is only invoked when the slot's key actually moved.
-func (f *Fitting) tableRowTips(tbl *Table, cache *[]rowTip, model func(TableRow) (string, func() TooltipModel)) {
-	for i := 0; i < len(tbl.rows); i++ {
-		w := tbl.rowWidget(i)
-		if w == nil {
-			continue
-		}
-		key, build := model(tbl.rows[i])
-		for len(*cache) <= i {
-			*cache = append(*cache, rowTip{})
-		}
-		(*cache)[i].set(f.env, w.GetWidget(), key, build)
-	}
-}
+// unequipReady reports whether a slot row can be unfit (it holds a
+// module) — the toolbar and the slot menu's Unefit entry share it.
+func unequipReady(slot slotPick) bool { return slot.mod != "" }
 
 // statLines renders the derived ship statistics (mirrors
 // ui.derivedStats, which reads the sim's own fit-computed values).
@@ -368,10 +291,42 @@ func (f *Fitting) slotRows(ship *sim.ShipState, hasShip bool) []TableRow {
 				Cells: []string{labels[class] + " " + FormatInt(int64(i+1)), name},
 				Icons: []string{"", icon},
 				Data:  pick,
+				Spec:  f.slotSpec(pick),
 			})
 		}
 	}
 	return rows
+}
+
+// slotSpec is one slot row's declared interactions: Show Info on the
+// fitted module (declared even when empty — the entry shows grayed),
+// Fit/Unefit gated on THIS row (the menu acts on the row it was opened
+// on; the toolbar keeps acting on the selection) and the shared module
+// tooltip with the slot in its sub line. The panel is built lazily by
+// the installer — only when the row's tooltip first attaches or its key
+// moves.
+func (f *Fitting) slotSpec(pick slotPick) RowSpec {
+	spec := RowSpec{
+		Ref: f.env.rowRef(pick),
+		Actions: []RowAction{
+			{Label: "Fit module", Disabled: !f.hasMod || !f.fitReady(f.selMod, pick),
+				Do: func() { f.fitInto(pick) }},
+			{Label: "Unefit slot", Disabled: !unequipReady(pick),
+				Do: func() { f.unfitInto(pick) }},
+		},
+	}
+	if pick.mod == "" {
+		return spec // empty slot: no tooltip (and a grayed Fit/Unefit pair)
+	}
+	def, ok := f.env.Content.Module(pick.mod)
+	if !ok {
+		return spec
+	}
+	slot := slotLabel(pick.ref)
+	spec.Tip = TipData{Key: string(pick.mod) + "|" + slot, Build: func() TooltipModel {
+		return f.env.moduleTip(def, slot, "", 0)
+	}}
+	return spec
 }
 
 // hangarRows renders the hangar's fit-able modules and stored ships
@@ -386,10 +341,12 @@ func (f *Fitting) hangarRows() []TableRow {
 		if !ok || st.Qty <= 0 {
 			continue
 		}
+		id := content.ModuleID(st.Item)
 		rows = append(rows, TableRow{
 			Cells: []string{mod.Name, "×" + FormatInt(int64(st.Qty))},
 			Icons: []string{ModuleIcon(mod.Kind), ""},
-			Data:  content.ModuleID(st.Item),
+			Data:  id,
+			Spec:  f.hangarSpec(id),
 		})
 	}
 	for _, ss := range f.env.Sim.Hangar.Ships {
@@ -401,9 +358,34 @@ func (f *Fitting) hangarRows() []TableRow {
 			Cells: []string{name, "×1"},
 			Icons: []string{"row_hull", ""},
 			Data:  ss.Hull,
+			Spec:  f.hangarSpec(ss.Hull),
 		})
 	}
 	return rows
+}
+
+// hangarSpec is one hangar row's declared interactions: Show Info plus
+// the Fit action into the SELECTED slot — gated by this row's own data
+// (a stored hull is not a module, so its Fit stays grayed instead of
+// arming from a stale module selection) and the slotless module tooltip
+// (stored hulls carry none: they aren't fitted yet).
+func (f *Fitting) hangarSpec(data any) RowSpec {
+	spec := RowSpec{
+		Ref: f.env.rowRef(data),
+	}
+	mod, isMod := data.(content.ModuleID)
+	spec.Actions = []RowAction{
+		{Label: "Fit module", Disabled: !f.fitReady(mod, f.selSlot),
+			Do: func() { f.fitFrom(mod) }},
+	}
+	def, ok := f.env.Content.Module(mod)
+	if !isMod || !ok {
+		return spec
+	}
+	spec.Tip = TipData{Key: string(mod), Build: func() TooltipModel {
+		return f.env.moduleTip(def, "", "", 0)
+	}}
+	return spec
 }
 
 // selectHangar records the hangar row's payload as the pending fit or
@@ -417,26 +399,41 @@ func (f *Fitting) selectHangar(r TableRow) {
 	}
 }
 
-// unfitClicked enqueues CmdUnfitModule for the selected fitted slot.
-func (f *Fitting) unfitClicked() {
-	if !f.hasSlot || f.selSlot.mod == "" {
+// unfitInto enqueues CmdUnfitModule for one slot row — the slot menu's
+// Unefit action carries the row it was opened on; the toolbar fits the
+// selection through unfitClicked.
+func (f *Fitting) unfitInto(pick slotPick) {
+	if !unequipReady(pick) {
 		return
 	}
-	f.env.Enqueue(sim.CmdUnfitModule{Slot: f.selSlot.ref})
+	f.env.Enqueue(sim.CmdUnfitModule{Slot: pick.ref})
 }
+
+// fitInto enqueues CmdFitModule for one slot row: the selected hangar
+// module into the right-clicked slot (the toolbar's fitClicked targets
+// the selected slot instead).
+func (f *Fitting) fitInto(pick slotPick) {
+	if !f.hasMod || !f.fitReady(f.selMod, pick) {
+		return
+	}
+	f.env.Enqueue(sim.CmdFitModule{Item: f.selMod, Slot: pick.ref})
+}
+
+// fitFrom enqueues CmdFitModule for one hangar row's module into the
+// selected slot — the hangar menu's Fit action.
+func (f *Fitting) fitFrom(mod content.ModuleID) {
+	if !f.fitReady(mod, f.selSlot) {
+		return
+	}
+	f.env.Enqueue(sim.CmdFitModule{Item: mod, Slot: f.selSlot.ref})
+}
+
+// unfitClicked enqueues CmdUnfitModule for the selected fitted slot.
+func (f *Fitting) unfitClicked() { f.unfitInto(f.selSlot) }
 
 // fitClicked enqueues CmdFitModule: the selected hangar module into the
 // selected empty slot of its class.
-func (f *Fitting) fitClicked() {
-	if !f.hasMod || !f.hasSlot || f.selSlot.mod != "" {
-		return
-	}
-	def, ok := f.env.Content.Module(f.selMod)
-	if !ok || def.Slot != f.selSlot.ref.Class {
-		return
-	}
-	f.env.Enqueue(sim.CmdFitModule{Item: def.ID, Slot: f.selSlot.ref})
-}
+func (f *Fitting) fitClicked() { f.fitFrom(f.selMod) }
 
 // assembleClicked enqueues CmdAssemble for the selected hangar ship.
 func (f *Fitting) assembleClicked() {

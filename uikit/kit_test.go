@@ -161,7 +161,7 @@ func TestOverviewRowClickSelectsThenShowsInfo(t *testing.T) {
 	k, cmds := newTestKit(t)
 	row := &ovRow{info: sim.Info{Entity: ecs.Entity(777), Name: "Scuttler"}}
 	k.ov.tbl.SetRows([]TableRow{
-		{Cells: []string{"Scuttler", "10 m", "Ship", "0 m/s"}, Data: row},
+		{Cells: []string{"Scuttler", "10 m", "Ship", "0 m/s"}, Data: row, Spec: k.overviewSpec(row)},
 	})
 
 	k.ov.tbl.rowClicked(0)
@@ -198,8 +198,9 @@ func TestOverviewRowClickSelectsThenShowsInfo(t *testing.T) {
 	if target.Entity.IsZero() {
 		t.Fatal("fixture: no visible entity with a definition")
 	}
+	trow := &ovRow{info: target}
 	k.ov.tbl.SetRows([]TableRow{
-		{Cells: []string{target.Name}, Data: &ovRow{info: target}},
+		{Cells: []string{target.Name}, Data: trow, Spec: k.overviewSpec(trow)},
 	})
 	k.ov.tbl.rowClicked(0)
 	k.ov.tbl.rowClicked(0)

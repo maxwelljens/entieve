@@ -329,8 +329,11 @@ func TestRackRightClickCyclesAmmo(t *testing.T) {
 			t.Fatalf("tooltip after step %d shows charge %q, want %q", i, got, r.ammoName(want))
 		}
 	}
-	// With a charge preferred, the menu carries its Show Info ref too.
+	// With a charge preferred, the menu carries its Show Info ref too
+	// (Sync rebuilds the cells' declared specs — production syncs every
+	// frame, so the menu always reads the current preference).
 	r.ammoPref[slot] = "charge-fusion"
+	r.Sync()
 	rightClick(c, t, gun.btn)
 	if ents := env.Menu().Entries(); len(ents) != 4 || ents[1].Label != "Show Info — "+r.ammoName("charge-fusion") {
 		t.Fatalf("menu with a preferred charge = %+v", ents)
@@ -382,6 +385,12 @@ func leftClick(c *chromeUI, t *testing.T, btn *widget.Button) {
 	})
 	c.update(t)
 }
+
+// spendDouble clears the rack's double-click arming so the next click in
+// a test reads as a lone single click: the clicks here run microseconds
+// apart, well inside the gesture window, where production clicks are
+// human-paced.
+func spendDouble(r *Rack) { r.dbl.armed = false }
 
 // TestRackLeftClickToggles is the command-wiring test for defect 3:
 // left-click enqueues CmdDeactivate for a running module and CmdActivate
@@ -442,6 +451,7 @@ func TestRackLeftClickToggles(t *testing.T) {
 	r.Sync()
 
 	before := len(*cmds)
+	spendDouble(r) // next gun click is a lone single, not a re-click
 	leftClick(c, t, gun.btn)
 	if len(*cmds) != before+1 {
 		t.Fatalf("locked weapon click enqueued %d commands, want 1", len(*cmds)-before)
@@ -528,6 +538,7 @@ func TestRackClickTargetsSelection(t *testing.T) {
 
 	// Selection cleared: fall back to the first suiting lock.
 	selected = 0
+	spendDouble(r) // next gun click is a lone single, not a re-click
 	before = len(*cmds)
 	leftClick(c, t, gun.btn)
 	if act, ok := (*cmds)[before].(sim.CmdActivate); !ok || act.Target != first {
@@ -575,5 +586,107 @@ func TestRackCellStacksTileNameAndBar(t *testing.T) {
 				t.Errorf("cell(%d,%d) children escape the cell %v", row, idx, root)
 			}
 		}
+	}
+}
+
+// TestRackCellSpecData: what each cell DECLARES (its RowSpec) — the
+// fitted weapon declares its module Ref, the Cycle charge action and the
+// tooltip payload (and gains the charge's secondary ref once one is
+// preferred), a non-weapon declares no Cycle charge, and an empty slot
+// declares nothing at all (no menu, no tooltip).
+func TestRackCellSpecData(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	r := NewRack(env)
+	c := newChromeUI(env)
+	c.addPanel(r.Container(), r)
+	c.frame(t, 1280, 720)
+
+	gun := r.cells[0][0] // EMP Turret: a weapon with the "light" ammo class
+	if gun.spec.Ref == nil || *gun.spec.Ref != ModuleRef("mod-emp-turret") {
+		t.Fatalf("gun Ref = %v, want module/mod-emp-turret", gun.spec.Ref)
+	}
+	if gun.spec.SecRef != nil {
+		t.Errorf("gun declares a secondary ref before any charge is preferred: %v", *gun.spec.SecRef)
+	}
+	if len(gun.spec.Actions) != 1 || gun.spec.Actions[0].Label != "Cycle charge" {
+		t.Fatalf("gun actions = %+v, want the single Cycle charge", gun.spec.Actions)
+	}
+	if gun.spec.Actions[0].Disabled {
+		t.Error("Cycle charge grayed with light charges in cargo")
+	}
+	if gun.spec.Tip.Key == "" || gun.spec.Tip.Build == nil {
+		t.Error("gun declares no tooltip payload")
+	}
+
+	// A charge preference appears as the secondary ref after a Sync
+	// (production syncs every frame, so the menu always reads it).
+	slot := sim.SlotRef{Class: content.SlotHigh, Index: 0}
+	r.ammoPref[slot] = "charge-fusion"
+	r.Sync()
+	if gun.spec.SecRef == nil || *gun.spec.SecRef != ItemRef("charge-fusion") {
+		t.Errorf("gun SecRef = %v, want item/charge-fusion", gun.spec.SecRef)
+	}
+	r.ammoPref[slot] = ""
+	r.Sync()
+
+	// Non-weapons declare no Cycle charge entry at all.
+	miner := r.cells[0][1]
+	if len(miner.spec.Actions) != 0 {
+		t.Errorf("mining laser actions = %+v, want none", miner.spec.Actions)
+	}
+	if miner.spec.Ref == nil {
+		t.Error("mining laser declares no Ref")
+	}
+
+	// Empty slot: the zero spec — nothing to menu, nothing to hover.
+	empty := r.cells[2][3]
+	if empty.spec.Ref != nil || empty.spec.SecRef != nil ||
+		len(empty.spec.Actions) != 0 || empty.spec.Tip.Build != nil {
+		t.Errorf("empty slot spec = %+v, want the zero RowSpec", empty.spec)
+	}
+}
+
+// TestRackDoubleClickShowsInfoWithoutToggle pins the rack's strict
+// double-click: a lone click toggles (single-click activation preserved),
+// the repeat click inside the window opens Show Info and does NOT toggle,
+// and the spent gesture means the next click toggles again.
+func TestRackDoubleClickShowsInfoWithoutToggle(t *testing.T) {
+	env, cmds := newChromeEnv(t)
+	r := NewRack(env)
+	c := newChromeUI(env)
+	c.addPanel(r.Container(), r)
+	c.frame(t, 1280, 720)
+
+	gun := r.cells[0][0]
+	if len(*cmds) != 0 {
+		t.Fatalf("fixture: %d commands queued", len(*cmds))
+	}
+
+	// A lone click toggles (single-click activation, preserved exactly).
+	leftClick(c, t, gun.btn)
+	if len(*cmds) != 1 {
+		t.Fatalf("single click queued %d commands, want 1 (the toggle)", len(*cmds))
+	}
+	if _, ok := (*cmds)[0].(sim.CmdActivate); !ok {
+		t.Fatalf("command = %T, want sim.CmdActivate", (*cmds)[0])
+	}
+
+	// The repeat click inside the window: Show Info, strictly — the
+	// dual gesture is gone, this click does not toggle.
+	leftClick(c, t, gun.btn)
+	if !env.InfoWindow().IsOpen() {
+		t.Fatal("double-click did not open Show Info")
+	}
+	if got, _ := env.InfoWindow().Ref(); got != ModuleRef("mod-emp-turret") {
+		t.Errorf("Show Info ref = %v, want module/mod-emp-turret", got)
+	}
+	if len(*cmds) != 1 {
+		t.Fatalf("double-click queued %d commands, want 1 — the repeat click must not toggle", len(*cmds))
+	}
+
+	// The gesture is spent: the next click is a lone click again.
+	leftClick(c, t, gun.btn)
+	if len(*cmds) != 2 {
+		t.Fatalf("click after the spent gesture queued %d commands, want 2 (toggling again)", len(*cmds))
 	}
 }

@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	eimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
@@ -694,24 +693,6 @@ func (e Env) npcPage(def *content.NpcDef) infoPage {
 	return p
 }
 
-// showInfoMenuEntry is the first entry of every surface menu: bold
-// Show Info, disabled when the payload resolves to nothing.
-func showInfoMenuEntry(env Env, ref InfoRef, ok bool) MenuEntry {
-	return MenuEntry{Label: "Show Info", Bold: true, Disabled: !ok, Action: func() {
-		if ok {
-			env.ShowInfo(ref)
-		}
-	}}
-}
-
-// showInfoData resolves a row payload and opens it — the double-click
-// path (no menu, no-op when there is nothing to show).
-func showInfoData(env Env, data any) {
-	if ref, ok := env.InfoRefOf(data); ok {
-		env.ShowInfo(ref)
-	}
-}
-
 // ---------------------------------------------------------------------------
 // The window
 // ---------------------------------------------------------------------------
@@ -738,9 +719,8 @@ type InfoWin struct {
 	refRows []InfoRefRow
 	ref     InfoRef
 	hasRef  bool
-	lastRef InfoRef // ref-row double-click bookkeeping
-	lastAt  time.Time
-	onClose func() // Kit-hosted: unmount (a bare env only hides)
+	dbl     RowDouble // ref-row double-click bookkeeping (the installer's half)
+	onClose func()    // Kit-hosted: unmount (a bare env only hides)
 }
 
 // NewInfoWin builds the closed window over the given environment. It
@@ -909,11 +889,6 @@ func (w *InfoWin) rewrap() {
 	}
 }
 
-// show opens ref through the environment's lifecycle: with a Kit hosting
-// the window that is Kit.ShowInfo (swap + raise), bare environments fill
-// the window in place.
-func (w *InfoWin) show(ref InfoRef) { w.env.ShowInfo(ref) }
-
 // render rebuilds the page container from a model: header, prose and the
 // section rows (link rows get their click seam).
 func (w *InfoWin) render(p infoPage) {
@@ -1027,19 +1002,19 @@ func (w *InfoWin) rowWidget(row infoRow) widget.PreferredSizeLocateableWidget {
 	if row.Ref != nil {
 		ref = *row.Ref
 	}
+	// The row's declared interactions, through the installer: right-click
+	// opens the derived (single-entry) menu, double-click swaps — strictly,
+	// only a resolvable Ref does.
+	spec := RowSpec{Ref: &ref}
 	handler := func(a *widget.WidgetMouseButtonClickedEventArgs) {
 		if row.Ref == nil {
 			return
 		}
 		switch a.Button {
 		case ebiten.MouseButtonRight:
-			w.env.OpenMenu([]MenuEntry{
-				{Label: "Show Info", Bold: true, Action: func() { w.show(ref) }},
-			}, ClickPoint(a))
+			w.env.OpenRowMenu(spec, ClickPoint(a))
 		case ebiten.MouseButtonLeft:
-			if w.refDouble(ref) {
-				w.show(ref)
-			}
+			w.dbl.Click(w.env, spec)
 		}
 	}
 
@@ -1073,15 +1048,6 @@ func (w *InfoWin) rowWidget(row infoRow) widget.PreferredSizeLocateableWidget {
 		w.refRows = append(w.refRows, InfoRefRow{Ref: ref, Widget: ctr.GetWidget()})
 	}
 	return ctr
-}
-
-// refDouble is the ref-row double-click window (same timing as the
-// tables' activate): two clicks on the same ref inside the window swap.
-func (w *InfoWin) refDouble(ref InfoRef) bool {
-	now := time.Now()
-	ok := w.lastRef == ref && now.Sub(w.lastAt) < doubleClickWindow
-	w.lastRef, w.lastAt = ref, now
-	return ok
 }
 
 // infoInnerW is the description's wrap width at the default geometry —
