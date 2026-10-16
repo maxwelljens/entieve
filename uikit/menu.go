@@ -61,11 +61,11 @@ type menuRow struct {
 	rect  image.Rectangle
 }
 
-// Menu is one session's context menu: opened by the panels through
-// Env.OpenMenu, drawn and gated by the Kit. The zero value is a closed
-// menu; NewMenu (through NewEnv/Kit) builds one bound to an environment.
+// Menu is one session's context menu: opened through the ActionSink
+// (Do(OpenMenu{…})), drawn and gated by the Kit. The zero value is a
+// closed menu; NewMenu (through NewEnv/Kit) builds one bound to a Theme.
 type Menu struct {
-	env Env
+	th Theme
 
 	open    bool
 	blocked bool // a click/Esc was consumed this frame (Kit.Update skips ui)
@@ -78,7 +78,7 @@ type Menu struct {
 }
 
 // NewMenu builds a closed context menu over the given environment.
-func NewMenu(env Env) *Menu { return &Menu{env: env, hover: -1} }
+func NewMenu(d Theme) *Menu { return &Menu{th: d, hover: -1} }
 
 // Open replaces the menu's entries and lays the popup out at at (the
 // click position), clamped inside the last screen the kit drew.
@@ -192,8 +192,8 @@ func (m *Menu) at(pt image.Point) (int, bool) {
 // inside the last known screen. Row bands tile the popup exactly (they
 // are the hit test and the hover fill).
 func (m *Menu) layout(at image.Point) {
-	face := m.env.Face(StepSmall)
-	bold := m.env.FaceBold(StepSmall)
+	face := m.th.Face(StepSmall)
+	bold := m.th.FaceBold(StepSmall)
 	rowPadX, rowPadY := Px(menuRowPadX), Px(menuRowPadY)
 	padY := Px(menuPadY)
 	rowH := tipLineH(face) + 2*rowPadY
@@ -248,7 +248,7 @@ func (m *Menu) Draw(dst *ebiten.Image) {
 		return
 	}
 	m.screen = dst.Bounds()
-	p := m.env.Pal
+	p := m.th.Pal()
 	fillRect(dst, m.rect, solid(p.BGHard))
 	// The popup's hairline border scales with the rest of the chrome.
 	bs := float32(Scale())
@@ -267,9 +267,9 @@ func (m *Menu) Draw(dst *ebiten.Image) {
 		if m.hover == r.entry && !e.Disabled {
 			fillRect(dst, r.rect, nrgba(p.Hover, menuHoverA))
 		}
-		face, col := m.env.Face(StepSmall), solid(p.Text)
+		face, col := m.th.Face(StepSmall), solid(p.Text)
 		if e.Bold {
-			face = m.env.FaceBold(StepSmall)
+			face = m.th.FaceBold(StepSmall)
 		}
 		if e.Disabled {
 			col = nrgba(p.Dim, 150)

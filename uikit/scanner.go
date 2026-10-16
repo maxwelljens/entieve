@@ -36,7 +36,8 @@ var scanKindOrder = [...]string{"ship", "asteroid", "wreck"}
 // NOT visible to the player but sits within 3 × sensor range. No names, no
 // distances — you learn what is out there, never exactly where.
 type Scanner struct {
-	env    Env
+	th     Theme
+	cv     ContentView
 	win    *widget.Window
 	bar    *widget.ProgressBar
 	status *widget.Text
@@ -55,9 +56,12 @@ type Scanner struct {
 
 // NewScanner builds the scanner window (draggable, fixed size) over the
 // given environment. The default location sits above the bottom-left log.
-func NewScanner(env Env) *Scanner {
-	p := env.Pal
-	s := &Scanner{env: env, base: time.Now()}
+func NewScanner(env interface {
+	Theme
+	ContentView
+}) *Scanner {
+	p := env.Pal()
+	s := &Scanner{th: env, cv: env, base: time.Now()}
 
 	s.status = widget.NewText(
 		widget.TextOpts.Text("Sweep 0%", env.Face(StepTiny), solid(p.Dim)),
@@ -142,12 +146,12 @@ func (s *Scanner) Win() *widget.Window { return s.win }
 // Sync advances the sweep: the bar and status line track the phase, and the
 // anonymous counts refresh whenever a sweep completes (and on first sync).
 func (s *Scanner) Sync() {
-	if s.env.Sim == nil {
+	if s.cv == nil {
 		return
 	}
 	phase := scanPhase(time.Since(s.base).Seconds(), scanCycle)
 	if s.counts == nil || phase < s.prev {
-		s.counts = scanCounts(s.env.Sim.Grid(), sim.SensorRange)
+		s.counts = scanCounts(s.cv.Grid(), sim.SensorRange)
 		s.applyCounts()
 	}
 	s.prev = phase

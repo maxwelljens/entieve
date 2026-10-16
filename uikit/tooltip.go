@@ -137,30 +137,30 @@ func tipLineH(face *text.Face) int {
 // tipInnerWidth is the content width a model wants, in pixels: the widest
 // natural line, capped at the panel's 320 px. Rows measure as label + gap +
 // value, so a model that fits here needs no ellipsis at all.
-func (e Env) tipInnerWidth(m TooltipModel) int {
+func tipInnerWidth(t Theme, m TooltipModel) int {
 	// The title and sub lines sit in the column right of the icon.
 	indent := 0.0
 	if m.Icon != "" {
 		indent = float64(Px(tipIcon) + Px(tipIconGap))
 	}
-	w := indent + tipMeasure(m.Title, e.FaceBold(StepBase))
-	if sub := indent + tipMeasure(m.Sub, e.Face(StepSmall)); sub > w {
+	w := indent + tipMeasure(m.Title, t.FaceBold(StepBase))
+	if sub := indent + tipMeasure(m.Sub, t.Face(StepSmall)); sub > w {
 		w = sub
 	}
 	for _, sec := range m.Sections {
-		if lw := tipMeasure(sec.Label, e.Face(StepSmall)); lw > w {
+		if lw := tipMeasure(sec.Label, t.Face(StepSmall)); lw > w {
 			w = lw
 		}
 		for _, row := range sec.Rows {
-			rw := tipMeasure(row.Label, e.Face(StepSmall)) + float64(Px(tipRowGap)) +
-				tipMeasure(row.Value, e.Face(StepSmall))
+			rw := tipMeasure(row.Label, t.Face(StepSmall)) + float64(Px(tipRowGap)) +
+				tipMeasure(row.Value, t.Face(StepSmall))
 			if rw > w {
 				w = rw
 			}
 		}
 	}
 	for _, h := range m.Hints {
-		if hw := tipMeasure(h, e.Face(StepTiny)); hw > w {
+		if hw := tipMeasure(h, t.Face(StepTiny)); hw > w {
 			w = hw
 		}
 	}
@@ -176,7 +176,7 @@ func (e Env) tipInnerWidth(m TooltipModel) int {
 // text line is emitted whether or not it fits — labels ellipsize at draw
 // time, values never do — so the height depends on the model alone and the
 // width only on the caller's box.
-func (e Env) tipLayoutAt(m TooltipModel, iw int) tipLayout {
+func tipLayoutAt(t Theme, m TooltipModel, iw int) tipLayout {
 	if iw < 0 {
 		iw = 0
 	}
@@ -194,9 +194,9 @@ func (e Env) tipLayoutAt(m TooltipModel, iw int) tipLayout {
 		titleX = x0 + icon + iconGap
 	}
 
-	titleH := tipLineH(e.FaceBold(StepBase))
-	smallH := tipLineH(e.Face(StepSmall))
-	tinyH := tipLineH(e.Face(StepTiny))
+	titleH := tipLineH(t.FaceBold(StepBase))
+	smallH := tipLineH(t.Face(StepSmall))
+	tinyH := tipLineH(t.Face(StepTiny))
 
 	l := tipLayout{ValueX: x1}
 	y := padY
@@ -229,12 +229,12 @@ func (e Env) tipLayoutAt(m TooltipModel, iw int) tipLayout {
 			sl := tipSectionLayout{Label: image.Rect(x0, y, x1, y+smallH)}
 			y += smallH
 			for _, row := range sec.Rows {
-				vw := int(math.Ceil(tipMeasure(row.Value, e.Face(StepSmall))))
+				vw := int(math.Ceil(tipMeasure(row.Value, t.Face(StepSmall))))
 				if vw > iw {
 					vw = iw
 				}
 				value := image.Rect(x1-vw, y, x1, y+smallH)
-				lw := int(math.Ceil(tipMeasure(row.Label, e.Face(StepSmall))))
+				lw := int(math.Ceil(tipMeasure(row.Label, t.Face(StepSmall))))
 				// The label gets everything left of the value's gutter, so
 				// the two rects are disjoint by construction.
 				if room := value.Min.X - rowGap - x0; lw > room {
@@ -280,8 +280,8 @@ func (e Env) tipLayoutAt(m TooltipModel, iw int) tipLayout {
 }
 
 // tipSize is the panel size a model wants at its content width.
-func (e Env) tipSize(m TooltipModel) image.Point {
-	return e.tipLayoutAt(m, e.tipInnerWidth(m)).Size
+func tipSize(t Theme, m TooltipModel) image.Point {
+	return tipLayoutAt(t, m, tipInnerWidth(t, m)).Size
 }
 
 // ---------------------------------------------------------------------------
@@ -324,8 +324,8 @@ func clampTipRect(r, screen image.Rectangle) image.Rectangle {
 // fill + 1 px border, exactly what the plain-text tip body used), the icon,
 // the header, the hairlines, the rows and the hints. It is a thin renderer
 // over tipLayoutAt — every rect it touches comes from the layout.
-func drawTooltip(dst *ebiten.Image, m TooltipModel, l tipLayout, e Env, origin image.Point) {
-	p := e.Pal
+func drawTooltip(dst *ebiten.Image, m TooltipModel, l tipLayout, t Theme, origin image.Point) {
+	p := t.Pal()
 	at := func(r image.Rectangle) image.Rectangle { return r.Add(origin) }
 	size := l.Size
 
@@ -349,30 +349,30 @@ func drawTooltip(dst *ebiten.Image, m TooltipModel, l tipLayout, e Env, origin i
 		opts.GeoM.Translate(float64(r.Min.X), float64(r.Min.Y))
 		dst.DrawImage(icons.Get(m.Icon, Px(tipIcon), tint), opts)
 	}
-	drawCardText(dst, m.Title, e.FaceBold(StepBase), at(l.Title).Min.X, at(l.Title).Min.Y, solid(p.Text))
+	drawCardText(dst, m.Title, t.FaceBold(StepBase), at(l.Title).Min.X, at(l.Title).Min.Y, solid(p.Text))
 	if m.Sub != "" {
-		drawCardText(dst, m.Sub, e.Face(StepSmall), at(l.Sub).Min.X, at(l.Sub).Min.Y, solid(p.Dim))
+		drawCardText(dst, m.Sub, t.Face(StepSmall), at(l.Sub).Min.X, at(l.Sub).Min.Y, solid(p.Dim))
 	}
 	for _, r := range l.Rules {
 		fillRect(dst, at(r), nrgba(p.Accent, tipRuleA))
 	}
 	for si, sec := range m.Sections {
 		sl := l.Sections[si]
-		drawCardText(dst, sec.Label, e.Face(StepSmall), at(sl.Label).Min.X, at(sl.Label).Min.Y, solid(p.Head))
+		drawCardText(dst, sec.Label, t.Face(StepSmall), at(sl.Label).Min.X, at(sl.Label).Min.Y, solid(p.Head))
 		for ri, row := range sec.Rows {
 			rr := sl.Rows[ri]
-			drawCardText(dst, row.Label, e.Face(StepSmall), at(rr.Label).Min.X, at(rr.Label).Min.Y, solid(p.Dim))
+			drawCardText(dst, row.Label, t.Face(StepSmall), at(rr.Label).Min.X, at(rr.Label).Min.Y, solid(p.Dim))
 			col := row.Tint
 			if col == (color.RGBA{}) {
 				col = p.Text
 			}
 			// Right-anchored: the value's box ends on the shared x.
-			drawValue(dst, row.Value, e.Face(StepSmall), at(rr.Value).Max.X, at(rr.Value).Min.Y, solid(col))
+			drawValue(dst, row.Value, t.Face(StepSmall), at(rr.Value).Max.X, at(rr.Value).Min.Y, solid(col))
 		}
 	}
 	for i, h := range m.Hints {
 		r := at(l.Hints[i])
-		drawCardText(dst, h, e.Face(StepTiny), r.Min.X, r.Min.Y, solid(p.Dim))
+		drawCardText(dst, h, t.Face(StepTiny), r.Min.X, r.Min.Y, solid(p.Dim))
 	}
 }
 
@@ -400,7 +400,7 @@ func drawValue(dst *ebiten.Image, s string, face *text.Face, x, y int, col color
 // a screen edge cannot clip the panel, because the clamp is the last word
 // on where the pixels go.
 type tipView struct {
-	env    Env
+	th     Theme
 	model  TooltipModel
 	widget *widget.Widget
 
@@ -409,8 +409,8 @@ type tipView struct {
 }
 
 // newTipView builds a view over the given model (call SetModel to change it).
-func newTipView(env Env, m TooltipModel) *tipView {
-	v := &tipView{env: env, model: m, layoutFor: -1}
+func newTipView(th Theme, m TooltipModel) *tipView {
+	v := &tipView{th: th, model: m, layoutFor: -1}
 	v.widget = widget.NewWidget(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 		HorizontalPosition: widget.AnchorLayoutPositionStart,
 		VerticalPosition:   widget.AnchorLayoutPositionStart,
@@ -423,8 +423,8 @@ func newTipView(env Env, m TooltipModel) *tipView {
 // newTipContent builds the structured panel a tooltip shows: a transparent
 // anchor container holding the view stretched across it. Tests and captures
 // mount this directly (without the hover state machine) to draw the panel.
-func newTipContent(env Env, m TooltipModel) (*widget.Container, *tipView) {
-	view := newTipView(env, m)
+func newTipContent(th Theme, m TooltipModel) (*widget.Container, *tipView) {
+	view := newTipView(th, m)
 	body := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
@@ -436,8 +436,8 @@ func newTipContent(env Env, m TooltipModel) (*widget.Container, *tipView) {
 // cursor-sticky content window with the shared rack delay (300 ms) and the
 // 12 px offset, so show/hide behaviour is exactly what it was. The returned
 // view is what callers refresh with SetModel as state changes.
-func newTip(env Env, m TooltipModel) (*widget.ToolTip, *tipView) {
-	body, view := newTipContent(env, m)
+func newTip(th Theme, m TooltipModel) (*widget.ToolTip, *tipView) {
+	body, view := newTipContent(th, m)
 	tip := widget.NewToolTip(
 		widget.ToolTipOpts.Content(body),
 		widget.ToolTipOpts.Delay(rackTipDelay),
@@ -482,7 +482,7 @@ type rowTip struct {
 // per-frame Sync must not pay for a model it throws away — and it always
 // derives the model from the inputs key summarizes, so what shows is
 // current, never stale.
-func (t *rowTip) set(env Env, w *widget.Widget, key string, build func() TooltipModel) {
+func (t *rowTip) set(th Theme, w *widget.Widget, key string, build func() TooltipModel) {
 	if key == "" {
 		if t.tip != nil {
 			w.ToolTips = nil
@@ -491,7 +491,7 @@ func (t *rowTip) set(env Env, w *widget.Widget, key string, build func() Tooltip
 		return
 	}
 	if t.tip == nil {
-		t.tip, t.view = newTip(env, build())
+		t.tip, t.view = newTip(th, build())
 		t.tips = []*widget.ToolTip{t.tip}
 	} else if t.key != key {
 		t.view.SetModel(build())
@@ -503,14 +503,14 @@ func (t *rowTip) set(env Env, w *widget.Widget, key string, build func() Tooltip
 // PreferredSize is the panel at its content width — the size widget.ToolTip
 // asks for every frame it is showing.
 func (v *tipView) PreferredSize() (int, int) {
-	l := v.panel(v.env.tipInnerWidth(v.model))
+	l := v.panel(tipInnerWidth(v.th, v.model))
 	return l.Size.X, l.Size.Y
 }
 
 // panel returns the cached layout for an inner width of iw.
 func (v *tipView) panel(iw int) tipLayout {
 	if v.layoutFor != iw {
-		v.layout = v.env.tipLayoutAt(v.model, iw)
+		v.layout = tipLayoutAt(v.th, v.model, iw)
 		v.layoutFor = iw
 	}
 	return v.layout
@@ -523,7 +523,7 @@ func (v *tipView) Render(screen *ebiten.Image) {
 		return
 	}
 	l := v.panel(r.Dx() - 2*Px(tipPadX))
-	drawTooltip(screen, v.model, l, v.env, clampTipRect(r, screen.Bounds()).Min)
+	drawTooltip(screen, v.model, l, v.th, clampTipRect(r, screen.Bounds()).Min)
 }
 
 // ---------------------------------------------------------------------------
@@ -568,7 +568,7 @@ func tipSub(slotText, kind string) string {
 // (rack + fitting tooltips) and the Show Info window's module page — one
 // builder, two renderers, so the two surfaces can never disagree about a
 // module's numbers. An unset field never becomes a row (never "N/A").
-func (e Env) moduleSections(def *content.ModuleDef, charge string, chargeQty int) []TooltipSection {
+func moduleSections(def *content.ModuleDef, charge string, chargeQty int) []TooltipSection {
 	if def == nil {
 		return nil
 	}
@@ -693,7 +693,7 @@ func (e Env) moduleSections(def *content.ModuleDef, charge string, chargeQty int
 //
 // Every row is driven by what the ModuleDef actually carries; a field the
 // def doesn't set simply never becomes a row (never "N/A").
-func (e Env) moduleTip(def *content.ModuleDef, slotText, charge string, chargeQty int, hints ...string) TooltipModel {
+func moduleTip(def *content.ModuleDef, slotText, charge string, chargeQty int, hints ...string) TooltipModel {
 	if def == nil {
 		return TooltipModel{}
 	}
@@ -703,7 +703,7 @@ func (e Env) moduleTip(def *content.ModuleDef, slotText, charge string, chargeQt
 		Sub:   tipSub(slotText, def.Kind),
 		Hints: hints,
 	}
-	m.Sections = e.moduleSections(def, charge, chargeQty)
+	m.Sections = moduleSections(def, charge, chargeQty)
 	if def.ActivationTime > 0 || def.ActivationCost > 0 {
 		var rows []TooltipRow
 		if def.ActivationTime > 0 {

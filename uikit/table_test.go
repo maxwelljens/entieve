@@ -14,9 +14,19 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// newTestEnv builds an Env over the embedded content and world-showcase,
-// capturing every enqueued command.
-func newTestEnv(t *testing.T) (Env, *[]sim.Command) {
+// testEnv is what the uikit tests drive panels with: the session (the
+// three seams plus its menu and Show Info window) over the embedded
+// content and world-showcase, plus the fixture handles — the sim and
+// registry the tests write through directly. The panels only ever see
+// the Session half: no screen reaches the sim.
+type testEnv struct {
+	Session
+	Sim     *sim.Sim
+	Content *content.Content
+}
+
+// newTestEnv builds that session, capturing every enqueued command.
+func newTestEnv(t *testing.T) (*testEnv, *[]sim.Command) {
 	t.Helper()
 	c, err := content.Load(content.FS())
 	if err != nil {
@@ -31,7 +41,8 @@ func newTestEnv(t *testing.T) (Env, *[]sim.Command) {
 		t.Fatalf("sim.New: %v", err)
 	}
 	var cmds []sim.Command
-	return NewEnv(c, s, func(cmd sim.Command) { cmds = append(cmds, cmd) }), &cmds
+	sess := NewEnv(c, s, func(cmd sim.Command) { cmds = append(cmds, cmd) })
+	return &testEnv{Session: sess, Sim: s, Content: c}, &cmds
 }
 
 // newPumpedTable builds a standalone table in its own UI and pumps one
@@ -40,7 +51,7 @@ func newTestEnv(t *testing.T) (Env, *[]sim.Command) {
 func newPumpedTable(t *testing.T, env Env, cols []Column, opts ...TableOption) (*Table, *ebitenui.UI) {
 	t.Helper()
 	tbl := NewTable(env, cols, opts...)
-	ui := &ebitenui.UI{Container: tbl.Container(), PrimaryTheme: env.Theme}
+	ui := &ebitenui.UI{Container: tbl.Container(), PrimaryTheme: env.WidgetTheme()}
 	ui.Update()
 	ui.Draw(ebiten.NewImage(640, 400))
 	return tbl, ui
@@ -153,7 +164,7 @@ func TestTableSelectVsActivate(t *testing.T) {
 		{Cells: []string{"charlie"}, Data: 2, Spec: RowSpec{Ref: &refCharlie}},
 	})
 
-	ui := &ebitenui.UI{Container: tbl.Container(), PrimaryTheme: env.Theme}
+	ui := &ebitenui.UI{Container: tbl.Container(), PrimaryTheme: env.WidgetTheme()}
 	ui.Update() // registers the deferred constructor handlers
 
 	clickRow(ui, tbl, 1)
@@ -333,7 +344,7 @@ func TestTableTintAssignment(t *testing.T) {
 	}
 
 	tbl.rowClicked(0)
-	accent := withA(env.Pal.Accent, selectionAlpha)
+	accent := withA(env.Pal().Accent, selectionAlpha)
 	if tbl.applied[0] != accent {
 		t.Errorf("selected row background = %v, want accent %v", tbl.applied[0], accent)
 	}

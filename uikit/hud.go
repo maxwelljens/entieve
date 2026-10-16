@@ -156,7 +156,8 @@ func ringTicks() [3]float64 {
 // anchors bottom-center, the target boxes top-center — so the integrator adds
 // a single stretched child to the interface root.
 type Hud struct {
-	env Env
+	th Theme
+	cv ContentView
 
 	container *widget.Container
 	targetRow *widget.Container
@@ -209,9 +210,12 @@ type targetCard struct {
 // NewHud builds the ship HUD over the given environment. Add the returned
 // container to the interface root with an anchor layout; Sync refreshes every
 // readout from the sim.
-func NewHud(env Env) *Hud {
-	p := env.Pal
-	h := &Hud{env: env, timeScale: 1}
+func NewHud(env interface {
+	Theme
+	ContentView
+}) *Hud {
+	p := env.Pal()
+	h := &Hud{th: env, cv: env, timeScale: 1}
 	faceSmall := env.Face(StepSmall)
 	h.measure = func(s string) float64 {
 		w, _ := text.Measure(s, *faceSmall, 0)
@@ -333,7 +337,7 @@ func NewHud(env Env) *Hud {
 
 // newBox builds one target card from the fixed widget pool: a container
 // holding a single Graphic that displays the card image.
-func (h *Hud) newBox(env Env) *hudBox {
+func (h *Hud) newBox(env Theme) *hudBox {
 	b := &hudBox{img: ebiten.NewImage(Px(hudBoxW), Px(hudBoxH))}
 	g := widget.NewGraphic(
 		widget.GraphicOpts.Image(b.img),
@@ -365,7 +369,7 @@ func (h *Hud) paintBox(b *hudBox) {
 	b.painted = true
 	b.drawn = b.card
 	b.draws++
-	drawTargetCard(b.img, b.card, h.env)
+	drawTargetCard(b.img, b.card, h.th)
 }
 
 // boxLabels fits a card's text: the name to the room right of the kind
@@ -386,8 +390,8 @@ func (h *Hud) boxLabels(name, dist string) (string, string) {
 // drawTargetCard paints one card image: background, border, the
 // name/distance line, the lock strip and the layer bars. Every rect comes
 // from the pure geometry above — this is a thin renderer over that math.
-func drawTargetCard(dst *ebiten.Image, c targetCard, env Env) {
-	p := env.Pal
+func drawTargetCard(dst *ebiten.Image, c targetCard, env Theme) {
+	p := env.Pal()
 	card := dst.Bounds()
 	// Hairlines scale with the card image: stroke s px centred on the
 	// s-pixel inset edge.
@@ -478,7 +482,7 @@ func (h *Hud) SetTimeScale(n int) {
 // Sync refreshes every readout — arcs, capacitor, speed, wallet and target
 // boxes — from the sim. Call it once per frame before Update.
 func (h *Hud) Sync() {
-	s := h.env.Sim
+	s := h.cv
 	if s == nil {
 		return
 	}
@@ -486,7 +490,7 @@ func (h *Hud) Sync() {
 
 	// 1 — the three damage-layer arcs (redrawn only when a fraction moved).
 	shield, armor, structure := 1.0, 1.0, 1.0
-	if sh, ok := s.Ships.Get(player); ok {
+	if sh, ok := s.ShipState(player); ok {
 		shield = hudFrac(sh.Shield, sh.MaxShield)
 		armor = hudFrac(sh.Armor, sh.MaxArmor)
 		structure = hudFrac(sh.Structure, sh.MaxStructure)
@@ -505,7 +509,7 @@ func (h *Hud) Sync() {
 
 	// 2 — capacitor bar + value label + recharge state.
 	frac, capLabel := 1.0, ""
-	if cap, ok := s.Caps.Get(player); ok && cap.Capacity > 0 {
+	if cap, ok := s.Capacitor(player); ok && cap.Capacity > 0 {
 		frac = hudFrac(cap.Current, cap.Capacity)
 		capLabel = groupFloat(cap.Current, 1) + "/" + groupFloat(cap.Capacity, 1) + " GJ"
 	}
@@ -515,7 +519,7 @@ func (h *Hud) Sync() {
 
 	// 3 — speed, time acceleration and wallet.
 	speed := 0.0
-	if m, ok := s.Motions.Get(player); ok {
+	if m, ok := s.Motion(player); ok {
 		speed = m.Vel.Len()
 	}
 	h.speedLbl.Label = formatSpeed(speed)
@@ -524,7 +528,7 @@ func (h *Hud) Sync() {
 
 	// 4 — locked-target cards (name, distance, lock strip, layer bars).
 	var locks []sim.Lock
-	if tg, ok := s.Targetings.Get(player); ok {
+	if tg, ok := s.Targeting(player); ok {
 		locks = tg.Locks
 	}
 	if len(locks) == 0 {
@@ -540,7 +544,7 @@ func (h *Hud) Sync() {
 		showWidget(box.root.GetWidget(), true)
 		l := locks[i]
 		info, hasInfo := s.Info(l.Target)
-		card := targetCard{lock: hudFrac01(l.Progress), name: "…", tint: h.env.Pal.Text}
+		card := targetCard{lock: hudFrac01(l.Progress), name: "…", tint: h.th.Pal().Text}
 		if hasInfo {
 			card.dist = formatDistance(info.Distance)
 			// The kind glyph leads the name line; hostiles wear
@@ -548,11 +552,11 @@ func (h *Hud) Sync() {
 			card.kind = KindIcon(info.Kind)
 			switch {
 			case info.Hostile:
-				card.tint = h.env.Pal.Danger
+				card.tint = h.th.Pal().Danger
 			case info.Entity == player:
-				card.tint = h.env.Pal.Info
+				card.tint = h.th.Pal().Info
 			}
-			if sh, ok := s.Ships.Get(l.Target); ok {
+			if sh, ok := s.ShipState(l.Target); ok {
 				// Ships report all three layers; other targets fall
 				// back to the read model's single health fraction.
 				card.ships = true
@@ -597,7 +601,7 @@ func (h *Hud) drawRing(shield, armor, structure float64) {
 	c := float64(Px(hudRingSize)) / 2
 	const twoPi = 2 * math.Pi
 	start := -math.Pi / 2
-	p := h.env.Pal
+	p := h.th.Pal()
 	layers := [...]struct {
 		rad, frac float64
 		col       color.RGBA

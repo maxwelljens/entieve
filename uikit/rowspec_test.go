@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/ebitenui/ebitenui"
+	"github.com/entieve/entieve/sim"
 )
 
 // Installer behaviour tests for the RowSpec seam (rowspec.go): the menu
@@ -21,27 +22,26 @@ import (
 // objective label / Show Info link), and an empty spec opens no menu at
 // all. An unresolvable Ref keeps its entry, grayed.
 func TestRowSpecMenuShape(t *testing.T) {
-	env, _ := newTestEnv(t)
+	env, cmds := newTestEnv(t)
 	ref := ItemRef("charge-emp")
 	sec := ItemRef("charge-fusion")
-	var ran []string
 	spec := RowSpec{
 		Ref:    &ref,
 		SecRef: &sec,
 		Actions: []RowAction{
-			{Label: "Buy", Do: func() { ran = append(ran, "buy") }},
-			{Label: "Sell", Disabled: true, Do: func() { ran = append(ran, "sell") }},
+			{Label: "Buy", Intent: Buy{Item: "charge-emp", Qty: 1}},
+			{Label: "Sell", Disabled: true, Intent: Sell{Item: "charge-emp", Qty: 1}},
 		},
 	}
 
-	ents := env.rowMenuEntries(spec)
+	ents := rowMenuEntries(env, env, spec)
 	if len(ents) != 5 {
 		t.Fatalf("entries = %+v, want Show Info / secondary / sep / Buy / Sell", ents)
 	}
 	if ents[0].Label != "Show Info" || !ents[0].Bold || ents[0].Disabled {
 		t.Errorf("entry 0 = %+v, want a bold, enabled Show Info", ents[0])
 	}
-	wantSecond := "Show Info — " + env.chainName("charge-fusion")
+	wantSecond := "Show Info — " + chainName(env, "charge-fusion")
 	if ents[1].Label != wantSecond || ents[1].Bold {
 		t.Errorf("entry 1 = %+v, want the non-bold secondary %q", ents[1], wantSecond)
 	}
@@ -55,30 +55,34 @@ func TestRowSpecMenuShape(t *testing.T) {
 		t.Errorf("entry 4 = %+v, want Sell grayed (visible, not hidden)", ents[4])
 	}
 
-	// Dispatch through the seam: a disabled entry closes without running,
-	// an enabled one runs its RowAction exactly once.
+	// Dispatch through the seam: a disabled entry closes without emitting,
+	// an enabled one emits its intent — here through the session's own
+	// sink, which maps it onto the command the trade button fires.
 	env.OpenRowMenu(spec, image.Pt(50, 60))
 	if !env.Menu().IsOpen() || env.Menu().Rect().Min != (image.Pt(50, 60)) {
 		t.Fatalf("menu open=%v origin=%v, want open at the click point",
 			env.Menu().IsOpen(), env.Menu().Rect().Min)
 	}
 	clickMenuEntry(t, env, "Sell")
-	if len(ran) != 0 {
-		t.Fatalf("disabled Sell ran %v, want nothing", ran)
+	if len(*cmds) != 0 {
+		t.Fatalf("disabled Sell emitted %v, want nothing", *cmds)
 	}
 	env.OpenRowMenu(spec, image.Pt(50, 60))
 	clickMenuEntry(t, env, "Buy")
-	if len(ran) != 1 || ran[0] != "buy" {
-		t.Fatalf("enabled Buy ran %v, want [buy]", ran)
+	if len(*cmds) != 1 {
+		t.Fatalf("enabled Buy emitted %v, want the single CmdBuy", *cmds)
+	}
+	if c, ok := (*cmds)[0].(sim.CmdBuy); !ok || c.Item != "charge-emp" || c.Qty != 1 {
+		t.Fatalf("cmd = %#v, want CmdBuy{charge-emp 1}", (*cmds)[0])
 	}
 
 	// Actions only: the single Accept entry, no leading separator.
-	actOnly := env.rowMenuEntries(RowSpec{Actions: []RowAction{{Label: "Accept"}}})
+	actOnly := rowMenuEntries(env, env, RowSpec{Actions: []RowAction{{Label: "Accept"}}})
 	if len(actOnly) != 1 || actOnly[0].Label != "Accept" || actOnly[0].Sep {
 		t.Errorf("actions-only = %+v, want the lone Accept entry", actOnly)
 	}
 	// Ref only: the single bold Show Info entry.
-	refOnly := env.rowMenuEntries(RowSpec{Ref: ptrRef(ModuleRef("mod-emp-turret"))})
+	refOnly := rowMenuEntries(env, env, RowSpec{Ref: ptrRef(ModuleRef("mod-emp-turret"))})
 	if len(refOnly) != 1 || refOnly[0].Label != "Show Info" || !refOnly[0].Bold {
 		t.Errorf("ref-only = %+v, want the lone bold Show Info", refOnly)
 	}
@@ -92,7 +96,7 @@ func TestRowSpecMenuShape(t *testing.T) {
 	// nothing.
 	bad := InfoRef{Kind: InfoItem, ID: "item-nowhere"}
 	gone := RowSpec{Ref: &bad}
-	entries := env.rowMenuEntries(gone)
+	entries := rowMenuEntries(env, env, gone)
 	if len(entries) != 1 || entries[0].Label != "Show Info" || !entries[0].Bold || !entries[0].Disabled {
 		t.Fatalf("unresolvable spec = %+v, want one grayed Show Info", entries)
 	}
@@ -110,7 +114,7 @@ func TestRowSpecMenuShape(t *testing.T) {
 func TestRowSpecTooltipLazy(t *testing.T) {
 	env, _ := newTestEnv(t)
 	tbl := NewTable(env, []Column{{Key: "A", Title: "A"}})
-	ui := &ebitenui.UI{Container: tbl.Container(), PrimaryTheme: env.Theme}
+	ui := &ebitenui.UI{Container: tbl.Container(), PrimaryTheme: env.WidgetTheme()}
 	ui.Update()
 
 	builds := 0
@@ -173,7 +177,7 @@ func TestRowSpecDoubleClickStrict(t *testing.T) {
 		{Cells: []string{"gun"}, Data: 0, Spec: RowSpec{Ref: &ref}},
 		{Cells: []string{"ghost"}, Data: 1, Spec: RowSpec{Ref: &bad}},
 	})
-	ui := &ebitenui.UI{Container: tbl.Container(), PrimaryTheme: env.Theme}
+	ui := &ebitenui.UI{Container: tbl.Container(), PrimaryTheme: env.WidgetTheme()}
 	ui.Update()
 
 	clickRow(ui, tbl, 0)

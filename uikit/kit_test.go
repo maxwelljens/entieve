@@ -147,7 +147,7 @@ func TestNewKitConstruction(t *testing.T) {
 
 	// And the kit itself wires all of it up.
 	k, _ := newTestKit(t)
-	if k.theme == nil || k.ui == nil || k.ov == nil || k.sp == nil {
+	if k.th.WidgetTheme() == nil || k.ui == nil || k.ov == nil || k.sp == nil {
 		t.Fatal("kit missing theme/ui/windows")
 	}
 }
@@ -190,7 +190,7 @@ func TestOverviewRowClickSelectsThenShowsInfo(t *testing.T) {
 		if !inf.Visible {
 			continue
 		}
-		if _, ok := k.panelEnv().InfoRefFor(inf.Entity); ok {
+		if _, ok := k.Env().InfoRefFor(inf.Entity); ok {
 			target = inf
 			break
 		}
@@ -207,11 +207,11 @@ func TestOverviewRowClickSelectsThenShowsInfo(t *testing.T) {
 	if !k.InfoOpen() {
 		t.Fatal("double-click on a resolvable row did not open Show Info")
 	}
-	ref, ok := k.panelEnv().InfoRefFor(target.Entity)
+	ref, ok := k.Env().InfoRefFor(target.Entity)
 	if !ok {
 		t.Fatalf("fixture: %v (%s) resolves to no definition", target.Entity, target.Kind)
 	}
-	page, _ := k.panelEnv().infoPageFor(ref)
+	page, _ := infoPageFor(k.Env(), ref)
 	if got, want := k.svc.info.TitleText(), page.Title+" — Info"; got != want {
 		t.Errorf("info title = %q, want %q", got, want)
 	}

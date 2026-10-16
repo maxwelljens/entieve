@@ -174,7 +174,7 @@ func (g *logCaptureGame) verify(img *ebiten.Image) {
 		return v
 	}
 	glyphs := func(r image.Rectangle) int {
-		want := g.env.Pal.Info
+		want := g.env.Pal().Info
 		n := 0
 		for y := r.Min.Y; y < r.Max.Y; y++ {
 			for x := r.Min.X; x < r.Max.X; x++ {

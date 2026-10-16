@@ -97,23 +97,22 @@ func (r InfoRef) String() string {
 // an NPC caste first (the dossier belongs to the caste, not its hull),
 // then the hull, then the asteroid's ore. False for celestials, wrecks
 // and anything else without a def.
-func (e Env) InfoRefFor(entity ecs.Entity) (InfoRef, bool) {
-	if e.Sim == nil || e.Content == nil {
+func infoRefFor(cv ContentView, entity ecs.Entity) (InfoRef, bool) {
+	if cv == nil || cv.Defs() == nil {
 		return InfoRef{}, false
 	}
-	s := e.Sim
-	if ai, ok := s.AIs.Get(entity); ok && ai.Npc != "" {
-		if ref := NpcRef(ai.Npc); e.infoRefExists(ref) {
+	if ai, ok := cv.NpcAI(entity); ok && ai.Npc != "" {
+		if ref := NpcRef(ai.Npc); infoRefExists(cv, ref) {
 			return ref, true
 		}
 	}
-	if sh, ok := s.Ships.Get(entity); ok && sh.Hull != "" {
-		if ref := ShipRef(sh.Hull); e.infoRefExists(ref) {
+	if sh, ok := cv.ShipState(entity); ok && sh.Hull != "" {
+		if ref := ShipRef(sh.Hull); infoRefExists(cv, ref) {
 			return ref, true
 		}
 	}
-	if a, ok := s.Asteroids.Get(entity); ok && a.Ore != "" {
-		if ref := ItemRef(a.Ore); e.infoRefExists(ref) {
+	if a, ok := cv.Asteroid(entity); ok && a.Ore != "" {
+		if ref := ItemRef(a.Ore); infoRefExists(cv, ref) {
 			return ref, true
 		}
 	}
@@ -124,66 +123,66 @@ func (e Env) InfoRefFor(entity ecs.Entity) (InfoRef, bool) {
 // hand it whatever their TableRow.Data carries (see market.itemLabel for
 // the same multi-kind resolution); false means the row has nothing to
 // show and its Show Info entry stays disabled.
-func (e Env) InfoRefOf(data any) (InfoRef, bool) {
+func infoRefOf(cv ContentView, data any) (InfoRef, bool) {
 	switch v := data.(type) {
 	case InfoRef:
-		return v, e.infoRefExists(v)
+		return v, infoRefExists(cv, v)
 	case factoryRow: // the factory panel's recipe and job rows
-		return v.ref, e.infoRefExists(v.ref)
+		return v.ref, infoRefExists(cv, v.ref)
 	case content.ItemID:
-		return e.refOfID(string(v))
+		return refOfID(cv, string(v))
 	case content.ModuleID:
-		return e.refOfID(string(v))
+		return refOfID(cv, string(v))
 	case content.ShipID:
-		return e.refOfID(string(v))
+		return refOfID(cv, string(v))
 	case *ovRow:
-		return e.InfoRefFor(v.info.Entity)
+		return infoRefFor(cv, v.info.Entity)
 	case slotPick:
 		if v.mod == "" {
 			return InfoRef{}, false
 		}
-		return e.refOfID(string(v.mod))
+		return refOfID(cv, string(v.mod))
 	case ecs.Entity:
-		return e.InfoRefFor(v)
+		return infoRefFor(cv, v)
 	}
 	return InfoRef{}, false
 }
 
 // refOfID resolves a raw id the way itemLabel does: item, then module,
 // then ship (holds can store any of them under one id type).
-func (e Env) refOfID(id string) (InfoRef, bool) {
-	if e.Content == nil || id == "" {
+func refOfID(cv ContentView, id string) (InfoRef, bool) {
+	if cv.Defs() == nil || id == "" {
 		return InfoRef{}, false
 	}
-	if _, ok := e.Content.Item(content.ItemID(id)); ok {
+	if _, ok := cv.Defs().Item(content.ItemID(id)); ok {
 		return ItemRef(content.ItemID(id)), true
 	}
-	if _, ok := e.Content.Module(content.ModuleID(id)); ok {
+	if _, ok := cv.Defs().Module(content.ModuleID(id)); ok {
 		return ModuleRef(content.ModuleID(id)), true
 	}
-	if _, ok := e.Content.Ship(content.ShipID(id)); ok {
+	if _, ok := cv.Defs().Ship(content.ShipID(id)); ok {
 		return ShipRef(content.ShipID(id)), true
 	}
 	return InfoRef{}, false
 }
 
 // infoRefExists reports whether ref's definition is loaded.
-func (e Env) infoRefExists(ref InfoRef) bool {
-	if e.Content == nil || !ref.Valid() {
+func infoRefExists(cv ContentView, ref InfoRef) bool {
+	if cv.Defs() == nil || !ref.Valid() {
 		return false
 	}
 	switch ref.Kind {
 	case InfoShip:
-		_, ok := e.Content.Ship(content.ShipID(ref.ID))
+		_, ok := cv.Defs().Ship(content.ShipID(ref.ID))
 		return ok
 	case InfoModule:
-		_, ok := e.Content.Module(content.ModuleID(ref.ID))
+		_, ok := cv.Defs().Module(content.ModuleID(ref.ID))
 		return ok
 	case InfoItem:
-		_, ok := e.Content.Item(content.ItemID(ref.ID))
+		_, ok := cv.Defs().Item(content.ItemID(ref.ID))
 		return ok
 	case InfoNpc:
-		_, ok := e.Content.Npc(content.NpcID(ref.ID))
+		_, ok := cv.Defs().Npc(content.NpcID(ref.ID))
 		return ok
 	}
 	return false
@@ -249,11 +248,11 @@ func valueRefRow(label, value string, ref InfoRef) infoRow {
 // recipeFor returns the first recipe (canonical id order) producing id.
 // v1 ships exactly one recipe per product; the schema is a list, so "first
 // in canonical order" is the documented resolution.
-func (e Env) recipeFor(id string) *content.RecipeDef {
-	if e.Content == nil || id == "" {
+func recipeFor(cv ContentView, id string) *content.RecipeDef {
+	if cv.Defs() == nil || id == "" {
 		return nil
 	}
-	for _, r := range e.Content.RecipesInOrder() {
+	for _, r := range cv.Defs().RecipesInOrder() {
 		if string(r.Product) == id {
 			return r
 		}
@@ -263,12 +262,12 @@ func (e Env) recipeFor(id string) *content.RecipeDef {
 
 // recipesUsing returns every recipe consuming id as an input, canonical
 // order.
-func (e Env) recipesUsing(id string) []*content.RecipeDef {
-	if e.Content == nil || id == "" {
+func recipesUsing(cv ContentView, id string) []*content.RecipeDef {
+	if cv.Defs() == nil || id == "" {
 		return nil
 	}
 	var out []*content.RecipeDef
-	for _, r := range e.Content.RecipesInOrder() {
+	for _, r := range cv.Defs().RecipesInOrder() {
 		for _, in := range r.Inputs {
 			if string(in.Item) == id {
 				out = append(out, r)
@@ -280,14 +279,14 @@ func (e Env) recipesUsing(id string) []*content.RecipeDef {
 }
 
 // chainName resolves a raw def id (item, module or ship) for display.
-func (e Env) chainName(id content.ItemID) string {
-	if d, ok := e.Content.Item(id); ok {
+func chainName(cv ContentView, id content.ItemID) string {
+	if d, ok := cv.Defs().Item(id); ok {
 		return d.Name
 	}
-	if d, ok := e.Content.Module(content.ModuleID(id)); ok {
+	if d, ok := cv.Defs().Module(content.ModuleID(id)); ok {
 		return d.Name
 	}
-	if d, ok := e.Content.Ship(content.ShipID(id)); ok {
+	if d, ok := cv.Defs().Ship(content.ShipID(id)); ok {
 		return d.Name
 	}
 	return string(id)
@@ -308,20 +307,20 @@ func chainVal(qty float64) string {
 // ("Ferrite ×720"). A hull's recipe also reports its family and base time
 // (the craft curve the sim applies lives in the sim — this is the raw
 // recipe figure).
-func (e Env) manufacturedRows(id string) []infoRow {
-	r := e.recipeFor(id)
+func manufacturedRows(cv ContentView, id string) []infoRow {
+	r := recipeFor(cv, id)
 	if r == nil {
 		return nil
 	}
 	var rows []infoRow
-	if _, isShip := e.Content.Ship(content.ShipID(id)); isShip {
+	if _, isShip := cv.Defs().Ship(content.ShipID(id)); isShip {
 		rows = append(rows,
 			infoRow{Label: "Family", Value: spacedKind(r.Family)},
 			infoRow{Label: "Base time", Value: groupFloat(r.Time, 1) + " s"})
 	}
 	for _, in := range r.Inputs {
-		name := e.chainName(in.Item)
-		if ref, ok := e.refOfID(string(in.Item)); ok {
+		name := chainName(cv, in.Item)
+		if ref, ok := refOfID(cv, string(in.Item)); ok {
 			rows = append(rows, refRow(name, ref, chainVal(in.Qty)))
 			continue
 		}
@@ -334,11 +333,11 @@ func (e Env) manufacturedRows(id string) []infoRow {
 // linked on its product. The value describes the LABELED definition (the
 // product's per-run output), so both sections read the same way: link on
 // the label, quantity of the linked def on the right.
-func (e Env) usedInRows(id string) []infoRow {
+func usedInRows(cv ContentView, id string) []infoRow {
 	var rows []infoRow
-	for _, r := range e.recipesUsing(id) {
-		name := e.chainName(r.Product)
-		if ref, ok := e.refOfID(string(r.Product)); ok {
+	for _, r := range recipesUsing(cv, id) {
+		name := chainName(cv, r.Product)
+		if ref, ok := refOfID(cv, string(r.Product)); ok {
 			rows = append(rows, refRow(name, ref, chainVal(float64(r.Qty))))
 			continue
 		}
@@ -375,30 +374,30 @@ func spacedKind(s string) string {
 
 // infoPageFor builds the page for ref (false when the def is unknown —
 // Show then opens nothing rather than a hollow window).
-func (e Env) infoPageFor(ref InfoRef) (infoPage, bool) {
-	if !e.infoRefExists(ref) {
+func infoPageFor(cv ContentView, ref InfoRef) (infoPage, bool) {
+	if !infoRefExists(cv, ref) {
 		return infoPage{}, false
 	}
 	switch ref.Kind {
 	case InfoShip:
-		def, _ := e.Content.Ship(content.ShipID(ref.ID))
-		return e.shipPage(def), true
+		def, _ := cv.Defs().Ship(content.ShipID(ref.ID))
+		return shipPage(cv, def), true
 	case InfoModule:
-		def, _ := e.Content.Module(content.ModuleID(ref.ID))
-		return e.modulePage(def), true
+		def, _ := cv.Defs().Module(content.ModuleID(ref.ID))
+		return modulePage(cv, def), true
 	case InfoItem:
-		def, _ := e.Content.Item(content.ItemID(ref.ID))
-		return e.itemPage(def), true
+		def, _ := cv.Defs().Item(content.ItemID(ref.ID))
+		return itemPage(cv, def), true
 	case InfoNpc:
-		def, _ := e.Content.Npc(content.NpcID(ref.ID))
-		return e.npcPage(def), true
+		def, _ := cv.Defs().Npc(content.NpcID(ref.ID))
+		return npcPage(cv, def), true
 	}
 	return infoPage{}, false
 }
 
 // shipPage renders a hull: construction (class · origin), slots, the
 // survival block with resists, capacitor, propulsion, sensors and cargo.
-func (e Env) shipPage(def *content.ShipDef) infoPage {
+func shipPage(cv ContentView, def *content.ShipDef) infoPage {
 	p := infoPage{Icon: "row_hull", Title: def.Name, Prose: def.Description}
 	if def.Class != "" {
 		p.Sub = spacedKind(def.Class)
@@ -505,15 +504,15 @@ func (e Env) shipPage(def *content.ShipDef) infoPage {
 	addSection(&p, "CARGO", cargo)
 
 	// Manufacturing chain: only when a recipe actually references this def.
-	addSection(&p, "MANUFACTURED FROM", e.manufacturedRows(string(def.ID)))
-	addSection(&p, "USED IN", e.usedInRows(string(def.ID)))
+	addSection(&p, "MANUFACTURED FROM", manufacturedRows(cv, string(def.ID)))
+	addSection(&p, "USED IN", usedInRows(cv, string(def.ID)))
 	return p
 }
 
 // modulePage renders a module: its own ACTIVATION block first (slot,
 // kind, cycle, capacitor draw), then the shared moduleTip stat sections,
 // the compatible charges as links and the market price.
-func (e Env) modulePage(def *content.ModuleDef) infoPage {
+func modulePage(cv ContentView, def *content.ModuleDef) infoPage {
 	p := infoPage{Icon: ModuleIcon(def.Kind), Title: def.Name, Prose: def.Description}
 	if def.Kind != "" {
 		p.Sub = spacedKind(def.Kind)
@@ -536,13 +535,13 @@ func (e Env) modulePage(def *content.ModuleDef) infoPage {
 
 	// The rack/fitting tooltip's stat sections, shared verbatim (charge
 	// context is an instance concern the def-only window has none of).
-	p.Sections = append(p.Sections, sectionsOf(e.moduleSections(def, "", 0))...)
+	p.Sections = append(p.Sections, sectionsOf(moduleSections(def, "", 0))...)
 
 	if def.Weapon != nil && def.Weapon.AmmoClass != "" {
 		var rows []infoRow
 		rows = append(rows, infoRow{Label: "Class", Value: spacedKind(def.Weapon.AmmoClass)})
-		for _, id := range e.ammoItems(def.Weapon.AmmoClass) {
-			item := e.Content.Items[id]
+		for _, id := range ammoItems(cv, def.Weapon.AmmoClass) {
+			item := cv.Defs().Items[id]
 			rows = append(rows, refRow(item.Name, ItemRef(id), formatVolume(item.Volume)))
 		}
 		addSection(&p, "CHARGES", rows)
@@ -552,16 +551,16 @@ func (e Env) modulePage(def *content.ModuleDef) infoPage {
 	}
 
 	// Manufacturing chain: only when a recipe actually references this def.
-	addSection(&p, "MANUFACTURED FROM", e.manufacturedRows(string(def.ID)))
-	addSection(&p, "USED IN", e.usedInRows(string(def.ID)))
+	addSection(&p, "MANUFACTURED FROM", manufacturedRows(cv, string(def.ID)))
+	addSection(&p, "USED IN", usedInRows(cv, string(def.ID)))
 	return p
 }
 
 // ammoItems lists every loaded item of an ammo class, by id for
 // determinism (the charges block of the module window).
-func (e Env) ammoItems(class string) []content.ItemID {
+func ammoItems(cv ContentView, class string) []content.ItemID {
 	var ids []content.ItemID
-	for id, it := range e.Content.Items {
+	for id, it := range cv.Defs().Items {
 		if it.AmmoClass == class {
 			ids = append(ids, id)
 		}
@@ -572,7 +571,7 @@ func (e Env) ammoItems(class string) []content.ItemID {
 
 // itemPage renders an item: properties, market price, the refine yields
 // as links and the ammo damage profile when it has one.
-func (e Env) itemPage(def *content.ItemDef) infoPage {
+func itemPage(cv ContentView, def *content.ItemDef) infoPage {
 	p := infoPage{Title: def.Name, Prose: def.Description}
 	if def.Category != "" {
 		p.Sub = spacedKind(def.Category)
@@ -600,10 +599,10 @@ func (e Env) itemPage(def *content.ItemDef) infoPage {
 		var rows []infoRow
 		for _, id := range ids {
 			name := string(id)
-			if d, ok := e.Content.Item(id); ok {
+			if d, ok := cv.Defs().Item(id); ok {
 				name = d.Name
 			}
-			if ref, ok := e.refOfID(string(id)); ok {
+			if ref, ok := refOfID(cv, string(id)); ok {
 				rows = append(rows, refRow(name, ref, formatPct(def.RefineYield[id])))
 				continue
 			}
@@ -623,17 +622,17 @@ func (e Env) itemPage(def *content.ItemDef) infoPage {
 	}
 
 	// Manufacturing chain: only when a recipe actually references this def.
-	addSection(&p, "MANUFACTURED FROM", e.manufacturedRows(string(def.ID)))
-	addSection(&p, "USED IN", e.usedInRows(string(def.ID)))
+	addSection(&p, "MANUFACTURED FROM", manufacturedRows(cv, string(def.ID)))
+	addSection(&p, "USED IN", usedInRows(cv, string(def.ID)))
 	return p
 }
 
 // npcPage renders a caste: the dossier prose (only when the content
 // stream gave it one — never placeholder text), the dossier block with
 // its hull as a link, behavior ranges and the loot table as links.
-func (e Env) npcPage(def *content.NpcDef) infoPage {
+func npcPage(cv ContentView, def *content.NpcDef) infoPage {
 	p := infoPage{Icon: "kind_ship", Title: def.Name, Prose: def.Description}
-	hull, hasHull := e.Content.Ship(def.Ship)
+	hull, hasHull := cv.Defs().Ship(def.Ship)
 	if hasHull && hull.Class != "" {
 		p.Sub = spacedKind(hull.Class)
 	}
@@ -673,7 +672,7 @@ func (e Env) npcPage(def *content.NpcDef) infoPage {
 	var loot []infoRow
 	for _, d := range def.Loot {
 		name := string(d.Item)
-		if it, ok := e.Content.Item(d.Item); ok {
+		if it, ok := cv.Defs().Item(d.Item); ok {
 			name = it.Name
 		}
 		value := pctLabel(d.Chance)
@@ -683,7 +682,7 @@ func (e Env) npcPage(def *content.NpcDef) infoPage {
 		case d.MaxQty > 0:
 			value += " · ×" + FormatInt(int64(d.MaxQty))
 		}
-		if ref, ok := e.refOfID(string(d.Item)); ok {
+		if ref, ok := refOfID(cv, string(d.Item)); ok {
 			loot = append(loot, refRow(name, ref, value))
 			continue
 		}
@@ -707,7 +706,9 @@ type InfoRefRow struct {
 // InfoWin is the Show Info window: one floating, non-modal, draggable
 // and resize-chromed window whose page swaps in place.
 type InfoWin struct {
-	env Env
+	th Theme
+	cv ContentView
+	as ActionSink
 
 	win    *widget.Window
 	title  *widget.Text
@@ -726,9 +727,9 @@ type InfoWin struct {
 // NewInfoWin builds the closed window over the given environment. It
 // starts hidden: the window appears only on demand and its geometry is
 // what the layout sidecar persists.
-func NewInfoWin(env Env) *InfoWin {
-	p := env.Pal
-	w := &InfoWin{env: env}
+func NewInfoWin(env Seams) *InfoWin {
+	p := env.Pal()
+	w := &InfoWin{th: env, cv: env, as: env}
 
 	w.page = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -829,7 +830,7 @@ func (w *InfoWin) RefRows() []InfoRefRow { return w.refRows }
 // Mounting (and the raise-to-top remount) is the host's job — see
 // Kit.ShowInfo.
 func (w *InfoWin) Show(ref InfoRef) bool {
-	page, ok := w.env.infoPageFor(ref)
+	page, ok := infoPageFor(w.cv, ref)
 	if !ok {
 		return false
 	}
@@ -865,7 +866,7 @@ func (w *InfoWin) scrollBy(notches float64) {
 		w.scroll.ScrollTop = 0
 		return
 	}
-	step := notches * infoWheelN * float64(tipLineH(w.env.Face(StepSmall)))
+	step := notches * infoWheelN * float64(tipLineH(w.th.Face(StepSmall)))
 	top := w.scroll.ScrollTop - step/over
 	w.scroll.ScrollTop = max(0, min(1, top))
 }
@@ -892,7 +893,7 @@ func (w *InfoWin) rewrap() {
 // render rebuilds the page container from a model: header, prose and the
 // section rows (link rows get their click seam).
 func (w *InfoWin) render(p infoPage) {
-	env, pal := w.env, w.env.Pal
+	env, pal := w.th, w.th.Pal()
 	w.page.RemoveChildren()
 	w.refRows = nil
 	w.prose = nil
@@ -973,7 +974,7 @@ func (w *InfoWin) render(p infoPage) {
 // on the row's shared edge, link rows tinted accent and wired for
 // right-click (menu) and double-click (swap).
 func (w *InfoWin) rowWidget(row infoRow) widget.PreferredSizeLocateableWidget {
-	env, pal := w.env, w.env.Pal
+	env, pal := w.th, w.th.Pal()
 	face := env.Face(StepSmall)
 	lineH := tipLineH(face)
 
@@ -1012,9 +1013,9 @@ func (w *InfoWin) rowWidget(row infoRow) widget.PreferredSizeLocateableWidget {
 		}
 		switch a.Button {
 		case ebiten.MouseButtonRight:
-			w.env.OpenRowMenu(spec, ClickPoint(a))
+			openRowMenu(w.cv, w.as, spec, ClickPoint(a))
 		case ebiten.MouseButtonLeft:
-			w.dbl.Click(w.env, spec)
+			w.dbl.Click(w.cv, w.as, spec)
 		}
 	}
 

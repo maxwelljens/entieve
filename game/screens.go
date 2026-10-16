@@ -260,11 +260,29 @@ type panelDef struct {
 // variable exists and before any session is built.
 var panelDefs []panelDef
 
+// screenByTitle keys every row by its lowercased Title for
+// Toggle{Screen} (game/intents.go). Like panelDefs it is assigned in
+// init: the rows' Build closures reach session code that resolves
+// titles through it, so a package-level initializer would be a circular
+// initialization.
+var screenByTitle map[string]Screen
+
 func init() {
 	panelDefs = derivePanelDefs(screens)
+	screenByTitle = titleIndex(screens)
 	KeyMap = slices.Concat(worldKeyMap, screenBindings(screens))
 	layoutNames = append([]string{"overview", "selected", "infowin"}, sidecarNames(screens)...)
 	stationPanels = stationScreens(screens)
+}
+
+// titleIndex keys rows by lowercased title — Toggle{Screen}'s lookup
+// (titles compare case-insensitively, as the intent documents).
+func titleIndex(rows []Screen) map[string]Screen {
+	m := make(map[string]Screen, len(rows))
+	for _, s := range rows {
+		m[strings.ToLower(s.Title)] = s
+	}
+	return m
 }
 
 // derivePanelDefs builds panelDefs from any Screen table (the tests run

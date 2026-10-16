@@ -15,7 +15,7 @@ import (
 // constructor handlers register.
 func newWindowUI(t *testing.T, env Env, wins ...*widget.Window) *ebitenui.UI {
 	t.Helper()
-	ui := &ebitenui.UI{Container: widget.NewContainer(), PrimaryTheme: env.Theme}
+	ui := &ebitenui.UI{Container: widget.NewContainer(), PrimaryTheme: env.WidgetTheme()}
 	for _, w := range wins {
 		ui.AddWindow(w)
 	}
@@ -385,7 +385,7 @@ func TestFittingActions(t *testing.T) {
 // stays in bounds and every table gets fitted to its cell.
 func TestStationWindowsDrawSmoke(t *testing.T) {
 	k, _ := newTestKit(t)
-	env := k.panelEnv()
+	env := k.Env()
 	market := NewMarket(env)
 	inventory := NewInventory(env)
 	fitting := NewFitting(env)

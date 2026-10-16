@@ -59,15 +59,15 @@ var selectedBands = [...]int{4, 5, 1, 1}
 
 // buildSelected constructs the Selected Item window and its handlers.
 func (k *Kit) buildSelected() {
-	p := k.palette
+	p := k.th.Pal()
 	sp := &selectedPanel{}
 	k.sp = sp
 
 	sp.name = widget.NewText(
-		widget.TextOpts.Text("No selection", facePtr(k.faces.largeBold), solid(p.Text)),
+		widget.TextOpts.Text("No selection", k.th.FaceBold(StepLarge), solid(p.Text)),
 	)
 	sp.dist = widget.NewText(
-		widget.TextOpts.Text("", facePtr(k.faces.tiny), solid(p.Dim)),
+		widget.TextOpts.Text("", k.th.Face(StepTiny), solid(p.Dim)),
 	)
 	// The kind glyph leads the name line (icon box + label, one row).
 	sp.kindIcon = newIconBox(IconTitle)
@@ -124,7 +124,7 @@ func (k *Kit) buildSelected() {
 	// warp minimum range: one ToolTip for the button's lifetime, its
 	// panel refreshed by syncSelected and attached only in that state
 	// (the module rack's tooltip pattern).
-	sp.warpTip, sp.warpTipView = newTip(k.panelEnv(), TooltipModel{})
+	sp.warpTip, sp.warpTipView = newTip(k.th, TooltipModel{})
 	sp.warpTips = []*widget.ToolTip{sp.warpTip}
 
 	body := widget.NewContainer(
@@ -144,7 +144,7 @@ func (k *Kit) buildSelected() {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	title.AddChild(widget.NewText(
-		widget.TextOpts.Text("Selected Item", facePtr(k.faces.baseBold), solid(p.Accent)),
+		widget.TextOpts.Text("Selected Item", k.th.FaceBold(StepBase), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,
@@ -349,12 +349,12 @@ func (l *selectedLayouter) Layout(children []widget.PreferredSizeLocateableWidge
 // are state, they never enqueue.
 func (k *Kit) syncSelected() {
 	sp := k.sp
-	info, ok := k.Sim.Info(k.selected)
+	info, ok := k.cv.Info(k.selected)
 	name, dist := "No selection", ""
 	if ok {
 		name = info.Name
 		dist = formatDistance(info.Distance) + "  ·  " + kindLabel(info.Kind)
-		sp.kindIcon.Set(KindIcon(info.Kind), k.palette.Text)
+		sp.kindIcon.Set(KindIcon(info.Kind), k.th.Pal().Text)
 	} else {
 		sp.kindIcon.Set("", color.RGBA{})
 	}
@@ -457,79 +457,81 @@ func (k *Kit) cycleWarpRange() {
 // Action seam
 // ---------------------------------------------------------------------------
 
-// approachSelected enqueues CmdApproach for the selected entity.
+// approachSelected emits Approach for the selected entity.
 func (k *Kit) approachSelected() {
 	if k.selected.IsZero() {
 		return
 	}
-	k.enqueue(sim.CmdApproach{Target: k.selected})
+	k.sink.Do(Approach{Entity: k.selected})
 }
 
-// warpSelected enqueues CmdWarpTo for the selected entity at the range
-// the warp selector currently shows (Kit.WarpRange — the same value Z
-// uses). The button is disabled without a valid, warpable, distant
-// enough target; this guard keeps the seam safe when driven directly.
+// warpSelected emits WarpTo for the selected entity; the executor reads
+// the landing range from the warp selector at press (Kit.WarpRange — the
+// same value Z uses). The button is disabled without a valid, warpable,
+// distant enough target; this guard keeps the seam safe when driven
+// directly.
 func (k *Kit) warpSelected() {
 	if k.selected.IsZero() {
 		return
 	}
-	k.enqueue(sim.CmdWarpTo{Target: k.selected, Range: k.WarpRange()})
+	k.sink.Do(WarpTo{Entity: k.selected})
 }
 
-// orbitSelected enqueues CmdOrbit for the selected entity at the range
-// the orbit selector currently shows (Kit.OrbitRange — the same value Q
-// uses).
+// orbitSelected emits Orbit for the selected entity; the executor reads
+// the range from the orbit selector at press (Kit.OrbitRange — the same
+// value Q uses).
 func (k *Kit) orbitSelected() {
 	if k.selected.IsZero() {
 		return
 	}
-	k.enqueue(sim.CmdOrbit{Target: k.selected, Range: k.OrbitRange()})
+	k.sink.Do(Orbit{Entity: k.selected})
 }
 
-// stopSelected enqueues CmdStop (cancels movement intent).
+// stopSelected emits Stop (cancels movement intent).
 func (k *Kit) stopSelected() {
-	k.enqueue(sim.CmdStop{})
+	k.sink.Do(Stop{})
 }
 
-// lockSelected enqueues CmdLock for the selected entity.
+// lockSelected emits Lock for the selected entity.
 func (k *Kit) lockSelected() {
 	if k.selected.IsZero() {
 		return
 	}
-	k.enqueue(sim.CmdLock{Target: k.selected})
+	k.sink.Do(Lock{Entity: k.selected})
 }
 
-// dockSelected enqueues CmdDock at the selected station.
+// dockSelected emits Dock at the selected station.
 func (k *Kit) dockSelected() {
 	if k.selected.IsZero() {
 		return
 	}
-	k.enqueue(sim.CmdDock{Station: k.selected})
+	k.sink.Do(Dock{Entity: k.selected})
 }
 
-// jumpSelected enqueues CmdJump through the selected gate.
+// jumpSelected emits Jump through the selected gate.
 func (k *Kit) jumpSelected() {
 	if k.selected.IsZero() {
 		return
 	}
-	k.enqueue(sim.CmdJump{Gate: k.selected})
+	k.sink.Do(Jump{Entity: k.selected})
 }
 
-// lootSelected enqueues CmdLoot (empty item = everything) at the wreck.
+// lootSelected emits Loot (empty item = everything) at the wreck.
 func (k *Kit) lootSelected() {
 	if k.selected.IsZero() {
 		return
 	}
-	k.enqueue(sim.CmdLoot{Wreck: k.selected})
+	k.sink.Do(Loot{Entity: k.selected})
 }
 
 // mineSelected fires the first fitted mining laser at the selected
-// asteroid (mirrors ui.UI.mineSelected).
+// asteroid (mirrors ui.UI.mineSelected): the slot resolves at press and
+// rides the intent.
 func (k *Kit) mineSelected() {
 	if k.selected.IsZero() {
 		return
 	}
-	info, ok := k.Sim.Info(k.selected)
+	info, ok := k.cv.Info(k.selected)
 	if !ok || info.Kind != sim.KindAsteroid {
 		return
 	}
@@ -537,18 +539,18 @@ func (k *Kit) mineSelected() {
 	if !ok {
 		return
 	}
-	k.enqueue(sim.CmdMine{Asteroid: k.selected, Slot: slot})
+	k.sink.Do(Mine{Entity: k.selected, Slot: slot})
 }
 
 // firstMiningSlot finds the first fitted mining laser.
 func (k *Kit) firstMiningSlot() (sim.SlotRef, bool) {
-	fit, ok := k.Sim.Fittings.Get(k.Sim.Player())
+	fit, ok := k.cv.Fitting(k.cv.Player())
 	if !ok {
 		return sim.SlotRef{}, false
 	}
 	for _, class := range []string{content.SlotHigh, content.SlotMid} {
 		for i, id := range fit.Defs(class) {
-			if def, ok := k.Content.Module(id); ok && def.Kind == content.KindMiningLaser {
+			if def, ok := k.cv.Defs().Module(id); ok && def.Kind == content.KindMiningLaser {
 				return sim.SlotRef{Class: class, Index: i}, true
 			}
 		}

@@ -11,11 +11,11 @@ import (
 	"github.com/entieve/entieve/sim"
 )
 
-// tipTestEnv is an Env with just what the tooltip maths needs (palette and
-// faces): the layout never touches the sim or the content registry.
-func tipTestEnv() Env {
-	ts := DefaultTypeScale()
-	return Env{Pal: DefaultPalette(), TS: ts, faces: newFaces(ts)}
+// tipTestEnv is a Theme with just what the tooltip maths needs (palette
+// and faces): the layout never touches the view or the sink — the seam
+// purity the tooltip-only widget proves.
+func tipTestEnv() Theme {
+	return newTheme(DefaultPalette(), DefaultTypeScale())
 }
 
 // tipFixtureModel is the layout fixture: a header, two sections of rows and
@@ -160,16 +160,16 @@ func TestTipLayoutTilesAtBothWidths(t *testing.T) {
 	m := tipFixtureModel()
 
 	// Content-sized: the widest natural line, capped at the 304 px box.
-	natural := env.tipInnerWidth(m)
+	natural := tipInnerWidth(env, m)
 	if natural >= tipMaxInner {
 		t.Fatalf("fixture wants %d px, should fit under the %d px cap", natural, tipMaxInner)
 	}
-	minW := env.tipLayoutAt(m, natural)
-	if got := env.tipSize(m); got != minW.Size {
+	minW := tipLayoutAt(env, m, natural)
+	if got := tipSize(env, m); got != minW.Size {
 		t.Errorf("tipSize = %v, want %v (the content-sized layout)", got, minW.Size)
 	}
 	// Capped: what the panel does when the content wants more than 320.
-	maxed := env.tipLayoutAt(m, tipMaxInner)
+	maxed := tipLayoutAt(env, m, tipMaxInner)
 	if maxed.Size.X != tipMaxW {
 		t.Errorf("capped panel width = %d, want %d", maxed.Size.X, tipMaxW)
 	}
@@ -249,7 +249,7 @@ func TestTipNaturalWidthMatchesLayout(t *testing.T) {
 	for _, m := range []TooltipModel{
 		tipFixtureModel(),
 		{Title: "Warp unavailable", Sub: "Target within warp minimum range (150 km)"},
-		env.moduleTip(&content.ModuleDef{
+		moduleTip(&content.ModuleDef{
 			Name: "EMP Turret", Kind: content.KindWeapon, Slot: content.SlotHigh,
 			ActivationCost: 2, ActivationTime: 3,
 			Weapon: &content.WeaponAttrs{
@@ -261,11 +261,11 @@ func TestTipNaturalWidthMatchesLayout(t *testing.T) {
 			},
 		}, "High slot 1", "Fusion L", 600, "Right-click: cycle ammo", "Click: activate"),
 	} {
-		iw := env.tipInnerWidth(m)
-		l := env.tipLayoutAt(m, iw)
-		if l.Size != env.tipSize(m) {
+		iw := tipInnerWidth(env, m)
+		l := tipLayoutAt(env, m, iw)
+		if l.Size != tipSize(env, m) {
 			t.Errorf("size mismatch at the natural width for %q: %v vs %v",
-				m.Title, l.Size, env.tipSize(m))
+				m.Title, l.Size, tipSize(env, m))
 		}
 		// A model that fits needs no ellipsis: every measured line is
 		// inside the box the layout was given.
@@ -300,9 +300,9 @@ func TestTipFits320px(t *testing.T) {
 		if def.Weapon != nil && def.Weapon.AmmoClass != "" {
 			charge, qty = "Prograde XL", 12345
 		}
-		m := env.moduleTip(def, "High slot 1", charge, qty,
+		m := moduleTip(def, "High slot 1", charge, qty,
 			"Right-click: cycle ammo", "Click: activate")
-		if w := env.tipSize(m).X; w > tipMaxW {
+		if w := tipSize(env, m).X; w > tipMaxW {
 			t.Errorf("%s (%s): tooltip %d px wide, cap is %d", id, def.Name, w, tipMaxW)
 		} else if w > widest {
 			widest, widestID = w, string(id)
@@ -409,7 +409,6 @@ func checkSections(t *testing.T, name string, got, want []TooltipSection) {
 // header (icon/title/sub), DAMAGE/RANGE/FIRING, the charge block, the
 // activation block — and the footer hints are the caller's.
 func TestModuleTipCarriesModuleDef(t *testing.T) {
-	env := tipTestEnv()
 	weapon := &content.ModuleDef{
 		ID: "mod-emp-turret", Name: "EMP Turret", Slot: content.SlotHigh, Kind: content.KindWeapon,
 		ActivationCost: 2, ActivationTime: 3,
@@ -422,7 +421,7 @@ func TestModuleTipCarriesModuleDef(t *testing.T) {
 			ShotTime:  3,
 		},
 	}
-	m := env.moduleTip(weapon, "High slot 1", "Fusion L", 600, "Right-click: cycle ammo", "Click: activate")
+	m := moduleTip(weapon, "High slot 1", "Fusion L", 600, "Right-click: cycle ammo", "Click: activate")
 	if m.Icon != "mod_weapon" || m.Title != "EMP Turret" || m.Sub != "High slot 1 · Weapon" {
 		t.Errorf("header = %q/%q/%q, want mod_weapon / EMP Turret / High slot 1 · Weapon",
 			m.Icon, m.Title, m.Sub)
@@ -457,7 +456,7 @@ func TestModuleTipCarriesModuleDef(t *testing.T) {
 
 	// No count row when the charge is Auto (there is no single charge to
 	// count) — but the charge block itself stays.
-	m = env.moduleTip(weapon, "High slot 1", "Auto", 0)
+	m = moduleTip(weapon, "High slot 1", "Auto", 0)
 	if sec := tipSection(m, "CHARGE"); sec == nil || len(sec.Rows) != 1 || sec.Rows[0].Value != "Auto" {
 		t.Errorf("Auto charge block = %+v, want Loaded Auto and no count", sec)
 	}
@@ -471,7 +470,7 @@ func TestModuleTipCarriesModuleDef(t *testing.T) {
 		Falloff:  weapon.Weapon.Falloff,
 		Tracking: weapon.Weapon.Tracking,
 	}
-	m = env.moduleTip(&plain, "High slot 3", "Fusion L", 600)
+	m = moduleTip(&plain, "High slot 3", "Fusion L", 600)
 	if tipSection(m, "CHARGE") != nil {
 		t.Errorf("ammo-less weapon has sections %v, want no CHARGE", tipSectionLabels(m))
 	}
@@ -481,14 +480,12 @@ func TestModuleTipCarriesModuleDef(t *testing.T) {
 // only when the def carries the data behind it (no "N/A" rows), and a nil
 // def produces an empty panel rather than a panic.
 func TestModuleTipOmitsAbsentData(t *testing.T) {
-	env := tipTestEnv()
-
 	// Mining: yield and activation, no weapon blocks, no charge.
 	miner := &content.ModuleDef{
 		Name: "Mining Laser", Kind: content.KindMiningLaser, ActivationCost: 20, ActivationTime: 30,
 		Mining: &content.MiningAttrs{VolumePerCycle: 100, CycleTime: 30},
 	}
-	m := env.moduleTip(miner, "High slot 2", "", 0)
+	m := moduleTip(miner, "High slot 2", "", 0)
 	checkSections(t, "miner", m.Sections, []TooltipSection{
 		{Label: "YIELD", Rows: []TooltipRow{
 			{Label: "Per cycle", Value: "100.0 m³"},
@@ -504,7 +501,7 @@ func TestModuleTipOmitsAbsentData(t *testing.T) {
 		Name: "Shield Extender", Kind: content.KindShieldExtender,
 		Passive: &content.PassiveAttrs{ShieldHP: 280},
 	}
-	m = env.moduleTip(extender, "Mid slot 1", "", 0)
+	m = moduleTip(extender, "Mid slot 1", "", 0)
 	checkSections(t, "extender", m.Sections, []TooltipSection{
 		{Label: "BONUSES", Rows: []TooltipRow{
 			{Label: "Shield", Value: "+280 HP", Tint: goodTint},
@@ -516,7 +513,7 @@ func TestModuleTipOmitsAbsentData(t *testing.T) {
 		Name: "Resist Coat", Kind: content.KindResistCoat,
 		Passive: &content.PassiveAttrs{ResistBonus: content.Resists{EM: .15, Thermal: .15, Kinetic: .15, Explosive: .15}},
 	}
-	m = env.moduleTip(coat, "Low slot 3", "", 0)
+	m = moduleTip(coat, "Low slot 3", "", 0)
 	if rows := tipSection(m, "BONUSES"); rows == nil || len(rows.Rows) != 4 {
 		t.Fatalf("resist rows = %+v, want four", rows)
 	} else if rows.Rows[0] != (TooltipRow{Label: "EM resist", Value: "+15%", Tint: goodTint}) {
@@ -527,7 +524,7 @@ func TestModuleTipOmitsAbsentData(t *testing.T) {
 	}
 
 	// Nothing at all: an empty panel, not a crash.
-	if got := env.moduleTip(nil, "High slot 1", "Auto", 1, "hint"); got.Title != "" || len(got.Sections) != 0 {
+	if got := moduleTip(nil, "High slot 1", "Auto", 1, "hint"); got.Title != "" || len(got.Sections) != 0 {
 		t.Errorf("moduleTip(nil) = %+v, want an empty model", got)
 	}
 }
@@ -573,7 +570,7 @@ func TestTipPanelDrawSmoke(t *testing.T) {
 	c.root.AddChild(body)
 	c.frame(t, 1280, 720)
 
-	size := env.tipSize(m)
+	size := tipSize(env, m)
 	if got, want := body.GetWidget().Rect.Size(), size; got != want {
 		t.Fatalf("panel rect = %v, want the model's size %v", got, want)
 	}
@@ -583,7 +580,7 @@ func TestTipPanelDrawSmoke(t *testing.T) {
 	if vr.Size() != size {
 		t.Errorf("view rect = %v, want %v", vr, size)
 	}
-	l := view.panel(env.tipInnerWidth(m))
+	l := view.panel(tipInnerWidth(env, m))
 	// The layout's rects are panel-relative; drawTooltip paints them offset
 	// by the view's origin, so translated they must sit inside the view.
 	inPanel := func(name string, r image.Rectangle) {

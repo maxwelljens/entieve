@@ -43,7 +43,8 @@ func logDefaultRect() image.Rectangle {
 // the integrator forwards sim.Events() to Push each frame and may add
 // its own lines with PushLine.
 type LogPanel struct {
-	env   Env
+	th    Theme
+	cv    ContentView
 	win   *widget.Window
 	ta    *widget.TextArea
 	lines []string
@@ -52,9 +53,12 @@ type LogPanel struct {
 // NewLog builds the log panel over the given environment as a window on
 // the interface's window stack (WindowPanel): default logDefaultW ×
 // logDefaultH, bottom-left, edge-resize chrome attached.
-func NewLog(env Env) *LogPanel {
-	p := env.Pal
-	l := &LogPanel{env: env}
+func NewLog(env interface {
+	Theme
+	ContentView
+}) *LogPanel {
+	p := env.Pal()
+	l := &LogPanel{th: env, cv: env}
 
 	// The text area is pinned to the body's single stretched grid cell
 	// (built below): RowLayout — the old body — stretches only in the
@@ -150,8 +154,8 @@ func (l *LogPanel) Push(evs []sim.Event) {
 // severity.
 func (l *LogPanel) PushLine(sev sim.Severity, text string) {
 	now := 0.0
-	if l.env.Sim != nil {
-		now = l.env.Sim.Time()
+	if l.cv != nil {
+		now = l.cv.Time()
 	}
 	l.append(l.compose(sev, l.stamp(now), text))
 	l.refresh()
@@ -173,7 +177,7 @@ func (l *LogPanel) refresh() { l.ta.SetText(strings.Join(l.lines, "\n")) }
 // compose renders one line as BBCode: dim "[m:ss]" timestamp, then the
 // severity color wrapped around the text.
 func (l *LogPanel) compose(sev sim.Severity, stamp, text string) string {
-	p := l.env.Pal
+	p := l.th.Pal()
 	return "[color=" + hexColor(p.Dim) + "][" + stamp + "][/color] " +
 		"[color=" + hexColor(l.sevColor(sev)) + "]" + text + "[/color]"
 }
@@ -182,13 +186,13 @@ func (l *LogPanel) compose(sev sim.Severity, stamp, text string) string {
 func (l *LogPanel) sevColor(sev sim.Severity) color.RGBA {
 	switch sev {
 	case sim.SevGood:
-		return l.env.Pal.Good
+		return l.th.Pal().Good
 	case sim.SevWarning:
-		return l.env.Pal.Warn
+		return l.th.Pal().Warn
 	case sim.SevDanger:
-		return l.env.Pal.Danger
+		return l.th.Pal().Danger
 	default:
-		return l.env.Pal.Info
+		return l.th.Pal().Info
 	}
 }
 

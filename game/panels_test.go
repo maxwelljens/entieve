@@ -61,16 +61,16 @@ func TestPanelMountAndSync(t *testing.T) {
 func TestPanelsShareTheKitsEnv(t *testing.T) {
 	g := newShowcaseGame(t)
 	env := g.kit.Env()
-	if g.env.Theme != env.Theme {
+	if g.env.WidgetTheme() != env.WidgetTheme() {
 		t.Error("panel env theme is not the kit's theme")
 	}
-	if g.env.Theme != g.kit.OverviewWindow().GetContainer().GetWidget().GetTheme() {
+	if g.env.WidgetTheme() != g.kit.OverviewWindow().GetContainer().GetWidget().GetTheme() {
 		t.Error("kit windows and the panels do not share one theme")
 	}
-	if g.env.Pal != env.Pal || g.env.TS != env.TS {
+	if g.env.Pal() != env.Pal() || g.env.TS() != env.TS() {
 		t.Error("panel env palette/type scale differs from the kit's")
 	}
-	if g.env.Sim != g.s || g.env.Content != g.opts.Content {
+	if g.env.Defs() != g.opts.Content || g.env.Player() != g.s.Player() {
 		t.Error("panel env not bound to this session's sim/content")
 	}
 }
@@ -401,7 +401,7 @@ func TestSaveRebuildLoad(t *testing.T) {
 			t.Fatal("panels missing after rebuild")
 		}
 		// Re-bound: every panel reads the live sim.
-		if g.env.Sim != g.s {
+		if g.env.Player() != g.s.Player() {
 			t.Error("env not rebound to the restored sim")
 		}
 		pump(t, g, size[0], size[1])

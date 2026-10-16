@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The `Env` god-context dissolved into three narrow seams — `Theme`,
+  `ContentView`, `ActionSink`** (`uikit/seams.go`, `uikit/intents.go`).
+  Every screen constructor now takes exactly the subset it uses: a
+  tooltip-only widget a `Theme`, the HUD/log/scanner/map the theme plus
+  the view, and the market, fitting, factory, inventory, rack, table and
+  Show Info window the union `Seams`. `ContentView` is the read-only
+  surface — the defs catalog plus the observable reads screens made off
+  `Env.Sim`/`Env.Content` — so a screen runs against a stub view and a
+  recording sink with no simulation anywhere near it
+  (`TestMarketRunsOnStubView`); `ActionSink` is `Do(Intent)`: screens
+  say *what* (`Buy{Item,Qty}`, `StartJob{Recipe,Runs}`, `WarpTo{Entity}`,
+  …; the RowSpec payload retyped from `Do func()` to `Intent`) and the
+  game executes it (`Game.Do` → `Kit.RunIntent`, one shared
+  intent→command table in `commandFor`), the seam later AI-emitted
+  intents will ride. `Env` survives only as the deprecated alias for the
+  union of the three seams; `NewEnv`/`Kit.Env` return a `Session` (the
+  seams plus the shared context menu and Show Info window hosts and
+  tests drive). Behaviour is unchanged — same menus, tooltips,
+  double-click, keymap, mounts and sidecars, and each intent dispatches
+  to exactly the command its button used to queue.
 - **One Screen spec per window** (`game/screens.go`): every window the
   player can open — inventory, fitting, market, factory, scanner,
   starmap, help, log, settings and the Esc menu — is now one

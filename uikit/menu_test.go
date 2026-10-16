@@ -11,7 +11,7 @@ import (
 // clickMenuEntry picks the labelled entry whether it is enabled or not:
 // a disabled entry must still close the menu (without running), which is
 // exactly what the gating tests press.
-func clickMenuEntry(t *testing.T, env Env, label string) {
+func clickMenuEntry(t *testing.T, env Session, label string) {
 	t.Helper()
 	m := env.Menu()
 	if !m.IsOpen() {
@@ -29,7 +29,7 @@ func clickMenuEntry(t *testing.T, env Env, label string) {
 
 // pressMenuEntry picks the labelled entry in the already-open menu and
 // fails when it is disabled.
-func pressMenuEntry(t *testing.T, env Env, label string) {
+func pressMenuEntry(t *testing.T, env Session, label string) {
 	t.Helper()
 	if e := entry(t, env, label); e.Disabled {
 		t.Fatalf("menu entry %q is disabled", label)
@@ -38,7 +38,7 @@ func pressMenuEntry(t *testing.T, env Env, label string) {
 }
 
 // pickMenuEntry right-clicks btn open and presses the labelled entry.
-func pickMenuEntry(t *testing.T, c *chromeUI, env Env, btn *widget.Button, label string) {
+func pickMenuEntry(t *testing.T, c *chromeUI, env Session, btn *widget.Button, label string) {
 	t.Helper()
 	rightClick(c, t, btn)
 	if !env.Menu().IsOpen() {

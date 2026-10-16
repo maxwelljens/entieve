@@ -15,7 +15,7 @@ import (
 // layout has run (rects are zero until a draw).
 func layoutTitleBar(t *testing.T, env Env, bar *widget.Container) {
 	t.Helper()
-	ui := &ebitenui.UI{Container: bar, PrimaryTheme: env.Theme}
+	ui := &ebitenui.UI{Container: bar, PrimaryTheme: env.WidgetTheme()}
 	ui.Update()
 	ui.Draw(ebiten.NewImage(300, titleBarH))
 }
@@ -163,17 +163,17 @@ func TestTableRowIconTints(t *testing.T) {
 	tbl.SetRows([]TableRow{
 		{Cells: []string{"Rock 1", "Asteroid"}, Icons: []string{"", "kind_asteroid"}, Data: 0},
 		{Cells: []string{"Rat 1", "Ship"}, Icons: []string{"", "kind_ship"},
-			IconTint: env.Pal.Danger, Data: 1},
+			IconTint: env.Pal().Danger, Data: 1},
 	})
-	if got := tbl.iconTint(0, tbl.rows[0]); got != env.Pal.Text {
-		t.Errorf("plain icon tint = %v, want ColText %v", got, env.Pal.Text)
+	if got := tbl.iconTint(0, tbl.rows[0]); got != env.Pal().Text {
+		t.Errorf("plain icon tint = %v, want ColText %v", got, env.Pal().Text)
 	}
-	if got := tbl.iconTint(1, tbl.rows[1]); got != env.Pal.Danger {
-		t.Errorf("hostile icon tint = %v, want ColDanger %v", got, env.Pal.Danger)
+	if got := tbl.iconTint(1, tbl.rows[1]); got != env.Pal().Danger {
+		t.Errorf("hostile icon tint = %v, want ColDanger %v", got, env.Pal().Danger)
 	}
 	tbl.SelectData(1)
-	if got := tbl.iconTint(1, tbl.rows[1]); got != env.Pal.Accent {
-		t.Errorf("selected icon tint = %v, want ColAccent %v", got, env.Pal.Accent)
+	if got := tbl.iconTint(1, tbl.rows[1]); got != env.Pal().Accent {
+		t.Errorf("selected icon tint = %v, want ColAccent %v", got, env.Pal().Accent)
 	}
 }
 
