@@ -308,11 +308,12 @@ func (g *Game) buildStationWindow() *widget.Window {
 	return win
 }
 
-// newBoardSection builds one contract-row section: a bare container whose
-// rows are placed by boardRowRects through the boardLayout layouter.
+// newBoardSection builds one contract-row section: a bare container
+// whose rows are tiled by the table module's row stack — equal heights,
+// boardRowGap apart, the pure pin of which is boardRowRects.
 func (g *Game) newBoardSection() *widget.Container {
 	return widget.NewContainer(
-		widget.ContainerOpts.Layout(boardLayout{}),
+		widget.ContainerOpts.Layout(widgets.StackLayout{Gap: theme.Px(boardRowGap)}),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
 }

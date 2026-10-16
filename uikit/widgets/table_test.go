@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/entieve/entieve/uikit/internal/uitest"
 	"github.com/entieve/entieve/uikit/theme"
+	"image"
 	"image/color"
 	"math"
 	"sort"
@@ -521,5 +522,346 @@ func TestTableRowIconTints(t *testing.T) {
 	tbl.SelectData(1)
 	if got := tbl.iconTint(1, tbl.Rows[1]); got != env.Pal().Accent {
 		t.Errorf("selected icon tint = %v, want ColAccent %v", got, env.Pal().Accent)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Rich rows: the line stack (the row form the contract board renders as)
+// ---------------------------------------------------------------------------
+
+// pumpRich flushes ebitenui's deferred event queue and draws one frame at
+// 640×400 (row layout runs inside the draw).
+func pumpRich(ui *ebitenui.UI) {
+	ui.Update()
+	ui.Draw(ebiten.NewImage(640, 400))
+}
+
+// newRichTable builds a one-column table over the given rows and pumps a
+// frame, so the rich row widgets are built, validated and laid out.
+func newRichTable(t *testing.T, env Seams, rows []TableRow) (*Table, *ebitenui.UI) {
+	t.Helper()
+	tbl := NewTable(env, []Column{{Key: "A", Title: "A"}})
+	ui := &ebitenui.UI{Container: tbl.Container(), PrimaryTheme: env.WidgetTheme()}
+	ui.Update()
+	tbl.SetRows(rows)
+	pumpRich(ui)
+	return tbl, ui
+}
+
+// TestTableRichRowStackTiles pins the rich row's own layout: its lines
+// stack vertically inside the row's padding, the cells of a line run left
+// to right at the row's gap, the leading icon boxes with line 1's first
+// cell at the icon gap over that cell's minimum width, the trailing action
+// button rides line 1 at the rich-row box, a single-cell line renders as
+// the bare text (what the row-surface goldens read), and a lone line
+// centres itself in the strip (the stretched "+N more" row).
+func TestTableRichRowStackTiles(t *testing.T) {
+	env, _ := newTestEnv(t)
+	tbl, ui := newRichTable(t, env, []TableRow{
+		{
+			Cells: []string{"cleanup"}, // Cells stay the fit/sort source
+			Icons: []string{"svc_contracts"},
+			Stack: []RowLine{
+				{Segs: []RowSeg{{Text: "Belt cleanup", MinW: 120}}},
+				{Segs: []RowSeg{{Text: "Destroy 1× Scuttler"}, {Text: "Requires 0.20"}}},
+				{Segs: []RowSeg{{Text: "40,000.00 € · +0.10 standing"}}},
+			},
+			Spec: RowSpec{Actions: []RowAction{{Label: "Accept"}}},
+		},
+		{Cells: []string{"note"}, Stack: []RowLine{{Segs: []RowSeg{{Text: "+4 more"}}}}},
+	})
+	pad, gap := theme.Px(RichPad), theme.Px(RichGap)
+
+	if len(tbl.RowCts) != 2 {
+		t.Fatalf("rows = %d, want 2", len(tbl.RowCts))
+	}
+	row := tbl.RowCts[0]
+	lines := row.Children()
+	if len(lines) != 3 {
+		t.Fatalf("rich row lines = %d, want 3", len(lines))
+	}
+	rr := row.GetWidget().Rect
+	y := rr.Min.Y
+	for i, ln := range lines {
+		got := ln.GetWidget().Rect
+		if got.Min.X != rr.Min.X+pad || got.Min.Y != y {
+			t.Errorf("line %d at %v, want x=%d y=%d (padded top-flush stack)",
+				i, got, rr.Min.X+pad, y)
+		}
+		y = got.Max.Y
+	}
+
+	// Line 1: [icon + title] cell, then the trailing action button.
+	line1 := lines[0].(*widget.Container)
+	if len(line1.Children()) != 2 {
+		t.Fatalf("line 1 children = %d, want the lead cell and the button", len(line1.Children()))
+	}
+	btn, ok := line1.Children()[1].(*widget.Button)
+	if !ok {
+		t.Fatalf("line 1's trailing child is %T, want *widget.Button", line1.Children()[1])
+	}
+	if got, want := btn.GetWidget().Rect.Min.X, line1.Children()[0].GetWidget().Rect.Max.X+gap; got != want {
+		t.Errorf("button at x=%d, want %d (RichGap after the lead cell)", got, want)
+	}
+	if got := btn.GetWidget().Rect.Dx(); got < theme.Px(RichBtnW) {
+		t.Errorf("button width %d, want ≥ RichBtnW %d", got, theme.Px(RichBtnW))
+	}
+	lead := line1.Children()[0].(*widget.Container)
+	if len(lead.Children()) != 2 {
+		t.Fatalf("lead cell children = %d, want icon + title", len(lead.Children()))
+	}
+	icon, title := lead.Children()[0].GetWidget(), lead.Children()[1].GetWidget()
+	if got, want := title.Rect.Min.X, icon.Rect.Max.X+theme.Px(theme.IconGap); got != want {
+		t.Errorf("title at x=%d, want %d (icon gap)", got, want)
+	}
+	if got := title.Rect.Dx(); got < 120 {
+		t.Errorf("title width %d, want its MinW 120", got)
+	}
+	// The icon centres in the line (the row is as tall as its button).
+	if title.Rect.Dy() >= line1.GetWidget().Rect.Dy() && icon.Rect.Min.Y < title.Rect.Min.Y {
+		t.Errorf("icon %v is not centred against the title line", icon.Rect)
+	}
+
+	// Line 2: two cells at the row's gap; line 3: the bare reward text.
+	line2 := lines[1].(*widget.Container)
+	if len(line2.Children()) != 2 {
+		t.Fatalf("line 2 cells = %d, want summary + requirement", len(line2.Children()))
+	}
+	if got, want := line2.Children()[1].GetWidget().Rect.Min.X,
+		line2.Children()[0].GetWidget().Rect.Max.X+gap; got != want {
+		t.Errorf("requirement at x=%d, want %d (RichGap)", got, want)
+	}
+	if _, ok := lines[2].(*widget.Text); !ok {
+		t.Errorf("single-cell line rendered as %T, want the bare *widget.Text", lines[2])
+	}
+
+	// The lone-line row centres its line (a stretched strip's note row).
+	note := tbl.RowCts[1]
+	if len(note.Children()) != 1 {
+		t.Fatalf("note row lines = %d, want 1", len(note.Children()))
+	}
+	ld, ok := note.Children()[0].GetWidget().LayoutData.(widget.RowLayoutData)
+	if !ok || ld.Position != widget.RowLayoutPositionCenter {
+		t.Errorf("lone line layout data = %#v, want centred", note.Children()[0].GetWidget().LayoutData)
+	}
+	ui.Draw(ebiten.NewImage(640, 400)) // keep the frame honest
+}
+
+// TestTableRichRowLineRefRoutes: a line that carries a Ref is its own
+// gesture target through the shared installer — right-click opens ITS
+// menu (bold-first Show Info, no row verbs) and a double-click emits
+// Show Info for that ref and nothing else — while the row's own
+// right-click still derives its menu from the row's spec.
+func TestTableRichRowLineRefRoutes(t *testing.T) {
+	env, _ := newTestEnv(t)
+	var intents []Intent
+	seams := NewSeams(env, env, SinkFunc(func(i Intent) {
+		intents = append(intents, i)
+		if om, ok := i.(OpenMenu); ok {
+			env.Menu().Open(om.Entries, om.At) // what the host's sink does
+		}
+	}))
+	ref := ItemRef("charge-emp")
+	tbl, ui := newRichTable(t, seams, []TableRow{{
+		Cells: []string{"emp"},
+		Stack: []RowLine{
+			{Segs: []RowSeg{{Text: "Deliver 2 m³ EMP Charge"}}},
+			{Segs: []RowSeg{{Text: "EMP Charge"}}, Ref: &ref},
+		},
+		Spec: RowSpec{Actions: []RowAction{{Label: "Accept"}}},
+	}})
+	if tbl.RowCts == nil {
+		t.Fatal("no rows")
+	}
+	line := tbl.RowCts[0].Children()[1].GetWidget()
+
+	// Right-click on the line: its own menu, alone and leading with the
+	// bold Show Info.
+	line.MouseButtonClickedEvent.Fire(&widget.WidgetMouseButtonClickedEventArgs{
+		Widget: line, Button: ebiten.MouseButtonRight, OffsetX: 4, OffsetY: 3,
+	})
+	pumpRich(ui)
+	m := env.Menu()
+	if !m.IsOpen() {
+		t.Fatal("line right-click opened no menu")
+	}
+	entries := m.Entries()
+	if len(entries) != 1 || entries[0].Label != "Show Info" || !entries[0].Bold {
+		t.Fatalf("line menu = %+v, want the single bold Show Info", entries)
+	}
+	intents = nil // the OpenMenu the right-click rode on is already asserted
+	m.Click(m.RowRect(0).Min.Add(image.Pt(1, 1)))
+	if len(intents) != 1 {
+		t.Fatalf("menu press enqueued %d intents, want 1", len(intents))
+	}
+	if si, ok := intents[0].(ShowInfo); !ok || si.Ref != ref {
+		t.Fatalf("intent = %#v, want ShowInfo{%v}", intents[0], ref)
+	}
+
+	// Double-click on the line: Show Info, strictly (no menu, twice fast).
+	intents = nil
+	for i := 0; i < 2; i++ {
+		line.MouseButtonClickedEvent.Fire(&widget.WidgetMouseButtonClickedEventArgs{
+			Widget: line, Button: ebiten.MouseButtonLeft, OffsetX: 4, OffsetY: 3,
+		})
+		pumpRich(ui)
+	}
+	if len(intents) != 1 {
+		t.Fatalf("double-click emitted %d intents, want 1: %#v", len(intents), intents)
+	}
+	if si, ok := intents[0].(ShowInfo); !ok || si.Ref != ref {
+		t.Fatalf("double-click intent = %#v, want ShowInfo{%v}", intents[0], ref)
+	}
+
+	// The row's own right-click still opens the ROW's menu (its action,
+	// its gate — no Show Info: a contract-like row declares no ref).
+	intents = nil
+	rowW := tbl.RowWidgetForTest(0)
+	rowW.MouseButtonClickedEvent.Fire(&widget.WidgetMouseButtonClickedEventArgs{
+		Widget: rowW, Button: ebiten.MouseButtonRight, OffsetX: 4, OffsetY: 3,
+	})
+	pumpRich(ui)
+	entries = m.Entries()
+	if len(entries) != 1 || entries[0].Label != "Accept" {
+		t.Fatalf("row menu = %+v, want the single Accept entry", entries)
+	}
+}
+
+// TestTableRichRowActionButtons: a rich row renders its Spec.Actions as
+// trailing buttons (at most two), the disabled one is grayed — widget
+// Disabled set — and emits nothing even when its click event is forced
+// straight past that gate, the enabled one emits its intent through the
+// sink.
+func TestTableRichRowActionButtons(t *testing.T) {
+	env, _ := newTestEnv(t)
+	var intents []Intent
+	seams := NewSeams(env, env, SinkFunc(func(i Intent) { intents = append(intents, i) }))
+	tbl, ui := newRichTable(t, seams, []TableRow{{
+		Cells: []string{"cleanup"},
+		Stack: []RowLine{{Segs: []RowSeg{{Text: "Belt cleanup"}}}},
+		Spec: RowSpec{Actions: []RowAction{
+			{Label: "Accept", Intent: Accept{Contract: "contract-solace-cleanup-1"}},
+			{Label: "Accepted", Disabled: true, Intent: Accept{Contract: "contract-solace-cordite-1"}},
+			{Label: "Dropped", Intent: Accept{Contract: "contract-penumbra-den-hunt-1"}},
+		}},
+	}})
+	line1, ok := tbl.RowCts[0].Children()[0].(*widget.Container)
+	if !ok {
+		t.Fatalf("line 1 = %T, want a container holding the buttons", tbl.RowCts[0].Children()[0])
+	}
+	var buttons []*widget.Button
+	for _, c := range line1.Children() {
+		if b, ok := c.(*widget.Button); ok {
+			buttons = append(buttons, b)
+		}
+	}
+	if len(buttons) != 2 {
+		t.Fatalf("trailing buttons = %d, want 2 (the row offers at most two)", len(buttons))
+	}
+	if !buttons[1].GetWidget().Disabled {
+		t.Error("grayed action renders enabled")
+	}
+	if buttons[0].GetWidget().Disabled {
+		t.Error("enabled action renders disabled")
+	}
+	if got := buttons[0].Text().Label; got != "Accept" {
+		t.Errorf("button label = %q, want Accept", got)
+	}
+
+	buttons[0].ClickedEvent.Fire(&widget.ButtonClickedEventArgs{Button: buttons[0]})
+	pumpRich(ui)
+	if len(intents) != 1 {
+		t.Fatalf("enabled button emitted %d intents, want 1", len(intents))
+	}
+	if a, ok := intents[0].(Accept); !ok || a.Contract != "contract-solace-cleanup-1" {
+		t.Fatalf("intent = %#v, want Accept{contract-solace-cleanup-1}", intents[0])
+	}
+	// The grayed one, clicked anyway (a harness can fire past the gate).
+	buttons[1].ClickedEvent.Fire(&widget.ButtonClickedEventArgs{Button: buttons[1]})
+	pumpRich(ui)
+	if len(intents) != 1 {
+		t.Fatalf("grayed button emitted %#v, want nothing further", intents)
+	}
+}
+
+// TestTableRichRowChangeGatedRebuild pins the change gate for stacks: an
+// identical SetRows reuses the row's widgets, while any move in what the
+// stack renders — a line's text, the leading icon, a trailing button's
+// gate — rebuilds it with the new content, and the fresh snapshot gates
+// the next identical SetRows again.
+func TestTableRichRowChangeGatedRebuild(t *testing.T) {
+	env, _ := newTestEnv(t)
+	rows := func(title, icon string, disabled bool) []TableRow {
+		return []TableRow{{
+			Cells: []string{title},
+			Icons: []string{icon},
+			Stack: []RowLine{
+				{Segs: []RowSeg{{Text: title}}},
+				{Segs: []RowSeg{{Text: "Destroy 1× Scuttler"}}},
+			},
+			Spec: RowSpec{Actions: []RowAction{{Label: "Accept", Disabled: disabled,
+				Intent: Accept{Contract: "contract-solace-cleanup-1"}}}},
+		}}
+	}
+	tbl, _ := newRichTable(t, env, rows("Belt cleanup", "", false))
+	built := tbl.RowCts[0]
+	lineTitle := func() string {
+		return tbl.RowCts[0].Children()[0].(*widget.Container).Children()[0].(*widget.Text).Label
+	}
+	if got := lineTitle(); got != "Belt cleanup" {
+		t.Fatalf("line 1 = %q, want Belt cleanup", got)
+	}
+
+	// Identical content: the widgets are reused (the diff-friendly rule).
+	tbl.SetRows(rows("Belt cleanup", "", false))
+	if tbl.RowCts[0] != built {
+		t.Error("identical SetRows rebuilt the rich row")
+	}
+
+	// A line's text moved: rebuilt, carrying the new line.
+	tbl.SetRows(rows("Cordite order", "", false))
+	if tbl.RowCts[0] == built {
+		t.Fatal("moved stack text did not rebuild the row")
+	}
+	if got := lineTitle(); got != "Cordite order" {
+		t.Errorf("rebuilt line 1 = %q, want Cordite order", got)
+	}
+
+	// The leading icon moved: rebuilt (the icon is stack-rendered too).
+	iconRow := tbl.RowCts[0]
+	tbl.SetRows(rows("Cordite order", "svc_contracts", false))
+	if tbl.RowCts[0] == iconRow {
+		t.Error("moved leading icon did not rebuild the row")
+	}
+
+	// A trailing button's gate moved: rebuilt, grayed — and the fresh
+	// snapshot gates the next identical SetRows.
+	gated := tbl.RowCts[0]
+	tbl.SetRows(rows("Cordite order", "svc_contracts", true))
+	if tbl.RowCts[0] == gated {
+		t.Fatal("moved action gate did not rebuild the row")
+	}
+	line1 := tbl.RowCts[0].Children()[0].(*widget.Container)
+	btn, ok := line1.Children()[len(line1.Children())-1].(*widget.Button)
+	if !ok || !btn.GetWidget().Disabled {
+		t.Fatalf("rebuilt button disabled = %v, want the grayed gate", !ok || btn.GetWidget().Disabled)
+	}
+	stable := tbl.RowCts[0]
+	tbl.SetRows(rows("Cordite order", "svc_contracts", true))
+	if tbl.RowCts[0] != stable {
+		t.Error("unchanged gate rebuilt the row again (snapshot not refreshed)")
+	}
+
+	// Dropping the stack flips the row back to plain form: rebuilt as
+	// per-column text widgets (the reverse move rebuilds too).
+	tbl.SetRows([]TableRow{{Cells: []string{"Cordite order"}}})
+	if tbl.rich[0] != nil {
+		t.Fatal("row kept its stack widgets after dropping Stack")
+	}
+	if got := tbl.Texts[0][0].Label; got != "Cordite order" {
+		t.Errorf("plain cell label = %q, want the cell text", got)
+	}
+	if len(tbl.RowCts[0].Children()) != 1 {
+		t.Errorf("plain row children = %d, want the single column cell", len(tbl.RowCts[0].Children()))
 	}
 }
