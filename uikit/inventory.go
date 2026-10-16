@@ -21,6 +21,7 @@ type Inventory struct {
 	oreLbl   *widget.Text
 	hangLbl  *widget.Text
 	qtyLabel *widget.Text
+	qtyBar   *widget.Container // stepper row: relaid when the readout changes
 
 	minus, plus *widget.Button
 	toCargo     *widget.Button
@@ -79,7 +80,7 @@ func NewInventory(env Env) *Inventory {
 	inv.hangLbl = newLabel("Station hangar")
 
 	inv.qtyLabel = widget.NewText(
-		widget.TextOpts.Text("Qty 1", env.Face(StepSmall), solid(p.Accent)),
+		widget.TextOpts.Text("Qty 1", env.FaceMono(StepSmall), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 			Position: widget.RowLayoutPositionCenter,
 		})),
@@ -89,7 +90,7 @@ func NewInventory(env Env) *Inventory {
 		return widget.NewButton(
 			widget.ButtonOpts.TextLabel(label),
 			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(0, 40),
+				widget.WidgetOpts.MinSize(Px(40), Px(40)),
 				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 			),
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
@@ -106,13 +107,13 @@ func NewInventory(env Env) *Inventory {
 		c := widget.NewContainer(
 			widget.ContainerOpts.Layout(widget.NewRowLayout(
 				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(contentsPad),
+				widget.RowLayoutOpts.Spacing(Px(contentsPad)),
 			)),
 		)
 		c.AddChild(children...)
 		return c
 	}
-	qtyBar := toolbar(inv.minus, inv.qtyLabel, inv.plus, inv.sell)
+	inv.qtyBar = toolbar(inv.minus, inv.qtyLabel, inv.plus, inv.sell)
 	xferBar := toolbar(inv.toCargo, inv.toOre, inv.toHangar)
 
 	// Body: label/table pairs over the two button rows; the grid gives
@@ -122,28 +123,28 @@ func NewInventory(env Env) *Inventory {
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, true, false, true, false, true, false, false}),
-			widget.GridLayoutOpts.Spacing(0, 4),
-			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+			widget.GridLayoutOpts.Spacing(0, Px(4)),
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(Px(contentsPad))),
 		)),
 	)
 	body.AddChild(inv.cargoLbl, inv.cargo.Container(),
 		inv.oreLbl, inv.ore.Container(),
 		inv.hangLbl, inv.hangar.Container(),
-		qtyBar, xferBar)
+		inv.qtyBar, xferBar)
 
 	title, _ := NewTitleBar(env, "Inventory", "svc_inventory")
 
 	inv.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.TitleBar(title, titleBarH),
+		widget.WindowOpts.TitleBar(title, Px(titleBarH)),
 		widget.WindowOpts.Draggable(),
 		// Content floor: every fixed row plus a full row of each hold
 		// section (the sections scroll below that).
-		widget.WindowOpts.MinSize(300, 420),
+		widget.WindowOpts.MinSize(Px(300), Px(420)),
 		// Fallback only: the composed rect at the 1024×700 minimum.
 		// The game recomposes from the real viewport at startup
 		// (game/station_layout.go).
-		widget.WindowOpts.Location(image.Rect(396, 256, 701, 690)),
+		widget.WindowOpts.Location(image.Rect(Px(396), Px(256), Px(701), Px(690))),
 	)
 	return inv
 }
@@ -190,7 +191,7 @@ func (inv *Inventory) Sync() {
 	inv.oreLbl.Label = inv.oreSection(cargo, hasCargo)
 	inv.hangLbl.Label = "Station hangar · " + FormatInt(int64(len(inv.hangarRows()))) + " stacks"
 
-	inv.qtyLabel.Label = "Qty " + FormatInt(int64(inv.qty()))
+	setStepperValue(inv.qtyBar, inv.qtyLabel, "Qty "+FormatInt(int64(inv.qty())))
 	inv.cargo.Sync()
 	inv.ore.Sync()
 	inv.hangar.Sync()
@@ -295,7 +296,7 @@ func (inv *Inventory) stepQty(delta int) {
 	if inv.qtyIdx >= len(qtySteps) {
 		inv.qtyIdx = len(qtySteps) - 1
 	}
-	inv.qtyLabel.Label = "Qty " + FormatInt(int64(inv.qty()))
+	setStepperValue(inv.qtyBar, inv.qtyLabel, "Qty "+FormatInt(int64(inv.qty())))
 }
 
 // qty is the current transfer/sell quantity.

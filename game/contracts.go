@@ -57,7 +57,7 @@ func boardRowRects(inner image.Rectangle, n int) []image.Rectangle {
 	if n <= 0 || inner.Dx() <= 0 || inner.Dy() <= 0 {
 		return nil
 	}
-	gap := boardRowGap
+	gap := uikit.Px(boardRowGap)
 	if (inner.Dy()-(n-1)*gap)/n < 1 {
 		gap = 0 // degenerate: no room for gaps, stack 1px rows
 	}
@@ -95,7 +95,7 @@ func (boardLayout) PreferredSize(ws []widget.PreferredSizeLocateableWidget) (int
 			h = ch
 		}
 	}
-	return w, len(ws)*h + (len(ws)-1)*boardRowGap
+	return w, len(ws)*h + (len(ws)-1)*uikit.Px(boardRowGap)
 }
 
 func (boardLayout) Layout(ws []widget.PreferredSizeLocateableWidget, rect image.Rectangle) {
@@ -294,7 +294,7 @@ func (g *Game) rebuildStationBoard(m stationBoardModel) {
 func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container, *widget.Button) {
 	p := g.env.Pal
 	rowBG := bordered(nrgba(p.Cell, 160), nrgba(p.Border, 140), 1)
-	rowPad := &widget.Insets{Left: boardRowPad, Right: boardRowPad}
+	rowPad := &widget.Insets{Left: uikit.Px(boardRowPad), Right: uikit.Px(boardRowPad)}
 
 	if r.Note {
 		row := widget.NewContainer(
@@ -305,7 +305,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 			)),
 		)
 		row.AddChild(widget.NewText(
-			widget.TextOpts.Text(g.ellip(r.Title, uikit.StepTiny, boardContentW), g.env.Face(uikit.StepTiny), solid(p.Dim)),
+			widget.TextOpts.Text(g.ellip(r.Title, uikit.StepTiny, float64(uikit.Px(boardContentW))), g.env.Face(uikit.StepTiny), solid(p.Dim)),
 			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 				Position: widget.RowLayoutPositionCenter,
 			})),
@@ -364,9 +364,12 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	// The kind glyph leads the title; the title's fixed width gives back
 	// the icon box, so every row keeps the same total width whether it
 	// carries an icon or not (note rows never do).
-	titleW := boardTextW
+	// Scaled ONCE here: the fixed width below (MinSize + ellip budget)
+	// reads it in live px, and the icon reserve matches the drawn
+	// Px(icon box) + Px(gap) of the row it mirrors.
+	titleW := uikit.Px(boardTextW)
 	if r.Icon != "" {
-		titleW -= uikit.IconInline + uikit.IconGap
+		titleW -= uikit.Px(uikit.IconInline) + uikit.Px(uikit.IconGap)
 	}
 	title := widget.NewText(
 		widget.TextOpts.Text(g.ellip(r.Title, step, float64(titleW)), g.env.Face(step), solid(p.Accent)),
@@ -376,7 +379,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	if r.Icon != "" {
 		ctr := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(uikit.IconGap),
+			widget.RowLayoutOpts.Spacing(uikit.Px(uikit.IconGap)),
 		)))
 		icon := uikit.NewIcon(r.Icon, uikit.IconInline, p.Text)
 		// Centre the glyph in the line: the row is as tall as its
@@ -394,7 +397,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 			widget.ContainerOpts.BackgroundImage(rowBG),
 			widget.ContainerOpts.Layout(widget.NewRowLayout(
 				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(boardBtnGap),
+				widget.RowLayoutOpts.Spacing(uikit.Px(boardBtnGap)),
 				widget.RowLayoutOpts.Padding(rowPad),
 			)),
 		)
@@ -407,14 +410,14 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	// gated row parks its standing requirement beside the objective
 	// (line 2) so line 3 gives the payout the whole row — the reward is
 	// the one string on a board row that must never ellipsize.
-	summaryW := float64(boardContentW)
+	summaryW := float64(uikit.Px(boardContentW))
 	if r.Require != "" {
 		reqW := g.textW(r.Require, uikit.StepTiny)
-		if capW := summaryW - boardBtnGap - 40; reqW > capW {
+		if capW := summaryW - float64(uikit.Px(boardBtnGap)) - float64(uikit.Px(40)); reqW > capW {
 			r.Require = g.ellip(r.Require, uikit.StepTiny, capW)
 			reqW = g.textW(r.Require, uikit.StepTiny)
 		}
-		summaryW -= reqW + boardBtnGap
+		summaryW -= reqW + float64(uikit.Px(boardBtnGap))
 	}
 	var line2 widget.PreferredSizeLocateableWidget = widget.NewText(
 		widget.TextOpts.Text(g.ellip(r.Summary, uikit.StepTiny, summaryW), g.env.Face(uikit.StepTiny), solid(p.Dim)),
@@ -425,7 +428,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 		)
 		ctr := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(boardBtnGap),
+			widget.RowLayoutOpts.Spacing(uikit.Px(boardBtnGap)),
 		)))
 		ctr.AddChild(line2, req)
 		line2 = ctr
@@ -456,13 +459,13 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	}
 
 	reward := widget.NewText(
-		widget.TextOpts.Text(g.ellip(r.Reward, uikit.StepTiny, float64(boardContentW)), g.env.Face(uikit.StepTiny), solid(p.Good)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(boardContentW, 0)),
+		widget.TextOpts.Text(g.ellip(r.Reward, uikit.StepTiny, float64(uikit.Px(boardContentW))), g.env.Face(uikit.StepTiny), solid(p.Good)),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(uikit.Px(boardContentW), 0)),
 	)
 
 	line1 := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
 		widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-		widget.RowLayoutOpts.Spacing(boardBtnGap),
+		widget.RowLayoutOpts.Spacing(uikit.Px(boardBtnGap)),
 	)))
 	line1.AddChild(titleCell, btn)
 

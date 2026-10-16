@@ -688,6 +688,25 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > HUD readouts; `goregular` no longer appears in `render`. Turret Road has
 > no U+25B2/U+25BC glyphs, so table sort indicators are ↑/↓.
 
+> **Resolution independence (2026-10).** The UI scale is
+> `uikit.SetScale(deviceFactor × uiScale)`, installed by `game` at boot
+> (the settings sidecar loads before the first layout) and on every
+> Settings-window change: every visible length goes through `uikit.Px` /
+> `uikit.Scale` (design units → live px; identity at scale 1, which is
+> what the baseline suite pins), and `TypeScale` is scaled once at
+> kit/env build so faces, line heights and measures follow. `Game.Layout`
+> returns the outside size × the device factor — the framebuffer is
+> device-resolution and text rasterizes at its final size (crisp on
+> HiDPI; never rendered small and upscaled) — while `SetWindowSize` stays
+> in window px. ebiten reports cursor positions in those same Layout
+> units, so resize grips, menu rows and `overUI` agree with the scaled
+> chrome by construction. The layout sidecar persists **design units**
+> (÷ scale on write, × scale on read): one arrangement restores at any
+> scale, and a live change round-trips through it (`Game.applyUIScale`)
+> while rebuilding the whole interface against the new scale. World zoom
+> (`zoomBase`) carries the device factor only — scaling the UI never
+> zooms the world.
+>
 > **UI platform (2026-10, complete):** the chrome lives in `uikit/`, built on
 > **ebitenui v0.7.3** (pinned in go.mod); the legacy hand-drawn `ui/` package
 > is retired (golden-value tests pin the EVE-dark palette and type scale).

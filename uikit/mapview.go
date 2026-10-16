@@ -52,14 +52,14 @@ type MapView struct {
 func NewMapView(env Env) *MapView {
 	p := env.Pal
 	m := &MapView{env: env}
-	m.img = ebiten.NewImage(mapImgW, mapImgH)
+	m.img = ebiten.NewImage(Px(mapImgW), Px(mapImgH))
 	m.gfx = widget.NewGraphic(widget.GraphicOpts.Image(m.img))
 
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(Px(contentsPad))),
 		)),
 	)
 	body.AddChild(m.gfx)
@@ -72,12 +72,12 @@ func NewMapView(env Env) *MapView {
 
 	m.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.TitleBar(titleBar, titleBarH),
+		widget.WindowOpts.TitleBar(titleBar, Px(titleBarH)),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.MinSize(400, 300),
+		widget.WindowOpts.MinSize(Px(400), Px(300)),
 		// Default: roughly centered at both design sizes (1024×700 and
 		// 1280×720); the integrator re-centers it on real layout.
-		widget.WindowOpts.Location(image.Rect(160, 80, 160+mapImgW+2*contentsPad, 80+titleBarH+mapImgH+2*contentsPad)),
+		widget.WindowOpts.Location(image.Rect(Px(160), Px(80), Px(160+mapImgW+2*contentsPad), Px(80+titleBarH+mapImgH+2*contentsPad))),
 	)
 	return m
 }
@@ -105,8 +105,11 @@ func (m *MapView) Sync() {
 }
 
 // drawMap repaints the whole graph: gate edges, system nodes and labels.
+// Every coordinate below lands in the scaled image, so lengths multiply
+// by s (the same scale the image dims went through Px with).
 func (m *MapView) drawMap(cur content.SystemID) {
 	m.img.Clear()
+	s := Scale()
 	nodes := m.mapNodes()
 	pts := m.project(nodes)
 	byID := make(map[content.SystemID]mapPoint, len(nodes))
@@ -135,7 +138,7 @@ func (m *MapView) drawMap(cur content.SystemID) {
 				col = nrgba(m.env.Pal.Accent, 170)
 			}
 			vector.StrokeLine(m.img, float32(a.x), float32(a.y),
-				float32(b.x), float32(b.y), 1, col, true)
+				float32(b.x), float32(b.y), float32(s), col, true)
 		}
 	}
 
@@ -143,10 +146,10 @@ func (m *MapView) drawMap(cur content.SystemID) {
 	face := m.env.Face(StepSmall)
 	for i, n := range nodes {
 		pt := pts[i]
-		rad := float32(5)
+		rad := float32(5 * s)
 		if n.id == cur {
-			rad = 7
-			vector.StrokeCircle(m.img, float32(pt.x), float32(pt.y), 12, 1.5, m.env.Pal.Accent, true)
+			rad = float32(7 * s)
+			vector.StrokeCircle(m.img, float32(pt.x), float32(pt.y), float32(12*s), float32(1.5*s), m.env.Pal.Accent, true)
 		}
 		vector.DrawFilledCircle(m.img, float32(pt.x), float32(pt.y), rad, m.mapSecurity(n.security), true)
 		label := string(n.id)
@@ -155,15 +158,15 @@ func (m *MapView) drawMap(cur content.SystemID) {
 			col = m.env.Pal.Accent
 		}
 		w, _ := text.Measure(label, *face, 0)
-		render.Text(m.img, label, pt.x-w/2, pt.y+14, m.env.TS.Small, col)
+		render.Text(m.img, label, pt.x-w/2, pt.y+14*s, m.env.TS.Small, col)
 	}
 
 	// Zone legend: the node colors decoded in the canon's zone words with
 	// their complementary status labels (docs/lore/UNIVERSE.md — Zones).
 	for i, sec := range zoneSecs {
-		y := float64(mapImgH-mapPad) + float64(i)*16
-		vector.DrawFilledCircle(m.img, 12, float32(y)+6, 4, m.mapSecurity(sec), true)
-		render.Text(m.img, zoneLabel(sec), 24, y, m.env.TS.Tiny, m.env.Pal.Dim)
+		y := float64(Px(mapImgH-mapPad)) + float64(i)*16*s
+		vector.DrawFilledCircle(m.img, float32(12*s), float32(y)+float32(6*s), float32(4*s), m.mapSecurity(sec), true)
+		render.Text(m.img, zoneLabel(sec), 24*s, y, m.env.TS.Tiny, m.env.Pal.Dim)
 	}
 }
 
@@ -231,7 +234,11 @@ func (m *MapView) project(nodes []mapNode) []mapPoint {
 		}
 	}
 	spanX, spanY := maxX-minX, maxY-minY
-	availW, availH := float64(mapImgW-2*mapPad), float64(mapImgH-2*mapPad)
+	// The image is sized Px(mapImgW/mapImgH); the pad goes through Px in
+	// the same decomposition here (Px(img) − 2·Px(pad)) so nodes land
+	// exactly Px(mapPad) inside the scaled image edges.
+	pad := float64(Px(mapPad))
+	availW, availH := float64(Px(mapImgW))-2*pad, float64(Px(mapImgH))-2*pad
 	scale := 1.0
 	switch {
 	case spanX > 0 && spanY > 0:
@@ -241,8 +248,8 @@ func (m *MapView) project(nodes []mapNode) []mapPoint {
 	case spanY > 0:
 		scale = availH / spanY
 	}
-	offX := float64(mapPad) + (availW-spanX*scale)/2
-	offY := float64(mapPad) + (availH-spanY*scale)/2
+	offX := pad + (availW-spanX*scale)/2
+	offY := pad + (availH-spanY*scale)/2
 	for i, n := range nodes {
 		pts[i] = mapPoint{
 			x: offX + (n.x-minX)*scale,

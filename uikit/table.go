@@ -16,8 +16,10 @@ import (
 
 // Table layout constants (derived from the legacy ui padding scale).
 const (
-	// tableHeaderH is the height of the sort-button header strip.
-	tableHeaderH = 30
+	// tableHeaderH is the height of the sort-button header strip. 40
+	// (design units, scaled by Px) gives every sort header a ≥40 px hit
+	// strip; the width stays the fitted column width.
+	tableHeaderH = 40
 	// headerSpace is the gap between the header strip and the rows.
 	headerSpace = 4
 	// cellPad is the horizontal padding inside every column cell.
@@ -162,7 +164,7 @@ func NewTable(env Env, cols []Column, opts ...TableOption) *Table {
 		return w
 	}
 	m := (*face).Metrics()
-	t.rowH = math.Ceil(m.HAscent+m.HDescent) + 2*entryPadV
+	t.rowH = math.Ceil(m.HAscent+m.HDescent) + 2*float64(Px(entryPadV))
 
 	t.hdrIdle = &widget.ButtonImage{
 		Idle:         bordered(solid(p.HeadBg), nrgba(p.Border, 160), 1),
@@ -205,12 +207,16 @@ func NewTable(env Env, cols []Column, opts ...TableOption) *Table {
 				Disabled: nrgba(p.Dim, 160),
 			}),
 			widget.ButtonOpts.TextPosition(align, widget.TextPositionCenter),
+			// The label anchors exactly like a left cell's text (the
+			// container's cellPad inset) and a right cell's glyphs (see
+			// the right-cell padding note in newRow): both land Px(cellPad)
+			// inside the fitted column, at every scale.
 			widget.ButtonOpts.TextPadding(&widget.Insets{
-				Left: cellPad, Right: cellPad, Top: 4, Bottom: 4,
+				Left: Px(cellPad), Right: Px(cellPad), Top: Px(4), Bottom: Px(4),
 			}),
 			widget.ButtonOpts.Image(t.hdrIdle),
 			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(0, tableHeaderH),
+				widget.WidgetOpts.MinSize(0, Px(tableHeaderH)),
 				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 			),
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
@@ -254,7 +260,7 @@ func NewTable(env Env, cols []Column, opts ...TableOption) *Table {
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, true}),
-			widget.GridLayoutOpts.Spacing(0, headerSpace),
+			widget.GridLayoutOpts.Spacing(0, Px(headerSpace)),
 		)),
 	)
 	t.root.AddChild(t.header, t.scroll)
@@ -509,12 +515,22 @@ func (t *Table) newRow(i int) *widget.Container {
 		// plain text so their numeric anchors never move — and they keep
 		// the horizontal padding themselves, while an icon cell's lives
 		// on its container.
+		//
+		// Right-cell padding (Defect A fix): ebitenui adds a Text's
+		// horizontal Padding into its measured line width AND subtracts
+		// Padding.Right again when drawing End-positioned text, so a
+		// right-anchored glyph run lands Padding.Left+2×Padding.Right
+		// left of the rect edge. With Right: 0 the anchor is exactly
+		// rect.Max − cellPad — the same place the header label's
+		// anchor padding puts it, so headers and cells share one x at
+		// every scale (pinned by TestHeaderCellAnchorAgreement; the
+		// quirk is ebitenui v0.7.3, re-verify if the dependency moves).
 		align, pad := widget.TextPositionStart, widget.Insets{
-			Top: entryPadV, Bottom: entryPadV,
+			Top: Px(entryPadV), Bottom: Px(entryPadV),
 		}
 		if c.AlignRight {
 			align = widget.TextPositionEnd
-			pad = widget.Insets{Left: cellPad, Right: cellPad, Top: entryPadV, Bottom: entryPadV}
+			pad = widget.Insets{Left: Px(cellPad), Top: Px(entryPadV), Bottom: Px(entryPadV)}
 		}
 		tx := widget.NewText(
 			widget.TextOpts.Text("", t.face, solid(t.env.Pal.Text)),
@@ -534,9 +550,9 @@ func (t *Table) newRow(i int) *widget.Container {
 		cell := widget.NewContainer(
 			widget.ContainerOpts.Layout(widget.NewRowLayout(
 				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(IconGap),
+				widget.RowLayoutOpts.Spacing(Px(IconGap)),
 				widget.RowLayoutOpts.Padding(&widget.Insets{
-					Left: cellPad, Right: cellPad, Top: entryPadV, Bottom: entryPadV,
+					Left: Px(cellPad), Right: Px(cellPad), Top: Px(entryPadV), Bottom: Px(entryPadV),
 				}),
 			)),
 			widget.ContainerOpts.WidgetOpts(
@@ -716,20 +732,20 @@ func (t *Table) applyWidths() {
 	natural := make([]ColWidth, len(t.cols))
 	prio := make([]int, len(t.cols))
 	for i, c := range t.cols {
-		w := t.headMeasure(c.Title+t.indicator(i)) + 2*cellPad
+		w := t.headMeasure(c.Title+t.indicator(i)) + 2*float64(Px(cellPad))
 		if c.Width > w {
 			w = c.Width
 		}
 		for _, row := range t.rows {
-			m := t.measure(cellOf(row, i)) + 2*cellPad
+			m := t.measure(cellOf(row, i)) + 2*float64(Px(cellPad))
 			if iconOf(row, i) != "" && !c.AlignRight {
-				m += IconInline + IconGap
+				m += float64(Px(IconInline) + Px(IconGap))
 			}
 			if m > w {
 				w = m
 			}
 		}
-		min := t.headMeasure(c.Title+t.indicator(i)) + 2*cellPad
+		min := t.headMeasure(c.Title+t.indicator(i)) + 2*float64(Px(cellPad))
 		if c.MinWidth > min {
 			min = c.MinWidth
 		}
@@ -774,9 +790,9 @@ func (t *Table) layoutCells() {
 		// ellipsize text that measurably fits ("25%" -> "2…"). An icon
 		// cell reserves its icon box out of the label's share.
 		for r := range t.rows {
-			inner := t.widths[i] - 2*cellPad
+			inner := t.widths[i] - 2*float64(Px(cellPad))
 			if t.cells[r][i] != nil && iconOf(t.rows[r], i) != "" {
-				inner -= IconInline + IconGap
+				inner -= float64(Px(IconInline) + Px(IconGap))
 			}
 			if inner < 0 {
 				inner = 0

@@ -34,7 +34,7 @@ const (
 // at the 1024×700 minimum); the game re-anchors it to the real screen
 // on first layout, like every other movable window.
 func logDefaultRect() image.Rectangle {
-	return image.Rect(10, 700-10-logDefaultH, 10+logDefaultW, 700-10)
+	return image.Rect(Px(10), Px(700-10-logDefaultH), Px(10+logDefaultW), Px(700-10))
 }
 
 // LogPanel is the combat/action log: a scrollable text area whose lines
@@ -73,7 +73,7 @@ func NewLog(env Env) *LogPanel {
 		widget.TextAreaOpts.FontColor(solid(p.Text)),
 		widget.TextAreaOpts.ContainerOpts(widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.GridLayoutData{}),
-			widget.WidgetOpts.MinSize(logViewW, logViewH),
+			widget.WidgetOpts.MinSize(Px(logViewW), Px(logViewH)),
 		)),
 	)
 
@@ -82,20 +82,20 @@ func NewLog(env Env) *LogPanel {
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
-			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(Px(contentsPad))),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.GridLayoutData{})),
 	)
 	body.AddChild(l.ta)
 
 	title, _ := NewTitleBar(env, "Log", "svc_log")
-	title.GetWidget().MinHeight = titleBarH
+	title.GetWidget().MinHeight = Px(titleBarH)
 
 	l.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.TitleBar(title, titleBarH),
+		widget.WindowOpts.TitleBar(title, Px(titleBarH)),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.MinSize(logMinW, logMinH),
+		widget.WindowOpts.MinSize(Px(logMinW), Px(logMinH)),
 		widget.WindowOpts.Location(logDefaultRect()),
 	)
 	return l

@@ -35,6 +35,7 @@ type Factory struct {
 	craftLbl *widget.Text
 	jobsLbl  *widget.Text
 	qtyLabel *widget.Text
+	qtyBar   *widget.Container // stepper row: relaid when the readout changes
 	title    *widget.Text
 
 	minus, plus *widget.Button
@@ -115,7 +116,7 @@ func NewFactory(env Env) *Factory {
 		widget.TextOpts.Text("Jobs", env.Face(StepTiny), solid(p.Accent)),
 	)
 	f.qtyLabel = widget.NewText(
-		widget.TextOpts.Text("Qty 1", env.Face(StepSmall), solid(p.Accent)),
+		widget.TextOpts.Text("Qty 1", env.FaceMono(StepSmall), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 			Position: widget.RowLayoutPositionCenter,
 		})),
@@ -125,7 +126,7 @@ func NewFactory(env Env) *Factory {
 		return widget.NewButton(
 			widget.ButtonOpts.TextLabel(label),
 			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(0, 40),
+				widget.WidgetOpts.MinSize(Px(40), Px(40)),
 				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 			),
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
@@ -139,14 +140,15 @@ func NewFactory(env Env) *Factory {
 	startBar := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(contentsPad),
+			widget.RowLayoutOpts.Spacing(Px(contentsPad)),
 		)),
 	)
 	startBar.AddChild(f.minus, f.qtyLabel, f.plus, f.start)
+	f.qtyBar = startBar
 	collectBar := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(contentsPad),
+			widget.RowLayoutOpts.Spacing(Px(contentsPad)),
 		)),
 	)
 	collectBar.AddChild(f.collect)
@@ -160,8 +162,8 @@ func NewFactory(env Env) *Factory {
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true},
 				[]bool{false, true, false, false, true, false}),
-			widget.GridLayoutOpts.Spacing(0, 4),
-			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+			widget.GridLayoutOpts.Spacing(0, Px(4)),
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(Px(contentsPad))),
 		)),
 	)
 	body.AddChild(f.craftLbl, f.recipes.Container(), startBar,
@@ -172,14 +174,14 @@ func NewFactory(env Env) *Factory {
 
 	f.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.TitleBar(title, titleBarH),
+		widget.WindowOpts.TitleBar(title, Px(titleBarH)),
 		widget.WindowOpts.Draggable(),
 		// Content floor: the craft line, a few rows of each table and
 		// both toolbars.
-		widget.WindowOpts.MinSize(360, 430),
+		widget.WindowOpts.MinSize(Px(360), Px(430)),
 		// Fallback only: the composed rect at the 1024×700 minimum (the
 		// game re-centers it from placeDefaults).
-		widget.WindowOpts.Location(image.Rect(332, 130, 732, 560)),
+		widget.WindowOpts.Location(image.Rect(Px(332), Px(130), Px(732), Px(560))),
 	)
 	return f
 }
@@ -290,7 +292,7 @@ func (f *Factory) Sync() {
 	slotsUsed := len(jobs)
 	f.jobsLbl.Label = "Jobs — " + FormatInt(int64(slotsUsed)) + "/" + FormatInt(int64(slots)) + " slots"
 
-	f.qtyLabel.Label = "Qty " + FormatInt(int64(runs))
+	setStepperValue(f.qtyBar, f.qtyLabel, "Qty "+FormatInt(int64(runs)))
 	f.start.GetWidget().Disabled = !f.startReadyFor(f.sel)
 	f.collect.GetWidget().Disabled = !f.collectReadyFor(f.sel)
 
@@ -431,7 +433,7 @@ func (f *Factory) stepQty(delta int) {
 	if f.qtyIdx >= len(qtySteps) {
 		f.qtyIdx = len(qtySteps) - 1
 	}
-	f.qtyLabel.Label = "Qty " + FormatInt(int64(f.qty()))
+	setStepperValue(f.qtyBar, f.qtyLabel, "Qty "+FormatInt(int64(f.qty())))
 }
 
 // qty is the current run count the stepper drives.

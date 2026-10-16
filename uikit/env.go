@@ -58,7 +58,7 @@ type Env struct {
 // NewEnv builds the EVE-dark environment (theme + faces) for the given sim.
 func NewEnv(c *content.Content, s *sim.Sim, enqueue EnqueueFunc) Env {
 	p := DefaultPalette()
-	ts := DefaultTypeScale()
+	ts := scaleTypeScale(DefaultTypeScale()) // design units → current scale
 	env := Env{
 		Content: c,
 		Sim:     s,

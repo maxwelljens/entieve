@@ -45,16 +45,16 @@ func NewHelp(env Env, rows []KeyRow) *HelpPanel {
 	newRow := func(k KeyRow) *widget.Container {
 		key := widget.NewText(
 			widget.TextOpts.Text(k.Key, faceTiny, solid(p.Accent)),
-			widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(helpKeyW, 0)),
+			widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(Px(helpKeyW), 0)),
 		)
 		desc := widget.NewText(
 			widget.TextOpts.Text(k.Desc, faceTiny, solid(p.Text)),
-			widget.TextOpts.MaxWidth(helpDescW),
+			widget.TextOpts.MaxWidth(float64(Px(helpDescW))),
 		)
 		box := widget.NewContainer(
 			widget.ContainerOpts.Layout(widget.NewRowLayout(
 				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(helpRowGap),
+				widget.RowLayoutOpts.Spacing(Px(helpRowGap)),
 			)),
 		)
 		box.AddChild(key, desc)
@@ -64,7 +64,7 @@ func NewHelp(env Env, rows []KeyRow) *HelpPanel {
 		return widget.NewContainer(
 			widget.ContainerOpts.Layout(widget.NewRowLayout(
 				widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-				widget.RowLayoutOpts.Spacing(2),
+				widget.RowLayoutOpts.Spacing(Px(2)),
 			)),
 		)
 	}
@@ -81,7 +81,7 @@ func NewHelp(env Env, rows []KeyRow) *HelpPanel {
 	columns := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(helpColGap),
+			widget.RowLayoutOpts.Spacing(Px(helpColGap)),
 		)),
 	)
 	columns.AddChild(left, right)
@@ -95,7 +95,7 @@ func NewHelp(env Env, rows []KeyRow) *HelpPanel {
 				"(750 km) and reports anonymous counts only — no names, no distances. "+
 				"Warp-to-within (Z) picks the landing range; travel still means flying to the gate.",
 			faceTiny, solid(p.Dim)),
-		widget.TextOpts.MaxWidth(helpW-2*contentsPad),
+		widget.TextOpts.MaxWidth(float64(Px(helpW-2*contentsPad))),
 	)
 	h.blurb = blurb
 
@@ -103,8 +103,8 @@ func NewHelp(env Env, rows []KeyRow) *HelpPanel {
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(10),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+			widget.RowLayoutOpts.Spacing(Px(10)),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(Px(contentsPad))),
 		)),
 	)
 	if len(rows) > 0 {
@@ -115,18 +115,20 @@ func NewHelp(env Env, rows []KeyRow) *HelpPanel {
 	titleBar, _ := NewTitleBar(env, "Help — Entieve key map", "svc_help")
 
 	// Size the window to the content so a short key map never leaves the
-	// blurb floating in dead space.
+	// blurb floating in dead space (bw/bh arrive already scaled; the
+	// design-constant floors go through Px exactly once here).
 	bw, bh := body.PreferredSize()
-	w := max(helpW, bw)
-	wh := titleBarH + bh
+	w := max(Px(helpW), bw)
+	wh := Px(titleBarH) + bh
+	x0 := max(Px(10), (Px(1024)-w)/2)
 	h.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.TitleBar(titleBar, titleBarH),
+		widget.WindowOpts.TitleBar(titleBar, Px(titleBarH)),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.MinSize(400, 200),
+		widget.WindowOpts.MinSize(Px(400), Px(200)),
 		// Default: centered for the 1024 px minimum width, 24 px from the
 		// top like the legacy help overlay; the integrator re-centers it.
-		widget.WindowOpts.Location(image.Rect(max(10, (1024-w)/2), helpStartY, max(10, (1024-w)/2)+w, helpStartY+wh)),
+		widget.WindowOpts.Location(image.Rect(x0, Px(helpStartY), x0+w, Px(helpStartY)+wh)),
 	)
 	return h
 }

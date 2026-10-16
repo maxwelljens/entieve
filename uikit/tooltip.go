@@ -141,7 +141,7 @@ func (e Env) tipInnerWidth(m TooltipModel) int {
 	// The title and sub lines sit in the column right of the icon.
 	indent := 0.0
 	if m.Icon != "" {
-		indent = tipIcon + tipIconGap
+		indent = float64(Px(tipIcon) + Px(tipIconGap))
 	}
 	w := indent + tipMeasure(m.Title, e.FaceBold(StepBase))
 	if sub := indent + tipMeasure(m.Sub, e.Face(StepSmall)); sub > w {
@@ -152,7 +152,7 @@ func (e Env) tipInnerWidth(m TooltipModel) int {
 			w = lw
 		}
 		for _, row := range sec.Rows {
-			rw := tipMeasure(row.Label, e.Face(StepSmall)) + tipRowGap +
+			rw := tipMeasure(row.Label, e.Face(StepSmall)) + float64(Px(tipRowGap)) +
 				tipMeasure(row.Value, e.Face(StepSmall))
 			if rw > w {
 				w = rw
@@ -165,8 +165,9 @@ func (e Env) tipInnerWidth(m TooltipModel) int {
 		}
 	}
 	iw := int(math.Round(w))
-	if iw > tipMaxInner {
-		iw = tipMaxInner
+	// The 320 px design cap, scaled: the panel never outgrows it.
+	if iw > Px(tipMaxInner) {
+		iw = Px(tipMaxInner)
 	}
 	return iw
 }
@@ -179,11 +180,18 @@ func (e Env) tipLayoutAt(m TooltipModel, iw int) tipLayout {
 	if iw < 0 {
 		iw = 0
 	}
-	x0 := tipPadX
+	// Design constants × the current scale, bound once: every rect below
+	// is positioned in live px, and the draw side uses the same values.
+	padX, padY := Px(tipPadX), Px(tipPadY)
+	icon, iconGap := Px(tipIcon), Px(tipIconGap)
+	ruleH, ruleGap := Px(tipRuleH), Px(tipRuleGap)
+	secGap, rowGap, hintGap := Px(tipSecGap), Px(tipRowGap), Px(tipHintGap)
+
+	x0 := padX
 	x1 := x0 + iw
 	titleX := x0
 	if m.Icon != "" {
-		titleX = x0 + tipIcon + tipIconGap
+		titleX = x0 + icon + iconGap
 	}
 
 	titleH := tipLineH(e.FaceBold(StepBase))
@@ -191,14 +199,14 @@ func (e Env) tipLayoutAt(m TooltipModel, iw int) tipLayout {
 	tinyH := tipLineH(e.Face(StepTiny))
 
 	l := tipLayout{ValueX: x1}
-	y := tipPadY
+	y := padY
 
 	// Header: the glyph and the bold title share one line (the glyph
 	// optically centered in it), the sub line hangs under the title column.
-	hdrH := max(tipIcon, titleH)
+	hdrH := max(icon, titleH)
 	if m.Icon != "" {
-		top := y + (hdrH-tipIcon)/2
-		l.Icon = image.Rect(x0, top, x0+tipIcon, top+tipIcon)
+		top := y + (hdrH-icon)/2
+		l.Icon = image.Rect(x0, top, x0+icon, top+icon)
 	}
 	top := y + (hdrH-titleH)/2
 	l.Title = image.Rect(titleX, top, x1, top+titleH)
@@ -211,12 +219,12 @@ func (e Env) tipLayoutAt(m TooltipModel, iw int) tipLayout {
 	// Body: a hairline, then the sections' labels and rows stacked without
 	// gaps (rows tile exactly), sections separated by tipSecGap.
 	if len(m.Sections) > 0 {
-		y += tipRuleGap
-		l.Rules = append(l.Rules, image.Rect(x0, y, x1, y+tipRuleH))
-		y += tipRuleH + tipRuleGap
+		y += ruleGap
+		l.Rules = append(l.Rules, image.Rect(x0, y, x1, y+ruleH))
+		y += ruleH + ruleGap
 		for si, sec := range m.Sections {
 			if si > 0 {
-				y += tipSecGap
+				y += secGap
 			}
 			sl := tipSectionLayout{Label: image.Rect(x0, y, x1, y+smallH)}
 			y += smallH
@@ -229,7 +237,7 @@ func (e Env) tipLayoutAt(m TooltipModel, iw int) tipLayout {
 				lw := int(math.Ceil(tipMeasure(row.Label, e.Face(StepSmall))))
 				// The label gets everything left of the value's gutter, so
 				// the two rects are disjoint by construction.
-				if room := value.Min.X - tipRowGap - x0; lw > room {
+				if room := value.Min.X - rowGap - x0; lw > room {
 					lw = room
 				}
 				if lw < 0 {
@@ -248,15 +256,15 @@ func (e Env) tipLayoutAt(m TooltipModel, iw int) tipLayout {
 	// Footer: a second hairline after the sections, then the hints.
 	if len(m.Hints) > 0 {
 		if len(m.Sections) > 0 {
-			y += tipRuleGap
-			l.Rules = append(l.Rules, image.Rect(x0, y, x1, y+tipRuleH))
-			y += tipRuleH + tipRuleGap
+			y += ruleGap
+			l.Rules = append(l.Rules, image.Rect(x0, y, x1, y+ruleH))
+			y += ruleH + ruleGap
 		} else {
-			y += tipRuleGap
+			y += ruleGap
 		}
 		for i := range m.Hints {
 			if i > 0 {
-				y += tipHintGap
+				y += hintGap
 			}
 			l.Hints = append(l.Hints, image.Rect(x0, y, x1, y+tinyH))
 			y += tinyH
@@ -265,9 +273,9 @@ func (e Env) tipLayoutAt(m TooltipModel, iw int) tipLayout {
 
 	// The content box is the padding inset; the panel adds the bottom pad
 	// after it (y here is the last line's end).
-	l.Inner = image.Rect(x0, tipPadY, x1, y)
-	y += tipPadY
-	l.Size = image.Point{X: x1 + tipPadX, Y: y}
+	l.Inner = image.Rect(x0, padY, x1, y)
+	y += padY
+	l.Size = image.Point{X: x1 + padX, Y: y}
 	return l
 }
 
@@ -324,10 +332,12 @@ func drawTooltip(dst *ebiten.Image, m TooltipModel, l tipLayout, e Env, origin i
 	// Surface: the current tooltip's own treatment (BGHard over a Border
 	// edge at 220), drawn by hand because the panel is this widget's rect.
 	fillRect(dst, image.Rect(0, 0, size.X, size.Y).Add(origin), solid(p.BGHard))
+	// Hairline border scales with the panel.
+	bs := float32(Scale())
 	vector.StrokeRect(dst,
-		float32(origin.X)+0.5, float32(origin.Y)+0.5,
-		float32(size.X)-1, float32(size.Y)-1,
-		1, nrgba(p.Border, 220), true)
+		float32(origin.X)+bs/2, float32(origin.Y)+bs/2,
+		float32(size.X)-bs, float32(size.Y)-bs,
+		bs, nrgba(p.Border, 220), true)
 
 	if m.Icon != "" && !l.Icon.Empty() {
 		tint := m.IconTint
@@ -337,7 +347,7 @@ func drawTooltip(dst *ebiten.Image, m TooltipModel, l tipLayout, e Env, origin i
 		r := at(l.Icon)
 		opts := &ebiten.DrawImageOptions{}
 		opts.GeoM.Translate(float64(r.Min.X), float64(r.Min.Y))
-		dst.DrawImage(icons.Get(m.Icon, tipIcon, tint), opts)
+		dst.DrawImage(icons.Get(m.Icon, Px(tipIcon), tint), opts)
 	}
 	drawCardText(dst, m.Title, e.FaceBold(StepBase), at(l.Title).Min.X, at(l.Title).Min.Y, solid(p.Text))
 	if m.Sub != "" {
@@ -432,7 +442,7 @@ func newTip(env Env, m TooltipModel) (*widget.ToolTip, *tipView) {
 		widget.ToolTipOpts.Content(body),
 		widget.ToolTipOpts.Delay(rackTipDelay),
 		widget.ToolTipOpts.Position(widget.TOOLTIP_POS_CURSOR_STICKY),
-		widget.ToolTipOpts.Offset(image.Point{X: 12, Y: 12}),
+		widget.ToolTipOpts.Offset(image.Point{X: Px(12), Y: Px(12)}),
 	)
 	return tip, view
 }
@@ -512,7 +522,7 @@ func (v *tipView) Render(screen *ebiten.Image) {
 	if r.Dx() <= 0 || r.Dy() <= 0 {
 		return
 	}
-	l := v.panel(r.Dx() - 2*tipPadX)
+	l := v.panel(r.Dx() - 2*Px(tipPadX))
 	drawTooltip(screen, v.model, l, v.env, clampTipRect(r, screen.Bounds()).Min)
 }
 

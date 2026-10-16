@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Resolution-independent UI.** Every visible length — window floors and
+  title bars, paddings and gaps, grip bands, icon boxes, tooltip cap,
+  starmap, HUD ring/cards, the 21 px type scale — now flows through one
+  scale funnel (`uikit.Px` / `uikit.Scale`): the display's device factor
+  × a persisted user setting. The framebuffer renders at *device*
+  resolution (`Layout` returns window size × device scale) so text
+  rasterizes at its final size — crisp on HiDPI instead of
+  rendered-small-and-upscaled — while hit tests (resize grips, menu rows,
+  `overUI`) keep agreeing with the cursor, which ebiten reports in those
+  same Layout units.
+- **Settings window** (`P`): a UI-scale stepper (0.75× / 1× / 1.25× /
+  1.5× / 2× / 2.5×, applied live — the interface rebuilds against the
+  new scale and every window keeps its design-unit placement), a
+  fullscreen toggle (`ebiten.SetFullscreen`) and **Reset window layout**.
+  Persisted next to the save as `<save>.settings.json`
+  (`{"ui_scale": 1.5, "fullscreen": false}`), loaded before the first
+  layout, defaulting to 1.0 / windowed when absent or damaged.
+- The layout sidecar now stores **design units** (÷ scale on write,
+  × scale on read): existing v2 files (written at scale 1, where design
+  unit == pixel) load seamlessly and one saved arrangement works at
+  every scale, including across a live scale change.
+
+### Fixed
+
+- **Inventory/table headers aligned with their cells** (Defect A): right
+  -aligned cell text anchored 3× the cell padding left of the column
+  edge (ebitenui adds a Text's horizontal padding into its measured line
+  width *and* subtracts `Padding.Right` again when drawing End-positioned
+  text), so headers sat ~10 px right of their column values. Right cells
+  now draw with `Padding.Right = 0`, landing every header label and cell
+  on the same x at every scale (`TestHeaderCellAnchorAgreement`).
+- **Quantity steppers resize their readout** (Defect B): the market /
+  inventory / factory `Qty` readout kept the box measured for its
+  previous value (changing `widget.Text.Label` does not invalidate
+  layout), so wide values drew under the `+` button. The readout now
+  relayouts its row on change and owns a box that fits its value; the
+  readout and the HUD wallet render in the tabular mono face.
+
 ## [0.2.0] - 2026-10-13
 
 ### Added

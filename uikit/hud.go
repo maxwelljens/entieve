@@ -52,13 +52,13 @@ const (
 // targetCardBody returns the content area of a target card: the card rect
 // inset by hudBoxPad.
 func targetCardBody(card image.Rectangle) image.Rectangle {
-	return card.Inset(hudBoxPad)
+	return card.Inset(Px(hudBoxPad))
 }
 
 // targetCardText returns the name line at the top of the body.
 func targetCardText(card image.Rectangle) image.Rectangle {
 	b := targetCardBody(card)
-	return image.Rect(b.Min.X, b.Min.Y, b.Max.X, b.Min.Y+hudBoxTextH)
+	return image.Rect(b.Min.X, b.Min.Y, b.Max.X, b.Min.Y+Px(hudBoxTextH))
 }
 
 // hudBoxIcon is the kind glyph box on a card's name line: the inline size
@@ -68,8 +68,8 @@ const hudBoxIcon = IconInline
 // targetCardIcon returns the kind glyph box at the start of the name line.
 func targetCardIcon(card image.Rectangle) image.Rectangle {
 	b := targetCardBody(card)
-	y := b.Min.Y + (hudBoxTextH-hudBoxIcon)/2
-	return image.Rect(b.Min.X, y, b.Min.X+hudBoxIcon, y+hudBoxIcon)
+	y := b.Min.Y + Px((hudBoxTextH-hudBoxIcon)/2)
+	return image.Rect(b.Min.X, y, b.Min.X+Px(hudBoxIcon), y+Px(hudBoxIcon))
 }
 
 // targetCardName returns the name text region: everything right of the
@@ -77,29 +77,29 @@ func targetCardIcon(card image.Rectangle) image.Rectangle {
 func targetCardName(card image.Rectangle) image.Rectangle {
 	ic := targetCardIcon(card)
 	line := targetCardText(card)
-	return image.Rect(ic.Max.X+IconGap, line.Min.Y, line.Max.X, line.Max.Y)
+	return image.Rect(ic.Max.X+Px(IconGap), line.Min.Y, line.Max.X, line.Max.Y)
 }
 
 // targetCardDist returns the distance line under the name.
 func targetCardDist(card image.Rectangle) image.Rectangle {
 	b := targetCardBody(card)
-	y := b.Min.Y + hudBoxTextH + hudBoxDistGap
-	return image.Rect(b.Min.X, y, b.Max.X, y+hudBoxDistH)
+	y := b.Min.Y + Px(hudBoxTextH) + Px(hudBoxDistGap)
+	return image.Rect(b.Min.X, y, b.Max.X, y+Px(hudBoxDistH))
 }
 
 // targetCardLock returns the lock-progress strip under the distance line.
 func targetCardLock(card image.Rectangle) image.Rectangle {
 	b := targetCardBody(card)
-	y := b.Min.Y + hudBoxTextH + hudBoxDistGap + hudBoxDistH + hudBoxLockGap
-	return image.Rect(b.Min.X, y, b.Max.X, y+hudBoxLockH)
+	y := b.Min.Y + Px(hudBoxTextH) + Px(hudBoxDistGap) + Px(hudBoxDistH) + Px(hudBoxLockGap)
+	return image.Rect(b.Min.X, y, b.Max.X, y+Px(hudBoxLockH))
 }
 
 // targetCardBars returns the layer-bar stack: from under the lock strip
 // down to the bottom of the body.
 func targetCardBars(card image.Rectangle) image.Rectangle {
 	b := targetCardBody(card)
-	y := b.Min.Y + hudBoxTextH + hudBoxDistGap + hudBoxDistH + hudBoxLockGap +
-		hudBoxLockH + hudBoxBarsGap
+	y := b.Min.Y + Px(hudBoxTextH) + Px(hudBoxDistGap) + Px(hudBoxDistH) + Px(hudBoxLockGap) +
+		Px(hudBoxLockH) + Px(hudBoxBarsGap)
 	return image.Rect(b.Min.X, y, b.Max.X, b.Max.Y)
 }
 
@@ -108,7 +108,8 @@ func targetCardBars(card image.Rectangle) image.Rectangle {
 // the last bar, so the three rects cover r with no gaps and no overlaps.
 func layerBars(r image.Rectangle) [3]image.Rectangle {
 	var out [3]image.Rectangle
-	h := (r.Dy() - 2*hudBoxBarGap) / 3
+	gap := Px(hudBoxBarGap)
+	h := (r.Dy() - 2*gap) / 3
 	if h < 1 {
 		h = 1
 	}
@@ -122,7 +123,7 @@ func layerBars(r image.Rectangle) [3]image.Rectangle {
 			bot = r.Max.Y
 		}
 		out[i] = image.Rect(r.Min.X, y, r.Max.X, bot)
-		y = bot + hudBoxBarGap
+		y = bot + gap
 	}
 	return out
 }
@@ -227,7 +228,7 @@ func NewHud(env Env) *Hud {
 	h.capBar = widget.NewProgressBar(
 		widget.ProgressBarOpts.Values(0, hudCapMax, hudCapMax),
 		widget.ProgressBarOpts.FillImage(&widget.ProgressBarImage{Idle: ns(solid(p.Cap))}),
-		widget.ProgressBarOpts.WidgetOpts(widget.WidgetOpts.MinSize(hudBarMin, 20)),
+		widget.ProgressBarOpts.WidgetOpts(widget.WidgetOpts.MinSize(Px(hudBarMin), Px(20))),
 	)
 	h.capValue = widget.NewText(widget.TextOpts.Text("", env.Face(StepTiny), solid(p.BGHard)),
 		widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionCenter))
@@ -241,7 +242,7 @@ func NewHud(env Env) *Hud {
 	capCaption := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(5),
+			widget.RowLayoutOpts.Spacing(Px(5)),
 		)),
 	)
 	capCaption.AddChild(
@@ -267,7 +268,9 @@ func NewHud(env Env) *Hud {
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
 	h.walletLbl = widget.NewText(
-		widget.TextOpts.Text("", env.FaceBold(StepSmall), solid(p.Good)),
+		// Tabular contents face: the wallet is a dynamic number and mono
+		// digits keep its right edge steady while it ticks.
+		widget.TextOpts.Text("", env.FaceMono(StepSmall), solid(p.Good)),
 		widget.TextOpts.Position(widget.TextPositionEnd, widget.TextPositionStart),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
@@ -278,20 +281,20 @@ func NewHud(env Env) *Hud {
 	)
 	right.AddChild(h.speedLbl, h.timeLbl, h.walletLbl)
 
-	h.ring = ebiten.NewImage(hudRingSize, hudRingSize)
+	h.ring = ebiten.NewImage(Px(hudRingSize), Px(hudRingSize))
 	ringGfx := widget.NewGraphic(widget.GraphicOpts.Image(h.ring))
 
 	bar := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(10),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+			widget.RowLayoutOpts.Spacing(Px(10)),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(Px(contentsPad))),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionCenter,
 			VerticalPosition:   widget.AnchorLayoutPositionEnd,
-			Padding:            &widget.Insets{Left: 10, Right: 10, Bottom: 10},
+			Padding:            &widget.Insets{Left: Px(10), Right: Px(10), Bottom: Px(10)},
 		})),
 	)
 	bar.AddChild(ringGfx, mid, right)
@@ -301,12 +304,12 @@ func NewHud(env Env) *Hud {
 	h.targetRow = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(hudBoxGap),
+			widget.RowLayoutOpts.Spacing(Px(hudBoxGap)),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionCenter,
 			VerticalPosition:   widget.AnchorLayoutPositionStart,
-			Padding:            &widget.Insets{Top: 10},
+			Padding:            &widget.Insets{Top: Px(10)},
 		})),
 	)
 	for i := range h.boxes {
@@ -329,7 +332,7 @@ func NewHud(env Env) *Hud {
 // newBox builds one target card from the fixed widget pool: a container
 // holding a single Graphic that displays the card image.
 func (h *Hud) newBox(env Env) *hudBox {
-	b := &hudBox{img: ebiten.NewImage(hudBoxW, hudBoxH)}
+	b := &hudBox{img: ebiten.NewImage(Px(hudBoxW), Px(hudBoxH))}
 	g := widget.NewGraphic(
 		widget.GraphicOpts.Image(b.img),
 		widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
@@ -338,7 +341,7 @@ func (h *Hud) newBox(env Env) *hudBox {
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 		)),
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(hudBoxW, hudBoxH)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(Px(hudBoxW), Px(hudBoxH))),
 	)
 	b.root.AddChild(g)
 	h.paintBox(b)
@@ -366,10 +369,10 @@ func (h *Hud) paintBox(b *hudBox) {
 // boxLabels fits a card's text: the name to the room right of the kind
 // glyph, the distance to its own line.
 func (h *Hud) boxLabels(name, dist string) (string, string) {
-	card := image.Rect(0, 0, hudBoxW, hudBoxH)
+	card := image.Rect(0, 0, Px(hudBoxW), Px(hudBoxH))
 	room := float64(targetCardName(card).Dx())
-	if room < hudBoxMinNameW {
-		room = hudBoxMinNameW
+	if room < float64(Px(hudBoxMinNameW)) {
+		room = float64(Px(hudBoxMinNameW))
 	}
 	name = Ellipsize(name, room, h.measure)
 	if w := h.measureTiny(dist); w > float64(targetCardDist(card).Dx()) {
@@ -384,9 +387,12 @@ func (h *Hud) boxLabels(name, dist string) (string, string) {
 func drawTargetCard(dst *ebiten.Image, c targetCard, env Env) {
 	p := env.Pal
 	card := dst.Bounds()
+	// Hairlines scale with the card image: stroke s px centred on the
+	// s-pixel inset edge.
+	s := float32(Scale())
 	dst.Fill(solid(p.BG))
-	vector.StrokeRect(dst, 0.5, 0.5, float32(card.Dx()-1), float32(card.Dy()-1),
-		1, nrgba(p.Border, 200), true)
+	vector.StrokeRect(dst, s/2, s/2, float32(card.Dx())-s, float32(card.Dy())-s,
+		s, nrgba(p.Border, 200), true)
 
 	// Kind glyph leads the name line, then the name — the two rects come
 	// from the same pure geometry, so they can never overlap.
@@ -394,7 +400,7 @@ func drawTargetCard(dst *ebiten.Image, c targetCard, env Env) {
 		ic := targetCardIcon(card)
 		opts := &ebiten.DrawImageOptions{}
 		opts.GeoM.Translate(float64(ic.Min.X), float64(ic.Min.Y))
-		dst.DrawImage(icons.Get(c.kind, hudBoxIcon, c.tint), opts)
+		dst.DrawImage(icons.Get(c.kind, Px(hudBoxIcon), c.tint), opts)
 	}
 	line := targetCardName(card)
 	drawCardText(dst, c.name, env.FaceBold(StepSmall), line.Min.X, line.Min.Y, solid(p.Text))
@@ -426,9 +432,9 @@ func drawTargetCard(dst *ebiten.Image, c targetCard, env Env) {
 			fillRect(dst, f, solid(col))
 		}
 		vector.StrokeRect(dst,
-			float32(bar.Min.X)+0.5, float32(bar.Min.Y)+0.5,
-			float32(bar.Dx())-1, float32(bar.Dy())-1,
-			1, nrgba(p.Border, 160), false)
+			float32(bar.Min.X)+s/2, float32(bar.Min.Y)+s/2,
+			float32(bar.Dx())-s, float32(bar.Dy())-s,
+			s, nrgba(p.Border, 160), false)
 	}
 }
 
@@ -583,7 +589,10 @@ func ringTrackColor(col color.RGBA) color.RGBA {
 func (h *Hud) drawRing(shield, armor, structure float64) {
 	h.redraws++
 	h.ring.Clear()
-	c := float64(hudRingSize) / 2
+	// The ring image was built Px(hudRingSize) wide: every radius and
+	// stroke below scales with it (identity at scale 1).
+	s := Scale()
+	c := float64(Px(hudRingSize)) / 2
 	const twoPi = 2 * math.Pi
 	start := -math.Pi / 2
 	p := h.env.Pal
@@ -591,16 +600,16 @@ func (h *Hud) drawRing(shield, armor, structure float64) {
 		rad, frac float64
 		col       color.RGBA
 	}{
-		{hudRingR, shield, p.Shield},
-		{hudRingR - hudRingStep, armor, p.Warn},
-		{hudRingR - 2*hudRingStep, structure, p.Struct},
+		{hudRingR * s, shield, p.Shield},
+		{(hudRingR - hudRingStep) * s, armor, p.Warn},
+		{(hudRingR - 2*hudRingStep) * s, structure, p.Struct},
 	}
 	for _, l := range layers {
 		render.Arc(h.ring, float32(c), float32(c), float32(l.rad),
-			float32(start), float32(start+twoPi), float32(hudArcW), ringTrackColor(l.col))
+			float32(start), float32(start+twoPi), float32(hudArcW*s), ringTrackColor(l.col))
 		if l.frac > 0 {
 			render.Arc(h.ring, float32(c), float32(c), float32(l.rad),
-				float32(start), float32(start+ringSweep(l.frac)), float32(hudArcW), l.col)
+				float32(start), float32(start+ringSweep(l.frac)), float32(hudArcW*s), l.col)
 		}
 	}
 	// Gauge ticks at the quarter/half/three-quarter marks, crossing each
@@ -610,26 +619,27 @@ func (h *Hud) drawRing(shield, armor, structure float64) {
 		a := start + t
 		dx, dy := math.Cos(a), math.Sin(a)
 		for _, l := range layers {
-			r0, r1 := l.rad-hudTickLen/2, l.rad+hudTickLen/2
+			r0, r1 := l.rad-hudTickLen*s/2, l.rad+hudTickLen*s/2
 			vector.StrokeLine(h.ring,
 				float32(c+dx*r0), float32(c+dy*r0),
 				float32(c+dx*r1), float32(c+dy*r1),
-				1.5, tick, true)
+				float32(1.5*s), tick, true)
 		}
 	}
 	// Hull silhouette (the legacy four-point ship glyph, scaled to the rings).
+	R := hudRingR * s
 	pts := [][2]float64{
-		{0, -hudRingR * 0.30},
-		{hudRingR * 0.19, hudRingR * 0.24},
-		{0, hudRingR * 0.08},
-		{-hudRingR * 0.19, hudRingR * 0.24},
+		{0, -R * 0.30},
+		{R * 0.19, R * 0.24},
+		{0, R * 0.08},
+		{-R * 0.19, R * 0.24},
 	}
 	for i := range pts {
 		a, b := pts[i], pts[(i+1)%len(pts)]
 		vector.StrokeLine(h.ring,
 			float32(c+a[0]), float32(c+a[1]),
 			float32(c+b[0]), float32(c+b[1]),
-			1.5, p.Struct, true)
+			float32(1.5*s), p.Struct, true)
 	}
 }
 

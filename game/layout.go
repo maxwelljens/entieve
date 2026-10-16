@@ -3,10 +3,12 @@ package game
 import (
 	"encoding/json"
 	"image"
+	"math"
 	"os"
 	"path/filepath"
 
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/uikit"
 )
 
 // Window-layout persistence: a JSON sidecar next to the save file,
@@ -31,10 +33,18 @@ import (
 // the defaults wholesale instead of pinning the mess; a higher version
 // is ignored for the usual forward-compat reason (never guess at an
 // unknown format).
+//
+// Scale independence: every rect field is persisted in DESIGN units —
+// the pixel layout at UI scale 1 (current px ÷ uikit.Scale() on write,
+// uikit.Px on read). Version-2 files were all written at scale 1, where
+// design unit == pixel, so they load seamlessly at any scale: one saved
+// arrangement works at 0.75× and at 2.5×, and a session that changes
+// scale mid-run round-trips through the same convention (applyScale).
 const layoutVersion = 2
 
 // winLayout is one persisted window: top-left corner, size and — for
-// the toggleable windows — whether it was open.
+// the toggleable windows — whether it was open. X/Y/W/H are DESIGN
+// units (see layoutVersion).
 type winLayout struct {
 	X    int  `json:"x"`
 	Y    int  `json:"y"`
@@ -126,10 +136,12 @@ func (g *Game) persistOpen(name string, open *bool) bool {
 }
 
 // writeLayout persists every named window's geometry and open state
-// (hidden windows too — their rects survive a dock). Errors bubble up
+// (hidden windows too — their rects survive a dock). Geometry goes to
+// the sidecar in DESIGN units (see layoutVersion). Errors bubble up
 // so SaveGame can report them; the clean-quit path is best-effort.
 func (g *Game) writeLayout() error {
 	f := layoutFile{Version: layoutVersion, Windows: map[string]winLayout{}}
+	s := uikit.Scale()
 	for _, name := range layoutNames {
 		win, open := g.layoutTarget(name)
 		if win == nil {
@@ -152,10 +164,14 @@ func (g *Game) writeLayout() error {
 			h = minH
 		}
 		f.Windows[name] = winLayout{
-			X:    r.Min.X,
-			Y:    r.Min.Y,
-			W:    w,
-			H:    h,
+			// px → design units (÷ current scale): the sidecar never
+			// records the scale, so the same numbers restore at any of
+			// them. The MinSize growth above ran in live px first, so
+			// the design rect still satisfies the scaled floor on read.
+			X:    int(math.Round(float64(r.Min.X) / s)),
+			Y:    int(math.Round(float64(r.Min.Y) / s)),
+			W:    int(math.Round(float64(w) / s)),
+			H:    int(math.Round(float64(h) / s)),
 			Open: g.persistOpen(name, open),
 		}
 	}
@@ -170,7 +186,8 @@ func (g *Game) writeLayout() error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-// readLayout loads the sidecar. Every failure mode — missing file, bad
+// readLayout loads the sidecar (rects in DESIGN units — see
+// layoutVersion). Every failure mode — missing file, bad
 // JSON, or a version that is not exactly the current one (stale
 // version-1 files predating the service-trio reclaim, and any newer
 // unknown format) — returns nil: defaults win and nothing crashes.
@@ -234,7 +251,10 @@ func (g *Game) applyLayout(screenW, screenH int) {
 		if win.MinSize != nil {
 			minSize = *win.MinSize
 		}
-		saved := image.Rect(e.X, e.Y, e.X+e.W, e.Y+e.H)
+		// Sidecar rects are DESIGN units: × current scale back into live
+		// px (at scale 1 this is the exact historical pixel rect).
+		x, y := uikit.Px(e.X), uikit.Px(e.Y)
+		saved := image.Rect(x, y, x+uikit.Px(e.W), y+uikit.Px(e.H))
 		win.SetLocation(clampLayoutRect(saved, minSize, screen))
 		// Track the rect actually applied (SetLocation may grow it), so
 		// the placement tracker never reports a restored window as
