@@ -176,7 +176,7 @@ func (g *Game) titleBar(label string) *widget.Container {
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(5),
+			Padding:            widget.NewInsetsSimple(uikit.Px(5)),
 		})),
 	))
 	return title
@@ -187,7 +187,8 @@ func (g *Game) titleBar(label string) *widget.Container {
 func (g *Game) newBtn(label string, minW, minH int, clicked func()) *widget.Button {
 	return widget.NewButton(
 		widget.ButtonOpts.TextLabel(label),
-		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(minW, minH)),
+		// minW/minH arrive as DESIGN units (callers pass the raw consts).
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(uikit.Px(minW), uikit.Px(minH))),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
 	)
 }
@@ -200,10 +201,10 @@ func (g *Game) newIconBtn(label, icon string, minW, minH int, clicked func()) *w
 	dim := color.RGBA{R: p.Dim.R, G: p.Dim.G, B: p.Dim.B, A: uikit.IconDisabledA}
 	return widget.NewButton(
 		widget.ButtonOpts.TextAndImage(label, nil, &widget.GraphicImage{
-			Idle:     icons.Get(icon, uikit.IconButton, p.Text),
-			Disabled: icons.Get(icon, uikit.IconButton, dim),
+			Idle:     icons.Get(icon, uikit.Px(uikit.IconButton), p.Text),
+			Disabled: icons.Get(icon, uikit.Px(uikit.IconButton), dim),
 		}, nil),
-		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(minW, minH)),
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(uikit.Px(minW), uikit.Px(minH))),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
 	)
 }
@@ -216,8 +217,8 @@ func (g *Game) buildMenuWindow() *widget.Window {
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(10),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(10)),
+			widget.RowLayoutOpts.Spacing(uikit.Px(10)),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(uikit.Px(10))),
 		)),
 	)
 	actions := map[string]func(){
@@ -232,11 +233,11 @@ func (g *Game) buildMenuWindow() *widget.Window {
 	}
 	return widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.TitleBar(g.titleBar("Menu"), winTitleH),
+		widget.WindowOpts.TitleBar(g.titleBar("Menu"), uikit.Px(winTitleH)),
 		widget.WindowOpts.Draggable(),
 		widget.WindowOpts.Modal(),
 		widget.WindowOpts.Location(image.Rect(0, 0,
-			int(menuBtnW)+20, int(4*menuBtnH+3*10+20)+winTitleH)),
+			uikit.Px(int(menuBtnW)+20), uikit.Px(int(4*menuBtnH+3*10+20)+winTitleH))),
 	)
 }
 
@@ -257,7 +258,7 @@ func (g *Game) buildStationWindow() *widget.Window {
 	header := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(10),
+			widget.RowLayoutOpts.Spacing(uikit.Px(10)),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
@@ -280,8 +281,8 @@ func (g *Game) buildStationWindow() *widget.Window {
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(boardSpacing),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(boardPad)),
+			widget.RowLayoutOpts.Spacing(uikit.Px(boardSpacing)),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(uikit.Px(boardPad))),
 		)),
 	)
 	body.AddChild(header, availHead, g.stAvail, actHead, g.stActive)
@@ -290,8 +291,8 @@ func (g *Game) buildStationWindow() *widget.Window {
 
 	win := widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.MinSize(stationMinW, stationMinH),
-		widget.WindowOpts.Location(image.Rect(stationX, stationY, stationX+stationWinW, stationY+stationMinH)),
+		widget.WindowOpts.MinSize(uikit.Px(stationMinW), uikit.Px(stationMinH)),
+		widget.WindowOpts.Location(image.Rect(uikit.Px(stationX), uikit.Px(stationY), uikit.Px(stationX+stationWinW), uikit.Px(stationY+stationMinH))),
 	)
 	// Bind the theme now: syncStationBoard sizes the window from the body's
 	// preferred size before the window is first mounted, and ebitenui

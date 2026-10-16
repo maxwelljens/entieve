@@ -80,11 +80,21 @@ func (sc *SpaceScene) OnLeave() {}
 // ResetView centers the camera on the player (used after travel/restore).
 func (sc *SpaceScene) ResetView() { sc.pan = core.Vec2{} }
 
+// screenZoom is zoomBase × the zoom multiplier × the display's device
+// factor: Layout hands out DEVICE pixels, and the world must keep its
+// physical size there (a HiDPI framebuffer covers the same physical area
+// with more pixels). The player's UI-scale setting never touches it —
+// scaling the interface does not zoom the world. Everything screen-space
+// below (panning, picking, click tolerance) goes through the same factor.
+func (sc *SpaceScene) screenZoom() float64 {
+	return zoomBase * sc.zoom * sc.g.deviceScale()
+}
+
 // Camera builds the render camera for the current screen size.
 func (sc *SpaceScene) Camera(w, h float64) render.Camera {
 	return render.Camera{
 		Center:  sc.playerPos().Add(sc.pan),
-		Zoom:    zoomBase * sc.zoom,
+		Zoom:    sc.screenZoom(),
 		ScreenW: w,
 		ScreenH: h,
 	}
@@ -100,7 +110,7 @@ func (sc *SpaceScene) playerPos() core.Vec2 {
 
 // panBy moves the camera center in screen pixels (converted to meters).
 func (sc *SpaceScene) panBy(dxPx, dyPx float64) {
-	sc.pan = sc.pan.Add(core.V(-dxPx/(zoomBase*sc.zoom), -dyPx/(zoomBase*sc.zoom)))
+	sc.pan = sc.pan.Add(core.V(-dxPx/sc.screenZoom(), -dyPx/sc.screenZoom()))
 }
 
 // Update handles camera controls and world clicks. Keyboard panning runs
@@ -186,15 +196,17 @@ func (sc *SpaceScene) Update(in Input) error {
 // doubleClick reports whether this click repeats the previous one closely
 // in time and space.
 func (sc *SpaceScene) doubleClick(x, y float64) bool {
+	tol := 6 * sc.g.deviceScale() // click pair tolerance in screen px
 	return time.Since(sc.lastClickAt) <= doubleClickWindow &&
-		math.Abs(x-sc.lastClickX) < 6 && math.Abs(y-sc.lastClickY) < 6
+		math.Abs(x-sc.lastClickX) < tol && math.Abs(y-sc.lastClickY) < tol
 }
 
 // pick returns the perceivable grid entity nearest the cursor within
 // pickRadiusPx (off-grid entities cannot be clicked — the client never
 // sees what the sensors do not).
 func (sc *SpaceScene) pick(cam render.Camera, x, y float64) (sim.Info, bool) {
-	bestDist := pickRadiusPx * pickRadiusPx
+	r := pickRadiusPx * sc.g.deviceScale() // screen px: Layout units
+	bestDist := r * r
 	var best sim.Info
 	found := false
 	for _, inf := range sc.g.s.Grid() {

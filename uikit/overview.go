@@ -120,7 +120,7 @@ func (k *Kit) buildOverview() {
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
-			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(Px(contentsPad))),
 		)),
 	)
 	contents.AddChild(tbl.Container())
@@ -134,19 +134,19 @@ func (k *Kit) buildOverview() {
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(contentsPad),
+			Padding:            widget.NewInsetsSimple(Px(contentsPad)),
 		})),
 	))
 
 	o.win = widget.NewWindow(
 		widget.WindowOpts.Contents(contents),
-		widget.WindowOpts.TitleBar(title, titleBarH),
+		widget.WindowOpts.TitleBar(title, Px(titleBarH)),
 		widget.WindowOpts.Draggable(),
 		// Resize comes from the winchrome edge grips (all four edges),
 		// not widget.WindowOpts.Resizeable() — that one only stretches
 		// the bottom/right corner. Kit.AddWindow attaches the chrome.
-		widget.WindowOpts.MinSize(320, 240),
-		widget.WindowOpts.Location(image.Rect(8, 8, 388, 428)),
+		widget.WindowOpts.MinSize(Px(320), Px(240)),
+		widget.WindowOpts.Location(image.Rect(Px(8), Px(8), Px(388), Px(428))),
 	)
 }
 

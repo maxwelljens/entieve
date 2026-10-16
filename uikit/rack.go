@@ -111,20 +111,20 @@ func NewRack(env Env) *Rack {
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(rackRowGap),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+			widget.RowLayoutOpts.Spacing(Px(rackRowGap)),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(Px(contentsPad))),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
 	for row := 0; row < rackRows; row++ {
 		label := widget.NewText(
 			widget.TextOpts.Text(rackRowLabels[row], faceTiny, solid(p.Head)),
-			widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(rackLabelW, 0)),
+			widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(Px(rackLabelW), 0)),
 		)
 		rowBox := widget.NewContainer(
 			widget.ContainerOpts.Layout(widget.NewRowLayout(
 				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(contentsPad),
+				widget.RowLayoutOpts.Spacing(Px(contentsPad)),
 			)),
 		)
 		rowBox.AddChild(label)
@@ -141,14 +141,14 @@ func NewRack(env Env) *Rack {
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(contentsPad),
+			Padding:            widget.NewInsetsSimple(Px(contentsPad)),
 		})),
 	)
 	title := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(0, titleBarH),
+			widget.WidgetOpts.MinSize(0, Px(titleBarH)),
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 		),
 	)
@@ -161,7 +161,7 @@ func NewRack(env Env) *Rack {
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionEnd,
 			VerticalPosition:   widget.AnchorLayoutPositionEnd,
-			Padding:            &widget.Insets{Right: 10, Bottom: 10},
+			Padding:            &widget.Insets{Right: Px(10), Bottom: Px(10)},
 		})),
 	)
 	r.container.AddChild(title, body)
@@ -189,10 +189,10 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 			Idle:     rackGlyph("", color.RGBA{}),
 			Disabled: rackGlyph("", color.RGBA{}),
 		}),
-		widget.ButtonOpts.GraphicPadding(widget.Insets{Left: 0, Right: rackIconPad}),
-		widget.ButtonOpts.TextPadding(&widget.Insets{Left: 3, Right: 3, Top: 2, Bottom: 2}),
+		widget.ButtonOpts.GraphicPadding(widget.Insets{Left: 0, Right: Px(rackIconPad)}),
+		widget.ButtonOpts.TextPadding(&widget.Insets{Left: Px(3), Right: Px(3), Top: Px(2), Bottom: Px(2)}),
 		widget.ButtonOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(rackCellW, rackCellH),
+			widget.WidgetOpts.MinSize(Px(rackCellW), Px(rackCellH)),
 			widget.WidgetOpts.MouseButtonClickedHandler(func(a *widget.WidgetMouseButtonClickedEventArgs) {
 				switch a.Button {
 				case ebiten.MouseButtonLeft:
@@ -209,7 +209,7 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 		widget.TextOpts.Text("", r.env.Face(StepTiny), solid(p.Dim)),
 		widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionCenter),
 		widget.TextOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(0, rackNameH),
+			widget.WidgetOpts.MinSize(0, Px(rackNameH)),
 			widget.WidgetOpts.MouseButtonClickedHandler(func(a *widget.WidgetMouseButtonClickedEventArgs) {
 				switch a.Button {
 				case ebiten.MouseButtonLeft:
@@ -222,7 +222,7 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 	)
 	cell.bar = widget.NewProgressBar(
 		widget.ProgressBarOpts.Values(0, rackCycleMax, 0),
-		widget.ProgressBarOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, rackCycleH)),
+		widget.ProgressBarOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, Px(rackCycleH))),
 	)
 	cell.root = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -237,10 +237,11 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 // tint ("" = an empty slot, which gets a transparent box of the same size
 // so no cell ever changes size when a module is fitted).
 func rackGlyph(name string, tint color.RGBA) *ebiten.Image {
+	// IconButton is a design unit: the glyph scales with the cell.
 	if name == "" {
-		return icons.Get(icons.Fallback, IconButton, color.RGBA{})
+		return icons.Get(icons.Fallback, Px(IconButton), color.RGBA{})
 	}
-	return icons.Get(name, IconButton, tint)
+	return icons.Get(name, Px(IconButton), tint)
 }
 
 // rackCellImages builds the cell chrome: an amber-tinted glow for active
@@ -385,7 +386,7 @@ func (r *Rack) shortName(def *content.ModuleDef) string {
 	if i := strings.IndexByte(name, ' '); i > 0 {
 		name = name[:i]
 	}
-	return Ellipsize(name, rackCellW-6, r.measure)
+	return Ellipsize(name, float64(Px(rackCellW-6)), r.measure)
 }
 
 // cellTip builds one fitted cell's tooltip: the shared module model plus

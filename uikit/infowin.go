@@ -753,8 +753,8 @@ func NewInfoWin(env Env) *InfoWin {
 	w.page = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(infoGap),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+			widget.RowLayoutOpts.Spacing(Px(infoGap)),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(Px(contentsPad))),
 		)),
 	)
 	w.scroll = widget.NewScrollContainer(
@@ -779,7 +779,7 @@ func NewInfoWin(env Env) *InfoWin {
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
-			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(Px(contentsPad))),
 		)),
 	)
 	body.AddChild(w.scroll)
@@ -791,7 +791,7 @@ func NewInfoWin(env Env) *InfoWin {
 	bar.AddChild(widget.NewButton(
 		widget.ButtonOpts.TextLabel("×"),
 		widget.ButtonOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(46, 30),
+			widget.WidgetOpts.MinSize(Px(46), Px(40)), // ≥40 scaled hit box
 			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 				HorizontalPosition: widget.AnchorLayoutPositionEnd,
 				VerticalPosition:   widget.AnchorLayoutPositionCenter,
@@ -802,15 +802,15 @@ func NewInfoWin(env Env) *InfoWin {
 
 	w.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.TitleBar(bar, titleBarH),
+		widget.WindowOpts.TitleBar(bar, Px(titleBarH)),
 		widget.WindowOpts.Draggable(),
 		// Resize comes from the kit's edge grips, not Resizeable() —
 		// same as every other kit window (Kit.AddWindow attaches them).
-		widget.WindowOpts.MinSize(infoMinW, infoMinH),
+		widget.WindowOpts.MinSize(Px(infoMinW), Px(infoMinH)),
 		// Fallback only: the composed rect at the 1024×700 minimum.
 		// The game recomposes (centers) it for the real viewport at
 		// startup (game/placeDefaults).
-		widget.WindowOpts.Location(image.Rect(302, 120, 722, 580)),
+		widget.WindowOpts.Location(image.Rect(Px(302), Px(120), Px(722), Px(580))),
 	)
 	showWidget(w.win.GetContainer().GetWidget(), false)
 	return w
@@ -897,7 +897,7 @@ func (w *InfoWin) rewrap() {
 	if w.prose == nil {
 		return
 	}
-	d := w.page.GetWidget().Rect.Dx() - 2*contentsPad
+	d := w.page.GetWidget().Rect.Dx() - 2*Px(contentsPad)
 	if d <= 0 {
 		return
 	}
@@ -928,7 +928,7 @@ func (w *InfoWin) render(p infoPage) {
 	line := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(IconGap),
+			widget.RowLayoutOpts.Spacing(Px(IconGap)),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
@@ -936,7 +936,9 @@ func (w *InfoWin) render(p infoPage) {
 		g := NewIcon(p.Icon, tipIcon, pal.Text)
 		g.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
 		line.AddChild(g)
-		iconW = tipIcon + IconGap
+		// Scaled ONCE here (it mirrors the drawn icon box + row gap);
+		// the spacer's MinSize below reads it already in live px.
+		iconW = Px(tipIcon) + Px(IconGap)
 	}
 	line.AddChild(widget.NewText(
 		widget.TextOpts.Text(p.Title, env.FaceBold(StepBase), solid(pal.Text)),
@@ -946,7 +948,7 @@ func (w *InfoWin) render(p infoPage) {
 		sub := widget.NewContainer(
 			widget.ContainerOpts.Layout(widget.NewRowLayout(
 				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(IconGap),
+				widget.RowLayoutOpts.Spacing(Px(IconGap)),
 			)),
 			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 		)
@@ -978,7 +980,7 @@ func (w *InfoWin) render(p infoPage) {
 		w.page.AddChild(widget.NewContainer(
 			widget.ContainerOpts.BackgroundImage(ns(nrgba(pal.Accent, tipRuleA))),
 			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
-			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, tipRuleH)),
+			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, Px(tipRuleH))),
 		))
 	}
 	for _, sec := range p.Sections {
@@ -1016,7 +1018,7 @@ func (w *InfoWin) rowWidget(row infoRow) widget.PreferredSizeLocateableWidget {
 	// the default width; a resize refits the prose, not these).
 	label := row.Label
 	if row.Value != "" && row.Label != "" {
-		maxW := float64(infoW-2*contentsPad-2*contentsPad-tipRowGap) -
+		maxW := float64(Px(infoW-2*contentsPad-2*contentsPad-tipRowGap)) -
 			tipMeasure(row.Value, face)
 		label = Ellipsize(label, maxW, func(s string) float64 { return tipMeasure(s, face) })
 	}
@@ -1085,5 +1087,5 @@ func (w *InfoWin) refDouble(ref InfoRef) bool {
 // infoInnerW is the description's wrap width at the default geometry —
 // the first frame before layout runs; rewrap keeps up afterwards.
 func infoInnerW() float64 {
-	return float64(infoW - 2*contentsPad - 2*contentsPad)
+	return float64(Px(infoW - 2*contentsPad - 2*contentsPad))
 }

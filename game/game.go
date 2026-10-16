@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -28,7 +29,10 @@ import (
 )
 
 // Default window geometry. 1024×700 is the minimum supported window: the
-// layout tests pin every property at 1280×720 AND 1024×700.
+// layout tests pin every property at 1280×720 AND 1024×700. These are
+// WINDOW (device-independent) pixels: SetWindowSize takes them as-is and
+// Layout converts them to device pixels via the device scale factor —
+// never scale the SetWindowSize call itself (window chrome is window px).
 const (
 	defaultW = 1280
 	defaultH = 720
@@ -47,6 +51,10 @@ type Options struct {
 	Save     *sim.Save         // optional: restore on boot (--load)
 	Title    string            // window title (default "Entieve")
 	SavePath string            // F5/F9 path (default: user config dir)
+	// DeviceScale is the display's DPI factor (0 = read the real monitor
+	// in Run). Tests pin it explicitly so the baseline suite runs hermetically
+	// at 1.0 no matter what display the suite runs on.
+	DeviceScale float64
 }
 
 // panelID identifies one toggleable interface window. The always-on
@@ -63,6 +71,7 @@ const (
 	pMap
 	pHelp
 	pLog
+	pSettings
 	pMenu
 	numPanels
 )
@@ -155,6 +164,13 @@ var panelDefs = [numPanels]panelDef{
 		want:   func(g *Game, docked bool) bool { return g.open[pLog] },
 		sync:   func(g *Game) { g.logP.Sync() },
 	},
+	pSettings: {
+		name:   "settings",
+		window: func(g *Game) *widget.Window { return g.sett.Win() },
+		open:   func(g *Game) *bool { return &g.open[pSettings] },
+		want:   func(g *Game, docked bool) bool { return g.open[pSettings] },
+		sync:   func(g *Game) { g.sett.Sync() },
+	},
 	pMenu: {
 		name:   "", // not persisted: the Esc menu is pushed as a scene
 		window: func(g *Game) *widget.Window { return g.menuWin },
@@ -196,6 +212,11 @@ type Game struct {
 	menuWin  *widget.Window
 	stationW *widget.Window
 	stName   *widget.Text
+
+	// The settings window (uikit/settings.go): UI scale stepper,
+	// fullscreen toggle, reset-layout. Like every panel it is rebuilt by
+	// buildKit, so its live state is re-read from g in Sync.
+	sett *uikit.Settings
 
 	// The station window's contract board (contracts.go): the body, the
 	// two row sections, the signature of the last rebuild and the
@@ -246,8 +267,16 @@ type Game struct {
 
 	scenes []Scene
 	space  *SpaceScene
-	w, h   int // logical screen size (Layout)
+	w, h   int // logical screen size (Layout), in device pixels
 	sized  bool
+
+	// Resolution independence: dev is the display's device scale factor
+	// (window px → device px, see Layout) and uiScale the persisted user
+	// setting; their product is what uikit.SetScale installs as the global
+	// UI scale, before the interface is built and again on every change.
+	dev        float64
+	uiScale    float64
+	fullscreen bool // persisted; applied in Run via ebiten.SetFullscreen
 }
 
 // New builds a game session from options.
@@ -279,9 +308,18 @@ func New(opts Options) (*Game, error) {
 		opts: opts,
 		s:    s,
 		ren:  render.New(opts.Content),
-		w:    defaultW,
-		h:    defaultH,
 	}
+	// Scale before anything is built: the device factor (pinned by tests,
+	// read from the display in Run) times the persisted user UI scale is
+	// the global uikit scale every metric and face below is built against.
+	g.dev = opts.DeviceScale
+	if g.dev <= 0 {
+		g.dev = 1
+	}
+	g.loadSettings() // <SavePath>.settings.json: ui_scale, fullscreen
+	uikit.SetScale(g.uiScale * g.dev)
+	g.w = int(math.Round(float64(defaultW) * g.dev))
+	g.h = int(math.Round(float64(defaultH) * g.dev))
 	// The log is open by default (it used to be non-closable chrome);
 	// the saved layout may override this once the first screen size
 	// lands (see applyLayout).
@@ -317,16 +355,49 @@ func (g *Game) Run() error {
 	if title == "" {
 		title = "Entieve"
 	}
+	// The display's device scale factor, read on the main thread before
+	// the main loop (Options.DeviceScale pins it for tests). If it moves
+	// the scale off what New built against (New runs at 1.0 unless
+	// pinned), rebuild the interface once, before the first Layout.
+	if g.opts.DeviceScale > 0 {
+		g.dev = g.opts.DeviceScale
+	} else {
+		// Documented pre-loop entry: DeviceScaleFactor must be called on
+		// the main thread before the main loop (deprecated in favor of
+		// Monitor().DeviceScaleFactor, which needs a window).
+		g.dev = ebiten.DeviceScaleFactor()
+	}
+	g.applyScale(false)
 	ebiten.SetWindowTitle(title)
+	// Window chrome is in WINDOW pixels: never multiply this by the UI or
+	// device scale (Layout converts the outside size separately).
 	ebiten.SetWindowSize(defaultW, defaultH)
 	ebiten.SetWindowResizable(true)
 	ebiten.SetVsyncEnabled(true)
+	ebiten.SetFullscreen(g.fullscreen)
 	return ebiten.RunGame(g)
 }
 
-// Layout returns the logical screen size (clamped to the layout minimum so
-// the HUD regions always fit) and (re)places the movable default window
+// deviceScale returns the display factor (1 for a Game built without one,
+// e.g. a struct-level test harness).
+func (g *Game) deviceScale() float64 {
+	if g.dev > 0 {
+		return g.dev
+	}
+	return 1
+}
+
+// Layout returns the screen size (clamped to the layout minimum in WINDOW
+// pixels first) in DEVICE pixels and (re)places the movable default window
 // positions whenever that size changes (virgin windows only).
+//
+// The outside size ebiten passes in is device-independent (window) pixels;
+// multiplying by the device scale factor makes the framebuffer match the
+// monitor, so text rasterizes at its final size — crisp on HiDPI instead
+// of rendered-small-and-upscaled by the OS. ebiten reports cursor
+// positions in these same Layout units, and every UI metric is scaled
+// into them (uikit.Px = uiScale × device), so grips, menu rows and
+// overUI rects all agree with the cursor by construction.
 func (g *Game) Layout(width, height int) (int, int) {
 	if width < minW {
 		width = minW
@@ -334,8 +405,10 @@ func (g *Game) Layout(width, height int) (int, int) {
 	if height < minH {
 		height = minH
 	}
-	g.applySize(width, height)
-	return width, height
+	w := int(math.Round(float64(width) * g.deviceScale()))
+	h := int(math.Round(float64(height) * g.deviceScale()))
+	g.applySize(w, h)
+	return w, h
 }
 
 // applySize records the screen size and — on every size change —
@@ -469,6 +542,8 @@ func (g *Game) handleKeys(in Input) error {
 				g.toggleMap()
 			case k == ebiten.KeyH:
 				g.toggleHelp()
+			case k == ebiten.KeyP:
+				g.open[pSettings] = !g.open[pSettings]
 			case k == ebiten.KeyI:
 				g.open[pInventory] = !g.open[pInventory]
 			case k == ebiten.KeyF:
@@ -756,6 +831,13 @@ func (g *Game) buildKit() error {
 	g.scan = uikit.NewScanner(env)
 	g.mp = uikit.NewMapView(env)
 	g.help = uikit.NewHelp(env, helpRows())
+	g.sett = uikit.NewSettings(env, uikit.SettingsActions{
+		UIScale:       func() float64 { return g.uiScale },
+		StepScale:     func(delta int) { g.stepUIScale(delta) },
+		Fullscreen:    func() bool { return g.fullscreen },
+		SetFullscreen: func(on bool) { g.setFullscreen(on) },
+		ResetLayout:   func() { g.resetLayout() },
+	})
 	g.menuWin = g.buildMenuWindow()
 	g.stationW = g.buildStationWindow()
 
@@ -775,7 +857,7 @@ func (g *Game) buildKit() error {
 	kit.AddContainer(g.rack.Container(), widget.AnchorLayoutData{
 		HorizontalPosition: widget.AnchorLayoutPositionEnd,
 		VerticalPosition:   widget.AnchorLayoutPositionEnd,
-		Padding:            &widget.Insets{Right: 10, Bottom: 10},
+		Padding:            &widget.Insets{Right: uikit.Px(10), Bottom: uikit.Px(10)},
 	})
 	// Rack tracks hover so input.UIHovered covers its padding too. The
 	// HUD container must not: it spans the whole screen. (The log window
@@ -816,25 +898,31 @@ func (g *Game) buildKit() error {
 // arrangement.
 func (g *Game) placeDefaults(w, h int) {
 	place := g.placeIfVirgin
+	// Design-unit margins composed through the scale funnel: at scale 1
+	// these are exactly the historical pixels (the layout tests pin them).
 	ov := g.kit.OverviewWindow()
 	if r := ov.GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		place(ov, image.Rect(8, 8, 8+r.Dx(), 8+r.Dy()))
+		m := uikit.Px(8)
+		place(ov, image.Rect(m, m, m+r.Dx(), m+r.Dy()))
 	}
 	sp := g.kit.SelectedWindow()
 	if r := sp.GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		place(sp, image.Rect(w-10-r.Dx(), 8, w-10, 8+r.Dy()))
+		m, edge := uikit.Px(8), w-uikit.Px(10)
+		place(sp, image.Rect(edge-r.Dx(), m, edge, m+r.Dy()))
 	}
 	// The log docks bottom-left: flush with the left/bottom margins, its
 	// default width fits the pocket left of the HUD bar (the 420 px bar
 	// starts at x=302 at the 1024 minimum) and its top clears the
 	// overview — so the default set stays pairwise disjoint.
 	if r := g.logP.Win().GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		place(g.logP.Win(), image.Rect(10, h-10-r.Dy(), 10+r.Dx(), h-10))
+		m := uikit.Px(10)
+		place(g.logP.Win(), image.Rect(m, h-m-r.Dy(), m+r.Dx(), h-m))
 	}
 	// Centre column, below the top row (Selected Item owns the top-right
 	// corner at 1024×700) and above the HUD bar.
 	if r := g.scan.Win().GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		place(g.scan.Win(), image.Rect(396, 276, 396+r.Dx(), 276+r.Dy()))
+		x, y := uikit.Px(396), uikit.Px(276)
+		place(g.scan.Win(), image.Rect(x, y, x+r.Dx(), y+r.Dy()))
 	}
 	center := func(win *widget.Window) {
 		r := win.GetContainer().GetWidget().Rect
@@ -850,9 +938,12 @@ func (g *Game) placeDefaults(w, h int) {
 	// floats centered like the other on-demand overlays — the player
 	// drags it where they want and the layout sidecar remembers.
 	center(g.fact.Win())
+	// The settings window floats with the other on-demand overlays too
+	// (reset-layout recomposes it here as well).
+	center(g.sett.Win())
 	if r := g.help.Win().GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		x := (w - r.Dx()) / 2
-		place(g.help.Win(), image.Rect(x, 24, x+r.Dx(), 24+r.Dy()))
+		x, y := (w-r.Dx())/2, uikit.Px(24)
+		place(g.help.Win(), image.Rect(x, y, x+r.Dx(), y+r.Dy()))
 	}
 	// The Show Info window floats: centered like the other on-demand
 	// overlays (its sidecar rect wins once the player has one, and it is

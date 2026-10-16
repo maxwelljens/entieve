@@ -14,6 +14,22 @@ import (
 // qtySteps are the trade quantity stepper's steps (1 / 10 / 100).
 var qtySteps = [...]int{1, 10, 100}
 
+// setStepperValue writes a stepper readout (market/inventory/factory qty)
+// and re-lays its row out. widget.Text.Label changes do NOT invalidate
+// layout, so without the relayout the readout keeps the box measured for
+// its previous value and a wider number draws under the + button
+// (Defect B: the readout must resize to fit its current value, so the
+// row re-measures it — the label's box grows and the buttons slide
+// right). The label carries the tabular contents face, so digit widths
+// stay stable while the value steps.
+func setStepperValue(bar *widget.Container, lbl *widget.Text, s string) {
+	if lbl.Label == s {
+		return
+	}
+	lbl.Label = s
+	bar.RequestRelayout()
+}
+
 // Market is the station market window: the docked station's order book as
 // rows — items ascending, asks (price ascending) above bids (price
 // descending) — over a quantity stepper and the Buy/Sell actions, which
@@ -27,6 +43,7 @@ type Market struct {
 
 	tbl      *Table
 	qtyLabel *widget.Text
+	qtyBar   *widget.Container // stepper row: relaid when the readout changes
 	title    *widget.Text
 	buy      *widget.Button
 	sell     *widget.Button
@@ -137,7 +154,7 @@ func NewMarket(env Env) *Market {
 	})
 
 	m.qtyLabel = widget.NewText(
-		widget.TextOpts.Text("Qty 1", env.Face(StepSmall), solid(p.Accent)),
+		widget.TextOpts.Text("Qty 1", env.FaceMono(StepSmall), solid(p.Accent)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 			Position: widget.RowLayoutPositionCenter,
 		})),
@@ -147,7 +164,7 @@ func NewMarket(env Env) *Market {
 		return widget.NewButton(
 			widget.ButtonOpts.TextLabel(label),
 			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(0, 40),
+				widget.WidgetOpts.MinSize(Px(40), Px(40)),
 				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 			),
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
@@ -158,13 +175,13 @@ func NewMarket(env Env) *Market {
 	m.buy = newBtn("Buy", m.buyClicked)
 	m.sell = newBtn("Sell", m.sellClicked)
 
-	toolbar := widget.NewContainer(
+	m.qtyBar = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(contentsPad),
+			widget.RowLayoutOpts.Spacing(Px(contentsPad)),
 		)),
 	)
-	toolbar.AddChild(m.minus, m.qtyLabel, m.plus, m.buy, m.sell)
+	m.qtyBar.AddChild(m.minus, m.qtyLabel, m.plus, m.buy, m.sell)
 
 	// Body: fixed toolbar row over the table row (the table's own
 	// preferred height must never grow the window).
@@ -173,11 +190,11 @@ func NewMarket(env Env) *Market {
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, true}),
-			widget.GridLayoutOpts.Spacing(0, contentsPad),
-			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+			widget.GridLayoutOpts.Spacing(0, Px(4)),
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(Px(contentsPad))),
 		)),
 	)
-	body.AddChild(toolbar)
+	body.AddChild(m.qtyBar)
 	body.AddChild(m.tbl.Container())
 
 	title, marketTitle := NewTitleBar(env, "Market", "svc_market")
@@ -185,13 +202,13 @@ func NewMarket(env Env) *Market {
 
 	m.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.TitleBar(title, titleBarH),
+		widget.WindowOpts.TitleBar(title, Px(titleBarH)),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.MinSize(300, 240), // content floor: mirrored in game/station_layout.go
+		widget.WindowOpts.MinSize(Px(300), Px(240)), // content floor: mirrored in game/station_layout.go
 		// Fallback only: the composed rect at the 1024×700 minimum.
 		// The game recomposes from the real viewport at startup
 		// (game/station_layout.go).
-		widget.WindowOpts.Location(image.Rect(396, 8, 1014, 248)),
+		widget.WindowOpts.Location(image.Rect(Px(396), Px(8), Px(1014), Px(248))),
 	)
 	return m
 }
@@ -280,7 +297,7 @@ func (m *Market) Sync() {
 		}
 	}
 
-	m.qtyLabel.Label = "Qty " + FormatInt(int64(m.qty()))
+	setStepperValue(m.qtyBar, m.qtyLabel, "Qty "+FormatInt(int64(m.qty())))
 	sys := m.env.Sim.System()
 	if sys != nil {
 		label := "Market — " + FormatCredits(m.env.Sim.Wallet())
@@ -307,7 +324,7 @@ func (m *Market) stepQty(delta int) {
 	if m.qtyIdx >= len(qtySteps) {
 		m.qtyIdx = len(qtySteps) - 1
 	}
-	m.qtyLabel.Label = "Qty " + FormatInt(int64(m.qty()))
+	setStepperValue(m.qtyBar, m.qtyLabel, "Qty "+FormatInt(int64(m.qty())))
 }
 
 // qty is the current trade quantity.

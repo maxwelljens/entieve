@@ -82,7 +82,10 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 		Sim:     s,
 		enqueue: enqueue,
 		palette: DefaultPalette(),
-		scale:   DefaultTypeScale(),
+		// Scaled once here: every face, line height and metric derived
+		// from k.scale follows the current UI scale (rebuild the kit to
+		// change it — see game.applyUIScale).
+		scale: scaleTypeScale(DefaultTypeScale()),
 	}
 	k.faces = newFaces(k.scale)
 	k.theme = NewTheme(k.palette, k.scale)

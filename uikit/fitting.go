@@ -114,7 +114,7 @@ func NewFitting(env Env) *Fitting {
 		return widget.NewButton(
 			widget.ButtonOpts.TextLabel(label),
 			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(0, 40),
+				widget.WidgetOpts.MinSize(0, Px(40)),
 				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 			),
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
@@ -126,7 +126,7 @@ func NewFitting(env Env) *Fitting {
 	buttons := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(contentsPad),
+			widget.RowLayoutOpts.Spacing(Px(contentsPad)),
 		)),
 	)
 	buttons.AddChild(f.unfit, f.fitMod, f.assemble)
@@ -144,8 +144,8 @@ func NewFitting(env Env) *Fitting {
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, false, false, true, false, true, false}),
-			widget.GridLayoutOpts.Spacing(0, 4),
-			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+			widget.GridLayoutOpts.Spacing(0, Px(4)),
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(Px(contentsPad))),
 		)),
 	)
 	body.AddChild(
@@ -161,15 +161,15 @@ func NewFitting(env Env) *Fitting {
 
 	f.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.TitleBar(title, titleBarH),
+		widget.WindowOpts.TitleBar(title, Px(titleBarH)),
 		widget.WindowOpts.Draggable(),
 		// Content floor: stat block, resist row and a full row of the
 		// slot and hangar tables (they scroll below that).
-		widget.WindowOpts.MinSize(300, 430),
+		widget.WindowOpts.MinSize(Px(300), Px(430)),
 		// Fallback only: the composed rect at the 1024×700 minimum.
 		// The game recomposes from the real viewport at startup
 		// (game/station_layout.go).
-		widget.WindowOpts.Location(image.Rect(709, 256, 1014, 690)),
+		widget.WindowOpts.Location(image.Rect(Px(709), Px(256), Px(1014), Px(690))),
 	)
 	return f
 }

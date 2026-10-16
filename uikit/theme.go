@@ -122,8 +122,11 @@ func solid(c color.RGBA) color.NRGBA { return nrgba(c, c.A) }
 
 func ns(c color.NRGBA) *eimage.NineSlice { return eimage.NewNineSliceColor(c) }
 
+// bordered builds a bordered nineslice with the border width scaled: a
+// 1 design-unit hairline is 1 DIP, so it must thicken with the rest of
+// the interface (at 2× it is 2 device px = 1 DIP, still a hairline).
 func bordered(body, edge color.NRGBA, w int) *eimage.NineSlice {
-	return eimage.NewBorderedNineSliceColor(body, edge, w)
+	return eimage.NewBorderedNineSliceColor(body, edge, Px(w))
 }
 
 // NewTheme builds a complete ebitenui widget theme for the EVE-dark look.
@@ -161,7 +164,7 @@ func NewTheme(p Palette, ts TypeScale) *widget.Theme {
 			Image:        buttonImage,
 			TextColor:    buttonText,
 			TextFace:     facePtr(f.smallBold), // buttons are emphasis text
-			TextPadding:  &widget.Insets{Left: 8, Right: 8, Top: 4, Bottom: 4},
+			TextPadding:  &widget.Insets{Left: Px(8), Right: Px(8), Top: Px(4), Bottom: Px(4)},
 			TextPosition: &widget.TextPositioning{HTextPosition: widget.TextPositionCenter, VTextPosition: widget.TextPositionCenter},
 		},
 
@@ -194,7 +197,7 @@ func NewTheme(p Palette, ts TypeScale) *widget.Theme {
 		},
 
 		ProgressBarTheme: &widget.ProgressBarParams{
-			TrackPadding: widget.NewInsetsSimple(2),
+			TrackPadding: widget.NewInsetsSimple(Px(2)),
 			TrackImage: &widget.ProgressBarImage{
 				Idle:     bordered(solid(p.Cell), nrgba(p.Border, 160), 1),
 				Hover:    bordered(solid(p.Cell), nrgba(p.Accent, 160), 1),
@@ -215,15 +218,15 @@ func NewTheme(p Palette, ts TypeScale) *widget.Theme {
 				TextColor: buttonText,
 				TextFace:  facePtr(f.smallBold),
 				TextPadding: &widget.Insets{
-					Left: 10, Right: 10, Top: 4, Bottom: 4,
+					Left: Px(10), Right: Px(10), Top: Px(4), Bottom: Px(4),
 				},
 				TextPosition: &widget.TextPositioning{
 					HTextPosition: widget.TextPositionCenter,
 					VTextPosition: widget.TextPositionCenter,
 				},
-				MinSize: &img.Point{X: 98, Y: 40},
+				MinSize: &img.Point{X: Px(98), Y: Px(40)},
 			},
-			TabSpacing: constantutil.ConstantToPointer(1),
+			TabSpacing: constantutil.ConstantToPointer(Px(1)),
 		},
 
 		TabTheme: &widget.TabParams{
@@ -242,14 +245,14 @@ func NewTheme(p Palette, ts TypeScale) *widget.Theme {
 				Caret:         solid(p.Accent),
 				DisabledCaret: nrgba(p.Dim, 160),
 			},
-			Padding: widget.NewInsetsSimple(5),
+			Padding: widget.NewInsetsSimple(Px(5)),
 		},
 
 		TextAreaTheme: &widget.TextAreaParams{
 			Face:                   facePtr(f.base),
 			ForegroundColor:        solid(p.Text),
-			TextPadding:            &widget.Insets{Right: 6},
-			ScrollContainerPadding: widget.NewInsetsSimple(4),
+			TextPadding:            &widget.Insets{Right: Px(6)},
+			ScrollContainerPadding: widget.NewInsetsSimple(Px(4)),
 			ScrollContainerImage:   scrollImage,
 			Slider:                 slider,
 		},
@@ -259,7 +262,7 @@ func NewTheme(p Palette, ts TypeScale) *widget.Theme {
 		ListComboButtonTheme: &widget.ListComboButtonParams{
 			List:             newListParams(p, f),
 			Button:           newButtonParams(p, f),
-			MaxContentHeight: constantutil.ConstantToPointer(200),
+			MaxContentHeight: constantutil.ConstantToPointer(Px(200)),
 		},
 	}
 	return th
@@ -282,7 +285,7 @@ func newButtonParams(p Palette, f kitFaces) *widget.ButtonParams {
 			Disabled: nrgba(p.Dim, 160),
 		},
 		TextFace:     facePtr(f.smallBold),
-		TextPadding:  &widget.Insets{Left: 8, Right: 8, Top: 4, Bottom: 4},
+		TextPadding:  &widget.Insets{Left: Px(8), Right: Px(8), Top: Px(4), Bottom: Px(4)},
 		TextPosition: &widget.TextPositioning{HTextPosition: widget.TextPositionCenter, VTextPosition: widget.TextPositionCenter},
 	}
 }
@@ -293,7 +296,7 @@ func newButtonParams(p Palette, f kitFaces) *widget.ButtonParams {
 func newListParams(p Palette, f kitFaces) *widget.ListParams {
 	return &widget.ListParams{
 		EntryFace:                   facePtr(f.small),
-		EntryTextPadding:            widget.NewInsetsSimple(5),
+		EntryTextPadding:            widget.NewInsetsSimple(Px(5)),
 		EntryTextHorizontalPosition: constantutil.ConstantToPointer(widget.TextPositionStart),
 		EntryTextVerticalPosition:   constantutil.ConstantToPointer(widget.TextPositionCenter),
 		EntryColor: &widget.ListEntryColor{
@@ -338,9 +341,10 @@ func newSliderParams(p Palette) *widget.SliderParams {
 		// edge of any window whose scrollbar sat at its end (the log's tail
 		// leaked 80 px past the frame that way). Pin both to the same value
 		// so size and position math agree; 16 matches what has always been
-		// rendered (the floor already won), so pixels do not change.
-		FixedHandleSize: constantutil.ConstantToPointer(16),
-		MinHandleSize:   constantutil.ConstantToPointer(16),
+		// rendered (the floor already won), so pixels do not change. The
+		// handle is a visible length: it scales with the UI (Px).
+		FixedHandleSize: constantutil.ConstantToPointer(Px(16)),
+		MinHandleSize:   constantutil.ConstantToPointer(Px(16)),
 		TrackOffset:     constantutil.ConstantToPointer(0),
 		PageSizeFunc:    func() int { return 1 },
 		TrackImage: &widget.SliderTrackImage{

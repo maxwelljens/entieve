@@ -1,6 +1,10 @@
 package game
 
-import "image"
+import (
+	"image"
+
+	"github.com/entieve/entieve/uikit"
+)
 
 // Docked service-window composition (docs/GAMEPLAY.md, "Docked at a
 // station").
@@ -72,23 +76,28 @@ type dockedLayout struct {
 func stationLayout(w, h, stationH int) dockedLayout {
 	// Bounding box of the service area: right of the station column,
 	// inside the top/side/bottom margins.
-	x0 := stationX + stationWinW + 2 // 406: station column + gutter
-	y0 := stationY                   // 8
-	x1 := w - 10
-	y1 := h - 10
+	// Design constants × the current scale (once per quantity): the
+	// viewport (w, h) already arrives in live px.
+	x0 := uikit.Px(stationX + stationWinW + 2) // 406: station column + gutter
+	y0 := uikit.Px(stationY)                   // 8
+	x1 := w - uikit.Px(10)
+	y1 := h - uikit.Px(10)
 
 	// The market takes the top band: a third of the free height, clamped
 	// between its own minimum and whatever leaves the bottom row its
 	// content minimum. The bottom row (inventory | fitting) gets the
 	// rest, so it can never come back below max(inventory, fitting).
-	avail := (y1 - y0) - dockGutter
-	bottomMin := max(inventoryMinH, fittingMinH)
-	mktH := clampInt(avail/3, marketMinH, max(marketMinH, avail-bottomMin))
+	avail := (y1 - y0) - uikit.Px(dockGutter)
+	// The floors mirror the uikit windows' own uikit.Px(min) MinSizes, so
+	// they scale the same way or the clamp would fight the window system.
+	bottomMin := max(uikit.Px(inventoryMinH), uikit.Px(fittingMinH))
+	mktH := clampInt(avail/3, uikit.Px(marketMinH), max(uikit.Px(marketMinH), avail-bottomMin))
 
-	by := y0 + mktH + dockGutter
-	invW := ((x1 - x0) - dockGutter) / 2
+	by := y0 + mktH + uikit.Px(dockGutter)
+	invW := ((x1 - x0) - uikit.Px(dockGutter)) / 2
 	return dockedLayout{
-		Station:   image.Rect(stationX, stationY, stationX+stationWinW, stationY+max(stationH, stationMinH)),
+		Station: image.Rect(uikit.Px(stationX), uikit.Px(stationY),
+			uikit.Px(stationX+stationWinW), uikit.Px(stationY)+max(stationH, uikit.Px(stationMinH))),
 		Market:    image.Rect(x0, y0, x1, y0+mktH),
 		Inventory: image.Rect(x0, by, x0+invW, y1),
 		Fitting:   image.Rect(x0+invW+dockGutter, by, x1, y1),

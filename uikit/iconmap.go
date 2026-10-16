@@ -107,14 +107,16 @@ func ContractIcon(kind string) string {
 // Graphic.PreferredSize reports 50×50 unless Image is set — the layout must
 // see the real box size.
 func NewIcon(name string, size int, tint color.RGBA) *widget.Graphic {
-	return widget.NewGraphic(widget.GraphicOpts.Image(icons.Get(name, size, tint)))
+	return widget.NewGraphic(widget.GraphicOpts.Image(icons.Get(name, Px(size), tint)))
 }
 
 // newIconBox builds a hidden icon graphic of the given box size; Set shows
-// and points it at an icon.
+// and points it at an icon. size is a DESIGN unit (IconInline/…): the box
+// drawn scales with the UI, and the table's width reserves use the same
+// Px(size), so the cell math and the box agree at every scale.
 func newIconBox(size int) *iconBox {
 	g := widget.NewGraphic(
-		widget.GraphicOpts.Image(icons.Get(icons.Fallback, size, color.RGBA{})),
+		widget.GraphicOpts.Image(icons.Get(icons.Fallback, Px(size), color.RGBA{})),
 		widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 			Position: widget.RowLayoutPositionCenter,
 		})),
@@ -146,7 +148,7 @@ func (b *iconBox) Set(name string, tint color.RGBA) {
 	}
 	b.name, b.tint = name, tint
 	if name != "" {
-		b.g.Image = icons.Get(name, b.size, tint)
+		b.g.Image = icons.Get(name, Px(b.size), tint)
 	}
 	showWidget(b.g.GetWidget(), vis == widget.Visibility_Show)
 }
@@ -175,7 +177,7 @@ func NewTitleBar(env Env, label, icon string) (*widget.Container, *widget.Text) 
 		g.GetWidget().LayoutData = widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(contentsPad),
+			Padding:            widget.NewInsetsSimple(Px(contentsPad)),
 		}
 		title.AddChild(g)
 		titlePad = contentsPad + IconTitle + IconGap
@@ -185,7 +187,7 @@ func NewTitleBar(env Env, label, icon string) (*widget.Container, *widget.Text) 
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(titlePad),
+			Padding:            widget.NewInsetsSimple(Px(titlePad)),
 		})),
 	)
 	title.AddChild(txt)

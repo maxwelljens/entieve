@@ -43,6 +43,7 @@ in-game help window renders.
 | `B` | Toggle factory window (manufacture while docked) |
 | `N` | Toggle starmap |
 | `H` | Toggle help window |
+| `P` | Toggle settings (UI scale, fullscreen, window layout) |
 | `Esc` | Menu: Resume / Save / Load / Quit |
 | `[` or `-` | Time acceleration down (8 → 4 → 2 → 1×) |
 | `]` or `=` | Time acceleration up (1 → 2 → 4 → 8×) |
@@ -85,7 +86,13 @@ its minimum size), and click anywhere on a window to raise it to the
 front.
 
 Toggle keys open and close their window (`I`, `F`, `G`, `B`, `C`, `N`, `H`,
-`Shift+L`) — windows have no separate close button. Icons (from
+`P`, `Shift+L`) — windows have no separate close button. The **Settings**
+window (`P`) holds the **UI scale** stepper (0.75× – 2.5×, applied live —
+every window, control and font rescales and keeps its arrangement), a
+**fullscreen** toggle and **Reset window layout**; the scale and the
+fullscreen flag persist next to the save in `<save>.settings.json`, and
+the window arrangement itself persists in design units, so one saved
+layout works at every scale. Icons (from
 [game-icons.net](https://game-icons.net), credited per-icon in
 `uikit/icons/CREDITS.md`) mark service titles, action buttons, overview
 kinds and contract types — monochrome glyphs tinted to the theme, and

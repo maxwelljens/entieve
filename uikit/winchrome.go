@@ -30,7 +30,10 @@ import (
 // grip never swallows the press: a click without a drag is a no-op here,
 // so clicking a table row inside the band still selects the row.
 
-// edgeGripPx is the grip band width per edge; a corner engages both axes.
+// edgeGripPx is the grip band width per edge in DESIGN units (scaled by
+// Px where the band is measured — the cursor runs in the same Layout
+// units every other metric is scaled into, so grips stay consistent);
+// a corner engages both axes.
 const edgeGripPx = 8
 
 // edgeMask is a bit set of window edges.
@@ -124,7 +127,7 @@ func (c *winChrome) gripStart(p image.Point) edgeMask {
 	if !wgt.IsVisible() {
 		return 0
 	}
-	e := edgesAt(p, wgt.Rect, edgeGripPx)
+	e := edgesAt(p, wgt.Rect, Px(edgeGripPx))
 	if e == 0 {
 		return 0
 	}

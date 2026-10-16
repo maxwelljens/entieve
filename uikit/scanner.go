@@ -84,7 +84,7 @@ func NewScanner(env Env) *Scanner {
 
 	s.bar = widget.NewProgressBar(
 		widget.ProgressBarOpts.Values(0, scanMax, 0),
-		widget.ProgressBarOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, 18),
+		widget.ProgressBarOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, Px(18)),
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
 
@@ -93,7 +93,7 @@ func NewScanner(env Env) *Scanner {
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 		)),
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, scanMaxLines*23)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, Px(scanMaxLines*23))),
 	)
 	for i := range s.labels {
 		lbl := widget.NewText(widget.TextOpts.Text("", env.Face(StepSmall), solid(p.Text)))
@@ -104,7 +104,7 @@ func NewScanner(env Env) *Scanner {
 		row := widget.NewContainer(
 			widget.ContainerOpts.Layout(widget.NewRowLayout(
 				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(IconGap),
+				widget.RowLayoutOpts.Spacing(Px(IconGap)),
 			)),
 		)
 		showWidget(row.GetWidget(), false)
@@ -117,8 +117,8 @@ func NewScanner(env Env) *Scanner {
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(contentsPad),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(contentsPad)),
+			widget.RowLayoutOpts.Spacing(Px(contentsPad)),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(Px(contentsPad))),
 		)),
 	)
 	body.AddChild(status, s.bar, s.empty)
@@ -128,10 +128,10 @@ func NewScanner(env Env) *Scanner {
 
 	s.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.TitleBar(title, titleBarH),
+		widget.WindowOpts.TitleBar(title, Px(titleBarH)),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.MinSize(260, titleBarH+scanBodyH),
-		widget.WindowOpts.Location(image.Rect(10, 251, 10+scanW, 251+titleBarH+scanBodyH)),
+		widget.WindowOpts.MinSize(Px(260), Px(titleBarH+scanBodyH)),
+		widget.WindowOpts.Location(image.Rect(Px(10), Px(251), Px(10+scanW), Px(251+titleBarH+scanBodyH))),
 	)
 	return s
 }

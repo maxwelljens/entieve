@@ -74,7 +74,7 @@ func (k *Kit) buildSelected() {
 	nameRow := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(IconGap),
+			widget.RowLayoutOpts.Spacing(Px(IconGap)),
 		)),
 	)
 	nameRow.AddChild(sp.kindIcon.Widget(), sp.name)
@@ -86,14 +86,14 @@ func (k *Kit) buildSelected() {
 	newBtn := func(label, icon string, clicked func(*widget.ButtonClickedEventArgs)) *widget.Button {
 		opts := []widget.ButtonOpt{
 			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(0, 40),
+				widget.WidgetOpts.MinSize(0, Px(40)),
 			),
 			widget.ButtonOpts.ClickedHandler(clicked),
 		}
 		if icon != "" {
 			opts = append(opts, widget.ButtonOpts.TextAndImage(label, nil, &widget.GraphicImage{
-				Idle:     icons.Get(icon, IconButton, p.Text),
-				Disabled: icons.Get(icon, IconButton, iconColor(p.Dim, IconDisabledA)),
+				Idle:     icons.Get(icon, Px(IconButton), p.Text),
+				Disabled: icons.Get(icon, Px(IconButton), iconColor(p.Dim, IconDisabledA)),
 			}, nil))
 		} else {
 			opts = append(opts, widget.ButtonOpts.TextLabel(label))
@@ -148,19 +148,19 @@ func (k *Kit) buildSelected() {
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(contentsPad),
+			Padding:            widget.NewInsetsSimple(Px(contentsPad)),
 		})),
 	))
 
 	sp.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.TitleBar(title, titleBarH),
+		widget.WindowOpts.TitleBar(title, Px(titleBarH)),
 		widget.WindowOpts.Draggable(),
 		// The two action rows must hold icon + label whole: five
 		// TextAndImage buttons measure 447 px on the type grid, so the
 		// content floor (mirrored by the default rect below) is 450.
-		widget.WindowOpts.MinSize(450, 240),
-		widget.WindowOpts.Location(image.Rect(8, 436, 458, 696)),
+		widget.WindowOpts.MinSize(Px(450), Px(240)),
+		widget.WindowOpts.Location(image.Rect(Px(8), Px(436), Px(458), Px(696))),
 	)
 }
 
@@ -285,7 +285,9 @@ type selectedLayouter struct {
 
 // inventory measures the children into selectedLayout's input.
 func (l *selectedLayouter) inventory(children []widget.PreferredSizeLocateableWidget) selectedInventory {
-	inv := selectedInventory{gap: contentsPad}
+	// gap holds SCALED px (Px once here): splitBand and the row math all
+	// read this field, so they must not scale it again.
+	inv := selectedInventory{gap: Px(contentsPad)}
 	if len(children) > 0 {
 		_, inv.nameH = children[0].PreferredSize()
 	}
@@ -325,7 +327,7 @@ func (l *selectedLayouter) PreferredSize(children []widget.PreferredSizeLocateab
 // Layout implements widget.Layouter: selectedLayout's rects are in child
 // order, so each child takes its own.
 func (l *selectedLayouter) Layout(children []widget.PreferredSizeLocateableWidget, rect image.Rectangle) {
-	rects := selectedLayout(rect.Inset(contentsPad), l.inventory(children))
+	rects := selectedLayout(rect.Inset(Px(contentsPad)), l.inventory(children))
 	for i, r := range rects {
 		if i >= len(children) {
 			return

@@ -194,11 +194,13 @@ func (m *Menu) at(pt image.Point) (int, bool) {
 func (m *Menu) layout(at image.Point) {
 	face := m.env.Face(StepSmall)
 	bold := m.env.FaceBold(StepSmall)
-	rowH := tipLineH(face) + 2*menuRowPadY
-	if b := tipLineH(bold) + 2*menuRowPadY; b > rowH {
+	rowPadX, rowPadY := Px(menuRowPadX), Px(menuRowPadY)
+	padY := Px(menuPadY)
+	rowH := tipLineH(face) + 2*rowPadY
+	if b := tipLineH(bold) + 2*rowPadY; b > rowH {
 		rowH = b
 	}
-	width := menuMinW
+	width := Px(menuMinW)
 	for _, e := range m.entries {
 		if e.Sep || e.Label == "" {
 			continue
@@ -207,23 +209,23 @@ func (m *Menu) layout(at image.Point) {
 		if e.Bold {
 			f = bold
 		}
-		if w := int(tipMeasure(e.Label, f)) + 2*menuRowPadX; w > width {
+		if w := int(tipMeasure(e.Label, f)) + 2*rowPadX; w > width {
 			width = w
 		}
 	}
 	// Rows tile the popup from the top padding down; the bottom padding
 	// follows the last band.
-	y := menuPadY
+	y := padY
 	m.rows = make([]menuRow, 0, len(m.entries))
 	for i, e := range m.entries {
 		h := rowH
 		if e.Sep {
-			h = menuSepH
+			h = Px(menuSepH)
 		}
 		m.rows = append(m.rows, menuRow{entry: i, rect: image.Rect(0, y, width, y+h)})
 		y += h
 	}
-	height := y + menuPadY
+	height := y + padY
 	// Clamp: a popup opened past an edge slides back inside the screen
 	// (no-op mid-screen — the same rule the tooltip placement uses).
 	px, py := at.X, at.Y
@@ -248,15 +250,17 @@ func (m *Menu) Draw(dst *ebiten.Image) {
 	m.screen = dst.Bounds()
 	p := m.env.Pal
 	fillRect(dst, m.rect, solid(p.BGHard))
+	// The popup's hairline border scales with the rest of the chrome.
+	bs := float32(Scale())
 	vector.StrokeRect(dst,
-		float32(m.rect.Min.X)+0.5, float32(m.rect.Min.Y)+0.5,
-		float32(m.rect.Dx())-1, float32(m.rect.Dy())-1,
-		1, nrgba(p.Border, 220), true)
+		float32(m.rect.Min.X)+bs/2, float32(m.rect.Min.Y)+bs/2,
+		float32(m.rect.Dx())-bs, float32(m.rect.Dy())-bs,
+		bs, nrgba(p.Border, 220), true)
 	for _, r := range m.rows {
 		e := m.entries[r.entry]
 		if e.Sep {
 			y := (r.rect.Min.Y + r.rect.Max.Y) / 2
-			fillRect(dst, image.Rect(r.rect.Min.X+menuPadX, y, r.rect.Max.X-menuPadX, y+1),
+			fillRect(dst, image.Rect(r.rect.Min.X+Px(menuPadX), y, r.rect.Max.X-Px(menuPadX), y+Px(1)),
 				nrgba(p.Border, 160))
 			continue
 		}
@@ -270,7 +274,7 @@ func (m *Menu) Draw(dst *ebiten.Image) {
 		if e.Disabled {
 			col = nrgba(p.Dim, 150)
 		}
-		drawCardText(dst, e.Label, face, r.rect.Min.X+menuRowPadX, r.rect.Min.Y+menuRowPadY, col)
+		drawCardText(dst, e.Label, face, r.rect.Min.X+Px(menuRowPadX), r.rect.Min.Y+Px(menuRowPadY), col)
 	}
 }
 

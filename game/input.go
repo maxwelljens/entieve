@@ -49,6 +49,7 @@ var KeyMap = []Binding{
 	{Key: ebiten.KeyB, Action: "factory", Desc: "B — toggle factory window (manufacture while docked)"},
 	{Key: ebiten.KeyN, Action: "starmap", Desc: "N — toggle starmap"},
 	{Key: ebiten.KeyH, Action: "help", Desc: "H — toggle help"},
+	{Key: ebiten.KeyP, Action: "settings", Desc: "P — toggle settings (UI scale, fullscreen, layout)"},
 	{Key: ebiten.KeyEscape, Action: "menu", Desc: "Esc — menu (Resume / Save / Load / Quit)"},
 	{Key: ebiten.KeyBracketLeft, Action: "time-slower", Desc: "[ — time acceleration down"},
 	{Key: ebiten.KeyMinus, Action: "time-slower", Desc: "- — time acceleration down"},
