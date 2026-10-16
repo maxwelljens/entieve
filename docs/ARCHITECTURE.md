@@ -681,11 +681,11 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > `CmdWarpTo` refuses a target closer than that *at command time*
 > (command-refusal pattern, `SevWarning` "Target within warp minimum range
 > (150 km)"), and the Selected Item Warp action gates on the same
-> constant with a hover hint. (2) The interface typeface is **Turret Road**
+> constant with a hover hint. (2) The interface typeface is **IBM Plex Sans**
 > (`render/fonts/*.ttf` + `OFL.txt`, SIL OFL 1.1, `//go:embed` in
-> `render/fonts.go`): Regular for body text, Bold via `render.FaceBold` /
+> `render/fonts.go`): Regular for body text, Medium via `render.FaceBold` /
 > `uikit.Env.FaceBold` for titles, table header sort buttons, buttons and
-> HUD readouts; `goregular` no longer appears in `render`. Turret Road has
+> HUD readouts; `goregular` no longer appears in `render`. IBM Plex Sans has
 > no U+25B2/U+25BC glyphs, so table sort indicators are ↑/↓.
 
 > **Resolution independence (2026-10).** The UI scale is

@@ -537,7 +537,7 @@ var (
 )
 
 // signed renders v with an explicit sign — "+60.0" / "−45.0" (U+2212, the
-// minus Turret Road ships).
+// minus IBM Plex Sans ships).
 func signed(v float64, prec int) string {
 	if v < 0 {
 		return "−" + groupFloat(-v, prec)

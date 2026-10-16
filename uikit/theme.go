@@ -77,9 +77,11 @@ type TypeScale struct {
 	Base, Small, Large, Tiny float64
 }
 
-// DefaultTypeScale returns the current game type scale (21 px base).
+// DefaultTypeScale returns the current game type scale (20 px base —
+// one pixel under the 21 px IBM Plex Sans base: IBM Plex Sans sets ~19 %
+// taller at the same size, so the base gave a pixel back).
 func DefaultTypeScale() TypeScale {
-	const base = 21.0
+	const base = 20.0
 	return TypeScale{
 		Base:  base,
 		Small: 0.8 * base,
@@ -88,7 +90,7 @@ func DefaultTypeScale() TypeScale {
 	}
 }
 
-// kitFaces holds the shared Turret Road faces (render.Face/FaceBold
+// kitFaces holds the shared IBM Plex Sans faces (render.Face/FaceBold
 // cache them), boxed as text.Face for direct use with text.Measure and
 // ebitenui widgets: the regular weight is body text, Bold is the
 // emphasis weight (titles, headers, buttons, HUD readouts).

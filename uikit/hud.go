@@ -28,19 +28,21 @@ const (
 	hudBarMin   = 140  // capacitor bar minimum width (px)
 	hudBoxPool  = 7    // target-box slots (hulls top out at 4 locks)
 	hudBoxW     = 132  // one target box width (px)
-	hudBoxH     = 78   // one target box height (px, fixed)
+	hudBoxH     = 83   // one target box height (px, fixed)
 	hudBoxGap   = 5    // gap between target boxes
 )
 
 // Target-card layout constants. The card (hudBoxW × hudBoxH) insets by
 // hudBoxPad; the body then stacks the name line, the distance line, a
 // lock-progress strip and the three layer bars. At the default size the
-// numbers tile exactly: body 70 = name 19 + gap 2 + dist 16 + gap 1 +
-// lock 2 + gap 2 + bars 28, and 28 = 3 × bar 8 + 2 × bar gap 2.
+// numbers tile exactly: body 75 = name 21 + gap 2 + dist 19 + gap 1 +
+// lock 2 + gap 2 + bars 28, and 28 = 3 × bar 8 + 2 × bar gap 2. The two
+// line heights fit IBM Plex Sans line boxes (1.30 em: 20.8 at StepSmall,
+// 18.2 at StepTiny).
 const (
 	hudBoxPad      = 4  // card padding around the body (px)
-	hudBoxTextH    = 19 // name line height (px, fits StepSmall)
-	hudBoxDistH    = 16 // distance line height (px, fits StepTiny)
+	hudBoxTextH    = 21 // name line height (px, fits StepSmall)
+	hudBoxDistH    = 19 // distance line height (px, fits StepTiny)
 	hudBoxDistGap  = 2  // gap between name and distance lines (px)
 	hudBoxLockH    = 2  // lock-progress strip height (px)
 	hudBoxLockGap  = 1  // gap between distance line and lock strip (px)

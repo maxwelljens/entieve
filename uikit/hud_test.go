@@ -403,33 +403,33 @@ func TestHudDrawSmoke(t *testing.T) {
 // asserts the three layer bars tile the bars region with no gaps and no
 // overlaps.
 func TestTargetCardGeometry(t *testing.T) {
-	card := image.Rect(0, 0, hudBoxW, hudBoxH) // 132×78
-	if got := targetCardBody(card); got != image.Rect(4, 4, 128, 74) {
-		t.Errorf("body = %v, want (4,4)-(128,74)", got)
+	card := image.Rect(0, 0, hudBoxW, hudBoxH) // 132×83
+	if got := targetCardBody(card); got != image.Rect(4, 4, 128, 79) {
+		t.Errorf("body = %v, want (4,4)-(128,79)", got)
 	}
-	if got := targetCardText(card); got != image.Rect(4, 4, 128, 23) {
-		t.Errorf("name line = %v, want (4,4)-(128,23)", got)
+	if got := targetCardText(card); got != image.Rect(4, 4, 128, 25) {
+		t.Errorf("name line = %v, want (4,4)-(128,25)", got)
 	}
-	if got := targetCardDist(card); got != image.Rect(4, 25, 128, 41) {
-		t.Errorf("distance line = %v, want (4,25)-(128,41)", got)
+	if got := targetCardDist(card); got != image.Rect(4, 27, 128, 46) {
+		t.Errorf("distance line = %v, want (4,27)-(128,46)", got)
 	}
-	if got := targetCardLock(card); got != image.Rect(4, 42, 128, 44) {
-		t.Errorf("lock strip = %v, want (4,42)-(128,44)", got)
+	if got := targetCardLock(card); got != image.Rect(4, 47, 128, 49) {
+		t.Errorf("lock strip = %v, want (4,47)-(128,49)", got)
 	}
 	bars := targetCardBars(card)
-	if bars != image.Rect(4, 46, 128, 74) {
-		t.Fatalf("bars region = %v, want (4,46)-(128,74)", bars)
+	if bars != image.Rect(4, 51, 128, 79) {
+		t.Fatalf("bars region = %v, want (4,51)-(128,79)", bars)
 	}
 
 	// The kind glyph box leads the name line: 16 px, centred in the line,
 	// and the name text starts clear of it.
 	ic := targetCardIcon(card)
-	if ic != image.Rect(4, 5, 20, 21) {
-		t.Errorf("icon box = %v, want (4,5)-(20,21)", ic)
+	if ic != image.Rect(4, 6, 20, 22) {
+		t.Errorf("icon box = %v, want (4,6)-(20,22)", ic)
 	}
 	name := targetCardName(card)
-	if name != image.Rect(24, 4, 128, 23) {
-		t.Errorf("name region = %v, want (24,4)-(128,23)", name)
+	if name != image.Rect(24, 4, 128, 25) {
+		t.Errorf("name region = %v, want (24,4)-(128,25)", name)
 	}
 	if ic.Overlaps(name) {
 		t.Errorf("icon %v overlaps the name region %v", ic, name)
@@ -440,9 +440,9 @@ func TestTargetCardGeometry(t *testing.T) {
 
 	got := layerBars(bars)
 	want := [3]image.Rectangle{
-		image.Rect(4, 46, 128, 54),
-		image.Rect(4, 56, 128, 64),
-		image.Rect(4, 66, 128, 74),
+		image.Rect(4, 51, 128, 59),
+		image.Rect(4, 61, 128, 69),
+		image.Rect(4, 71, 128, 79),
 	}
 	for i := range want {
 		if got[i] != want[i] {

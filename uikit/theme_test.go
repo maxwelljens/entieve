@@ -46,7 +46,7 @@ func hexByte(v uint32) string {
 	return string([]byte{digits[(v>>4)&0xf], digits[v&0xf]})
 }
 
-// TestTypeScaleGolden pins the type scale (21px base with 0.8/1.3/0.7 steps).
+// TestTypeScaleGolden pins the type scale (20px base with 0.8/1.3/0.7 steps).
 func TestTypeScaleGolden(t *testing.T) {
 	ts := DefaultTypeScale()
 	for _, c := range []struct {
@@ -54,8 +54,8 @@ func TestTypeScaleGolden(t *testing.T) {
 		got  float64
 		want float64
 	}{
-		{"Base", ts.Base, 21}, {"Small", ts.Small, 21 * 0.8},
-		{"Large", ts.Large, 21 * 1.3}, {"Tiny", ts.Tiny, 21 * 0.7},
+		{"Base", ts.Base, 20}, {"Small", ts.Small, 20 * 0.8},
+		{"Large", ts.Large, 20 * 1.3}, {"Tiny", ts.Tiny, 20 * 0.7},
 	} {
 		if math.Abs(c.got-c.want) > 1e-9 {
 			t.Errorf("%s = %v, want %v", c.name, c.got, c.want)

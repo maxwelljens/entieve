@@ -75,7 +75,7 @@ func TestTableContentsFace(t *testing.T) {
 
 // TestInventoryAndMarketRowsUseMonoFace pins the wiring: the inventory
 // window's three hold tables and the market window's order book draw
-// their rows in the mono contents face (Source Code Pro), so every
+// their rows in the mono contents face (IBM Plex Mono), so every
 // name, quantity and price lines up column-wise.
 func TestInventoryAndMarketRowsUseMonoFace(t *testing.T) {
 	env, _ := newTestEnv(t)

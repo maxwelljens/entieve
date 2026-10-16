@@ -141,7 +141,7 @@ func (e Env) FaceBold(step string) *text.Face {
 	}
 }
 
-// FaceMono returns the mono contents face (Source Code Pro Regular, the
+// FaceMono returns the mono contents face (IBM Plex Mono Regular, the
 // variable font's default instance) for one type-scale step: the row
 // cells of tables whose contents are numbers and listed entries
 // (inventory, market) — monospaced cells line the columns up. Unknown

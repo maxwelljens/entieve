@@ -123,10 +123,10 @@ rules: [docs/ART.md](docs/ART.md).
 
 ## Typeface
 
-The UI is set in **Turret Road** — Regular for body text, Bold for window
+The UI is set in **IBM Plex Sans** — Regular for body text, Medium for window
 titles, table headers, buttons and HUD readouts — embedded from
-`render/fonts/` alongside its license, so `Turret Road, SIL Open Font
-License 1.1` ("Copyright 2018 The Turret Road Project Authors"
+`render/fonts/` alongside its license, so `IBM Plex Sans, SIL Open Font
+License 1.1` ("Copyright 2018 The IBM Plex Sans Project Authors"
 <https://github.com/noponies/turret-road>) is included in every binary
 ([`render/fonts/OFL.txt`](render/fonts/OFL.txt), [docs/ART.md](docs/ART.md)).
 
@@ -206,4 +206,4 @@ deterministic (twin-run hash equality is asserted); `content` always loads and
 validates the real data; `tests/` proves the showcase world exercises every
 feature end-to-end.
 
-License: MIT (the bundled Turret Road fonts: SIL Open Font License 1.1).
+License: MIT (the bundled IBM Plex Sans fonts: SIL Open Font License 1.1).

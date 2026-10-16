@@ -200,38 +200,38 @@ func TestSelectedLayoutPinnedRects(t *testing.T) {
 	_, sp, _ := pumpSelected(t, 1024, 700, false, true)
 	got := selectedRects(sp)
 	want := []image.Rectangle{
-		image.Rect(13, 485, 453, 515),  // name (icon + label row)
-		image.Rect(13, 520, 453, 537),  // dist
-		image.Rect(13, 542, 149, 575),  // Approach
-		image.Rect(154, 542, 255, 575), // Warp
-		image.Rect(260, 542, 355, 575), // Orbit
-		image.Rect(360, 542, 453, 575), // Stop
-		image.Rect(13, 580, 95, 613),   // Lock
-		image.Rect(100, 580, 185, 613), // Dock
-		image.Rect(190, 580, 277, 613), // Jump
-		image.Rect(282, 580, 362, 613), // Loot
-		image.Rect(367, 580, 453, 613), // Mine
-		image.Rect(13, 618, 453, 651),  // Orbit range selector
-		image.Rect(13, 656, 453, 689),  // Warp to within selector
+		image.Rect(13, 485, 453, 519),  // name (icon + label row)
+		image.Rect(13, 524, 453, 543),  // dist
+		image.Rect(13, 548, 149, 580),  // Approach
+		image.Rect(154, 548, 253, 580), // Warp
+		image.Rect(258, 548, 355, 580), // Orbit
+		image.Rect(360, 548, 453, 580), // Stop
+		image.Rect(13, 585, 95, 617),   // Lock
+		image.Rect(100, 585, 185, 617), // Dock
+		image.Rect(190, 585, 279, 617), // Jump
+		image.Rect(284, 585, 364, 617), // Loot
+		image.Rect(369, 585, 453, 617), // Mine
+		image.Rect(13, 622, 453, 654),  // Orbit range selector
+		image.Rect(13, 659, 453, 691),  // Warp to within selector
 	}
 	assertRectsEqual(t, "1024x700", got, want)
 
 	_, spMin, _ := pumpSelected(t, 1024, 700, true, false)
 	gotMin := selectedRects(spMin)
 	wantMin := []image.Rectangle{
-		image.Rect(5, 49, 445, 79),     // name (icon + label row)
-		image.Rect(5, 84, 445, 84),     // dist (empty line, zero height)
-		image.Rect(5, 89, 141, 121),    // Approach
-		image.Rect(146, 89, 247, 121),  // Warp
-		image.Rect(252, 89, 347, 121),  // Orbit
-		image.Rect(352, 89, 445, 121),  // Stop
-		image.Rect(5, 126, 87, 158),    // Lock
-		image.Rect(92, 126, 177, 158),  // Dock
-		image.Rect(182, 126, 269, 158), // Jump
-		image.Rect(274, 126, 354, 158), // Loot
-		image.Rect(359, 126, 445, 158), // Mine
-		image.Rect(5, 163, 445, 195),   // Orbit range selector
-		image.Rect(5, 200, 445, 232),   // Warp to within selector
+		image.Rect(5, 49, 445, 83),     // name (icon + label row)
+		image.Rect(5, 88, 445, 88),     // dist (empty line, zero height)
+		image.Rect(5, 93, 141, 124),    // Approach
+		image.Rect(146, 93, 245, 124),  // Warp
+		image.Rect(250, 93, 347, 124),  // Orbit
+		image.Rect(352, 93, 445, 124),  // Stop
+		image.Rect(5, 129, 87, 160),    // Lock
+		image.Rect(92, 129, 177, 160),  // Dock
+		image.Rect(182, 129, 271, 160), // Jump
+		image.Rect(276, 129, 356, 160), // Loot
+		image.Rect(361, 129, 445, 160), // Mine
+		image.Rect(5, 165, 445, 196),   // Orbit range selector
+		image.Rect(5, 201, 445, 232),   // Warp to within selector
 	}
 	assertRectsEqual(t, "min-450x240", gotMin, wantMin)
 }

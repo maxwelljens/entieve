@@ -340,7 +340,7 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	}
 
 	// The active line is title + progress ("Belt cleanup — 1/3") and only
-	// fits the title column at the tiny step in Turret Road (at small the
+	// fits the title column at the tiny step in IBM Plex Sans (at small the
 	// em-dash suffix alone costs 56 px); available titles, which carry no
 	// suffix, stay at small.
 	step := uikit.StepSmall

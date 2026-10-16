@@ -114,7 +114,7 @@ for mechanics (sizes, fallbacks, directories); this section binds the look.
   red danger, blue info. Nothing pastel, nothing white, no colour without a
   job. Per-system nebula palettes in `content/data/systems/*.json` stay
   dark washes behind this chrome.
-- **Type — Turret Road** everywhere (OFL, embedded in `render/fonts/`):
+- **Type — IBM Plex Sans** everywhere (OFL, embedded in `render/fonts/`):
   Regular for body, Bold for emphasis. Diacritics and `€`/`¢` are covered;
   use authentic spellings.
 - **Icons — monochrome game-icons silhouettes** (`uikit/icons/`, CC BY 3.0,
@@ -133,7 +133,7 @@ for mechanics (sizes, fallbacks, directories); this section binds the look.
 - MUST place every new name in one layer of the naming matrix and give every
   new hull exactly one origin tag.
 - MUST keep trait skew soft: flavour and stat skew only.
-- MUST keep the visual canon: amber-on-black, Turret Road, monochrome
+- MUST keep the visual canon: amber-on-black, IBM Plex Sans, monochrome
   silhouettes, drop-in sprites.
 - MUST write amounts as `1,234.56 €` / `50¢` in UI and logs, "euro(s)" /
   "cent(s)" in prose.

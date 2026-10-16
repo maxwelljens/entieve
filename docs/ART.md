@@ -106,52 +106,52 @@ window title.
 
 ## Typeface
 
-The interface is set in **Turret Road** (the display face) with **Source
-Code Pro** as the mono face for tabular contents; both are embedded from
+The interface is set in **IBM Plex Sans** (the display face) with **IBM
+Plex Mono** as the mono face for tabular contents; both are embedded from
 `render/fonts/` (TTFs + their license files, `//go:embed` in
-`render/fonts.go`). The 21 px type scale is unchanged — only the
-typefaces and the emphasis face are new.
+`render/fonts.go`). The type scale moved one pixel with the swap: the
+base is 20 px, because Plex sets ~19 % taller at the size the old face
+did (`uikit.DefaultTypeScale`).
 
 | Weight | Role |
 |---|---|
 | Regular | body text: log lines, labels, tooltip rows and values, text input, table cells (outside the mono tables below) |
-| Bold | emphasis: window titles, table header sort buttons, buttons, HUD readouts, tooltip titles (`render.FaceBold` / `Env.FaceBold`) |
-| Light, Medium, ExtraLight, ExtraBold | shipped with the family in `render/fonts/`, not used by the UI |
+| Medium | emphasis: window titles, table header sort buttons, buttons, HUD readouts, tooltip titles (`render.FaceBold` / `Env.FaceBold` — the constant name is historical) |
+| Light, Bold | shipped with the family in `render/fonts/`, not used by the UI |
 
-- **License — Turret Road, SIL Open Font License 1.1**: `Copyright 2018
-  The Turret Road Project Authors (https://github.com/noponies/turret-road)`.
-  The full `TurretRoad_LICENCE.txt` travels in the same directory as the TTFs (and is
-  embedded with them), so any redistribution of the binary carries the
+- **License — IBM Plex Sans, SIL Open Font License 1.1**: `Copyright ©
+  2017 IBM Corp. with Reserved Font Name "Plex"`. The full
+  `IBMPlexSans_LICENCE.txt` travels in the same directory as the TTFs (and
+  is embedded with them), so any redistribution of the binary carries the
   license.
-- **Glyph coverage**: Turret Road has no U+25B2/U+25BC triangles, so the
+- **Glyph coverage**: IBM Plex Sans has no U+25B2/U+25BC triangles, so the
   table sort indicators are the ↑/↓ arrows it does carry
   (`uikit/table.go`, `indicator`). Bold was chosen over Medium by rendering
-  both at the 16.8 px button size: Medium sits too close to Regular to read
+  both at the 16 px button size: Medium sits too close to Regular to read
   as emphasis.
 
-**Source Code Pro** is the second family — the **tabular contents** face.
+**IBM Plex Mono** is the second family — the **tabular contents** face.
 The inventory window's three hold tables and the market window's order
 book draw every row cell in it: item names, quantities, volumes and
 prices alike (`render.MonoFace` / `Env.FaceMono`, opted into per table
-with the `uikit.ContentsFace` table option). It ships as a variable TTF
-and is drawn at its default Regular instance — `text/v2` applies no
-variation settings, and none are wanted: monospace is the point, digits
-and listed entries line the columns up. Everything around the rows stays
-Turret Road: window titles, section labels, the table header sort
-buttons, buttons and the stepper readouts.
+with the `uikit.ContentsFace` table option). It ships as a single static
+Regular TTF, drawn as-is — monospace is the point, digits and listed
+entries line the columns up. Everything around the rows stays IBM Plex
+Sans: window titles, section labels, the table header sort buttons,
+buttons and the stepper readouts.
 
-- **Rule of thumb**: display font (Turret Road) for chrome and prose —
-  titles, labels, buttons, tooltips, logs; mono (Source Code Pro) for
+- **Rule of thumb**: display font (IBM Plex Sans) for chrome and prose —
+  titles, labels, buttons, tooltips, logs; mono (IBM Plex Mono) for
   tabular data — numbers and listed entries in tables.
-- **License — Source Code Pro, SIL Open Font License 1.1**: `Copyright
-  2010, 2012 Adobe Systems Incorporated (http://www.adobe.com/), with
-  Reserved Font Name 'Source'`. The full `SourceCodePro_LICENCE.txt`
-  travels in `render/fonts/` beside the two variable TTFs (embedded with
-  them), so any redistribution of the binary carries the license.
+- **License — IBM Plex Mono, SIL Open Font License 1.1**: `Copyright ©
+  2017 IBM Corp. with Reserved Font Name "Plex"`. The full
+  `IBMPlexMono_LICENCE.txt` travels in `render/fonts/` beside its TTF
+  (embedded with it), so any redistribution of the binary carries the
+  license.
 - **Glyph coverage**: digits, `€`/`¢`, `×`/`³` and the Polish/Czech
   diacritics the listed names carry are probed over the embedded TTF in
   `render/fonts_test.go` (`TestMonoFaceResolvesAndCovers`); the sort
-  indicators stay Turret Road's ↑/↓ — only the row cells change face.
+  indicators stay IBM Plex Sans's ↑/↓ — only the row cells change face.
 
 ## Tooltip anatomy
 

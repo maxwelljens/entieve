@@ -9,14 +9,14 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
-// TestEmbeddedFontFamily pins the font payload: Turret Road ships as six
-// weights plus its SIL OFL notice, and Source Code Pro (the mono contents
-// face) as its two variable TTFs plus SourceCodePro_LICENCE.txt — all
-// inside the embedded directory, so the licenses travel with the fonts
-// (the binary carries them too), and every glyph the interface actually
-// draws is covered.
+// TestEmbeddedFontFamily pins the font payload: IBM Plex Sans ships as
+// four weights plus its SIL OFL notice, and IBM Plex Mono (the mono
+// contents face) as its single Regular TTF plus IBMPlexMono_LICENCE.txt
+// — all inside the embedded directory, so the licenses travel with the
+// fonts (the binary carries them too), and every glyph the interface
+// actually draws is covered.
 //
-// Turret Road has no U+25B2/U+25BC triangles — the sort indicators are
+// IBM Plex Sans has no U+25B2/U+25BC triangles — the sort indicators are
 // the ↑/↓ arrows it does carry (uikit/table.go indicator()).
 func TestEmbeddedFontFamily(t *testing.T) {
 	entries, err := fontFS.ReadDir("fonts")
@@ -32,9 +32,9 @@ func TestEmbeddedFontFamily(t *testing.T) {
 		}
 	}
 	want := []string{
-		"TurretRoad-Bold.ttf", "TurretRoad-ExtraBold.ttf", "TurretRoad-ExtraLight.ttf",
-		"TurretRoad-Light.ttf", "TurretRoad-Medium.ttf", "TurretRoad-Regular.ttf",
-		"SourceCodePro-Italic-VariableFont_wght.ttf", "SourceCodePro-VariableFont_wght.ttf",
+		"IBMPlexSans-Bold.ttf", "IBMPlexSans-Light.ttf",
+		"IBMPlexSans-Medium.ttf", "IBMPlexSans-Regular.ttf",
+		"IBMPlexMono-Regular.ttf",
 	}
 	if len(ttfs) != len(want) {
 		t.Fatalf("embedded TTFs = %v, want %v", ttfs, want)
@@ -52,54 +52,29 @@ func TestEmbeddedFontFamily(t *testing.T) {
 	}
 	// Each family's license travels in the same directory as its TTFs
 	// (and with the binary), under its canonical per-family name.
-	turretLic := ""
-	for _, cand := range []string{"TurretRoad_LICENCE.txt"} {
+	for _, name := range []string{"IBMPlexSans_LICENCE.txt", "IBMPlexMono_LICENCE.txt"} {
+		found := false
 		for _, o := range others {
-			if o == cand {
-				turretLic = cand
+			if o == name {
+				found = true
 			}
 		}
-	}
-	if turretLic == "" {
-		t.Errorf("Turret Road license missing beside the TTFs (have %v)", others)
-	}
-	found := false
-	for _, o := range others {
-		if o == "SourceCodePro_LICENCE.txt" {
-			found = true
+		if !found {
+			t.Errorf("license file %s missing beside the TTFs (have %v)", name, others)
+			continue
 		}
-	}
-	if !found {
-		t.Errorf("license file SourceCodePro_LICENCE.txt missing beside the TTFs (have %v)", others)
-	}
-
-	// The OFL notice itself: license name and copyright line.
-	if turretLic != "" {
-		lic, err := fontFS.ReadFile("fonts/" + turretLic)
+		// The OFL notice itself: license name and copyright line.
+		lic, err := fontFS.ReadFile("fonts/" + name)
 		if err != nil {
-			t.Fatalf("embedded %s: %v", turretLic, err)
+			t.Fatalf("embedded %s: %v", name, err)
 		}
 		for _, want := range []string{
 			"SIL Open Font License, Version 1.1",
-			"Copyright 2018 The Turret Road Project Authors",
+			"Copyright © 2017 IBM Corp. with Reserved Font Name \"Plex\"",
 		} {
 			if !strings.Contains(string(lic), want) {
-				t.Errorf("%s missing %q", turretLic, want)
+				t.Errorf("%s missing %q", name, want)
 			}
-		}
-	}
-
-	// Source Code Pro's notice: same license, Adobe's copyright.
-	scp, err := fontFS.ReadFile("fonts/SourceCodePro_LICENCE.txt")
-	if err != nil {
-		t.Fatalf("embedded SourceCodePro_LICENCE.txt: %v", err)
-	}
-	for _, want := range []string{
-		"SIL Open Font License, Version 1.1",
-		"Copyright 2010, 2012 Adobe Systems Incorporated",
-	} {
-		if !strings.Contains(string(scp), want) {
-			t.Errorf("SourceCodePro_LICENCE.txt missing %q", want)
 		}
 	}
 }
@@ -120,7 +95,7 @@ func TestFaceWeightsParseAndDiffer(t *testing.T) {
 	if Face(21) != reg {
 		t.Error("Face is not cached per size")
 	}
-	if FaceBold(16.8) == bold {
+	if FaceBold(16) == bold {
 		t.Error("FaceBold is not cached per size")
 	}
 
@@ -151,19 +126,19 @@ func TestFaceWeightsParseAndDiffer(t *testing.T) {
 	}
 }
 
-// TestMonoFaceResolvesAndCovers pins the tabular contents face: Source
-// Code Pro parses through text/v2 at the sizes the tables draw at,
+// TestMonoFaceResolvesAndCovers pins the tabular contents face: IBM
+// Plex Mono parses through text/v2 at the sizes the tables draw at,
 // shapes headless as a real monospace (uniform digit advances — the
-// column-alignment contract; the variable font's default Regular
-// instance is what text/v2 draws), is a different source than the
-// display face, and covers every glyph the inventory and market rows
-// draw: row punctuation, the €/¢ currency marks, and the Polish/Czech
-// diacritics the system and item names carry (Młynów, Kuźnica…).
+// column-alignment contract; the static Regular weight is what text/v2
+// draws), is a different source than the display face, and covers every
+// glyph the inventory and market rows draw: row punctuation, the €/¢
+// currency marks, and the Polish/Czech diacritics the system and item
+// names carry (Młynów, Kuźnica…).
 //
 // The sort indicators (↑/↓) are deliberately absent from the probe:
 // they live in the header buttons, which keep the display face.
 func TestMonoFaceResolvesAndCovers(t *testing.T) {
-	const small = 16.8 // the table contents step (0.8 × the 21 px base)
+	const small = 16 // the table contents step (0.8 × the 20 px base)
 	f := MonoFace(small)
 	if f.Size != small {
 		t.Errorf("MonoFace(%v).Size = %v, want %v", small, f.Size, small)
@@ -172,15 +147,14 @@ func TestMonoFaceResolvesAndCovers(t *testing.T) {
 		t.Error("MonoFace is not cached per size")
 	}
 	if MonoFace(21) == f {
-		t.Error("MonoFace(21) returned the 16.8 px face: the cache ignores size")
+		t.Error("MonoFace(21) returned the 16 px face: the cache ignores size")
 	}
 	if f.Source == Face(small).Source {
-		t.Fatal("MonoFace shares its source with the display face: Source Code Pro did not load")
+		t.Fatal("MonoFace shares its source with the display face: IBM Plex Mono did not load")
 	}
 
-	// text/v2 shapes the default variable instance without variation
-	// settings: every digit has the same advance, and a name with
-	// diacritics measures to a real width.
+	// text/v2 shapes the static Regular weight: every digit has the same
+	// advance, and a name with diacritics measures to a real width.
 	d1, _ := text.Measure("1", f, 0)
 	d4, _ := text.Measure("1111", f, 0)
 	d0, _ := text.Measure("0000", f, 0)

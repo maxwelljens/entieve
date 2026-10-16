@@ -95,8 +95,8 @@ func NewMarket(env Env) *Market {
 		{Key: "Side", Title: "Side", Priority: 3},
 	}
 	// Contents face: the order book is names, prices and quantities —
-	// Source Code Pro lines the columns up (title, toolbar and buttons
-	// stay Turret Road).
+	// IBM Plex Mono lines the columns up (title, toolbar and buttons
+	// stay IBM Plex Sans).
 	m.tbl = NewTable(env, cols, ContentsFace(env.FaceMono(StepSmall)))
 	m.tbl.SetSort("Item", true)
 	// Sync builds rows in canonical book order; the Item sort key keeps

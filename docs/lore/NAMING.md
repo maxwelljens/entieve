@@ -22,7 +22,7 @@ entities here in the same format before their content lands.
 - Retired names that must not survive in display text: **Solace, Penumbra,
   Gloam, Haven Rest, Thevek Reach, Loomfall, Loomfall Security, Mire
   Corsairs, Gloam Hierarchy** (and their fragments).
-- Authentic diacritics are correct, not risky: the game font (Turret Road)
+- Authentic diacritics are correct, not risky: the game font (IBM Plex Sans)
   renders all Polish/Czech diacritics plus `€` and `¢`. Keep names sayable
   for English readers; note the lexical root in `notes`.
 - Full rules and the trait matrix: [AESTHETIC.md](AESTHETIC.md). Setting

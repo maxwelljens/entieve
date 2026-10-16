@@ -48,8 +48,8 @@ func NewInventory(env Env) *Inventory {
 	}
 	// One selection callback per section: the source hold of the next
 	// transfer is whichever table the row was clicked in. Contents face:
-	// these rows are names, quantities and volumes — Source Code Pro
-	// lines the columns up (section labels and buttons stay Turret Road).
+	// these rows are names, quantities and volumes — IBM Plex Mono
+	// lines the columns up (section labels and buttons stay IBM Plex Sans).
 	mono := ContentsFace(env.FaceMono(StepSmall))
 	inv.cargo = NewTable(env, cols, mono)
 	inv.cargo.OnSelect(inv.selectFrom("cargo"))

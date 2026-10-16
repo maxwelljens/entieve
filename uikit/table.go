@@ -127,7 +127,7 @@ type TableOption func(*Table)
 
 // ContentsFace draws every row cell — labels and values alike — in the
 // given face instead of the display face, and measures the columns with
-// it (Source Code Pro via Env.FaceMono in the inventory and market
+// it (IBM Plex Mono via Env.FaceMono in the inventory and market
 // windows: monospaced cells line the columns up). Only the contents move:
 // the header sort buttons keep the emphasis face.
 func ContentsFace(face *text.Face) TableOption {
@@ -152,7 +152,7 @@ func NewTable(env Env, cols []Column, opts ...TableOption) *Table {
 	// The cell measure and the row height follow t.face (set above or by
 	// an option), so the fitted column widths and the drawn cells agree.
 	face := t.face
-	// Headers draw in the emphasis weight (Turret Road Bold), so their
+	// Headers draw in the emphasis weight (IBM Plex Sans Bold), so their
 	// widths are measured with it too — the fit and the drawn label have
 	// to agree or the header overflows its column.
 	headFace := env.FaceBold(StepSmall)
@@ -810,7 +810,7 @@ func (t *Table) layoutCells() {
 	t.body.RequestRelayout()
 }
 
-// indicator is the active sort column's arrow suffix. Turret Road ships
+// indicator is the active sort column's arrow suffix. IBM Plex Sans ships
 // no U+25B2/U+25BC triangles, so the arrows are the ↑/↓ it does have.
 func (t *Table) indicator(i int) string {
 	if t.sortKey == "" || t.cols[i].Key != t.sortKey {

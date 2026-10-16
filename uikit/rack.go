@@ -26,7 +26,7 @@ const (
 	rackMaxCells = 4                      // widest slot row across every hull
 	rackCellW    = 50                     // cell width
 	rackCellH    = 40                     // cell height (minimum hit area)
-	rackNameH    = 16                     // name line under a tile (fits StepTiny)
+	rackNameH    = 19                     // name line under a tile (fits StepTiny line box)
 	rackCycleH   = 4                      // cycle bar height under a cell
 	rackLabelW   = 30                     // "High"/"Mid"/"Low" label column
 	rackCycleMax = 1000                   // cycle bar resolution (0.1 % steps)

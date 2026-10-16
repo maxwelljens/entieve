@@ -74,8 +74,8 @@ func TestScaleDoublesConstructionMetrics(t *testing.T) {
 	useScale(t, 2)
 	env, _ := newTestEnv(t)
 
-	if env.TS.Base != 42 || env.TS.Small != 33.6 {
-		t.Errorf("env TS at 2 = %v, want Base 42 / Small 33.6 (design 21/16.8)", env.TS)
+	if env.TS.Base != 40 || env.TS.Small != 32 {
+		t.Errorf("env TS at 2 = %v, want Base 40 / Small 32 (design 20/16)", env.TS)
 	}
 	w2, _ := text.Measure("Entieve", *env.Face(StepBase), 0)
 	// Glyph advances carry a sub-1/1000 px quantization, so "double"
