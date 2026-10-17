@@ -20,6 +20,11 @@ names the *modules and seams* we build that vocabulary into.
 | **Belief** | an agent's EWMA of executed trade prices (its market view) |
 | **Haul wish** | an agent's cross-node arbitrage intent, flown as a real convoy |
 | **Warp process** | align → accel → cruise → decel; spatial easing over a frozen timeline |
+| **Departure beat** | the jittered 2–8 s hold a convoy keeps after spawning, resuming or arriving before it commences its warp — a stateless tick hash, never a persisted timer |
+| **Gate cycle** | a stargate transit in two paced parts: the *dwell* (2–5 s at the gate before the hop) and the *jump cycle* (1–3 s between hop-out and materializing at the destination gate) |
+| **Turnaround** | a station visit in stages: approach (2–4 s) → docked dwell (5–15 s, the cargo/market action fires partway through) → undock + departure beat |
+| **Hold** | a shipment parked upstream of a full gate queue: it waits in the journey ledger until the far queue drains, logging one line on entering the hold and one when it finally jumps |
+| **Agent cooldown** | per-agent jittered 1–10 s between behavior acts; one act moves capital at most once (its job / quotes / wish slot rotates on a stateless tick hash) |
 
 ## Architecture (the UI tranche)
 

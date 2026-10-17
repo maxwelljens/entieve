@@ -282,11 +282,28 @@ type Wreck struct {
 	ExpiresAt float64
 }
 
-// Traffic phases (Traffic.Phase of a live convoy hauler).
+// Traffic phases (Traffic.Phase of a live convoy hauler): the paced
+// commencement states. A hauler sits in its phase until the deadline the
+// phase armed in Traffic.Next (both already in the save schema — the beat
+// needs no new field and draws no entropy), so no transition fires the
+// tick it first becomes possible (CONTEXT.md: departure beat, gate cycle,
+// turnaround).
 const (
-	// TrafficTransit is a hauler flying its one-way leg: warp out, retry on
-	// interruption, deliver (station) or despawn (gate/belt) on arrival.
+	// TrafficTransit is a hauler flying its one-way leg — or holding its
+	// departure beat after spawn/resume — until the leg warp commences, or
+	// until first contact arms the gate cycle / turnaround.
 	TrafficTransit = "transit"
+	// TrafficGate is the gate cycle's dwell: the hauler stands at its
+	// cross-system gate, then trafficHop jumps it.
+	TrafficGate = "gate"
+	// TrafficApproach / TrafficDock / TrafficBerth / TrafficUndock are the
+	// turnaround stages at a station endpoint: close on the station, dock
+	// until the cargo action fires partway through the dwell, finish the
+	// dwell, then undock + departure beat before the hauler leaves the grid.
+	TrafficApproach = "approach"
+	TrafficDock     = "dock"
+	TrafficBerth    = "berth"
+	TrafficUndock   = "undock"
 )
 
 // Traffic outcome phases (TrafficAttack.Outcome).

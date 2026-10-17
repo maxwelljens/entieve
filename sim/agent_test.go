@@ -48,9 +48,9 @@ func stepToTick(s *Sim, n int64) {
 	}
 }
 
-// stepPasses advances n behavior passes (each pass lands on a step whose
-// pre-tick count was a positive multiple of agentPassTicks, so afterwards
-// ticks ≡ 1 mod agentPassTicks).
+// stepPasses advances n legacy pass windows (agentPassTicks each) — pure
+// wall-clock stepping. Paced agents act on their own cooldowns, not on
+// these boundaries: tests that need an agent to ACT use stepAgentAct.
 func stepPasses(s *Sim, n int) {
 	for i := 0; i < n; i++ {
 		for {
@@ -60,6 +60,42 @@ func stepPasses(s *Sim, n int) {
 			}
 		}
 	}
+}
+
+// stepAgentAct advances until id's next paced behavior act fires. Act
+// ticks are a pure hash of (tick, agent id) — pass boundaries no longer
+// mark acts — so this is the only honest "run the agent's pass" wait.
+func stepAgentAct(s *Sim, id string) {
+	stepAgentActs(s, id, 1)
+}
+
+// stepAgentActs advances until id has performed n paced behavior acts
+// (systems run on the pre-increment tick, so the act fired on ticks-1).
+func stepAgentActs(s *Sim, id string, n int) {
+	idx := s.agentIndex(id)
+	if idx < 0 {
+		panic("test: agent " + id + " not found")
+	}
+	a := &s.agents[idx]
+	for done := 0; done < n; {
+		s.Step()
+		if s.ticks > 1 && trafficDue(s.ticks-1, agentKey(a), agentCooldownTicks(a)) {
+			done++
+		}
+	}
+}
+
+// stepUntil advances up to max ticks or until cond holds, whichever comes
+// first (the runUntil-style wait for paced, jittered timing).
+func stepUntil(t *testing.T, s *Sim, max int, cond func() bool, what string) {
+	t.Helper()
+	for i := 0; i < max; i++ {
+		s.Step()
+		if cond() {
+			return
+		}
+	}
+	t.Fatalf("condition not met within %d ticks: %s", max, what)
 }
 
 // lastTrade returns a book's last executed price for an item.
@@ -205,12 +241,17 @@ func TestAgentZipConvergence(t *testing.T) {
 	seller.Beliefs["charge-emp"] = 100 / (0.75 * (1 - imputeHaircut))
 	buyer.Beliefs["charge-emp"] = 100
 
-	const rounds = 60
+	// Paced rounds: each round advances the clock through one act of each
+	// side (their cooldowns are 1–10 s, so a fixed pass window no longer
+	// guarantees an act) plus the settling ticks between them.
+	const rounds = 160
 	var prices []float64
 	trades := 0
 	prevStock := buyer.Inventory["min-ferrite"]
 	for i := 0; i < rounds; i++ {
-		stepPasses(s, 1)
+		stepAgentAct(s, "ag-zip-sell")
+		stepAgentAct(s, "ag-zip-buy")
+		stepN(s, 60)
 		// Count executions by the buyer's stock growth (it never sells
 		// ferrite), and record each newly printed trade price.
 		if got := buyer.Inventory["min-ferrite"]; got > prevStock {
@@ -294,7 +335,7 @@ func TestAgentMinerDepletesBeltAndSells(t *testing.T) {
 		t.Fatalf("fixture belt volume = %v, want > 0", baseline)
 	}
 
-	stepPasses(s, 1)
+	stepAgentAct(s, "ag-mine")
 	after := s.BeltOreVolume("sys-a")
 	if after >= baseline {
 		t.Fatalf("belt volume %v after a mining pass, want < %v", after, baseline)
@@ -331,9 +372,9 @@ func TestAgentMinerDepletesBeltAndSells(t *testing.T) {
 		t.Fatalf("MarketPrice = %v, want last trade %v (base was %v)",
 			p, ask.Price, s.marketBasePrice("ore-sterngrit"))
 	}
-	// The belt keeps depleting across passes (stock effect), even with
+	// The belt keeps depleting across acts (stock effect), even with
 	// regrowth windows in play.
-	stepPasses(s, 3)
+	stepAgentActs(s, "ag-mine", 3)
 	if v := s.BeltOreVolume("sys-a"); v >= after {
 		t.Fatalf("belt volume %v after three more passes, want < %v", v, after)
 	}
@@ -348,7 +389,7 @@ func TestAgentMinerDryBeltBids(t *testing.T) {
 	addTestAgent(s, "ag-dry", RoleMiner, "cel-station-a", 100_000)
 	a := agentOf(s, "ag-dry")
 
-	stepPasses(s, 1)
+	stepAgentAct(s, "ag-dry")
 	if got := a.Inventory["ore-sterngrit"]; got != 0 {
 		t.Fatalf("dry belt: miner drew %d units, want 0", got)
 	}
@@ -380,8 +421,11 @@ func TestAgentIndustrialistLoop(t *testing.T) {
 	a := agentOf(s, "ag-ind")
 	walletBefore := s.Wallet()
 
-	// Pass 1 buys the two-run ferrite stock off the founding ask.
-	stepPasses(s, 1)
+	// The first quote act buys the two-run ferrite stock off the founding
+	// ask (paced acts land on this agent's own cooldowns, so wait for the
+	// outcome, not for a pass boundary).
+	stepUntil(t, s, 30000, func() bool { return a.Inventory["min-ferrite"] > 0 },
+		"industrialist never bought its ferrite stock")
 	if p, ok := restOrder(s, home, OrderBuy, "min-ferrite", agentOwnerTag(a.ID)); ok && p.Qty > 0 {
 		t.Fatalf("founding ask should have filled immediately, leftover bid %+v", p)
 	}
@@ -389,8 +433,9 @@ func TestAgentIndustrialistLoop(t *testing.T) {
 		t.Fatal("industrialist took ferrite out of the player's storage")
 	}
 
-	// Pass 2 starts the job (jobs per agent capped at 1).
-	stepPasses(s, 1)
+	// The commission act starts the job (jobs per agent capped at 1).
+	stepUntil(t, s, 30000, func() bool { return len(s.Jobs(home)) > 0 },
+		"industrialist never commissioned a job")
 	jobs := s.Jobs(home)
 	if len(jobs) != 1 || jobs[0].Owner != agentOwnerTag(a.ID) {
 		t.Fatalf("jobs = %+v, want exactly the agent's", jobs)
@@ -404,12 +449,17 @@ func TestAgentIndustrialistLoop(t *testing.T) {
 	// sells into the standing bid; the cap on one job at a time lets it
 	// immediately commission the next run.
 	stepToTick(s, 7000)
-	stepPasses(s, 1)
-	for _, j := range s.Jobs(home) {
-		if j.ID == job1 {
-			t.Fatalf("job %d never collected: %+v", job1, s.Jobs(home))
+	stepUntil(t, s, 12000, func() bool {
+		for _, j := range s.Jobs(home) {
+			if j.ID == job1 {
+				return false
+			}
 		}
-	}
+		return true
+	}, "job never collected")
+	stepUntil(t, s, 12000, func() bool {
+		return stacksCount(s.Hangar.Items, "mod-emp-turret") >= 1
+	}, "industrialist never sold into the standing bid")
 	stepToTick(s, s.ticks+1)
 
 	if got := a.Inventory["mod-emp-turret"]; got != 1 {
@@ -552,7 +602,10 @@ func TestAgentHaulWishSeam(t *testing.T) {
 	addTestAgent(s, "ag-haul", RoleTrader, home, 100_000)
 	a := agentOf(s, "ag-haul")
 
-	stepPasses(s, 1)
+	// Wait for the trader's contract act (paced: acts land on its own
+	// cooldown, and only its wish slot rebuilds the list).
+	stepUntil(t, s, 12000, func() bool { return len(s.HaulWishes()) > 0 },
+		"trader never authored its wish")
 	wishes := s.HaulWishes()
 	if len(wishes) != 1 {
 		t.Fatalf("wishes = %+v, want exactly the charge-emp spread", wishes)
@@ -785,7 +838,7 @@ func TestAgentTwinRunSoakDeterminism(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stepPasses(s, 1)
+	stepN(s, int(agentCooldownMax)) // every roster agent acts at least once
 	acted := false
 	for i := range s.agents {
 		if len(s.agents[i].Beliefs) > 0 || len(s.agents[i].Margin) > 0 {
@@ -793,7 +846,7 @@ func TestAgentTwinRunSoakDeterminism(t *testing.T) {
 		}
 	}
 	if !acted {
-		t.Fatal("no agent valued or quoted anything in a full pass")
+		t.Fatal("no agent valued or quoted anything in a full cooldown window")
 	}
 }
 

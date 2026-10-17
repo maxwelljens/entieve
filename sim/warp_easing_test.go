@@ -240,6 +240,9 @@ func TestWarpAccelDecelGridSlidesNpc(t *testing.T) {
 // warp duration in ticks. ANY movement of these numbers is drift.
 // Baseline (captured on the unmodified build): player 180/564 (384 warp
 // ticks), traffic hauler 426/809 (383), respawn slide 3826/4178 (352).
+// The hauler's START moved with the paced departure beat (740/1123 — the
+// spawn tick plus its jittered beat); the 383-tick duration is frozen
+// exactly as before: the beat delays commencement, never warp physics.
 func TestWarpTimelineFrozen(t *testing.T) {
 	t.Run("player", func(t *testing.T) {
 		s := newTestSim(t)
@@ -277,7 +280,7 @@ func TestWarpTimelineFrozen(t *testing.T) {
 				}
 			}
 		}
-		assertWarpStamps(t, startT, landT, 426, 809, 383)
+		assertWarpStamps(t, startT, landT, 740, 1123, 383)
 	})
 
 	t.Run("respawn-slide", func(t *testing.T) {

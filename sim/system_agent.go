@@ -12,14 +12,16 @@ import "sort"
 //	               own resting orders (the counterparty side of a trade
 //	               lands here one system later: a player's market command,
 //	               a convoy withdrawal, a respawn requisition).
-//	agentPass    — every agentPassTicks: beliefs, imputation, jobs,
-//	               extraction, ZIP quoting, haul wishes (agent.go).
+//	agentPass    — every tick, gated per agent by its own stateless
+//	               cooldown: beliefs, imputation, one capital step,
+//	               extraction, haul wishes (agent.go).
 //	upkeepPass   — every agentUpkeepTicks: the station repair/rearm
 //	               basket and its maintenance-fee money sink.
 //
 // Determinism: agents are held in ascending-id order, every list it
-// touches is sorted, and it draws no RNG (rng_roles_test's master-stream
-// pin holds unchanged).
+// touches is sorted, the cooldown gate is a pure hash of (tick, agent id)
+// — restore reproduces it from the tick count alone — and it draws no RNG
+// (rng_roles_test's master-stream pin holds unchanged).
 // ---------------------------------------------------------------------------
 
 // agentSettle reconciles every agent's resting-order ledger against the
@@ -88,15 +90,15 @@ func (s *Sim) agentSettleFill(a *Agent, o AgentOrder, qty int) {
 	}
 }
 
-// systemAgent runs system 18: settle resting agent fills, then (on the
-// cadence) the behavior pass and the station upkeep cycle. No-op in
-// worlds without a roster (the showcase tour and fixtures).
+// systemAgent runs system 18: settle resting agent fills, then (per agent
+// cooldown) the behavior pass and, on the clock, the station upkeep cycle.
+// No-op in worlds without a roster (the showcase tour and fixtures).
 func (s *Sim) systemAgent() {
 	if len(s.agents) == 0 {
 		return
 	}
 	s.agentSettle()
-	if s.ticks > 0 && s.ticks%agentPassTicks == 0 {
+	if s.ticks > 0 {
 		s.agentPass()
 	}
 	if s.ticks > 0 && s.ticks%agentUpkeepTicks == 0 {

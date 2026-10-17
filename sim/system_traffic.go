@@ -126,6 +126,33 @@ const (
 	// fee is a pure sink: FulfillHaul debits the agent's free capital and
 	// credits nothing.
 	trafficHaulFee = 2.5
+
+	// --- The beat: paced, jittered, deterministic commencement. Nothing
+	// commences the tick it becomes possible — spawn, resume, gate arrival
+	// and station arrival all hold a window first (CONTEXT.md: departure
+	// beat / gate cycle / turnaround; docs/SIM.md). Every window is in
+	// ticks and jittered per event from trafficPhase (a pure hash — no
+	// entropy, no persisted timers: the running deadline rides the
+	// Traffic.Next / Traffic.Phase fields that are already in the save
+	// schema). Delays move only WHEN things happen; cargo and money never
+	// move early, twice or not at all.
+	//
+	// departure beat         spawn/resume → leg warp       120..480 (2..8 s)
+	// gate cycle: dwell      at the gate before the hop    120..300 (2..5 s)
+	// gate cycle: jump       hop-out → materialize         60..180  (1..3 s)
+	// turnaround: approach   landing → station contact     120..240 (2..4 s)
+	// turnaround: dock       contact → cargo action        120..300 (2..5 s)
+	// turnaround: berth      cargo action → undock         180..600 (3..10 s)
+	// turnaround: undock     undock → despawn (beat)       120..480 (2..8 s)
+	//
+	// (dock+berth is the docked dwell: 300..900 ticks, 5..15 s, with the
+	// cargo/market action firing partway through.)
+	trafficDepartBeatMin, trafficDepartBeatMax = 120, 480
+	trafficGateDwellMin, trafficGateDwellMax   = 120, 300
+	trafficJumpCycleMin, trafficJumpCycleMax   = 60, 180
+	trafficApproachMin, trafficApproachMax     = 120, 240
+	trafficDockMin, trafficDockMax             = 120, 300
+	trafficBerthMin, trafficBerthMax           = 180, 600
 )
 
 // ---------------------------------------------------------------------------
@@ -214,6 +241,25 @@ func trafficDue(ticks int64, key string, interval int64) bool {
 	}
 	off := int64(trafficPhase(key) % uint64(interval))
 	return (ticks+off)%interval == 0
+}
+
+// trafficBeat is a jittered delay in [min, max] ticks derived from the
+// same pure hash the schedules use — stateless jitter for the paced
+// commencement (departure beat, gate cycle, turnaround): no entropy is
+// drawn, no timer is persisted, and the same key always yields the same
+// delay in twin runs and after a restore.
+func trafficBeat(key string, min, max int64) int64 {
+	if max < min {
+		max = min
+	}
+	return min + int64(trafficPhase(key)%uint64(max-min+1))
+}
+
+// beatKey is a jitter key unique to one live hauler event: the entity
+// handle (reproduced exactly by twin runs and by save/restore) plus the
+// event kind, so identical shipments never share one beat.
+func beatKey(e ecs.Entity, kind string) string {
+	return "beat|" + kind + "|" + itoaN(int(uint64(e)))
 }
 
 // ---------------------------------------------------------------------------
@@ -387,6 +433,12 @@ func (s *Sim) createHauler(hull *content.ShipDef, pos core.Vec2, facing float64,
 	s.Targetings.Set(e, Targeting{
 		MaxTargets: hull.MaxTargets, MaxRange: hull.MaxTargetRange, ScanRes: hull.ScanResolution,
 	})
+	// Departure beat: every hauler — fresh spawn, wish convoy, resumed
+	// journey — holds before its first warp commencement (the drive loop's
+	// s.time >= tc.Next gate below). A carried journey deadline is
+	// superseded here; it gated the resume itself.
+	tc.Next = s.time + float64(trafficBeat(beatKey(e, "depart"),
+		trafficDepartBeatMin, trafficDepartBeatMax))*DT
 	s.Traffic.Set(e, tc)
 	s.recomputeFit(e)
 	s.healToFull(e)
@@ -760,8 +812,10 @@ func (s *Sim) spawnPatrolShip(sys *content.SystemDef, hull content.ShipID) ecs.E
 
 // trafficDriveHaulers runs every live convoy hauler: burn away during the
 // ambush window, roll the per-leg ambush at tunnel entry, mark escapes,
-// hop the gate (cross-system leg), deliver, or despawn at a same-system
-// gate/belt on arrival, and (re)issue the leg warp on cooldown.
+// sit out the gate cycle / turnaround at its endpoint (trafficArrive — no
+// commencement on the tick of arrival), hop the gate (cross-system leg),
+// deliver, or despawn at a same-system gate/belt on arrival, and issue the
+// leg warp only once the departure beat in Traffic.Next has run.
 func (s *Sim) trafficDriveHaulers(sys *content.SystemDef, td *content.TrafficDef, sec string) {
 	for _, e := range sortedEntities(s.Traffic) {
 		tc, ok := s.Traffic.Get(e)
@@ -953,12 +1007,15 @@ func (s *Sim) trafficEscaped(e ecs.Entity, tc *Traffic) {
 	s.scheduleRaidersLeave(atk)
 }
 
-// trafficArrive resolves a completed leg. A station endpoint delivers the
-// cargo as supply on that station's own book; a leg whose route's final
-// destination is in another system hops through the gate it reached (the
-// shipment parks as a journey for the far system); any other endpoint
-// despawns the hauler (it leaves the system through a same-system gate or
-// finishes its run at a belt).
+// trafficArrive resolves a hauler standing at its leg's endpoint — on the
+// beat: an arrival never commences the next transition in the same tick.
+// A gate endpoint runs the gate cycle (dwell → hop), a station endpoint
+// runs the turnaround (approach → docked dwell with the cargo action
+// partway through → undock + departure beat), any other endpoint despawns
+// as before. First contact (Phase == TrafficTransit) arms the stage's
+// deadline in Traffic.Next; later ticks wait it out — both fields are
+// already in the save schema, so a snapshot taken mid-stage resumes that
+// stage to the same deadline.
 func (s *Sim) trafficArrive(sys *content.SystemDef, e ecs.Entity, tc *Traffic) {
 	dest := sysCelestial(sys, tc.Dest)
 	if dest == nil {
@@ -967,32 +1024,107 @@ func (s *Sim) trafficArrive(sys *content.SystemDef, e ecs.Entity, tc *Traffic) {
 		return
 	}
 	if tc.DestSys != "" && tc.DestSys != sys.ID {
-		s.trafficHop(sys, e, tc, dest)
+		s.trafficGateCycle(sys, e, tc, dest)
 		return
 	}
 	if dest.Station != nil {
-		s.trafficDeliver(sys, e, tc, dest)
+		s.trafficTurnaround(sys, e, tc, dest)
 		return
 	}
 	s.trafficLoseWish(tc) // a wish never routes to a belt/gate end (To is a station)
 	s.destroy(e)
 }
 
-// trafficHop completes a cross-system leg: the hauler jumps through the
-// gate it reached and the shipment parks as a journey (Save.TrafficJourneys)
-// in the far system — it flies on when that grid loads next. The far-system
-// leg is a NEW leg: its ambush roll is unconsumed (per-leg risk under the
-// destination's own security), and any live ambush dies with this grid.
+// trafficGateCycle is the gate half of the beat: the hauler dwells at the
+// gate it reached (jittered statelessly) before trafficHop runs, so a
+// cross-system shipment never teleports onward on the tick of arrival.
+func (s *Sim) trafficGateCycle(sys *content.SystemDef, e ecs.Entity, tc *Traffic, gate *content.CelestialDef) {
+	if tc.Phase != TrafficGate { // first contact: arm the dwell
+		tc.Phase = TrafficGate
+		tc.Next = s.time + float64(trafficBeat(beatKey(e, "gate"),
+			trafficGateDwellMin, trafficGateDwellMax))*DT
+		return
+	}
+	if s.time < tc.Next {
+		return
+	}
+	s.trafficHop(sys, e, tc, gate)
+}
+
+// trafficTurnaround is the station half of the beat: approach, then the
+// docked dwell — the cargo/market action fires partway through it, never
+// at the instant of contact — then undock + departure beat before the
+// hauler leaves the grid. Each stage arms its own jittered deadline.
+func (s *Sim) trafficTurnaround(sys *content.SystemDef, e ecs.Entity, tc *Traffic, dest *content.CelestialDef) {
+	switch tc.Phase {
+	case TrafficApproach:
+		if s.time < tc.Next {
+			return
+		}
+		tc.Phase = TrafficDock
+		tc.Next = s.time + float64(trafficBeat(beatKey(e, "dock"),
+			trafficDockMin, trafficDockMax))*DT
+	case TrafficDock:
+		if s.time < tc.Next {
+			return
+		}
+		// Cargo action, partway through the dwell: the shipment posts (and
+		// a wish shipment settles its haul) now — not at first contact.
+		s.trafficDeliver(sys, e, tc, dest)
+		tc.Phase = TrafficBerth
+		tc.Next = s.time + float64(trafficBeat(beatKey(e, "berth"),
+			trafficBerthMin, trafficBerthMax))*DT
+	case TrafficBerth:
+		if s.time < tc.Next {
+			return
+		}
+		tc.Phase = TrafficUndock
+		tc.Next = s.time + float64(trafficBeat(beatKey(e, "undock"),
+			trafficDepartBeatMin, trafficDepartBeatMax))*DT
+	case TrafficUndock:
+		if s.time < tc.Next {
+			return
+		}
+		s.destroy(e)
+	default: // first contact (transit / unknown): arm the approach
+		tc.Phase = TrafficApproach
+		tc.Next = s.time + float64(trafficBeat(beatKey(e, "approach"),
+			trafficApproachMin, trafficApproachMax))*DT
+	}
+}
+
+// trafficHop completes a cross-system leg: the hauler dwells out its gate
+// cycle (see trafficGateCycle — the caller arms TrafficGate first), then
+// jumps through the gate it reached and the shipment parks as a journey
+// (Save.TrafficJourneys) in the far system — it flies on when that grid
+// loads next. The parked entry carries a jump cycle (jittered from the
+// same pure hashes): between hop-out and materializing at the destination
+// gate there is always a floor, so an arrival is never instantaneous even
+// when the player follows straight behind. The far-system leg is a NEW
+// leg: its ambush roll is unconsumed (per-leg risk under the destination's
+// own security), and any live ambush dies with this grid.
 //
 // Gate queue: when the far system's parked ledger is already at its
 // ceiling (trafficMaxParkedJourneys), the journey HOLDS at its CURRENT
 // system instead — same provenance, same final destination, spawn position
 // kept where the hauler stands — and the hop is retried on later ticks
-// once the far queue drains (resume respawns it, it re-reaches the gate,
-// the ceiling is re-checked). A hold never hop-parks past the ceiling, is
+// once the far queue drains. A hold never hop-parks past the ceiling, is
 // never dropped, and never moves a unit of cargo (closed mass balance);
 // backlog therefore pushes upstream across the ring instead of stacking
 // unboundedly at one destination.
+//
+// Everything COMMENCES on the beat (the paced windows below): spawns and
+// resumes hold a departure beat, gate arrivals hold a gate cycle
+// (dwell → jump), station arrivals run a turnaround (approach → docked
+// dwell with the cargo action partway → undock + beat), and a hold logs
+// once when its episode begins. Every window is jittered from pure hashes
+// of (tick, canonical key) — stateless, entropy-free, schema-free — so the
+// delays change only WHEN things happen: the closed mass balance above is
+// untouched. The hold announces itself ONCE — on
+// entering the hold — because a held shipment then waits IN THE LEDGER
+// (the resume loop hops gate-standing entries straight across, see
+// trafficLedgerHop): no respawn/re-hold cycle exists to re-log, and the
+// successful jump below is the episode's follow-up line.
 func (s *Sim) trafficHop(sys *content.SystemDef, e ecs.Entity, tc *Traffic, gate *content.CelestialDef) {
 	if gate.Gate == nil {
 		// A cross-system leg always ends at a gate (route validation):
@@ -1035,6 +1167,10 @@ func (s *Sim) trafficHop(sys *content.SystemDef, e ecs.Entity, tc *Traffic, gate
 		System: nextSys, At: at, DestSys: tc.DestSys, DestCel: tc.DestCel,
 		Item: tc.Item, Qty: tc.Qty, Basis: tc.Basis, Hull: hull,
 		Owner: tc.Owner,
+		// Jump cycle: the continuation is not due at the destination gate
+		// until hop + 1..3 s (resume checks s.time < j.Next first).
+		Next: s.time + float64(trafficBeat(beatKey(e, "jump"),
+			trafficJumpCycleMin, trafficJumpCycleMax))*DT,
 	})
 	s.emit(Event{Kind: EvTraffic, Phase: TrafficJumped, Severity: SevInfo, Actor: e,
 		System: sys.ID, Cel: gate.ID, Item: tc.Item, Value: float64(tc.Qty),
@@ -1075,6 +1211,14 @@ func (s *Sim) trafficParkGrid() {
 		if sh, ok := s.Ships.Get(e); ok {
 			hull = sh.Hull
 		}
+		// A hauler parked DURING its turnaround's rest has already posted
+		// its hold (the cargo action cleared it) — it has no continuation:
+		// parking it would forge a journey claiming cargo that is already
+		// on the destination book (a ghost shipment that "delivers" twice).
+		// The undock beat is cosmetic; the grid rebuild discards the husk.
+		if tc.Phase == TrafficBerth || tc.Phase == TrafficUndock {
+			continue
+		}
 		destCel := tc.DestCel
 		if destCel == "" { // pre-cross-system Traffic: the leg target was the destination
 			destCel = tc.Dest
@@ -1088,8 +1232,12 @@ func (s *Sim) trafficParkGrid() {
 }
 
 // trafficResumeJourneys respawns journeys waiting in the active grid,
-// behind two stateless gates so a deep ledger can never unload as one fleet:
+// behind three stateless gates so a deep ledger can never unload as one
+// fleet:
 //
+//   - jump cycle / carried deadline: a journey whose Traffic.Next is still
+//     in the future (the hop's jump cycle, or a stage deadline a grid
+//     rebuild froze mid-stage) waits where it is;
 //   - live cap: at most (trafficMaxLive − live haulers on this grid) spawns
 //     per tick — the same cap the fresh schedules enforce, so first entry
 //     into a system shows ordinary traffic density and the backlog drains
@@ -1097,6 +1245,14 @@ func (s *Sim) trafficParkGrid() {
 //   - departure stagger: each ledger entry fires on its own stateless
 //     schedule (trafficDue keyed by system + ledger position), so resumed
 //     convoys spread across ticks instead of aligning and warping together.
+//
+// Gate-standing entries — a shipment already standing at its next-hop gate
+// (a gate hold, or a park frozen mid-gate-cycle) — never respawn a hauler
+// just to jump again: they hop straight from the ledger once the far
+// queue has room (trafficLedgerHop), and keep waiting silently while it is
+// full. That silence is what makes a hold episode log exactly once — the
+// live hauler can only hold on its FIRST arrival; every later retry is a
+// ledger operation.
 //
 // Selection walks the ledger in canonical order; a gated journey simply
 // keeps its entry for a later tick (nothing reschedules, and trafficPhase
@@ -1111,11 +1267,24 @@ func (s *Sim) trafficResumeJourneys(sys *content.SystemDef) {
 	if len(s.trafficJourneys) == 0 {
 		return
 	}
+	// A gate-standing entry may hop (or keep waiting) only after its own
+	// resume schedule fires; classified first, resolved after `kept` is
+	// installed so the ceiling counts this tick's hops as they land.
+	type gateStanding struct {
+		j    TrafficJourney
+		i    int
+		gate *content.CelestialDef
+	}
 	budget := trafficMaxLive - s.Traffic.Len()
 	kept := make([]TrafficJourney, 0, len(s.trafficJourneys))
+	var standing []gateStanding
 	for i := range s.trafficJourneys {
 		j := s.trafficJourneys[i]
 		if j.System != s.systemID {
+			kept = append(kept, j)
+			continue
+		}
+		if s.time < j.Next { // jump cycle / a frozen stage deadline
 			kept = append(kept, j)
 			continue
 		}
@@ -1138,6 +1307,16 @@ func (s *Sim) trafficResumeJourneys(sys *content.SystemDef) {
 			s.trafficJourneyLost(sys, j, destSys)
 			continue
 		}
+		// Standing at its own next-hop gate: it needs no flight before the
+		// hop (the same warpLandRange measure the drive loop uses), so it
+		// continues from the ledger — never through a spawn.
+		if destSys != s.systemID {
+			if gate := sysCelestial(sys, target); gate != nil && gate.Gate != nil &&
+				j.At.Dist(gate.Position) <= warpLandRange {
+				standing = append(standing, gateStanding{j: j, i: i, gate: gate})
+				continue
+			}
+		}
 		if budget <= 0 ||
 			!trafficDue(s.ticks, string(s.systemID)+"|resume|"+itoaN(i), trafficResumeInterval) {
 			kept = append(kept, j)
@@ -1147,11 +1326,54 @@ func (s *Sim) trafficResumeJourneys(sys *content.SystemDef) {
 		s.spawnResumedHauler(sys, hull, j, target)
 	}
 	s.trafficJourneys = kept
+	for _, h := range standing {
+		if !trafficDue(s.ticks, string(s.systemID)+"|resume|"+itoaN(h.i), trafficResumeInterval) {
+			s.trafficJourneys = append(s.trafficJourneys, h.j)
+			continue
+		}
+		s.trafficLedgerHop(sys, h.j, h.gate)
+	}
+}
+
+// trafficLedgerHop jumps a gate-standing journey straight from the ledger
+// (see trafficResumeJourneys): no hauler spawns just to jump again, and a
+// far queue still at its ceiling keeps the entry here — silently, because
+// the hold's one announcement already fired when the episode began. The
+// far entry carries the jump cycle's floor (hop → materialize) exactly
+// like trafficHop's park.
+func (s *Sim) trafficLedgerHop(sys *content.SystemDef, j TrafficJourney, gate *content.CelestialDef) {
+	nextSys := gate.Gate.ToSystem
+	nextDef, ok := s.Content.System(nextSys)
+	if !ok {
+		s.trafficJourneyLost(sys, j, nextSys)
+		return
+	}
+	if s.trafficParkedIn(nextSys) >= trafficMaxParkedJourneys {
+		s.trafficJourneys = append(s.trafficJourneys, j) // hold continues, quietly
+		return
+	}
+	entry := sysCelestial(nextDef, gate.Gate.ToCel)
+	var at core.Vec2
+	if entry != nil {
+		at = entry.Position
+	}
+	j.System = nextSys
+	j.At = at
+	j.Rolled = false // a hop is a NEW leg: the far ambush roll is unconsumed
+	j.Next = s.time + float64(trafficBeat(
+		string(sys.ID)+"|jump|"+string(j.DestCel)+"|"+string(j.Item),
+		trafficJumpCycleMin, trafficJumpCycleMax))*DT
+	s.trafficJourneys = append(s.trafficJourneys, j)
+	s.emit(Event{Kind: EvTraffic, Phase: TrafficJumped, Severity: SevInfo,
+		System: sys.ID, Cel: gate.ID, Item: j.Item, Value: float64(j.Qty),
+		Text: "Convoy hauler jumps through " + gate.Name + " to " + nextDef.Name})
 }
 
 // spawnResumedHauler re-creates a parked shipment's hauler at its recorded
 // position with its provenance intact and announces the continuation. No
-// RNG draws: the parked position is exact.
+// RNG draws: the parked position is exact. The carried Next only gated the
+// resume itself — createHauler arms a fresh departure beat, so a
+// materialized continuation holds before its onward warp like every spawn.
 func (s *Sim) spawnResumedHauler(sys *content.SystemDef, hull *content.ShipDef, j TrafficJourney, target content.CelID) {
 	e := s.createHauler(hull, j.At, 0, Traffic{
 		Dest: target, DestSys: j.DestSys, DestCel: j.DestCel,
@@ -1299,7 +1521,18 @@ func (s *Sim) trafficDeliver(sys *content.SystemDef, e ecs.Entity, tc *Traffic, 
 	if agent != nil {
 		s.trafficSettleWish(agent, tc, dest.ID)
 	}
-	s.destroy(e)
+	// The cargo action offloads the hold: the units posted above ARE the
+	// shipment, so from here the standing hauler carries nothing (the
+	// closed mass balance counts cargo once — in the book, never in the
+	// hold as well — and a kill during the rest of the turnaround wrecks
+	// an empty ship).
+	if c, ok := s.Cargos.Get(e); ok {
+		c.Stacks = nil
+		s.Cargos.Set(e, *c)
+	}
+	// The hauler does NOT leave here: trafficTurnaround keeps it standing
+	// through the rest of the docked dwell and despawns it after the
+	// undock departure beat.
 }
 
 // trafficHaulerDestroyed resolves a lost convoy hauler (raider kill or
@@ -1310,17 +1543,24 @@ func (s *Sim) trafficDeliver(sys *content.SystemDef, e ecs.Entity, tc *Traffic, 
 // the hauler spawned, and a shipment that never arrived never touched the
 // destination book.
 func (s *Sim) trafficHaulerDestroyed(e ecs.Entity, tc *Traffic) {
+	// A hauler killed DURING its turnaround's rest (post-delivery: the
+	// cargo action already posted the hold and settled the wish) is just a
+	// lost ship — the shipment arrived, so no risk premium speaks and the
+	// wreck carries nothing. Pre-delivery deaths keep every loss signal.
+	delivered := tc.Phase == TrafficBerth || tc.Phase == TrafficUndock
 	// A wish shipment dies with its hauler: the goods were debited at
 	// spawn (they ride the wreck), so the agent is never paid and its
 	// wish is dropped — the events below are the existing loss signals.
-	s.trafficLoseWish(tc)
+	if !delivered {
+		s.trafficLoseWish(tc)
+	}
 	destName := ""
 	if sys := s.System(); sys != nil {
 		if d := sysCelestial(sys, tc.Dest); d != nil {
 			destName = d.Name
 		}
 	}
-	if destName != "" {
+	if destName != "" && !delivered {
 		s.emit(Event{Kind: EvMarket, Severity: SevWarning, System: s.systemID, Item: tc.Item,
 			Value: float64(tc.Qty),
 			Text: "Risk premium — " + s.itemName(tc.Item) +
@@ -1328,9 +1568,13 @@ func (s *Sim) trafficHaulerDestroyed(e ecs.Entity, tc *Traffic) {
 	}
 
 	nearID, nearName := s.nearestLandmark(mustPos(s, e))
+	cargoTail := " with its cargo"
+	if delivered {
+		cargoTail = ""
+	}
 	s.emit(Event{Kind: EvTraffic, Phase: TrafficDestroyed, Severity: SevDanger, Actor: e,
 		System: s.systemID, Cel: nearID, Item: tc.Item, Value: float64(tc.Qty),
-		Text: "Convoy hauler destroyed with its cargo near " + nearName})
+		Text: "Convoy hauler destroyed" + cargoTail + " near " + nearName})
 	if atk := tc.Attack; atk != nil && atk.Outcome == "" {
 		atk.Outcome = TrafficOutcomeDestroyed
 		s.scheduleRaidersLeave(atk)

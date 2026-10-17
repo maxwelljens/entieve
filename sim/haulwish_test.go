@@ -76,7 +76,41 @@ func seedWishAgent(t *testing.T, s *Sim, id string, home StationID, item content
 	addTestAgent(s, id, RoleIndustrialist, home, 100_000)
 	a := agentOf(s, id)
 	addInv(a, item, qty)
-	stepPasses(s, 1)
+	// Stand the surplus ask up front — exactly the quote the pass itself
+	// posts (reservation × the opening margin: belief × (1 − needPremium)
+	// × (1 + zipMarginInit), tick-quantized). Paced acts let a contract
+	// slot reach its 60-tick wish poll before any quote slot has run, and
+	// the fixture needs HOME-station data standing from tick 0 so the wish
+	// lists From = home (the pass later computes the same limit and its
+	// quote rests on top of this one — same price, no cancel, no fee).
+	belief := s.agentBelief(a, item)
+	limit := quantizeTick(belief * (1 + needPremium*agentNeed(0, qty)) * (1 + zipMarginInit))
+	res, ok := s.PlaceOrder(home, OrderSell, item, qty, limit, agentOwnerTag(a.ID))
+	if !ok {
+		t.Fatalf("fixture: agent surplus ask refused at %v", limit)
+	}
+	// Ledger it like the pass would (escrow stays in Inventory; the free
+	// stock is what the poll sources), so spawn-time sourcing cancels this
+	// very ask — the "sourced from the agent's own ask" pins below.
+	a.Orders = append(a.Orders, AgentOrder{ID: res.ID, Station: home,
+		Side: OrderSell, Item: item, Price: limit, Qty: qty})
+	// Step only until THIS agent's wish lists its home station, and stop
+	// before a wish-poll tick could launch the fixture's shipment before
+	// the caller arranges its books.
+	for i := 0; i < 4000; i++ {
+		mine := false
+		for _, w := range s.HaulWishes() {
+			if w.From == home {
+				mine = true
+				break
+			}
+		}
+		if mine {
+			return a
+		}
+		s.Step()
+	}
+	t.Fatal("seeded agent never authored its wish from its home station")
 	return a
 }
 
@@ -210,8 +244,14 @@ func TestHaulWishSpawnsConvoyAndDelivers(t *testing.T) {
 
 	// …and delivers. The agent quotes nothing while its goods are in
 	// flight (no stock, no resting orders), so its capital is frozen: the
-	// only movement on the delivery tick is the haul fee.
-	wantAsk := quantizeTick(a.Beliefs["min-ferrite"] * (1 + a.Margin["min-ferrite"]))
+	// only movement on the delivery tick is the haul fee. The reservation
+	// mirrors agentHaulAsk's rule: belief × current ZIP margin, with the
+	// opening margin standing until a pass actually sets one.
+	µ := a.Margin["min-ferrite"]
+	if µ <= 0 {
+		µ = zipMarginInit
+	}
+	wantAsk := quantizeTick(a.Beliefs["min-ferrite"] * (1 + µ))
 	if wantAsk <= 0 {
 		t.Fatal("fixture: agent has no reservation ask for min-ferrite")
 	}
@@ -290,33 +330,38 @@ func TestHaulWishStaleSpreadSkipsSpawn(t *testing.T) {
 		t.Fatal("fixture: destination ask not found")
 	}
 	drain(s)
+	// Fixture state, checked before any paced act could churn it: the skip
+	// below must not source the origin — the agent still holds stock and
+	// its own ask stands.
+	if q, p := askAt(s, "cel-a-dock", "min-ferrite"); q != 20 || p != 8.25 {
+		t.Fatalf("origin ask = %d @ %v, want 20 @ 8.25 (fixture)", q, p)
+	}
 
 	var evs []Event
 	if runUntil(t, s, &evs, 4*trafficWishInterval, func() bool { return wishHaulers(s) > 0 }) {
 		t.Fatal("stale wish spawned a convoy")
 	}
-	if len(s.HaulWishes()) != 1 {
-		t.Fatalf("wishes after the skip = %+v, want the stale one left pending", s.HaulWishes())
-	}
-	// Nothing was sourced: the agent still holds its stock and its ask.
+	// Nothing was sourced: the agent still holds its stock. (The wish
+	// itself may already be pruned — a paced contract act inside the
+	// window rebuilds from live spreads legally; spawning is what must
+	// never happen.)
 	if n := a.Inventory["min-ferrite"]; n != 20 {
 		t.Fatalf("agent stock = %d, want 20 (no spawn, no debit)", n)
-	}
-	if q, p := askAt(s, "cel-a-dock", "min-ferrite"); q != 20 || p != 8.25 {
-		t.Fatalf("origin ask = %d @ %v, want 20 @ 8.25 (untouched)", q, p)
 	}
 	if len(a.InFlight) != 0 {
 		t.Fatalf("in-flight = %+v, want none", a.InFlight)
 	}
 
-	// The next behavior pass rebuilds from live spreads: the stale wish is
+	// The next contract acts rebuild from live spreads: the stale wish is
 	// pruned (any survivor of the rebuild still cannot pay the fee).
-	stepPasses(s, 1)
-	for _, w := range s.HaulWishes() {
-		if w.To == "cel-b-dock" {
-			t.Fatalf("stale wish survived the pass: %+v", w)
+	stepUntil(t, s, 12000, func() bool {
+		for _, w := range s.HaulWishes() {
+			if w.To == "cel-b-dock" {
+				return false
+			}
 		}
-	}
+		return true
+	}, "stale wish survived the contract acts")
 	if runUntil(t, s, &evs, 3*trafficWishInterval, func() bool { return wishHaulers(s) > 0 }) {
 		t.Fatal("a rebuilt wish spawned although its spread cannot pay the fee")
 	}
@@ -336,18 +381,25 @@ func TestHaulWishUnfundedWishSkippedAndPruned(t *testing.T) {
 	}
 	// Free capital below the wish's own MaxCost (and below the pinned fee).
 	a.Capital = dormantCapital + 1
+	// Still pending before any tick: nothing has sourced it yet.
+	if len(s.HaulWishes()) != 1 {
+		t.Fatalf("wishes after the skip = %+v, want it left pending", s.HaulWishes())
+	}
 
+	// The poll skips it (nothing spawned, nothing sourced) — and its own
+	// contract act may prune it mid-window now that acts are paced: both
+	// are legal, spawning is not.
 	var evs []Event
 	if runUntil(t, s, &evs, 4*trafficWishInterval, func() bool { return wishHaulers(s) > 0 }) {
 		t.Fatal("unfunded wish spawned a convoy")
 	}
-	if len(s.HaulWishes()) != 1 {
-		t.Fatalf("wishes after the skip = %+v, want it left pending", s.HaulWishes())
-	}
 	if n := a.Inventory["min-ferrite"]; n != 20 {
 		t.Fatalf("agent stock = %d, want 20 (nothing sourced)", n)
 	}
-	stepPasses(s, 1)
+	// The next contract act rebuilds from live spreads: an unfundable wish
+	// cannot survive it.
+	stepUntil(t, s, 12000, func() bool { return len(s.HaulWishes()) == 0 },
+		"unfunded wish never pruned")
 	if n := len(s.HaulWishes()); n != 0 {
 		t.Fatalf("wishes after the pass = %d, want 0 (pruned: unfundable)", n)
 	}
@@ -430,7 +482,10 @@ func TestHaulWishSharesLiveCap(t *testing.T) {
 	for i := 1; i <= 7; i++ {
 		addInv(agentOf(s, "ag-0"+itoaN(i)), "min-ferrite", 20)
 	}
-	stepPasses(s, 1)
+	// Each of the seven agents authors its wish on its own contract slot —
+	// wait for the seventh rather than a pass boundary.
+	stepUntil(t, s, 30000, func() bool { return len(s.HaulWishes()) >= 7 },
+		"not every agent authored its wish")
 	if n := len(s.HaulWishes()); n != 7 {
 		t.Fatalf("wishes = %d, want 7 (one per agent)", n)
 	}

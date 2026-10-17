@@ -406,10 +406,14 @@ func TestTrafficLifecycleDeliveryOrder(t *testing.T) {
 	if delivered.Item != "min-ferrite" || delivered.Value != 100 {
 		t.Fatalf("delivered item/value = %q/%v, want min-ferrite/100", delivered.Item, delivered.Value)
 	}
-	// The delivering hauler despawned (its entity is gone).
-	if s.World.Alive(delivered.Actor) {
-		t.Fatal("hauler still alive after delivery")
+	// The delivering hauler stands out its turnaround: the cargo action
+	// (the delivery above) fired partway through the docked dwell, and the
+	// ship only leaves the grid after the undock departure beat.
+	if !s.World.Alive(delivered.Actor) {
+		t.Fatal("hauler vanished at the cargo action — no turnaround")
 	}
+	stepUntil(t, s, 2000, func() bool { return !s.World.Alive(delivered.Actor) },
+		"delivered hauler never despawned after its turnaround")
 	// Provenance: the 100 units were fulfilled from Haven Rest's ask AT
 	// SPAWN (500 -> 400 — the withdrawal is a transfer, never a trade) and
 	// list as supply on Dock Two's book — one tick under the 10.00 € cost

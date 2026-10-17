@@ -97,7 +97,7 @@ func TestNpcHaulerLegRunsPlayerWarpProcess(t *testing.T) {
 	alignStepBound := m.MaxSpeed * DT     // sublight per-tick motion cap
 	warpSpeed := s.warpSpeedMS(e, m)
 
-	var tAlign, tWarp, tGone float64 = -1, -1, -1
+	var tAlign, tWarp, tLand float64 = -1, -1, -1
 	var warpDist, stepBound float64
 	sawAlign, sawWarp := false, false
 	prevPhase := ""
@@ -105,8 +105,10 @@ func TestNpcHaulerLegRunsPlayerWarpProcess(t *testing.T) {
 	for i := 0; i < 6000; i++ {
 		phase := warpPhaseOf(s, e)
 		if !s.World.Alive(e) {
-			tGone = s.time
 			break
+		}
+		if tLand >= 0 {
+			break // landed: the hauler now dwells at the endpoint (paced)
 		}
 		tr, _ := s.Transforms.Get(e)
 		tp := tr.Pos
@@ -125,17 +127,25 @@ func TestNpcHaulerLegRunsPlayerWarpProcess(t *testing.T) {
 		if phase == "align" && sawWarp {
 			t.Fatalf("align re-entered after the tunnel opened (t=%v)", s.time)
 		}
-		if phase != "warp" && tp.Dist(dp) <= warpLandRange {
-			// The only arrival path is the warp-land snap (announced by
-			// EvWarp "land"): no sublight sample before it may sit inside
-			// the tolerance. (The final tunnel step legitimately ends
-			// inside the tolerance — the next tick lands.)
+		// Before the warp ends, the hauler may never sit inside the
+		// tolerance — the only arrival path is the warp-land snap. Once
+		// the tunnel is behind it (sawWarp, no warp drive), it STANDS
+		// there: the paced gate cycle / turnaround is a legitimate stay.
+		// (The final tunnel step legitimately ends inside the tolerance —
+		// the next tick lands.)
+		landed := sawWarp && phase != "warp"
+		if !landed && phase != "warp" && tp.Dist(dp) <= warpLandRange {
 			t.Fatalf("hauler inside the landing tolerance during %q at t=%v", phase, s.time)
 		}
 		prevPhase = phase
 
 		s.Step()
 		evs = append(evs, drain(s)...)
+		for _, ev := range evs {
+			if ev.Kind == EvWarp && ev.Phase == "land" && ev.Actor == e && tLand < 0 {
+				tLand = ev.Time
+			}
+		}
 
 		// Per-tick displacement bound by the phase that flew the step: the
 		// warp flip happens after movement, so the transition step is still
@@ -150,8 +160,8 @@ func TestNpcHaulerLegRunsPlayerWarpProcess(t *testing.T) {
 			}
 		}
 	}
-	if tGone < 0 {
-		t.Fatal("hauler never completed the leg")
+	if tLand < 0 {
+		t.Fatal("hauler never landed its leg")
 	}
 	if !sawAlign || !sawWarp {
 		t.Fatalf("phases observed: align=%v warp=%v, want both", sawAlign, sawWarp)
@@ -162,27 +172,56 @@ func TestNpcHaulerLegRunsPlayerWarpProcess(t *testing.T) {
 	if d := tWarp - tAlign; d < alignGate-2*DT || d > alignGate+4*DT {
 		t.Errorf("align = %.2fs, want %.2fs (0.75 x Agility x 10)", d, alignGate)
 	}
-	// Tunnel: the shared three-segment profile, closed form.
+	// Tunnel: the shared three-segment profile, closed form (warp land to
+	// warp land — the departure beat and turnaround happen around it, never
+	// inside it).
 	want := warpTunnelExpected(warpDist, warpSpeed)
-	if d := tGone - tWarp; math.Abs(d-want) > 0.2 {
+	if d := tLand - tWarp; math.Abs(d-want) > 0.2 {
 		t.Errorf("tunnel = %.2fs, want %.2fs (profile over %v m at %.0f m/s)", d, want, warpDist, warpSpeed)
 	}
 
 	// The arrival is a warp LAND, announced and delivered — the hauler
-	// never stood inside the tolerance before the snap.
-	land := findEvent(evs, EvWarp, "Warp complete")
-	if land == nil || land.Actor != e {
+	// never stood inside the tolerance before the snap. (Filtered by
+	// actor: other lanes' haulers warp in this fixture too.)
+	var land *Event
+	for i := range evs {
+		if evs[i].Kind == EvWarp && evs[i].Phase == "land" && evs[i].Actor == e {
+			land = &evs[i]
+			break
+		}
+	}
+	if land == nil {
 		t.Fatalf("no warp land event for the hauler: %v", evs)
 	}
 	if tWarp >= land.Time {
 		t.Fatalf("land at %.2f not after tunnel start %.2f", land.Time, tWarp)
 	}
-	delivered := firstPhase(evs, EvTraffic, TrafficDelivered)
-	if delivered == nil || delivered.Actor != e {
-		t.Fatalf("no delivery event for the hauler: %v", trafficTexts(evs))
+	// The cargo action fires partway through the turnaround, after the
+	// land — wait for THIS hauler's delivery (other lanes deliver in the
+	// fixture too) rather than pinning the tick.
+	var evidence *Event
+	for i := 0; i < 6000; i++ {
+		s.Step()
+		evs = append(evs, drain(s)...)
+		for j := range evs {
+			if evs[j].Kind == EvTraffic && evs[j].Phase == TrafficDelivered &&
+				evs[j].Actor == e {
+				evidence = &evs[j]
+				break
+			}
+		}
+		if evidence != nil {
+			break
+		}
+		if !s.World.Alive(e) {
+			t.Fatalf("hauler gone without its delivery event: %v", trafficTexts(evs))
+		}
 	}
-	if delivered.Time < land.Time {
-		t.Fatalf("delivered at %.2f before the warp landed at %.2f", delivered.Time, land.Time)
+	if evidence == nil {
+		t.Fatalf("hauler never delivered after landing: %v", trafficTexts(evs))
+	}
+	if evidence.Time < land.Time {
+		t.Fatalf("delivered at %.2f before the warp landed at %.2f", evidence.Time, land.Time)
 	}
 }
 

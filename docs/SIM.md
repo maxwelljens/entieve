@@ -79,9 +79,22 @@ last so the rebuilt grid is never observed mid-Step.
   id), jobs ascending by id, craft by (station, family), agents ascending
   by id. Map iteration never reaches behavior or serialization.
 - **Stateless schedules.** Convoy/patrol cadences are hashes of
-  (tick, key, interval) (`trafficDue`), not persisted timers; agent passes
-  fire on tick modulo cadence. A skipped spawn attempt never reschedules
-  anything.
+  (tick, key, interval) (`trafficDue`), not persisted timers; agent acts
+  fire on each agent's own hashed cooldown (`agentCooldownTicks`). A
+  skipped spawn attempt never reschedules anything.
+- **The beat — paced commencement.** Nothing commences the tick it first
+  becomes possible (CONTEXT.md: departure beat / gate cycle / turnaround /
+  agent cooldown): spawns and resumes hold a departure beat (120–480
+  ticks), gate arrivals hold a gate cycle (dwell 120–300, then a jump
+  cycle of 60–180 between hop-out and materializing at the destination
+  gate), station arrivals run a turnaround (approach 120–240, then a
+  docked dwell of 300–900 whose cargo action fires partway through, then
+  undock + departure beat), and each agent's capital actions sit at least
+  one jittered cooldown (60–600 ticks) apart, at most one capital-moving
+  step per act. Every window is jittered by `trafficBeat` — a pure hash of
+  (tick, canonical key), no entropy — and the running deadlines ride the
+  already-persisted `Traffic.Next`/`Traffic.Phase` fields, so the beat
+  changes no save schema.
 - **Twin-run tests.** `sim/determinism_test.go`, `sim/world_metabolism_test.go`,
   `sim/traffic_test.go` and friends drive two sims through the same
   commands and compare `Hash()`.
@@ -187,6 +200,16 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    their system loads next; multi-hop routing finds the next gate toward
    the destination (`trafficNextHop`). Authored interval lanes
    (`content/data/traffic/`) coexist with this ledger.
+   Everything commences on the beat (this file's §2): a departure beat
+   after spawn/resume, the gate cycle at stargates (dwell → hop → jump
+   cycle), and a turnaround at station endpoints — approach, then the
+   docked dwell with the delivery posting partway through (the hold
+   leaves the hauler exactly when the book gains it, so the units are
+   counted once), then undock + departure beat before the hauler leaves
+   the grid. A gate-queue hold announces itself once on entering the
+   hold: the held shipment waits in the ledger and hops straight across
+   once the far queue drains, closing the episode with one jump line —
+   no respawn/re-hold cycle exists to re-log.
 5. **Consumption — real burns.** Guns consume charges per shot (dry guns
    refuse to fire). Every 3600 ticks each market station's **upkeep** cycle
    burns a 5,000 € maintenance fee and buys a repair/rearm basket (every
@@ -262,9 +285,14 @@ quarter of free capital, and an agent under 1 € takes no actions at all.
    break-even by construction); traders market-make and stockpile a small
    basket.
 
-**Cadence.** Resting fills settle every tick (`agentSettle`); the full
-behavior pass every 300 ticks; station upkeep every 3600 ticks. Agents
-iterate in ascending id order everywhere and draw zero RNG.
+**Cadence.** Resting fills settle every tick (`agentSettle`); each agent's
+behavior act fires on its own stateless cooldown (a hashed 60–600-tick
+window per agent id — CONTEXT.md "agent cooldown"), and one act performs
+at most ONE capital-moving step: the applicable steps of {commission a
+job, quote orders, contract a haul wish} rotate on a hashed slot of the
+act ordinal, so two capital-moving actions are never less than one
+cooldown apart. Station upkeep every 3600 ticks. Agents iterate in
+ascending id order everywhere and draw zero RNG.
 
 **Haul wishes and fulfillment.** Traders and industrialists rebuild a wish
 list each pass: for every item they hold or quote, when the cheapest and

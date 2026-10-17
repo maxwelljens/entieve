@@ -30,10 +30,14 @@ package sim
 //     to [zipMarginMin, zipMarginMax].
 //
 //   - Cadence. Resting fills settle every tick (agentSettle); the full
-//     behavior pass runs every agentPassTicks; station upkeep every
-//     agentUpkeepTicks. Canonical order everywhere — agents ascending id,
-//     items/recipes/stations sorted, maps point-looked-up only — and ZERO
-//     RNG draws (imputation, ZIP and upkeep are pure math).
+//     behavior pass fires on each agent's OWN stateless cooldown
+//     (agentCooldownTicks: 1–10 s jittered from a pure hash — CONTEXT.md
+//     "agent cooldown"), and at most one capital-moving step runs per act
+//     (the job / quotes / wish slot rotates on the same hashes), so an
+//     agent never moves capital twice inside one cooldown. Station upkeep
+//     every agentUpkeepTicks. Canonical order everywhere — agents
+//     ascending id, items/recipes/stations sorted, maps point-looked-up
+//     only — and ZERO RNG draws (imputation, ZIP and upkeep are pure math).
 //
 // Bootstrap leanings (roles) are starting behaviors, not classes: miners
 // draw belt ore and sell it, industrialists buy materials / run jobs / sell
@@ -67,10 +71,20 @@ const (
 	// selector's denominator).
 	agentStartCapital = 250_000.0
 
-	// Cadence, in ticks: behavior pass every 300 ticks (5 sim seconds),
-	// station upkeep every 3600 ticks (60 sim seconds).
-	agentPassTicks   = int64(300)
+	// Cadence, in ticks: resting fills settle every tick; the behavior pass
+	// fires per agent on its own cooldown (agentCooldownMin..Max — a pure
+	// hash of tick + agent id, no persisted timer); station upkeep every
+	// agentUpkeepTicks.
+	agentPassTicks   = int64(300) // legacy pass cadence: the per-test stepping helper
 	agentUpkeepTicks = int64(3600)
+
+	// agentCooldownMin/Max is the agent pacing window (CONTEXT.md "agent
+	// cooldown"): one jittered cooldown in ticks per agent — 1..10 sim
+	// seconds — bounding how often an agent's behavior act fires and,
+	// with the one-capital-step-per-act rule in agentAct, how often it
+	// can move capital at all.
+	agentCooldownMin = int64(60)
+	agentCooldownMax = int64(600)
 
 	// beliefGamma is the EWMA weight on the last executed trade price
 	// (trade-price memory; own quotes never move a belief).
@@ -1444,10 +1458,27 @@ func (s *Sim) upkeepPass() {
 // The behavior pass
 // ---------------------------------------------------------------------------
 
+// agentKey is the pure schedule key of one agent (cooldown gate + act
+// slot): a string no map iteration can reorder.
+func agentKey(a *Agent) string { return "agent|" + a.ID }
+
+// agentCooldownTicks is one agent's pacing window (CONTEXT.md "agent
+// cooldown"): a jittered value in [agentCooldownMin, agentCooldownMax]
+// derived from the same pure hash the traffic schedules use. It is a
+// function of the id alone — no entropy, no persisted timer — so a
+// restored roster resumes on exactly its own cadence.
+func agentCooldownTicks(a *Agent) int64 {
+	const span = agentCooldownMax - agentCooldownMin + 1
+	return agentCooldownMin + int64(trafficPhase(agentKey(a))%uint64(span))
+}
+
 // agentAct runs one agent's full pass in canonical order: settle its view
 // of the world (beliefs → values → plan), collect finished jobs, extract
-// (miner), commission (industrialist), quote (ZIP), append haul wishes.
-// A dormant agent (capital under dormantCapital) is fully inert.
+// (miner — work, not a capital move), then ONE capital-moving step: the
+// applicable steps of {commission a job, quote orders, contract a haul
+// wish} rotate on the agent's own stateless slot (act ordinal + id phase),
+// so an agent never performs two capital-moving actions inside one
+// cooldown. A dormant agent (capital under dormantCapital) is fully inert.
 func (s *Sim) agentAct(a *Agent) {
 	if a.Capital < dormantCapital {
 		return
@@ -1460,21 +1491,44 @@ func (s *Sim) agentAct(a *Agent) {
 	if a.Role == RoleMiner {
 		s.agentDrawOre(a, p)
 	}
-	s.agentStartJob(a, &p)
 	quotes := s.agentQuotes(a, candidates, V, &p)
-	s.agentApplyQuotes(a, quotes)
+
+	key := agentKey(a)
+	c := agentCooldownTicks(a)
+	ord := (s.ticks + int64(trafficPhase(key)%uint64(c))) / c // this firing's ordinal: pure tick math
+	var kinds []string
+	if a.Role == RoleIndustrialist && p.recipe != "" {
+		kinds = append(kinds, "commission")
+	}
+	kinds = append(kinds, "quote")
+	if a.Role != RoleMiner {
+		kinds = append(kinds, "contract")
+	}
+	switch kinds[(uint64(ord)+trafficPhase(key))%uint64(len(kinds))] {
+	case "commission":
+		s.agentStartJob(a, &p)
+	case "quote":
+		s.agentApplyQuotes(a, quotes)
+	default: // contract: rebuild the haul-wish list
+		s.agentUpdateWishes(a)
+	}
 	if a.Role == RoleMiner {
 		a.Wishes = nil
-		return
 	}
-	s.agentUpdateWishes(a)
 }
 
-// agentPass runs every agent in ascending id order (the canonical roster
-// iteration — never map order).
+// agentPass runs every agent whose stateless cooldown fires this tick, in
+// ascending id order (the canonical roster iteration — never map order).
+// The gate is a pure hash of (tick, agent id): a skipped tick never
+// reschedules anything, and restore reproduces the cadence from the tick
+// count alone.
 func (s *Sim) agentPass() {
 	for i := range s.agents {
-		s.agentAct(&s.agents[i])
+		a := &s.agents[i]
+		if !trafficDue(s.ticks, agentKey(a), agentCooldownTicks(a)) {
+			continue
+		}
+		s.agentAct(a)
 	}
 }
 
