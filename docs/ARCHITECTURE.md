@@ -479,7 +479,7 @@ anatomy lives in `docs/SIM.md`):
 17. `industry` (manufacturing jobs from recipes, craft growth and idle
     decay),
 18. `agents` (the ledger economy: settle resting fills every tick, the
-    agent behavior pass every 300 ticks, the station upkeep cycle every
+    agent behavior pass on per-agent cooldowns of 60-600 ticks, the station upkeep cycle every
     3600 ticks).
 
 After all systems, the **deferred player death respawn** runs (so a
