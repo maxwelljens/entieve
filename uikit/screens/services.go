@@ -2,7 +2,6 @@ package screens
 
 import (
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -22,8 +21,8 @@ import (
 // header it replaces, so the docked column's content height — and
 // therefore its clearance over the log — is unchanged.
 const (
-	// svcBtnW/svcBtnH are one icon button's design box: the rail's cell
-	// width over the header height the strip's Undock button had, so a
+	// svcBtnW/svcBtnH are one icon button's design box: the strip
+	// header's height over a square the 20 px glyph centres in, so a
 	// services row is exactly as tall as the row it replaces.
 	svcBtnW = 36
 	svcBtnH = 40
@@ -41,7 +40,9 @@ type svcButton struct {
 	screen  string
 	service string
 	label   string // tooltip title
+	cell    *widget.Container
 	btn     *widget.Button
+	glyph   *theme.IconBox
 	visible bool
 }
 
@@ -103,15 +104,32 @@ func NewServices(env widgets.Seams, innerWidth int) *Services {
 		b := &s.btns[i]
 		b.btn = widget.NewButton(
 			widget.ButtonOpts.Image(svcCellImages(p)),
-			widget.ButtonOpts.Graphic(&widget.GraphicImage{
-				Idle:     icons.Get(b.icon, theme.Px(theme.IconButton), p.Text),
-				Disabled: icons.Get(b.icon, theme.Px(theme.IconButton), iconColor(p.Dim, theme.IconDisabledA)),
-			}),
 			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(theme.Px(svcBtnW), theme.Px(svcBtnH)),
+				widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+					StretchHorizontal: true,
+					StretchVertical:   true,
+				}),
 				widget.WidgetOpts.MouseButtonClickedHandler(func(*widget.WidgetMouseButtonClickedEventArgs) { s.fire(b) }),
 			),
 		)
+		// The glyph is anchored by the cell, not ridden through the
+		// button's graphic slot: ebitenui lays that slot out as
+		// [empty label][10 px fixed spacing][graphic], a fixed
+		// right-offset that hung the glyph over the cell's right edge —
+		// the same defect the rail had (TestSvcIconsInsideCells pins the
+		// centring). The house icon box reports its real Px box to the
+		// layout (a bare Graphic would report 50×50).
+		b.glyph = theme.NewIconBox(theme.IconButton)
+		b.glyph.Widget().GetWidget().LayoutData = widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionCenter,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		}
+		b.glyph.Set(b.icon, p.Text)
+		b.cell = widget.NewContainer(
+			widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(svcBtnW), theme.Px(svcBtnH))),
+		)
+		b.cell.AddChild(b.btn, b.glyph.Widget()) // glyph last: it draws over the chrome
 	}
 
 	s.row = widget.NewContainer(
@@ -127,8 +145,10 @@ func NewServices(env widgets.Seams, innerWidth int) *Services {
 	centred(s.name)
 	s.row.AddChild(s.name)
 	for i := range s.btns {
-		centred(s.btns[i].btn)
-		s.row.AddChild(s.btns[i].btn)
+		// The row carries the cell (square + anchored glyph); Button()
+		// still hands tests and tooltips the button inside it.
+		centred(s.btns[i].cell)
+		s.row.AddChild(s.btns[i].cell)
 	}
 	s.Sync()
 	return s
@@ -195,6 +215,10 @@ func (s *Services) Sync() {
 		b := &s.btns[i]
 		show := b.service == "" || slices.Contains(info.Services, b.service)
 		b.visible = show
+		// Hide the whole cell (the glyph is its sibling) and the button
+		// handle alike: the row skips the cell's space, the pin reads the
+		// button's visibility, and a hidden button fires nothing.
+		theme.ShowWidget(b.cell.GetWidget(), show)
 		theme.ShowWidget(b.btn.GetWidget(), show)
 		if show {
 			visible++

@@ -88,6 +88,139 @@ func TestRailGeometry(t *testing.T) {
 	}
 }
 
+// TestRailIconsInsideCells pins the icon anchoring class the playtest
+// caught (defect: glyphs hung over the cell's right edge): every entry's
+// glyph rect sits strictly inside its button square with EQUAL margins
+// on all four sides (±1 px for integer centring), at scale 1 and 1.5.
+// The same cell draws the open-state glow and, collapsed, the rail keeps
+// only the edge tab — neither may move the glyph or leave the column.
+func TestRailIconsInsideCells(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		scale float64
+	}{{"scale 1", 1}, {"scale 1.5", 1.5}} {
+		t.Run(tc.name, func(t *testing.T) {
+			uitest.UseScale(t, tc.scale)
+			env, _ := newChromeEnv(t)
+			c := newChromeUI(env)
+			open := true // the glow cell: the glyph must not move with it
+			r := NewRail(env, railEntries3(&open))
+			c.AddPanel(r.Container(), r)
+			c.Frame(t, 1280, 720)
+
+			railRect := r.Container().GetWidget().Rect
+			for i, title := range []string{"Overview", "Fitting", "Market", "Scanner"} {
+				btn := r.Button(title)
+				if btn == nil {
+					t.Fatalf("no button for %q", title)
+				}
+				cell := btn.GetWidget().Rect
+				glyph := r.icons[i].Widget().GetWidget().Rect
+				if glyph.Dx() != theme.Px(railIcon) || glyph.Dy() != theme.Px(railIcon) {
+					t.Errorf("%s: glyph box = %v, want %d² design (the Px funnel)", title, glyph, railIcon)
+				}
+				if !glyph.In(cell) {
+					t.Errorf("%s: glyph %v escapes its cell %v", title, glyph, cell)
+					continue
+				}
+				l, rr := glyph.Min.X-cell.Min.X, cell.Max.X-glyph.Max.X
+				tp, b := glyph.Min.Y-cell.Min.Y, cell.Max.Y-glyph.Max.Y
+				if abs(l-rr) > 1 || abs(tp-b) > 1 {
+					t.Errorf("%s: glyph margins L%d R%d T%d B%d in %v, want equal ±1",
+						title, l, rr, tp, b, cell)
+				}
+				// Square glyph in a square cell: horizontal margins match
+				// the vertical ones too.
+				if abs(l-tp) > 1 {
+					t.Errorf("%s: glyph margins horizontal %d vs vertical %d in %v, want equal ±1",
+						title, l, tp, cell)
+				}
+				if cell.Dx() != theme.Px(RailInset) || cell.Dy() != theme.Px(RailInset) {
+					t.Errorf("%s: cell = %v, want a %d² square", title, cell, theme.Px(RailInset))
+				}
+			}
+
+			// The collapse tab rides inside the column with equal side
+			// margins (it stretches across the rail).
+			tab := r.Tab().GetWidget().Rect
+			if !tab.In(railRect) {
+				t.Errorf("tab %v outside the rail %v", tab, railRect)
+			}
+			if tl, tr := tab.Min.X-railRect.Min.X, railRect.Max.X-tab.Max.X; abs(tl-tr) > 1 {
+				t.Errorf("tab margins L%d R%d in %v, want equal ±1", tl, tr, railRect)
+			}
+		})
+	}
+}
+
+// TestRailColumnCapsAndScrolls: the host's viewport cap (what the game
+// passes at the design sizes) keeps the rail column inside its max
+// height — a tall entry table clips into a wheel-scrollable viewport
+// (the tables' convention: a notch moves the offset and the entries
+// with it) instead of running past the bottom edge — and no cap
+// restores the full column.
+func TestRailColumnCapsAndScrolls(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	c := newChromeUI(env)
+	open := false
+	r := NewRail(env, railEntries3(&open))
+	c.AddPanel(r.Container(), r)
+	c.Frame(t, 1280, 720)
+	full := r.Container().GetWidget().Rect.Dy()
+	// Cap below the full column: tab + head gap + one cell of list.
+	capPx := theme.Px(railTabH + railHeadGap + RailInset)
+	r.SetMaxHeight(capPx)
+	c.Frame(t, 1280, 720)
+	got := r.Container().GetWidget().Rect
+	if got.Dy() != capPx {
+		t.Errorf("capped column height = %d, want the cap %d (full was %d)", got.Dy(), capPx, full)
+	}
+	if got.Dy() >= full {
+		t.Fatalf("fixture: cap %d does not bind the full column %d", got.Dy(), full)
+	}
+	if over := r.scrollOverflow(); over <= 0 {
+		t.Fatalf("capped column overflow = %v, want > 0", over)
+	}
+	// Wheel up: the offset moves and the entries ride it.
+	top0 := r.icons[3].Widget().GetWidget().Rect.Min.Y
+	r.scroll.GetWidget().ScrolledEvent.Fire(&widget.WidgetScrolledEventArgs{Y: -2})
+	c.Update(t)
+	c.Frame(t, 1280, 720)
+	if r.scroll.ScrollTop <= 0 {
+		t.Fatalf("wheel: ScrollTop = %v, want > 0", r.scroll.ScrollTop)
+	}
+	if got := r.icons[3].Widget().GetWidget().Rect.Min.Y; got >= top0 {
+		t.Errorf("wheel: entry 3 at %d, want above %d (column scrolled)", got, top0)
+	}
+	// Uncap: the column returns to its full height.
+	r.SetMaxHeight(0)
+	c.Frame(t, 1280, 720)
+	if got := r.Container().GetWidget().Rect.Dy(); got != full {
+		t.Errorf("uncapped column height = %d, want the full %d", got, full)
+	}
+}
+
+// TestRailGutterAndGlyphLiterals pins the +75 % itself: the geometry
+// pins above derive from RailInset, so this one pins the constants —
+// the cell/gutter square 36 → 63 and the glyph grown with it
+// (20 → 35, the Button glyph's own ×1.75).
+func TestRailGutterAndGlyphLiterals(t *testing.T) {
+	if RailInset != 63 {
+		t.Errorf("RailInset = %d, want 63 (36 × 1.75)", RailInset)
+	}
+	if railIcon != 35 {
+		t.Errorf("railIcon = %d, want 35 (IconButton 20 × 1.75)", railIcon)
+	}
+}
+
+// abs is |v| (the geometry pins' tolerance helper).
+func abs(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
 // TestRailCollapseTabClicks: the edge tab toggles the collapse — the
 // gesture the settings sidecar then persists (the game mirrors
 // Collapsed into settings.json).

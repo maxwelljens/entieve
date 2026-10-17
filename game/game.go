@@ -821,6 +821,14 @@ func (g *Game) buildKit() error {
 // arrangement.
 func (g *Game) placeDefaults(w, h int) {
 	place := g.placeIfVirgin
+	// The rail column fits the viewport: cap it to the room under its
+	// top inset (plus the bottom margin every window keeps), so the
+	// entry column clips + wheel-scrolls inside the screen instead of
+	// running past the bottom edge at the design sizes (twelve 63 px
+	// cells outrun 720). Design-unit margins through the scale funnel.
+	if g.rail != nil {
+		g.rail.SetMaxHeight(h - theme.Px(uikit.RailTopInset) - theme.Px(10))
+	}
 	// Design-unit margins composed through the scale funnel: at scale 1
 	// these are exactly the historical pixels (the layout tests pin them).
 	ov := g.kit.OverviewWindow()

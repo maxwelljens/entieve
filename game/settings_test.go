@@ -299,11 +299,11 @@ func TestLayoutReturnsDevicePixelsAndOverUIAgrees(t *testing.T) {
 		t.Errorf("clamped Layout(640,480) = %d×%d, want 1536×1050 (min 1024×700 × 1.5)", w, h)
 	}
 	// Metrics agree with those units: the overview starts clear of the
-	// rail (design 8 + uikit.RailInset = 44 → 66 device px) at the
+	// rail (design 8 + uikit.RailInset = 71 → 107 device px) at the
 	// window row's design top (8 → 12), and its rect is the scaled one.
 	ov := g.kit.OverviewWindow().GetContainer().GetWidget().Rect
-	if ov.Min.X != 66 || ov.Min.Y != 12 {
-		t.Errorf("overview at device scale = %v, want to start at (66,12) (design 44,8 × 1.5)", ov)
+	if ov.Min.X != 107 || ov.Min.Y != 12 {
+		t.Errorf("overview at device scale = %v, want to start at (107,12) (design 71,8 × 1.5)", ov)
 	}
 
 	// Refresh ebitenui's hover flag from the real cursor (0,0) before

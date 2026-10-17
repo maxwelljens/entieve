@@ -114,6 +114,47 @@ func TestServicesEmitsTypedIntents(t *testing.T) {
 	}
 }
 
+// TestSvcIconsInsideCells pins the service row's icon anchoring (the
+// station overview's square buttons — the same graphic-row overshoot the
+// rail cells had): every glyph sits strictly inside its button square
+// with equal margins ±1 px, at scale 1 and 1.5, and the square itself
+// keeps its design box.
+func TestSvcIconsInsideCells(t *testing.T) {
+	for _, scale := range []float64{1, 1.5} {
+		uitest.UseScale(t, scale)
+		s, _, _ := newServicesView(t, 346, []string{"market", "fitting", "industry", "repair", "refine"})
+		checked := 0
+		for i := range s.btns {
+			b := &s.btns[i]
+			if !b.visible {
+				continue
+			}
+			cell := b.btn.GetWidget().Rect
+			glyph := b.glyph.Widget().GetWidget().Rect
+			if glyph.Dx() != theme.Px(theme.IconButton) || glyph.Dy() != theme.Px(theme.IconButton) {
+				t.Errorf("%s: glyph box = %v, want %d² design (the Px funnel)", b.name, glyph, theme.IconButton)
+			}
+			if cell.Dx() != theme.Px(svcBtnW) || cell.Dy() != theme.Px(svcBtnH) {
+				t.Errorf("%s: cell = %v, want %d×%d design box", b.name, cell, svcBtnW, svcBtnH)
+			}
+			if !glyph.In(cell) {
+				t.Errorf("%s: glyph %v escapes its cell %v", b.name, glyph, cell)
+				continue
+			}
+			l, r := glyph.Min.X-cell.Min.X, cell.Max.X-glyph.Max.X
+			tp, bt := glyph.Min.Y-cell.Min.Y, cell.Max.Y-glyph.Max.Y
+			if abs(l-r) > 1 || abs(tp-bt) > 1 {
+				t.Errorf("%s: glyph margins L%d R%d T%d B%d in %v, want equal ±1",
+					b.name, l, r, tp, bt, cell)
+			}
+			checked++
+		}
+		if checked == 0 {
+			t.Fatal("no visible service buttons to check")
+		}
+	}
+}
+
 // TestServicesIdentityAndFit: the identity line carries the station
 // name and system, and the whole row — identity over its buttons —
 // measures inside the column it is hosted in, so it can never push the
