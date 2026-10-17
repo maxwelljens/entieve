@@ -7,7 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Organic pace before every commencement** (`sim/system_traffic.go`,
+  `sim/system_agent.go`, `sim/agent.go`): convoys and economy agents no
+  longer act the instant it becomes possible — every window is tick-based
+  and deterministically jittered from the existing pure hashes (no RNG
+  draws, no new save fields: the running deadlines ride the already
+  persisted `Traffic.Next`/`Traffic.Phase`), so twin-run hashes and
+  save/load stay bit-identical while traffic gains a beat:
+  - *departure beat* — a spawned, resumed or arrived hauler holds
+    120–480 ticks before its leg warp commences (the warp physics are
+    untouched: align, tunnel and landing keep their pinned timeline);
+  - *gate cycle* — a cross-system hauler dwells 120–300 ticks at the gate
+    before the hop, and the parked journey carries a jump cycle of
+    60–180 ticks between hop-out and materializing at the destination
+    gate;
+  - *turnaround* — a station endpoint runs approach (120–240 ticks) → a
+    docked dwell (300–900 ticks) whose cargo/market action fires partway
+    through, never at the instant of contact (the hold leaves the hauler
+    exactly when the book gains it — the mass balance stays closed) →
+    undock + departure beat;
+  - *agent cooldown* — each ledger agent's behavior act fires on its own
+    hashed 60–600-tick cooldown, and one act performs at most one
+    capital-moving step (commission / quote / contract slots rotate on a
+    hashed act ordinal), so an agent never moves capital twice inside one
+    cooldown.
+  Vocabulary pinned in `CONTEXT.md` ("departure beat", "gate cycle",
+  "turnaround", "hold", "agent cooldown"); pins and conservation gates in
+  `sim/pacing_test.go`.
+
 ### Fixed
+
+- **Gate-queue hold chatter** (`sim/system_traffic.go`): the
+  "gate queue full, shipment waits in …" line now fires **once per hold
+  episode** — on entering the hold — with the shipment's eventual jump as
+  its single follow-up. A held shipment now waits in the journey ledger
+  (it stands at its gate; nothing respawns it just to re-hold), so retry
+  ticks are silent instead of re-logging roughly every resume window.
+  New pacing events follow the same discipline: state transitions only,
+  never per-tick or per-retry chatter.
 
 - **NPC fleet burst on first system entry** (`sim/system_traffic.go`): the
   cross-system journey ledger no longer dumps every parked shipment into a
