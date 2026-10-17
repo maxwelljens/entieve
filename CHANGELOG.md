@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Docking opens exactly one window.** The station scene no longer
+  force-opens the market/inventory/fitting trio (nor the factory at
+  industry stations): `StationScene.OnEnter` opens only the new station
+  services view and `OnLeave` closes only it, leaving every
+  player-opened window exactly as it was. The trio became ordinary
+  windows — the docked composition (`stationLayout` + the reclaim) still
+  places them, but only when the player opens them (rail, keys or the
+  services view's buttons). The `Screen.ForcedDockOpen` field is
+  **deleted**: composed membership now derives from
+  `DockPolicy == DockStation` alone, and with nothing force-open on
+  dock the `stationPrior` pre-dock-intent machinery went with it —
+  `persistOpen`/`applyLayout` record and restore the live state the
+  player last saw (the services view's flag is the scene's). The old
+  game-built station strip (`buildStationWindow`, `syncStationLabel`,
+  `setStrip`/`stShown`) is deleted: its identity line and Undock button
+  moved into the services view, its contract board rides the services
+  window, and the window mounts through the ordinary panel path.
 - **The contract board folds onto the table module** (`widgets.StackRow`,
   `widgets.StackLayout`): the table gains a modest rich-row capability —
   a `TableRow` may carry a **line stack** (`Stack []RowLine`) instead of
@@ -129,6 +146,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The left navigation rail (EVE-neocom).** Root-overlay chrome beside
+  the HUD and module rack, pinned to the left screen edge: one icon per
+  openable window, **derived from the Screen spec** — every
+  non-transient row becomes exactly one entry carrying its `Icon`,
+  `Title` display key and the row's new `Group` field
+  (`game/rail.go`), rendered in section order **Ship · Trade ·
+  Industry · Station · World · Help & System** with a hairline between
+  sections. The two core windows join the Ship section (they are
+  kit-owned chrome, not spec rows, and toggle through `Kit.ToggleCore`);
+  the Esc menu (transient) and the HUD/module rack (permanent ship
+  chrome) have no entries — `screenSpecErrors` now also rejects a
+  non-transient row without a rail icon or a known group, and a `Service`
+  field names the station service a window needs. A click emits
+  `Toggle{Title}` on the ActionSink: the first click opens (a fresh
+  mount lands on top of the stack), the second closes. Entries glow
+  with the rack's active-cell accent while their window is open, carry
+  the structured hover tooltip (icon + title + the row's `key — desc`
+  hint), and are **grayed — clicks inert — outside their context**:
+  `DockedOnly` in space, `SpaceOnly` while docked, and a
+  station-dependent entry (`Service`) at a station lacking that service.
+  A slim edge tab collapses the rail to its tab; the state persists as
+  `rail_collapsed` in `<save>.settings.json` (omitempty — the
+  documented default shape stays two keys, absent = expanded). Geometry
+  runs through the scale funnel: the expanded width is
+  `uikit.RailInset` (36 design px) and is also the left gutter every
+  default window keeps clear — the overview, scanner, log and the
+  docked station column all start right of it while their right edges
+  stay put, so the composition right of the left column is unchanged.
+- **The station services view** (`Station Services`, a `DockedOnly`
+  `DockStation` Screen row): the one window docking opens. Built from
+  `uikit.NewServices` — the docked-at identity (station name · system),
+  an **Undock** button, a **Cargo** button and one button per service
+  the station actually offers (Market / Fitting / Industry; absent
+  services are hidden, never grayed) — over the contract board, in the
+  left column of the docked composition. Every button emits a typed
+  intent (`Undock`, `Toggle{Screen}` with the spec's own titles); the
+  row is exactly as tall as the strip header it replaces, so the
+  column's worst-case height and its clearance over the log are
+  unchanged.
 - **Resolution-independent UI.** Every visible length — window floors and
   title bars, paddings and gaps, grip bands, icon boxes, tooltip cap,
   starmap, HUD ring/cards, the 21 px type scale — now flows through one

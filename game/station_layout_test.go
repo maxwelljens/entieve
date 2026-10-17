@@ -38,7 +38,7 @@ func logPocket(h int) image.Rectangle {
 // them; see the clearance note in station_layout.go.)
 func TestStationLayoutDisjoint1024(t *testing.T) {
 	checkStationLayout(t, 1024, 700, dockedLayout{
-		Station:   image.Rect(10, 8, 404, 434),
+		Station:   image.Rect(46, 8, 404, 434), // 46 = 10 + the rail gutter
 		Market:    image.Rect(406, 8, 1014, 248),
 		Inventory: image.Rect(406, 256, 706, 690),
 		Fitting:   image.Rect(714, 256, 1014, 690),
@@ -48,7 +48,7 @@ func TestStationLayoutDisjoint1024(t *testing.T) {
 // TestStationLayoutDisjoint1280 pins the default window size.
 func TestStationLayoutDisjoint1280(t *testing.T) {
 	checkStationLayout(t, 1280, 720, dockedLayout{
-		Station:   image.Rect(10, 8, 404, 434),
+		Station:   image.Rect(46, 8, 404, 434), // 46 = 10 + the rail gutter
 		Market:    image.Rect(406, 8, 1270, 248),
 		Inventory: image.Rect(406, 256, 834, 710),
 		Fitting:   image.Rect(842, 256, 1270, 710),
@@ -59,7 +59,7 @@ func TestStationLayoutDisjoint1280(t *testing.T) {
 // grows with the height, the bottom row keeps its content minimum.
 func TestStationLayoutDisjoint1920(t *testing.T) {
 	checkStationLayout(t, 1920, 1080, dockedLayout{
-		Station:   image.Rect(10, 8, 404, 434),
+		Station:   image.Rect(46, 8, 404, 434), // 46 = 10 + the rail gutter
 		Market:    image.Rect(406, 8, 1910, 359),
 		Inventory: image.Rect(406, 367, 1154, 1070),
 		Fitting:   image.Rect(1162, 367, 1910, 1070),
@@ -163,7 +163,7 @@ func TestStationLayoutAppliedAtDesignSizes(t *testing.T) {
 		g.syncMounts()
 		pump(t, g, w, h)
 
-		station := g.stationW.GetContainer().GetWidget().Rect
+		station := g.svcWin.GetContainer().GetWidget().Rect
 		lay := stationLayout(w, h, station.Dy())
 		got := dockedLayout{
 			Station:   station,
@@ -193,7 +193,7 @@ func TestStationLayoutAppliedAtDesignSizes(t *testing.T) {
 			win  *widget.Window
 			r    image.Rectangle
 		}{
-			{"station", g.stationW, got.Station},
+			{"station", g.svcWin, got.Station},
 			{"market", g.mkt.Win(), got.Market},
 			{"inventory", g.inv.Win(), got.Inventory},
 			{"fitting", g.fitt.Win(), got.Fitting},
@@ -291,14 +291,14 @@ func TestStationLayoutSavedWins(t *testing.T) {
 	}
 	// The sidecar says nothing about the inventory: it composes.
 	if got, want := g.inv.Win().GetContainer().GetWidget().Rect,
-		stationLayout(1280, 720, g.stationW.GetContainer().GetWidget().Rect.Dy()).Inventory; got != want {
+		stationLayout(1280, 720, g.svcWin.GetContainer().GetWidget().Rect.Dy()).Inventory; got != want {
 		t.Errorf("startup: virgin inventory = %v, want %v", got, want)
 	}
 
 	// Resize: the saved market stays put, the virgin windows recompose.
 	g.applySize(1024, 700)
 	pump(t, g, 1024, 700)
-	lay := stationLayout(1024, 700, g.stationW.GetContainer().GetWidget().Rect.Dy())
+	lay := stationLayout(1024, 700, g.svcWin.GetContainer().GetWidget().Rect.Dy())
 	if got := g.mkt.Win().GetContainer().GetWidget().Rect; got != saved {
 		t.Errorf("after resize: market = %v, want the saved %v (sidecar wins)", got, saved)
 	}
@@ -342,7 +342,7 @@ func TestPlaceDefaultsKeepsUserMoves(t *testing.T) {
 	}
 
 	// Virgin windows re-place for the new viewport.
-	lay := stationLayout(1024, 700, g.stationW.GetContainer().GetWidget().Rect.Dy())
+	lay := stationLayout(1024, 700, g.svcWin.GetContainer().GetWidget().Rect.Dy())
 	if got, want := g.mkt.Win().GetContainer().GetWidget().Rect, lay.Market; got != want {
 		t.Errorf("virgin market = %v, want the composed %v", got, want)
 	}
@@ -363,7 +363,7 @@ func TestPlaceDefaultsKeepsUserMoves(t *testing.T) {
 	if got := g.logP.Win().GetContainer().GetWidget().Rect; got != movedLog {
 		t.Errorf("user-moved log = %v after the second resize, want %v", got, movedLog)
 	}
-	lay = stationLayout(1920, 1080, g.stationW.GetContainer().GetWidget().Rect.Dy())
+	lay = stationLayout(1920, 1080, g.svcWin.GetContainer().GetWidget().Rect.Dy())
 	if got, want := g.inv.Win().GetContainer().GetWidget().Rect, lay.Inventory; got != want {
 		t.Errorf("virgin inventory = %v, want the composed %v", got, want)
 	}

@@ -298,11 +298,12 @@ func TestLayoutReturnsDevicePixelsAndOverUIAgrees(t *testing.T) {
 	if w != 1536 || h != 1050 {
 		t.Errorf("clamped Layout(640,480) = %d×%d, want 1536×1050 (min 1024×700 × 1.5)", w, h)
 	}
-	// Metrics agree with those units: the overview sits at design 8 →
-	// 12 device px and its rect is the scaled one.
+	// Metrics agree with those units: the overview starts clear of the
+	// rail (design 8 + uikit.RailInset = 44 → 66 device px) at the
+	// window row's design top (8 → 12), and its rect is the scaled one.
 	ov := g.kit.OverviewWindow().GetContainer().GetWidget().Rect
-	if ov.Min.X != 12 || ov.Min.Y != 12 {
-		t.Errorf("overview at device scale = %v, want to start at (12,12) (design 8 × 1.5)", ov)
+	if ov.Min.X != 66 || ov.Min.Y != 12 {
+		t.Errorf("overview at device scale = %v, want to start at (66,12) (design 44,8 × 1.5)", ov)
 	}
 
 	// Refresh ebitenui's hover flag from the real cursor (0,0) before
@@ -383,4 +384,68 @@ func TestSetFullscreenPersists(t *testing.T) {
 	if g.fullscreen {
 		t.Error("setFullscreen(false) did not stick")
 	}
+}
+
+// TestRailCollapsePersists: the navigation rail's collapse rides
+// <SavePath>.settings.json. A fresh session starts EXPANDED (the key is
+// omitempty, so the documented default shape stays exactly ui_scale +
+// fullscreen); collapsing through the edge tab writes
+// "rail_collapsed": true; a new session on that path boots collapsed
+// (buildKit restores the state onto the rebuilt rail); expanding it
+// again drops the key back to the default shape.
+func TestRailCollapsePersists(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	g := newShowcaseGameAt(t, path)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+	if g.rail.Collapsed() {
+		t.Fatal("a fresh rail starts expanded")
+	}
+
+	// Collapse through the edge tab; the next frame's syncRail mirrors
+	// it into the sidecar.
+	click(t, g, g.rail.Tab())
+	if !g.rail.Collapsed() {
+		t.Fatal("edge tab did not collapse the rail")
+	}
+	pump(t, g, 1280, 720)
+	if !g.railCollapsed {
+		t.Fatal("collapsed state did not reach the host (syncRail)")
+	}
+	raw := readSettingsMap(t, g.settingsPath())
+	if len(raw) != 3 || raw["rail_collapsed"] != true {
+		t.Errorf("collapsed settings keys = %v, want the default two plus rail_collapsed: true", raw)
+	}
+
+	// A new session on the same path boots collapsed.
+	g2 := newShowcaseGameAt(t, path)
+	if !g2.railCollapsed || !g2.rail.Collapsed() {
+		t.Error("collapsed rail did not survive the restart")
+	}
+
+	// Expand again: the key vanishes — the documented default shape.
+	click(t, g, g.rail.Tab())
+	pump(t, g, 1280, 720)
+	raw = readSettingsMap(t, g.settingsPath())
+	if _, ok := raw["rail_collapsed"]; ok || len(raw) != 2 {
+		t.Errorf("expanded settings keys = %v, want exactly ui_scale + fullscreen", raw)
+	}
+	g3 := newShowcaseGameAt(t, path)
+	if g3.rail.Collapsed() {
+		t.Error("expanded state did not survive the restart")
+	}
+}
+
+// readSettingsMap parses the settings sidecar as raw JSON.
+func readSettingsMap(t *testing.T, path string) map[string]any {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read settings: %v", err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("settings JSON: %v", err)
+	}
+	return raw
 }

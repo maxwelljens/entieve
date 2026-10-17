@@ -58,9 +58,9 @@ type Options struct {
 }
 
 // panelID identifies one toggleable interface window. The always-on
-// chrome (Overview, Selected Item, HUD, rack) and the docked station
-// strip are managed separately. The enum is the compile-time half of the
-// Screen spec: rows are declared in this order (game/uikit.go), and
+// chrome (Overview, Selected Item, HUD, rack) and the navigation rail
+// are managed separately. The enum is the compile-time half of the
+// Screen spec: rows are declared in this order (game/screens.go), and
 // TestScreenSpecMatchesRegistries pins the two together — the ids, their
 // count (numPanels) and the table order.
 type panelID int
@@ -75,6 +75,7 @@ const (
 	pHelp
 	pLog
 	pSettings
+	pServices
 	pMenu
 	numPanels
 )
@@ -114,9 +115,21 @@ type Game struct {
 	mp   *uikit.MapView
 	help *uikit.HelpPanel
 
-	menuWin  *widget.Window
-	stationW *widget.Window
-	stName   *widget.Text
+	menuWin *widget.Window
+
+	// The station services view (the one window docking opens): its
+	// window rides the panel registry like every Screen row, and svcUI
+	// is the uikit row it is built from — identity, Undock, Cargo and
+	// this station's service buttons (uikit/screens/services.go).
+	svcWin *widget.Window
+	svcUI  *uikit.Services
+
+	// The left navigation rail (uikit/screens/rail.go): root-overlay
+	// chrome like the HUD and rack, derived from the Screen spec by
+	// railEntries (game/rail.go). railCollapsed is its persisted
+	// settings.json state (missing key = expanded).
+	rail          *uikit.Rail
+	railCollapsed bool
 
 	// The settings window (uikit/screens/settings.go): UI scale stepper,
 	// fullscreen toggle, reset-layout. Like every panel it is rebuilt by
@@ -138,11 +151,6 @@ type Game struct {
 	stAvailRows []stationRow
 	stActRows   []stationRow
 
-	// The docked station strip is the only game-built strip that still
-	// rides the window stack (the chrome above lives on the root overlay).
-	stMount widget.RemoveWindowFunc
-	stShown bool
-
 	// open is the player-visible state of each toggleable window;
 	// mounted is its current AddWindow handle (nil = unmounted).
 	open    [numPanels]bool
@@ -154,8 +162,6 @@ type Game struct {
 
 	// Selection lives in the kit: world clicks, the Tab cycle-lock and
 	// the overview all feed Kit.Select, the game reads Kit.Selected.
-	stationPrior [numPanels]bool
-
 	// placed is the last rect this session composed for each window,
 	// restored the windows positioned from the layout sidecar. A window
 	// is virgin — safe to (re)place when the viewport changes — while it
@@ -506,9 +512,26 @@ func (g *Game) syncPanels() {
 	g.kit.Sync()
 	g.hud.Sync()
 	g.rack.Sync()
+	g.syncRail()
 	for p := panelID(0); p < numPanels; p++ {
 		if g.mounted[p] != nil {
 			g.syncPanel(p)
+		}
+	}
+}
+
+// syncRail refreshes the navigation rail (context gating and the
+// open-state glow) and mirrors its collapse into
+// <SavePath>.settings.json when the player flips the edge tab — the one
+// settings write that is not a settings-window control. The write is
+// best-effort like every settings write; boot restores the state in
+// buildKit (a missing key reads expanded).
+func (g *Game) syncRail() {
+	g.rail.Sync()
+	if collapsed := g.rail.Collapsed(); collapsed != g.railCollapsed {
+		g.railCollapsed = collapsed
+		if err := g.writeSettings(); err != nil {
+			g.report(err, "")
 		}
 	}
 }
@@ -538,13 +561,13 @@ func (g *Game) syncMounts() {
 	g.setChromeVisible(!docked)
 	g.kit.SetCoreVisible(!docked)
 
-	// The station strip appears while docked; the contract board follows
-	// the docked station and the live mission state.
+	// The services view is an ordinary panel now (the station scene
+	// opens it, syncMounts mounts it); only the contract board keeps a
+	// docked-only refresh — it follows the docked station and the live
+	// mission state while the scene is up.
 	if docked {
-		g.syncStationLabel()
 		g.syncStationBoard()
 	}
-	g.setStrip(&g.stShown, &g.stMount, docked, g.stationW)
 }
 
 // setChromeVisible shows or hides the space chrome (HUD + module rack) on
@@ -592,20 +615,6 @@ func (g *Game) setPanel(p panelID, want bool) {
 	g.mounted[p] = nil
 }
 
-// setStrip mounts or unmounts one chrome/station window.
-func (g *Game) setStrip(shown *bool, remove *widget.RemoveWindowFunc, want bool, win *widget.Window) {
-	if *shown == want {
-		return
-	}
-	if want {
-		*remove = g.kit.AddWindow(win)
-		*shown = true
-		return
-	}
-	(*remove)()
-	*remove, *shown = nil, false
-}
-
 // panelWindow returns the window backing a panel id (nil for an id
 // outside the enum).
 func (g *Game) panelWindow(p panelID) *widget.Window {
@@ -617,7 +626,7 @@ func (g *Game) panelWindow(p panelID) *widget.Window {
 
 // overUI reports whether the pointer sits on any interface panel: the
 // exact rects of every measurable panel (the kit's core windows, the
-// root-overlay chrome, the station and menu strips, all mounted toggle
+// root-overlay chrome (HUD, rack, rail), the menu, all mounted toggle
 // windows — the log among them while it is open) plus ebitenui's own
 // hover flag, which covers what the game cannot measure (rack tooltips,
 // ephemeral windows). The hover flag only
@@ -673,7 +682,7 @@ func (g *Game) overUI(x, y float64) bool {
 			return true
 		}
 	}
-	if g.stShown && hitWidget(pt, g.stationW.GetContainer().GetWidget()) {
+	if g.rail != nil && hitWidget(pt, g.rail.Container().GetWidget()) {
 		return true
 	}
 	return false
@@ -748,13 +757,13 @@ func (g *Game) buildKit() error {
 			win.Modal = true
 		}
 	}
-	g.stationW = g.buildStationWindow()
 
 	// Always-on chrome mounts straight onto the kit's root overlay — no
 	// full-screen wrapper windows: the HUD stretches across the root and
 	// anchors its own bar/target row, the rack takes the bottom-right
-	// corner. (The log used to anchor here too; it is a window now and
-	// mounts through syncMounts like the other panels.)
+	// corner, the navigation rail the left edge. (The log used to anchor
+	// here too; it is a window now and mounts through syncMounts like
+	// the other panels.)
 	kit.AddContainer(g.hud.Container(), widget.AnchorLayoutData{
 		StretchHorizontal: true,
 		StretchVertical:   true,
@@ -764,22 +773,28 @@ func (g *Game) buildKit() error {
 		VerticalPosition:   widget.AnchorLayoutPositionEnd,
 		Padding:            &widget.Insets{Right: theme.Px(10), Bottom: theme.Px(10)},
 	})
-	// Rack tracks hover so input.UIHovered covers its padding too. The
-	// HUD container must not: it spans the whole screen. (The log window
-	// gets hover tracking from the window chrome itself.)
+	// The rail is derived from the spec in one pass (game/rail.go) and
+	// pinned to the left edge, top-flush with the window row below the
+	// top margin. Its collapse state comes back from settings.json on
+	// every rebuild (boot, load, scale change).
+	g.rail = uikit.NewRail(env, railEntries(g))
+	kit.AddContainer(g.rail.Container(), widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionStart,
+		Padding:            &widget.Insets{Top: theme.Px(uikit.RailTopInset)},
+	})
+	g.rail.SetCollapsed(g.railCollapsed)
+	// Rack and rail track hover so input.UIHovered covers their padding.
+	// The HUD container must not: it spans the whole screen. (The log
+	// window gets hover tracking from the window chrome itself.)
 	g.rack.Container().GetWidget().TrackHover = true
+	g.rail.Container().GetWidget().TrackHover = true
 
 	// Panels are fresh: no mounts, no selection (documented). The
 	// placement records belong to the old windows — drop them with the
 	// kit (a load rebuild re-composes the defaults, then applyLayout
-	// brings the player's saved arrangement back over them). The dock
-	// prior goes too: it is mount bookkeeping for the panels being
-	// rebuilt (applyLayout re-adopts the persisted pre-dock intent for a
-	// docked restore).
+	// brings the player's saved arrangement back over them).
 	g.mounted = [numPanels]widget.RemoveWindowFunc{}
-	g.stShown = false
-	g.stMount = nil
-	g.stationPrior = [numPanels]bool{}
 	g.placed = map[*widget.Window]image.Rectangle{}
 	g.restored = map[*widget.Window]bool{}
 
@@ -789,15 +804,16 @@ func (g *Game) buildKit() error {
 }
 
 // placeDefaults (re)places every movable default window for the current
-// screen. The kit's core windows are placed too: Overview top-left,
-// Selected Item top-right — the left column's bottom belongs to the log
-// and the bottom row to the HUD bar, so nothing overlaps at 1280×720 or
-// at the 1024×700 minimum. Every Screen row then places itself from its
-// declared DefaultRect + Anchor (anchorRect): the log's bottom-left
-// pocket, the scanner in the centre column under the top row, the
-// on-demand overlays centred, help top-center — and the station strip
-// takes the now-free top-left corner while docked, with the docked
-// service trio (DockStation rows) tiled beside it by stationLayout.
+// screen. The kit's core windows are placed too: Overview starts clear
+// of the rail's left gutter (uikit.RailInset — the rail is root chrome
+// and windows never sit under it), Selected Item hugs the right edge —
+// the left column's bottom belongs to the log and the bottom row to the
+// HUD bar, so nothing overlaps at 1280×720 or at the 1024×700 minimum.
+// Every Screen row then places itself from its declared DefaultRect +
+// Anchor (anchorRect): the log's bottom-left pocket, the scanner in the
+// centre column under the top row, the on-demand overlays centred, help
+// top-center — and the DockStation rows (the services view's left column
+// over the docked service trio) tile beside it by stationLayout.
 //
 // Every placement goes through placeIfVirgin: a window the player
 // dragged, or one restored from the layout sidecar, keeps its
@@ -809,8 +825,10 @@ func (g *Game) placeDefaults(w, h int) {
 	// these are exactly the historical pixels (the layout tests pin them).
 	ov := g.kit.OverviewWindow()
 	if r := ov.GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		m := theme.Px(8)
-		place(ov, image.Rect(m, m, m+r.Dx(), m+r.Dy()))
+		// Left margin clears the rail's column; the top margin stays
+		// the window row's 8 (only the left inset carries the rail).
+		x, y := theme.Px(8+uikit.RailInset), theme.Px(8)
+		place(ov, image.Rect(x, y, x+r.Dx(), y+r.Dy()))
 	}
 	sp := g.kit.SelectedWindow()
 	if r := sp.GetContainer().GetWidget().Rect; r.Dx() > 0 {
@@ -823,7 +841,7 @@ func (g *Game) placeDefaults(w, h int) {
 	// overview, so the default set stays pairwise disjoint.
 	for _, s := range screens {
 		if s.DockPolicy == DockStation {
-			continue // composed below, with the station strip
+			continue // composed below, with the docked composition
 		}
 		win := g.screenWin[s.ID]
 		r := win.GetContainer().GetWidget().Rect
@@ -839,10 +857,11 @@ func (g *Game) placeDefaults(w, h int) {
 	if r := g.kit.InfoWindow().GetContainer().GetWidget().Rect; r.Dx() > 0 && r.Dy() > 0 {
 		place(g.kit.InfoWindow(), centerRect(r.Dx(), r.Dy(), w, h))
 	}
-	// Docked set: the station's own column (content height) and the
-	// service trio composed for this viewport (membership from the spec).
-	lay := stationLayout(w, h, g.stationW.GetContainer().GetWidget().Rect.Dy())
-	place(g.stationW, lay.Station)
+	// Docked set: the services view's left column (content height — the
+	// board hugs it) and the service trio composed for this viewport
+	// (membership from the spec; composeStation places the services row
+	// at the Station rect like every other DockStation window).
+	lay := stationLayout(w, h, g.svcWin.GetContainer().GetWidget().Rect.Dy())
 	g.composeStation(lay)
 }
 

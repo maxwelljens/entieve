@@ -248,7 +248,7 @@ func TestStationWindowGeometry(t *testing.T) {
 		g.syncMounts()
 		pump(t, g, size[0], size[1])
 
-		station := g.stationW.GetContainer().GetWidget().Rect
+		station := g.svcWin.GetContainer().GetWidget().Rect
 		log := g.logP.Win().GetContainer().GetWidget().Rect
 		market := g.mkt.Win().GetContainer().GetWidget().Rect
 

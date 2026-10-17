@@ -50,6 +50,13 @@ type ContentView interface {
 	// PlayerDocked reports whether the player is docked somewhere.
 	PlayerDocked() bool
 
+	// DockedStation is the docked-at identity plus the services that
+	// station offers ("market", "fitting", "industry", "repair",
+	// "refine") — the reads behind the station services view's identity
+	// line and per-service buttons, and the rail's gray-out of
+	// station-dependent entries. ok is false while undocked.
+	DockedStation() (StationInfo, bool)
+
 	// Component-store reads (observable state, one per store screens
 	// touch): a value snapshot of one component — the store's own Get,
 	// dereferenced, so nothing hands a screen a live handle to write
@@ -88,6 +95,16 @@ type ContentView interface {
 	InfoRefOf(any) (InfoRef, bool)
 }
 
+// StationInfo is one docked station as the interface reads it: the
+// identity the station view shows (celestial name + system name) and the
+// service names it offers. Services is a copy — a screen never holds a
+// live handle into the sim.
+type StationInfo struct {
+	Name     string
+	System   string
+	Services []string
+}
+
 // view is the production ContentView: loaded content plus the live sim,
 // exposed read-only. Screens receive it through the seams; nothing on it
 // mutates the simulation.
@@ -115,6 +132,36 @@ func (v *view) Wallet() float64 { return v.s.Wallet() }
 
 func (v *view) PlayerDocked() bool {
 	return v.s.Docked.Has(v.s.Player())
+}
+
+// DockedStation resolves the station the player is docked at: identity
+// from the system definition (the same read the station label used) and
+// the service list from the sim's station component. Undocked → ok false.
+func (v *view) DockedStation() (StationInfo, bool) {
+	at, ok := v.s.Docked.Get(v.s.Player())
+	if !ok {
+		return StationInfo{}, false
+	}
+	var info StationInfo
+	if sys := v.s.System(); sys != nil {
+		info.System = sys.Name
+		for _, cel := range sys.Celestials {
+			if cel.ID == at.At {
+				info.Name = cel.Name
+				break
+			}
+		}
+	}
+	// The station's entity is the celestial with this CelID: the sim's
+	// own dockedStation read walks the same pair (celEntity is private).
+	var services []string
+	v.s.Stations.Each(func(e ecs.Entity, st *sim.Station) {
+		if c, ok := v.s.Celestials.Get(e); ok && c.Cel == at.At && st != nil {
+			services = append([]string(nil), st.Services...)
+		}
+	})
+	info.Services = services
+	return info, true
 }
 
 func (v *view) Transform(e ecs.Entity) (sim.Transform, bool) {

@@ -72,8 +72,12 @@ type dockedLayout struct {
 // forName pairs a station-composition screen's sidecar name with its
 // composed rect (ok=false for anything the composition does not cover —
 // screenSpecErrors rejects such a row before a session can be built).
+// The services view IS the left column (the strip's slot); the trio
+// keeps its rects right of it.
 func (d dockedLayout) forName(name string) (image.Rectangle, bool) {
 	switch name {
+	case "services":
+		return d.Station, true
 	case "market":
 		return d.Market, true
 	case "inventory":
@@ -84,9 +88,9 @@ func (d dockedLayout) forName(name string) (image.Rectangle, bool) {
 	return image.Rectangle{}, false
 }
 
-// stationWins returns the station-composition screens' windows, in spec
-// order — the membership is the Screen spec's ForcedDockOpen set
-// (stationPanels, scenes.go), the rects from stationLayout.
+// stationWins returns the docked composition's windows, in spec order —
+// the membership is the Screen spec's DockStation set (stationPanels,
+// scenes.go), the rects from stationLayout.
 func (g *Game) stationWins() []*widget.Window {
 	wins := make([]*widget.Window, 0, len(stationPanels))
 	for _, id := range stationPanels {
@@ -95,8 +99,9 @@ func (g *Game) stationWins() []*widget.Window {
 	return wins
 }
 
-// composeStation places every station-composition screen (the trio —
-// stationPanels) at the rect stationLayout pairs with its sidecar name,
+// composeStation places every docked-composition screen (the services
+// view and the trio — stationPanels) at the rect stationLayout pairs
+// with its sidecar name,
 // through the placement tracker (placeIfVirgin), so a player-arranged or
 // restored service window keeps its rect.
 func (g *Game) composeStation(lay dockedLayout) {

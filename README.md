@@ -29,6 +29,17 @@ decides where you come out.
 Most of flying is travel: station to belt to gate to the next system. Time
 acceleration runs 1× to 8× to shorten the trips.
 
+Windows toggle from the keyboard (`I`, `F`, `G`, `B`, `C`, `N`, `H`, `P`,
+`Shift+L`) or from the **left navigation rail** — one glyph per window in
+six sections (Ship, Trade, Industry, Station, World, Help & System).
+Hover for the name and hotkey, click once to open (the window lands on
+top) and again to close; an entry you cannot use in the current context
+is grayed, never hidden, and the slim edge tab collapses the rail
+between sessions (`rail_collapsed` in the settings sidecar). The rail is
+derived from the window table, so every window is one row in it; the
+Esc menu keeps its own key and the HUD and module rack are permanent
+chrome with no entries.
+
 ## Stations
 
 ![Station interior with contracts, market, inventory and fitting windows open](screenshots/2.png)
@@ -36,8 +47,14 @@ acceleration runs 1× to 8× to shorten the trips.
 *Docked at Jernborg. Contracts on the left, the market with stock and prices
 at the top, cargo and ore hold in the middle, the fitting window on the right.*
 
-Docking opens the station services: repair, market, refine, fitting and
-hangar — and, at industry stations, the factory. Contracts give you
+Docking opens exactly one window: the **station services view**, with
+the docked-at identity, an **Undock** button, a **Cargo** button and one
+button per service *this* station offers (repair, market, refine,
+fitting; industry where it exists — an absent service is not offered)
+over the contract board on the left. Market, inventory, fitting and the
+factory are ordinary windows you open from it, their keys, or the left
+rail — they tile to the right of it while docked, and undocking closes
+the services view and leaves your own windows as they were. Contracts give you
 specific work — destroy a named rat, mine a volume of ore, deliver cargo to
 another system — and pay money and standing on completion. The market is an
 order book: buying and selling take the best resting prices, with a broker

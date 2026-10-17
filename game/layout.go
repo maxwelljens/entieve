@@ -109,22 +109,18 @@ func (g *Game) layoutTarget(name string) (*widget.Window, *bool) {
 
 // persistOpen picks the open flag writeLayout records for a named
 // window: the core windows always write open, a toggleable one writes
-// its flag — except the three station services while the station scene
-// forces them open (their sidecar entry carries the PRE-dock intent, or
-// quitting while docked would reopen them in space on the next boot) and
-// the Show Info window, which is geometry-only: it always writes closed
-// and never restores open — it appears on demand, never at boot.
+// its LIVE flag, and the Show Info window is geometry-only (always
+// closed, never restored — it appears on demand, never at boot). No
+// docked special case remains: nothing is force-opened on dock any
+// more, so the sidecar holds exactly the state the player last saw (the
+// services view's flag is the station scene's, which is open exactly
+// while docked).
 func (g *Game) persistOpen(name string, open *bool) bool {
 	if name == "infowin" {
 		return false
 	}
 	if open == nil {
 		return true
-	}
-	if g.s.Docked.Has(g.s.Player()) {
-		if p, ok := panelByName(name); ok && isStationPanel(p) {
-			return g.stationPrior[p]
-		}
 	}
 	return *open
 }
@@ -210,12 +206,10 @@ func (g *Game) readLayout() map[string]winLayout {
 // is flagged as the player's arrangement so the composed defaults never
 // overwrite it on a later resize (see placeIfVirgin).
 //
-// While the station scene is running, the dock services' restored flags
-// are the pre-dock intent (persistOpen writes them that way): they are
-// adopted into stationPrior and the forced-open state is re-asserted.
-// When the scene is NOT running yet (booting a docked save), the intent
-// is left in the flags and StationScene.OnEnter picks it up as the
-// pre-dock state when it pushes.
+// Restored flags are plain player state now (nothing docks-open the
+// service windows): a docked boot reads the services view's flag from
+// the sidecar, and StationScene.OnEnter opens it on the first frame
+// anyway — docking always lands on the services view.
 func (g *Game) applyLayout(screenW, screenH int) {
 	wins := g.readLayout()
 	if len(wins) == 0 {
@@ -228,10 +222,6 @@ func (g *Game) applyLayout(screenW, screenH int) {
 		g.placed = map[*widget.Window]image.Rectangle{}
 	}
 	screen := image.Rect(0, 0, screenW, screenH)
-	dockedScene := g.s.Docked.Has(g.s.Player()) && g.findScene(func(s Scene) bool {
-		_, ok := s.(*StationScene)
-		return ok
-	})
 	for _, name := range layoutNames {
 		e, ok := wins[name]
 		if !ok {
@@ -260,14 +250,6 @@ func (g *Game) applyLayout(screenW, screenH int) {
 		g.restored[win] = true
 		if open != nil {
 			*open = e.Open
-			if p, named := panelByName(name); named && dockedScene && isStationPanel(p) {
-				g.stationPrior[p] = e.Open // pre-dock intent, adopted
-			}
-		}
-	}
-	if dockedScene {
-		for _, p := range stationPanels {
-			g.open[p] = true // the scene forces its services open
 		}
 	}
 	// The map and help windows only exist through their overlay scenes
@@ -294,8 +276,9 @@ func (g *Game) applyLayout(screenW, screenH int) {
 	g.syncMounts()
 }
 
-// reclaimServiceTrio enforces the docked service trio's disjoint tiling
-// against a stale sidecar claim. The three services are ONE composed
+// reclaimServiceTrio enforces the composed docked set's disjoint tiling
+// against a stale sidecar claim (the set is the service trio plus the
+// services view's left column — stationWins). The three services are ONE composed
 // unit (stationLayout tiles them by construction), but restoring their
 // saved rects is per-window: clamping a sidecar saved at a larger
 // viewport slides each entry into the screen independently and folds
@@ -344,7 +327,7 @@ func (g *Game) reclaimServiceTrio(screenW, screenH int) {
 	if !overlap {
 		return // the claim realizes a valid tiling: saved wins
 	}
-	lay := stationLayout(screenW, screenH, g.stationW.GetContainer().GetWidget().Rect.Dy())
+	lay := stationLayout(screenW, screenH, g.svcWin.GetContainer().GetWidget().Rect.Dy())
 	for _, win := range wins {
 		g.restored[win] = false
 	}

@@ -23,10 +23,12 @@ import (
 //
 // The rows are declarative. Behaviour that belongs to a scene (the map,
 // help and Esc overlays) or to the docked composition stays where it is;
-// a row reaches it through Modal / DockPolicy / ForcedDockOpen instead of
-// carrying the logic. screenSpecErrors is the well-formedness rule for
-// the whole table (New refuses to build on a bad spec, the tests drive it
-// with deliberately broken rows).
+// a row reaches it through Modal / DockPolicy instead of carrying the
+// logic. screenSpecErrors is the well-formedness rule for the whole
+// table (New refuses to build on a bad spec, the tests drive it with
+// deliberately broken rows). The left navigation rail derives from the
+// same rows (game/rail.go): every openable row is one rail entry, its
+// Icon its glyph, its Group the rail section it lands in.
 //
 // Default geometry is DESIGN units (theme.Px scales them — see the Px
 // funnel, uikit/theme/scale.go) written against the 1280×720 design viewport
@@ -37,8 +39,10 @@ import (
 //	DockFloating    a free overlay: placeDefaults hangs it on the viewport
 //	                from its DefaultRect + Anchor, the sidecar persists it
 //	DockStation     part of the docked station composition: stationLayout
-//	                owns its rect (it declares no DefaultRect), the sidecar
-//	                persists it under the pre-dock intent
+//	                owns its rect (it declares no DefaultRect); the
+//	                composition places it whenever it mounts, and the
+//	                station scene opens exactly one of them — the
+//	                services view — on dock
 //	DockTransient   scene-owned and never persisted — the Esc menu, which
 //	                must not reopen on the next boot
 type DockPolicy uint8
@@ -75,15 +79,20 @@ const keyNone ebiten.Key = -1
 //	              order (the log lands before the Esc menu)
 //	Title         the window's canonical name (its title bar, the test
 //	              labels; must be non-empty and unique)
-//	Icon          the title-bar glyph ("" = text-only). The uikit
+//	Icon          the title-bar glyph AND the navigation rail's entry
+//	              glyph — the rail renders one icon per openable row, so
+//	              a non-transient row needs one (screenSpecErrors
+//	              rejects an empty Icon outside transients; non-empty
+//	              names are checked against the icon manifest). The uikit
 //	              constructors draw their own bars — the starmap appends
 //	              its region — so the spec declares the identity, it does
 //	              not re-render it
 //	Key, Shift    the toggle binding (keyNone = none); Action + Desc are
 //	              the KeyMap row that derives from it, which is also what
-//	              the help overlay renders. A MODAL screen's key is wired
-//	              to its scene instead (Esc → onEscape, N → map, H →
-//	              help), so Modal rows are never flag-toggled here
+//	              the help overlay renders and what the rail's tooltip
+//	              quotes as its hint. A MODAL screen's key is wired to its
+//	              scene instead (Esc → onEscape, N → map, H → help), so
+//	              Modal rows are never flag-toggled here
 //	DefaultRect   default geometry in design units (see Anchor for which
 //	              parts the composition reads; DockStation screens declare
 //	              none — stationLayout composes them)
@@ -91,9 +100,15 @@ const keyNone ebiten.Key = -1
 //	              sidecar)
 //	Modal         the window is modal while up (map, help, menu)
 //	SpaceOnly     mounts only in space (the scanner's docked counterpart
-//	              rule); DockedOnly mounts only while docked (the factory)
-//	ForcedDockOpen the station scene force-opens it on dock and restores
-//	              the pre-dock intent on undock (the station trio)
+//	              rule); DockedOnly mounts only while docked (the factory
+//	              and the services view)
+//	Group         the rail's section: railEntries (game/rail.go) groups
+//	              and orders the entries by it (transients carry none and
+//	              never appear; every other row must name a known group)
+//	Service       the station service this window needs: docked at a
+//	              station lacking it the rail entry grays, clicking it
+//	              does nothing ("" = no dependency; in space the window
+//	              opens exactly as its key always did)
 //	SidecarName   the layout-sidecar key; "" = not persisted (transient)
 //	Sync          refresh the panel from the sim (nil = static content);
 //	              runs every frame while mounted and once when it mounts
@@ -111,12 +126,13 @@ type Screen struct {
 	DefaultRect image.Rectangle
 	Anchor      Anchor
 
-	DockPolicy     DockPolicy
-	Modal          bool
-	SpaceOnly      bool
-	DockedOnly     bool
-	ForcedDockOpen bool
-	SidecarName    string
+	DockPolicy  DockPolicy
+	Modal       bool
+	SpaceOnly   bool
+	DockedOnly  bool
+	Group       string
+	Service     string
+	SidecarName string
 
 	Sync  func(*Game)
 	Build func(*Game) *widget.Window
@@ -127,21 +143,23 @@ var screens = []Screen{
 	{
 		ID: pInventory, Title: "Inventory", Icon: "svc_inventory",
 		Key: ebiten.KeyI, Action: "inventory", Desc: "I — toggle inventory",
-		DockPolicy: DockStation, ForcedDockOpen: true, SidecarName: "inventory",
+		DockPolicy: DockStation, SidecarName: "inventory", Group: "Trade",
 		Sync:  func(g *Game) { g.inv.Sync() },
 		Build: func(g *Game) *widget.Window { g.inv = uikit.NewInventory(g.env); return g.inv.Win() },
 	},
 	{
 		ID: pFitting, Title: "Fitting", Icon: "svc_fitting",
 		Key: ebiten.KeyF, Action: "fitting", Desc: "F — toggle fitting",
-		DockPolicy: DockStation, ForcedDockOpen: true, SidecarName: "fitting",
+		DockPolicy: DockStation, SidecarName: "fitting",
+		Group: "Ship", Service: "fitting",
 		Sync:  func(g *Game) { g.fitt.Sync() },
 		Build: func(g *Game) *widget.Window { g.fitt = uikit.NewFitting(g.env); return g.fitt.Win() },
 	},
 	{
 		ID: pMarket, Title: "Market", Icon: "svc_market",
 		Key: ebiten.KeyG, Action: "market", Desc: "G — toggle market window (trade while docked)",
-		DockPolicy: DockStation, ForcedDockOpen: true, SidecarName: "market",
+		DockPolicy: DockStation, SidecarName: "market",
+		Group: "Trade", Service: "market",
 		Sync:  func(g *Game) { g.mkt.Sync() },
 		Build: func(g *Game) *widget.Window { g.mkt = uikit.NewMarket(g.env); return g.mkt.Win() },
 	},
@@ -153,18 +171,22 @@ var screens = []Screen{
 		Key: ebiten.KeyB, Action: "factory", Desc: "B — toggle factory window (manufacture while docked)",
 		DefaultRect: image.Rect(332, 130, 732, 560),
 		DockPolicy:  DockFloating, DockedOnly: true, SidecarName: "factory",
+		Group: "Industry", Service: "industry",
 		Sync:  func(g *Game) { g.fact.Sync() },
 		Build: func(g *Game) *widget.Window { g.fact = uikit.NewFactory(g.env); return g.fact.Win() },
 	},
 	{
 		// Space chrome: hidden while docked (legacy parity). Fixed in the
 		// centre column under the top row — uikit.NewScanner's own
-		// constructor default is 10,251 (above the bottom-left log).
+		// constructor default is 10,251 (above the bottom-left log). The
+		// x carries the rail inset: the left column (rail, overview, log,
+		// station) all start clear of uikit.RailInset.
 		ID: pScanner, Title: "Scanner", Icon: "svc_scanner",
 		Key: ebiten.KeyC, Action: "scanner", Desc: "C — toggle scanner (off-grid sweep)",
-		DefaultRect: image.Rect(396, 276, 696, 524), // 300×248 (uikit scanW × titleBarH+scanBodyH)
+		DefaultRect: image.Rect(396+uikit.RailInset, 276, 696+uikit.RailInset, 524), // 300×248 (uikit scanW × titleBarH+scanBodyH)
 		Anchor:      AnchorFixed,
 		DockPolicy:  DockFloating, SpaceOnly: true, SidecarName: "scanner",
+		Group: "World",
 		Sync:  func(g *Game) { g.scan.Sync() },
 		Build: func(g *Game) *widget.Window { g.scan = uikit.NewScanner(g.env); return g.scan.Win() },
 	},
@@ -175,6 +197,7 @@ var screens = []Screen{
 		Key: ebiten.KeyN, Action: "starmap", Desc: "N — toggle starmap",
 		DefaultRect: image.Rect(160, 80, 870, 634), // uikit.NewMapView's landing rect
 		DockPolicy:  DockFloating, Modal: true, SidecarName: "map",
+		Group: "World",
 		Sync:  func(g *Game) { g.mp.Sync() },
 		Build: func(g *Game) *widget.Window { g.mp = uikit.NewMapView(g.env); return g.mp.Win() },
 	},
@@ -187,37 +210,60 @@ var screens = []Screen{
 		DefaultRect: image.Rect(0, 24, defaultW, defaultH),
 		Anchor:      AnchorTopCenter,
 		DockPolicy:  DockFloating, Modal: true, SidecarName: "help",
+		Group: "Help & System",
 		Sync:  func(g *Game) { g.help.Sync() },
 		Build: func(g *Game) *widget.Window { g.help = uikit.NewHelp(g.env, helpRows()); return g.help.Win() },
 	},
 	{
 		// Bottom-left pocket beside the HUD bar: left/bottom insets of 10
 		// against the design viewport (uikit logDefaultW/H = 288×240).
+		// The pocket starts clear of the rail; its right edge (the 298
+		// that must keep its gutter before the HUD bar) is unchanged, so
+		// the log narrows by the rail inset to its content floor.
 		ID: pLog, Title: "Log", Icon: "svc_log",
 		Key: ebiten.KeyL, Shift: true, Action: "log", Desc: "Shift+L — toggle log window",
-		DefaultRect: image.Rect(10, defaultH-10-240, 10+288, defaultH-10),
+		DefaultRect: image.Rect(10+uikit.RailInset, defaultH-10-240, 10+288, defaultH-10),
 		Anchor:      AnchorBottomLeft,
 		DockPolicy:  DockFloating, SidecarName: "log",
+		Group: "World",
 		Sync:  func(g *Game) { g.logP.Sync() },
 		Build: func(g *Game) *widget.Window { g.logP = uikit.NewLog(g.env); return g.logP.Win() },
 	},
 	{
 		// Like every panel it is rebuilt by buildKit, so its live state
 		// (scale ladder, fullscreen) is re-read from g in Sync.
-		ID: pSettings, Title: "Settings",
+		ID: pSettings, Title: "Settings", Icon: "kind_unknown",
 		Key: ebiten.KeyP, Action: "settings", Desc: "P — toggle settings (UI scale, fullscreen, layout)",
 		DefaultRect: image.Rect(490, 248, 790, 472), // uikit.NewSettings' landing rect
 		DockPolicy:  DockFloating, SidecarName: "settings",
-		Sync: func(g *Game) { g.sett.Sync() },
+		Group: "Help & System",
+		Sync:  func(g *Game) { g.sett.Sync() },
 		Build: func(g *Game) *widget.Window {
 			g.sett = uikit.NewSettings(g.env, g.settActions)
 			return g.sett.Win()
 		},
 	},
 	{
+		// The station services view: the ONE window docking opens, the
+		// window that replaced the old station strip. It owns the
+		// left column of the docked composition (stationLayout's Station
+		// rect — DockStation rows declare no DefaultRect), so its
+		// content height still drives the column: uikit.NewServices'
+		// row over the contract board. Unkeyed by design — docking opens
+		// it, the rail reopens it, and there is nothing to press in
+		// space where it cannot mount.
+		ID: pServices, Title: "Station Services", Icon: "kind_station",
+		Key:        keyNone, // docking opens it; the rail reopens it
+		DockPolicy: DockStation, DockedOnly: true, SidecarName: "services",
+		Group: "Station",
+		Sync:  func(g *Game) { g.svcUI.Sync() },
+		Build: func(g *Game) *widget.Window { return g.buildServicesWindow() },
+	},
+	{
 		// The Esc menu: scene-owned (MenuScene flips the flag), modal,
 		// static buttons — no Sync — and never persisted, so a restart
-		// cannot reopen it.
+		// cannot reopen it. It is deliberately NOT in the rail: the pause
+		// menu keeps its key and its function.
 		ID: pMenu, Title: "Menu",
 		Key: ebiten.KeyEscape, Action: "menu", Desc: "Esc — menu (Resume / Save / Load / Quit)",
 		DefaultRect: image.Rect(0, 0, 240, 254), // buildMenuWindow's landing rect
@@ -333,14 +379,16 @@ func screenBindings(rows []Screen) []Binding {
 	return out
 }
 
-// stationScreens returns the ids the station scene force-opens on dock —
-// every row flagged ForcedDockOpen, in spec order (scenes.go's
-// stationPanels, layout.go's pre-dock persistence and the reclaim all
-// read this set).
+// stationScreens returns the ids of the docked station composition —
+// every row with DockPolicy == DockStation, in spec order (scenes.go's
+// stationPanels, layout.go's reclaim and the composed placement all
+// read this set). Nothing force-opens on dock any more: the station
+// scene opens exactly one member, the services view, and the player
+// opens the rest (the composition then places them).
 func stationScreens(rows []Screen) []panelID {
-	ids := make([]panelID, 0, 3)
+	ids := make([]panelID, 0, 4)
 	for _, s := range rows {
-		if s.ForcedDockOpen {
+		if s.DockPolicy == DockStation {
 			ids = append(ids, s.ID)
 		}
 	}
@@ -434,7 +482,13 @@ func screenSpecErrors(rows []Screen) []string {
 		if s.Title == "" {
 			add("row %d (id %d): zero title", i, s.ID)
 		}
-		if s.Icon != "" && !icons.Has(s.Icon) {
+		if s.Icon == "" {
+			// The rail renders one glyph per openable entry, so every
+			// non-transient row names one; the Esc menu has no entry.
+			if s.DockPolicy != DockTransient {
+				add("row %d (%s): missing icon (the rail renders one glyph per entry)", i, s.Title)
+			}
+		} else if !icons.Has(s.Icon) {
 			add("row %d (%s): unknown icon %q", i, s.Title, s.Icon)
 		}
 		if s.Build == nil {
@@ -492,11 +546,21 @@ func screenSpecErrors(rows []Screen) []string {
 		}
 		labels[label] = s.Title
 
-		// The docked trio is ONE membership: the composition owns the
-		// window's rect, the station scene owns its open flag (and the
-		// reclaim checks the same set).
-		if (s.DockPolicy == DockStation) != s.ForcedDockOpen {
-			add("row %d (%s): DockStation and ForcedDockOpen must agree (the docked trio is one membership)", i, s.Title)
+		// Rail grouping and the station service the window needs:
+		// transients never enter the rail and must not claim a section,
+		// every other row must name a known group, and a service must be
+		// one the content model can offer.
+		if s.DockPolicy == DockTransient {
+			if s.Group != "" {
+				add("row %d (%s): transient screen must not carry rail group %q", i, s.Title, s.Group)
+			}
+		} else if s.Group == "" {
+			add("row %d (%s): missing rail group", i, s.Title)
+		} else if !slices.Contains(railGroups[:], s.Group) {
+			add("row %d (%s): unknown rail group %q", i, s.Title, s.Group)
+		}
+		if s.Service != "" && !slices.Contains(stationServices[:], s.Service) {
+			add("row %d (%s): unknown station service %q", i, s.Title, s.Service)
 		}
 		// A station-composition screen needs a rect stationLayout knows.
 		if s.DockPolicy == DockStation && s.SidecarName != "" {
