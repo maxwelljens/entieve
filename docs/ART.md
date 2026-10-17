@@ -41,9 +41,23 @@ directories are ignored.
 - **Hull sprites point right (+X)**, the nose direction, matching the
   built-in silhouettes; the engine rotates them to the ship's heading.
   Celestials, asteroids and backgrounds are never rotated.
-- **Backgrounds** are scaled to *cover* the screen (aspect preserved, cropped
-  at the edges), drawn above the flat background colour and below the nebula
-  washes and starfield.
+- **Backgrounds are per-system starfield plates, in layers.**
+  `assets/backgrounds/<system-id>.png` is layer 0 (near, bright),
+  `<system-id>-01.png` layer 1 (far, faint), `<system-id>-02.png` an optional
+  layer 2 — so `sys-solace.png` serves Starogród. Each plate replaces the
+  procedural star layer of the same number: it draws at its native size on
+  that layer's camera-parallax rate and wrap, over the nebula washes, and
+  only the layers a system ships art for change — a system with no plates
+  keeps the stock procedural starfield untouched.
+- **Give plate skies real transparency** (dots opaque, sky transparent) and
+  author them to tile edge-to-edge: each plate is pixel-probed once at load
+  and a transparent sky commits it to its starfield layer, while an
+  opaque-black sky draws it as the *bottom* layer instead — scaled to *cover*
+  the screen (aspect preserved, cropped at the edges), above the flat
+  background fill and below the nebula washes. Plates are decoded for the
+  current star system only and dropped on system change (a two-layer system
+  is ~52 MB decoded), so never rely on another system's plate still being in
+  memory.
 
 ## Sizing (what "fits" means)
 

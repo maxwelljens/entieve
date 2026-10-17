@@ -16,11 +16,12 @@ import (
 )
 
 // stashAssets points the process-wide sprite registry at dir for the rest of
-// the test and restores the previous state afterwards.
+// the test and restores the previous state afterwards (the plate path index
+// is process state too, so it stashes with the sprites).
 func stashAssets(t *testing.T, dir string) {
 	t.Helper()
-	prev, prevTried := sprites, spritesTried
-	t.Cleanup(func() { sprites, spritesTried = prev, prevTried })
+	prev, prevTried, prevPlates := sprites, spritesTried, platePaths
+	t.Cleanup(func() { sprites, spritesTried, platePaths = prev, prevTried, prevPlates })
 	LoadAssets(dir)
 }
 
