@@ -594,7 +594,7 @@ func TestOverviewLogEdgeGripsResize(t *testing.T) {
 		// Park the window under test back at its default rect so each
 		// case starts from a known geometry.
 		if tc.win == k.ov.win {
-			k.ov.win.SetLocation(image.Rect(8, 8, 388, 428))
+			k.ov.win.SetLocation(image.Rect(8+RailInset, 8, 388+RailInset, 428))
 		} else {
 			log.Win().SetLocation(logTestRect)
 		}

@@ -28,6 +28,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are mass-neutral: no cargo is ever dropped, duplicated or created, and
   the caps never emit a lost-shipment event.
 
+- **Window focus, default layout and the rail's front-of-stack seat**
+  (three window-system defects, one change-set):
+  1. *Click anywhere raises.* Any mouse press inside a window — body,
+     title bar or resize chrome, left **or** right button — now raises
+     that window to the top of the stack. ebitenui's built-in relayering
+     only ever saw title-bar presses (the body's scroll viewport claims
+     the input layer over the window container), so the kit re-tops
+     through its own remove + re-mount seam instead, and kit windows run
+     with `DisableRelayering` so that seam is the single, deterministic
+     stacking path. When windows overlap, the **topmost** window under
+     the cursor wins (that is the window receiving the click); the raise
+     is gated exactly like input is — never through the modal context
+     menu's frame, never through the rail's own rect, and never up
+     through a mounted modal window. A raise re-tops without moving the
+     rect, and pays the documented remount leak only when the stacking
+     actually changes.
+  2. *Defaults clear the rail gutter.* Every default window rect starts
+     right of `uikit.RailInset` — the uikit construction defaults that
+     still sat at their pre-rail x (overview 8, Selected Item 8, scanner
+     10, log 10, help's fallback 10) are retargeted through the same
+     constant, and the game's placement floors (`anchorRect`,
+     `centerRect`) now clamp every anchored/centered default past the
+     gutter: the help window's centred default landed at x=62 against
+     the 63 px gutter at the 1024×700 minimum, and at x=93 vs 94.5 at
+     device scale 1.5. Pinned at scale 1 and 1.5, both design sizes, for
+     the construction rects and the placed set (user-dragged and
+     sidecar-restored rects are not defaults and stay untouched).
+  3. *The rail is top chrome.* The navigation rail now mounts through
+     `Kit.AddTopContainer`: `Kit.Draw` parks it out of the ebitenui
+     window pass (`Visibility_Hide_Blocking` — still laid out, never
+     painted), paints it after every window with its hover-tooltip
+     windows following it (the context menu remains the absolute topmost
+     pixels), and re-adds its input layer on top of the window layers
+     each frame — so a window dragged onto the gutter never paints over
+     the rail, and clicks in the rail's area always reach the rail.
+     Paint priority and input priority now agree; while a modal window
+     is up the rail keeps its old under-window input gating. The HUD and
+     module rack keep their under-window position (`AddContainer`).
+
 ## [0.3.0] - 2026-10-17
 
 ### Added

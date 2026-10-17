@@ -178,9 +178,9 @@ var screens = []Screen{
 	{
 		// Space chrome: hidden while docked (legacy parity). Fixed in the
 		// centre column under the top row — uikit.NewScanner's own
-		// constructor default is 10,251 (above the bottom-left log). The
-		// x carries the rail inset: the left column (rail, overview, log,
-		// station) all start clear of uikit.RailInset.
+		// constructor default is 10+RailInset,251 (above the bottom-left
+		// log). The x carries the rail inset: the left column (rail,
+		// overview, log, station) all start clear of uikit.RailInset.
 		ID: pScanner, Title: "Scanner", Icon: "svc_scanner",
 		Key: ebiten.KeyC, Action: "scanner", Desc: "C — toggle scanner (off-grid sweep)",
 		DefaultRect: image.Rect(396+uikit.RailInset, 276, 696+uikit.RailInset, 524), // 300×248 (uikit scanW × titleBarH+scanBodyH)
@@ -425,7 +425,9 @@ func (g *Game) pressScreen(k ebiten.Key, shift bool) bool {
 // window keeps the size it measured (placement positions, never resizes),
 // and DefaultRect + Anchor decide where that size sits — an absolute
 // design coordinate, the viewport centre, or the declared insets to the
-// bottom-left / top edges.
+// bottom-left / top edges. Every rule lands clear of the rail's left
+// gutter: no default placement is allowed inside it (the rail is top
+// chrome; a window tucked under it would only fight for pixels).
 func anchorRect(d image.Rectangle, a Anchor, dw, dh, w, h int) image.Rectangle {
 	var x, y int
 	switch a {
@@ -440,15 +442,23 @@ func anchorRect(d image.Rectangle, a Anchor, dw, dh, w, h int) image.Rectangle {
 	default: // AnchorCenter: the viewport decides both axes.
 		return centerRect(dw, dh, w, h)
 	}
-	return image.Rect(x, y, x+dw, y+dh)
+	return image.Rect(max(x, railClearX()), y, max(x, railClearX())+dw, y+dh)
 }
 
 // centerRect centres a dw×dh window in a w×h viewport (the AnchorCenter
-// rule, also used by the Show Info window, which is not a Screen row).
+// rule, also used by the Show Info window, which is not a Screen row),
+// floored clear of the rail gutter like every other default placement —
+// a window wider than the viewport minus the gutter starts at the floor
+// instead of inside the rail.
 func centerRect(dw, dh, w, h int) image.Rectangle {
-	x, y := (w-dw)/2, (h-dh)/2
+	x := max((w-dw)/2, railClearX())
+	y := (h - dh) / 2
 	return image.Rect(x, y, x+dw, y+dh)
 }
+
+// railClearX is the left edge every default window placement clears: the
+// rail's expanded width plus the design window margin, in live px.
+func railClearX() int { return theme.Px(10 + uikit.RailInset) }
 
 // screenSpecErrors reports every way a Screen table can be malformed.
 // New refuses to build a session on a bad spec, and the spec tests drive

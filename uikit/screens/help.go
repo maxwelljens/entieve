@@ -121,7 +121,11 @@ func NewHelp(d theme.Theme, rows []KeyRow) *HelpPanel {
 	bw, bh := body.PreferredSize()
 	w := max(theme.Px(helpW), bw)
 	wh := theme.Px(theme.TitleBarH) + bh
-	x0 := max(theme.Px(10), (theme.Px(1024)-w)/2)
+	// Default: centered for the 1024 px minimum width, 24 px from the
+	// top like the legacy help overlay, with the left edge floored clear
+	// of the rail's gutter (10+RailInset) when the centered x would land
+	// inside it; the integrator re-centers it under the same floor.
+	x0 := max(theme.Px(10+RailInset), (theme.Px(1024)-w)/2)
 	h.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(titleBar, theme.Px(theme.TitleBarH)),

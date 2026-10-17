@@ -5,12 +5,15 @@ import (
 	"strings"
 	"testing"
 
+	enuiinput "github.com/ebitenui/ebitenui/input"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/icons"
 	uikit "github.com/entieve/entieve/uikit/screens"
+	"github.com/entieve/entieve/uikit/widgets"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // The navigation rail as the game wires it: the entries table derived
@@ -376,4 +379,76 @@ func entryByTitle(t *testing.T, g *Game, title string) uikit.RailEntry {
 	}
 	t.Fatalf("no rail entry titled %q", title)
 	return uikit.RailEntry{}
+}
+
+// TestRailClicksWinOverAWindowUnderneath: input priority matches paint
+// priority. Drag a window onto the rail's gutter so it sits under a rail
+// cell, click that cell through the real frame loop — the rail wins: the
+// entry toggles its window, and the buried window underneath receives
+// nothing (its table never moves the selection). Seams: the scripted
+// mouse feeds ebitenui's cursor cache for the widgets, the raw press
+// edge and live cursor feed uikit's polls (the menu-loop test's split).
+func TestRailClicksWinOverAWindowUnderneath(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	mm := useLoopMouse(t)
+	img := ebiten.NewImage(1280, 720)
+
+	// The kit's raw press-edge seam, armed for the click frame only.
+	clickEdge := false
+	defer widgets.SetPressEdgeForTest(func(b ebiten.MouseButton) bool {
+		return b == ebiten.MouseButtonLeft && clickEdge
+	})()
+	defer widgets.SetPollCursorForTest(func() (int, int) { return mm.x, mm.y })()
+
+	frame := func() {
+		t.Helper()
+		if err := g.Update(); err != nil {
+			t.Fatalf("Update: %v", err)
+		}
+		g.Draw(img)
+	}
+
+	// Drag the overview onto the gutter: it now covers the rail column.
+	g.kit.OverviewWindow().SetLocation(image.Rect(0, 8, 400, 400))
+	pump(t, g, 1280, 720)
+
+	cell := g.rail.Button("Inventory").GetWidget().Rect
+	ovRect := g.kit.OverviewWindow().GetContainer().GetWidget().Rect
+	if cell.Dx() <= 0 || !cell.In(ovRect) {
+		t.Fatalf("fixture: Inventory cell %v not under the dragged overview %v", cell, ovRect)
+	}
+	if g.open[pInventory] {
+		t.Fatal("fixture: inventory already open")
+	}
+	before := g.kit.Selected()
+
+	// Hover one frame, then press and release inside the cell.
+	mm.moveTo(cell.Min.X+cell.Dx()/2, cell.Min.Y+cell.Dy()/2)
+	frame()
+	clickEdge, mm.left = true, true
+	frame()
+	clickEdge, mm.left = false, false
+	frame()
+
+	g.syncMounts()
+	if !g.open[pInventory] || g.mounted[pInventory] == nil {
+		t.Errorf("rail cell under a window did not toggle the inventory (open=%v mounted=%v) — "+
+			"the window underneath won the click", g.open[pInventory], g.mounted[pInventory] != nil)
+	}
+	if got := g.kit.Selected(); got != before {
+		t.Errorf("the buried overview received the click (selection %v → %v) — "+
+			"input priority does not match paint priority", before, got)
+	}
+
+	// Leave the process clean: ebitenui's hover backstop (input.UIHovered)
+	// refreshes only in AfterDraw, and this test's last frame hovered a
+	// rail cell — park the cursor on nothing and draw once, so a later
+	// test that reads the backstop without drawing sees the flag it
+	// expects (the settings overUI pin reads it exactly that way).
+	mm.moveTo(0, 0)
+	frame()
+	if enuiinput.UIHovered {
+		t.Error("hover backstop still latched after parking the cursor clear of every panel")
+	}
 }
