@@ -72,6 +72,12 @@ type Renderer struct {
 	glows  map[glowKey]*ebiten.Image
 	bodies map[uint32]*ebiten.Image
 
+	// Background plates for plateSys only: decoded plates are ~26 MB each
+	// (2560² RGBA), so the cache is evicted on system change instead of
+	// accumulating a plate per system (see plate).
+	plates   map[int]*bgPlate
+	plateSys content.SystemID
+
 	selected ecs.Entity
 
 	// Per-frame buckets, reused to avoid allocations in Draw.
@@ -86,6 +92,7 @@ func New(c *content.Content) *Renderer {
 		tiles:  map[starKey]*ebiten.Image{},
 		glows:  map[glowKey]*ebiten.Image{},
 		bodies: map[uint32]*ebiten.Image{},
+		plates: map[int]*bgPlate{},
 	}
 }
 
@@ -130,6 +137,56 @@ func (r *Renderer) starTile(seed uint64, layer int) *ebiten.Image {
 	}
 	r.tiles[k] = img
 	return img
+}
+
+// bgPlate is one decoded background plate with the draw path committed by its
+// pixel probe (see plateSky).
+type bgPlate struct {
+	img *ebiten.Image // never nil in the cache
+	sky bool          // opaque sky: bottom layer under the nebula washes
+}
+
+// plate returns the current system's plate for one starfield layer, decoding
+// it on first use; nil when the system ships no plate for that layer — the
+// caller then draws the untouched procedural art. The cache holds one
+// system's plates only: a decoded 2560² RGBA plate is ~26 MB, so switching
+// systems evicts the previous ones instead of accumulating a plate per
+// system (bounded at 3 layers ≈ 78 MB worst case, 52 MB for a two-layer
+// system such as sys-solace).
+func (r *Renderer) plate(layer int, sys *content.SystemDef) *bgPlate {
+	var id content.SystemID
+	if sys != nil {
+		id = sys.ID
+	}
+	if id != r.plateSys {
+		r.plateSys = id
+		clear(r.plates) // drop the previous system's decoded plates
+	}
+	if pl, ok := r.plates[layer]; ok {
+		return pl
+	}
+	path := platePath(plateKey(string(id), layer))
+	if path == "" {
+		return nil // no plate for this layer: procedural fallback
+	}
+	img, sky := loadPlate(path)
+	if img == nil {
+		return nil
+	}
+	pl := &bgPlate{img: img, sky: sky}
+	r.plates[layer] = pl
+	return pl
+}
+
+// starLayerTile selects what one starfield layer draws and at what native
+// tile size: the system's plate when it has that layer (sky plates are the
+// backdrop's job), otherwise the cached procedural tile.
+func (r *Renderer) starLayerTile(seed uint64, layer int, sys *content.SystemDef) (*ebiten.Image, float64, float64) {
+	if pl := r.plate(layer, sys); pl != nil && !pl.sky {
+		b := pl.img.Bounds()
+		return pl.img, float64(b.Dx()), float64(b.Dy())
+	}
+	return r.starTile(seed, layer), starTileSize, starTileSize
 }
 
 // ---------------------------------------------------------------------------
@@ -300,22 +357,26 @@ func (r *Renderer) bucket(s *sim.Sim, sys *content.SystemDef) {
 // Background layers
 // ---------------------------------------------------------------------------
 
-// drawBackdrop paints the optional per-system backdrop PNG
-// (assets/backgrounds/<system-id>.png) over the flat background fill and
-// under the nebula washes and starfield, covering the whole screen with the
-// aspect preserved. No file = no-op: the stock background draws as always.
+// drawBackdrop paints the sky-classified plates — assets/backgrounds/
+// <system-id>[-NN].png whose pixel probe read an opaque sky — over the flat
+// background fill and under the nebula washes and starfield, covering the
+// whole screen with the aspect preserved. Transparent star plates skip this
+// pass and draw with their starfield layer instead (drawStarfield). No plate
+// = no-op: the stock background draws as always.
+// shortcut: sky plates are screen-anchored with no parallax — the shipped art
+// probes as the star layer, so this path only serves future opaque art;
+// give it the clamped parallax offset when such art lands.
 func (r *Renderer) drawBackdrop(dst *ebiten.Image, cam Camera, sys *content.SystemDef) {
-	if sys == nil {
-		return
+	for layer := 0; layer < 3; layer++ {
+		pl := r.plate(layer, sys)
+		if pl == nil || !pl.sky {
+			continue
+		}
+		b := pl.img.Bounds()
+		s := math.Max(cam.ScreenW/float64(b.Dx()), cam.ScreenH/float64(b.Dy()))
+		drawSprite(dst, pl.img, cam.ScreenW/2, cam.ScreenH/2,
+			float64(b.Dx())*s, float64(b.Dy())*s, 0)
 	}
-	img := spriteFor("backgrounds/" + string(sys.ID))
-	if img == nil {
-		return
-	}
-	b := img.Bounds()
-	s := math.Max(cam.ScreenW/float64(b.Dx()), cam.ScreenH/float64(b.Dy()))
-	drawSprite(dst, img, cam.ScreenW/2, cam.ScreenH/2,
-		float64(b.Dx())*s, float64(b.Dy())*s, 0)
 }
 
 // drawNebula paints the system palette's nebula washes (screen-anchored).
@@ -340,7 +401,14 @@ func (r *Renderer) drawNebula(dst *ebiten.Image, cam Camera, sys *content.System
 	}
 }
 
-// drawStarfield paints three parallax layers of cached star tiles.
+// drawStarfield paints three parallax layers. A layer with a drop-in plate
+// for the current system draws that plate at its native size on the same
+// camera-parallax wrap and at the same rate as the procedural layer it
+// replaces; a layer without one draws the untouched procedural tile, so
+// systems with no plates render byte-identically to the stock game.
+// shortcut: plates tile 1:1 (the shipped plates measure seam-clean at the
+// edges), art whose opposite edges don't match will show the seam — switch
+// such a plate to a screen-anchored clamped draw when it lands.
 func (r *Renderer) drawStarfield(dst *ebiten.Image, cam Camera, sys *content.SystemDef) {
 	var seed uint64
 	if sys != nil {
@@ -349,26 +417,26 @@ func (r *Renderer) drawStarfield(dst *ebiten.Image, cam Camera, sys *content.Sys
 	factors := [3]float64{0.01, 0.03, 0.06}
 	op := &ebiten.DrawImageOptions{}
 	for layer := 0; layer < 3; layer++ {
-		tile := r.starTile(seed, layer)
+		tile, tw, th := r.starLayerTile(seed, layer, sys)
 		f := factors[layer]
-		ox := math.Mod(cam.Center.X*cam.Zoom*f, starTileSize)
-		oy := math.Mod(cam.Center.Y*cam.Zoom*f, starTileSize)
+		ox := math.Mod(cam.Center.X*cam.Zoom*f, tw)
+		oy := math.Mod(cam.Center.Y*cam.Zoom*f, th)
 		if ox < 0 {
-			ox += starTileSize
+			ox += tw
 		}
 		if oy < 0 {
-			oy += starTileSize
+			oy += th
 		}
-		startX := math.Mod(-ox, starTileSize)
+		startX := math.Mod(-ox, tw)
 		if startX > 0 {
-			startX -= starTileSize
+			startX -= tw
 		}
-		startY := math.Mod(-oy, starTileSize)
+		startY := math.Mod(-oy, th)
 		if startY > 0 {
-			startY -= starTileSize
+			startY -= th
 		}
-		for x := startX; x < cam.ScreenW; x += starTileSize {
-			for y := startY; y < cam.ScreenH; y += starTileSize {
+		for x := startX; x < cam.ScreenW; x += tw {
+			for y := startY; y < cam.ScreenH; y += th {
 				op.GeoM.Reset()
 				op.GeoM.Translate(x, y)
 				dst.DrawImage(tile, op)

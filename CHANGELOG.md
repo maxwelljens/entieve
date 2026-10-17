@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Per-system starfield background plates** (`assets/backgrounds/`): a star
+  system's starfield can now be dropped in as PNG layers — `<system-id>.png`
+  (layer 0, near/bright), `<system-id>-01.png` (layer 1, far/faint), `-02`
+  optional — each replacing the procedural star layer of the same number and
+  riding the same camera-parallax wrap and rate; systems without plates draw
+  the untouched procedural starfield, byte-identical to before. Every plate
+  is pixel-probed once at load: a transparent sky commits it to its starfield
+  layer (over the nebula washes), an opaque-black sky draws it as the bottom
+  layer under them. Plates are decoded for the current system only and
+  evicted on system change (a two-layer system is ~52 MB decoded). Ships
+  with `sys-solace.png` / `sys-solace-01.png` for Starogród; convention in
+  `docs/ART.md`.
+
 ### Changed
 
 - **Docking opens exactly one window.** The station scene no longer

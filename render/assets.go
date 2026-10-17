@@ -1,6 +1,8 @@
 package render
 
 import (
+	"fmt"
+	"image"
 	"image/png"
 	"io/fs"
 	"math"
@@ -15,14 +17,22 @@ import (
 // replaces the procedural vector art for that content ID (convention table
 // in docs/ART.md). Nothing is configured — a missing file simply means
 // "draw the vector art", so an empty assets/ directory plays identically.
+// assets/backgrounds/ is the one exception: those PNGs are starfield plates,
+// indexed here but decoded only for the current star system (see plateKey,
+// platePath and Renderer.plate).
 
 // sprites holds the loaded art keyed by convention path relative to the
 // asset root ("hulls/ship-sloop"). spritesTried records that the lazy root
 // probe happened, so a missing assets/ dir is never re-scanned or logged.
-// Like faceCache, access is game-goroutine only — no locking.
+// Background plates are the exception: platePaths indexes their convention
+// key to the on-disk path without decoding them — a 2560² plate is ~26 MB
+// decoded, so only the current system's plates are ever held in memory
+// (Renderer.plate decodes and evicts). Like faceCache, access is
+// game-goroutine only — no locking.
 var (
 	sprites      map[string]*ebiten.Image
 	spritesTried bool
+	platePaths   map[string]string
 )
 
 // LoadAssets loads every PNG under dir into the sprite registry, replacing
@@ -32,6 +42,7 @@ var (
 // entry point for tests and callers that keep art somewhere specific.
 func LoadAssets(dir string) {
 	sprites = map[string]*ebiten.Image{}
+	platePaths = map[string]string{}
 	spritesTried = true
 	if dir == "" {
 		return
@@ -48,8 +59,13 @@ func LoadAssets(dir string) {
 		if rerr != nil {
 			return nil
 		}
+		key := strings.TrimSuffix(filepath.ToSlash(rel), ext)
+		if strings.HasPrefix(key, "backgrounds/") {
+			platePaths[key] = path // indexed, decoded on demand per system
+			return nil
+		}
 		if img := loadPNG(path); img != nil {
-			sprites[strings.TrimSuffix(filepath.ToSlash(rel), ext)] = img
+			sprites[key] = img
 		}
 		return nil
 	})
@@ -62,6 +78,24 @@ func LoadAssets(dir string) {
 func spriteFor(key string) *ebiten.Image {
 	ensureSprites()
 	return sprites[key]
+}
+
+// plateKey returns the convention key of one starfield plate layer for a
+// system id: layer 0 = "<id>.png" (near/bright), layer 1 = "<id>-01.png"
+// (far/faint), layer 2 = optional "<id>-02.png".
+func plateKey(id string, layer int) string {
+	if layer <= 0 {
+		return "backgrounds/" + id
+	}
+	return fmt.Sprintf("backgrounds/%s-%02d", id, layer)
+}
+
+// platePath returns the on-disk location of the plate registered under key
+// (e.g. "backgrounds/sys-solace"), or "" when the system ships no plate —
+// the same nil-means-fallback contract as spriteFor, one decode later.
+func platePath(key string) string {
+	ensureSprites()
+	return platePaths[key]
 }
 
 // ensureSprites probes the convention asset roots exactly once, on the
@@ -94,20 +128,71 @@ func assetRoots() []string {
 // image/png yields straight alpha, the same convention as colorScale, so
 // DrawImage composites it exactly like the procedural sprites.
 func loadPNG(path string) *ebiten.Image {
+	img, ok := decodePNG(path)
+	if !ok {
+		return nil
+	}
+	return ebiten.NewImageFromImage(img)
+}
+
+// decodePNG reads one PNG file. ok is false for anything unreadable, empty
+// or not a PNG — a corrupt drop-in must never crash the game.
+func decodePNG(path string) (image.Image, bool) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil
+		return nil, false
 	}
 	defer f.Close()
 	img, err := png.Decode(f)
 	if err != nil {
-		return nil
+		return nil, false
 	}
 	b := img.Bounds()
 	if b.Dx() <= 0 || b.Dy() <= 0 {
-		return nil
+		return nil, false
 	}
-	return ebiten.NewImageFromImage(img)
+	return img, true
+}
+
+// plateSky samples a sparse pixel grid of a decoded plate and reports whether
+// its sky is opaque: true = solid-sky plate, drawn as the bottom layer under
+// the nebula washes; false = transparent star plate (dots opaque, sky
+// transparent), drawn where that starfield layer draws today. One probe per
+// plate at load, then the draw path is committed for the plate's life. The
+// shipped plates measure ~98% of samples fully transparent → star path.
+func plateSky(img image.Image) bool {
+	b := img.Bounds()
+	sx, sy := b.Dx()/32, b.Dy()/32 // ~32×32 samples max, every pixel if tiny
+	if sx < 1 {
+		sx = 1
+	}
+	if sy < 1 {
+		sy = 1
+	}
+	transparent, total := 0, 0
+	for y := b.Min.Y; y < b.Max.Y; y += sy {
+		for x := b.Min.X; x < b.Max.X; x += sx {
+			_, _, _, a := img.At(x, y).RGBA()
+			total++
+			if a < 8<<8 { // below 8/255 alpha counts as sky-transparent
+				transparent++
+			}
+		}
+	}
+	// Sky reads opaque unless a quarter of the plate is transparent.
+	return total == 0 || transparent*4 < total
+}
+
+// loadPlate decodes one plate PNG and commits its draw path with a single
+// pixel probe (see plateSky). nil image for anything unreadable — the same
+// contract as loadPNG.
+func loadPlate(path string) (*ebiten.Image, bool) {
+	img, ok := decodePNG(path)
+	if !ok {
+		return nil, false
+	}
+	sky := plateSky(img)
+	return ebiten.NewImageFromImage(img), sky
 }
 
 // fitSprite scales a w×h source to fit the square of side 2·logicalRadius —
