@@ -28,15 +28,25 @@ func (r *recordingSink) Do(i widgets.Intent) { r.got = append(r.got, i) }
 // instead of quietly finding a sim — no simulation exists in this test.
 type stubView struct {
 	widgets.ContentView
-	c      *content.Content
-	orders []sim.MarketStock
-	docked bool
-	wallet float64
+	c       *content.Content
+	orders  []sim.MarketStock
+	docked  bool
+	wallet  float64
+	station widgets.StationInfo // docked-at identity + services (nil = none)
 }
 
 func (v *stubView) Defs() *content.Content { return v.c }
 
 func (v *stubView) PlayerDocked() bool { return v.docked }
+
+// DockedStation hands the stub's station back while "docked" — the read
+// the services view and the rail's gray-out share.
+func (v *stubView) DockedStation() (widgets.StationInfo, bool) {
+	if !v.docked {
+		return widgets.StationInfo{}, false
+	}
+	return v.station, true
+}
 
 func (v *stubView) DockedMarket() sim.StationID { return "cel-stub" }
 

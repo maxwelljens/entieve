@@ -37,15 +37,21 @@ func lineAt(t *testing.T, root *widget.Container, i int) widget.PreferredSizeLoc
 // line, centred in the stretched strip) and a standing-gated row (the
 // requirement beside the summary). The board renders through the table
 // module's rich rows; these are the rects the bespoke board laid out.
+//
+// The left column carries the navigation rail's gutter (uikit.RailInset
+// = 36): every LEFT edge sits 36 px right of the pre-rail pin, every
+// right-anchored edge (row right edge, buttons, the 395 line cap) is
+// unchanged — the column's right edge never moved, so the composition to
+// its right is untouched. Widths of content-sized rects are identical.
 func TestBoardOnTableRowRects(t *testing.T) {
 	// --- The default showcase board: three available rows over the
 	// empty-state note.
 	g := dockedShowcaseGame(t, 1280, 720)
-	pinRect(t, "available section", g.stAvail, image.Rect(16, 85, 398, 327))
+	pinRect(t, "available section", g.stAvail, image.Rect(52, 85, 398, 327))
 	wantRows := []image.Rectangle{
-		image.Rect(16, 85, 398, 163),
-		image.Rect(16, 167, 398, 245),
-		image.Rect(16, 249, 398, 327),
+		image.Rect(52, 85, 398, 163),
+		image.Rect(52, 167, 398, 245),
+		image.Rect(52, 249, 398, 327),
 	}
 	avail := g.stAvail.Children()
 	if len(avail) != len(wantRows) {
@@ -58,20 +64,20 @@ func TestBoardOnTableRowRects(t *testing.T) {
 	if len(first.Children()) != 3 {
 		t.Fatalf("available row lines = %d, want 3", len(first.Children()))
 	}
-	pinRect(t, "title line", lineAt(t, first, 0), image.Rect(19, 85, 395, 125))
-	pinRect(t, "summary line", lineAt(t, first, 1), image.Rect(19, 125, 141, 144))
-	pinRect(t, "reward line", lineAt(t, first, 2), image.Rect(19, 144, 395, 163))
+	pinRect(t, "title line", lineAt(t, first, 0), image.Rect(55, 85, 395, 125))
+	pinRect(t, "summary line", lineAt(t, first, 1), image.Rect(55, 125, 177, 144))
+	pinRect(t, "reward line", lineAt(t, first, 2), image.Rect(55, 144, 395, 163))
 	line1 := lineAt(t, first, 0).(*widget.Container)
-	pinRect(t, "icon+title cell", line1.Children()[0], image.Rect(19, 94, 297, 115))
+	pinRect(t, "icon+title cell", line1.Children()[0], image.Rect(55, 94, 297, 115))
 	pinRect(t, "accept button", line1.Children()[1], image.Rect(303, 85, 395, 125))
 	lead := line1.Children()[0].(*widget.Container)
-	pinRect(t, "kind icon", lead.Children()[0], image.Rect(19, 96, 35, 112))
-	pinRect(t, "title", lead.Children()[1], image.Rect(39, 94, 297, 115))
+	pinRect(t, "kind icon", lead.Children()[0], image.Rect(55, 96, 71, 112))
+	pinRect(t, "title", lead.Children()[1], image.Rect(75, 94, 297, 115))
 
-	pinRect(t, "active section", g.stActive, image.Rect(16, 358, 398, 377))
+	pinRect(t, "active section", g.stActive, image.Rect(52, 358, 398, 377))
 	note := g.stActive.Children()[0].(*widget.Container)
-	pinRect(t, "empty-state row", note, image.Rect(16, 358, 398, 377))
-	pinRect(t, "empty-state line", lineAt(t, note, 0), image.Rect(19, 358, 144, 377))
+	pinRect(t, "empty-state row", note, image.Rect(52, 358, 398, 377))
+	pinRect(t, "empty-state line", lineAt(t, note, 0), image.Rect(55, 358, 180, 377))
 
 	// --- Row caps: an active contract beside a "+N more" note, both
 	// stretched to the section's shared row height — the note's line
@@ -86,17 +92,17 @@ func TestBoardOnTableRowRects(t *testing.T) {
 	)
 	g.syncMounts()
 	pump(t, g, 1280, 720)
-	pinRect(t, "capped active section", g.stActive, image.Rect(16, 358, 398, 442))
+	pinRect(t, "capped active section", g.stActive, image.Rect(52, 358, 398, 442))
 	active := g.stActive.Children()
 	if len(active) != 2 {
 		t.Fatalf("capped active rows = %d, want 2", len(active))
 	}
-	pinRect(t, "active contract row", active[0], image.Rect(16, 358, 398, 398))
+	pinRect(t, "active contract row", active[0], image.Rect(52, 358, 398, 398))
 	actLine := lineAt(t, active[0].(*widget.Container), 0)
-	pinRect(t, "active title line", actLine, image.Rect(19, 358, 395, 398))
+	pinRect(t, "active title line", actLine, image.Rect(55, 358, 395, 398))
 	pinRect(t, "abandon button", actLine.(*widget.Container).Children()[1], image.Rect(303, 358, 395, 398))
-	pinRect(t, "capped note row", active[1], image.Rect(16, 402, 398, 442))
-	pinRect(t, "centred note line", lineAt(t, active[1].(*widget.Container), 0), image.Rect(19, 412, 72, 431))
+	pinRect(t, "capped note row", active[1], image.Rect(52, 402, 398, 442))
+	pinRect(t, "centred note line", lineAt(t, active[1].(*widget.Container), 0), image.Rect(55, 412, 108, 431))
 
 	// All five missions are taken, so every offering wears the model's
 	// own button label and gate: "Accepted", grayed (never hidden).
@@ -130,11 +136,11 @@ func TestBoardOnTableRowRects(t *testing.T) {
 	g.syncScenes()
 	g.syncMounts()
 	pump(t, g, 1280, 720)
-	pinRect(t, "gated section", g.stAvail, image.Rect(16, 85, 398, 245))
+	pinRect(t, "gated section", g.stAvail, image.Rect(52, 85, 398, 245))
 	gated := g.stAvail.Children()[0].(*widget.Container)
-	pinRect(t, "gated row", gated, image.Rect(16, 85, 398, 163))
+	pinRect(t, "gated row", gated, image.Rect(52, 85, 398, 163))
 	gatedLine2 := lineAt(t, gated, 1).(*widget.Container)
-	pinRect(t, "gated summary line", gatedLine2, image.Rect(19, 125, 304, 144))
-	pinRect(t, "gated summary", gatedLine2.Children()[0], image.Rect(19, 125, 152, 144))
-	pinRect(t, "gated requirement", gatedLine2.Children()[1], image.Rect(158, 125, 304, 144))
+	pinRect(t, "gated summary line", gatedLine2, image.Rect(55, 125, 340, 144))
+	pinRect(t, "gated summary", gatedLine2.Children()[0], image.Rect(55, 125, 188, 144))
+	pinRect(t, "gated requirement", gatedLine2.Children()[1], image.Rect(194, 125, 340, 144))
 }

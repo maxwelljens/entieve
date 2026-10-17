@@ -20,26 +20,27 @@ import (
 func TestDoHandlesHostIntents(t *testing.T) {
 	g := dockedShowcaseGame(t, 1280, 720)
 
-	// Toggle: the docked trio starts open (the station force-opens it),
-	// and the intent flips exactly what the screen's key flips.
-	if !g.open[pMarket] {
-		t.Fatal("fixture: market not open while docked")
+	// Toggle: docking opened ONLY the services view (nothing force-
+	// opens any more), so the market starts closed and the intent flips
+	// exactly what the screen's key flips.
+	if g.open[pMarket] {
+		t.Fatal("fixture: market opened by docking (only the services view opens)")
 	}
 	g.Do(widgets.Toggle{Screen: "Market"})
+	if !g.open[pMarket] {
+		t.Error("Toggle did not open the Market screen")
+	}
+	g.syncMounts()
+	if g.mounted[pMarket] == nil {
+		t.Error("opened Market screen did not mount")
+	}
+	g.Do(widgets.Toggle{Screen: "market"}) // the title matches case-insensitively
 	if g.open[pMarket] {
-		t.Error("Toggle did not close the Market screen")
+		t.Error("second Toggle did not close the Market screen")
 	}
 	g.syncMounts()
 	if g.mounted[pMarket] != nil {
 		t.Error("closed Market screen stayed mounted (setPanel handler not reached)")
-	}
-	g.Do(widgets.Toggle{Screen: "market"}) // the title matches case-insensitively
-	if !g.open[pMarket] {
-		t.Error("second Toggle did not reopen the Market screen")
-	}
-	g.syncMounts()
-	if g.mounted[pMarket] == nil {
-		t.Error("reopened Market screen did not mount")
 	}
 
 	// A Modal row pushes/pops its scene, the way its key does.
@@ -79,7 +80,7 @@ func TestDoDelegatesToTheKitExecutor(t *testing.T) {
 	var got []sim.Command
 	g.enqueue = func(c sim.Command) { got = append(got, c) }
 
-	// Undock: exactly what the station strip's Undock button queues.
+	// Undock: exactly what the services view's Undock button queues.
 	g.Do(widgets.Undock{})
 	if len(got) != 1 {
 		t.Fatalf("Undock queued %#v, want the single CmdUndock", got)

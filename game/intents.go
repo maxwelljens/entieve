@@ -43,6 +43,10 @@ func (g *Game) toggleScreen(name string) {
 	// screenByTitle is populated in init, with the other registries.
 	s, ok := screenByTitle[strings.ToLower(name)]
 	if !ok {
+		// Not a Screen row: the two core windows (the rail's Overview /
+		// Selected Item entries) toggle through the kit; anything else
+		// is not a window this game opens.
+		g.kit.ToggleCore(name)
 		return
 	}
 	if s.Modal {

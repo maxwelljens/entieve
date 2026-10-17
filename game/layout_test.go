@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -76,77 +77,82 @@ func TestClampLayoutRect(t *testing.T) {
 	}
 }
 
-// TestQuitWhileDockedPersistsPreDockIntent: while docked the three
-// station services are force-open by the scene, but the sidecar records
-// the PRE-dock intent — so the next session does not boot with the
-// market/inventory open in space — and a session restored while docked
-// still surfaces the services (the scene's force) with the intent
-// intact for undock.
-func TestQuitWhileDockedPersistsPreDockIntent(t *testing.T) {
+// TestQuitWhileDockedPersistsLiveState: the sidecar records exactly what
+// the player last saw — nothing force-opens on dock any more, so the
+// services view's flag is the scene's (open while docked) and every
+// service window's flag is the player's own intent. A session restored
+// while docked surfaces the services view again, and undock closes only
+// it.
+func TestQuitWhileDockedPersistsLiveState(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "save.json")
 	g := newShowcaseGameAt(t, path)
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
 
-	// Pre-dock intent: fitting open, market/inventory closed.
+	// Player intent: fitting open, market/inventory closed.
 	g.open[pFitting] = true
 	g.syncMounts()
 
-	// Dock: the scene force-opens all three.
+	// Dock: exactly the services view opens.
 	dockAt(t, g)
 	g.syncScenes()
 	g.syncMounts()
 	pump(t, g, 1280, 720)
-	for _, p := range stationPanels {
-		if !g.open[p] {
-			t.Fatalf("station panel %s not force-open while docked", panelNames[p])
+	if !g.open[pServices] {
+		t.Fatal("services view not open while docked")
+	}
+	for _, p := range []panelID{pMarket, pInventory} {
+		if g.open[p] {
+			t.Fatalf("station panel %s auto-opened on dock — only the services view opens", panelNames[p])
 		}
 	}
 
-	// Save: the sidecar carries the intent, not the forced state.
+	// Save: the sidecar carries the live state.
 	if err := g.SaveGame(); err != nil {
 		t.Fatalf("SaveGame: %v", err)
 	}
 	doc := readDoc(t, g.layoutPath())
 	if doc.Windows["market"].Open {
-		t.Error("closed market persisted open (the dock force leaked into intent)")
+		t.Error("closed market persisted open")
 	}
 	if doc.Windows["inventory"].Open {
 		t.Error("closed inventory persisted open")
 	}
 	if !doc.Windows["fitting"].Open {
-		t.Error("pre-dock-open fitting persisted closed")
+		t.Error("player-open fitting persisted closed")
+	}
+	if !doc.Windows["services"].Open {
+		t.Error("open services view persisted closed while docked")
 	}
 
 	// Next session, restored while docked (the save carries the dock):
-	// the services surface again, and undock restores the intent.
+	// the services view surfaces, the player's intent survives.
 	g2 := newShowcaseGameLoaded(t, path)
 	g2.applySize(1280, 720)
 	pump(t, g2, 1280, 720)
 	if !g2.s.Docked.Has(g2.s.Player()) {
 		t.Fatal("fixture: the save did not carry the dock")
 	}
-	for _, p := range stationPanels {
-		if g2.mounted[p] == nil {
-			t.Errorf("station panel %s not surfaced on the docked restore", panelNames[p])
-		}
+	if g2.mounted[pServices] == nil {
+		t.Error("services view not surfaced on the docked restore")
 	}
-	if !g2.open[pFitting] {
-		t.Error("pre-dock-open fitting closed by the restore")
+	if !g2.open[pFitting] || g2.mounted[pFitting] == nil {
+		t.Error("player-open fitting closed by the restore")
+	}
+	if g2.open[pMarket] || g2.mounted[pMarket] != nil {
+		t.Error("market reopened by the docked restore")
 	}
 
+	// Undock: the services view closes; the player's windows stay.
 	g2.s.Docked.Remove(g2.s.Player())
 	g2.syncScenes()
 	g2.syncMounts()
 	pump(t, g2, 1280, 720)
-	if g2.open[pMarket] || g2.mounted[pMarket] != nil {
-		t.Error("market reopened in space (forced dock state persisted as intent)")
-	}
-	if g2.open[pInventory] || g2.mounted[pInventory] != nil {
-		t.Error("inventory reopened in space")
+	if g2.open[pServices] || g2.mounted[pServices] != nil {
+		t.Error("services view still open in space")
 	}
 	if !g2.open[pFitting] || g2.mounted[pFitting] == nil {
-		t.Error("pre-dock-open fitting lost by the dock round-trip")
+		t.Error("player-open fitting lost by the dock round-trip")
 	}
 }
 
@@ -260,12 +266,12 @@ func TestPlacementTrackerMatchesActualRects(t *testing.T) {
 	g.syncMounts()
 	pump(t, g, 1280, 720)
 	assertTracked("docked board hug")
-	station := g.stationW.GetContainer().GetWidget().Rect
+	station := g.svcWin.GetContainer().GetWidget().Rect
 	if want := stationLayout(1280, 720, station.Dy()); station != want.Station {
 		t.Errorf("station = %v, want the composed %v", station, want.Station)
 	}
-	if g.placed[g.stationW] != station {
-		t.Errorf("station tracker = %v, want the actual %v", g.placed[g.stationW], station)
+	if g.placed[g.svcWin] != station {
+		t.Errorf("station tracker = %v, want the actual %v", g.placed[g.svcWin], station)
 	}
 
 	// Restore path: a fresh session over this session's sidecar tracks
@@ -400,7 +406,7 @@ func TestLayoutCorruptAndPartialDegrade(t *testing.T) {
 	g := newShowcaseGameAt(t, path)
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
-	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != image.Rect(8, 8, 388, 428) {
+	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != image.Rect(8+uikit.RailInset, 8, 388+uikit.RailInset, 428) {
 		t.Errorf("corrupt sidecar moved the overview to %v, want the default", r)
 	}
 
@@ -411,7 +417,7 @@ func TestLayoutCorruptAndPartialDegrade(t *testing.T) {
 		t.Fatal(err)
 	}
 	g.applyLayout(1280, 720)
-	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != image.Rect(8, 8, 388, 428) {
+	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != image.Rect(8+uikit.RailInset, 8, 388+uikit.RailInset, 428) {
 		t.Errorf("version-99 sidecar was applied (%v)", r)
 	}
 
@@ -432,7 +438,7 @@ func TestLayoutCorruptAndPartialDegrade(t *testing.T) {
 	if g.open[pLog] {
 		t.Error("log open flag not restored from the partial sidecar")
 	}
-	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != image.Rect(8, 8, 388, 428) {
+	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != image.Rect(8+uikit.RailInset, 8, 388+uikit.RailInset, 428) {
 		t.Errorf("absent overview entry moved the window to %v", r)
 	}
 	if r := g.scan.Win().GetContainer().GetWidget().Rect; r.Dx() == 0 {

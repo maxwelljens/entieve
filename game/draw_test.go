@@ -120,9 +120,10 @@ func pump(t *testing.T, g *Game, w, h int) *ebiten.Image {
 }
 
 // mountedRects returns the screen rect of every visible panel: the kit's
-// core windows, the mounted toggle windows (the log among them), the
-// station strip and the root-overlay chrome. Hidden panels are skipped —
-// they never lay out and keep a stale rect.
+// core windows, the mounted toggle windows (the log and the services
+// view among them) and the root-overlay chrome (HUD, rack, rail).
+// Hidden panels are skipped — they never lay out and keep a stale
+// rect.
 func mountedRects(g *Game) []struct {
 	name string
 	rect image.Rectangle
@@ -147,11 +148,9 @@ func mountedRects(g *Game) []struct {
 			add(panelNames[p], g.panelWindow(p).GetContainer().GetWidget())
 		}
 	}
-	if g.stShown {
-		add("station", g.stationW.GetContainer().GetWidget())
-	}
 	// Root-overlay chrome: the HUD's visible children (the target-box row
-	// is hidden until something is locked) and the rack.
+	// is hidden until something is locked), the rack and the navigation
+	// rail.
 	if g.hud != nil && isVisible(g.hud.Container().GetWidget()) {
 		for i, ch := range g.hud.Container().Children() {
 			add("hud."+strconv.Itoa(i), ch.GetWidget())
@@ -159,6 +158,9 @@ func mountedRects(g *Game) []struct {
 	}
 	if g.rack != nil {
 		add("rack", g.rack.Container().GetWidget())
+	}
+	if g.rail != nil {
+		add("rail", g.rail.Container().GetWidget())
 	}
 	return out
 }
@@ -253,7 +255,7 @@ func TestSceneDrawSmoke(t *testing.T) {
 		g.pop()
 		g.syncMounts()
 
-		// Station view: docked chrome + the undock strip.
+		// Station view: docked chrome + the services view.
 		dockAt(t, g)
 		g.syncScenes()
 		g.syncMounts()
@@ -338,7 +340,8 @@ func TestFrameReconcilesMounts(t *testing.T) {
 	}
 
 	// Dock (state changes only): the frame pushes the station scene, so
-	// the services surface and the scanner drops without any manual sync.
+	// the services view — the ONE window docking opens — surfaces and
+	// the scanner drops without any manual sync.
 	dockAt(t, g)
 	if err := g.Update(); err != nil {
 		t.Fatalf("dock frame: %v", err)
@@ -347,33 +350,31 @@ func TestFrameReconcilesMounts(t *testing.T) {
 	if g.mounted[pScanner] != nil {
 		t.Error("scanner still mounted while docked")
 	}
-	for _, p := range stationPanels {
-		if g.mounted[p] == nil {
-			t.Errorf("station panel %s not surfaced by the dock frame", panelNames[p])
+	if !g.open[pServices] || g.mounted[pServices] == nil {
+		t.Error("services view not opened by the dock frame")
+	}
+	for _, p := range []panelID{pMarket, pFitting, pFactory} {
+		if g.open[p] || g.mounted[p] != nil {
+			t.Errorf("docking opened %s as well — only the services view auto-opens", panelNames[p])
 		}
 	}
-	if !g.stShown {
-		t.Error("station strip not mounted by the dock frame")
-	}
 
-	// Undock: the frame pops the scene and restores the pre-dock intent
-	// — the market/fitting the player had closed close again, the
-	// inventory they had open stays, and the scanner comes back.
+	// Undock: the frame pops the scene, which closes the services view;
+	// the player's own windows (the inventory they opened) stay exactly
+	// as they were, and the scanner comes back.
 	g.s.Docked.Remove(g.s.Player())
 	if err := g.Update(); err != nil {
 		t.Fatalf("undock frame: %v", err)
 	}
 	check("undocked")
+	if g.open[pServices] || g.mounted[pServices] != nil {
+		t.Error("services view still open after the undock frame")
+	}
 	if g.mounted[pScanner] == nil {
 		t.Error("scanner not restored by the undock frame")
 	}
 	if g.mounted[pInventory] == nil {
-		t.Error("pre-dock-open inventory closed by the undock frame")
-	}
-	for _, p := range []panelID{pMarket, pFitting} {
-		if g.mounted[p] != nil {
-			t.Errorf("station panel %s still mounted after the undock frame", panelNames[p])
-		}
+		t.Error("player-opened inventory closed by the undock frame")
 	}
 }
 

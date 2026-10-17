@@ -22,6 +22,7 @@ package screens
 import (
 	"errors"
 	"image"
+	"strings"
 
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/widget"
@@ -80,8 +81,13 @@ type Kit struct {
 	// remounts it, which is also what raises it to the top of the stack.
 	infoRemove widget.RemoveWindowFunc
 
-	// core visibility (hidden e.g. while docked in a station)
-	coreHidden bool
+	// core visibility (hidden e.g. while docked in a station) and the
+	// player's own close of a core window (the rail's Overview /
+	// Selected Item entries): a window shows when the host shows the
+	// core (coreShown) AND the player has not closed it. State lives on
+	// the kit, so a rebuild (load, scale change) starts open.
+	coreClosed map[string]bool
+	coreShown  bool
 }
 
 // NewKit builds the interface layer over loaded content and a live
@@ -120,6 +126,8 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	// Per-kit chrome registry: a kit built by a save/load rebuild must
 	// not disturb any kit still pumping (they own disjoint windows).
 	k.chromes = map[*widget.Window]*winChrome{}
+	k.coreClosed = map[string]bool{}
+	k.coreShown = true
 
 	// Shared interaction services first: Kit.Env hands them to every
 	// panel (menu + Show Info), and the kit takes over the window's
@@ -281,22 +289,57 @@ func (k *Kit) CloseInfo() {
 	k.svc.info.hide()
 }
 
-// SetCoreVisible hides or shows the always-mounted chrome (Overview and
-// Selected Item), e.g. hide while docked in a station scene.
+// SetCoreVisible shows or hides the always-mounted chrome (Overview and
+// Selected Item), e.g. hide while docked in a station scene. The host's
+// rule composes with the player's own close (ToggleCore): the docked
+// veil can never be overridden from the rail, and a player close
+// survives it.
 func (k *Kit) SetCoreVisible(show bool) {
-	if k.coreHidden == !show {
-		return
+	k.coreShown = show
+	k.applyCore()
+}
+
+// ToggleCore flips the player's own open state of a core window by its
+// title — the rail's toggle for the two always-on windows, which are
+// not Screen spec rows. Reports whether the name is a core window (false
+// leaves it untouched).
+func (k *Kit) ToggleCore(name string) bool {
+	key := strings.ToLower(name)
+	if key != "overview" && key != "selected item" {
+		return false
 	}
-	k.coreHidden = !show
-	vis := widget.Visibility_Show
-	if !show {
-		vis = widget.Visibility_Hide
+	k.coreClosed[key] = !k.coreClosed[key]
+	k.applyCore()
+	return true
+}
+
+// CoreOpen reports whether the player has NOT closed the core window
+// titled name (unknown names read as open — they never toggle).
+func (k *Kit) CoreOpen(name string) bool {
+	return !k.coreClosed[strings.ToLower(name)]
+}
+
+// applyCore resolves the two core windows' visibility from the host rule
+// and the player's close (state writes only; unchanged widgets are not
+// touched, so the per-frame call stays free).
+func (k *Kit) applyCore() {
+	set := func(c widget.Containerer, show bool) {
+		if c == nil {
+			return
+		}
+		vis := widget.Visibility_Show
+		if !show {
+			vis = widget.Visibility_Hide
+		}
+		if w := c.GetWidget(); w.GetVisibility() != vis {
+			w.SetVisibility(vis)
+		}
 	}
-	if c := k.ov.win.GetContainer(); c != nil {
-		c.GetWidget().SetVisibility(vis)
+	if k.ov != nil {
+		set(k.ov.win.GetContainer(), k.coreShown && k.CoreOpen("Overview"))
 	}
-	if c := k.sp.win.GetContainer(); c != nil {
-		c.GetWidget().SetVisibility(vis)
+	if k.sp != nil {
+		set(k.sp.win.GetContainer(), k.coreShown && k.CoreOpen("Selected Item"))
 	}
 }
 

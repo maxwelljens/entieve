@@ -86,11 +86,29 @@ its minimum size), and click anywhere on a window to raise it to the
 front.
 
 Toggle keys open and close their window (`I`, `F`, `G`, `B`, `C`, `N`, `H`,
-`P`, `Shift+L`) — windows have no separate close button. The **Settings**
+`P`, `Shift+L`) — windows have no separate close button. The same
+toggles live on the **left navigation rail**: one glyph per window in
+six sections — **Ship** (Overview, Selected Item, Fitting), **Trade**
+(Market, Inventory), **Industry** (Factory), **Station** (Station
+Services), **World** (Scanner, Starmap, Log) and **Help & System**
+(Help, Settings). Hover an entry for its tooltip (icon, name and hotkey
+hint); click once to open — a freshly opened window lands on top — and
+again to close it. An entry you cannot use right now is **grayed, never
+hidden** (the services view and factory in space, the scanner while
+docked, fitting at a station without the fitting service); clicking a
+grayed entry does nothing. A window that is open wears the entry's amber
+glow, and the slim tab at the rail's top edge collapses the rail to its
+tab — a setting that persists as `rail_collapsed` in
+`<save>.settings.json` (a missing key means expanded). The HUD bar and
+the module rack are permanent ship chrome and have no rail entries, and
+the Esc menu keeps its own key — the rail is not its launcher.
+
+The **Settings**
 window (`P`) holds the **UI scale** stepper (0.75× – 2.5×, applied live —
 every window, control and font rescales and keeps its arrangement), a
-**fullscreen** toggle and **Reset window layout**; the scale and the
-fullscreen flag persist next to the save in `<save>.settings.json`, and
+**fullscreen** toggle and **Reset window layout**; the scale, the
+fullscreen flag and the rail's collapse state persist next to the save
+in `<save>.settings.json`, and
 the window arrangement itself persists in design units, so one saved
 layout works at every scale. Icons (from
 [game-icons.net](https://game-icons.net), credited per-icon in
@@ -103,7 +121,8 @@ every icon keeps its text label. Two panels are
 module's name under it). The **log** is a normal window now —
 bottom left by default, toggle with `Shift+L`, draggable and resizable
 like the rest. The **Overview** (top left) and **Selected Item** window
-(top right) stay open but are draggable — a click in space selects the
+(top right) are open by default (the rail's Ship entries close and
+reopen them) and draggable — a click in space selects the
 target that **Selected Item** then shows and that every
 `selected`-targeted key acts on. Its action buttons (Approach, Warp,
 Orbit, Stop, Lock, Dock, Jump, Loot, Mine) act on that selection; the two
@@ -146,34 +165,38 @@ the defaults, and unknown entries in the file are ignored. **Your saved
 arrangement wins**: a window with a sidecar entry is never recomposed —
 the automatic tiling only fills in the windows the sidecar does not
 mention. One carve-out keeps that promise honest for the docked
-services: if a saved market/inventory/fitting set comes back
-overlapping itself (a layout file from an older game version, or one
-saved at a resolution that no longer fits), the three re-tile to the
-current viewport instead of restoring the overlap — open/closed state
-is always honored either way.
+composition: if a saved services-view/market/inventory/fitting set
+comes back overlapping itself (a layout file from an older game version,
+or one saved at a resolution that no longer fits), the docked set
+re-tiles to the current viewport instead of restoring the overlap —
+open/closed state is always honored either way.
 The layout sidecar is deliberately separate from the save itself — the
 simulation save format is unchanged for the CLI tools.
 
 ### Docked at a station
 
-Docking (`D`) opens the **Market**, **Inventory** and **Fitting**
-windows plus the **Station** window — the station identity, the
-**Undock** button and the contract board (see
+Docking (`D`) opens exactly one window: the **Station Services** view —
+the docked-at identity (station name · system), the **Undock** button,
+a **Cargo** button and one button per service *this* station offers
+(Market, Fitting, Industry — a service the station lacks is not offered
+at all) over the contract board (see
 [Contracts & standing](#contracts--standing)) — and hides the space
 chrome (HUD bar, module rack, scanner) together with the
-**Overview** and **Selected Item** windows. At a station with the
-industry service the **Factory** window (`B`) surfaces automatically
-too (see [The factory](#the-factory)). The service windows **tile
-automatically at your viewport size** — market on top, inventory and
-fitting below — and any arrangement you saved or dragged wins over that
-tiling (unless the saved set would come back overlapping itself, in
-which case the three re-tile — see **Your layout persists**).
-Undocking closes the station windows that were closed before
-docking, restores the space chrome and the overview/selected pair, and
-resets the camera view. The layout sidecar remembers that pre-dock
-state (not the dock-forced open flags), so quitting while docked does
-not reopen the market and friends in space on the next boot. The log
-stays mounted while docked so its history comes with you.
+**Overview** and **Selected Item** windows. Nothing else auto-opens:
+the market, fitting, inventory and factory are ordinary windows you
+open from the services view, their keys, or the rail. While docked the
+service windows **tile automatically at your viewport size** — the
+services view owns the left column, market on top to its right,
+inventory and fitting below — and any arrangement you saved or dragged
+wins over that tiling (unless the saved set would come back overlapping
+itself, in which case the docked set re-tiles — see **Your layout
+persists**).
+Undocking closes the services view and leaves every window you opened
+exactly as it was, restores the space chrome and the overview/selected
+pair, and resets the camera view. The layout sidecar records the state
+you last saw (nothing is force-open any more), so quitting while docked
+reopens precisely that arrangement. The log stays mounted while docked
+so its history comes with you.
 
 ### Overview (top-left)
 
@@ -369,9 +392,10 @@ Starogród. Death is paperwork; the log line `Respawned at <station> in a
 ## The factory
 
 Manufacturing is a station service like any other. Press **`B`** for the
-**Factory** window — docked at a station with the **industry** service it
-opens there like the other service windows (Przystań, Huta at Młynów, Doki
-at Kamieniec), and it only ever mounts while docked.
+**Factory** window (or its Industry button on the services view) — docked
+at a station with the **industry** service it opens there like the other
+service windows (Przystań, Huta at Młynów, Doki at Kamieniec), and it
+only ever mounts while docked.
 
 The factory turns **minerals into products**: pick a recipe — a hull, a
 module or a batch of charges — set the number of **runs**, and press start.

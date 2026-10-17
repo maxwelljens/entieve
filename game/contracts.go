@@ -10,6 +10,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -17,17 +18,19 @@ import (
 )
 
 // Station contract-board geometry (docs/GAMEPLAY.md, "Contracts &
-// standing"). The station window owns the top-left column while docked:
-// x ∈ [stationX, stationX+stationWinW) keeps a gutter before the market at
-// x=396, and the content-driven height (row caps included) keeps the
-// bottom above the log, whose top sits at screen-height-250 — i.e. y=450
-// at the 1024×700 minimum. Both are pinned by tests at1280×720, 1024×700
-// and at the window minimum.
+// standing"). The station services window owns the left column while
+// docked: x ∈ [stationX, stationX+stationWinW) starts clear of the
+// navigation rail's gutter and keeps its right edge at 404, so the
+// market still starts at x=406 — the composition right of the column is
+// bit-identical to the pre-rail layout. The content-driven height (row
+// caps included) keeps the bottom above the log, whose top sits at
+// screen-height-250 — i.e. y=450 at the 1024×700 minimum. Both are
+// pinned by tests at 1280×720, 1024×700 and at the window minimum.
 const (
-	stationX     = 10 // window left/top edge (matches placeDefaults)
+	stationX     = 10 + uikit.RailInset // window left edge: rail gutter first
 	stationY     = 8
-	stationWinW  = 394 // window width; right edge 404, market starts at x=406
-	stationMinW  = 394 // window MinSize — the "minimum window" row-rect pin
+	stationWinW  = 394 - uikit.RailInset // window width; right edge still 404
+	stationMinW  = 394 - uikit.RailInset // window MinSize — the "minimum window" row-rect pin
 	stationMinH  = 200
 	boardPad     = 6 // body padding
 	boardSpacing = 5 // vertical gap between body children
@@ -203,14 +206,14 @@ func (g *Game) buildStationBoard() stationBoardModel {
 	return m
 }
 
-// syncStationBoard rebuilds the station window's contract board when its
+// syncStationBoard rebuilds the services view's contract board when its
 // model signature changes and resizes the window to the content. It is
 // called on drained EvMission/EvDocked/EvUndocked events (the same path
 // the log drains) and every frame while docked from syncMounts — the
 // frame-level call also catches state that emits no mission event (cargo
 // bought at the market feeds the deliver progress line).
 func (g *Game) syncStationBoard() {
-	if g.stationW == nil || g.stAvail == nil || g.stBody == nil {
+	if g.svcWin == nil || g.stAvail == nil || g.stBody == nil {
 		return
 	}
 	m := g.buildStationBoard()
@@ -242,13 +245,13 @@ func (g *Game) rebuildStationBoard(m stationBoardModel) {
 		}
 	}
 	_, h := g.stBody.PreferredSize()
-	// The station column is part of the composed docked layout — same
+	// The services column is part of the composed docked layout — same
 	// source of truth as placeDefaults (stationLayout), so the board's
 	// content hug and the viewport composition can never disagree — and
 	// it goes through the placement tracker like every other composed
 	// rect: a direct SetLocation here would leave g.placed stale and the
 	// window would read as player-moved (never recomposed again).
-	g.placeIfVirgin(g.stationW, stationLayout(g.w, g.h, h).Station)
+	g.placeIfVirgin(g.svcWin, stationLayout(g.w, g.h, h).Station)
 }
 
 // buildContractRow renders one board row as a rich row of the table

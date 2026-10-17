@@ -63,9 +63,11 @@ func TestFactoryPanelMount(t *testing.T) {
 	}
 }
 
-// TestFactorySurfacesAtIndustryStation: docking at an industry-capable
-// station opens the factory like the other station services do (the
-// session's own content copy patches the start station with the service).
+// TestFactorySurfacesAtIndustryStation: the factory is an ordinary
+// window now — docking opens only the services view, and the player
+// opens the factory from there (its Industry button) or with B (the
+// session's own content copy patches the start station with the
+// service).
 func TestFactorySurfacesAtIndustryStation(t *testing.T) {
 	c, err := content.Load(content.FS())
 	if err != nil {
@@ -95,8 +97,18 @@ func TestFactorySurfacesAtIndustryStation(t *testing.T) {
 	dockAt(t, g)
 	g.syncScenes()
 	g.syncMounts()
+	if g.open[pFactory] || g.mounted[pFactory] != nil {
+		t.Fatal("factory auto-opened on dock — only the services view opens")
+	}
+	if !g.open[pServices] || g.mounted[pServices] == nil {
+		t.Fatal("services view not open at the industry station")
+	}
+	// The player opens it (B — what the services view's Industry button
+	// emits too).
+	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyB}})
+	g.syncMounts()
 	if !g.open[pFactory] {
-		t.Fatal("factory did not surface at an industry station")
+		t.Fatal("factory did not open at an industry station")
 	}
 	if g.mounted[pFactory] == nil {
 		t.Fatal("factory not mounted after the dock frame")
@@ -107,7 +119,7 @@ func TestFactorySurfacesAtIndustryStation(t *testing.T) {
 		t.Fatalf("factory window %v not laid out in bounds", r)
 	}
 
-	// Closing it sticks for this dock (the panel is toggleable, B again).
+	// Closing it sticks (the panel is toggleable, B again).
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyB}})
 	g.syncMounts()
 	if g.open[pFactory] || g.mounted[pFactory] != nil {

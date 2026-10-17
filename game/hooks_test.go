@@ -66,10 +66,11 @@ func TestWorldClickSelection(t *testing.T) {
 	}
 }
 
-// TestChromeOnRootOverlay: HUD and rack mount directly on the kit's
-// root overlay (no full-screen wrapper windows), the rack tracks hover,
-// and their exact rects gate the world while empty space does not. The
-// log moved off the root — it is a window now (see TestLogWindowGate).
+// TestChromeOnRootOverlay: HUD, rack and the navigation rail mount
+// directly on the kit's root overlay (no full-screen wrapper windows),
+// the rack and rail track hover, and their exact rects gate the world
+// while empty space does not. The log moved off the root — it is a
+// window now (see TestLogWindowGate).
 func TestChromeOnRootOverlay(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
@@ -84,11 +85,11 @@ func TestChromeOnRootOverlay(t *testing.T) {
 		}
 		mounted[c] = true
 	}
-	if len(kids) != 2 {
-		t.Errorf("root overlay has %d children, want exactly the HUD and rack", len(kids))
+	if len(kids) != 3 {
+		t.Errorf("root overlay has %d children, want exactly the HUD, rack and rail", len(kids))
 	}
 	for name, c := range map[string]*widget.Container{
-		"hud": g.hud.Container(), "rack": g.rack.Container(),
+		"hud": g.hud.Container(), "rack": g.rack.Container(), "rail": g.rail.Container(),
 	} {
 		if !mounted[c] {
 			t.Errorf("%s is not mounted on the root overlay", name)
@@ -101,8 +102,9 @@ func TestChromeOnRootOverlay(t *testing.T) {
 	// The rack tracks hover so input.UIHovered covers its padding; the
 	// HUD container must not: it spans the whole screen. The log window
 	// container tracks hover through the window chrome itself.
-	if !g.rack.Container().GetWidget().TrackHover || !g.logP.Container().GetWidget().TrackHover {
-		t.Error("rack/log containers do not track hover")
+	if !g.rack.Container().GetWidget().TrackHover || !g.logP.Container().GetWidget().TrackHover ||
+		!g.rail.Container().GetWidget().TrackHover {
+		t.Error("rack/log/rail containers do not track hover")
 	}
 	if g.hud.Container().GetWidget().TrackHover {
 		t.Error("HUD container tracks hover (it spans the whole screen)")
@@ -130,6 +132,7 @@ func TestChromeOnRootOverlay(t *testing.T) {
 	}{
 		{"rack", g.rack.Container().GetWidget().Rect},
 		{"log", g.logP.Container().GetWidget().Rect},
+		{"rail", g.rail.Container().GetWidget().Rect},
 	} {
 		x, y := centerOf(t, p.rect)
 		if !g.overUI(x, y) {

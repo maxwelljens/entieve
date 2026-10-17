@@ -25,7 +25,7 @@ func withFixture() []Screen {
 		ID: panelID(len(screens)), Title: "Fixture", Icon: "svc_inventory",
 		Key: ebiten.KeyV, Action: "fixture", Desc: "V — toggle fixture",
 		DefaultRect: image.Rect(0, 0, defaultW, defaultH),
-		DockPolicy:  DockFloating, SidecarName: "fixture",
+		DockPolicy:  DockFloating, SidecarName: "fixture", Group: "Trade",
 		Build: func(*Game) *widget.Window { return nil },
 	}
 	return append(slices.Clone(screens), fixture)
@@ -68,7 +68,11 @@ func TestScreenSpecRejectsMalformedRows(t *testing.T) {
 		{"persisted screen without a name", func(r []Screen) { r[0].SidecarName = "" }, "needs a sidecar name"},
 		{"duplicate sidecar name", func(r []Screen) { r[1].SidecarName = "inventory" }, `sidecar name "inventory" already used`},
 		{"station screen outside the composition", func(r []Screen) { r[pMarket].SidecarName = "bourse" }, "no composed rect"},
-		{"docked trio disagreeing with its scene force", func(r []Screen) { r[0].ForcedDockOpen = false }, "must agree"},
+		{"missing rail group", func(r []Screen) { r[0].Group = "" }, "missing rail group"},
+		{"unknown rail group", func(r []Screen) { r[0].Group = "Cargo Bay" }, "unknown rail group"},
+		{"transient row claiming a group", func(r []Screen) { r[pMenu].Group = "Ship" }, "transient screen must not carry"},
+		{"unknown station service", func(r []Screen) { r[1].Service = "banking" }, "unknown station service"},
+		{"row without a rail icon", func(r []Screen) { r[0].Icon = "" }, "missing icon"},
 		{"space-only and docked-only at once", func(r []Screen) { r[pFactory].SpaceOnly = true }, "never mounts"},
 		{"unknown anchor", func(r []Screen) { r[0].Anchor = Anchor(99) }, "unknown anchor"},
 	}
@@ -174,7 +178,7 @@ func TestScreenPlacementDerivesFromSpec(t *testing.T) {
 		w, h := size[0], size[1]
 		g := newShowcaseGame(t)
 		g.applySize(w, h)
-		lay := stationLayout(w, h, g.stationW.GetContainer().GetWidget().Rect.Dy())
+		lay := stationLayout(w, h, g.svcWin.GetContainer().GetWidget().Rect.Dy())
 
 		for _, s := range screens {
 			r := g.screenWin[s.ID].GetContainer().GetWidget().Rect
@@ -193,12 +197,16 @@ func TestScreenPlacementDerivesFromSpec(t *testing.T) {
 		}
 
 		// Anchor semantics, stated as behaviour (the pre-spec contract).
-		if r := g.screenWin[pLog].GetContainer().GetWidget().Rect; r != image.Rect(10, h-10-240, 10+288, h-10) {
-			t.Errorf("%dx%d: log = %v, want the bottom-left pocket (10, %d)-(298, %d)",
+		// The log's pocket starts clear of the rail's gutter (46 = 10 +
+		// uikit.RailInset) and keeps its 288 px width and bottom inset.
+		if r := g.screenWin[pLog].GetContainer().GetWidget().Rect; r != image.Rect(46, h-10-240, 46+288, h-10) {
+			t.Errorf("%dx%d: log = %v, want the bottom-left pocket (46, %d)-(334, %d)",
 				w, h, r, h-10-240, h-10)
 		}
-		if r := g.screenWin[pScanner].GetContainer().GetWidget().Rect; r.Min != image.Pt(396, 276) {
-			t.Errorf("%dx%d: scanner at %v, want the fixed design position (396,276)", w, h, r.Min)
+		// The scanner sits in the centre column, 36 px right of the
+		// pre-rail design position (396 + uikit.RailInset).
+		if r := g.screenWin[pScanner].GetContainer().GetWidget().Rect; r.Min != image.Pt(432, 276) {
+			t.Errorf("%dx%d: scanner at %v, want the fixed design position (432,276)", w, h, r.Min)
 		}
 		if r := g.screenWin[pHelp].GetContainer().GetWidget().Rect; r.Min.Y != 24 || r.Min.X != (w-r.Dx())/2 {
 			t.Errorf("%dx%d: help at %v, want top inset 24 and x centred (%d)", w, h, r.Min, (w-r.Dx())/2)

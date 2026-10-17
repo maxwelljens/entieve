@@ -25,7 +25,7 @@ func TestPanelMountAndSync(t *testing.T) {
 			"hud": g.hud, "rack": g.rack, "log": g.logP, "inventory": g.inv,
 			"fitting": g.fitt, "market": g.mkt, "factory": g.fact,
 			"scanner": g.scan, "map": g.mp, "help": g.help, "menu": g.menuWin,
-			"station": g.stationW, "kit": g.kit, "infowin": g.kit.InfoWindow(),
+			"station": g.svcWin, "kit": g.kit, "infowin": g.kit.InfoWindow(),
 		} {
 			if v == nil {
 				t.Fatalf("%dx%d: panel %s is nil", size[0], size[1], name)
@@ -415,8 +415,9 @@ func TestSaveRebuildLoad(t *testing.T) {
 	}
 }
 
-// TestSceneTransitionsDock: docking surfaces the station windows and
-// hides the space chrome; undocking restores the pre-dock state.
+// TestSceneTransitionsDock: docking opens exactly one window — the
+// station services view — and hides the space chrome; undocking closes
+// that view and leaves everything else as the player had it.
 func TestSceneTransitionsDock(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
@@ -427,20 +428,27 @@ func TestSceneTransitionsDock(t *testing.T) {
 	if g.mounted[pScanner] == nil {
 		t.Fatal("scanner not mounted in space")
 	}
-	if !chromeShown(g) || g.stShown {
-		t.Fatal("chrome/station state wrong in space")
+	if !chromeShown(g) {
+		t.Fatal("space chrome wrong in space")
 	}
 
-	// Dock: the station scene pushes, services open, chrome hides.
+	// Dock: the station scene pushes, the services view opens (alone),
+	// chrome hides.
 	dockAt(t, g)
 	g.syncScenes()
 	if _, ok := g.top().(*StationScene); !ok {
 		t.Fatal("station scene not pushed on dock")
 	}
 	g.syncMounts()
+	if !g.open[pServices] || g.mounted[pServices] == nil {
+		t.Error("services view not surfaced on dock")
+	}
 	for _, p := range stationPanels {
-		if !g.open[p] || g.mounted[p] == nil {
-			t.Errorf("station panel %s not surfaced on dock", panelNames[p])
+		if p == pServices {
+			continue
+		}
+		if g.open[p] || g.mounted[p] != nil {
+			t.Errorf("docking opened %s too — only the services view auto-opens", panelNames[p])
 		}
 	}
 	if g.mounted[pScanner] != nil {
@@ -449,36 +457,31 @@ func TestSceneTransitionsDock(t *testing.T) {
 	if chromeShown(g) {
 		t.Error("HUD/rack still visible while docked")
 	}
-	if !g.stShown {
-		t.Fatal("station strip not mounted while docked")
-	}
 	pump(t, g, 1280, 720)
 
-	// Undock: the scene pops and the auto-opened windows close again
-	// (their pre-dock state was closed); the scanner returns.
+	// Undock: the scene pops and closes the services view; nothing else
+	// moved, and the scanner returns.
 	g.s.Docked.Remove(g.s.Player())
 	g.syncScenes()
 	if _, ok := g.top().(*StationScene); ok {
 		t.Fatal("station scene not popped on undock")
 	}
 	g.syncMounts()
-	for _, p := range stationPanels {
-		if g.open[p] || g.mounted[p] != nil {
-			t.Errorf("station panel %s not restored on undock", panelNames[p])
-		}
+	if g.open[pServices] || g.mounted[pServices] != nil {
+		t.Error("services view still open after undock")
 	}
 	if g.mounted[pScanner] == nil {
 		t.Error("scanner not restored after undock")
 	}
-	if !chromeShown(g) || g.stShown {
-		t.Error("chrome/station state wrong after undock")
+	if !chromeShown(g) {
+		t.Error("space chrome wrong after undock")
 	}
 	pump(t, g, 1280, 720)
 	assertInBounds(t, g, 1280, 720)
 }
 
 // TestStationPriorState: a window the player had open before docking
-// stays open after undocking.
+// stays open after undocking (undock closes only the services view).
 func TestStationPriorState(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
@@ -493,7 +496,7 @@ func TestStationPriorState(t *testing.T) {
 	g.syncScenes()
 	g.syncMounts()
 	if !g.open[pFitting] || g.mounted[pFitting] == nil {
-		t.Error("pre-open fitting window was closed by the undock restore")
+		t.Error("pre-open fitting window was closed by the undock")
 	}
 }
 

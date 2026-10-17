@@ -6,13 +6,13 @@ import (
 
 	eimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/uikit/icons"
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// Window chrome metrics for the game-built windows (menu, station):
+// Window chrome metrics for the game-built windows (menu, services):
 // mirrored from the uikit title-bar scale so they read as one theme.
 const (
 	winTitleH = 44
@@ -38,51 +38,28 @@ func bordered(body, edge color.NRGBA, w int) *eimage.NineSlice {
 // ---------------------------------------------------------------------------
 
 // StationScene shows the station view: the world stays veiled behind it
-// and the station chrome (Market / Inventory / Fitting / Undock) rides the
-// uikit window stack. World input is off while it is on top.
+// and the services view (identity / Undock / Cargo / services, over the
+// contract board) rides the uikit window stack. World input is off while
+// it is on top.
 type StationScene struct{ g *Game }
 
-// stationPanels are the windows that auto-open on dock: every Screen row
-// flagged ForcedDockOpen (the station trio), in spec order — the same
-// set layout.go persists the PRE-dock intent for and station_layout.go
-// composes. Assigned in init from the spec (uikit.go), like panelDefs.
+// stationPanels are the docked station COMPOSITION: every Screen row
+// with DockPolicy == DockStation, in spec order — the set
+// station_layout.go composes and the reclaim checks. Nothing force-opens
+// on dock; the scene opens exactly one of them (the services view), and
+// the player opens the rest, which the composition then places.
+// Assigned in init from the spec (screens.go), like panelDefs.
 var stationPanels []panelID
 
-// isStationPanel reports whether p is one of the dock-forced services.
-func isStationPanel(p panelID) bool {
-	for _, s := range stationPanels {
-		if s == p {
-			return true
-		}
-	}
-	return false
-}
+// OnEnter implements Scene: docking opens exactly one window — the
+// station services view. The market, fitting and inventory stay closed
+// unless the player opened them; the composition places them when they
+// do.
+func (sc *StationScene) OnEnter() { sc.g.open[pServices] = true }
 
-// OnEnter implements Scene: remember which station windows were open and
-// surface the station services. The factory is the industry service's
-// panel: it surfaces on its own when the docked station offers industry
-// (B toggles it from there on).
-func (sc *StationScene) OnEnter() {
-	g := sc.g
-	for _, p := range stationPanels {
-		g.stationPrior[p] = g.open[p]
-		g.open[p] = true
-	}
-	if g.s.DockedIndustry() != "" {
-		g.open[pFactory] = true
-	}
-}
-
-// OnLeave implements Scene: restore the pre-dock window state (windows
-// that were closed before docking close again; already-open ones stay).
-func (sc *StationScene) OnLeave() {
-	g := sc.g
-	for _, p := range stationPanels {
-		if !g.stationPrior[p] {
-			g.open[p] = false
-		}
-	}
-}
+// OnLeave implements Scene: undocking closes the services view and
+// leaves every player-opened window exactly as it was.
+func (sc *StationScene) OnLeave() { sc.g.open[pServices] = false }
 
 // Update is a no-op: buttons live in the interface, world input stays off
 // because this scene is on top.
@@ -196,22 +173,6 @@ func (g *Game) newBtn(label string, minW, minH int, clicked func()) *widget.Butt
 	)
 }
 
-// newIconBtn is newBtn with a 20 px icon beside the label (ebitenui's
-// TextAndImage path — the graphic trails the label, the theme's image
-// states are untouched, and the disabled icon draws at 40%).
-func (g *Game) newIconBtn(label, icon string, minW, minH int, clicked func()) *widget.Button {
-	p := g.env.Pal()
-	dim := color.RGBA{R: p.Dim.R, G: p.Dim.G, B: p.Dim.B, A: theme.IconDisabledA}
-	return widget.NewButton(
-		widget.ButtonOpts.TextAndImage(label, nil, &widget.GraphicImage{
-			Idle:     icons.Get(icon, theme.Px(theme.IconButton), p.Text),
-			Disabled: icons.Get(icon, theme.Px(theme.IconButton), dim),
-		}, nil),
-		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(minW), theme.Px(minH))),
-		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
-	)
-}
-
 // buildMenuWindow constructs the Esc menu window: modal so no click leaks
 // past it while it is open.
 func (g *Game) buildMenuWindow() *widget.Window {
@@ -247,32 +208,19 @@ func (g *Game) buildMenuWindow() *widget.Window {
 	)
 }
 
-// buildStationWindow constructs the docked station strip: the station
-// identity header (name + Undock) over the two contract-board sections —
-// Available contracts (this station's board) and Active contracts (every
-// accepted contract). The sections' rows are laid out by boardRowRects
-// (contracts.go); syncStationBoard rebuilds them and hugs the window to
-// the content height.
-func (g *Game) buildStationWindow() *widget.Window {
+// buildServicesWindow constructs the station services view — the ONE
+// window docking opens: uikit.NewServices' service row (docked-at
+// identity, Undock, Cargo and one button per service this station
+// offers) over the two contract-board sections — Available contracts
+// (this station's board) and Active contracts (every accepted contract).
+// The sections' rows are laid out by boardRowRects (contracts.go);
+// syncStationBoard rebuilds them and hugs the window to the content
+// height. The window owns no title bar — the service row is its header,
+// exactly as tall as the strip's header was, so the column's worst-case
+// height (and its clearance over the log) is unchanged.
+func (g *Game) buildServicesWindow() *widget.Window {
 	p := g.env.Pal()
-	g.stName = widget.NewText(
-		widget.TextOpts.Text("Docked", g.env.Face(theme.StepSmall), solid(p.Text)),
-	)
-	undock := g.newIconBtn("Undock", "act_undock", 150, menuBtnH, func() {
-		g.Do(widgets.Undock{})
-	})
-	header := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(10)),
-		)),
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
-	)
-	// The station strip is the contracts service's face: its leading glyph
-	// is the only "title" this window has (it owns no title bar).
-	glyph := theme.NewIcon("svc_contracts", theme.IconTitle, p.Accent)
-	glyph.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
-	header.AddChild(glyph, g.stName, undock)
+	g.svcUI = uikit.NewServices(g.env, boardInnerW)
 
 	g.stAvail = g.newBoardSection()
 	g.stActive = g.newBoardSection()
@@ -291,7 +239,7 @@ func (g *Game) buildStationWindow() *widget.Window {
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(boardPad))),
 		)),
 	)
-	body.AddChild(header, availHead, g.stAvail, actHead, g.stActive)
+	body.AddChild(g.svcUI.Container(), availHead, g.stAvail, actHead, g.stActive)
 	g.stBody = body
 	g.stModel, g.stAvailRows, g.stActRows = stationBoardModel{}, nil, nil // fresh window: rebuild on next sync
 
@@ -305,6 +253,7 @@ func (g *Game) buildStationWindow() *widget.Window {
 	// validates (and themes) buttons during that measurement. Same palette
 	// and type scale as the kit's own theme.
 	win.GetContainer().GetWidget().SetTheme(g.env.WidgetTheme())
+	g.svcWin = win
 	return win
 }
 
@@ -316,23 +265,4 @@ func (g *Game) newBoardSection() *widget.Container {
 		widget.ContainerOpts.Layout(widgets.StackLayout{Gap: theme.Px(boardRowGap)}),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
-}
-
-// syncStationLabel refreshes the station strip's identity line.
-func (g *Game) syncStationLabel() {
-	name := "Station"
-	if d := g.s.System(); d != nil {
-		if at, ok := g.s.Docked.Get(g.s.Player()); ok {
-			for _, cel := range d.Celestials {
-				if cel.ID == at.At {
-					name = cel.Name
-					break
-				}
-			}
-		}
-	}
-	label := "Docked at " + name
-	if g.stName.Label != label {
-		g.stName.Label = label
-	}
 }

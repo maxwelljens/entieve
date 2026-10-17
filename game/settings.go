@@ -13,10 +13,15 @@ import (
 )
 
 // Player settings persistence: a JSON sidecar next to the save file,
-// <Options.SavePath>.settings.json, holding the UI scale and the
-// fullscreen flag:
+// <Options.SavePath>.settings.json, holding the UI scale, the fullscreen
+// flag and the navigation rail's collapse state:
 //
 //	{"ui_scale": 1.5, "fullscreen": false}
+//	{"ui_scale": 1, "fullscreen": false, "rail_collapsed": true}
+//
+// rail_collapsed is omitempty: the documented DEFAULT shape above stays
+// exactly two keys (an absent key reads as expanded — the rail's boot
+// state), and a collapsed rail writes the third.
 //
 // Like the layout sidecar the contract is robustness over fidelity: a
 // missing, corrupt or out-of-ladder file degrades to the defaults (UI
@@ -42,6 +47,9 @@ const defaultUIScale = 1.0
 type settingsFile struct {
 	UIScale    float64 `json:"ui_scale"`
 	Fullscreen bool    `json:"fullscreen"`
+	// RailCollapsed parks the left navigation rail to its edge tab;
+	// absent = expanded (the boot default).
+	RailCollapsed bool `json:"rail_collapsed,omitempty"`
 }
 
 // settingsPath is the sidecar location: the resolved save path plus
@@ -53,6 +61,7 @@ func (g *Game) settingsPath() string { return g.SavePath() + ".settings.json" }
 // in place (never an error; called from New before anything is built).
 func (g *Game) loadSettings() {
 	g.uiScale, g.fullscreen = defaultUIScale, false
+	g.railCollapsed = false
 	data, err := os.ReadFile(g.settingsPath())
 	if err != nil {
 		return
@@ -65,11 +74,12 @@ func (g *Game) loadSettings() {
 		g.uiScale = s
 	}
 	g.fullscreen = f.Fullscreen
+	g.railCollapsed = f.RailCollapsed
 }
 
 // writeSettings persists g's settings (called on every change).
 func (g *Game) writeSettings() error {
-	f := settingsFile{UIScale: g.uiScale, Fullscreen: g.fullscreen}
+	f := settingsFile{UIScale: g.uiScale, Fullscreen: g.fullscreen, RailCollapsed: g.railCollapsed}
 	data, err := json.MarshalIndent(f, "", "  ")
 	if err != nil {
 		return err
