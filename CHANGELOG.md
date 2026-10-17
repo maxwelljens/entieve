@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-17
+
 ### Added
 
 - **Drop-in starfield background plates** (`assets/backgrounds/`): any star
@@ -24,145 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evicted on system change (a two-layer system is ~52 MB decoded). Ships
   with `sys-solace.png` / `sys-solace-01.png` for Starogród; convention in
   `docs/ART.md`.
-
-### Changed
-
-- **Docking opens exactly one window.** The station scene no longer
-  force-opens the market/inventory/fitting trio (nor the factory at
-  industry stations): `StationScene.OnEnter` opens only the new station
-  services view and `OnLeave` closes only it, leaving every
-  player-opened window exactly as it was. The trio became ordinary
-  windows — the docked composition (`stationLayout` + the reclaim) still
-  places them, but only when the player opens them (rail, keys or the
-  services view's buttons). The `Screen.ForcedDockOpen` field is
-  **deleted**: composed membership now derives from
-  `DockPolicy == DockStation` alone, and with nothing force-open on
-  dock the `stationPrior` pre-dock-intent machinery went with it —
-  `persistOpen`/`applyLayout` record and restore the live state the
-  player last saw (the services view's flag is the scene's). The old
-  game-built station strip (`buildStationWindow`, `syncStationLabel`,
-  `setStrip`/`stShown`) is deleted: its identity line and Undock button
-  moved into the services view, its contract board rides the services
-  window, and the window mounts through the ordinary panel path.
-- **The contract board folds onto the table module** (`widgets.StackRow`,
-  `widgets.StackLayout`): the table gains a modest rich-row capability —
-  a `TableRow` may carry a **line stack** (`Stack []RowLine`) instead of
-  one text per column: each line a run of cells (`RowSeg`, own type-scale
-  step, colour and minimum width), the row's `Icons[0]` boxing with line
-  1's first cell, and its `RowSpec.Actions` drawn as trailing buttons
-  (1–2, `Disabled` grayed and silent — one declaration feeding the
-  button, the context menu and the gate alike), with a per-line `Ref`
-  that joins the shared installer (right-click menu with the bold-first
-  Show Info, strict double-click). Everything else — change-gated
-  rebuilds (a rich row's stack and its buttons' labels/gates are
-  snapshotted like plain cells, so an identical `SetRows` stays a no-op),
-  column fitting, sorting, selection and `TipData` tooltips — applies to
-  rich rows as to plain ones. The station contract board now declares
-  `TableRow` values and renders them through `widgets.NewStackRow`: the
-  bespoke `boardLayout` layouter and the hand-built row widget tree it
-  laid out are deleted — the equal-height stack behind them moves to
-  `widgets.StackLayout` (the pure `boardRowRects` pin stays as the
-  geometry tests' subject), and what survives beside it is only the
-  contract-id/button/root handle the board's tests press. The look is
-  preserved rect for rect — same window chrome, title line, row order,
-  strings (the Accepted marker button and the menu's Accept/Abandon verb
-  split included), button gating, objective-label Show Info and
-  Accept/Abandon dispatch — pinned by the new `TestBoardOnTableRowRects`
-  against the pre-port geometry, with the board's golden strings and
-  mouse-flow tests passing byte-untouched.
-- **`uikit` split into three modules with an enforced import direction**
-  (`uikit/theme`, `uikit/widgets`, `uikit/screens`): the flat package
-  became `theme` (visual constants and their plumbing — `Palette`,
-  `TypeScale`, the `Px`/`SetScale`/`Scale` funnel, faces and the `Theme`
-  seam with its implementation, chrome constants, draw helpers, icon
-  maps, display formatters) ← `widgets` (reusable mechanics — table,
-  menu, tooltip, rowspec, the `Intent` vocabulary and `commandFor`, the
-  `ContentView`/`ActionSink`/`Seams` seam interfaces, the `InfoRef` row
-  data and its resolvers) ← `screens` (every panel plus the `Kit` shell,
-  the session/`NewEnv` wiring and the window-resize chrome). Each layer
-  imports only downward (`screens → widgets → theme`, plus `uikit/icons`
-  and `render` as before); `widgets` can never import `screens`, and the
-  compiler's acyclicity plus a new parsing test
-  (`uikit/widgets.TestImportDirection`) pin the rule. Names that now
-  span packages are exported at their new home (e.g. `uikit.Px` →
-  `theme.Px`, `theme.ContentsPad`, `widgets.RowRef`, `widgets.OpenRowMenu`)
-  and call sites updated; a handful of table/tooltip test seams
-  (`…ForTest` hooks, exported layout fields) let the screen suites assert
-  widget geometry across the seam. Behaviour is unchanged — same menus,
-  tooltips, double-clicks and golden pins, and `TestMarketRunsOnStubView`
-  now lives with the screens it proves seam-only.
-- **The `Env` god-context dissolved into three narrow seams — `Theme`,
-  `ContentView`, `ActionSink`** (`uikit/seams.go`, `uikit/intents.go`).
-  Every screen constructor now takes exactly the subset it uses: a
-  tooltip-only widget a `Theme`, the HUD/log/scanner/map the theme plus
-  the view, and the market, fitting, factory, inventory, rack, table and
-  Show Info window the union `Seams`. `ContentView` is the read-only
-  surface — the defs catalog plus the observable reads screens made off
-  `Env.Sim`/`Env.Content` — so a screen runs against a stub view and a
-  recording sink with no simulation anywhere near it
-  (`TestMarketRunsOnStubView`); `ActionSink` is `Do(Intent)`: screens
-  say *what* (`Buy{Item,Qty}`, `StartJob{Recipe,Runs}`, `WarpTo{Entity}`,
-  …; the RowSpec payload retyped from `Do func()` to `Intent`) and the
-  game executes it (`Game.Do` → `Kit.RunIntent`, one shared
-  intent→command table in `commandFor`), the seam later AI-emitted
-  intents will ride. `Env` survives only as the deprecated alias for the
-  union of the three seams; `NewEnv`/`Kit.Env` return a `Session` (the
-  seams plus the shared context menu and Show Info window hosts and
-  tests drive). Behaviour is unchanged — same menus, tooltips,
-  double-click, keymap, mounts and sidecars, and each intent dispatches
-  to exactly the command its button used to queue.
-- **One Screen spec per window** (`game/screens.go`): every window the
-  player can open — inventory, fitting, market, factory, scanner,
-  starmap, help, log, settings and the Esc menu — is now one
-  declarative `Screen` row (id, title, icon, key, design-unit default
-  rect + anchor, dock policy, modal, mount rule, sidecar name, sync,
-  build) from which the window registries derive: the `panelDef` table
-  `syncMounts`/`syncPanels` walk, `KeyMap`'s toggle rows and the help
-  overlay text rendered from them, the layout sidecar's name list,
-  `placeDefaults`, the docked station trio (composition + the scene's
-  force-open set) and the tests' panel label map. Adding a window is one
-  row plus its builder — it used to touch eight wiring sites. The table
-  is validated when a session starts (`screenSpecErrors`: duplicate
-  id/key/action/name, zero title, an unknown icon, help text without a
-  key, a transient screen carrying a sidecar name, a station row outside
-  the composition, `SpaceOnly`+`DockedOnly` together, …), and the tests
-  drive the same rule with deliberately broken rows. Behaviour is
-  unchanged except the help overlay's row order: the screen toggles now
-  form one block after the world bindings (same rows, same text). Also
-  removed the dead `Game.objClick` double-click latch (its only user
-  moved to `uikit.RowDouble` in the RowSpec pass above).
-- **New typefaces: IBM Plex Sans (display) and IBM Plex Mono (tabular).**
-  Turret Road and Source Code Pro are replaced wholesale in
-  `render/fonts/` — IBM Plex Sans ships Light/Regular/Medium/Bold, IBM
-  Plex Mono a single static Regular — role for role: `render.Face`
-  (body), `render.FaceBold` (emphasis), `render.MonoFace` (inventory and
-  market table rows). Plex sets ~19 % taller at the same size, so
-  `uikit.DefaultTypeScale`'s base moves 21 → 20 px (Small 16.8 → 16,
-  Large 27.3 → 26, Tiny 14.7 → 14). Glyph coverage (ASCII, `€`/`¢`,
-  `×`/`³`, the Polish/Czech diacritics, the ↑/↓ sort indicators) and
-  uniform mono digit advances stay pinned in `render/fonts_test.go`;
-  both SIL OFL 1.1 notices ship embedded beside the TTFs.
-
-- **Row interactions declare one seam** (`uikit.RowSpec`): every listed
-  row — market, inventory, fitting, rack, overview, factory, the
-  contract board and Show Info's chain links — now declares its
-  interactions as data (`Ref` for Show Info, `Actions` for its verbs,
-  `Tip` for its hover panel), and one installer derives the context menu
-  (bold **Show Info** first, `MenuSep`, grayed-but-visible actions), the
-  lazy tooltip and strict double-click Show Info from that declaration,
-  replacing the five hand-wired surfaces (24 wiring sites). User-visible
-  consequences: a second click on a rack cell inside the double-click
-  window opens Show Info **without also toggling** the module (the old
-  toggle+info dual gesture; a lone click still toggles exactly once),
-  right-clicking a row no longer silently moves the window's selection
-  (menu actions target the row they were opened on — the market's
-  Buy/Sell, fitting's Fit/Unefit and the factory's Start/Collect enqueue
-  for the clicked row directly), and a stored ship's fit entry in the
-  Fitting hangar now stays grayed instead of arming from a stale module
-  selection. Menu shapes, gating rules, tooltip anatomy and the menu's
-  world-input latch are unchanged.
-
-### Added
 
 - **The left navigation rail (EVE-neocom).** Root-overlay chrome beside
   the HUD and module rack, pinned to the left screen edge: one icon per
@@ -224,47 +87,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   × scale on read): existing v2 files (written at scale 1, where design
   unit == pixel) load seamlessly and one saved arrangement works at
   every scale, including across a live scale change.
-
-### Fixed
-
-- **Navigation-rail icons centred, cells +75 %, station/market
-  playtest batch**: ebitenui lays a graphic button out as
-  `[empty label][10 px fixed spacing][graphic]` inside the button's
-  padded anchor — a fixed right-offset that hung the rail's and the
-  station services row's glyphs over their cells' right edges. Both now
-  own their glyph: the house `theme.IconBox` anchored dead centre in an
-  anchor-layout cell, so the box sits at `(cell − icon)/2` on both axes
-  at every scale (`TestRailIconsInsideCells`,
-  `TestSvcIconsInsideCells`, `TestStackRowIconInsideRow`). The rail's
-  cell square and its gutter grew 36 → 63 px (+75 %, `RailInset` stays
-  the windows' left inset) with the glyph grown to 35; twelve 63 px
-  cells outrun the 720 design viewport, so the entry column caps to the
-  room under its top inset and wheel-scrolls, clipped like the tables,
-  when it overflows (`TestRailColumnCapsAndScrolls`,
-  `TestRailGutterAndGlyphLiterals`, and the composition pins
-  re-derived to the 63 px gutter: station tuple, board lefts, log
-  pocket, scanner, overview/settings). The market order book shows a
-  visible scrollbar rail beside its scroll viewport — wheel and drag
-  both mirror the table's `ScrollTop` — while the title line, quantity
-  steppers and Buy/Sell rows stay exactly where they were
-  (`TestMarketOrderBookScrolls`).
-- **Inventory/table headers aligned with their cells** (Defect A): right
-  -aligned cell text anchored 3× the cell padding left of the column
-  edge (ebitenui adds a Text's horizontal padding into its measured line
-  width *and* subtracts `Padding.Right` again when drawing End-positioned
-  text), so headers sat ~10 px right of their column values. Right cells
-  now draw with `Padding.Right = 0`, landing every header label and cell
-  on the same x at every scale (`TestHeaderCellAnchorAgreement`).
-- **Quantity steppers resize their readout** (Defect B): the market /
-  inventory / factory `Qty` readout kept the box measured for its
-  previous value (changing `widget.Text.Label` does not invalidate
-  layout), so wide values drew under the `+` button. The readout now
-  relayouts its row on change and owns a box that fits its value; the
-  readout and the HUD wallet render in the tabular mono face.
-
-## [0.2.0] - 2026-10-13
-
-### Added
 
 - **Show Info** item inspection: right-click any item anywhere it appears
   (rack, fitting, market, inventory, overview, contract rows) for
@@ -412,6 +234,141 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Docking opens exactly one window.** The station scene no longer
+  force-opens the market/inventory/fitting trio (nor the factory at
+  industry stations): `StationScene.OnEnter` opens only the new station
+  services view and `OnLeave` closes only it, leaving every
+  player-opened window exactly as it was. The trio became ordinary
+  windows — the docked composition (`stationLayout` + the reclaim) still
+  places them, but only when the player opens them (rail, keys or the
+  services view's buttons). The `Screen.ForcedDockOpen` field is
+  **deleted**: composed membership now derives from
+  `DockPolicy == DockStation` alone, and with nothing force-open on
+  dock the `stationPrior` pre-dock-intent machinery went with it —
+  `persistOpen`/`applyLayout` record and restore the live state the
+  player last saw (the services view's flag is the scene's). The old
+  game-built station strip (`buildStationWindow`, `syncStationLabel`,
+  `setStrip`/`stShown`) is deleted: its identity line and Undock button
+  moved into the services view, its contract board rides the services
+  window, and the window mounts through the ordinary panel path.
+- **The contract board folds onto the table module** (`widgets.StackRow`,
+  `widgets.StackLayout`): the table gains a modest rich-row capability —
+  a `TableRow` may carry a **line stack** (`Stack []RowLine`) instead of
+  one text per column: each line a run of cells (`RowSeg`, own type-scale
+  step, colour and minimum width), the row's `Icons[0]` boxing with line
+  1's first cell, and its `RowSpec.Actions` drawn as trailing buttons
+  (1–2, `Disabled` grayed and silent — one declaration feeding the
+  button, the context menu and the gate alike), with a per-line `Ref`
+  that joins the shared installer (right-click menu with the bold-first
+  Show Info, strict double-click). Everything else — change-gated
+  rebuilds (a rich row's stack and its buttons' labels/gates are
+  snapshotted like plain cells, so an identical `SetRows` stays a no-op),
+  column fitting, sorting, selection and `TipData` tooltips — applies to
+  rich rows as to plain ones. The station contract board now declares
+  `TableRow` values and renders them through `widgets.NewStackRow`: the
+  bespoke `boardLayout` layouter and the hand-built row widget tree it
+  laid out are deleted — the equal-height stack behind them moves to
+  `widgets.StackLayout` (the pure `boardRowRects` pin stays as the
+  geometry tests' subject), and what survives beside it is only the
+  contract-id/button/root handle the board's tests press. The look is
+  preserved rect for rect — same window chrome, title line, row order,
+  strings (the Accepted marker button and the menu's Accept/Abandon verb
+  split included), button gating, objective-label Show Info and
+  Accept/Abandon dispatch — pinned by the new `TestBoardOnTableRowRects`
+  against the pre-port geometry, with the board's golden strings and
+  mouse-flow tests passing byte-untouched.
+- **`uikit` split into three modules with an enforced import direction**
+  (`uikit/theme`, `uikit/widgets`, `uikit/screens`): the flat package
+  became `theme` (visual constants and their plumbing — `Palette`,
+  `TypeScale`, the `Px`/`SetScale`/`Scale` funnel, faces and the `Theme`
+  seam with its implementation, chrome constants, draw helpers, icon
+  maps, display formatters) ← `widgets` (reusable mechanics — table,
+  menu, tooltip, rowspec, the `Intent` vocabulary and `commandFor`, the
+  `ContentView`/`ActionSink`/`Seams` seam interfaces, the `InfoRef` row
+  data and its resolvers) ← `screens` (every panel plus the `Kit` shell,
+  the session/`NewEnv` wiring and the window-resize chrome). Each layer
+  imports only downward (`screens → widgets → theme`, plus `uikit/icons`
+  and `render` as before); `widgets` can never import `screens`, and the
+  compiler's acyclicity plus a new parsing test
+  (`uikit/widgets.TestImportDirection`) pin the rule. Names that now
+  span packages are exported at their new home (e.g. `uikit.Px` →
+  `theme.Px`, `theme.ContentsPad`, `widgets.RowRef`, `widgets.OpenRowMenu`)
+  and call sites updated; a handful of table/tooltip test seams
+  (`…ForTest` hooks, exported layout fields) let the screen suites assert
+  widget geometry across the seam. Behaviour is unchanged — same menus,
+  tooltips, double-clicks and golden pins, and `TestMarketRunsOnStubView`
+  now lives with the screens it proves seam-only.
+- **The `Env` god-context dissolved into three narrow seams — `Theme`,
+  `ContentView`, `ActionSink`** (`uikit/seams.go`, `uikit/intents.go`).
+  Every screen constructor now takes exactly the subset it uses: a
+  tooltip-only widget a `Theme`, the HUD/log/scanner/map the theme plus
+  the view, and the market, fitting, factory, inventory, rack, table and
+  Show Info window the union `Seams`. `ContentView` is the read-only
+  surface — the defs catalog plus the observable reads screens made off
+  `Env.Sim`/`Env.Content` — so a screen runs against a stub view and a
+  recording sink with no simulation anywhere near it
+  (`TestMarketRunsOnStubView`); `ActionSink` is `Do(Intent)`: screens
+  say *what* (`Buy{Item,Qty}`, `StartJob{Recipe,Runs}`, `WarpTo{Entity}`,
+  …; the RowSpec payload retyped from `Do func()` to `Intent`) and the
+  game executes it (`Game.Do` → `Kit.RunIntent`, one shared
+  intent→command table in `commandFor`), the seam later AI-emitted
+  intents will ride. `Env` survives only as the deprecated alias for the
+  union of the three seams; `NewEnv`/`Kit.Env` return a `Session` (the
+  seams plus the shared context menu and Show Info window hosts and
+  tests drive). Behaviour is unchanged — same menus, tooltips,
+  double-click, keymap, mounts and sidecars, and each intent dispatches
+  to exactly the command its button used to queue.
+- **One Screen spec per window** (`game/screens.go`): every window the
+  player can open — inventory, fitting, market, factory, scanner,
+  starmap, help, log, settings and the Esc menu — is now one
+  declarative `Screen` row (id, title, icon, key, design-unit default
+  rect + anchor, dock policy, modal, mount rule, sidecar name, sync,
+  build) from which the window registries derive: the `panelDef` table
+  `syncMounts`/`syncPanels` walk, `KeyMap`'s toggle rows and the help
+  overlay text rendered from them, the layout sidecar's name list,
+  `placeDefaults`, the docked station trio (composition + the scene's
+  force-open set) and the tests' panel label map. Adding a window is one
+  row plus its builder — it used to touch eight wiring sites. The table
+  is validated when a session starts (`screenSpecErrors`: duplicate
+  id/key/action/name, zero title, an unknown icon, help text without a
+  key, a transient screen carrying a sidecar name, a station row outside
+  the composition, `SpaceOnly`+`DockedOnly` together, …), and the tests
+  drive the same rule with deliberately broken rows. Behaviour is
+  unchanged except the help overlay's row order: the screen toggles now
+  form one block after the world bindings (same rows, same text). Also
+  removed the dead `Game.objClick` double-click latch (its only user
+  moved to `uikit.RowDouble` in the RowSpec pass above).
+- **New typefaces: IBM Plex Sans (display) and IBM Plex Mono (tabular).**
+  Turret Road and Source Code Pro are replaced wholesale in
+  `render/fonts/` — IBM Plex Sans ships Light/Regular/Medium/Bold, IBM
+  Plex Mono a single static Regular — role for role: `render.Face`
+  (body), `render.FaceBold` (emphasis), `render.MonoFace` (inventory and
+  market table rows). Plex sets ~19 % taller at the same size, so
+  `uikit.DefaultTypeScale`'s base moves 21 → 20 px (Small 16.8 → 16,
+  Large 27.3 → 26, Tiny 14.7 → 14). Glyph coverage (ASCII, `€`/`¢`,
+  `×`/`³`, the Polish/Czech diacritics, the ↑/↓ sort indicators) and
+  uniform mono digit advances stay pinned in `render/fonts_test.go`;
+  both SIL OFL 1.1 notices ship embedded beside the TTFs.
+
+- **Row interactions declare one seam** (`uikit.RowSpec`): every listed
+  row — market, inventory, fitting, rack, overview, factory, the
+  contract board and Show Info's chain links — now declares its
+  interactions as data (`Ref` for Show Info, `Actions` for its verbs,
+  `Tip` for its hover panel), and one installer derives the context menu
+  (bold **Show Info** first, `MenuSep`, grayed-but-visible actions), the
+  lazy tooltip and strict double-click Show Info from that declaration,
+  replacing the five hand-wired surfaces (24 wiring sites). User-visible
+  consequences: a second click on a rack cell inside the double-click
+  window opens Show Info **without also toggling** the module (the old
+  toggle+info dual gesture; a lone click still toggles exactly once),
+  right-clicking a row no longer silently moves the window's selection
+  (menu actions target the row they were opened on — the market's
+  Buy/Sell, fitting's Fit/Unefit and the factory's Start/Collect enqueue
+  for the clicked row directly), and a stored ship's fit entry in the
+  Fitting hangar now stays grayed instead of arming from a stale module
+  selection. Menu shapes, gating rules, tooltip anatomy and the menu's
+  world-input latch are unchanged.
+
 - Rack right-click now opens the context menu instead of cycling the
   loaded charge directly; quick charge-cycling is the menu's **Cycle
   charge** entry. World right-click (orbit under cursor) is unchanged.
@@ -492,6 +449,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Navigation-rail icons centred, cells +75 %, station/market
+  playtest batch**: ebitenui lays a graphic button out as
+  `[empty label][10 px fixed spacing][graphic]` inside the button's
+  padded anchor — a fixed right-offset that hung the rail's and the
+  station services row's glyphs over their cells' right edges. Both now
+  own their glyph: the house `theme.IconBox` anchored dead centre in an
+  anchor-layout cell, so the box sits at `(cell − icon)/2` on both axes
+  at every scale (`TestRailIconsInsideCells`,
+  `TestSvcIconsInsideCells`, `TestStackRowIconInsideRow`). The rail's
+  cell square and its gutter grew 36 → 63 px (+75 %, `RailInset` stays
+  the windows' left inset) with the glyph grown to 35; twelve 63 px
+  cells outrun the 720 design viewport, so the entry column caps to the
+  room under its top inset and wheel-scrolls, clipped like the tables,
+  when it overflows (`TestRailColumnCapsAndScrolls`,
+  `TestRailGutterAndGlyphLiterals`, and the composition pins
+  re-derived to the 63 px gutter: station tuple, board lefts, log
+  pocket, scanner, overview/settings). The market order book shows a
+  visible scrollbar rail beside its scroll viewport — wheel and drag
+  both mirror the table's `ScrollTop` — while the title line, quantity
+  steppers and Buy/Sell rows stay exactly where they were
+  (`TestMarketOrderBookScrolls`).
+- **Inventory/table headers aligned with their cells** (Defect A): right
+  -aligned cell text anchored 3× the cell padding left of the column
+  edge (ebitenui adds a Text's horizontal padding into its measured line
+  width *and* subtracts `Padding.Right` again when drawing End-positioned
+  text), so headers sat ~10 px right of their column values. Right cells
+  now draw with `Padding.Right = 0`, landing every header label and cell
+  on the same x at every scale (`TestHeaderCellAnchorAgreement`).
+- **Quantity steppers resize their readout** (Defect B): the market /
+  inventory / factory `Qty` readout kept the box measured for its
+  previous value (changing `widget.Text.Label` does not invalidate
+  layout), so wide values drew under the `+` button. The readout now
+  relayouts its row on change and owns a box that fits its value; the
+  readout and the HUD wallet render in the tabular mono face.
+
+## [0.2.0] - 2026-10-13
+
 - Per-frame interface garbage churn: panels that are not mounted no longer
   run their `Sync` every frame (a panel Syncs when it mounts, so it still
   draws current data in that same frame), `Table.SetRows` skips the column
@@ -555,6 +549,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rats are no longer inert: they patrol, notice intruders and defend their
   belts against miners and shooters.
 
-[Unreleased]: https://github.com/entieve/entieve/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/entieve/entieve/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/entieve/entieve/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/entieve/entieve/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/entieve/entieve/releases/tag/v0.1.0
