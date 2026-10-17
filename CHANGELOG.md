@@ -209,6 +209,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Navigation-rail icons centred, cells +75 %, station/market
+  playtest batch**: ebitenui lays a graphic button out as
+  `[empty label][10 px fixed spacing][graphic]` inside the button's
+  padded anchor — a fixed right-offset that hung the rail's and the
+  station services row's glyphs over their cells' right edges. Both now
+  own their glyph: the house `theme.IconBox` anchored dead centre in an
+  anchor-layout cell, so the box sits at `(cell − icon)/2` on both axes
+  at every scale (`TestRailIconsInsideCells`,
+  `TestSvcIconsInsideCells`, `TestStackRowIconInsideRow`). The rail's
+  cell square and its gutter grew 36 → 63 px (+75 %, `RailInset` stays
+  the windows' left inset) with the glyph grown to 35; twelve 63 px
+  cells outrun the 720 design viewport, so the entry column caps to the
+  room under its top inset and wheel-scrolls, clipped like the tables,
+  when it overflows (`TestRailColumnCapsAndScrolls`,
+  `TestRailGutterAndGlyphLiterals`, and the composition pins
+  re-derived to the 63 px gutter: station tuple, board lefts, log
+  pocket, scanner, overview/settings). The market order book shows a
+  visible scrollbar rail beside its scroll viewport — wheel and drag
+  both mirror the table's `ScrollTop` — while the title line, quantity
+  steppers and Buy/Sell rows stay exactly where they were
+  (`TestMarketOrderBookScrolls`).
 - **Inventory/table headers aligned with their cells** (Defect A): right
   -aligned cell text anchored 3× the cell padding left of the column
   edge (ebitenui adds a Text's horizontal padding into its measured line

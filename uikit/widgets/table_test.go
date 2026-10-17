@@ -647,6 +647,68 @@ func TestTableRichRowStackTiles(t *testing.T) {
 	ui.Draw(ebiten.NewImage(640, 400)) // keep the frame honest
 }
 
+// TestStackRowIconInsideRow pins the rich-row icon anchoring class the
+// playtest flagged (the station contract board's rows): the icon box is
+// exactly its Px-sized square, sits STRICTLY inside the row bounds,
+// starts at the row's leading pad (its leading column slot) and centres
+// vertically in line 1 with equal margins ±1 px — at scale 1 and 1.5.
+func TestStackRowIconInsideRow(t *testing.T) {
+	for _, scale := range []float64{1, 1.5} {
+		uitest.UseScale(t, scale)
+		env, _ := newTestEnv(t)
+		tbl, _ := newRichTable(t, env, []TableRow{
+			{
+				Cells: []string{"cleanup"},
+				Icons: []string{"svc_contracts"},
+				Stack: []RowLine{
+					{Segs: []RowSeg{{Text: "Belt cleanup", MinW: 120}}},
+					{Segs: []RowSeg{{Text: "Destroy 1× Scuttler"}, {Text: "Requires 0.20"}}},
+				},
+				Spec: RowSpec{Actions: []RowAction{{Label: "Accept"}}},
+			},
+		})
+		if tbl.rich == nil || tbl.rich[0] == nil || tbl.rich[0].Icon == nil {
+			t.Fatalf("scale %v: rich row has no icon box", scale)
+		}
+		row := tbl.RowCts[0]
+		rr := row.GetWidget().Rect
+		icon := tbl.rich[0].Icon.Widget().GetWidget().Rect
+
+		if icon.Dx() != theme.Px(theme.IconInline) || icon.Dy() != theme.Px(theme.IconInline) {
+			t.Errorf("scale %v: icon box = %v, want %d² design (the Px funnel)", scale, icon, theme.IconInline)
+		}
+		if !icon.In(rr) {
+			t.Errorf("scale %v: icon %v escapes the row %v", scale, icon, rr)
+			continue
+		}
+		// Leading column: the box starts at the row's own pad.
+		if l := icon.Min.X - rr.Min.X; math.Abs(float64(l-theme.Px(RichPad))) > 1 {
+			t.Errorf("scale %v: icon %v sits %d px into row %v, want the %d px leading pad ±1",
+				scale, icon, l, rr, theme.Px(RichPad))
+		}
+		// ...and centres in line 1 with equal margins (±2: the box
+		// rounds twice — inside its lead cell, the cell inside the line).
+		line1 := row.Children()[0].GetWidget().Rect
+		top, bot := icon.Min.Y-line1.Min.Y, line1.Max.Y-icon.Max.Y
+		if math.Abs(float64(top-bot)) > 2 {
+			t.Errorf("scale %v: icon %v margins in line 1 %v: top %d bottom %d, want equal ±2",
+				scale, icon, line1, top, bot)
+		}
+		// The title follows at the icon gap, inside the same lead cell.
+		lead := row.Children()[0].(*widget.Container).Children()[0].(*widget.Container)
+		title := lead.Children()[1].GetWidget().Rect
+		if got, want := title.Min.X, icon.Max.X+theme.Px(theme.IconGap); math.Abs(float64(got-want)) > 1 {
+			t.Errorf("scale %v: title at %d, want the icon gap %d", scale, got, want)
+		}
+		if !title.In(line1) {
+			t.Errorf("scale %v: title %v escapes line 1 %v", scale, title, line1)
+		}
+		if !lead.GetWidget().Rect.In(rr) {
+			t.Errorf("scale %v: lead cell %v escapes the row %v", scale, lead.GetWidget().Rect, rr)
+		}
+	}
+}
+
 // TestTableRichRowLineRefRoutes: a line that carries a Ref is its own
 // gesture target through the shared installer — right-click opens ITS
 // menu (bold-first Show Info, no row verbs) and a double-click emits

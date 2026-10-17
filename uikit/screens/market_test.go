@@ -1,15 +1,17 @@
 package screens
 
 import (
-	"github.com/entieve/entieve/uikit/internal/uitest"
-	"github.com/entieve/entieve/uikit/theme"
-	"github.com/hajimehoshi/ebiten/v2/text/v2"
+	"math"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/internal/uitest"
+	"github.com/entieve/entieve/uikit/theme"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 // parseCredits reads back a FormatCredits cell ("1,234.56 €", "50¢").
@@ -110,6 +112,91 @@ func TestMarketOrderBookRows(t *testing.T) {
 	orders := env.Sim.Market(sys.ID)
 	if len(m.tbl.Rows) != len(orders) {
 		t.Fatalf("rows = %d, want %d resting orders", len(m.tbl.Rows), len(orders))
+	}
+}
+
+// TestMarketOrderBookScrolls pins the order book's scrollability
+// (playtest: "the marketplace window does not have a scrollbar"), in the
+// pattern the table scroll tests use: the book rides the standard
+// ScrollContainer with real overflow at the window's own size, a wheel
+// notch moves the offset and the rows with it, and the scrollbar rail
+// beside the viewport mirrors the offset — and writes drags back — while
+// the title line and the stepper/button row keep their place above the
+// book.
+func TestMarketOrderBookScrolls(t *testing.T) {
+	env, _ := newTestEnv(t)
+	m := NewMarket(env)
+	ui := newWindowUI(t, env, m.Win())
+	frame := func() { uitest.PumpWindow(t, ui, m.Sync, 1280, 720) }
+	frame()
+	frame()
+
+	sc := m.tbl.ScrollForTest()
+	if sc == nil {
+		t.Fatal("market table has no scroll container")
+	}
+	view := sc.ViewRect()
+	if !view.In(m.Win().GetContainer().GetWidget().Rect) {
+		t.Fatalf("scroll viewport %v outside the window %v", view, m.Win().GetContainer().GetWidget().Rect)
+	}
+	rows := m.tbl.RowCts
+	if len(rows) < 3 {
+		t.Fatalf("rows = %d, want a book long enough to overflow", len(rows))
+	}
+	union := rows[0].GetWidget().Rect
+	for _, r := range rows[1:] {
+		union = union.Union(r.GetWidget().Rect)
+	}
+	if union.Dy() <= view.Dy() {
+		t.Fatalf("book content %d px does not overflow the %d px viewport", union.Dy(), view.Dy())
+	}
+	if !m.bar.GetWidget().IsVisible() {
+		t.Error("scrollbar hidden over an overflowing book")
+	}
+
+	// Wheel: the table's scroll handler moves the offset and the rows.
+	row0 := rows[0].GetWidget().Rect
+	sc.GetWidget().ScrolledEvent.Fire(&widget.WidgetScrolledEventArgs{Y: -3})
+	frame()
+	frame()
+	if sc.ScrollTop <= 0 {
+		t.Fatalf("wheel: ScrollTop = %v, want > 0", sc.ScrollTop)
+	}
+	if got := rows[0].GetWidget().Rect; got.Min.Y >= row0.Min.Y {
+		t.Errorf("wheel: row 0 at %d, want above %d (content moved)", got.Min.Y, row0.Min.Y)
+	}
+	// The rail mirrors the offset the wheel set.
+	if want := int(math.Round(sc.ScrollTop * mktBarSteps)); m.bar.Current != want {
+		t.Errorf("rail position = %d, want the mirrored ScrollTop %d", m.bar.Current, want)
+	}
+
+	// Drag: the rail writes the offset back through its changed event
+	// (what a handle drag fires mid-frame), and the mirror re-converges.
+	sc.ScrollTop = 0
+	m.bar.ChangedEvent.Fire(&widget.SliderChangedEventArgs{Slider: m.bar, Current: 500, Dragging: true})
+	ui.Update() // dispatch the deferred event before the next frame's mirror
+	frame()
+	frame()
+	if got := sc.ScrollTop; math.Abs(got-0.5) > 1e-9 {
+		t.Errorf("rail drag: ScrollTop = %v, want 0.5", got)
+	}
+	if m.bar.Current != 500 {
+		t.Errorf("rail position = %d, want 500 (mirror of ScrollTop 0.5)", m.bar.Current)
+	}
+
+	// The window's own rows are untouched: title line, stepper row
+	// (minus/readout/plus/buy/sell), then the book under them.
+	title := m.title.GetWidget().Rect
+	stepper := m.qtyBar.GetWidget().Rect
+	table := m.tbl.Container().GetWidget().Rect
+	if !(title.Max.Y <= stepper.Min.Y && stepper.Max.Y <= table.Min.Y) {
+		t.Errorf("stacking changed: title %v, stepper %v, book %v (want stacked top to bottom)",
+			title, stepper, table)
+	}
+	for name, b := range map[string]*widget.Button{"-": m.minus, "+": m.plus, "Buy": m.buy, "Sell": m.sell} {
+		if r := b.GetWidget().Rect; !r.In(stepper) {
+			t.Errorf("%s button %v outside the stepper row %v", name, r, stepper)
+		}
 	}
 }
 

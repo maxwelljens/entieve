@@ -18,15 +18,17 @@ import (
 
 // stationBoardWorstCaseH is the docked contract board's content height
 // with every section at its row cap: the station window then reads
-// (10,8)-(404,434), its worst case.
+// (73,8)-(404,434), its worst case (73 = 10 + the rail gutter).
 const stationBoardWorstCaseH = 426
 
 // logPocket is the log's default bottom-left pocket at any design size:
-// 288×240 flush into the 10 px left/bottom margins (uikit's
-// logDefaultRect). The log is the one anchored chrome window that stays
-// on screen while docked, so the composed set must stay clear of it.
+// 288×240 at the rail gutter (73 = 10 + uikit.RailInset), flush into the
+// bottom margin — where placeDefaults parks it (uikit's logDefaultRect,
+// anchored past the rail). The log is the one anchored chrome window
+// that stays on screen while docked, so the composed set must stay clear
+// of it.
 func logPocket(h int) image.Rectangle {
-	return image.Rect(10, h-10-240, 10+288, h-10)
+	return image.Rect(73, h-10-240, 73+288, h-10)
 }
 
 // TestStationLayoutDisjoint1024 pins the composed rect tuples at the
@@ -38,7 +40,7 @@ func logPocket(h int) image.Rectangle {
 // them; see the clearance note in station_layout.go.)
 func TestStationLayoutDisjoint1024(t *testing.T) {
 	checkStationLayout(t, 1024, 700, dockedLayout{
-		Station:   image.Rect(46, 8, 404, 434), // 46 = 10 + the rail gutter
+		Station:   image.Rect(73, 8, 404, 434), // 73 = 10 + the rail gutter
 		Market:    image.Rect(406, 8, 1014, 248),
 		Inventory: image.Rect(406, 256, 706, 690),
 		Fitting:   image.Rect(714, 256, 1014, 690),
@@ -48,7 +50,7 @@ func TestStationLayoutDisjoint1024(t *testing.T) {
 // TestStationLayoutDisjoint1280 pins the default window size.
 func TestStationLayoutDisjoint1280(t *testing.T) {
 	checkStationLayout(t, 1280, 720, dockedLayout{
-		Station:   image.Rect(46, 8, 404, 434), // 46 = 10 + the rail gutter
+		Station:   image.Rect(73, 8, 404, 434), // 73 = 10 + the rail gutter
 		Market:    image.Rect(406, 8, 1270, 248),
 		Inventory: image.Rect(406, 256, 834, 710),
 		Fitting:   image.Rect(842, 256, 1270, 710),
@@ -59,7 +61,7 @@ func TestStationLayoutDisjoint1280(t *testing.T) {
 // grows with the height, the bottom row keeps its content minimum.
 func TestStationLayoutDisjoint1920(t *testing.T) {
 	checkStationLayout(t, 1920, 1080, dockedLayout{
-		Station:   image.Rect(46, 8, 404, 434), // 46 = 10 + the rail gutter
+		Station:   image.Rect(73, 8, 404, 434), // 73 = 10 + the rail gutter
 		Market:    image.Rect(406, 8, 1910, 359),
 		Inventory: image.Rect(406, 367, 1154, 1070),
 		Fitting:   image.Rect(1162, 367, 1910, 1070),

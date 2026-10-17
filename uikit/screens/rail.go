@@ -1,11 +1,11 @@
 package screens
 
 import (
+	"image/color"
 	"slices"
 	"strconv"
 
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 )
@@ -32,8 +32,16 @@ import (
 const (
 	// RailInset is the expanded rail width AND the left inset every
 	// window keeps clear of it (game reads this constant directly — one
-	// source, no drift).
-	RailInset = 36
+	// source, no drift). It is also the entry cell square: the cells
+	// grew 36 → 63 (+75 %) with the buttons, so the gutter follows and
+	// windows can never cover an entry.
+	RailInset = 63
+
+	// railIcon is the entry glyph's design box: the 20 px Button glyph
+	// grown with the cell (36 → 63 is ×1.75, so 20 → 35 keeps the
+	// ~56 % fill the rail always had — a 20 px glyph in a 63 px cell
+	// reads as a lost dot).
+	railIcon = 35
 
 	// railTabW is the edge tab's width in the collapsed rail (all that
 	// is left of the column); railTabH its height.
@@ -91,6 +99,7 @@ type Rail struct {
 
 	entries []RailEntry
 	btns    []*widget.Button
+	icons   []*theme.IconBox
 	enabled []bool
 	tips    []widgets.RowTip
 
@@ -103,7 +112,9 @@ type Rail struct {
 
 	container *widget.Container
 	list      *widget.Container
+	scroll    *widget.ScrollContainer // viewport over the entry list (capped columns)
 	tab       *widget.Button
+	maxH      int // current column cap in live px (0 = uncapped)
 	collapsed bool
 }
 
@@ -118,6 +129,7 @@ func NewRail(env widgets.Seams, entries []RailEntry) *Rail {
 		as:      env,
 		entries: entries,
 		btns:    make([]*widget.Button, len(entries)),
+		icons:   make([]*theme.IconBox, len(entries)),
 		enabled: make([]bool, len(entries)),
 		tips:    make([]widgets.RowTip, len(entries)),
 	}
@@ -152,10 +164,36 @@ func NewRail(env widgets.Seams, entries []RailEntry) *Rail {
 			r.list.AddChild(railSeparator(p))
 		}
 		prev = e.Group
-		btn := r.newEntryButton(env, i, e)
-		r.btns[i] = btn
-		r.list.AddChild(btn)
+		btn, glyph := r.newEntryButton(i, e)
+		r.btns[i], r.icons[i] = btn, glyph
+		r.list.AddChild(r.iconCell(btn, glyph))
 	}
+
+	// The entry list rides a scroll viewport: uncapped it IS the list's
+	// full height (the viewport passes straight through), and the host's
+	// SetMaxHeight caps it so a tall entry table clips + wheel-scrolls
+	// inside the screen instead of running off the bottom edge (twelve
+	// 63 px cells do not fit the 720 design viewport).
+	r.scroll = widget.NewScrollContainer(
+		widget.ScrollContainerOpts.Content(r.list),
+		// The column has no chrome of its own: an invisible viewport
+		// frame, the mask still clipping the entries to the cap.
+		widget.ScrollContainerOpts.Image(&widget.ScrollContainerImage{
+			Idle: theme.NineSlice(color.NRGBA{}),
+			Mask: theme.NineSlice(theme.Solid(p.BG)),
+		}),
+		widget.ScrollContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+			Stretch: true,
+		})),
+	)
+	// Wheel scrolls the column; ScrollTop is a 0..1 fraction of the
+	// overflow, so the step scales by the measured overflow (the
+	// tables' convention).
+	r.scroll.GetWidget().ScrolledEvent.AddHandler(func(args any) {
+		if ev, ok := args.(*widget.WidgetScrolledEventArgs); ok {
+			r.scrollBy(ev.Y)
+		}
+	})
 
 	r.container = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -170,7 +208,7 @@ func NewRail(env widgets.Seams, entries []RailEntry) *Rail {
 			Padding:            &widget.Insets{Top: theme.Px(RailTopInset)},
 		})),
 	)
-	r.container.AddChild(r.tab, r.list)
+	r.container.AddChild(r.tab, r.scroll)
 	r.Sync()
 	return r
 }
@@ -189,6 +227,10 @@ func (r *Rail) SetCollapsed(c bool) {
 		return
 	}
 	r.collapsed = c
+	// Both hide: the scroll column keeps the container's width (the
+	// collapsed rail is exactly the edge tab) and the list behind it
+	// reports the entries' own state to the pins.
+	theme.ShowWidget(r.scroll.GetWidget(), !c)
 	theme.ShowWidget(r.list.GetWidget(), !c)
 	label := "<"
 	if c {
@@ -199,6 +241,66 @@ func (r *Rail) SetCollapsed(c bool) {
 
 // Tab returns the collapse/expand edge tab — the handle tests click.
 func (r *Rail) Tab() *widget.Button { return r.tab }
+
+// SetMaxHeight caps the rail column (tab + entry list) in LIVE px — the
+// host passes the room under the top inset (the game: viewport height
+// minus RailTopInset and its bottom margin). While the entries fit, the
+// column keeps its full preferred height; past the cap the column
+// becomes a wheel-scrollable viewport (clipped like the tables), so
+// every entry stays reachable and the column stays on screen at the
+// design sizes. 0 removes the cap.
+func (r *Rail) SetMaxHeight(px int) {
+	h := 0
+	if px > 0 {
+		// The cap covers the whole column; the scroll owns what is left
+		// under the tab and the gap below it. The tab measures itself —
+		// bind the session's widget theme and validate it first, since
+		// the game caps at build time, before any layout has resolved
+		// its face (the NewStackRow convention: the theme the mounted UI
+		// carries is the one bound here).
+		r.tab.GetWidget().SetTheme(r.th.WidgetTheme())
+		r.tab.Validate()
+		_, tabH := r.tab.PreferredSize()
+		h = px - tabH - theme.Px(railHeadGap)
+		if h < 1 {
+			h = 1
+		}
+	}
+	if r.maxH == h {
+		return
+	}
+	r.maxH = h
+	r.scroll.GetWidget().LayoutData = widget.RowLayoutData{Stretch: true, MaxHeight: h}
+	r.container.RequestRelayout()
+	// Re-lay the COLUMN itself, not just its children: a layout-data
+	// change alone only dirties this container, while ebitenui
+	// propagates a parent relayout from a widget's visibility change —
+	// so pulse it (restoring whatever state the collapse left).
+	vis := r.scroll.GetWidget().GetVisibility() == widget.Visibility_Show
+	theme.ShowWidget(r.scroll.GetWidget(), !vis)
+	theme.ShowWidget(r.scroll.GetWidget(), vis)
+}
+
+// scrollBy turns wheel notches into a fraction of the column overflow
+// (positive notch scrolls up — the tables' convention); two cells per
+// notch reads right on a rail. No overflow means nothing to scroll and
+// a pinned top (a stale offset would bottom-anchor the list).
+func (r *Rail) scrollBy(notches float64) {
+	over := r.scrollOverflow()
+	if over <= 0 {
+		r.scroll.ScrollTop = 0
+		return
+	}
+	top := r.scroll.ScrollTop - notches*2*float64(theme.Px(RailInset+railGap))/over
+	r.scroll.ScrollTop = max(0, min(1, top))
+}
+
+// scrollOverflow is the scrollable distance in px: the list's preferred
+// height minus the viewport (≤ 0 exactly while the entries fit).
+func (r *Rail) scrollOverflow() float64 {
+	_, h := r.list.PreferredSize()
+	return float64(h - r.scroll.ViewRect().Dy())
+}
 
 // Button returns the entry button titled title (nil when the rail has no
 // such entry) — the handle tests click and captures pin.
@@ -214,21 +316,20 @@ func (r *Rail) Button(title string) *widget.Button {
 // Entries returns the rail's table, in draw order (derivation pins).
 func (r *Rail) Entries() []RailEntry { return r.entries }
 
-// newEntryButton builds one icon entry: a RailInset×RailInset icon cell
-// that emits Toggle{Title} when the entry is available here. Grayed
-// entries emit nothing (the established convention) — ebitenui still
-// fires clicks on disabled widgets, so the handler gates on the last
-// synced state.
-func (r *Rail) newEntryButton(env widgets.Seams, i int, e RailEntry) *widget.Button {
-	p := env.Pal()
+// newEntryButton builds one icon entry's two halves: the chrome button
+// (stretched edge to edge of its cell — see iconCell) that emits
+// Toggle{Title} when the entry is available here, and the glyph box the
+// cell anchors at its centre. Grayed entries emit nothing (the
+// established convention) — ebitenui still fires clicks on disabled
+// widgets, so the handler gates on the last synced state.
+func (r *Rail) newEntryButton(i int, e RailEntry) (*widget.Button, *theme.IconBox) {
 	btn := widget.NewButton(
 		widget.ButtonOpts.Image(r.imgIdle),
-		widget.ButtonOpts.Graphic(&widget.GraphicImage{
-			Idle:     icons.Get(e.Icon, theme.Px(theme.IconButton), p.Text),
-			Disabled: icons.Get(e.Icon, theme.Px(theme.IconButton), iconColor(p.Dim, theme.IconDisabledA)),
-		}),
 		widget.ButtonOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(theme.Px(RailInset), theme.Px(RailInset)),
+			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				StretchHorizontal: true,
+				StretchVertical:   true,
+			}),
 			widget.WidgetOpts.MouseButtonClickedHandler(func(*widget.WidgetMouseButtonClickedEventArgs) {
 				if !r.enabled[i] {
 					return // grayed: unavailable in this context
@@ -237,13 +338,41 @@ func (r *Rail) newEntryButton(env widgets.Seams, i int, e RailEntry) *widget.But
 			}),
 		),
 	)
-	return btn
+	// The house icon box: its widget's preferred rect IS the Px-scaled
+	// icon (a bare Graphic reports 50×50 unless Image is set), and Set
+	// costs a string compare per Sync. The cell anchors it, so its rect
+	// is the real icon box the inside-bounds pin reads.
+	glyph := theme.NewIconBox(railIcon)
+	glyph.Widget().GetWidget().LayoutData = widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionCenter,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+	}
+	return btn, glyph
+}
+
+// iconCell is one entry's square: the chrome button stretched edge to
+// edge under its glyph, the glyph anchored dead centre in the cell.
+//
+// The glyph used to ride the button's own graphic slot, which ebitenui
+// lays out as [empty label][10 px fixed spacing][graphic] inside the
+// button's padded anchor — a fixed right-offset that hung the glyph over
+// the cell's right edge at every scale. Owning the glyph here centres it
+// exactly ((cell − icon)/2 on both axes) and keeps its rect reachable
+// for the inside-bounds pin.
+func (r *Rail) iconCell(btn *widget.Button, glyph *theme.IconBox) *widget.Container {
+	cell := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(RailInset), theme.Px(RailInset))),
+	)
+	cell.AddChild(btn, glyph.Widget()) // glyph last: it draws over the chrome
+	return cell
 }
 
 // Sync refreshes every entry's gating and open-state glow from the view:
 // context (docked/undocked), the docked station's services and the
 // host's open flags. Nothing is rebuilt — state writes only.
 func (r *Rail) Sync() {
+	p := r.th.Pal()
 	docked := false
 	var services []string
 	if r.cv != nil {
@@ -258,6 +387,14 @@ func (r *Rail) Sync() {
 		r.enabled[i] = enabled
 		btn := r.btns[i]
 		btn.GetWidget().Disabled = !enabled
+		// The glyph lives beside the button in the cell now, so its
+		// grayed look is written here — state writes only (Set is a
+		// string compare when nothing moved).
+		tint := p.Text
+		if !enabled {
+			tint = iconColor(p.Dim, theme.IconDisabledA)
+		}
+		r.icons[i].Set(e.Icon, tint)
 		img := r.imgIdle
 		if open {
 			img = r.imgOpen
@@ -266,6 +403,13 @@ func (r *Rail) Sync() {
 		r.tips[i].Set(r.th, btn.GetWidget(), entryTipKey(e, enabled), func() widgets.TooltipModel {
 			return entryTip(e, enabled)
 		})
+	}
+	// Pin the column's offset to the current overflow (a cap change on
+	// resize can make a scrolled column fit again).
+	if over := r.scrollOverflow(); over <= 0 {
+		r.scroll.ScrollTop = 0
+	} else {
+		r.scroll.ScrollTop = max(0, min(1, r.scroll.ScrollTop))
 	}
 }
 
