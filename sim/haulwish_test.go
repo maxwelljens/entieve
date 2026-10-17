@@ -186,8 +186,19 @@ func TestHaulWishSpawnsConvoyAndDelivers(t *testing.T) {
 	if s.systemID != "sys-b" {
 		t.Fatalf("system = %q, want sys-b", s.systemID)
 	}
-	if len(s.trafficJourneys) != 0 {
-		t.Fatalf("sys-b journey still parked after resume: %+v", s.trafficJourneys)
+	// Resume is capped and staggered (trafficResumeInterval): the parked
+	// shipment flies within a few schedule windows — not necessarily on
+	// the jump tick itself. No sys-b journey may stay parked once it has
+	// resumed; journeys for the system the player left stay parked.
+	if !runUntil(t, s, &evs, 600, func() bool {
+		for _, j := range s.trafficJourneys {
+			if j.System == "sys-b" {
+				return false
+			}
+		}
+		return true
+	}) {
+		t.Fatalf("sys-b journey never resumed: %+v", s.trafficJourneys)
 	}
 	_, tc2, ok := findHauler(s, "cel-b-dock")
 	if !ok {

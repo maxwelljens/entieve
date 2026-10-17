@@ -375,11 +375,18 @@ func TestLogisticsCrossSystemJourney(t *testing.T) {
 	}
 	// The cross-system journey resumed (no sys-b shipment left parked);
 	// journeys bound to OTHER systems — e.g. a sys-a hauler parked by the
-	// jump — must stay parked while the player is abroad.
-	for _, j := range s.trafficJourneys {
-		if j.System == "sys-b" {
-			t.Fatalf("sys-b journey still parked after resume: %+v", j)
+	// jump — must stay parked while the player is abroad. Resume is
+	// staggered (trafficResumeInterval), so wait for the sys-b ledger to
+	// drain rather than pinning the jump tick.
+	if !runUntil(t, s, &evs, 600, func() bool {
+		for _, j := range s.trafficJourneys {
+			if j.System == "sys-b" {
+				return false
+			}
 		}
+		return true
+	}) {
+		t.Fatalf("sys-b journey never resumed; %+v", s.trafficJourneys)
 	}
 	e2, tc2, ok := findHauler(s, "cel-b-dock")
 	if !ok {
@@ -477,15 +484,28 @@ func TestLogisticsJourneySurvivesSaveRestore(t *testing.T) {
 	if len(b.trafficJourneys) != 1 || b.trafficJourneys[0] != s.trafficJourneys[0] {
 		t.Fatalf("restored journeys = %+v, want %+v", b.trafficJourneys, s.trafficJourneys)
 	}
-	// The restored sim completes the journey after its own jump.
+	// The restored sim completes the journey after its own jump: resume is
+	// staggered (trafficResumeInterval), so wait for the continuation
+	// hauler bound to the sys-b destination instead of pinning the tick.
 	gate := entityByName(b, "Gate to Beta")
 	setPlayerPos(b, gatePos(b, gate))
 	b.Queue(CmdJump{Gate: gate})
 	b.Step()
 	drain(b)
-	if b.systemID != "sys-b" || b.Traffic.Len() != 1 {
-		t.Fatalf("restored continuation: system=%q haulers=%d, want sys-b/1",
-			b.systemID, b.Traffic.Len())
+	if b.systemID != "sys-b" {
+		t.Fatalf("restored continuation: system=%q, want sys-b", b.systemID)
+	}
+	resumed := false
+	for i := 0; i < 600 && !resumed; i++ {
+		if _, _, ok := findHauler(b, "cel-b-dock"); ok {
+			resumed = true
+			break
+		}
+		b.Step()
+		drain(b)
+	}
+	if !resumed {
+		t.Fatal("restored journey never resumed in sys-b")
 	}
 }
 
@@ -712,14 +732,22 @@ func TestLogisticsMultiHopJourney(t *testing.T) {
 	parkIn("sys-b") // first hop
 	jumpTo("sys-b", "Gate to Beta")
 	// The continuation aims at sys-b's far gate, not the destination.
-	e, tc, ok := findHauler(s, "cel-gate-gamma")
-	if !ok {
+	// Resume is capped/staggered (trafficResumeInterval), so the hauler
+	// appears within a few schedule windows, not on the jump tick.
+	var cont *Traffic
+	if !runUntil(t, s, &evs, 600, func() bool {
+		_, tc, ok := findHauler(s, "cel-gate-gamma")
+		if ok {
+			cont = tc
+		}
+		return ok
+	}) {
 		t.Fatalf("no continuation hauler in sys-b; %v", trafficTexts(evs))
 	}
+	tc := cont
 	if tc.DestSys != "sys-c" || tc.DestCel != "cel-c-dock" {
 		t.Fatalf("continuation = %q/%q, want sys-c/cel-c-dock", tc.DestSys, tc.DestCel)
 	}
-	_ = e
 	parkIn("sys-c") // second hop
 	jumpTo("sys-c", "Gate to Gamma")
 

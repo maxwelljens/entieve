@@ -511,7 +511,10 @@ func TestJourneyResumeWarpsOnward(t *testing.T) {
 		Item: "min-ferrite", Qty: 100, Basis: 10, Hull: "ship-convoy",
 	})
 	var evs []Event
-	for i := 0; i < 10 && len(s.trafficJourneys) > 0; i++ {
+	// Resume is capped and staggered (trafficResumeInterval): the lone
+	// journey fires within a few schedule windows of the first traffic
+	// tick, never on a fixed tick — bound the wait accordingly.
+	for i := 0; i < 4*trafficResumeInterval && len(s.trafficJourneys) > 0; i++ {
 		s.Step()
 		evs = append(evs, drain(s)...)
 	}

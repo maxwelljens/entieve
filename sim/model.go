@@ -332,6 +332,11 @@ type Traffic struct {
 	// celestial); Dest is the current leg's target — a next-hop gate while
 	// DestSys is still ahead, the destination itself on the last leg. An
 	// empty DestSys reads as the spawn system (pre-cross-system saves).
+	// When a gate hop would park the shipment into a system whose parked
+	// ledger is at its ceiling (trafficMaxParkedJourneys), the journey
+	// HOLDS instead: it re-parks with System set to the CURRENT system at
+	// the hauler's own position and the hop retries on later ticks once
+	// the far queue drains — never past the ceiling, never dropped.
 	DestSys content.SystemID `json:"dsys,omitempty"`
 	DestCel content.CelID    `json:"dcel,omitempty"`
 	// Owner is the shipment's principal: the opaque market owner tag of
@@ -346,6 +351,14 @@ type Traffic struct {
 // the grid was rebuilt under it) and flies again when System loads next.
 // Park order is the canonical serialization order (Save.TrafficJourneys);
 // a resumed journey spawns a hauler at At carrying the recorded provenance.
+// Resume is capped and staggered (at most trafficMaxLive − live haulers
+// per tick, each entry on its own trafficDue schedule keyed by its ledger
+// position), so a deep backlog drains across ticks instead of bursting.
+// A hop into a system already holding trafficMaxParkedJourneys parked
+// journeys keeps the entry with its CURRENT system (System = now, At =
+// where the hauler stands) and retries the hop on later ticks — the gate
+// queue holds upstream rather than stacking past the ceiling, and the
+// recorded cargo rides every hold/resume unchanged.
 type TrafficJourney struct {
 	System  content.SystemID `json:"system"` // system the continuation flies in
 	At      core.Vec2        `json:"at"`     // spawn position there (entry gate or mid-leg)

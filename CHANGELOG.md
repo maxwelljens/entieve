@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **NPC fleet burst on first system entry** (`sim/system_traffic.go`): the
+  cross-system journey ledger no longer dumps every parked shipment into a
+  grid at once. Resume is capped and staggered — at most
+  `trafficMaxLive − live haulers` respawns per tick, each ledger entry
+  firing on its own stateless `trafficDue` schedule in canonical ledger
+  order — so a system first loaded with a deep backlog shows ordinary
+  traffic density and the backlog drains at the normal cadence behind it.
+  A new per-system gate queue (`trafficMaxParkedJourneys` = 3 ×
+  trafficMaxLive) refuses to hop-park past its ceiling: overflow shipments
+  hold at their current system with cargo intact and retry the hop on
+  later ticks, pushing backlog upstream across the ring instead of
+  stacking unboundedly at one destination. Concurrent traffic raiders are
+  capped per grid (`trafficMaxRaiders` = 6): an ambush whose raider count
+  would break the ceiling does not spawn — the count draw is consumed in
+  a fixed order first, keeping twin-run and save/restore determinism —
+  while static spawn-group NPCs and patrols never count. All three caps
+  are mass-neutral: no cargo is ever dropped, duplicated or created, and
+  the caps never emit a lost-shipment event.
+
 ## [0.3.0] - 2026-10-17
 
 ### Added

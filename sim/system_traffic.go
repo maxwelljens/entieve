@@ -40,6 +40,12 @@ import (
 // ever touches the origin book. Cross-system hauls park the shipment as a
 // journey (Save.TrafficJourneys) when they cross a gate or when the grid
 // rebuilds under them, and continue when the destination system loads.
+// The parked ledger is a closed queue behind three caps: resume is
+// staggered and shares trafficMaxLive with fresh spawns, a gate hop into a
+// system already at its parked-journey ceiling holds upstream instead
+// (trafficMaxParkedJourneys), and an ambush that would break
+// trafficMaxRaiders does not spawn — none of them ever drops, duplicates
+// or creates cargo.
 //
 // Haul-wish convoys (the consumption seam for agent.go's HaulWish) are the
 // second spawn path: on a slow stateless poll the system walks the agents'
@@ -62,10 +68,22 @@ const (
 	// trafficMaxLive caps live convoy haulers per system; trafficMaxPatrols
 	// caps patrol ships. Spawn attempts beyond the cap are skipped (the
 	// schedule itself is stateless, so skips never shift future attempts).
+	// The resume path shares trafficMaxLive with the fresh schedules, so a
+	// deep parked ledger can never unload as one fleet.
 	trafficMaxLive    = 6
 	trafficMaxPatrols = 4
-	trafficMaxRaiders = 3
-	trafficMinRaiders = 1
+
+	// trafficMaxRaiders caps CONCURRENT live traffic raiders per grid —
+	// static spawnGroup NPCs and patrols are not raiders and never count.
+	// trafficMaxParkedJourneys is the per-system gate queue: trafficHop
+	// never parks a journey past it (the shipment holds upstream instead).
+	// trafficResumeInterval staggers resumed convoy departures so a backlog
+	// spreads across ticks instead of aligning and warping in one tick.
+	trafficMaxRaiders        = 6
+	trafficMaxParkedJourneys = 3 * trafficMaxLive // 18 parked journeys per system
+	trafficResumeInterval    = 30                 // ticks between resumed-departure opportunities
+	trafficAmbushRaidersMax  = 3                  // one ambush drops in 1..3 raiders
+	trafficMinRaiders        = 1
 
 	// trafficFleeDelaySec is how long an ambushed hauler burns away from its
 	// attackers before attempting the warp-out. Calibrated against the
@@ -863,7 +881,17 @@ func (s *Sim) startAmbush(e ecs.Entity, tc *Traffic, td *content.TrafficDef, sec
 		dir = core.Vec2{X: 1}
 	}
 	base := pos.Add(dir.Norm().Scale(WarpMinRange))
-	n := trafficMinRaiders + s.trafficRNG.Intn(trafficMaxRaiders-trafficMinRaiders+1)
+	n := trafficMinRaiders + s.trafficRNG.Intn(trafficAmbushRaidersMax-trafficMinRaiders+1)
+	// Raider ceiling (per grid): the count draw above is consumed on every
+	// successful ambush roll in a FIXED order — the ceiling never re-orders
+	// or skips draws before it, so the traffic stream diverges from an
+	// uncapped run only when the check below actually refuses a spawn.
+	// Refusing the whole ambush (rather than clamping n) keeps twin runs
+	// and post-restore continuations bit-identical. Static spawnGroup NPCs
+	// and patrols are not raiders and never count toward the ceiling.
+	if s.trafficLiveRaiders()+n > trafficMaxRaiders {
+		return
+	}
 	raiders := make([]ecs.Entity, 0, n)
 	for i := 0; i < n; i++ {
 		r := s.spawnNpcStream(td.Raider, base, trafficAmbushSpread, s.trafficRNG)
@@ -955,6 +983,16 @@ func (s *Sim) trafficArrive(sys *content.SystemDef, e ecs.Entity, tc *Traffic) {
 // in the far system — it flies on when that grid loads next. The far-system
 // leg is a NEW leg: its ambush roll is unconsumed (per-leg risk under the
 // destination's own security), and any live ambush dies with this grid.
+//
+// Gate queue: when the far system's parked ledger is already at its
+// ceiling (trafficMaxParkedJourneys), the journey HOLDS at its CURRENT
+// system instead — same provenance, same final destination, spawn position
+// kept where the hauler stands — and the hop is retried on later ticks
+// once the far queue drains (resume respawns it, it re-reaches the gate,
+// the ceiling is re-checked). A hold never hop-parks past the ceiling, is
+// never dropped, and never moves a unit of cargo (closed mass balance);
+// backlog therefore pushes upstream across the ring instead of stacking
+// unboundedly at one destination.
 func (s *Sim) trafficHop(sys *content.SystemDef, e ecs.Entity, tc *Traffic, gate *content.CelestialDef) {
 	if gate.Gate == nil {
 		// A cross-system leg always ends at a gate (route validation):
@@ -970,14 +1008,28 @@ func (s *Sim) trafficHop(sys *content.SystemDef, e ecs.Entity, tc *Traffic, gate
 		s.destroy(e)
 		return
 	}
+	hull := content.ShipID("")
+	if sh, ok := s.Ships.Get(e); ok {
+		hull = sh.Hull
+	}
+	if s.trafficParkedIn(nextSys) >= trafficMaxParkedJourneys {
+		// Queue full: hold the shipment here (see the doc comment above).
+		s.trafficJourneys = append(s.trafficJourneys, TrafficJourney{
+			System: sys.ID, At: mustPos(s, e), DestSys: tc.DestSys, DestCel: tc.DestCel,
+			Item: tc.Item, Qty: tc.Qty, Basis: tc.Basis, Hull: hull,
+			Owner: tc.Owner,
+		})
+		s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: e,
+			System: sys.ID, Cel: gate.ID, Item: tc.Item, Value: float64(tc.Qty),
+			Text: "Convoy hauler holds at " + gate.Name + " — " + nextDef.Name +
+				" gate queue full, shipment waits in " + sys.Name})
+		s.destroy(e)
+		return
+	}
 	entry := sysCelestial(nextDef, gate.Gate.ToCel)
 	var at core.Vec2
 	if entry != nil {
 		at = entry.Position
-	}
-	hull := content.ShipID("")
-	if sh, ok := s.Ships.Get(e); ok {
-		hull = sh.Hull
 	}
 	s.trafficJourneys = append(s.trafficJourneys, TrafficJourney{
 		System: nextSys, At: at, DestSys: tc.DestSys, DestCel: tc.DestCel,
@@ -988,6 +1040,18 @@ func (s *Sim) trafficHop(sys *content.SystemDef, e ecs.Entity, tc *Traffic, gate
 		System: sys.ID, Cel: gate.ID, Item: tc.Item, Value: float64(tc.Qty),
 		Text: "Convoy hauler jumps through " + gate.Name + " to " + nextDef.Name})
 	s.destroy(e)
+}
+
+// trafficParkedIn counts the journeys parked for a system — its gate
+// queue. Ledger order is canonical; this is a pure count (no entropy).
+func (s *Sim) trafficParkedIn(sys content.SystemID) int {
+	n := 0
+	for i := range s.trafficJourneys {
+		if s.trafficJourneys[i].System == sys {
+			n++
+		}
+	}
+	return n
 }
 
 // trafficParkGrid parks every live convoy hauler just before the grid is
@@ -1023,16 +1087,31 @@ func (s *Sim) trafficParkGrid() {
 	}
 }
 
-// trafficResumeJourneys respawns every journey waiting in the active grid.
-// Journeys of other systems stay parked (they do not tick while the player
-// is away — the respawn-timer rule applies to shipments too). A journey
-// whose route can no longer resolve on this grid resolves as a lost
-// shipment (event, no book movement, no re-spawn: the origin was debited
-// at spawn) — content is static, so this is a backstop.
+// trafficResumeJourneys respawns journeys waiting in the active grid,
+// behind two stateless gates so a deep ledger can never unload as one fleet:
+//
+//   - live cap: at most (trafficMaxLive − live haulers on this grid) spawns
+//     per tick — the same cap the fresh schedules enforce, so first entry
+//     into a system shows ordinary traffic density and the backlog drains
+//     at the normal cadence behind it;
+//   - departure stagger: each ledger entry fires on its own stateless
+//     schedule (trafficDue keyed by system + ledger position), so resumed
+//     convoys spread across ticks instead of aligning and warping together.
+//
+// Selection walks the ledger in canonical order; a gated journey simply
+// keeps its entry for a later tick (nothing reschedules, and trafficPhase
+// is a pure hash — resume draws no entropy, so twin runs and save/restore
+// round-trips stay bit-identical). Journeys of other systems stay parked
+// (they do not tick while the player is away — the respawn-timer rule
+// applies to shipments too). A journey whose route can no longer resolve
+// on this grid resolves as a lost shipment (event, no book movement, no
+// re-spawn: the origin was debited at spawn) — content is static, so this
+// is a backstop.
 func (s *Sim) trafficResumeJourneys(sys *content.SystemDef) {
 	if len(s.trafficJourneys) == 0 {
 		return
 	}
+	budget := trafficMaxLive - s.Traffic.Len()
 	kept := make([]TrafficJourney, 0, len(s.trafficJourneys))
 	for i := range s.trafficJourneys {
 		j := s.trafficJourneys[i]
@@ -1059,6 +1138,12 @@ func (s *Sim) trafficResumeJourneys(sys *content.SystemDef) {
 			s.trafficJourneyLost(sys, j, destSys)
 			continue
 		}
+		if budget <= 0 ||
+			!trafficDue(s.ticks, string(s.systemID)+"|resume|"+itoaN(i), trafficResumeInterval) {
+			kept = append(kept, j)
+			continue
+		}
+		budget--
 		s.spawnResumedHauler(sys, hull, j, target)
 	}
 	s.trafficJourneys = kept
@@ -1629,6 +1714,34 @@ func (s *Sim) isTrafficRaider(e ecs.Entity) bool {
 		}
 	})
 	return found
+}
+
+// trafficLiveRaiders counts the traffic raiders alive on this grid: every
+// living raider referenced by a live ambush (whatever its outcome — the
+// raiders linger until break-off after an escape) plus scheduled break-offs
+// still on the grid (a hauler that dies hands its raiders to trafficLeaves).
+// The overlap between the two sets is de-duplicated by handle; the map is
+// only measured with len(), never iterated, so no map order reaches
+// behavior. Static spawnGroup NPCs and patrols are not raiders and never
+// count — this is the population the trafficMaxRaiders ceiling governs.
+func (s *Sim) trafficLiveRaiders() int {
+	seen := make(map[ecs.Entity]bool)
+	s.Traffic.Each(func(_ ecs.Entity, tc *Traffic) {
+		if tc.Attack == nil {
+			return
+		}
+		for _, r := range tc.Attack.Raiders {
+			if s.World.Alive(r) {
+				seen[r] = true
+			}
+		}
+	})
+	for _, l := range s.trafficLeaves {
+		if s.World.Alive(l.Entity) {
+			seen[l.Entity] = true
+		}
+	}
+	return len(seen)
 }
 
 // sysCelestial returns the celestial definition with the given ID inside sys.
