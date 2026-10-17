@@ -25,7 +25,7 @@ it decorates. IDs are the same kebab-case strings the content JSON uses
 | `assets/hulls/` | hull ID = ship content ID (`content/data/ships/*.json`) | `ship-sloop.png`, `ship-rat-marauder.png` | rotated to heading |
 | `assets/stations/` | celestial ID (`CelestialDef.id` in `content/data/systems/*.json`) — stations, gates, belts, other structures | `cel-haven-rest.png`, `cel-gate-penumbra.png` | unrotated |
 | `assets/asteroids/` | ore ID the belt's asteroids carry (`items/ores.json`) | `ore-cordite.png` | unrotated |
-| `assets/backgrounds/` | system ID (`sys-*.json`) | `sys-solace.png` | unrotated |
+| `assets/backgrounds/` | system ID (`sys-*.json`) or `default` | `default.png` | unrotated |
 
 Sub-JSON lookup is exactly `<directory>/<id>.png`; other files and
 directories are ignored.
@@ -41,23 +41,24 @@ directories are ignored.
 - **Hull sprites point right (+X)**, the nose direction, matching the
   built-in silhouettes; the engine rotates them to the ship's heading.
   Celestials, asteroids and backgrounds are never rotated.
-- **Backgrounds are per-system starfield plates, in layers.**
-  `assets/backgrounds/<system-id>.png` is layer 0 (near, bright),
-  `<system-id>-01.png` layer 1 (far, faint), `<system-id>-02.png` an optional
-  layer 2 — so `sys-solace.png` serves Starogród. Each plate replaces the
-  procedural star layer of the same number: it draws at its native size on
-  that layer's camera-parallax rate and wrap, over the nebula washes, and
-  only the layers a system ships art for change — a system with no plates
-  keeps the stock procedural starfield untouched.
+- **Backgrounds are starfield plates, in layers, with a cluster-wide
+  default.** Per layer the lookup is `assets/backgrounds/<system-id>.png`
+  (layer 0, near, bright), `<system-id>-01.png` (layer 1, far, faint),
+  `<system-id>-02.png` (optional layer 2) — falling back to `default.png` /
+  `default-01.png` / `default-02.png`, which serve every system. Each plate
+  replaces the procedural star layer of the same number: it draws at its
+  native size on that layer's camera-parallax rate and wrap, over the nebula
+  washes; with neither override nor default for a layer, the stock
+  procedural starfield draws untouched.
 - **Give plate skies real transparency** (dots opaque, sky transparent) and
   author them to tile edge-to-edge: each plate is pixel-probed once at load
   and a transparent sky commits it to its starfield layer, while an
   opaque-black sky draws it as the *bottom* layer instead — scaled to *cover*
   the screen (aspect preserved, cropped at the edges), above the flat
-  background fill and below the nebula washes. Plates are decoded for the
-  current star system only and dropped on system change (a two-layer system
-  is ~52 MB decoded), so never rely on another system's plate still being in
-  memory.
+  background fill and below the nebula washes. Shared defaults stay decoded
+  across system switches (~52 MB for the two shipped default layers);
+  per-system plates decode on demand and drop with their system, so never
+  rely on another system's override still being in memory.
 
 ## Sizing (what "fits" means)
 

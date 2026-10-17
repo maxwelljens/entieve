@@ -9,7 +9,7 @@ assets/
 ├── hulls/<hull-id>.png            e.g. ship-sloop.png        (rotated to heading)
 ├── stations/<celestial-id>.png    e.g. cel-haven-rest.png    (unrotated)
 ├── asteroids/<ore-id>.png         e.g. ore-cordite.png       (unrotated)
-└── backgrounds/<system-id>.png    e.g. sys-solace.png        (unrotated, covers screen)
+└── backgrounds/<system-id>.png    e.g. default.png          (unrotated, tiles; default.png serves all systems)
 ```
 
 The file name is exactly the content ID used by the game's JSON data.

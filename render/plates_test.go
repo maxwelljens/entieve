@@ -215,3 +215,52 @@ func TestPlateEvictedOnSystemSwitch(t *testing.T) {
 		t.Errorf("on sys-b the cache holds %d plates, want 1", len(r.plates))
 	}
 }
+
+// TestDefaultPlatesSurviveSwitch: the shared "default" plates serve every
+// system and stay decoded across switches (they are cluster-wide); a
+// system's own plate wins over the default for the same layer and is still
+// evicted with its system.
+func TestDefaultPlatesSurviveSwitch(t *testing.T) {
+	dir := t.TempDir()
+	writePNG(t, filepath.Join(dir, "backgrounds", "default.png"), 30, 30)
+	writePNG(t, filepath.Join(dir, "backgrounds", "sys-a.png"), 10, 10)
+	stashAssets(t, dir)
+
+	r := New(nil)
+	sysA := &content.SystemDef{ID: "sys-a"}
+	sysB := &content.SystemDef{ID: "sys-b"}
+
+	// sys-a ships its own layer 0: the override wins over the default.
+	oa := r.plate(0, sysA)
+	if oa == nil || oa.def {
+		t.Fatal("sys-a layer 0 must resolve to its own override")
+	}
+	if b := oa.img.Bounds(); b.Dx() != 10 || b.Dy() != 10 {
+		t.Errorf("override plate = %dx%d, want 10x10", b.Dx(), b.Dy())
+	}
+
+	// sys-b ships nothing: the shared default serves it.
+	db := r.plate(0, sysB)
+	if db == nil || !db.def {
+		t.Fatal("sys-b layer 0 must resolve to the shared default")
+	}
+	if b := db.img.Bounds(); b.Dx() != 30 || b.Dy() != 30 {
+		t.Errorf("default plate = %dx%d, want 30x30", b.Dx(), b.Dy())
+	}
+
+	// The switch evicted sys-a's override but kept the default: the same
+	// decoded image serves the next system without a re-decode.
+	if len(r.plates) != 1 {
+		t.Fatalf("cache holds %d plates after switch, want 1 (the default)", len(r.plates))
+	}
+	dc := r.plate(0, &content.SystemDef{ID: "sys-c"})
+	if dc == nil || dc.img != db.img {
+		t.Error("shared default must survive a system switch without re-decode")
+	}
+
+	// Returning to sys-a re-decodes its evicted override over the default.
+	oa2 := r.plate(0, sysA)
+	if oa2 == nil || oa2.img == oa.img {
+		t.Error("per-system override must be evicted with its system")
+	}
+}

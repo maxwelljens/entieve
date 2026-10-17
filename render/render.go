@@ -72,10 +72,10 @@ type Renderer struct {
 	glows  map[glowKey]*ebiten.Image
 	bodies map[uint32]*ebiten.Image
 
-	// Background plates for plateSys only: decoded plates are ~26 MB each
-	// (2560² RGBA), so the cache is evicted on system change instead of
-	// accumulating a plate per system (see plate).
-	plates   map[int]*bgPlate
+	// Background plates keyed by resolved path: decoded plates are ~26 MB
+	// each (2560² RGBA). Shared "default" plates persist across system
+	// switches; per-system plates are evicted on change (see plate).
+	plates   map[string]*bgPlate
 	plateSys content.SystemID
 
 	selected ecs.Entity
@@ -92,7 +92,7 @@ func New(c *content.Content) *Renderer {
 		tiles:  map[starKey]*ebiten.Image{},
 		glows:  map[glowKey]*ebiten.Image{},
 		bodies: map[uint32]*ebiten.Image{},
-		plates: map[int]*bgPlate{},
+		plates: map[string]*bgPlate{},
 	}
 }
 
@@ -144,15 +144,16 @@ func (r *Renderer) starTile(seed uint64, layer int) *ebiten.Image {
 type bgPlate struct {
 	img *ebiten.Image // never nil in the cache
 	sky bool          // opaque sky: bottom layer under the nebula washes
+	def bool          // resolved from the shared "default" plate: survives switches
 }
 
-// plate returns the current system's plate for one starfield layer, decoding
-// it on first use; nil when the system ships no plate for that layer — the
-// caller then draws the untouched procedural art. The cache holds one
-// system's plates only: a decoded 2560² RGBA plate is ~26 MB, so switching
-// systems evicts the previous ones instead of accumulating a plate per
-// system (bounded at 3 layers ≈ 78 MB worst case, 52 MB for a two-layer
-// system such as sys-solace).
+// plate resolves one starfield layer for a system: the system's own plate when
+// it ships one, else the shared cluster-wide default plate (`default.png`,
+// `default-01.png`, …), else nil — the caller then draws the untouched
+// procedural art. The cache is keyed by resolved path: shared defaults persist
+// across system switches (they serve every system), per-system plates are
+// evicted when the system changes (a decoded 2560² RGBA plate is ~26 MB, so
+// the decode cache stays bounded at defaults + one system's overrides).
 func (r *Renderer) plate(layer int, sys *content.SystemDef) *bgPlate {
 	var id content.SystemID
 	if sys != nil {
@@ -160,21 +161,30 @@ func (r *Renderer) plate(layer int, sys *content.SystemDef) *bgPlate {
 	}
 	if id != r.plateSys {
 		r.plateSys = id
-		clear(r.plates) // drop the previous system's decoded plates
-	}
-	if pl, ok := r.plates[layer]; ok {
-		return pl
+		for k, p := range r.plates {
+			if !p.def {
+				delete(r.plates, k) // per-system plate: drop with the system
+			}
+		}
 	}
 	path := platePath(plateKey(string(id), layer))
+	def := false
+	if path == "" {
+		path = platePath(plateKey(defaultPlateID, layer))
+		def = path != ""
+	}
 	if path == "" {
 		return nil // no plate for this layer: procedural fallback
+	}
+	if pl, ok := r.plates[path]; ok {
+		return pl
 	}
 	img, sky := loadPlate(path)
 	if img == nil {
 		return nil
 	}
-	pl := &bgPlate{img: img, sky: sky}
-	r.plates[layer] = pl
+	pl := &bgPlate{img: img, sky: sky, def: def}
+	r.plates[path] = pl
 	return pl
 }
 

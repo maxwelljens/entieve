@@ -80,6 +80,13 @@ func spriteFor(key string) *ebiten.Image {
 	return sprites[key]
 }
 
+// defaultPlateID is the pseudo-system whose plates serve every star system:
+// `backgrounds/default.png` (layer 0), `backgrounds/default-01.png` (layer 1),
+// `backgrounds/default-02.png` (layer 2). A system's own plate wins over the
+// shared default for the same layer; with neither, the procedural starfield
+// draws.
+const defaultPlateID = "default"
+
 // plateKey returns the convention key of one starfield plate layer for a
 // system id: layer 0 = "<id>.png" (near/bright), layer 1 = "<id>-01.png"
 // (far/faint), layer 2 = optional "<id>-02.png".
