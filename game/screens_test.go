@@ -208,8 +208,13 @@ func TestScreenPlacementDerivesFromSpec(t *testing.T) {
 		if r := g.screenWin[pScanner].GetContainer().GetWidget().Rect; r.Min != image.Pt(459, 276) {
 			t.Errorf("%dx%d: scanner at %v, want the fixed design position (459,276)", w, h, r.Min)
 		}
-		if r := g.screenWin[pHelp].GetContainer().GetWidget().Rect; r.Min.Y != 24 || r.Min.X != (w-r.Dx())/2 {
-			t.Errorf("%dx%d: help at %v, want top inset 24 and x centred (%d)", w, h, r.Min, (w-r.Dx())/2)
+		// The help window centres on top (24 px inset) with its left
+		// edge floored clear of the rail gutter: centred lands at 62 in
+		// the 1024 minimum, one pixel INSIDE the 63 px rail, so the
+		// floor (10+RailInset = 73) wins there.
+		if r := g.screenWin[pHelp].GetContainer().GetWidget().Rect; r.Min.Y != 24 || r.Min.X != max(railClearX(), (w-r.Dx())/2) {
+			t.Errorf("%dx%d: help at %v, want top inset 24 and x = max(%d, centred %d)",
+				w, h, r.Min, railClearX(), (w-r.Dx())/2)
 		}
 		for _, p := range []panelID{pMap, pMenu, pFactory, pSettings} {
 			r := g.screenWin[p].GetContainer().GetWidget().Rect

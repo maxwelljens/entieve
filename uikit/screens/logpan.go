@@ -33,10 +33,11 @@ const (
 )
 
 // logDefaultRect is the construction-time placement (bottom-left pocket
-// at the 1024×700 minimum); the game re-anchors it to the real screen
-// on first layout, like every other movable window.
+// at the 1024×700 minimum, clear of the rail's left gutter); the game
+// re-anchors it to the real screen on first layout, like every other
+// movable window — its spec row carries the same 10+RailInset inset.
 func logDefaultRect() image.Rectangle {
-	return image.Rect(theme.Px(10), theme.Px(700-10-logDefaultH), theme.Px(10+logDefaultW), theme.Px(700-10))
+	return image.Rect(theme.Px(10+RailInset), theme.Px(700-10-logDefaultH), theme.Px(10+RailInset+logDefaultW), theme.Px(700-10))
 }
 
 // LogPanel is the combat/action log: a scrollable text area whose lines

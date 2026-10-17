@@ -8,12 +8,16 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // The left navigation rail (EVE-neocom style): one icon per openable
 // window, pinned to the left screen edge on the root overlay — chrome
 // like the HUD and module rack, never a window (no title bar, no drag,
-// not in the window stack, never persisted as geometry).
+// not in the window stack, never persisted as geometry) — but TOP
+// chrome: mounted through Kit.AddTopContainer, so it paints above every
+// window and its clicks win over a window dragged onto the gutter (the
+// HUD and rack, which must stay under windows, use Kit.AddContainer).
 //
 // The entries are DERIVED by the host from its window table (game:
 // railEntries from the Screen spec) — the rail knows icons, titles,
@@ -116,6 +120,13 @@ type Rail struct {
 	tab       *widget.Button
 	maxH      int // current column cap in live px (0 = uncapped)
 	collapsed bool
+
+	// tipsUp are the rail's tooltip windows currently showing, in show
+	// order: the events bubble up from the entry buttons to the column's
+	// widget, and Kit.Draw's top pass parks and repaints exactly these —
+	// they are ebitenui ephemeral windows, painted inside ui.Draw, which
+	// would leave them UNDER the rail's own top pass otherwise.
+	tipsUp []*widget.Window
 }
 
 // NewRail builds the rail over the given seams. entries arrive in draw
@@ -200,8 +211,9 @@ func NewRail(env widgets.Seams, entries []RailEntry) *Rail {
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Spacing(theme.Px(railHeadGap)),
 		)),
-		// The anchor the game re-passes through Kit.AddContainer (the
-		// rack does the same), so a standalone mount pins the same way.
+		// The anchor the game re-passes through Kit.AddTopContainer (the
+		// rack does the same through AddContainer), so a standalone mount
+		// pins the same way.
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionStart,
@@ -209,6 +221,31 @@ func NewRail(env widgets.Seams, entries []RailEntry) *Rail {
 		})),
 	)
 	r.container.AddChild(r.tab, r.scroll)
+	// Track the column's tooltip windows as they show and hide (the
+	// ToolTipEvent re-fires bubble up the container chain to this
+	// widget), so Kit.Draw's top pass can park and repaint them above
+	// the rail. Registered once, at construction.
+	r.container.GetWidget().ToolTipEvent.AddHandler(func(args any) {
+		a, ok := args.(*widget.WidgetToolTipEventArgs)
+		if !ok || a.Window == nil {
+			return
+		}
+		if a.Show {
+			for _, w := range r.tipsUp {
+				if w == a.Window {
+					return
+				}
+			}
+			r.tipsUp = append(r.tipsUp, a.Window)
+			return
+		}
+		for i, w := range r.tipsUp {
+			if w == a.Window {
+				r.tipsUp = append(r.tipsUp[:i], r.tipsUp[i+1:]...)
+				return
+			}
+		}
+	})
 	r.Sync()
 	return r
 }
@@ -216,6 +253,35 @@ func NewRail(env widgets.Seams, entries []RailEntry) *Rail {
 // Container returns the rail's root widget for the interface root
 // (anchor layout, pinned top-left).
 func (r *Rail) Container() *widget.Container { return r.container }
+
+// SetWindowPass parks the column — and its showing tooltip windows — out
+// of ebitenui's ui.Draw pass and brings them back for Kit.Draw's top
+// pass (the TopChrome seam). Visibility_Hide_Blocking is the key: the
+// root layout still lays the column out (only Visibility_Hide skips a
+// child), so its rect stays fresh, while Container.Render paints
+// neither the column nor the parked tips. The tips are unparked by
+// visibility only — the ToolTip state machine runs during Update, which
+// always sees the rail shown, so no tip ever flinches mid-hover.
+func (r *Rail) SetWindowPass(on bool) {
+	vis := widget.Visibility_Show
+	if !on {
+		vis = widget.Visibility_Hide_Blocking
+	}
+	r.container.GetWidget().SetVisibility(vis)
+	for _, w := range r.tipsUp {
+		w.GetContainer().GetWidget().SetVisibility(vis)
+	}
+}
+
+// Draw paints the column and its tooltip windows — Kit.Draw's top pass,
+// after ui.Draw, so the rail is above every window while the context
+// menu still paints last of all.
+func (r *Rail) Draw(screen *ebiten.Image) {
+	r.container.Render(screen)
+	for _, w := range r.tipsUp {
+		w.GetContainer().Render(screen)
+	}
+}
 
 // Collapsed reports whether the entries are hidden (only the edge tab
 // shows). The host persists this — the rail holds no settings of its own.

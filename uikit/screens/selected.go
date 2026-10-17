@@ -162,7 +162,9 @@ func (k *Kit) buildSelected() {
 		// TextAndImage buttons measure 447 px on the type grid, so the
 		// content floor (mirrored by the default rect below) is 450.
 		widget.WindowOpts.MinSize(theme.Px(450), theme.Px(240)),
-		widget.WindowOpts.Location(image.Rect(theme.Px(8), theme.Px(436), theme.Px(458), theme.Px(696))),
+		// Default clears the rail's left gutter (RailInset); the game
+		// re-anchors it to the right edge on first layout.
+		widget.WindowOpts.Location(image.Rect(theme.Px(8+RailInset), theme.Px(436), theme.Px(458+RailInset), theme.Px(696))),
 	)
 }
 

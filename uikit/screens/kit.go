@@ -15,7 +15,8 @@
 //
 // Integration: call Sync every frame before Update, then Draw after the
 // world render. World clicks feed selection back through Kit.Select; always
-// on chrome mounts via AddContainer; the built-in windows are reachable via
+// on chrome mounts via AddContainer (or AddTopContainer for chrome that
+// paints above windows), the built-in windows are reachable via
 // OverviewWindow/SelectedWindow and can be hidden with SetCoreVisible.
 package screens
 
@@ -25,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/ebitenui/ebitenui"
+	"github.com/ebitenui/ebitenui/input"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
@@ -72,6 +74,21 @@ type Kit struct {
 	// mid-drag or closed — is never stepped again. Pumped every frame
 	// from Update/Draw.
 	chromes map[*widget.Window]*winChrome
+
+	// stack is every window this kit has mounted, bottom → top: the paint
+	// and input order ebitenui keeps internally, mirrored here because
+	// ebitenui exposes no way to read it back. The raise (raisePressed)
+	// hit-tests and re-tops through it, and ebitenui's own relayering is
+	// switched off for kit windows (AddWindow sets DisableRelayering), so
+	// remove + re-mount is the single, deterministic top-of-stack path.
+	stack []*kitMount
+
+	// tops is the root-overlay chrome that lives ABOVE the window stack
+	// (the navigation rail — AddTopContainer): Kit.Draw parks it out of
+	// ui.Draw and paints it after every window, under the menu, and lifts
+	// its input layer to the top of the layer stack each frame. The HUD
+	// and module rack keep their under-window position (AddContainer).
+	tops []TopChrome
 
 	// svc is the shared interaction state every panel built from this
 	// kit's Env reaches: the context menu and the Show Info window.
@@ -166,11 +183,14 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 // polled here (the host's earlier MenuInput pass already spent the
 // frame's click/Esc — this one is the fallback for hosts that do not
 // drive it) and ui.Update is skipped, so the click or Esc that
-// dismisses the popup never reaches the widgets underneath.
+// dismisses the popup never reaches the widgets underneath. The window
+// raise is gated the same way: a dismiss click can never re-stack what
+// lies beneath the popup.
 func (k *Kit) Update() error {
 	k.svc.menu.Poll()
 	menuBlocked := k.svc.menu.TakeBlocked()
 	if !k.svc.menu.IsOpen() && !menuBlocked {
+		k.raisePressed()
 		k.ui.Update()
 	}
 	k.stepChromes()
@@ -178,15 +198,136 @@ func (k *Kit) Update() error {
 }
 
 // Draw renders the interface onto screen. Call it AFTER the world render.
+//
+// Draw order (the stacking contract, bottom → top): top chrome parked
+// out of the window pass → ui.Draw (root overlay, then windows, then
+// ebitenui's deferred popups) → resize chrome recompute → the top chrome
+// re-shown and painted over every window (its input layer lifts with it
+// in drawTops) → the context menu, always the last pixels.
 func (k *Kit) Draw(screen *ebiten.Image) {
+	for _, t := range k.tops {
+		t.SetWindowPass(false) // parked: ui.Draw must not paint it
+	}
 	k.ui.Draw(screen)
 	// Second chrome pass: the built-in title-bar drag moved rects during
 	// Render; recompute so the next frame's hit tests see clean geometry.
 	k.stepChromes()
 	k.ov.drawTints(screen, k)
+	k.drawTops(screen)
 	// The context menu paints last: it is always the topmost pixels,
 	// above every window and tooltip.
 	k.svc.menu.Draw(screen)
+}
+
+// ---------------------------------------------------------------------------
+// Window raise
+// ---------------------------------------------------------------------------
+
+// raisePressed brings the window under the cursor to the top of the
+// stack on any mouse press — left or right, body, title bar and resize
+// chrome alike. ebitenui's own click-to-raise never sees presses in a
+// window body: the body's scroll viewport elevates its input layer over
+// the window container, so only title-bar presses ever fired it (and it
+// is switched off for kit windows anyway — see AddWindow). So the raise
+// polls the raw press edge and cursor (widgets' shared seams — the same
+// ones Menu.Poll reads) and re-tops through the Show-Info seam: remove
+// + re-mount. It runs inside Kit.Update's menu gate, before ui.Update,
+// so a modal menu's dismiss click can never re-stack what lies beneath
+// the popup.
+//
+// Selection: the topmost mounted window under the cursor wins when
+// windows overlap — that is the window receiving the click, so that is
+// the one that rises. Top chrome (the rail) owns its rect outright, and
+// a modal window between the top and the candidate owns every gesture
+// (its ebitenui layer is fullscreen — input below it is gated, so
+// nothing below it may rise either). A window already at the top of the
+// stack is a no-op: the remount leak (documented in ShowInfo and
+// game.setPanel) is paid only when the stacking actually changes.
+func (k *Kit) raisePressed() {
+	if !widgets.PressEdge(ebiten.MouseButtonLeft) && !widgets.PressEdge(ebiten.MouseButtonRight) {
+		return
+	}
+	x, y := widgets.PollCursor()
+	pt := image.Pt(x, y)
+	for _, t := range k.tops {
+		if w := t.Container().GetWidget(); w.IsVisible() && pt.In(w.Rect) {
+			return // top chrome (the rail) owns this point — no raise
+		}
+	}
+	for i := len(k.stack) - 1; i >= 0; i-- {
+		w := k.stack[i].win.GetContainer().GetWidget()
+		if !w.IsVisible() {
+			continue // a hidden window keeps its rect but claims nothing
+		}
+		if pt.In(w.Rect) {
+			if i == len(k.stack)-1 {
+				return // already the topmost window
+			}
+			k.raise(k.stack[i].win)
+			return
+		}
+		if k.stack[i].win.Modal {
+			return // a modal above the candidate owns every gesture
+		}
+	}
+}
+
+// raise re-tops win: the kit's own remove closure (chrome, stack entry,
+// ebitenui window) followed by a fresh AddWindow, which appends it on
+// top — the deterministic top-of-stack ShowInfo already uses. Running
+// from Update, before ui.Update, the next Draw rebuilds the input
+// layers with the new order, so paint, input and stack agree.
+func (k *Kit) raise(win *widget.Window) {
+	m, ok := k.mountOf(win)
+	if !ok {
+		return
+	}
+	m.remove()
+	k.AddWindow(win)
+}
+
+// modalUp reports whether a modal window is mounted: its ebitenui layer
+// is fullscreen, so while it is up the top chrome must keep its normal
+// under-window input (the modal keeps gating exactly as it did before
+// the chrome was lifted). Paint is unaffected — no modal covers the
+// rail's column.
+func (k *Kit) modalUp() bool {
+	for _, m := range k.stack {
+		if m.win.Modal && m.win.GetContainer().GetWidget().IsVisible() {
+			return true
+		}
+	}
+	return false
+}
+
+// drawTops runs Kit.Draw's top pass: each top chrome comes back from its
+// park, paints over every window (its tooltips with it), and its input
+// layer is re-added on TOP of the window layers — ui.Draw rebuilt the
+// layer stack moments ago, so setup here lands last, matching paint
+// priority with input priority. Skipped while a modal window is up: the
+// modal's fullscreen layer keeps gating the chrome exactly as before.
+func (k *Kit) drawTops(screen *ebiten.Image) {
+	// The deferred-setup executor ebitenui uses internally, wired to run
+	// immediately: the subtree's layers must be added right here, in
+	// place, not back on ui's queue (which has already drained).
+	var next input.DeferredSetupInputLayerFunc
+	next = func(s input.SetupInputLayerFunc) { s(next) }
+	modal := k.modalUp()
+	for _, t := range k.tops {
+		t.SetWindowPass(true)
+		t.Draw(screen)
+		if modal {
+			continue
+		}
+		c, w := t.Container(), t.Container().GetWidget()
+		w.ElevateToNewInputLayer(&input.Layer{
+			DebugLabel: "top chrome",
+			EventTypes: input.LayerEventTypeAll,
+			BlockLower: true,
+			RectFunc:   func() image.Rectangle { return w.Rect },
+		})
+		c.SetupInputLayer(next)
+	}
 }
 
 // Sync refreshes every row and label from the simulation. Call it every
@@ -240,10 +381,42 @@ func (k *Kit) Select(e ecs.Entity) {
 func (k *Kit) Root() widget.Containerer { return k.root }
 
 // AddContainer mounts an always-on panel container into the root overlay
-// with the given anchor layout data (widget.AnchorLayoutData).
+// with the given anchor layout data (widget.AnchorLayoutData). Root
+// chrome mounted here keeps its ordinary position: windows paint and
+// take input above it (the HUD and module rack — permanent ship chrome
+// that no default window overlaps).
 func (k *Kit) AddContainer(c widget.Containerer, layoutData any) {
 	c.GetWidget().LayoutData = layoutData
 	k.root.AddChild(c)
+}
+
+// TopChrome is root-overlay chrome mounted ABOVE the window stack — the
+// navigation rail (Kit.AddTopContainer). Its left gutter is what
+// default windows keep clear (uikit.RailInset); when a window is
+// dragged over the column anyway, this is the contract that keeps the
+// rail on top: paint in Kit's own pass, input in its own topmost layer,
+// tooltips following it, the context menu still last of all.
+type TopChrome interface {
+	// Container is the laid-out column: the root anchor layout positions
+	// it, the topmost input layer claims it, the raise gate reads it.
+	Container() *widget.Container
+	// SetWindowPass parks the chrome (and its tooltip windows) out of
+	// ui.Draw's window pass (Visibility_Hide_Blocking — still laid out,
+	// never painted) and brings it back for Kit.Draw's top pass, so its
+	// pixels are composited exactly once, after every window.
+	SetWindowPass(on bool)
+	// Draw paints the chrome column and its tooltip windows onto screen.
+	Draw(screen *ebiten.Image)
+}
+
+// AddTopContainer mounts top chrome into the root overlay with the given
+// anchor layout data (widget.AnchorLayoutData) — see TopChrome for what
+// "top" buys. The HUD and rack, which must stay under windows, mount
+// through AddContainer instead.
+func (k *Kit) AddTopContainer(t TopChrome, layoutData any) {
+	t.Container().GetWidget().LayoutData = layoutData
+	k.root.AddChild(t.Container())
+	k.tops = append(k.tops, t)
 }
 
 // OverviewWindow returns the built-in Overview window for hit-testing,

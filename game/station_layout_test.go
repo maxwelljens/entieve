@@ -349,8 +349,8 @@ func TestPlaceDefaultsKeepsUserMoves(t *testing.T) {
 		t.Errorf("virgin market = %v, want the composed %v", got, want)
 	}
 	help := g.help.Win().GetContainer().GetWidget().Rect
-	if want := (1024 - help.Dx()) / 2; help.Min.X != want {
-		t.Errorf("virgin help x = %d, want %d (re-centered for 1024)", help.Min.X, want)
+	if want := max(railClearX(), (1024-help.Dx())/2); help.Min.X != want {
+		t.Errorf("virgin help x = %d, want %d (re-centred for 1024, floored past the rail gutter)", help.Min.X, want)
 	}
 	if help.Min.X == helpBefore.Min.X {
 		t.Errorf("help did not move on resize (still at x=%d)", help.Min.X)

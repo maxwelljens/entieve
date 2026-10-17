@@ -421,3 +421,52 @@ func fireRailClick(t *testing.T, c *chromeUI, b *widget.Button) {
 	})
 	c.Update(t)
 }
+
+// TestDefaultWindowRectsClearTheRailGutter: every default window rect a
+// uikit constructor ships starts right of the rail's gutter — the
+// construction-time Location literals, at the design scale and through
+// the scale funnel (1.5×). These are the rects a host sees before its
+// first placement pass (and what uikit-only integrations render); the
+// game's composed defaults are pinned the same way in
+// game/rail_gutter_test.go.
+func TestDefaultWindowRectsClearTheRailGutter(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		scale float64
+	}{{"scale 1", 1}, {"scale 1.5", 1.5}} {
+		t.Run(tc.name, func(t *testing.T) {
+			uitest.UseScale(t, tc.scale)
+			k, _ := newTestKit(t)
+			env := k.Env()
+			cases := []struct {
+				name string
+				win  *widget.Window
+			}{
+				{"overview", k.OverviewWindow()},
+				{"selected item", k.SelectedWindow()},
+				{"show info", k.InfoWindow()},
+				{"log", NewLog(env).Win()},
+				{"market", NewMarket(env).Win()},
+				{"inventory", NewInventory(env).Win()},
+				{"fitting", NewFitting(env).Win()},
+				{"factory", NewFactory(env).Win()},
+				{"scanner", NewScanner(env).Win()},
+				{"starmap", NewMapView(env).Win()},
+				{"help", NewHelp(env, keyMapRows(8)).Win()},
+				{"settings", NewSettings(env, SettingsActions{}).Win()},
+			}
+			floor := theme.Px(RailInset)
+			for _, c := range cases {
+				r := c.win.GetContainer().GetWidget().Rect
+				if r.Dx() <= 0 || r.Dy() <= 0 {
+					t.Errorf("%s: empty default rect %v", c.name, r)
+					continue
+				}
+				if r.Min.X < floor {
+					t.Errorf("%s default rect = %v, left edge %d starts inside the rail gutter (%d = RailInset through Px)",
+						c.name, r, r.Min.X, floor)
+				}
+			}
+		})
+	}
+}

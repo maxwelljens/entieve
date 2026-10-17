@@ -125,9 +125,11 @@ type Game struct {
 	svcUI  *uikit.Services
 
 	// The left navigation rail (uikit/screens/rail.go): root-overlay
-	// chrome like the HUD and rack, derived from the Screen spec by
-	// railEntries (game/rail.go). railCollapsed is its persisted
-	// settings.json state (missing key = expanded).
+	// chrome like the HUD and rack, but mounted TOP (Kit.AddTopContainer):
+	// it paints above windows and its clicks win over a window dragged
+	// onto its gutter. Derived from the Screen spec by railEntries
+	// (game/rail.go). railCollapsed is its persisted settings.json state
+	// (missing key = expanded).
 	rail          *uikit.Rail
 	railCollapsed bool
 
@@ -775,10 +777,13 @@ func (g *Game) buildKit() error {
 	})
 	// The rail is derived from the spec in one pass (game/rail.go) and
 	// pinned to the left edge, top-flush with the window row below the
-	// top margin. Its collapse state comes back from settings.json on
-	// every rebuild (boot, load, scale change).
+	// top margin. It mounts as TOP chrome (AddTopContainer): above every
+	// window in paint and input, under the context menu — its left
+	// gutter (uikit.RailInset) is what every default window keeps clear.
+	// Its collapse state comes back from settings.json on every rebuild
+	// (boot, load, scale change).
 	g.rail = uikit.NewRail(env, railEntries(g))
-	kit.AddContainer(g.rail.Container(), widget.AnchorLayoutData{
+	kit.AddTopContainer(g.rail, widget.AnchorLayoutData{
 		HorizontalPosition: widget.AnchorLayoutPositionStart,
 		VerticalPosition:   widget.AnchorLayoutPositionStart,
 		Padding:            &widget.Insets{Top: theme.Px(uikit.RailTopInset)},

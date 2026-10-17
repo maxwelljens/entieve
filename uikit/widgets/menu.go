@@ -287,7 +287,7 @@ var pressEdge = func(b ebiten.MouseButton) bool {
 	return inpututil.IsMouseButtonJustPressed(b)
 }
 
-// SetPressEdgeForTest overrides the menu's press-edge poll for a headless
+// SetPressEdgeForTest overrides the raw press-edge poll for a headless
 // test and returns a restore func. Test-only seam: never call it from
 // production code. Cursor position has its own seam, SetPollCursorForTest.
 func SetPressEdgeForTest(f func(ebiten.MouseButton) bool) func() {
@@ -295,6 +295,12 @@ func SetPressEdgeForTest(f func(ebiten.MouseButton) bool) func() {
 	pressEdge = f
 	return func() { pressEdge = prev }
 }
+
+// PressEdge reports this frame's raw press edge for b through the seam
+// above — the same edge Menu.Poll dispatches on, so one scripted click
+// drives the popup and the kit's window raise alike (production: raw
+// ebiten inpututil, never ebitenui's cached input).
+func PressEdge(b ebiten.MouseButton) bool { return pressEdge(b) }
 
 // pollCursor is the menu's cursor read: live off ebiten, NOT ebitenui's
 // input.CursorPosition() — that one is a cache refreshed only inside
@@ -313,6 +319,11 @@ func SetPollCursorForTest(f func() (int, int)) func() {
 	pollCursor = f
 	return func() { pollCursor = prev }
 }
+
+// PollCursor reads the live cursor through the seam above (production:
+// raw ebiten.CursorPosition — the same position Menu.Poll and the kit's
+// window raise must agree on; ebitenui's cache is stale by design).
+func PollCursor() (int, int) { return pollCursor() }
 
 // Poll runs one frame of menu input: hover from the live cursor, then
 // Esc and the mouse buttons (any press dismisses; a press on an enabled

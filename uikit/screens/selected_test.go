@@ -201,20 +201,23 @@ func TestSelectedLayoutDegenerate(t *testing.T) {
 func TestSelectedLayoutPinnedRects(t *testing.T) {
 	_, sp, _ := pumpSelected(t, 1024, 700, false, true)
 	got := selectedRects(sp)
+	// The default window rect starts clear of the rail gutter
+	// (8+uikit.RailInset), so every screen-space x below carries the
+	// same +RailInset the window itself does.
 	want := []image.Rectangle{
-		image.Rect(13, 485, 453, 519),  // name (icon + label row)
-		image.Rect(13, 524, 453, 543),  // dist
-		image.Rect(13, 548, 149, 580),  // Approach
-		image.Rect(154, 548, 253, 580), // Warp
-		image.Rect(258, 548, 355, 580), // Orbit
-		image.Rect(360, 548, 453, 580), // Stop
-		image.Rect(13, 585, 95, 617),   // Lock
-		image.Rect(100, 585, 185, 617), // Dock
-		image.Rect(190, 585, 279, 617), // Jump
-		image.Rect(284, 585, 364, 617), // Loot
-		image.Rect(369, 585, 453, 617), // Mine
-		image.Rect(13, 622, 453, 654),  // Orbit range selector
-		image.Rect(13, 659, 453, 691),  // Warp to within selector
+		image.Rect(13+RailInset, 485, 453+RailInset, 519),  // name (icon + label row)
+		image.Rect(13+RailInset, 524, 453+RailInset, 543),  // dist
+		image.Rect(13+RailInset, 548, 149+RailInset, 580),  // Approach
+		image.Rect(154+RailInset, 548, 253+RailInset, 580), // Warp
+		image.Rect(258+RailInset, 548, 355+RailInset, 580), // Orbit
+		image.Rect(360+RailInset, 548, 453+RailInset, 580), // Stop
+		image.Rect(13+RailInset, 585, 95+RailInset, 617),   // Lock
+		image.Rect(100+RailInset, 585, 185+RailInset, 617), // Dock
+		image.Rect(190+RailInset, 585, 279+RailInset, 617), // Jump
+		image.Rect(284+RailInset, 585, 364+RailInset, 617), // Loot
+		image.Rect(369+RailInset, 585, 453+RailInset, 617), // Mine
+		image.Rect(13+RailInset, 622, 453+RailInset, 654),  // Orbit range selector
+		image.Rect(13+RailInset, 659, 453+RailInset, 691),  // Warp to within selector
 	}
 	assertRectsEqual(t, "1024x700", got, want)
 

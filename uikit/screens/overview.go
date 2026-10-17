@@ -42,23 +42,73 @@ type overview struct {
 // the kit never used).
 func (k *Kit) Env() Session { return k.sess }
 
+// kitMount is one mounted window: its place in the stack (bottom →
+// top) and the remove func that detaches it — chrome registry, stack
+// entry and ebitenui window in one call. The same closure is what
+// AddWindow returns to the host, so a host unmount and a raise both
+// leave identical state behind.
+type kitMount struct {
+	win    *widget.Window
+	remove widget.RemoveWindowFunc
+}
+
 // AddWindow mounts an extra window on the kit's UI so it shares the
 // kit's theme, stacking and input pump. Every mounted window gets the
 // four-edge resize chrome here (the registry is the kit's: see
-// Kit.chromes), and the returned func closes the window again —
-// detaching its chrome, so an unmounted window stops being pumped and a
-// drag interrupted by the unmount leaves no rect or cursor state behind.
+// Kit.chromes), joins the kit's stack order (Kit.stack — the raise's
+// hit-test reads it; ebitenui's own relayering is switched off for kit
+// windows so remove + re-mount stays the single top-of-stack path), and
+// the returned func closes the window again — detaching its chrome, so
+// an unmounted window stops being pumped and a drag interrupted by the
+// unmount leaves no rect or cursor state behind. Mounting a window that
+// is already mounted is a no-op that returns the same detach.
 func (k *Kit) AddWindow(w *widget.Window) widget.RemoveWindowFunc {
 	if _, ok := k.chromes[w]; !ok {
 		k.chromes[w] = &winChrome{win: w}
 	}
+	if m, ok := k.mountOf(w); ok {
+		return m.remove
+	}
+	// ebitenui would re-top a window when its container sees a press —
+	// but a body widget's scroll viewport claims the input layer over
+	// the container, so that relayering only ever fires on the title
+	// bar, and it would reorder ebitenui's stack behind the kit's back.
+	// The kit's own raise (remove + re-mount, exactly what ShowInfo
+	// does) is the one deterministic path; the built-in one stays off.
+	w.DisableRelayering = true
 	remove := k.ui.AddWindow(w)
-	return func() {
+	m := &kitMount{win: w}
+	m.remove = func() {
 		if ch, ok := k.chromes[w]; ok {
 			ch.cancel() // mid-drag unmount: drop the grip state first
 			delete(k.chromes, w)
 		}
+		k.unstack(w)
 		remove()
+	}
+	k.stack = append(k.stack, m)
+	return m.remove
+}
+
+// mountOf finds win's stack entry (false = not mounted on this kit).
+func (k *Kit) mountOf(w *widget.Window) (*kitMount, bool) {
+	for _, m := range k.stack {
+		if m.win == w {
+			return m, true
+		}
+	}
+	return nil, false
+}
+
+// unstack drops win's stack entry (identity match — a stale remove
+// closure must never remove a re-mounted window's live entry, so the
+// entry is matched by window, not by closure).
+func (k *Kit) unstack(w *widget.Window) {
+	for i, m := range k.stack {
+		if m.win == w {
+			k.stack = append(k.stack[:i], k.stack[i+1:]...)
+			return
+		}
 	}
 }
 
@@ -121,7 +171,10 @@ func (k *Kit) buildOverview() {
 		// not widget.WindowOpts.Resizeable() — that one only stretches
 		// the bottom/right corner. Kit.AddWindow attaches the chrome.
 		widget.WindowOpts.MinSize(theme.Px(320), theme.Px(240)),
-		widget.WindowOpts.Location(image.Rect(theme.Px(8), theme.Px(8), theme.Px(388), theme.Px(428))),
+		// The default clears the rail's left gutter (RailInset) at the
+		// construction scale; the game re-anchors it the same way
+		// (placeDefaults reads the same constant).
+		widget.WindowOpts.Location(image.Rect(theme.Px(8+RailInset), theme.Px(8), theme.Px(388+RailInset), theme.Px(428))),
 	)
 }
 
