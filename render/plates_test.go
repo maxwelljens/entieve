@@ -114,8 +114,9 @@ func TestPlateProbeCommitsDrawPath(t *testing.T) {
 }
 
 // TestStarLayerTilePlateOrProcedural: layer mapping through the draw path —
-// the -01 plate serves layer 1, and both the layers and the systems without
-// a plate keep the untouched procedural tile (pixel-identical fallback).
+// the -01 plate serves layer 1, layers inside the set without a plate draw
+// nothing (the resolved set is the sky), and systems with no plates keep the
+// untouched procedural starfield (pixel-identical fallback).
 func TestStarLayerTilePlateOrProcedural(t *testing.T) {
 	dir := t.TempDir()
 	// Only the layer-1 plate exists for this system.
@@ -134,12 +135,8 @@ func TestStarLayerTilePlateOrProcedural(t *testing.T) {
 		t.Errorf("plate tile = %vx%v, want 48x24", tw, th)
 	}
 	for _, layer := range []int{0, 2} {
-		img, tw, th := r.starLayerTile(seed, layer, sys)
-		if img != r.starTile(seed, layer) {
-			t.Errorf("layer %d without a plate must keep the procedural tile", layer)
-		}
-		if tw != starTileSize || th != starTileSize {
-			t.Errorf("procedural tile = %vx%v, want %dx%d", tw, th, starTileSize, starTileSize)
+		if img, _, _ := r.starLayerTile(seed, layer, sys); img != nil {
+			t.Errorf("layer %d inside a plate set must draw nothing", layer)
 		}
 	}
 

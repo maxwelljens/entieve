@@ -189,14 +189,32 @@ func (r *Renderer) plate(layer int, sys *content.SystemDef) *bgPlate {
 }
 
 // starLayerTile selects what one starfield layer draws and at what native
-// tile size: the system's plate when it has that layer (sky plates are the
-// backdrop's job), otherwise the cached procedural tile.
+// tile size: the resolved plate when the layer ships one (sky plates are the
+// backdrop's job), otherwise the cached procedural tile — but only when the
+// system has no star plates at all. A resolved star-plate set IS the sky:
+// layers without a plate draw nothing, so no stock procedural dots bleed
+// through next to author art. Returns nil when the layer draws nothing.
 func (r *Renderer) starLayerTile(seed uint64, layer int, sys *content.SystemDef) (*ebiten.Image, float64, float64) {
 	if pl := r.plate(layer, sys); pl != nil && !pl.sky {
 		b := pl.img.Bounds()
 		return pl.img, float64(b.Dx()), float64(b.Dy())
 	}
+	if r.plateStarSet(sys) {
+		return nil, 0, 0
+	}
 	return r.starTile(seed, layer), starTileSize, starTileSize
+}
+
+// plateStarSet reports whether any starfield layer resolves to a
+// star-classified plate (per-system override or shared default) for this
+// system — the "the plates are the sky" trigger.
+func (r *Renderer) plateStarSet(sys *content.SystemDef) bool {
+	for l := 0; l < 3; l++ {
+		if pl := r.plate(l, sys); pl != nil && !pl.sky {
+			return true
+		}
+	}
+	return false
 }
 
 // ---------------------------------------------------------------------------
@@ -412,10 +430,11 @@ func (r *Renderer) drawNebula(dst *ebiten.Image, cam Camera, sys *content.System
 }
 
 // drawStarfield paints three parallax layers. A layer with a drop-in plate
-// for the current system draws that plate at its native size on the same
-// camera-parallax wrap and at the same rate as the procedural layer it
-// replaces; a layer without one draws the untouched procedural tile, so
-// systems with no plates render byte-identically to the stock game.
+// (per-system override or the shared default) draws that plate at its native
+// size on the same camera-parallax wrap and rate as the procedural layer it
+// replaces. The resolved star-plate set is the sky: layers without a plate
+// draw nothing once any star plate exists — only a system with no plates at
+// all renders the untouched stock procedural starfield, byte-identically.
 // shortcut: plates tile 1:1 (the shipped plates measure seam-clean at the
 // edges), art whose opposite edges don't match will show the seam — switch
 // such a plate to a screen-anchored clamped draw when it lands.
@@ -428,6 +447,9 @@ func (r *Renderer) drawStarfield(dst *ebiten.Image, cam Camera, sys *content.Sys
 	op := &ebiten.DrawImageOptions{}
 	for layer := 0; layer < 3; layer++ {
 		tile, tw, th := r.starLayerTile(seed, layer, sys)
+		if tile == nil {
+			continue // plate set is the sky: this layer draws nothing
+		}
 		f := factors[layer]
 		ox := math.Mod(cam.Center.X*cam.Zoom*f, tw)
 		oy := math.Mod(cam.Center.Y*cam.Zoom*f, th)

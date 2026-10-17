@@ -48,8 +48,10 @@ directories are ignored.
   `default-01.png` / `default-02.png`, which serve every system. Each plate
   replaces the procedural star layer of the same number: it draws at its
   native size on that layer's camera-parallax rate and wrap, over the nebula
-  washes; with neither override nor default for a layer, the stock
-  procedural starfield draws untouched.
+  washes. **The resolved star-plate set is the sky** — layers without a plate
+  draw nothing once any star plate resolves, so no stock procedural dots
+  bleed through next to author art; only a system with no plates at all keeps
+  the untouched procedural starfield.
 - **Give plate skies real transparency** (dots opaque, sky transparent) and
   author them to tile edge-to-edge: each plate is pixel-probed once at load
   and a transparent sky commits it to its starfield layer, while an

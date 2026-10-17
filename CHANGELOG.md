@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   serving every system; each plate replaces the procedural star layer of the
   same number and rides the same camera-parallax wrap and rate; systems with
   neither override nor default draw the untouched procedural starfield,
-  byte-identical to before. Every plate
+  byte-identical to before. The resolved star-plate set is the sky: layers
+  without a plate draw nothing once art exists — no leftover procedural dots. Every plate
   is pixel-probed once at load: a transparent sky commits it to its starfield
   layer (over the nebula washes), an opaque-black sky draws it as the bottom
   layer under them. Plates are decoded for the current system only and
