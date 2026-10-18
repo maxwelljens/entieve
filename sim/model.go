@@ -495,6 +495,27 @@ type (
 		Qty  int
 	}
 
+	// CmdPlaceOrder posts a standing limit order (a bid, side buy, or an
+	// ask, side sell) on the docked station's book — the station the
+	// market window shows, exactly like CmdBuy/CmdSell. It crosses every
+	// resting order it can first (at the resting orders' prices); only the
+	// unfilled remainder rests, and it rests until filled or cancelled (no
+	// expiry, partial fills accumulate). A player bid escrows price×qty
+	// plus the 3% broker fee from the wallet; a player ask escrows the
+	// goods. ANY positive price is legal — no clamp (the broker fee is the
+	// anti-spam). Rejections are SevWarning log lines.
+	CmdPlaceOrder struct {
+		Item  content.ItemID
+		Side  OrderSide
+		Price float64
+		Qty   int
+	}
+
+	// CmdCancelOrder cancels one of the player's resting orders on the
+	// docked station's book by its arrival id, refunding the unspent
+	// escrow (the placement broker fee is kept).
+	CmdCancelOrder struct{ ID uint64 }
+
 	// CmdRefine refines ore into minerals at a station.
 	CmdRefine struct {
 		Item content.ItemID
@@ -576,6 +597,8 @@ func (CmdUndock) isCommand()         {}
 func (CmdJump) isCommand()           {}
 func (CmdBuy) isCommand()            {}
 func (CmdSell) isCommand()           {}
+func (CmdPlaceOrder) isCommand()     {}
+func (CmdCancelOrder) isCommand()    {}
 func (CmdRefine) isCommand()         {}
 func (CmdRepair) isCommand()         {}
 func (CmdAssemble) isCommand()       {}

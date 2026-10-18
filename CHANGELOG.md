@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Player standing market orders** (`sim/model.go`, `sim/command.go`,
+  `sim/system_economy.go`, `uikit/widgets/intents.go`,
+  `uikit/screens/market.go`): the market window now posts, lists and
+  cancels *both* sides of the auction — a Bid (buy) or Ask (sell) limit
+  order rests on the docked station's book until filled or cancelled,
+  partial fills accumulating on the one order (no expiry). New commands
+  `CmdPlaceOrder{Item, Side, Price, Qty}` (the station is the docked one,
+  exactly like `CmdBuy`/`CmdSell` — station-local reach) and
+  `CmdCancelOrder{ID}` dispatch to the engine's existing
+  `PlaceOrder`/`CancelOrder` with `owner=OwnerPlayer`: strict SevWarning
+  refusals, a 20-slot open-order cap (universe-wide) and **no price
+  clamp** — any positive price is legal, the non-refundable 3% broker fee
+  is the anti-spam. Fees keep the engine's rule (broker fee at placement,
+  kept on cancel; 2.5% sales tax on executed sells). Resting orders —
+  player-owned ones alike — already rode the v2 market persistence, so no
+  save-schema change. The window gains a Place order panel (Bid/Ask toggle,
+  price stepper, the toolbar quantity) and a My orders list (this station's
+  player orders, Cancel per row). CONTEXT.md gains Bid / Ask / Open order.
+
 ### Changed
 
 - **Scrollbars sit in a reserved gutter beside their content; furniture
