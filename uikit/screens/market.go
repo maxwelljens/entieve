@@ -24,10 +24,10 @@ const (
 	// scrollbar every table now carries.
 	mktBarSteps = widgets.RailSteps
 
-	// mktSideW is the standing-order column's width in design px: the
-	// Place order panel over the My orders list, beside the book (which
-	// keeps the height it always had). Composed market windows are >=560 px
-	// wide, leaving the book >=350 px of columns at the 1024 minimum.
+	// mktSideW is the standing-order column's width in design px: the My
+	// orders list beside the book (which keeps the height it always had).
+	// Composed market windows are >=560 px wide, leaving the book >=350 px
+	// of columns at the 1024 minimum.
 	mktSideW = 240
 
 	// mineMaxRows caps the My orders rows drawn before a "+N more" note:
@@ -60,11 +60,11 @@ func setStepperValue(bar *widget.Container, lbl *widget.Text, s string) {
 // and the fee schedule. Trade is only possible while the player is docked,
 // so both buttons are disabled in space.
 //
-// Beside the book sits the standing-order column: a Place order panel (a
-// Bid/Ask side toggle, a price stepper and the Place button, at the
-// toolbar's quantity) and My orders — only THIS station's player orders,
-// each with a Cancel button. Both act on the docked book, exactly like
-// Buy/Sell.
+// Beside the book sits the standing-order column: My orders — only THIS
+// station's player orders, each with a Cancel button. It acts on the
+// docked book, exactly like Buy/Sell. Posting a new standing order is the
+// typed order mini-window's job (OrderWin, launched from an item's
+// context menu), not a panel here.
 type Market struct {
 	th  theme.Theme
 	cv  widgets.ContentView
@@ -81,22 +81,11 @@ type Market struct {
 	minus    *widget.Button
 	plus     *widget.Button
 
-	// Standing orders: the Place order panel over the My orders list.
-	placePanel *widget.Container // side toggle + price stepper + Place
-	sideBtn    *widget.Button    // flips the standing side (Bid/Ask)
-	placeBtn   *widget.Button
-	priceRow   *widget.Container // price stepper row: relaid on readout change
-	priceLbl   *widget.Text
-	pMinus     *widget.Button
-	pPlus      *widget.Button
-	mineLbl    *widget.Text
-	mineBox    *widget.Container // the station's player orders, as rich rows
-	mineRows   []*widgets.StackRow
-	mineKey    string // change signature of the My orders rows
-
-	side      sim.OrderSide
-	price     float64
-	priceItem content.ItemID // item the price was last seeded from
+	// My orders: the station's player orders as rich rows.
+	mineLbl  *widget.Text
+	mineBox  *widget.Container // the station's player orders, as rich rows
+	mineRows []*widgets.StackRow
+	mineKey  string // change signature of the My orders rows
 
 	qtyIdx int
 	sel    content.ItemID
@@ -221,53 +210,6 @@ func NewMarket(env widgets.Seams) *Market {
 	)
 	m.qtyBar.AddChild(m.minus, m.qtyLabel, m.plus, m.buy, m.sell)
 
-	// Place-order panel: a side toggle (Bid/Ask), a price stepper and the
-	// Place button. The quantity comes from the toolbar stepper above —
-	// the same "Qty" value the immediate Buy/Sell use, so the market has
-	// one quantity control. Own container, so the price readout's relayout
-	// never disturbs the book or the toolbar.
-	newSmallBtn := func(label string, clicked func()) *widget.Button {
-		return widget.NewButton(
-			widget.ButtonOpts.TextLabel(label),
-			widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(40), theme.Px(40))),
-			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
-		)
-	}
-	m.side = sim.OrderBuy
-	m.sideBtn = newBtn(sideLabel(m.side), m.toggleSide)
-	m.placeBtn = newBtn("Place", m.placeClicked)
-	m.pMinus = newSmallBtn("-", func() { m.stepPrice(-1) })
-	m.pPlus = newSmallBtn("+", func() { m.stepPrice(1) })
-	m.priceLbl = widget.NewText(
-		widget.TextOpts.Text(theme.FormatCredits(0), env.FaceMono(theme.StepSmall), theme.Solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-			Stretch:  true,
-			Position: widget.RowLayoutPositionCenter,
-		})),
-	)
-	m.priceRow = widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
-		)),
-	)
-	m.priceRow.AddChild(m.pMinus, m.priceLbl, m.pPlus)
-	placeTop := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
-		)),
-	)
-	placeTop.AddChild(m.sideBtn, m.placeBtn)
-	m.placePanel = widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Columns(1),
-			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, false}),
-			widget.GridLayoutOpts.Spacing(0, theme.Px(theme.ContentsPad)),
-		)),
-	)
-	m.placePanel.AddChild(placeTop, m.priceRow)
-
 	// The book row: the order table — widgets.Table owns its scroll
 	// viewport, its wheel wiring AND the scrollbar rail beside it (the
 	// reserved-gutter chrome, ScrollGutter design px: the handle can never
@@ -299,12 +241,12 @@ func NewMarket(env widgets.Seams) *Market {
 	side := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
-			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, false, true}),
+			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, true}),
 			widget.GridLayoutOpts.Spacing(0, theme.Px(theme.ContentsPad)),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(mktSideW), 0)),
 	)
-	side.AddChild(m.placePanel, m.mineLbl, m.mineBox)
+	side.AddChild(m.mineLbl, m.mineBox)
 
 	// The standing-order column sits beside the toolbar-and-book column,
 	// spanning the full body height (so the My orders list gets the room
@@ -425,6 +367,10 @@ func (m *Market) Sync() {
 				Actions: []widgets.RowAction{
 					{Label: "Buy", Disabled: gated, Intent: widgets.Buy{Item: item, Qty: m.qty()}},
 					{Label: "Sell", Disabled: gated, Intent: widgets.Sell{Item: item, Qty: m.qty()}},
+					{Label: "Sell on Market", Disabled: gated,
+						Intent: widgets.OpenOrder{Item: item, Side: sim.OrderSell, Qty: m.cv.PlayerStock(item)}},
+					{Label: "Request on Market", Disabled: gated,
+						Intent: widgets.OpenOrder{Item: item, Side: sim.OrderBuy, Qty: 1}},
 				},
 			},
 		})
@@ -444,16 +390,6 @@ func (m *Market) Sync() {
 	}
 
 	setStepperValue(m.qtyBar, m.qtyLabel, "Qty "+theme.FormatInt(int64(m.qty())))
-
-	// Place-order panel: seed the price from the selected item's displayed
-	// price when the selection changes (a fresh quote to undercut or
-	// overcut), then refresh the readouts and the gate.
-	if m.hasSel && m.sel != m.priceItem {
-		m.priceItem = m.sel
-		m.price = m.cv.MarketPrice(m.cv.DockedMarket(), m.sel)
-	}
-	setStepperValue(m.priceRow, m.priceLbl, theme.FormatCredits(m.price))
-	m.placeBtn.GetWidget().Disabled = gated || !m.hasSel || m.price <= 0
 
 	// The station's own standing orders (rebuilt only when they move).
 	m.syncMine(gated)
@@ -621,51 +557,6 @@ func mineKey(orders []sim.MarketStock, gated bool) string {
 		b.WriteByte(';')
 	}
 	return b.String()
-}
-
-// stepPrice moves the standing order's price one tick at its current
-// magnitude (never to zero or below). The sim quantizes the price onto the
-// same tick grid at placement, so what the readout shows is what rests.
-func (m *Market) stepPrice(delta int) {
-	step := sim.TickStep(m.price)
-	if step <= 0 {
-		step = 0.01 // no seed price yet: the smallest tick
-	}
-	p := m.price + float64(delta)*step
-	if p < step {
-		p = step
-	}
-	m.price = p
-	setStepperValue(m.priceRow, m.priceLbl, theme.FormatCredits(m.price))
-}
-
-// toggleSide flips the standing order's side between bid and ask.
-func (m *Market) toggleSide() {
-	if m.side == sim.OrderBuy {
-		m.side = sim.OrderSell
-	} else {
-		m.side = sim.OrderBuy
-	}
-	m.sideBtn.SetText(sideLabel(m.side))
-}
-
-// sideLabel is a standing-order side's display name: EVE's bid (buy) and
-// ask (sell).
-func sideLabel(s sim.OrderSide) string {
-	if s == sim.OrderSell {
-		return "Ask"
-	}
-	return "Bid"
-}
-
-// placeClicked posts the standing order the panel describes: the selected
-// item, the panel's side and price, the toolbar's quantity. Guarded even
-// when called directly (the market buttons' rule).
-func (m *Market) placeClicked() {
-	if !m.docked() || !m.hasSel || m.price <= 0 {
-		return
-	}
-	m.as.Do(widgets.PlaceOrder{Item: m.sel, Side: m.side, Price: m.price, Qty: m.qty()})
 }
 
 // itemLabel resolves a market/hangar ID to a display name (items, ships

@@ -40,9 +40,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is the anti-spam. Fees keep the engine's rule (broker fee at placement,
   kept on cancel; 2.5% sales tax on executed sells). Resting orders —
   player-owned ones alike — already rode the v2 market persistence, so no
-  save-schema change. The window gains a Place order panel (Bid/Ask toggle,
-  price stepper, the toolbar quantity) and a My orders list (this station's
-  player orders, Cancel per row). CONTEXT.md gains Bid / Ask / Open order.
+  save-schema change. The window gains a My orders list (this station's
+  player orders, Cancel per row) and a Place order panel that the typed
+  mini-window entry below supersedes in the same cycle. CONTEXT.md gains
+  Bid / Ask / Open order.
+
+- **Typed market-order mini-window launched from item context menus**
+  (`uikit/screens/orderwin.go`, `uikit/screens/kit.go`,
+  `uikit/widgets/intents.go`, `uikit/screens/{inventory,market}.go`,
+  `game/game.go`): inventory stacks (cargo, ore hold and station hangar)
+  and market book rows now offer **Sell on Market** / **Request on Market**
+  in their right-click menus (grayed, never hidden, while undocked). Either
+  opens one small draggable **&lt;name&gt; — Order** window, Show-Info-style — a
+  second launch re-targets the single instance and raises it. Price and
+  quantity are typed `TextInput` fields (no steppers): plain decimals, a
+  live `theme.FormatCredits` preview, Accept armed only while the price is
+  finite and > 0 and the quantity an integer ≥ 1. The mode toggle
+  Sell ↔ Request re-applies its default price (Sell = best bid + 1 €,
+  Request = best ask − 1 €, an empty side = the item's base price) and its
+  default quantity (the clicked stack / 1). Accept emits the existing
+  `PlaceOrder` intent; Cancel and the chrome × close without effect. The
+  engine keeps every authority (escrow, 3% broker fee, oversell, the
+  20-order cap) and answers with its own SevWarning lines. The window is
+  transient: its rect is not written to the layout sidecar, it opens
+  centred, and it closes on undock/jump. While a field holds focus the
+  game's world hotkeys yield (typing "s" never stops the ship; Esc clears
+  the focus first).
 
 - **Ten named manufacturing corporations, with original emblems**
   (`content/corps.go`, `content/data/**`, `content/validate.go`,
@@ -69,6 +92,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shared white-alpha PNG pipeline and tints per palette role.
 
 ### Changed
+
+- **Market window's Place order panel removed; posting moves to the item
+  menu's order mini-window** (`uikit/screens/market.go`,
+  `uikit/screens/orderwin.go`): the Bid/Ask side toggle, price stepper and
+  Place button are gone (no stepper survives anywhere in the posting
+  flow). The market keeps its immediate Buy/Sell (with the Qty stepper),
+  the order book with its scroll rail, and the My orders list with a
+  Cancel per row; its side column now belongs to My orders alone. Posting
+  is the typed order mini-window, opened from a row's **Sell on Market** /
+  **Request on Market** entries (and from inventory stacks, full stack).
+  `market_orders_test` and the row-menu wiring pins were re-targeted.
 
 - **Navigation rail buttons restored to full width; window padding and
   table-header air widened** (`uikit/screens/rail.go`,

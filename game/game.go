@@ -418,6 +418,10 @@ func (g *Game) Update() error {
 // overlays (N map, H help — their rows are Modal, i.e. scene-owned), the
 // panel toggles the Screen spec declares and, while no overlay scene is
 // on top, the world action keys.
+//
+// While the order mini-window has a focused price/qty field, the keys are
+// the field's: every hotkey yields so typing into it never fires a world
+// action (Esc clears the focus first — closing needs Cancel / the ×).
 func (g *Game) handleKeys(in Input) error {
 	ctrl := held(in.KeysDown, ebiten.KeyControl)
 	shift := held(in.KeysDown, ebiten.KeyShift)
@@ -427,8 +431,15 @@ func (g *Game) handleKeys(in Input) error {
 	case *SpaceScene, *StationScene:
 		world = true
 	}
+	typing := g.kit.OrderTyping()
 
 	for _, k := range in.JustPressed {
+		if typing {
+			if k == ebiten.KeyEscape {
+				g.kit.BlurOrder()
+			}
+			continue
+		}
 		switch {
 		case k == ebiten.KeyEscape:
 			// A context menu that was up this frame consumed the Esc
@@ -572,6 +583,13 @@ func (g *Game) syncMounts() {
 	if docked {
 		g.syncStationBoard()
 	}
+
+	// The order mini-window is transient and docked-only: a player who
+	// leaves the station has no book to post to, so it closes with the
+	// dock (undock and jump — a jump implies undocked — both land here).
+	if !docked {
+		g.kit.CloseOrder()
+	}
 }
 
 // setChromeVisible shows or hides the space chrome (HUD + module rack) on
@@ -664,6 +682,11 @@ func (g *Game) overUI(x, y float64) bool {
 	// it is up: closed it is unmounted AND hidden, and a hidden widget
 	// keeps its last rect (hitWidget checks visibility).
 	if hitWidget(pt, g.kit.InfoWindow().GetContainer().GetWidget()) {
+		return true
+	}
+	// The order mini-window is a normal (non-modal) window too: it gates
+	// the world while it is up (closed it is unmounted and hidden).
+	if ow := g.kit.OrderWindow(); ow != nil && hitWidget(pt, ow.GetContainer().GetWidget()) {
 		return true
 	}
 	if g.hud != nil && isVisible(g.hud.Container().GetWidget()) {
@@ -879,6 +902,14 @@ func (g *Game) placeDefaults(w, h int) {
 	// special, not a Screen row — see layoutTarget.
 	if r := g.kit.InfoWindow().GetContainer().GetWidget().Rect; r.Dx() > 0 && r.Dy() > 0 {
 		place(g.kit.InfoWindow(), centerRect(r.Dx(), r.Dy(), w, h))
+	}
+	// The order mini-window floats too: centred on first use. It is a
+	// transient dialog with no sidecar rect (never persisted), and
+	// placeIfVirgin still refuses to stomp a dragged position.
+	if ow := g.kit.OrderWindow(); ow != nil {
+		if r := ow.GetContainer().GetWidget().Rect; r.Dx() > 0 && r.Dy() > 0 {
+			place(ow, centerRect(r.Dx(), r.Dy(), w, h))
+		}
 	}
 	// Docked set: the services view's left column (content height — the
 	// board hugs it) and the service trio composed for this viewport

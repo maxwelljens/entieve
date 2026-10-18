@@ -86,6 +86,7 @@ func TestCommandForSkipsHostIntents(t *testing.T) {
 	host := []Intent{
 		ShowInfo{Ref: ItemRef("charge-emp")},
 		OpenMenu{At: image.Pt(1, 2)},
+		OpenOrder{Item: "charge-emp", Side: sim.OrderSell, Qty: 1},
 		Toggle{Screen: "Market"},
 		Save{}, Load{}, Quit{},
 	}

@@ -29,9 +29,10 @@ func TestMarketRowMenu(t *testing.T) {
 	}
 	wantItem := m.tbl.Rows[0].Data.(content.ItemID)
 
-	// Undocked: Buy/Sell visible but disabled.
+	// Undocked: the trade verbs and the two order-window launches are
+	// visible but disabled.
 	rightClickRow(t, ui, m.tbl, 0)
-	for _, label := range []string{"Show Info", "Buy", "Sell"} {
+	for _, label := range []string{"Show Info", "Buy", "Sell", "Sell on Market", "Request on Market"} {
 		if e := entry(t, env, label); label == "Show Info" {
 			if !e.Bold || e.Disabled {
 				t.Errorf("Show Info = %+v, want bold and enabled", e)
@@ -46,19 +47,28 @@ func TestMarketRowMenu(t *testing.T) {
 	}
 
 	// The declared data behind that menu: the row's RowSpec carries
-	// Buy/Sell gated from the same docked state, targeting this row's
-	// item — no click-time selection side effect.
+	// Buy/Sell plus the two order-window launches, gated from the same
+	// docked state, targeting this row's item — no click-time selection
+	// side effect.
 	spec := m.tbl.Rows[0].Spec
 	if ref, ok := env.InfoRefOf(wantItem); !ok || spec.Ref == nil || *spec.Ref != ref {
 		t.Fatalf("row Ref = %v (%v), want the row item's ref for %s", spec.Ref, ok, wantItem)
 	}
-	if len(spec.Actions) != 2 {
-		t.Fatalf("row actions = %+v, want Buy and Sell", spec.Actions)
+	wantLabels := []string{"Buy", "Sell", "Sell on Market", "Request on Market"}
+	if len(spec.Actions) != len(wantLabels) {
+		t.Fatalf("row actions = %+v, want %v", spec.Actions, wantLabels)
 	}
-	for i, want := range []string{"Buy", "Sell"} {
+	for i, want := range wantLabels {
 		if got := spec.Actions[i]; got.Label != want || !got.Disabled {
 			t.Errorf("action %d = %+v, want %s grayed while undocked", i, got, want)
 		}
+	}
+	// The two launches carry the row item and the right side.
+	if a := spec.Actions[2]; a.Intent != (widgets.OpenOrder{Item: wantItem, Side: sim.OrderSell, Qty: env.Sim.PlayerStock(wantItem)}) {
+		t.Errorf("Sell on Market intent = %#v, want OpenOrder{sell %s}", a.Intent, wantItem)
+	}
+	if a := spec.Actions[3]; a.Intent != (widgets.OpenOrder{Item: wantItem, Side: sim.OrderBuy, Qty: 1}) {
+		t.Errorf("Request on Market intent = %#v, want OpenOrder{buy %s qty 1}", a.Intent, wantItem)
 	}
 
 	// Docked: the same menu, now armed — data and entries agree.
@@ -72,6 +82,9 @@ func TestMarketRowMenu(t *testing.T) {
 	rightClickRow(t, ui, m.tbl, 0)
 	if e := entry(t, env, "Buy"); e.Disabled {
 		t.Fatal("Buy still disabled while docked")
+	}
+	if e := entry(t, env, "Request on Market"); e.Disabled {
+		t.Fatal("Request on Market still disabled while docked")
 	}
 	pressMenuEntry(t, env, "Buy")
 	if env.Menu().IsOpen() {
@@ -214,10 +227,11 @@ func TestOverviewEntityMenu(t *testing.T) {
 }
 
 // TestInventoryAndFittingMenus: the inventory's rows declare Show Info
-// only (one-entry menu, double-click swap); a fitting slot row declares
-// Show Info plus Fit/Unefit gated on that row — the menu's actions carry
-// the clicked row's payload, so Unefit arms for a filled slot and Fit
-// does not.
+// plus the full-stack "Sell on Market" launch (grayed, never hidden, while
+// undocked — orders rest on the docked station's book); a fitting slot row
+// declares Show Info plus Fit/Unefit gated on that row — the menu's
+// actions carry the clicked row's payload, so Unefit arms for a filled slot
+// and Fit does not.
 func TestInventoryAndFittingMenus(t *testing.T) {
 	env, cmds := newTestEnv(t)
 
@@ -228,10 +242,23 @@ func TestInventoryAndFittingMenus(t *testing.T) {
 	if len(inv.cargo.Rows) == 0 {
 		t.Fatal("fixture: empty cargo")
 	}
+	cargo, hasCargo := env.Cargo(env.Sim.Player())
+	stackQty := 0
+	if hasCargo && len(cargo.Stacks) > 0 {
+		stackQty = cargo.Stacks[0].Qty
+	}
 	rightClickRow(t, uiInv, inv.cargo, 0)
 	ents := env.Menu().Entries()
-	if len(ents) != 1 || ents[0].Label != "Show Info" || !ents[0].Bold {
-		t.Fatalf("inventory menu = %+v, want the single Show Info entry", ents)
+	if len(ents) != 3 || ents[0].Label != "Show Info" || !ents[0].Bold || !ents[1].Sep {
+		t.Fatalf("inventory menu = %+v, want Show Info / sep / Sell on Market", ents)
+	}
+	if e := entry(t, env, "Sell on Market"); !e.Disabled {
+		t.Error("Sell on Market enabled while undocked")
+	}
+	// The declared launch carries the clicked stack's item and quantity.
+	if got := inv.cargo.Rows[0].Spec.Actions[0].Intent; got != (widgets.OpenOrder{
+		Item: inv.cargo.Rows[0].Data.(content.ItemID), Side: sim.OrderSell, Qty: stackQty}) {
+		t.Errorf("inventory Sell on Market intent = %#v, want OpenOrder on the clicked stack (qty %d)", got, stackQty)
 	}
 	pressMenuEntry(t, env, "Show Info")
 	if !env.InfoWindow().IsOpen() {

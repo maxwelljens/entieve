@@ -110,6 +110,14 @@ type Kit struct {
 	// remounts it, which is also what raises it to the top of the stack.
 	infoRemove widget.RemoveWindowFunc
 
+	// orderWin is the player market-order mini-window (Show-Info-style:
+	// one instance, re-targeted and raised on every launch) and
+	// orderRemove its mount handle (nil = closed). It is deliberately NOT
+	// in the layout sidecar: a transient dialog, never restored. The task
+	// queue gates the game's world hotkeys on its OrderTyping.
+	orderWin    *OrderWin
+	orderRemove widget.RemoveWindowFunc
+
 	// core visibility (hidden e.g. while docked in a station) and the
 	// player's own close of a core window (the rail's Overview /
 	// Selected Item entries): a window shows when the host shows the
@@ -174,6 +182,12 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	// unmount, rect survives for the sidecar, never auto-opens) — now
 	// through the one kit-wide close seam, which adds the fade.
 	k.SetWindowClose(k.svc.info.Win(), k.CloseInfo)
+
+	// The order mini-window: one instance, launched from item menus
+	// (OpenOrder), closed by its × / Cancel and by the host on undock.
+	k.orderWin = NewOrderWin(k.seams())
+	k.orderWin.onClose = k.CloseOrder
+	k.SetWindowClose(k.orderWin.Win(), k.CloseOrder)
 
 	// Root container: transparent overlay over the world render; windows
 	// float above it. The theme rides the widget parent chain.
@@ -395,11 +409,17 @@ func (k *Kit) SetSink(s widgets.ActionSink) {
 }
 
 // RunIntent executes one intent on the kit's own behalf: session intents
-// (Show Info, the context menu) run on the kit's services, every other
-// intent maps onto the sim command it dispatches to (commandFor) and
-// rides the enqueue tail. Game.Do delegates here for whatever it does
-// not handle itself.
-func (k *Kit) RunIntent(i widgets.Intent) { k.exec.Do(i) }
+// (Show Info, the context menu, the order mini-window) run on the kit's
+// services, every other intent maps onto the sim command it dispatches to
+// (commandFor) and rides the enqueue tail. Game.Do delegates here for
+// whatever it does not handle itself.
+func (k *Kit) RunIntent(i widgets.Intent) {
+	if o, ok := i.(widgets.OpenOrder); ok {
+		k.OpenOrder(o.Item, o.Side, o.Qty)
+		return
+	}
+	k.exec.Do(i)
+}
 
 // Selected returns the entity selected in the overview (zero if none).
 func (k *Kit) Selected() ecs.Entity { return k.selected }
@@ -506,6 +526,66 @@ func (k *Kit) CloseInfo() {
 	}
 	k.svc.info.hide()
 }
+
+// OpenOrder opens (or re-targets) the player market-order mini-window on
+// item: Show-Info-style, one instance — a second launch swaps the target
+// in place and raises the window, a first open fades it in (its rect is
+// never persisted). The item's side and its sell default quantity come
+// from the clicked row; an undocked player opens nothing.
+func (k *Kit) OpenOrder(item content.ItemID, side sim.OrderSide, qty int) {
+	if k.orderWin == nil || !k.orderWin.Show(item, side, qty) {
+		return
+	}
+	raised := k.orderRemove != nil
+	if raised {
+		k.orderRemove()
+		k.orderRemove = nil
+	}
+	k.orderRemove = k.addWindow(k.orderWin.Win(), !raised)
+}
+
+// CloseOrder closes the order mini-window: unmount and hide (its rect is
+// transient and never persisted). Idempotent — safe to call every frame,
+// e.g. while the player is undocked.
+func (k *Kit) CloseOrder() {
+	if k.orderWin == nil {
+		return
+	}
+	if k.orderRemove != nil {
+		k.orderRemove()
+		k.orderRemove = nil
+	}
+	k.orderWin.hide()
+}
+
+// OrderOpen reports whether the order mini-window is up.
+func (k *Kit) OrderOpen() bool { return k.orderWin != nil && k.orderWin.IsOpen() }
+
+// OrderTyping reports whether a price/qty field of the order window holds
+// focus — the game gates its world hotkeys on this so typing into a field
+// never fires a world action.
+func (k *Kit) OrderTyping() bool { return k.orderWin != nil && k.orderWin.Typing() }
+
+// BlurOrder clears focus from the order window's fields (the game's
+// Esc-while-typing).
+func (k *Kit) BlurOrder() {
+	if k.orderWin != nil {
+		k.orderWin.Blur()
+	}
+}
+
+// OrderWindow returns the order mini-window (the world-input gate
+// hit-tests it, like InfoWindow). nil only before NewKit finishes.
+func (k *Kit) OrderWindow() *widget.Window {
+	if k.orderWin == nil {
+		return nil
+	}
+	return k.orderWin.Win()
+}
+
+// OrderWin returns the order mini-window panel (the host's key-gate tests
+// reach its fields through it).
+func (k *Kit) OrderWin() *OrderWin { return k.orderWin }
 
 // SetCoreVisible shows or hides the always-mounted chrome (Overview and
 // Selected Item), e.g. hide while docked in a station scene. The host's

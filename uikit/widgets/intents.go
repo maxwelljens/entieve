@@ -36,6 +36,17 @@ type (
 		At      image.Point
 	}
 
+	// OpenOrder opens the player market-order mini-window on an item,
+	// pre-set to the clicked row's side and its sell default quantity —
+	// the "Sell on Market" / "Request on Market" menu entries a row
+	// declares. A host-owned (Kit) session intent, like ShowInfo: it
+	// carries no command, the window's Accept is what emits PlaceOrder.
+	OpenOrder struct {
+		Item content.ItemID
+		Side sim.OrderSide
+		Qty  int
+	}
+
 	// Buy/Sell trade at the docked station's market.
 	Buy struct {
 		Item content.ItemID
@@ -127,6 +138,7 @@ type (
 
 func (ShowInfo) isIntent()    {}
 func (OpenMenu) isIntent()    {}
+func (OpenOrder) isIntent()   {}
 func (Buy) isIntent()         {}
 func (Sell) isIntent()        {}
 func (PlaceOrder) isIntent()  {}
@@ -162,10 +174,10 @@ func (Quit) isIntent()        {}
 // the game's. warpRange/orbitRange are the Selected Item selectors'
 // current values, read at press (0 where there is no selector, e.g. a
 // kit-less session). ok is false for the intents a host handles itself:
-// ShowInfo, OpenMenu, Toggle, Save, Load, Quit.
+// ShowInfo, OpenMenu, OpenOrder, Toggle, Save, Load, Quit.
 func commandFor(i Intent, warpRange, orbitRange float64) (sim.Command, bool) {
 	switch v := i.(type) {
-	case ShowInfo, OpenMenu, Toggle, Save, Load, Quit:
+	case ShowInfo, OpenMenu, OpenOrder, Toggle, Save, Load, Quit:
 		return nil, false
 	case Buy:
 		return sim.CmdBuy{Item: v.Item, Qty: v.Qty}, true
