@@ -27,8 +27,9 @@ const (
 	svcBtnW = 36
 	svcBtnH = 40
 
-	// svcGap is the horizontal gap between the identity and the buttons.
-	svcGap = 4
+	// svcGap is the horizontal gap between the identity and the buttons
+	// (the furniture token: the cells get air without growing the row).
+	svcGap = theme.SpMd
 )
 
 // svcButton is one button of the view: its handle name, its glyph, the

@@ -332,14 +332,16 @@ func TestOverviewMinSizeAndRefit(t *testing.T) {
 
 	want := 900.0 - 2*theme.ContentsPad
 	if got := k.ov.tbl.Container().GetWidget().Rect.Dx(); float64(got) != want {
-		t.Fatalf("table root width = %v, want %v (window width minus padding)", got, want)
+		t.Fatalf("table wrapper width = %v, want %v (window width minus padding)", got, want)
 	}
+	// The columns fit the table root — the wrapper minus the reserved
+	// scrollbar gutter at its right edge.
 	sum := 0.0
 	for _, w := range k.ov.tbl.WidthsForTest() {
 		sum += w
 	}
-	if math.Abs(sum-want) > 1e-6 {
-		t.Fatalf("fitted column sum = %v, want %v", sum, want)
+	if inner := want - float64(theme.Px(theme.ScrollGutter)); math.Abs(sum-inner) > 1e-6 {
+		t.Fatalf("fitted column sum = %v, want %v (root minus the scrollbar gutter)", sum, inner)
 	}
 	for i, btn := range k.ov.tbl.HdrBtnForTest() {
 		// layoutCells tiles buttons with cumulative rounding.

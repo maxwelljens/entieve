@@ -2,7 +2,6 @@ package screens
 
 import (
 	"image"
-	"math"
 	"slices"
 	"sort"
 	"strconv"
@@ -17,18 +16,11 @@ import (
 // qtySteps are the trade quantity stepper's steps (1 / 10 / 100).
 var qtySteps = [...]int{1, 10, 100}
 
-const (
-	// mktBarW is the order book's scrollbar rail: design px reserved at
-	// the table's right edge for the house slider chrome (the theme's
-	// SliderParams — the same chrome the log's textarea scrollbar uses).
-	// The rail column is reserved even while the book fits, so the
-	// viewport never jumps when a long book starts overflowing.
-	mktBarW = 8
-
-	// mktBarSteps is the rail's resolution: the table's ScrollTop is a
-	// 0..1 fraction of the overflow, the slider an integer over it.
-	mktBarSteps = 1000
-)
+// mktBarSteps is the order-book rail's resolution: the table's ScrollTop
+// is a 0..1 fraction of the overflow, the slider an integer over it. The
+// rail itself is widgets.Table's (ScrollRail) — the reserved-gutter
+// scrollbar every table now carries.
+const mktBarSteps = widgets.RailSteps
 
 // setStepperValue writes a stepper readout (market/inventory/factory qty)
 // and re-lays its row out. widget.Text.Label changes do NOT invalidate
@@ -192,41 +184,18 @@ func NewMarket(env widgets.Seams) *Market {
 	)
 	m.qtyBar.AddChild(m.minus, m.qtyLabel, m.plus, m.buy, m.sell)
 
-	// The book row: the order table's scroll viewport (widgets.Table
-	// already owns the ScrollContainer and the wheel wiring) beside a
-	// scrollbar rail on its right edge — the long book's overflow has to
-	// be VISIBLE and draggable, which the bare viewport never showed
-	// (playtest: "the marketplace window does not have a scrollbar").
-	// The title line and the stepper row above stay exactly as they are.
-	m.bar = widget.NewSlider(
-		widget.SliderOpts.Orientation(widget.DirectionVertical),
-		widget.SliderOpts.MinMax(0, mktBarSteps),
-		widget.SliderOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(theme.Px(mktBarW), 0),
-			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-				HorizontalPosition: widget.AnchorLayoutPositionEnd,
-				StretchVertical:    true,
-			}),
-		),
-		widget.SliderOpts.ChangedHandler(func(a *widget.SliderChangedEventArgs) {
-			m.tbl.ScrollForTest().ScrollTop = float64(a.Current) / mktBarSteps
-		}),
-	)
-	// The slider validates against a theme the moment anything measures
-	// it — bind the session's widget theme here (the same object the
-	// window rides), the way NewStackRow binds it for its buttons.
-	m.bar.GetWidget().SetTheme(env.WidgetTheme())
-
+	// The book row: the order table — widgets.Table owns its scroll
+	// viewport, its wheel wiring AND the scrollbar rail beside it (the
+	// reserved-gutter chrome, ScrollGutter design px: the handle can never
+	// overhang a row, and the rail hides while the book fits). The title
+	// line and the stepper row above stay exactly as they are.
+	m.bar = m.tbl.Rail()
 	book := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
-	// The table fills the book row except the rail column; the rail
-	// anchors to the right edge of the same cell.
-	tableRoot := m.tbl.Container().GetWidget()
-	tableRoot.LayoutData = widget.AnchorLayoutData{
+	m.tbl.Container().GetWidget().LayoutData = widget.AnchorLayoutData{
 		StretchHorizontal: true,
 		StretchVertical:   true,
-		Padding:           &widget.Insets{Right: theme.Px(mktBarW)},
 	}
-	book.AddChild(m.tbl.Container(), m.bar)
+	book.AddChild(m.tbl.Container())
 
 	// Body: fixed toolbar row over the book row (the table's own
 	// preferred height must never grow the window).
@@ -367,31 +336,9 @@ func (m *Market) Sync() {
 	// Trades only happen docked at a station (the gate declared above).
 	m.buy.GetWidget().Disabled = gated
 	m.sell.GetWidget().Disabled = gated
-
-	// The scrollbar rail mirrors the table's scroll: hidden while the
-	// book fits its viewport (no overflow → ScrollTop pinned 0), thumb
-	// at ScrollTop otherwise. Wheel input reaches the table's own
-	// scroll container; dragging the rail writes the offset back.
-	theme.ShowWidget(m.bar.GetWidget(), m.bookOverflow() > 0)
-	if cur := int(math.Round(m.tbl.ScrollForTest().ScrollTop * mktBarSteps)); m.bar.Current != cur {
-		m.bar.Current = cur
-	}
-}
-
-// bookOverflow is the order book's scrollable distance in px: the laid
-// out rows' union minus the scroll viewport (≤ 0 while the book fits).
-// Row rects come from the last layout pass, so a first Sync before any
-// draw reports no overflow and the rail stays hidden.
-func (m *Market) bookOverflow() float64 {
-	rows := m.tbl.RowCts
-	if len(rows) == 0 {
-		return 0
-	}
-	union := rows[0].GetWidget().Rect
-	for _, r := range rows[1:] {
-		union = union.Union(r.GetWidget().Rect)
-	}
-	return float64(union.Dy() - m.tbl.ScrollForTest().ViewRect().Dy())
+	// The scrollbar rail (the table's own) mirrors the table's scroll in
+	// m.tbl.Sync above: hidden while the book fits, thumb at ScrollTop
+	// otherwise; a drag writes the offset back.
 }
 
 // stepQty moves the quantity stepper one step (clamped).

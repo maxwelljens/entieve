@@ -166,16 +166,18 @@ func NewTitleBar(d Theme, label, icon string) (*widget.Container, *widget.Text) 
 	)
 	// The icon is anchored to the bar's start and the title is padded past
 	// it, so the two can never overlap however wide the bar gets.
-	titlePad := ContentsPad
+	// Title bars are furniture: they take the SpMd token (the panel
+	// margin ContentsPad is denser — the bar gets air the body does not).
+	titlePad := SpMd
 	if icon != "" {
 		g := NewIcon(icon, IconTitle, p.Accent)
 		g.GetWidget().LayoutData = widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(Px(ContentsPad)),
+			Padding:            widget.NewInsetsSimple(Px(SpMd)),
 		}
 		title.AddChild(g)
-		titlePad = ContentsPad + IconTitle + IconGap
+		titlePad = SpMd + IconTitle + IconGap
 	}
 	txt := widget.NewText(
 		widget.TextOpts.Text(label, d.FaceBold(StepBase), Solid(p.Accent)),

@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Scrollbars sit in a reserved gutter beside their content; furniture
+  gets air** (`uikit/theme`, `uikit/widgets/scrollrail.go`,
+  `uikit/widgets/table.go`, `uikit/screens/{rail,infowin,market,services}.go`):
+  every scrollbar now rides a `theme.ScrollGutter` design-px column beside
+  its viewport, so the handle can no longer overhang the content it scrolls
+  ("the scrollbar is laid over content" — the market's old 8 px rail was
+  narrower than the theme's 16 px handle). The gutter is reserved whether
+  or not the rail shows, so the viewport never jumps when a long list
+  starts overflowing, and the rail hides while the content fits. The
+  pattern — the market order book's rail — is now the shared
+  `widgets.ScrollRail`, carried by every `widgets.Table` as well as the
+  station rail's entry column and the Show Info page. A small spacing
+  token set (`SpSm`/`SpMd`/`SpLg` = 4/8/16) gives the furniture air:
+  button/title-bar padding, the slider's track padding, the rail's entry
+  gaps. Data rows stay dense on purpose (the table's `cellPad`/`entryPadV`
+  literals are pinned unchanged). The station rail keeps its `RailInset`
+  footprint — the gutter is carved from the entry cells.
+
 - **Star systems rescaled to real-solar-system proportions**
   (`content/data/systems/*.json`, `content/data/worlds/*.json`): bodies
   spread across tens of AU instead of the old ~0.1 AU cloud — inner

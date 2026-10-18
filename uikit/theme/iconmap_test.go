@@ -124,8 +124,8 @@ func TestTitleBarIconAndLabelDoNotOverlap(t *testing.T) {
 	if icon.Overlaps(label) {
 		t.Errorf("icon %v overlaps the label %v", icon, label)
 	}
-	if icon.Min.X != ContentsPad {
-		t.Errorf("icon starts at x=%d, want the %d px bar padding", icon.Min.X, ContentsPad)
+	if icon.Min.X != SpMd {
+		t.Errorf("icon starts at x=%d, want the %d px bar padding (SpMd)", icon.Min.X, SpMd)
 	}
 	if label.Min.X < icon.Max.X+IconGap {
 		t.Errorf("label starts at x=%d, want ≥ %d (icon end + gap)",
@@ -145,9 +145,9 @@ func TestTitleBarIconAndLabelDoNotOverlap(t *testing.T) {
 	if len(plain.Children()) != 1 {
 		t.Fatalf("icon-less title bar has %d children, want 1", len(plain.Children()))
 	}
-	if plain.Children()[0].GetWidget().Rect.Min.X != ContentsPad {
-		t.Errorf("plain title starts at x=%d, want %d",
-			plain.Children()[0].GetWidget().Rect.Min.X, ContentsPad)
+	if plain.Children()[0].GetWidget().Rect.Min.X != SpMd {
+		t.Errorf("plain title starts at x=%d, want %d (SpMd)",
+			plain.Children()[0].GetWidget().Rect.Min.X, SpMd)
 	}
 }
 
