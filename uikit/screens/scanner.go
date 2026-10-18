@@ -135,7 +135,6 @@ func NewScanner(env interface {
 	s.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
-		widget.WindowOpts.Draggable(),
 		widget.WindowOpts.MinSize(theme.Px(260), theme.Px(theme.TitleBarH+scanBodyH)),
 		// Default clears the rail's left gutter (RailInset); the game
 		// re-anchors it to the centre column on first layout.

@@ -6,10 +6,12 @@ import (
 	"github.com/ebitenui/ebitenui/input"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// Window chrome: edge-grip resize for every window a Kit mounts.
+// Window chrome: edge-grip resize AND title-bar dragging for every
+// window a Kit mounts.
 //
 // ebitenui's windowOpts.Resizeable() only extends the container rect's
 // Max corner, so it resizes from the bottom/right edge alone. The grip
@@ -26,10 +28,21 @@ import (
 // TitleBar/Contents never fire there and those windows could not be
 // resized from their own edges. step only needs the cursor and the button
 // state, which is also what makes the drag testable without ebiten input.
-// Title-bar dragging keeps the built-in Draggable() handling; while a grip
-// drag is active the chrome's absolute recompute wins every frame. The
-// grip never swallows the press: a click without a drag is a no-op here,
-// so clicking a table row inside the band still selects the row.
+// The grip never swallows the press: a click without a drag is a no-op
+// here, so clicking a table row inside the band still selects the row.
+//
+// Title-bar dragging is chrome-owned the same way (no WindowOpts
+// Draggable()): ebitenui's built-in drag moved the rect through
+// SetLocation from Render, whose RequestRelayout re-laid out the whole
+// window subtree every frame of the drag — the cost this replaced. The
+// chrome's title drag is translate-only: translate walks the widget tree
+// rewriting rects in place (containers recurse, a TextArea re-lays its
+// private interior, a ScrollContainer carries its stashed content so
+// renderContent sees an equal rect and skips its own re-location), so no
+// layout pass runs. It reports the release through Window.MoveEvent
+// exactly as the built-in handler did — including a plain click on the
+// title — and the grip keeps precedence where a press is in both bands
+// (the corner), with both events firing on release.
 
 // edgeGripPx is the grip band width per edge in DESIGN units (scaled by
 // Px where the band is measured — the cursor runs in the same Layout
@@ -96,23 +109,26 @@ func resizeRect(start image.Rectangle, dx, dy int, edges edgeMask, minSize image
 	return r
 }
 
-// winChrome is one window's edge-resize state: attached by Kit.AddWindow,
+// winChrome is one window's drag state: attached by Kit.AddWindow,
 // pumped every frame by Kit.stepChromes while that window stays mounted.
 type winChrome struct {
-	win    *widget.Window
-	held   bool            // left button state at the previous step
-	armed  bool            // press started in a grip band, waiting for a drag
-	active bool            // a grip drag is in flight
-	edges  edgeMask        // gripped edges
-	start  image.Rectangle // window rect at press
-	origin image.Point     // cursor at press
+	win        *widget.Window
+	held       bool            // left button state at the previous step
+	armed      bool            // press started in a grip band, waiting for a drag
+	active     bool            // a grip drag is in flight
+	edges      edgeMask        // gripped edges
+	moveArmed  bool            // press started in the title bar, waiting for a drag
+	moveActive bool            // a title drag is in flight
+	start      image.Rectangle // window rect at press
+	origin     image.Point     // cursor at press
 }
 
-// cancel drops any grip state without touching the rect: the window is
+// cancel drops any drag state without touching the rect: the window is
 // leaving the pump (unmounted, or hidden this frame) and must leave no
 // drag or cursor side effects behind.
 func (c *winChrome) cancel() {
 	c.armed, c.active = false, false
+	c.moveArmed, c.moveActive = false, false
 }
 
 // gripStart reports the edges gripped when a press lands on p: the point
@@ -142,19 +158,51 @@ func (c *winChrome) gripStart(p image.Point) edgeMask {
 	return e
 }
 
+// moveStart reports whether a press on p starts a title-bar drag: the
+// point must sit in this window's own title bar (the same rect ebitenui's
+// built-in Draggable() armed from — a window without a TitleBar never
+// drags) and on top of every other input layer, so only the topmost
+// window under the cursor ever moves. The layer test asks for mouse
+// BUTTON events here (the grip asks for wheel only — that is a body
+// viewport property: a scroll layer claims every event except wheel and
+// covers the side/bottom grip bands, while the title band is never
+// covered by the window's own body, so the plain press is the right
+// question for it).
+func (c *winChrome) moveStart(p image.Point) bool {
+	wgt := c.win.GetContainer().GetWidget()
+	if !wgt.IsVisible() || c.win.TitleBar == nil {
+		return false
+	}
+	if !p.In(c.win.TitleBar.GetWidget().Rect) {
+		return false
+	}
+	// A never-mounted window has no layer of its own — same reject as
+	// gripStart (DefaultLayer would pass anywhere).
+	layer := wgt.EffectiveInputLayer()
+	if layer == &input.DefaultLayer || !layer.ActiveFor(p.X, p.Y, input.LayerEventTypeMouseButton) {
+		return false
+	}
+	return true
+}
+
 // step pumps one frame from the cursor and the left-button state.
 //
-// A press that begins in a grip band arms the drag; it becomes active as
-// soon as the cursor moves, and the rect is then recomputed in absolute
-// terms from the press every step — so the built-in title-bar drag (which
-// also runs for presses inside the title bar's 44 px) cannot double-move
-// the window: its Render-time offset is wiped on the next step. Releasing
-// without ever moving is a click, not a drag: nothing resizes and no
-// ResizeEvent fires (the child widget keeps the press). Releasing after a
-// drag fires ResizeEvent once with the final rect. cursor/pressed are
-// parameters so tests drive the math without ebiten input.
+// A press that begins in a grip band arms the resize; one that begins in
+// the title bar arms the move; a corner press arms both, and the grip
+// keeps precedence while it is armed or active (the rect is recomputed
+// in absolute terms from the press every step), so a corner drag resizes
+// exactly like a plain grip drag — and still reports the move on
+// release, because the press was in the title bar too. Each drag becomes
+// active as soon as the cursor moves. Releasing without ever moving is a
+// click, not a drag: the grip keeps its no-op contract (nothing resizes,
+// no ResizeEvent, the child widget keeps the press) while the title drag
+// still reports it — one MoveEvent with the unchanged rect, which is
+// what the built-in handler fired on every title release. Releasing after
+// a drag fires ResizeEvent (and MoveEvent, if the press was in the title
+// bar) once with the final rect. cursor/pressed are parameters so tests
+// drive the math without ebiten input.
 //
-// A hidden window is never stepped into: its grip state drops instead of
+// A hidden window is never stepped into: its drag state drops instead of
 // applying rects (the idle branch already refused the cursor; an active
 // drag used to keep moving the invisible rect, which then read back as a
 // player-moved window).
@@ -169,9 +217,13 @@ func (c *winChrome) step(cursor image.Point, pressed bool) {
 	}
 
 	switch {
-	case c.active:
+	case c.active: // grip drag in flight (grip precedence over the move)
 		if !pressed {
 			c.active = false
+			// Move first, then resize: the built-in path queued
+			// MoveEvent during ui.Update, ahead of the chrome's own
+			// ResizeEvent, so handlers see them in the same order.
+			c.fireMove(wgt)
 			c.win.ResizeEvent.Fire(&widget.WindowChangedEventArgs{
 				Window: c.win,
 				Rect:   wgt.Rect,
@@ -181,9 +233,10 @@ func (c *winChrome) step(cursor image.Point, pressed bool) {
 		c.apply(cursor, wgt)
 		return
 
-	case c.armed:
+	case c.armed: // grip press waiting for the cursor to move
 		if !pressed {
 			c.armed = false // click without drag: no-op, child keeps it
+			c.fireMove(wgt) // …unless it was also a title press
 			return
 		}
 		if cursor != c.origin {
@@ -192,10 +245,32 @@ func (c *winChrome) step(cursor image.Point, pressed bool) {
 		}
 		return
 
-	case rising:
-		if e := c.gripStart(cursor); e != 0 {
-			c.armed, c.edges, c.start, c.origin = true, e, wgt.Rect, cursor
+	case c.moveActive: // title drag in flight
+		if !pressed {
+			c.fireMove(wgt)
+			return
 		}
+		c.applyMove(cursor)
+		return
+
+	case c.moveArmed: // title press waiting for the cursor to move
+		if !pressed {
+			c.fireMove(wgt) // click on the title: report it, rect unchanged
+			return
+		}
+		if cursor != c.origin {
+			c.moveArmed, c.moveActive = false, true
+			c.applyMove(cursor)
+		}
+		return
+
+	case rising:
+		e := c.gripStart(cursor)
+		m := c.moveStart(cursor)
+		if e != 0 || m {
+			c.start, c.origin = wgt.Rect, cursor
+		}
+		c.armed, c.edges, c.moveArmed = e != 0, e, m
 		return
 	}
 
@@ -218,6 +293,76 @@ func (c *winChrome) apply(cursor image.Point, wgt *widget.Widget) {
 		c.win.SetLocation(r)
 	}
 	setResizeCursor(c.edges)
+}
+
+// fireMove reports a completed title press: exactly one MoveEvent when
+// the press started in the title bar (drag or click — the built-in
+// handler fired on any title release, carrying the rect as it stands),
+// nothing otherwise. Clearing both move flags is part of the fire.
+func (c *winChrome) fireMove(wgt *widget.Widget) {
+	if !c.moveArmed && !c.moveActive {
+		return
+	}
+	c.moveArmed, c.moveActive = false, false
+	c.win.MoveEvent.Fire(&widget.WindowChangedEventArgs{
+		Window: c.win,
+		Rect:   wgt.Rect,
+	})
+}
+
+// applyMove translates the window to start + press-to-cursor delta —
+// absolute from the press, like the grip's recompute, so the step's
+// second per-frame pass (after ui.Draw) derives the same target and is
+// a no-op instead of double-moving.
+func (c *winChrome) applyMove(cursor image.Point) {
+	target := c.start.Add(cursor.Sub(c.origin))
+	wgt := c.win.GetContainer().GetWidget()
+	if target != wgt.Rect {
+		translate(c.win, target.Min.Sub(wgt.Rect.Min))
+	}
+}
+
+// translate moves win's whole widget subtree rigidly by d WITHOUT a
+// relayout: Container.SetLocation would RequestRelayout the subtree —
+// the per-frame cascade (grid → title/contents → table body rows) that
+// made a window drag cost a full layout pass every frame. Rects are
+// rewritten in place instead; see translateNode for the per-type rules.
+func translate(win *widget.Window, d image.Point) {
+	if d == (image.Point{}) {
+		return
+	}
+	root := win.GetContainer()
+	root.GetWidget().Rect = root.GetWidget().Rect.Add(d)
+	for _, ch := range root.Children() {
+		translateNode(ch, d)
+	}
+}
+
+// translateNode is translate's per-child step: the rect moves first,
+// then the type-specific follow-up. Containers recurse through their
+// children; a TextArea's children are private (no Children()), so its
+// tiny interior layout re-runs from the new rect (cheap: the width —
+// hence the text measure — is unchanged); a ScrollContainer carries the
+// content subtree stashed by widgets.AttachScrollContent, so
+// renderContent derives a rect equal to the content's already-translated
+// one and skips its own SetLocation + RequestRelayout of it. Everything
+// else (Button, Slider, Text, Graphic, ProgressBar, …) is rect-only —
+// which is all SetLocation did for them: Slider re-derives its handle
+// from the rect at Render, Button re-syncs its inner container at Render.
+func translateNode(n widget.PreferredSizeLocateableWidget, d image.Point) {
+	n.GetWidget().Rect = n.GetWidget().Rect.Add(d)
+	switch t := n.(type) {
+	case widget.Containerer:
+		for _, ch := range t.Children() {
+			translateNode(ch, d)
+		}
+	case *widget.TextArea:
+		t.RequestRelayout()
+	case *widget.ScrollContainer:
+		if content := widgets.ScrollContentOf(t); content != nil {
+			translateNode(content, d)
+		}
+	}
 }
 
 // windowMin is the window's MinSize as a point (no MinSize → 1×1 floor
@@ -244,8 +389,9 @@ func setResizeCursor(e edgeMask) {
 // kit (Kit.chromes — an unmounted window's entry is gone, so it is never
 // stepped). The Kit calls it right after ui.Update (press events just
 // fired, so the new rect applies to this frame's render) and again after
-// ui.Draw (the built-in title drag moves the rect during Render; the
-// recompute wipes that drift before the next frame's hit tests).
+// ui.Draw (input may have changed while drawing; both drags recompute
+// their rect absolutely from the press, so this pass applies the fresh
+// cursor or derives an identical rect and does nothing).
 func (k *Kit) stepChromes() {
 	cursor := image.Point{}
 	cursor.X, cursor.Y = input.CursorPosition()

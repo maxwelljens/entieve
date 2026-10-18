@@ -220,7 +220,9 @@ func useFakeMouse(t *testing.T) *fakeMouse {
 }
 
 // newChromeTestWindow builds a minimal titled window with a resize
-// chrome, at a known rect.
+// chrome, at a known rect. No WindowOpts.Draggable(): the title drag is
+// chrome-owned like the grip (see winchrome.go), and this fixture pumps
+// the chrome directly.
 func newChromeTestWindow(t *testing.T) (*widget.Window, *winChrome) {
 	t.Helper()
 	env, _ := newTestEnv(t)
@@ -229,7 +231,6 @@ func newChromeTestWindow(t *testing.T) (*widget.Window, *winChrome) {
 	win := widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, 44),
-		widget.WindowOpts.Draggable(),
 		widget.WindowOpts.MinSize(320, 240),
 		widget.WindowOpts.Location(image.Rect(100, 100, 500, 400)),
 	)
@@ -248,11 +249,13 @@ func newChromeTestWindow(t *testing.T) (*widget.Window, *winChrome) {
 // button state alone: a press in the grip band arms the drag, step()
 // applies the drag math every frame (the win rect only moves through
 // SetLocation), and release fires ResizeEvent exactly once with the
-// final rect.
+// final rect. The press point is inside the title bar too (the top-left
+// corner always is), so the release also reports the move — both
+// handlers fire, the grip owning the rect.
 func TestWinChromeGripDrag(t *testing.T) {
 	win, ch := newChromeTestWindow(t)
 
-	// Count ResizeEvents.
+	// Count ResizeEvents and MoveEvents.
 	resizes := 0
 	var last image.Rectangle
 	win.ResizeEvent.AddHandler(func(a interface{}) {
@@ -261,11 +264,19 @@ func TestWinChromeGripDrag(t *testing.T) {
 			last = e.Rect
 		}
 	})
+	moves := 0
+	var lastMove image.Rectangle
+	win.MoveEvent.AddHandler(func(a interface{}) {
+		if e, ok := a.(*widget.WindowChangedEventArgs); ok {
+			moves++
+			lastMove = e.Rect
+		}
+	})
 	event.ExecuteDeferred()
 
 	// Press on the left edge inside the title bar (3 px in, 5 px down):
-	// this arms a left|top grip, and the built-in Draggable() handler
-	// starts its title drag too — the chrome's absolute recompute wins.
+	// this arms a left|top grip AND the title move — the grip wins while
+	// it is armed or active, so the rect follows the resize math.
 	ch.step(image.Point{X: 103, Y: 105}, true)
 	if !ch.armed || ch.edges != edgeLeft|edgeTop {
 		t.Fatalf("press in top-left grip: armed = %v edges = %b, want true / left|top", ch.armed, ch.edges)
@@ -289,6 +300,9 @@ func TestWinChromeGripDrag(t *testing.T) {
 	if resizes != 0 {
 		t.Errorf("ResizeEvent fired mid-drag (%d times)", resizes)
 	}
+	if moves != 0 {
+		t.Errorf("MoveEvent fired mid-drag (%d times)", moves)
+	}
 
 	// Shrink below MinSize: clamped, right/bottom edges still fixed.
 	ch.step(image.Point{X: 400, Y: 400}, true)
@@ -297,12 +311,13 @@ func TestWinChromeGripDrag(t *testing.T) {
 		t.Errorf("drag past MinSize: rect = %v, want 320×240 ending at (500,400)", rect)
 	}
 
-	// Release: one ResizeEvent, final rect, chrome idle again. The
-	// event queue is deferred (ebitenui semantics), so flush it before
-	// counting.
+	// Release: one ResizeEvent with the final rect, and — because the
+	// press was in the title bar as well — one MoveEvent (the corner
+	// reports both, chrome idle again). The event queue is deferred
+	// (ebitenui semantics), so flush it before counting.
 	ch.step(image.Point{X: 400, Y: 400}, false)
 	event.ExecuteDeferred()
-	if ch.active || ch.armed {
+	if ch.active || ch.armed || ch.moveArmed || ch.moveActive {
 		t.Error("still dragging after release")
 	}
 	if resizes != 1 {
@@ -311,26 +326,40 @@ func TestWinChromeGripDrag(t *testing.T) {
 	if last != win.GetContainer().GetWidget().Rect {
 		t.Errorf("ResizeEvent rect = %v, want final %v", last, win.GetContainer().GetWidget().Rect)
 	}
+	if moves != 1 {
+		t.Errorf("MoveEvent count = %d, want 1 (the press was inside the title bar)", moves)
+	} else if lastMove != win.GetContainer().GetWidget().Rect {
+		t.Errorf("MoveEvent rect = %v, want final %v", lastMove, win.GetContainer().GetWidget().Rect)
+	}
 
-	// A press in the window interior does not arm a resize (the title
-	// drag / content widgets own it).
+	// A press in the window interior does not arm a resize or a move (the
+	// title drag / content widgets own it).
 	ch.step(image.Point{X: 300, Y: 300}, true)
 	if ch.armed || ch.active {
 		t.Error("interior press armed a resize")
+	}
+	if ch.moveArmed || ch.moveActive {
+		t.Error("interior press armed a move")
 	}
 	ch.step(image.Point{X: 999, Y: 999}, false)
 	if resizes != 1 {
 		t.Errorf("ResizeEvent count after interior press = %d, want 1", resizes)
 	}
+	if moves != 1 {
+		t.Errorf("MoveEvent count after interior press = %d, want 1", moves)
+	}
 }
 
 // TestWinChromePressWithoutDragIsNoOp: a press that starts in the grip
 // band and releases without moving never resizes and never fires
-// ResizeEvent — the press belongs to the child widget.
+// ResizeEvent — the press belongs to the child widget. The bottom-right
+// corner is not inside the title bar, so it reports no move either.
 func TestWinChromePressWithoutDragIsNoOp(t *testing.T) {
 	win, ch := newChromeTestWindow(t)
 	resizes := 0
 	win.ResizeEvent.AddHandler(func(interface{}) { resizes++ })
+	moves := 0
+	win.MoveEvent.AddHandler(func(interface{}) { moves++ })
 	event.ExecuteDeferred()
 
 	start := win.GetContainer().GetWidget().Rect
@@ -350,6 +379,9 @@ func TestWinChromePressWithoutDragIsNoOp(t *testing.T) {
 	}
 	if resizes != 0 {
 		t.Errorf("ResizeEvent count = %d, want 0 for a click", resizes)
+	}
+	if moves != 0 {
+		t.Errorf("MoveEvent count = %d, want 0 for a corner click outside the title bar", moves)
 	}
 }
 

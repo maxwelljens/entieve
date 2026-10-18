@@ -101,7 +101,6 @@ func NewLog(env interface {
 	l.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
-		widget.WindowOpts.Draggable(),
 		widget.WindowOpts.MinSize(theme.Px(logMinW), theme.Px(logMinH)),
 		widget.WindowOpts.Location(logDefaultRect()),
 	)

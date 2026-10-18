@@ -67,6 +67,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
      is up the rail keeps its old under-window input gating. The HUD and
      module rack keep their under-window position (`AddContainer`).
 
+- **Window dragging no longer costs a layout pass per frame**
+  (uikit/screens/winchrome.go, uikit/widgets/scrollcontent.go): title-bar
+  dragging moved from ebitenui's built-in `WindowOpts.Draggable()` to the
+  kit's chrome, translate-only. The built-in drag relocated the window
+  through `Container.SetLocation` from `Window.Render`, whose
+  `RequestRelayout` re-laid out the whole window subtree — grid, rows,
+  anchors, preferred-size re-measures and the scroll content's own
+  re-location — on every frame of the drag (`doLayout` cost +0.26 s per
+  300-frame drag window, `RowLayout.layout` +0.18 s). The chrome now
+  rewrites the subtree's rects in place each frame (containers recurse, a
+  TextArea re-lays its private interior, a `ScrollContainer` carries the
+  content subtree recorded by the new `widgets.AttachScrollContent`
+  stash so `renderContent` computes an equal rect and skips its
+  `SetLocation` + `RequestRelayout` of the table body), so no layout
+  runs: the kit-draw delta between idle and drag fell from 1.38× (heavy,
+  325-row market) and 1.31× (light, log) to ≈1.0×, and the drag-vs-idle
+  profile diff for every layout function is now zero. Behaviour is
+  unchanged: the grip keeps precedence in corners and fires ResizeEvent
+  as before, the title drag reports exactly one `Window.MoveEvent` per
+  completed press (including a plain click's unchanged rect, matching
+  the built-in handler), contents follow the window in the same frame,
+  and the services window (no TitleBar) still never drags. Regression
+  pins: the title-drag contract (`TestTitleDragBehavior`), a displaced
+  title-bar canary proving no layout pass runs during a translate-only
+  drag (`TestTitleDragSkipsRelayout`), an alloc bound on drag frames
+  over idle (`TestDragFrameCost`), and the existing per-phase sidecar
+  signature assertion (a drag still writes no sidecar).
+
 ## [0.3.0] - 2026-10-17
 
 ### Added

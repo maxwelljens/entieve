@@ -129,7 +129,6 @@ func NewFitting(env widgets.Seams) *Fitting {
 	f.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
-		widget.WindowOpts.Draggable(),
 		// Content floor: stat block, resist row and a full row of the
 		// slot and hangar tables (they scroll below that).
 		widget.WindowOpts.MinSize(theme.Px(300), theme.Px(430)),

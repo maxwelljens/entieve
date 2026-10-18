@@ -201,7 +201,6 @@ func (g *Game) buildMenuWindow() *widget.Window {
 	return widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(g.titleBar("Menu"), theme.Px(winTitleH)),
-		widget.WindowOpts.Draggable(),
 		widget.WindowOpts.Modal(),
 		widget.WindowOpts.Location(image.Rect(0, 0,
 			theme.Px(int(menuBtnW)+20), theme.Px(int(4*menuBtnH+3*10+20)+winTitleH))),

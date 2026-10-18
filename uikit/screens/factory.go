@@ -173,7 +173,6 @@ func NewFactory(env widgets.Seams) *Factory {
 	f.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
-		widget.WindowOpts.Draggable(),
 		// Content floor: the craft line, a few rows of each table and
 		// both toolbars.
 		widget.WindowOpts.MinSize(theme.Px(360), theme.Px(430)),
