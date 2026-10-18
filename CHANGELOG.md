@@ -81,6 +81,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `uikit/theme/theme_test.go`, `uikit/screens/selected_test.go`,
   `sim/helpers_test.go`, `render/art_test.go`.
 
+### Fixed
+
+- **The world body pass no longer draws off-screen celestials**
+  (`render/render.go`, `render/overlay.go`): a body whose disc cannot reach
+  the viewport is skipped instead of drawn. ebiten's vector path flattener
+  (`Arc → cubicTo → AddStroke`) degenerates when its input coordinates run
+  into the 1e7..1e13 px band — exactly where an AU-scale system's world
+  units land once the camera is tight — so an off-screen stroked circle cost
+  ~5-20 ms against ~15 µs on-screen, every frame, for geometry no pixel sees
+  (pprof put `StrokeCircle`/`AddStroke`/`Path.Arc` at 54% of an idle frame).
+  The overlay's brackets, lock lines, selection highlight and ship effects
+  gate the same way, sharing `render.offscreen`. Measured headless: the world
+  draw drops from ~30 ms to ~0.1-0.4 ms per frame at a tight camera, and from
+  ~180 ms to ~0.3 ms after a system jump; the whole-system framing still
+  draws every on-screen body. Pinned by
+  `game/draw_cull_test.go` `TestWorldDrawCullsOffscreenBodies` (a
+  deterministic body-primitive counter, no wall clock).
+
 ## [0.4.0] - 2026-10-18
 
 ### Added

@@ -83,6 +83,11 @@ type Renderer struct {
 	// Per-frame buckets, reused to avoid allocations in Draw.
 	bStar, bPlanet, bAnomaly, bStatic, bRock, bWreck, bShip []gridObj
 	poly                                                    []core.Vec2
+
+	// bodyPrims counts the body primitives the last Draw submitted: every
+	// on-screen celestial, rock, wreck and ship. Read by
+	// BodiesDrawnForTest — the frame-cost pin.
+	bodyPrims int
 }
 
 // New returns a Renderer over the loaded content.
@@ -99,6 +104,11 @@ func New(c *content.Content) *Renderer {
 // SetSelected marks an entity for the amber selection highlight. The Game
 // syncs this from the UI each frame before Draw.
 func (r *Renderer) SetSelected(e ecs.Entity) { r.selected = e }
+
+// BodiesDrawnForTest is the number of body primitives the last Draw
+// submitted — the off-screen culling pin's counter (see keepBody). Tests
+// only; production never reads it.
+func (r *Renderer) BodiesDrawnForTest() int { return r.bodyPrims }
 
 // glow returns a cached radial glow sprite.
 func (r *Renderer) glow(size int, col color.RGBA) *ebiten.Image {
@@ -293,6 +303,7 @@ func (r *Renderer) Draw(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 	}
 	sys := s.System()
 	now := s.Time()
+	r.bodyPrims = 0
 
 	dst.Fill(color.RGBA{2, 3, 6, 255})
 	r.drawBackdrop(dst, cam, sys)
@@ -520,6 +531,9 @@ func (r *Renderer) drawStar(dst *ebiten.Image, cam Camera, o gridObj, sys *conte
 		o.radius = 3e8
 	}
 	glowR := clamp(o.radius*cam.Zoom, 80, 0.45*math.Max(cam.ScreenW, cam.ScreenH))
+	if !r.keepBody(cam, sx, sy, glowR) {
+		return
+	}
 	img := r.glow(128, color.RGBA{col.R, col.G, col.B, 220})
 	drawGlowCentered(dst, img, sx, sy, glowR*2, true)
 	vector.DrawFilledCircle(dst, float32(sx), float32(sy), float32(glowR*0.22),
@@ -545,6 +559,9 @@ func (r *Renderer) drawPlanet(dst *ebiten.Image, cam Camera, o gridObj, sys *con
 	}
 	maxDim := math.Max(cam.ScreenW, cam.ScreenH)
 	px := clamp(o.radius*cam.Zoom, 6, 0.4*maxDim)
+	if !r.keepBody(cam, sx, sy, px) {
+		return
+	}
 	drawGlowCentered(dst, r.body(col), sx, sy, px*2, false)
 }
 
@@ -554,6 +571,9 @@ func (r *Renderer) drawAnomaly(dst *ebiten.Image, cam Camera, o gridObj, now flo
 	col := color.RGBA{208, 128, 255, 90}
 	img := r.glow(128, col)
 	px := clamp(2e4*cam.Zoom, 40, 0.3*math.Max(cam.ScreenW, cam.ScreenH))
+	if !r.keepBody(cam, sx, sy, px) {
+		return
+	}
 	drawGlowCentered(dst, img, sx, sy, px*2, true)
 	ang := now * 0.4
 	r.path.Reset()
@@ -596,6 +616,9 @@ func (r *Renderer) drawStatic(dst *ebiten.Image, cam Camera, o gridObj) {
 	switch o.info.Kind {
 	case sim.KindStation:
 		px := clamp(orDef(o.radius, 2500)*cam.Zoom, 14, 0.25*maxDim)
+		if !r.keepBody(cam, sx, sy, px) {
+			return
+		}
 		if drawCelSprite(dst, sx, sy, px, o.info.Cel) {
 			break
 		}
@@ -629,6 +652,9 @@ func (r *Renderer) drawStatic(dst *ebiten.Image, cam Camera, o gridObj) {
 		}
 	case sim.KindGate:
 		px := clamp(orDef(o.radius, 1500)*cam.Zoom, 16, 0.3*maxDim)
+		if !r.keepBody(cam, sx, sy, px) {
+			return
+		}
 		if drawCelSprite(dst, sx, sy, px, o.info.Cel) {
 			break
 		}
@@ -646,6 +672,9 @@ func (r *Renderer) drawStatic(dst *ebiten.Image, cam Camera, o gridObj) {
 		}
 	default: // belts, unknown celestials: faint dust circle
 		px := clamp(orDef(o.radius, 4e4)*cam.Zoom, 20, 0.4*maxDim)
+		if !r.keepBody(cam, sx, sy, px) {
+			return
+		}
 		if drawCelSprite(dst, sx, sy, px, o.info.Cel) {
 			break
 		}
@@ -662,6 +691,9 @@ func (r *Renderer) drawStatic(dst *ebiten.Image, cam Camera, o gridObj) {
 func (r *Renderer) drawRock(dst *ebiten.Image, cam Camera, o gridObj) {
 	sx, sy := cam.WorldToScreen(o.info.Pos)
 	px := clamp(70*cam.Zoom, 4, 60)
+	if !r.keepBody(cam, sx, sy, px) {
+		return
+	}
 	if img := spriteFor("asteroids/" + o.ore); img != nil {
 		dw, dh := fitSprite(img.Bounds().Dx(), img.Bounds().Dy(), px)
 		drawSprite(dst, img, sx, sy, dw, dh, 0)
@@ -686,6 +718,9 @@ func (r *Renderer) drawRock(dst *ebiten.Image, cam Camera, o gridObj) {
 func (r *Renderer) drawWreck(dst *ebiten.Image, cam Camera, o gridObj) {
 	sx, sy := cam.WorldToScreen(o.info.Pos)
 	px := clamp(55*cam.Zoom, 5, 40)
+	if !r.keepBody(cam, sx, sy, px) {
+		return
+	}
 	r.poly = r.poly[:0]
 	src := rockPoly(uint64(o.info.Entity)^0xBEEF, 9)
 	for i, p := range src {
@@ -704,6 +739,9 @@ func (r *Renderer) drawWreck(dst *ebiten.Image, cam Camera, o gridObj) {
 func (r *Renderer) drawShip(dst *ebiten.Image, cam Camera, o gridObj, now float64) {
 	sx, sy := cam.WorldToScreen(o.info.Pos)
 	sizePx := clamp(hullSize(o.hull)*cam.Zoom, 7, 160)
+	if !r.keepBody(cam, sx, sy, sizePx) {
+		return
+	}
 
 	// Afterburner flame (behind the ship, opposite the nose).
 	if o.speedMult > 1 {
@@ -738,4 +776,22 @@ func orDef(v, d float64) float64 {
 		return d
 	}
 	return v
+}
+
+// keepBody reports whether a body drawn as a disc of radius px around the
+// screen point (sx, sy) belongs in this frame, counting the ones it
+// submits. A body whose disc cannot reach the viewport (see cullMargin)
+// is skipped, not merely clipped: ebiten's vector path flattener
+// (Arc → cubicTo → AddStroke) degenerates
+// when its input coordinates run into the 1e7..1e13 px band — exactly
+// where AU-scale systems' world units land once the camera is tight — so
+// an off-screen body costs ~5-20 ms per stroked primitive against ~15 µs
+// on-screen, every frame, for geometry no pixel sees. The overlay already
+// gates its brackets this way; the body layers must too.
+func (r *Renderer) keepBody(cam Camera, sx, sy, px float64) bool {
+	if offscreen(cam, sx, sy, px) {
+		return false
+	}
+	r.bodyPrims++
+	return true
 }
