@@ -1,6 +1,8 @@
 package screens
 
 import (
+	"fmt"
+	"image"
 	"sort"
 	"testing"
 
@@ -11,10 +13,56 @@ import (
 	"github.com/entieve/entieve/uikit/widgets"
 )
 
+// TestOrderWindowFitsContent is the regression lock for the clipped dialog
+// (the qty field and the button row used to fall past the frame): every
+// child rect — the content body, the mode toggle, the price field, the live
+// preview, the qty field and both buttons — must lie inside the window
+// frame at UI scale 1.0 and 1.5, and the frame must be at least the
+// content's own preferred size. Content that outgrows orderMinW/orderMinH
+// fails here instead of silently overflowing.
+func TestOrderWindowFitsContent(t *testing.T) {
+	for _, scale := range []float64{1.0, 1.5} {
+		t.Run(fmt.Sprintf("scale %.1f", scale), func(t *testing.T) {
+			uitest.UseScale(t, scale)
+			_, _, env := orderStub([]sim.MarketStock{
+				{Item: "item-stub-ore", Price: 100, Qty: 5, Side: sim.OrderSell},
+				{Item: "item-stub-ore", Price: 90, Qty: 2, Side: sim.OrderBuy},
+			})
+			w := NewOrderWin(env)
+			ui := newWindowUI(t, env, w.Win())
+			w.Show("item-stub-ore", sim.OrderSell, 5)
+			uitest.PumpWindow(t, ui, nil, 1024, 700)
+
+			frame := w.win.GetContainer().GetWidget().Rect
+			if pw, ph := w.win.GetContainer().PreferredSize(); frame.Dx() < pw || frame.Dy() < ph {
+				t.Errorf("frame %v is smaller than its content %dx%d", frame, pw, ph)
+			}
+			for _, c := range []struct {
+				name string
+				rect image.Rectangle
+			}{
+				{"body", w.body.GetWidget().Rect},
+				{"toggle", w.modeBtn.GetWidget().Rect},
+				{"price", w.price.GetWidget().Rect},
+				{"preview", w.preview.GetWidget().Rect},
+				{"qty", w.qty.GetWidget().Rect},
+				{"accept", w.accept.GetWidget().Rect},
+				{"cancel", w.cancel.GetWidget().Rect},
+			} {
+				if !c.rect.In(frame) {
+					t.Errorf("%s rect %v is not inside the window frame %v", c.name, c.rect, frame)
+				}
+			}
+		})
+	}
+}
+
 // orderStub builds the seam-stub world the order window reads: one item
 // with a base price, a docked market and a caller-set book.
 func orderStub(orders []sim.MarketStock) (*stubView, *recordingSink, widgets.Seams) {
-	th := theme.NewSeam(theme.DefaultPalette(), theme.DefaultTypeScale())
+	// Scale the type at build time like the kit does, so a pin that raises
+	// the UI scale exercises the real face metrics (identity at scale 1).
+	th := theme.NewSeam(theme.DefaultPalette(), theme.ScaleTypeScale(theme.DefaultTypeScale()))
 	cv := &stubView{
 		c: &content.Content{Items: map[content.ItemID]*content.ItemDef{
 			"item-stub-ore": {Name: "Stub Ore", Category: content.CatOre, BasePrice: 7},

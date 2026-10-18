@@ -83,11 +83,26 @@ func TestOrderWindowOpensCentered(t *testing.T) {
 	if w == nil {
 		t.Fatal("no order window")
 	}
+	// Open it (mounted + themed, like any real launch) and look at the
+	// placed rect: the host centres the shown dialog once, and its size is
+	// the content's own.
+	g.kit.OpenOrder("min-ferrite", sim.OrderSell, 1)
+	if !g.kit.OrderOpen() {
+		t.Fatal("fixture: order window did not open")
+	}
+	pump(t, g, 1280, 720)
 	r := w.GetContainer().GetWidget().Rect
 	cx, cy := (r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2
 	if cx != 1280/2 || cy != 720/2 {
 		t.Errorf("order window centre = %d,%d, want the viewport centre %d,%d (rect %v)",
 			cx, cy, 1280/2, 720/2, r)
+	}
+
+	// The frame is sized to its content: the window must be at least the
+	// container's preferred size, so no row (the qty field, the buttons)
+	// overflows it. A content growth past the pinned size fails here.
+	if pw, ph := w.GetContainer().PreferredSize(); r.Dx() < pw || r.Dy() < ph {
+		t.Errorf("order window %v is smaller than its content %dx%d", r, pw, ph)
 	}
 
 	// Not persisted: the sidecar name list holds only the core windows and
