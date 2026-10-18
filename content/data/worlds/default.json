@@ -4,7 +4,7 @@
   "description": "The normal game start: a Väktare with a modest fit parked outside Jernborg station in Starogród.",
   "start": {
     "system": "sys-solace",
-    "position": { "X": 540000000, "Y": 340000000 },
+    "position": { "X": 843007620248, "Y": 502580312071 },
     "ship": "ship-sloop",
     "fit": ["mod-emp-turret", "mod-afterburner", "mod-armor-rep"],
     "cargo": [

@@ -63,7 +63,7 @@ in-game help window renders.
 | Right click | Orbit target under cursor (2,500 m) — in the world; unchanged |
 | Right click | On an item anywhere it appears: flat context menu — **Show Info** first (always bold), then the surface's actions (grayed-but-visible when impossible); on a weapon cell in the module rack: Show Info / Show Info — `<charge>` / ─ / **Cycle charge** |
 | Middle drag | Pan camera |
-| Wheel | Zoom (0.05× – 4×); over a table (overview, market, inventory, fitting), scroll it — wheel up moves toward the top |
+| Wheel | Zoom (2×10⁻⁹ – 4×: the whole system down to a grid); over a table (overview, market, inventory, fitting), scroll it — wheel up moves toward the top |
 
 Mouse handling is fully context-aware: a click, drag or wheel over *any*
 window or the HUD chrome never reaches the world behind it.

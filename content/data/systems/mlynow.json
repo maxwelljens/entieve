@@ -24,7 +24,7 @@
       "id": "cel-mlynow-prime",
       "name": "Młynów Prime",
       "kind": "planet",
-      "position": { "X": 1700000000, "Y": 800000000 },
+      "position": { "X": 174131788010, "Y": 81944370828 },
       "radius": 6371000,
       "colors": ["#8a7f5f"]
     },
@@ -32,7 +32,7 @@
       "id": "cel-huta",
       "name": "Huta",
       "kind": "station",
-      "position": { "X": 1900000000, "Y": -1100000000 },
+      "position": { "X": 274857800180, "Y": -159128200104 },
       "radius": 900,
       "colors": ["#e0cfa8"],
       "station": {
@@ -62,7 +62,7 @@
       "id": "cel-mlynow-belt",
       "name": "Młynów Belt",
       "kind": "belt",
-      "position": { "X": -1100000000, "Y": -1400000000 },
+      "position": { "X": -559868967560, "Y": -712560504167 },
       "radius": 280000,
       "colors": ["#7c6f63"],
       "belt": {
@@ -80,7 +80,7 @@
       "id": "cel-gate-rudnik",
       "name": "Rudnik Gate",
       "kind": "gate",
-      "position": { "X": 2500000000, "Y": 2000000000 },
+      "position": { "X": 2853755567647, "Y": 2283004454117 },
       "radius": 2500,
       "colors": ["#8fd8c0"],
       "gate": {
@@ -92,7 +92,7 @@
       "id": "cel-gate-penumbra",
       "name": "Kuźnica Gate",
       "kind": "gate",
-      "position": { "X": -2800000000, "Y": 600000000 },
+      "position": { "X": -4913469412868, "Y": 1052886302757 },
       "radius": 2500,
       "colors": ["#c9a8ff"],
       "gate": {
