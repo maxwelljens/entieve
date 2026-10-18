@@ -61,6 +61,21 @@ func DefaultPalette() Palette {
 	}
 }
 
+// OwnedRowAlpha is the alpha of the background tint a table row wears
+// when it belongs to the player (the market book's own orders). It is
+// the same 60 the overview's own-ship (Player) and hostile (Danger) rows
+// already use: a row hint that leaves the dense mono figures readable.
+// A selection's Accent tint (selectionAlpha 64) still wins over it.
+const OwnedRowAlpha = 60
+
+// OwnedRowTint is that tint for a row the player owns: the palette's
+// Good green — the HUD's positive/success role — at OwnedRowAlpha.
+func OwnedRowTint(p Palette) color.RGBA {
+	c := p.Good
+	c.A = OwnedRowAlpha
+	return c
+}
+
 // mustHex parses a palette color; invalid constants would be a build bug.
 func mustHex(s string) color.RGBA {
 	c, err := render.ParseHex(s)
