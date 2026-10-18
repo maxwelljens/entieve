@@ -174,6 +174,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The typed market-order mini-window's content no longer overflows its
+  frame** (`uikit/screens/orderwin.go`): the dialog's fixed design height was
+  guessed at 190 px while title bar + body need 263 (Sell↔Request toggle,
+  price field, live preview, qty field, Accept/Cancel buttons + the
+  `ContentsPad` margins), so the qty field and the button row hung past the
+  bottom edge. The floor is now the measured requirement rounded up by one
+  `ContentsPad` of cushion (300×272), the fallback rect matches it so the
+  host's centring sees the real height, and every child rect is pinned
+  inside the frame at UI scale 1.0 and 1.5 (`orderwin_test.go`
+  `TestOrderWindowFitsContent`; the game-level
+  `TestOrderWindowOpensCentered` now also asserts the frame holds the
+  container's preferred size, so future content growth fails loudly instead
+  of clipping).
+
 - **The world body pass no longer draws off-screen celestials**
   (`render/render.go`, `render/overlay.go`): a body whose disc cannot reach
   the viewport is skipped instead of drawn. ebiten's vector path flattener

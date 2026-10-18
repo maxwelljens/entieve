@@ -15,9 +15,14 @@ import (
 
 // orderMinW/orderMinH are the mini-window's design-px floor (and its
 // fallback rect, centred by the host at startup — see game.placeDefaults).
+// orderMinH is the measured content requirement (title bar 44 + the padded
+// body's 219: the five rows and their ContentsPad gaps) rounded up by one
+// ContentsPad of cushion, so device-pixel rounding at higher type scales
+// can't clip the last row. Content growth past this fails loudly in
+// TestOrderWindowFitsContent / TestOrderWindowOpensCentered.
 const (
 	orderMinW = 300
-	orderMinH = 190
+	orderMinH = 272
 )
 
 // OrderWin is the player market-order mini-window: a small, draggable,
@@ -40,6 +45,7 @@ type OrderWin struct {
 
 	win   *widget.Window
 	title *widget.Text
+	body  *widget.Container
 
 	modeBtn *widget.Button
 	price   *widget.TextInput
@@ -122,6 +128,7 @@ func NewOrderWin(env widgets.Seams) *OrderWin {
 		)),
 	)
 	body.AddChild(o.modeBtn, row(label("Price"), o.price), o.preview, row(label("Qty"), o.qty), row(o.accept, o.cancel))
+	o.body = body
 
 	// The title bar carries the target ("<ItemName> — Order"); the × close
 	// is attached by the kit's close seam (SetWindowClose), like Show Info.
@@ -132,8 +139,10 @@ func NewOrderWin(env widgets.Seams) *OrderWin {
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(bar, theme.Px(theme.TitleBarH)),
 		widget.WindowOpts.MinSize(theme.Px(orderMinW), theme.Px(orderMinH)),
-		// Fallback only: the host centres it for the real viewport.
-		widget.WindowOpts.Location(image.Rect(theme.Px(362), theme.Px(240), theme.Px(662), theme.Px(430))),
+		// Fallback only: the host centres it for the real viewport. Kept at
+		// the floor: Location bypasses SetLocation's MinSize clamp, so a
+		// smaller fallback would let the host centre the wrong height.
+		widget.WindowOpts.Location(image.Rect(theme.Px(362), theme.Px(240), theme.Px(362+orderMinW), theme.Px(240+orderMinH))),
 	)
 	theme.ShowWidget(o.win.GetContainer().GetWidget(), false)
 	return o
