@@ -24,7 +24,7 @@
       "id": "cel-glusza-prime",
       "name": "Głusza Prime",
       "kind": "planet",
-      "position": { "X": 1500000000, "Y": -900000000 },
+      "position": { "X": 188689321815, "Y": -113213593089 },
       "radius": 6371000,
       "colors": ["#5f6f7a"]
     },
@@ -32,7 +32,7 @@
       "id": "cel-kantor",
       "name": "Kantor",
       "kind": "station",
-      "position": { "X": -700000000, "Y": 1000000000 },
+      "position": { "X": -733780939157, "Y": 1048258484510 },
       "radius": 700,
       "colors": ["#d8c8b0"],
       "station": {
@@ -57,7 +57,7 @@
       "id": "cel-glusza-belt",
       "name": "Głusza Belt",
       "kind": "belt",
-      "position": { "X": -1000000000, "Y": -1500000000 },
+      "position": { "X": -655983899627, "Y": -983975849441 },
       "radius": 310000,
       "colors": ["#9db8d0"],
       "belt": {
@@ -76,7 +76,7 @@
       "id": "cel-gate-kamieniec",
       "name": "Kamieniec Gate",
       "kind": "gate",
-      "position": { "X": 2600000000, "Y": -1700000000 },
+      "position": { "X": 2706209756564, "Y": -1769444840830 },
       "radius": 2500,
       "colors": ["#ff9f8a"],
       "gate": {
@@ -88,7 +88,7 @@
       "id": "cel-gate-gloam",
       "name": "Pustkowie Gate",
       "kind": "gate",
-      "position": { "X": 2400000000, "Y": 2000000000 },
+      "position": { "X": 4467521572858, "Y": 3722934644049 },
       "radius": 2500,
       "colors": ["#a8b8ff"],
       "gate": {

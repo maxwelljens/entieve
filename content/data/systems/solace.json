@@ -24,7 +24,7 @@
       "id": "cel-solace-prime",
       "name": "Starogród Prime",
       "kind": "planet",
-      "position": { "X": 1400000000, "Y": -600000000 },
+      "position": { "X": 106112365472, "Y": -45476728060 },
       "radius": 6371000,
       "colors": ["#4a7fb5"]
     },
@@ -32,7 +32,7 @@
       "id": "cel-haven-rest",
       "name": "Jernborg",
       "kind": "station",
-      "position": { "X": 520000000, "Y": 310000000 },
+      "position": { "X": 842987620248, "Y": 502550312071 },
       "radius": 800,
       "colors": ["#c9d4e8"],
       "station": {
@@ -70,7 +70,7 @@
       "id": "cel-solace-belt",
       "name": "Starogród Belt",
       "kind": "belt",
-      "position": { "X": -1100000000, "Y": 800000000 },
+      "position": { "X": -1054958828540, "Y": 767242784393 },
       "radius": 4000,
       "colors": ["#8f8475"],
       "belt": {
@@ -87,7 +87,7 @@
       "id": "cel-gate-penumbra",
       "name": "Kuźnica Gate",
       "kind": "gate",
-      "position": { "X": 2400000000, "Y": -1700000000 },
+      "position": { "X": 2945076955526, "Y": -2086096176831 },
       "radius": 2500,
       "colors": ["#7fd0ff"],
       "gate": {
@@ -99,7 +99,7 @@
       "id": "cel-gate-rudnik",
       "name": "Rudnik Gate",
       "kind": "gate",
-      "position": { "X": -2400000000, "Y": 900000000 },
+      "position": { "X": -4561869113906, "Y": 1710700917715 },
       "radius": 2500,
       "colors": ["#ffd28a"],
       "gate": {

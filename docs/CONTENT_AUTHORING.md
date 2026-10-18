@@ -92,7 +92,7 @@ systems come only from `systems/*.json`.
 
 | Quantity        | Unit            | Example                        |
 |-----------------|-----------------|--------------------------------|
-| Distance (grid) | meters          | station at `{ "X": 520000000, "Y": 310000000 }` |
+| Distance (grid) | meters          | station at `{ "X": 830000000000, "Y": 490000000000 }` (AU-scale — see below) |
 | Distance (starmap) | light-years   | `"position": { "X": 6.2, "Y": -1.8 }` |
 | Volume          | m³              | `"volume": 0.01`, cargo `400`  |
 | Energy          | GJ              | `"capacitor": 420`, `"activation_cost": 15` |
@@ -104,6 +104,11 @@ systems come only from `systems/*.json`.
 | Fractions       | [0,1) resists, (0,1] yields | `"em": 0.15` |
 
 Positions are `core.Vec2` JSON: `{"X": ..., "Y": ...}` (Y grows downward).
+System bodies are placed at real-solar-system scale (1 AU = 1.496e11 m):
+planets 0.4–2 AU from the star, belts/belt-like anomalies 2–10 AU, stations
+1–10 AU, gates 20–40 AU, with separation floors keeping landmarks off each
+other's grids — the scheme is described in [../SIM.md](../SIM.md) §7 and
+pinned by `content/layout_test.go`, which a system outside the bands fails.
 
 ## Lore fields: hull `origin` and NPC `description`
 
@@ -182,7 +187,7 @@ complete, valid two-celestial system with a gate back to Starogród):
       "id": "cel-cinder-belt",
       "name": "Cinder Belt",
       "kind": "belt",
-      "position": { "X": -900000000, "Y": 700000000 },
+      "position": { "X": -700000000000, "Y": 550000000000 },
       "radius": 250000,
       "colors": ["#8f8475"],
       "belt": {
@@ -198,7 +203,7 @@ complete, valid two-celestial system with a gate back to Starogród):
       "id": "cel-gate-solace",
       "name": "Starogród Gate",
       "kind": "gate",
-      "position": { "X": 2000000000, "Y": -1400000000 },
+      "position": { "X": 3200000000000, "Y": -2240000000000 },
       "radius": 2500,
       "colors": ["#7fd0ff"],
       "gate": { "to_system": "sys-solace", "to_cel": "cel-gate-cinder" }
@@ -215,7 +220,7 @@ complete, valid two-celestial system with a gate back to Starogród):
   "id": "cel-gate-cinder",
   "name": "Cinder Gate",
   "kind": "gate",
-  "position": { "X": -2400000000, "Y": 900000000 },
+  "position": { "X": -3200000000000, "Y": 1200000000000 },
   "radius": 2500,
   "colors": ["#ff9a5c"],
   "gate": { "to_system": "sys-cinder", "to_cel": "cel-gate-solace" }
@@ -452,7 +457,7 @@ economy (see `docs/SIM.md`).
   "description": "A compact challenge world: kill the Gniazdo, dock, repeat.",
   "start": {
     "system": "sys-penumbra",
-    "position": { "X": 1500000000, "Y": -800000000 },
+    "position": { "X": 530000000000, "Y": -300000000000 },
     "ship": "ship-sloop",
     "fit": ["mod-emp-turret", "mod-afterburner", "mod-armor-rep"],
     "cargo": [{ "item": "charge-emp", "qty": 100 }],

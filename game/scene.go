@@ -38,8 +38,12 @@ type Scene interface {
 
 // Camera tuning for the space scene.
 const (
-	zoomBase          = 0.02 // px/m at 1x zoom multiplier
-	zoomMin           = 0.05
+	zoomBase = 0.02 // px/m at 1x zoom multiplier
+	// zoomMin lets the widest framing fit the whole system on the short edge
+	// at the 1280×720 design size: 720 px / (zoomBase·zoomMin) ≈ 120 AU, so
+	// gates out at 40 AU and the star are on screen together. The tight end
+	// is untouched — grid-scale UX lives at zoomBase·zoomMax (≈ 16 km across).
+	zoomMin           = 2e-9
 	zoomMax           = 4.0
 	zoomStep          = 1.15 // wheel notch factor
 	panSpeed          = 10.0 // screen px per arrow press

@@ -24,7 +24,7 @@
       "id": "cel-kamieniec-prime",
       "name": "Kamieniec Prime",
       "kind": "planet",
-      "position": { "X": -1600000000, "Y": -600000000 },
+      "position": { "X": -172416500386, "Y": -64656187645 },
       "radius": 6371000,
       "colors": ["#7f8a94"]
     },
@@ -32,7 +32,7 @@
       "id": "cel-doki",
       "name": "Doki",
       "kind": "station",
-      "position": { "X": 1200000000, "Y": 1400000000 },
+      "position": { "X": 394813455714, "Y": 460615698333 },
       "radius": 850,
       "colors": ["#c9d4e8"],
       "station": {
@@ -63,7 +63,7 @@
       "id": "cel-kamieniec-belt",
       "name": "Kamieniec Belt",
       "kind": "belt",
-      "position": { "X": -900000000, "Y": 1300000000 },
+      "position": { "X": -330134854342, "Y": 476861456272 },
       "radius": 290000,
       "colors": ["#8f8475"],
       "belt": {
@@ -82,7 +82,7 @@
       "id": "cel-gate-penumbra",
       "name": "Kuźnica Gate",
       "kind": "gate",
-      "position": { "X": 2900000000, "Y": -1800000000 },
+      "position": { "X": 3117105713934, "Y": -1934755270718 },
       "radius": 2500,
       "colors": ["#9fd0ff"],
       "gate": {
@@ -94,7 +94,7 @@
       "id": "cel-gate-glusza",
       "name": "Głusza Gate",
       "kind": "gate",
-      "position": { "X": 2700000000, "Y": 1900000000 },
+      "position": { "X": 4098724975052, "Y": 2884287945407 },
       "radius": 2500,
       "colors": ["#ff9f8a"],
       "gate": {

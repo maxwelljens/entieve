@@ -24,7 +24,7 @@
       "id": "cel-gloam-belt",
       "name": "Pustkowie Belt",
       "kind": "belt",
-      "position": { "X": -900000000, "Y": -1400000000 },
+      "position": { "X": -492723823375, "Y": -766459280806 },
       "radius": 300000,
       "colors": ["#9db8d0"],
       "belt": {
@@ -42,7 +42,7 @@
       "id": "cel-gate-penumbra",
       "name": "Kuźnica Gate",
       "kind": "gate",
-      "position": { "X": 2800000000, "Y": 1900000000 },
+      "position": { "X": 2788672514437, "Y": 1892313491939 },
       "radius": 2500,
       "colors": ["#b98cff"],
       "gate": {
@@ -54,7 +54,7 @@
       "id": "cel-gate-glusza",
       "name": "Głusza Gate",
       "kind": "gate",
-      "position": { "X": -2500000000, "Y": 1700000000 },
+      "position": { "X": -4064181929557, "Y": 2763643712099 },
       "radius": 2500,
       "colors": ["#a8b8ff"],
       "gate": {

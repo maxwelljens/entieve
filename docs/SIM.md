@@ -410,3 +410,41 @@ schema change: `content/model.go` struct + `content/validate.go`
 cross-checks + the ID registry in ARCHITECTURE.md + a NAMING.md registry
 row — then a showcase checkpoint so `tests/` keeps proving the feature
 end-to-end.
+
+## 7. System layout (placement)
+
+What the shipped system geometry in `content/data/systems/*.json` looks
+like. Descriptive — `content/layout_test.go` pins the contract.
+
+Scale is real-solar-system: 1 AU = 1.496e11 m (the house conversion hull
+`WarpSpeed` and the distance formatters use), star at the origin with its
+physical radius. Bands, measured from the star:
+
+| Bodies | Band |
+|---|---|
+| inner planets (and moons) | 0.4–2 AU |
+| asteroid belts, belt-like anomalies | 2–10 AU |
+| stations | 1–10 AU, near their planet or independent |
+| stargates | 20–40 AU, on the system rim |
+
+Separation floors keep landmarks off each other's grids: stations, belts
+and anomalies land at least 2 AU apart (a station may sit near its own
+planet), rim gates at least 5 AU apart. Everything is warp-separated —
+sub-light travel between landmarks is scenery, not transport.
+
+The placement is per-system, never cloned: each body keeps its authored
+direction from the star (the authored vector is rescaled, so gate
+directions still read as the Kresy ring across systems), and its distance
+comes from a band split into one radial slot per body with a seeded
+jitter, driven by a SplitMix64 stream keyed on the FNV-1a hash of the
+system id. Slots violating a separation floor are re-drawn from their
+whole band on the same stream (95% of the band after twelve tries). World
+starts (`content/data/worlds/*.json`) ride their anchor body — Jernborg,
+the Starogród Belt — keeping their authored offset.
+
+Consequences the layout deliberately accepts: warp speeds are already
+AU/s, so a system crossing takes tens of seconds at warp (the warp
+timeline's ease over the frozen 386-tick floor still binds short hops),
+and convoy/miner transit legs now dominate their economy cycles — the
+cadence knobs (haul fees, wish cadence, agent counts) are meant to be
+balanced live against that, not here.

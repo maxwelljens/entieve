@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Star systems rescaled to real-solar-system proportions**
+  (`content/data/systems/*.json`, `content/data/worlds/*.json`): bodies
+  spread across tens of AU instead of the old ~0.1 AU cloud — inner
+  planets 0.4–2 AU from the star, asteroid belts (and belt-like anomalies
+  like Gniazdo) 2–10 AU, stations 1–10 AU near their planet or
+  independent, stargates 20–40 AU on the rim. Ids, names, radii, kinds
+  and every other field are untouched: only positions moved. Each body
+  keeps its authored direction from the star (gate directions still read
+  as the Kresy ring on the starmap), distances come from per-system
+  seeded radial slots (system id as the variation seed — scheme in
+  `docs/SIM.md` §7), and stations/belts/anomalies hold a 2 AU separation
+  floor (gates 5 AU) so landmarks can never bunch again — pinned by
+  `content/layout_test.go`. Warp physics is unchanged (hull `WarpSpeed`
+  was already AU/s), so transit across a system now takes tens of seconds
+  EVE-style, and convoy/miner legs dominate their economy cycles until
+  the cadence knobs are balanced live. World starts ride their anchor
+  bodies (Jernborg, the Starogród Belt). The space camera's zoom-out
+  range now frames the whole system (`game/scene.go`, pinned in
+  `game/scene_test.go`); grid-scale UX is untouched. Showcase tour
+  timings drift with the new legs (its recalibration follows separately).
+
 - **Distance display switches to AU past 99,999 km** (`uikit/theme/format.go`,
   `render/art.go`, `uikit/screens/selected.go`, `sim/command.go`): the four
   in-sync distance formatters now read meters as "42 m" under 2 km, 1-decimal

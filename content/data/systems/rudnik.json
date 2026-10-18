@@ -24,7 +24,7 @@
       "id": "cel-rudnik-prime",
       "name": "Rudnik Prime",
       "kind": "planet",
-      "position": { "X": 1500000000, "Y": -700000000 },
+      "position": { "X": 192734907622, "Y": -89942956890 },
       "radius": 6371000,
       "colors": ["#6f8f6a"]
     },
@@ -32,7 +32,7 @@
       "id": "cel-halda",
       "name": "Halda",
       "kind": "station",
-      "position": { "X": 620000000, "Y": 430000000 },
+      "position": { "X": 1069460519460, "Y": 741722618335 },
       "radius": 800,
       "colors": ["#c9d4e8"],
       "station": {
@@ -59,7 +59,7 @@
       "id": "cel-rudnik-belt",
       "name": "Rudnik Belt",
       "kind": "belt",
-      "position": { "X": -1200000000, "Y": 950000000 },
+      "position": { "X": -371770736261, "Y": 294318499540 },
       "radius": 300000,
       "colors": ["#8f8475"],
       "belt": {
@@ -78,7 +78,7 @@
       "id": "cel-gate-solace",
       "name": "Starogród Gate",
       "kind": "gate",
-      "position": { "X": -2700000000, "Y": -1500000000 },
+      "position": { "X": -3492472586259, "Y": -1940262547922 },
       "radius": 2500,
       "colors": ["#ffd28a"],
       "gate": {
@@ -90,7 +90,7 @@
       "id": "cel-gate-mlynow",
       "name": "Młynów Gate",
       "kind": "gate",
-      "position": { "X": 2600000000, "Y": 1700000000 },
+      "position": { "X": 4025289688051, "Y": 2631920180649 },
       "radius": 2500,
       "colors": ["#8fd8c0"],
       "gate": {
