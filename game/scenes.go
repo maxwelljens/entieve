@@ -178,7 +178,7 @@ func (g *Game) newBtn(label string, minW, minH int, clicked func()) *widget.Butt
 func (g *Game) buildMenuWindow() *widget.Window {
 	p := g.env.Pal()
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(bordered(theme.WindowBody(p.BG), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Spacing(theme.Px(10)),
@@ -231,7 +231,7 @@ func (g *Game) buildServicesWindow() *widget.Window {
 	)
 
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BG), nrgba(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(bordered(theme.WindowBody(p.BG), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Spacing(theme.Px(boardSpacing)),

@@ -50,6 +50,27 @@ import (
 // a corner engages both axes.
 const edgeGripPx = 8
 
+// closeBtnW/closeBtnH are the title-bar close button's hit box in DESIGN
+// units (scaled through Px everywhere it is measured): the same values
+// the × button sets as its MinSize, so the chrome's exclusion strip and
+// the widget's own rect agree.
+const (
+	closeBtnW = 46
+	closeBtnH = 40
+)
+
+// closeButtonRect is the × strip at a title bar's right edge: full bar
+// height, closeBtnW wide. moveStart excludes it for a closable window,
+// so a press that closes never arms a drag — while the window's grip
+// bands still classify first (edgesAt), which is what keeps a corner
+// press a resize. Pure — unit-tested by TestCloseButtonStripExcludesDrag.
+func closeButtonRect(title image.Rectangle) image.Rectangle {
+	if title.Empty() {
+		return image.Rectangle{}
+	}
+	return image.Rect(title.Max.X-theme.Px(closeBtnW), title.Min.Y, title.Max.X, title.Max.Y)
+}
+
 // edgeMask is a bit set of window edges.
 type edgeMask uint8
 
@@ -121,6 +142,14 @@ type winChrome struct {
 	moveActive bool            // a title drag is in flight
 	start      image.Rectangle // window rect at press
 	origin     image.Point     // cursor at press
+
+	// closable marks the × strip at the title bar's right edge: a press
+	// there never arms the title drag (the button owns that strip).
+	// settle drops the window's open animation when a drag arms — the
+	// fade must not relayout the subtree a drag is translating (nil for
+	// a chrome a test builds on its own).
+	closable bool
+	settle   func()
 }
 
 // cancel drops any drag state without touching the rect: the window is
@@ -174,6 +203,12 @@ func (c *winChrome) moveStart(p image.Point) bool {
 		return false
 	}
 	if !p.In(c.win.TitleBar.GetWidget().Rect) {
+		return false
+	}
+	// The × strip belongs to the close button: a press there never arms
+	// the drag (the grip still classifies first in its own test, so a
+	// corner press keeps resizing).
+	if c.closable && p.In(closeButtonRect(c.win.TitleBar.GetWidget().Rect)) {
 		return false
 	}
 	// A never-mounted window has no layer of its own — same reject as
@@ -269,6 +304,12 @@ func (c *winChrome) step(cursor image.Point, pressed bool) {
 		m := c.moveStart(cursor)
 		if e != 0 || m {
 			c.start, c.origin = wgt.Rect, cursor
+			// Grabbing the window settles its open animation: the fade's
+			// per-frame park flips would relayout the subtree the drag
+			// translates (CONTEXT.md "Settle").
+			if c.settle != nil {
+				c.settle()
+			}
 		}
 		c.armed, c.edges, c.moveArmed = e != 0, e, m
 		return

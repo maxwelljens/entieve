@@ -585,9 +585,9 @@ func NewInfoWin(env widgets.Seams) *InfoWin {
 		widget.ScrollContainerOpts.Content(w.page),
 		widget.ScrollContainerOpts.StretchContentWidth(),
 		widget.ScrollContainerOpts.Image(&widget.ScrollContainerImage{
-			Idle:     theme.Bordered(theme.Solid(p.BG), theme.NRGBA(p.Border, 160), 1),
+			Idle:     theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 160), 1),
 			Disabled: theme.Bordered(theme.NRGBA(p.Cell, 140), theme.NRGBA(p.Border, 110), 1),
-			Mask:     eimage.NewNineSliceColor(theme.Solid(p.BG)),
+			Mask:     eimage.NewNineSliceColor(theme.WindowBody(p.BG)),
 		}),
 	)
 	// The viewport itself does not scroll (the tables own their offset
@@ -603,7 +603,7 @@ func NewInfoWin(env widgets.Seams) *InfoWin {
 	widgets.AttachScrollContent(w.scroll, w.page)
 
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
@@ -612,21 +612,11 @@ func NewInfoWin(env widgets.Seams) *InfoWin {
 	)
 	body.AddChild(w.scroll)
 
-	// Title bar: name + "— Info", and the window's close affordance (the
-	// only mouse-only close in the kit — this window has no key).
+	// Title bar: name + "— Info". The close affordance (the ×) is not
+	// built here: Kit.SetWindowClose attaches it through the kit-wide
+	// close seam, so every closable title bar carries the same button.
 	bar, title := theme.NewTitleBar(env, "Info", "")
 	w.title = title
-	bar.AddChild(widget.NewButton(
-		widget.ButtonOpts.TextLabel("×"),
-		widget.ButtonOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(theme.Px(46), theme.Px(40)), // ≥40 scaled hit box
-			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-				HorizontalPosition: widget.AnchorLayoutPositionEnd,
-				VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			}),
-		),
-		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { w.Close() }),
-	))
 
 	w.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),

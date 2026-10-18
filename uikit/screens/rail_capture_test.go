@@ -17,7 +17,10 @@ import (
 
 // railCaptureFrames is how many drawn frames settle each phase before
 // its sample is taken (anchors and layout settle on the first frames).
-const railCaptureFrames = 3
+// 13 draws per phase (on top of the two fixture pumps): the kit
+// windows open with the 12-frame fade — captures pin the settled
+// state, never a mid-fade one (winanim.go).
+const railCaptureFrames = 13
 
 // TestRailPixelsDrawAboveWindows: a window dragged onto the rail's
 // gutter must never paint over the rail — the rail's column is topmost

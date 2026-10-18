@@ -16,7 +16,9 @@ import (
 
 // iconsCaptureFrames is how many full draws run before the screenshot is
 // taken (anchors and layout settle on the first frames).
-const iconsCaptureFrames = 3
+// 13 draws: the kit windows open with the 12-frame fade — captures
+// pin the settled state, never a mid-fade one (winanim.go).
+const iconsCaptureFrames = 13
 
 // TestIconsCaptureFrame renders the three icon-bearing core surfaces —
 // overview (kind column), Selected Item (kind glyph + action buttons) and
@@ -85,7 +87,6 @@ func (g *iconsCaptureGame) Update() error {
 		g.err = err
 		return ebiten.Termination
 	}
-	g.frames++
 	if g.frames > iconsCaptureFrames && g.last != nil {
 		g.verify(g.last)
 		return ebiten.Termination
@@ -98,6 +99,7 @@ func (g *iconsCaptureGame) Draw(screen *ebiten.Image) {
 	g.k.Draw(img)
 	screen.DrawImage(img, nil)
 	g.last = img
+	g.frames++ // frames count DRAWS: ebiten runs Updates on their own cadence (see rail_capture_test.go)
 }
 
 func (g *iconsCaptureGame) Layout(w, h int) (int, int) { return 1280, 720 }

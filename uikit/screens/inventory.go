@@ -115,7 +115,7 @@ func NewInventory(env widgets.Seams) *Inventory {
 	// Body: label/table pairs over the two button rows; the grid gives
 	// each table exactly its cell (bounded viewport, equal thirds).
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, true, false, true, false, true, false, false}),

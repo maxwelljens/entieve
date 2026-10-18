@@ -62,12 +62,47 @@ type kitMount struct {
 // an unmounted window stops being pumped and a drag interrupted by the
 // unmount leaves no rect or cursor state behind. Mounting a window that
 // is already mounted is a no-op that returns the same detach.
+//
+// A fresh mount runs the open animation (fade + slide in — the window
+// stays input-live throughout); the internal raise paths call
+// addWindow(w, false) instead, because a raise is not an open. A window
+// whose × close is still fading re-mounts as a reopen: the pending
+// close (and its deferred unmount) is dropped here.
 func (k *Kit) AddWindow(w *widget.Window) widget.RemoveWindowFunc {
-	if _, ok := k.chromes[w]; !ok {
-		k.chromes[w] = &winChrome{win: w}
+	return k.addWindow(w, true)
+}
+
+// addWindow is AddWindow with the open-animation switch (see AddWindow).
+func (k *Kit) addWindow(w *widget.Window, animate bool) widget.RemoveWindowFunc {
+	// Re-mounting a window whose close is still fading = a reopen: the
+	// unmount its remove owed is cancelled right here.
+	k.cancelClose(w)
+	_, ok := k.chromes[w]
+	if !ok {
+		k.chromes[w] = &winChrome{win: w, closable: k.closes[w] != nil}
+		// Drag-arming settles the open fade: the fade's park flips would
+		// relayout the subtree the drag translates (CONTEXT.md "Settle").
+		k.chromes[w].settle = func() { k.settleOpen(w) }
 	}
-	if m, ok := k.mountOf(w); ok {
+	if m, mounted := k.mountOf(w); mounted {
+		if animate {
+			// The still-mounted reopen path (a × close deferred its
+			// unmount): fade back in.
+			k.anims[w] = &winAnim{open: true}
+		}
 		return m.remove
+	}
+	// A fresh append changes the stack. A raise (animate=false) retops
+	// one window over every animating one — nothing may keep fading
+	// below it, so everything settles. An open mount lands on top of the
+	// stack: the other open fades keep running (the composite walks the
+	// stack in order, so their paint order stays correct), but a close
+	// fade anywhere must finish now — its window just landed below this
+	// one and the composite would paint it over the new mount.
+	if animate {
+		k.settleCloseAnims()
+	} else {
+		k.settleAnims()
 	}
 	// ebitenui would re-top a window when its container sees a press —
 	// but a body widget's scroll viewport claims the input layer over
@@ -77,14 +112,32 @@ func (k *Kit) AddWindow(w *widget.Window) widget.RemoveWindowFunc {
 	// does) is the one deterministic path; the built-in one stays off.
 	w.DisableRelayering = true
 	remove := k.ui.AddWindow(w)
-	m := &kitMount{win: w}
-	m.remove = func() {
+	// The actual unmount (chrome detach, stack entry, ebitenui window) —
+	// what m.remove runs directly, and what a running close fade holds
+	// on to until it settles.
+	real := func() {
 		if ch, ok := k.chromes[w]; ok {
 			ch.cancel() // mid-drag unmount: drop the grip state first
 			delete(k.chromes, w)
 		}
+		delete(k.anims, w)
 		k.unstack(w)
 		remove()
+	}
+	m := &kitMount{win: w}
+	m.remove = func() {
+		if a, ok := k.anims[w]; ok && !a.open {
+			// The × close is fading: the unmount waits for settle (run
+			// once, there — winanim.go). Idempotent while it lasts.
+			if a.remove == nil {
+				a.remove = real
+			}
+			return
+		}
+		real()
+	}
+	if animate {
+		k.anims[w] = &winAnim{open: true}
 	}
 	k.stack = append(k.stack, m)
 	return m.remove
@@ -141,7 +194,7 @@ func (k *Kit) buildOverview() {
 	// Body: the table fills its grid cell exactly, so the scroll
 	// viewport is bounded by the window no matter how tall the rows are.
 	contents := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(k.th.Pal().BG), theme.NRGBA(k.th.Pal().Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(k.th.Pal().BG), theme.NRGBA(k.th.Pal().Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),

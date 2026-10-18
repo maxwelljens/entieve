@@ -75,6 +75,18 @@ type Kit struct {
 	// from Update/Draw.
 	chromes map[*widget.Window]*winChrome
 
+	// closes is the registered close semantics per window (the × button
+	// runs it through startClose); closeBtns is the attached × itself,
+	// the idempotence guard for attaching. anims is every running
+	// open/close animation (winanim.go) — parked out of ebitenui's
+	// window pass and composited by Kit.Draw — with animImg the one
+	// offscreen that composite reuses while an animation runs.
+	closes      map[*widget.Window]func()
+	closeBtns   map[*widget.Window]*widget.Button
+	anims       map[*widget.Window]*winAnim
+	animImg     *ebiten.Image
+	animImgSize image.Point
+
 	// stack is every window this kit has mounted, bottom → top: the paint
 	// and input order ebitenui keeps internally, mirrored here because
 	// ebitenui exposes no way to read it back. The raise (raisePressed)
@@ -143,6 +155,9 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	// Per-kit chrome registry: a kit built by a save/load rebuild must
 	// not disturb any kit still pumping (they own disjoint windows).
 	k.chromes = map[*widget.Window]*winChrome{}
+	k.closes = map[*widget.Window]func(){}
+	k.closeBtns = map[*widget.Window]*widget.Button{}
+	k.anims = map[*widget.Window]*winAnim{}
 	k.coreClosed = map[string]bool{}
 	k.coreShown = true
 
@@ -155,6 +170,10 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	k.svc.info = NewInfoWin(k.sess)
 	k.svc.show = k.ShowInfo
 	k.svc.info.onClose = k.CloseInfo
+	// Show Info's × registers the same close it always ran (CloseInfo:
+	// unmount, rect survives for the sidecar, never auto-opens) — now
+	// through the one kit-wide close seam, which adds the fade.
+	k.SetWindowClose(k.svc.info.Win(), k.CloseInfo)
 
 	// Root container: transparent overlay over the world render; windows
 	// float above it. The theme rides the widget parent chain.
@@ -169,6 +188,10 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	// kit's AddWindow is what attaches a chrome, see overview.go) and
 	// the window trees get validated against the theme. The chrome also
 	// makes the resize persistent: the spike has no close affordance.
+	// The two core windows' × closes through the rail's own toggle
+	// (ToggleCore) — hiding, not unmounting; reopening stays the rail's.
+	k.SetWindowClose(k.ov.win, func() { k.ToggleCore("Overview") })
+	k.SetWindowClose(k.sp.win, func() { k.ToggleCore("Selected Item") })
 	k.AddWindow(k.ov.win)
 	k.AddWindow(k.sp.win)
 
@@ -200,22 +223,31 @@ func (k *Kit) Update() error {
 
 // Draw renders the interface onto screen. Call it AFTER the world render.
 //
-// Draw order (the stacking contract, bottom → top): top chrome parked
-// out of the window pass → ui.Draw (root overlay, then windows, then
-// ebitenui's deferred popups) → chrome recompute → the top chrome
-// re-shown and painted over every window (its input layer lifts with it
-// in drawTops) → the context menu, always the last pixels.
+// Draw order (the stacking contract, bottom → top): the animating
+// windows parked out of the window pass and the top chrome parked with
+// them → ui.Draw (root overlay, then every settled window, then
+// ebitenui's deferred popups) → the animations unparked and the chrome
+// recompute → the fade composite (above the settled windows, below the
+// rail: it paints windows, so windows are its place in the order) → the
+// top chrome re-shown and painted over every window (its input layer
+// lifts with it in drawTops) → the context menu, always the last pixels.
 func (k *Kit) Draw(screen *ebiten.Image) {
+	k.parkAnims()
 	for _, t := range k.tops {
 		t.SetWindowPass(false) // parked: ui.Draw must not paint it
 	}
 	k.ui.Draw(screen)
+	// Back to shown before the chrome pass: a dragging press must arm
+	// against live geometry (see unparkAnims).
+	k.unparkAnims()
+	k.relayAnimWindows()
 	// Second chrome pass: input may have changed while drawing, and both
 	// drags recompute their rect absolutely from the press — this pass
 	// applies the fresh cursor (or derives an identical rect) so the
 	// next frame's hit tests see clean geometry.
 	k.stepChromes()
 	k.ov.drawTints(screen, k)
+	k.drawAnims(screen)
 	k.drawTops(screen)
 	// The context menu paints last: it is always the topmost pixels,
 	// above every window and tooltip.
@@ -286,7 +318,11 @@ func (k *Kit) raise(win *widget.Window) {
 		return
 	}
 	m.remove()
-	k.AddWindow(win)
+	// animate=false: a raise is not an open — the remount re-tops an
+	// already-visible window and must not restart its fade (the fresh
+	// append inside addWindow settles any other running animation, the
+	// stack-change rule of CONTEXT.md "Settle").
+	k.addWindow(win, false)
 }
 
 // modalUp reports whether a modal window is mounted: its ebitenui layer
@@ -448,11 +484,17 @@ func (k *Kit) ShowInfo(ref widgets.InfoRef) {
 	if !k.svc.info.Show(ref) {
 		return
 	}
-	if k.infoRemove != nil {
+	raised := k.infoRemove != nil
+	if raised {
 		k.infoRemove()
 		k.infoRemove = nil
 	}
-	k.infoRemove = k.AddWindow(k.svc.info.Win())
+	// First open fades in; a re-raise of the already-open window is a
+	// raise, not an open (addWindow with animate=false); a Show landing
+	// while the × close is still fading re-opens it — addWindow drops
+	// that pending close (its unmount is no longer owed) and the window
+	// fades back in from zero.
+	k.infoRemove = k.addWindow(k.svc.info.Win(), !raised)
 }
 
 // CloseInfo closes the Show Info window: unmount (its rect survives for
@@ -499,23 +541,36 @@ func (k *Kit) CoreOpen(name string) bool {
 // and the player's close (state writes only; unchanged widgets are not
 // touched, so the per-frame call stays free).
 func (k *Kit) applyCore() {
-	set := func(c widget.Containerer, show bool) {
-		if c == nil {
+	set := func(w *widget.Window, show bool) {
+		if w == nil {
 			return
+		}
+		if show {
+			// A rail/dock re-show while the × close is still fading
+			// cancels that close: the player reopened the window, so no
+			// unmount is owed — it shows at once.
+			k.cancelClose(w)
+		} else {
+			// A host hide (the docked veil) while the open fade runs
+			// settles it: the unpark pass would otherwise show the window
+			// every frame against the host's hide.
+			k.settleOpen(w)
 		}
 		vis := widget.Visibility_Show
 		if !show {
 			vis = widget.Visibility_Hide
 		}
-		if w := c.GetWidget(); w.GetVisibility() != vis {
-			w.SetVisibility(vis)
+		if c := w.GetContainer(); c != nil {
+			if wc := c.GetWidget(); wc.GetVisibility() != vis {
+				wc.SetVisibility(vis)
+			}
 		}
 	}
 	if k.ov != nil {
-		set(k.ov.win.GetContainer(), k.coreShown && k.CoreOpen("Overview"))
+		set(k.ov.win, k.coreShown && k.CoreOpen("Overview"))
 	}
 	if k.sp != nil {
-		set(k.sp.win.GetContainer(), k.coreShown && k.CoreOpen("Selected Item"))
+		set(k.sp.win, k.coreShown && k.CoreOpen("Selected Item"))
 	}
 }
 
