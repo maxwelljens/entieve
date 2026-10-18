@@ -2,6 +2,8 @@ package screens
 
 import (
 	"image"
+	"image/color"
+	"math"
 	"slices"
 	"sort"
 	"strconv"
@@ -30,10 +32,11 @@ const (
 	// of columns at the 1024 minimum.
 	mktSideW = 240
 
-	// mineMaxRows caps the My orders rows drawn before a "+N more" note:
-	// the slot cap is 20, but the docked band is short and a scrolled list
-	// is not worth the widget churn (the log keeps every fill).
-	mineMaxRows = 3
+	// mineWheelRows is how many My-orders rows one wheel notch scrolls.
+	// The list is uncapped (every standing order the player has is
+	// listed), so it rides a scroll viewport in the standing-order
+	// column with the rail's reserved gutter beside it.
+	mineWheelRows = 3
 )
 
 // setStepperValue writes a stepper readout (market/inventory/factory qty)
@@ -81,11 +84,14 @@ type Market struct {
 	minus    *widget.Button
 	plus     *widget.Button
 
-	// My orders: the station's player orders as rich rows.
-	mineLbl  *widget.Text
-	mineBox  *widget.Container // the station's player orders, as rich rows
-	mineRows []*widgets.StackRow
-	mineKey  string // change signature of the My orders rows
+	// My orders: the station's player orders as rich rows, every one of
+	// them listed, in a scroll viewport with the house rail beside it.
+	mineLbl    *widget.Text
+	mineBox    *widget.Container // the rich rows (the scroll content)
+	mineScroll *widget.ScrollContainer
+	mineRail   *widgets.ScrollRail
+	mineRows   []*widgets.StackRow
+	mineKey    string // change signature of the My orders rows
 
 	qtyIdx int
 	sel    content.ItemID
@@ -226,18 +232,41 @@ func NewMarket(env widgets.Seams) *Market {
 	// My orders: only THIS station's player orders (station-local, the
 	// docked book), each a rich row — the item beside its Cancel button on
 	// line 1, side/price/remaining on line 2 — tiled by the table module's
-	// StackLayout (the contract board's row form).
+	// StackLayout (the contract board's row form). Every order is listed:
+	// the rows ride the house scroll viewport (the reserved-gutter rail
+	// hides while they fit) once the list outgrows the column.
 	m.mineLbl = widget.NewText(
 		widget.TextOpts.Text("My orders", env.Face(theme.StepTiny), theme.Solid(p.Accent)),
 	)
 	m.mineBox = widget.NewContainer(
 		widget.ContainerOpts.Layout(widgets.StackLayout{Gap: theme.Px(theme.ContentsPad)}),
-		// Cap the column's width: a long item name must not widen the
-		// standing-order column and squeeze the book.
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.GridLayoutData{
-			MaxWidth: theme.Px(mktSideW),
-		})),
 	)
+	m.mineScroll = widget.NewScrollContainer(
+		widget.ScrollContainerOpts.Content(m.mineBox),
+		widget.ScrollContainerOpts.StretchContentWidth(),
+		// No chrome of the list's own: an invisible frame, the mask
+		// clipping the rows to the viewport (the tables' own mask).
+		widget.ScrollContainerOpts.Image(&widget.ScrollContainerImage{
+			Idle: theme.NineSlice(color.NRGBA{}),
+			Mask: theme.NineSlice(theme.WindowBody(p.BG)),
+		}),
+	)
+	// Wheel scrolls the column; ScrollTop is a 0..1 fraction of the
+	// overflow, so the step scales by the measured overflow (the tables'
+	// convention). The rail beside it drags the same offset.
+	m.mineScroll.GetWidget().ScrolledEvent.AddHandler(func(args any) {
+		if ev, ok := args.(*widget.WidgetScrolledEventArgs); ok {
+			m.scrollMine(ev.Y)
+		}
+	})
+	// Same stash as the tables: the window chrome's translate walk carries
+	// the rows with the viewport instead of re-locating them mid-drag.
+	widgets.AttachScrollContent(m.mineScroll, m.mineBox)
+	m.mineRail = widgets.NewScrollRail(env, m.mineScroll, m.mineScroll, m.mineBox)
+	// A long item name must not widen the standing-order column and
+	// squeeze the book: gutter included, the column keeps the authored
+	// width (the mineBox MaxWidth this replaces).
+	m.mineRail.Container().GetWidget().LayoutData = widget.GridLayoutData{MaxWidth: theme.Px(mktSideW)}
 	side := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
@@ -246,7 +275,7 @@ func NewMarket(env widgets.Seams) *Market {
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(mktSideW), 0)),
 	)
-	side.AddChild(m.mineLbl, m.mineBox)
+	side.AddChild(m.mineLbl, m.mineRail.Container())
 
 	// The standing-order column sits beside the toolbar-and-book column,
 	// spanning the full body height (so the My orders list gets the room
@@ -354,6 +383,13 @@ func (m *Market) Sync() {
 			side = "Bid"
 		}
 		item := o.Item
+		// The player's own resting orders wear the owned-row green: one
+		// glance separates them from the NPC/agent rows (the overview's
+		// own-ship/hostile tint convention). Selection still wins.
+		var tint color.RGBA
+		if o.Owner == sim.OwnerPlayer {
+			tint = theme.OwnedRowTint(m.th.Pal())
+		}
 		rows = append(rows, widgets.TableRow{
 			Cells: []string{
 				itemLabel(m.cv, o.Item),
@@ -361,6 +397,7 @@ func (m *Market) Sync() {
 				theme.FormatInt(int64(o.Qty)),
 				side,
 			},
+			Tint: tint,
 			Data: o.Item,
 			Spec: widgets.RowSpec{
 				Ref: widgets.RowRef(m.cv, o.Item),
@@ -393,6 +430,14 @@ func (m *Market) Sync() {
 
 	// The station's own standing orders (rebuilt only when they move).
 	m.syncMine(gated)
+
+	// The list rides the house rail beside it: mirror the offset onto the
+	// handle, and drop a stale offset once the list fits again — the
+	// tables' clamp rule (ebitenui would otherwise bottom-anchor it).
+	m.mineRail.Sync()
+	if m.mineRail.Overflow() <= 0 {
+		m.mineScroll.ScrollTop = 0
+	}
 
 	sys := m.cv.System()
 	if sys != nil {
@@ -470,9 +515,9 @@ func (m *Market) mineOrders() []sim.MarketStock {
 }
 
 // syncMine rebuilds the My orders rows only when their content (or the
-// docked gate) moved: one rich row per player order at the docked station,
-// its Cancel button the row's trailing action — the same gate the book's
-// trade actions carry.
+// docked gate) moved: one rich row per player order at the docked
+// station — every order, no cap — its Cancel button the row's trailing
+// action, the same gate the book's trade actions carry.
 func (m *Market) syncMine(gated bool) {
 	orders := m.mineOrders()
 	key := mineKey(orders, gated)
@@ -482,15 +527,10 @@ func (m *Market) syncMine(gated bool) {
 	m.mineKey = key
 	m.mineBox.RemoveChildren()
 	m.mineRows = m.mineRows[:0]
-	show := len(orders)
-	if show > mineMaxRows {
-		show = mineMaxRows
-	}
-	for _, o := range orders[:show] {
-		m.mineRows = append(m.mineRows, m.orderRow(o, gated))
-	}
-	if hidden := len(orders) - show; hidden > 0 {
-		m.mineRows = append(m.mineRows, m.noteRow("+"+strconv.Itoa(hidden)+" more"))
+	for _, o := range orders {
+		r := m.orderRow(o, gated)
+		m.mineRows = append(m.mineRows, r)
+		m.mineBox.AddChild(r.Root)
 	}
 	if len(orders) == 0 {
 		m.mineLbl.Label = "My orders — none"
@@ -526,13 +566,25 @@ func (m *Market) orderRow(o sim.MarketStock, gated bool) *widgets.StackRow {
 	return widgets.NewStackRow(widgets.NewSeams(m.th, m.cv, m.as), row, m.th.Face(theme.StepSmall))
 }
 
-// noteRow is a dim rich row with no verbs (the "+N more" overflow note).
-func (m *Market) noteRow(text string) *widgets.StackRow {
-	p := m.th.Pal()
-	row := widgets.TableRow{Stack: []widgets.RowLine{{Segs: []widgets.RowSeg{{
-		Text: text, Tint: p.Dim, Step: theme.StepTiny,
-	}}}}}
-	return widgets.NewStackRow(widgets.NewSeams(m.th, m.cv, m.as), row, m.th.Face(theme.StepSmall))
+// scrollMine turns wheel notches into the My orders viewport's offset:
+// mineWheelRows rows of the measured row height per notch, the same
+// 0..1-fraction-of-overflow convention the tables use (a positive notch
+// is wheel up, scrolling towards the top of the list).
+func (m *Market) scrollMine(notches float64) {
+	over := m.mineRail.Overflow()
+	if over <= 0 {
+		m.mineScroll.ScrollTop = 0
+		return
+	}
+	rowH := 0
+	if len(m.mineRows) > 0 {
+		_, rowH = m.mineRows[0].Root.PreferredSize()
+	}
+	if rowH <= 0 {
+		return
+	}
+	top := m.mineScroll.ScrollTop - notches*mineWheelRows*float64(rowH)/over
+	m.mineScroll.ScrollTop = math.Max(0, math.Min(1, top))
 }
 
 // mineKey is the My orders section's change signature: the docked gate

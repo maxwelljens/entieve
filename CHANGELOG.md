@@ -91,6 +91,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `manifest.json` (CC BY 3.0, Delapouite). Like every icon it rides the
   shared white-alpha PNG pipeline and tints per palette role.
 
+- **Market QoL — every standing order listed, your book rows in green**
+  (`uikit/screens/market.go`, `uikit/theme/theme.go`): the My orders
+  column lists *every* order the player has on the docked station's book
+  (the 3-row cap and its "+N more" note are gone), scrolling through them
+  on the house rail (wheel included) once they outgrow the column — each
+  row keeps its own Cancel. The order book paints the player's own resting
+  orders with the owned-row green (`theme.OwnedRowTint`: the palette's
+  `Good` at `OwnedRowAlpha`), so they stand out among the NPC/agent rows.
+  Fixed in the same pass: the My orders rows were built but never mounted,
+  so the column drew nothing.
+
 ### Changed
 
 - **Market window's Place order panel removed; posting moves to the item
@@ -173,6 +184,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sim/helpers_test.go`, `render/art_test.go`.
 
 ### Fixed
+
+- **My orders rows now render** (`uikit/screens/market.go`): the standing-
+  order column built its rich rows but never mounted them, so the list drew
+  nothing (the old pin passed vacuously — `image.Rectangle.In` is true for an
+  empty rect). Every player order on the docked book is now shown, each with
+  its Cancel.
 
 - **The world body pass no longer draws off-screen celestials**
   (`render/render.go`, `render/overlay.go`): a body whose disc cannot reach
