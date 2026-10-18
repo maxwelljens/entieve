@@ -191,6 +191,13 @@ entities here in the same format before their content lands.
 
 `traffic/*.json` carry no display names (keyed by system id) and need no row.
 
+### Interface strings
+
+| field | current value | proposed value | origin | notes |
+|---|---|---|---|---|
+| Finances window title (`game/screens.go`, `uikit/screens/finances.go`) | — | **Finances** | trade | the wallet window: holdings over the transaction ledger. Plain trade vocabulary, no coined term. Approved 2026-10-18 |
+| Finances holdings labels | — | cash · deployed in orders · receivables · total | trade | the three pools the player's money can sit in: the wallet, the escrow held by open buy orders (refundable on cancel) and the rewards still owed on accepted contracts, plus their total. Approved 2026-10-18 |
+
 ## Money strings
 
 The euro is the unit of account ([UNIVERSE.md — The

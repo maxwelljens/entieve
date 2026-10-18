@@ -76,6 +76,7 @@ const (
 	pLog
 	pSettings
 	pServices
+	pFinances
 	pMenu
 	numPanels
 )
@@ -114,6 +115,7 @@ type Game struct {
 	scan *uikit.Scanner
 	mp   *uikit.MapView
 	help *uikit.HelpPanel
+	fin  *uikit.Finances
 
 	menuWin *widget.Window
 

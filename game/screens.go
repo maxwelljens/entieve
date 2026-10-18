@@ -260,6 +260,18 @@ var screens = []Screen{
 		Build: func(g *Game) *widget.Window { return g.buildServicesWindow() },
 	},
 	{
+		// The wallet window: a floating read-only ledger, so it opens in
+		// space and docked alike (nothing in it needs a station service).
+		// K: F and G already belong to fitting and market.
+		ID: pFinances, Title: "Finances", Icon: "svc_log",
+		Key: ebiten.KeyK, Action: "finances", Desc: "K — toggle finances window (holdings and transactions)",
+		DefaultRect: image.Rect(312, 170, 712, 530),
+		DockPolicy:  DockFloating, SidecarName: "finances",
+		Group: "Trade",
+		Sync:  func(g *Game) { g.fin.Sync() },
+		Build: func(g *Game) *widget.Window { g.fin = uikit.NewFinances(g.env); return g.fin.Win() },
+	},
+	{
 		// The Esc menu: scene-owned (MenuScene flips the flag), modal,
 		// static buttons — no Sync — and never persisted, so a restart
 		// cannot reopen it. It is deliberately NOT in the rail: the pause

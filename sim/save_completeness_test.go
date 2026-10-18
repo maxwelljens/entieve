@@ -64,6 +64,7 @@ var simFieldClasses = map[string]fieldClass{
 	"wallet":        {save: []string{"Wallet"}},
 	"standing":      {save: []string{"Standing"}},
 	"missions":      {save: []string{"Missions"}},
+	"ledger":        {save: []string{"Ledger"}},
 	"player":        {derived: true}, // the Pilot.Player entity in Save.Entities
 	"lastStation":   {save: []string{"LastStation", "LastStationCel"}},
 	"market":        {save: []string{"Market", "MarketLasts"}},

@@ -72,6 +72,11 @@ type Sim struct {
 	lastStation content.CelID
 	queue       []Command
 	events      []Event
+
+	// ledger is the capped ring of the player's wallet movements
+	// (Save.Ledger) — see ledger.go. Append order is deterministic; the
+	// oldest entries are evicted past LedgerCap.
+	ledger []LedgerEntry
 	// market holds one order book per station (station celestial id →
 	// book), keyed universe-wide; stations sort by id for every read that
 	// iterates (sortStationIDs). marketSeq is the next order arrival id.

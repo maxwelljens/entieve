@@ -93,6 +93,13 @@ type ContentView interface {
 	// Show Info reference resolution (the info catalog seam).
 	InfoRefFor(ecs.Entity) (InfoRef, bool)
 	InfoRefOf(any) (InfoRef, bool)
+
+	// Finance reads (the Finances window): the wallet's history and the
+	// two other pools of the player's money — the capital escrowed in
+	// open buy orders and the rewards accepted contracts still owe.
+	Ledger() []sim.LedgerEntry
+	Deployed() float64
+	Receivables() float64
 }
 
 // StationInfo is one docked station as the interface reads it: the
@@ -285,6 +292,12 @@ func (v *view) CraftLevel(st sim.StationID, family string) int { return v.s.Craf
 func (v *view) InfoRefFor(e ecs.Entity) (InfoRef, bool) { return InfoRefFor(v, e) }
 
 func (v *view) InfoRefOf(data any) (InfoRef, bool) { return InfoRefOf(v, data) }
+
+func (v *view) Ledger() []sim.LedgerEntry { return v.s.Ledger() }
+
+func (v *view) Deployed() float64 { return v.s.Deployed() }
+
+func (v *view) Receivables() float64 { return v.s.Receivables() }
 
 // ActionSink is the write seam: a screen expresses "do this" as a typed
 // Intent (uikit/widgets/intents.go) and never touches the simulation. The host

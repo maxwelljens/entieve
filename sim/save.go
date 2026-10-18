@@ -21,6 +21,7 @@ func (s *Sim) buildSave() (*Save, error) {
 		Wallet:    s.wallet,
 		Standing:  s.standing,
 		Missions:  append([]MissionState(nil), s.missions...),
+		Ledger:    append([]LedgerEntry(nil), s.ledger...),
 		Hangar:    *s.Hangar,
 		Schema:    s.schema,
 		Market:    make(map[content.SystemID][]MarketStock, len(s.market)),
@@ -400,6 +401,8 @@ func (s *Sim) restore(save *Save) error {
 	s.wallet = save.Wallet
 	s.standing = save.Standing
 	s.missions = append([]MissionState(nil), save.Missions...)
+	s.ledger = append([]LedgerEntry(nil), save.Ledger...)
+	s.trimLedger()
 	s.RNG = core.RestoreRNG(save.RNGState)
 	s.trafficRNG = core.RestoreRNG(save.TrafficRNGState)
 	s.lastStation = ""
