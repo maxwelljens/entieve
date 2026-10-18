@@ -120,7 +120,7 @@ func logScrollTop(t *testing.T, l *LogPanel) float64 {
 }
 
 // TestLogBodyConformsToWindow is the design-math pin: at the default
-// 288×240 and a resized 400×300, appending 200+ lines leaves the window
+// 264×240 and a resized 400×300, appending 200+ lines leaves the window
 // rect byte-identical, the body rect equal to the window's inner rect,
 // the text area equal to the body's padded inner rect (every reachable
 // content widget inside the frame), and it stays that way through the

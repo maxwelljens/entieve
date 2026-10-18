@@ -36,10 +36,11 @@ import (
 const (
 	// RailInset is the expanded rail width AND the left inset every
 	// window keeps clear of it (game reads this constant directly — one
-	// source, no drift). It is also the entry cell square: the cells
-	// grew 36 → 63 (+75 %) with the buttons, so the gutter follows and
+	// source, no drift). It is the entry cell square (63) plus the
+	// ScrollGutter the scrollbar reserves BESIDE the cells: the gutter
+	// rides outside the button column, so the cells stay 63×63 and
 	// windows can never cover an entry.
-	RailInset = 63
+	RailInset = 63 + theme.ScrollGutter // 87
 
 	// railIcon is the entry glyph's design box: the 20 px Button glyph
 	// grown with the cell (36 → 63 is ×1.75, so 20 → 35 keeps the
@@ -207,11 +208,10 @@ func NewRail(env widgets.Seams, entries []RailEntry) *Rail {
 		}
 	})
 	// The entry column rides the house scrollbar in a reserved gutter (the
-	// same chrome the tables and the order book carry): the entries are
-	// inset past the rail's scrollbar, so the handle never overhangs an
-	// entry. The rail's OUTER width stays RailInset (the window inset the
-	// game reads) — the gutter is carved from the cell column, so the
-	// entry cells are (RailInset − ScrollGutter) wide, not squares.
+	// same chrome the tables and the order book carry): the gutter sits
+	// BESIDE the cell column, so the handle never overhangs an entry and
+	// the cells keep their square 63×63. The rail's OUTER width is
+	// RailInset (the window inset the game reads) = cells + gutter.
 	r.rail = widgets.NewScrollRail(env, r.scroll, r.scroll, r.list)
 	r.rail.Container().GetWidget().LayoutData = widget.RowLayoutData{Stretch: true}
 
@@ -438,12 +438,12 @@ func (r *Rail) newEntryButton(i int, e RailEntry) (*widget.Button, *theme.IconBo
 // exactly ((cell − icon)/2 on both axes) and keeps its rect reachable
 // for the inside-bounds pin.
 func (r *Rail) iconCell(btn *widget.Button, glyph *theme.IconBox) *widget.Container {
-	// The cell is as tall as the rail (RailInset) but stops short of the
-	// scrollbar's reserved gutter (ScrollGutter), so the handle beside it
-	// never overhangs an entry.
+	// The cell is the 63×63 entry square (RailInset − the ScrollGutter the
+	// handle reserves beside it), so the glyph centres with equal margins
+	// on all four sides and the handle never overhangs an entry.
 	cell := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(RailInset-theme.ScrollGutter), theme.Px(RailInset))),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(RailInset-theme.ScrollGutter), theme.Px(RailInset-theme.ScrollGutter))),
 	)
 	cell.AddChild(btn, glyph.Widget()) // glyph last: it draws over the chrome
 	return cell

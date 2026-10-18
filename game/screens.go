@@ -216,13 +216,13 @@ var screens = []Screen{
 	},
 	{
 		// Bottom-left pocket beside the HUD bar: left/bottom insets of 10
-		// against the design viewport (uikit logDefaultW/H = 288×240).
+		// against the design viewport (uikit logDefaultW/H = 264×240).
 		// The pocket starts clear of the rail; its right edge (the 298
 		// that must keep its gutter before the HUD bar) is unchanged, so
 		// the log narrows by the rail inset to its content floor.
 		ID: pLog, Title: "Log", Icon: "svc_log",
 		Key: ebiten.KeyL, Shift: true, Action: "log", Desc: "Shift+L — toggle log window",
-		DefaultRect: image.Rect(10+uikit.RailInset, defaultH-10-240, 10+288, defaultH-10),
+		DefaultRect: image.Rect(10+uikit.RailInset, defaultH-10-240, 10+264, defaultH-10),
 		Anchor:      AnchorBottomLeft,
 		DockPolicy:  DockFloating, SidecarName: "log",
 		Group: "World",
@@ -263,7 +263,7 @@ var screens = []Screen{
 		// The wallet window: a floating read-only ledger, so it opens in
 		// space and docked alike (nothing in it needs a station service).
 		// K: F and G already belong to fitting and market.
-		ID: pFinances, Title: "Finances", Icon: "svc_log",
+		ID: pFinances, Title: "Finances", Icon: "svc_finances",
 		Key: ebiten.KeyK, Action: "finances", Desc: "K — toggle finances window (holdings and transactions)",
 		DefaultRect: image.Rect(312, 170, 712, 530),
 		DockPolicy:  DockFloating, SidecarName: "finances",

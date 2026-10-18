@@ -554,10 +554,10 @@ func dragAt(t *testing.T, k *Kit, fm *fakeMouse, win *widget.Window, from image.
 // TestOverviewLogEdgeGripsResize is the regression test for the two
 // windows whose bodies used to swallow grip presses: the overview's
 // table and the log's text area are scroll containers that elevate an
-// input layer over the 8 px grip band, so widget press events never
-// reached the chrome. Driven from the window rect in step, every edge
-// and corner resizes exactly like the pure resizeRect math — the press
-// points below are asserted to sit INSIDE those scroll viewports.
+// input layer over the grip band. Now the body padding (ContentsPad = 8,
+// exactly the grip band) insets both scroll layers clear of the band, so
+// the press is no longer swallowed; the cases below still pin that every
+// edge and corner resizes exactly like the pure resizeRect math.
 func TestOverviewLogEdgeGripsResize(t *testing.T) {
 	k, _ := newTestKit(t)
 	fm := useFakeMouse(t)
@@ -595,10 +595,10 @@ func TestOverviewLogEdgeGripsResize(t *testing.T) {
 		inBody  image.Rectangle // the press must sit in this full-bleed body
 		swallow bool            // the body's layer must swallow that press
 	}{
-		{"overview left edge through the table", k.ov.win, ovRes,
-			image.Point{ovRect.Min.X + 6, ovView.Min.Y + 12}, -40, 0, edgeLeft, ovView, true},
-		{"overview bottom edge through the table", k.ov.win, ovRes,
-			image.Point{(ovView.Min.X + ovView.Max.X) / 2, ovRect.Max.Y - 7}, 0, 30, edgeBottom, ovView, true},
+		{"overview left edge (table inset clear of the grip band)", k.ov.win, ovRes,
+			image.Point{ovRect.Min.X + 6, ovView.Min.Y + 12}, -40, 0, edgeLeft, image.Rectangle{}, false},
+		{"overview bottom edge (table inset clear of the grip band)", k.ov.win, ovRes,
+			image.Point{(ovView.Min.X + ovView.Max.X) / 2, ovRect.Max.Y - 7}, 0, 30, edgeBottom, image.Rectangle{}, false},
 		// The table now stops short of its own scrollbar gutter, so the
 		// right-edge band over it is the (empty while the rows fit)
 		// gutter, not the elevated scroll viewport — the press is not
@@ -609,18 +609,16 @@ func TestOverviewLogEdgeGripsResize(t *testing.T) {
 			image.Point{ovRect.Max.X - 7, ovRect.Max.Y - 7}, 20, 18, edgeRight | edgeBottom, ovRect, false},
 		{"overview top edge (title bar)", k.ov.win, ovRes,
 			image.Point{(ovRect.Min.X + ovRect.Max.X) / 2, ovRect.Min.Y + 4}, 0, -20, edgeTop, image.Rectangle{}, false},
-		// The log's body nests two paddings (5 px body + 4 px text-area
-		// scroll), so its inner scroll layer stops 9 px short of the
-		// window edge and never covers the grip band — the log's own
-		// failure was in step, not in press routing (see the header
-		// comment), so these cases pin the resize math over a
-		// text-area-filled body without the swallow requirement.
+		// The log's body nests two paddings (8 px body + 4 px text-area
+		// scroll), so its inner scroll layer stops 12 px short of the
+		// window edge and never covers the grip band — these cases pin
+		// the resize math over a text-area-filled body.
 		{"log left edge through the text area", log.Win(), logRes,
-			image.Point{logRect.Min.X + 6, taView.Min.Y + 12}, -35, 0, edgeLeft, taView, false},
+			image.Point{logRect.Min.X + 6, taView.Min.Y + 12}, -35, 0, edgeLeft, image.Rectangle{}, false},
 		{"log right edge through the text area", log.Win(), logRes,
-			image.Point{logRect.Max.X - 7, taView.Min.Y + 12}, 30, 0, edgeRight, taView, false},
+			image.Point{logRect.Max.X - 7, taView.Min.Y + 12}, 30, 0, edgeRight, image.Rectangle{}, false},
 		{"log bottom edge through the text area", log.Win(), logRes,
-			image.Point{(taView.Min.X + taView.Max.X) / 2, logRect.Max.Y - 7}, 0, 40, edgeBottom, taView, false},
+			image.Point{(taView.Min.X + taView.Max.X) / 2, logRect.Max.Y - 7}, 0, 40, edgeBottom, image.Rectangle{}, false},
 		{"log top-left corner (title bar)", log.Win(), logRes,
 			image.Point{logRect.Min.X + 4, logRect.Min.Y + 4}, -12, -10, edgeLeft | edgeTop, image.Rectangle{}, false},
 	}
@@ -671,8 +669,8 @@ func TestOverviewLogEdgeGripsResize(t *testing.T) {
 }
 
 // TestRowClickNearGripEdgeDoesNotResize: a click that starts inside the
-// grip band but never drags is a no-op for the chrome — the table row
-// under the cursor still gets its click and selects.
+// grip band but never drags is a no-op for the chrome; a click on the
+// closest row pixel to that band still reaches the row and selects.
 func TestRowClickNearGripEdgeDoesNotResize(t *testing.T) {
 	k, _ := newTestKit(t)
 	fm := useFakeMouse(t)
@@ -685,31 +683,49 @@ func TestRowClickNearGripEdgeDoesNotResize(t *testing.T) {
 		t.Fatal("overview has no rows")
 	}
 	row := k.ov.tbl.RowCts[0].GetWidget().Rect
-	// Inside the 8 px left grip band AND over the row (the scroll
-	// viewport's layer sits above the window's, which is the case that
-	// used to eat the press).
-	from := image.Point{X: ovRect.Min.X + 6, Y: (row.Min.Y + row.Max.Y) / 2}
-	if !from.In(row) || edgesAt(from, ovRect, edgeGripPx)&edgeLeft == 0 {
-		t.Fatalf("fixture: press %v must sit in row %v and the left grip band of %v",
-			from, row, ovRect)
+
+	click := func(from image.Point) {
+		fm.at(from.X, from.Y)
+		pumpKit(t, k, 1024, 700)
+		fm.down()
+		pumpKit(t, k, 1024, 700)
+		if got := k.ov.win.GetContainer().GetWidget().Rect; got != ovRect {
+			t.Fatalf("press alone moved the window: %v -> %v", ovRect, got)
+		}
+		fm.up()
+		pumpKit(t, k, 1024, 700)
+		pumpKit(t, k, 1024, 700)
 	}
 
-	fm.at(from.X, from.Y)
-	pumpKit(t, k, 1024, 700)
-	fm.down()
-	pumpKit(t, k, 1024, 700)
-	if got := k.ov.win.GetContainer().GetWidget().Rect; got != ovRect {
-		t.Fatalf("press alone moved the window: %v -> %v", ovRect, got)
+	// The grip band (8 px) is CONTENTS padding now — the table is inset
+	// clear of it, so a press in the band lands on the chrome, not a
+	// row: no resize and no selection.
+	bandFrom := image.Point{X: ovRect.Min.X + 6, Y: (row.Min.Y + row.Max.Y) / 2}
+	if edgesAt(bandFrom, ovRect, edgeGripPx)&edgeLeft == 0 {
+		t.Fatalf("fixture: press %v must sit in the left grip band of %v", bandFrom, ovRect)
 	}
-	fm.up()
-	pumpKit(t, k, 1024, 700)
-	pumpKit(t, k, 1024, 700)
-
+	click(bandFrom)
 	if got := k.ov.win.GetContainer().GetWidget().Rect; got != ovRect {
 		t.Errorf("click without drag resized the window: %v -> %v", ovRect, got)
 	}
 	if ovRes.n != 0 {
 		t.Errorf("ResizeEvent count = %d, want 0 for a click", ovRes.n)
+	}
+	if got := k.Selected(); got != 0 {
+		t.Errorf("selected = %v, want none (the grip band is chrome, not a row)", got)
+	}
+
+	// The closest row pixel to the band still gets the click and selects.
+	rowFrom := image.Point{X: row.Min.X, Y: (row.Min.Y + row.Max.Y) / 2}
+	if edgesAt(rowFrom, ovRect, edgeGripPx) != 0 {
+		t.Fatalf("fixture: press %v must sit outside the grip band of %v", rowFrom, ovRect)
+	}
+	click(rowFrom)
+	if got := k.ov.win.GetContainer().GetWidget().Rect; got != ovRect {
+		t.Errorf("row click resized the window: %v -> %v", ovRect, got)
+	}
+	if ovRes.n != 0 {
+		t.Errorf("ResizeEvent count = %d, want 0 for a row click", ovRes.n)
 	}
 	wantSel := k.ov.tbl.Rows[0].Data.(*ovRow).info.Entity
 	if got := k.Selected(); got != wantSel {

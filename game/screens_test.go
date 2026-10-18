@@ -197,21 +197,21 @@ func TestScreenPlacementDerivesFromSpec(t *testing.T) {
 		}
 
 		// Anchor semantics, stated as behaviour (the pre-spec contract).
-		// The log's pocket starts clear of the rail's gutter (73 = 10 +
-		// uikit.RailInset) and keeps its 288 px width and bottom inset.
-		if r := g.screenWin[pLog].GetContainer().GetWidget().Rect; r != image.Rect(73, h-10-240, 73+288, h-10) {
-			t.Errorf("%dx%d: log = %v, want the bottom-left pocket (73, %d)-(361, %d)",
+		// The log's pocket starts clear of the rail's gutter (97 = 10 +
+		// uikit.RailInset) and keeps its 264 px width and bottom inset.
+		if r := g.screenWin[pLog].GetContainer().GetWidget().Rect; r != image.Rect(97, h-10-240, 97+264, h-10) {
+			t.Errorf("%dx%d: log = %v, want the bottom-left pocket (97, %d)-(361, %d)",
 				w, h, r, h-10-240, h-10)
 		}
-		// The scanner sits in the centre column, 63 px right of the
+		// The scanner sits in the centre column, 87 px right of the
 		// pre-rail design position (396 + uikit.RailInset).
-		if r := g.screenWin[pScanner].GetContainer().GetWidget().Rect; r.Min != image.Pt(459, 276) {
-			t.Errorf("%dx%d: scanner at %v, want the fixed design position (459,276)", w, h, r.Min)
+		if r := g.screenWin[pScanner].GetContainer().GetWidget().Rect; r.Min != image.Pt(483, 276) {
+			t.Errorf("%dx%d: scanner at %v, want the fixed design position (483,276)", w, h, r.Min)
 		}
 		// The help window centres on top (24 px inset) with its left
-		// edge floored clear of the rail gutter: centred lands at 62 in
-		// the 1024 minimum, one pixel INSIDE the 63 px rail, so the
-		// floor (10+RailInset = 73) wins there.
+		// edge floored clear of the rail gutter: centred lands inside
+		// the 87 px rail at the 1024 minimum, so the floor (10+RailInset
+		// = 97) wins there.
 		if r := g.screenWin[pHelp].GetContainer().GetWidget().Rect; r.Min.Y != 24 || r.Min.X != max(railClearX(), (w-r.Dx())/2) {
 			t.Errorf("%dx%d: help at %v, want top inset 24 and x = max(%d, centred %d)",
 				w, h, r.Min, railClearX(), (w-r.Dx())/2)

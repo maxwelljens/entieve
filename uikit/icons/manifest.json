@@ -225,6 +225,12 @@
       "url": "https://game-icons.net/1x1/delapouite/scroll-quill.html",
       "file": "scroll-quill.png"
     },
+    "svc_finances": {
+      "slug": "wallet",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/wallet.html",
+      "file": "wallet.png"
+    },
     "svc_fitting": {
       "slug": "gears",
       "author": "Lorc",

@@ -18,7 +18,7 @@ import (
 // legacy ui padding scale).
 const (
 	TitleBarH   = 44 // title line + breathing room (ui.TitleBarH at 21 px)
-	ContentsPad = 5  // panel margins inside a window
+	ContentsPad = 8  // panel margins inside a window (the SpMd air: a real, visible margin on all four sides)
 )
 
 // WindowAlpha is the ONE translucency token: the alpha every window
