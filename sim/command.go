@@ -140,9 +140,18 @@ func holdLabel(hold string) string {
 }
 
 // kmLabel renders a metre distance as the kilometre figure the refusal
-// log lines quote ("150 km" for WarpMinRange).
+// log lines quote ("150 km" for WarpMinRange). Beyond 99,999 km it
+// switches like theme.FormatDistance: "<0.01 AU" below 0.01 AU, then
+// two-decimal AU. Mirrored byte-identical in uikit/screens.kmLabel.
 func kmLabel(m float64) string {
-	return strconv.FormatFloat(m/1000, 'f', -1, 64) + " km"
+	switch {
+	case m <= 9.9999e7:
+		return strconv.FormatFloat(m/1000, 'f', -1, 64) + " km"
+	case m < 1.496e9:
+		return "<0.01 AU"
+	default:
+		return strconv.FormatFloat(m/1.496e11, 'f', 2, 64) + " AU"
+	}
 }
 
 // execTransfer moves qty units of an item between the player's storage holds

@@ -14,7 +14,9 @@ import (
 // ---------------------------------------------------------------------------
 
 // formatDistance renders a distance in meters EVE-style: "42 m" /
-// "1,250 m" (under 2 km), "3.4 km" (under 0.1 AU), "1.2 AU" beyond.
+// "1,250 m" (under 2 km), "12.3 km" up to 99,999 km, "<0.01 AU" below
+// 0.01 AU, "0.45 AU" beyond (two decimals). 1 AU = 1.496e11 m here (house
+// convention).
 func FormatDistance(m float64) string {
 	if m < 0 {
 		m = 0
@@ -22,10 +24,12 @@ func FormatDistance(m float64) string {
 	switch {
 	case m < 2e3:
 		return FormatInt(int64(math.Round(m))) + " m"
-	case m < 1.496e10: // 0.1 AU: EVE switches to AU here
+	case m <= 9.9999e7: // 99,999 km: the km band ends here
 		return GroupFloat(m/1000, 1) + " km"
+	case m < 1.496e9: // 0.01 AU: below this an AU figure reads as zero
+		return "<0.01 AU"
 	default:
-		return GroupFloat(m/1.496e11, 1) + " AU"
+		return GroupFloat(m/1.496e11, 2) + " AU"
 	}
 }
 
