@@ -185,6 +185,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The typed market-order mini-window's price and quantity text now
+  renders** (`uikit/screens/winclip.go`): the dialog's `TextInput` fields
+  draw through ebitenui's `MaskedRenderBuffer`, which sizes its scratch
+  images to the draw destination — and the window frame clip rendered the
+  body into `screen.SubImage(bodyRect)`, so the typed glyphs were dropped.
+  The clip wrapper is now skipped for any body whose subtree carries a
+  `MaskedRenderBuffer`-backed widget (`TextInput`, and the scroll viewports
+  `ScrollContainer`/`TextArea`/`List`); flat, buffer-free bodies keep their
+  clip and the 0-px-outside-frame pin. A new gated capture
+  (`uikit/screens/orderwin_capture_test.go`) blanks both fields, types into
+  them and asserts the glyph pixels appear (blank field ink 0 → 423/119 px
+  typed), and the wrap-coverage test pins that a `TextInput` body is left
+  unwrapped.
 - **The typed market-order mini-window's content no longer overflows its
   frame** (`uikit/screens/orderwin.go`): the dialog's fixed design height was
   guessed at 190 px while title bar + body need 263 (Sell↔Request toggle,
