@@ -547,3 +547,91 @@ func findMissionPhase(evs []sim.Event, phase string) *sim.Event {
 	}
 	return nil
 }
+
+// TestStationWindowGripStopsAtContentMin drives the contract board's
+// resize grip through the real frame loop: the window can be grown by a
+// bottom-edge drag, but shrinking stops at the board's own content height
+// -- not at the static stationMinH the empty board used to declare -- and
+// every row still sits inside the frame at that floor.
+func TestStationWindowGripStopsAtContentMin(t *testing.T) {
+	g := dockedShowcaseGame(t, 1280, 720)
+	// Worst case: a full available board plus a capped active one, so the
+	// content floor is well above the static minimum.
+	setMissions(t, g, sim.MissionState{ID: "contract-solace-cleanup-1"})
+	g.syncMounts()
+	pump(t, g, 1280, 720)
+	// Close the log: it sits directly below the board, and growing the
+	// board's bottom edge into its pocket would put the shrink press on
+	// the log instead of the board.
+	g.open[pLog] = false
+	g.syncMounts()
+	pump(t, g, 1280, 720)
+
+	win := g.svcWin
+	start := win.GetContainer().GetWidget().Rect
+
+	mm := useLoopMouse(t)
+	pressEdge := installSeams(t, mm)
+	img := ebiten.NewImage(1280, 720)
+	frame := func() {
+		if err := g.Update(); err != nil {
+			t.Fatalf("Update: %v", err)
+		}
+		g.Draw(img)
+	}
+
+	// Grow: drag the bottom edge down.
+	from := image.Point{X: (start.Min.X + start.Max.X) / 2, Y: start.Max.Y - 3}
+	mm.moveTo(from.X, from.Y)
+	frame()
+	mm.left = true
+	*pressEdge = true
+	frame()
+	*pressEdge = false
+	mm.moveTo(from.X, from.Y+200)
+	frame()
+	mm.left = false
+	frame()
+	frame()
+	grown := win.GetContainer().GetWidget().Rect
+	if grown.Dy() <= start.Dy() {
+		t.Fatalf("bottom-edge grip did not grow the board: %v -> %v", start, grown)
+	}
+
+	// Shrink hard: the floor holds at the board's content height.
+	_, ph := g.stBody.PreferredSize()
+	contentH := max(ph, theme.Px(stationMinH))
+	if contentH <= theme.Px(stationMinH) {
+		t.Fatalf("fixture: board content height %d is not above the static %d", contentH, theme.Px(stationMinH))
+	}
+
+	from = image.Point{X: (grown.Min.X + grown.Max.X) / 2, Y: grown.Max.Y - 3}
+	mm.moveTo(from.X, from.Y)
+	frame()
+	mm.left = true
+	*pressEdge = true
+	frame()
+	*pressEdge = false
+	mm.moveTo(from.X, from.Y-10000)
+	frame()
+	mm.left = false
+	frame()
+	frame()
+
+	final := win.GetContainer().GetWidget().Rect
+	if final.Dy() != contentH {
+		t.Errorf("shrink stopped at height %d, want the board content height %d", final.Dy(), contentH)
+	}
+	if final.Max.Y > grown.Max.Y {
+		t.Errorf("shrink grew the window: %v -> %v", grown, final)
+	}
+
+	// Pin (b): every board row sits inside the frame at the floor.
+	for _, sec := range []*widget.Container{g.stAvail, g.stActive} {
+		for i, ch := range sec.Children() {
+			if !ch.GetWidget().Rect.In(final) {
+				t.Errorf("row %d %v escapes the board frame %v", i, ch.GetWidget().Rect, final)
+			}
+		}
+	}
+}

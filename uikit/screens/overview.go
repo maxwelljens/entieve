@@ -111,6 +111,7 @@ func (k *Kit) addWindow(w *widget.Window, animate bool) widget.RemoveWindowFunc 
 	// The kit's own raise (remove + re-mount, exactly what ShowInfo
 	// does) is the one deterministic path; the built-in one stays off.
 	w.DisableRelayering = true
+	clipWindowBody(w)
 	remove := k.ui.AddWindow(w)
 	// The actual unmount (chrome detach, stack entry, ebitenui window) —
 	// what m.remove runs directly, and what a running close fade holds

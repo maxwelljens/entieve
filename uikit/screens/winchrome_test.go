@@ -656,7 +656,7 @@ func TestOverviewLogEdgeGripsResize(t *testing.T) {
 		}
 		start := dragAt(t, k, fm, tc.win, tc.from, tc.dx, tc.dy)
 		got := tc.win.GetContainer().GetWidget().Rect
-		want := resizeRect(start, tc.dx, tc.dy, tc.edges, windowMin(tc.win))
+		want := resizeRect(start, tc.dx, tc.dy, tc.edges, windowMin(tc.win, start))
 		if got != want {
 			t.Errorf("%s: rect = %v, want resizeRect math %v", tc.name, got, want)
 		}
@@ -770,7 +770,7 @@ func TestTopmostWindowWinsGrip(t *testing.T) {
 	if ovRes.n != 0 {
 		t.Errorf("covered window fired %d ResizeEvents, want 0", ovRes.n)
 	}
-	if want := resizeRect(logRect, -30, 0, edgeLeft, windowMin(log.Win())); logGot != want {
+	if want := resizeRect(logRect, -30, 0, edgeLeft, windowMin(log.Win(), logRect)); logGot != want {
 		t.Errorf("topmost window rect = %v, want %v", logGot, want)
 	}
 	if logRes.n != 1 {

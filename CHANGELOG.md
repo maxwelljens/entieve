@@ -203,6 +203,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nothing (the old pin passed vacuously — `image.Rectangle.In` is true for an
   empty rect). Every player order on the docked book is now shown, each with
   its Cancel.
+- **Resizable windows can no longer be shrunk below their content, and
+  their bodies cannot paint outside the frame** (`uikit/screens/winchrome.go`,
+  `uikit/screens/winclip.go` new, `uikit/screens/{help,overview}.go`,
+  `game/contracts.go`): a manual grip drag used to shrink the contracts
+  (station) and help windows — every resizable window — until the layout
+  overflowed, spilling rows and text outside the frame. `WindowOpts.MinSize`
+  was an honest floor all along (`Window.SetLocation` and `resizeRect` both
+  clamp to it), but the per-window literals (e.g. help 400×200, the board's
+  200) sat far below the bodies they framed. The grip now consults the
+  body's content minimum at resize time: `windowMin(win, pressRect)` raises
+  the floor per axis to `Container.PreferredSize()` when that axis already
+  fits at the press rect, so a drag stops at the frame that still holds the
+  content and never grows a window whose body is elastic (a table's fitted
+  columns, the Selected Item's compressing layouter) or scrolls. The
+  contracts board keeps `MinSize` at its measured body height, rebuilt with
+  the board; help sets it to the hugged size it already measures. On top,
+  every mounted window body without a scroll viewport is wrapped in a
+  frame-clip container (`winclip.go`) that renders into
+  `screen.SubImage(bodyRect)`: ebiten clips a sub-image destination at zero
+  cost (no offscreen composite) while keeping absolute coordinates, so
+  layout, hit-testing and input layers are untouched. Pinned by
+  `uikit/screens/winclip_test.go`
+  (`TestHelpGripStopsAtContentMin` at 1×/1.5×, `TestClipWindowBodyWrapsFlatBodies`,
+  the gated `TestWindowClipCapture`) and
+  `game/contracts_test.go` `TestStationWindowGripStopsAtContentMin`; the
+  window-body walkers in `game/{draw,actions}_test.go` now recurse through
+  `widget.Containerer` so they cross the clip wrapper.
 
 - **The world body pass no longer draws off-screen celestials**
   (`render/render.go`, `render/overlay.go`): a body whose disc cannot reach

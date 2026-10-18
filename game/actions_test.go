@@ -91,20 +91,22 @@ func TestWorldKeysActAtKitRanges(t *testing.T) {
 func fireSelector(t *testing.T, g *Game, prefix string, n int) {
 	t.Helper()
 	var btn *widget.Button
-	var walk func(c *widget.Container)
-	walk = func(c *widget.Container) {
+	// Recurse through Containerer: the window body wears the kit's
+	// frame-clip wrapper (uikit/screens/winclip.go).
+	var walk func(c widget.Containerer)
+	walk = func(c widget.Containerer) {
 		for _, ch := range c.Children() {
 			switch v := ch.(type) {
 			case *widget.Button:
 				if v.Text() != nil && strings.HasPrefix(v.Text().Label, prefix) {
 					btn = v
 				}
-			case *widget.Container:
+			case widget.Containerer:
 				walk(v)
 			}
 		}
 	}
-	ctr, ok := g.kit.SelectedWindow().GetContainer().(*widget.Container)
+	ctr, ok := g.kit.SelectedWindow().GetContainer().(widget.Containerer)
 	if !ok {
 		t.Fatalf("Selected Item window container is %T", g.kit.SelectedWindow().GetContainer())
 	}

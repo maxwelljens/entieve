@@ -245,6 +245,13 @@ func (g *Game) rebuildStationBoard(m stationBoardModel) {
 		}
 	}
 	_, h := g.stBody.PreferredSize()
+	// The board IS the window's content floor: the chrome clamps a grip
+	// drag to MinSize, so pinning MinSize at the body's preferred height
+	// (capped rows + headers, never the static 200 the empty board wore)
+	// stops a manual shrink at the frame that still holds every row. The
+	// rebuild re-derives it, so a board that grows raises the floor too.
+	h = max(h, theme.Px(stationMinH))
+	g.svcWin.MinSize = &image.Point{X: theme.Px(stationMinW), Y: h}
 	// The services column is part of the composed docked layout — same
 	// source of truth as placeDefaults (stationLayout), so the board's
 	// content hug and the viewport composition can never disagree — and

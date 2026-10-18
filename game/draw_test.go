@@ -462,20 +462,24 @@ func TestPendingLoadSwapsKitAfterPump(t *testing.T) {
 func menuButton(t *testing.T, g *Game, label string) *widget.Button {
 	t.Helper()
 	var found *widget.Button
-	var walk func(c *widget.Container)
-	walk = func(c *widget.Container) {
+	// Recurse through the Containerer interface, not the concrete
+	// *widget.Container: a window body is wrapped in the kit's frame-clip
+	// container (uikit/screens/winclip.go), so a concrete-only walk stops
+	// at the wrapper.
+	var walk func(c widget.Containerer)
+	walk = func(c widget.Containerer) {
 		for _, ch := range c.Children() {
 			switch v := ch.(type) {
 			case *widget.Button:
 				if v.Text() != nil && v.Text().Label == label {
 					found = v
 				}
-			case *widget.Container:
+			case widget.Containerer:
 				walk(v)
 			}
 		}
 	}
-	ctr, ok := g.menuWin.GetContainer().(*widget.Container)
+	ctr, ok := g.menuWin.GetContainer().(widget.Containerer)
 	if !ok {
 		t.Fatalf("menu container is %T", g.menuWin.GetContainer())
 	}

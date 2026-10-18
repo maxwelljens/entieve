@@ -129,7 +129,11 @@ func NewHelp(d theme.Theme, rows []KeyRow) *HelpPanel {
 	h.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(titleBar, theme.Px(theme.TitleBarH)),
-		widget.WindowOpts.MinSize(theme.Px(400), theme.Px(200)),
+		// The content floor IS the hugged size just measured: the key map
+		// is a fixed stack, so a grip drag may grow the window but never
+		// shrink it below the rows + blurb (the old 400×200 literal let
+		// the two-column table and the blurb paint past the frame).
+		widget.WindowOpts.MinSize(w, wh),
 		// Default: centered for the 1024 px minimum width, 24 px from the
 		// top like the legacy help overlay; the integrator re-centers it.
 		widget.WindowOpts.Location(image.Rect(x0, theme.Px(helpStartY), x0+w, theme.Px(helpStartY)+wh)),
