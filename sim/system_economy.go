@@ -244,6 +244,11 @@ func (s *Sim) settle(book *MarketBook, ms []match) (int, float64) {
 		tax := MarketSalesTax * v
 		received := v - tax
 		s.wallet += received
+		s.recordLedger(LedgerEntry{
+			What:   "Market sell — " + itoaN(m.qty) + " x " + s.itemName(m.order.Item),
+			Where:  s.stationName(m.order.Station),
+			Amount: received, Tax: tax,
+		})
 		s.emit(Event{Kind: EvMarket, Severity: SevGood, Actor: s.player, Item: m.order.Item,
 			Text: "Sold " + itoaN(m.qty) + " x " + s.itemName(m.order.Item) + " for " +
 				euro(received) + " (" + euro(tax) + " sales tax)",
@@ -365,6 +370,11 @@ func (s *Sim) execBuy(c CmdBuy) {
 	}
 	before := s.marketPrice(book, c.Item)
 	s.wallet -= cost + fee
+	s.recordLedger(LedgerEntry{
+		What:   "Market buy — " + itoaN(qty) + " x " + s.itemName(c.Item),
+		Where:  s.stationName(station),
+		Amount: -(cost + fee), Fee: fee,
+	})
 	s.settle(book, ms)
 	s.storePlayerStock(c.Item, qty)
 	s.emit(Event{Kind: EvMarket, Severity: SevGood, Actor: s.player, Item: c.Item,
@@ -419,6 +429,11 @@ func (s *Sim) execSell(c CmdSell) {
 	tax := MarketSalesTax * proceeds
 	received := proceeds - tax - fee
 	s.wallet += received
+	s.recordLedger(LedgerEntry{
+		What:   "Market sell — " + itoaN(qty) + " x " + s.itemName(c.Item),
+		Where:  s.stationName(station),
+		Amount: received, Fee: fee, Tax: tax,
+	})
 	s.emit(Event{Kind: EvMarket, Severity: SevGood, Actor: s.player, Item: c.Item,
 		Text: "Sold " + itoaN(qty) + " x " + s.itemName(c.Item) + " for " + euro(received) +
 			" (" + euro(fee) + " broker fee, " + euro(tax) + " sales tax)",
@@ -587,6 +602,13 @@ func (s *Sim) PlaceOrder(station StationID, side OrderSide, item content.ItemID,
 			// resting remainder: only the price improvement is surplus.
 			res.Refund = escrow - cost - limit*float64(rest)
 			s.wallet += res.Refund
+			// The escrow debit and its price-improvement refund are one
+			// transaction: one row, net, broker fee itemized.
+			s.recordLedger(LedgerEntry{
+				What:   "Buy order — " + itoaN(qty) + " x " + s.itemName(item),
+				Where:  s.stationName(station),
+				Amount: res.Refund - (escrow + fee), Fee: fee,
+			})
 		} else {
 			if _, isShip := s.Content.Ship(content.ShipID(item)); isShip {
 				return OrderResult{}, false // fitted hulls cannot be escrowed
@@ -606,6 +628,8 @@ func (s *Sim) PlaceOrder(station StationID, side OrderSide, item content.ItemID,
 		}
 	}
 
+	// The fill side of a sell placement, for the single ledger row below.
+	var fillTax, fillNet float64
 	if filled > 0 {
 		qtyFilled, value := s.settle(book, ms)
 		if owner == OwnerPlayer {
@@ -619,12 +643,23 @@ func (s *Sim) PlaceOrder(station StationID, side OrderSide, item content.ItemID,
 				tax := MarketSalesTax * value
 				received := value - tax
 				s.wallet += received
+				fillTax, fillNet = tax, received
 				s.emit(Event{Kind: EvMarket, Severity: SevGood, Actor: s.player, Item: item,
 					Text: "Sold " + itoaN(qtyFilled) + " x " + s.itemName(item) + " for " +
 						euro(received) + " (" + euro(tax) + " sales tax)",
 					Value: received})
 			}
 		}
+	}
+	if owner == OwnerPlayer && side == OrderSell {
+		// A sell placement settles as ONE row whether or not it crossed:
+		// the proceeds net of the broker fee charged at placement and the
+		// sales tax, or the fee alone when nothing traded.
+		s.recordLedger(LedgerEntry{
+			What:   "Sell order — " + itoaN(qty) + " x " + s.itemName(item),
+			Where:  s.stationName(station),
+			Amount: fillNet - res.Fee, Fee: res.Fee, Tax: fillTax,
+		})
 	}
 	if rest > 0 {
 		s.marketSeq++
@@ -670,6 +705,13 @@ func (s *Sim) CancelOrder(station StationID, id uint64, owner string) bool {
 	if owner == OwnerPlayer {
 		if o.Side == OrderBuy {
 			s.wallet += o.Price * float64(o.Qty)
+			// The escrow comes back whole: the broker fee charged at
+			// placement was kept (EVE's rule) and is not refunded.
+			s.recordLedger(LedgerEntry{
+				What:   "Escrow released — " + itoaN(o.Qty) + " x " + s.itemName(o.Item),
+				Where:  s.stationName(station),
+				Amount: o.Price * float64(o.Qty),
+			})
 		} else {
 			s.storePlayerStock(o.Item, o.Qty)
 		}
@@ -785,6 +827,11 @@ func (s *Sim) execRepair() {
 		return
 	}
 	s.wallet -= cost
+	s.recordLedger(LedgerEntry{
+		What:   "Repairs — " + num(missing) + " HP",
+		Where:  s.stationName(s.dockedStationID()),
+		Amount: -cost,
+	})
 	ship.Shield = ship.MaxShield
 	ship.Armor = ship.MaxArmor
 	ship.Structure = ship.MaxStructure

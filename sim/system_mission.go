@@ -178,6 +178,11 @@ func (s *Sim) completeMission(i int, def *content.ContractDef) {
 		}
 	}
 	s.wallet += def.Reward.Credits
+	s.recordLedger(LedgerEntry{
+		What:   "Contract — " + def.Title,
+		Where:  s.stationName(s.dockedStationID()),
+		Amount: def.Reward.Credits,
+	})
 	if def.Reward.Item != "" && def.Reward.Qty > 0 {
 		s.Hangar.Items = addStacks(s.Hangar.Items, def.Reward.Item, def.Reward.Qty)
 	}

@@ -1124,4 +1124,10 @@ type Save struct {
 	// (a gate hop, or the grid rebuilt under them mid-leg), in park order —
 	// the canonical serialization (Hash) of the journey ledger.
 	TrafficJourneys []TrafficJourney `json:"traffic_journeys,omitempty"`
+
+	// --- finance (the player's transaction ledger) ---
+	// Ledger is the capped ring of the player's last LedgerCap wallet
+	// movements, oldest first (see ledger.go) — empty and omitted on saves
+	// written before the field existed.
+	Ledger []LedgerEntry `json:"ledger,omitempty"`
 }

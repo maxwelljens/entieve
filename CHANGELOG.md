@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Finances window — holdings and the transaction ledger**
+  (`uikit/screens/finances.go`, the `pFinances` Screen row in
+  `game/screens.go`, key `K`, rail section Trade): a read-only wallet
+  window opening in space and docked alike. The header shows the player's
+  money in the three places it can sit — spendable **cash**, **capital
+  deployed** in open buy orders (escrowed at placement, refundable in full
+  on cancel; the 3% broker fee charged at placement is not), **receivables**
+  (the credits accepted contracts still owe) and their total. Below it the
+  transaction ledger: one row per wallet movement (`sim/ledger.go`,
+  recorded at every debit/credit site — market buys/sells, order placement
+  and escrow release, bounties, repairs and contract payouts), with the net
+  amount, the broker fee and sales tax itemized inside the trade's own row,
+  and columns when/what/where/amount (euro form, `-1,234.50 €`). The ring
+  keeps the newest 200 entries in `Save.Ledger` (newest first in the
+  window; empty on older saves).
+
 - **Player standing market orders** (`sim/model.go`, `sim/command.go`,
   `sim/system_economy.go`, `uikit/widgets/intents.go`,
   `uikit/screens/market.go`): the market window now posts, lists and

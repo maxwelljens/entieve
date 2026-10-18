@@ -136,6 +136,9 @@ respawn anchor, module target bindings — and the living-economy state the
 v2 schema added: `Market` (per-station books), `MarketLasts`,
 `MarketSeq`, `Belts`, `FactionLedger`, `Jobs`, `JobSeq`, `Craft`,
 `Agents`, `Upkeep`, `TrafficJourneys` (plus `TrafficLeaves`).
+`Ledger` (`sim/ledger.go`) is the one additive field outside that break:
+the capped ring of the player's last `LedgerCap` wallet movements, empty
+(and omitted) on saves written before it existed.
 Every list carries its canonical order and map keys marshal sorted, so the
 JSON is canonical.
 

@@ -44,6 +44,7 @@ in-game help window renders.
 | `N` | Toggle starmap |
 | `H` | Toggle help window |
 | `P` | Toggle settings (UI scale, fullscreen, window layout) |
+| `K` | Toggle finances window (holdings and transactions) |
 | `Esc` | Menu: Resume / Save / Load / Quit |
 | `[` or `-` | Time acceleration down (8 → 4 → 2 → 1×) |
 | `]` or `=` | Time acceleration up (1 → 2 → 4 → 8×) |
@@ -86,10 +87,10 @@ its minimum size), and click anywhere on a window to raise it to the
 front.
 
 Toggle keys open and close their window (`I`, `F`, `G`, `B`, `C`, `N`, `H`,
-`P`, `Shift+L`) — windows have no separate close button. The same
+`P`, `K`, `Shift+L`) — windows have no separate close button. The same
 toggles live on the **left navigation rail**: one glyph per window in
 six sections — **Ship** (Overview, Selected Item, Fitting), **Trade**
-(Market, Inventory), **Industry** (Factory), **Station** (Station
+(Market, Inventory, Finances), **Industry** (Factory), **Station** (Station
 Services), **World** (Scanner, Starmap, Log) and **Help & System**
 (Help, Settings). Hover an entry for its tooltip (icon, name and hotkey
 hint); click once to open — a freshly opened window lands on top — and

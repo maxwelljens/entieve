@@ -202,6 +202,11 @@ func (s *Sim) handleDeath(e, src ecs.Entity) {
 	// Bounty: only kills attributed to the player pay out.
 	if def != nil && def.Bounty > 0 && src == s.player {
 		s.wallet += def.Bounty
+		s.recordLedger(LedgerEntry{
+			What:   "Bounty — " + name,
+			Where:  s.systemName(),
+			Amount: def.Bounty,
+		})
 		s.emit(Event{Kind: EvLog, Severity: SevGood, Actor: s.player, Target: e,
 			Text: "Bounty paid: " + euro(def.Bounty), Value: def.Bounty})
 	}
