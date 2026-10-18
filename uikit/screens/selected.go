@@ -130,7 +130,7 @@ func (k *Kit) buildSelected() {
 	sp.warpTips = []*widget.ToolTip{sp.warpTip}
 
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
 		// The body's geometry comes from the pure selectedLayout below —
 		// rows stack from the top, bands tile their row with equal gaps.
 		widget.ContainerOpts.Layout(&selectedLayouter{bands: selectedBands[:]}),

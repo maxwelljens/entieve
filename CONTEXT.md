@@ -43,6 +43,9 @@ names the *modules and seams* we build that vocabulary into.
 | **Session** | one host's environment: the three seams plus its shared context menu and Show Info window (`uikit/screens.Session`, from `Kit.Env` / `NewEnv`) |
 | **uikit modules** | `uikit/theme` (visual constants + the Theme seam) ← `uikit/widgets` (mechanics: table, menu, tooltip, rowspec, intents, seams) ← `uikit/screens` (the panels + Kit): each layer imports only downward, pinned by `TestImportDirection` |
 | **Deep module** | a module whose interface is small and whose implementation absorbs complexity (the goal of every seam here) |
+| **Close button** | the `×` affordance at a title bar's right edge: registered per window through `Kit.SetWindowClose`, wired to that window's existing close semantics (Screen-row toggle, core toggle, Show Info close). Its hit strip is excluded from the chrome-owned title drag; the window's resize grip keeps precedence where the strip meets a grip band |
+| **Window animation** | the render-only open/close fade: a mount fades + slides in over 12 frames, a close-button close fades out over 10 frames before its unmount runs. The animating window is parked out of ebitenui's window pass and composited through one offscreen with alpha/translate — input is live throughout the open fade, inert throughout the close fade; no rects, layout or simulation state move |
+| **Settle** | an animation completing: an open window snaps to the normal paint path, a closing window runs its deferred unmount. A raise settles every animation (nothing may fade below a retopped window); a new open mount settles the close fades only (the other open fades below it keep running — the composite walks the stack in paint order); a drag-arming press settles that window's open fade, so a fade's park flips can never relayout a subtree a drag is translating |
 
 ## Vocabulary rules
 

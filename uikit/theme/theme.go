@@ -152,9 +152,9 @@ func NewTheme(p Palette, ts TypeScale) *widget.Theme {
 		Disabled: NRGBA(p.Dim, 160),
 	}
 	scrollImage := &widget.ScrollContainerImage{
-		Idle:     Bordered(Solid(p.BG), NRGBA(p.Border, 160), 1),
+		Idle:     Bordered(WindowBody(p.BG), NRGBA(p.Border, 160), 1),
 		Disabled: Bordered(NRGBA(p.Cell, 140), NRGBA(p.Border, 110), 1),
-		Mask:     NineSlice(Solid(p.BG)),
+		Mask:     NineSlice(WindowBody(p.BG)),
 	}
 	slider := newSliderParams(p)
 

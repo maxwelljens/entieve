@@ -101,7 +101,7 @@ func NewHelp(d theme.Theme, rows []KeyRow) *HelpPanel {
 	h.blurb = blurb
 
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Spacing(theme.Px(10)),

@@ -21,6 +21,19 @@ const (
 	ContentsPad = 5  // panel margins inside a window
 )
 
+// WindowAlpha is the ONE translucency token: the alpha every window
+// body fill draws at (~0.90), so windows read the world through a
+// slight translucency. The title bar stays on the opaque BGHard, and
+// non-window chrome (HUD, rail, rack) keeps the palette alpha — every
+// window body funnels through WindowBody so the value stays uniform.
+const WindowAlpha = 230 // 0.90 × 255
+
+// WindowBody returns a window body fill color: the palette color at the
+// WindowAlpha translucency token (pinned by
+// TestWindowBodyTranslucencyToken; the drawn uniformity across windows
+// by TestWindowFadeAndTranslucencyCapture).
+func WindowBody(c color.RGBA) color.NRGBA { return NRGBA(c, WindowAlpha) }
+
 // showWidget shows or hides w only on a state change (a visibility flip
 // requests a parent relayout, so Sync must not spam it).
 func ShowWidget(w *widget.Widget, show bool) {

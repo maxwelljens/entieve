@@ -758,6 +758,14 @@ func (g *Game) buildKit() error {
 		if s.Modal {
 			win.Modal = true
 		}
+		// The title-bar × for every row: wired through the row's OWN
+		// close semantics — the same toggle its key and rail entry
+		// perform (non-modal rows flip the open flag, modal rows pop
+		// their scene), so reopen behavior is untouched. Rows without a
+		// title bar (the station services view) register harmlessly: the
+		// kit attaches no button for them.
+		s := s
+		kit.SetWindowClose(win, func() { g.toggleScreen(s.Title) })
 	}
 
 	// Always-on chrome mounts straight onto the kit's root overlay — no

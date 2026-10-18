@@ -18,7 +18,9 @@ import (
 
 // infoCaptureFrames is how many full draws run before the screenshot is
 // taken (anchors and layout settle on the first frames).
-const infoCaptureFrames = 3
+// 13 draws: Show Info opens with the 12-frame fade — captures pin
+// the settled state, never a mid-fade one (winanim.go).
+const infoCaptureFrames = 13
 
 // TestInfoWindowCaptureFrame renders the two Show Info surfaces — a
 // floating details window (hull page: header, prose, section rows) and a
@@ -68,9 +70,15 @@ func TestInfoWindowCaptureFrame(t *testing.T) {
 		{Label: "Cycle charge", Disabled: true, Action: func() {}},
 	}, image.Pt(760, 140))
 	// Park the (fake) cursor on the second row: Kit.Update's menu poll
-	// reads the live cursor for the hover band, exactly as in game.
+	// reads the live cursor for the hover band, exactly as in game — and
+	// the menu's live poll is the RAW ebiten cursor (menu.go's
+	// pollCursor), not the ebitenui seam above, so pin it to the parked
+	// point through its test seam or the band would follow the operator's
+	// real pointer.
 	hov := m.RowRect(1)
-	fm.at((hov.Min.X+hov.Max.X)/2, (hov.Min.Y+hov.Max.Y)/2)
+	cx, cy := (hov.Min.X+hov.Max.X)/2, (hov.Min.Y+hov.Max.Y)/2
+	fm.at(cx, cy)
+	t.Cleanup(widgets.SetPollCursorForTest(func() (int, int) { return cx, cy }))
 	m.Hover(m.RowRect(1).Min.Add(image.Pt(6, 6)))
 
 	g := &infoCaptureGame{k: k, out: filepath.Join(outDir, "infowin_capture.png")}
@@ -104,7 +112,6 @@ func (g *infoCaptureGame) Update() error {
 		g.err = err
 		return ebiten.Termination
 	}
-	g.frames++
 	if g.frames > infoCaptureFrames && g.last != nil {
 		g.verify(g.last)
 		return ebiten.Termination
@@ -117,6 +124,7 @@ func (g *infoCaptureGame) Draw(screen *ebiten.Image) {
 	g.k.Draw(img)
 	screen.DrawImage(img, nil)
 	g.last = img
+	g.frames++ // frames count DRAWS: ebiten runs Updates on their own cadence (see rail_capture_test.go)
 }
 
 func (g *infoCaptureGame) Layout(w, h int) (int, int) { return 1280, 720 }

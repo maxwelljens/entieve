@@ -107,7 +107,7 @@ func NewFitting(env widgets.Seams) *Fitting {
 	// Body: fixed rows for the stat block, resist table and section
 	// labels; the two data tables split the remaining height.
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, false, false, true, false, true, false}),

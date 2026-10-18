@@ -98,7 +98,6 @@ func (g *tooltipCaptureGame) Update() error {
 		p.Sync()
 	}
 	g.c.ui.Update()
-	g.frames++
 	if g.frames > tooltipCaptureFrames && g.last != nil {
 		g.verify(g.last)
 		return ebiten.Termination
@@ -111,6 +110,7 @@ func (g *tooltipCaptureGame) Draw(screen *ebiten.Image) {
 	g.c.ui.Draw(img)
 	screen.DrawImage(img, nil)
 	g.last = img
+	g.frames++ // frames count DRAWS: ebiten runs Updates on their own cadence (see rail_capture_test.go)
 }
 
 func (g *tooltipCaptureGame) Layout(w, h int) (int, int) { return 1280, 720 }

@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Title-bar close buttons, window open/close fades, translucent window
+  bodies** (`uikit/screens/winanim.go`, `uikit/screens/winchrome.go`,
+  `uikit/theme/chrome.go`, registration in `game/game.go`): every window
+  with a title bar carries a × at its right edge, wired through that
+  window's EXISTING close semantics — a Screen row flips its own toggle
+  (modal rows pop their scene), the two core windows close through the
+  rail's toggle, Show Info keeps its persisted rect and its
+  never-auto-open rule, and the title-less Station Services view stays
+  as it was. The press is excluded from the chrome-owned title drag (the
+  resize grip keeps corner precedence, and a drag that started on the
+  strip never counts as a × click) and rides Kit.Update's menu guard, so
+  a modal context menu's frame can never close a window. Opens and
+  closes animate, render-only: a mount fades + slides in over 12 frames
+  with input live from frame 0, a × close commits immediately (the
+  window is inert for its 10-frame fade) and defers its unmount to
+  settle — the animating window is parked out of ebitenui's window pass
+  and composited through one reusable offscreen with alpha/translate (no
+  rects move, no layout or simulation state changes, no RNG), and any
+  raise, fresh mount or drag-arming press settles a running fade so
+  paint order always matches the stack. Window bodies draw through ONE
+  translucency token (`theme.WindowAlpha`, ~0.90) — title bars stay
+  opaque, HUD/rack/rail keep the palette alpha. Vocabulary pinned in
+  `CONTEXT.md` ("close button", "window animation", "settle"); pins in
+  `uikit/screens/winclose_test.go`, `uikit/screens/winanim_test.go`,
+  `uikit/screens/winchrome_capture_test.go`,
+  `uikit/theme/windowbody_test.go`, `game/closebutton_test.go`.
+
 - **Organic pace before every commencement** (`sim/system_traffic.go`,
   `sim/system_agent.go`, `sim/agent.go`): convoys and economy agents no
   longer act the instant it becomes possible — every window is tick-based

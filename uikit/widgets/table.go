@@ -539,9 +539,9 @@ func NewTable(env Seams, cols []Column, opts ...TableOption) *Table {
 		// to fill it instead of scrolling horizontally at rest.
 		widget.ScrollContainerOpts.StretchContentWidth(),
 		widget.ScrollContainerOpts.Image(&widget.ScrollContainerImage{
-			Idle:     theme.Bordered(theme.Solid(p.BG), theme.NRGBA(p.Border, 160), 1),
+			Idle:     theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 160), 1),
 			Disabled: theme.Bordered(theme.NRGBA(p.Cell, 140), theme.NRGBA(p.Border, 110), 1),
-			Mask:     eimage.NewNineSliceColor(theme.Solid(p.BG)),
+			Mask:     eimage.NewNineSliceColor(theme.WindowBody(p.BG)),
 		}),
 	)
 	// Wheel scrolls the viewport; ScrollTop is a 0..1 fraction of the
