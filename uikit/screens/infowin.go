@@ -621,7 +621,7 @@ func NewInfoWin(env widgets.Seams) *InfoWin {
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Spacing(theme.Px(infoGap)),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.SpMd))),
 		)),
 	)
 	w.scroll = widget.NewScrollContainer(

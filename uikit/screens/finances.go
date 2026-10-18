@@ -86,7 +86,7 @@ func NewFinances(env widgets.Seams) *Finances {
 	)
 	body.AddChild(head, f.tbl.Container())
 
-	title, _ := theme.NewTitleBar(env, "Finances", "svc_log")
+	title, _ := theme.NewTitleBar(env, "Finances", "svc_finances")
 
 	f.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),

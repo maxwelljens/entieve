@@ -24,8 +24,9 @@ const (
 	// headerSpace is the gap between the header strip and the rows
 	// (the furniture token; the row metrics below stay dense on purpose).
 	headerSpace = theme.SpSm
-	// cellPad is the horizontal padding inside every column cell.
-	cellPad = 5
+	// cellPad is the horizontal padding inside every column cell (the
+	// header title and the row cells share it, so their text agrees).
+	cellPad = theme.SpMd
 	// entryPadV is the vertical padding inside a row.
 	entryPadV = 5
 	// selectionAlpha is the accent tint alpha of the selected row.

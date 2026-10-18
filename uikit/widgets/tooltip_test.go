@@ -195,10 +195,10 @@ func TestTipLayoutTilesAtBothWidths(t *testing.T) {
 	// Regression pin: the fixture's panel size at both widths. The height
 	// is width-independent (the same lines, stacked), so a change in either
 	// number is a change to the shipped tooltip's geometry.
-	if got, want := maxed.Size, (image.Point{X: tipMaxW, Y: 225}); got != want {
+	if got, want := maxed.Size, (image.Point{X: tipMaxW, Y: 231}); got != want {
 		t.Errorf("capped fixture panel = %v, want %v", got, want)
 	}
-	if got, want := minW.Size, (image.Point{X: 190, Y: 225}); got != want {
+	if got, want := minW.Size, (image.Point{X: 190, Y: 231}); got != want {
 		t.Errorf("content-sized fixture panel = %v, want %v", got, want)
 	}
 	if minW.Size.X >= maxed.Size.X {

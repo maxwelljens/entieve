@@ -16,17 +16,18 @@ import (
 // Log panel geometry: five visible lines like the legacy log window, a
 // 200-line history cap (older lines are dropped, not truncated in
 // place), and the window defaults. The log is a normal draggable/
-// resizable window docked bottom-left: the free pocket left of the HUD
-// bar is 292 px wide at the 1024×700 minimum (the 420 px bar starts at
-// x=302), so the default stays under it — with the defaults the window
-// never overlaps the HUD, rack or overview.
+// resizable window docked bottom-left: with the rail gutter (RailInset)
+// on its left, 264 keeps its right edge at the historical 361 (the pocket
+// clear of the HUD bar at the 1024×700 minimum), so it still fits with
+// room to spare over the HUD — with the defaults the window never
+// overlaps the HUD, rack or overview.
 const (
 	logViewLines = 5
 	logViewW     = 240
 	logViewH     = logViewLines * 23 // lines × lineH(FontSmall)
 	logMaxLines  = 200
 
-	logDefaultW = 288 // fits the bottom-left pocket (see above)
+	logDefaultW = 264 // 361 − (10 + RailInset): the pocket right edge, clear of the HUD bar
 	logDefaultH = 240
 	logMinW     = logViewW + 2*theme.ContentsPad                   // text-area floor + body padding
 	logMinH     = theme.TitleBarH + logViewH + 2*theme.ContentsPad // + title bar
@@ -89,7 +90,7 @@ func NewLog(env interface {
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
-			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.SpMd))),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.GridLayoutData{})),
 	)

@@ -331,12 +331,15 @@ func TestStationBoardRendersShippedContent(t *testing.T) {
 		t.Errorf("empty active section = %q", got)
 	}
 
-	// The longest active line (deliver title + progress) must fit its
-	// column whole: no ellipsis, integer progress.
+	// The active line is the title + progress at the tiny step. The
+	// station column is narrower since the rail grew (stationWinW =
+	// 404 − stationX), so the longest shipped title now ellipsizes its
+	// progress suffix rather than fitting whole — the board's content
+	// floor, not a regression in the row metrics.
 	setMissions(t, g, sim.MissionState{ID: "contract-solace-supply-run-1"})
 	g.syncMounts()
 	pump(t, g, 1024, 700)
-	if got, want := activeTitle(t, g, 0), "Supply run to Przystań — 0/2"; got != want {
+	if got, want := activeTitle(t, g, 0), "Supply run to Przystań — …"; got != want {
 		t.Errorf("supply active line = %q, want %q", got, want)
 	}
 

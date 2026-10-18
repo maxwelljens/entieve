@@ -989,12 +989,14 @@ func TestTableScrollRailGutter(t *testing.T) {
 }
 
 // TestTableRowDensityPins: information density in tables is deliberate
-// (EVE-like), so the furniture tokens never reach a row's metrics — the
-// cell and row padding stay their literal values. The header gap is
-// furniture and does take the token.
+// (EVE-like), so the furniture tokens never reach a row's VERTICAL
+// metrics — entryPadV stays its literal. The horizontal cell padding
+// joins the window padding scale (SpMd), so edge columns stop hugging
+// the frame, and the header gap is furniture too.
 func TestTableRowDensityPins(t *testing.T) {
-	if entryPadV != 5 || cellPad != 5 {
-		t.Errorf("row density = entryPadV %d / cellPad %d, want 5/5 (deliberate)", entryPadV, cellPad)
+	if entryPadV != 5 || cellPad != theme.SpMd {
+		t.Errorf("row density = entryPadV %d / cellPad %d, want 5/%d (vertical dense, horizontal on the window scale)",
+			entryPadV, cellPad, theme.SpMd)
 	}
 	if headerSpace != theme.SpSm {
 		t.Errorf("headerSpace = %d, want the SpSm furniture token %d", headerSpace, theme.SpSm)

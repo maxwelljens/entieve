@@ -158,12 +158,13 @@ func (k *Kit) buildSelected() {
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
 		// The two action rows must hold icon + label whole: five
-		// TextAndImage buttons measure 447 px on the type grid, so the
-		// content floor (mirrored by the default rect below) is 450.
-		widget.WindowOpts.MinSize(theme.Px(450), theme.Px(240)),
+		// TextAndImage buttons measure 447 px on the type grid plus the
+		// wider ContentsPad margins and cell gaps, so the content floor
+		// (mirrored by the default rect below) is 464.
+		widget.WindowOpts.MinSize(theme.Px(464), theme.Px(240)),
 		// Default clears the rail's left gutter (RailInset); the game
 		// re-anchors it to the right edge on first layout.
-		widget.WindowOpts.Location(image.Rect(theme.Px(8+RailInset), theme.Px(436), theme.Px(458+RailInset), theme.Px(696))),
+		widget.WindowOpts.Location(image.Rect(theme.Px(8+RailInset), theme.Px(436), theme.Px(472+RailInset), theme.Px(696))),
 	)
 }
 
@@ -187,7 +188,7 @@ type selectedInventory struct {
 // band by band. Rows stack from the top of inner with inv.gap between
 // them; the text lines keep their measured height and the bands share
 // whatever height is left, capped at their natural height — so every rect
-// stays inside inner even at the 450×240 minimum. Cells within a band
+// stays inside inner even at the 464×240 minimum. Cells within a band
 // scale proportionally to their natural widths with exactly inv.gap
 // between them, which tiles the band edge to edge.
 func selectedLayout(inner image.Rectangle, inv selectedInventory) []image.Rectangle {

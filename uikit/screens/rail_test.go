@@ -64,11 +64,12 @@ func TestRailGeometry(t *testing.T) {
 					t.Fatalf("no button for %q", title)
 				}
 				br := b.GetWidget().Rect
-				// The cell stops short of the rail's scrollbar gutter
-				// (ScrollGutter), so the handle beside it never overhangs.
-				if br.Dx() != theme.Px(RailInset-theme.ScrollGutter) || br.Dy() != theme.Px(RailInset) {
-					t.Errorf("%s cell = %v, want %d×%d (RailInset − ScrollGutter × RailInset)",
-						title, br, theme.Px(RailInset-theme.ScrollGutter), theme.Px(RailInset))
+				// The cell IS the 63×63 entry square: the rail's outer
+				// width is RailInset = cells + the scrollbar's reserved
+				// ScrollGutter, which rides beside the cells.
+				if br.Dx() != theme.Px(RailInset-theme.ScrollGutter) || br.Dy() != theme.Px(RailInset-theme.ScrollGutter) {
+					t.Errorf("%s cell = %v, want %d² (RailInset − ScrollGutter)",
+						title, br, theme.Px(RailInset-theme.ScrollGutter))
 				}
 			}
 
@@ -128,10 +129,9 @@ func TestRailIconsInsideCells(t *testing.T) {
 				}
 				l, rr := glyph.Min.X-cell.Min.X, cell.Max.X-glyph.Max.X
 				tp, b := glyph.Min.Y-cell.Min.Y, cell.Max.Y-glyph.Max.Y
-				// The glyph is centred in its cell: each opposing pair of
-				// margins matches ±1 (the cell is now taller than wide —
-				// the scrollbar gutter is carved from its right edge — so
-				// only each pair must agree, not all four).
+				// The cell is a square (63×63, the gutter rides beside
+				// it), so the glyph is centred: each opposing pair of
+				// margins matches ±1.
 				if abs(l-rr) > 1 || abs(tp-b) > 1 {
 					t.Errorf("%s: glyph margins L%d R%d T%d B%d in %v, want each pair equal ±1",
 						title, l, rr, tp, b, cell)
@@ -139,9 +139,9 @@ func TestRailIconsInsideCells(t *testing.T) {
 				if l < 1 || rr < 1 || tp < 1 || b < 1 {
 					t.Errorf("%s: glyph %v touches its cell edge %v (want visible air)", title, glyph, cell)
 				}
-				if cell.Dx() != theme.Px(RailInset-theme.ScrollGutter) || cell.Dy() != theme.Px(RailInset) {
-					t.Errorf("%s: cell = %v, want %d×%d (RailInset − ScrollGutter × RailInset)",
-						title, cell, theme.Px(RailInset-theme.ScrollGutter), theme.Px(RailInset))
+				if cell.Dx() != theme.Px(RailInset-theme.ScrollGutter) || cell.Dy() != theme.Px(RailInset-theme.ScrollGutter) {
+					t.Errorf("%s: cell = %v, want %d² (RailInset − ScrollGutter)",
+						title, cell, theme.Px(RailInset-theme.ScrollGutter))
 				}
 			}
 
@@ -207,11 +207,12 @@ func TestRailColumnCapsAndScrolls(t *testing.T) {
 
 // TestRailGutterAndGlyphLiterals pins the +75 % itself: the geometry
 // pins above derive from RailInset, so this one pins the constants —
-// the cell/gutter square 36 → 63 and the glyph grown with it
+// the 63×63 entry square sits beside the 24 px scrollbar gutter, so
+// RailInset (cells + gutter) is 87, and the glyph grown with the cell
 // (20 → 35, the Button glyph's own ×1.75).
 func TestRailGutterAndGlyphLiterals(t *testing.T) {
-	if RailInset != 63 {
-		t.Errorf("RailInset = %d, want 63 (36 × 1.75)", RailInset)
+	if RailInset != 87 {
+		t.Errorf("RailInset = %d, want 87 (63 cells + 24 gutter)", RailInset)
 	}
 	if railIcon != 35 {
 		t.Errorf("railIcon = %d, want 35 (IconButton 20 × 1.75)", railIcon)

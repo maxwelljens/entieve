@@ -323,7 +323,8 @@ func (g *Game) boardRowStack(r boardRowModel, active bool) []widgets.RowLine {
 	// The active line is title + progress ("Belt cleanup — 1/3") and only
 	// fits the title column at the tiny step in IBM Plex Sans (at small
 	// the em-dash suffix alone costs 56 px); available titles, which
-	// carry no suffix, stay at small.
+	// carry no suffix, stay at small. The station column narrowed with
+	// the rail, so the longest shipped title's progress ellipsizes.
 	step := theme.StepSmall
 	if active {
 		step = theme.StepTiny

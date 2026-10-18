@@ -59,7 +59,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tools/emblemraster`. The `origin` heritage tag stays, unchanged, for
   the rat hulls (Old Works) and as name-heritage metadata.
 
+- **Dedicated Finances icon** (`uikit/icons/wallet.png`,
+  `uikit/icons/manifest.json`, `uikit/icons/CREDITS.md`,
+  `uikit/screens/finances.go`, `game/screens.go`): the Finances window
+  (rail entry, tooltip and title bar) no longer borrows the Log's book
+  glyph — it carries its own wallet silhouette, fetched from
+  game-icons.net and credited per file in `CREDITS.md` and
+  `manifest.json` (CC BY 3.0, Delapouite). Like every icon it rides the
+  shared white-alpha PNG pipeline and tints per palette role.
+
 ### Changed
+
+- **Navigation rail buttons restored to full width; window padding and
+  table-header air widened** (`uikit/screens/rail.go`,
+  `uikit/theme/chrome.go`, `uikit/widgets/table.go`,
+  `uikit/screens/{logpan,infowin,selected}.go`,
+  `uikit/screens/finances.go`, `game/*`): the rail's scroll gutter no
+  longer carves the entry cells — they are 63×63 again and the 24 px
+  `ScrollGutter` rides beside them, so `RailInset` grows 63 → 87 and every
+  default window's left edge moves +24 (the docked station column narrows
+  to keep its right edge at 404; the log's default width follows to 264 so
+  it still clears the HUD bar). Every window's interior padding grows
+  `ContentsPad` 5 → 8 (the `SpMd` token), the table's header and cell
+  horizontal padding joins it (`cellPad` 5 → `SpMd`; vertical density
+  unchanged), and the Selected Item window's content floor widens 450 →
+  464 so its icon+label buttons still fit their cells whole. Line and row
+  packing stays untouched; the pins and the pixel captures were
+  re-targeted in one sweep.
 
 - **Scrollbars sit in a reserved gutter beside their content; furniture
   gets air** (`uikit/theme`, `uikit/widgets/scrollrail.go`,
@@ -76,8 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   token set (`SpSm`/`SpMd`/`SpLg` = 4/8/16) gives the furniture air:
   button/title-bar padding, the slider's track padding, the rail's entry
   gaps. Data rows stay dense on purpose (the table's `cellPad`/`entryPadV`
-  literals are pinned unchanged). The station rail keeps its `RailInset`
-  footprint — the gutter is carved from the entry cells.
+  literals are pinned unchanged). The station rail grows to `RailInset`
+  = cells (63) + gutter (24): the gutter rides beside the entry cells.
 
 - **Star systems rescaled to real-solar-system proportions**
   (`content/data/systems/*.json`, `content/data/worlds/*.json`): bodies
