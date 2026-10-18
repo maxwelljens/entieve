@@ -220,7 +220,7 @@ func TestTitleDragBehavior(t *testing.T) {
 	fm.up()
 	frame()
 	frame()
-	wantResize := resizeRect(start, d.X, d.Y, edgeLeft|edgeTop, windowMin(win))
+	wantResize := resizeRect(start, d.X, d.Y, edgeLeft|edgeTop, windowMin(win, start))
 	if got := win.GetContainer().GetWidget().Rect; got != wantResize {
 		t.Errorf("corner drag: rect = %v, want resizeRect %v", got, wantResize)
 	}

@@ -243,7 +243,7 @@ func TestCloseButtonGripKeepsCornerPrecedence(t *testing.T) {
 	pumpKit(t, k, 1024, 700)
 	fm.up()
 	pumpKit(t, k, 1024, 700)
-	want := resizeRect(rect, d.X, d.Y, edgeRight|edgeTop, windowMin(win))
+	want := resizeRect(rect, d.X, d.Y, edgeRight|edgeTop, windowMin(win, rect))
 	if got := win.GetContainer().GetWidget().Rect; got != want {
 		t.Errorf("corner drag: rect = %v, want resizeRect %v", got, want)
 	}

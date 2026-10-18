@@ -329,7 +329,7 @@ func (c *winChrome) step(cursor image.Point, pressed bool) {
 // apply moves the window to the rect the drag math asks for.
 func (c *winChrome) apply(cursor image.Point, wgt *widget.Widget) {
 	r := resizeRect(c.start, cursor.X-c.origin.X, cursor.Y-c.origin.Y,
-		c.edges, windowMin(c.win))
+		c.edges, windowMin(c.win, c.start))
 	if r != wgt.Rect {
 		c.win.SetLocation(r)
 	}
@@ -406,13 +406,36 @@ func translateNode(n widget.PreferredSizeLocateableWidget, d image.Point) {
 	}
 }
 
-// windowMin is the window's MinSize as a point (no MinSize → 1×1 floor
-// lives inside resizeRect).
-func windowMin(win *widget.Window) image.Point {
+// windowMin is the floor a grip drag may shrink win to: the window's
+// declared MinSize, raised per axis to the body's content minimum when
+// that axis already fits at the press rect. This is what actually stops a
+// manual shrink at the frame that still holds the content — the
+// WindowOpts.MinSize literals were honest floors all along (SetLocation
+// honours them and resizeRect clamps to them), they were simply smaller
+// than the bodies they framed, so a grip drag could shrink and overflow.
+//
+// Two guards keep the floor from making a grip touch GROW a window:
+//   - an axis whose preferred size exceeds the press rect is elastic (a
+//     table's fitted columns, the Selected Item's compressing layouter,
+//     the starmap graphic) -- MinSize is the only honest floor there;
+//   - a body carrying a scroll viewport self-clips and reports its
+//     content's preferred size, not a frame minimum, so MinSize stands.
+func windowMin(win *widget.Window, start image.Rectangle) image.Point {
+	min := image.Point{X: 1, Y: 1}
 	if win.MinSize != nil {
-		return *win.MinSize
+		min = *win.MinSize
 	}
-	return image.Point{}
+	if win.Contents == nil || hasScrollContainer(win.Contents) {
+		return min
+	}
+	pw, ph := win.GetContainer().PreferredSize()
+	if pw <= start.Dx() {
+		min.X = max(min.X, pw)
+	}
+	if ph <= start.Dy() {
+		min.Y = max(min.Y, ph)
+	}
+	return min
 }
 
 // setResizeCursor picks the cursor for the gripped axes. ebitenui ships
