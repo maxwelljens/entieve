@@ -289,31 +289,31 @@
     "target": "Gniazdo"
   },
   {
-    "at_tick": 59900,
+    "at_tick": 60180,
     "action": "lock",
     "target": "Marauder",
     "note": "fight 3: the marauder webs us and hits us with its warp scrambler"
   },
   {
-    "at_tick": 60100,
+    "at_tick": 60380,
     "action": "orbit",
     "target": "Marauder",
     "range": 6000
   },
   {
-    "at_tick": 61000,
+    "at_tick": 61280,
     "action": "activate",
     "slot": "high0",
     "target": "Marauder"
   },
   {
-    "at_tick": 61060,
+    "at_tick": 61340,
     "action": "activate",
     "slot": "mid2",
     "target": "Marauder"
   },
   {
-    "at_tick": 61120,
+    "at_tick": 61400,
     "action": "activate",
     "slot": "high2",
     "target": "Marauder"
