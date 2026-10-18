@@ -1,0 +1,9 @@
+<!-- Entieve original artwork — the Aldemar Group emblem (calipers and nodes). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <polygon fill="#2f3d4c" points="8,7 13,7 26,40 21,40"/>
+  <polygon fill="#2f3d4c" points="40,7 35,7 22,40 27,40"/>
+  <rect fill="#8fa3b5" x="10" y="21" width="28" height="3.5"/>
+  <circle fill="#9fb4c7" cx="10.5" cy="7" r="3"/>
+  <circle fill="#9fb4c7" cx="37.5" cy="7" r="3"/>
+  <circle fill="#9fb4c7" cx="24" cy="43" r="3"/>
+</svg>

@@ -1,6 +1,7 @@
 [
   {
     "id": "mod-emp-turret",
+    "maker": "corp-nordvakt",
     "name": "EMP Turret",
     "description": "Light turret for charge-class ammunition. Versatile EM-biased volley; loads any light charge.",
     "slot": "high",
@@ -24,6 +25,7 @@
   },
   {
     "id": "mod-rail-turret",
+    "maker": "corp-nordvakt",
     "name": "Rail Turret",
     "description": "Long-range light railgun. Snipes at 18 km with kinetic punch; loads any light charge.",
     "slot": "high",
@@ -47,6 +49,7 @@
   },
   {
     "id": "mod-rocket-pod",
+    "maker": "corp-nordvakt",
     "name": "Rocket Pod",
     "description": "Short-range rocket pod with endless internal feedstock: no ammo, explosive volley, great tracking.",
     "slot": "high",

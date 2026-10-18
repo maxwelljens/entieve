@@ -1,0 +1,9 @@
+<!-- Entieve original artwork — the Nordvakt emblem (gunsight reticle). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <path fill="#6ea8ff" d="M41 24 C41 33.39 33.39 41 24 41 C14.61 41 7 33.39 7 24 C7 14.61 14.61 7 24 7 C33.39 7 41 14.61 41 24 Z M24 11 C16.82 11 11 16.82 11 24 C11 31.18 16.82 37 24 37 C31.18 37 37 31.18 37 24 C37 16.82 31.18 11 24 11 Z"/>
+  <rect fill="#6ea8ff" x="22.5" y="12" width="3" height="8"/>
+  <rect fill="#6ea8ff" x="22.5" y="28" width="3" height="8"/>
+  <rect fill="#6ea8ff" x="12" y="22.5" width="8" height="3"/>
+  <rect fill="#6ea8ff" x="28" y="22.5" width="8" height="3"/>
+  <circle fill="#eaf6ff" cx="24" cy="24" r="3"/>
+</svg>

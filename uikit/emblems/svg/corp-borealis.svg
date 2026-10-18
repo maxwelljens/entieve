@@ -1,0 +1,7 @@
+<!-- Entieve original artwork — the Borealis emblem (aurora arcs). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <path fill="#3fe0c0" d="M4 33 Q24 3 44 33 Q24 21 4 33 Z"/>
+  <path fill="#2aa98f" d="M6 38 Q24 13 42 38 Q24 27 6 38 Z"/>
+  <path fill="#1c7a68" d="M9 43 Q24 24 39 43 Q24 33 9 43 Z"/>
+  <circle fill="#eaf6ff" cx="24" cy="9" r="2.2"/>
+</svg>

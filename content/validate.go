@@ -43,6 +43,18 @@ var (
 	validOrigins = map[string]bool{
 		"moravian": true, "polish": true, "nordic": true, "latinate": true, "old-works": true,
 	}
+	// validMakers is the manufacturer vocabulary of the `maker` field on
+	// ShipDef/ModuleDef/ItemDef: the corp-* slugs of content.AllCorps
+	// (docs/lore/NAMING.md, APPROVED 2026-10-18). Empty is allowed here
+	// (rat hulls, ores, minerals, loot); shipped-data completeness is
+	// enforced by content/maker_test.go.
+	validMakers = func() map[string]bool {
+		m := make(map[string]bool, len(AllCorps))
+		for _, c := range AllCorps {
+			m[c.ID] = true
+		}
+		return m
+	}()
 	// activeKinds run cycles (used by the balance sanity tests).
 	activeKinds = map[string]bool{
 		KindWeapon: true, KindShieldBoost: true, KindArmorRep: true,
@@ -115,6 +127,7 @@ func (v *validator) items() {
 		if !validCategories[it.Category] {
 			v.addf("%s: unknown category %q (want mineral|ore|ammo|charge|loot)", ctx, it.Category)
 		}
+		v.maker(ctx, it.Maker)
 		if it.Volume < 0 {
 			v.addf("%s: negative volume %v", ctx, it.Volume)
 		}
@@ -165,6 +178,7 @@ func (v *validator) ships() {
 		if s.Origin != "" && !validOrigins[s.Origin] {
 			v.addf("%s: unknown origin %q (want moravian|polish|nordic|latinate|old-works)", ctx, s.Origin)
 		}
+		v.maker(ctx, s.Maker)
 		if s.Shield < 0 {
 			v.addf("%s: negative shield %v", ctx, s.Shield)
 		}
@@ -217,6 +231,15 @@ func (v *validator) ships() {
 	}
 }
 
+// maker rejects any non-empty maker outside the corp-* vocabulary
+// (content.AllCorps). Empty is legal everywhere: only manufactured goods
+// carry a maker.
+func (v *validator) maker(ctx, maker string) {
+	if maker != "" && !validMakers[maker] {
+		v.addf("%s: unknown maker %q (want a corp-* slug)", ctx, maker)
+	}
+}
+
 func (v *validator) resists(ctx string, r Resists) {
 	for _, t := range AllDamageTypes {
 		x := r.Of(t)
@@ -243,6 +266,7 @@ func (v *validator) modules() {
 		if !validKinds[m.Kind] {
 			v.addf("%s: unknown kind %q", ctx, m.Kind)
 		}
+		v.maker(ctx, m.Maker)
 		if m.ActivationCost < 0 {
 			v.addf("%s: negative activation cost %v", ctx, m.ActivationCost)
 		}

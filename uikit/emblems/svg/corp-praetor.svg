@@ -1,0 +1,7 @@
+<!-- Entieve original artwork — the Praetor emblem (shield and eye). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <path fill="#0f2340" d="M24 3 L42 9 L42 23 C42 34 34 42 24 45 C14 42 6 34 6 23 L6 9 Z"/>
+  <path fill="#1d3a63" d="M24 8 L38 12.5 L38 23 C38 31.5 32 38 24 40.5 C16 38 10 31.5 10 23 L10 12.5 Z"/>
+  <ellipse fill="#eaf6ff" cx="24" cy="23" rx="9.5" ry="5.5"/>
+  <circle fill="#4da6ff" cx="24" cy="23" r="3.2"/>
+</svg>

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Ten named manufacturing corporations, with original emblems**
+  (`content/corps.go`, `content/data/**`, `content/validate.go`,
+  `uikit/emblems/**`, `uikit/screens/infowin.go`): the generic culture
+  origins on the item display and in the lore are replaced by a named
+  manufacturer layer — the roster approved 2026-10-18, registered in
+  `docs/lore/NAMING.md`. Every manufactured def (`ShipDef`, `ModuleDef`,
+  ammo/charge `ItemDef`s) now carries a `maker` slug (`corp-*`, a
+  registered extension of the frozen id list); rat hulls, ores, minerals
+  and loot stay unattributed. Show Info's Sub line reads "class · maker"
+  ("Frigate · Kombinat Ferrum") and the CONSTRUCTION block shows a Maker
+  row beside the maker's full-colour emblem — a 40 px header mark from
+  `uikit/emblems`, rasterized from committed SVGs by the build-time tool
+  `tools/emblemraster`. The `origin` heritage tag stays, unchanged, for
+  the rat hulls (Old Works) and as name-heritage metadata.
+
 ### Changed
 
 - **Scrollbars sit in a reserved gutter beside their content; furniture

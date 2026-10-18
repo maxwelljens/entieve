@@ -16,7 +16,7 @@ the `1,234.56 €` / `50¢` money strings, and the zone words Charter space /
 the Fringe / Unincorporated). That covers the structured lore fields too:
 hull `origin` tags are copied from NAMING.md's registry, and NPC
 `description` prose MUST read in AESTHETIC's voice — see
-[Lore fields](#lore-fields-hull-origin-and-npc-description) below. Ids are
+[Lore fields](#lore-fields-hull-origin-maker-and-npc-description) below. Ids are
 frozen implementation slugs and stay as they are even when the slug embeds
 a retired name.
 
@@ -56,6 +56,7 @@ All IDs are kebab-case strings, cross-referenced everywhere:
 | Kind        | Prefix      | Example              | Uniqueness             |
 |-------------|-------------|----------------------|------------------------|
 | Item        | `min-`, `ore-`, `charge-`, `loot-` | `min-ferrite` | global (all items share one map) |
+| Corporation | `corp-`     | `corp-ferrum`        | global (the ten-firm maker roster, `content.AllCorps`; a registered extension of the frozen id list) |
 | Ship        | `ship-`     | `ship-sloop`         | global                 |
 | Module      | `mod-`      | `mod-emp-turret`     | global                 |
 | NPC (rat)   | `npc-rat-`  | `npc-rat-scuttler`   | global                 |
@@ -110,14 +111,15 @@ planets 0.4–2 AU from the star, belts/belt-like anomalies 2–10 AU, stations
 other's grids — the scheme is described in [../SIM.md](../SIM.md) §7 and
 pinned by `content/layout_test.go`, which a system outside the bands fails.
 
-## Lore fields: hull `origin` and NPC `description`
+## Lore fields: hull `origin`, `maker` and NPC `description`
 
-Two schema fields carry lore into the UI. Both are single-line JSON strings
-on one line each, next to `name`:
+Three schema fields carry lore into the UI. Each is a single-line JSON
+string on one line each, next to `name`:
 
 | Field | Struct | Shape | Source of truth |
 |-------|--------|-------|-----------------|
 | `origin` | `ShipDef` (`ships/*.json`) | one lowercase tag: `moravian` \| `polish` \| `nordic` \| `latinate` \| `old-works` | the `origin` column of `docs/lore/NAMING.md` — copy it, never invent |
+| `maker` | `ShipDef`, `ModuleDef`, ammo/charge `ItemDef` | one `corp-*` slug (the ten-firm roster) | [NAMING.md — Corporations](../docs/lore/NAMING.md#corporations--manufacturers) / `content.AllCorps` — copy it, never invent |
 | `description` | `NpcDef` (`npcs/*.json`) | one plain single-line string, 1–2 sentences | `docs/lore/AESTHETIC.md` voice; caste framing per `docs/lore/FACTIONS.md` |
 
 **`origin`** is the hull's heritage tag from AESTHETIC's naming layers and
@@ -128,6 +130,22 @@ tags). Register the hull's row in `docs/lore/NAMING.md` first and copy its
 worlds stay small, but the validator rejects any tag outside the vocabulary
 (`content/validate.go`) and `TestShippedHullsCarryOrigin` requires every
 shipped hull to carry one.
+
+**`maker`** is the manufacturer — the corporation that builds the def (the
+"Corporation" concept of `CONTEXT.md`). It is required on every manufactured
+product: ships, modules and ammo/charge items. Rat hulls (`ship-rat-*`),
+ores, minerals and loot stay **unattributed** (no `maker`). The value must
+be one of the ten registered slugs; the validator rejects anything else
+(`content/validate.go`) and `content/maker_test.go` enforces completeness.
+Show Info renders the maker's display name with its emblem
+(`uikit/emblems`, keyed by the same slug). Emblems are original artwork:
+edit the SVG in `uikit/emblems/svg/` and regenerate (see the note below).
+
+Regenerate the emblems after adding or editing one:
+
+```sh
+cd tools/emblemraster && go run . -svg ../../uikit/emblems/svg -out ../../uikit/emblems
+```
 
 **`description`** on an NPC is dossier prose: what the machine is and does
 from the frontier's working perspective — how it behaves, what it does to a
@@ -265,6 +283,7 @@ Create `content/data/ships/ship-<name>.json` (one file per hull). Populate
   "class": "frigate",
   "description": "A nimble escort frigate with a strong shield bias.",
   "origin": "nordic",
+  "maker": "corp-borealis",
   "slots": { "high": 2, "mid": 4, "low": 2 },
   "shield": 260,
   "armor": 140,
@@ -294,8 +313,9 @@ slot unless it is an industrial/hauler.
 `origin` must be one of `moravian | polish | nordic | latinate | old-works`
 (Old Works machine hulls are `old-works`) — register the hull in
 `docs/lore/NAMING.md` and copy the row's origin column, per
-[Lore fields](#lore-fields-hull-origin-and-npc-description). The validator
-rejects unknown tags; shipped hulls may not omit the field.
+[Lore fields](#lore-fields-hull-origin-maker-and-npc-description). The validator
+rejects unknown tags; shipped hulls may not omit the field. `maker` must be
+one of the ten `corp-*` slugs (rat hulls stay unattributed).
 
 ## Recipe 3: add a module
 
@@ -316,6 +336,7 @@ constants in `model.go`, and the matching attribute block is **required**:
   "id": "mod-flak-turret",
   "name": "Flak Turret",
   "description": "Slow heavy turret firing explosive flak; uses light charges.",
+  "maker": "corp-nordvakt",
   "slot": "high",
   "kind": "weapon",
   "activation_cost": 22,
@@ -368,7 +389,7 @@ each loot row: existing item, `chance` in [0,1], `1 <= min_qty <= max_qty`.
 `description` is required on shipped NPCs: 1–2 sentences of dossier prose
 about the machine — what it does and how it behaves, no stat recitation,
 AESTHETIC's voice, no retired placeholder names (see
-[Lore fields](#lore-fields-hull-origin-and-npc-description)).
+[Lore fields](#lore-fields-hull-origin-maker-and-npc-description)).
 Machine classes take an Old Works caste name (Scuttler above) while the id
 keeps its slug — ids are frozen (`docs/lore/NAMING.md`).
 Then reference it from a belt spawn or anomaly spawn (Recipe 1) — NPCs only
@@ -410,6 +431,7 @@ Ammo (needs `damage` + `ammo_class`; ammo items are category `ammo`):
   "id": "charge-thermite",
   "name": "Thermite Charge",
   "description": "Burns hot. Thermal-biased light charge.",
+  "maker": "corp-burza",
   "category": "ammo",
   "volume": 0.01,
   "base_price": 140,
@@ -800,4 +822,7 @@ Huta (`cel-huta`, Młynów) and Doki (`cel-doki`, Kamieniec) carry it.
    non-barges, ammo-less `ammo_class: ""`, guard NPCs' `bounty: 0`).
    Every shipped hull carries an `origin` from the vocabulary and every
    shipped NPC a `description` (both test-enforced — see
-   [Lore fields](#lore-fields-hull-origin-and-npc-description)).
+   [Lore fields](#lore-fields-hull-origin-maker-and-npc-description)), and
+   every manufactured def (ships, modules, ammo/charge items) a `maker`
+   from the ten-firm roster (rat hulls, ores, minerals and loot stay
+   unattributed — `content/maker_test.go`).

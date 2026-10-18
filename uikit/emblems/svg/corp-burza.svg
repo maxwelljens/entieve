@@ -1,0 +1,8 @@
+<!-- Entieve original artwork — the Zakłady Burza emblem (storm cloud and bolt). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <circle fill="#2f3d4c" cx="15" cy="17" r="8"/>
+  <circle fill="#2f3d4c" cx="25" cy="14" r="10"/>
+  <circle fill="#2f3d4c" cx="34" cy="18" r="7"/>
+  <rect fill="#2f3d4c" x="10" y="16" width="28" height="7"/>
+  <polygon fill="#ffd24a" points="28,22 18,35 24,35 21,45 34,30 27,30"/>
+</svg>

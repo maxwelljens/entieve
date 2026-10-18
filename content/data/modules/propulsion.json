@@ -1,6 +1,7 @@
 [
   {
     "id": "mod-afterburner",
+    "maker": "corp-celeritas",
     "name": "Afterburner",
     "description": "Active propulsion module: +75% max speed while it runs, paid for in capacitor.",
     "slot": "mid",

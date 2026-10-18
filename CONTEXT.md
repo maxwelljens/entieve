@@ -8,6 +8,7 @@ names the *modules and seams* we build that vocabulary into.
 
 | Term | Meaning |
 |---|---|
+| **Corporation** | a named manufacturing house (`corp-*`, `content.AllCorps`): the maker of a hull, module or charge, carrying a display name and an emblem; a supplier layer, never a power bloc |
 | **Hull** | a ship chassis (`ship-*`); flyable or machine |
 | **Module** | a fitted component (`mod-*`); slot-classed high/mid/low |
 | **Item** | everything else tradeable: ore, mineral, charge, ammo, loot (`item-*`/`ore-*`/`min-*`/`charge-*`/`loot-*`) |

@@ -81,6 +81,29 @@ entities here in the same format before their content lands.
 | `cel-glusza-belt` | — | Głusza Belt | place | "<system> Belt" convention; approved 2026-10-13 |
 | `cel-gate-glusza` | — | Głusza Gate | place | gates named for the destination; two instances (`sys-kamieniec`, `sys-gloam`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory); approved 2026-10-13 |
 
+### Corporations — manufacturers
+
+**APPROVED 2026-10-18.** The ten manufacturing houses whose `maker` slug
+(`corp-*`) every manufactured def carries. The `corp-*` prefix is a
+registered extension of the frozen id list (user-approved), like the other
+kind prefixes; the slugs live in `content/corps.go` (`AllCorps`) and their
+emblems in `uikit/emblems`. They are independent suppliers, **not** power
+blocs ([FACTIONS.md — Corporate members](FACTIONS.md#corporate-members)).
+Rat hulls, ores, minerals and loot stay unattributed.
+
+| id | current name | proposed name | origin | notes |
+|---|---|---|---|---|
+| `corp-borealis` | Borealis Systems | **Borealis** | Nordic | Latin *borealis* "northern"; renames the house Borealis Systems (drops the form-word); sensors, avionics, electronic warfare |
+| `corp-nordvakt` | — | **Nordvakt** | Nordic | Norwegian *nord* "north" + *vakt* "watch, guard"; ordnance, turrets, guidance |
+| `corp-iskald` | — | **Iskald** | Nordic | Danish/Norwegian *is* "ice" + *kald* "cold"; energy systems, capacitors, cells |
+| `corp-ferrum` | Kombinat Ferrum | **Kombinat Ferrum** | Polish | Polish *kombinat* "combine" + Latin *ferrum* "iron"; keeps its name; heavy hulls, armor, structures |
+| `corp-druzstvo` | Družstvo Concordia | **Družstvo** | Moravian | Czech *družstvo* "cooperative, team"; renames the house Družstvo Concordia (drops the Latinate tail); extraction, refining, barging |
+| `corp-burza` | — | **Zakłady Burza** | Polish/Moravian | Polish *zakłady* "works, plant" + *burza* "storm"; munitions, energetic materials |
+| `corp-celeritas` | Celeritas Courier | **Celeritas** | Latinate | Latin *celeritas* "swiftness"; renames the house Celeritas Courier (drops the form-word); propulsion, express logistics, recovery |
+| `corp-praetor` | — | **Praetor** | Latinate | Latin *praetor* "one who goes before; commander"; security services, patrol craft, protective systems |
+| `corp-aldemar` | — | **Aldemar Group** | indistinct European | Continental personal-name stock, Germanic *ald-* "old" + *-mar* "renowned"; instrumentation, field repair, components |
+| `corp-vantera` | — | **Vantera** | indistinct European | coined from Latin *vānus* "hollow, empty" (*vantera* "the hollowing"); industrial automation, shielding, station systems |
+
 ### Ship hulls
 
 | id | current name | proposed name | origin | notes |
