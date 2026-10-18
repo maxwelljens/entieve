@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Distance display switches to AU past 99,999 km** (`uikit/theme/format.go`,
+  `render/art.go`, `uikit/screens/selected.go`, `sim/command.go`): the four
+  in-sync distance formatters now read meters as "42 m" under 2 km, 1-decimal
+  km through 99,999 km, the literal "<0.01 AU" in the gap below 0.01 AU, and
+  two-decimal AU beyond (1 AU = 1.496e11 m, house convention) — so 100,000 km
+  shows "0.01 AU" instead of "100,000.0 km". The hint/refusal `kmLabel` pair
+  keeps its whole-km style inside the km band ("150 km" for `WarpMinRange`).
+  AU figures are fixed two decimals ("0.10 AU", "2.01 AU"), matching the
+  house figure style and tabular columns. Golden pins updated and extended in
+  `uikit/theme/theme_test.go`, `uikit/screens/selected_test.go`,
+  `sim/helpers_test.go`, `render/art_test.go`.
+
 ## [0.4.0] - 2026-10-18
 
 ### Added

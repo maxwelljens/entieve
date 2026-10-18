@@ -68,8 +68,10 @@ func TestTypeScaleGolden(t *testing.T) {
 func TestFormattersGolden(t *testing.T) {
 	distances := map[float64]string{
 		-5: "0 m", 0: "0 m", 42: "42 m", 999: "999 m", 1999: "1,999 m",
-		2000: "2.0 km", 12345: "12.3 km", 1.495999e9: "1,495,999.0 km",
-		1.496e10: "0.1 AU", 3e11: "2.0 AU",
+		2000: "2.0 km", 12345: "12.3 km", 9.9999e7: "99,999.0 km",
+		1e8: "<0.01 AU", 1.4e9: "<0.01 AU", 1.495999e9: "<0.01 AU",
+		1.496e9: "0.01 AU", 1.496e10: "0.10 AU", 6.7e10: "0.45 AU",
+		3e11: "2.01 AU", 1.496e13: "100.00 AU",
 	}
 	for m, want := range distances {
 		if got := FormatDistance(m); got != want {

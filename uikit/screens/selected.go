@@ -400,9 +400,18 @@ func (k *Kit) syncSelected() {
 
 // kmLabel renders a metre distance as the kilometre figure quoted in
 // hints ("150 km" for sim.WarpMinRange) — mirrors sim.kmLabel so the
-// panel and the refusal log line word it identically.
+// panel and the refusal log line word it identically. Beyond 99,999 km it
+// switches like theme.FormatDistance: "<0.01 AU" below 0.01 AU, then
+// two-decimal AU.
 func kmLabel(m float64) string {
-	return strconv.FormatFloat(m/1000, 'f', -1, 64) + " km"
+	switch {
+	case m <= 9.9999e7:
+		return strconv.FormatFloat(m/1000, 'f', -1, 64) + " km"
+	case m < 1.496e9:
+		return "<0.01 AU"
+	default:
+		return strconv.FormatFloat(m/1.496e11, 'f', 2, 64) + " AU"
+	}
 }
 
 // canLock mirrors ui.canLock: the entity kinds that can be targeted.

@@ -262,16 +262,24 @@ func Measure(s string, size float64) float64 {
 }
 
 // fmtDist formats a distance in meters for world labels. Keep in sync with
-// ui.FormatDistance (render must not import ui, so the logic is duplicated).
+// theme.FormatDistance (render must not import uikit, so the logic is
+// duplicated).
 func fmtDist(m float64) string {
 	switch {
 	case m < 2e3:
 		return groupInt(int64(math.Round(m))) + " m"
-	case m < 1.496e10:
+	case m <= 9.9999e7:
 		return commaFloat(m/1000) + " km"
+	case m < 1.496e9:
+		return "<0.01 AU"
 	default:
-		return commaFloat(m/1.496e11) + " AU"
+		return commaFloat2(m/1.496e11) + " AU"
 	}
+}
+
+// commaFloat2 formats v with two decimals and commas in the integer part.
+func commaFloat2(v float64) string {
+	return addCommas(strconv.FormatFloat(v, 'f', 2, 64))
 }
 
 // commaFloat formats v with one decimal and commas in the integer part.

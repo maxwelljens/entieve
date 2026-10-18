@@ -28,3 +28,25 @@ func TestEuroFormat(t *testing.T) {
 		}
 	}
 }
+
+// TestKmLabelBands pins the refusal-line kmLabel unit switch with the same
+// golden table as uikit/screens.TestKmLabelBands — sim.kmLabel is
+// unexported and unreachable from that package, so the two tables must stay
+// identical to keep the panel hint and the refusal log line wording alike.
+func TestKmLabelBands(t *testing.T) {
+	for _, c := range []struct {
+		in   float64
+		want string
+	}{
+		{WarpMinRange, "150 km"},
+		{9.9999e7, "99999 km"},
+		{1e8, "<0.01 AU"},
+		{1.4e9, "<0.01 AU"},
+		{1.496e9, "0.01 AU"},
+		{3e11, "2.01 AU"},
+	} {
+		if got := kmLabel(c.in); got != c.want {
+			t.Errorf("kmLabel(%v) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}

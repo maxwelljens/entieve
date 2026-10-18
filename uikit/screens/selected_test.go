@@ -532,6 +532,26 @@ func TestWarpMinimumRangeGate(t *testing.T) {
 	_ = tr
 }
 
+// TestKmLabelBands pins kmLabel's unit switch — whole-km style through
+// 99,999 km, "<0.01 AU" below 0.01 AU, two-decimal AU beyond. sim.kmLabel
+// is unexported and unreachable from here without a test seam, so both
+// sides pin the same golden table (sim side: TestKmLabelBands in
+// sim/helpers_test.go) to keep the hint and refusal wording identical.
+func TestKmLabelBands(t *testing.T) {
+	for m, want := range map[float64]string{
+		sim.WarpMinRange: "150 km",
+		9.9999e7:         "99999 km",
+		1e8:              "<0.01 AU",
+		1.4e9:            "<0.01 AU",
+		1.496e9:          "0.01 AU",
+		3e11:             "2.01 AU",
+	} {
+		if got := kmLabel(m); got != want {
+			t.Errorf("kmLabel(%v) = %q, want %q", m, got, want)
+		}
+	}
+}
+
 // TestSelectedButtonContentFitsItsCell: an icon+label action button never
 // asks for more width than its cell hands out, so the glyph+label group can
 // never bleed into its neighbour — at both design sizes and at the window
