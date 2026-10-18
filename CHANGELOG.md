@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-18
+
 ### Added
 
 - **Title-bar close buttons, window open/close fades, translucent window
@@ -63,107 +65,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Vocabulary pinned in `CONTEXT.md` ("departure beat", "gate cycle",
   "turnaround", "hold", "agent cooldown"); pins and conservation gates in
   `sim/pacing_test.go`.
-
-### Fixed
-
-- **Gate-queue hold chatter** (`sim/system_traffic.go`): the
-  "gate queue full, shipment waits in …" line now fires **once per hold
-  episode** — on entering the hold — with the shipment's eventual jump as
-  its single follow-up. A held shipment now waits in the journey ledger
-  (it stands at its gate; nothing respawns it just to re-hold), so retry
-  ticks are silent instead of re-logging roughly every resume window.
-  New pacing events follow the same discipline: state transitions only,
-  never per-tick or per-retry chatter.
-
-- **NPC fleet burst on first system entry** (`sim/system_traffic.go`): the
-  cross-system journey ledger no longer dumps every parked shipment into a
-  grid at once. Resume is capped and staggered — at most
-  `trafficMaxLive − live haulers` respawns per tick, each ledger entry
-  firing on its own stateless `trafficDue` schedule in canonical ledger
-  order — so a system first loaded with a deep backlog shows ordinary
-  traffic density and the backlog drains at the normal cadence behind it.
-  A new per-system gate queue (`trafficMaxParkedJourneys` = 3 ×
-  trafficMaxLive) refuses to hop-park past its ceiling: overflow shipments
-  hold at their current system with cargo intact and retry the hop on
-  later ticks, pushing backlog upstream across the ring instead of
-  stacking unboundedly at one destination. Concurrent traffic raiders are
-  capped per grid (`trafficMaxRaiders` = 6): an ambush whose raider count
-  would break the ceiling does not spawn — the count draw is consumed in
-  a fixed order first, keeping twin-run and save/restore determinism —
-  while static spawn-group NPCs and patrols never count. All three caps
-  are mass-neutral: no cargo is ever dropped, duplicated or created, and
-  the caps never emit a lost-shipment event.
-
-- **Window focus, default layout and the rail's front-of-stack seat**
-  (three window-system defects, one change-set):
-  1. *Click anywhere raises.* Any mouse press inside a window — body,
-     title bar or resize chrome, left **or** right button — now raises
-     that window to the top of the stack. ebitenui's built-in relayering
-     only ever saw title-bar presses (the body's scroll viewport claims
-     the input layer over the window container), so the kit re-tops
-     through its own remove + re-mount seam instead, and kit windows run
-     with `DisableRelayering` so that seam is the single, deterministic
-     stacking path. When windows overlap, the **topmost** window under
-     the cursor wins (that is the window receiving the click); the raise
-     is gated exactly like input is — never through the modal context
-     menu's frame, never through the rail's own rect, and never up
-     through a mounted modal window. A raise re-tops without moving the
-     rect, and pays the documented remount leak only when the stacking
-     actually changes.
-  2. *Defaults clear the rail gutter.* Every default window rect starts
-     right of `uikit.RailInset` — the uikit construction defaults that
-     still sat at their pre-rail x (overview 8, Selected Item 8, scanner
-     10, log 10, help's fallback 10) are retargeted through the same
-     constant, and the game's placement floors (`anchorRect`,
-     `centerRect`) now clamp every anchored/centered default past the
-     gutter: the help window's centred default landed at x=62 against
-     the 63 px gutter at the 1024×700 minimum, and at x=93 vs 94.5 at
-     device scale 1.5. Pinned at scale 1 and 1.5, both design sizes, for
-     the construction rects and the placed set (user-dragged and
-     sidecar-restored rects are not defaults and stay untouched).
-  3. *The rail is top chrome.* The navigation rail now mounts through
-     `Kit.AddTopContainer`: `Kit.Draw` parks it out of the ebitenui
-     window pass (`Visibility_Hide_Blocking` — still laid out, never
-     painted), paints it after every window with its hover-tooltip
-     windows following it (the context menu remains the absolute topmost
-     pixels), and re-adds its input layer on top of the window layers
-     each frame — so a window dragged onto the gutter never paints over
-     the rail, and clicks in the rail's area always reach the rail.
-     Paint priority and input priority now agree; while a modal window
-     is up the rail keeps its old under-window input gating. The HUD and
-     module rack keep their under-window position (`AddContainer`).
-
-- **Window dragging no longer costs a layout pass per frame**
-  (uikit/screens/winchrome.go, uikit/widgets/scrollcontent.go): title-bar
-  dragging moved from ebitenui's built-in `WindowOpts.Draggable()` to the
-  kit's chrome, translate-only. The built-in drag relocated the window
-  through `Container.SetLocation` from `Window.Render`, whose
-  `RequestRelayout` re-laid out the whole window subtree — grid, rows,
-  anchors, preferred-size re-measures and the scroll content's own
-  re-location — on every frame of the drag (`doLayout` cost +0.26 s per
-  300-frame drag window, `RowLayout.layout` +0.18 s). The chrome now
-  rewrites the subtree's rects in place each frame (containers recurse, a
-  TextArea re-lays its private interior, a `ScrollContainer` carries the
-  content subtree recorded by the new `widgets.AttachScrollContent`
-  stash so `renderContent` computes an equal rect and skips its
-  `SetLocation` + `RequestRelayout` of the table body), so no layout
-  runs: the kit-draw delta between idle and drag fell from 1.38× (heavy,
-  325-row market) and 1.31× (light, log) to ≈1.0×, and the drag-vs-idle
-  profile diff for every layout function is now zero. Behaviour is
-  unchanged: the grip keeps precedence in corners and fires ResizeEvent
-  as before, the title drag reports exactly one `Window.MoveEvent` per
-  completed press (including a plain click's unchanged rect, matching
-  the built-in handler), contents follow the window in the same frame,
-  and the services window (no TitleBar) still never drags. Regression
-  pins: the title-drag contract (`TestTitleDragBehavior`), a displaced
-  title-bar canary proving no layout pass runs during a translate-only
-  drag (`TestTitleDragSkipsRelayout`), an alloc bound on drag frames
-  over idle (`TestDragFrameCost`), and the existing per-phase sidecar
-  signature assertion (a drag still writes no sidecar).
-
-## [0.3.0] - 2026-10-17
-
-### Added
 
 - **Drop-in starfield background plates** (`assets/backgrounds/`): any star
   system's starfield can be dropped in as PNG layers — `<system-id>.png`
@@ -603,6 +504,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Gate-queue hold chatter** (`sim/system_traffic.go`): the
+  "gate queue full, shipment waits in …" line now fires **once per hold
+  episode** — on entering the hold — with the shipment's eventual jump as
+  its single follow-up. A held shipment now waits in the journey ledger
+  (it stands at its gate; nothing respawns it just to re-hold), so retry
+  ticks are silent instead of re-logging roughly every resume window.
+  New pacing events follow the same discipline: state transitions only,
+  never per-tick or per-retry chatter.
+
+- **NPC fleet burst on first system entry** (`sim/system_traffic.go`): the
+  cross-system journey ledger no longer dumps every parked shipment into a
+  grid at once. Resume is capped and staggered — at most
+  `trafficMaxLive − live haulers` respawns per tick, each ledger entry
+  firing on its own stateless `trafficDue` schedule in canonical ledger
+  order — so a system first loaded with a deep backlog shows ordinary
+  traffic density and the backlog drains at the normal cadence behind it.
+  A new per-system gate queue (`trafficMaxParkedJourneys` = 3 ×
+  trafficMaxLive) refuses to hop-park past its ceiling: overflow shipments
+  hold at their current system with cargo intact and retry the hop on
+  later ticks, pushing backlog upstream across the ring instead of
+  stacking unboundedly at one destination. Concurrent traffic raiders are
+  capped per grid (`trafficMaxRaiders` = 6): an ambush whose raider count
+  would break the ceiling does not spawn — the count draw is consumed in
+  a fixed order first, keeping twin-run and save/restore determinism —
+  while static spawn-group NPCs and patrols never count. All three caps
+  are mass-neutral: no cargo is ever dropped, duplicated or created, and
+  the caps never emit a lost-shipment event.
+
+- **Window focus, default layout and the rail's front-of-stack seat**
+  (three window-system defects, one change-set):
+  1. *Click anywhere raises.* Any mouse press inside a window — body,
+     title bar or resize chrome, left **or** right button — now raises
+     that window to the top of the stack. ebitenui's built-in relayering
+     only ever saw title-bar presses (the body's scroll viewport claims
+     the input layer over the window container), so the kit re-tops
+     through its own remove + re-mount seam instead, and kit windows run
+     with `DisableRelayering` so that seam is the single, deterministic
+     stacking path. When windows overlap, the **topmost** window under
+     the cursor wins (that is the window receiving the click); the raise
+     is gated exactly like input is — never through the modal context
+     menu's frame, never through the rail's own rect, and never up
+     through a mounted modal window. A raise re-tops without moving the
+     rect, and pays the documented remount leak only when the stacking
+     actually changes.
+  2. *Defaults clear the rail gutter.* Every default window rect starts
+     right of `uikit.RailInset` — the uikit construction defaults that
+     still sat at their pre-rail x (overview 8, Selected Item 8, scanner
+     10, log 10, help's fallback 10) are retargeted through the same
+     constant, and the game's placement floors (`anchorRect`,
+     `centerRect`) now clamp every anchored/centered default past the
+     gutter: the help window's centred default landed at x=62 against
+     the 63 px gutter at the 1024×700 minimum, and at x=93 vs 94.5 at
+     device scale 1.5. Pinned at scale 1 and 1.5, both design sizes, for
+     the construction rects and the placed set (user-dragged and
+     sidecar-restored rects are not defaults and stay untouched).
+  3. *The rail is top chrome.* The navigation rail now mounts through
+     `Kit.AddTopContainer`: `Kit.Draw` parks it out of the ebitenui
+     window pass (`Visibility_Hide_Blocking` — still laid out, never
+     painted), paints it after every window with its hover-tooltip
+     windows following it (the context menu remains the absolute topmost
+     pixels), and re-adds its input layer on top of the window layers
+     each frame — so a window dragged onto the gutter never paints over
+     the rail, and clicks in the rail's area always reach the rail.
+     Paint priority and input priority now agree; while a modal window
+     is up the rail keeps its old under-window input gating. The HUD and
+     module rack keep their under-window position (`AddContainer`).
+
+- **Window dragging no longer costs a layout pass per frame**
+  (uikit/screens/winchrome.go, uikit/widgets/scrollcontent.go): title-bar
+  dragging moved from ebitenui's built-in `WindowOpts.Draggable()` to the
+  kit's chrome, translate-only. The built-in drag relocated the window
+  through `Container.SetLocation` from `Window.Render`, whose
+  `RequestRelayout` re-laid out the whole window subtree — grid, rows,
+  anchors, preferred-size re-measures and the scroll content's own
+  re-location — on every frame of the drag (`doLayout` cost +0.26 s per
+  300-frame drag window, `RowLayout.layout` +0.18 s). The chrome now
+  rewrites the subtree's rects in place each frame (containers recurse, a
+  TextArea re-lays its private interior, a `ScrollContainer` carries the
+  content subtree recorded by the new `widgets.AttachScrollContent`
+  stash so `renderContent` computes an equal rect and skips its
+  `SetLocation` + `RequestRelayout` of the table body), so no layout
+  runs: the kit-draw delta between idle and drag fell from 1.38× (heavy,
+  325-row market) and 1.31× (light, log) to ≈1.0×, and the drag-vs-idle
+  profile diff for every layout function is now zero. Behaviour is
+  unchanged: the grip keeps precedence in corners and fires ResizeEvent
+  as before, the title drag reports exactly one `Window.MoveEvent` per
+  completed press (including a plain click's unchanged rect, matching
+  the built-in handler), contents follow the window in the same frame,
+  and the services window (no TitleBar) still never drags. Regression
+  pins: the title-drag contract (`TestTitleDragBehavior`), a displaced
+  title-bar canary proving no layout pass runs during a translate-only
+  drag (`TestTitleDragSkipsRelayout`), an alloc bound on drag frames
+  over idle (`TestDragFrameCost`), and the existing per-phase sidecar
+  signature assertion (a drag still writes no sidecar).
+
+## [0.3.0] - 2026-10-17
+
 - **Navigation-rail icons centred, cells +75 %, station/market
   playtest batch**: ebitenui lays a graphic button out as
   `[empty label][10 px fixed spacing][graphic]` inside the button's
@@ -703,7 +701,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rats are no longer inert: they patrol, notice intruders and defend their
   belts against miners and shooters.
 
-[Unreleased]: https://github.com/entieve/entieve/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/entieve/entieve/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/entieve/entieve/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/entieve/entieve/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/entieve/entieve/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/entieve/entieve/releases/tag/v0.1.0
