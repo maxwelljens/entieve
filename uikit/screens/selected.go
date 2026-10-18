@@ -157,7 +157,6 @@ func (k *Kit) buildSelected() {
 	sp.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
-		widget.WindowOpts.Draggable(),
 		// The two action rows must hold icon + label whole: five
 		// TextAndImage buttons measure 447 px on the type grid, so the
 		// content floor (mirrored by the default rect below) is 450.

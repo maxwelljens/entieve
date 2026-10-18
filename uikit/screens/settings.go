@@ -127,7 +127,6 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 	s.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
-		widget.WindowOpts.Draggable(),
 		// Content floor: title + three 40 px rows + the hint line (the
 		// frame does not auto-grow, so the fallback is exactly this tall).
 		widget.WindowOpts.MinSize(theme.Px(300), theme.Px(224)),

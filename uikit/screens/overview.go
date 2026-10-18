@@ -166,7 +166,6 @@ func (k *Kit) buildOverview() {
 	o.win = widget.NewWindow(
 		widget.WindowOpts.Contents(contents),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
-		widget.WindowOpts.Draggable(),
 		// Resize comes from the winchrome edge grips (all four edges),
 		// not widget.WindowOpts.Resizeable() — that one only stretches
 		// the bottom/right corner. Kit.AddWindow attaches the chrome.

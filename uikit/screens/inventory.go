@@ -133,7 +133,6 @@ func NewInventory(env widgets.Seams) *Inventory {
 	inv.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
-		widget.WindowOpts.Draggable(),
 		// Content floor: every fixed row plus a full row of each hold
 		// section (the sections scroll below that).
 		widget.WindowOpts.MinSize(theme.Px(300), theme.Px(420)),

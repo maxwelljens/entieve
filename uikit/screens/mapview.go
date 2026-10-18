@@ -79,7 +79,6 @@ func NewMapView(env interface {
 	m.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(titleBar, theme.Px(theme.TitleBarH)),
-		widget.WindowOpts.Draggable(),
 		widget.WindowOpts.MinSize(theme.Px(400), theme.Px(300)),
 		// Default: roughly centered at both design sizes (1024×700 and
 		// 1280×720); the integrator re-centers it on real layout.

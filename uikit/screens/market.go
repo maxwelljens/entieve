@@ -248,7 +248,6 @@ func NewMarket(env widgets.Seams) *Market {
 	m.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
-		widget.WindowOpts.Draggable(),
 		widget.WindowOpts.MinSize(theme.Px(300), theme.Px(240)), // content floor: mirrored in game/station_layout.go
 		// Fallback only: the composed rect at the 1024×700 minimum.
 		// The game recomposes from the real viewport at startup

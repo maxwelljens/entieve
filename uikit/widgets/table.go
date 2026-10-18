@@ -551,6 +551,10 @@ func NewTable(env Seams, cols []Column, opts ...TableOption) *Table {
 			t.scrollBy(ev.Y)
 		}
 	})
+	// Let the window chrome's translate walk carry the body with the
+	// viewport (see AttachScrollContent): a title drag must not
+	// re-locate — and thereby relayout — 300+ rows every frame.
+	AttachScrollContent(t.scroll, t.body)
 
 	// Root: header row (fixed) over the scroll row (fills the rest).
 	// A grid keeps the viewport bounded by the window — the scroll

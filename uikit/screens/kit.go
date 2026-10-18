@@ -177,7 +177,8 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 }
 
 // Update advances the UI (input, layout bookkeeping, deferred events)
-// and pumps the window resize chrome. Call it from ebiten.Game.Update.
+// and pumps the window chrome (resize grips and title dragging). Call it
+// from ebiten.Game.Update.
 //
 // The context menu owns its frame while it is up: its own input is
 // polled here (the host's earlier MenuInput pass already spent the
@@ -201,7 +202,7 @@ func (k *Kit) Update() error {
 //
 // Draw order (the stacking contract, bottom → top): top chrome parked
 // out of the window pass → ui.Draw (root overlay, then windows, then
-// ebitenui's deferred popups) → resize chrome recompute → the top chrome
+// ebitenui's deferred popups) → chrome recompute → the top chrome
 // re-shown and painted over every window (its input layer lifts with it
 // in drawTops) → the context menu, always the last pixels.
 func (k *Kit) Draw(screen *ebiten.Image) {
@@ -209,8 +210,10 @@ func (k *Kit) Draw(screen *ebiten.Image) {
 		t.SetWindowPass(false) // parked: ui.Draw must not paint it
 	}
 	k.ui.Draw(screen)
-	// Second chrome pass: the built-in title-bar drag moved rects during
-	// Render; recompute so the next frame's hit tests see clean geometry.
+	// Second chrome pass: input may have changed while drawing, and both
+	// drags recompute their rect absolutely from the press — this pass
+	// applies the fresh cursor (or derives an identical rect) so the
+	// next frame's hit tests see clean geometry.
 	k.stepChromes()
 	k.ov.drawTints(screen, k)
 	k.drawTops(screen)

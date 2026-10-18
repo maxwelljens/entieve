@@ -597,6 +597,10 @@ func NewInfoWin(env widgets.Seams) *InfoWin {
 			w.scrollBy(ev.Y)
 		}
 	})
+	// Same stash as the tables: the chrome's translate walk carries the
+	// page with the viewport instead of triggering renderContent's
+	// re-location of it mid-drag.
+	widgets.AttachScrollContent(w.scroll, w.page)
 
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BG), theme.NRGBA(p.Border, 200), 1)),
@@ -627,7 +631,6 @@ func NewInfoWin(env widgets.Seams) *InfoWin {
 	w.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(bar, theme.Px(theme.TitleBarH)),
-		widget.WindowOpts.Draggable(),
 		// Resize comes from the kit's edge grips, not Resizeable() —
 		// same as every other kit window (Kit.AddWindow attaches them).
 		widget.WindowOpts.MinSize(theme.Px(infoMinW), theme.Px(infoMinH)),
