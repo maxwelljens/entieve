@@ -46,6 +46,17 @@ type (
 		Qty  int
 	}
 
+	// PlaceOrder/CancelOrder are the market window's standing-order verbs:
+	// PlaceOrder posts a bid or an ask on the docked station's book,
+	// CancelOrder cancels one of the player's resting orders by arrival id.
+	PlaceOrder struct {
+		Item  content.ItemID
+		Side  sim.OrderSide
+		Price float64
+		Qty   int
+	}
+	CancelOrder struct{ ID uint64 }
+
 	// Transfer moves item units between holds ("cargo", "ore", "hangar").
 	Transfer struct {
 		Item content.ItemID
@@ -118,6 +129,8 @@ func (ShowInfo) isIntent()    {}
 func (OpenMenu) isIntent()    {}
 func (Buy) isIntent()         {}
 func (Sell) isIntent()        {}
+func (PlaceOrder) isIntent()  {}
+func (CancelOrder) isIntent() {}
 func (Transfer) isIntent()    {}
 func (Fit) isIntent()         {}
 func (Unequip) isIntent()     {}
@@ -158,6 +171,10 @@ func commandFor(i Intent, warpRange, orbitRange float64) (sim.Command, bool) {
 		return sim.CmdBuy{Item: v.Item, Qty: v.Qty}, true
 	case Sell:
 		return sim.CmdSell{Item: v.Item, Qty: v.Qty}, true
+	case PlaceOrder:
+		return sim.CmdPlaceOrder{Item: v.Item, Side: v.Side, Price: v.Price, Qty: v.Qty}, true
+	case CancelOrder:
+		return sim.CmdCancelOrder{ID: v.ID}, true
 	case Transfer:
 		return sim.CmdTransfer{Item: v.Item, Qty: v.Qty, From: v.From, To: v.To}, true
 	case Fit:

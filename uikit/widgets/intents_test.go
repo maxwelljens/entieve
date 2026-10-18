@@ -24,6 +24,9 @@ func TestCommandForMapsEveryCommandIntent(t *testing.T) {
 	}{
 		{"buy", Buy{Item: "charge-emp", Qty: 3}, sim.CmdBuy{Item: "charge-emp", Qty: 3}},
 		{"sell", Sell{Item: "min-ore", Qty: 1}, sim.CmdSell{Item: "min-ore", Qty: 1}},
+		{"place order", PlaceOrder{Item: "min-ore", Side: sim.OrderBuy, Price: 4.5, Qty: 2},
+			sim.CmdPlaceOrder{Item: "min-ore", Side: sim.OrderBuy, Price: 4.5, Qty: 2}},
+		{"cancel order", CancelOrder{ID: 9}, sim.CmdCancelOrder{ID: 9}},
 		{"transfer", Transfer{Item: "min-ore", Qty: 5, From: "cargo", To: "hangar"},
 			sim.CmdTransfer{Item: "min-ore", Qty: 5, From: "cargo", To: "hangar"}},
 		{"fit", Fit{Module: "mod-emp-turret", Slot: slot},

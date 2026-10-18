@@ -379,6 +379,7 @@ CmdActivate{Slot SlotRef, Target}, CmdDeactivate{Slot SlotRef}, CmdSetAmmo{Slot 
 CmdLoot{Wreck, Item ItemID|""}, CmdMine{Asteroid, Slot SlotRef},
 CmdDock{Station}, CmdUndock{}, CmdJump{Gate},
 CmdBuy{Item, Qty}, CmdSell{Item, Qty},
+CmdPlaceOrder{Item, Side, Price, Qty}, CmdCancelOrder{ID uint64}, // standing market orders (docked book)
 CmdTransfer{Item, Qty, From, To}, // holds: "cargo" | "ore" | "hangar"
 CmdRefine{Item, Qty}, CmdRepair{}, CmdAssemble{ShipID},
 CmdFitModule{ModuleID, Slot SlotRef}, CmdUnfitModule{Slot SlotRef},

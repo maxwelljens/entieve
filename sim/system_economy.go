@@ -31,7 +31,24 @@ const (
 	// marketTickDigits is EVE's price-tick rule: every order price carries
 	// four significant figures (48 ticks in 0.01 steps, 195000 in 100s).
 	marketTickDigits = 4
+	// maxPlayerOrders is the player's standing-order slot cap, universe-
+	// wide (EVE-style order slots): a 21st open order is refused. It bounds
+	// the bookkeeping the UI renders and, with the non-refundable broker
+	// fee, the free-for-all price spam the free market allows.
+	maxPlayerOrders = 20
 )
+
+// TickStep is the price-tick step at p — one unit of the 4-significant-
+// figure grid every resting order price lands on. The market UI steps its
+// price stepper by it; tickDown undercuts with it. Non-positive, NaN or
+// infinite p reports 0 (no step).
+func TickStep(p float64) float64 {
+	q := quantizeTick(p)
+	if q <= 0 || math.IsNaN(q) || math.IsInf(q, 0) {
+		return 0
+	}
+	return math.Pow(10, math.Floor(math.Log10(q))-(marketTickDigits-1))
+}
 
 // quantizeTick rounds a price onto the 4-significant-figure tick grid: the
 // only price an order may rest at. Non-positive prices pass through
@@ -54,8 +71,7 @@ func tickDown(p float64) float64 {
 	if q <= 0 {
 		return q
 	}
-	step := math.Pow(10, math.Floor(math.Log10(q))-(marketTickDigits-1))
-	return quantizeTick(q - step)
+	return quantizeTick(q - TickStep(q))
 }
 
 // systemEconomy executes deferred station-service commands (only while
@@ -67,6 +83,10 @@ func (s *Sim) systemEconomy() {
 			s.execBuy(c)
 		case CmdSell:
 			s.execSell(c)
+		case CmdPlaceOrder:
+			s.execPlaceOrder(c)
+		case CmdCancelOrder:
+			s.execCancelOrder(c)
 		case CmdRefine:
 			s.execRefine(c)
 		case CmdRepair:
@@ -404,6 +424,119 @@ func (s *Sim) execSell(c CmdSell) {
 			" (" + euro(fee) + " broker fee, " + euro(tax) + " sales tax)",
 		Value: received})
 	s.marketVoice(book, c.Item, before, s.stationName(station))
+}
+
+// playerOrderCount counts the player's open resting orders across every
+// station book — the universe-wide order-slot cap (maxPlayerOrders). Books
+// iterate in sorted station order, so the count is deterministic.
+func (s *Sim) playerOrderCount() int {
+	n := 0
+	for _, st := range s.stationsSorted() {
+		book := s.market[st]
+		if book == nil {
+			continue
+		}
+		for _, o := range book.Orders {
+			if o.Owner == OwnerPlayer {
+				n++
+			}
+		}
+	}
+	return n
+}
+
+// execPlaceOrder posts a standing limit order (bid or ask) for the player
+// on the docked station's book — the book the market window shows, the
+// same reach CmdBuy/CmdSell have. Strict validation up front (every
+// refusal a SevWarning log line, no state touched); the placement itself
+// rides the existing PlaceOrder with owner=OwnerPlayer, which escrows the
+// wallet (bid: price×qty + 3% broker fee) or the goods (ask) and emits the
+// fill and placement lines. Any positive price is legal.
+func (s *Sim) execPlaceOrder(c CmdPlaceOrder) {
+	if _, ok := s.stationAccess("market"); !ok {
+		return
+	}
+	if c.Side != OrderBuy && c.Side != OrderSell {
+		s.log(SevWarning, s.player, "Invalid order side")
+		return
+	}
+	if c.Qty < 1 {
+		s.log(SevWarning, s.player, "Invalid quantity")
+		return
+	}
+	if c.Price <= 0 || math.IsNaN(c.Price) || math.IsInf(c.Price, 0) {
+		s.log(SevWarning, s.player, "Invalid price")
+		return
+	}
+	// The item must exist: a book never rests a phantom id. Items, modules
+	// and hulls are all addressable as ids (as in execTransfer).
+	if _, ok := s.Content.Item(c.Item); !ok {
+		if _, ok := s.Content.Module(content.ModuleID(c.Item)); !ok {
+			if _, ok := s.Content.Ship(content.ShipID(c.Item)); !ok {
+				s.log(SevWarning, s.player, "Unknown item "+string(c.Item))
+				return
+			}
+		}
+	}
+	if s.playerOrderCount() >= maxPlayerOrders {
+		s.log(SevWarning, s.player, "Maximum number of open orders reached ("+itoaN(maxPlayerOrders)+")")
+		return
+	}
+
+	// Clear reasons for the two things PlaceOrder would otherwise reject
+	// without a word: the escrow arithmetic mirrors its own check (the
+	// placed value + the broker fee on it, EVE's rule) read from the same
+	// constants, so it can never drift ahead of or behind the engine.
+	station := s.dockedStationID()
+	limit := quantizeTick(c.Price)
+	switch c.Side {
+	case OrderBuy:
+		if s.wallet < limit*float64(c.Qty)*(1+MarketBrokerFee) {
+			s.emit(Event{Kind: EvMarket, Severity: SevWarning, Actor: s.player, Item: c.Item,
+				Text:  "Insufficient funds for " + s.itemName(c.Item),
+				Value: limit * float64(c.Qty)})
+			return
+		}
+	case OrderSell:
+		if _, isShip := s.Content.Ship(content.ShipID(c.Item)); isShip {
+			s.log(SevWarning, s.player, "Fitted hulls cannot rest in a sell order")
+			return
+		}
+		if s.wallet < MarketBrokerFee*limit*float64(c.Qty) {
+			s.emit(Event{Kind: EvMarket, Severity: SevWarning, Actor: s.player, Item: c.Item,
+				Text:  "Insufficient funds for the order fee",
+				Value: MarketBrokerFee * limit * float64(c.Qty)})
+			return
+		}
+		if s.playerStock(c.Item) < c.Qty {
+			s.log(SevWarning, s.player, "Not enough "+s.itemName(c.Item)+" to list")
+			return
+		}
+	}
+
+	before := s.marketPrice(s.market[station], c.Item)
+	if _, ok := s.PlaceOrder(station, c.Side, c.Item, c.Qty, c.Price, OwnerPlayer); !ok {
+		s.log(SevWarning, s.player, "Order refused")
+		return
+	}
+	// A crossing placement moved the book: print the price voice exactly
+	// like execBuy/execSell do (no-op when nothing traded).
+	s.marketVoice(s.market[station], c.Item, before, s.stationName(station))
+}
+
+// execCancelOrder cancels one of the player's resting orders on the docked
+// station's book by arrival id. The unspent escrow comes back (a bid's
+// leftover wallet, an ask's goods into the station hangar); the placement
+// broker fee stays — EVE's rule, kept by CancelOrder.
+func (s *Sim) execCancelOrder(c CmdCancelOrder) {
+	if _, ok := s.stationAccess("market"); !ok {
+		return
+	}
+	if c.ID == 0 || !s.CancelOrder(s.dockedStationID(), c.ID, OwnerPlayer) {
+		s.log(SevWarning, s.player, "No such order")
+		return
+	}
+	s.emit(Event{Kind: EvMarket, Severity: SevInfo, Actor: s.player, Text: "Order cancelled"})
 }
 
 // PlaceOrder posts a (limit) order on a station's book — the seam agents

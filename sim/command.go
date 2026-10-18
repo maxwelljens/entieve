@@ -118,7 +118,8 @@ func (s *Sim) applyCommand(cmd Command) {
 	case CmdAcceptMission, CmdAbandonMission:
 		s.deferMission = append(s.deferMission, c)
 
-	case CmdBuy, CmdSell, CmdRefine, CmdRepair, CmdAssemble, CmdFitModule, CmdUnfitModule:
+	case CmdBuy, CmdSell, CmdRefine, CmdRepair, CmdAssemble, CmdFitModule, CmdUnfitModule,
+		CmdPlaceOrder, CmdCancelOrder:
 		s.deferEcon = append(s.deferEcon, c)
 
 	case CmdStartJob, CmdCollectJob:
