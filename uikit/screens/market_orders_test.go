@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"image"
 	"testing"
 
 	"github.com/entieve/entieve/content"
@@ -11,10 +12,12 @@ import (
 )
 
 // TestMarketStandingOrderPanel drives the market's standing-order half over
-// the stub seams: the Place order panel emits PlaceOrder for the selected
-// item at its side/price and the toolbar quantity, and the My orders list
-// shows ONLY the player's own orders — its Cancel button emitting
-// CancelOrder for that row's id.
+// the stub seams: the My orders list shows ONLY the player's own orders —
+// its Cancel button emitting CancelOrder for that row's id — and every book
+// row declares the two order-window launch verbs ("Sell on Market" /
+// "Request on Market"), which emit OpenOrder through the row's ActionSink
+// (the typed order mini-window is the posting surface now; the old Place
+// panel is gone).
 func TestMarketStandingOrderPanel(t *testing.T) {
 	th := theme.NewSeam(theme.DefaultPalette(), theme.DefaultTypeScale())
 	cv := &stubView{
@@ -57,28 +60,48 @@ func TestMarketStandingOrderPanel(t *testing.T) {
 		t.Fatalf("cancel emitted %#v, want CancelOrder{ID:7}", rec.got)
 	}
 
-	// Place: selecting the item seeds the price from the displayed price,
-	// one step moves one tick, and Place emits the intent at the toolbar
-	// quantity.
-	clickRow(ui, m.tbl, 0)
-	frame()
-	if !m.hasSel || m.price != 42 {
-		t.Fatalf("selection/price = %v/%v, want selected at the stub price 42", m.hasSel, m.price)
+	// The book row declares the two order-window launch verbs: Sell on
+	// Market carries the player's holdings as the window's sell default,
+	// Request on Market defaults to 1. Pressing each through a real Menu
+	// routes OpenOrder into the sink.
+	spec := m.tbl.Rows[0].Spec
+	wantActions := []widgets.RowAction{
+		{Label: "Buy", Intent: widgets.Buy{Item: "item-stub-ore", Qty: 1}},
+		{Label: "Sell", Intent: widgets.Sell{Item: "item-stub-ore", Qty: 1}},
+		{Label: "Sell on Market", Intent: widgets.OpenOrder{Item: "item-stub-ore", Side: sim.OrderSell, Qty: 5}},
+		{Label: "Request on Market", Intent: widgets.OpenOrder{Item: "item-stub-ore", Side: sim.OrderBuy, Qty: 1}},
 	}
-	m.stepPrice(1)
-	if m.price != 42.01 {
-		t.Fatalf("price after one step = %v, want 42.01 (one tick at 42)", m.price)
+	if len(spec.Actions) != len(wantActions) {
+		t.Fatalf("row actions = %+v, want %+v", spec.Actions, wantActions)
 	}
-	uitest.FireButton(ui, m.plus) // qty ladder: 1 → 10
-	uitest.FireButton(ui, m.placeBtn)
-	want := widgets.PlaceOrder{Item: "item-stub-ore", Side: sim.OrderBuy, Price: 42.01, Qty: 10}
-	if len(rec.got) != 2 || rec.got[1] != want {
-		t.Fatalf("place emitted %#v, want %#v", rec.got, want)
+	for i, want := range wantActions {
+		if spec.Actions[i].Label != want.Label || spec.Actions[i].Intent != want.Intent {
+			t.Errorf("action %d = %+v, want %+v", i, spec.Actions[i], want)
+		}
 	}
 
-	// The side toggle flips bid → ask.
-	m.toggleSide()
-	if m.side != sim.OrderSell {
-		t.Fatalf("side = %v, want OrderSell after the toggle", m.side)
+	entries := widgets.RowMenuEntries(cv, rec, spec)
+	menu := widgets.NewMenu(th)
+	press := func(label string) {
+		t.Helper()
+		menu.Open(entries, image.Pt(10, 10))
+		for i, e := range menu.Entries() {
+			if e.Label == label {
+				menu.Click(menu.RowRect(i).Min.Add(image.Pt(1, 1)))
+				return
+			}
+		}
+		t.Fatalf("menu has no %q entry: %+v", label, menu.Entries())
+	}
+	press("Sell on Market")
+	press("Request on Market")
+	if len(rec.got) != 3 {
+		t.Fatalf("order-window launches emitted %#v, want two OpenOrder intents", rec.got)
+	}
+	if got := rec.got[1]; got != (widgets.OpenOrder{Item: "item-stub-ore", Side: sim.OrderSell, Qty: 5}) {
+		t.Errorf("Sell on Market emitted %#v, want OpenOrder{sell, qty 5}", got)
+	}
+	if got := rec.got[2]; got != (widgets.OpenOrder{Item: "item-stub-ore", Side: sim.OrderBuy, Qty: 1}) {
+		t.Errorf("Request on Market emitted %#v, want OpenOrder{buy, qty 1}", got)
 	}
 }

@@ -220,6 +220,10 @@ Rat hulls, ores, minerals and loot stay unattributed.
 |---|---|---|---|---|
 | Finances window title (`game/screens.go`, `uikit/screens/finances.go`) | — | **Finances** | trade | the wallet window: holdings over the transaction ledger. Plain trade vocabulary, no coined term. Approved 2026-10-18 |
 | Finances holdings labels | — | cash · deployed in orders · receivables · total | trade | the three pools the player's money can sit in: the wallet, the escrow held by open buy orders (refundable on cancel) and the rewards still owed on accepted contracts, plus their total. Approved 2026-10-18 |
+| Order mini-window item entry (`uikit/screens/inventory.go`, `uikit/screens/market.go`) | — | **Sell on Market** | trade | posts a standing ask for the clicked stack/item on the docked station's book through the typed order mini-window; grayed (never hidden) while undocked. Approved 2026-10-18 |
+| Order mini-window item entry (market rows) | — | **Request on Market** | trade | posts a standing bid for the clicked item through the same window (holding the item is not required). Approved 2026-10-18 |
+| Order mini-window mode toggle (`uikit/screens/orderwin.go`) | — | **Sell** / **Request** | trade | the two order sides in the player's words — the book itself keeps Bid/Ask. Re-toggling re-applies the mode's default price. Approved 2026-10-18 |
+| Order mini-window title (`uikit/screens/orderwin.go`) | — | **&lt;name&gt; — Order** | trade | follows the "&lt;name&gt; — Info" title convention. Approved 2026-10-18 |
 
 ## Money strings
 

@@ -235,9 +235,13 @@ func (inv *Inventory) hangarRows() []content.CargoStack {
 	return inv.cv.HangarItems()
 }
 
-// rowsOf converts stacks to Item/Qty/m³ table rows.
+// rowsOf converts stacks to Item/Qty/m³ table rows, each declaring the
+// full-stack "Sell on Market" verb (grayed, never hidden, while undocked —
+// orders rest on the docked station's book). The action carries the
+// clicked stack's own quantity as the order window's sell default.
 func (inv *Inventory) rowsOf(stacks []content.CargoStack) []widgets.TableRow {
 	rows := make([]widgets.TableRow, 0, len(stacks))
+	docked := inv.cv.PlayerDocked()
 	for _, st := range stacks {
 		vol, name := 0.0, itemLabel(inv.cv, st.Item)
 		if def, ok := inv.cv.Defs().Item(st.Item); ok {
@@ -246,8 +250,14 @@ func (inv *Inventory) rowsOf(stacks []content.CargoStack) []widgets.TableRow {
 		rows = append(rows, widgets.TableRow{
 			Cells: []string{name, "×" + theme.FormatInt(int64(st.Qty)), theme.FormatVolume(vol)},
 			Data:  st.Item,
-			// The whole interaction surface: Show Info only.
-			Spec: widgets.RowSpec{Ref: widgets.RowRef(inv.cv, st.Item)},
+			// The whole interaction surface: Show Info, plus the sell verb.
+			Spec: widgets.RowSpec{
+				Ref: widgets.RowRef(inv.cv, st.Item),
+				Actions: []widgets.RowAction{
+					{Label: "Sell on Market", Disabled: !docked,
+						Intent: widgets.OpenOrder{Item: st.Item, Side: sim.OrderSell, Qty: st.Qty}},
+				},
+			},
 		})
 	}
 	return rows

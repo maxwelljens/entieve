@@ -50,6 +50,10 @@ func (v *stubView) DockedStation() (widgets.StationInfo, bool) {
 
 func (v *stubView) DockedMarket() sim.StationID { return "cel-stub" }
 
+// PlayerStock is the player's holdings read the market row uses for the
+// order window's sell default (a fixed 5 in the stub).
+func (v *stubView) PlayerStock(content.ItemID) int { return 5 }
+
 func (v *stubView) BookOrders(sim.StationID) []sim.MarketStock { return v.orders }
 
 func (v *stubView) Market(content.SystemID) []sim.MarketStock { return v.orders }
