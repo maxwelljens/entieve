@@ -88,3 +88,39 @@ func TestFormattersGolden(t *testing.T) {
 		}
 	}
 }
+
+// TestSpacingTokensGolden pins the furniture rhythm and the scrollbar
+// gutter derived from it. Data rows keep their own denser scale (the
+// table's entryPadV literal), so these are the only air tokens.
+func TestSpacingTokensGolden(t *testing.T) {
+	if SpSm != 4 || SpMd != 8 || SpLg != 16 {
+		t.Errorf("tokens = %d/%d/%d, want 4/8/16", SpSm, SpMd, SpLg)
+	}
+	if ScrollGutter != 24 {
+		t.Errorf("ScrollGutter = %d, want 24 (SpLg + 2×SpSm)", ScrollGutter)
+	}
+}
+
+// TestFurniturePaddingPins pins the representative furniture insets — the
+// button and text-area padding and the slider's track padding (the
+// handle's air) — so a padding edit is a deliberate change, not drift.
+func TestFurniturePaddingPins(t *testing.T) {
+	th := NewTheme(DefaultPalette(), DefaultTypeScale())
+	btn := th.ButtonTheme.TextPadding
+	if btn.Left != Px(SpMd) || btn.Right != Px(SpMd) || btn.Top != Px(SpSm) || btn.Bottom != Px(SpSm) {
+		t.Errorf("button TextPadding = %+v, want L/R SpMd, T/B SpSm", btn)
+	}
+	tp := th.SliderTheme.TrackPadding
+	if tp.Left != Px(SpSm) || tp.Top != Px(SpSm) {
+		t.Errorf("slider TrackPadding = %+v, want SpSm", tp)
+	}
+	if *th.SliderTheme.FixedHandleSize != Px(SpLg) || *th.SliderTheme.MinHandleSize != Px(SpLg) {
+		t.Errorf("slider handle = %d/%d, want Px(SpLg)",
+			*th.SliderTheme.FixedHandleSize, *th.SliderTheme.MinHandleSize)
+	}
+	ta := th.TextAreaTheme
+	if ta.TextPadding.Right != Px(SpMd) || ta.ScrollContainerPadding.Right != Px(SpSm) {
+		t.Errorf("textarea padding right = %d / %d, want SpMd / SpSm",
+			ta.TextPadding.Right, ta.ScrollContainerPadding.Right)
+	}
+}

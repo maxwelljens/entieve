@@ -599,10 +599,14 @@ func TestOverviewLogEdgeGripsResize(t *testing.T) {
 			image.Point{ovRect.Min.X + 6, ovView.Min.Y + 12}, -40, 0, edgeLeft, ovView, true},
 		{"overview bottom edge through the table", k.ov.win, ovRes,
 			image.Point{(ovView.Min.X + ovView.Max.X) / 2, ovRect.Max.Y - 7}, 0, 30, edgeBottom, ovView, true},
-		{"overview right edge through the table", k.ov.win, ovRes,
-			image.Point{ovRect.Max.X - 7, ovView.Min.Y + 12}, 25, 0, edgeRight, ovView, true},
-		{"overview bottom-right corner through the table", k.ov.win, ovRes,
-			image.Point{ovRect.Max.X - 7, ovRect.Max.Y - 7}, 20, 18, edgeRight | edgeBottom, ovView, true},
+		// The table now stops short of its own scrollbar gutter, so the
+		// right-edge band over it is the (empty while the rows fit)
+		// gutter, not the elevated scroll viewport — the press is not
+		// swallowed and the grip still classifies.
+		{"overview right edge through the scrollbar gutter", k.ov.win, ovRes,
+			image.Point{ovRect.Max.X - 7, ovView.Min.Y + 12}, 25, 0, edgeRight, ovRect, false},
+		{"overview bottom-right corner through the scrollbar gutter", k.ov.win, ovRes,
+			image.Point{ovRect.Max.X - 7, ovRect.Max.Y - 7}, 20, 18, edgeRight | edgeBottom, ovRect, false},
 		{"overview top edge (title bar)", k.ov.win, ovRes,
 			image.Point{(ovRect.Min.X + ovRect.Max.X) / 2, ovRect.Min.Y + 4}, 0, -20, edgeTop, image.Rectangle{}, false},
 		// The log's body nests two paddings (5 px body + 4 px text-area

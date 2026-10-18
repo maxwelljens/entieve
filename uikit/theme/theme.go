@@ -166,7 +166,7 @@ func NewTheme(p Palette, ts TypeScale) *widget.Theme {
 			Image:        buttonImage,
 			TextColor:    buttonText,
 			TextFace:     facePtr(f.SmallBold), // buttons are emphasis text
-			TextPadding:  &widget.Insets{Left: Px(8), Right: Px(8), Top: Px(4), Bottom: Px(4)},
+			TextPadding:  &widget.Insets{Left: Px(SpMd), Right: Px(SpMd), Top: Px(SpSm), Bottom: Px(SpSm)},
 			TextPosition: &widget.TextPositioning{HTextPosition: widget.TextPositionCenter, VTextPosition: widget.TextPositionCenter},
 		},
 
@@ -220,7 +220,7 @@ func NewTheme(p Palette, ts TypeScale) *widget.Theme {
 				TextColor: buttonText,
 				TextFace:  facePtr(f.SmallBold),
 				TextPadding: &widget.Insets{
-					Left: Px(10), Right: Px(10), Top: Px(4), Bottom: Px(4),
+					Left: Px(SpMd), Right: Px(SpMd), Top: Px(SpSm), Bottom: Px(SpSm),
 				},
 				TextPosition: &widget.TextPositioning{
 					HTextPosition: widget.TextPositionCenter,
@@ -253,8 +253,8 @@ func NewTheme(p Palette, ts TypeScale) *widget.Theme {
 		TextAreaTheme: &widget.TextAreaParams{
 			Face:                   facePtr(f.Base),
 			ForegroundColor:        Solid(p.Text),
-			TextPadding:            &widget.Insets{Right: Px(6)},
-			ScrollContainerPadding: widget.NewInsetsSimple(Px(4)),
+			TextPadding:            &widget.Insets{Right: Px(SpMd)},
+			ScrollContainerPadding: widget.NewInsetsSimple(Px(SpSm)),
 			ScrollContainerImage:   scrollImage,
 			Slider:                 slider,
 		},
@@ -287,7 +287,7 @@ func newButtonParams(p Palette, f kitFaces) *widget.ButtonParams {
 			Disabled: NRGBA(p.Dim, 160),
 		},
 		TextFace:     facePtr(f.SmallBold),
-		TextPadding:  &widget.Insets{Left: Px(8), Right: Px(8), Top: Px(4), Bottom: Px(4)},
+		TextPadding:  &widget.Insets{Left: Px(SpMd), Right: Px(SpMd), Top: Px(SpSm), Bottom: Px(SpSm)},
 		TextPosition: &widget.TextPositioning{HTextPosition: widget.TextPositionCenter, VTextPosition: widget.TextPositionCenter},
 	}
 }
@@ -317,7 +317,7 @@ func newListParams(p Palette, f kitFaces) *widget.ListParams {
 			SelectingFocusedBackground: NRGBA(p.Accent, 64),
 			DisabledSelectedBackground: NRGBA(p.Cell, 140),
 		},
-		ScrollContainerPadding: widget.NewInsetsSimple(0),
+		ScrollContainerPadding: widget.NewInsetsSimple(Px(SpSm)),
 		ScrollContainerImage: &widget.ScrollContainerImage{
 			Idle:     NineSlice(Solid(p.BG)),
 			Disabled: NineSlice(NRGBA(p.BG, 140)),
@@ -335,18 +335,22 @@ func newSliderParams(p Palette) *widget.SliderParams {
 		Pressed: Bordered(Solid(p.Head), NRGBA(p.Accent, 220), 1),
 	}
 	return &widget.SliderParams{
-		TrackPadding: widget.NewInsetsSimple(0),
+		// The track keeps SpSm of air around the handle: the handle's
+		// preferred width is then handle + 2×SpSm — exactly
+		// ScrollGutter — so a rail authored at that width can never be
+		// overhung by its own handle.
+		TrackPadding: widget.NewInsetsSimple(Px(SpSm)),
 		// ebitenui sizes the handle with round(FixedHandleSize) floored at
 		// MinHandleSize (default 16) but POSITIONS it with FixedHandleSize
 		// alone: at the bottom of the travel a 6 px position plus the 16 px
 		// floor pushed the handle 10 px past the track — through the bottom
 		// edge of any window whose scrollbar sat at its end (the log's tail
 		// leaked 80 px past the frame that way). Pin both to the same value
-		// so size and position math agree; 16 matches what has always been
-		// rendered (the floor already won), so pixels do not change. The
-		// handle is a visible length: it scales with the UI (Px).
-		FixedHandleSize: constantutil.ConstantToPointer(Px(16)),
-		MinHandleSize:   constantutil.ConstantToPointer(Px(16)),
+		// so size and position math agree; SpLg matches what has always
+		// been rendered (the floor already won), so pixels do not change.
+		// The handle is a visible length: it scales with the UI (Px).
+		FixedHandleSize: constantutil.ConstantToPointer(Px(SpLg)),
+		MinHandleSize:   constantutil.ConstantToPointer(Px(SpLg)),
 		TrackOffset:     constantutil.ConstantToPointer(0),
 		PageSizeFunc:    func() int { return 1 },
 		TrackImage: &widget.SliderTrackImage{

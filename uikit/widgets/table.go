@@ -21,8 +21,9 @@ const (
 	// (design units, scaled by Px) gives every sort header a ≥40 px hit
 	// strip; the width stays the fitted column width.
 	TableHeaderH = 40
-	// headerSpace is the gap between the header strip and the rows.
-	headerSpace = 4
+	// headerSpace is the gap between the header strip and the rows
+	// (the furniture token; the row metrics below stay dense on purpose).
+	headerSpace = theme.SpSm
 	// cellPad is the horizontal padding inside every column cell.
 	cellPad = 5
 	// entryPadV is the vertical padding inside a row.
@@ -389,6 +390,7 @@ type Table struct {
 	rowH        float64
 
 	root    *widget.Container
+	rail    *ScrollRail // the reserved-gutter scrollbar beside the viewport
 	header  *widget.Container
 	hdrBtn  []*widget.Button
 	hdrIdle *widget.ButtonImage
@@ -567,13 +569,26 @@ func NewTable(env Seams, cols []Column, opts ...TableOption) *Table {
 		)),
 	)
 	t.root.AddChild(t.header, t.scroll)
+
+	// The rail: a reserved gutter at the table's right edge with the
+	// house scrollbar in it (ScrollRail). The viewport and the header are
+	// inset past it, so the handle can never overhang a cell, and the
+	// gutter is reserved while the rows fit too — the viewport never jumps
+	// when a long list starts overflowing.
+	t.rail = NewScrollRail(env, t.root, t.scroll, t.body)
 	return t
 }
 
 // Container returns the table's widget tree for embedding in a window or
 // the root container. Give it the full cell of a stretched grid row (or
 // an AnchorLayoutData with both stretches) so the viewport is bounded.
-func (t *Table) Container() widget.Containerer { return t.root }
+// The returned root wraps the header/scroll column and the scrollbar
+// rail; the header and viewport never reach the rail's gutter.
+func (t *Table) Container() widget.Containerer { return t.rail.Container() }
+
+// Rail returns the table's scrollbar slider (drag writes the scroll
+// offset back; the geometry pins read its rect).
+func (t *Table) Rail() *widget.Slider { return t.rail.Bar() }
 
 // SelectData selects the row carrying the given Data identity (nil clears
 // the selection) and refreshes row highlights. For selection that
@@ -648,6 +663,7 @@ func (t *Table) SetRows(rows []TableRow) {
 // once per frame; it is cheap when nothing changed.
 func (t *Table) Sync() {
 	t.clampScroll()
+	t.rail.Sync()
 	avail := float64(t.root.GetWidget().Rect.Dx())
 	if avail > 0 && avail != t.fittedFor {
 		t.applyWidths()

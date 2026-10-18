@@ -152,11 +152,14 @@ func TestTableRefitOnResize(t *testing.T) {
 	})
 	tbl.SetRows([]TableRow{{Cells: []string{"alpha", "1"}, Data: 0}})
 	tbl.Sync()
-	if tbl.FitWidthForTest() != 640 {
-		t.Fatalf("fittedFor = %v, want 640", tbl.FitWidthForTest())
+	// The columns fit the cell MINUS the scrollbar gutter reserved at the
+	// table's right edge (ScrollRail).
+	gutter := float64(theme.Px(theme.ScrollGutter))
+	if want := 640 - gutter; tbl.FitWidthForTest() != want {
+		t.Fatalf("fittedFor = %v, want %v (640 − the %v px gutter)", tbl.FitWidthForTest(), want, gutter)
 	}
-	if sum := uitest.SumPrefix(tbl.widths); math.Abs(sum-640) > 1e-6 {
-		t.Fatalf("column sum = %v, want 640", sum)
+	if sum := uitest.SumPrefix(tbl.widths); math.Abs(sum-(640-gutter)) > 1e-6 {
+		t.Fatalf("column sum = %v, want %v", sum, 640-gutter)
 	}
 
 	// A narrower draw resizes the root; Sync refits to it. All the
@@ -165,11 +168,11 @@ func TestTableRefitOnResize(t *testing.T) {
 	oldName := tbl.widths[0]
 	ui.Draw(ebiten.NewImage(400, 300))
 	tbl.Sync()
-	if tbl.FitWidthForTest() != 400 {
-		t.Fatalf("after resize fittedFor = %v, want 400", tbl.FitWidthForTest())
+	if want := 400 - gutter; tbl.FitWidthForTest() != want {
+		t.Fatalf("after resize fittedFor = %v, want %v", tbl.FitWidthForTest(), want)
 	}
-	if sum := uitest.SumPrefix(tbl.widths); math.Abs(sum-400) > 1e-6 {
-		t.Fatalf("after resize column sum = %v, want 400", sum)
+	if sum := uitest.SumPrefix(tbl.widths); math.Abs(sum-(400-gutter)) > 1e-6 {
+		t.Fatalf("after resize column sum = %v, want %v", sum, 400-gutter)
 	}
 	if tbl.widths[0] == oldName {
 		t.Errorf("Name column width unchanged (%v) after a 240 px shrink", oldName)
@@ -925,5 +928,75 @@ func TestTableRichRowChangeGatedRebuild(t *testing.T) {
 	}
 	if len(tbl.RowCts[0].Children()) != 1 {
 		t.Errorf("plain row children = %d, want the single column cell", len(tbl.RowCts[0].Children()))
+	}
+}
+
+// TestTableScrollRailGutter: the table's scrollbar rides a reserved
+// gutter beside the viewport — the gutter is ScrollGutter wide, reserved
+// even while the rows fit (the rail hides but the viewport stays inset,
+// so it never jumps), and once the rows overflow the handle shows, never
+// intersects the viewport, and a wheel notch still scrolls — at scale 1
+// and 1.5.
+func TestTableScrollRailGutter(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		scale float64
+	}{{"scale 1", 1}, {"scale 1.5", 1.5}} {
+		t.Run(tc.name, func(t *testing.T) {
+			uitest.UseScale(t, tc.scale)
+			env, _ := newTestEnv(t)
+			tbl, ui := newPumpedTable(t, env, []Column{{Key: "A", Title: "A"}})
+			tbl.SetRows([]TableRow{{Cells: []string{"one"}, Data: 0}})
+			tbl.Sync()
+			ui.Draw(ebiten.NewImage(640, 400))
+
+			// The table root stops ScrollGutter short of the wrapper.
+			if got := tbl.Container().GetWidget().Rect.Dx() - tbl.root.GetWidget().Rect.Dx(); got != theme.Px(theme.ScrollGutter) {
+				t.Errorf("reserved gutter = %d, want ScrollGutter %d", got, theme.Px(theme.ScrollGutter))
+			}
+			if tbl.Rail().GetWidget().IsVisible() {
+				t.Error("rail visible while one row fits")
+			}
+
+			// Overflow: the rail shows and the handle clears the viewport.
+			rows := make([]TableRow, 60)
+			for i := range rows {
+				rows[i] = TableRow{Cells: []string{"row"}, Data: i}
+			}
+			tbl.SetRows(rows)
+			tbl.Sync()
+			ui.Draw(ebiten.NewImage(640, 400))
+			tbl.Sync()
+			if !tbl.Rail().GetWidget().IsVisible() {
+				t.Fatalf("rail hidden over an overflowing table (overflow %v)", tbl.scrollOverflow())
+			}
+			bar := tbl.Rail().GetWidget().Rect
+			if bar.Overlaps(tbl.ScrollForTest().ViewRect()) {
+				t.Errorf("scrollbar %v intersects the viewport %v", bar, tbl.ScrollForTest().ViewRect())
+			}
+			if !bar.In(tbl.Container().GetWidget().Rect) {
+				t.Errorf("scrollbar %v leaves the table %v", bar, tbl.Container().GetWidget().Rect)
+			}
+			// Wheel still scrolls the viewport.
+			tbl.ScrollForTest().GetWidget().ScrolledEvent.Fire(&widget.WidgetScrolledEventArgs{Y: -3})
+			ui.Update()
+			ui.Draw(ebiten.NewImage(640, 400))
+			if tbl.ScrollForTest().ScrollTop <= 0 {
+				t.Fatalf("wheel: ScrollTop = %v, want > 0", tbl.ScrollForTest().ScrollTop)
+			}
+		})
+	}
+}
+
+// TestTableRowDensityPins: information density in tables is deliberate
+// (EVE-like), so the furniture tokens never reach a row's metrics — the
+// cell and row padding stay their literal values. The header gap is
+// furniture and does take the token.
+func TestTableRowDensityPins(t *testing.T) {
+	if entryPadV != 5 || cellPad != 5 {
+		t.Errorf("row density = entryPadV %d / cellPad %d, want 5/5 (deliberate)", entryPadV, cellPad)
+	}
+	if headerSpace != theme.SpSm {
+		t.Errorf("headerSpace = %d, want the SpSm furniture token %d", headerSpace, theme.SpSm)
 	}
 }

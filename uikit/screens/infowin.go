@@ -557,6 +557,7 @@ type InfoWin struct {
 	title  *widget.Text
 	page   *widget.Container
 	scroll *widget.ScrollContainer
+	rail   *widgets.ScrollRail
 	prose  *widget.Text
 
 	proseW  float64 // inner width the prose is wrapped to
@@ -601,6 +602,9 @@ func NewInfoWin(env widgets.Seams) *InfoWin {
 	// page with the viewport instead of triggering renderContent's
 	// re-location of it mid-drag.
 	widgets.AttachScrollContent(w.scroll, w.page)
+	// The page rides a reserved scrollbar gutter: the rail hides while a
+	// short page fits, shows (and drags) once it overflows.
+	w.rail = widgets.NewScrollRail(env, w.scroll, w.scroll, w.page)
 
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
@@ -610,7 +614,7 @@ func NewInfoWin(env widgets.Seams) *InfoWin {
 			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	body.AddChild(w.scroll)
+	body.AddChild(w.rail.Container())
 
 	// Title bar: name + "— Info". The close affordance (the ×) is not
 	// built here: Kit.SetWindowClose attaches it through the kit-wide
@@ -636,9 +640,13 @@ func NewInfoWin(env widgets.Seams) *InfoWin {
 // Win returns the window for Kit.AddWindow / the layout sidecar.
 func (w *InfoWin) Win() *widget.Window { return w.win }
 
-// Sync is the Panel seam (Kit.Sync drives it); its one job is
-// re-wrapping the description to the page's current width.
-func (w *InfoWin) Sync() { w.rewrap() }
+// Sync is the Panel seam (Kit.Sync drives it): it re-wraps the
+// description to the page's current width and mirrors the scroll offset
+// onto the rail (hiding it while the page fits).
+func (w *InfoWin) Sync() {
+	w.rewrap()
+	w.rail.Sync()
+}
 
 // IsOpen reports whether the window is revealed (shown, and mounted when
 // a Kit hosts it).

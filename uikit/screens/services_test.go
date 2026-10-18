@@ -166,10 +166,13 @@ func TestServicesIdentityAndFit(t *testing.T) {
 		const inner = 346
 		// Every service → five buttons: the widest the row gets.
 		s, _, _ := newServicesView(t, inner, []string{"market", "fitting", "industry", "repair", "refine"})
-		if want := "Jernborg · Genesis"; s.Identity() != want {
+		const want = "Jernborg · Genesis"
+		if s.Identity() != want {
 			t.Errorf("identity = %q, want %q (station name · system)", s.Identity(), want)
 		}
-		if s.name.Label == "" || !strings.HasPrefix("Jernborg · Genesis", s.name.Label) {
+		// The drawn line is the identity, ellipsized (… dropped) when the
+		// five service cells and their SpMd gaps leave it no room.
+		if s.name.Label == "" || !strings.HasPrefix(want, strings.TrimSuffix(s.name.Label, "…")) {
 			t.Errorf("drawn label = %q, want the identity (ellipsized when tight)", s.name.Label)
 		}
 		w, _ := s.Container().PreferredSize()

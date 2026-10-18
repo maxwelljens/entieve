@@ -615,3 +615,58 @@ func TestInfoWindowShowAndRefSwap(t *testing.T) {
 		t.Error("window stayed visible after Close")
 	}
 }
+
+// TestInfoWindowScrollbarGutter: the Show Info page rides a reserved
+// scrollbar gutter — the rail hides while a short page fits, the viewport
+// stays inset either way (the gutter never collapses), and an overflowing
+// page shows the handle clearing the viewport — at scale 1 and 1.5.
+func TestInfoWindowScrollbarGutter(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		scale float64
+	}{{"scale 1", 1}, {"scale 1.5", 1.5}} {
+		t.Run(tc.name, func(t *testing.T) {
+			uitest.UseScale(t, tc.scale)
+			env, _ := newChromeEnv(t)
+			w := env.InfoWindow()
+			if w == nil {
+				t.Fatal("environment has no info window")
+			}
+			ui := newWindowUI(t, env, w.Win())
+			frame := func() { uitest.PumpWindow(t, ui, w.Sync, 1024, 700) }
+			frame()
+
+			fixtureItem(t, env, "itm-fixture-short", &content.ItemDef{Name: "Short", Description: "One line."})
+			if !w.Show(widgets.ItemRef("itm-fixture-short")) {
+				t.Fatal("short ref did not resolve")
+			}
+			frame() // layout the revealed page
+			frame() // Sync sees the laid-out overflow
+
+			body := w.rail.Container().GetWidget().Rect
+			if got := body.Max.X - w.scroll.ViewRect().Max.X; got != theme.Px(theme.ScrollGutter) {
+				t.Errorf("reserved gutter = %d, want ScrollGutter %d", got, theme.Px(theme.ScrollGutter))
+			}
+			if w.rail.Bar().GetWidget().IsVisible() {
+				t.Error("rail visible over a short page")
+			}
+
+			// A long description overflows the window: the rail shows and
+			// the handle clears the viewport.
+			long := strings.Repeat("The dossier prose runs long. ", 200)
+			fixtureItem(t, env, "itm-fixture-long", &content.ItemDef{Name: "Long", Description: long})
+			if !w.Show(widgets.ItemRef("itm-fixture-long")) {
+				t.Fatal("long ref did not resolve")
+			}
+			frame()
+			frame()
+			if !w.rail.Bar().GetWidget().IsVisible() {
+				t.Fatalf("rail hidden over an overflowing page")
+			}
+			bar := w.rail.Bar().GetWidget().Rect
+			if bar.Overlaps(w.scroll.ViewRect()) {
+				t.Errorf("scrollbar %v intersects the viewport %v", bar, w.scroll.ViewRect())
+			}
+		})
+	}
+}

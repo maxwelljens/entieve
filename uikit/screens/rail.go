@@ -48,8 +48,9 @@ const (
 	railIcon = 35
 
 	// railTabW is the edge tab's width in the collapsed rail (all that
-	// is left of the column); railTabH its height.
-	railTabW = 16
+	// is left of the column); railTabH its height. 20 gives the glyph the
+	// SpSm air the tab now carries on each side.
+	railTabW = 20
 	railTabH = 20
 
 	// RailTopInset is the rail's top margin: the edge tab sits level
@@ -58,8 +59,9 @@ const (
 	RailTopInset = 8
 
 	// railGap is the vertical rhythm between entries and their group
-	// hairlines; railHeadGap the gap under the edge tab.
-	railGap     = 2
+	// hairlines (the furniture token); railHeadGap the gap under the edge
+	// tab.
+	railGap     = theme.SpSm
 	railHeadGap = 6
 )
 
@@ -117,6 +119,7 @@ type Rail struct {
 	container *widget.Container
 	list      *widget.Container
 	scroll    *widget.ScrollContainer // viewport over the entry list (capped columns)
+	rail      *widgets.ScrollRail     // reserved-gutter scrollbar beside the viewport
 	tab       *widget.Button
 	maxH      int // current column cap in live px (0 = uncapped)
 	collapsed bool
@@ -150,9 +153,10 @@ func NewRail(env widgets.Seams, entries []RailEntry) *Rail {
 	r.tab = widget.NewButton(
 		widget.ButtonOpts.Image(r.imgIdle),
 		widget.ButtonOpts.TextLabel("<"),
-		// The tab sizes to its glyph, not to the theme's button padding:
-		// collapsed, its width IS the rail's (railTabW).
-		widget.ButtonOpts.TextPadding(&widget.Insets{}),
+		// The furniture token, not the theme's wider button padding: the
+		// collapsed tab sizes to its glyph plus this air (railTabW is the
+		// width that leaves).
+		widget.ButtonOpts.TextPadding(widget.NewInsetsSimple(theme.Px(theme.SpSm))),
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.MinSize(theme.Px(railTabW), theme.Px(railTabH)),
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
@@ -193,9 +197,6 @@ func NewRail(env widgets.Seams, entries []RailEntry) *Rail {
 			Idle: theme.NineSlice(color.NRGBA{}),
 			Mask: theme.NineSlice(theme.Solid(p.BG)),
 		}),
-		widget.ScrollContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-			Stretch: true,
-		})),
 	)
 	// Wheel scrolls the column; ScrollTop is a 0..1 fraction of the
 	// overflow, so the step scales by the measured overflow (the
@@ -205,6 +206,14 @@ func NewRail(env widgets.Seams, entries []RailEntry) *Rail {
 			r.scrollBy(ev.Y)
 		}
 	})
+	// The entry column rides the house scrollbar in a reserved gutter (the
+	// same chrome the tables and the order book carry): the entries are
+	// inset past the rail's scrollbar, so the handle never overhangs an
+	// entry. The rail's OUTER width stays RailInset (the window inset the
+	// game reads) — the gutter is carved from the cell column, so the
+	// entry cells are (RailInset − ScrollGutter) wide, not squares.
+	r.rail = widgets.NewScrollRail(env, r.scroll, r.scroll, r.list)
+	r.rail.Container().GetWidget().LayoutData = widget.RowLayoutData{Stretch: true}
 
 	r.container = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -220,7 +229,7 @@ func NewRail(env widgets.Seams, entries []RailEntry) *Rail {
 			Padding:            &widget.Insets{Top: theme.Px(RailTopInset)},
 		})),
 	)
-	r.container.AddChild(r.tab, r.scroll)
+	r.container.AddChild(r.tab, r.rail.Container())
 	// Track the column's tooltip windows as they show and hide (the
 	// ToolTipEvent re-fires bubble up the container chain to this
 	// widget), so Kit.Draw's top pass can park and repaint them above
@@ -293,10 +302,10 @@ func (r *Rail) SetCollapsed(c bool) {
 		return
 	}
 	r.collapsed = c
-	// Both hide: the scroll column keeps the container's width (the
-	// collapsed rail is exactly the edge tab) and the list behind it
-	// reports the entries' own state to the pins.
-	theme.ShowWidget(r.scroll.GetWidget(), !c)
+	// Both hide: the scroll column (rail + entries) keeps the container's
+	// width (the collapsed rail is exactly the edge tab) and the list
+	// behind it reports the entries' own state to the pins.
+	theme.ShowWidget(r.rail.Container().GetWidget(), !c)
 	theme.ShowWidget(r.list.GetWidget(), !c)
 	label := "<"
 	if c {
@@ -336,15 +345,18 @@ func (r *Rail) SetMaxHeight(px int) {
 		return
 	}
 	r.maxH = h
-	r.scroll.GetWidget().LayoutData = widget.RowLayoutData{Stretch: true, MaxHeight: h}
+	// The cap rides the rail wrapper (the container's direct child); the
+	// scroll viewport sits inside it.
+	w := r.rail.Container().GetWidget()
+	w.LayoutData = widget.RowLayoutData{Stretch: true, MaxHeight: h}
 	r.container.RequestRelayout()
 	// Re-lay the COLUMN itself, not just its children: a layout-data
 	// change alone only dirties this container, while ebitenui
 	// propagates a parent relayout from a widget's visibility change —
 	// so pulse it (restoring whatever state the collapse left).
-	vis := r.scroll.GetWidget().GetVisibility() == widget.Visibility_Show
-	theme.ShowWidget(r.scroll.GetWidget(), !vis)
-	theme.ShowWidget(r.scroll.GetWidget(), vis)
+	vis := w.GetVisibility() == widget.Visibility_Show
+	theme.ShowWidget(w, !vis)
+	theme.ShowWidget(w, vis)
 }
 
 // scrollBy turns wheel notches into a fraction of the column overflow
@@ -426,9 +438,12 @@ func (r *Rail) newEntryButton(i int, e RailEntry) (*widget.Button, *theme.IconBo
 // exactly ((cell − icon)/2 on both axes) and keeps its rect reachable
 // for the inside-bounds pin.
 func (r *Rail) iconCell(btn *widget.Button, glyph *theme.IconBox) *widget.Container {
+	// The cell is as tall as the rail (RailInset) but stops short of the
+	// scrollbar's reserved gutter (ScrollGutter), so the handle beside it
+	// never overhangs an entry.
 	cell := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(RailInset), theme.Px(RailInset))),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(RailInset-theme.ScrollGutter), theme.Px(RailInset))),
 	)
 	cell.AddChild(btn, glyph.Widget()) // glyph last: it draws over the chrome
 	return cell
@@ -477,6 +492,8 @@ func (r *Rail) Sync() {
 	} else {
 		r.scroll.ScrollTop = max(0, min(1, r.scroll.ScrollTop))
 	}
+	// The scrollbar mirrors the column and hides while the entries fit.
+	r.rail.Sync()
 }
 
 // entryEnabled is one entry's context rule (pure — unit-tested): the

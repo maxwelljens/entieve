@@ -64,8 +64,11 @@ func TestRailGeometry(t *testing.T) {
 					t.Fatalf("no button for %q", title)
 				}
 				br := b.GetWidget().Rect
-				if br.Dx() != theme.Px(RailInset) || br.Dy() != theme.Px(RailInset) {
-					t.Errorf("%s cell = %v, want a %d² icon cell", title, br, theme.Px(RailInset))
+				// The cell stops short of the rail's scrollbar gutter
+				// (ScrollGutter), so the handle beside it never overhangs.
+				if br.Dx() != theme.Px(RailInset-theme.ScrollGutter) || br.Dy() != theme.Px(RailInset) {
+					t.Errorf("%s cell = %v, want %d×%d (RailInset − ScrollGutter × RailInset)",
+						title, br, theme.Px(RailInset-theme.ScrollGutter), theme.Px(RailInset))
 				}
 			}
 
@@ -125,18 +128,20 @@ func TestRailIconsInsideCells(t *testing.T) {
 				}
 				l, rr := glyph.Min.X-cell.Min.X, cell.Max.X-glyph.Max.X
 				tp, b := glyph.Min.Y-cell.Min.Y, cell.Max.Y-glyph.Max.Y
+				// The glyph is centred in its cell: each opposing pair of
+				// margins matches ±1 (the cell is now taller than wide —
+				// the scrollbar gutter is carved from its right edge — so
+				// only each pair must agree, not all four).
 				if abs(l-rr) > 1 || abs(tp-b) > 1 {
-					t.Errorf("%s: glyph margins L%d R%d T%d B%d in %v, want equal ±1",
+					t.Errorf("%s: glyph margins L%d R%d T%d B%d in %v, want each pair equal ±1",
 						title, l, rr, tp, b, cell)
 				}
-				// Square glyph in a square cell: horizontal margins match
-				// the vertical ones too.
-				if abs(l-tp) > 1 {
-					t.Errorf("%s: glyph margins horizontal %d vs vertical %d in %v, want equal ±1",
-						title, l, tp, cell)
+				if l < 1 || rr < 1 || tp < 1 || b < 1 {
+					t.Errorf("%s: glyph %v touches its cell edge %v (want visible air)", title, glyph, cell)
 				}
-				if cell.Dx() != theme.Px(RailInset) || cell.Dy() != theme.Px(RailInset) {
-					t.Errorf("%s: cell = %v, want a %d² square", title, cell, theme.Px(RailInset))
+				if cell.Dx() != theme.Px(RailInset-theme.ScrollGutter) || cell.Dy() != theme.Px(RailInset) {
+					t.Errorf("%s: cell = %v, want %d×%d (RailInset − ScrollGutter × RailInset)",
+						title, cell, theme.Px(RailInset-theme.ScrollGutter), theme.Px(RailInset))
 				}
 			}
 
@@ -210,6 +215,63 @@ func TestRailGutterAndGlyphLiterals(t *testing.T) {
 	}
 	if railIcon != 35 {
 		t.Errorf("railIcon = %d, want 35 (IconButton 20 × 1.75)", railIcon)
+	}
+	// The collapsed edge tab carries the furniture token's air: 20 =
+	// the "<" glyph (≈10) + SpSm on each side.
+	if railTabW != 20 {
+		t.Errorf("railTabW = %d, want 20 (glyph + 2×SpSm)", railTabW)
+	}
+}
+
+// TestRailScrollbarGutter: the entry column's scrollbar rides a reserved
+// gutter inside the rail — the rail keeps its RailInset width, the
+// reserved column is exactly ScrollGutter wide even while the rail is
+// hidden (hide-when-fits), and once the column overflows the handle
+// shows and never intersects the entry viewport — at scale 1 and 1.5.
+func TestRailScrollbarGutter(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		scale float64
+	}{{"scale 1", 1}, {"scale 1.5", 1.5}} {
+		t.Run(tc.name, func(t *testing.T) {
+			uitest.UseScale(t, tc.scale)
+			env, _ := newChromeEnv(t)
+			c := newChromeUI(env)
+			open := false
+			r := NewRail(env, railEntries3(&open))
+			c.AddPanel(r.Container(), r)
+			c.Frame(t, 1280, 720) // lays the viewport out
+			c.Frame(t, 1280, 720) // Sync sees the laid-out overflow
+
+			// Fitting: the rail hides, the gutter stays reserved.
+			if r.rail.Bar().GetWidget().IsVisible() {
+				t.Error("rail scrollbar visible while the entries fit")
+			}
+			railW := r.Container().GetWidget().Rect.Dx()
+			gutter := railW - r.scroll.ViewRect().Dx()
+			if gutter != theme.Px(theme.ScrollGutter) {
+				t.Errorf("reserved gutter = %d, want ScrollGutter %d", gutter, theme.Px(theme.ScrollGutter))
+			}
+			if railW != theme.Px(RailInset) {
+				t.Errorf("rail width = %d, want RailInset %d (the gutter is carved inside)", railW, theme.Px(RailInset))
+			}
+
+			// Cap below the full column: the entries overflow, the rail
+			// shows and the handle clears the viewport.
+			r.SetMaxHeight(theme.Px(railTabH + railHeadGap + RailInset))
+			c.Frame(t, 1280, 720)
+			c.Frame(t, 1280, 720)
+			if !r.rail.Bar().GetWidget().IsVisible() {
+				t.Fatalf("rail scrollbar hidden over an overflowing column (overflow %v)", r.scrollOverflow())
+			}
+			bar := r.rail.Bar().GetWidget().Rect
+			if bar.Overlaps(r.scroll.ViewRect()) {
+				t.Errorf("scrollbar %v intersects the entry viewport %v", bar, r.scroll.ViewRect())
+			}
+			if !bar.In(r.Container().GetWidget().Rect) {
+				t.Errorf("scrollbar %v leaves the rail %v", bar, r.Container().GetWidget().Rect)
+			}
+		})
 	}
 }
 
