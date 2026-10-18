@@ -1,0 +1,111 @@
+{
+  "credit": "original artwork",
+  "generator": "tools/emblemraster",
+  "sizes": [
+    24,
+    32,
+    48
+  ],
+  "emblems": {
+    "corp-aldemar": {
+      "credit": "original artwork",
+      "svg": "svg/corp-aldemar.svg",
+      "svg_sha256": "8890e10e4b7041d2754853f1c8ab2b4ef4953556e9f87f1cbff6508ac42c14d1",
+      "png_sha256": {
+        "24": "285b9e811a6f7ff425dc42f8a76ac12fdfc19711dbfbad77d0d4174bbcc7fbd8",
+        "32": "6f7d67d2f1407159990d8beed0e190e460489c2b14ce1e88071d4888ed89c1ee",
+        "48": "82f8c4f57e36d0c3b01d4c8a8642a251bdd23ad45c9b89036da88d5c036ab87e"
+      }
+    },
+    "corp-borealis": {
+      "credit": "original artwork",
+      "svg": "svg/corp-borealis.svg",
+      "svg_sha256": "51ff917b397336afbde8f881fb0e215adf6257292f97a43bc09a7343a77ddf44",
+      "png_sha256": {
+        "24": "5215f450acff178cbf6eabd1710b9457d3fb063feee352e10bf87c418b4b9a97",
+        "32": "fdfb4549ffbb3133846e29f8d67bce4374f72492a99190707d07f03f6357e1a1",
+        "48": "90f3144c589aae49f99c652b283eaf0712aec1af1d9b0ef73db8bcbbc1d3df9f"
+      }
+    },
+    "corp-burza": {
+      "credit": "original artwork",
+      "svg": "svg/corp-burza.svg",
+      "svg_sha256": "1ed88d59f4726f1ec1f45a45cf6f2e66f032a084f0e185c29609150dc0bf4a96",
+      "png_sha256": {
+        "24": "e10bf43c43cad51e219495c831e347ce2972cdae923521f551d8af6b7c82e683",
+        "32": "433f647c271b1f6dd21e656d28260b6951b79d549191238f79d2e5d8492b254a",
+        "48": "9565cbfd43deac3fde964a6f2e3184eaddbfc5ed072d02d6d7c368e97d445f6b"
+      }
+    },
+    "corp-celeritas": {
+      "credit": "original artwork",
+      "svg": "svg/corp-celeritas.svg",
+      "svg_sha256": "6bfc3f7515de434a6864e3bff252797c89d7d9f50d5afefe04a1efd4099db45e",
+      "png_sha256": {
+        "24": "1b967393f2278d47bc24478f3eb38c49b332475baabe121a2ee3753cc4f5c35e",
+        "32": "46eb7b38efa70de864ce00da35faa07af17fca96c83a88af452e860cfdb774e8",
+        "48": "ef2837994ba7a0ba4096c7d273183a0a12911ce52980c49401d6300b0802eef7"
+      }
+    },
+    "corp-druzstvo": {
+      "credit": "original artwork",
+      "svg": "svg/corp-druzstvo.svg",
+      "svg_sha256": "5d8320c8b9be5a17446629e2461a8f501be59ee7f6894e55cc677c0b660e448c",
+      "png_sha256": {
+        "24": "6bad35019404c118db49c8080c6ba6bac567fe8f40b9b3e2144c79b59b6ca6c6",
+        "32": "edc5c46ecf4a08560a74623e33758a14abaebebe18c14ce416e81e61b1bb1496",
+        "48": "1a86a6ed01efdb995cbde62d6d724c494fca981b284648bfc214034621b73eb3"
+      }
+    },
+    "corp-ferrum": {
+      "credit": "original artwork",
+      "svg": "svg/corp-ferrum.svg",
+      "svg_sha256": "c6e058503671f229dff805a6f1571dc08d1716e806e37f9306de6dbb363deec5",
+      "png_sha256": {
+        "24": "48c3458c177c8eec065548b8bc80d041a930e0677cea86a89866110d73069ead",
+        "32": "f3a0815bf6844434c8d19bdf8843aef3e42a20e4959658b9de529de0c93a7f2d",
+        "48": "df0f23efd9402731b8891c423d7eb218664b0cb4427757e0e093761c82a2d139"
+      }
+    },
+    "corp-iskald": {
+      "credit": "original artwork",
+      "svg": "svg/corp-iskald.svg",
+      "svg_sha256": "bde4409f5027efeb855ed0a720654bb1bdc3e90db0080406f3a58936fea1c7c1",
+      "png_sha256": {
+        "24": "8803061748c69bc4a004b81f69e118db1b97575a9a9a3e1b7adfac4d4a1fb0e0",
+        "32": "19f964622b28d0a6cf07a14ed3b6b82432ced749267473109f1a0de6ab739026",
+        "48": "4925d6911c1ef1081fe1eba6915b1af264e60fe1eee9ad4d2a1677be9514d2f4"
+      }
+    },
+    "corp-nordvakt": {
+      "credit": "original artwork",
+      "svg": "svg/corp-nordvakt.svg",
+      "svg_sha256": "2af889af6eb5d69d525ca53c23ca7d1c7e558309c7864d9bdaa5a68b4c4cbc65",
+      "png_sha256": {
+        "24": "d9d7bd2dd022a0e87a0dfdc71e8a6492b6b1f86a65a95c09c7dd32bf3ebb161e",
+        "32": "a886df8f5c8f25f7f648b5b7c5a6336d8a78bdb3361322b181ba808a8d7d6000",
+        "48": "58d647b014e8591164a31f229939298cfe33d079fe6738e772e8531f2a618601"
+      }
+    },
+    "corp-praetor": {
+      "credit": "original artwork",
+      "svg": "svg/corp-praetor.svg",
+      "svg_sha256": "f4adc69139a63a362a5a80ae04ab2084a938b9e8e6da94cdcba7344ea37bff78",
+      "png_sha256": {
+        "24": "49ebbcee6dc866feb4ec11a453b2b8e4f6cba9bfc46c5f07a03e3fc85bbac30d",
+        "32": "98af3fd88b106d432333d665f84f08a2279cd7d0d9ac0fd40fc9ad6f24c2241d",
+        "48": "5a719fcdfbc0f43e1b5fbba0195f41b3494e3b86233e998a3aeaaa63de774361"
+      }
+    },
+    "corp-vantera": {
+      "credit": "original artwork",
+      "svg": "svg/corp-vantera.svg",
+      "svg_sha256": "5de2d07be9509367fda84f6f73d41963b033cba2baae5ae60c43e10a7814dbc4",
+      "png_sha256": {
+        "24": "efdbf247011ba835e9aa64c9ada9088e5146c440ab1d9abbe9325cf1e6260003",
+        "32": "f1bfb0decd106883f60300c0d4e8b8ea6718d46d21ed05fb5da895372e50acbf",
+        "48": "58a273e7934ac919b6f4fce480cf03e7a9ec1bc21fcd54a4b6aaa4adfe3f96a2"
+      }
+    }
+  }
+}

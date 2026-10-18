@@ -1,0 +1,7 @@
+<!-- Entieve original artwork — the Celeritas emblem (speed chevrons). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <polygon fill="#ffd0bd" points="4,12 15,20 4,28"/>
+  <polygon fill="#ff9a5c" points="16,12 27,20 16,28"/>
+  <polygon fill="#ff7a45" points="28,12 39,20 28,28"/>
+  <rect fill="#2f3d4c" x="4" y="34" width="40" height="4"/>
+</svg>

@@ -272,6 +272,23 @@ func TestValidateNegativeCases(t *testing.T) {
 			want: "unknown origin \"martian\"",
 		},
 		{
+			// The maker vocabulary is the corp-* roster; an unknown slug is
+			// rejected on every manufactured def kind.
+			name:   "unknown ship maker",
+			mutate: func(c *Content) { c.Ships["ship-hull"].Maker = "corp-ghost" },
+			want:   "unknown maker \"corp-ghost\"",
+		},
+		{
+			name:   "unknown module maker",
+			mutate: func(c *Content) { c.Modules["mod-gun"].Maker = "megacorp" },
+			want:   "unknown maker \"megacorp\"",
+		},
+		{
+			name:   "unknown item maker",
+			mutate: func(c *Content) { c.Items["charge-bolt"].Maker = "corp-ghost" },
+			want:   "unknown maker \"corp-ghost\"",
+		},
+		{
 			name: "loot chance out of range",
 			mutate: func(c *Content) {
 				c.NPCs["npc-rat"].Loot[0].Chance = 1.5

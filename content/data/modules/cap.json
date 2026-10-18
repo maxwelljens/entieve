@@ -1,6 +1,7 @@
 [
   {
     "id": "mod-cap-booster",
+    "maker": "corp-iskald",
     "name": "Cap Booster",
     "description": "Burns a capacitor booster cell from cargo to slam GJ back into the capacitor at once.",
     "slot": "mid",
@@ -14,6 +15,7 @@
   },
   {
     "id": "mod-cap-recharger",
+    "maker": "corp-iskald",
     "name": "Cap Recharger",
     "description": "Passive capacitor circuitry that shortens the recharge time constant.",
     "slot": "low",

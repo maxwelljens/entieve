@@ -11,6 +11,7 @@ import (
 	eimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/uikit/emblems"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -37,12 +38,13 @@ import (
 // Window geometry: a floating page, wide enough for label/value rows at
 // the small step and tall enough to show several sections at once.
 const (
-	infoW      = 420 // default width
-	infoH      = 460 // default height
-	infoMinW   = 300 // content floor: header + prose + two rows
-	infoMinH   = 340
-	infoGap    = 6 // vertical gap between page blocks
-	infoWheelN = 3 // wheel notches per scroll step (rows), like the tables
+	infoW       = 420 // default width
+	infoH       = 460 // default height
+	infoMinW    = 300 // content floor: header + prose + two rows
+	infoMinH    = 340
+	infoGap     = 6  // vertical gap between page blocks
+	infoWheelN  = 3  // wheel notches per scroll step (rows), like the tables
+	emblemBlock = 40 // header emblem box, design px (readable at 32–48)
 )
 
 // ---------------------------------------------------------------------------
@@ -71,9 +73,34 @@ type infoSection struct {
 type infoPage struct {
 	Icon     string
 	Title    string
-	Sub      string // category/origin line under the title
+	Sub      string // category/maker line under the title
 	Prose    string // wrapped description ("" = no prose block at all)
+	Emblem   string // maker slug whose emblem leads the Sub line ("" = none)
 	Sections []infoSection
+}
+
+// makerSub joins a def's lead label (class/kind/category) with its maker's
+// display name — "Frigate · Kombinat Ferrum". A maker-less def keeps its
+// lead label alone ("" maker and "" lead → "").
+func makerSub(lead, maker string) string {
+	name := content.CorpName(maker)
+	switch {
+	case name == "":
+		return lead
+	case lead == "":
+		return name
+	}
+	return lead + " · " + name
+}
+
+// makerRows is the CONSTRUCTION block of a manufactured def: the Maker row
+// carrying the corporation's display name. Nil for an unattributed def
+// (rat hulls, ores, minerals, loot).
+func makerRows(maker string) []infoRow {
+	if name := content.CorpName(maker); name != "" {
+		return []infoRow{{Label: "Maker", Value: name}}
+	}
+	return nil
 }
 
 // addSection appends a section only when it has rows — a def without the
@@ -238,14 +265,17 @@ func infoPageFor(cv widgets.ContentView, ref widgets.InfoRef) (infoPage, bool) {
 	return infoPage{}, false
 }
 
-// shipPage renders a hull: construction (class · origin), slots, the
-// survival block with resists, capacitor, propulsion, sensors and cargo.
+// shipPage renders a hull: construction (class · maker, or class · origin
+// for the unattributed rat hulls), slots, the survival block with resists,
+// capacitor, propulsion, sensors and cargo.
 func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
-	p := infoPage{Icon: "row_hull", Title: def.Name, Prose: def.Description}
+	p := infoPage{Icon: "row_hull", Title: def.Name, Prose: def.Description, Emblem: def.Maker}
 	if def.Class != "" {
 		p.Sub = spacedKind(def.Class)
 	}
-	if def.Origin != "" {
+	if def.Maker != "" {
+		p.Sub = makerSub(p.Sub, def.Maker)
+	} else if def.Origin != "" {
 		o := originLabel(def.Origin)
 		if p.Sub == "" {
 			p.Sub = o
@@ -258,7 +288,9 @@ func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
 	if def.Class != "" {
 		cons = append(cons, infoRow{Label: "Class", Value: spacedKind(def.Class)})
 	}
-	if def.Origin != "" {
+	if def.Maker != "" {
+		cons = append(cons, makerRows(def.Maker)...)
+	} else if def.Origin != "" {
 		cons = append(cons, infoRow{Label: "Origin", Value: originLabel(def.Origin)})
 	}
 	addSection(&p, "CONSTRUCTION", cons)
@@ -356,10 +388,11 @@ func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
 // kind, cycle, capacitor draw), then the shared moduleTip stat sections,
 // the compatible charges as links and the market price.
 func modulePage(cv widgets.ContentView, def *content.ModuleDef) infoPage {
-	p := infoPage{Icon: theme.ModuleIcon(def.Kind), Title: def.Name, Prose: def.Description}
+	p := infoPage{Icon: theme.ModuleIcon(def.Kind), Title: def.Name, Prose: def.Description, Emblem: def.Maker}
 	if def.Kind != "" {
 		p.Sub = spacedKind(def.Kind)
 	}
+	p.Sub = makerSub(p.Sub, def.Maker)
 
 	var act []infoRow
 	if def.Slot != "" {
@@ -375,6 +408,9 @@ func modulePage(cv widgets.ContentView, def *content.ModuleDef) infoPage {
 		act = append(act, infoRow{Label: "Cap use", Value: theme.GroupFloat(def.ActivationCost, 1) + " GJ"})
 	}
 	addSection(&p, "ACTIVATION", act)
+	// The maker block follows the activation lead (ACTIVATION stays the
+	// module page's first section).
+	addSection(&p, "CONSTRUCTION", makerRows(def.Maker))
 
 	// The rack/fitting tooltip's stat sections, shared verbatim (charge
 	// context is an instance concern the def-only window has none of).
@@ -415,10 +451,15 @@ func ammoItems(cv widgets.ContentView, class string) []content.ItemID {
 // itemPage renders an item: properties, market price, the refine yields
 // as links and the ammo damage profile when it has one.
 func itemPage(cv widgets.ContentView, def *content.ItemDef) infoPage {
-	p := infoPage{Title: def.Name, Prose: def.Description}
+	p := infoPage{Title: def.Name, Prose: def.Description, Emblem: def.Maker}
 	if def.Category != "" {
 		p.Sub = spacedKind(def.Category)
 	}
+	p.Sub = makerSub(p.Sub, def.Maker)
+
+	// Manufactured charges/ammo lead with their maker; ores, minerals and
+	// loot carry no maker and no block.
+	addSection(&p, "CONSTRUCTION", makerRows(def.Maker))
 
 	var props []infoRow
 	if def.Category != "" {
@@ -559,6 +600,7 @@ type InfoWin struct {
 	scroll *widget.ScrollContainer
 	rail   *widgets.ScrollRail
 	prose  *widget.Text
+	emblem *widget.Graphic // header maker emblem (nil when the def has none)
 
 	proseW  float64 // inner width the prose is wrapped to
 	refRows []InfoRefRow
@@ -669,6 +711,10 @@ func (w *InfoWin) TitleText() string {
 // click / double-click handlers live on).
 func (w *InfoWin) RefRows() []InfoRefRow { return w.refRows }
 
+// Emblem is the header emblem graphic of the current page — the maker's
+// mark beside the Sub line — or nil when the def has no maker.
+func (w *InfoWin) Emblem() *widget.Graphic { return w.emblem }
+
 // Show swaps the window's whole page to ref's details and reveals the
 // window. It reports whether the ref resolved: unknown ids open nothing.
 // Mounting (and the raise-to-top remount) is the host's job — see
@@ -741,6 +787,7 @@ func (w *InfoWin) render(p infoPage) {
 	w.page.RemoveChildren()
 	w.refRows = nil
 	w.prose = nil
+	w.emblem = nil
 
 	// Header: the class glyph and the bold title share one line, the
 	// category/origin line hangs under the title column (tooltip anatomy).
@@ -764,7 +811,7 @@ func (w *InfoWin) render(p infoPage) {
 		widget.TextOpts.Text(p.Title, env.FaceBold(theme.StepBase), theme.Solid(pal.Text)),
 	))
 	w.page.AddChild(line)
-	if p.Sub != "" {
+	if p.Sub != "" || p.Emblem != "" {
 		sub := widget.NewContainer(
 			widget.ContainerOpts.Layout(widget.NewRowLayout(
 				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
@@ -778,9 +825,23 @@ func (w *InfoWin) render(p infoPage) {
 				widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(iconW, 0)),
 			))
 		}
-		sub.AddChild(widget.NewText(
-			widget.TextOpts.Text(p.Sub, env.Face(theme.StepSmall), theme.Solid(pal.Dim)),
-		))
+		// The maker's emblem leads the Sub line (the corporation mark on
+		// manufactured goods; nothing on rat hulls and unattributed items).
+		if p.Emblem != "" {
+			g := widget.NewGraphic(
+				widget.GraphicOpts.Image(emblems.Get(p.Emblem, theme.Px(emblemBlock))),
+				widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+					Position: widget.RowLayoutPositionCenter,
+				})),
+			)
+			sub.AddChild(g)
+			w.emblem = g
+		}
+		if p.Sub != "" {
+			sub.AddChild(widget.NewText(
+				widget.TextOpts.Text(p.Sub, env.Face(theme.StepSmall), theme.Solid(pal.Dim)),
+			))
+		}
 		w.page.AddChild(sub)
 	}
 

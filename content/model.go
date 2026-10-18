@@ -137,6 +137,7 @@ type ItemDef struct {
 	ID          ItemID             `json:"id"`
 	Name        string             `json:"name"`
 	Description string             `json:"description,omitempty"`
+	Maker       string             `json:"maker,omitempty"` // manufacturer: a corp-* slug (Corp.ID); empty for ores/minerals/loot
 	Category    string             `json:"category"`
 	Volume      float64            `json:"volume"`                 // m³ per unit
 	BasePrice   float64            `json:"base_price"`             // credits per unit
@@ -159,6 +160,7 @@ type ShipDef struct {
 	Class          string  `json:"class"` // "frigate"|"destroyer"|"barge"|"industrial"|"rat"
 	Description    string  `json:"description,omitempty"`
 	Origin         string  `json:"origin,omitempty"` // naming-layer heritage: "moravian"|"polish"|"nordic"|"latinate"|"old-works"
+	Maker          string  `json:"maker,omitempty"`  // manufacturer: a corp-* slug (Corp.ID); empty on the unattributed rat hulls
 	Slots          Slots   `json:"slots"`
 	Shield         float64 `json:"shield"`
 	Armor          float64 `json:"armor"`
@@ -242,7 +244,8 @@ type ModuleDef struct {
 	ID             ModuleID      `json:"id"`
 	Name           string        `json:"name"`
 	Description    string        `json:"description,omitempty"`
-	Slot           string        `json:"slot"` // "high" | "mid" | "low"
+	Maker          string        `json:"maker,omitempty"` // manufacturer: a corp-* slug (Corp.ID)
+	Slot           string        `json:"slot"`            // "high" | "mid" | "low"
 	Kind           string        `json:"kind"`
 	ActivationCost float64       `json:"activation_cost"` // GJ per activation/cycle; 0 for passive
 	ActivationTime float64       `json:"activation_time"` // seconds per cycle; 0 for passive

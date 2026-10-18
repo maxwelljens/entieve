@@ -95,7 +95,9 @@ The homelands the settlers left are **the old worlds** — plural, distant, and
 deliberately unnamed. "Moravian", "Polish", "Nordic" and "Latinate" are
 heritages: language, work songs, building styles, and the formal register the
 charter institutions still write in. They are not states, not governments,
-not flags.
+not flags. The manufacturers take their names from these heritages (see
+[FACTIONS.md — Corporate members](FACTIONS.md#corporate-members)) — the
+heritage shapes the house, never the other way round.
 
 Nobody in Far Moravia sends mail home and gets an answer.
 

@@ -1,0 +1,7 @@
+<!-- Entieve original artwork — the Kombinat Ferrum emblem (anvil and ingot band). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <rect fill="#24313f" x="6" y="17" width="36" height="7"/>
+  <rect fill="#e08b3a" x="6" y="17" width="36" height="3"/>
+  <polygon fill="#24313f" points="18,24 30,24 32,35 37,35 37,42 11,42 11,35 16,35"/>
+  <rect fill="#8fa3b5" x="4" y="42" width="40" height="3"/>
+</svg>

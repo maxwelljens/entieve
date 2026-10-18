@@ -39,12 +39,31 @@ per [UNIVERSE.md — The settlement waves](UNIVERSE.md#the-settlement-waves)).
 Institutional cores follow the Latinate register; the origin shows in the
 trade and in one heritage form-word where a house keeps one.
 
+The ten-firm roster below is the **manufacturer layer** of the economy: the
+houses that make the goods the market sells and whose marks appear on them
+(`maker` in the content; registered in
+[NAMING.md — Corporations](NAMING.md#corporations--manufacturers)). It is
+*not* a fifth power bloc — the firms own no territory, hold no law and fly
+no warships, and they stay independent of each other and of the Charter.
+
 | House | Origin | Trade | Notes |
 |---|---|---|---|
-| **Borealis Systems** | Nordic | sensors, ewar, shield and capacitor electronics | precise instruments; expensive; the fleet's eyes |
-| **Kombinat Ferrum** | Polish | hulls, plating, bulk haulers | heavy yards, thick steel, prices that hold |
-| **Družstvo Concordia** | Moravian | mining, refining, ore logistics | cooperative-owned; runs shifts, not fleets |
-| **Celeritas Courier** | Latinate | couriers, executive runs, fast freight | charter-registered; paperwork in triplicate, delivered on time |
+| **Borealis** | Nordic | sensors, avionics, electronic warfare | aurora-chasing sensor engineers; the region's eyes, sold by subscription |
+| **Nordvakt** | Nordic | ordnance, turrets, guidance | founded by artillery officers; still believes every problem has a caliber |
+| **Iskald** | Nordic | energy systems, capacitors, cells | cold-weather power systems; the grid nobody notices until it fails |
+| **Kombinat Ferrum** | Polish | heavy hulls, armor, structures | the iron combine: heavy hulls, heavier contracts |
+| **Družstvo** | Moravian | extraction, refining, barging | a miners' cooperative that outgrew its own pit |
+| **Zakłady Burza** | Polish/Moravian | munitions, energetic materials | Storm Works: propellants, warheads, and very good insurance |
+| **Celeritas** | Latinate | propulsion, express logistics, recovery | if it must arrive yesterday — for a price, it does |
+| **Praetor** | Latinate | security services, patrol craft, protective systems | security is a service; the Custos hull is the receipt |
+| **Aldemar Group** | indistinct European | instrumentation, field repair, components | components for everyone; a boardroom for no one |
+| **Vantera** | indistinct European | industrial automation, shielding, station systems | station infrastructure, shielding, and quiet shareholdings |
+
+Three houses carry a rename from their founding charters: **Borealis
+Systems → Borealis**, **Družstvo Concordia → Družstvo** and **Celeritas
+Courier → Celeritas** (each dropped its Latinate form-word); **Kombinat
+Ferrum** keeps its name. The full registry is
+[NAMING.md — Corporations](NAMING.md#corporations--manufacturers).
 
 Corps buy ore, sell hulls and modules, post contracts on the boards, and
 occasionally sue each other. They do not patrol and they do not fight the
@@ -55,6 +74,8 @@ Old Works — they write the losses down and raise the risk premium.
 - MUST keep every corporate house's trade aligned with its origin's trait
   skew ([AESTHETIC.md — Origins and traits](AESTHETIC.md#origins-and-traits)).
 - MUST name institutions in the Latinate register.
+- MUST keep the roster a manufacturer layer: firms are independent
+  suppliers that appear on goods and markets, never a bloc.
 - NEVER let a corporation hold territory, law or a military. It holds
   contracts.
 - NEVER add a fifth power bloc without registering it here.

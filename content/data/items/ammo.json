@@ -1,6 +1,7 @@
 [
   {
     "id": "charge-emp",
+    "maker": "corp-burza",
     "name": "EMP Charge",
     "description": "Light charge that dumps its energy as an electromagnetic pulse. EM-biased damage.",
     "category": "ammo",
@@ -11,6 +12,7 @@
   },
   {
     "id": "charge-fusion",
+    "maker": "corp-burza",
     "name": "Fusion Charge",
     "description": "Volatile light charge that detonates on impact. Explosive-biased damage.",
     "category": "ammo",
@@ -21,6 +23,7 @@
   },
   {
     "id": "charge-ap",
+    "maker": "corp-burza",
     "name": "Armor-Piercing Charge",
     "description": "Dense penetrator slug for light turrets. Kinetic-biased damage.",
     "category": "ammo",
@@ -31,6 +34,7 @@
   },
   {
     "id": "charge-plutonium",
+    "maker": "corp-burza",
     "name": "Plutonium Charge",
     "description": "Radioactive shell that burns through plating. Thermal-biased damage.",
     "category": "ammo",

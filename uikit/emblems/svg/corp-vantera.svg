@@ -1,0 +1,14 @@
+<!-- Entieve original artwork — the Vantera emblem (structural frame and grid). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <rect fill="#24313f" x="5" y="5" width="38" height="4"/>
+  <rect fill="#24313f" x="5" y="39" width="38" height="4"/>
+  <rect fill="#24313f" x="5" y="5" width="4" height="38"/>
+  <rect fill="#24313f" x="39" y="5" width="4" height="38"/>
+  <rect fill="#8fa3b5" x="22.5" y="9" width="3" height="30"/>
+  <rect fill="#8fa3b5" x="9" y="22.5" width="30" height="3"/>
+  <circle fill="#5ad2c0" cx="24" cy="24" r="4"/>
+  <circle fill="#5ad2c0" cx="7" cy="7" r="2.4"/>
+  <circle fill="#5ad2c0" cx="41" cy="7" r="2.4"/>
+  <circle fill="#5ad2c0" cx="7" cy="41" r="2.4"/>
+  <circle fill="#5ad2c0" cx="41" cy="41" r="2.4"/>
+</svg>
