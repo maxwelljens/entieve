@@ -20,8 +20,9 @@ import (
 // ---------------------------------------------------------------------------
 
 // TestClipWindowBodyWrapsFlatBodies: a mounted flat body is wrapped so its
-// paint is confined; a scroll body (its own clip) and a re-mount are left
-// alone — the wrapper is inserted once and never doubled.
+// paint is confined; a scroll body (its own clip), a body carrying a
+// masked-buffer widget (a field), and a re-mount are left alone — the
+// wrapper is inserted once and never doubled.
 func TestClipWindowBodyWrapsFlatBodies(t *testing.T) {
 	k, _ := newTestKit(t)
 
@@ -29,6 +30,15 @@ func TestClipWindowBodyWrapsFlatBodies(t *testing.T) {
 	k.AddWindow(help.Win())
 	if _, ok := help.Win().Contents.(*winClip); !ok {
 		t.Fatalf("flat help body = %T, want *winClip", help.Win().Contents)
+	}
+
+	// A flat body with no masked-buffer widget keeps its clip; the order
+	// dialog's body carries TextInput fields (MaskedRenderBuffer-backed)
+	// and must render unwrapped or the typed text is invisible.
+	order := k.OrderWin()
+	k.AddWindow(order.Win())
+	if _, ok := order.Win().Contents.(*winClip); ok {
+		t.Fatal("order body (TextInput fields) must not be wrapped — its masked buffer breaks inside the frame clip")
 	}
 	// Re-mount (the raise path calls addWindow again): still exactly one
 	// wrapper.

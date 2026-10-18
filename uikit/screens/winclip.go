@@ -37,11 +37,12 @@ func (c *winClip) Render(screen *ebiten.Image) {
 }
 
 // clipWindowBody wraps w's body in a winClip unless the body carries a
-// scroll viewport. A ScrollContainer (and a TextArea, which embeds one)
-// renders through a screen-sized MaskedRenderBuffer that assumes its
-// destination is the whole screen, so a sub-image destination would
-// misplace its content; those bodies already clip their own content, and
-// the window MinSize keeps their frame large enough. Idempotent: a raise
+// widget that renders through a screen-sized MaskedRenderBuffer. A
+// ScrollContainer, TextInput, TextArea or List draws its content into a
+// buffer sized to the destination, so a sub-image destination misplaces
+// or drops it — a body holding one of those renders unwrapped; the
+// scroll viewports clip their own content, and a flat body with a field
+// (the order dialog) fits its frame by MinSize. Idempotent: a raise
 // re-mounts through AddWindow and finds the wrapper already there.
 func clipWindowBody(w *widget.Window) {
 	if w == nil || w.Contents == nil {
@@ -50,7 +51,7 @@ func clipWindowBody(w *widget.Window) {
 	if _, done := w.Contents.(*winClip); done {
 		return
 	}
-	if hasScrollContainer(w.Contents) {
+	if hasMaskedBuffer(w.Contents) {
 		return
 	}
 	body := w.Contents
@@ -81,6 +82,27 @@ func hasScrollContainer(n widget.PreferredSizeLocateableWidget) bool {
 	if c, ok := n.(widget.Containerer); ok {
 		for _, ch := range c.Children() {
 			if hasScrollContainer(ch) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hasMaskedBuffer reports whether n's subtree renders through ebitenui's
+// MaskedRenderBuffer, which sizes its scratch images to the draw
+// destination: TextInput and the scroll viewport family. TextArea and
+// List each own a ScrollContainer internally (as a child of an outer
+// container, or as their very widget), so the plain child walk cannot see
+// through them — they are matched by type.
+func hasMaskedBuffer(n widget.PreferredSizeLocateableWidget) bool {
+	switch n.(type) {
+	case *widget.TextInput, *widget.ScrollContainer, *widget.TextArea, *widget.List:
+		return true
+	}
+	if c, ok := n.(widget.Containerer); ok {
+		for _, ch := range c.Children() {
+			if hasMaskedBuffer(ch) {
 				return true
 			}
 		}
