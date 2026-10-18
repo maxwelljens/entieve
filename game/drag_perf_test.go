@@ -23,10 +23,11 @@ import (
 // the menu/rail real-loop pattern) and reports per phase:
 //
 //   - wall time per frame split into Update / scene draw / kit draw —
-//     the scene render is a large constant (documented headless artifact
-//     soup: no GPU, offscreen atlas commands defer to a BeginFrame only a
-//     real window drains — see TestMemoryFootprintPump), so the honest
-//     drag signal is the kit-draw + update delta vs idle
+//     the scene render still carries headless overhead (no GPU, offscreen
+//     atlas commands defer to a BeginFrame only a real window drains — see
+//     TestMemoryFootprintPump) though the off-screen body cull
+//     (TestWorldDrawCullsOffscreenBodies) removed its dominant term, so
+//     the honest drag signal is the kit-draw + update delta vs idle
 //   - exact allocations per frame (runtime.MemStats Mallocs delta)
 //   - layout/settings sidecar signatures before vs after the phase (H2:
 //     any sidecar write during a drag fails the run)

@@ -60,6 +60,26 @@ func BracketColor(kind string, hostile bool) color.RGBA {
 	return bracketColor(kind, hostile, false)
 }
 
+// cullMargin is how far outside the viewport a primitive's main extent may
+// sit before it is skipped, in px. It is deliberately generous: bodies
+// draw small satellites beyond their main radius (a gate's glow at 1.2×,
+// a rock's specks at ~2.3×+8, a ship's flame at ~1.8×), and a just-off-
+// screen body must keep them. It costs nothing — a body drawn at the
+// margin still sits at ≤ ~2100 px, hundreds of times below the 1e7 px
+// band where ebiten's path flattener degenerates (see offscreen).
+const cullMargin = 256
+
+// offscreen reports whether a primitive drawn around the screen point
+// (sx, sy) with main extent px lies outside the viewport by more than
+// cullMargin. The world body pass culls the same way (see
+// Renderer.keepBody); the overlay's own passes use this so no vector path
+// is ever built at the screen coordinates an AU-scale system produces
+// off-screen, where ebiten's flattener degenerates.
+func offscreen(cam Camera, sx, sy, px float64) bool {
+	return sx+px+cullMargin < 0 || sx-px-cullMargin > cam.ScreenW ||
+		sy+px+cullMargin < 0 || sy-px-cullMargin > cam.ScreenH
+}
+
 // seg adds an open line subpath to the cached path.
 func (r *Renderer) seg(x0, y0, x1, y1 float32) {
 	r.path.MoveTo(x0, y0)
@@ -118,6 +138,9 @@ func (r *Renderer) drawEffects(dst *ebiten.Image, cam Camera, s *sim.Sim, now fl
 		}
 		sx, sy := cam.WorldToScreen(o.info.Pos)
 		sizePx := clamp(hullSize(o.hull)*cam.Zoom, 7, 160)
+		if offscreen(cam, sx, sy, sizePx) {
+			continue // its effects would build paths far outside the viewport
+		}
 		nose := core.V(sx, sy).Add(core.V(math.Cos(o.facing), math.Sin(o.facing)).Scale(sizePx))
 
 		for _, class := range [...]string{content.SlotHigh, content.SlotMid} {
@@ -252,6 +275,9 @@ func (r *Renderer) drawOverlay(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 					continue
 				}
 				x1, y1 := cam.WorldToScreen(tr.Pos)
+				if offscreen(cam, x1, y1, 15) {
+					continue // a line to an off-screen target: no pixel, huge coords
+				}
 				vector.StrokeLine(dst, float32(x0), float32(y0), float32(x1), float32(y1), 1,
 					color.RGBA{140, 230, 255, 110}, true)
 				if l.Progress < 1 {
@@ -273,6 +299,9 @@ func (r *Renderer) drawOverlay(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 			}
 			sx, sy := cam.WorldToScreen(o.info.Pos)
 			half := bracketHalfSize(o, cam) + 5
+			if offscreen(cam, sx, sy, half+6) {
+				continue
+			}
 			r.bracket(dst, sx, sy, half, colSelect, 2)
 			vector.StrokeCircle(dst, float32(sx), float32(sy), float32(half+6), 1,
 				color.RGBA{255, 180, 84, 90}, true)
