@@ -136,9 +136,9 @@ func NewInventory(env widgets.Seams) *Inventory {
 		// Content floor: every fixed row plus a full row of each hold
 		// section (the sections scroll below that).
 		widget.WindowOpts.MinSize(theme.Px(300), theme.Px(420)),
-		// Fallback only: the composed rect at the 1024×700 minimum.
-		// The game recomposes from the real viewport at startup
-		// (game/station_layout.go).
+		// The game's Inventory Screen row declares the same rect as its
+		// per-type default (game/screens.go), so it opens here on first
+		// use, docked and in space alike.
 		widget.WindowOpts.Location(image.Rect(theme.Px(396), theme.Px(256), theme.Px(701), theme.Px(690))),
 	)
 	return inv

@@ -443,10 +443,7 @@ func TestSceneTransitionsDock(t *testing.T) {
 	if !g.open[pServices] || g.mounted[pServices] == nil {
 		t.Error("services view not surfaced on dock")
 	}
-	for _, p := range stationPanels {
-		if p == pServices {
-			continue
-		}
+	for _, p := range []panelID{pInventory, pFitting, pMarket} {
 		if g.open[p] || g.mounted[p] != nil {
 			t.Errorf("docking opened %s too — only the services view auto-opens", panelNames[p])
 		}

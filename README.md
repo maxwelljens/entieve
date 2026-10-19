@@ -53,8 +53,9 @@ button per service *this* station offers (repair, market, refine,
 fitting; industry where it exists — an absent service is not offered)
 over the contract board on the left. Market, inventory, fitting and the
 factory are ordinary windows you open from it, their keys, or the left
-rail — they tile to the right of it while docked, and undocking closes
-the services view and leaves your own windows as they were. Contracts give you
+rail — each opens at its own default size and position, docked or in
+space, and undocking closes the services view and leaves your own windows
+as they were. Contracts give you
 specific work — destroy a named rat, mine a volume of ore, deliver cargo to
 another system — and pay money and standing on completion. The market is an
 order book: buying and selling take the best resting prices, with a broker

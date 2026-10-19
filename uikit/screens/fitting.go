@@ -132,9 +132,9 @@ func NewFitting(env widgets.Seams) *Fitting {
 		// Content floor: stat block, resist row and a full row of the
 		// slot and hangar tables (they scroll below that).
 		widget.WindowOpts.MinSize(theme.Px(300), theme.Px(430)),
-		// Fallback only: the composed rect at the 1024×700 minimum.
-		// The game recomposes from the real viewport at startup
-		// (game/station_layout.go).
+		// The game's Fitting Screen row declares the same rect as its
+		// per-type default (game/screens.go), so it opens here on first
+		// use, docked and in space alike.
 		widget.WindowOpts.Location(image.Rect(theme.Px(709), theme.Px(256), theme.Px(1014), theme.Px(690))),
 	)
 	return f

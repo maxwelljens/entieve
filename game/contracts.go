@@ -20,12 +20,11 @@ import (
 // Station contract-board geometry (docs/GAMEPLAY.md, "Contracts &
 // standing"). The station services window owns the left column while
 // docked: x ∈ [stationX, stationX+stationWinW) starts clear of the
-// navigation rail's gutter and keeps its right edge at 404, so the
-// market still starts at x=406 — the composition right of the column is
-// bit-identical to the pre-rail layout. The content-driven height (row
-// caps included) keeps the bottom above the log, whose top sits at
-// screen-height-250 — i.e. y=450 at the 1024×700 minimum. Both are
-// pinned by tests at 1280×720, 1024×700 and at the window minimum.
+// navigation rail's gutter and keeps its right edge at 404. The
+// content-driven height (row caps included) keeps the bottom above the
+// log, whose top sits at screen-height-250 — i.e. y=450 at the 1024×700
+// minimum. Both are pinned by tests at 1280×720, 1024×700 and at the
+// window minimum.
 const (
 	stationX     = 10 + uikit.RailInset // window left edge: rail gutter first
 	stationY     = 8
@@ -252,13 +251,13 @@ func (g *Game) rebuildStationBoard(m stationBoardModel) {
 	// rebuild re-derives it, so a board that grows raises the floor too.
 	h = max(h, theme.Px(stationMinH))
 	g.svcWin.MinSize = &image.Point{X: theme.Px(stationMinW), Y: h}
-	// The services column is part of the composed docked layout — same
-	// source of truth as placeDefaults (stationLayout), so the board's
-	// content hug and the viewport composition can never disagree — and
-	// it goes through the placement tracker like every other composed
-	// rect: a direct SetLocation here would leave g.placed stale and the
-	// window would read as player-moved (never recomposed again).
-	g.placeIfVirgin(g.svcWin, stationLayout(g.w, g.h, h).Station)
+	// The services column's rect comes from stationRect — the same source
+	// of truth as placeDefaults — so the board's content hug and the
+	// default placement can never disagree — and it goes through the
+	// placement tracker like every other placed rect: a direct SetLocation
+	// here would leave g.placed stale and the window would read as
+	// player-moved (never recomposed again).
+	g.placeIfVirgin(g.svcWin, stationRect(h))
 }
 
 // buildContractRow renders one board row as a rich row of the table

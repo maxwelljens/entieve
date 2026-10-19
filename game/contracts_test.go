@@ -225,13 +225,13 @@ func sectionName(size [2]int) string {
 }
 
 // ---------------------------------------------------------------------------
-// Geometry: the window never overlaps the log or the market
+// Geometry: the window never overlaps the log
 // ---------------------------------------------------------------------------
 
 // TestStationWindowGeometry pumps the docked board at both design sizes —
 // with the worst-case row set — and pins the window: on screen, above the
-// log, left of the market, and every row inside the window rect at the
-// rects boardRowRects produced.
+// log, and every row inside the window rect at the rects boardRowRects
+// produced.
 func TestStationWindowGeometry(t *testing.T) {
 	for _, size := range [][2]int{{1280, 720}, {1024, 700}} {
 		g := dockedShowcaseGame(t, size[0], size[1])
@@ -250,7 +250,6 @@ func TestStationWindowGeometry(t *testing.T) {
 
 		station := g.svcWin.GetContainer().GetWidget().Rect
 		log := g.logP.Win().GetContainer().GetWidget().Rect
-		market := g.mkt.Win().GetContainer().GetWidget().Rect
 
 		if station.Min.X < 0 || station.Max.X > size[0] || station.Max.Y > size[1] {
 			t.Errorf("%dx%d: station window %v out of bounds", size[0], size[1], station)
@@ -258,10 +257,6 @@ func TestStationWindowGeometry(t *testing.T) {
 		if station.Max.Y > log.Min.Y {
 			t.Errorf("%dx%d: station window %v overlaps the log %v",
 				size[0], size[1], station, log)
-		}
-		if market.Dx() > 0 && station.Max.X > market.Min.X {
-			t.Errorf("%dx%d: station window %v overlaps the market %v",
-				size[0], size[1], station, market)
 		}
 
 		// Every row sits at the rect boardRowRects hands out, inside the window.

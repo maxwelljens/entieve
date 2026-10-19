@@ -43,18 +43,10 @@ func bordered(body, edge color.NRGBA, w int) *eimage.NineSlice {
 // it is on top.
 type StationScene struct{ g *Game }
 
-// stationPanels are the docked station COMPOSITION: every Screen row
-// with DockPolicy == DockStation, in spec order — the set
-// station_layout.go composes and the reclaim checks. Nothing force-opens
-// on dock; the scene opens exactly one of them (the services view), and
-// the player opens the rest, which the composition then places.
-// Assigned in init from the spec (screens.go), like panelDefs.
-var stationPanels []panelID
-
 // OnEnter implements Scene: docking opens exactly one window — the
 // station services view. The market, fitting and inventory stay closed
-// unless the player opened them; the composition places them when they
-// do.
+// unless the player opened them; they are ordinary windows now, opening
+// at their own per-type defaults when the player does.
 func (sc *StationScene) OnEnter() { sc.g.open[pServices] = true }
 
 // OnLeave implements Scene: undocking closes the services view and

@@ -176,8 +176,8 @@ func NewFactory(env widgets.Seams) *Factory {
 		// Content floor: the craft line, a few rows of each table and
 		// both toolbars.
 		widget.WindowOpts.MinSize(theme.Px(360), theme.Px(430)),
-		// Fallback only: the composed rect at the 1024×700 minimum (the
-		// game re-centers it from placeDefaults).
+		// Construction landing rect: the game centers the window on first
+		// open (placeDefaults, AnchorCenter).
 		widget.WindowOpts.Location(image.Rect(theme.Px(332), theme.Px(130), theme.Px(732), theme.Px(560))),
 	)
 	return f
