@@ -19,8 +19,9 @@ import (
 // Robustness contract: a missing, corrupt, wrong-version or partial
 // sidecar degrades to the built-in defaults (never an error, never a
 // crash); unknown keys are ignored on read and dropped on write; every
-// restored rect is clamped to the window's MinSize and to the screen —
-// at restore time AND again on every later viewport change
+// restored rect is clamped to the window's MinSize and to the screen,
+// and its left edge to the rail gutter (applyLayout) — at restore time;
+// later viewport changes re-clamp to MinSize and the screen
 // (clampRestored), so shrinking the window after a restore can never
 // strand a restored window off-screen.
 
@@ -237,7 +238,16 @@ func (g *Game) applyLayout(screenW, screenH int) {
 		// px (at scale 1 this is the exact historical pixel rect).
 		x, y := theme.Px(e.X), theme.Px(e.Y)
 		saved := image.Rect(x, y, x+theme.Px(e.W), y+theme.Px(e.H))
-		win.SetLocation(clampLayoutRect(saved, minSize, screen))
+		r := clampLayoutRect(saved, minSize, screen)
+		// The rail is top chrome painting over every window, so a sidecar
+		// written before it widened can park a title bar under the gutter,
+		// out of reach. Floor the left edge only, keeping the saved size
+		// and y (for an over-wide window the rail beats the right edge —
+		// the same rule anchorRect applies to defaults).
+		if floor := railClearX(); r.Min.X < floor {
+			r = r.Add(image.Pt(floor-r.Min.X, 0))
+		}
+		win.SetLocation(r)
 		// Track the rect actually applied (SetLocation may grow it), so
 		// the placement tracker never reports a restored window as
 		// player-moved — see placeIfVirgin and TestPlacementTracker.
