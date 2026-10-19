@@ -216,6 +216,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Restored windows clear the navigation rail** (`game/layout.go`): a
+  layout sidecar written before the rail widened (RailInset 63 → 87) can
+  park a window's title bar under the rail gutter, where the top chrome
+  paints over it and the window is unreachable. The restore path now
+  floors every restored window's left edge at the same `railClearX` the
+  defaults use (10 + RailInset), moving the rect right while keeping its
+  saved size, y and every other part of the arrangement; a reachable
+  sidecar restores exactly as saved and re-sanitizing is a no-op. Sizes
+  are never re-defaulted (the market keeps its old saved band size) —
+  reset layout remains the way back to the defaults.
+
 - **The default window set no longer overlaps itself at startup**
   (`game/game.go`, `uikit/screens/overview.go`, `uikit/screens/market.go`):
   the Overview window now defaults to the viewport's **upper-right corner**

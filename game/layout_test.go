@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -371,9 +372,11 @@ func TestLayoutRoundTripAcrossRestart(t *testing.T) {
 	g2.applySize(1024, 700)
 	pump(t, g2, 1024, 700)
 
+	// The saved x is under the rail gutter (railClearX 97): the restore
+	// floors the left edge, keeping the saved size and y.
 	ov := g2.kit.OverviewWindow().GetContainer().GetWidget().Rect
-	if ov != image.Rect(40, 60, 440, 360) {
-		t.Errorf("overview restored to %v, want (40,60)-(440,360)", ov)
+	if want := image.Rect(railClearX(), 60, railClearX()+400, 360); ov != want {
+		t.Errorf("overview restored to %v, want %v (floored clear of the rail)", ov, want)
 	}
 	// The saved log rect overflows 1024 px: size kept, slid fully in.
 	lr := g2.logP.Win().GetContainer().GetWidget().Rect
@@ -389,6 +392,104 @@ func TestLayoutRoundTripAcrossRestart(t *testing.T) {
 	// Bounds only: a player-arranged layout is allowed to overlap (the
 	// pairwise-disjoint guarantee belongs to the defaults).
 	assertInBounds(t, g2, 1024, 700)
+}
+
+// TestRestoredRectsClearTheRailGutter pins the load-time sanitize of the
+// sidecar: a title bar saved under the rail gutter (the layouts written
+// before RailInset grew to 87) restores right of railClearX, an
+// off-screen one restores on-screen, and a reachable one restores
+// exactly as saved. Only reachability moves a rect — the saved size and
+// y, and the market's saved (possibly old band) size, are user layout.
+func TestRestoredRectsClearTheRailGutter(t *testing.T) {
+	write := func(t *testing.T, path, windows string) {
+		t.Helper()
+		if err := os.WriteFile(path+".layout.json", []byte(
+			`{"version":2,"windows":{`+windows+`}}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Run("tucked under the rail", func(t *testing.T) {
+		for _, entry := range []struct {
+			name  string
+			win   func(*Game) image.Rectangle
+			json  string
+			wantW int
+		}{
+			{"overview", func(g *Game) image.Rectangle {
+				return g.kit.OverviewWindow().GetContainer().GetWidget().Rect
+			}, `"overview":{"x":8,"y":60,"w":400,"h":300,"open":true}`, 400},
+			{"log", func(g *Game) image.Rectangle {
+				return g.logP.Win().GetContainer().GetWidget().Rect
+			}, `"log":{"x":95,"y":300,"w":360,"h":240,"open":true}`, 360},
+		} {
+			path := filepath.Join(t.TempDir(), "save.json")
+			write(t, path, entry.json)
+			g := newShowcaseGameAt(t, path)
+			g.applySize(1024, 700)
+			r := entry.win(g)
+			if r.Min.X != railClearX() {
+				t.Errorf("%s restored at x=%d, want railClearX %d", entry.name, r.Min.X, railClearX())
+			}
+			if r.Dx() != entry.wantW {
+				t.Errorf("%s width = %d, want the saved %d (size is user layout)", entry.name, r.Dx(), entry.wantW)
+			}
+			if entry.name == "overview" && r.Min.Y != 60 {
+				t.Errorf("overview y = %d, want the saved 60", r.Min.Y)
+			}
+		}
+	})
+
+	t.Run("off-screen", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "save.json")
+		write(t, path, `"overview":{"x":1500,"y":800,"w":400,"h":300,"open":true}`)
+		g := newShowcaseGameAt(t, path)
+		g.applySize(1024, 700)
+		r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect
+		if want := image.Rect(624, 400, 1024, 700); r != want {
+			t.Errorf("off-screen overview restored to %v, want the clamped %v", r, want)
+		}
+		if r.Min.X < 0 || r.Min.Y < 0 || r.Max.X > 1024 || r.Min.Y+theme.TitleBarH > 700 {
+			t.Errorf("title bar not fully on-screen: %v", r)
+		}
+	})
+
+	t.Run("reachable layout honored", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "save.json")
+		write(t, path, `"overview":{"x":200,"y":100,"w":400,"h":300,"open":true}`)
+		g := newShowcaseGameAt(t, path)
+		g.applySize(1024, 700)
+		if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != image.Rect(200, 100, 600, 400) {
+			t.Errorf("reachable overview restored to %v, want it exactly as saved", r)
+		}
+	})
+
+	t.Run("idempotent", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "save.json")
+		write(t, path, `"overview":{"x":8,"y":60,"w":400,"h":300,"open":true}`)
+		g := newShowcaseGameAt(t, path)
+		g.applySize(1024, 700)
+		once := g.kit.OverviewWindow().GetContainer().GetWidget().Rect
+		if err := g.writeLayout(); err != nil {
+			t.Fatalf("writeLayout: %v", err)
+		}
+		g.applyLayout(1024, 700)
+		if twice := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; twice != once {
+			t.Errorf("re-sanitized rect = %v, want the already-sanitized %v", twice, once)
+		}
+	})
+
+	t.Run("market saved size kept", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "save.json")
+		// The market's pre-square 618×240 band: the exact saved size
+		// restores untouched (reset layout, not restore, re-defaults it).
+		write(t, path, `"market":{"x":400,"y":200,"w":618,"h":240,"open":true}`)
+		g := newShowcaseGameAt(t, path)
+		g.applySize(1280, 720)
+		if r := g.mkt.Win().GetContainer().GetWidget().Rect; r != image.Rect(400, 200, 1018, 440) {
+			t.Errorf("market restored to %v, want the saved 618×240 rect at (400,200)", r)
+		}
+	})
 }
 
 // TestLayoutCorruptAndPartialDegrade: a corrupt sidecar leaves the
@@ -497,8 +598,8 @@ func TestLayoutRestoredOnLoad(t *testing.T) {
 		t.Fatalf("LoadGame: %v", err)
 	}
 	r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect
-	if r != image.Rect(40, 60, 440, 360) {
-		t.Errorf("overview after load = %v, want (40,60)-(440,360)", r)
+	if want := image.Rect(railClearX(), 60, railClearX()+400, 360); r != want {
+		t.Errorf("overview after load = %v, want %v (floored clear of the rail)", r, want)
 	}
 	if !g.open[pInventory] || g.mounted[pInventory] == nil {
 		t.Error("inventory open state not restored by the load")
