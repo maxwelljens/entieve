@@ -213,14 +213,34 @@ content without touching engine code is the intended workflow:
 ## Development
 
 ```sh
-go test ./...        # unit + integration tests, headless
-go vet ./...
-gofmt -l .
+just            # the recipe list
+just run        # play the game
+just check      # the release gate: gofmt, go vet, tests, content validate
 ```
+
+Agent-facing workflow notes live in [AGENTS.md](AGENTS.md).
+
+Everything is a [just](https://github.com/casey/just) recipe: `just test` /
+`just test-race` / `just cover`, `just validate` / `just simulate …` /
+`just describe <id>`, `just lint` / `just lint-deep` / `just fmt` /
+`just tidy`. `just build` stamps the version from `git describe` into
+`bin/entieve`; the raw `go test ./...` and friends work too.
 
 Testing policy: heavy stdlib `testing` coverage per package; `sim` is
 deterministic (twin-run hash equality is asserted); `content` always loads and
 validates the real data; `tests/` proves the showcase world exercises every
 feature end-to-end.
+
+### Releasing
+
+`just release <version>` cuts a release end to end: it runs `just check`,
+folds the `[Unreleased]` CHANGELOG section into `## [x.y.z] - date`, commits,
+tags `vx.y.z`, pushes to Codeberg (origin) and GitHub, then GoReleaser
+(`.goreleaser.yaml`) cross-compiles linux/windows/darwin on amd64 + arm64
+(cgo-free, so one machine builds them all) and publishes the GitHub release at
+[maxwelljens/entieve](https://github.com/maxwelljens/entieve) with the
+CHANGELOG section as the release notes and a SHA-256 sums file. `just dist`
+builds every target into `dist/` without publishing, and `just
+release-notes <version>` previews the notes a release would use.
 
 License: MIT (the bundled IBM Plex Sans fonts: SIL Open Font License 1.1).

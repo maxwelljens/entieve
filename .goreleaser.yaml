@@ -1,0 +1,61 @@
+# GoReleaser configuration — Entieve.
+#
+# Local use (via the justfile):
+#   just dist            build every target into dist/ (snapshot, no publish)
+#   just release 0.5.0   full release: builds + publishes the GitHub release
+#
+# Ebitengine 2.10 builds cgo-free on all three desktops, so every target
+# cross-compiles from one machine with CGO_ENABLED=0.
+
+version: 2
+
+project_name: entieve
+
+builds:
+  - id: entieve
+    main: ./cmd/entieve
+    binary: entieve
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: entieve
+    ids:
+      - entieve
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_sha256sums.txt"
+
+# Release notes come from the CHANGELOG section (see just release-notes),
+# so goreleaser must not generate its own changelog.
+changelog:
+  disable: true
+
+release:
+  github:
+    owner: maxwelljens
+    name: entieve
+  name_template: "v{{ .Version }}"
+  prerelease: auto

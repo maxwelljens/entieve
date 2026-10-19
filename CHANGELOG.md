@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Dev tooling — justfile + GoReleaser** (`justfile`, `.goreleaser.yaml`):
+  `just` runs the game and everything around it (`test`, `validate`,
+  `simulate`, `describe`, `check`, `build`, …), and `just release <version>`
+  cuts a GitHub release end to end: gate → CHANGELOG fold → tag → push →
+  cgo-free cross-builds for linux/windows/darwin on amd64 + arm64 published
+  to github.com/maxwelljens/entieve with the CHANGELOG section as the
+  release notes.
+
 - **Finances window — holdings and the transaction ledger**
   (`uikit/screens/finances.go`, the `pFinances` Screen row in
   `game/screens.go`, key `K`, rail section Trade): a read-only wallet
@@ -954,8 +962,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rats are no longer inert: they patrol, notice intruders and defend their
   belts against miners and shooters.
 
-[Unreleased]: https://github.com/entieve/entieve/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/entieve/entieve/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/entieve/entieve/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/entieve/entieve/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/entieve/entieve/releases/tag/v0.1.0
+[Unreleased]: https://github.com/maxwelljens/entieve/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/maxwelljens/entieve/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/maxwelljens/entieve/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/maxwelljens/entieve/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/maxwelljens/entieve/releases/tag/v0.1.0
