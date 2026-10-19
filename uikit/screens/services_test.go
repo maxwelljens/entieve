@@ -158,8 +158,8 @@ func TestSvcIconsInsideCells(t *testing.T) {
 // TestServicesIdentityAndFit: the identity line carries the station
 // name and system, and the whole row — identity over its buttons —
 // measures inside the column it is hosted in, so it can never push the
-// composed window past stationLayout's left column (at scale 1 and
-// through the funnel).
+// services window past its station column (at scale 1 and through the
+// funnel).
 func TestServicesIdentityAndFit(t *testing.T) {
 	for _, scale := range []float64{1, 1.5} {
 		uitest.UseScale(t, scale)

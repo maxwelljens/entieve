@@ -254,34 +254,31 @@ func TestDockOpensExactlyTheServicesView(t *testing.T) {
 	}
 }
 
-// TestRailPlacesOpenedWindowsWhileDocked: the composition is the
-// placement policy for what the player opens docked — the services view
-// owns the left column, and every service window the rail opens lands on
-// its composed rect.
+// TestRailPlacesOpenedWindowsWhileDocked: docking no longer composes a
+// band — the rail opens each service window at its own per-type default,
+// and the services view stays the station column.
 func TestRailPlacesOpenedWindowsWhileDocked(t *testing.T) {
 	g := dockedShowcaseGame(t, 1280, 720)
-	lay := stationLayout(1280, 720, g.svcWin.GetContainer().GetWidget().Rect.Dy())
 
-	if r := g.svcWin.GetContainer().GetWidget().Rect; r != lay.Station {
-		t.Errorf("services view at %v, want the composed left column %v", r, lay.Station)
+	if r := g.svcWin.GetContainer().GetWidget().Rect; r != stationRect(r.Dy()) {
+		t.Errorf("services view at %v, want the station column %v", r, stationRect(r.Dy()))
 	}
 
 	wins := map[string]*widget.Window{
 		"Market": g.mkt.Win(), "Inventory": g.inv.Win(), "Fitting": g.fitt.Win(),
 	}
-	for _, c := range []struct {
-		title string
-		want  image.Rectangle
-	}{
-		{"Market", lay.Market}, {"Inventory", lay.Inventory}, {"Fitting", lay.Fitting},
-	} {
-		click(t, g, g.rail.Button(c.title))
+	defaults := map[string]image.Rectangle{
+		"Market": serviceDefaults[pMarket], "Inventory": serviceDefaults[pInventory],
+		"Fitting": serviceDefaults[pFitting],
+	}
+	for _, title := range []string{"Market", "Inventory", "Fitting"} {
+		click(t, g, g.rail.Button(title))
 		g.syncMounts()
 		pump(t, g, 1280, 720)
-		if got := wins[c.title].GetContainer().GetWidget().Rect; got != c.want {
-			t.Errorf("%s opened at %v, want the composed %v", c.title, got, c.want)
+		if got := wins[title].GetContainer().GetWidget().Rect; got != defaults[title] {
+			t.Errorf("%s opened at %v, want its per-type default %v", title, got, defaults[title])
 		}
-		click(t, g, g.rail.Button(c.title))
+		click(t, g, g.rail.Button(title))
 		g.syncMounts()
 	}
 }

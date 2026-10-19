@@ -67,7 +67,6 @@ func TestScreenSpecRejectsMalformedRows(t *testing.T) {
 		{"transient screen with a name", func(r []Screen) { r[pMenu].SidecarName = "menu" }, "transient screen must not carry"},
 		{"persisted screen without a name", func(r []Screen) { r[0].SidecarName = "" }, "needs a sidecar name"},
 		{"duplicate sidecar name", func(r []Screen) { r[1].SidecarName = "inventory" }, `sidecar name "inventory" already used`},
-		{"station screen outside the composition", func(r []Screen) { r[pMarket].SidecarName = "bourse" }, "no composed rect"},
 		{"missing rail group", func(r []Screen) { r[0].Group = "" }, "missing rail group"},
 		{"unknown rail group", func(r []Screen) { r[0].Group = "Cargo Bay" }, "unknown rail group"},
 		{"transient row claiming a group", func(r []Screen) { r[pMenu].Group = "Ship" }, "transient screen must not carry"},
@@ -147,16 +146,6 @@ func TestScreenSpecMatchesRegistries(t *testing.T) {
 		t.Errorf("layoutNames = %v, want %v", layoutNames, wantNames)
 	}
 
-	// Docked trio: one membership, read by scenes.go and by the layout.
-	if !slices.Equal(stationPanels, stationScreens(screens)) {
-		t.Errorf("stationPanels = %v, want %v", stationPanels, stationScreens(screens))
-	}
-	for _, s := range screens {
-		if (s.DockPolicy == DockStation) != slices.Contains(stationPanels, s.ID) {
-			t.Errorf("%s: DockPolicy %d disagrees with trio membership", screenLabel(s), s.DockPolicy)
-		}
-	}
-
 	// Test labels: draw_test's panelNames is the spec's label set.
 	if len(panelNames) != len(screens) {
 		t.Errorf("panelNames covers %d ids, want %d", len(panelNames), len(screens))
@@ -178,19 +167,10 @@ func TestScreenPlacementDerivesFromSpec(t *testing.T) {
 		w, h := size[0], size[1]
 		g := newShowcaseGame(t)
 		g.applySize(w, h)
-		lay := stationLayout(w, h, g.svcWin.GetContainer().GetWidget().Rect.Dy())
 
 		for _, s := range screens {
 			r := g.screenWin[s.ID].GetContainer().GetWidget().Rect
-			var want image.Rectangle
-			if s.DockPolicy == DockStation {
-				var ok bool
-				if want, ok = lay.forName(s.SidecarName); !ok {
-					t.Fatalf("%s: no composed rect for %q", screenLabel(s), s.SidecarName)
-				}
-			} else {
-				want = anchorRect(s.DefaultRect, s.Anchor, r.Dx(), r.Dy(), w, h)
-			}
+			want := anchorRect(s.DefaultRect, s.Anchor, r.Dx(), r.Dy(), w, h)
 			if r != want {
 				t.Errorf("%dx%d: %s = %v, want the derived %v", w, h, screenLabel(s), r, want)
 			}

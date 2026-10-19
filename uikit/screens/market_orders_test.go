@@ -146,7 +146,7 @@ func TestMarketMyOrdersListsEveryOrder(t *testing.T) {
 	if want := "My orders — " + theme.FormatInt(20); m.mineLbl.Label != want {
 		t.Errorf("label = %q, want %q", m.mineLbl.Label, want)
 	}
-	// The uncapped list must not grow the window: the composed rect stands
+	// The uncapped list must not grow the window: the default rect stands
 	// (the scroll viewport bounds it, exactly like the order book). The
 	// default is a square — 546 × 546, the largest side that stays right
 	// of the rail gutter, fits the 1024×700 minimum, clears the log pocket

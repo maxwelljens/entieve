@@ -5,272 +5,135 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/uikit/theme"
-	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
-// The composed docked layout, pinned at the three design sizes. The
-// station rect is the board's worst case (both sections capped); at
-// runtime the station hugs whatever the live board needs and the test
-// compares against stationLayout(w, h, thatHeight).
+// Docked windows are ordinary windows now: the station view opens only the
+// services view, and every service window the player opens lands on its
+// own per-type default (its Screen row's DefaultRect + Anchor), exactly as
+// it does in space. The band composition (stationLayout's market band and
+// the inventory/fitting bottom row) is gone; stationRect is the only
+// docked rect left, and it is just the services view's column.
 
 // stationBoardWorstCaseH is the docked contract board's content height
-// with every section at its row cap: the station window then reads
+// with every section at its row cap: the services column then reads
 // (73,8)-(404,434), its worst case (73 = 10 + the rail gutter).
 const stationBoardWorstCaseH = 426
 
-// logPocket is the log's default bottom-left pocket at any design size:
-// 264×240 at the rail gutter (97 = 10 + uikit.RailInset), flush into the
-// bottom margin — where placeDefaults parks it (uikit's logDefaultRect,
-// anchored past the rail). The log is the one anchored chrome window
-// that stays on screen while docked, so the composed set must stay clear
-// of it.
-func logPocket(h int) image.Rectangle {
-	return image.Rect(97, h-10-240, 97+264, h-10)
+// serviceDefaults are the three service windows' per-type defaults (their
+// Screen rows), in design units == px at the identity scale: the market's
+// square (546×546, the largest side that stays right of the rail gutter
+// and fits the 1024×700 minimum) and the inventory/fitting rects beside
+// each other below it.
+var serviceDefaults = map[panelID]image.Rectangle{
+	pMarket:    image.Rect(396, 8, 942, 554),
+	pInventory: image.Rect(396, 256, 701, 690),
+	pFitting:   image.Rect(709, 256, 1014, 690),
 }
 
-// TestStationLayoutDisjoint1024 pins the composed rect tuples at the
-// minimum window and checks the invariants: pairwise disjoint, fully
-// on-screen, at least each window's MinSize and clear of the log pocket.
-//
-// (The HUD bar and the scanner pockets belong to the space view — both
-// are hidden/unmounted while docked — so the composed set may sit over
-// them; see the clearance note in station_layout.go.)
-func TestStationLayoutDisjoint1024(t *testing.T) {
-	checkStationLayout(t, 1024, 700, dockedLayout{
-		Station:   image.Rect(97, 8, 404, 434), // 97 = 10 + the rail gutter
-		Market:    image.Rect(406, 8, 1014, 248),
-		Inventory: image.Rect(406, 256, 706, 690),
-		Fitting:   image.Rect(714, 256, 1014, 690),
-	})
-}
-
-// TestStationLayoutDisjoint1280 pins the default window size.
-func TestStationLayoutDisjoint1280(t *testing.T) {
-	checkStationLayout(t, 1280, 720, dockedLayout{
-		Station:   image.Rect(97, 8, 404, 434), // 97 = 10 + the rail gutter
-		Market:    image.Rect(406, 8, 1270, 248),
-		Inventory: image.Rect(406, 256, 834, 710),
-		Fitting:   image.Rect(842, 256, 1270, 710),
-	})
-}
-
-// TestStationLayoutDisjoint1920 pins a large viewport: the market band
-// grows with the height, the bottom row keeps its content minimum.
-func TestStationLayoutDisjoint1920(t *testing.T) {
-	checkStationLayout(t, 1920, 1080, dockedLayout{
-		Station:   image.Rect(97, 8, 404, 434), // 97 = 10 + the rail gutter
-		Market:    image.Rect(406, 8, 1910, 359),
-		Inventory: image.Rect(406, 367, 1154, 1070),
-		Fitting:   image.Rect(1162, 367, 1910, 1070),
-	})
-}
-
-// checkStationLayout asserts the exact tuples and every layout invariant
-// for one viewport.
-func checkStationLayout(t *testing.T, w, h int, want dockedLayout) {
-	t.Helper()
-	got := stationLayout(w, h, stationBoardWorstCaseH)
-	for _, c := range []struct {
-		name string
-		got  image.Rectangle
-		want image.Rectangle
-	}{
-		{"station", got.Station, want.Station},
-		{"market", got.Market, want.Market},
-		{"inventory", got.Inventory, want.Inventory},
-		{"fitting", got.Fitting, want.Fitting},
-	} {
-		if c.got != c.want {
-			t.Errorf("%dx%d: %s = %v, want %v", w, h, c.name, c.got, c.want)
+// TestServiceDefaultsAreDeclared pins the spec rows themselves: each
+// service window declares its per-type default rect (AnchorFixed), and the
+// market's is square. A change to a row's geometry must be deliberate.
+func TestServiceDefaultsAreDeclared(t *testing.T) {
+	for id, want := range serviceDefaults {
+		row := screens[id]
+		if row.DefaultRect != want {
+			t.Errorf("%s DefaultRect = %v, want %v", row.Title, row.DefaultRect, want)
+		}
+		if row.Anchor != AnchorFixed {
+			t.Errorf("%s Anchor = %v, want AnchorFixed", row.Title, row.Anchor)
 		}
 	}
-
-	screen := image.Rect(0, 0, w, h)
-	log := logPocket(h)
-	rects := []struct {
-		name string
-		r    image.Rectangle
-		min  image.Point
-	}{
-		{"station", got.Station, image.Point{X: stationMinW, Y: stationMinH}},
-		{"market", got.Market, image.Point{X: marketMinW, Y: marketMinH}},
-		{"inventory", got.Inventory, image.Point{X: inventoryMinW, Y: inventoryMinH}},
-		{"fitting", got.Fitting, image.Point{X: fittingMinW, Y: fittingMinH}},
-	}
-	for i, a := range rects {
-		if !a.r.In(screen) {
-			t.Errorf("%dx%d: %s %v is not fully on screen", w, h, a.name, a.r)
-		}
-		if a.r.Dx() < a.min.X || a.r.Dy() < a.min.Y {
-			t.Errorf("%dx%d: %s %v is %d×%d, below its MinSize %d×%d",
-				w, h, a.name, a.r, a.r.Dx(), a.r.Dy(), a.min.X, a.min.Y)
-		}
-		if a.r.Overlaps(log) {
-			t.Errorf("%dx%d: %s %v overlaps the log pocket %v", w, h, a.name, a.r, log)
-		}
-		for _, b := range rects[i+1:] {
-			if a.r.Overlaps(b.r) {
-				t.Errorf("%dx%d: %s %v overlaps %s %v", w, h, a.name, a.r, b.name, b.r)
-			}
-		}
-	}
-
-	// Readability: the market band carries the trade columns. The
-	// shipped boards measure ≈357 px of natural column width, so the
-	// 560 px target leaves headroom — 618 px at the 1024×700 minimum,
-	// 874 px at 1280 and 1510 px at 1920 (the achievable state at 1024
-	// is a full, un-truncated table; the truncation the old fixed
-	// 300 px rect caused is gone at every design size).
-	if got := got.Market.Dx(); got < 560 {
-		t.Errorf("%dx%d: market band is %d px, want ≥ 560 for un-truncated columns", w, h, got)
+	if mkt := serviceDefaults[pMarket]; mkt.Dx() != mkt.Dy() {
+		t.Errorf("market default %v is not square: %d×%d", mkt, mkt.Dx(), mkt.Dy())
 	}
 }
 
-// TestWindowMinSizesMatch pins game's mirrored content minimums to the
-// real uikit windows, so the composition can never drift below what a
-// window actually accepts.
-func TestWindowMinSizesMatch(t *testing.T) {
-	g := newShowcaseGame(t)
-	for _, c := range []struct {
-		name string
-		win  *widget.Window
-		want image.Point
-	}{
-		{"market", g.mkt.Win(), image.Point{X: marketMinW, Y: marketMinH}},
-		{"inventory", g.inv.Win(), image.Point{X: inventoryMinW, Y: inventoryMinH}},
-		{"fitting", g.fitt.Win(), image.Point{X: fittingMinW, Y: fittingMinH}},
-	} {
-		if c.win.MinSize == nil || *c.win.MinSize != c.want {
-			t.Errorf("%s MinSize = %v, want %v (mirror in station_layout.go)",
-				c.name, c.win.MinSize, c.want)
-		}
-	}
-}
-
-// TestStationLayoutAppliedAtDesignSizes: the composed tuples are the
-// rects the docked windows actually occupy — pumped at every design
-// size, each window sits exactly on its composed rect, the set stays
-// pairwise disjoint (the live log included), on screen and at or above
-// each window's real MinSize.
-func TestStationLayoutAppliedAtDesignSizes(t *testing.T) {
+// TestServiceWindowsOpenAtTheirDefaults: docked, with the market,
+// inventory and fitting opened the way the player does, each sits on its
+// own per-type default at every design size — on screen, right of the
+// rail gutter, clear of the log pocket and at or above its MinSize — not
+// in a composed band.
+func TestServiceWindowsOpenAtTheirDefaults(t *testing.T) {
 	for _, size := range [][2]int{{1024, 700}, {1280, 720}, {1920, 1080}} {
 		w, h := size[0], size[1]
 		g := newShowcaseGame(t)
 		g.applySize(w, h)
 		dockAt(t, g)
 		g.syncScenes()
+		g.open[pMarket], g.open[pInventory], g.open[pFitting] = true, true, true
 		g.syncMounts()
 		pump(t, g, w, h)
 
-		station := g.svcWin.GetContainer().GetWidget().Rect
-		lay := stationLayout(w, h, station.Dy())
-		got := dockedLayout{
-			Station:   station,
-			Market:    g.mkt.Win().GetContainer().GetWidget().Rect,
-			Inventory: g.inv.Win().GetContainer().GetWidget().Rect,
-			Fitting:   g.fitt.Win().GetContainer().GetWidget().Rect,
-		}
-		for _, c := range []struct {
-			name string
-			got  image.Rectangle
-			want image.Rectangle
-		}{
-			{"station", got.Station, lay.Station},
-			{"market", got.Market, lay.Market},
-			{"inventory", got.Inventory, lay.Inventory},
-			{"fitting", got.Fitting, lay.Fitting},
-		} {
-			if c.got != c.want {
-				t.Errorf("%dx%d: %s window %v, composed %v", w, h, c.name, c.got, c.want)
+		screen := image.Rect(0, 0, w, h)
+		log := g.logP.Win().GetContainer().GetWidget().Rect
+		floor := railClearX()
+		for _, id := range []panelID{pMarket, pInventory, pFitting} {
+			win := g.screenWin[id]
+			r := win.GetContainer().GetWidget().Rect
+			if want := serviceDefaults[id]; r != want {
+				t.Errorf("%dx%d: %s at %v, want its per-type default %v",
+					w, h, panelNames[id], r, want)
+			}
+			if !r.In(screen) {
+				t.Errorf("%dx%d: %s %v is not fully on screen", w, h, panelNames[id], r)
+			}
+			if r.Min.X < floor {
+				t.Errorf("%dx%d: %s %v starts inside the rail gutter (%d)", w, h, panelNames[id], r, floor)
+			}
+			if r.Overlaps(log) {
+				t.Errorf("%dx%d: %s %v overlaps the log pocket %v", w, h, panelNames[id], r, log)
+			}
+			if min := win.MinSize; min != nil && (r.Dx() < min.X || r.Dy() < min.Y) {
+				t.Errorf("%dx%d: %s %v is below MinSize %v", w, h, panelNames[id], r, min)
 			}
 		}
 
-		screen := image.Rect(0, 0, w, h)
-		log := g.logP.Win().GetContainer().GetWidget().Rect
-		rects := []struct {
-			name string
-			win  *widget.Window
-			r    image.Rectangle
-		}{
-			{"station", g.svcWin, got.Station},
-			{"market", g.mkt.Win(), got.Market},
-			{"inventory", g.inv.Win(), got.Inventory},
-			{"fitting", g.fitt.Win(), got.Fitting},
-		}
-		for i, a := range rects {
-			if !a.r.In(screen) {
-				t.Errorf("%dx%d: %s %v out of bounds", w, h, a.name, a.r)
-			}
-			if min := a.win.MinSize; min != nil &&
-				(a.r.Dx() < min.X || a.r.Dy() < min.Y) {
-				t.Errorf("%dx%d: %s %v below MinSize %v", w, h, a.name, a.r, min)
-			}
-			if a.r.Overlaps(log) {
-				t.Errorf("%dx%d: %s %v overlaps the log %v", w, h, a.name, a.r, log)
-			}
-			for _, b := range rects[i+1:] {
-				if a.r.Overlaps(b.r) {
-					t.Errorf("%dx%d: %s %v overlaps %s %v", w, h, a.name, a.r, b.name, b.r)
-				}
-			}
+		// The services view is the only docked rect: the station column.
+		station := g.svcWin.GetContainer().GetWidget().Rect
+		if want := stationRect(station.Dy()); station != want {
+			t.Errorf("%dx%d: services view %v, want the station column %v", w, h, station, want)
 		}
 	}
 }
 
-// TestStationLayoutMarketFitsColumns: the composed market band is wide
-// enough for the shipped market's columns to render whole — the trade
-// table's natural width (measured exactly like uikit's fitColumns:
-// widest cell or title per column + cell padding) always fits the band.
-func TestStationLayoutMarketFitsColumns(t *testing.T) {
-	g := newSmokeGame(t)
-	g.applySize(1920, 1080)
-	dockAt(t, g)
-	g.syncScenes()
-	g.syncMounts()
-	pump(t, g, 1920, 1080)
+// TestStationRect: stationRect is the services column — origin
+// (stationX, stationY), width stationWinW, height max(stationH,
+// stationMinH) — a pure function of the board height, floored at
+// stationMinH and unbounded above (a huge board only stretches the
+// column).
+func TestStationRect(t *testing.T) {
+	for _, h := range []int{0, stationMinH - 1, stationMinH, stationBoardWorstCaseH, 1 << 20} {
+		got := stationRect(h)
+		wantH := max(h, stationMinH)
+		if got.Min != image.Pt(stationX, stationY) {
+			t.Errorf("stationRect(%d) origin = %v, want (%d,%d)", h, got.Min, stationX, stationY)
+		}
+		if got.Dx() != stationWinW || got.Dy() != wantH {
+			t.Errorf("stationRect(%d) = %v, want %dx%d", h, got, stationWinW, wantH)
+		}
+	}
+}
 
-	sys := g.s.System()
-	if sys == nil {
-		t.Fatal("no current system")
-	}
-	measure := func(s string) float64 {
-		w, _ := text.Measure(s, *g.env.Face(theme.StepSmall), 0)
-		return w
-	}
-	const cellPad = 5.0 // uikit's per-cell horizontal padding
-	natural := []float64{
-		measure("Item ↓") + 2*cellPad, // sorted column carries the ↓
-		measure("Price") + 2*cellPad,
-		measure("Qty") + 2*cellPad,
-	}
-	for _, st := range g.s.Market(sys.ID) {
-		name := string(st.Item)
-		if def, ok := g.opts.Content.Item(st.Item); ok {
-			name = def.Name
-		}
-		for i, cell := range []string{name, theme.FormatCredits(st.Price), theme.FormatInt(int64(st.Qty))} {
-			if w := measure(cell) + 2*cellPad; w > natural[i] {
-				natural[i] = w
-			}
-		}
-	}
-	want := natural[0] + natural[1] + natural[2]
-	for _, size := range [][2]int{{1024, 700}, {1280, 720}, {1920, 1080}} {
-		band := stationLayout(size[0], size[1], stationBoardWorstCaseH).Market.Dx()
-		// The table sits inside the window body's padding (2× contentsPad).
-		if avail := float64(band - 10); avail < want {
-			t.Errorf("%dx%d: market band %d leaves %.0f px for %.0f px of columns (truncation)",
-				size[0], size[1], band, avail, want)
+// TestUndeclaredDefaultCenters: a Screen row with no declared position —
+// a genuinely new window type: the zero DefaultRect and the zero Anchor
+// (AnchorCenter) — opens centred, the order-window / Show-Info fallback.
+// This is the one placement rule that must never drift to a corner.
+func TestUndeclaredDefaultCenters(t *testing.T) {
+	row := Screen{} // no DefaultRect, no Anchor
+	for _, size := range [][2]int{{1280, 720}, {1024, 700}} {
+		w, h := size[0], size[1]
+		const dw, dh = 300, 240
+		got := anchorRect(row.DefaultRect, row.Anchor, dw, dh, w, h)
+		want := centerRect(dw, dh, w, h)
+		if got != want {
+			t.Errorf("%dx%d: undeclared default = %v, want the centred fallback %v", w, h, got, want)
 		}
 	}
 }
 
 // TestStationLayoutSavedWins: a sidecar entry pins its window — a later
-// viewport change must not recompose it — while windows the sidecar
-// never mentions are virgin and do compose.
+// viewport change must not recompose it — while windows the sidecar never
+// mentions are virgin and land on their per-type defaults.
 func TestStationLayoutSavedWins(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "save.json")
 	// Partial sidecar: only the market, at a hand-arranged spot.
@@ -291,36 +154,27 @@ func TestStationLayoutSavedWins(t *testing.T) {
 	if got := g.mkt.Win().GetContainer().GetWidget().Rect; got != saved {
 		t.Fatalf("startup: market = %v, want the saved %v", got, saved)
 	}
-	// The sidecar says nothing about the inventory: it composes.
-	if got, want := g.inv.Win().GetContainer().GetWidget().Rect,
-		stationLayout(1280, 720, g.svcWin.GetContainer().GetWidget().Rect.Dy()).Inventory; got != want {
-		t.Errorf("startup: virgin inventory = %v, want %v", got, want)
+	// The sidecar says nothing about the inventory: it lands on its own
+	// per-type default.
+	if got := g.inv.Win().GetContainer().GetWidget().Rect; got != serviceDefaults[pInventory] {
+		t.Errorf("startup: virgin inventory = %v, want %v", got, serviceDefaults[pInventory])
 	}
 
-	// Resize: the saved market stays put, the virgin windows recompose.
+	// Resize: the saved market stays put, the virgin windows re-place.
 	g.applySize(1024, 700)
 	pump(t, g, 1024, 700)
-	lay := stationLayout(1024, 700, g.svcWin.GetContainer().GetWidget().Rect.Dy())
 	if got := g.mkt.Win().GetContainer().GetWidget().Rect; got != saved {
 		t.Errorf("after resize: market = %v, want the saved %v (sidecar wins)", got, saved)
 	}
-	for _, c := range []struct {
-		name string
-		win  *widget.Window
-		want image.Rectangle
-	}{
-		{"inventory", g.inv.Win(), lay.Inventory},
-		{"fitting", g.fitt.Win(), lay.Fitting},
-	} {
-		if got := c.win.GetContainer().GetWidget().Rect; got != c.want {
-			t.Errorf("after resize: virgin %s = %v, want %v", c.name, got, c.want)
-		}
+	if got := g.fitt.Win().GetContainer().GetWidget().Rect; got != serviceDefaults[pFitting] {
+		t.Errorf("after resize: virgin fitting = %v, want %v", got, serviceDefaults[pFitting])
 	}
 }
 
 // TestPlaceDefaultsKeepsUserMoves: recomposing for a new viewport only
 // touches virgin windows — a dragged overview/log keep their rects,
-// untouched ones (the centered help, the service trio) re-place.
+// untouched ones (the centered help, the service windows) re-place on
+// their per-type defaults.
 func TestPlaceDefaultsKeepsUserMoves(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
@@ -343,10 +197,9 @@ func TestPlaceDefaultsKeepsUserMoves(t *testing.T) {
 		t.Errorf("user-moved log = %v, want %v (resize stomped it)", got, movedLog)
 	}
 
-	// Virgin windows re-place for the new viewport.
-	lay := stationLayout(1024, 700, g.svcWin.GetContainer().GetWidget().Rect.Dy())
-	if got, want := g.mkt.Win().GetContainer().GetWidget().Rect, lay.Market; got != want {
-		t.Errorf("virgin market = %v, want the composed %v", got, want)
+	// Virgin windows re-place on their per-type defaults.
+	if got := g.mkt.Win().GetContainer().GetWidget().Rect; got != serviceDefaults[pMarket] {
+		t.Errorf("virgin market = %v, want its per-type default %v", got, serviceDefaults[pMarket])
 	}
 	help := g.help.Win().GetContainer().GetWidget().Rect
 	if want := max(railClearX(), (1024-help.Dx())/2); help.Min.X != want {
@@ -365,8 +218,34 @@ func TestPlaceDefaultsKeepsUserMoves(t *testing.T) {
 	if got := g.logP.Win().GetContainer().GetWidget().Rect; got != movedLog {
 		t.Errorf("user-moved log = %v after the second resize, want %v", got, movedLog)
 	}
-	lay = stationLayout(1920, 1080, g.svcWin.GetContainer().GetWidget().Rect.Dy())
-	if got, want := g.inv.Win().GetContainer().GetWidget().Rect, lay.Inventory; got != want {
-		t.Errorf("virgin inventory = %v, want the composed %v", got, want)
+	if got := g.inv.Win().GetContainer().GetWidget().Rect; got != serviceDefaults[pInventory] {
+		t.Errorf("virgin inventory = %v, want its per-type default %v", got, serviceDefaults[pInventory])
+	}
+}
+
+// TestSavedServiceOverlapHonored: every window is ordinary now, so a
+// sidecar that parks two service windows on one rect restores exactly
+// that — your saved arrangement wins, there is no docked-set reclaim any
+// more (the old stacked-trio symptom is now just a hand-arranged
+// overlap).
+func TestSavedServiceOverlapHonored(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	// Both at the same rect, ≥ each window's MinSize and on screen at 1280.
+	if err := os.WriteFile(path+".layout.json", []byte(
+		`{"version":2,"windows":{`+
+			`"market":{"x":400,"y":200,"w":360,"h":420,"open":false},`+
+			`"inventory":{"x":400,"y":200,"w":360,"h":420,"open":false}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g := newShowcaseGameAt(t, path)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+
+	overlap := image.Rect(400, 200, 760, 620)
+	for _, id := range []panelID{pMarket, pInventory} {
+		if got := g.screenWin[id].GetContainer().GetWidget().Rect; got != overlap {
+			t.Errorf("%s = %v, want the saved overlapping rect %v (saved wins)",
+				panelNames[id], got, overlap)
+		}
 	}
 }

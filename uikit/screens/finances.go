@@ -72,8 +72,8 @@ func NewFinances(env widgets.Seams) *Finances {
 		// Content floor: the holdings block, the table header and a few
 		// ledger rows (the list scrolls below that).
 		widget.WindowOpts.MinSize(theme.Px(360), theme.Px(300)),
-		// Fallback only: the composed rect at the 1024×700 minimum (the
-		// game re-centers it from placeDefaults).
+		// Construction landing rect: the game centers the window on first
+		// open (placeDefaults, AnchorCenter).
 		widget.WindowOpts.Location(image.Rect(theme.Px(312), theme.Px(170), theme.Px(712), theme.Px(530))),
 	)
 	return f

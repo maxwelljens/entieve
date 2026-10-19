@@ -135,19 +135,18 @@ currently shows.
 Default positions: overview top-right, selected item top-left, scanner
 in the center column under the top row, log bottom-left, HUD
 bottom-center, module rack bottom-right, starmap and the Esc menu
-centered, help top-center. While docked the Station window (contract
-board included) takes the top-left corner (overview and selected item
-step aside) and the **service windows tile themselves to your viewport**:
-the market takes the full band beside the station — wide enough that its
-Item/Price/Qty columns render whole instead of ellipsized — and
-inventory and fitting share the row under it. The defaults never
-overlap: the in-space layout and the docked set are checked pairwise at
-1024×700, 1280×720 and 1920×1080.
+centered, help top-center. Every window type also carries its own default
+size and position for its first open — the market's square, the inventory
+and fitting rects, the factory, finances and settings — and a genuinely
+new window type with no declared position opens centred. While docked the
+Station window (contract board included) takes the top-left column
+(overview and selected item step aside); the service windows open at
+those same per-type defaults, not tiled into a docked band.
 
-**Resizing never stomps your arrangement.** Those composed defaults only
+**Resizing never stomps your arrangement.** Those defaults only
 ever apply to windows you have never touched: drag any window somewhere
 else, resize the game window, and it stays exactly where you put it
-while the untouched ones re-tile around it.
+while the untouched ones re-place on their defaults.
 
 **Your layout persists.** Every named window's position, size and
 open/closed state (overview, selected item, log, market, inventory,
@@ -164,13 +163,9 @@ window off-screen — and only what no longer fits slides back in; a
 missing, corrupt, wrong-version or partial sidecar simply falls back to
 the defaults, and unknown entries in the file are ignored. **Your saved
 arrangement wins**: a window with a sidecar entry is never recomposed —
-the automatic tiling only fills in the windows the sidecar does not
-mention. One carve-out keeps that promise honest for the docked
-composition: if a saved services-view/market/inventory/fitting set
-comes back overlapping itself (a layout file from an older game version,
-or one saved at a resolution that no longer fits), the docked set
-re-tiles to the current viewport instead of restoring the overlap —
-open/closed state is always honored either way.
+the defaults only fill in the windows the sidecar does not mention. Every
+window is ordinary, so a saved overlap is honored as-is (it is your
+arrangement), and open/closed state is always honored.
 The layout sidecar is deliberately separate from the save itself — the
 simulation save format is unchanged for the CLI tools.
 
@@ -185,13 +180,10 @@ at all) over the contract board (see
 chrome (HUD bar, module rack, scanner) together with the
 **Overview** and **Selected Item** windows. Nothing else auto-opens:
 the market, fitting, inventory and factory are ordinary windows you
-open from the services view, their keys, or the rail. While docked the
-service windows **tile automatically at your viewport size** — the
-services view owns the left column, market on top to its right,
-inventory and fitting below — and any arrangement you saved or dragged
-wins over that tiling (unless the saved set would come back overlapping
-itself, in which case the docked set re-tiles — see **Your layout
-persists**).
+open from the services view, their keys, or the rail, and they open at
+their own per-type defaults exactly as they do in space — the services
+view keeps the station's left column. Any arrangement you saved or
+dragged wins over the defaults (see **Your layout persists**).
 Undocking closes the services view and leaves every window you opened
 exactly as it was, restores the space chrome and the overview/selected
 pair, and resets the camera view. The layout sidecar records the state

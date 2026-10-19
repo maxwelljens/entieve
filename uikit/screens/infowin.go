@@ -670,9 +670,8 @@ func NewInfoWin(env widgets.Seams) *InfoWin {
 		// Resize comes from the kit's edge grips, not Resizeable() —
 		// same as every other kit window (Kit.AddWindow attaches them).
 		widget.WindowOpts.MinSize(theme.Px(infoMinW), theme.Px(infoMinH)),
-		// Fallback only: the composed rect at the 1024×700 minimum.
-		// The game recomposes (centers) it for the real viewport at
-		// startup (game/placeDefaults).
+		// Construction landing rect; the game centers the Show Info window
+		// on first use (placeDefaults).
 		widget.WindowOpts.Location(image.Rect(theme.Px(302), theme.Px(120), theme.Px(722), theme.Px(580))),
 	)
 	theme.ShowWidget(w.win.GetContainer().GetWidget(), false)

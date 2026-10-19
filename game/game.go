@@ -851,8 +851,10 @@ func (g *Game) buildKit() error {
 // Every Screen row then places itself from its declared DefaultRect +
 // Anchor (anchorRect): the log's bottom-left pocket, the scanner in the
 // centre column under the top row, the on-demand overlays centred, help
-// top-center — and the DockStation rows (the services view's left column
-// over the docked service trio) tile beside it by stationLayout.
+// top-center, the market/inventory/fitting their own per-type defaults
+// and the services view its station column (re-placed to the board's
+// content height by contracts.go). Nothing is composed specially for the
+// docked state.
 //
 // Every placement goes through placeIfVirgin: a window the player
 // dragged, or one restored from the layout sidecar, keeps its
@@ -894,9 +896,6 @@ func (g *Game) placeDefaults(w, h int) {
 	// TestVirginPlacementTable); every other row clears the rail gutter
 	// and stays on screen.
 	for _, s := range screens {
-		if s.DockPolicy == DockStation {
-			continue // composed below, with the docked composition
-		}
 		win := g.screenWin[s.ID]
 		r := win.GetContainer().GetWidget().Rect
 		if r.Dx() <= 0 || r.Dy() <= 0 {
@@ -919,12 +918,6 @@ func (g *Game) placeDefaults(w, h int) {
 			place(ow, centerRect(r.Dx(), r.Dy(), w, h))
 		}
 	}
-	// Docked set: the services view's left column (content height — the
-	// board hugs it) and the service trio composed for this viewport
-	// (membership from the spec; composeStation places the services row
-	// at the Station rect like every other DockStation window).
-	lay := stationLayout(w, h, g.svcWin.GetContainer().GetWidget().Rect.Dy())
-	g.composeStation(lay)
 }
 
 // placeIfVirgin moves win to rect unless the player owns its position:

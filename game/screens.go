@@ -17,14 +17,14 @@ import (
 // and the single source the window registries derive from. Adding a
 // window is one row here plus its Build; the panel enum order, panelDefs
 // (the frame/mount/persistence table), the KeyMap toggle rows and their
-// help-overlay text, the layout sidecar's name list, placeDefaults, the
-// docked station composition and the test label map all follow from the
-// rows — each derivation below names what it feeds.
+// help-overlay text, the layout sidecar's name list, placeDefaults and the
+// test label map all follow from the rows — each derivation below names
+// what it feeds.
 //
 // The rows are declarative. Behaviour that belongs to a scene (the map,
-// help and Esc overlays) or to the docked composition stays where it is;
-// a row reaches it through Modal / DockPolicy instead of carrying the
-// logic. screenSpecErrors is the well-formedness rule for the whole
+// help and Esc overlays) stays where it is; a row reaches it through Modal
+// instead of carrying the logic. screenSpecErrors is the well-formedness
+// rule for the whole
 // table (New refuses to build on a bad spec, the tests drive it with
 // deliberately broken rows). The left navigation rail derives from the
 // same rows (game/rail.go): every openable row is one rail entry, its
@@ -38,20 +38,21 @@ import (
 //
 //	DockFloating    a free overlay: placeDefaults hangs it on the viewport
 //	                from its DefaultRect + Anchor, the sidecar persists it
-//	DockStation     part of the docked station composition: stationLayout
-//	                owns its rect (it declares no DefaultRect); the
-//	                composition places it whenever it mounts, and the
-//	                station scene opens exactly one of them — the
-//	                services view — on dock
 //	DockTransient   scene-owned and never persisted — the Esc menu, which
 //	                must not reopen on the next boot
+//
+// There is no docked special case any more: a service window opened while
+// docked is an ordinary floating window (the market's square default, the
+// inventory/fitting rects) exactly like it is in space. The one window
+// docking opens — the Station Services view — declares the station column
+// as its DefaultRect and is re-placed to the board's content height by
+// contracts.go.
 type DockPolicy uint8
 
 const (
 	// DockFloating is the zero value: a row that forgets to say where it
 	// lives is a normal floating window.
 	DockFloating DockPolicy = iota
-	DockStation
 	DockTransient
 )
 
@@ -94,10 +95,8 @@ const keyNone ebiten.Key = -1
 //	              scene instead (Esc → onEscape, N → map, H → help), so
 //	              Modal rows are never flag-toggled here
 //	DefaultRect   default geometry in design units (see Anchor for which
-//	              parts the composition reads; DockStation screens declare
-//	              none — stationLayout composes them)
-//	DockPolicy    floating / station composition / transient (not in the
-//	              sidecar)
+//	              parts the composition reads)
+//	DockPolicy    floating / transient (not in the sidecar)
 //	Modal         the window is modal while up (map, help, menu)
 //	SpaceOnly     mounts only in space (the scanner's docked counterpart
 //	              rule); DockedOnly mounts only while docked (the factory
@@ -141,32 +140,43 @@ type Screen struct {
 // screens is THE table. Enum order, one row per panel id.
 var screens = []Screen{
 	{
+		// An ordinary floating window, docked or in space: it opens at its
+		// own declared default (uikit.NewInventory's landing rect), not in
+		// a composed docked band.
 		ID: pInventory, Title: "Inventory", Icon: "svc_inventory",
 		Key: ebiten.KeyI, Action: "inventory", Desc: "I — toggle inventory",
-		DockPolicy: DockStation, SidecarName: "inventory", Group: "Trade",
+		DefaultRect: image.Rect(396, 256, 701, 690), Anchor: AnchorFixed,
+		DockPolicy: DockFloating, SidecarName: "inventory", Group: "Trade",
 		Sync:  func(g *Game) { g.inv.Sync() },
 		Build: func(g *Game) *widget.Window { g.inv = uikit.NewInventory(g.env); return g.inv.Win() },
 	},
 	{
 		ID: pFitting, Title: "Fitting", Icon: "svc_fitting",
 		Key: ebiten.KeyF, Action: "fitting", Desc: "F — toggle fitting",
-		DockPolicy: DockStation, SidecarName: "fitting",
+		DefaultRect: image.Rect(709, 256, 1014, 690), Anchor: AnchorFixed,
+		DockPolicy: DockFloating, SidecarName: "fitting",
 		Group: "Ship", Service: "fitting",
 		Sync:  func(g *Game) { g.fitt.Sync() },
 		Build: func(g *Game) *widget.Window { g.fitt = uikit.NewFitting(g.env); return g.fitt.Win() },
 	},
 	{
+		// The market's per-type default is its square landing rect
+		// (uikit.NewMarket) — 546×546, the largest side that stays right of
+		// the rail gutter, fits the 1024×700 minimum and still lays the body
+		// out. Docked or in space it opens here; the old docked band
+		// stretched it across the viewport.
 		ID: pMarket, Title: "Market", Icon: "svc_market",
 		Key: ebiten.KeyG, Action: "market", Desc: "G — toggle market window (trade while docked)",
-		DockPolicy: DockStation, SidecarName: "market",
+		DefaultRect: image.Rect(396, 8, 942, 554), Anchor: AnchorFixed,
+		DockPolicy: DockFloating, SidecarName: "market",
 		Group: "Trade", Service: "market",
 		Sync:  func(g *Game) { g.mkt.Sync() },
 		Build: func(g *Game) *widget.Window { g.mkt = uikit.NewMarket(g.env); return g.mkt.Win() },
 	},
 	{
-		// A station service that floats: it mounts only while docked but
-		// has no composed slot in the trio (the 1024×700 minimum has no
-		// room for a fourth window), so it centres like the overlays.
+		// A station service that floats: it mounts only while docked and
+		// centres like the overlays on first open (its Screen row carries
+		// no Anchor, so the centred fallback applies).
 		ID: pFactory, Title: "Factory", Icon: "row_module",
 		Key: ebiten.KeyB, Action: "factory", Desc: "B — toggle factory window (manufacture while docked)",
 		DefaultRect: image.Rect(332, 130, 732, 560),
@@ -246,16 +256,18 @@ var screens = []Screen{
 	},
 	{
 		// The station services view: the ONE window docking opens, the
-		// window that replaced the old station strip. It owns the
-		// left column of the docked composition (stationLayout's Station
-		// rect — DockStation rows declare no DefaultRect), so its
-		// content height still drives the column: uikit.NewServices'
-		// row over the contract board. Unkeyed by design — docking opens
-		// it, the rail reopens it, and there is nothing to press in
-		// space where it cannot mount.
+		// window that replaced the old station strip. An ordinary floating
+		// window whose declared default is the station column (left of the
+		// viewport, clear of the rail gutter); its content height drives
+		// the column — contracts.go re-places it to the board's height
+		// (stationRect). Unkeyed by design — docking opens it, the rail
+		// reopens it, and there is nothing to press in space where it
+		// cannot mount.
 		ID: pServices, Title: "Station Services", Icon: "kind_station",
-		Key:        keyNone, // docking opens it; the rail reopens it
-		DockPolicy: DockStation, DockedOnly: true, SidecarName: "services",
+		Key:         keyNone, // docking opens it; the rail reopens it
+		DefaultRect: image.Rect(stationX, stationY, stationX+stationWinW, stationY+stationMinH),
+		Anchor:      AnchorFixed,
+		DockPolicy:  DockFloating, DockedOnly: true, SidecarName: "services",
 		Group: "Station",
 		Sync:  func(g *Game) { g.svcUI.Sync() },
 		Build: func(g *Game) *widget.Window { return g.buildServicesWindow() },
@@ -332,7 +344,6 @@ func init() {
 	screenByTitle = titleIndex(screens)
 	KeyMap = slices.Concat(worldKeyMap, screenBindings(screens))
 	layoutNames = append([]string{"overview", "selected", "infowin"}, sidecarNames(screens)...)
-	stationPanels = stationScreens(screens)
 }
 
 // titleIndex keys rows by lowercased title — Toggle{Screen}'s lookup
@@ -390,22 +401,6 @@ func screenBindings(rows []Screen) []Binding {
 		out = append(out, Binding{Key: s.Key, Shift: s.Shift, Action: s.Action, Desc: s.Desc})
 	}
 	return out
-}
-
-// stationScreens returns the ids of the docked station composition —
-// every row with DockPolicy == DockStation, in spec order (scenes.go's
-// stationPanels, layout.go's reclaim and the composed placement all
-// read this set). Nothing force-opens on dock any more: the station
-// scene opens exactly one member, the services view, and the player
-// opens the rest (the composition then places them).
-func stationScreens(rows []Screen) []panelID {
-	ids := make([]panelID, 0, 4)
-	for _, s := range rows {
-		if s.DockPolicy == DockStation {
-			ids = append(ids, s.ID)
-		}
-	}
-	return ids
 }
 
 // screenLabel is a screen's registry label: its sidecar key, or the
@@ -584,12 +579,6 @@ func screenSpecErrors(rows []Screen) []string {
 		}
 		if s.Service != "" && !slices.Contains(stationServices[:], s.Service) {
 			add("row %d (%s): unknown station service %q", i, s.Title, s.Service)
-		}
-		// A station-composition screen needs a rect stationLayout knows.
-		if s.DockPolicy == DockStation && s.SidecarName != "" {
-			if _, ok := (dockedLayout{}).forName(s.SidecarName); !ok {
-				add("row %d (%s): station screen %q has no composed rect", i, s.Title, s.SidecarName)
-			}
 		}
 	}
 	return probs

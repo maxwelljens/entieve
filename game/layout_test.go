@@ -258,7 +258,7 @@ func TestPlacementTrackerMatchesActualRects(t *testing.T) {
 	pump(t, g, 1280, 720)
 	assertTracked("compose")
 
-	// Docked: the board's content hug recomposes the station column —
+	// Docked: the board's content hug re-places the station column —
 	// through the tracker, so the invariant survives it.
 	dockAt(t, g)
 	g.syncScenes()
@@ -266,8 +266,8 @@ func TestPlacementTrackerMatchesActualRects(t *testing.T) {
 	pump(t, g, 1280, 720)
 	assertTracked("docked board hug")
 	station := g.svcWin.GetContainer().GetWidget().Rect
-	if want := stationLayout(1280, 720, station.Dy()); station != want.Station {
-		t.Errorf("station = %v, want the composed %v", station, want.Station)
+	if want := stationRect(station.Dy()); station != want {
+		t.Errorf("station = %v, want the station column %v", station, want)
 	}
 	if g.placed[g.svcWin] != station {
 		t.Errorf("station tracker = %v, want the actual %v", g.placed[g.svcWin], station)
@@ -556,5 +556,56 @@ func TestLogWindowGating(t *testing.T) {
 	}
 	if g.overUI(x, y) {
 		t.Errorf("closed log still gates the world at (%v, %v)", x, y)
+	}
+}
+
+// TestWriteLayoutNeverPersistsDegenerateRects: the writer must never
+// persist a zero/degenerate geometry — a named window whose rect was
+// zeroed round-trips at at least its MinSize (grown top-left held,
+// exactly what the read-side clamp would apply), so no future read can
+// pin a zero rect.
+func TestWriteLayoutNeverPersistsDegenerateRects(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+
+	g.help.Win().GetContainer().GetWidget().Rect = image.Rectangle{}
+	if err := g.writeLayout(); err != nil {
+		t.Fatalf("writeLayout: %v", err)
+	}
+	e := readDoc(t, g.layoutPath()).Windows["help"]
+	if e.W <= 0 || e.H <= 0 {
+		t.Errorf("help persisted as %+v: degenerate %d×%d geometry", e, e.W, e.H)
+	}
+	if min := g.help.Win().MinSize; min != nil && (e.W < min.X || e.H < min.Y) {
+		t.Errorf("help persisted as %+v, below MinSize %v", e, min)
+	}
+}
+
+// TestStaleLayoutVersionIgnored: version 1 files (written by builds
+// predating the current sidecar) are ignored wholesale: defaults win
+// instead of the stale geometry being pinned as saved-wins. The old
+// docked service-trio fold is gone with the composition, so the market,
+// inventory and fitting simply take their per-type defaults.
+func TestStaleLayoutVersionIgnored(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	if err := os.WriteFile(path+".layout.json", []byte(
+		`{"version":1,"windows":{`+
+			`"overview":{"x":700,"y":500,"w":400,"h":300,"open":false},`+
+			`"market":{"x":396,"y":8,"w":874,"h":240,"open":false},`+
+			`"inventory":{"x":396,"y":8,"w":874,"h":240,"open":false},`+
+			`"fitting":{"x":396,"y":8,"w":874,"h":240,"open":false}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g := newShowcaseGameAt(t, path)
+	g.applySize(1280, 720)
+	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != defaultOverviewRect(1280) {
+		t.Errorf("version-1 sidecar was applied: overview = %v, want the default %v", r, defaultOverviewRect(1280))
+	}
+	for id, want := range serviceDefaults {
+		if got := g.screenWin[id].GetContainer().GetWidget().Rect; got != want {
+			t.Errorf("version-1 sidecar was applied: %s = %v, want the default %v",
+				panelNames[id], got, want)
+		}
 	}
 }

@@ -121,6 +121,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Docked windows are ordinary windows — the station band composition is
+  gone** (`game/screens.go`, `game/station_layout.go`, `game/layout.go`,
+  `game/game.go`, `game/contracts.go`): while docked the market, inventory
+  and fitting used to be tiled into a composed band (the market stretched
+  across the top, inventory/fitting splitting the row below). They now open
+  at their own per-type defaults, exactly as in space — the market's
+  **546×546 square**, the inventory/fitting rects — on first use, and the
+  sidecar persists wherever the player drags them. The station view still
+  opens exactly one window, the Station Services view, whose station column
+  (left edge, contract-board content height) is unchanged. The band helpers,
+  the docked rect override, the trio-reclaim machinery and the `station`
+  DockPolicy are deleted; a new window type without a declared position
+  still opens centred.
+
 - **Market window's Place order panel removed; posting moves to the item
   menu's order mini-window** (`uikit/screens/market.go`,
   `uikit/screens/orderwin.go`): the Bid/Ask side toggle, price stepper and
