@@ -193,6 +193,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The default window set no longer overlaps itself at startup**
+  (`game/game.go`, `uikit/screens/overview.go`, `uikit/screens/market.go`):
+  the Overview window now defaults to the viewport's **upper-right corner**
+  and the Selected Item window takes the top-left, so the two core windows
+  never share a corner; the Overview's default height stops 8 px above the
+  module rack at the 1024×700 minimum. The **market window's default rect is
+  square** (546×546 at the identity scale) instead of the old 618×240 band —
+  the largest side that stays right of the rail gutter, fits the 1024×700
+  minimum, clears the log pocket and the HUD bar and still lays the order
+  book + My orders column out (a side below 522 overflows the stepper row).
+  A new `TestVirginPlacementTable` pins the whole virgin table at 1280×720
+  and 1024×700 at UI scale 1.0 and 1.5: every composed default window is on
+  screen and clear of the rail gutter, the boot set (overview, selected
+  item, log) is pairwise disjoint and each window holds its corner. The
+  market default still covers the module rack at the 1024×700 minimum (it
+  clears it at 1280×720), and the log still overlaps the HUD bar there —
+  both are inherent to the fixed window sizes at that minimum and are
+  documented at the pin.
+- **Resize grips show the corner drag cursor** (`uikit/screens/winchrome.go`):
+  hovering or holding a grip wrote ebitenui's `input.SetCursorShape`, whose
+  name cache maps only the EW/NS names, so every corner advertised a plain
+  horizontal arrow (its `AfterDraw` fell through to the default arrow for a
+  diagonal). The chrome now writes ebiten's own shape — `NESWResize` /
+  `NWSEResize` per corner, `EWResize` / `NSResize` on the edges — through a
+  test seam, and keeps re-writing it every frame a grip is hovered, armed or
+  dragged (`TestResizeGripCursorShapes`).
 - **The typed market-order mini-window's price and quantity text now
   renders** (`uikit/screens/winclip.go`): the dialog's `TextInput` fields
   draw through ebitenui's `MaskedRenderBuffer`, which sizes its scratch

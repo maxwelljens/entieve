@@ -274,6 +274,9 @@ func (c *winChrome) step(cursor image.Point, pressed bool) {
 			c.fireMove(wgt) // …unless it was also a title press
 			return
 		}
+		// Still held in the band: keep advertising the grip (ebitenui
+		// resets the OS cursor from its own cache every frame).
+		setResizeCursor(c.edges)
 		if cursor != c.origin {
 			c.armed, c.active = false, true
 			c.apply(cursor, wgt)
@@ -438,15 +441,43 @@ func windowMin(win *widget.Window, start image.Rectangle) image.Point {
 	return min
 }
 
-// setResizeCursor picks the cursor for the gripped axes. ebitenui ships
-// only the EW/NS resize cursors (no diagonals), so any horizontal edge —
-// corners included — uses EW.
+// setCursorShape is the chrome's cursor write. It is ebiten's own call,
+// not ebitenui's input.SetCursorShape: that one is only a name cache
+// whose AfterDraw mapping knows the EW/NS names, so the diagonals a
+// corner needs would fall through to the default arrow. The indirection
+// is the test seam (the pollCursor precedent, uikit/widgets/menu.go):
+// headless tests cannot touch the OS cursor.
+var setCursorShape = ebiten.SetCursorShape
+
+// SetCursorShapeForTest overrides the chrome's cursor write for a
+// headless test and returns a restore func. Test-only seam: never call
+// it from production code.
+func SetCursorShapeForTest(f func(ebiten.CursorShapeType)) func() {
+	prev := setCursorShape
+	setCursorShape = f
+	return func() { setCursorShape = prev }
+}
+
+// setResizeCursor picks the cursor for the gripped axes: the plain EW/NS
+// arrows on an edge, the matching diagonal on a corner (left+top and
+// right+bottom run NWSE, right+top and left+bottom NESW). The chrome
+// re-writes it every frame it classifies a grip: ebitenui's AfterDraw
+// resets the OS cursor from its own name cache each frame.
 func setResizeCursor(e edgeMask) {
-	if e&(edgeLeft|edgeRight) != 0 {
-		input.SetCursorShape(input.CURSOR_EWRESIZE)
-		return
+	var shape ebiten.CursorShapeType
+	switch {
+	case e&(edgeLeft|edgeRight) != 0 && e&(edgeTop|edgeBottom) != 0:
+		if (e&edgeLeft != 0) == (e&edgeTop != 0) {
+			shape = ebiten.CursorShapeNWSEResize
+		} else {
+			shape = ebiten.CursorShapeNESWResize
+		}
+	case e&(edgeLeft|edgeRight) != 0:
+		shape = ebiten.CursorShapeEWResize
+	default:
+		shape = ebiten.CursorShapeNSResize
 	}
-	input.SetCursorShape(input.CURSOR_NSRESIZE)
+	setCursorShape(shape)
 }
 
 // stepChromes pumps the chrome of every window currently mounted on this

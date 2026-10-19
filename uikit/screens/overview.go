@@ -226,8 +226,11 @@ func (k *Kit) buildOverview() {
 		widget.WindowOpts.MinSize(theme.Px(320), theme.Px(240)),
 		// The default clears the rail's left gutter (RailInset) at the
 		// construction scale; the game re-anchors it the same way
-		// (placeDefaults reads the same constant).
-		widget.WindowOpts.Location(image.Rect(theme.Px(8+RailInset), theme.Px(8), theme.Px(388+RailInset), theme.Px(428))),
+		// (placeDefaults reads the same constant) and moves it to the
+		// viewport's upper-right corner. Its height stops 8 px above the
+		// module rack's top edge at the 1024×700 minimum (425 − 8 − 8 =
+		// 409), so the corner placement never overlaps the rack.
+		widget.WindowOpts.Location(image.Rect(theme.Px(8+RailInset), theme.Px(8), theme.Px(388+RailInset), theme.Px(8+409))),
 	)
 }
 
