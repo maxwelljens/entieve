@@ -3,7 +3,6 @@ package screens
 import (
 	"fmt"
 	"image"
-	"image/color"
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/sim"
@@ -21,45 +20,24 @@ import (
 // in full on cancel — the broker fee charged at placement is not), and
 // receivables are earned but not yet paid.
 type Finances struct {
+	th  theme.Theme
 	cv  widgets.ContentView
 	win *widget.Window
 
-	cash, deployed, receivables, total *widget.Text
-	tbl                                *widgets.Table
+	hold *widgets.PlainTable
+	tbl  *widgets.Table
 }
 
 // NewFinances builds the Finances window over the shared environment.
 // Mount it on a Kit with Kit.AddWindow and call Sync every frame.
 func NewFinances(env widgets.Seams) *Finances {
-	f := &Finances{cv: env}
+	f := &Finances{th: env, cv: env}
 	p := env.Pal()
 
-	// Holdings block: label/value lines, the values in the tabular
-	// contents face so the digits do not jitter while money moves.
-	head := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(theme.Px(2)),
-		)),
-	)
-	metric := func(label string, tint color.RGBA) *widget.Text {
-		value := widget.NewText(widget.TextOpts.Text(
-			theme.FormatCredits(0), env.FaceMono(theme.StepSmall), theme.Solid(tint)))
-		line := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
-		)))
-		line.AddChild(widget.NewText(widget.TextOpts.Text(
-			label, env.Face(theme.StepSmall), theme.Solid(p.Dim))), value)
-		head.AddChild(line)
-		return value
-	}
-	f.cash = metric("Cash", p.Text)
-	f.deployed = metric("Deployed in orders", p.Text)
-	// Receivables: the reward an accepted contract still owes (paid on
-	// completion) — the player's own third pool of money.
-	f.receivables = metric("Receivables", p.Text)
-	f.total = metric("Total", p.Accent)
+	// Holdings block: a decorless two-column plain table — labels left,
+	// money right-aligned in the mono tabular face so the digits do not
+	// jitter while it moves.
+	f.hold = widgets.NewPlainTable(env, []widgets.PlainColumn{{}, {AlignRight: true}})
 
 	cols := []widgets.Column{
 		{Key: "When", Title: "When", Priority: 3},
@@ -84,7 +62,7 @@ func NewFinances(env widgets.Seams) *Finances {
 			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	body.AddChild(head, f.tbl.Container())
+	body.AddChild(f.hold.Container(), f.tbl.Container())
 
 	title, _ := theme.NewTitleBar(env, "Finances", "svc_finances")
 
@@ -108,10 +86,14 @@ func (f *Finances) Win() *widget.Window { return f.win }
 // simulation. Call it every frame while mounted.
 func (f *Finances) Sync() {
 	cash, deployed, receivables := f.cv.Wallet(), f.cv.Deployed(), f.cv.Receivables()
-	f.cash.Label = theme.FormatCredits(cash)
-	f.deployed.Label = theme.FormatCredits(deployed)
-	f.receivables.Label = theme.FormatCredits(receivables)
-	f.total.Label = theme.FormatCredits(cash + deployed + receivables)
+	f.hold.SetRows([]widgets.PlainRow{
+		{Cells: []string{"Cash", theme.FormatCredits(cash)}},
+		{Cells: []string{"Deployed in orders", theme.FormatCredits(deployed)}},
+		// Receivables: the reward an accepted contract still owes (paid on
+		// completion) — the player's own third pool of money.
+		{Cells: []string{"Receivables", theme.FormatCredits(receivables)}},
+		{Cells: []string{"Total", theme.FormatCredits(cash + deployed + receivables)}, Tint: f.th.Pal().Accent},
+	})
 
 	entries := f.cv.Ledger()
 	rows := make([]widgets.TableRow, 0, len(entries))

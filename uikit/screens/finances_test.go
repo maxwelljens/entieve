@@ -3,7 +3,9 @@ package screens
 import (
 	"testing"
 
+	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/internal/uitest"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 )
@@ -70,20 +72,31 @@ func TestFinancesRendersHoldingsAndLedger(t *testing.T) {
 		t.Errorf("where cell = %q, want the station", got)
 	}
 
-	// Holdings: the three pools and their total.
-	for _, c := range []struct {
-		name string
-		got  string
-		want string
+	// Holdings: a decorless plain table — the three pools and their total,
+	// labels left, FormatCredits values right-aligned in the value column.
+	hold := f.hold.RowsForTest()
+	if len(hold) != 4 {
+		t.Fatalf("holdings rows = %d, want the 4 pools", len(hold))
+	}
+	for i, c := range []struct {
+		label string
+		value string
 	}{
-		{"cash", f.cash.Label, "1,234.50 €"},
-		{"deployed", f.deployed.Label, "90.00 €"},
-		{"receivables", f.receivables.Label, "30,000.00 €"},
-		{"total", f.total.Label, "31,324.50 €"},
+		{"Cash", "1,234.50 €"},
+		{"Deployed in orders", "90.00 €"},
+		{"Receivables", "30,000.00 €"},
+		{"Total", "31,324.50 €"},
 	} {
-		if c.got != c.want {
-			t.Errorf("%s = %q, want %q", c.name, c.got, c.want)
+		if got := hold[i].Cells[0]; got != c.label {
+			t.Errorf("holdings row %d label = %q, want %q", i, got, c.label)
 		}
+		if got := hold[i].Cells[1]; got != c.value {
+			t.Errorf("holdings row %d value = %q, want %q", i, got, c.value)
+		}
+	}
+	// The Total row keeps its emphasis (the accent value tint).
+	if got, want := hold[3].Tint, theme.DefaultPalette().Accent; got != want {
+		t.Errorf("total tint = %v, want the accent %v", got, want)
 	}
 
 	// An empty ledger renders no rows and still reads the holdings.
@@ -91,5 +104,28 @@ func TestFinancesRendersHoldingsAndLedger(t *testing.T) {
 	f.Sync()
 	if len(f.tbl.Rows) != 0 {
 		t.Errorf("empty ledger rendered %d rows", len(f.tbl.Rows))
+	}
+}
+
+// TestFinancesHoldingsAlign: mounted and laid out, the holdings block is a
+// decorless two-column plain table — every value ends on the block's right
+// edge, so the four figures share one column in the real window.
+func TestFinancesHoldingsAlign(t *testing.T) {
+	env, _ := newTestEnv(t)
+	f := NewFinances(env)
+	ui := newWindowUI(t, env, f.Win())
+	uitest.PumpWindow(t, ui, f.Sync, 1024, 700)
+	uitest.PumpWindow(t, ui, f.Sync, 1024, 700)
+
+	rows := f.hold.RowsForTest()
+	if len(rows) != 4 {
+		t.Fatalf("holdings rows = %d, want 4", len(rows))
+	}
+	block := f.hold.RowWidgetForTest(0).GetWidget().Rect
+	for r := range rows {
+		val := f.hold.RowWidgetForTest(r).Children()[1].(*widget.Text).GetWidget().Rect
+		if val.Max.X != block.Max.X {
+			t.Errorf("holdings row %d value ends %d, want the block edge %d", r, val.Max.X, block.Max.X)
+		}
 	}
 }

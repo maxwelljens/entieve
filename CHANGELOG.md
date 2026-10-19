@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Plain table — decorless column lists** (`uikit/widgets/plain.go`,
+  `uikit/screens/finances.go`): a reusable decorless table — aligned
+  columns, no header, no row tints or borders — for readouts that want a
+  column list without the sortable table's chrome. The Finances window's
+  holdings block (cash, capital deployed in open orders, receivables and
+  their total) is now a two-column plain table: labels left, `FormatCredits`
+  values right-aligned in the mono tabular face, the Total row in the
+  accent.
+
 - **Dev tooling — justfile + GoReleaser** (`justfile`, `.goreleaser.yaml`):
   `just` runs the game and everything around it (`test`, `validate`,
   `simulate`, `describe`, `check`, `build`, …), and `just release <version>`
