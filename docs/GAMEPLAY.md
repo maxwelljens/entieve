@@ -121,8 +121,8 @@ every icon keeps its text label. Two panels are
 **module rack** (bottom right; each cell is a class-glyph tile with the
 module's name under it). The **log** is a normal window now —
 bottom left by default, toggle with `Shift+L`, draggable and resizable
-like the rest. The **Overview** (top left) and **Selected Item** window
-(top right) are open by default (the rail's Ship entries close and
+like the rest. The **Overview** (top right) and **Selected Item** window
+(top left) are open by default (the rail's Ship entries close and
 reopen them) and draggable — a click in space selects the
 target that **Selected Item** then shows and that every
 `selected`-targeted key acts on. Its action buttons (Approach, Warp,
@@ -132,7 +132,7 @@ selectors — **Orbit range** (2.5k–50k m) and **Warp to within** (0/10/50 km)
 command. Warp, Orbit, `Z` and `Q` all act at the range their selector
 currently shows.
 
-Default positions: overview top-left, selected item top-right, scanner
+Default positions: overview top-right, selected item top-left, scanner
 in the center column under the top row, log bottom-left, HUD
 bottom-center, module rack bottom-right, starmap and the Esc menu
 centered, help top-center. While docked the Station window (contract

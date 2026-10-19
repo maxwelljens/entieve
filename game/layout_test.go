@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -406,7 +405,7 @@ func TestLayoutCorruptAndPartialDegrade(t *testing.T) {
 	g := newShowcaseGameAt(t, path)
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
-	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != image.Rect(8+uikit.RailInset, 8, 388+uikit.RailInset, 428) {
+	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != defaultOverviewRect(1280) {
 		t.Errorf("corrupt sidecar moved the overview to %v, want the default", r)
 	}
 
@@ -417,7 +416,7 @@ func TestLayoutCorruptAndPartialDegrade(t *testing.T) {
 		t.Fatal(err)
 	}
 	g.applyLayout(1280, 720)
-	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != image.Rect(8+uikit.RailInset, 8, 388+uikit.RailInset, 428) {
+	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != defaultOverviewRect(1280) {
 		t.Errorf("version-99 sidecar was applied (%v)", r)
 	}
 
@@ -438,7 +437,7 @@ func TestLayoutCorruptAndPartialDegrade(t *testing.T) {
 	if g.open[pLog] {
 		t.Error("log open flag not restored from the partial sidecar")
 	}
-	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != image.Rect(8+uikit.RailInset, 8, 388+uikit.RailInset, 428) {
+	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != defaultOverviewRect(1280) {
 		t.Errorf("absent overview entry moved the window to %v", r)
 	}
 	if r := g.scan.Win().GetContainer().GetWidget().Rect; r.Dx() == 0 {

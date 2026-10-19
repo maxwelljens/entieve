@@ -842,11 +842,12 @@ func (g *Game) buildKit() error {
 }
 
 // placeDefaults (re)places every movable default window for the current
-// screen. The kit's core windows are placed too: Overview starts clear
+// screen. The kit's core windows are placed too: Overview takes the
+// viewport's upper-right corner, Selected Item the top-left — both clear
 // of the rail's left gutter (uikit.RailInset — the rail is root chrome
-// and windows never sit under it), Selected Item hugs the right edge —
-// the left column's bottom belongs to the log and the bottom row to the
-// HUD bar, so nothing overlaps at 1280×720 or at the 1024×700 minimum.
+// and windows never sit under it) — so the two never share a corner and
+// the default set is pairwise disjoint at 1280×720 and at the 1024×700
+// minimum (TestVirginPlacementTable).
 // Every Screen row then places itself from its declared DefaultRect +
 // Anchor (anchorRect): the log's bottom-left pocket, the scanner in the
 // centre column under the top row, the on-demand overlays centred, help
@@ -869,22 +870,29 @@ func (g *Game) placeDefaults(w, h int) {
 	}
 	// Design-unit margins composed through the scale funnel: at scale 1
 	// these are exactly the historical pixels (the layout tests pin them).
+	//
+	// The two core windows hold opposite top corners: the Overview — the
+	// table the player reads first — takes the viewport's upper-right
+	// corner, and the Selected Item window (the verbs for the current
+	// selection) the top-left, clear of the rail's gutter. The two are
+	// 380 + 464 design px wide, so no corner can hold both at the
+	// 1024×700 minimum; the split keeps every default disjoint there.
 	ov := g.kit.OverviewWindow()
 	if r := ov.GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		// Left margin clears the rail's column; the top margin stays
-		// the window row's 8 (only the left inset carries the rail).
-		x, y := theme.Px(8+uikit.RailInset), theme.Px(8)
+		x, y := w-theme.Px(10)-r.Dx(), theme.Px(8)
 		place(ov, image.Rect(x, y, x+r.Dx(), y+r.Dy()))
 	}
 	sp := g.kit.SelectedWindow()
 	if r := sp.GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		m, edge := theme.Px(8), w-theme.Px(10)
-		place(sp, image.Rect(edge-r.Dx(), m, edge, m+r.Dy()))
+		x, y := theme.Px(8+uikit.RailInset), theme.Px(8)
+		place(sp, image.Rect(x, y, x+r.Dx(), y+r.Dy()))
 	}
 	// The screens themselves: declared geometry, one rule per row. The
-	// log's default width fits the pocket left of the HUD bar (the 420 px
-	// bar starts at x=302 at the 1024 minimum) and its top clears the
-	// overview, so the default set stays pairwise disjoint.
+	// log keeps its bottom-left pocket — its content floor (logMinW = 260
+	// design px) is wider than the pocket left of the HUD bar at the
+	// 1024×700 minimum, so that one overlap is inherent (see
+	// TestVirginPlacementTable); every other row clears the rail gutter
+	// and stays on screen.
 	for _, s := range screens {
 		if s.DockPolicy == DockStation {
 			continue // composed below, with the docked composition

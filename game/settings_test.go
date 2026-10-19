@@ -191,12 +191,18 @@ func TestApplyUIScaleLiveRelayout(t *testing.T) {
 	}
 	// Design-unit placement preserved: each coordinate is the old one
 	// moved to 1.5× through the sidecar (round to the nearest device px).
+	// The Overview is right-anchored: in the UNCHANGED viewport a 1.5×
+	// rebuild makes its restored rect overflow the right edge, so the
+	// restore clamp slides it fully on-screen (clampRestored) — the same
+	// path the right-anchored Selected Item window has always taken. A
+	// window whose scaled rect still fits round-trips exactly.
 	after := g.kit.OverviewWindow().GetContainer().GetWidget().Rect
-	want := image.Rect(
+	want := clampLayoutRect(image.Rect(
 		int(math.Round(float64(before.Min.X)*1.5)), int(math.Round(float64(before.Min.Y)*1.5)),
-		int(math.Round(float64(before.Max.X)*1.5)), int(math.Round(float64(before.Max.Y)*1.5)))
+		int(math.Round(float64(before.Max.X)*1.5)), int(math.Round(float64(before.Max.Y)*1.5))),
+		*g.kit.OverviewWindow().MinSize, image.Rect(0, 0, g.w, g.h))
 	if after != want {
-		t.Errorf("overview rect after change = %v, want %v (design units ×1.5)", after, want)
+		t.Errorf("overview rect after change = %v, want %v (design units ×1.5, clamped on screen)", after, want)
 	}
 	// The log survived the rebuild.
 	found := false
@@ -208,10 +214,19 @@ func TestApplyUIScaleLiveRelayout(t *testing.T) {
 	if !found {
 		t.Errorf("log line lost across the scale rebuild: %v", g.logP.Lines())
 	}
-	// And back: the design rect round-trips to the original pixels.
+	// And back: the sidecar now holds the clamped design rect (the
+	// right-anchored Overview cannot keep its corner in an unchanged
+	// viewport), so the window returns to the spot it was clamped to —
+	// on screen, at its design size.
 	g.applyUIScale(1.0)
-	if back := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; back != before {
-		t.Errorf("overview rect at scale 1 again = %v, want the original %v", back, before)
+	back := g.kit.OverviewWindow().GetContainer().GetWidget().Rect
+	if wantBack := image.Rect(
+		int(math.Round(float64(after.Min.X)/1.5)), int(math.Round(float64(after.Min.Y)/1.5)),
+		int(math.Round(float64(after.Max.X)/1.5)), int(math.Round(float64(after.Max.Y)/1.5))); back != wantBack {
+		t.Errorf("overview rect at scale 1 again = %v, want the round-tripped design rect %v", back, wantBack)
+	}
+	if back.Min.X < 0 || back.Min.Y < 0 || back.Max.X > 1280 || back.Max.Y > 720 {
+		t.Errorf("overview after the scale round trip is off screen: %v", back)
 	}
 }
 
@@ -298,12 +313,12 @@ func TestLayoutReturnsDevicePixelsAndOverUIAgrees(t *testing.T) {
 	if w != 1536 || h != 1050 {
 		t.Errorf("clamped Layout(640,480) = %d×%d, want 1536×1050 (min 1024×700 × 1.5)", w, h)
 	}
-	// Metrics agree with those units: the overview starts clear of the
-	// rail (design 8 + uikit.RailInset = 95 → 143 device px) at the
+	// Metrics agree with those units: the right-anchored overview ends at
+	// the right margin (design 1024 − 10 = 1014 → 1521 device px) at the
 	// window row's design top (8 → 12), and its rect is the scaled one.
 	ov := g.kit.OverviewWindow().GetContainer().GetWidget().Rect
-	if ov.Min.X != 143 || ov.Min.Y != 12 {
-		t.Errorf("overview at device scale = %v, want to start at (143,12) (design 95,8 × 1.5)", ov)
+	if ov.Max.X != 1521 || ov.Min.Y != 12 {
+		t.Errorf("overview at device scale = %v, want to end at (1521,12) (design 1014,8 × 1.5)", ov)
 	}
 
 	// Refresh ebitenui's hover flag from the real cursor (0,0) before

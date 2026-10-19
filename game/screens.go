@@ -217,9 +217,10 @@ var screens = []Screen{
 	{
 		// Bottom-left pocket beside the HUD bar: left/bottom insets of 10
 		// against the design viewport (uikit logDefaultW/H = 264×240).
-		// The pocket starts clear of the rail; its right edge (the 298
-		// that must keep its gutter before the HUD bar) is unchanged, so
-		// the log narrows by the rail inset to its content floor.
+		// The pocket starts clear of the rail and keeps the historical
+		// 361 right edge, so the log narrows by the rail inset to its
+		// content floor (its overlap with the HUD bar at the 1024×700
+		// minimum is inherent — see TestVirginPlacementTable).
 		ID: pLog, Title: "Log", Icon: "svc_log",
 		Key: ebiten.KeyL, Shift: true, Action: "log", Desc: "Shift+L — toggle log window",
 		DefaultRect: image.Rect(10+uikit.RailInset, defaultH-10-240, 10+264, defaultH-10),

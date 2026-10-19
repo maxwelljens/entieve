@@ -313,8 +313,16 @@ func NewMarket(env widgets.Seams) *Market {
 		widget.WindowOpts.MinSize(theme.Px(300), theme.Px(240)), // content floor: mirrored in game/station_layout.go
 		// Fallback only: the composed rect at the 1024×700 minimum.
 		// The game recomposes from the real viewport at startup
-		// (game/station_layout.go).
-		widget.WindowOpts.Location(image.Rect(theme.Px(396), theme.Px(8), theme.Px(1014), theme.Px(248))),
+		// (game/station_layout.go). The rect is SQUARE: 546 is the
+		// largest side that stays right of the rail gutter, fits the
+		// 1024×700 minimum, clears the log pocket and the HUD bar (its
+		// top edge is 554 there, 546 + the 8 px margin) and still lays
+		// the body out — the stepper row plus the fixed mktSideW=240
+		// standing-order column need a 522 px window. The module rack
+		// (bottom-right, top edge 425 at the minimum) is the one chrome
+		// the square cannot clear: no side ≥ 522 keeps out of both its
+		// x range and the log pocket.
+		widget.WindowOpts.Location(image.Rect(theme.Px(396), theme.Px(8), theme.Px(942), theme.Px(554))),
 	)
 	return m
 }

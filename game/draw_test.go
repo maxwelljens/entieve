@@ -119,6 +119,23 @@ func pump(t *testing.T, g *Game, w, h int) *ebiten.Image {
 	return img
 }
 
+// layoutPump runs the production size path at a DEVICE scale: Layout
+// (which multiplies the window px by the device factor, so the design
+// viewport stays w×h and the whole layout is scale-invariant), then two
+// full frames through Game.Update/Draw like pump. It is the size path a
+// real window takes; pump's applySize is the design-px-only shortcut.
+func layoutPump(t *testing.T, g *Game, w, h int) {
+	t.Helper()
+	g.Layout(w, h)
+	img := ebiten.NewImage(g.w, g.h)
+	for i := 0; i < 2; i++ {
+		if err := g.Update(); err != nil {
+			t.Fatalf("Update frame %d: %v", i, err)
+		}
+		g.Draw(img)
+	}
+}
+
 // mountedRects returns the screen rect of every visible panel: the kit's
 // core windows, the mounted toggle windows (the log and the services
 // view among them) and the root-overlay chrome (HUD, rack, rail).
@@ -182,6 +199,15 @@ var panelNames = func() map[panelID]string {
 	}
 	return m
 }()
+
+// defaultOverviewRect is the Overview's default placement for a w-wide
+// viewport at the identity scale: the upper-right corner (placeDefaults),
+// at the window's 380×409 design default size (uikit's overview
+// constructor; the height clears the module rack at the 1024×700
+// minimum).
+func defaultOverviewRect(w int) image.Rectangle {
+	return image.Rect(w-10-380, 8, w-10, 8+409)
+}
 
 // assertInBounds fails the test if any mounted window sticks out of the
 // screen.

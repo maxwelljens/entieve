@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
-	uikit "github.com/entieve/entieve/uikit/screens"
 )
 
 // Pins for the docked service trio's sidecar behavior (the stacked-
@@ -352,8 +351,8 @@ func TestStaleLayoutVersionIgnored(t *testing.T) {
 	}
 	g := newShowcaseGameAt(t, path)
 	g.applySize(1280, 720)
-	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != image.Rect(8+uikit.RailInset, 8, 388+uikit.RailInset, 428) {
-		t.Errorf("version-1 sidecar was applied: overview = %v, want the default clear of the rail", r)
+	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != defaultOverviewRect(1280) {
+		t.Errorf("version-1 sidecar was applied: overview = %v, want the default %v", r, defaultOverviewRect(1280))
 	}
 	assertTrioTuples(t, "version-1 sidecar ignored", trioActual(g),
 		stationLayout(1280, 720, stationBoardWorstCaseH), 1280, 720)

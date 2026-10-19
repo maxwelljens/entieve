@@ -1,6 +1,7 @@
 package game
 
 import (
+	"image"
 	"path/filepath"
 	"testing"
 
@@ -61,6 +62,153 @@ func TestPlacedDefaultRectsClearTheRailGutter(t *testing.T) {
 					if r.Min.X < floor {
 						t.Errorf("%dx%d @%v: %s default rect = %v, left edge %d starts inside the rail gutter (%d = RailInset through Px)",
 							size[0], size[1], tc.dev, c.name, r, r.Min.X, floor)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestVirginPlacementTable pins the whole virgin placement table at both
+// design viewports and both scales (device 1 and 1.5: the framebuffer
+// grows with the scale, so the design layout is scale-invariant):
+//
+//   - every window placeDefaults composes — the kit's core windows, the
+//     Show Info window, every Screen row and the docked services column —
+//     starts fully on-screen and right of the navigation rail's gutter;
+//   - the always-on boot set (overview, selected item, log) is pairwise
+//     disjoint, so the screen a fresh save shows has no overlap;
+//   - the Overview holds the viewport's upper-right corner and the
+//     Selected Item window the top-left (the user's default: the table
+//     the player reads first gets the corner), the log its bottom-left
+//     pocket;
+//   - the market's construction-time default rect is square — on screen,
+//     right of the rail gutter and clear of the log pocket and the HUD
+//     bar.
+//
+// Two deliberate limits, both pinned by the facts they name:
+//   - the market's default square covers the module rack at the 1024×700
+//     minimum (it clears it at 1280×720): no side ≥ the 522 px its body
+//     needs stays out of both the rack's x range and the log pocket, so
+//     the default keeps the body usable and the rack loses;
+//   - the log overlaps the HUD bar at the 1024×700 minimum, in space
+//     only and pre-existing: the log's content floor (logMinW = 260
+//     design px) is wider than the pocket left of the bar there (its left
+//     edge is 292 while the log starts at 97), and raising the log above
+//     the bar would put it under the docked station column instead.
+func TestVirginPlacementTable(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		dev  float64
+	}{{"device 1", 1}, {"device 1.5", 1.5}} {
+		t.Run(tc.name, func(t *testing.T) {
+			resetScale(t)
+			for _, size := range [][2]int{{1280, 720}, {1024, 700}} {
+				w, h := size[0], size[1]
+				g := newScaleGameAt(t, filepath.Join(t.TempDir(), "save.json"), tc.dev)
+				layoutPump(t, g, w, h)
+				screen := image.Rect(0, 0, g.w, g.h)
+				floor := theme.Px(uikit.RailInset)
+
+				// Every composed default window: laid out, on screen,
+				// clear of the rail's gutter.
+				check := func(name string, r image.Rectangle) {
+					t.Helper()
+					if r.Dx() <= 0 || r.Dy() <= 0 {
+						t.Errorf("%dx%d @%v: %s has an empty default rect %v", w, h, tc.dev, name, r)
+						return
+					}
+					if !r.In(screen) {
+						t.Errorf("%dx%d @%v: %s default %v is not fully on screen", w, h, tc.dev, name, r)
+					}
+					if r.Min.X < floor {
+						t.Errorf("%dx%d @%v: %s default %v starts inside the rail gutter (%d)",
+							w, h, tc.dev, name, r, floor)
+					}
+				}
+				check("overview", g.kit.OverviewWindow().GetContainer().GetWidget().Rect)
+				check("selected item", g.kit.SelectedWindow().GetContainer().GetWidget().Rect)
+				check("show info", g.kit.InfoWindow().GetContainer().GetWidget().Rect)
+				check("station services", g.svcWin.GetContainer().GetWidget().Rect)
+				for _, s := range screens {
+					check(s.Title, g.screenWin[s.ID].GetContainer().GetWidget().Rect)
+				}
+
+				// The boot set is pairwise disjoint…
+				ov := g.kit.OverviewWindow().GetContainer().GetWidget().Rect
+				sp := g.kit.SelectedWindow().GetContainer().GetWidget().Rect
+				lg := g.logP.Win().GetContainer().GetWidget().Rect
+				for _, p := range []struct {
+					a, b   string
+					ra, rb image.Rectangle
+				}{
+					{"overview", "selected item", ov, sp},
+					{"overview", "log", ov, lg},
+					{"selected item", "log", sp, lg},
+				} {
+					if p.ra.Overlaps(p.rb) {
+						t.Errorf("%dx%d @%v: default %s %v overlaps %s %v",
+							w, h, tc.dev, p.a, p.ra, p.b, p.rb)
+					}
+				}
+				// …and each holds its corner of the user's default.
+				if want := image.Rect(g.w-theme.Px(10)-ov.Dx(), theme.Px(8),
+					g.w-theme.Px(10), theme.Px(8)+ov.Dy()); ov != want {
+					t.Errorf("%dx%d @%v: overview %v, want the upper-right corner %v", w, h, tc.dev, ov, want)
+				}
+				if sp.Min != image.Pt(theme.Px(8+uikit.RailInset), theme.Px(8)) {
+					t.Errorf("%dx%d @%v: selected item at %v, want the top-left corner (%d,%d)",
+						w, h, tc.dev, sp.Min, theme.Px(8+uikit.RailInset), theme.Px(8))
+				}
+				if lg.Min.X != theme.Px(10+uikit.RailInset) || lg.Max.Y != g.h-theme.Px(10) {
+					t.Errorf("%dx%d @%v: log %v, want the bottom-left pocket (x %d, bottom %d)",
+						w, h, tc.dev, lg, theme.Px(10+uikit.RailInset), g.h-theme.Px(10))
+				}
+				// The corner windows must stay clear of the bottom chrome
+				// they sit over (the overview's height is what clears the
+				// rack at the minimum); the log's HUD-bar overlap at
+				// 1024×700 is the documented exception above.
+				for _, cr := range mountedRects(g) {
+					if cr.name != "hud.1" && cr.name != "rack" {
+						continue
+					}
+					for _, bw := range []struct {
+						name string
+						r    image.Rectangle
+					}{{"overview", ov}, {"selected item", sp}, {"log", lg}} {
+						if bw.name == "log" && cr.name == "hud.1" {
+							continue // documented: the log's content floor cannot clear the bar
+						}
+						if bw.r.Overlaps(cr.rect) {
+							t.Errorf("%dx%d @%v: default %s %v overlaps the %s %v",
+								w, h, tc.dev, bw.name, bw.r, cr.name, cr.rect)
+						}
+					}
+				}
+
+				// The market's default rect: square, on screen, clear of
+				// the rail gutter, the log pocket and the HUD bar (the
+				// rack only at the design size — see the doc comment).
+				mkt := uikit.NewMarket(g.env).Win().GetContainer().GetWidget().Rect
+				if mkt.Dx() != mkt.Dy() {
+					t.Errorf("%dx%d @%v: market default %v is not square: %d×%d",
+						w, h, tc.dev, mkt, mkt.Dx(), mkt.Dy())
+				}
+				check("market default", mkt)
+				for _, cr := range mountedRects(g) {
+					if cr.name == "log" || cr.name == "hud.1" {
+						if mkt.Overlaps(cr.rect) {
+							t.Errorf("%dx%d @%v: market default %v overlaps the %s %v",
+								w, h, tc.dev, mkt, cr.name, cr.rect)
+						}
+					}
+				}
+				if w >= 1280 {
+					for _, cr := range mountedRects(g) {
+						if cr.name == "rack" && mkt.Overlaps(cr.rect) {
+							t.Errorf("%dx%d @%v: market default %v overlaps the module rack %v",
+								w, h, tc.dev, mkt, cr.rect)
+						}
 					}
 				}
 			}
