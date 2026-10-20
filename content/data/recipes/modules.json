@@ -4,7 +4,7 @@
     "product": "mod-afterburner",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 8540 }, { "item": "min-nickel", "qty": 1490 }, { "item": "min-argon", "qty": 360 }],
-    "time": 45,
+    "time": 180,
     "family": "modules"
   },
   {
@@ -12,7 +12,7 @@
     "product": "mod-armor-plate",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 6580 }, { "item": "min-nickel", "qty": 1160 }, { "item": "min-cobalt", "qty": 740 }],
-    "time": 35,
+    "time": 180,
     "family": "modules"
   },
   {
@@ -20,7 +20,7 @@
     "product": "mod-armor-rep",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 11560 }, { "item": "min-nickel", "qty": 2020 }, { "item": "min-cobalt", "qty": 1290 }],
-    "time": 60,
+    "time": 180,
     "family": "modules"
   },
   {
@@ -28,7 +28,7 @@
     "product": "mod-cap-booster",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 10740 }, { "item": "min-nickel", "qty": 1250 }, { "item": "min-silex", "qty": 520 }, { "item": "min-argon", "qty": 300 }],
-    "time": 60,
+    "time": 180,
     "family": "modules"
   },
   {
@@ -36,7 +36,7 @@
     "product": "mod-cap-recharger",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 4940 }, { "item": "min-glacite", "qty": 530 }],
-    "time": 30,
+    "time": 180,
     "family": "modules"
   },
   {
@@ -44,7 +44,7 @@
     "product": "mod-emp-turret",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 13750 }, { "item": "min-cobalt", "qty": 1020 }, { "item": "min-silex", "qty": 660 }, { "item": "min-argon", "qty": 390 }],
-    "time": 75,
+    "time": 180,
     "family": "modules"
   },
   {
@@ -52,7 +52,7 @@
     "product": "mod-mining-laser",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 9630 }, { "item": "min-silex", "qty": 690 }, { "item": "min-argon", "qty": 410 }],
-    "time": 50,
+    "time": 180,
     "family": "modules"
   },
   {
@@ -60,7 +60,7 @@
     "product": "mod-rail-turret",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 17610 }, { "item": "min-nickel", "qty": 1540 }, { "item": "min-cobalt", "qty": 980 }, { "item": "min-silex", "qty": 640 }, { "item": "min-argon", "qty": 370 }],
-    "time": 90,
+    "time": 180,
     "family": "modules"
   },
   {
@@ -68,7 +68,7 @@
     "product": "mod-resist-coat",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 9060 }, { "item": "min-cobalt", "qty": 1010 }, { "item": "min-silex", "qty": 660 }],
-    "time": 50,
+    "time": 180,
     "family": "modules"
   },
   {
@@ -76,7 +76,7 @@
     "product": "mod-rocket-pod",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 9910 }, { "item": "min-nickel", "qty": 1740 }, { "item": "min-cobalt", "qty": 1100 }],
-    "time": 55,
+    "time": 180,
     "family": "modules"
   },
   {
@@ -84,7 +84,7 @@
     "product": "mod-shield-boost",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 12570 }, { "item": "min-glacite", "qty": 680 }, { "item": "min-argon", "qty": 540 }],
-    "time": 65,
+    "time": 180,
     "family": "modules"
   },
   {
@@ -92,7 +92,7 @@
     "product": "mod-shield-extender",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 7700 }, { "item": "min-cobalt", "qty": 860 }, { "item": "min-glacite", "qty": 410 }],
-    "time": 40,
+    "time": 180,
     "family": "modules"
   },
   {
@@ -100,7 +100,7 @@
     "product": "mod-stasis-web",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 7150 }, { "item": "min-silex", "qty": 520 }, { "item": "min-argon", "qty": 300 }],
-    "time": 40,
+    "time": 180,
     "family": "modules"
   },
   {
@@ -108,7 +108,7 @@
     "product": "mod-warp-scram",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 13200 }, { "item": "min-cobalt", "qty": 980 }, { "item": "min-silex", "qty": 640 }, { "item": "min-argon", "qty": 370 }],
-    "time": 70,
+    "time": 180,
     "family": "modules"
   }
 ]

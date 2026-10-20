@@ -122,7 +122,7 @@ shipment). `Severity` is `SevInfo | SevGood | SevWarning | SevDanger`.
 `CmdSetAmmo`, `CmdLoot`, `CmdMine`, `CmdDock`, `CmdUndock`, `CmdJump`,
 `CmdBuy`, `CmdSell`, `CmdRefine`, `CmdRepair`, `CmdAssemble`,
 `CmdFitModule`, `CmdUnfitModule`, `CmdTransfer`, `CmdAcceptMission`,
-`CmdAbandonMission`, `CmdStartJob`, `CmdCollectJob`. Station services and
+`CmdAbandonMission`, `CmdStartJob`, `CmdCollectJob`, `CmdCancelJob`. Station services and
 industry commands ride same-Step deferral buckets (`deferEcon`,
 `deferIndustry`) to the systems that own them; refusals are events, never
 silent.
@@ -176,12 +176,16 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    ore units into minerals at `floor(refine_yield × qty)` per mineral
    (`execRefine`, `sim/system_economy.go`). Tier 1 of the two-tier recipe
    economy; outputs land in the general hold.
-3. **Manufacturing — jobs and craft growth.** Tier 2: `RecipeDef`
+3. **Manufacturing — jobs, fees and craft growth.** Tier 2: `RecipeDef`
    (`content/data/recipes/`, `rec-*`) turns minerals into ships, modules or
    charges at an `industry` station. `CmdStartJob` commits the materials
-   for every run up front (integer units) at a station's 2 concurrent
-   slots; `CmdCollectJob` delivers the output to the hangar. Timing is
-   pure clock math (`Job.StartedAt`/`DoneAt`) — zero RNG. Craft grows per
+   for every run up front (integer units) and pays the job fee — **3 % of
+   the recipe's mineral value at base prices**, per run, `Sim.JobFee` —
+   from the wallet into the ledger; all stations share **3 global job
+   slots**. `CmdCollectJob` delivers the output to the hangar;
+   `CmdCancelJob` cancels a running job (materials back to the hangar, the
+   fee kept, the slot freed). Timing is pure clock math
+   (`Job.StartedAt`/`DoneAt`) — zero RNG. Craft grows per
    (station, recipe family): `L = min(5, 1 + floor(sqrt(runs)/2))`, each
    level cutting job time 4 % and materials 2 % below the L1 baseline
    (both frozen at job start). Every 3600 idle ticks a family's counter

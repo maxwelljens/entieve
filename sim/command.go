@@ -122,7 +122,7 @@ func (s *Sim) applyCommand(cmd Command) {
 		CmdPlaceOrder, CmdCancelOrder:
 		s.deferEcon = append(s.deferEcon, c)
 
-	case CmdStartJob, CmdCollectJob:
+	case CmdStartJob, CmdCollectJob, CmdCancelJob:
 		s.deferIndustry = append(s.deferIndustry, c)
 	}
 }

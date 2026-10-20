@@ -98,7 +98,8 @@ func NewServices(env widgets.Seams, innerWidth int) *Services {
 		{name: "cargo", icon: "svc_inventory", screen: "Inventory", label: "Cargo"},
 		{name: "market", icon: "svc_market", screen: "Market", service: "market", label: "Market"},
 		{name: "fitting", icon: "svc_fitting", screen: "Fitting", service: "fitting", label: "Fitting"},
-		{name: "industry", icon: "row_module", screen: "Factory", service: "industry", label: "Industry"},
+		{name: "industry", icon: "row_module", screen: "Manufacturing", service: "industry", label: "Manufacturing"},
+		{name: "refine", icon: "kind_belt", screen: "Refinery", service: "refine", label: "Refinery"},
 	}
 	s.tips = make([]widgets.RowTip, len(s.btns))
 	for i := range s.btns {

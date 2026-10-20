@@ -69,13 +69,14 @@ const (
 	pInventory panelID = iota
 	pFitting
 	pMarket
-	pFactory
+	pManufacturing
 	pScanner
 	pMap
 	pHelp
 	pLog
 	pSettings
 	pServices
+	pRefinery
 	pFinances
 	pMenu
 	numPanels
@@ -111,7 +112,8 @@ type Game struct {
 	inv  *uikit.Inventory
 	fitt *uikit.Fitting
 	mkt  *uikit.Market
-	fact *uikit.Factory
+	manu *uikit.Manufacturing
+	ref  *uikit.Refinery
 	scan *uikit.Scanner
 	mp   *uikit.MapView
 	help *uikit.HelpPanel

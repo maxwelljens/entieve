@@ -72,7 +72,7 @@ func TestScreenSpecRejectsMalformedRows(t *testing.T) {
 		{"transient row claiming a group", func(r []Screen) { r[pMenu].Group = "Ship" }, "transient screen must not carry"},
 		{"unknown station service", func(r []Screen) { r[1].Service = "banking" }, "unknown station service"},
 		{"row without a rail icon", func(r []Screen) { r[0].Icon = "" }, "missing icon"},
-		{"space-only and docked-only at once", func(r []Screen) { r[pFactory].SpaceOnly = true }, "never mounts"},
+		{"space-only and docked-only at once", func(r []Screen) { r[pManufacturing].SpaceOnly = true }, "never mounts"},
 		{"unknown anchor", func(r []Screen) { r[0].Anchor = Anchor(99) }, "unknown anchor"},
 	}
 	for _, tc := range cases {
@@ -196,7 +196,7 @@ func TestScreenPlacementDerivesFromSpec(t *testing.T) {
 			t.Errorf("%dx%d: help at %v, want top inset 24 and x = max(%d, centred %d)",
 				w, h, r.Min, railClearX(), (w-r.Dx())/2)
 		}
-		for _, p := range []panelID{pMap, pMenu, pFactory, pSettings} {
+		for _, p := range []panelID{pMap, pMenu, pManufacturing, pSettings} {
 			r := g.screenWin[p].GetContainer().GetWidget().Rect
 			if want := centerRect(r.Dx(), r.Dy(), w, h); r.Min != want.Min {
 				t.Errorf("%dx%d: %s at %v, want centred at %v", w, h, panelNames[p], r.Min, want.Min)

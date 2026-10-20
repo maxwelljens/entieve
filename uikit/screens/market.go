@@ -39,7 +39,7 @@ const (
 	mineWheelRows = 3
 )
 
-// setStepperValue writes a stepper readout (market/inventory/factory qty)
+// setStepperValue writes a stepper readout (market/inventory/manufacturing qty)
 // and re-lays its row out. widget.Text.Label changes do NOT invalidate
 // layout, so without the relayout the readout keeps the box measured for
 // its previous value and a wider number draws under the + button

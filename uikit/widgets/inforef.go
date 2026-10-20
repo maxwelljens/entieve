@@ -12,7 +12,7 @@ import (
 // info window consumes them.
 
 // infoRefPayload is the resolver's extension point for row payloads
-// whose ref needs the surface's own knowledge (the factory's job rows,
+// whose ref needs the surface's own knowledge (the manufacturing job rows,
 // the overview's entity rows, the fitting's slot picks): each screen
 // implements InfoRefOf on its own payload type, so this package — and
 // the seam it serves — never imports a screen.

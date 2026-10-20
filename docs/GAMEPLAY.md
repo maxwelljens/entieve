@@ -40,7 +40,7 @@ in-game help window renders.
 | `F` | Toggle fitting window |
 | `C` | Toggle scanner (slow off-grid sweep) |
 | `G` | Toggle market window (trade while docked) |
-| `B` | Toggle factory window (manufacture while docked) |
+| `B` | Toggle manufacturing window (manufacture while docked) |
 | `N` | Toggle starmap |
 | `H` | Toggle help window |
 | `P` | Toggle settings (UI scale, fullscreen, window layout) |
@@ -90,12 +90,12 @@ Toggle keys open and close their window (`I`, `F`, `G`, `B`, `C`, `N`, `H`,
 `P`, `K`, `Shift+L`) — windows have no separate close button. The same
 toggles live on the **left navigation rail**: one glyph per window in
 six sections — **Ship** (Overview, Selected Item, Fitting), **Trade**
-(Market, Inventory, Finances), **Industry** (Factory), **Station** (Station
+(Market, Inventory, Finances), **Industry** (Manufacturing, Refinery), **Station** (Station
 Services), **World** (Scanner, Starmap, Log) and **Help & System**
 (Help, Settings). Hover an entry for its tooltip (icon, name and hotkey
 hint); click once to open — a freshly opened window lands on top — and
 again to close it. An entry you cannot use right now is **grayed, never
-hidden** (the services view and factory in space, the scanner while
+hidden** (the services view and manufacturing in space, the scanner while
 docked, fitting at a station without the fitting service); clicking a
 grayed entry does nothing. A window that is open wears the entry's amber
 glow, and the slim tab at the rail's top edge collapses the rail to its
@@ -137,7 +137,7 @@ in the center column under the top row, log bottom-left, HUD
 bottom-center, module rack bottom-right, starmap and the Esc menu
 centered, help top-center. Every window type also carries its own default
 size and position for its first open — the market's square, the inventory
-and fitting rects, the factory, finances and settings — and a genuinely
+and fitting rects, the manufacturing and refinery, finances and settings — and a genuinely
 new window type with no declared position opens centred. While docked the
 Station window (contract board included) takes the top-left column
 (overview and selected item step aside); the service windows open at
@@ -150,7 +150,7 @@ while the untouched ones re-place on their defaults.
 
 **Your layout persists.** Every named window's position, size and
 open/closed state (overview, selected item, log, market, inventory,
-fitting, factory, scanner, map, help) is saved to a sidecar file next to the
+fitting, manufacturing, refinery, scanner, map, help) is saved to a sidecar file next to the
 save — `<save path>.layout.json`, e.g.
 `os.UserConfigDir()/entieve/save.json.layout.json` — whenever you save
 (`Ctrl+S` / menu **Save**) and again when you quit cleanly from the
@@ -179,7 +179,7 @@ at all) over the contract board (see
 [Contracts & standing](#contracts--standing)) — and hides the space
 chrome (HUD bar, module rack, scanner) together with the
 **Overview** and **Selected Item** windows. Nothing else auto-opens:
-the market, fitting, inventory and factory are ordinary windows you
+the market, fitting, inventory and manufacturing are ordinary windows you
 open from the services view, their keys, or the rail, and they open at
 their own per-type defaults exactly as they do in space — the services
 view keeps the station's left column. Any arrangement you saved or
@@ -382,21 +382,35 @@ system's first station otherwise — instead of being shipped back to
 Starogród. Death is paperwork; the log line `Respawned at <station> in a
 <hull>` is the insurer's replacement notice arriving.
 
-## The factory
+## Manufacturing
 
 Manufacturing is a station service like any other. Press **`B`** for the
-**Factory** window (or its Industry button on the services view) — docked
-at a station with the **industry** service it opens there like the other
-service windows (Przystań, Huta at Młynów, Doki at Kamieniec), and it
-only ever mounts while docked.
+**Manufacturing** window (or its Manufacturing button on the services
+view) — docked at a station with the **industry** service it opens there
+like the other service windows (Przystań, Huta at Młynów, Doki at
+Kamieniec), and it only ever mounts while docked.
 
-The factory turns **minerals into products**: pick a recipe — a hull, a
+The window turns **minerals into products**: pick a recipe — a hull, a
 module or a batch of charges — set the number of **runs**, and press start.
 The materials for every run are committed up front from your stock (the
 have/need column shows exactly what you hold against what the job eats),
-the job occupies one of the station's two slots, and a timer runs. Collect
-the output into your hangar when it is done. Ore is not a factory input:
-it refines into minerals at a refinery first — the two-tier chain.
+and the job pays a **fee of 3% of the recipe's mineral value** when it
+starts. All stations share **three job slots**, so a yard running a hull
+still leaves room elsewhere. The job list shows every job you own, grouped
+by station; you can collect or cancel only the jobs at the station you are
+docked at. Cancelling a running job returns its materials to the hangar
+and keeps the fee. Collect the output into your hangar when it is done.
+Ore is not a manufacturing input: it refines into minerals at a refinery
+first — the two-tier chain.
+
+## The refinery
+
+The **Refinery** window (its button on the services view, or the rail's
+Industry section) lists every ore stack in your cargo and ore hold and
+previews exactly what **Refine** would yield — `floor(refine_yield × qty)`
+per mineral at the stepper quantity. Refined minerals land in the general
+hold; if they do not fit, the window warns and the sim refuses with a
+cargo-full event. **Huta** at Młynów and **Jernborg** run refineries.
 
 Stations get better at their own work: every completed run raises that
 station's **craft** in the recipe's family (hulls, modules, charges), up
@@ -418,7 +432,7 @@ only when real goods trade hands.
 The book is not yours alone. A roster of **economy agents** — traders,
 miners and industrialists with their own capital, stock and beliefs —
 works every market station in the cluster: miners cut rock and sell ore,
-industrialists buy minerals and run factory jobs, traders quote between
+industrialists buy minerals and run manufacturing jobs, traders quote between
 the two. They post real orders, pay the same fees you do, and when a
 spread between two stations is worth the freight they post **haul
 wishes** that the convoy traffic works off — cargo bought at one station,
@@ -456,7 +470,7 @@ aggressive, the belt holding richer ore (cordite, lucidite), and the
 anomaly **Gniazdo** hiding Marauders plus a Hierarch boss with the best
 loot. Its station, **Przystań**, is a freeport: it runs the level-2 board,
 doubles as the local insurance point (see Contracts & standing) and builds
-things (see The factory). **Młynów** is the refinery step of the chain —
+things (see Manufacturing). **Młynów** is the refinery step of the chain —
 its platform **Huta** refines and manufactures (market, refine, industry).
 **Kamieniec** is the shipyard country: **Doki**, its depot (market,
 fitting, industry), and the lane on to Głusza.

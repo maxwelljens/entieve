@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Factory is now Manufacturing** (`uikit/screens/manufacturing.go`, the
+  `pManufacturing` Screen row, key `B` unchanged): the industry window is
+  renamed per the approved design. The layout sidecar key follows
+  (`factory` → `manufacturing`); version-2 sidecars still map the old key on
+  read, so a saved window rect survives the rename.
+- **Three global job slots**: manufacturing jobs at every station share one
+  3-slot pool (was 2 per station). The job list now shows all of the
+  player's jobs grouped by station; Collect and Cancel stay limited to the
+  docked station.
+- **Duration ladder retuned** (`content/data/recipes/modules.json`,
+  `ships.json`): modules run ~3 minutes and hulls ~10 minutes per run at 1×
+  (ammo's ~30 s rung is the parallel ammo pass). Runs still multiply
+  linearly and craft levels still discount time 4% per level.
+
+### Added
+
+- **Job fee**: 3% of a recipe's mineral value at base prices, per run, paid
+  from the wallet when the job starts and recorded in the ledger; the
+  Manufacturing preview quotes it. Refusals check the wallet first.
+- **Cancel job** (`CmdCancelJob`): cancels a running job at the docked
+  station — materials return to the hangar, the fee is kept, the slot
+  frees. Finished jobs must be collected.
+- **Refinery window** (`uikit/screens/refinery.go`, `pRefinery` Screen row,
+  service `refine`, rail section Industry): ore list from the general cargo
+  and ore hold, the exact `floor(refine_yield × qty)` yield preview, a
+  quantity stepper and Refine over the existing `CmdRefine`; the window
+  warns when the minerals will not fit the hold (the sim's EvCargoFull).
+  The station services row gains a Refinery button.
+- **Two manufacturing contracts** (`content/data/contracts/manufacturing.json`):
+  deliver Shield Boosters to Przystań and Stasis Webs to Doki — durable
+  module goods, no weapon or ammo ids. Deliver contracts now accept module
+  ids as cargo.
+
 ## [0.5.0] - 2026-10-19
 
 ### Added

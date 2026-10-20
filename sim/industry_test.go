@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/core"
 )
 
 // ---------------------------------------------------------------------------
@@ -478,7 +479,7 @@ func TestIndustrySlotCap(t *testing.T) {
 		t.Fatal("third job accepted over the slot cap")
 	}
 	evs := drain(s)
-	if !hasEvent(evs, EvLog, "Industry: All job slots busy at Haven Rest") {
+	if !hasEvent(evs, EvLog, "Industry: All job slots busy") {
 		t.Fatalf("missing busy refusal: %v", evs)
 	}
 	if got := cargoCount(s, "min-ferrite"); got != ferrite {
@@ -785,5 +786,216 @@ func TestIndustryRestoreRejectsCorruptJobs(t *testing.T) {
 	}
 	if err := b.Restore(sv); err != nil {
 		t.Fatalf("valid save rejected: %v", err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Manufacturing rework: global slots, job fee, cancel, duration ladder
+// ---------------------------------------------------------------------------
+
+// industryContentTwoStations extends the industry fixture with a second
+// industry-capable station in sys-b (the global-slot pool fixture).
+func industryContentTwoStations() *content.Content {
+	c := industryContent()
+	sys := c.Systems["sys-b"]
+	sys.Celestials = append(sys.Celestials, content.CelestialDef{
+		ID: "cel-station-b", Name: "Second Yard", Kind: content.CelStation,
+		Position: core.Vec2{X: 2e7},
+		Station:  &content.StationDef{Services: []string{"industry"}},
+	})
+	return c
+}
+
+// TestIndustrySlotsAreGlobal: the three slots are one pool shared by every
+// station — jobs at a second station compete with the first, and collecting
+// or cancelling anywhere frees the same slot.
+func TestIndustrySlotsAreGlobal(t *testing.T) {
+	s, err := New(industryContentTwoStations(), testWorld(), testSeed)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	giveCargo(s, "min-ferrite", 1000)
+	giveCargo(s, "min-nickel", 1000)
+
+	if _, ok := s.StartJob("cel-station-a", "rec-charge-emp", 1, OwnerPlayer); !ok {
+		t.Fatal("job 1 refused with slots free")
+	}
+	if _, ok := s.StartJob("cel-station-a", "rec-charge-emp", 1, OwnerPlayer); !ok {
+		t.Fatal("job 2 refused with slots free")
+	}
+	if _, ok := s.StartJob("cel-station-b", "rec-charge-emp", 1, OwnerPlayer); !ok {
+		t.Fatal("job 3 refused with one slot free")
+	}
+	if _, ok := s.StartJob("cel-station-b", "rec-charge-emp", 1, OwnerPlayer); ok {
+		t.Fatal("fourth job accepted over the global slot cap")
+	}
+	if evs := drain(s); !hasEvent(evs, EvLog, "Industry: All job slots busy") {
+		t.Fatalf("missing busy refusal: %v", evs)
+	}
+	jobs := s.AllJobs()
+	if len(jobs) != industrySlots {
+		t.Fatalf("AllJobs = %d, want %d", len(jobs), industrySlots)
+	}
+	if jobs[0].Station != "cel-station-a" || jobs[2].Station != "cel-station-b" {
+		t.Fatalf("AllJobs stations = %+v", jobs)
+	}
+	if got := s.StationName("cel-station-b"); got != "Second Yard" {
+		t.Errorf("StationName = %q, want Second Yard", got)
+	}
+
+	// Cancelling at one station frees the shared slot for the other.
+	if !s.CancelJob("cel-station-a", jobs[0].ID, OwnerPlayer) {
+		t.Fatal("cancel failed")
+	}
+	drain(s)
+	if _, ok := s.StartJob("cel-station-b", "rec-charge-emp", 1, OwnerPlayer); !ok {
+		t.Fatal("slot not freed by a cancel at another station")
+	}
+}
+
+// TestIndustryJobFee pins the fee: 3% of the recipe's mineral value at
+// base prices, per run, debited up front with one ledger line, and
+// refused when the wallet cannot cover it.
+func TestIndustryJobFee(t *testing.T) {
+	s := newIndustrySim(t)
+	st := StationID("cel-station-a")
+	// (5.5 × 10) + (3 × 12) = 91 mineral value → 2.73 per run.
+	if got := s.JobFee("rec-charge-emp", 1); math.Abs(got-2.73) > 1e-9 {
+		t.Errorf("JobFee(1) = %v, want 2.73", got)
+	}
+	if got := s.JobFee("rec-charge-emp", 2); math.Abs(got-5.46) > 1e-9 {
+		t.Errorf("JobFee(2) = %v, want 5.46 (runs linear)", got)
+	}
+	if got := s.JobFee("rec-nope", 1); got != 0 {
+		t.Errorf("unknown recipe fee = %v, want 0", got)
+	}
+
+	dockAtHaven(t, s)
+	drain(s)
+	giveCargo(s, "min-ferrite", 100)
+	giveCargo(s, "min-nickel", 100)
+	before := s.Wallet()
+	if _, ok := s.StartJob(st, "rec-charge-emp", 2, OwnerPlayer); !ok {
+		t.Fatal("stocked start refused")
+	}
+	if got := before - s.Wallet(); math.Abs(got-5.46) > 1e-9 {
+		t.Errorf("upfront debit = %v, want 5.46", got)
+	}
+	led := s.Ledger()
+	last := led[len(led)-1]
+	if last.What != "Industry fee — 2 x EMP Charge" || math.Abs(last.Amount+5.46) > 1e-9 ||
+		last.Where != "Haven Rest" {
+		t.Errorf("fee ledger = %+v", last)
+	}
+
+	// An unaffordable fee refuses the start before any material moves.
+	s.wallet = 1
+	ferrite := cargoCount(s, "min-ferrite")
+	ledgerLen := len(s.Ledger())
+	if _, ok := s.StartJob(st, "rec-charge-emp", 1, OwnerPlayer); ok {
+		t.Fatal("start accepted with the wallet under the fee")
+	}
+	if evs := drain(s); !hasEvent(evs, EvLog, "Industry: Not enough credits for the job fee") {
+		t.Fatalf("missing fee refusal: %v", evs)
+	}
+	if got := cargoCount(s, "min-ferrite"); got != ferrite {
+		t.Errorf("refused start committed materials: %d -> %d", ferrite, got)
+	}
+	if len(s.Ledger()) != ledgerLen || s.Wallet() != 1 {
+		t.Error("refused start moved money")
+	}
+}
+
+// TestIndustryCancelRefundsMaterials: cancelling a running job returns its
+// committed materials to the hangar, keeps the fee, drops the job and frees
+// its slot; a finished job must be collected instead.
+func TestIndustryCancelRefundsMaterials(t *testing.T) {
+	s := newIndustrySim(t)
+	dockAtHaven(t, s)
+	drain(s)
+	giveCargo(s, "min-ferrite", 1000)
+	giveCargo(s, "min-nickel", 100)
+	wallet := s.Wallet()
+
+	id, ok := s.StartJob("cel-station-a", "rec-charge-emp", 2, OwnerPlayer)
+	if !ok {
+		t.Fatal("start refused")
+	}
+	// Committed from cargo: ceil(5.5×2)=11 ferrite, 6 nickel.
+	if cargoCount(s, "min-ferrite") != 989 || cargoCount(s, "min-nickel") != 94 {
+		t.Fatalf("commit = %d ferrite / %d nickel", cargoCount(s, "min-ferrite"), cargoCount(s, "min-nickel"))
+	}
+	s.Queue(CmdCancelJob{ID: id})
+	s.Step()
+	if evs := drain(s); !hasEvent(evs, EvLog, "Industry: EMP Charge cancelled at Haven Rest") {
+		t.Fatalf("missing cancel line: %v", evs)
+	}
+	if got := hangarCount(s, "min-ferrite"); got != 11 {
+		t.Errorf("hangar ferrite = %d, want 11", got)
+	}
+	if got := hangarCount(s, "min-nickel"); got != 6 {
+		t.Errorf("hangar nickel = %d, want 6", got)
+	}
+	if jobs := s.AllJobs(); len(jobs) != 0 {
+		t.Fatalf("cancelled job survived: %+v", jobs)
+	}
+	// The fee is kept: no refund line, no credit.
+	if got := s.Wallet(); got != wallet-s.JobFee("rec-charge-emp", 2) {
+		t.Errorf("wallet after cancel = %v, want the fee kept", got)
+	}
+	if _, ok := s.StartJob("cel-station-a", "rec-charge-emp", 1, OwnerPlayer); !ok {
+		t.Fatal("cancel did not free the slot")
+	}
+
+	// A finished job cannot be cancelled; another owner cannot either.
+	done, ok := s.StartJob("cel-station-a", "rec-charge-emp", 1, OwnerPlayer)
+	if !ok {
+		t.Fatal("fixture start refused")
+	}
+	stepUntilDone(t, s, "cel-station-a", done)
+	drain(s)
+	if s.CancelJob("cel-station-a", done, OwnerPlayer) {
+		t.Fatal("finished job cancelled")
+	}
+	if evs := drain(s); !hasEvent(evs, EvLog, "Industry: Job is ready — collect it at Haven Rest") {
+		t.Fatalf("missing ready refusal: %v", evs)
+	}
+	if s.CancelJob("cel-station-a", done, OwnerSystem) {
+		t.Fatal("another owner cancelled the job")
+	}
+	if _, ok := jobAt(s, "cel-station-a", done); !ok {
+		t.Fatal("refused cancel removed the job")
+	}
+}
+
+// TestRecipeDurationLadder pins the shipped per-run durations: modules ~3
+// minutes and hulls ~10 minutes at 1× (ammo is another stream's file; the
+// duration math is pinned in TestIndustryCraftFormulas).
+func TestRecipeDurationLadder(t *testing.T) {
+	c, err := content.Load(content.FS())
+	if err != nil {
+		t.Fatalf("content.Load: %v", err)
+	}
+	modules, hulls := 0, 0
+	for _, rec := range c.RecipesInOrder() {
+		switch rec.Family {
+		case content.FamilyModules:
+			modules++
+			if rec.Time != 180 {
+				t.Errorf("%s time = %v, want 180 s", rec.ID, rec.Time)
+			}
+		case content.FamilyHulls:
+			hulls++
+			if rec.Time != 600 {
+				t.Errorf("%s time = %v, want 600 s", rec.ID, rec.Time)
+			}
+		case content.FamilyCharges:
+			// charges.json belongs to the ammo stream (the ~30 s rung).
+		default:
+			t.Errorf("%s has unknown family %q", rec.ID, rec.Family)
+		}
+	}
+	if modules == 0 || hulls == 0 {
+		t.Fatalf("ladder fixture empty: %d modules, %d hulls", modules, hulls)
 	}
 }

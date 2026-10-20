@@ -194,6 +194,8 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | `contract-solace-cordite-1` | Cordite order | keep | trade | description: "Haven Rest's refinery", "Solace belt" → "Jernborg's refinery", "Starogród belt" |
 | `contract-penumbra-den-hunt-1` | Den hunt | **Gniazdo hunt** | place | description: "the Penumbra Den", "the Port office" → "Gniazdo", "the Przystań office" |
 | `contract-penumbra-lucidite-1` | Lucidite contract | keep | trade | description: "the Port", "the Penumbra belt" → "Przystań", "the Kuźnica belt" |
+| `contract-manufacturing-shield-1` | — | **Shield booster order** | trade | durable manufactured goods (Shield Booster, a non-weapon module); offering Doki, delivery Przystań |
+| `contract-manufacturing-web-1` | — | **Web units for the yard** | trade | durable manufactured goods (Stasis Web, a non-weapon module); offering Huta, delivery Doki |
 
 ### Worlds
 
@@ -224,6 +226,8 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | Order mini-window item entry (market rows) | — | **Request on Market** | trade | posts a standing bid for the clicked item through the same window (holding the item is not required). Approved 2026-10-18 |
 | Order mini-window mode toggle (`uikit/screens/orderwin.go`) | — | **Sell** / **Request** | trade | the two order sides in the player's words — the book itself keeps Bid/Ask. Re-toggling re-applies the mode's default price. Approved 2026-10-18 |
 | Order mini-window title (`uikit/screens/orderwin.go`) | — | **&lt;name&gt; — Order** | trade | follows the "&lt;name&gt; — Info" title convention. Approved 2026-10-18 |
+| Manufacturing window title (`game/screens.go`, `uikit/screens/manufacturing.go`) | Factory | **Manufacturing** | trade | the industry window: recipe board, up-front job fee, the three global job slots and Start/Collect/Cancel. User-approved rename of Factory; key B unchanged. Approved 2026-10-20 |
+| Refinery window title (`game/screens.go`, `uikit/screens/refinery.go`) | — | **Refinery** | trade | the ore→mineral service window at a `refine` station: ore list, yield preview, Refine. Plain trade noun. Approved 2026-10-20 |
 
 ## Money strings
 

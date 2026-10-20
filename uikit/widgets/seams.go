@@ -81,14 +81,24 @@ type ContentView interface {
 	MarketPrice(sim.StationID, content.ItemID) float64
 	DockedMarket() sim.StationID
 
-	// Industry: the factory's jobs, materials, gating and craft reads.
+	// Industry: the manufacturing jobs, materials, fees, gating and craft
+	// reads. Jobs are the GLOBAL list (every station) — controls gate on
+	// DockedIndustry.
 	DockedIndustry() sim.StationID
 	Jobs(sim.StationID) []sim.Job
+	AllJobs() []sim.Job
+	StationName(sim.StationID) string
 	JobMaterials(sim.StationID, content.RecipeID, int) []content.CargoStack
+	JobFee(content.RecipeID, int) float64
 	CanStartJob(sim.StationID, content.RecipeID, int) bool
 	PlayerStock(content.ItemID) int
 	JobDuration(sim.StationID, content.RecipeID, int) float64
 	CraftLevel(sim.StationID, string) int
+
+	// Holds, as the refinery reads them: copies of the general cargo and
+	// the dedicated ore hold (the two places CmdRefine consumes from).
+	CargoStacks() []content.CargoStack
+	OreStacks() []content.CargoStack
 
 	// Show Info reference resolution (the info catalog seam).
 	InfoRefFor(ecs.Entity) (InfoRef, bool)
@@ -273,9 +283,29 @@ func (v *view) DockedIndustry() sim.StationID { return v.s.DockedIndustry() }
 
 func (v *view) Jobs(st sim.StationID) []sim.Job { return v.s.Jobs(st) }
 
+func (v *view) AllJobs() []sim.Job { return v.s.AllJobs() }
+
+func (v *view) StationName(st sim.StationID) string { return v.s.StationName(st) }
+
+func (v *view) CargoStacks() []content.CargoStack {
+	if c, ok := v.s.Cargos.Get(v.s.Player()); ok {
+		return append([]content.CargoStack(nil), c.Stacks...)
+	}
+	return nil
+}
+
+func (v *view) OreStacks() []content.CargoStack {
+	if c, ok := v.s.Cargos.Get(v.s.Player()); ok {
+		return append([]content.CargoStack(nil), c.Ore...)
+	}
+	return nil
+}
+
 func (v *view) JobMaterials(st sim.StationID, rec content.RecipeID, runs int) []content.CargoStack {
 	return v.s.JobMaterials(st, rec, runs)
 }
+
+func (v *view) JobFee(rec content.RecipeID, runs int) float64 { return v.s.JobFee(rec, runs) }
 
 func (v *view) CanStartJob(st sim.StationID, rec content.RecipeID, runs int) bool {
 	return v.s.CanStartJob(st, rec, runs)

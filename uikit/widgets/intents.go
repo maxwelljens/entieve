@@ -84,12 +84,18 @@ type (
 	Unequip  struct{ Slot sim.SlotRef }
 	Assemble struct{ Ship content.ShipID }
 
-	// StartJob/CollectJob are the factory's two verbs.
+	// StartJob/CollectJob/CancelJob are the manufacturing window's verbs;
+	// Refine is the refinery's (CmdRefine: ore → minerals at base yield).
 	StartJob struct {
 		Recipe content.RecipeID
 		Runs   int
 	}
 	CollectJob struct{ Job uint64 }
+	CancelJob  struct{ Job uint64 }
+	Refine     struct {
+		Ore content.ItemID
+		Qty int
+	}
 
 	// Accept/Abandon are the station contract board's two verbs.
 	Accept  struct{ Contract content.ContractID }
@@ -149,6 +155,8 @@ func (Unequip) isIntent()     {}
 func (Assemble) isIntent()    {}
 func (StartJob) isIntent()    {}
 func (CollectJob) isIntent()  {}
+func (CancelJob) isIntent()   {}
+func (Refine) isIntent()      {}
 func (Accept) isIntent()      {}
 func (Abandon) isIntent()     {}
 func (Activate) isIntent()    {}
@@ -199,6 +207,10 @@ func commandFor(i Intent, warpRange, orbitRange float64) (sim.Command, bool) {
 		return sim.CmdStartJob{Recipe: v.Recipe, Runs: v.Runs}, true
 	case CollectJob:
 		return sim.CmdCollectJob{ID: v.Job}, true
+	case CancelJob:
+		return sim.CmdCancelJob{ID: v.Job}, true
+	case Refine:
+		return sim.CmdRefine{Item: v.Ore, Qty: v.Qty}, true
 	case Accept:
 		return sim.CmdAcceptMission{ID: v.Contract}, true
 	case Abandon:

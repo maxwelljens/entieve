@@ -2,6 +2,7 @@ package screens
 
 import (
 	"github.com/entieve/entieve/uikit/internal/uitest"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"strings"
 	"testing"
@@ -13,7 +14,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Factory panel fixtures. Content is read-only in production: the test
+// Manufacturing panel fixtures. Content is read-only in production: the test
 // session patches ITS OWN copy of the shipped content (the start station
 // gains the industry service — shipped solace offers none, penumbra does).
 // ---------------------------------------------------------------------------
@@ -64,11 +65,11 @@ func giveItem(s *sim.Sim, item content.ItemID, qty int) {
 	cargo.Stacks = append(cargo.Stacks, content.CargoStack{Item: item, Qty: qty})
 }
 
-// recipeRowFor returns the recipe-table row index whose payload produces
+// manufacturingRowFor returns the recipe-table row index whose payload produces
 // product (-1 when absent).
-func recipeRowFor(f *Factory, product content.ItemID) int {
+func recipeRowFor(f *Manufacturing, product content.ItemID) int {
 	for i, r := range f.recipes.Rows {
-		row, ok := r.Data.(factoryRow)
+		row, ok := r.Data.(manufacturingRow)
 		if !ok {
 			continue
 		}
@@ -79,13 +80,13 @@ func recipeRowFor(f *Factory, product content.ItemID) int {
 	return -1
 }
 
-// TestFactoryPanelGatingAndEnqueue walks the panel like the market tests
+// TestManufacturingPanelGatingAndEnqueue walks the panel like the market tests
 // walk theirs: rows from the sim, visible-but-grayed Start while undocked
 // / unstocked / over the slot cap, the stepper's have/need readout, and
 // the two enqueued commands.
-func TestFactoryPanelGatingAndEnqueue(t *testing.T) {
+func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 	env, cmds := factoryEnv(t)
-	f := NewFactory(env)
+	f := NewManufacturing(env)
 	ui := newWindowUI(t, env, f.Win())
 	frame := func() { uitest.PumpWindow(t, ui, f.Sync, 1024, 700) }
 	frame()
@@ -98,8 +99,8 @@ func TestFactoryPanelGatingAndEnqueue(t *testing.T) {
 		t.Fatalf("recipe rows = %d, want %d", len(f.recipes.Rows), len(want))
 	}
 	for i, r := range f.recipes.Rows {
-		if len(r.Cells) != 4 {
-			t.Fatalf("row %d has %d cells, want 4", i, len(r.Cells))
+		if len(r.Cells) != 5 {
+			t.Fatalf("row %d has %d cells, want 5", i, len(r.Cells))
 		}
 		if r.Cells[0] != itemLabel(env, want[i].Product) {
 			t.Fatalf("row %d = %q, want %q (canonical order)", i, r.Cells[0], want[i].Product)
@@ -119,8 +120,8 @@ func TestFactoryPanelGatingAndEnqueue(t *testing.T) {
 	if chargeRow < 0 {
 		t.Fatal("no charge-emp recipe row")
 	}
-	if !strings.Contains(f.recipes.Rows[chargeRow].Cells[3], "Ferrite 0/720") {
-		t.Errorf("inputs cell = %q, want the have/need readout", f.recipes.Rows[chargeRow].Cells[3])
+	if !strings.Contains(f.recipes.Rows[chargeRow].Cells[4], "Ferrite 0/720") {
+		t.Errorf("inputs cell = %q, want the have/need readout", f.recipes.Rows[chargeRow].Cells[4])
 	}
 
 	// Undocked: Start is visible but grayed, and a direct press enqueues
@@ -141,8 +142,8 @@ func TestFactoryPanelGatingAndEnqueue(t *testing.T) {
 		!strings.Contains(f.craftLbl.Label, "hulls L1") {
 		t.Errorf("craft line = %q, want per-family levels", f.craftLbl.Label)
 	}
-	if f.jobsLbl.Label != "Jobs — 0/2 slots" {
-		t.Errorf("jobs line = %q, want the 0/2 slot readout", f.jobsLbl.Label)
+	if f.jobsLbl.Label != "Jobs — 0/3 slots" {
+		t.Errorf("jobs line = %q, want the 0/3 slot readout", f.jobsLbl.Label)
 	}
 	if !f.start.GetWidget().Disabled {
 		t.Fatal("Start enabled with an empty hold")
@@ -184,7 +185,7 @@ func TestFactoryPanelGatingAndEnqueue(t *testing.T) {
 	if f.qty() != 10 {
 		t.Fatalf("qty = %d, want 10", f.qty())
 	}
-	cell := f.recipes.Rows[chargeRow].Cells[3]
+	cell := f.recipes.Rows[chargeRow].Cells[4]
 	if !strings.Contains(cell, "/7,200") {
 		t.Errorf("inputs cell at qty 10 = %q, want /7,200", cell)
 	}
@@ -205,8 +206,8 @@ func TestFactoryPanelGatingAndEnqueue(t *testing.T) {
 	if len(f.jobs.Rows) != 1 {
 		t.Fatalf("job rows = %d, want 1", len(f.jobs.Rows))
 	}
-	if f.jobs.Rows[0].Cells[3] != "Running" {
-		t.Errorf("job state cell = %q, want Running", f.jobs.Rows[0].Cells[3])
+	if f.jobs.Rows[0].Cells[4] != "Running" {
+		t.Errorf("job state cell = %q, want Running", f.jobs.Rows[0].Cells[4])
 	}
 	if !f.collect.GetWidget().Disabled {
 		t.Fatal("Collect enabled before the job row is selected")
@@ -224,7 +225,7 @@ func TestFactoryPanelGatingAndEnqueue(t *testing.T) {
 	if f.collect.GetWidget().Disabled {
 		t.Fatal("Collect never armed (job did not complete)")
 	}
-	if f.jobs.Rows[0].Cells[3] != "Ready" || f.jobs.Rows[0].Cells[2] != "100%" {
+	if f.jobs.Rows[0].Cells[4] != "Ready" || f.jobs.Rows[0].Cells[3] != "100%" {
 		t.Errorf("done job row = %+v, want Ready/100%%", f.jobs.Rows[0].Cells)
 	}
 	uitest.FireButton(ui, f.collect)
@@ -237,12 +238,12 @@ func TestFactoryPanelGatingAndEnqueue(t *testing.T) {
 	}
 }
 
-// TestFactoryRowsShowInfo: recipe and job rows carry the product ref —
+// TestManufacturingRowsShowInfo: recipe and job rows carry the product ref —
 // right-click opens the Show Info menu (plus the gated action entry) and
 // double-click swaps the window.
-func TestFactoryRowsShowInfo(t *testing.T) {
+func TestManufacturingRowsShowInfo(t *testing.T) {
 	env, cmds := factoryEnv(t)
-	f := NewFactory(env)
+	f := NewManufacturing(env)
 	ui := newWindowUI(t, env, f.Win())
 	frame := func() { uitest.PumpWindow(t, ui, f.Sync, 1024, 700) }
 	frame()
@@ -256,7 +257,7 @@ func TestFactoryRowsShowInfo(t *testing.T) {
 	}
 
 	// Double-click (two clicks inside the window) swaps Show Info onto the
-	// product — the ref resolves through InfoRefOf's factoryRow case.
+	// product — the ref resolves through InfoRefOf's manufacturingRow case.
 	ref, ok := env.InfoRefOf(f.recipes.Rows[chargeRow].Data)
 	if !ok || ref != widgets.ItemRef("charge-emp") {
 		t.Fatalf("row ref = %v (%v), want item/charge-emp", ref, ok)
@@ -361,8 +362,8 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 	if r := mustRow(t, page, "MANUFACTURED FROM", "Family"); r.Value != "Hulls" {
 		t.Errorf("family row = %+v, want Hulls", r)
 	}
-	if r := mustRow(t, page, "MANUFACTURED FROM", "Base time"); r.Value != "240.0 s" {
-		t.Errorf("base time row = %+v, want 240.0 s", r)
+	if r := mustRow(t, page, "MANUFACTURED FROM", "Base time"); r.Value != "600.0 s" {
+		t.Errorf("base time row = %+v, want 600.0 s", r)
 	}
 	if r := mustRow(t, page, "MANUFACTURED FROM", "Ferrite"); r.Value != "×44,700" {
 		t.Errorf("input qty = %+v, want ×44,700", r)
@@ -525,5 +526,94 @@ func TestInfoWindowChainRefSwap(t *testing.T) {
 	click(back)
 	if got, _ := w.Ref(); got != widgets.ItemRef("charge-emp") {
 		t.Fatalf("double-click ref = %v, want the charge back", got)
+	}
+}
+
+// TestManufacturingAllStationJobs: the job list is global — every station's
+// jobs are listed with their station — but Collect and Cancel stay gated to
+// the docked station. The recipe board quotes the up-front fee.
+func TestManufacturingAllStationJobs(t *testing.T) {
+	env, cmds := factoryEnv(t)
+	f := NewManufacturing(env)
+	ui := newWindowUI(t, env, f.Win())
+	frame := func() { uitest.PumpWindow(t, ui, f.Sync, 1024, 700) }
+	frame()
+
+	// Stock and start a job at ANOTHER industry station (Huta).
+	rec := env.Content.Recipes["rec-charge-emp"]
+	for _, m := range env.Sim.JobMaterials("cel-huta", rec.ID, 1) {
+		giveItem(env.Sim, m.Item, m.Qty)
+	}
+	if _, ok := env.Sim.StartJob("cel-huta", rec.ID, 1, sim.OwnerPlayer); !ok {
+		t.Fatal("remote fixture job refused")
+	}
+	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: factoryStation})
+	frame()
+
+	if len(f.jobs.Rows) != 1 {
+		t.Fatalf("job rows = %d, want the remote job listed", len(f.jobs.Rows))
+	}
+	if got := f.jobs.Rows[0].Cells[1]; got != env.Sim.StationName("cel-huta") {
+		t.Errorf("station cell = %q, want %q", got, env.Sim.StationName("cel-huta"))
+	}
+	// The fee column quotes the recipe's 3% mineral value at the stepper qty.
+	chargeRow := recipeRowFor(f, "charge-emp")
+	if chargeRow < 0 {
+		t.Fatal("no charge-emp recipe row")
+	}
+	if got, want := f.recipes.Rows[chargeRow].Cells[3], theme.FormatCredits(env.Sim.JobFee(rec.ID, 1)); got != want {
+		t.Errorf("fee cell = %q, want %q", got, want)
+	}
+
+	// Select the remote job: both local actions stay grayed.
+	clickRow(ui, f.jobs, 0)
+	frame()
+	if !f.collect.GetWidget().Disabled || !f.cancel.GetWidget().Disabled {
+		t.Fatal("remote job is controllable from another station")
+	}
+	f.collectClicked()
+	f.cancelClicked()
+	if len(*cmds) != 0 {
+		t.Fatalf("remote job enqueued %d commands, want 0", len(*cmds))
+	}
+
+	// A local job lists too and its Cancel works from here.
+	for _, m := range env.Sim.JobMaterials(factoryStation, rec.ID, 1) {
+		giveItem(env.Sim, m.Item, m.Qty)
+	}
+	if _, ok := env.Sim.StartJob(factoryStation, rec.ID, 1, sim.OwnerPlayer); !ok {
+		t.Fatal("local fixture job refused")
+	}
+	frame()
+	if len(f.jobs.Rows) != 2 {
+		t.Fatalf("job rows = %d, want both stations", len(f.jobs.Rows))
+	}
+	remote := -1
+	local := -1
+	for i, r := range f.jobs.Rows {
+		row := r.Data.(manufacturingRow)
+		for _, j := range env.Sim.AllJobs() {
+			if j.ID == row.job && j.Station == factoryStation {
+				local = i
+			}
+			if j.ID == row.job && j.Station == "cel-huta" {
+				remote = i
+			}
+		}
+	}
+	if local < 0 || remote < 0 {
+		t.Fatalf("rows = %+v, want one local and one remote", f.jobs.Rows)
+	}
+	clickRow(ui, f.jobs, local)
+	frame()
+	if f.cancel.GetWidget().Disabled {
+		t.Fatal("Cancel grayed for a local running job")
+	}
+	uitest.FireButton(ui, f.cancel)
+	if len(*cmds) != 1 {
+		t.Fatalf("cancel enqueued %d commands, want 1", len(*cmds))
+	}
+	if _, ok := (*cmds)[0].(sim.CmdCancelJob); !ok {
+		t.Fatalf("cmd = %#v, want CmdCancelJob", (*cmds)[0])
 	}
 }

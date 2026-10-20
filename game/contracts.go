@@ -419,7 +419,7 @@ func (g *Game) objectiveRef(id content.ContractID) (widgets.InfoRef, bool) {
 	case def.Objective.Target != "":
 		ref = widgets.NpcRef(def.Objective.Target)
 	case def.Objective.Item != "":
-		ref = widgets.ItemRef(def.Objective.Item)
+		ref, _ = widgets.RefOfID(g.env, string(def.Objective.Item))
 	default:
 		return widgets.InfoRef{}, false
 	}
@@ -438,6 +438,12 @@ func objectiveSummary(c *content.Content, def *content.ContractDef) string {
 		}
 		return fmt.Sprintf("Destroy %d× %s", def.Objective.Count, name)
 	case content.ContractDeliver:
+		// Modules trade as cargo units (no volume); items keep the m³ line.
+		if _, ok := c.Module(content.ModuleID(def.Objective.Item)); ok {
+			return fmt.Sprintf("Deliver %d× %s to %s",
+				def.Objective.Count, itemName(c, def.Objective.Item),
+				celName(c, def.Objective.Destination))
+		}
 		return fmt.Sprintf("Deliver %d m³ %s to %s",
 			def.Objective.Count, itemName(c, def.Objective.Item),
 			celName(c, def.Objective.Destination))
@@ -480,7 +486,8 @@ func (g *Game) cargoProgress(def *content.ContractDef) float64 {
 	}
 	item, ok := g.opts.Content.Item(def.Objective.Item)
 	if !ok || item.Volume <= 0 {
-		return 0
+		// A volume-less cargo unit (a module) counts as whole units.
+		return math.Min(float64(qty), float64(def.Objective.Count))
 	}
 	have := float64(qty) * item.Volume
 	if want := float64(def.Objective.Count); have > want {
@@ -492,6 +499,9 @@ func (g *Game) cargoProgress(def *content.ContractDef) float64 {
 // itemName resolves an item id to its display name.
 func itemName(c *content.Content, id content.ItemID) string {
 	if def, ok := c.Item(id); ok {
+		return def.Name
+	}
+	if def, ok := c.Module(content.ModuleID(id)); ok {
 		return def.Name
 	}
 	return string(id)

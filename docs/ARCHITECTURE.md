@@ -29,8 +29,8 @@ library. **Unit tests use only the standard `testing` package.**
 | `content/`    | Data schema (`model.go`), JSON loading (`load.go`), cross-reference validation (`validate.go`), embedded game data (`data/`). |
 | `sim/`        | The deterministic game simulation: components, commands, events, systems. Headless — never imports Ebitengine. |
 | `render/`     | Draws `sim` state: starfield, grid, ships (vector art), brackets, effects. |
-| `uikit/`      | The UI platform (ebitenui v0.7.3): EVE-style windows — overview, HUD, module rack, selected item, inventory, fitting, factory, station services, starmap, log — plus the Show Info window (`infowin.go`), the flat context menu (`menu.go`) and the icon set (`icons/`). The legacy hand-drawn `ui/` package is retired. |
-| `game/`       | Ebiten `Game` implementation, scene stack (menu / space / station / starmap), input→`sim` commands, camera, time acceleration, save/load wiring, the factory panel wiring. |
+| `uikit/`      | The UI platform (ebitenui v0.7.3): EVE-style windows — overview, HUD, module rack, selected item, inventory, fitting, manufacturing, refinery, station services, starmap, log — plus the Show Info window (`infowin.go`), the flat context menu (`menu.go`) and the icon set (`icons/`). The legacy hand-drawn `ui/` package is retired. |
+| `game/`       | Ebiten `Game` implementation, scene stack (menu / space / station / starmap), input→`sim` commands, camera, time acceleration, save/load wiring, the manufacturing panel wiring. |
 | `cmd/entieve` | CLI entrypoint: `run` (play), `validate` (content lint), `simulate` (headless run with report), `version`. |
 
 Dependency direction (never invert):
@@ -384,12 +384,13 @@ CmdTransfer{Item, Qty, From, To}, // holds: "cargo" | "ore" | "hangar"
 CmdRefine{Item, Qty}, CmdRepair{}, CmdAssemble{ShipID},
 CmdFitModule{ModuleID, Slot SlotRef}, CmdUnfitModule{Slot SlotRef},
 CmdAcceptMission{ID content.ContractID}, CmdAbandonMission{ID content.ContractID},
-CmdStartJob{Recipe content.RecipeID, Runs int}, CmdCollectJob{ID uint64} // industry (system 17)
+CmdStartJob{Recipe content.RecipeID, Runs int}, CmdCollectJob{ID uint64},
+CmdCancelJob{ID uint64} // industry (system 17)
 ```
 (`Target ecs.Entity`; module index = flat slot index within its slot class.
 The two mission commands validate against the docked station's contract
 board — docked check, board check, `min_standing` check — and report
-refusals as `EvMission` phase `"refused"`. The two industry commands ride
+refusals as `EvMission` phase `"refused"`. The three industry commands ride
 `deferIndustry` to `systemIndustry` and report refusals as `SevWarning`
 "Industry: …" log lines.)
 
@@ -477,8 +478,8 @@ anatomy lives in `docs/SIM.md`):
 16. `traffic` (the living universe: convoy spawn/warp/deliver schedules,
     real-cargo provenance, per-leg ambush rolls, raider and patrol combat,
     cross-system journey parking/resume, book supply),
-17. `industry` (manufacturing jobs from recipes, craft growth and idle
-    decay),
+17. `industry` (manufacturing jobs from recipes, the 3-slot global pool,
+    job fees/cancels, craft growth and idle decay),
 18. `agents` (the ledger economy: settle resting fills every tick, the
     agent behavior pass on per-agent cooldowns of 60-600 ticks, the station upkeep cycle every
     3600 ticks).
@@ -795,8 +796,9 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
   (shield/armor/structure arcs, capacitor bar, speed, targeting list),
   Module rack (high/mid/low rows, F1–F8 activates high, deactivated state
   shown), Inventory (cargo + ore hold), Fitting (hull slots + stats),
-  Factory (manufacturing jobs, craft levels and material counts at a
-  docked `industry` station), Station services (repair/market/refine/
+  Manufacturing (jobs, fees, three global slots, craft levels and material
+  counts at a docked `industry` station), Refinery (ore→mineral yield
+  preview at a `refine` station), Station services (repair/market/refine/
   fitting tabs), Starmap (system graph, current system highlighted —
   click selects, gates are used in-system), Log (event feed).
 - `game`: scene stack. Space scene is the hub. The keyboard map is

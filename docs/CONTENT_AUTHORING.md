@@ -723,7 +723,7 @@ dir; one themed file per product family):
     "product": "ship-sloop",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 20800 }, { "item": "min-nickel", "qty": 3700 }, { "item": "min-silex", "qty": 1500 }],
-    "time": 120,
+    "time": 600,
     "family": "hulls"
   }
 ]
@@ -735,7 +735,7 @@ dir; one themed file per product family):
 | `product` | the ItemID / ShipID / ModuleID produced. Resolves like a market order: item first, then ship, then module. Unknown product, or a product in category `ore`/`mineral`/`loot`, is a validation error |
 | `qty` | units produced per run (1 for hulls and modules; charge runs are batched — shipped batches are 100) |
 | `inputs` | minerals only (`min-*` ids, category `mineral`), each `item` + `qty` in whole units |
-| `time` | seconds per run at the craft-L1 baseline (each craft level above L1 cuts 4 %): **30–90 s** for charges/modules, **2–5 min** for hulls (session-visible timescale) |
+| `time` | seconds per run at the craft-L1 baseline (each craft level above L1 cuts 4 %): **~30 s** for charges, **~3 min** for modules, **~10 min** for hulls (the approved per-family ladder; runs multiply linearly) |
 | `family` | the station craft-growth key (`CraftLevel` in `sim`): `hulls` \| `modules` \| `charges` |
 
 v1 ships **exactly one recipe per product**, but the schema is a list:
@@ -789,6 +789,20 @@ Manufacturing runs at stations offering the `industry` service (the closed
 set lives in `content/validate.go`: `repair | market | refine | fitting |
 industry`). Shipped, Przystań (`cel-penumbra-port`, the Kuźnica freeport),
 Huta (`cel-huta`, Młynów) and Doki (`cel-doki`, Kamieniec) carry it.
+
+Every job commits its minerals up front and costs a fee of **3 % of the
+recipe's mineral value at base prices**, per run, debited from the wallet
+when it starts (`Sim.JobFee`; the Manufacturing window quotes it). All
+stations share **three global job slots**; cancelling a running job returns
+the materials to the hangar and keeps the fee. The four-minute and
+ten-minute families are deliberate pacing, not a per-recipe knob: keep a
+new module near 180 s and a new hull near 600 s so the ladder reads at a
+glance.
+
+Deliver contracts may demand **module ids** as cargo (modules trade as
+whole units, no volume), which is how the manufacturing contracts
+(`contracts/manufacturing.json`) ask for manufactured goods; ammo and
+weapon ids are not stable targets for them.
 
 ## Checklist before you finish
 
