@@ -790,8 +790,10 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > shares, which have no weights. `widgets.SplitPane` is a stack
 > (`NewSplitPane`) or a row (`NewSplitPaneRow`) with a draggable seam
 > between each pair: its own `Layouter` (so no upstream change), a
-> hairline seam with an 8 px grab band classified from the cursor every
-> frame (the window chrome's `gripStart` idiom and its topmost-input-layer
+> recessed 4 px track seam — a dark fill edged with the border color and a
+> centred three-dot sash grip, dim at rest and lit while the pointer is in
+> the band or dragging — with an 8 px grab band classified from the cursor
+> every frame (the window chrome's `gripStart` idiom and its topmost-input-layer
 > test, so a seam under another window is inert), an NS-resize cursor over
 > a stack and EW over a row, and a 72 design-px pane floor. The cursor has
 > one writer: ebitenui's cursor management is off (`Kit`), seams and the

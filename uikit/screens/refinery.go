@@ -123,7 +123,7 @@ func NewRefinery(env widgets.Seams) *Refinery {
 	)
 	body.AddChild(r.ores.Container(), r.status, r.qtyBar)
 
-	title, _ := theme.NewTitleBar(env, "Refinery", "kind_belt")
+	title, _ := theme.NewTitleBar(env, "Refinery", "svc_refinery")
 
 	r.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),

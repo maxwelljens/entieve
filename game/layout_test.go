@@ -921,9 +921,9 @@ func TestMarketSplitRatioPersists(t *testing.T) {
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
 
-	// The opening share: 240 of the 529 px the split spans at the 546 px
-	// landing square (546 − 2·ContentsPad − the 1 px seam).
-	const opening = 1 - 240.0/529
+	// The opening share: 240 of the 526 px the split spans at the 546 px
+	// landing square (546 − 2·ContentsPad − the 4 px split seam).
+	const opening = 1 - 240.0/526
 	seams := g.splitSeams("market")
 	if len(seams) != 1 || seams[0].Name != "market-orders" {
 		t.Fatalf("market seams = %+v, want one named market-orders", seams)
@@ -976,7 +976,7 @@ func TestMarketSplitV2Default(t *testing.T) {
 		"market":{"x":396,"y":8,"w":546,"h":546,"open":true}}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	const opening = 1 - 240.0/529
+	const opening = 1 - 240.0/526
 
 	g := newShowcaseGameAt(t, path)
 	g.applySize(1280, 720)

@@ -87,7 +87,8 @@ its minimum size), and click anywhere on a window to raise it to the
 front.
 
 **Multi-pane windows** — Inventory, Fitting and Manufacturing — carry
-**draggable seams** between their lists: the seam is a thin line with an
+**draggable seams** between their lists: the seam is a recessed track with
+a dotted grip in its middle (the grip lights up under the pointer) and an
 about 8 px grab band (the cursor turns into the up/down arrow over it),
 and dragging it trades height between the two lists it separates, so a
 long hangar or job list can be given the room. Each pane keeps a minimum

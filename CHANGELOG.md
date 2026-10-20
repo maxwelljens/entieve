@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Draggable split panes** in Inventory (cargo/ore, ore/hangar), Fitting
   (slots/hangar), Manufacturing (recipes/jobs) and the Market (order book /
-  My orders): the pane seam is a thin line with an 8 px grab band and a
+  My orders): the pane seam is a recessed 4 px track with a centred
+  three-dot grip that lights up under the pointer, an 8 px grab band and a
   resize cursor (up/down in the stacked windows, left/right in the market);
   dragging it trades height (or width) between the two lists, each pane
   keeps a minimum size, and nothing else in the window moves. The market
@@ -22,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Manufacturing and Refinery have their own icons** (game-icons.net
+  `factory` and `furnace`, both by Delapouite, CC BY 3.0, credited in
+  `uikit/icons/CREDITS.md`) on the window title bar, the navigation rail
+  and the station-services strip, instead of borrowing the module and
+  ore-belt glyphs.
 - **Refining is atomic in 100-ore batches** (`sim/system_economy.go`,
   `uikit/screens/refinery.go`): ore refines only in whole batches of 100, so
   a fraction of a unit per ore can no longer floor to nothing while eating

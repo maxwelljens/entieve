@@ -2,8 +2,10 @@ package widgets
 
 import (
 	"image"
+	"image/color"
 	"math"
 
+	eimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/input"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/uikit/theme"
@@ -20,8 +22,9 @@ import (
 // seam i at i/n; 0.5 for a two-pane split, the default): the fraction
 // above it in a vertical stack, the fraction left of it in a row.
 // Dragging a seam trades height (or width) between the two panes it
-// bounds and leaves the rest untouched. The seam itself is a hairline;
-// its grab band is 8 px, classified from the cursor every frame like the
+// bounds and leaves the rest untouched. The seam is a recessed track with
+// a centred sash grip (three dots, dim at rest and lit on hover/drag); its
+// grab band is 8 px, classified from the cursor every frame like the
 // window chrome's edge grips — a body widget that elevates its own input
 // layer (a table's scroll viewport) never eats the press in the band. The
 // cursor is NS-resize for a stack, EW-resize for a row.
@@ -34,11 +37,15 @@ type SplitPane struct {
 	root   *widget.Container
 	panes  []widget.PreferredSizeLocateableWidget
 	seams  []*widget.Container
-	shares []float64 // pane i's share of the stack (sum 1; 1/n each at rest)
-	def    []float64 // shares Reset restores (equal unless SetDefaultRatio)
-	minPx  int       // per-pane floor
-	seamPx int       // hairline thickness
-	row    bool      // panes side by side (width split) instead of stacked
+	grips  []*widget.Container // the sash handle inside each seam
+	shares []float64           // pane i's share of the stack (sum 1; 1/n each at rest)
+	def    []float64           // shares Reset restores (equal unless SetDefaultRatio)
+	minPx  int                 // per-pane floor
+	seamPx int                 // track thickness
+	row    bool                // panes side by side (width split) instead of stacked
+
+	gripDim, gripLit *eimage.NineSlice // the grip's two states (shared by seams)
+	lit              int               // seam whose grip is bright (-1 = none)
 
 	seam       int // seam grabbed by the press (-1 = none)
 	start      image.Point
@@ -48,14 +55,17 @@ type SplitPane struct {
 }
 
 // SplitPane metrics in DESIGN units (theme.Px at every measure). The
-// floor keeps a section label plus two rows readable; the seam is a
-// hairline with 4 px of grab on either side (8 px total, the chrome's
-// edge-grip width). Stored ratios outside SplitMinRatio..SplitMaxRatio
-// are clamped: a pane that far collapsed is unusable, and the pixel floor
-// then does the rest.
+// floor keeps a section label plus two rows readable; the seam is a 4 px
+// recessed track carrying a dotted grip (2 px dots, 2 px apart) with the
+// 8 px grab band centred on it (the chrome's edge-grip width; the track
+// itself counts, so the margin is 2 px a side). Stored ratios outside
+// SplitMinRatio..SplitMaxRatio are clamped: a pane that far collapsed is
+// unusable, and the pixel floor then does the rest.
 const (
 	SplitMinPane  = 72
-	SplitSeamH    = 1
+	SplitSeamH    = 4
+	SplitGripDot  = 2
+	SplitGripGap  = 2
 	SplitGrabPx   = 4
 	SplitMinRatio = 0.1
 	SplitMaxRatio = 0.9
@@ -84,15 +94,22 @@ func NewSplitPaneRow(th theme.Theme, panes ...widget.PreferredSizeLocateableWidg
 }
 
 func newSplitPane(th theme.Theme, row bool, panes []widget.PreferredSizeLocateableWidget) *SplitPane {
+	pal := th.Pal()
 	s := &SplitPane{
-		panes:  panes,
-		shares: make([]float64, len(panes)),
-		minPx:  theme.Px(SplitMinPane),
-		seamPx: theme.Px(SplitSeamH),
-		row:    row,
-		seam:   -1,
+		panes:   panes,
+		shares:  make([]float64, len(panes)),
+		minPx:   theme.Px(SplitMinPane),
+		seamPx:  theme.Px(SplitSeamH),
+		row:     row,
+		seam:    -1,
+		lit:     -1,
+		gripDim: splitGrip(pal.Head, row),
+		gripLit: splitGrip(pal.Text, row),
 	}
-	seamImg := theme.NineSlice(theme.NRGBA(th.Pal().Border, 200))
+	// Recessed track: a Border line around the near-black BGHard fill, so
+	// the division reads on any surface (the body is the same near-black
+	// at window translucency).
+	trackImg := theme.Bordered(theme.Solid(pal.BGHard), theme.NRGBA(pal.Border, 200), 1)
 	if n := len(panes); n > 0 {
 		for i := range s.shares {
 			s.shares[i] = 1 / float64(n)
@@ -103,12 +120,61 @@ func newSplitPane(th theme.Theme, row bool, panes []widget.PreferredSizeLocateab
 	for i, p := range panes {
 		s.root.AddChild(p)
 		if i < len(panes)-1 {
-			seam := widget.NewContainer(widget.ContainerOpts.BackgroundImage(seamImg))
+			grip := widget.NewContainer(
+				widget.ContainerOpts.BackgroundImage(s.gripDim),
+				widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+					HorizontalPosition: widget.AnchorLayoutPositionCenter,
+					VerticalPosition:   widget.AnchorLayoutPositionCenter,
+				})),
+			)
+			seam := widget.NewContainer(
+				widget.ContainerOpts.BackgroundImage(trackImg),
+				widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+			)
+			seam.AddChild(grip)
+			s.grips = append(s.grips, grip)
 			s.seams = append(s.seams, seam)
 			s.root.AddChild(seam)
 		}
 	}
 	return s
+}
+
+// splitGrip builds one sash handle: three dots along the seam's axis
+// (across a stack's horizontal seam, down a row's vertical one), drawn at
+// their own pixels and centred by the seam's anchor layout.
+func splitGrip(c color.RGBA, row bool) *eimage.NineSlice {
+	dot, gap := theme.Px(SplitGripDot), theme.Px(SplitGripGap)
+	w, h := 3*dot+2*gap, dot
+	if row {
+		w, h = dot, 3*dot+2*gap
+	}
+	img := ebiten.NewImage(w, h)
+	for i := 0; i < 3; i++ {
+		at := i * (dot + gap)
+		if row {
+			theme.FillRect(img, image.Rect(0, at, dot, at+dot), c)
+			continue
+		}
+		theme.FillRect(img, image.Rect(at, 0, at+dot, dot), c)
+	}
+	return eimage.NewFixedNineSlice(img)
+}
+
+// light brightens seam i's grip (or dims every grip for -1): the handle
+// advertises the grab band under the pointer, and stays lit while dragged.
+func (s *SplitPane) light(i int) {
+	if i == s.lit {
+		return
+	}
+	for n, grip := range s.grips {
+		img := s.gripDim
+		if n == i {
+			img = s.gripLit
+		}
+		grip.SetBackgroundImage(img)
+	}
+	s.lit = i
 }
 
 // Container returns the wrapper to place where the pane stack goes.
@@ -191,28 +257,27 @@ func (s *SplitPane) Step(cursor image.Point, rising, pressed bool) {
 	if s.seam >= 0 {
 		if !pressed {
 			s.seam = -1
+		} else {
+			s.drag(cursor)
+			s.setCursor()
+			s.light(s.seam)
 			return
 		}
-		s.drag(cursor)
-		s.setCursor()
-		return
 	}
-	if rising {
-		i := s.seamAt(cursor)
-		if i < 0 {
-			return
-		}
-		s.startUpper = s.axisLen(s.panes[i].GetWidget().Rect)
-		s.pairPx = s.startUpper + s.axisLen(s.panes[i+1].GetWidget().Rect)
+	at := s.seamAt(cursor)
+	s.light(at)
+	if rising && at >= 0 {
+		s.startUpper = s.axisLen(s.panes[at].GetWidget().Rect)
+		s.pairPx = s.startUpper + s.axisLen(s.panes[at+1].GetWidget().Rect)
 		s.availPx = s.axisLen(s.root.GetWidget().Rect) - s.seamPx*len(s.seams)
 		if s.pairPx <= 0 || s.availPx <= 0 {
 			return
 		}
-		s.seam, s.start = i, cursor
+		s.seam, s.start = at, cursor
 		s.setCursor()
 		return
 	}
-	if s.seamAt(cursor) >= 0 {
+	if at >= 0 {
 		s.setCursor()
 	}
 }
@@ -270,18 +335,21 @@ func (s *SplitPane) seamAt(p image.Point) int {
 		!l.ActiveFor(p.X, p.Y, input.LayerEventTypeWheel) {
 		return -1
 	}
+	// The grab band is 8 px total, centred on the track (the track counts
+	// inside it), like the old hairline's 4 px on either side.
 	grab := theme.Px(SplitGrabPx)
+	pad := max(grab-s.seamPx/2, 0)
 	for i, seam := range s.seams {
 		r := seam.GetWidget().Rect
 		if s.row {
 			if p.Y >= r.Min.Y && p.Y < r.Max.Y &&
-				p.X >= r.Min.X-grab && p.X < r.Max.X+grab {
+				p.X >= r.Min.X-pad && p.X < r.Max.X+pad {
 				return i
 			}
 			continue
 		}
 		if p.X >= r.Min.X && p.X < r.Max.X &&
-			p.Y >= r.Min.Y-grab && p.Y < r.Max.Y+grab {
+			p.Y >= r.Min.Y-pad && p.Y < r.Max.Y+pad {
 			return i
 		}
 	}
@@ -290,7 +358,7 @@ func (s *SplitPane) seamAt(p image.Point) int {
 
 // Layout implements widget.Layouter over the stack's own children
 // (pane, seam, pane, …): the panes take sizes() and the seams the
-// hairline between them.
+// track between them.
 func (s *SplitPane) Layout(_ []widget.PreferredSizeLocateableWidget, rect image.Rectangle) {
 	sizes := s.sizes(s.axisLen(rect))
 	at := rect.Min
@@ -314,7 +382,7 @@ func (s *SplitPane) Layout(_ []widget.PreferredSizeLocateableWidget, rect image.
 }
 
 // PreferredSize implements widget.Layouter: the panes' preferred extents
-// along the axis plus the seam hairlines, the largest across it.
+// along the axis plus the seam tracks, the largest across it.
 func (s *SplitPane) PreferredSize(_ []widget.PreferredSizeLocateableWidget) (int, int) {
 	w, h := 0, 0
 	if s.row {

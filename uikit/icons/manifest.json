@@ -255,6 +255,12 @@
       "url": "https://game-icons.net/1x1/delapouite/book-cover.html",
       "file": "book-cover.png"
     },
+    "svc_manufacturing": {
+      "slug": "factory",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/factory.html",
+      "file": "factory.png"
+    },
     "svc_map": {
       "slug": "treasure-map",
       "author": "Lorc",
@@ -266,6 +272,12 @@
       "author": "Delapouite",
       "url": "https://game-icons.net/1x1/delapouite/coins.html",
       "file": "coins.png"
+    },
+    "svc_refinery": {
+      "slug": "furnace",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/furnace.html",
+      "file": "furnace.png"
     },
     "svc_scanner": {
       "slug": "radar-sweep",

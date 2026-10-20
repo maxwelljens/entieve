@@ -175,7 +175,7 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	)
 	body.AddChild(f.craftLbl, f.split.Container())
 
-	title, titleText := theme.NewTitleBar(env, "Manufacturing", "row_module")
+	title, titleText := theme.NewTitleBar(env, "Manufacturing", "svc_manufacturing")
 	f.title = titleText
 
 	f.win = widget.NewWindow(
