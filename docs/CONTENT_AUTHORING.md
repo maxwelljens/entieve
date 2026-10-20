@@ -414,7 +414,10 @@ Append to the matching `content/data/items/*.json`:
 }
 ```
 
-Ore (note `refine_yield`: each value in `(0,1]`, **sum ≤ 1**):
+Ore (note `refine_yield`: each value in `(0,1]`, **sum ≤ 1**). Refining
+runs in whole 100-ore batches, so a batch yields exactly
+`floor(refine_yield × 100)` of each mineral — author yields that give whole
+minerals per batch:
 
 ```json
 {
@@ -711,7 +714,7 @@ rule, enforced by the validator:
 
 | Tier | Input | Mechanism |
 |------|-------|-----------|
-| 1. Refining | `ore-*` | `refine_yield` on the ore turns it into `min-*` minerals at a `refine` station |
+| 1. Refining | `ore-*` | `refine_yield` on the ore turns it into `min-*` minerals in 100-ore batches at a `refine` station |
 | 2. Manufacturing | `min-*` minerals | `recipes/*.json` turns minerals into products at an `industry` station |
 
 Ore never goes straight into a product (recipes take minerals only), and

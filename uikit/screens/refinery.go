@@ -14,9 +14,11 @@ import (
 // Refinery is the station refinery window: every ore stack in the general
 // cargo and the ore hold, the minerals it would yield at the stepper
 // quantity (the sim's own floor(RefineYield × qty) math), and the Refine
-// action. The window predicts the EvCargoFull refusal (the output volume
-// against the general hold's free space) instead of letting the press be
-// the first warning.
+// action. Ore refines in whole 100-ore batches only: the stepper offers
+// 100, 200, 300, … capped at the selected ore's stock, and a stock under
+// one batch disables Refine. The window predicts the EvCargoFull refusal
+// (the output volume against the general hold's free space) instead of
+// letting the press be the first warning.
 //
 // Gating follows the game's menu convention: the button stays VISIBLE and
 // grays out while undocked, at a station without the refine service, with
@@ -41,6 +43,11 @@ type Refinery struct {
 	sel    refineryRow
 	hasSel bool
 }
+
+// refineBatch is the refinery's only quantity step: ore refines in whole
+// 100-ore batches (the sim refuses anything else), because the yields are
+// fractions of a unit per ore and a smaller lot floors to nothing.
+const refineBatch = 100
 
 // refineryRow is one ore table row: the ore id plus its Show Info ref.
 type refineryRow struct {
@@ -218,12 +225,11 @@ func (r *Refinery) cargoFits(outs []content.CargoStack) bool {
 // simulation. Call it every frame before Kit.Update.
 func (r *Refinery) Sync() {
 	ores := r.oreStacks()
-	qty := r.qty()
 	rows := make([]widgets.TableRow, 0, len(ores))
 	for _, st := range ores {
 		ref, _ := widgets.RefOfID(r.cv, string(st.Item))
 		row := refineryRow{ore: st.Item, ref: ref}
-		eff := min(qty, st.Qty)
+		eff := r.qtyFor(st.Qty)
 		def, _ := r.cv.Defs().Item(st.Item)
 		rows = append(rows, widgets.TableRow{
 			Cells: []string{
@@ -253,16 +259,21 @@ func (r *Refinery) Sync() {
 		r.sel = refineryRow{}
 	}
 
+	// A smaller selection can drop the stepper's cap: stay on a whole batch.
+	r.qtyIdx = min(r.qtyIdx, max(0, r.batches()-1))
+	qty := r.qty()
 	setStepperValue(r.qtyBar, r.qtyLabel, "Qty "+theme.FormatInt(int64(qty)))
 	r.refine.GetWidget().Disabled = !r.refineReadyFor(r.sel)
 
 	if !r.hasSel {
 		r.status.Label = "Select an ore to refine."
+	} else if qty < refineBatch {
+		r.status.Label = "One batch needs 100 ore — you hold " +
+			theme.FormatInt(int64(r.stockOf(r.sel.ore))) + " " + itemLabel(r.cv, r.sel.ore) + "."
 	} else {
 		def, _ := r.cv.Defs().Item(r.sel.ore)
-		eff := min(qty, r.stockOf(r.sel.ore))
-		outs := refineOutputs(r.cv, def, eff)
-		line := "Refine " + theme.FormatInt(int64(eff)) + " × " + itemLabel(r.cv, r.sel.ore) + " → "
+		outs := refineOutputs(r.cv, def, qty)
+		line := "Refine " + theme.FormatInt(int64(qty)) + " × " + itemLabel(r.cv, r.sel.ore) + " → "
 		if text := r.outputsText(outs); text != "" {
 			line += text
 		} else {
@@ -288,12 +299,12 @@ func (r *Refinery) stockOf(ore content.ItemID) int {
 }
 
 // refineReadyFor is the Refine gate: a selected ore, the docked station's
-// refine service and a positive quantity that fits the hold's stock.
+// refine service and at least one whole batch of that ore in the holds.
 func (r *Refinery) refineReadyFor(row refineryRow) bool {
 	if row.ore == "" || !r.refineService() {
 		return false
 	}
-	return min(r.qty(), r.stockOf(row.ore)) > 0
+	return r.qtyFor(r.stockOf(row.ore)) >= refineBatch
 }
 
 // refineService reports whether the docked station offers refine (in space
@@ -303,20 +314,28 @@ func (r *Refinery) refineService() bool {
 	return ok && slices.Contains(info.Services, "refine")
 }
 
-// stepQty moves the quantity stepper one step (clamped).
+// stepQty moves the quantity stepper one batch (clamped to the selected
+// ore's whole batches).
 func (r *Refinery) stepQty(delta int) {
-	r.qtyIdx += delta
-	if r.qtyIdx < 0 {
-		r.qtyIdx = 0
-	}
-	if r.qtyIdx >= len(qtySteps) {
-		r.qtyIdx = len(qtySteps) - 1
-	}
+	r.qtyIdx = min(max(r.qtyIdx+delta, 0), max(0, r.batches()-1))
 	setStepperValue(r.qtyBar, r.qtyLabel, "Qty "+theme.FormatInt(int64(r.qty())))
 }
 
-// qty is the current unit count the stepper drives.
-func (r *Refinery) qty() int { return qtySteps[r.qtyIdx] }
+// batches is how many whole 100-ore batches the selected ore covers.
+func (r *Refinery) batches() int { return r.stockOf(r.sel.ore) / refineBatch }
+
+// qtyFor is the stepper's unit count for an ore holding stock units: whole
+// batches only, capped by the stepper position and that stack's stock.
+func (r *Refinery) qtyFor(stock int) int {
+	n := min(r.qtyIdx+1, stock/refineBatch)
+	if n < 1 {
+		return 0
+	}
+	return n * refineBatch
+}
+
+// qty is the unit count the stepper drives for the selected ore.
+func (r *Refinery) qty() int { return r.qtyFor(r.stockOf(r.sel.ore)) }
 
 // refineClicked emits Refine for the selected ore (gated even when called
 // directly, the market buttons' rule).
@@ -324,5 +343,5 @@ func (r *Refinery) refineClicked() {
 	if !r.refineReadyFor(r.sel) {
 		return
 	}
-	r.as.Do(widgets.Refine{Ore: r.sel.ore, Qty: min(r.qty(), r.stockOf(r.sel.ore))})
+	r.as.Do(widgets.Refine{Ore: r.sel.ore, Qty: r.qty()})
 }

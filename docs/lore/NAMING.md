@@ -240,6 +240,7 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | Order mini-window title (`uikit/screens/orderwin.go`) | — | **&lt;name&gt; — Order** | trade | follows the "&lt;name&gt; — Info" title convention. Approved 2026-10-18 |
 | Manufacturing window title (`game/screens.go`, `uikit/screens/manufacturing.go`) | Factory | **Manufacturing** | trade | the industry window: recipe board, up-front job fee, the three global job slots and Start/Collect/Cancel. User-approved rename of Factory; key B unchanged. Approved 2026-10-20 |
 | Refinery window title (`game/screens.go`, `uikit/screens/refinery.go`) | — | **Refinery** | trade | the ore→mineral service window at a `refine` station: ore list, yield preview, Refine. Plain trade noun. Approved 2026-10-20 |
+| Refinery batch strings (`uikit/screens/refinery.go`, `sim/system_economy.go`) | — | **One batch needs 100 ore — you hold &lt;n&gt; &lt;ore&gt;.** / **Refining runs in whole batches of 100 ore** | trade | refining is atomic in 100-ore batches: the window's status names the shortfall (Refine grayed below one batch) and the sim's refusal log names the partial quantity. Approved 2026-10-20 |
 
 ## Money strings
 

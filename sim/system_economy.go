@@ -721,8 +721,14 @@ func (s *Sim) CancelOrder(station StationID, id uint64, owner string) bool {
 	return true
 }
 
+// refineBatch is the refinery's unit of work: ore refines in whole batches
+// of 100. Yields are fractions of a mineral per ore, so a smaller lot can
+// floor to zero output while still eating the ore.
+const refineBatch = 100
+
 // execRefine converts ore units into minerals via RefineYield at a refine
-// service station. Output is floor(yield * qty) per mineral (documented);
+// service station. Quantities are whole 100-ore batches — anything else is
+// refused untouched. Output is floor(yield * qty) per mineral (documented);
 // when the outputs do not fit in the general hold, nothing is refined and
 // EvtCargoFull fires.
 func (s *Sim) execRefine(c CmdRefine) {
@@ -746,6 +752,12 @@ func (s *Sim) execRefine(c CmdRefine) {
 	}
 	if qty <= 0 {
 		s.log(SevWarning, s.player, "No "+def.Name+" to refine")
+		return
+	}
+	if qty%refineBatch != 0 {
+		s.emit(Event{Kind: EvLog, Severity: SevWarning, Actor: s.player, Item: c.Item,
+			Text:  "Refining runs in whole batches of 100 ore — " + itoaN(qty) + " x " + def.Name + " is a partial batch",
+			Value: float64(qty)})
 		return
 	}
 
