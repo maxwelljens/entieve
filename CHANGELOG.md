@@ -10,13 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Draggable split panes** in Inventory (cargo/ore, ore/hangar), Fitting
-  (slots/hangar) and Manufacturing (recipes/jobs): the pane seam is a thin
-  line with an 8 px grab band and an up/down resize cursor; dragging it
-  trades height between the two lists, each pane keeps a minimum height,
-  and nothing else in the window moves. The proportions persist in the
-  layout sidecar (now version 3) under named seams and are restored with
-  the rest of the arrangement; version-2 sidecars still load and simply
-  start at equal shares. The market's splitter is a follow-up.
+  (slots/hangar), Manufacturing (recipes/jobs) and the Market (order book /
+  My orders): the pane seam is a thin line with an 8 px grab band and a
+  resize cursor (up/down in the stacked windows, left/right in the market);
+  dragging it trades height (or width) between the two lists, each pane
+  keeps a minimum size, and nothing else in the window moves. The market
+  opens where its fixed 240 px My-orders column stood. The proportions
+  persist in the layout sidecar (now version 3) under named seams and are
+  restored with the rest of the arrangement; version-2 sidecars still load
+  and simply start at the default shares.
 
 ### Changed
 

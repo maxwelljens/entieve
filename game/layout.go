@@ -236,6 +236,10 @@ func (g *Game) splitSeams(name string) []widgets.Seam {
 		if g.manu != nil {
 			return g.manu.Splits()
 		}
+	case "market":
+		if g.mkt != nil {
+			return g.mkt.Splits()
+		}
 	}
 	return nil
 }

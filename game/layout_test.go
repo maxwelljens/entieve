@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"image"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -887,4 +888,110 @@ func TestSplitRatioOutOfRangeClamps(t *testing.T) {
 	// Fitting restores open, so its split is laid out; manufacturing is
 	// docked-only and closed here, so only its stored ratio is checked.
 	assertSplitTiled(t, "fitting", g.splitSeams("fitting")[0].Split)
+}
+
+// assertSplitRowTiled: a row split's panes and hairlines fill its rect
+// across the width — no pane collapsed, no gap (the horizontal twin of
+// assertSplitTiled).
+func assertSplitRowTiled(t *testing.T, name string, split *widgets.SplitPane) {
+	t.Helper()
+	root := split.Container().GetWidget().Rect
+	total := 0
+	for _, ch := range split.Container().Children() {
+		w := ch.GetWidget().Rect.Dx()
+		if w == 0 {
+			t.Errorf("%s: a split column is 0 px wide (%v)", name, ch.GetWidget().Rect)
+		}
+		total += w
+	}
+	if total != root.Dx() {
+		t.Errorf("%s: split columns fill %d px, want the %d px rect", name, total, root.Dx())
+	}
+}
+
+// TestMarketSplitRatioPersists: the market's book | My orders seam is
+// exposed to the sidecar as market-orders, round-trips its ratio through
+// a version-3 file, restores it on a fresh session (tiling at the 1024
+// minimum), and "Reset window layout" returns it to the panel's own
+// opening share — today's 240 px column of the 546 px landing square.
+// A version-2 file names no ratio and keeps that opening share.
+func TestMarketSplitRatioPersists(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	g := newShowcaseGameAt(t, path)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+
+	// The opening share: 240 of the 529 px the split spans at the 546 px
+	// landing square (546 − 2·ContentsPad − the 1 px seam).
+	const opening = 1 - 240.0/529
+	seams := g.splitSeams("market")
+	if len(seams) != 1 || seams[0].Name != "market-orders" {
+		t.Fatalf("market seams = %+v, want one named market-orders", seams)
+	}
+	if got := seamRatio("market-orders", seams); math.Abs(got-opening) > 1e-9 {
+		t.Errorf("opening market ratio = %v, want %v", got, opening)
+	}
+
+	seams[0].Split.SetRatio(seams[0].Index, 0.32)
+	if err := g.SaveGame(); err != nil {
+		t.Fatalf("SaveGame: %v", err)
+	}
+	doc := readDoc(t, g.layoutPath())
+	if doc.Version != 3 {
+		t.Fatalf("sidecar version = %d, want 3", doc.Version)
+	}
+	if got := doc.Windows["market"].Splits["market-orders"]; got != 0.32 {
+		t.Errorf("market-orders = %v, want the dragged 0.32", got)
+	}
+
+	// Next session: the ratio comes back, mounted and laid out; a resize
+	// still tiles the row.
+	g2 := newShowcaseGameAt(t, path)
+	g2.applySize(1280, 720)
+	g2.open[pMarket] = true
+	g2.syncMounts()
+	pump(t, g2, 1280, 720)
+	if got := seamRatio("market-orders", g2.splitSeams("market")); got != 0.32 {
+		t.Errorf("restored market-orders = %v, want 0.32", got)
+	}
+	assertSplitRowTiled(t, "market", g2.splitSeams("market")[0].Split)
+	g2.applySize(1024, 700)
+	pump(t, g2, 1024, 700)
+	assertSplitRowTiled(t, "market", g2.splitSeams("market")[0].Split)
+
+	// Reset window layout: back to the market's opening share (the old
+	// 240 px column), not the widget's equal halves.
+	g2.resetLayout()
+	if got := seamRatio("market-orders", g2.splitSeams("market")); math.Abs(got-opening) > 1e-9 {
+		t.Errorf("after reset market-orders = %v, want the opening share %v", got, opening)
+	}
+}
+
+// TestMarketSplitV2Default: a version-2 sidecar (no splits) restores the
+// market geometry and leaves its seam at the opening share; the next
+// write is version 3 and records that share.
+func TestMarketSplitV2Default(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	if err := os.WriteFile(path+".layout.json", []byte(`{"version":2,"windows":{
+		"market":{"x":396,"y":8,"w":546,"h":546,"open":true}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	const opening = 1 - 240.0/529
+
+	g := newShowcaseGameAt(t, path)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+	if got := seamRatio("market-orders", g.splitSeams("market")); math.Abs(got-opening) > 1e-9 {
+		t.Errorf("v2 market-orders = %v, want the opening share %v", got, opening)
+	}
+	if err := g.writeLayout(); err != nil {
+		t.Fatalf("writeLayout: %v", err)
+	}
+	doc := readDoc(t, g.layoutPath())
+	if doc.Version != 3 {
+		t.Errorf("rewritten sidecar version = %d, want 3", doc.Version)
+	}
+	if got := doc.Windows["market"].Splits["market-orders"]; math.Abs(got-opening) > 1e-9 {
+		t.Errorf("rewritten market-orders = %v, want the opening share %v", got, opening)
+	}
 }
