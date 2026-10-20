@@ -441,28 +441,11 @@ func windowMin(win *widget.Window, start image.Rectangle) image.Point {
 	return min
 }
 
-// setCursorShape is the chrome's cursor write. It is ebiten's own call,
-// not ebitenui's input.SetCursorShape: that one is only a name cache
-// whose AfterDraw mapping knows the EW/NS names, so the diagonals a
-// corner needs would fall through to the default arrow. The indirection
-// is the test seam (the pollCursor precedent, uikit/widgets/menu.go):
-// headless tests cannot touch the OS cursor.
-var setCursorShape = ebiten.SetCursorShape
-
-// SetCursorShapeForTest overrides the chrome's cursor write for a
-// headless test and returns a restore func. Test-only seam: never call
-// it from production code.
-func SetCursorShapeForTest(f func(ebiten.CursorShapeType)) func() {
-	prev := setCursorShape
-	setCursorShape = f
-	return func() { setCursorShape = prev }
-}
-
-// setResizeCursor picks the cursor for the gripped axes: the plain EW/NS
+// setResizeCursor claims the cursor for the gripped axes: the plain EW/NS
 // arrows on an edge, the matching diagonal on a corner (left+top and
 // right+bottom run NWSE, right+top and left+bottom NESW). The chrome
-// re-writes it every frame it classifies a grip: ebitenui's AfterDraw
-// resets the OS cursor from its own name cache each frame.
+// re-claims it every frame it classifies a grip; the kit's single
+// ApplyCursor writes the frame's winner after the chrome pass.
 func setResizeCursor(e edgeMask) {
 	var shape ebiten.CursorShapeType
 	switch {
@@ -477,7 +460,7 @@ func setResizeCursor(e edgeMask) {
 	default:
 		shape = ebiten.CursorShapeNSResize
 	}
-	setCursorShape(shape)
+	widgets.ClaimCursor(shape)
 }
 
 // stepChromes pumps the chrome of every window currently mounted on this

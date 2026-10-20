@@ -149,6 +149,12 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 		enqueue: enqueue,
 		th:      theme.NewSeam(theme.DefaultPalette(), theme.ScaleTypeScale(theme.DefaultTypeScale())),
 	}
+	// The kit is the app's only cursor writer (widgets.ClaimCursor /
+	// ApplyCursor — one OS write per frame, after all input). ebitenui's
+	// own AfterDraw reset would be a second writer alternating the shape
+	// every frame; nothing in the app uses its cursor names or images, so
+	// its management is switched off.
+	input.CursorManagementEnabled = false
 	k.cv = widgets.NewView(c, s)
 	// The built-in executor: session intents on the kit's own services,
 	// command intents on enqueue at the selectors' current ranges.
@@ -255,10 +261,6 @@ func (k *Kit) Draw(screen *ebiten.Image) {
 	// against live geometry (see unparkAnims).
 	k.unparkAnims()
 	k.relayAnimWindows()
-	// The hovered pane seam claims the cursor here — after ui.Draw's
-	// default reset, before the chrome pass, whose grips keep priority
-	// in the window edges (widgets.ApplySplitCursor).
-	widgets.ApplySplitCursor()
 	// Second chrome pass: input may have changed while drawing, and both
 	// drags recompute their rect absolutely from the press — this pass
 	// applies the fresh cursor (or derives an identical rect) so the
@@ -270,6 +272,12 @@ func (k *Kit) Draw(screen *ebiten.Image) {
 	// The context menu paints last: it is always the topmost pixels,
 	// above every window and tooltip.
 	k.svc.menu.Draw(screen)
+	// The frame's one OS cursor write, after every claimer ran (the pane
+	// polls and both chrome passes). ebitenui's own cursor management is
+	// off (NewKit), so nothing resets the shape afterwards: exactly one
+	// write reaches the OS per frame and a stationary pointer presents
+	// the same shape every frame.
+	widgets.ApplyCursor()
 }
 
 // ---------------------------------------------------------------------------

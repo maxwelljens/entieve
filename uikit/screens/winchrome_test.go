@@ -3,6 +3,7 @@ package screens
 import (
 	"github.com/entieve/entieve/uikit/internal/uitest"
 	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
 	"image"
 	"testing"
 
@@ -801,15 +802,13 @@ func TestGripBandScalesWithUI(t *testing.T) {
 	}
 }
 
-// TestResizeGripCursorShapes: the chrome advertises the matching cursor
-// on every grip — the EW/NS arrows on the four edges, the matching
-// diagonal on the four corners (left+top / right+bottom NWSE,
-// right+top / left+bottom NESW) — while hovering, while the press is
-// held (armed) and while the drag is in flight (active). The write goes
-// through the setCursorShape seam, so the assertion needs no OS cursor;
-// the chrome re-writes the shape every frame it classifies a grip
-// because ebitenui's AfterDraw resets the OS cursor from its own name
-// cache each frame (which knows no diagonal names — see setResizeCursor).
+// TestResizeGripCursorShapes: the chrome claims the matching cursor on
+// every grip — the EW/NS arrows on the four edges, the matching diagonal
+// on the four corners (left+top / right+bottom NWSE, right+top /
+// left+bottom NESW) — while hovering, while the press is held (armed)
+// and while the drag is in flight (active). The chrome only declares the
+// shape; the kit's single ApplyCursor writes it through the shared seam,
+// so the assertion needs no OS cursor.
 func TestResizeGripCursorShapes(t *testing.T) {
 	win, ch := newChromeTestWindow(t)
 	rect := win.GetContainer().GetWidget().Rect
@@ -819,7 +818,7 @@ func TestResizeGripCursorShapes(t *testing.T) {
 
 	var got ebiten.CursorShapeType
 	writes := 0
-	restore := SetCursorShapeForTest(func(s ebiten.CursorShapeType) { got, writes = s, writes+1 })
+	restore := widgets.SetCursorShapeForTest(func(s ebiten.CursorShapeType) { got, writes = s, writes+1 })
 	defer restore()
 
 	midY := (rect.Min.Y + rect.Max.Y) / 2
@@ -843,9 +842,10 @@ func TestResizeGripCursorShapes(t *testing.T) {
 			t.Fatalf("%s: fixture: %v is not in a grip band of %v", c.name, c.p, rect)
 		}
 
-		// Idle hover: the band advertises its own shape.
+		// Idle hover: the band claims its own shape.
 		got, writes = 0, 0
 		ch.step(c.p, false)
+		widgets.ApplyCursor()
 		if writes == 0 || got != c.want {
 			t.Errorf("%s: hover cursor = %v (%d writes), want %v", c.name, got, writes, c.want)
 		}
@@ -854,6 +854,7 @@ func TestResizeGripCursorShapes(t *testing.T) {
 		got, writes = 0, 0
 		ch.step(c.p, true) // rising edge: arms the grip
 		ch.step(c.p, true) // held, cursor unmoved
+		widgets.ApplyCursor()
 		if writes == 0 || got != c.want {
 			t.Errorf("%s: held cursor = %v (%d writes), want %v", c.name, got, writes, c.want)
 		}
@@ -865,17 +866,19 @@ func TestResizeGripCursorShapes(t *testing.T) {
 	ch.step(corner, true)
 	got, writes = 0, 0
 	ch.step(corner.Add(image.Point{20, 20}), true)
+	widgets.ApplyCursor()
 	if writes == 0 || got != ebiten.CursorShapeNWSEResize {
 		t.Errorf("dragging the bottom-right corner: cursor = %v (%d writes), want %v",
 			got, writes, ebiten.CursorShapeNWSEResize)
 	}
 	ch.step(corner.Add(image.Point{20, 20}), false)
 
-	// Clear of every band the chrome writes nothing: it must not claim
-	// the cursor over the body.
+	// Clear of every band the chrome claims nothing: the frame's write
+	// falls back to the default arrow.
 	got, writes = 0, 0
 	ch.step(image.Point{midX, midY}, false)
-	if writes != 0 {
-		t.Errorf("body hover wrote the cursor %d times (%v), want none", writes, got)
+	widgets.ApplyCursor()
+	if got != ebiten.CursorShapeDefault {
+		t.Errorf("body hover claimed %v, want the default arrow", got)
 	}
 }
