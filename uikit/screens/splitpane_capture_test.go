@@ -23,9 +23,10 @@ const splitCaptureFrames = 13
 
 // TestSplitPaneSeamCapture draws the three split windows side by side
 // through a real ebiten loop and pins the seams' PIXELS, not only their
-// rects: each hairline is painted on its laid-out row (brighter than the
-// body row above and below it), and the seam rows sit at the split's
-// proportions — inventory's two seams at its thirds, fitting's and
+// rects: each seam is a recessed 4 px track (a Border line around the
+// near-black fill) with a dotted sash grip in its middle — the grip's dots
+// brighter than the track's fill — and the tracks sit at the split's
+// proportions: inventory's two seams at its thirds, fitting's and
 // manufacturing's at their halves. Pixel reads need a running loop, so
 // this is gated like the other captures; the PNG lands in
 // $ENTIEVE_CAPTURE_DIR (default /tmp/opencode).
@@ -143,16 +144,20 @@ func (g *splitCaptureGame) verify(img *ebiten.Image) error {
 		for i := 0; i < len(panes)-1; i++ {
 			seam := splitSeam(split, i)
 			if seam.Dy() != theme.Px(widgets.SplitSeamH) {
-				fail("%s: seam %d is %d px, want the hairline", name, i, seam.Dy())
+				fail("%s: seam %d is %d px, want the %d px track", name, i, seam.Dy(), theme.Px(widgets.SplitSeamH))
 				continue
 			}
-			x, y := (seam.Min.X+seam.Max.X)/2, seam.Min.Y
-			line := lum(image.Pt(x, y))
-			if up, down := lum(image.Pt(x, y-4)), lum(image.Pt(x, y+5)); line <= up || line <= down {
-				fail("%s: seam %d row at y=%d (brightness %d) does not stand out of its body rows (%d, %d)",
-					name, i, y, line, up, down)
+			mid := image.Pt((seam.Min.X+seam.Max.X)/2, (seam.Min.Y+seam.Max.Y)/2)
+			fill := lum(image.Pt(seam.Min.X+4, seam.Min.Y+1)) // track fill, clear of the grip
+			if edge := lum(image.Pt(seam.Min.X+4, seam.Min.Y)); edge <= fill {
+				fail("%s: seam %d's top edge (brightness %d) does not stand out of the track fill (%d)",
+					name, i, edge, fill)
 			}
-			rows = append(rows, y)
+			if grip := lum(mid); grip <= fill {
+				fail("%s: seam %d's grip (brightness %d) does not stand out of the track fill (%d)",
+					name, i, grip, fill)
+			}
+			rows = append(rows, seam.Min.Y)
 		}
 		return rows
 	}

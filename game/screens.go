@@ -177,7 +177,7 @@ var screens = []Screen{
 		// A station service that floats: it mounts only while docked and
 		// centres like the overlays on first open (its Screen row carries
 		// no Anchor, so the centred fallback applies).
-		ID: pManufacturing, Title: "Manufacturing", Icon: "row_module",
+		ID: pManufacturing, Title: "Manufacturing", Icon: "svc_manufacturing",
 		Key: ebiten.KeyB, Action: "manufacturing", Desc: "B — toggle manufacturing window (manufacture while docked)",
 		DefaultRect: image.Rect(312, 120, 792, 600),
 		DockPolicy:  DockFloating, DockedOnly: true, SidecarName: "manufacturing",
@@ -276,7 +276,7 @@ var screens = []Screen{
 		// The refinery: an ore→mineral service window, docked-only like the
 		// manufacturing panel, centred on first open. Its own key would
 		// crowd the bindings; the rail and the services row open it.
-		ID: pRefinery, Title: "Refinery", Icon: "kind_belt",
+		ID: pRefinery, Title: "Refinery", Icon: "svc_refinery",
 		Key:         keyNone,
 		DefaultRect: image.Rect(430, 160, 850, 560),
 		DockPolicy:  DockFloating, DockedOnly: true, SidecarName: "refinery",

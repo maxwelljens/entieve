@@ -55,7 +55,7 @@ func seamMid(s *SplitPane, i int) image.Point {
 }
 
 // TestSplitPaneEqualSharesByDefault: with no stored ratio the panes split
-// the stack equally, a hairline seam sits between each pair, and the
+// the stack equally, a track seam sits between each pair, and the
 // parts tile the rect exactly.
 func TestSplitPaneEqualSharesByDefault(t *testing.T) {
 	s, _ := newPumpedSplit(t, 3)
@@ -77,7 +77,10 @@ func TestSplitPaneEqualSharesByDefault(t *testing.T) {
 		t.Errorf("panes + seams = %d, want the split's %d (no gap, no overflow)", total, rect.Dy())
 	}
 	if seam := s.seams[0].GetWidget().Rect; seam.Dy() != s.seamPx {
-		t.Errorf("seam height = %d, want the hairline %d", seam.Dy(), s.seamPx)
+		t.Errorf("seam height = %d, want the %d px track", seam.Dy(), s.seamPx)
+	}
+	if gw, gh := s.grips[0].PreferredSize(); gw <= gh {
+		t.Errorf("sash grip = %dx%d, want the three dots running across the seam", gw, gh)
 	}
 }
 
@@ -109,7 +112,7 @@ func TestSplitPaneDragMovesPairProportionally(t *testing.T) {
 	if got, want := s.seams[0].GetWidget().Rect.Min.Y, seamBefore.Min.Y+30; got != want {
 		t.Errorf("seam top = %d, want %d (the seam follows the cursor down)", got, want)
 	}
-	avail := before[0] + before[1] + before[2] // the stack without the hairlines
+	avail := before[0] + before[1] + before[2] // the stack without the tracks
 	if got, want := s.Ratio(0), float64(after[0])/float64(avail); got != want {
 		t.Errorf("seam 0 ratio = %v, want %v (the stack fraction above it)", got, want)
 	}
@@ -218,9 +221,37 @@ func TestSplitPaneSetRatioClamps(t *testing.T) {
 	}
 }
 
-// TestSplitPaneGrabBand: the press must land within 4 px of the hairline
-// and on the stack's own input layer; hovering the band advertises the
-// NS-resize cursor.
+// TestSplitPaneGripLightsOnHover: the sash handle is dim at rest, lights
+// when the pointer enters the grab band, stays lit through the drag, and
+// dims again when the pointer leaves.
+func TestSplitPaneGripLightsOnHover(t *testing.T) {
+	s, _ := newPumpedSplit(t, 2)
+	at := seamMid(s, 0)
+	if s.lit != -1 {
+		t.Fatalf("grip starts lit on seam %d, want every grip dim", s.lit)
+	}
+	s.Step(at, false, false)
+	if s.lit != 0 {
+		t.Fatalf("hovering the seam lit %d, want seam 0", s.lit)
+	}
+	s.Step(at, true, true)
+	s.Step(image.Pt(at.X, at.Y+1), false, true) // drag
+	if s.lit != 0 {
+		t.Fatalf("dragging seam 0 lit %d, want it to stay lit", s.lit)
+	}
+	s.Step(image.Pt(at.X, at.Y+1), false, false) // release inside the band
+	if s.lit != 0 {
+		t.Fatalf("release in the band dimmed the grip (%d), want it lit", s.lit)
+	}
+	s.Step(image.Pt(at.X, at.Y+100), false, false)
+	if s.lit != -1 {
+		t.Errorf("leaving the band left seam %d lit, want every grip dim", s.lit)
+	}
+}
+
+// TestSplitPaneGrabBand: the press must land inside the 8 px grab band
+// centred on the track and on the stack's own input layer; hovering the
+// band advertises the NS-resize cursor.
 func TestSplitPaneGrabBand(t *testing.T) {
 	s, _ := newPumpedSplit(t, 2)
 	at := seamMid(s, 0)
@@ -352,8 +383,8 @@ func rowSeamMid(s *SplitPane, i int) image.Point {
 }
 
 // TestSplitPaneRowEqualShares: a row split places the panes side by side
-// in equal shares, a hairline seam between each pair (full height, one
-// pixel wide), the parts tiling the rect; the grab band runs across the
+// in equal shares, a track seam between each pair (full height, one
+// track wide), the parts tiling the rect; the grab band runs across the
 // seam and advertises the EW cursor.
 func TestSplitPaneRowEqualShares(t *testing.T) {
 	s, _ := newPumpedRow(t, 3)
@@ -366,7 +397,10 @@ func TestSplitPaneRowEqualShares(t *testing.T) {
 		t.Errorf("panes + seams = %d, want the split's %d (no gap, no overflow)", total, rect.Dx())
 	}
 	if seam := s.seams[0].GetWidget().Rect; seam.Dx() != s.seamPx || seam.Dy() != s.root.GetWidget().Rect.Dy() {
-		t.Errorf("seam = %v, want a %d px hairline over the full height", seam, s.seamPx)
+		t.Errorf("seam = %v, want a %d px track over the full height", seam, s.seamPx)
+	}
+	if gw, gh := s.grips[0].PreferredSize(); gh <= gw {
+		t.Errorf("sash grip = %dx%d, want the three dots running down the seam", gw, gh)
 	}
 
 	at := rowSeamMid(s, 0)
