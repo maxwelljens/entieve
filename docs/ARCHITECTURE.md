@@ -793,7 +793,10 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > hairline seam with an 8 px grab band classified from the cursor every
 > frame (the window chrome's `gripStart` idiom and its topmost-input-layer
 > test, so a seam under another window is inert), an NS-resize cursor over
-> a stack and EW over a row, and a 72 design-px pane floor. Each panel
+> a stack and EW over a row (written once per frame from the kit's
+> post-Draw pass, `widgets.ApplySplitCursor`, ahead of the window grips —
+> a write from Update is reset by ebitenui's AfterDraw and flickers), and
+> a 72 design-px pane floor. Each panel
 > names its seams (`Inventory.Splits`, `Fitting.Splits`,
 > `Manufacturing.Splits`, `Market.Splits` → `widgets.Seam`) and the layout
 > sidecar persists them in the version-3 `splits` map (name → the fraction

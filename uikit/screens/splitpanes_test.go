@@ -79,8 +79,9 @@ func TestWindowSplitsEqualByDefault(t *testing.T) {
 
 // TestInventorySplitDragTradesTwoPanes drives the real window input:
 // a press in the cargo/ore seam's grab band, a 15 px downward drag, a
-// release. Cargo's table shrinks by 30, ore's grows by the same, the
-// hangar above/below them is untouched, and the seam's ratio follows.
+// release. The seam follows the cursor down: cargo's table grows by 15,
+// ore's shrinks by the same, the hangar above/below them is untouched,
+// and the seam's ratio follows.
 func TestInventorySplitDragTradesTwoPanes(t *testing.T) {
 	env, _ := newTestEnv(t)
 	inv := NewInventory(env)
@@ -111,11 +112,11 @@ func TestInventorySplitDragTradesTwoPanes(t *testing.T) {
 	pump() // release
 
 	after := splitPanes(inv.split)
-	if d := after[0].Dy() - (before[0].Dy() - 15); d < -1 || d > 1 {
-		t.Errorf("cargo pane = %d px, want %d (15 px shorter)", after[0].Dy(), before[0].Dy()-15)
+	if d := after[0].Dy() - (before[0].Dy() + 15); d < -1 || d > 1 {
+		t.Errorf("cargo pane = %d px, want %d (15 px taller: the seam moved down with the cursor)", after[0].Dy(), before[0].Dy()+15)
 	}
-	if d := after[1].Dy() - (before[1].Dy() + 15); d < -1 || d > 1 {
-		t.Errorf("ore pane = %d px, want %d (15 px taller)", after[1].Dy(), before[1].Dy()+15)
+	if d := after[1].Dy() - (before[1].Dy() - 15); d < -1 || d > 1 {
+		t.Errorf("ore pane = %d px, want %d (15 px shorter)", after[1].Dy(), before[1].Dy()-15)
 	}
 	if after[0].Dy()+after[1].Dy() != before[0].Dy()+before[1].Dy() {
 		t.Errorf("cargo+ore = %d px, want the unchanged pair %d (the pair trades space)",
@@ -133,7 +134,7 @@ func TestInventorySplitDragTradesTwoPanes(t *testing.T) {
 		t.Error("the drag left the seam ratio at its equal-share default")
 	}
 	// The tables (not only the panes) follow: the drag reaches layout.
-	if got, want := inv.cargo.Container().GetWidget().Rect.Dy(), cargoBefore-15; got < want-1 || got > want+1 {
+	if got, want := inv.cargo.Container().GetWidget().Rect.Dy(), cargoBefore+15; got < want-1 || got > want+1 {
 		t.Errorf("cargo table height = %d, want %d (the pane's 15 px)", got, want)
 	}
 }

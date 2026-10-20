@@ -81,13 +81,14 @@ func TestSplitPaneEqualSharesByDefault(t *testing.T) {
 	}
 }
 
-// TestSplitPaneDragMovesPairProportionally: dragging seam 0 down grows
-// the pane below it by the drag distance, shrinks the pane above it by
-// the same, and leaves the third pane untouched — the pair trades space,
-// the stack never changes size.
+// TestSplitPaneDragMovesPairProportionally: dragging seam 0 down moves
+// the seam down with the cursor — the pane above it grows by the drag
+// distance, the pane below shrinks by the same, and the third pane is
+// untouched: the pair trades space, the stack never changes size.
 func TestSplitPaneDragMovesPairProportionally(t *testing.T) {
 	s, ui := newPumpedSplit(t, 3)
 	before := paneHeights(s)
+	seamBefore := s.seams[0].GetWidget().Rect
 	at := seamMid(s, 0)
 
 	s.Step(at, true, true)
@@ -96,15 +97,17 @@ func TestSplitPaneDragMovesPairProportionally(t *testing.T) {
 	uitest.PumpWindow(t, ui, nil, 640, 480)
 
 	after := paneHeights(s)
-	want := before[1] + 30
-	if after[1] != want {
-		t.Errorf("lower pane = %d, want %d (grew by the 30 px drag)", after[1], want)
+	if after[0] != before[0]+30 {
+		t.Errorf("upper pane = %d, want %d (grew by the 30 px downward drag)", after[0], before[0]+30)
 	}
-	if after[0] != before[0]-30 {
-		t.Errorf("upper pane = %d, want %d (shrank by the same 30 px)", after[0], before[0]-30)
+	if after[1] != before[1]-30 {
+		t.Errorf("lower pane = %d, want %d (shrank by the same 30 px)", after[1], before[1]-30)
 	}
 	if after[2] != before[2] {
 		t.Errorf("third pane = %d, want %d (a seam moves only its pair)", after[2], before[2])
+	}
+	if got, want := s.seams[0].GetWidget().Rect.Min.Y, seamBefore.Min.Y+30; got != want {
+		t.Errorf("seam top = %d, want %d (the seam follows the cursor down)", got, want)
 	}
 	avail := before[0] + before[1] + before[2] // the stack without the hairlines
 	if got, want := s.Ratio(0), float64(after[0])/float64(avail); got != want {
@@ -115,30 +118,56 @@ func TestSplitPaneDragMovesPairProportionally(t *testing.T) {
 	}
 }
 
+// TestSplitPaneDragUpMovesSeamUp: the reported inverse — moving the mouse
+// up pushed the seam down — so an upward drag of seam 1 shrinks the pane
+// above it and grows the one below: the seam lands under the cursor.
+func TestSplitPaneDragUpMovesSeamUp(t *testing.T) {
+	s, ui := newPumpedSplit(t, 3)
+	before := paneHeights(s)
+	seamBefore := s.seams[1].GetWidget().Rect
+	at := seamMid(s, 1)
+
+	s.Step(at, true, true)
+	s.Step(image.Pt(at.X, at.Y-20), false, true)
+	s.Step(image.Pt(at.X, at.Y-20), false, false)
+	uitest.PumpWindow(t, ui, nil, 640, 480)
+
+	after := paneHeights(s)
+	if after[1] != before[1]-20 {
+		t.Errorf("pane above = %d, want %d (shrank by the 20 px upward drag)", after[1], before[1]-20)
+	}
+	if after[2] != before[2]+20 {
+		t.Errorf("pane below = %d, want %d (grew by the same 20 px)", after[2], before[2]+20)
+	}
+	if got, want := s.seams[1].GetWidget().Rect.Min.Y, seamBefore.Min.Y-20; got != want {
+		t.Errorf("seam top = %d, want %d (the seam follows the cursor up)", got, want)
+	}
+}
+
 // TestSplitPaneMinPaneHolds: a huge drag in either direction stops at the
 // pane floor — nothing collapses to zero — and the stack still tiles.
 func TestSplitPaneMinPaneHolds(t *testing.T) {
 	s, ui := newPumpedSplit(t, 3)
 	at := seamMid(s, 1)
 
-	// Drag the seam to the top: the lower pane bottoms out at the floor.
+	// Drag the seam to the top: the pane above bottoms out at the floor.
 	s.Step(at, true, true)
 	s.Step(image.Pt(at.X, at.Y-10000), false, true)
 	s.Step(image.Pt(at.X, at.Y-10000), false, false)
 	uitest.PumpWindow(t, ui, nil, 640, 480)
-	if got := paneHeights(s)[2]; got != s.minPx {
-		t.Errorf("lower pane after the hard upward drag = %d, want the floor %d", got, s.minPx)
+	if got := paneHeights(s)[1]; got != s.minPx {
+		t.Errorf("pane above after the hard upward drag = %d, want the floor %d", got, s.minPx)
 	}
 
-	// …and to the bottom: the upper pane goes to the floor, the lower grows.
+	// …and to the bottom: the lower pane goes to the floor, its upper grows.
 	at = seamMid(s, 1)
 	s.Step(at, true, true)
 	s.Step(image.Pt(at.X, at.Y+10000), false, true)
 	s.Step(image.Pt(at.X, at.Y+10000), false, false)
 	uitest.PumpWindow(t, ui, nil, 640, 480)
 	h := paneHeights(s)
-	if h[1] != s.minPx {
-		t.Errorf("upper pane after the hard downward drag = %d, want the floor %d", h[1], s.minPx)
+	if h[2] != s.minPx {
+		t.Errorf("lower pane after the hard downward drag = %d, want the floor %d", h[2], s.minPx)
 	}
 	total := h[0] + h[1] + h[2] + s.seamPx*len(s.seams)
 	if rect := s.root.GetWidget().Rect; total != rect.Dy() {
@@ -206,9 +235,72 @@ func TestSplitPaneGrabBand(t *testing.T) {
 
 	cursors := 0
 	defer SetSplitCursorForTest(func(ebiten.CursorShapeType) { cursors++ })()
-	s.Step(at, false, false) // idle hover
+	s.Step(at, false, false) // idle hover: the seam claims the frame
+	ApplySplitCursor()
 	if cursors == 0 {
 		t.Error("hovering the seam advertised no resize cursor")
+	}
+}
+
+// TestSplitPaneCursorStableOverSeam: one cursor writer per frame. A frame
+// runs the Update-phase Poll, ebitenui's input.AfterDraw (which rewrites
+// the OS cursor as the arrow) and then the kit's post-Draw apply. Held on
+// the seam the split shape must survive that reset on every frame: a
+// second write during Update is what made the two alternate every frame.
+// Leaving the band leaves ebitenui's arrow.
+func TestSplitPaneCursorStableOverSeam(t *testing.T) {
+	s, _ := newPumpedSplit(t, 2)
+	at := seamMid(s, 0)
+	var shape ebiten.CursorShapeType
+	writes := 0
+	defer SetSplitCursorForTest(func(c ebiten.CursorShapeType) { shape, writes = c, writes+1 })()
+
+	for frame := 0; frame < 8; frame++ {
+		shape, writes = ebiten.CursorShapeDefault, 0
+		s.Step(at, false, false) // Update phase: records the claim, writes nothing
+		if writes != 0 {
+			t.Fatalf("frame %d: the Update phase wrote the cursor %d time(s) (%v); AfterDraw then resets it, so the two alternate every frame",
+				frame, writes, shape)
+		}
+		shape = ebiten.CursorShapeDefault // input.AfterDraw
+		ApplySplitCursor()                // the kit's post-Draw pass
+		if shape != ebiten.CursorShapeNSResize {
+			t.Fatalf("frame %d: presented cursor = %v, want NS-resize", frame, shape)
+		}
+		if writes != 1 {
+			t.Fatalf("frame %d: %d cursor writes, want exactly one", frame, writes)
+		}
+	}
+
+	// Off the band: no claim, so the frame presents the arrow again.
+	shape, writes = ebiten.CursorShapeDefault, 0
+	s.Step(image.Pt(at.X, at.Y+theme.Px(SplitGrabPx)+4), false, false)
+	shape = ebiten.CursorShapeDefault
+	ApplySplitCursor()
+	if writes != 0 || shape != ebiten.CursorShapeDefault {
+		t.Errorf("off the band: %d writes, presented %v; want the default", writes, shape)
+	}
+}
+
+// TestSplitPaneRowCursorStableOverSeam: the row axis gets the same single
+// post-Draw write, its EW shape.
+func TestSplitPaneRowCursorStableOverSeam(t *testing.T) {
+	s, _ := newPumpedRow(t, 2)
+	at := rowSeamMid(s, 0)
+	var shape ebiten.CursorShapeType
+	writes := 0
+	defer SetSplitCursorForTest(func(c ebiten.CursorShapeType) { shape, writes = c, writes+1 })()
+
+	for frame := 0; frame < 4; frame++ {
+		shape, writes = ebiten.CursorShapeDefault, 0
+		s.Step(at, false, false)
+		if writes != 0 {
+			t.Fatalf("frame %d: the Update phase wrote the cursor (%v)", frame, shape)
+		}
+		ApplySplitCursor()
+		if shape != ebiten.CursorShapeEWResize || writes != 1 {
+			t.Fatalf("frame %d: presented %v (%d writes), want one EW-resize", frame, shape, writes)
+		}
 	}
 }
 
@@ -285,6 +377,7 @@ func TestSplitPaneRowEqualShares(t *testing.T) {
 	var shape ebiten.CursorShapeType
 	defer SetSplitCursorForTest(func(c ebiten.CursorShapeType) { shape = c })()
 	s.Step(at, false, false) // idle hover
+	ApplySplitCursor()
 	if shape != ebiten.CursorShapeEWResize {
 		t.Errorf("row seam cursor = %v, want EW-resize", shape)
 	}
