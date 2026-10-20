@@ -124,13 +124,15 @@ func bracketHalfSize(o gridObj, cam Camera) float64 {
 }
 
 // ---------------------------------------------------------------------------
-// Effects: turret tracers, muzzle flash, mining beams
+// Effects: gun fire (flash + projectile + impact), mining beams
 // ---------------------------------------------------------------------------
 
-// drawEffects draws per-ship active-module effects. Turret flashes/tracers
-// are driven from Fitting Runtimes (event-driven flashes would need a sim
-// event feed in Draw's signature; runtimes cover the same visual window).
+// drawEffects draws per-ship active-module effects. Gun fire is drawn as
+// discrete shots, never as a muzzle→target beam: the shot moment comes from
+// the module runtime's cycle clock (see shotAge), so no sim event feed is
+// needed in Draw's signature.
 func (r *Renderer) drawEffects(dst *ebiten.Image, cam Camera, s *sim.Sim, now float64) {
+	r.shotPrims, r.shotStrokes = 0, r.shotStrokes[:0]
 	for _, o := range r.bShip {
 		fit, ok := s.Fittings.Get(o.info.Entity)
 		if !ok {
@@ -142,6 +144,7 @@ func (r *Renderer) drawEffects(dst *ebiten.Image, cam Camera, s *sim.Sim, now fl
 			continue // its effects would build paths far outside the viewport
 		}
 		nose := core.V(sx, sy).Add(core.V(math.Cos(o.facing), math.Sin(o.facing)).Scale(sizePx))
+		tgt, haveTgt := lockPoint(cam, s, o.info.Entity)
 
 		for _, class := range [...]string{content.SlotHigh, content.SlotMid} {
 			defs := fit.Defs(class)
@@ -156,9 +159,11 @@ func (r *Renderer) drawEffects(dst *ebiten.Image, cam Camera, s *sim.Sim, now fl
 				}
 				switch def.Kind {
 				case content.KindWeapon:
-					heavy := def.Weapon != nil && def.Weapon.ShotTime >= heavyCycle
-					r.muzzleFlash(dst, nose, sizePx, now, i, heavy)
-					r.tracer(dst, cam, s, o.info.Entity, nose, now, i, heavy)
+					age, fired := shotAge(rts[i].Active, rts[i].CycleEnds, shotCycle(def), now)
+					if !fired {
+						continue
+					}
+					r.weaponFire(dst, nose, tgt, haveTgt, sizePx, age, def.Weapon.ShotTime >= heavyCycle)
 				case content.KindMiningLaser:
 					r.miningBeam(dst, cam, o, nose)
 				}
@@ -168,69 +173,127 @@ func (r *Renderer) drawEffects(dst *ebiten.Image, cam Camera, s *sim.Sim, now fl
 }
 
 // heavyCycle is the shot time at or above which a gun renders as artillery:
-// a slow heavy flash instead of an autocannon's fast rattle.
+// a slow heavy projectile instead of an autocannon's fast rattle.
 const heavyCycle = 6
 
-// muzzleFlash draws a hot additive flash at the ship's nose: a small fast
-// flicker for autocannons, a broad slow bloom for artillery.
-func (r *Renderer) muzzleFlash(dst *ebiten.Image, nose core.Vec2, sizePx float64, now float64, i int, heavy bool) {
-	fr := sizePx * (0.55 + 0.25*math.Sin(now*40+float64(i)*2.1))
-	col := color.RGBA{255, 220, 150, 255}
-	if heavy {
-		fr = sizePx * (1.5 + 0.2*math.Sin(now*7+float64(i)*2.1))
-		col = color.RGBA{255, 190, 110, 255}
-	}
-	if fr < 2 {
-		return
-	}
-	img := r.glow(64, col)
-	drawGlowCentered(dst, img, nose.X, nose.Y, fr*2, true)
-}
-
-// tracer draws a shot line from the muzzle to the first locked target: an
-// autocannon rattles a thin line with a bright bolt running down it, an
-// artillery piece flashes one heavy stroke. The line always reaches the
-// target, so the range cue the beam carried survives.
-// shortcut: the bolt is a cosmetic phase off the render clock (a shot
-// resolves instantly in the sim); give it flight time if shots ever travel.
-func (r *Renderer) tracer(dst *ebiten.Image, cam Camera, s *sim.Sim, ship ecs.Entity, nose core.Vec2, now float64, i int, heavy bool) {
+// lockPoint returns the screen position of the ship's first fully locked
+// target — where its guns fire.
+func lockPoint(cam Camera, s *sim.Sim, ship ecs.Entity) (core.Vec2, bool) {
 	tg, ok := s.Targetings.Get(ship)
 	if !ok {
-		return
+		return core.Vec2{}, false
 	}
 	for _, l := range tg.Locks {
 		if l.Progress < 1 {
 			continue
 		}
-		tr, ok := s.Transforms.Get(l.Target)
-		if !ok {
+		if tr, ok := s.Transforms.Get(l.Target); ok {
+			x, y := cam.WorldToScreen(tr.Pos)
+			return core.V(x, y), true
+		}
+	}
+	return core.Vec2{}, false
+}
+
+// shotAge is the time since a weapon's last shot, read off its cycle clock:
+// fireWeapon sets CycleEnds = shot + period, so the shot sits one period
+// back. ok is false before the first shot and once the cycle has run out.
+func shotAge(active bool, cycleEnds, period, now float64) (age float64, ok bool) {
+	if !active || cycleEnds <= 0 || period <= 0 {
+		return 0, false
+	}
+	age = now - (cycleEnds - period)
+	return age, age >= 0 && age < period
+}
+
+// shotCycle is the gun's fire period, derived exactly as fireWeapon does.
+func shotCycle(def *content.ModuleDef) float64 {
+	switch {
+	case def.Weapon != nil && def.Weapon.ShotTime > 0:
+		return def.Weapon.ShotTime
+	case def.ActivationTime > 0:
+		return def.ActivationTime
+	}
+	return 1
+}
+
+// shotStyle is one gun family's shot timeline, in seconds after the shot.
+type shotStyle struct {
+	bolts  int     // rounds per cycle
+	gap    float64 // spacing between round launches
+	flight float64 // muzzle → target travel
+	muzzle float64 // muzzle-flash life
+	impact float64 // impact-glow life, from arrival
+}
+
+var (
+	autoShot = shotStyle{bolts: 3, gap: 0.14, flight: 0.28, muzzle: 0.07, impact: 0.10}
+	artyShot = shotStyle{bolts: 1, flight: 1.1, muzzle: 0.26, impact: 0.30}
+)
+
+// boltTail is the on-screen length of a travelling bolt, px.
+const boltTail = 22
+
+// weaponFire draws one gun's shot at age seconds after it fired: a muzzle
+// flash at the nose, a bolt per round travelling to the target, an impact
+// glow on arrival. Nothing is drawn for the rest of the cycle — fire is an
+// event, not a persistent beam; the target bracket's distance label carries
+// the range cue.
+// shortcut: the flight is cosmetic (a shot resolves instantly in the sim);
+// give the bolt real travel time if shots ever become simulated objects.
+func (r *Renderer) weaponFire(dst *ebiten.Image, nose, tgt core.Vec2, haveTgt bool, sizePx, age float64, heavy bool) {
+	st := autoShot
+	boltW, glowSize := float32(1.6), 9.0
+	boltCol := color.RGBA{255, 232, 180, 235}
+	flashCol := color.RGBA{255, 220, 150, 255}
+	if heavy {
+		st = artyShot
+		boltW, glowSize = 2.4, 13.0
+		boltCol = color.RGBA{255, 205, 130, 240}
+		flashCol = color.RGBA{255, 190, 110, 255}
+	}
+	dx, dy := tgt.X-nose.X, tgt.Y-nose.Y
+	dist := math.Hypot(dx, dy)
+
+	for k := 0; k < st.bolts; k++ {
+		t := age - float64(k)*st.gap
+		if t < 0 {
 			continue
 		}
-		tx, ty := cam.WorldToScreen(tr.Pos)
-		if heavy {
-			alpha := uint8(170 + 60*math.Abs(math.Sin(now*6+float64(i))))
-			vector.StrokeLine(dst, float32(nose.X), float32(nose.Y), float32(tx), float32(ty),
-				2.4, color.RGBA{255, 196, 120, alpha}, true)
-			img := r.glow(64, color.RGBA{255, 210, 150, 255})
-			drawGlowCentered(dst, img, tx, ty, 12, true)
-			return
+		if f := t / st.muzzle; f < 1 {
+			fr := sizePx * (0.6 + 0.5*(1-f))
+			if heavy {
+				fr = sizePx * (1.5 + 0.6*(1-f))
+			}
+			drawGlowCentered(dst, r.glow(64, flashCol), nose.X, nose.Y, fr*2, true)
+			r.shotPrims++
 		}
-		alpha := uint8(120 + 100*math.Abs(math.Sin(now*45+float64(i)*1.7)))
-		vector.StrokeLine(dst, float32(nose.X), float32(nose.Y), float32(tx), float32(ty),
-			0.9, color.RGBA{255, 205, 130, alpha / 2}, true)
-		// The bolt: a short bright segment travelling muzzle to target.
-		ph := math.Mod(now*2.4+float64(i)*0.37, 1)
-		bx := nose.X + (tx-nose.X)*ph
-		by := nose.Y + (ty-nose.Y)*ph
-		dx, dy := tx-nose.X, ty-nose.Y
-		seg := math.Hypot(dx, dy)
-		if seg > 1 {
-			k := 22 / seg
-			vector.StrokeLine(dst, float32(bx), float32(by), float32(bx-dx*k), float32(by-dy*k),
-				1.6, color.RGBA{255, 232, 180, 235}, true)
+		if !haveTgt || dist < 1 {
+			continue
 		}
-		return
+		switch f := t / st.flight; {
+		case f < 1: // in flight: a short bright segment, never a full line
+			bx, by := nose.X+dx*f, nose.Y+dy*f
+			tl := math.Min(boltTail, dist) / dist
+			r.shotLine(dst, bx, by, bx-dx*tl, by-dy*tl, boltW, boltCol)
+			if heavy { // a thrown shell glows at its head
+				drawGlowCentered(dst, r.glow(32, flashCol), bx, by, 9, true)
+				r.shotPrims++
+			}
+		case t < st.flight+st.impact: // arrival
+			drawGlowCentered(dst, r.glow(64, flashCol), tgt.X, tgt.Y, glowSize*1.6, true)
+			r.shotPrims++
+		}
 	}
+}
+
+// shotLine strokes a weapon-effect segment and records its length for the
+// render pins — how "no full-length weapon line" is asserted. Tests only
+// read the record; production never does.
+func (r *Renderer) shotLine(dst *ebiten.Image, x0, y0, x1, y1 float64, w float32, col color.RGBA) {
+	vector.StrokeLine(dst, float32(x0), float32(y0), float32(x1), float32(y1), w, col, true)
+	r.shotPrims++
+	r.shotStrokes = append(r.shotStrokes, float32(math.Hypot(x1-x0, y1-y0)))
 }
 
 // miningBeam draws the laser link from ship to the nearest asteroid.

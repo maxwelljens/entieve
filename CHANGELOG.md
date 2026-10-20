@@ -30,10 +30,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (and their module runtimes), wreck loot, convoy shipments, market orders and
   last trades, industry jobs, agent ledgers and parked shipments. The save
   schema stays 2.
-- **Turret effects render by family** (`render/overlay.go`): autocannons
-  rattle a thin tracer with a bright bolt running down it, artillery flashes
-  one heavy stroke with a broad muzzle bloom; the full muzzle-to-target line
-  and its range cue are unchanged.
+- **Gun fire renders as projectiles, not lasers** (`render/overlay.go`): the
+  persistent muzzle-to-target line is gone for every weapon family. A shot is
+  now a per-shot event — a muzzle flash, bolts travelling to the locked
+  target and an impact glow on arrival: an autocannon rattles a three-bolt
+  burst of thin bolts, an artillery piece throws one heavy round on a slower
+  arc; both are silent for the rest of the cycle. Shot timing is read from
+  the module's existing cycle clock (`CycleEnds`), so the sim, its RNG and
+  the save schema (2) are untouched. Range stays readable in the target
+  bracket's distance label. Mining beams and lock lines are unchanged.
 
 ### Added
 
