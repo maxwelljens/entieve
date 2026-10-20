@@ -43,7 +43,11 @@ func RunCaptureLoop(t *testing.T, title string, g ebiten.Game) {
 }
 
 // PumpWindow runs one frame: Sync (rows + gating), Update (dispatch
-// deferred events) and Draw (layout).
+// deferred events) and Draw (layout). It does NOT announce a cursor input
+// pass (widgets.BeginCursorFrame): a caller that asserts the unclaimed
+// arrow announces one itself, and a caller that never does keeps the last
+// claim — the same "draw-only frame repeats the decision" semantics the
+// game relies on.
 func PumpWindow(t *testing.T, ui *ebitenui.UI, sync func(), w, h int) {
 	t.Helper()
 	if sync != nil {

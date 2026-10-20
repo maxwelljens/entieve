@@ -66,6 +66,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Splitter seams keep their resize cursor on draw-only frames**
+  (`uikit/widgets/cursor.go`, `game/game.go`): ebiten runs `Draw` once per
+  display frame but `Update` only ~60 times a second, so on a fast display
+  roughly half the draws have no input pass. The cursor claim was cleared by
+  `ApplyCursor` on every draw, and seam claims are made in the Update phase,
+  so those draws fell back to the arrow and the resize shape alternated with
+  it — still flickering after the single-writer fix. The claim now belongs to
+  the input pass: `widgets.BeginCursorFrame` (first line of `Game.Update`)
+  starts the pass and `ApplyCursor` repeats its decision on every draw until
+  the next one, so the OS write is still exactly one per draw and no longer
+  needs an Update tick to hold the shape.
 - **The pane splitter follows the cursor and its resize cursor no longer
   flickers** (`uikit/widgets/splitpane.go`, `uikit/screens/kit.go`): a
   vertical seam moved opposite to the drag — pulling up pushed it down —

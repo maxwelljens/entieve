@@ -796,8 +796,14 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > a stack and EW over a row, and a 72 design-px pane floor. The cursor has
 > one writer: ebitenui's cursor management is off (`Kit`), seams and the
 > window grips only claim a shape (`widgets.ClaimCursor` — chrome steps
-> last, so a grip outranks a seam) and the kit's `widgets.ApplyCursor` at
-> the end of Draw makes the frame's single OS write. Two writers per frame
+> last, so a grip outranks a seam; the chrome also re-claims inside Draw)
+> and the kit's `widgets.ApplyCursor` at the end of Draw makes the frame's
+> single OS write. A claim belongs to the input pass, not the draw:
+> `widgets.BeginCursorFrame` on the first line of `Game.Update` starts the
+> pass, so a draw-only frame (ebiten draws every display frame, updates
+> only ~60/s — on a fast display half the draws have no tick) repeats the
+> pass's decision instead of falling back to the arrow. A host that never
+> announces a pass (the `uitest` pump) keeps the last claim. Two writers per frame
 > (ebitenui's AfterDraw arrow plus ours) alternated the shape and flickered. Each panel
 > names its seams (`Inventory.Splits`, `Fitting.Splits`,
 > `Manufacturing.Splits`, `Market.Splits` → `widgets.Seam`) and the layout

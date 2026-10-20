@@ -137,6 +137,7 @@ func TestCursorSingleWriterPerFrame(t *testing.T) {
 			for frame := 0; frame < frames; frame++ {
 				tr.reset()
 				before := ebiten.CursorShape()
+				widgets.BeginCursorFrame() // the host's input pass
 				if sync != nil {
 					sync()
 				}

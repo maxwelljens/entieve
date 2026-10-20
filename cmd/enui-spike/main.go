@@ -24,6 +24,7 @@ import (
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/screens"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -112,6 +113,9 @@ func main() {
 // syncs the kit and the station windows, and steps the simulation on a
 // fixed 60 tps timestep.
 func (g *spike) Update() error {
+	// Announce the input pass so the cursor claims below (seam polls, ebitenui
+	// input) apply to this pass only and can fall back to the arrow.
+	widgets.BeginCursorFrame()
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 		return ebiten.Termination
 	}
