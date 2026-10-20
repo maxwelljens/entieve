@@ -224,12 +224,12 @@ func TestLogisticsGateOriginImportUnchanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	td, _ := s.Content.TrafficFor("sys-a")
-	havenBefore, _ := askAt(s, "cel-station-a", "charge-emp")
-	dockBefore, _ := askAt(s, "cel-a-dock", "charge-emp")
+	havenBefore, _ := askAt(s, "cel-station-a", "ammo-emp-s")
+	dockBefore, _ := askAt(s, "cel-a-dock", "ammo-emp-s")
 
 	s.spawnTrafficHauler(s.System(), td, content.RouteDef{
 		From: "cel-gate-b", To: "cel-a-dock", Hull: "ship-convoy",
-		Cargo:         content.RouteCargo{Item: "charge-emp", Qty: 600},
+		Cargo:         content.RouteCargo{Item: "ammo-emp-s", Qty: 600},
 		IntervalTicks: 1 << 30,
 	})
 	e, tc, ok := findHauler(s, "cel-a-dock")
@@ -239,10 +239,10 @@ func TestLogisticsGateOriginImportUnchanged(t *testing.T) {
 	if tc.Basis != 5 {
 		t.Fatalf("basis = %v, want 5 (import prices at the def base price)", tc.Basis)
 	}
-	if h, _ := askAt(s, "cel-station-a", "charge-emp"); h != havenBefore {
+	if h, _ := askAt(s, "cel-station-a", "ammo-emp-s"); h != havenBefore {
 		t.Fatal("a gate import debited a station book")
 	}
-	if d, _ := askAt(s, "cel-a-dock", "charge-emp"); d != dockBefore {
+	if d, _ := askAt(s, "cel-a-dock", "ammo-emp-s"); d != dockBefore {
 		t.Fatal("a gate import debited the destination book at spawn")
 	}
 	_ = e
@@ -253,7 +253,7 @@ func TestLogisticsGateOriginImportUnchanged(t *testing.T) {
 	}) {
 		t.Fatalf("import never delivered; %v", trafficTexts(evs))
 	}
-	if q, p := askAt(s, "cel-a-dock", "charge-emp"); q != 600 || p != 4.999 {
+	if q, p := askAt(s, "cel-a-dock", "ammo-emp-s"); q != 600 || p != 4.999 {
 		t.Fatalf("delivered import = %d @ %v, want 600 @ 4.999 (one tick under the base)",
 			q, p)
 	}

@@ -20,9 +20,9 @@ import (
 // come from the SHOOTER's RNG stream (the player's master stream or the
 // NPC's forked stream): a hit roll r1 < chance, then a damage roll r2 in
 // [0,1) giving multiplier 0.01 + r2*0.99, with a wrecking shot at x3 when
-// r2 < 0.01. Ammo with a damage profile replaces the base volley; guns
-// without a matching charge in cargo are dry: they log one warning per dry
-// cycle and deactivate.
+// r2 < 0.01. Ammo with a damage profile replaces the base volley, scaled by
+// the gun's damage multiplier; guns without a matching shell in cargo are
+// dry: they log one warning per dry cycle and deactivate.
 func (s *Sim) systemWeapons() {
 	now := s.time
 	for _, e := range sortedEntities(s.Fittings) {
@@ -78,7 +78,9 @@ func (s *Sim) fireWeapon(e ecs.Entity, def *content.ModuleDef, slot SlotRef, rt 
 		}
 		cargo.Stacks = stacks
 		if ammoDef.Damage != nil {
-			volley = *ammoDef.Damage
+			// The shell carries the damage profile; the gun's multiplier is
+			// its share of the shot (artillery throws a heavier volley).
+			volley = ammoDef.Damage.Scale(w.Mult())
 		}
 	}
 

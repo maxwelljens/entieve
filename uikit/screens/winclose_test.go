@@ -298,7 +298,7 @@ func TestCloseButtonCannotFireThroughTheMenu(t *testing.T) {
 func TestCloseButtonPreservesShowInfoRect(t *testing.T) {
 	k, _ := newTestKit(t)
 	fm := useFakeMouse(t)
-	k.ShowInfo(widgets.ItemRef("charge-emp"))
+	k.ShowInfo(widgets.ItemRef("ammo-emp-s"))
 	if !k.InfoOpen() {
 		t.Fatal("fixture: Show Info did not open")
 	}
@@ -318,7 +318,7 @@ func TestCloseButtonPreservesShowInfoRect(t *testing.T) {
 		t.Fatal("info window still mounted after the close fade settled")
 	}
 
-	k.ShowInfo(widgets.ItemRef("charge-emp"))
+	k.ShowInfo(widgets.ItemRef("ammo-emp-s"))
 	if a, ok := k.anims[win]; !ok || !a.open {
 		t.Fatalf("reopened Show Info is not fading in: ok=%v open=%v", ok, a)
 	}

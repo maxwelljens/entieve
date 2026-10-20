@@ -38,18 +38,20 @@
       "station": {
         "services": ["market"],
         "market": [
-          { "item": "mod-rail-turret", "qty": 8, "price": 416000 },
-          { "item": "mod-emp-turret", "qty": 8, "price": 325000 },
+          { "item": "mod-artillery-s", "qty": 8, "price": 416000 },
+          { "item": "mod-autocannon-s", "qty": 8, "price": 325000 },
           { "item": "mod-shield-boost", "qty": 8, "price": 299000 },
           { "item": "mod-warp-scram", "qty": 6, "price": 336000 },
-          { "item": "charge-emp", "qty": 4000, "price": 168 },
-          { "item": "charge-plutonium", "qty": 3000, "price": 182 },
+          { "item": "ammo-emp-s", "qty": 4000, "price": 168 },
+          { "item": "ammo-plutonium-s", "qty": 3000, "price": 182 },
+          { "item": "ammo-emp-m", "qty": 1000, "price": 336 },
+          { "item": "ammo-emp-l", "qty": 300, "price": 672 },
           { "item": "charge-cap-cell", "qty": 600, "price": 1300 },
           { "item": "loot-alloy-scrap", "qty": 500, "price": 3200, "side": "buy" },
           { "item": "loot-navdata", "qty": 80, "price": 20000, "side": "buy" },
           { "item": "loot-iced-core", "qty": 4, "price": 72000, "side": "buy" },
-          { "item": "charge-plutonium", "qty": 2000, "price": 104, "side": "buy" },
-          { "item": "charge-emp", "qty": 3000, "price": 96, "side": "buy" }
+          { "item": "ammo-plutonium-s", "qty": 2000, "price": 104, "side": "buy" },
+          { "item": "ammo-emp-s", "qty": 3000, "price": 96, "side": "buy" }
         ]
       }
     },

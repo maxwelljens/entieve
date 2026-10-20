@@ -133,11 +133,11 @@ func TestAgentImputationFixpoint(t *testing.T) {
 	a := agentOf(s, "ag-imp")
 
 	cands := []content.ItemID{
-		"charge-emp", "min-ferrite", "min-nickel", "mod-emp-turret",
+		"ammo-emp-s", "min-ferrite", "min-nickel", "mod-autocannon-s",
 		"ore-sterngrit", "ship-sloop",
 	} // already sorted
-	a.Beliefs["charge-emp"] = 100
-	a.Beliefs["mod-emp-turret"] = 1000
+	a.Beliefs["ammo-emp-s"] = 100
+	a.Beliefs["mod-autocannon-s"] = 1000
 	a.Beliefs["ship-sloop"] = 350_000
 
 	V := s.agentValues(a, cands)
@@ -183,7 +183,7 @@ func TestAgentImputationFixpoint(t *testing.T) {
 
 	// Tracking: raise the product's belief, revalue, mineral V rises.
 	before := V["min-ferrite"]
-	a.Beliefs["charge-emp"] = 200
+	a.Beliefs["ammo-emp-s"] = 200
 	V2 := s.agentValues(a, cands)
 	if V2["min-ferrite"] <= before {
 		t.Fatalf("mineral V did not track product V: %v -> %v", before, V2["min-ferrite"])
@@ -209,7 +209,7 @@ func zipContent() *content.Content {
 	c := testContent()
 	c.Recipes = map[content.RecipeID]*content.RecipeDef{
 		"rec-zip-ferrite": {
-			ID: "rec-zip-ferrite", Product: "charge-emp", Qty: 10000,
+			ID: "rec-zip-ferrite", Product: "ammo-emp-s", Qty: 10000,
 			Inputs: []content.RecipeInput{{Item: "min-ferrite", Qty: 10000}},
 			Time:   100000, Family: content.FamilyCharges, // never finishes in-test
 		},
@@ -238,8 +238,8 @@ func TestAgentZipConvergence(t *testing.T) {
 	// buyer fully deficit (need +1 → bids at 1.25·V). Beliefs make them
 	// 100 and 118.125 exactly: V = (1−fee)·belief·Qty/inputQty = 0.945·b.
 	seller.Inventory["min-ferrite"] = 10_000
-	seller.Beliefs["charge-emp"] = 100 / (0.75 * (1 - imputeHaircut))
-	buyer.Beliefs["charge-emp"] = 100
+	seller.Beliefs["ammo-emp-s"] = 100 / (0.75 * (1 - imputeHaircut))
+	buyer.Beliefs["ammo-emp-s"] = 100
 
 	// Paced rounds: each round advances the clock through one act of each
 	// side (their cooldowns are 1–10 s, so a fixed pass window no longer
@@ -414,7 +414,7 @@ func TestAgentIndustrialistLoop(t *testing.T) {
 	home := StationID("cel-station-a")
 	// The player is the customer: a standing bid the industrialist's
 	// product ask crosses on arrival.
-	if _, ok := s.PlaceOrder(home, OrderBuy, "mod-emp-turret", 1, 2000, OwnerPlayer); !ok {
+	if _, ok := s.PlaceOrder(home, OrderBuy, "mod-autocannon-s", 1, 2000, OwnerPlayer); !ok {
 		t.Fatal("fixture: player bid refused")
 	}
 	addTestAgent(s, "ag-ind", RoleIndustrialist, home, 1_000_000)
@@ -458,14 +458,14 @@ func TestAgentIndustrialistLoop(t *testing.T) {
 		return true
 	}, "job never collected")
 	stepUntil(t, s, 12000, func() bool {
-		return stacksCount(s.Hangar.Items, "mod-emp-turret") >= 1
+		return stacksCount(s.Hangar.Items, "mod-autocannon-s") >= 1
 	}, "industrialist never sold into the standing bid")
 	stepToTick(s, s.ticks+1)
 
-	if got := a.Inventory["mod-emp-turret"]; got != 1 {
+	if got := a.Inventory["mod-autocannon-s"]; got != 1 {
 		t.Fatalf("industrialist turret stock = %d, want 1 (2 made, 1 sold)", got)
 	}
-	if got := stacksCount(s.Hangar.Items, "mod-emp-turret"); got != 1 {
+	if got := stacksCount(s.Hangar.Items, "mod-autocannon-s"); got != 1 {
 		t.Fatalf("player hangar turrets = %d, want 1 (bought from the agent)", got)
 	}
 	if a.Capital <= 0 {
@@ -550,9 +550,9 @@ func TestAgentUpkeepDemandAndFeeSink(t *testing.T) {
 		}
 		addTestAgent(s, "ag-dormant", RoleTrader, station, dormantCapital/2)
 		s.upkeep = map[StationID]float64{station: upkeepEndowment}
-		// The player supplies half the rearm basket: 50 charge-ap at 8.
-		giveCargo(s, "charge-ap", 50)
-		if _, ok := s.PlaceOrder(station, OrderSell, "charge-ap", 50, 8, OwnerPlayer); !ok {
+		// The player supplies half the rearm basket: 50 ammo-ap-s at 8.
+		giveCargo(s, "ammo-ap-s", 50)
+		if _, ok := s.PlaceOrder(station, OrderSell, "ammo-ap-s", 50, 8, OwnerPlayer); !ok {
 			t.Fatal("fixture: player ask refused")
 		}
 		before := moneySupply(s)
@@ -561,8 +561,8 @@ func TestAgentUpkeepDemandAndFeeSink(t *testing.T) {
 
 		// The basket was bought: the goods left the player's escrow and
 		// the proceeds landed in the wallet (net of the sales tax).
-		if got := stacksCount(s.Hangar.Items, "charge-ap"); got != 0 {
-			t.Fatalf("player hangar holds %d charge-ap, want 0 (sold to upkeep)", got)
+		if got := stacksCount(s.Hangar.Items, "ammo-ap-s"); got != 0 {
+			t.Fatalf("player hangar holds %d ammo-ap-s, want 0 (sold to upkeep)", got)
 		}
 		if led := s.upkeep[station]; led > upkeepEndowment-upkeepFee {
 			t.Fatalf("upkeep ledger %v never paid for the basket", led)
@@ -588,7 +588,7 @@ func spreadContent() *content.Content {
 		ID: "cel-station-b", Name: "Anvil Stop", Kind: content.CelStation,
 		Position: core.Vec2{X: 1.2e7, Y: 3e6}, Radius: 500,
 		Station: &content.StationDef{Services: []string{"market"},
-			Market: []content.MarketOrderDef{{Item: "charge-emp", Qty: 100, Price: 10}}},
+			Market: []content.MarketOrderDef{{Item: "ammo-emp-s", Qty: 100, Price: 10}}},
 	})
 	return c
 }
@@ -608,15 +608,15 @@ func TestAgentHaulWishSeam(t *testing.T) {
 		"trader never authored its wish")
 	wishes := s.HaulWishes()
 	if len(wishes) != 1 {
-		t.Fatalf("wishes = %+v, want exactly the charge-emp spread", wishes)
+		t.Fatalf("wishes = %+v, want exactly the ammo-emp-s spread", wishes)
 	}
 	w := wishes[0]
-	// charge-emp: 5 at station A (last/base), 10 at station B → spread 5
+	// ammo-emp-s: 5 at station A (last/base), 10 at station B → spread 5
 	// minus the 5.5% round-trip fee load on the cheap leg.
 	wantMax := (10.0 - 5.0) - (MarketBrokerFee+MarketSalesTax)*5.0
 	if w.Owner != agentOwnerTag(a.ID) || w.From != home || w.To != "cel-station-b" ||
-		w.Item != "charge-emp" || w.Qty < 1 || math.Abs(w.MaxCost-wantMax) > 1e-9 {
-		t.Fatalf("wish = %+v, want owner %s %s→%s charge-emp MaxCost %v",
+		w.Item != "ammo-emp-s" || w.Qty < 1 || math.Abs(w.MaxCost-wantMax) > 1e-9 {
+		t.Fatalf("wish = %+v, want owner %s %s→%s ammo-emp-s MaxCost %v",
 			w, agentOwnerTag(a.ID), home, "cel-station-b", wantMax)
 	}
 
@@ -659,7 +659,7 @@ func TestAgentStartJobDebitsAgentInventory(t *testing.T) {
 		t.Fatal("fixture: player already holds materials")
 	}
 
-	id, ok := s.StartJob(home, "rec-charge-emp", 2, agentOwnerTag(a.ID))
+	id, ok := s.StartJob(home, "rec-ammo-emp-s", 2, agentOwnerTag(a.ID))
 	if !ok {
 		t.Fatal("agent StartJob refused with materials in hand")
 	}
@@ -679,7 +679,7 @@ func TestAgentStartJobDebitsAgentInventory(t *testing.T) {
 
 	// Refusal: a materials-starved start changes nothing.
 	jobsBefore := len(s.Jobs(home))
-	if _, ok := s.StartJob(home, "rec-charge-emp", 100, agentOwnerTag(a.ID)); ok {
+	if _, ok := s.StartJob(home, "rec-ammo-emp-s", 100, agentOwnerTag(a.ID)); ok {
 		t.Fatal("materials-starved start accepted")
 	}
 	if len(s.Jobs(home)) != jobsBefore || a.Inventory["min-ferrite"] != 89 {
@@ -707,8 +707,8 @@ func TestAgentStartJobDebitsAgentInventory(t *testing.T) {
 			t.Fatal("job never collected")
 		}
 	}
-	if a.Inventory["charge-emp"] != 200 {
-		t.Fatalf("agent product = %d, want 200", a.Inventory["charge-emp"])
+	if a.Inventory["ammo-emp-s"] != 200 {
+		t.Fatalf("agent product = %d, want 200", a.Inventory["ammo-emp-s"])
 	}
 	if len(s.Hangar.Items) != 0 || len(s.Hangar.Ships) != 0 {
 		t.Fatalf("agent output leaked into the player hangar: %+v", s.Hangar)
@@ -722,12 +722,12 @@ func TestAgentStartJobDebitsAgentInventory(t *testing.T) {
 func TestAgentSaveRestoreAndHash(t *testing.T) {
 	s := newIndustrySim(t)
 	home := StationID("cel-station-a")
-	if _, ok := s.PlaceOrder(home, OrderBuy, "mod-emp-turret", 2, 2000, OwnerPlayer); !ok {
+	if _, ok := s.PlaceOrder(home, OrderBuy, "mod-autocannon-s", 2, 2000, OwnerPlayer); !ok {
 		t.Fatal("fixture: player bid refused")
 	}
 	addTestAgent(s, "ag-save-a", RoleIndustrialist, home, 1_000_000)
 	addTestAgent(s, "ag-save-b", RoleTrader, home, 250_000)
-	agentOf(s, "ag-save-b").Inventory["charge-emp"] = 42
+	agentOf(s, "ag-save-b").Inventory["ammo-emp-s"] = 42
 	s.upkeep = map[StationID]float64{home: upkeepEndowment}
 	stepPasses(s, 2) // quotes placed, some fills settled
 
@@ -760,8 +760,8 @@ func TestAgentSaveRestoreAndHash(t *testing.T) {
 				s.agents[i].ID, len(b.agents[i].Orders), len(s.agents[i].Orders))
 		}
 	}
-	if b.agents[1].Inventory["charge-emp"] != 42 {
-		t.Fatalf("restored inventory = %d, want 42", b.agents[1].Inventory["charge-emp"])
+	if b.agents[1].Inventory["ammo-emp-s"] != 42 {
+		t.Fatalf("restored inventory = %d, want 42", b.agents[1].Inventory["ammo-emp-s"])
 	}
 
 	// Continuation: both runs keep hashing identically.

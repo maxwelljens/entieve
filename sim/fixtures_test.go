@@ -21,10 +21,10 @@ func testContent() *content.Content {
 		return &content.Damage{EM: em, Thermal: th, Kinetic: ki, Explosive: ex}
 	}
 	items := map[content.ItemID]*content.ItemDef{
-		"charge-emp": {ID: "charge-emp", Name: "EMP Charge", Category: content.CatAmmo,
-			Volume: 0.01, BasePrice: 5, AmmoClass: "light", Damage: dmg(10, 2, 0, 0)},
-		"charge-ap": {ID: "charge-ap", Name: "AP Charge", Category: content.CatAmmo,
-			Volume: 0.01, BasePrice: 6, AmmoClass: "light", Damage: dmg(0, 0, 12, 0)},
+		"ammo-emp-s": {ID: "ammo-emp-s", Name: "EMP Charge", Category: content.CatAmmo,
+			Volume: 0.01, BasePrice: 5, AmmoClass: "small", Damage: dmg(10, 2, 0, 0)},
+		"ammo-ap-s": {ID: "ammo-ap-s", Name: "AP Charge", Category: content.CatAmmo,
+			Volume: 0.01, BasePrice: 6, AmmoClass: "small", Damage: dmg(0, 0, 12, 0)},
 		"charge-cap-cell": {ID: "charge-cap-cell", Name: "Cap Booster Cell", Category: content.CatCharge,
 			Volume: 0.1, BasePrice: 10},
 		"ore-sterngrit": {ID: "ore-sterngrit", Name: "Sterngrit", Category: content.CatOre,
@@ -76,12 +76,12 @@ func testContent() *content.Content {
 
 	modules := map[content.ModuleID]*content.ModuleDef{
 		// high: weapons + mining
-		"mod-emp-turret": {
-			ID: "mod-emp-turret", Name: "EMP Turret", Slot: content.SlotHigh, Kind: content.KindWeapon,
+		"mod-autocannon-s": {
+			ID: "mod-autocannon-s", Name: "EMP Turret", Slot: content.SlotHigh, Kind: content.KindWeapon,
 			ActivationCost: 10, ActivationTime: 2, Price: 1000,
 			Weapon: &content.WeaponAttrs{
 				Damage: content.Damage{EM: 10, Thermal: 2}, Optimal: 6000, Falloff: 3000,
-				Tracking: 0.4, AmmoClass: "light", ShotTime: 2,
+				Tracking: 0.4, AmmoClass: "small", ShotTime: 2,
 			},
 		},
 		"mod-rocket-pod": {
@@ -152,7 +152,7 @@ func testContent() *content.Content {
 		"npc-rat-scuttler": {
 			ID: "npc-rat-scuttler", Name: "Rat Scuttler", Faction: "Mire Corsairs",
 			Ship:          "ship-rat",
-			Fit:           []content.ModuleID{"mod-emp-turret", "mod-shield-boost", "mod-stasis-web", "mod-warp-scram"},
+			Fit:           []content.ModuleID{"mod-autocannon-s", "mod-shield-boost", "mod-stasis-web", "mod-warp-scram"},
 			AggroRange:    15000,
 			OrbitRange:    1500,
 			FleeThreshold: 0.25,
@@ -173,12 +173,12 @@ func testContent() *content.Content {
 	// asks that seed supply and standing bids that seed demand — never
 	// crossing (every bid strictly below its ask).
 	stationA.Station.Market = []content.MarketOrderDef{
-		{Item: "charge-emp", Qty: 100, Price: 5},
+		{Item: "ammo-emp-s", Qty: 100, Price: 5},
 		{Item: "charge-cap-cell", Qty: 50, Price: 10},
 		{Item: "min-ferrite", Qty: 500, Price: 10},
 		{Item: "mod-armor-plate", Qty: 10, Price: 1000},
 		{Item: "ship-barge", Qty: 3, Price: 50000},
-		{Item: "charge-emp", Qty: 40, Price: 4, Side: "buy"},
+		{Item: "ammo-emp-s", Qty: 40, Price: 4, Side: "buy"},
 		{Item: "min-ferrite", Qty: 200, Price: 9, Side: "buy"},
 	}
 
@@ -247,9 +247,9 @@ func testWorld() *content.WorldDef {
 			System:   "sys-a",
 			Position: core.Vec2{X: 1e7, Y: 500},
 			Ship:     "ship-sloop",
-			Fit:      []content.ModuleID{"mod-emp-turret"},
+			Fit:      []content.ModuleID{"mod-autocannon-s"},
 			Cargo: []content.CargoStack{
-				{Item: "charge-emp", Qty: 20},
+				{Item: "ammo-emp-s", Qty: 20},
 				{Item: "charge-cap-cell", Qty: 5},
 			},
 			Wallet: 100000,

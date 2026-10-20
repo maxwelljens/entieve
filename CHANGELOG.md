@@ -22,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ships.json`): modules run ~3 minutes and hulls ~10 minutes per run at 1×
   (ammo's ~30 s rung is the parallel ammo pass). Runs still multiply
   linearly and craft levels still discount time 4% per level.
+- **Saves from before the shell-weapons rename load cleanly**: restore
+  remaps the retired content ids in place — `charge-emp/fusion/ap/plutonium`
+  to the small-calibre shell of the same damage profile, `mod-emp-turret` to
+  the small autocannon, `mod-rail-turret` to the small artillery, and the
+  four charge recipes to their shell recipes — across hangars, cargo, fits
+  (and their module runtimes), wreck loot, convoy shipments, market orders and
+  last trades, industry jobs, agent ledgers and parked shipments. The save
+  schema stays 2.
+- **Turret effects render by family** (`render/overlay.go`): autocannons
+  rattle a thin tracer with a bright bolt running down it, artillery flashes
+  one heavy stroke with a broad muzzle bloom; the full muzzle-to-target line
+  and its range cue are unchanged.
 
 ### Added
 
@@ -41,6 +53,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deliver Shield Boosters to Przystań and Stasis Webs to Doki — durable
   module goods, no weapon or ammo ids. Deliver contracts now accept module
   ids as cargo.
+- **Shell weapons — autocannon and artillery families** (`content/data/modules/weapons.json`,
+  `content/data/items/ammo.json`): the laser turrets and their charges are
+  replaced by projectile guns in three calibres — `mod-autocannon-s/m/l`
+  (fast cycle, high tracking, short optimal) and `mod-artillery-s/m/l`
+  (slow cycle, low tracking, long optimal, a heavier volley from the same
+  shell) — and twelve `ammo-*` shells: four damage profiles (EMP, fusion,
+  armor-piercing, plutonium) per calibre, shared by both families, since
+  ammunition is keyed by calibre. All six guns run capacitor-free; the
+  damage-application math (optimal + falloff + tracking + signature) is
+  unchanged. NPC fits moved to calibres matching their hulls (Scuttler and
+  Custos small, Marauder medium, Hierarch large), the market books seed the
+  shell set, and the retired ids are rejected by validation.
 
 ## [0.5.0] - 2026-10-19
 

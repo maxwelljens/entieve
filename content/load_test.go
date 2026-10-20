@@ -40,7 +40,7 @@ func TestLoadEmbedded(t *testing.T) {
 
 	// Spot-check registry IDs.
 	for _, id := range []ItemID{"min-ferrite", "min-argon", "ore-sterngrit", "ore-glacierite",
-		"charge-emp", "charge-plutonium", "charge-cap-cell",
+		"ammo-emp-s", "ammo-plutonium-l", "charge-cap-cell",
 		"loot-navdata", "loot-hierarch-crest"} {
 		if _, ok := c.Items[id]; !ok {
 			t.Errorf("Items missing %q", id)
@@ -64,15 +64,15 @@ func TestLoadEmbedded(t *testing.T) {
 		}
 	}
 
-	turret, ok := c.Modules["mod-emp-turret"]
+	turret, ok := c.Modules["mod-autocannon-s"]
 	if !ok {
-		t.Fatal("Modules missing mod-emp-turret")
+		t.Fatal("Modules missing mod-autocannon-s")
 	}
 	if turret.Weapon == nil {
-		t.Fatal("mod-emp-turret has no weapon block")
+		t.Fatal("mod-autocannon-s has no weapon block")
 	}
-	if turret.Weapon.AmmoClass != "light" {
-		t.Errorf("mod-emp-turret ammo class = %q, want light", turret.Weapon.AmmoClass)
+	if turret.Weapon.AmmoClass != "small" {
+		t.Errorf("mod-autocannon-s ammo class = %q, want small", turret.Weapon.AmmoClass)
 	}
 	if len(c.Modules) < 14 {
 		t.Errorf("len(Modules) = %d, want >= 14", len(c.Modules))

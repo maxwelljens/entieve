@@ -6,7 +6,7 @@
       "to": "cel-halda",
       "to_system": "sys-rudnik",
       "hull": "ship-npc-hauler",
-      "cargo": { "item": "charge-fusion", "qty": 400 },
+      "cargo": { "item": "ammo-fusion-s", "qty": 400 },
       "interval_ticks": 7200
     },
     {
@@ -14,7 +14,7 @@
       "to": "cel-doki",
       "to_system": "sys-kamieniec",
       "hull": "ship-npc-hauler",
-      "cargo": { "item": "charge-ap", "qty": 400 },
+      "cargo": { "item": "ammo-ap-s", "qty": 400 },
       "interval_ticks": 7200
     }
   ],

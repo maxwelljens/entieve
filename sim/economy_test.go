@@ -152,10 +152,10 @@ func TestBuyHullQtyDeliversEveryHull(t *testing.T) {
 func TestBuyReducesStockAndWallet(t *testing.T) {
 	s := newTestSim(t)
 	dockAtHaven(t, s)
-	qtyBefore, price, _ := marketQty(s, "charge-emp")
+	qtyBefore, price, _ := marketQty(s, "ammo-emp-s")
 	walletBefore := s.Wallet()
 
-	s.Queue(CmdBuy{Item: "charge-emp", Qty: 10})
+	s.Queue(CmdBuy{Item: "ammo-emp-s", Qty: 10})
 	s.Step()
 	evs := drain(s)
 
@@ -163,12 +163,12 @@ func TestBuyReducesStockAndWallet(t *testing.T) {
 		t.Fatalf("wallet=%v want %v", s.Wallet(),
 			walletBefore-(price*10+MarketBrokerFee*(price*10)))
 	}
-	qtyAfter, _, _ := marketQty(s, "charge-emp")
+	qtyAfter, _, _ := marketQty(s, "ammo-emp-s")
 	if qtyAfter != qtyBefore-10 {
 		t.Fatalf("stock=%d want %d", qtyAfter, qtyBefore-10)
 	}
-	if hangarCount(s, "charge-emp") != 10 {
-		t.Fatalf("hangar=%d want 10", hangarCount(s, "charge-emp"))
+	if hangarCount(s, "ammo-emp-s") != 10 {
+		t.Fatalf("hangar=%d want 10", hangarCount(s, "ammo-emp-s"))
 	}
 	if !hasEvent(evs, EvMarket, "Bought 10 x EMP Charge for 50.00 €") {
 		t.Fatalf("missing buy event: %v", evs)
@@ -178,7 +178,7 @@ func TestBuyReducesStockAndWallet(t *testing.T) {
 func TestBuyRequiresDockedMarketService(t *testing.T) {
 	s := newTestSim(t)
 	// Not docked.
-	s.Queue(CmdBuy{Item: "charge-emp", Qty: 1})
+	s.Queue(CmdBuy{Item: "ammo-emp-s", Qty: 1})
 	s.Step()
 	evs := drain(s)
 	if findEvent(evs, EvLog, "must be docked") == nil {
@@ -236,14 +236,14 @@ func TestSellFillsBidMinusTax(t *testing.T) {
 	s := newTestSim(t)
 	dockAtHaven(t, s)
 	walletBefore := s.Wallet()
-	bid := bidPrice(s, "charge-emp")
+	bid := bidPrice(s, "ammo-emp-s")
 	if bid <= 0 {
-		t.Fatal("fixture: no standing bid for charge-emp")
+		t.Fatal("fixture: no standing bid for ammo-emp-s")
 	}
-	bidBefore := bidQty(s, "charge-emp")
-	ammoBefore := cargoCount(s, "charge-emp")
+	bidBefore := bidQty(s, "ammo-emp-s")
+	ammoBefore := cargoCount(s, "ammo-emp-s")
 
-	s.Queue(CmdSell{Item: "charge-emp", Qty: 5})
+	s.Queue(CmdSell{Item: "ammo-emp-s", Qty: 5})
 	s.Step()
 	evs := drain(s)
 
@@ -255,14 +255,14 @@ func TestSellFillsBidMinusTax(t *testing.T) {
 		t.Fatalf("wallet=%v want %v (bid %v x 5, %v broker fee, %v sales tax)", s.Wallet(),
 			walletBefore+received, bid, fee, tax)
 	}
-	if cargoCount(s, "charge-emp") != ammoBefore-5 {
+	if cargoCount(s, "ammo-emp-s") != ammoBefore-5 {
 		t.Fatal("cargo not reduced")
 	}
-	if got := bidQty(s, "charge-emp"); got != bidBefore-5 {
+	if got := bidQty(s, "ammo-emp-s"); got != bidBefore-5 {
 		t.Fatalf("bid qty=%d want %d (the bid absorbed the sale)", got, bidBefore-5)
 	}
 	// The ask side is untouched: selling never restocks supply.
-	if qty, _, _ := marketQty(s, "charge-emp"); qty == 0 {
+	if qty, _, _ := marketQty(s, "ammo-emp-s"); qty == 0 {
 		t.Fatal("selling consumed the ask side")
 	}
 	if !hasEvent(evs, EvMarket, "Sold 5 x EMP Charge for "+euro(received)) {
@@ -508,13 +508,13 @@ func TestAssembleSwapsHullsAndPreservesBoth(t *testing.T) {
 	s := newTestSim(t)
 	dockAtHaven(t, s)
 	ship, _ := s.Ships.Get(s.player)
-	ammoBefore := cargoCount(s, "charge-emp")
+	ammoBefore := cargoCount(s, "ammo-emp-s")
 
 	// The hangar holds a barge with its own fit and cargo.
 	s.Hangar.Ships = append(s.Hangar.Ships, StoredShip{
 		Hull:  "ship-barge",
 		Fit:   []content.ModuleID{"mod-shield-extender"},
-		Cargo: []content.CargoStack{{Item: "charge-ap", Qty: 7}},
+		Cargo: []content.CargoStack{{Item: "ammo-ap-s", Qty: 7}},
 	})
 
 	s.Queue(CmdAssemble{Ship: "ship-barge"})
@@ -527,10 +527,10 @@ func TestAssembleSwapsHullsAndPreservesBoth(t *testing.T) {
 	if len(fit.Low) != 1 || fit.Low[0] != "mod-shield-extender" {
 		t.Fatalf("barge fit=%v", fit.Low)
 	}
-	if cargoCount(s, "charge-ap") != 7 {
-		t.Fatalf("barge cargo=%d", cargoCount(s, "charge-ap"))
+	if cargoCount(s, "ammo-ap-s") != 7 {
+		t.Fatalf("barge cargo=%d", cargoCount(s, "ammo-ap-s"))
 	}
-	if cargoCount(s, "charge-emp") != 0 {
+	if cargoCount(s, "ammo-emp-s") != 0 {
 		t.Fatal("sloop cargo should have moved to the hangar")
 	}
 	if len(s.Hangar.Ships) != 1 || s.Hangar.Ships[0].Hull != "ship-sloop" {
@@ -538,10 +538,10 @@ func TestAssembleSwapsHullsAndPreservesBoth(t *testing.T) {
 	}
 	// The stored sloop kept its fit and cargo.
 	stored := s.Hangar.Ships[0]
-	if len(stored.Fit) != 1 || stored.Fit[0] != "mod-emp-turret" {
+	if len(stored.Fit) != 1 || stored.Fit[0] != "mod-autocannon-s" {
 		t.Fatalf("stored fit=%v", stored.Fit)
 	}
-	if stacksCount(stored.Cargo, "charge-emp") != ammoBefore {
+	if stacksCount(stored.Cargo, "ammo-emp-s") != ammoBefore {
 		t.Fatalf("stored cargo=%+v", stored.Cargo)
 	}
 	if !hasEvent(evs, EvLog, "Assembled Ore Barge") {
@@ -555,18 +555,18 @@ func TestAssembleSwapsHullsAndPreservesBoth(t *testing.T) {
 	if ship.Hull != "ship-sloop" {
 		t.Fatalf("hull after swap back=%s", ship.Hull)
 	}
-	if cargoCount(s, "charge-emp") != ammoBefore {
+	if cargoCount(s, "ammo-emp-s") != ammoBefore {
 		t.Fatal("sloop cargo not restored")
 	}
 	fit, _ = s.Fittings.Get(s.player)
-	if len(fit.High) != 1 || fit.High[0] != "mod-emp-turret" {
+	if len(fit.High) != 1 || fit.High[0] != "mod-autocannon-s" {
 		t.Fatalf("sloop fit=%v", fit.High)
 	}
 	if len(s.Hangar.Ships) != 1 || s.Hangar.Ships[0].Hull != "ship-barge" {
 		t.Fatalf("hangar after swap=%+v", s.Hangar.Ships)
 	}
 	barge := s.Hangar.Ships[0]
-	if stacksCount(barge.Cargo, "charge-ap") != 7 || len(barge.Fit) != 1 {
+	if stacksCount(barge.Cargo, "ammo-ap-s") != 7 || len(barge.Fit) != 1 {
 		t.Fatalf("stored barge corrupted: %+v", barge)
 	}
 }

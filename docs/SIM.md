@@ -217,14 +217,15 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    hold: the held shipment waits in the ledger and hops straight across
    once the far queue drains, closing the episode with one jump line —
    no respawn/re-hold cycle exists to re-log.
-5. **Consumption — real burns.** Guns consume charges per shot (dry guns
-   refuse to fire). Every 3600 ticks each market station's **upkeep** cycle
+5. **Consumption — real burns.** Guns consume one shell per shot, of their
+   own calibre (dry guns refuse to fire; artillery's damage multiplier is
+   the gun's share of the shell's volley). Every 3600 ticks each market station's **upkeep** cycle
    burns a 5,000 € maintenance fee and buys a repair/rearm basket (every
    ammo item × 50 plus the lowest-id armor-repair module) against its own
    book at up to ×1.25 the displayed price, consuming the goods outright —
    a money sink seeded once with a 100,000,000 € endowment and never
    refilled (`upkeepPass`, `sim/agent.go`). Replacement NPCs are
-   **requisitioned**: a guard buys its hull, fit and 1,000-round charge
+   **requisitioned**: a guard buys its hull, fit and 1,000-round shell
    basket from the respawn station's book against its faction's ledger
    (`Save.FactionLedger`, likewise seeded once — only respawn requisitions
    debit it); a rat pays belt ore (1 m³ per 200 mineral units of its hull

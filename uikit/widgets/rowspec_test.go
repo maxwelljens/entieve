@@ -79,7 +79,7 @@ func TestRowSpecTooltipLazy(t *testing.T) {
 func TestRowSpecMenuAtScale(t *testing.T) {
 	uitest.UseScale(t, 1.5)
 	env, _ := newTestEnv(t)
-	ref := ItemRef("charge-emp")
+	ref := ItemRef("ammo-emp-s")
 	spec := RowSpec{
 		Ref:     &ref,
 		Actions: []RowAction{{Label: "Buy", Disabled: true}, {Label: "Sell"}},

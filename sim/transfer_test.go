@@ -64,25 +64,25 @@ func TestTransferCargoToOreHoldMergesStacks(t *testing.T) {
 func TestTransferToHangarAndBackWhileDocked(t *testing.T) {
 	s := newTestSim(t)
 	dockAtHaven(t, s)
-	before := cargoCount(s, "charge-emp")
+	before := cargoCount(s, "ammo-emp-s")
 
-	evs := queueTransfer(s, "charge-emp", 8, "cargo", "hangar")
-	if got := cargoCount(s, "charge-emp"); got != before-8 {
+	evs := queueTransfer(s, "ammo-emp-s", 8, "cargo", "hangar")
+	if got := cargoCount(s, "ammo-emp-s"); got != before-8 {
 		t.Fatalf("cargo=%d want %d", got, before-8)
 	}
-	if hangarCount(s, "charge-emp") != 8 {
-		t.Fatalf("hangar=%d want 8", hangarCount(s, "charge-emp"))
+	if hangarCount(s, "ammo-emp-s") != 8 {
+		t.Fatalf("hangar=%d want 8", hangarCount(s, "ammo-emp-s"))
 	}
 	if findEvent(evs, EvMarket, "Transferred 8 x EMP Charge to station hangar") == nil {
 		t.Fatalf("missing transfer event: %v", evs)
 	}
 
-	evs = queueTransfer(s, "charge-emp", 5, "hangar", "cargo")
-	if got := cargoCount(s, "charge-emp"); got != before-3 {
+	evs = queueTransfer(s, "ammo-emp-s", 5, "hangar", "cargo")
+	if got := cargoCount(s, "ammo-emp-s"); got != before-3 {
 		t.Fatalf("cargo after return=%d want %d", got, before-3)
 	}
-	if hangarCount(s, "charge-emp") != 3 {
-		t.Fatalf("hangar after return=%d want 3", hangarCount(s, "charge-emp"))
+	if hangarCount(s, "ammo-emp-s") != 3 {
+		t.Fatalf("hangar after return=%d want 3", hangarCount(s, "ammo-emp-s"))
 	}
 	if findEvent(evs, EvMarket, "Transferred 5 x EMP Charge to cargo hold") == nil {
 		t.Fatalf("missing transfer-back event: %v", evs)

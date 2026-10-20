@@ -190,7 +190,7 @@ formation).
 
 ```sh
 go run ./cmd/entieve validate                 # lint all content, cross-check refs
-go run ./cmd/entieve describe mod-emp-turret  # introspect any content id (JSON)
+go run ./cmd/entieve describe mod-autocannon-s  # introspect any content id (JSON)
 go run ./cmd/entieve simulate \
     --world world-showcase --ticks 36000 \
     --script scripts/showcase.json            # headless run + report

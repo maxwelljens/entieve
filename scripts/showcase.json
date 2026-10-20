@@ -132,7 +132,7 @@
     "at_tick": 18120,
     "action": "setammo",
     "slot": "high0",
-    "item": "charge-plutonium",
+    "item": "ammo-plutonium-s",
     "note": "load plutonium first: the turret consumes the preferred charge"
   },
   {

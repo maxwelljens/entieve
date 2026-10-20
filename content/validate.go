@@ -63,6 +63,15 @@ var (
 	}
 )
 
+// retiredIDs are content ids that must never return: the shell-weapons
+// rename replaced the laser turrets and their charge ammunition
+// (docs/CONTENT_AUTHORING.md — Weapons and shells). Saves carrying them are
+// remapped at restore (sim/save.go migrateLegacyIDs).
+var retiredIDs = map[string]bool{
+	"charge-emp": true, "charge-fusion": true, "charge-ap": true, "charge-plutonium": true,
+	"mod-emp-turret": true, "mod-rail-turret": true,
+}
+
 type validator struct {
 	c    *Content
 	errs []string
@@ -121,6 +130,9 @@ func (v *validator) items() {
 			continue
 		}
 		ctx := "items/" + string(id)
+		if retiredIDs[string(id)] {
+			v.addf("%s: id is retired (replaced in the shell-weapons rename)", ctx)
+		}
 		if it.Name == "" {
 			v.addf("%s: missing name", ctx)
 		}
@@ -257,6 +269,9 @@ func (v *validator) modules() {
 			continue
 		}
 		ctx := "modules/" + string(id)
+		if retiredIDs[string(id)] {
+			v.addf("%s: id is retired (replaced in the shell-weapons rename)", ctx)
+		}
 		if m.Name == "" {
 			v.addf("%s: missing name", ctx)
 		}
@@ -318,6 +333,9 @@ func (v *validator) modules() {
 			}
 			if w.ShotTime < 0 {
 				v.addf("%s: negative shot time %v", ctx, w.ShotTime)
+			}
+			if w.DamageMult < 0 {
+				v.addf("%s: negative damage multiplier %v", ctx, w.DamageMult)
 			}
 			if w.AmmoClass != "" && !v.ammoClassExists(w.AmmoClass) {
 				v.addf("%s: weapon ammo class %q matches no ammo or charge item", ctx, w.AmmoClass)

@@ -53,11 +53,11 @@ func hasLedger(entries []LedgerEntry, what string) bool {
 }
 
 func TestLedgerMarketBuyAndSell(t *testing.T) {
-	// IOC buy: cost + broker fee out, one row (charge-emp asks at 5).
+	// IOC buy: cost + broker fee out, one row (ammo-emp-s asks at 5).
 	s := newMissionSim(t)
 	dockNamed(t, s, "Haven Rest")
 	got := runRecorded(t, s, 1, func() {
-		s.Queue(CmdBuy{Item: "charge-emp", Qty: 10})
+		s.Queue(CmdBuy{Item: "ammo-emp-s", Qty: 10})
 		s.Step()
 		drain(s)
 	})
@@ -76,11 +76,11 @@ func TestLedgerMarketBuyAndSell(t *testing.T) {
 	}
 
 	// IOC sell: proceeds minus broker fee and sales tax, both itemized
-	// (the world-start cargo holds 20 charge-emp, the book bids 4).
+	// (the world-start cargo holds 20 ammo-emp-s, the book bids 4).
 	s = newMissionSim(t)
 	dockNamed(t, s, "Haven Rest")
 	got = runRecorded(t, s, 1, func() {
-		s.Queue(CmdSell{Item: "charge-emp", Qty: 10})
+		s.Queue(CmdSell{Item: "ammo-emp-s", Qty: 10})
 		s.Step()
 		drain(s)
 	})
@@ -107,10 +107,10 @@ func TestLedgerRestingOrderFillAndPlacement(t *testing.T) {
 	s := newMissionSim(t)
 	// Clear the founding ask first (a system buy, no player movement), so
 	// the player's ask is the only supply the crossing buy can reach.
-	if _, ok := s.PlaceOrder("cel-station-a", OrderBuy, "charge-emp", 100, 5, OwnerSystem); !ok {
+	if _, ok := s.PlaceOrder("cel-station-a", OrderBuy, "ammo-emp-s", 100, 5, OwnerSystem); !ok {
 		t.Fatal("could not clear the founding ask")
 	}
-	res, ok := s.PlaceOrder("cel-station-a", OrderSell, "charge-emp", 5, 6, OwnerPlayer)
+	res, ok := s.PlaceOrder("cel-station-a", OrderSell, "ammo-emp-s", 5, 6, OwnerPlayer)
 	if !ok {
 		t.Fatal("player ask refused")
 	}
@@ -118,7 +118,7 @@ func TestLedgerRestingOrderFillAndPlacement(t *testing.T) {
 		t.Fatalf("ask = %+v, want it resting whole", res)
 	}
 	got := runRecorded(t, s, 1, func() {
-		s.PlaceOrder("cel-station-a", OrderBuy, "charge-emp", 5, 6, OwnerSystem)
+		s.PlaceOrder("cel-station-a", OrderBuy, "ammo-emp-s", 5, 6, OwnerSystem)
 	})
 	e := got[0]
 	if !strings.Contains(e.What, "Market sell — 5 x EMP Charge") {
@@ -247,7 +247,7 @@ func TestLedgerSellOrderPlacementIsOneRowEitherWay(t *testing.T) {
 	s := newMissionSim(t)
 	var got []LedgerEntry
 	got = runRecorded(t, s, 1, func() {
-		res, ok := s.PlaceOrder("cel-station-a", OrderSell, "charge-emp", 5, 6, OwnerPlayer)
+		res, ok := s.PlaceOrder("cel-station-a", OrderSell, "ammo-emp-s", 5, 6, OwnerPlayer)
 		if !ok || res.Filled != 0 || res.Remaining != 5 {
 			t.Fatalf("resting sell = %+v ok=%v, want it resting whole", res, ok)
 		}
@@ -264,7 +264,7 @@ func TestLedgerSellOrderPlacementIsOneRowEitherWay(t *testing.T) {
 	// sale.
 	s = newMissionSim(t)
 	got = runRecorded(t, s, 1, func() {
-		res, ok := s.PlaceOrder("cel-station-a", OrderSell, "charge-emp", 5, 4, OwnerPlayer)
+		res, ok := s.PlaceOrder("cel-station-a", OrderSell, "ammo-emp-s", 5, 4, OwnerPlayer)
 		if !ok || res.Filled != 5 || res.Remaining != 0 {
 			t.Fatalf("crossing sell = %+v ok=%v, want a full fill", res, ok)
 		}
@@ -342,7 +342,7 @@ func TestLedgerRecordsNothingWithoutAMovement(t *testing.T) {
 	// Undocked selling moves nothing either.
 	s = newMissionSim(t)
 	runRecorded(t, s, 0, func() {
-		s.Queue(CmdSell{Item: "charge-emp", Qty: 1})
+		s.Queue(CmdSell{Item: "ammo-emp-s", Qty: 1})
 		s.Step()
 		drain(s)
 	})
@@ -372,7 +372,7 @@ func TestLedgerRingCapsAtTwohundredAndEvictsOldest(t *testing.T) {
 	// 150 placements + 150 escrow releases = 300 movements, each pair
 	// costing the broker fee alone (limit 1 rests under the 5 ask).
 	for i := 1; i <= 150; i++ {
-		res, ok := s.PlaceOrder("cel-station-a", OrderBuy, "charge-emp", i, 1, OwnerPlayer)
+		res, ok := s.PlaceOrder("cel-station-a", OrderBuy, "ammo-emp-s", i, 1, OwnerPlayer)
 		if !ok {
 			t.Fatalf("placement %d refused", i)
 		}
@@ -405,7 +405,7 @@ func TestLedgerRingCapsAtTwohundredAndEvictsOldest(t *testing.T) {
 func TestLedgerSurvivesSaveRestore(t *testing.T) {
 	s := newMissionSim(t)
 	dockNamed(t, s, "Haven Rest")
-	s.Queue(CmdBuy{Item: "charge-emp", Qty: 10})
+	s.Queue(CmdBuy{Item: "ammo-emp-s", Qty: 10})
 	s.Step()
 	drain(s)
 	if len(s.ledger) == 0 {

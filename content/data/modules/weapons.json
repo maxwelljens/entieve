@@ -1,51 +1,153 @@
 [
   {
-    "id": "mod-emp-turret",
+    "id": "mod-autocannon-s",
     "maker": "corp-nordvakt",
-    "name": "EMP Turret",
-    "description": "Light turret for charge-class ammunition. Versatile EM-biased volley; loads any light charge.",
+    "name": "Small Autocannon",
+    "description": "Small-calibre autocannon: a 3 s cycle and high tracking, built to brawl inside a few kilometres. Loads any small shell.",
     "slot": "high",
     "kind": "weapon",
-    "activation_cost": 2,
+    "activation_cost": 0,
     "activation_time": 3,
     "weapon": {
       "damage": {
-        "em": 16,
-        "thermal": 5,
-        "kinetic": 2,
-        "explosive": 1
+        "em": 8,
+        "thermal": 6,
+        "kinetic": 6,
+        "explosive": 5
       },
-      "optimal": 12000,
-      "falloff": 6000,
-      "tracking": 145,
-      "ammo_class": "light",
-      "shot_time": 3
+      "optimal": 4000,
+      "falloff": 9000,
+      "tracking": 160,
+      "ammo_class": "small",
+      "shot_time": 3,
+      "damage_multiplier": 1
     },
     "price": 250000
   },
   {
-    "id": "mod-rail-turret",
+    "id": "mod-autocannon-m",
     "maker": "corp-nordvakt",
-    "name": "Rail Turret",
-    "description": "Long-range light railgun. Snipes at 18 km with kinetic punch; loads any light charge.",
+    "name": "Medium Autocannon",
+    "description": "Medium-calibre autocannon: a 3.6 s cycle and high tracking, built to brawl inside ten kilometres. Loads any medium shell.",
     "slot": "high",
     "kind": "weapon",
-    "activation_cost": 2,
-    "activation_time": 4,
+    "activation_cost": 0,
+    "activation_time": 3.6,
     "weapon": {
       "damage": {
-        "em": 3,
-        "thermal": 6,
-        "kinetic": 17,
-        "explosive": 1
+        "em": 16,
+        "thermal": 12,
+        "kinetic": 12,
+        "explosive": 10
       },
-      "optimal": 18000,
-      "falloff": 4500,
-      "tracking": 95,
-      "ammo_class": "light",
-      "shot_time": 4
+      "optimal": 10000,
+      "falloff": 22000,
+      "tracking": 120,
+      "ammo_class": "medium",
+      "shot_time": 3.6,
+      "damage_multiplier": 1
+    },
+    "price": 275000
+  },
+  {
+    "id": "mod-autocannon-l",
+    "maker": "corp-nordvakt",
+    "name": "Large Autocannon",
+    "description": "Large-calibre autocannon: a 4.5 s cycle and high tracking, built to brawl inside sixteen kilometres. Loads any large shell.",
+    "slot": "high",
+    "kind": "weapon",
+    "activation_cost": 0,
+    "activation_time": 4.5,
+    "weapon": {
+      "damage": {
+        "em": 32,
+        "thermal": 24,
+        "kinetic": 24,
+        "explosive": 20
+      },
+      "optimal": 16000,
+      "falloff": 36000,
+      "tracking": 90,
+      "ammo_class": "large",
+      "shot_time": 4.5,
+      "damage_multiplier": 1
     },
     "price": 320000
+  },
+  {
+    "id": "mod-artillery-s",
+    "maker": "corp-nordvakt",
+    "name": "Small Artillery",
+    "description": "Small-calibre artillery: a 9 s cycle that throws a heavy shell far past the autocannon's reach, at the cost of tracking. Loads any small shell.",
+    "slot": "high",
+    "kind": "weapon",
+    "activation_cost": 0,
+    "activation_time": 9,
+    "weapon": {
+      "damage": {
+        "em": 22,
+        "thermal": 17,
+        "kinetic": 17,
+        "explosive": 14
+      },
+      "optimal": 20000,
+      "falloff": 15000,
+      "tracking": 35,
+      "ammo_class": "small",
+      "shot_time": 9,
+      "damage_multiplier": 2.75
+    },
+    "price": 320000
+  },
+  {
+    "id": "mod-artillery-m",
+    "maker": "corp-nordvakt",
+    "name": "Medium Artillery",
+    "description": "Medium-calibre artillery: a 10.8 s cycle that throws a heavy shell far past the autocannon's reach, at the cost of tracking. Loads any medium shell.",
+    "slot": "high",
+    "kind": "weapon",
+    "activation_cost": 0,
+    "activation_time": 10.8,
+    "weapon": {
+      "damage": {
+        "em": 44,
+        "thermal": 33,
+        "kinetic": 33,
+        "explosive": 27
+      },
+      "optimal": 50000,
+      "falloff": 37500,
+      "tracking": 26,
+      "ammo_class": "medium",
+      "shot_time": 10.8,
+      "damage_multiplier": 2.75
+    },
+    "price": 340000
+  },
+  {
+    "id": "mod-artillery-l",
+    "maker": "corp-nordvakt",
+    "name": "Large Artillery",
+    "description": "Large-calibre artillery: a 13.5 s cycle that throws a heavy shell far past the autocannon's reach, at the cost of tracking. Loads any large shell.",
+    "slot": "high",
+    "kind": "weapon",
+    "activation_cost": 0,
+    "activation_time": 13.5,
+    "weapon": {
+      "damage": {
+        "em": 88,
+        "thermal": 66,
+        "kinetic": 66,
+        "explosive": 55
+      },
+      "optimal": 80000,
+      "falloff": 60000,
+      "tracking": 20,
+      "ammo_class": "large",
+      "shot_time": 13.5,
+      "damage_multiplier": 2.75
+    },
+    "price": 355000
   },
   {
     "id": "mod-rocket-pod",

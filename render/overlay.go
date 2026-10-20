@@ -156,8 +156,9 @@ func (r *Renderer) drawEffects(dst *ebiten.Image, cam Camera, s *sim.Sim, now fl
 				}
 				switch def.Kind {
 				case content.KindWeapon:
-					r.muzzleFlash(dst, nose, sizePx, now, i)
-					r.tracer(dst, cam, s, o.info.Entity, nose, now, i)
+					heavy := def.Weapon != nil && def.Weapon.ShotTime >= heavyCycle
+					r.muzzleFlash(dst, nose, sizePx, now, i, heavy)
+					r.tracer(dst, cam, s, o.info.Entity, nose, now, i, heavy)
 				case content.KindMiningLaser:
 					r.miningBeam(dst, cam, o, nose)
 				}
@@ -166,18 +167,33 @@ func (r *Renderer) drawEffects(dst *ebiten.Image, cam Camera, s *sim.Sim, now fl
 	}
 }
 
-// muzzleFlash draws a hot additive flash at the ship's nose.
-func (r *Renderer) muzzleFlash(dst *ebiten.Image, nose core.Vec2, sizePx float64, now float64, i int) {
+// heavyCycle is the shot time at or above which a gun renders as artillery:
+// a slow heavy flash instead of an autocannon's fast rattle.
+const heavyCycle = 6
+
+// muzzleFlash draws a hot additive flash at the ship's nose: a small fast
+// flicker for autocannons, a broad slow bloom for artillery.
+func (r *Renderer) muzzleFlash(dst *ebiten.Image, nose core.Vec2, sizePx float64, now float64, i int, heavy bool) {
 	fr := sizePx * (0.55 + 0.25*math.Sin(now*40+float64(i)*2.1))
+	col := color.RGBA{255, 220, 150, 255}
+	if heavy {
+		fr = sizePx * (1.5 + 0.2*math.Sin(now*7+float64(i)*2.1))
+		col = color.RGBA{255, 190, 110, 255}
+	}
 	if fr < 2 {
 		return
 	}
-	img := r.glow(64, color.RGBA{255, 220, 150, 255})
+	img := r.glow(64, col)
 	drawGlowCentered(dst, img, nose.X, nose.Y, fr*2, true)
 }
 
-// tracer draws a shot line from the muzzle to the first locked target.
-func (r *Renderer) tracer(dst *ebiten.Image, cam Camera, s *sim.Sim, ship ecs.Entity, nose core.Vec2, now float64, i int) {
+// tracer draws a shot line from the muzzle to the first locked target: an
+// autocannon rattles a thin line with a bright bolt running down it, an
+// artillery piece flashes one heavy stroke. The line always reaches the
+// target, so the range cue the beam carried survives.
+// shortcut: the bolt is a cosmetic phase off the render clock (a shot
+// resolves instantly in the sim); give it flight time if shots ever travel.
+func (r *Renderer) tracer(dst *ebiten.Image, cam Camera, s *sim.Sim, ship ecs.Entity, nose core.Vec2, now float64, i int, heavy bool) {
 	tg, ok := s.Targetings.Get(ship)
 	if !ok {
 		return
@@ -191,9 +207,28 @@ func (r *Renderer) tracer(dst *ebiten.Image, cam Camera, s *sim.Sim, ship ecs.En
 			continue
 		}
 		tx, ty := cam.WorldToScreen(tr.Pos)
-		alpha := uint8(140 + 80*math.Abs(math.Sin(now*30+float64(i))))
+		if heavy {
+			alpha := uint8(170 + 60*math.Abs(math.Sin(now*6+float64(i))))
+			vector.StrokeLine(dst, float32(nose.X), float32(nose.Y), float32(tx), float32(ty),
+				2.4, color.RGBA{255, 196, 120, alpha}, true)
+			img := r.glow(64, color.RGBA{255, 210, 150, 255})
+			drawGlowCentered(dst, img, tx, ty, 12, true)
+			return
+		}
+		alpha := uint8(120 + 100*math.Abs(math.Sin(now*45+float64(i)*1.7)))
 		vector.StrokeLine(dst, float32(nose.X), float32(nose.Y), float32(tx), float32(ty),
-			1.4, color.RGBA{255, 205, 130, alpha}, true)
+			0.9, color.RGBA{255, 205, 130, alpha / 2}, true)
+		// The bolt: a short bright segment travelling muzzle to target.
+		ph := math.Mod(now*2.4+float64(i)*0.37, 1)
+		bx := nose.X + (tx-nose.X)*ph
+		by := nose.Y + (ty-nose.Y)*ph
+		dx, dy := tx-nose.X, ty-nose.Y
+		seg := math.Hypot(dx, dy)
+		if seg > 1 {
+			k := 22 / seg
+			vector.StrokeLine(dst, float32(bx), float32(by), float32(bx-dx*k), float32(by-dy*k),
+				1.6, color.RGBA{255, 232, 180, 235}, true)
+		}
 		return
 	}
 }

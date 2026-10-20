@@ -111,9 +111,9 @@ func TestPlaceOrderNeverCrossesBook(t *testing.T) {
 	s := newTestSim(t)
 	station := StationID("cel-station-a")
 
-	// The fixture asks 100 charge-emp @ 5.00; cross it with a 120-unit bid
+	// The fixture asks 100 ammo-emp-s @ 5.00; cross it with a 120-unit bid
 	// at 5.00: 100 fill at the resting price, 20 rest.
-	res, ok := s.PlaceOrder(station, OrderBuy, "charge-emp", 120, 5, OwnerSystem)
+	res, ok := s.PlaceOrder(station, OrderBuy, "ammo-emp-s", 120, 5, OwnerSystem)
 	if !ok {
 		t.Fatal("placement refused")
 	}
@@ -126,14 +126,14 @@ func TestPlaceOrderNeverCrossesBook(t *testing.T) {
 	// (bids rank descending: the new 20 @ 5.00 first).
 	var chargeEmp []MarketStock
 	for _, o := range s.BookOrders(station) {
-		if o.Item == "charge-emp" {
+		if o.Item == "ammo-emp-s" {
 			chargeEmp = append(chargeEmp, o)
 		}
 	}
 	if len(chargeEmp) != 2 || chargeEmp[0].Side != OrderBuy ||
 		chargeEmp[0].Qty != 20 || chargeEmp[0].Price != 5 ||
 		chargeEmp[1].Side != OrderBuy || chargeEmp[1].Price != 4 {
-		t.Fatalf("charge-emp orders = %+v, want bids [20 @ 5, 40 @ 4] and no asks", chargeEmp)
+		t.Fatalf("ammo-emp-s orders = %+v, want bids [20 @ 5, 40 @ 4] and no asks", chargeEmp)
 	}
 	// A system owner pays no escrow (the book just moves).
 	if s.Wallet() != 100000 {
@@ -178,13 +178,13 @@ func TestPriceTimePriority(t *testing.T) {
 func TestWeightedAverageMarketOrderFill(t *testing.T) {
 	s := newTestSim(t)
 	station := StationID("cel-station-a")
-	if _, ok := s.PlaceOrder(station, OrderSell, "charge-emp", 50, 6, OwnerSystem); !ok {
+	if _, ok := s.PlaceOrder(station, OrderSell, "ammo-emp-s", 50, 6, OwnerSystem); !ok {
 		t.Fatal("second ask refused")
 	}
 	dockAtHaven(t, s)
 	walletBefore := s.Wallet()
 
-	s.Queue(CmdBuy{Item: "charge-emp", Qty: 120})
+	s.Queue(CmdBuy{Item: "ammo-emp-s", Qty: 120})
 	s.Step()
 	evs := drain(s)
 
@@ -194,8 +194,8 @@ func TestWeightedAverageMarketOrderFill(t *testing.T) {
 		t.Fatalf("wallet = %v, want %v (weighted cost %v + fee %v)",
 			s.Wallet(), walletBefore-(cost+fee), cost, fee)
 	}
-	if hangarCount(s, "charge-emp") != 120 {
-		t.Fatalf("hangar = %d, want 120", hangarCount(s, "charge-emp"))
+	if hangarCount(s, "ammo-emp-s") != 120 {
+		t.Fatalf("hangar = %d, want 120", hangarCount(s, "ammo-emp-s"))
 	}
 	if !hasEvent(evs, EvMarket, "Bought 120 x EMP Charge for 620.00 €") {
 		t.Fatalf("missing weighted-fill event: %v", evs)
@@ -212,7 +212,7 @@ func TestEscrowDebitAndRefund(t *testing.T) {
 	walletBefore := s.Wallet()
 
 	// Bid under the 5.00 ask: nothing crosses, the order rests.
-	res, ok := s.PlaceOrder(station, OrderBuy, "charge-emp", 10, 3, OwnerPlayer)
+	res, ok := s.PlaceOrder(station, OrderBuy, "ammo-emp-s", 10, 3, OwnerPlayer)
 	if !ok || res.Filled != 0 || res.Remaining != 10 || res.ID == 0 {
 		t.Fatalf("result = %+v, want a resting 10-unit bid", res)
 	}
@@ -249,7 +249,7 @@ func TestMarketableLimitRefundsPriceImprovement(t *testing.T) {
 	walletBefore := s.Wallet()
 
 	// Limit 10 against the 5.00 ask: 6 units at the resting price.
-	res, ok := s.PlaceOrder(station, OrderBuy, "charge-emp", 6, 10, OwnerPlayer)
+	res, ok := s.PlaceOrder(station, OrderBuy, "ammo-emp-s", 6, 10, OwnerPlayer)
 	if !ok || res.Filled != 6 || res.Remaining != 0 {
 		t.Fatalf("result = %+v, want a full 6-unit fill", res)
 	}
@@ -262,8 +262,8 @@ func TestMarketableLimitRefundsPriceImprovement(t *testing.T) {
 	if s.Wallet() != want {
 		t.Fatalf("wallet = %v, want %v", s.Wallet(), want)
 	}
-	if hangarCount(s, "charge-emp") != 6 {
-		t.Fatalf("hangar = %d, want 6", hangarCount(s, "charge-emp"))
+	if hangarCount(s, "ammo-emp-s") != 6 {
+		t.Fatalf("hangar = %d, want 6", hangarCount(s, "ammo-emp-s"))
 	}
 }
 
@@ -338,16 +338,16 @@ func TestEmptyBookRefusals(t *testing.T) {
 	dockAtHaven(t, s)
 	walletBefore := s.Wallet()
 
-	// No ask for an item the fixture never seeded (charge-ap exists but no
+	// No ask for an item the fixture never seeded (ammo-ap-s exists but no
 	// station here bids or asks it).
-	s.Queue(CmdBuy{Item: "charge-ap", Qty: 1})
+	s.Queue(CmdBuy{Item: "ammo-ap-s", Qty: 1})
 	s.Step()
 	if evs := drain(s); findEvent(evs, EvLog, "is not sold here") == nil {
 		t.Fatalf("no refusal: %v", evs)
 	}
 	// No bid for an item nobody wants.
-	giveCargo(s, "charge-ap", 2)
-	s.Queue(CmdSell{Item: "charge-ap", Qty: 2})
+	giveCargo(s, "ammo-ap-s", 2)
+	s.Queue(CmdSell{Item: "ammo-ap-s", Qty: 2})
 	s.Step()
 	if evs := drain(s); findEvent(evs, EvLog, "No buy orders for") == nil {
 		t.Fatalf("no refusal: %v", evs)
@@ -355,7 +355,7 @@ func TestEmptyBookRefusals(t *testing.T) {
 	if s.Wallet() != walletBefore {
 		t.Fatalf("wallet = %v, want unchanged", s.Wallet())
 	}
-	if cargoCount(s, "charge-ap") != 2 {
+	if cargoCount(s, "ammo-ap-s") != 2 {
 		t.Fatal("a refusal moved goods")
 	}
 }
@@ -423,7 +423,7 @@ func TestPlayerSellEscrowAndCancel(t *testing.T) {
 	}
 	// Fitted hulls cannot ride in an order (their fit would be lost).
 	s.Hangar.Ships = append(s.Hangar.Ships, StoredShip{Hull: "ship-sloop",
-		Fit: []content.ModuleID{"mod-emp-turret"}})
+		Fit: []content.ModuleID{"mod-autocannon-s"}})
 	if _, ok := s.PlaceOrder(station, OrderSell, "ship-sloop", 1, 1000, OwnerPlayer); ok {
 		t.Fatal("a hull was accepted into a sell order (fit would be lost)")
 	}
@@ -442,11 +442,11 @@ func TestPerStationBooksAreIsolated(t *testing.T) {
 	}
 	anvil := StationID("cel-station-b")
 	haven := StationID("cel-station-a")
-	if _, ok := s.PlaceOrder(anvil, OrderSell, "charge-emp", 30, 12, OwnerSystem); !ok {
+	if _, ok := s.PlaceOrder(anvil, OrderSell, "ammo-emp-s", 30, 12, OwnerSystem); !ok {
 		t.Fatal("anvil placement refused")
 	}
-	havenPrice := s.MarketPrice(haven, "charge-emp")
-	anvilPrice := s.MarketPrice(anvil, "charge-emp")
+	havenPrice := s.MarketPrice(haven, "ammo-emp-s")
+	anvilPrice := s.MarketPrice(anvil, "ammo-emp-s")
 	if havenPrice != 5 || anvilPrice != 12 {
 		t.Fatalf("prices = haven %v / anvil %v, want 5 / 12", havenPrice, anvilPrice)
 	}
@@ -459,13 +459,13 @@ func TestPerStationBooksAreIsolated(t *testing.T) {
 	teleport(s, s.player, mustPos(s, anvilE))
 	dockAtStation(t, s, "Anvil Stop")
 	walletBefore := s.Wallet()
-	s.Queue(CmdBuy{Item: "charge-emp", Qty: 30})
+	s.Queue(CmdBuy{Item: "ammo-emp-s", Qty: 30})
 	s.Step()
 	drain(s)
-	if qty, price := askAtBook(s, haven, "charge-emp"); qty != 100 || price != 5 {
+	if qty, price := askAtBook(s, haven, "ammo-emp-s"); qty != 100 || price != 5 {
 		t.Fatalf("haven ask = %d @ %v, want 100 @ 5 (isolated)", qty, price)
 	}
-	if qty, _ := askAtBook(s, anvil, "charge-emp"); qty != 0 {
+	if qty, _ := askAtBook(s, anvil, "ammo-emp-s"); qty != 0 {
 		t.Fatalf("anvil ask = %d, want 0 (bought out)", qty)
 	}
 	if s.Wallet() >= walletBefore {
@@ -473,11 +473,11 @@ func TestPerStationBooksAreIsolated(t *testing.T) {
 	}
 	// The ladder keeps the trade that emptied the book: an all-filled book
 	// still remembers what the units went for (rung #1: last trade price).
-	if p := s.MarketPrice(anvil, "charge-emp"); p != 12 {
+	if p := s.MarketPrice(anvil, "ammo-emp-s"); p != 12 {
 		t.Fatalf("anvil ladder = %v, want the last trade price 12", p)
 	}
 	// Haven Rest never traded: its ladder reads its own best ask (5.00).
-	if p := s.MarketPrice(haven, "charge-emp"); p != 5 {
+	if p := s.MarketPrice(haven, "ammo-emp-s"); p != 5 {
 		t.Fatalf("haven ladder = %v, want the best ask 5", p)
 	}
 	assertBooksSane(t, s)
@@ -671,8 +671,8 @@ func TestMarketTwinRunsIdentical(t *testing.T) {
 	run := func() *Sim {
 		s := newTestSim(t)
 		dockAtHaven(t, s)
-		s.Queue(CmdBuy{Item: "charge-emp", Qty: 40})
-		s.Queue(CmdSell{Item: "charge-emp", Qty: 10})
+		s.Queue(CmdBuy{Item: "ammo-emp-s", Qty: 40})
+		s.Queue(CmdSell{Item: "ammo-emp-s", Qty: 10})
 		s.Step()
 		drain(s)
 		s.PlaceOrder(StationID("cel-station-a"), OrderBuy, "min-nickel", 5, 2, OwnerPlayer)

@@ -375,7 +375,7 @@ func checkSections(t *testing.T, name string, got, want []TooltipSection) {
 // activation block — and the footer hints are the caller's.
 func TestModuleTipCarriesModuleDef(t *testing.T) {
 	weapon := &content.ModuleDef{
-		ID: "mod-emp-turret", Name: "EMP Turret", Slot: content.SlotHigh, Kind: content.KindWeapon,
+		ID: "mod-autocannon-s", Name: "EMP Turret", Slot: content.SlotHigh, Kind: content.KindWeapon,
 		ActivationCost: 2, ActivationTime: 3,
 		Weapon: &content.WeaponAttrs{
 			Damage:    content.Damage{EM: 16, Thermal: 5, Kinetic: 2, Explosive: 1},

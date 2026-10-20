@@ -196,7 +196,7 @@ func TestStepTransientsEmptyAtBoundaries(t *testing.T) {
 		switch i {
 		case 5: // economy + travel buckets, dock stamp
 			s.Queue(CmdDock{Station: station})
-			s.Queue(CmdBuy{Item: "charge-emp", Qty: 1})
+			s.Queue(CmdBuy{Item: "ammo-emp-s", Qty: 1})
 		case 6:
 			s.Queue(CmdUndock{})
 		case 10: // mission bucket
@@ -350,11 +350,11 @@ func TestRestoreResetsDocumentedPreferences(t *testing.T) {
 	s := newTestSim(t)
 	dockAtHaven(t, s)
 	slot := SlotRef{Class: content.SlotHigh, Index: 0}
-	s.Queue(CmdSetAmmo{Slot: slot, Item: "charge-emp"})
+	s.Queue(CmdSetAmmo{Slot: slot, Item: "ammo-emp-s"})
 	s.Step()
 	drain(s)
-	if got := s.ammoPref(s.player, slot); got != "charge-emp" {
-		t.Fatalf("ammo pref=%q want charge-emp", got)
+	if got := s.ammoPref(s.player, slot); got != "ammo-emp-s" {
+		t.Fatalf("ammo pref=%q want ammo-emp-s", got)
 	}
 	s.recordPlayerWork(v(1e7, 500))
 	if s.lastPlayerWork.at == playerWorkNever {
@@ -374,7 +374,7 @@ func TestRestoreResetsDocumentedPreferences(t *testing.T) {
 	}
 
 	// The live sim keeps both.
-	if got := s.ammoPref(s.player, slot); got != "charge-emp" {
+	if got := s.ammoPref(s.player, slot); got != "ammo-emp-s" {
 		t.Fatalf("live ammo pref=%q, want it kept", got)
 	}
 	if s.lastPlayerWork.at == playerWorkNever {

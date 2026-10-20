@@ -22,19 +22,19 @@ func TestCommandForMapsEveryCommandIntent(t *testing.T) {
 		in   Intent
 		want sim.Command
 	}{
-		{"buy", Buy{Item: "charge-emp", Qty: 3}, sim.CmdBuy{Item: "charge-emp", Qty: 3}},
+		{"buy", Buy{Item: "ammo-emp-s", Qty: 3}, sim.CmdBuy{Item: "ammo-emp-s", Qty: 3}},
 		{"sell", Sell{Item: "min-ore", Qty: 1}, sim.CmdSell{Item: "min-ore", Qty: 1}},
 		{"place order", PlaceOrder{Item: "min-ore", Side: sim.OrderBuy, Price: 4.5, Qty: 2},
 			sim.CmdPlaceOrder{Item: "min-ore", Side: sim.OrderBuy, Price: 4.5, Qty: 2}},
 		{"cancel order", CancelOrder{ID: 9}, sim.CmdCancelOrder{ID: 9}},
 		{"transfer", Transfer{Item: "min-ore", Qty: 5, From: "cargo", To: "hangar"},
 			sim.CmdTransfer{Item: "min-ore", Qty: 5, From: "cargo", To: "hangar"}},
-		{"fit", Fit{Module: "mod-emp-turret", Slot: slot},
-			sim.CmdFitModule{Item: "mod-emp-turret", Slot: slot}},
+		{"fit", Fit{Module: "mod-autocannon-s", Slot: slot},
+			sim.CmdFitModule{Item: "mod-autocannon-s", Slot: slot}},
 		{"unequip", Unequip{Slot: slot}, sim.CmdUnfitModule{Slot: slot}},
 		{"assemble", Assemble{Ship: "ship-sloop"}, sim.CmdAssemble{Ship: "ship-sloop"}},
-		{"start job", StartJob{Recipe: "rec-charge-emp", Runs: 2},
-			sim.CmdStartJob{Recipe: "rec-charge-emp", Runs: 2}},
+		{"start job", StartJob{Recipe: "rec-ammo-emp-s", Runs: 2},
+			sim.CmdStartJob{Recipe: "rec-ammo-emp-s", Runs: 2}},
 		{"collect job", CollectJob{Job: 9}, sim.CmdCollectJob{ID: 9}},
 		{"accept", Accept{Contract: "contract-solace-cleanup-1"},
 			sim.CmdAcceptMission{ID: "contract-solace-cleanup-1"}},
@@ -42,8 +42,8 @@ func TestCommandForMapsEveryCommandIntent(t *testing.T) {
 			sim.CmdAbandonMission{ID: "contract-solace-cleanup-1"}},
 		{"activate", Activate{Slot: slot, Target: e}, sim.CmdActivate{Slot: slot, Target: e}},
 		{"deactivate", Deactivate{Slot: slot}, sim.CmdDeactivate{Slot: slot}},
-		{"cycle charge", CycleCharge{Slot: slot, Item: "charge-fusion"},
-			sim.CmdSetAmmo{Slot: slot, Item: "charge-fusion"}},
+		{"cycle charge", CycleCharge{Slot: slot, Item: "ammo-fusion-s"},
+			sim.CmdSetAmmo{Slot: slot, Item: "ammo-fusion-s"}},
 		{"approach", Approach{Entity: e}, sim.CmdApproach{Target: e}},
 		{"lock", Lock{Entity: e}, sim.CmdLock{Target: e}},
 		{"stop", Stop{}, sim.CmdStop{}},
@@ -84,9 +84,9 @@ func TestCommandForReadsRangeAtDispatch(t *testing.T) {
 // intents map onto no command — their handlers live in the host.
 func TestCommandForSkipsHostIntents(t *testing.T) {
 	host := []Intent{
-		ShowInfo{Ref: ItemRef("charge-emp")},
+		ShowInfo{Ref: ItemRef("ammo-emp-s")},
 		OpenMenu{At: image.Pt(1, 2)},
-		OpenOrder{Item: "charge-emp", Side: sim.OrderSell, Qty: 1},
+		OpenOrder{Item: "ammo-emp-s", Side: sim.OrderSell, Qty: 1},
 		Toggle{Screen: "Market"},
 		Save{}, Load{}, Quit{},
 	}

@@ -361,7 +361,7 @@ func TestConvoyTimeToKillPinned(t *testing.T) {
 			volley := m.Weapon.Damage
 			if m.Weapon.AmmoClass != "" {
 				if ch := spawnCharge(m.Weapon.AmmoClass); ch != nil && ch.Damage != nil {
-					volley = *ch.Damage
+					volley = ch.Damage.Scale(m.Weapon.Mult())
 				}
 			}
 			pen := volley.ApplyTo(hull.Resists).Total()
@@ -380,18 +380,19 @@ func TestConvoyTimeToKillPinned(t *testing.T) {
 		t.Fatalf("Convoy Hauler EHP = %v, want 2800 (pooled)", ehp)
 	}
 
-	// Pinned effective DPS (spawned charge-ap 1/2/21/2 vs the hauler's
-	// 0.1/0.15/0.35/0.3 resists = 17.65 penetrating per shot): marauder
-	// 3x rail (4 s), hierarch 2x rail + 2x EMP (4 s / 3 s), scuttler 2x
-	// EMP (3 s).
+	// Pinned effective DPS (the spawned first sorted shell of each class,
+	// scaled by the gun's damage multiplier, against the hauler's
+	// 0.1/0.15/0.35/0.3 resists): marauder 3x medium autocannon (3.6 s),
+	// hierarch 2x large artillery + 2x large autocannon (13.5 s / 4.5 s),
+	// scuttler 2x small autocannon (3 s).
 	cases := []struct {
 		raider  NpcID
 		raiders int
 		wantDPS float64
 	}{
-		{"npc-rat-marauder", 1, 7.0801},
-		{"npc-rat-marauder", 3, 21.2403},
-		{"npc-rat-hierarch", 1, 11.0135},
+		{"npc-rat-marauder", 1, 15.7335},
+		{"npc-rat-marauder", 3, 47.2006},
+		{"npc-rat-hierarch", 1, 32.1663},
 		{"npc-rat-scuttler", 2, 12.5868},
 	}
 	for _, tc := range cases {
@@ -401,14 +402,14 @@ func TestConvoyTimeToKillPinned(t *testing.T) {
 				tc.raider, tc.raiders, got, tc.wantDPS)
 		}
 	}
-	// Pinned headline: one Kuźnica marauder needs ~395 s of continuous fire
-	// to kill a convoy hauler; three raiders ~132 s. The escape and patrol
+	// Pinned headline: one Kuźnica marauder needs ~178 s of continuous fire
+	// to kill a convoy hauler; three raiders ~59 s. The escape and patrol
 	// windows (20 s flee, 15 s response) are measured against these.
 	ttk := ehp / (dps("npc-rat-marauder", "ship-npc-hauler"))
-	if math.Abs(ttk-395.48) > 0.1 {
-		t.Errorf("marauder TTK = %.2fs, want ~395.48s", ttk)
+	if math.Abs(ttk-177.96) > 0.1 {
+		t.Errorf("marauder TTK = %.2fs, want ~177.96s", ttk)
 	}
-	if ttk3 := ehp / (dps("npc-rat-marauder", "ship-npc-hauler") * 3); math.Abs(ttk3-131.83) > 0.1 {
-		t.Errorf("3x marauder TTK = %.2fs, want ~131.83s", ttk3)
+	if ttk3 := ehp / (dps("npc-rat-marauder", "ship-npc-hauler") * 3); math.Abs(ttk3-59.32) > 0.1 {
+		t.Errorf("3x marauder TTK = %.2fs, want ~59.32s", ttk3)
 	}
 }

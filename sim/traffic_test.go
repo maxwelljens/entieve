@@ -30,7 +30,7 @@ func trafficContent() *content.Content {
 	// ask behind Haven Rest's 500-unit founding ask (spawn-time route
 	// withdrawals would exhaust it after five shipments) — the 500 ask
 	// stays first in price-time order, so the lifecycle/tick-down pins
-	// (500 -> 400 -> 300) still read it — and a founding charge-emp ask on
+	// (500 -> 400 -> 300) still read it — and a founding ammo-emp-s ask on
 	// Dock Two, the origin of the non-delivering route (station origins
 	// must carry the stock they ship; it never spawns ex nihilo).
 	for i := range sysA.Celestials {
@@ -46,7 +46,7 @@ func trafficContent() *content.Content {
 		Station: &content.StationDef{
 			Services: []string{"repair", "market"},
 			Market: []content.MarketOrderDef{
-				{Item: "charge-emp", Qty: 100000, Price: 5},
+				{Item: "ammo-emp-s", Qty: 100000, Price: 5},
 			},
 		},
 	})
@@ -76,14 +76,14 @@ func trafficContent() *content.Content {
 		MaxTargetRange: 20000, MaxTargets: 1, ScanResolution: 300,
 	}
 	// Fixture turret with shipped-style tracking (145): the shared fixture's
-	// mod-emp-turret tracks at 0.4, which never hits a drifting target —
+	// mod-autocannon-s tracks at 0.4, which never hits a drifting target —
 	// NPC-vs-NPC fire in these tests needs a real hit chance.
 	c.Modules["mod-test-turret"] = &content.ModuleDef{
 		ID: "mod-test-turret", Name: "Test Turret", Slot: content.SlotHigh,
 		Kind: content.KindWeapon, ActivationCost: 10, ActivationTime: 2, Price: 1000,
 		Weapon: &content.WeaponAttrs{
 			Damage: content.Damage{EM: 10}, Optimal: 6000, Falloff: 3000,
-			Tracking: 145, AmmoClass: "light", ShotTime: 2,
+			Tracking: 145, AmmoClass: "small", ShotTime: 2,
 		},
 	}
 	c.Ships["ship-guard"] = &content.ShipDef{
@@ -136,7 +136,7 @@ func trafficContent() *content.Content {
 			System: "sys-a",
 			Routes: []content.RouteDef{
 				route("cel-station-a", "cel-a-dock", "min-ferrite", 100, 600),
-				route("cel-a-dock", "cel-gate-b", "charge-emp", 200, 900),
+				route("cel-a-dock", "cel-gate-b", "ammo-emp-s", 200, 900),
 			},
 			Patrol: &content.PatrolDef{Hulls: []content.ShipID{"ship-guard"}, IntervalTicks: 600},
 			Raider: "npc-rat-raider",

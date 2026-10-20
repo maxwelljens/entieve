@@ -85,7 +85,7 @@ func TestValidateMissingDir(t *testing.T) {
 func TestDescribeKnownIDs(t *testing.T) {
 	cases := map[string]string{
 		"ship-sloop":       `"class"`,
-		"mod-emp-turret":   `"tracking"`,
+		"mod-autocannon-s": `"tracking"`,
 		"min-ferrite":      `"category"`,
 		"npc-rat-scuttler": `"aggro_range"`,
 		"sys-solace":       `"celestials"`,
@@ -110,11 +110,11 @@ func TestDescribeKnownIDs(t *testing.T) {
 
 func TestDescribeUnknownSuggests(t *testing.T) {
 	var out, errOut bytes.Buffer
-	code := run([]string{"describe", "emp-turret"}, &out, &errOut)
+	code := run([]string{"describe", "autocannon"}, &out, &errOut)
 	if code != 1 {
 		t.Fatalf("exit = %d, want 1", code)
 	}
-	if !strings.Contains(errOut.String(), "did you mean") || !strings.Contains(errOut.String(), "mod-emp-turret") {
+	if !strings.Contains(errOut.String(), "did you mean") || !strings.Contains(errOut.String(), "mod-autocannon-s") {
 		t.Fatalf("stderr %q missing suggestion", errOut.String())
 	}
 }

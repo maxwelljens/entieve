@@ -29,7 +29,7 @@ func missionContent(t *testing.T) *content.Content {
 	c.NPCs["npc-rat-marauder"] = &content.NpcDef{
 		ID: "npc-rat-marauder", Name: "Rat Marauder", Faction: "Test",
 		Ship:          "ship-rat",
-		Fit:           []content.ModuleID{"mod-emp-turret"},
+		Fit:           []content.ModuleID{"mod-autocannon-s"},
 		AggroRange:    15000,
 		OrbitRange:    1500,
 		FleeThreshold: 0,

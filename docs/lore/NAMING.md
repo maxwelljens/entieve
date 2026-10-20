@@ -122,8 +122,12 @@ Rat hulls, ores, minerals and loot stay unattributed.
 
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
-| `mod-emp-turret` | EMP Turret | keep | trade | mechanics-aligned trade name |
-| `mod-rail-turret` | Rail Turret | keep | trade | |
+| `mod-autocannon-s` | — | **Small Autocannon** | trade | proposed 2026-10-20: calibre + projectile family (fast cycle, short reach) |
+| `mod-autocannon-m` | — | **Medium Autocannon** | trade | proposed 2026-10-20: same family, medium calibre |
+| `mod-autocannon-l` | — | **Large Autocannon** | trade | proposed 2026-10-20: same family, large calibre |
+| `mod-artillery-s` | — | **Small Artillery** | trade | proposed 2026-10-20: calibre + projectile family (slow cycle, long reach) |
+| `mod-artillery-m` | — | **Medium Artillery** | trade | proposed 2026-10-20: same family, medium calibre |
+| `mod-artillery-l` | — | **Large Artillery** | trade | proposed 2026-10-20: same family, large calibre |
 | `mod-rocket-pod` | Rocket Pod | keep | trade | |
 | `mod-shield-boost` | Shield Booster | keep | trade | |
 | `mod-shield-extender` | Shield Extender | keep | trade | |
@@ -141,11 +145,19 @@ Rat hulls, ores, minerals and loot stay unattributed.
 
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
-| `charge-emp` | EMP Charge | keep | trade | |
-| `charge-fusion` | Fusion Charge | keep | trade | |
-| `charge-ap` | Armor-Piercing Charge | keep | trade | |
-| `charge-plutonium` | Plutonium Charge | keep | trade | |
-| `charge-cap-cell` | Capacitor Booster Cell | keep | trade | |
+| `ammo-emp-s` | — | **Small EMP Shell** | trade | proposed 2026-10-20: calibre + damage profile (was EMP Charge) |
+| `ammo-fusion-s` | — | **Small Fusion Shell** | trade | proposed 2026-10-20: (was Fusion Charge) |
+| `ammo-ap-s` | — | **Small Armor-Piercing Shell** | trade | proposed 2026-10-20: (was Armor-Piercing Charge) |
+| `ammo-plutonium-s` | — | **Small Plutonium Shell** | trade | proposed 2026-10-20: (was Plutonium Charge) |
+| `ammo-emp-m` | — | **Medium EMP Shell** | trade | proposed 2026-10-20 |
+| `ammo-fusion-m` | — | **Medium Fusion Shell** | trade | proposed 2026-10-20 |
+| `ammo-ap-m` | — | **Medium Armor-Piercing Shell** | trade | proposed 2026-10-20 |
+| `ammo-plutonium-m` | — | **Medium Plutonium Shell** | trade | proposed 2026-10-20 |
+| `ammo-emp-l` | — | **Large EMP Shell** | trade | proposed 2026-10-20 |
+| `ammo-fusion-l` | — | **Large Fusion Shell** | trade | proposed 2026-10-20 |
+| `ammo-ap-l` | — | **Large Armor-Piercing Shell** | trade | proposed 2026-10-20 |
+| `ammo-plutonium-l` | — | **Large Plutonium Shell** | trade | proposed 2026-10-20 |
+| `charge-cap-cell` | Capacitor Booster Cell | keep | trade | cap booster fuel, not gun ammo |
 
 ### Items — minerals
 

@@ -248,6 +248,15 @@ fitting window (`F`) shows the hull, the slots and the derived stats; its
 **Hangar** section lets you **fit** modules from the hangar into their first
 free slot and **unfit** them back, and **assemble** stored hulls.
 
+**Weapons and shells.** Projectile guns come in two families:
+**autocannons** (fast cycle, high tracking, short optimal range) and
+**artillery** (slow cycle, poor tracking, long optimal range, a heavier
+volley out of the same shell). Both are built in three calibres — small,
+medium, large — and a gun loads only the **shells** of its own calibre:
+four damage profiles (EMP, fusion, armor-piercing, plutonium) per calibre.
+The shell carries the damage mix; the gun's multiplier and cycle decide how
+hard and how often it lands. Projectile guns draw no capacitor.
+
 **Damage layers.** Damage hits **shield → armor → structure**, each reduced by
 the ship's four **resists** (EM, thermal, kinetic, explosive). Entieve uses a
 documented simplification: overflow damage carries to the next layer at *full*
@@ -313,8 +322,8 @@ omniscience), enforced in the sim's read model and the renderer alike.
 **Ammo cycling.** Right-click a weapon cell in the module rack for its
 context menu: **Show Info** for the module, **Show Info —** the loaded
 charge, and **Cycle charge**, which steps the loaded charge **Auto → each
-ammo of that weapon's class that sits in your cargo → Auto** (the sim
-validates class and cargo, and logs every load).
+shell of that weapon's calibre that sits in your cargo → Auto** (the sim
+validates calibre and cargo, and logs every load).
 The module tooltip — hover any rack cell for 300 ms — is a structured
 panel: class icon, **bold** module name, a dim `slot · class` line, then
 sectioned stats with values right-aligned on one column (damage mix,

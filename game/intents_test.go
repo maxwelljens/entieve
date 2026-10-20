@@ -90,12 +90,12 @@ func TestDoDelegatesToTheKitExecutor(t *testing.T) {
 	}
 
 	// Show Info: exactly what the menu's Show Info entries open.
-	g.Do(widgets.ShowInfo{Ref: widgets.ItemRef("charge-emp")})
+	g.Do(widgets.ShowInfo{Ref: widgets.ItemRef("ammo-emp-s")})
 	if !g.kit.InfoOpen() {
 		t.Fatal("ShowInfo intent did not open the window")
 	}
-	if ref, _ := g.env.InfoWindow().Ref(); ref != widgets.ItemRef("charge-emp") {
-		t.Errorf("info ref = %v, want charge-emp", ref)
+	if ref, _ := g.env.InfoWindow().Ref(); ref != widgets.ItemRef("ammo-emp-s") {
+		t.Errorf("info ref = %v, want ammo-emp-s", ref)
 	}
 
 	// OpenMenu: exactly what the row installer's popup mounts.

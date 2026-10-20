@@ -248,7 +248,7 @@ func printReport(w io.Writer, s *sim.Sim, res *script.Result, ticks int64) {
 
 // cmdDescribe prints the definition of any content ID as pretty JSON —
 // introspection tooling for content authors and AI agents ("what exactly is
-// mod-emp-turret?"). Unknown IDs exit 1 with near-miss suggestions.
+// mod-autocannon-s?"). Unknown IDs exit 1 with near-miss suggestions.
 func cmdDescribe(args []string, stdout, stderr io.Writer) int {
 	fs := newFlagSet("describe", stderr)
 	if err := fs.Parse(args); err != nil {

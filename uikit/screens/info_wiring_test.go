@@ -315,14 +315,14 @@ func TestInventoryAndFittingMenus(t *testing.T) {
 // all. An unresolvable Ref keeps its entry, grayed.
 func TestRowSpecMenuShape(t *testing.T) {
 	env, cmds := newTestEnv(t)
-	ref := widgets.ItemRef("charge-emp")
-	sec := widgets.ItemRef("charge-fusion")
+	ref := widgets.ItemRef("ammo-emp-s")
+	sec := widgets.ItemRef("ammo-fusion-s")
 	spec := widgets.RowSpec{
 		Ref:    &ref,
 		SecRef: &sec,
 		Actions: []widgets.RowAction{
-			{Label: "Buy", Intent: widgets.Buy{Item: "charge-emp", Qty: 1}},
-			{Label: "Sell", Disabled: true, Intent: widgets.Sell{Item: "charge-emp", Qty: 1}},
+			{Label: "Buy", Intent: widgets.Buy{Item: "ammo-emp-s", Qty: 1}},
+			{Label: "Sell", Disabled: true, Intent: widgets.Sell{Item: "ammo-emp-s", Qty: 1}},
 		},
 	}
 
@@ -333,7 +333,7 @@ func TestRowSpecMenuShape(t *testing.T) {
 	if ents[0].Label != "Show Info" || !ents[0].Bold || ents[0].Disabled {
 		t.Errorf("entry 0 = %+v, want a bold, enabled Show Info", ents[0])
 	}
-	wantSecond := "Show Info — " + widgets.ChainName(env, "charge-fusion")
+	wantSecond := "Show Info — " + widgets.ChainName(env, "ammo-fusion-s")
 	if ents[1].Label != wantSecond || ents[1].Bold {
 		t.Errorf("entry 1 = %+v, want the non-bold secondary %q", ents[1], wantSecond)
 	}
@@ -364,8 +364,8 @@ func TestRowSpecMenuShape(t *testing.T) {
 	if len(*cmds) != 1 {
 		t.Fatalf("enabled Buy emitted %v, want the single CmdBuy", *cmds)
 	}
-	if c, ok := (*cmds)[0].(sim.CmdBuy); !ok || c.Item != "charge-emp" || c.Qty != 1 {
-		t.Fatalf("cmd = %#v, want CmdBuy{charge-emp 1}", (*cmds)[0])
+	if c, ok := (*cmds)[0].(sim.CmdBuy); !ok || c.Item != "ammo-emp-s" || c.Qty != 1 {
+		t.Fatalf("cmd = %#v, want CmdBuy{ammo-emp-s 1}", (*cmds)[0])
 	}
 
 	// Actions only: the single Accept entry, no leading separator.
@@ -374,7 +374,7 @@ func TestRowSpecMenuShape(t *testing.T) {
 		t.Errorf("actions-only = %+v, want the lone Accept entry", actOnly)
 	}
 	// Ref only: the single bold Show Info entry.
-	refOnly := widgets.RowMenuEntries(env, env, widgets.RowSpec{Ref: widgets.PtrRef(widgets.ModuleRef("mod-emp-turret"))})
+	refOnly := widgets.RowMenuEntries(env, env, widgets.RowSpec{Ref: widgets.PtrRef(widgets.ModuleRef("mod-autocannon-s"))})
 	if len(refOnly) != 1 || refOnly[0].Label != "Show Info" || !refOnly[0].Bold {
 		t.Errorf("ref-only = %+v, want the lone bold Show Info", refOnly)
 	}
@@ -405,7 +405,7 @@ func TestRowSpecMenuShape(t *testing.T) {
 // gesture), and a row whose Ref does not resolve never fires.
 func TestRowSpecDoubleClickStrict(t *testing.T) {
 	env, cmds := newTestEnv(t)
-	ref := widgets.ModuleRef("mod-emp-turret")
+	ref := widgets.ModuleRef("mod-autocannon-s")
 	bad := widgets.InfoRef{Kind: widgets.InfoItem, ID: "item-nowhere"}
 	tbl := widgets.NewTable(env, []widgets.Column{{Key: "A", Title: "A"}})
 	tbl.SetRows([]widgets.TableRow{
