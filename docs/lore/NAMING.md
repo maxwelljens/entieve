@@ -240,6 +240,7 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | Order mini-window title (`uikit/screens/orderwin.go`) | — | **&lt;name&gt; — Order** | trade | follows the "&lt;name&gt; — Info" title convention. Approved 2026-10-18 |
 | Manufacturing window title (`game/screens.go`, `uikit/screens/manufacturing.go`) | Factory | **Manufacturing** | trade | the industry window: recipe board, up-front job fee, the three global job slots and Start/Collect/Cancel. User-approved rename of Factory; key B unchanged. Approved 2026-10-20 |
 | Refinery window title (`game/screens.go`, `uikit/screens/refinery.go`) | — | **Refinery** | trade | the ore→mineral service window at a `refine` station: ore list, yield preview, Refine. Plain trade noun. Approved 2026-10-20 |
+| Market item row's Side cell (`uikit/screens/market.go`) | — | **—** | trade | the tree's parent rows carry no side of their own (the order rows folded beneath them keep Ask/Bid); the em dash reads as "none" while keeping the column visibly present. Approved 2026-10-20 |
 
 ## Money strings
 

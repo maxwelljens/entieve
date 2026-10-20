@@ -284,18 +284,14 @@ func TestRailPlacesOpenedWindowsWhileDocked(t *testing.T) {
 }
 
 // TestServicesViewButtonsOnTheRealStations: at the start station
-// (Jernborg: repair, market, refine, fitting) the view offers market and
-// fitting but no industry; on a station carrying the Doki set (market,
-// fitting, industry) the industry button appears. Cargo toggles the
+// (Jernborg: repair, market, refine, fitting, industry) the view offers
+// market, fitting and industry; a repair-only service set hides them. Cargo toggles the
 // inventory window, every service button's Toggle names a Screen spec
 // row the host resolves, and Undock queues the sim's undock command.
 func TestServicesViewButtonsOnTheRealStations(t *testing.T) {
 	g := dockedShowcaseGame(t, 1280, 720)
-	if !g.svcUI.Visible("market") || !g.svcUI.Visible("fitting") {
-		t.Fatal("start station's market/fitting buttons hidden")
-	}
-	if g.svcUI.Visible("industry") {
-		t.Error("industry button offered where the station lacks the service")
+	if !g.svcUI.Visible("market") || !g.svcUI.Visible("fitting") || !g.svcUI.Visible("industry") {
+		t.Fatal("start station's market/fitting/industry buttons hidden")
 	}
 	if !g.svcUI.Visible("undock") || !g.svcUI.Visible("cargo") {
 		t.Error("Undock/Cargo are not station services — they must always show")
@@ -335,17 +331,14 @@ func TestServicesViewButtonsOnTheRealStations(t *testing.T) {
 
 	// A second station's service set: the sim copies a station's
 	// services into its Station component at build (sim/build.go), so
-	// the second set goes on the docked station's component — Doki's
-	// "market, fitting, industry". The view follows the list: the
-	// industry button appears, repair/refine-only affordances stay gone.
+	// the second set goes on the docked station's component — a
+	// repair-only outpost. The view follows the list: the trade and
+	// industry buttons disappear.
 	g.s.Stations.Set(dockedStationEntity(t, g, "cel-haven-rest"),
-		sim.Station{Services: []string{"market", "fitting", "industry"}})
+		sim.Station{Services: []string{"repair"}})
 	pump(t, g, 1280, 720)
-	if !g.svcUI.Visible("industry") {
-		t.Error("industry button hidden at a station offering the service")
-	}
-	if !g.svcUI.Visible("fitting") || !g.svcUI.Visible("market") {
-		t.Error("buttons hidden at a station offering their services")
+	if g.svcUI.Visible("industry") || g.svcUI.Visible("fitting") || g.svcUI.Visible("market") {
+		t.Error("service button shown where the station lacks the service")
 	}
 }
 

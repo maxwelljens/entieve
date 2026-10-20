@@ -51,7 +51,22 @@
           { "item": "ore-cordite", "qty": 3000, "price": 43, "side": "buy" },
           { "item": "ore-lucidite", "qty": 1500, "price": 76, "side": "buy" },
           { "item": "min-ferrite", "qty": 20000, "price": 5, "side": "buy" },
-          { "item": "min-nickel", "qty": 6000, "price": 12, "side": "buy" }
+          { "item": "min-nickel", "qty": 6000, "price": 12, "side": "buy" },
+          { "item": "min-argon", "qty": 800, "price": 64 },
+          { "item": "min-cobalt", "qty": 3500, "price": 25 },
+          { "item": "min-ferrite", "qty": 12000, "price": 7 },
+          { "item": "min-glacite", "qty": 1500, "price": 51 },
+          { "item": "min-nickel", "qty": 5000, "price": 16 },
+          { "item": "min-silex", "qty": 2500, "price": 38 },
+          { "item": "ore-cordite", "qty": 2000, "price": 53 },
+          { "item": "ore-glacierite", "qty": 400, "price": 126 },
+          { "item": "ore-lucidite", "qty": 1000, "price": 94 },
+          { "item": "ore-sterngrit", "qty": 3000, "price": 28 },
+          { "item": "min-argon", "qty": 1200, "price": 48, "side": "buy" },
+          { "item": "min-cobalt", "qty": 6000, "price": 18, "side": "buy" },
+          { "item": "min-glacite", "qty": 2500, "price": 38, "side": "buy" },
+          { "item": "min-silex", "qty": 4000, "price": 28, "side": "buy" },
+          { "item": "ore-glacierite", "qty": 800, "price": 96, "side": "buy" }
         ]
       }
     },

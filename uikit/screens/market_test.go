@@ -33,10 +33,11 @@ func parseCredits(t *testing.T, s string) float64 {
 	return v
 }
 
-// TestMarketOrderBookRows pins the order-book view: one row per resting
-// order with a side tag, items grouped ascending, and inside every item
-// the asks (price ascending) above the bids (price descending) — the
-// canonical book order, price-time priority included.
+// TestMarketOrderBookRows pins the order-book tree: one parent row per
+// item of the tradeable catalog (canonical order, always listed), its
+// resting orders folded out beneath it on a click — asks (price
+// ascending) above the bids (price descending) — and every order of the
+// station's book present exactly once, expanded.
 func TestMarketOrderBookRows(t *testing.T) {
 	env, _ := newTestEnv(t)
 	m := NewMarket(env)
@@ -45,9 +46,44 @@ func TestMarketOrderBookRows(t *testing.T) {
 	frame()
 	frame()
 
-	if len(m.tbl.Rows) == 0 {
-		t.Fatal("empty order book")
+	want := marketCatalog(env)
+	if len(m.tbl.Rows) != len(want) {
+		t.Fatalf("rows = %d, want one parent per catalog item (%d)", len(m.tbl.Rows), len(want))
 	}
+	for i, r := range m.tbl.Rows {
+		if len(r.Cells) != 4 {
+			t.Fatalf("row %d has %d cells, want 4 (Item/Price/Qty/Side)", i, len(r.Cells))
+		}
+		row, ok := r.Data.(mktItemRow)
+		if !ok {
+			t.Fatalf("row %d payload is %#v, want an item (parent) row", i, r.Data)
+		}
+		if row.Item != want[i] {
+			t.Fatalf("row %d item = %q, want %q (canonical catalog order)", i, row.Item, want[i])
+		}
+		if r.Cells[3] != mktNoSide {
+			t.Errorf("row %d side = %q, want %q", i, r.Cells[3], mktNoSide)
+		}
+	}
+
+	// Expanding every item shows the station's whole book, in book order
+	// inside each item: asks ascending, then bids descending.
+	sys := env.Sim.System()
+	if sys == nil {
+		t.Fatal("no current system")
+	}
+	orders := env.Sim.Market(sys.ID)
+	if len(orders) == 0 {
+		t.Fatal("fixture: empty book")
+	}
+	for _, item := range want {
+		m.open[item] = true
+	}
+	frame()
+	if got, wantN := len(m.tbl.Rows), len(want)+len(orders); got != wantN {
+		t.Fatalf("expanded rows = %d, want %d (catalog + every order)", got, wantN)
+	}
+	seen := 0
 	var (
 		curItem  content.ItemID
 		askPhase = true // within an item: asks may not follow bids
@@ -56,62 +92,63 @@ func TestMarketOrderBookRows(t *testing.T) {
 		done     = map[content.ItemID]bool{}
 	)
 	for i, r := range m.tbl.Rows {
-		if len(r.Cells) != 4 {
-			t.Fatalf("row %d has %d cells, want 4 (Item/Price/Qty/Side)", i, len(r.Cells))
-		}
-		id, ok := r.Data.(content.ItemID)
-		if !ok {
-			t.Fatalf("row %d payload is %T, want content.ItemID", i, r.Data)
-		}
-		side := r.Cells[3]
-		if side != "Ask" && side != "Bid" {
-			t.Fatalf("row %d side = %q, want Ask or Bid", i, side)
-		}
-		price := parseCredits(t, r.Cells[1])
-		if i == 0 || id != curItem {
-			if done[curItem] {
+		if parent, isParent := r.Data.(mktItemRow); isParent {
+			if done[curItem] && i > 0 {
 				t.Fatalf("row %d: item %q left the board and came back (items must group)", i, curItem)
 			}
 			if i > 0 {
 				done[curItem] = true
 			}
-			curItem, askPhase, lastAsk, lastBid = id, true, -1, -1
+			curItem, askPhase, lastAsk, lastBid = parent.Item, true, -1, -1
+			continue
 		}
+		row, isOrder := r.Data.(mktOrderRow)
+		if !isOrder {
+			t.Fatalf("row %d payload = %#v, want an item or an order row", i, r.Data)
+		}
+		seen++
+		if row.Item != curItem {
+			t.Fatalf("row %d: order row for %q under parent %q", i, row.Item, curItem)
+		}
+		if r.Cells[0] != "" {
+			t.Errorf("row %d: child item cell = %q, want blank (the parent names it)", i, r.Cells[0])
+		}
+		side := r.Cells[3]
+		price := parseCredits(t, r.Cells[1])
 		switch side {
 		case "Ask":
 			if !askPhase {
-				t.Fatalf("row %d: ask after bids for %q (book out of order)", i, id)
+				t.Fatalf("row %d: ask after bids for %q (book out of order)", i, row.Item)
 			}
 			if price < lastAsk {
-				t.Fatalf("row %d: ask %v below a previous ask %v for %q", i, price, lastAsk, id)
+				t.Fatalf("row %d: ask %v below a previous ask %v for %q", i, price, lastAsk, row.Item)
 			}
 			lastAsk = price
 		case "Bid":
 			askPhase = false
 			if lastBid >= 0 && price > lastBid {
-				t.Fatalf("row %d: bid %v above a previous bid %v for %q", i, price, lastBid, id)
+				t.Fatalf("row %d: bid %v above a previous bid %v for %q", i, price, lastBid, row.Item)
 			}
 			lastBid = price
+		default:
+			t.Fatalf("row %d side = %q, want Ask or Bid", i, side)
 		}
+	}
+	if seen != len(orders) {
+		t.Fatalf("child rows = %d, want every resting order (%d) listed once", seen, len(orders))
 	}
 
 	// The founding books carry both sides: the showcase station seeds asks
-	// (hulls, modules, charges) and standing bids for the loot it buys.
+	// (hulls, modules, charges, materials) and standing bids (loot and the
+	// raw materials its industry buys).
 	sides := map[string]bool{}
 	for _, r := range m.tbl.Rows {
-		sides[r.Cells[3]] = true
+		if r.Cells[3] != mktNoSide {
+			sides[r.Cells[3]] = true
+		}
 	}
 	if !sides["Ask"] || !sides["Bid"] {
 		t.Fatalf("board shows %v, want both Ask and Bid rows", sides)
-	}
-	// Rows read back to the sim's own numbers (cell <-> sim consistency).
-	sys := env.Sim.System()
-	if sys == nil {
-		t.Fatal("no current system")
-	}
-	orders := env.Sim.Market(sys.ID)
-	if len(m.tbl.Rows) != len(orders) {
-		t.Fatalf("rows = %d, want %d resting orders", len(m.tbl.Rows), len(orders))
 	}
 }
 

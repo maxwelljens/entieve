@@ -27,7 +27,7 @@ func TestMarketRowMenu(t *testing.T) {
 	if len(m.tbl.Rows) == 0 {
 		t.Fatal("fixture: empty market")
 	}
-	wantItem := m.tbl.Rows[0].Data.(content.ItemID)
+	wantItem := m.tbl.Rows[0].Data.(mktItemRow).Item
 
 	// Undocked: the trade verbs and the two order-window launches are
 	// visible but disabled.

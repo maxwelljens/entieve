@@ -34,9 +34,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rattle a thin tracer with a bright bolt running down it, artillery flashes
   one heavy stroke with a broad muzzle bloom; the full muzzle-to-target line
   and its range cue are unchanged.
+- **Agent roster leaning shifts**: Jernborg joining the industry stations
+  re-leans the 24 economy agents to 8 industrialists, 8 traders and 8 miners
+  (was 6/9/9) — the same four per station, no ids or homes moved.
 
 ### Added
 
+- **Market as a per-item tree** (`uikit/screens/market.go`): the order book
+  now lists one parent row per item of the whole tradeable catalog — every
+  item, module and hull, always (canonical order) — carrying the station's
+  price ladder, the quantity resting on both sides and a `—` side cell.
+  Clicking an item folds its resting orders out beneath it in the book's
+  own [price, qty, Ask/Bid] rows (asks ascending, then bids descending;
+  player orders in the owned green) and re-clicking folds them away; the
+  fold state is session-only and never persisted. An item with no orders
+  anywhere is dimmed but stays fully live: Request on Market opens on it,
+  so a dead market can be woken. The My orders column is unchanged.
+- **Raw-material liquidity**: every market-service station now seeds both
+  sides of every ore and mineral (`content/data/systems/*.json`) — NPC stock
+  asks just above base price and standing bids just under it, at the
+  existing quantity scale (tens of thousands for cheap minerals, thousands
+  for ore). Seeds only, no restock. **Przystań** had no market block at all;
+  its freeport now carries the materials set plus the shells its raiders
+  need.
+- **Jernborg runs manufacturing**: the starter system's station now offers
+  the `industry` service, so the factory is reachable from the first dock.
 - **Job fee**: 3% of a recipe's mineral value at base prices, per run, paid
   from the wallet when the job starts and recorded in the ledger; the
   Manufacturing preview quotes it. Refusals check the wallet first.

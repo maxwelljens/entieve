@@ -258,7 +258,7 @@ players. The design is the approved one in
 — `floor(24 / #stations)` each, ≥ 1. The shipped six-station universe gets
 four per station: industry stations lead with two **industrialists** and
 then alternate trader/miner, market-only stations alternate from the top —
-6 industrialists, 9 traders, 9 miners. Ids (`ag-001`…), homes, roles and
+8 industrialists, 8 traders, 8 miners. Ids (`ag-001`…), homes, roles and
 starting capital (250,000 €) are pure functions of content: no RNG. The
 roster is world-gated to `world-default` (`agentWorlds`); the showcase tour
 and test fixtures run without agents — and therefore without upkeep.

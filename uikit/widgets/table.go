@@ -52,8 +52,10 @@ type Column struct {
 }
 
 // TableRow is one displayed row: one cell string per Column, an optional
-// background tint (zero = none) and an opaque payload handed to the row
-// callbacks (e.g. sim.Info, content.ItemID). Icons, when set, runs parallel
+// background tint (zero = none), an optional cell-text tint (zero = the
+// palette's text; the market's orderless item rows dim through it) and an
+// opaque payload handed to the row callbacks (e.g. sim.Info,
+// content.ItemID). Icons, when set, runs parallel
 // to Cells: an icon name per cell ("" = none) drawn in a fixed box to the
 // left of that cell's text. Right-aligned columns ignore it — numeric
 // anchors stay exact — so icons belong in the left-aligned cells. Spec is
@@ -70,6 +72,7 @@ type TableRow struct {
 	Icons    []string
 	IconTint color.RGBA // icon palette role; zero = ColText
 	Tint     color.RGBA
+	TextTint color.RGBA // cell text colour; zero = the palette's text
 	Data     any
 	Spec     RowSpec
 	Stack    []RowLine
@@ -785,6 +788,7 @@ func (t *Table) updateRows() bool {
 		}
 		t.updateIcon(i)
 		t.updateBg(i)
+		t.updateTextTint(i)
 		// The installer's tooltip half: attach the row's declared Tip to
 		// its widget (rowTip rebuilds the panel only when the key moves;
 		// a spec with no Tip drops any attachment).
@@ -927,7 +931,7 @@ func (t *Table) newRow(i int) *widget.Container {
 			pad = widget.Insets{Left: theme.Px(cellPad), Top: theme.Px(entryPadV), Bottom: theme.Px(entryPadV)}
 		}
 		tx := widget.NewText(
-			widget.TextOpts.Text("", t.Face, theme.Solid(t.th.Pal().Text)),
+			widget.TextOpts.Text("", t.Face, t.textColor(t.Rows[i])),
 			widget.TextOpts.Position(align, widget.TextPositionCenter),
 			widget.TextOpts.Padding(&pad),
 			widget.TextOpts.WidgetOpts(
@@ -1111,6 +1115,30 @@ func (t *Table) rowTint(i int) color.RGBA {
 		return color.RGBA{}
 	}
 	return t.Rows[i].Tint
+}
+
+// textColor is a row's cell text colour: the row's own TextTint when it
+// declares one, else the palette's primary text.
+func (t *Table) textColor(row TableRow) color.Color {
+	if row.TextTint.A == 0 {
+		return theme.Solid(t.th.Pal().Text)
+	}
+	return theme.Solid(row.TextTint)
+}
+
+// updateTextTint re-applies the row's text tint. It runs every pass because
+// the tint can flip without a cell changing (a dimmed item row gaining its
+// first order changes the Qty cell, but the reverse need not); SetColor only
+// writes the draw colour, it never re-measures or relayouts. Rich rows draw
+// their own segments and own no cell labels here.
+func (t *Table) updateTextTint(i int) {
+	if i < 0 || i >= len(t.Rows) || i >= len(t.Texts) || t.Texts[i] == nil {
+		return
+	}
+	col := t.textColor(t.Rows[i])
+	for _, tx := range t.Texts[i] {
+		tx.SetColor(col)
+	}
 }
 
 // scrollBy moves the viewport by notches wheel-notches of rows. The wheel
