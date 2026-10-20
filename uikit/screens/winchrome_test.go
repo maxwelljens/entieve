@@ -873,9 +873,11 @@ func TestResizeGripCursorShapes(t *testing.T) {
 	}
 	ch.step(corner.Add(image.Point{20, 20}), false)
 
-	// Clear of every band the chrome claims nothing: the frame's write
-	// falls back to the default arrow.
+	// Clear of every band the chrome claims nothing: the pass's write
+	// falls back to the default arrow (the chrome runs inside Draw, so a
+	// body hover claims nothing there either).
 	got, writes = 0, 0
+	widgets.BeginCursorFrame()
 	ch.step(image.Point{midX, midY}, false)
 	widgets.ApplyCursor()
 	if got != ebiten.CursorShapeDefault {

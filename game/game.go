@@ -24,6 +24,7 @@ import (
 	"github.com/entieve/entieve/sim"
 	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -365,6 +366,11 @@ func (g *Game) applySize(w, h int) {
 // drains events into the log and the scene reactions, then syncs and
 // advances the interface.
 func (g *Game) Update() error {
+	// One input pass per Update: the previous pass's cursor claim is spent
+	// (a pointer that left a seam falls back to the arrow). ebiten may run
+	// Draw without an Update, and ApplyCursor then repeats this pass's
+	// decision instead of clearing it.
+	widgets.BeginCursorFrame()
 	// The context menu owns its frame: sample it before anything reads
 	// input (it may consume this frame's Esc or click), then gate the
 	// scene and key switches on the latch.
