@@ -26,11 +26,21 @@ const (
 	// scrollbar every table now carries.
 	mktBarSteps = widgets.RailSteps
 
-	// mktSideW is the standing-order column's width in design px: the My
-	// orders list beside the book (which keeps the height it always had).
-	// Composed market windows are >=560 px wide, leaving the book >=350 px
-	// of columns at the 1024 minimum.
+	// mktSideW is the standing-order column's width in design px at the
+	// window's landing rect: the My orders list beside the book (which
+	// keeps the height it always had). It is the split's opening share,
+	// not a fixed width — the seam trades it with the book.
 	mktSideW = 240
+
+	// mktDefaultW is the window's landing width (the 546 px square, see
+	// the Location below).
+	mktDefaultW = 546
+
+	// mktSideShare is the My-orders pane's fraction of the split at that
+	// landing width: today's fixed 240 px of the square, body padding and
+	// the seam excluded. The seam stores the fraction BEFORE it, so its
+	// default ratio is 1-mktSideShare (the book's share).
+	mktSideShare = float64(mktSideW) / float64(mktDefaultW-2*theme.ContentsPad-widgets.SplitSeamH)
 
 	// mineWheelRows is how many My-orders rows one wheel notch scrolls.
 	// The list is uncapped (every standing order the player has is
@@ -72,9 +82,11 @@ func setStepperValue(bar *widget.Container, lbl *widget.Text, s string) {
 //
 // Beside the book sits the standing-order column: My orders — only THIS
 // station's player orders, each with a Cancel button. It acts on the
-// docked book, exactly like Buy/Sell. Posting a new standing order is the
-// typed order mini-window's job (OrderWin, launched from a row's context
-// menu), not a panel here.
+// docked book, exactly like Buy/Sell. The column is the second pane of a
+// draggable row split (book | seam | orders) and opens where the old fixed
+// 240 px column stood. Posting a new standing order is the typed order
+// mini-window's job (OrderWin, launched from a row's context menu), not a
+// panel here.
 type Market struct {
 	th  theme.Theme
 	cv  widgets.ContentView
@@ -90,6 +102,10 @@ type Market struct {
 	sell     *widget.Button
 	minus    *widget.Button
 	plus     *widget.Button
+
+	// split is the book | My-orders row: the seam trades width between
+	// the two panes (the old fixed 240 px column is its opening share).
+	split *widgets.SplitPane
 
 	// The tree: items is the catalog the parent rows list (built once —
 	// content never changes under a session) and open is the fold state
@@ -346,17 +362,12 @@ func NewMarket(env widgets.Seams) *Market {
 	// the rows with the viewport instead of re-locating them mid-drag.
 	widgets.AttachScrollContent(m.mineScroll, m.mineBox)
 	m.mineRail = widgets.NewScrollRail(env, m.mineScroll, m.mineScroll, m.mineBox)
-	// A long item name must not widen the standing-order column and
-	// squeeze the book: gutter included, the column keeps the authored
-	// width (the mineBox MaxWidth this replaces).
-	m.mineRail.Container().GetWidget().LayoutData = widget.GridLayoutData{MaxWidth: theme.Px(mktSideW)}
 	side := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, true}),
 			widget.GridLayoutOpts.Spacing(0, theme.Px(theme.ContentsPad)),
 		)),
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(mktSideW), 0)),
 	)
 	side.AddChild(m.mineLbl, m.mineRail.Container())
 
@@ -373,19 +384,21 @@ func NewMarket(env widgets.Seams) *Market {
 	)
 	left.AddChild(m.qtyBar, book)
 
-	// Body: the toolbar over the book, with the standing-order column
-	// across the whole height (the table's own preferred height must never
-	// grow the window).
+	// Body: book | seam | My orders. The row split replaces the old fixed
+	// 240 px column with a draggable seam; it opens at today's proportion
+	// (the seam stores the book's share, so the orders pane keeps 240 px
+	// of the 546 px landing square) and each pane keeps SplitMinPane.
+	m.split = widgets.NewSplitPaneRow(env, left, side)
+	m.split.SetDefaultRatio(0, 1-mktSideShare)
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Columns(2),
-			widget.GridLayoutOpts.Stretch([]bool{true, false}, []bool{true}),
-			widget.GridLayoutOpts.Spacing(theme.Px(theme.ContentsPad), 0),
+			widget.GridLayoutOpts.Columns(1),
+			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
 			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	body.AddChild(left, side)
+	body.AddChild(m.split.Container())
 
 	title, marketTitle := theme.NewTitleBar(env, "Market", "svc_market")
 	m.title = marketTitle
@@ -398,8 +411,8 @@ func NewMarket(env widgets.Seams) *Market {
 		// that stays right of the rail gutter, fits the 1024×700 minimum,
 		// clears the log pocket and the HUD bar (its top edge is 554
 		// there, 546 + the 8 px margin) and still lays the body out — the
-		// stepper row plus the fixed mktSideW=240 standing-order column
-		// need a 522 px window. The module rack (bottom-right, top edge
+		// stepper row plus the opening 240 px My-orders share need a
+		// 522 px window. The module rack (bottom-right, top edge
 		// 425 at the minimum) is the one chrome the square cannot clear:
 		// no side ≥ 522 keeps out of both its x range and the log pocket.
 		// The game's Market Screen row declares the same rect as its
@@ -412,6 +425,12 @@ func NewMarket(env widgets.Seams) *Market {
 
 // Win returns the market window for Kit.AddWindow.
 func (m *Market) Win() *widget.Window { return m.win }
+
+// Splits names the window's draggable seam for the layout sidecar: the
+// My-orders pane right of it.
+func (m *Market) Splits() []widgets.Seam {
+	return []widgets.Seam{{Name: "market-orders", Split: m.split, Index: 0}}
+}
 
 // orders returns the orders the window shows: the docked station's own
 // book when it offers the market, else every station's book in the
@@ -491,6 +510,7 @@ func marketCatalog(cv widgets.ContentView) []content.ItemID {
 // Sync refreshes the rows, the wallet readout and the docked gating
 // from the simulation. Call it every frame before Kit.Update.
 func (m *Market) Sync() {
+	m.split.Poll()
 	orders := m.orders()
 	sortBookOrders(orders)
 	// Folds are session-only: a window that closed (the kit hides it, see

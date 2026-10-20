@@ -786,21 +786,25 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > exact-rect list, so a click over the popup can never reach world input.
 
 > **Split panes (2026-10):** a multi-pane window divides its leftover
-> height by **ratio**, not ebitenui's equal `GridLayout` shares, which
-> have no weights. `widgets.SplitPane` is a vertical stack with a
-> draggable seam between each pair: its own `Layouter` (so no upstream
-> change), a hairline seam with an 8 px grab band classified from the
-> cursor every frame (the window chrome's `gripStart` idiom and its
-> topmost-input-layer test, so a seam under another window is inert), an
-> NS-resize cursor write, and a 72 design-px pane floor. Each panel names
-> its seams (`Inventory.Splits`, `Fitting.Splits`,
-> `Manufacturing.Splits` → `widgets.Seam`) and the layout sidecar
-> persists them in the version-3 `splits` map (name → the fraction of the
-> stack above that seam; equal shares when a seam is absent). Version-2
-> sidecars still load — they carry no ratios, so every seam starts at its
-> equal share and the next write is v3. Wired: Inventory (cargo/ore,
-> ore/hangar), Fitting (slots/hangar), Manufacturing (recipes/jobs); the
-> market's splitter is a follow-up.
+> height — or width — by **ratio**, not ebitenui's equal `GridLayout`
+> shares, which have no weights. `widgets.SplitPane` is a stack
+> (`NewSplitPane`) or a row (`NewSplitPaneRow`) with a draggable seam
+> between each pair: its own `Layouter` (so no upstream change), a
+> hairline seam with an 8 px grab band classified from the cursor every
+> frame (the window chrome's `gripStart` idiom and its topmost-input-layer
+> test, so a seam under another window is inert), an NS-resize cursor over
+> a stack and EW over a row, and a 72 design-px pane floor. Each panel
+> names its seams (`Inventory.Splits`, `Fitting.Splits`,
+> `Manufacturing.Splits`, `Market.Splits` → `widgets.Seam`) and the layout
+> sidecar persists them in the version-3 `splits` map (name → the fraction
+> of the stack before that seam — above in a stack, left of it in a row;
+> equal shares when a seam is absent, or the panel's own opening share when
+> it sets one, as the market does). Version-2 sidecars still load — they
+> carry no ratios, so every seam starts at its default and the next write
+> is v3. Wired: Inventory (cargo/ore, ore/hangar), Fitting
+> (slots/hangar), Manufacturing (recipes/jobs), Market (book / My orders,
+> `market-orders`: the old fixed 240 px column is its opening share of the
+> window, the pane floor is `SplitMinPane`).
 
 - `render.Renderer` created with `(*content.Content)`; `Draw(dst *ebiten.Image,
   cam Camera, s *sim.Sim)` reads sim stores read-only. Vector art: ships as

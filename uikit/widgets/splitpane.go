@@ -10,36 +10,41 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// SplitPane is a vertical stack of panes with a draggable seam between
-// each pair (CONTEXT.md "Split pane"): the panes divide the leftover
-// height by ratio instead of GridLayout's equal shares. Each pane keeps a
-// minimum height so nothing collapses, and the seams are named for the
-// layout sidecar, so a dragged split survives a restart.
+// SplitPane is a stack of panes with a draggable seam between each pair
+// (CONTEXT.md "Split pane"): the panes divide the leftover height — or,
+// for a row, the width — by ratio instead of GridLayout's equal shares.
+// Each pane keeps a minimum extent so nothing collapses, and the seams are
+// named for the layout sidecar, so a dragged split survives a restart.
 //
-// A seam's ratio is the fraction of the stack ABOVE it (equal shares put
-// seam i at i/n; 0.5 for a two-pane split, the default). Dragging a seam
-// trades height between the two panes it bounds and leaves the rest
-// untouched. The seam itself is a hairline; its grab band is 8 px,
-// classified from the cursor every frame like the window chrome's edge
-// grips — a body widget that elevates its own input layer (a table's
-// scroll viewport) never eats the press in the band.
+// A seam's ratio is the fraction of the stack BEFORE it (equal shares put
+// seam i at i/n; 0.5 for a two-pane split, the default): the fraction
+// above it in a vertical stack, the fraction left of it in a row.
+// Dragging a seam trades height (or width) between the two panes it
+// bounds and leaves the rest untouched. The seam itself is a hairline;
+// its grab band is 8 px, classified from the cursor every frame like the
+// window chrome's edge grips — a body widget that elevates its own input
+// layer (a table's scroll viewport) never eats the press in the band. The
+// cursor is NS-resize for a stack, EW-resize for a row.
 //
 // Wiring: the screen builds the pane containers, hands them to
-// NewSplitPane, places Container() in its grid and calls Poll once per
-// frame from Sync — the pane layouts and their ScrollRails are untouched.
+// NewSplitPane (vertical) or NewSplitPaneRow (horizontal), places
+// Container() in its grid and calls Poll once per frame from Sync — the
+// pane layouts and their ScrollRails are untouched.
 type SplitPane struct {
 	root   *widget.Container
 	panes  []widget.PreferredSizeLocateableWidget
 	seams  []*widget.Container
 	shares []float64 // pane i's share of the stack (sum 1; 1/n each at rest)
+	def    []float64 // shares Reset restores (equal unless SetDefaultRatio)
 	minPx  int       // per-pane floor
-	seamPx int       // hairline height
+	seamPx int       // hairline thickness
+	row    bool      // panes side by side (width split) instead of stacked
 
 	seam       int // seam grabbed by the press (-1 = none)
 	start      image.Point
-	startUpper int // upper pane's height at the press, px
-	pairPx     int // the grabbed pair's combined height at the press, px
-	availPx    int // the stack's split height (without the seams) at the press
+	startUpper int // leading pane's extent at the press, px
+	pairPx     int // the grabbed pair's combined extent at the press, px
+	availPx    int // the stack's split extent (without the seams) at the press
 }
 
 // SplitPane metrics in DESIGN units (theme.Px at every measure). The
@@ -57,7 +62,7 @@ const (
 )
 
 // Seam names one split boundary for the layout sidecar: Split's seam
-// Index under Name (the value is the fraction of the stack above it).
+// Index under Name (the value is the fraction of the stack before it).
 type Seam struct {
 	Name  string
 	Split *SplitPane
@@ -68,11 +73,23 @@ type Seam struct {
 // container of its fixed label over its scroll body) with a draggable
 // seam between neighbours.
 func NewSplitPane(th theme.Theme, panes ...widget.PreferredSizeLocateableWidget) *SplitPane {
+	return newSplitPane(th, false, panes)
+}
+
+// NewSplitPaneRow places the panes side by side with a draggable vertical
+// seam between neighbours: the same pane floors, grab band and sidecar
+// ratios as NewSplitPane, measured across the width.
+func NewSplitPaneRow(th theme.Theme, panes ...widget.PreferredSizeLocateableWidget) *SplitPane {
+	return newSplitPane(th, true, panes)
+}
+
+func newSplitPane(th theme.Theme, row bool, panes []widget.PreferredSizeLocateableWidget) *SplitPane {
 	s := &SplitPane{
 		panes:  panes,
 		shares: make([]float64, len(panes)),
 		minPx:  theme.Px(SplitMinPane),
 		seamPx: theme.Px(SplitSeamH),
+		row:    row,
 		seam:   -1,
 	}
 	seamImg := theme.NineSlice(theme.NRGBA(th.Pal().Border, 200))
@@ -81,6 +98,7 @@ func NewSplitPane(th theme.Theme, panes ...widget.PreferredSizeLocateableWidget)
 			s.shares[i] = 1 / float64(n)
 		}
 	}
+	s.def = append([]float64(nil), s.shares...)
 	s.root = widget.NewContainer(widget.ContainerOpts.Layout(s))
 	for i, p := range panes {
 		s.root.AddChild(p)
@@ -96,8 +114,9 @@ func NewSplitPane(th theme.Theme, panes ...widget.PreferredSizeLocateableWidget)
 // Container returns the wrapper to place where the pane stack goes.
 func (s *SplitPane) Container() *widget.Container { return s.root }
 
-// Ratio is seam i's ratio: the fraction of the stack above it, which is
-// also what the layout sidecar stores.
+// Ratio is seam i's ratio: the fraction of the stack before it (above in
+// a stack, left of it in a row), which is also what the layout sidecar
+// stores.
 func (s *SplitPane) Ratio(i int) float64 {
 	if i < 0 || i >= len(s.shares)-1 {
 		return 0.5
@@ -109,37 +128,52 @@ func (s *SplitPane) Ratio(i int) float64 {
 	return sum
 }
 
-// SetRatio restores seam i's ratio, clamped to the sane band (a stored
-// sidecar value can be anything; NaN is ignored): the two panes the seam
-// bounds trade height, so the rest of the stack keeps its shares.
-// Equal shares stay the default — no SetRatio call, no change.
-func (s *SplitPane) SetRatio(i int, f float64) {
-	if i < 0 || i >= len(s.shares)-1 || math.IsNaN(f) {
+// setShare writes ratio f for seam i into sh, clamped to the sane band
+// (a stored sidecar value can be anything; NaN is ignored): the two panes
+// the seam bounds trade extent, so the rest of the stack keeps its shares.
+func (s *SplitPane) setShare(sh []float64, i int, f float64) {
+	if i < 0 || i >= len(sh)-1 || math.IsNaN(f) {
 		return
 	}
 	f = min(max(f, SplitMinRatio), SplitMaxRatio)
 	prefix := 0.0
-	for _, sh := range s.shares[:i] {
-		prefix += sh
+	for _, v := range sh[:i] {
+		prefix += v
 	}
-	pair := s.shares[i] + s.shares[i+1]
+	pair := sh[i] + sh[i+1]
 	upper := min(max(f-prefix, 0), pair)
-	if upper == s.shares[i] {
+	sh[i], sh[i+1] = upper, pair-upper
+}
+
+// SetRatio restores seam i's ratio, clamped to the sane band.
+// Equal shares stay the default — no SetRatio call, no change.
+func (s *SplitPane) SetRatio(i int, f float64) {
+	if i < 0 || i >= len(s.shares)-1 {
 		return
 	}
-	s.shares[i], s.shares[i+1] = upper, pair-upper
+	was := s.shares[i]
+	s.setShare(s.shares, i, f)
+	if s.shares[i] != was {
+		s.root.RequestRelayout()
+	}
+}
+
+// SetDefaultRatio sets the ratio Reset restores — and the split's opening
+// arrangement — for a panel whose default is not the equal share (the
+// market's book / My orders). The other panels never call it: equal
+// shares are theirs.
+func (s *SplitPane) SetDefaultRatio(i int, f float64) {
+	if i < 0 || i >= len(s.def)-1 {
+		return
+	}
+	s.setShare(s.def, i, f)
+	s.shares[i], s.shares[i+1] = s.def[i], s.def[i+1]
 	s.root.RequestRelayout()
 }
 
-// Reset restores the equal-share default ("Reset window layout").
+// Reset restores the opening shares ("Reset window layout").
 func (s *SplitPane) Reset() {
-	n := len(s.shares)
-	if n == 0 {
-		return
-	}
-	for i := range s.shares {
-		s.shares[i] = 1 / float64(n)
-	}
+	copy(s.shares, s.def)
 	s.root.RequestRelayout()
 }
 
@@ -160,7 +194,7 @@ func (s *SplitPane) Step(cursor image.Point, rising, pressed bool) {
 			return
 		}
 		s.drag(cursor)
-		setSplitCursor()
+		s.setCursor()
 		return
 	}
 	if rising {
@@ -168,35 +202,50 @@ func (s *SplitPane) Step(cursor image.Point, rising, pressed bool) {
 		if i < 0 {
 			return
 		}
-		s.startUpper = s.panes[i].GetWidget().Rect.Dy()
-		s.pairPx = s.startUpper + s.panes[i+1].GetWidget().Rect.Dy()
-		s.availPx = s.root.GetWidget().Rect.Dy() - s.seamPx*len(s.seams)
+		s.startUpper = s.axisLen(s.panes[i].GetWidget().Rect)
+		s.pairPx = s.startUpper + s.axisLen(s.panes[i+1].GetWidget().Rect)
+		s.availPx = s.axisLen(s.root.GetWidget().Rect) - s.seamPx*len(s.seams)
 		if s.pairPx <= 0 || s.availPx <= 0 {
 			return
 		}
 		s.seam, s.start = i, cursor
-		setSplitCursor()
+		s.setCursor()
 		return
 	}
 	if s.seamAt(cursor) >= 0 {
-		setSplitCursor()
+		s.setCursor()
 	}
 }
 
-// drag moves the grabbed seam: the upper pane's height follows the cursor
-// delta, held inside the pane floor, and becomes the seam's new ratio. The
-// first movement re-derives the shares from the panes' laid-out heights,
-// so the drag trades exact pixels (the shares a resize rounded away must
-// not leak a drift into the two panes).
+// axisLen is a rect's extent along the split axis (height in a stack,
+// width in a row).
+func (s *SplitPane) axisLen(r image.Rectangle) int {
+	if s.row {
+		return r.Dx()
+	}
+	return r.Dy()
+}
+
+// drag moves the grabbed seam: the leading pane's extent follows the
+// cursor delta, held inside the pane floor, and becomes the seam's new
+// ratio. The first movement re-derives the shares from the panes'
+// laid-out extents, so the drag trades exact pixels (the shares a resize
+// rounded away must not leak a drift into the two panes).
 func (s *SplitPane) drag(cursor image.Point) {
-	dy := cursor.Y - s.start.Y
-	if dy == 0 || s.pairPx <= 0 || s.availPx <= 0 {
+	// lead is the leading pane's growth: down the stack the house sign
+	// shrinks the pane above (the vertical windows' shipped behavior);
+	// a row grows the pane before the seam as the cursor moves right.
+	lead := s.start.Y - cursor.Y
+	if s.row {
+		lead = cursor.X - s.start.X
+	}
+	if lead == 0 || s.pairPx <= 0 || s.availPx <= 0 {
 		return
 	}
 	for i, p := range s.panes {
-		s.shares[i] = float64(p.GetWidget().Rect.Dy()) / float64(s.availPx)
+		s.shares[i] = float64(s.axisLen(p.GetWidget().Rect)) / float64(s.availPx)
 	}
-	upper := float64(s.startUpper - dy)
+	upper := float64(s.startUpper + lead)
 	if s.pairPx >= 2*s.minPx {
 		upper = min(max(upper, float64(s.minPx)), float64(s.pairPx-s.minPx))
 	} else {
@@ -224,6 +273,13 @@ func (s *SplitPane) seamAt(p image.Point) int {
 	grab := theme.Px(SplitGrabPx)
 	for i, seam := range s.seams {
 		r := seam.GetWidget().Rect
+		if s.row {
+			if p.Y >= r.Min.Y && p.Y < r.Max.Y &&
+				p.X >= r.Min.X-grab && p.X < r.Max.X+grab {
+				return i
+			}
+			continue
+		}
 		if p.X >= r.Min.X && p.X < r.Max.X &&
 			p.Y >= r.Min.Y-grab && p.Y < r.Max.Y+grab {
 			return i
@@ -233,25 +289,43 @@ func (s *SplitPane) seamAt(p image.Point) int {
 }
 
 // Layout implements widget.Layouter over the stack's own children
-// (pane, seam, pane, …): the panes take heights() and the seams the
+// (pane, seam, pane, …): the panes take sizes() and the seams the
 // hairline between them.
 func (s *SplitPane) Layout(_ []widget.PreferredSizeLocateableWidget, rect image.Rectangle) {
-	heights := s.heights(rect.Dy())
-	y := rect.Min.Y
-	for i, h := range heights {
-		s.panes[i].SetLocation(image.Rect(rect.Min.X, y, rect.Max.X, y+h))
-		y += h
+	sizes := s.sizes(s.axisLen(rect))
+	at := rect.Min
+	for i, n := range sizes {
+		if s.row {
+			s.panes[i].SetLocation(image.Rect(at.X, rect.Min.Y, at.X+n, rect.Max.Y))
+			at.X += n
+			if i < len(s.seams) {
+				s.seams[i].SetLocation(image.Rect(at.X, rect.Min.Y, at.X+s.seamPx, rect.Max.Y))
+				at.X += s.seamPx
+			}
+			continue
+		}
+		s.panes[i].SetLocation(image.Rect(rect.Min.X, at.Y, rect.Max.X, at.Y+n))
+		at.Y += n
 		if i < len(s.seams) {
-			s.seams[i].SetLocation(image.Rect(rect.Min.X, y, rect.Max.X, y+s.seamPx))
-			y += s.seamPx
+			s.seams[i].SetLocation(image.Rect(rect.Min.X, at.Y, rect.Max.X, at.Y+s.seamPx))
+			at.Y += s.seamPx
 		}
 	}
 }
 
-// PreferredSize implements widget.Layouter: the widest pane, the panes'
-// preferred heights plus the seam hairlines.
+// PreferredSize implements widget.Layouter: the panes' preferred extents
+// along the axis plus the seam hairlines, the largest across it.
 func (s *SplitPane) PreferredSize(_ []widget.PreferredSizeLocateableWidget) (int, int) {
-	w, h := 0, s.seamPx*len(s.seams)
+	w, h := 0, 0
+	if s.row {
+		w = s.seamPx * len(s.seams)
+		for _, p := range s.panes {
+			pw, ph := p.PreferredSize()
+			w, h = w+pw, max(h, ph)
+		}
+		return w, h
+	}
+	h = s.seamPx * len(s.seams)
 	for _, p := range s.panes {
 		pw, ph := p.PreferredSize()
 		w, h = max(w, pw), h+ph
@@ -259,12 +333,12 @@ func (s *SplitPane) PreferredSize(_ []widget.PreferredSizeLocateableWidget) (int
 	return w, h
 }
 
-// heights splits avail px across the panes: the shares scaled to the
-// rect, floored at minPx, with the running budget leaving every later
-// pane its floor. Too little room for every floor (a tiny window, a
-// just-mounted split) falls back to equal shares, so the panes always
-// tile the rect exactly.
-func (s *SplitPane) heights(avail int) []int {
+// sizes splits avail px across the panes: the shares scaled to the rect,
+// floored at minPx, with the running budget leaving every later pane its
+// floor. Too little room for every floor (a tiny window, a just-mounted
+// split) falls back to equal shares, so the panes always tile the rect
+// exactly.
+func (s *SplitPane) sizes(avail int) []int {
 	n := len(s.panes)
 	out := make([]int, n)
 	avail -= s.seamPx * (n - 1)
@@ -308,15 +382,24 @@ func SetSplitHeldForTest(f func() bool) func() {
 	return func() { splitHeld = prev }
 }
 
-// setSplitCursor is the seam's cursor write: ebiten's own call (the
-// window chrome's setCursorShape idiom — ebitenui's name cache resets the
-// OS cursor every frame, so the hover rewrites it every frame too).
-var setSplitCursor = func() { ebiten.SetCursorShape(ebiten.CursorShapeNSResize) }
+// setCursor is the seam's cursor write: NS over a stack's horizontal
+// seam, EW over a row's vertical one — ebiten's own call (the window
+// chrome's setCursorShape idiom — ebitenui's name cache resets the OS
+// cursor every frame, so the hover rewrites it every frame too).
+func (s *SplitPane) setCursor() {
+	shape := ebiten.CursorShapeNSResize
+	if s.row {
+		shape = ebiten.CursorShapeEWResize
+	}
+	setSplitCursor(shape)
+}
+
+var setSplitCursor = ebiten.SetCursorShape
 
 // SetSplitCursorForTest overrides the seam cursor write for a headless
 // test and returns a restore func. Test-only seam: never call it from
 // production code.
-func SetSplitCursorForTest(f func()) func() {
+func SetSplitCursorForTest(f func(ebiten.CursorShapeType)) func() {
 	prev := setSplitCursor
 	setSplitCursor = f
 	return func() { setSplitCursor = prev }

@@ -9,6 +9,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/uikit/internal/uitest"
 	"github.com/entieve/entieve/uikit/theme"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // newPumpedSplit stacks n uniform panes in a split, mounts it in a window
@@ -204,9 +205,145 @@ func TestSplitPaneGrabBand(t *testing.T) {
 	}
 
 	cursors := 0
-	defer SetSplitCursorForTest(func() { cursors++ })()
+	defer SetSplitCursorForTest(func(ebiten.CursorShapeType) { cursors++ })()
 	s.Step(at, false, false) // idle hover
 	if cursors == 0 {
 		t.Error("hovering the seam advertised no resize cursor")
+	}
+}
+
+// newPumpedRow places n uniform panes side by side in a row split and
+// pumps a frame inside a 400×400 window (the horizontal twin of
+// newPumpedSplit).
+func newPumpedRow(t *testing.T, n int) (*SplitPane, *ebitenui.UI) {
+	t.Helper()
+	env, _ := newTestEnv(t)
+	panes := make([]widget.PreferredSizeLocateableWidget, n)
+	for i := range panes {
+		panes[i] = widget.NewContainer(
+			widget.ContainerOpts.Layout(widget.NewRowLayout()),
+			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(SplitMinPane), 0)),
+		)
+	}
+	s := NewSplitPaneRow(env, panes...)
+	win := widget.NewWindow(
+		widget.WindowOpts.Contents(s.Container()),
+		widget.WindowOpts.TitleBar(
+			widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout())),
+			theme.Px(theme.TitleBarH)),
+		widget.WindowOpts.MinSize(theme.Px(200), theme.Px(200)),
+		widget.WindowOpts.Location(image.Rect(0, 0, 400, 400)),
+	)
+	ui := newWindowUI(t, env, win)
+	uitest.PumpWindow(t, ui, nil, 640, 480)
+	return s, ui
+}
+
+// rowWidths is the panes' laid-out widths, left to right.
+func rowWidths(s *SplitPane) []int {
+	out := make([]int, len(s.panes))
+	for i, p := range s.panes {
+		out[i] = p.GetWidget().Rect.Dx()
+	}
+	return out
+}
+
+// rowSeamMid is the grab point on seam i in a row: the seam's left x and
+// its vertical centre.
+func rowSeamMid(s *SplitPane, i int) image.Point {
+	r := s.seams[i].GetWidget().Rect
+	return image.Pt(r.Min.X, r.Min.Y+r.Dy()/2)
+}
+
+// TestSplitPaneRowEqualShares: a row split places the panes side by side
+// in equal shares, a hairline seam between each pair (full height, one
+// pixel wide), the parts tiling the rect; the grab band runs across the
+// seam and advertises the EW cursor.
+func TestSplitPaneRowEqualShares(t *testing.T) {
+	s, _ := newPumpedRow(t, 3)
+	w := rowWidths(s)
+	if max(w[0], max(w[1], w[2]))-min(w[0], min(w[1], w[2])) > 1 {
+		t.Errorf("pane widths = %v, want equal thirds (±1 px remainder)", w)
+	}
+	total := w[0] + w[1] + w[2] + s.seamPx*len(s.seams)
+	if rect := s.root.GetWidget().Rect; total != rect.Dx() {
+		t.Errorf("panes + seams = %d, want the split's %d (no gap, no overflow)", total, rect.Dx())
+	}
+	if seam := s.seams[0].GetWidget().Rect; seam.Dx() != s.seamPx || seam.Dy() != s.root.GetWidget().Rect.Dy() {
+		t.Errorf("seam = %v, want a %d px hairline over the full height", seam, s.seamPx)
+	}
+
+	at := rowSeamMid(s, 0)
+	grab := theme.Px(SplitGrabPx)
+	if got := s.seamAt(image.Pt(at.X+grab+2, at.Y)); got != -1 {
+		t.Errorf("press %d px right of the seam grabbed seam %d, want none", grab+2, got)
+	}
+	if got := s.seamAt(image.Pt(at.X+grab-1, at.Y)); got != 0 {
+		t.Errorf("press inside the grab band = seam %d, want 0", got)
+	}
+
+	var shape ebiten.CursorShapeType
+	defer SetSplitCursorForTest(func(c ebiten.CursorShapeType) { shape = c })()
+	s.Step(at, false, false) // idle hover
+	if shape != ebiten.CursorShapeEWResize {
+		t.Errorf("row seam cursor = %v, want EW-resize", shape)
+	}
+}
+
+// TestSplitPaneRowDragTradesWidths: dragging the seam right widens the
+// pane before it by exactly the drag distance, shrinks the pane after it
+// by the same, and leaves the third untouched; a hard drag stops at the
+// pane floor and the row still tiles.
+func TestSplitPaneRowDragTradesWidths(t *testing.T) {
+	s, ui := newPumpedRow(t, 3)
+	before := rowWidths(s)
+	at := rowSeamMid(s, 0)
+
+	s.Step(at, true, true)
+	s.Step(image.Pt(at.X+30, at.Y), false, true)
+	s.Step(image.Pt(at.X+30, at.Y), false, false)
+	uitest.PumpWindow(t, ui, nil, 640, 480)
+
+	after := rowWidths(s)
+	if after[0] != before[0]+30 {
+		t.Errorf("leading pane = %d, want %d (grew by the 30 px drag)", after[0], before[0]+30)
+	}
+	if after[1] != before[1]-30 {
+		t.Errorf("trailing pane = %d, want %d (shrank by the same 30 px)", after[1], before[1]-30)
+	}
+	if after[2] != before[2] {
+		t.Errorf("third pane = %d, want %d (a seam moves only its pair)", after[2], before[2])
+	}
+	if got, want := s.Ratio(0), float64(after[0])/float64(before[0]+before[1]+before[2]); got != want {
+		t.Errorf("seam ratio = %v, want %v (the fraction left of it)", got, want)
+	}
+
+	// Hard drag left: the leading pane bottoms out at the floor.
+	at = rowSeamMid(s, 0)
+	s.Step(at, true, true)
+	s.Step(image.Pt(at.X-10000, at.Y), false, true)
+	s.Step(image.Pt(at.X-10000, at.Y), false, false)
+	uitest.PumpWindow(t, ui, nil, 640, 480)
+	w := rowWidths(s)
+	if w[0] != s.minPx {
+		t.Errorf("leading pane after the hard drag = %d, want the floor %d", w[0], s.minPx)
+	}
+	if total := w[0] + w[1] + w[2] + s.seamPx*len(s.seams); total != s.root.GetWidget().Rect.Dx() {
+		t.Errorf("panes + seams = %d, want the split's %d", total, s.root.GetWidget().Rect.Dx())
+	}
+}
+
+// TestSplitPaneDefaultRatio: a panel whose opening arrangement is not the
+// equal share sets its own default; Reset returns to it, not to 1/n.
+func TestSplitPaneDefaultRatio(t *testing.T) {
+	s, _ := newPumpedRow(t, 2)
+	s.SetDefaultRatio(0, 0.6)
+	if got := s.Ratio(0); got != 0.6 {
+		t.Errorf("default ratio = %v, want the 0.6 default applied", got)
+	}
+	s.SetRatio(0, 0.3)
+	s.Reset()
+	if got := s.Ratio(0); got != 0.6 {
+		t.Errorf("after Reset ratio = %v, want the 0.6 default", got)
 	}
 }
