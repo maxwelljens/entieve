@@ -479,6 +479,32 @@ These are the book's **founding** endowment: finite, depleting with trades
 respawn requisitions — is never conjured from data; it comes through the
 economy (see `docs/SIM.md`).
 
+### Material seeds: both sides at every market station
+
+Every station that offers the `market` service seeds **both sides of every
+ore and mineral** — one ask and one bid per item (`min-*`, `ore-*`). The
+market window's item tree lists each of those items as a row whatever the
+book holds, so a single missing side reads as a dead market to the player:
+a mined hold must be sellable and materials must be buyable at every port.
+
+- Prices stay anchored to `base_price`: the bid sits just under it
+  (ferrite 5 vs base 6), the ask just over it (ferrite 7) — the existing
+  style, and the reason a founding book never opens crossed.
+- Quantities follow value: tens of thousands for cheap minerals
+  (ferrite 25,000 bid / 12,000 ask), thousands for ore and the dear
+  minerals, hundreds for the rarest. Asks are modest stock; bids are the
+  local industry's standing demand.
+- Przystań (`cel-penumbra-port`) had no `market` block at all before this
+  pass: its freeport now carries the same materials set plus the shells its
+  own raiders need (`TestRespawnAmmoIsOnTheLocalBook`).
+- The materials rows live at the end of each station's `market` array in
+  two blocks — asks first, then bids, each ascending by item id. The
+  validator (`TestMarketStationsSeedBothMaterialSides`) keeps every
+  market-service station complete.
+- These are **seeds only**: nothing replenishes them. Industrialist agents'
+  demand and the player's buying are the only ongoing flow; a system whose
+  materials are bought out stays dry until someone sells back.
+
 ## Recipe 7: add a world / scenario checkpoint
 
 ```json

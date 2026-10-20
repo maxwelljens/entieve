@@ -75,7 +75,7 @@ func TestMarketGatingAndEnqueue(t *testing.T) {
 	}
 	// The table sorts by name, so the selected row — not the sim's
 	// canonical stock order — is the trade target.
-	wantItem := m.tbl.Rows[0].Data.(content.ItemID)
+	wantItem := m.tbl.Rows[0].Data.(mktItemRow).Item
 	if buy.Item != wantItem || buy.Qty != 10 {
 		t.Errorf("CmdBuy = %+v, want {%s 10}", buy, wantItem)
 	}
@@ -157,9 +157,10 @@ func TestInventoryTransferAndSell(t *testing.T) {
 	}
 }
 
-// TestMarketSelectionRevalidatesOnSync: a selected order that leaves the
-// board stops reading as selected — the click-time cache alone would
-// keep Buy/Sell armed on an item the market no longer offers.
+// TestMarketSelectionRevalidatesOnSync: a selected order row that leaves
+// the board stops reading as selected — the click-time cache alone would
+// keep Buy/Sell armed on an order the market no longer offers (its item's
+// own row stays: an orderless item is still listed).
 func TestMarketSelectionRevalidatesOnSync(t *testing.T) {
 	env, cmds := newTestEnv(t)
 	m := NewMarket(env)
@@ -168,7 +169,13 @@ func TestMarketSelectionRevalidatesOnSync(t *testing.T) {
 	frame()
 	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
 	frame()
+	// Row 0 is the first catalog item's parent, row 1 its first order.
 	clickRow(ui, m.tbl, 0)
+	frame()
+	if _, isOrder := m.tbl.Rows[1].Data.(mktOrderRow); !isOrder {
+		t.Fatalf("row 1 payload = %#v, want an order row (the fixture book is empty)", m.tbl.Rows[1].Data)
+	}
+	clickRow(ui, m.tbl, 1)
 	frame()
 	if !m.hasSel {
 		t.Fatal("fixture: selection did not take")

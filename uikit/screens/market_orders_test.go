@@ -201,8 +201,14 @@ func TestMarketMyOrdersListsEveryOrder(t *testing.T) {
 		t.Errorf("wheel: row 0 at %d, want above %d (list moved)", got.Min.Y, row0.Min.Y)
 	}
 
-	// Ownership highlight: the 20 player rows wear the owned green, the
-	// one NPC ask keeps the plain background.
+	// Ownership highlight inside the fold: the 20 player orders wear the
+	// owned green, the one NPC ask keeps the plain background (and the
+	// item's own parent row carries no tint at all).
+	clickRow(ui, m.tbl, 0)
+	frame()
+	if got, want := len(m.tbl.Rows), 22; got != want {
+		t.Fatalf("expanded rows = %d, want the parent + 21 orders (%d)", got, want)
+	}
 	want := theme.OwnedRowTint(theme.DefaultPalette())
 	owned, plain := 0, 0
 	for _, r := range m.tbl.Rows {
@@ -215,8 +221,8 @@ func TestMarketMyOrdersListsEveryOrder(t *testing.T) {
 			t.Errorf("book row tint = %#v, want the owned green or none", r.Tint)
 		}
 	}
-	if owned != 20 || plain != 1 {
-		t.Errorf("book tints: %d owned, %d plain, want 20/1", owned, plain)
+	if owned != 20 || plain != 2 {
+		t.Errorf("book tints: %d owned, %d plain, want 20/2 (parent + NPC ask)", owned, plain)
 	}
 }
 
@@ -290,7 +296,9 @@ func TestMarketMyOrdersAfterOrderDialog(t *testing.T) {
 	}
 
 	// Every OwnerPlayer book row is green, and there is at least one —
-	// the order the dialog placed.
+	// the order the dialog placed. It sits in its item's fold.
+	clickRow(mui, m.tbl, mktParentRow(t, m, item))
+	frame()
 	ownedOrders := 0
 	for _, o := range k.Env().BookOrders("cel-haven-rest") {
 		if o.Owner == sim.OwnerPlayer {

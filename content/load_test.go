@@ -99,8 +99,8 @@ func TestLoadEmbedded(t *testing.T) {
 	if station == nil {
 		t.Fatal("sys-solace missing cel-haven-rest station block")
 	}
-	if len(station.Services) != 4 {
-		t.Errorf("cel-haven-rest services = %v, want all four", station.Services)
+	if len(station.Services) != 5 {
+		t.Errorf("cel-haven-rest services = %v, want all five (repair, market, refine, fitting, industry)", station.Services)
 	}
 
 	showcase, ok := c.Worlds["world-showcase"]

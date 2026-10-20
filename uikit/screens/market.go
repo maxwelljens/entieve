@@ -56,18 +56,25 @@ func setStepperValue(bar *widget.Container, lbl *widget.Text, s string) {
 }
 
 // Market is the station market window: the docked station's order book as
-// rows — items ascending, asks (price ascending) above bids (price
-// descending) — over a quantity stepper and the Buy/Sell actions, which
-// execute as market orders against that book. The title carries the
-// selected item's displayed price (last trade, best ask, best bid, base)
-// and the fee schedule. Trade is only possible while the player is docked,
-// so both buttons are disabled in space.
+// a per-item tree — one parent row per item of the tradeable catalog
+// (canonical order), its resting orders folded out beneath it on a click:
+// asks (price ascending) above bids (price descending), each order in the
+// book's own [price, qty, side] form. Over that sit the quantity stepper
+// and the Buy/Sell actions, which execute as market orders against the
+// book. The title carries the selected item's displayed price (last trade,
+// best ask, best bid, base) and the fee schedule. Trade is only possible
+// while the player is docked, so both buttons are disabled in space.
+//
+// An item with no orders anywhere still gets its row — dimmed, but live:
+// placing the first order is how a market wakes up (Request on Market
+// works from an empty book). Placing a hull ask is refused by the sim, so
+// hull rows trade the way they always did.
 //
 // Beside the book sits the standing-order column: My orders — only THIS
 // station's player orders, each with a Cancel button. It acts on the
 // docked book, exactly like Buy/Sell. Posting a new standing order is the
-// typed order mini-window's job (OrderWin, launched from an item's
-// context menu), not a panel here.
+// typed order mini-window's job (OrderWin, launched from a row's context
+// menu), not a panel here.
 type Market struct {
 	th  theme.Theme
 	cv  widgets.ContentView
@@ -84,6 +91,13 @@ type Market struct {
 	minus    *widget.Button
 	plus     *widget.Button
 
+	// The tree: items is the catalog the parent rows list (built once —
+	// content never changes under a session) and open is the fold state
+	// (item → its orders shown). open is session-only: it never persists
+	// and a closed window forgets it.
+	items []content.ItemID
+	open  map[content.ItemID]bool
+
 	// My orders: the station's player orders as rich rows, every one of
 	// them listed, in a scroll viewport with the house rail beside it.
 	mineLbl    *widget.Text
@@ -96,6 +110,34 @@ type Market struct {
 	qtyIdx int
 	sel    content.ItemID
 	hasSel bool
+}
+
+// mktNoSide is an item row's Side cell: an item has no side of its own.
+// The Qty column already reads 0 for a dead market, so the cell stays a
+// dash rather than an empty box.
+const mktNoSide = "—"
+
+// mktItemRow is an item's parent row payload: the item the row names. A
+// parent row folds its orders out; its child rows carry mktOrderRow.
+type mktItemRow struct{ Item content.ItemID }
+
+// mktOrderRow is one resting order's child row payload: the item it trades
+// and the order id (the table's row identity across rebuilds).
+type mktOrderRow struct {
+	Item content.ItemID
+	ID   uint64
+}
+
+// mktItemOf resolves a market row payload to its item (false when the row
+// is not one of the market's).
+func mktItemOf(data any) (content.ItemID, bool) {
+	switch r := data.(type) {
+	case mktItemRow:
+		return r.Item, true
+	case mktOrderRow:
+		return r.Item, true
+	}
+	return "", false
 }
 
 // feePct renders a fee rate as a percentage ("3%", "2.5%").
@@ -125,10 +167,48 @@ func sortBookOrders(orders []sim.MarketStock) {
 	})
 }
 
+// mktCell is a row's cell text by column index ("" when the row is short).
+func mktCell(row widgets.TableRow, i int) string {
+	if i < 0 || i >= len(row.Cells) {
+		return ""
+	}
+	return row.Cells[i]
+}
+
+// mktIsParent reports whether a row is an item (parent) row.
+func mktIsParent(row widgets.TableRow) bool {
+	_, ok := row.Data.(mktItemRow)
+	return ok
+}
+
+// mktBlocks splits the tree's flat rows into one block per item row: the
+// parent followed by its folded-out order rows. Rows before the first
+// parent (there are none) would form their own block, so a sort can never
+// drop a row.
+func mktBlocks(rows []widgets.TableRow) [][]widgets.TableRow {
+	var out [][]widgets.TableRow
+	for _, r := range rows {
+		if mktIsParent(r) || len(out) == 0 {
+			out = append(out, nil)
+		}
+		out[len(out)-1] = append(out[len(out)-1], r)
+	}
+	return out
+}
+
+// mktJoin writes the blocks back into rows, block by block: the tree's
+// parent-before-its-orders shape survives any header sort.
+func mktJoin(rows []widgets.TableRow, blocks [][]widgets.TableRow) {
+	at := 0
+	for _, b := range blocks {
+		at += copy(rows[at:], b)
+	}
+}
+
 // NewMarket builds the Market window over the shared environment. Mount
 // it on a Kit with Kit.AddWindow and call Sync every frame.
 func NewMarket(env widgets.Seams) *Market {
-	m := &Market{th: env, cv: env, as: env}
+	m := &Market{th: env, cv: env, as: env, items: marketCatalog(env), open: map[content.ItemID]bool{}}
 	p := env.Pal()
 
 	cols := []widgets.Column{
@@ -142,16 +222,12 @@ func NewMarket(env widgets.Seams) *Market {
 	// stay IBM Plex Sans).
 	m.tbl = widgets.NewTable(env, cols, widgets.ContentsFace(env.FaceMono(theme.StepSmall)))
 	m.tbl.SetSort("Item", true)
-	// Sync builds rows in canonical book order; the Item sort key keeps
-	// that order (reversing on a second click), any other header click
-	// falls back to plain cell sorting.
+	// Sync builds rows in canonical book order (each item's parent row,
+	// then its orders when the item is open); the Item sort key keeps that
+	// order — reversing the ITEMS on a second click — and any other header
+	// falls back to sorting the items by that column's cell, never tearing
+	// an item's orders away from their parent.
 	m.tbl.SetSortFunc(func(key string, asc bool, rows []widgets.TableRow) {
-		if key == "Item" {
-			if !asc {
-				slices.Reverse(rows)
-			}
-			return
-		}
 		idx := -1
 		for i, c := range cols {
 			if c.Key == key {
@@ -162,27 +238,34 @@ func NewMarket(env widgets.Seams) *Market {
 		if idx < 0 {
 			return
 		}
-		sort.SliceStable(rows, func(a, b int) bool {
-			x, y := rows[a].Cells[idx], rows[b].Cells[idx]
-			if asc {
-				return x < y
+		blocks := mktBlocks(rows)
+		if key == "Item" {
+			if !asc {
+				slices.Reverse(blocks)
 			}
-			return y < x
-		})
-	})
-	m.tbl.OnSelect(func(r widgets.TableRow) {
-		if id, ok := r.Data.(content.ItemID); ok {
-			m.sel, m.hasSel = id, true
+		} else {
+			sort.SliceStable(blocks, func(a, b int) bool {
+				x, y := mktCell(blocks[a][0], idx), mktCell(blocks[b][0], idx)
+				if asc {
+					return x < y
+				}
+				return y < x
+			})
 		}
+		mktJoin(rows, blocks)
 	})
-	// Double-click (Show Info) and the right-click menu (Show Info +
-	// Buy/Sell) derive from each row's declared RowSpec — built in Sync,
-	// where the docked gate and the row's own item are known. The menu's
-	// actions carry the clicked row's payload, so Buy/Sell always trade
-	// the row they were opened on — no click-time selection side effects.
+	// A click selects the row's item (the title quotes it, Buy/Sell trade
+	// it) and, on an item row, folds its orders out or away. The row's
+	// declared RowSpec already carries its own item, so the menu never
+	// depends on this selection; a double-click still opens Show Info.
 	m.tbl.OnSelect(func(r widgets.TableRow) {
-		if id, ok := r.Data.(content.ItemID); ok {
-			m.sel, m.hasSel = id, true
+		item, ok := mktItemOf(r.Data)
+		if !ok {
+			return
+		}
+		m.sel, m.hasSel = item, true
+		if _, isItem := r.Data.(mktItemRow); isItem {
+			m.open[item] = !m.open[item]
 		}
 	})
 
@@ -354,8 +437,14 @@ func (m *Market) priceOf(item content.ItemID) float64 {
 	if station != "" {
 		return m.cv.MarketPrice(station, item)
 	}
+	return m.bookPrice(item, m.orders())
+}
+
+// bookPrice is the undocked half of priceOf's ladder, against an order set
+// the caller already holds (Sync quotes every item once from one copy).
+func (m *Market) bookPrice(item content.ItemID, orders []sim.MarketStock) float64 {
 	ask, bid := -1.0, -1.0
-	for _, o := range m.orders() {
+	for _, o := range orders {
 		if o.Item != item {
 			continue
 		}
@@ -373,7 +462,30 @@ func (m *Market) priceOf(item content.ItemID) float64 {
 	if bid >= 0 {
 		return bid
 	}
-	return m.cv.MarketPrice(station, item) // def base price
+	return m.cv.MarketPrice("", item) // def base price
+}
+
+// marketCatalog is the market's item universe in canonical order: every
+// item (ore, mineral, loot, ammo, charge), module and hull the book can
+// list, ascending by id — the order the book always used. Built once; the
+// catalog never changes under a session.
+func marketCatalog(cv widgets.ContentView) []content.ItemID {
+	d := cv.Defs()
+	if d == nil {
+		return nil
+	}
+	out := make([]content.ItemID, 0, len(d.Items)+len(d.Modules)+len(d.Ships))
+	for id := range d.Items {
+		out = append(out, id)
+	}
+	for id := range d.Modules {
+		out = append(out, content.ItemID(id))
+	}
+	for id := range d.Ships {
+		out = append(out, content.ItemID(id))
+	}
+	slices.Sort(out)
+	return out
 }
 
 // Sync refreshes the rows, the wallet readout and the docked gating
@@ -381,44 +493,41 @@ func (m *Market) priceOf(item content.ItemID) float64 {
 func (m *Market) Sync() {
 	orders := m.orders()
 	sortBookOrders(orders)
+	// Folds are session-only: a window that closed (the kit hides it, see
+	// winanim.startClose) forgets what was open and reopens collapsed.
+	// shortcut: a hotkey close unmounts without hiding, so that path keeps
+	// the folds until the next × close; add a close hook to the Screen seam
+	// if a reopened window must always start collapsed.
+	if !m.win.GetContainer().GetWidget().IsVisible() {
+		clear(m.open)
+	}
 	// Trades only happen docked at a station — the same gate feeds the
 	// buttons below and every row's declared Buy/Sell actions.
 	gated := !m.docked()
-	rows := make([]widgets.TableRow, 0, len(orders))
+	// One quote per item for the parent rows: the station ladder docked,
+	// else the shown book's own best ask/bid walked once (not once per
+	// row over a fresh copy of the system book).
+	docked := m.cv.DockedMarket()
+	quote := func(item content.ItemID) float64 { return m.cv.MarketPrice(docked, item) }
+	if docked == "" {
+		quote = func(item content.ItemID) float64 { return m.bookPrice(item, orders) }
+	}
+	by := make(map[content.ItemID][]sim.MarketStock, len(m.items))
 	for _, o := range orders {
-		side := "Ask"
-		if o.Side == sim.OrderBuy {
-			side = "Bid"
+		by[o.Item] = append(by[o.Item], o)
+	}
+	rows := make([]widgets.TableRow, 0, len(m.items)+len(orders))
+	for _, item := range m.items {
+		ords := by[item]
+		rows = append(rows, m.itemRow(item, ords, quote(item), gated))
+		if !m.open[item] {
+			continue
 		}
-		item := o.Item
-		// The player's own resting orders wear the owned-row green: one
-		// glance separates them from the NPC/agent rows (the overview's
-		// own-ship/hostile tint convention). Selection still wins.
-		var tint color.RGBA
-		if o.Owner == sim.OwnerPlayer {
-			tint = theme.OwnedRowTint(m.th.Pal())
+		// sortBookOrders put the item's orders in book order already:
+		// asks ascending, then bids descending.
+		for _, o := range ords {
+			rows = append(rows, m.bookRow(o, gated))
 		}
-		rows = append(rows, widgets.TableRow{
-			Cells: []string{
-				itemLabel(m.cv, o.Item),
-				theme.FormatCredits(o.Price),
-				theme.FormatInt(int64(o.Qty)),
-				side,
-			},
-			Tint: tint,
-			Data: o.Item,
-			Spec: widgets.RowSpec{
-				Ref: widgets.RowRef(m.cv, o.Item),
-				Actions: []widgets.RowAction{
-					{Label: "Buy", Disabled: gated, Intent: widgets.Buy{Item: item, Qty: m.qty()}},
-					{Label: "Sell", Disabled: gated, Intent: widgets.Sell{Item: item, Qty: m.qty()}},
-					{Label: "Sell on Market", Disabled: gated,
-						Intent: widgets.OpenOrder{Item: item, Side: sim.OrderSell, Qty: m.cv.PlayerStock(item)}},
-					{Label: "Request on Market", Disabled: gated,
-						Intent: widgets.OpenOrder{Item: item, Side: sim.OrderBuy, Qty: 1}},
-				},
-			},
-		})
 	}
 	m.tbl.SetRows(rows)
 	m.tbl.Sync()
@@ -429,8 +538,8 @@ func (m *Market) Sync() {
 	// no longer offers.
 	m.hasSel = false
 	if r, ok := m.tbl.Selected(); ok {
-		if id, isItem := r.Data.(content.ItemID); isItem {
-			m.sel, m.hasSel = id, true
+		if item, isRow := mktItemOf(r.Data); isRow {
+			m.sel, m.hasSel = item, true
 		}
 	}
 
@@ -464,6 +573,74 @@ func (m *Market) Sync() {
 	// The scrollbar rail (the table's own) mirrors the table's scroll in
 	// m.tbl.Sync above: hidden while the book fits, thumb at ScrollTop
 	// otherwise; a drag writes the offset back.
+}
+
+// itemRow is one item's parent row: the item, its displayed price (the
+// station's ladder: last trade, best ask, best bid, base), the total
+// quantity resting on both sides and the dash an item's side cell reads.
+// An item with no orders anywhere is dimmed but stays fully actionable —
+// placing its first order is how a market wakes up.
+func (m *Market) itemRow(item content.ItemID, ords []sim.MarketStock, price float64, gated bool) widgets.TableRow {
+	total := 0
+	for _, o := range ords {
+		total += o.Qty
+	}
+	row := widgets.TableRow{
+		Cells: []string{
+			itemLabel(m.cv, item),
+			theme.FormatCredits(price),
+			theme.FormatInt(int64(total)),
+			mktNoSide,
+		},
+		Data: mktItemRow{Item: item},
+		Spec: m.rowSpec(item, gated),
+	}
+	if len(ords) == 0 {
+		row.TextTint = m.th.Pal().Dim
+	}
+	return row
+}
+
+// bookRow is one resting order as its item's child row: the book's own
+// [price, qty, side] cells (the item is the parent above it), the
+// player's own orders in the owned-row green — one glance separates them
+// from the NPC/agent rows (the overview's own-ship/hostile tint
+// convention). Selection still wins.
+func (m *Market) bookRow(o sim.MarketStock, gated bool) widgets.TableRow {
+	side := "Ask"
+	if o.Side == sim.OrderBuy {
+		side = "Bid"
+	}
+	var tint color.RGBA
+	if o.Owner == sim.OwnerPlayer {
+		tint = theme.OwnedRowTint(m.th.Pal())
+	}
+	return widgets.TableRow{
+		Cells: []string{"", theme.FormatCredits(o.Price), theme.FormatInt(int64(o.Qty)), side},
+		Tint:  tint,
+		Data:  mktOrderRow{Item: o.Item, ID: o.ID},
+		Spec:  m.rowSpec(o.Item, gated),
+	}
+}
+
+// rowSpec is every market row's declared interactions — an item row and
+// its order rows offer the same verbs on the same item (Buy/Sell trade
+// the book, the two order-window launches post to it); only the payload
+// tells the row kinds apart. The menu's actions carry the row's own item,
+// so Buy/Sell always trade the row they were opened on — no click-time
+// selection side effects.
+func (m *Market) rowSpec(item content.ItemID, gated bool) widgets.RowSpec {
+	return widgets.RowSpec{
+		Ref: widgets.RowRef(m.cv, item),
+		Actions: []widgets.RowAction{
+			{Label: "Buy", Disabled: gated, Intent: widgets.Buy{Item: item, Qty: m.qty()}},
+			{Label: "Sell", Disabled: gated, Intent: widgets.Sell{Item: item, Qty: m.qty()}},
+			{Label: "Sell on Market", Disabled: gated,
+				Intent: widgets.OpenOrder{Item: item, Side: sim.OrderSell, Qty: m.cv.PlayerStock(item)}},
+			{Label: "Request on Market", Disabled: gated,
+				Intent: widgets.OpenOrder{Item: item, Side: sim.OrderBuy, Qty: 1}},
+		},
+	}
 }
 
 // stepQty moves the quantity stepper one step (clamped).

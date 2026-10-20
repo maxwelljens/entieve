@@ -899,9 +899,9 @@ func TestAgentRosterSplitAndWorldGate(t *testing.T) {
 		}
 	}
 	// The documented split: industry stations lead with two
-	// industrialists (3×2 = 6), the rest alternate trader/miner (9/9).
-	if roles[RoleIndustrialist] != 6 || roles[RoleTrader] != 9 || roles[RoleMiner] != 9 {
-		t.Fatalf("roles = %+v, want {industrialist:6 trader:9 miner:9}", roles)
+	// industrialists (4×2 = 8), the rest alternate trader/miner (8/8).
+	if roles[RoleIndustrialist] != 8 || roles[RoleTrader] != 8 || roles[RoleMiner] != 8 {
+		t.Fatalf("roles = %+v, want {industrialist:8 trader:8 miner:8}", roles)
 	}
 	// Upkeep ledgers seeded for every market station.
 	if len(s.upkeep) != 6 {
