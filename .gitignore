@@ -22,3 +22,5 @@
 assets/**/*.png
 # Font source archives are local material (TTFs ship in render/fonts/).
 assets/*.zip
+# Serena MCP project metadata (local tooling state).
+.serena/
