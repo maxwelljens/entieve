@@ -9,12 +9,14 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
 )
 
 // Window-layout persistence: a JSON sidecar next to the save file,
-// <Options.SavePath>.layout.json, holding each named window's geometry
-// and open state. The sim save (sim.Save) stays untouched — the CLI
-// tools read it — so layout lives entirely outside the save format.
+// <Options.SavePath>.layout.json, holding each named window's geometry,
+// open state and split-pane ratios. The sim save (sim.Save) stays
+// untouched — the CLI tools read it — so layout lives entirely outside
+// the save format.
 //
 // Robustness contract: a missing, corrupt, wrong-version or partial
 // sidecar degrades to the built-in defaults (never an error, never a
@@ -25,13 +27,14 @@ import (
 // (clampRestored), so shrinking the window after a restore can never
 // strand a restored window off-screen.
 
-// layoutVersion tags the sidecar format. Only the exact current version
-// is read: version 1 was written by builds whose restore clamp could
-// fold the market/inventory/fitting trio onto one rect (and whose
-// writeLayout then persisted that fold back), so v1 files fall back to
-// the defaults wholesale instead of pinning the mess; a higher version
-// is ignored for the usual forward-compat reason (never guess at an
-// unknown format).
+// layoutVersion tags the sidecar format. Version 2 (rects + open flags
+// only) is still read — existing user sidecars must survive the split
+// ratios' arrival — and every write is version 3. Version 1 files fall
+// back to the defaults wholesale: they were written by builds whose
+// restore clamp could fold the market/inventory/fitting trio onto one
+// rect (and whose writeLayout then persisted that fold back), so reading
+// them would pin the mess. A higher version is ignored for the usual
+// forward-compat reason (never guess at an unknown format).
 //
 // Scale independence: every rect field is persisted in DESIGN units —
 // the pixel layout at UI scale 1 (current px ÷ theme.Scale() on write,
@@ -39,17 +42,19 @@ import (
 // design unit == pixel, so they load seamlessly at any scale: one saved
 // arrangement works at 0.75× and at 2.5×, and a session that changes
 // scale mid-run round-trips through the same convention (applyScale).
-const layoutVersion = 2
+const layoutVersion = 3
 
 // winLayout is one persisted window: top-left corner, size and — for
-// the toggleable windows — whether it was open. X/Y/W/H are DESIGN
-// units (see layoutVersion).
+// the toggleable windows — whether it was open, plus the split panes'
+// seam ratios (name → the lower pane's share of its pair, 0.5 = equal).
+// X/Y/W/H are DESIGN units (see layoutVersion).
 type winLayout struct {
-	X    int  `json:"x"`
-	Y    int  `json:"y"`
-	W    int  `json:"w"`
-	H    int  `json:"h"`
-	Open bool `json:"open"`
+	X      int                `json:"x"`
+	Y      int                `json:"y"`
+	W      int                `json:"w"`
+	H      int                `json:"h"`
+	Open   bool               `json:"open"`
+	Splits map[string]float64 `json:"splits,omitempty"`
 }
 
 // layoutFile is the sidecar document.
@@ -124,10 +129,11 @@ func (g *Game) persistOpen(name string, open *bool) bool {
 	return *open
 }
 
-// writeLayout persists every named window's geometry and open state
-// (hidden windows too — their rects survive a dock). Geometry goes to
-// the sidecar in DESIGN units (see layoutVersion). Errors bubble up
-// so SaveGame can report them; the clean-quit path is best-effort.
+// writeLayout persists every named window's geometry, open state and
+// split-pane ratios (hidden windows too — their rects survive a dock).
+// Geometry goes to the sidecar in DESIGN units (see layoutVersion). Errors
+// bubble up so SaveGame can report them; the clean-quit path is
+// best-effort.
 func (g *Game) writeLayout() error {
 	f := layoutFile{Version: layoutVersion, Windows: map[string]winLayout{}}
 	s := theme.Scale()
@@ -157,11 +163,12 @@ func (g *Game) writeLayout() error {
 			// records the scale, so the same numbers restore at any of
 			// them. The MinSize growth above ran in live px first, so
 			// the design rect still satisfies the scaled floor on read.
-			X:    int(math.Round(float64(r.Min.X) / s)),
-			Y:    int(math.Round(float64(r.Min.Y) / s)),
-			W:    int(math.Round(float64(w) / s)),
-			H:    int(math.Round(float64(h) / s)),
-			Open: g.persistOpen(name, open),
+			X:      int(math.Round(float64(r.Min.X) / s)),
+			Y:      int(math.Round(float64(r.Min.Y) / s)),
+			W:      int(math.Round(float64(w) / s)),
+			H:      int(math.Round(float64(h) / s)),
+			Open:   g.persistOpen(name, open),
+			Splits: g.splitRatios(name),
 		}
 	}
 	data, err := json.MarshalIndent(f, "", "  ")
@@ -177,9 +184,9 @@ func (g *Game) writeLayout() error {
 
 // readLayout loads the sidecar (rects in DESIGN units — see
 // layoutVersion). Every failure mode — missing file, bad
-// JSON, or a version that is not exactly the current one (stale
-// version-1 files predating the service-trio reclaim, and any newer
-// unknown format) — returns nil: defaults win and nothing crashes.
+// JSON, a version older than 2 (stale version-1 files predating the
+// service-trio reclaim) or newer than the current one (an unknown
+// format) — returns nil: defaults win and nothing crashes.
 func (g *Game) readLayout() map[string]winLayout {
 	data, err := os.ReadFile(g.layoutPath())
 	if err != nil {
@@ -189,7 +196,9 @@ func (g *Game) readLayout() map[string]winLayout {
 	if err := json.Unmarshal(data, &f); err != nil {
 		return nil
 	}
-	if f.Version != layoutVersion {
+	// Version 2 is read as-is: it simply carries no split ratios, so
+	// every seam keeps its equal-share default and the next write is v3.
+	if f.Version < 2 || f.Version > layoutVersion {
 		return nil
 	}
 	return migrateLayoutNames(f.Windows)
@@ -207,6 +216,53 @@ func migrateLayoutNames(w map[string]winLayout) map[string]winLayout {
 		delete(w, "factory")
 	}
 	return w
+}
+
+// splitSeams resolves a sidecar name to its panel's named split seams
+// (nil for the windows without panes, and before the kit is built).
+// The names live with each panel's SplitPane wiring, not in the Screen
+// spec: a window with panes is the exception, not the rule.
+func (g *Game) splitSeams(name string) []widgets.Seam {
+	switch name {
+	case "inventory":
+		if g.inv != nil {
+			return g.inv.Splits()
+		}
+	case "fitting":
+		if g.fitt != nil {
+			return g.fitt.Splits()
+		}
+	case "manufacturing":
+		if g.manu != nil {
+			return g.manu.Splits()
+		}
+	}
+	return nil
+}
+
+// splitRatios is the write side: each named seam's current ratio, nil
+// when the window has no panes.
+func (g *Game) splitRatios(name string) map[string]float64 {
+	seams := g.splitSeams(name)
+	if len(seams) == 0 {
+		return nil
+	}
+	ratios := make(map[string]float64, len(seams))
+	for _, sm := range seams {
+		ratios[sm.Name] = sm.Split.Ratio(sm.Index)
+	}
+	return ratios
+}
+
+// applySplits is the read side: restore the stored ratios (the split
+// clamps anything out of range); a seam the file does not name keeps its
+// equal-share default.
+func (g *Game) applySplits(name string, ratios map[string]float64) {
+	for _, sm := range g.splitSeams(name) {
+		if f, ok := ratios[sm.Name]; ok {
+			sm.Split.SetRatio(sm.Index, f)
+		}
+	}
 }
 
 // applyLayout restores the sidecar over the built-in defaults: geometry
@@ -273,6 +329,9 @@ func (g *Game) applyLayout(screenW, screenH int) {
 		if open != nil {
 			*open = e.Open
 		}
+		// The split ratios (v3): a v2 file names none, so every seam
+		// keeps its equal-share default.
+		g.applySplits(name, e.Splits)
 	}
 	// The map and help windows only exist through their overlay scenes
 	// (modal + dim backdrop): sync the stack to the restored flags.
