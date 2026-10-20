@@ -28,7 +28,7 @@ content/data/
 ├── items/
 │   ├── minerals.json        # min-* IDs
 │   ├── ores.json            # ore-* IDs (carry refine_yield)
-│   ├── ammo.json            # charge-* IDs with damage (categories: ammo)
+│   ├── ammo.json            # ammo-* shells: damage + calibre (category: ammo)
 │   ├── charges.json         # charge-cap-cell (category: charge)
 │   └── loot.json            # loot-* IDs
 ├── ships/                   # one hull per file, ship-* IDs
@@ -55,10 +55,11 @@ All IDs are kebab-case strings, cross-referenced everywhere:
 
 | Kind        | Prefix      | Example              | Uniqueness             |
 |-------------|-------------|----------------------|------------------------|
-| Item        | `min-`, `ore-`, `charge-`, `loot-` | `min-ferrite` | global (all items share one map) |
+| Item        | `min-`, `ore-`, `ammo-`, `charge-`, `loot-` | `min-ferrite` | global (all items share one map) |
+| Shell (ammo) | `ammo-` | `ammo-emp-s` | global; `ammo_class` = calibre (`small`/`medium`/`large`), shared by both gun families |
 | Corporation | `corp-`     | `corp-ferrum`        | global (the ten-firm maker roster, `content.AllCorps`; a registered extension of the frozen id list) |
 | Ship        | `ship-`     | `ship-sloop`         | global                 |
-| Module      | `mod-`      | `mod-emp-turret`     | global                 |
+| Module      | `mod-`      | `mod-autocannon-s`   | global (weapon families: autocannon, artillery — three calibres each) |
 | NPC (rat)   | `npc-rat-`  | `npc-rat-scuttler`   | global                 |
 | NPC (guard) | `npc-guard-` | `npc-guard-patrol`  | global (non-rat NPC loadouts: zero bounty, no loot; traffic patrols) |
 | System      | `sys-`      | `sys-solace`         | global                 |
@@ -163,11 +164,11 @@ title/description rule).
 `MarketOrderDef` has a single `item` field. An order's `item` resolves in
 this order:
 
-1. an **ItemID** (`min-ferrite`, `charge-emp`, ...),
+1. an **ItemID** (`min-ferrite`, `ammo-emp-s`, ...),
 2. else a **ShipID cast to ItemID** (`ship-sloop`) — ships are listed on the
    market this way; the price lives only on the order (`ShipDef` has no price
    field),
-3. else a **ModuleID** (`mod-emp-turret`).
+3. else a **ModuleID** (`mod-autocannon-s`).
 
 Anything that resolves to none of the three is a validation error.
 
@@ -335,28 +336,31 @@ constants in `model.go`, and the matching attribute block is **required**:
 {
   "id": "mod-flak-turret",
   "name": "Flak Turret",
-  "description": "Slow heavy turret firing explosive flak; uses light charges.",
+  "description": "Medium-calibre flak thrower: slow cycle, heavy explosive volley.",
   "maker": "corp-nordvakt",
   "slot": "high",
   "kind": "weapon",
-  "activation_cost": 22,
-  "activation_time": 5,
+  "activation_cost": 0,
+  "activation_time": 7,
   "weapon": {
     "damage": { "em": 2, "thermal": 4, "kinetic": 5, "explosive": 28 },
-    "optimal": 9000,
-    "falloff": 7000,
-    "tracking": 0.4,
-    "ammo_class": "light",
-    "shot_time": 5
+    "optimal": 30000,
+    "falloff": 20000,
+    "tracking": 30,
+    "ammo_class": "medium",
+    "shot_time": 7,
+    "damage_multiplier": 2.75
   },
-  "price": 275000
+  "price": 300000
 }
 ```
 
 Rules: passive modules use `activation_cost: 0, activation_time: 0`; active
 modules need `activation_time > 0`; `weapon.ammo_class` must match
-`ammo_class` of at least one existing `charge`/`ammo` item (or `""` for
-ammo-less weapons like `mod-rocket-pod`); `price` 10k–400k for standard mods.
+`ammo_class` of at least one existing shell (or `""` for ammo-less weapons
+like `mod-rocket-pod`); `damage_multiplier` is the gun's share of a loaded
+shell's damage (`0` reads as `1`, so artillery throws a heavier shot from the
+same shell than an autocannon); `price` 10k–400k for standard mods.
 
 ## Recipe 4: add an NPC (and its loot)
 
@@ -369,7 +373,7 @@ Append to `content/data/npcs/rats.json`:
   "description": "Old Works worker frame: it strips what the swarm can carry off, and it does not care who is standing in the way.",
   "faction": "Old Works",
   "ship": "ship-rat-scuttler",
-  "fit": ["mod-rail-turret", "mod-rail-turret", "mod-afterburner"],
+  "fit": ["mod-autocannon-s", "mod-autocannon-s", "mod-afterburner"],
   "aggro_range": 25000,
   "orbit_range": 5000,
   "flee_threshold": 0.2,
@@ -424,19 +428,21 @@ Ore (note `refine_yield`: each value in `(0,1]`, **sum ≤ 1**):
 }
 ```
 
-Ammo (needs `damage` + `ammo_class`; ammo items are category `ammo`):
+Ammo (needs `damage` + `ammo_class`; ammo items are category `ammo`, and
+`ammo_class` is the calibre — `small`/`medium`/`large` — which is what a gun
+loads: both projectile families at a calibre share its shells):
 
 ```json
 {
-  "id": "charge-thermite",
-  "name": "Thermite Charge",
-  "description": "Burns hot. Thermal-biased light charge.",
+  "id": "ammo-thermite-s",
+  "name": "Small Thermite Shell",
+  "description": "Burns hot. Thermal-biased small shell.",
   "maker": "corp-burza",
   "category": "ammo",
   "volume": 0.01,
   "base_price": 140,
   "damage": { "em": 2, "thermal": 20, "kinetic": 3, "explosive": 2 },
-  "ammo_class": "light"
+  "ammo_class": "small"
 }
 ```
 
@@ -481,8 +487,8 @@ economy (see `docs/SIM.md`).
     "system": "sys-penumbra",
     "position": { "X": 530000000000, "Y": -300000000000 },
     "ship": "ship-sloop",
-    "fit": ["mod-emp-turret", "mod-afterburner", "mod-armor-rep"],
-    "cargo": [{ "item": "charge-emp", "qty": 100 }],
+    "fit": ["mod-autocannon-s", "mod-afterburner", "mod-armor-rep"],
+    "cargo": [{ "item": "ammo-emp-s", "qty": 100 }],
     "wallet": 750000
   },
   "scenario": [
@@ -591,7 +597,7 @@ no separate id):
   "routes": [
     { "from": "cel-haven-rest", "to": "cel-gate-penumbra",
       "hull": "ship-npc-hauler",
-      "cargo": { "item": "charge-emp", "qty": 600 },
+      "cargo": { "item": "ammo-emp-s", "qty": 600 },
       "interval_ticks": 5400 },
     { "from": "cel-gate-penumbra", "to": "cel-haven-rest",
       "hull": "ship-npc-hauler",
@@ -694,7 +700,7 @@ invariant). Stock changes are always exact integers (units), never floats.
 A shipment lost in an ambush touches no book at all: it surfaces only as
 the event line `Risk premium — <item> shipment lost en route to <station>`
 (a supply-risk signal, not a price step). Worked example (shipped): 600
-`charge-emp` imported through a gate land as a 600-unit ask one tick under
+`ammo-emp-s` imported through a gate land as a 600-unit ask one tick under
 its base price (`4.999 €` for a `5.00 €` base). The mechanics behind all
 of this are documented in [SIM.md](SIM.md).
 

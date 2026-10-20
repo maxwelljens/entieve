@@ -40,8 +40,48 @@
     "family": "modules"
   },
   {
-    "id": "rec-mod-emp-turret",
-    "product": "mod-emp-turret",
+    "id": "rec-mod-artillery-l",
+    "product": "mod-artillery-l",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 18490 }, { "item": "min-nickel", "qty": 1620 }, { "item": "min-cobalt", "qty": 1030 }, { "item": "min-silex", "qty": 670 }, { "item": "min-argon", "qty": 390 }],
+    "time": 190,
+    "family": "modules"
+  },
+  {
+    "id": "rec-mod-artillery-m",
+    "product": "mod-artillery-m",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 18490 }, { "item": "min-nickel", "qty": 1620 }, { "item": "min-cobalt", "qty": 1030 }, { "item": "min-silex", "qty": 670 }, { "item": "min-argon", "qty": 390 }],
+    "time": 130,
+    "family": "modules"
+  },
+  {
+    "id": "rec-mod-artillery-s",
+    "product": "mod-artillery-s",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 17610 }, { "item": "min-nickel", "qty": 1540 }, { "item": "min-cobalt", "qty": 980 }, { "item": "min-silex", "qty": 640 }, { "item": "min-argon", "qty": 370 }],
+    "time": 90,
+    "family": "modules"
+  },
+  {
+    "id": "rec-mod-autocannon-l",
+    "product": "mod-autocannon-l",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 18560 }, { "item": "min-cobalt", "qty": 1380 }, { "item": "min-silex", "qty": 890 }, { "item": "min-argon", "qty": 530 }],
+    "time": 160,
+    "family": "modules"
+  },
+  {
+    "id": "rec-mod-autocannon-m",
+    "product": "mod-autocannon-m",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 15810 }, { "item": "min-cobalt", "qty": 1170 }, { "item": "min-silex", "qty": 760 }, { "item": "min-argon", "qty": 450 }],
+    "time": 110,
+    "family": "modules"
+  },
+  {
+    "id": "rec-mod-autocannon-s",
+    "product": "mod-autocannon-s",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 13750 }, { "item": "min-cobalt", "qty": 1020 }, { "item": "min-silex", "qty": 660 }, { "item": "min-argon", "qty": 390 }],
     "time": 75,
@@ -53,14 +93,6 @@
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 9630 }, { "item": "min-silex", "qty": 690 }, { "item": "min-argon", "qty": 410 }],
     "time": 50,
-    "family": "modules"
-  },
-  {
-    "id": "rec-mod-rail-turret",
-    "product": "mod-rail-turret",
-    "qty": 1,
-    "inputs": [{ "item": "min-ferrite", "qty": 17610 }, { "item": "min-nickel", "qty": 1540 }, { "item": "min-cobalt", "qty": 980 }, { "item": "min-silex", "qty": 640 }, { "item": "min-argon", "qty": 370 }],
-    "time": 90,
     "family": "modules"
   },
   {

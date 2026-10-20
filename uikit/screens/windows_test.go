@@ -307,12 +307,12 @@ func TestFittingActions(t *testing.T) {
 	}
 
 	// Fit a hangar module into the empty slot.
-	def, ok := env.Content.Module("mod-rail-turret")
+	def, ok := env.Content.Module("mod-artillery-s")
 	if !ok || def.Slot != content.SlotHigh {
-		t.Fatalf("fixture: mod-rail-turret slot = %q (ok=%v), want a high module", def.Slot, ok)
+		t.Fatalf("fixture: mod-artillery-s slot = %q (ok=%v), want a high module", def.Slot, ok)
 	}
 	env.Sim.Hangar.Items = append(env.Sim.Hangar.Items,
-		content.CargoStack{Item: "mod-rail-turret", Qty: 1})
+		content.CargoStack{Item: "mod-artillery-s", Qty: 1})
 	frame()
 	modRow := -1
 	for i, r := range f.hangar.Rows {
@@ -446,7 +446,7 @@ func TestTableSelectVsActivate(t *testing.T) {
 	refBravo := widgets.ModuleRef("mod-mining-laser")
 	refCharlie := widgets.ModuleRef("mod-afterburner")
 	tbl.SetRows([]widgets.TableRow{
-		{Cells: []string{"alpha"}, Data: 0, Spec: widgets.RowSpec{Ref: widgets.PtrRef(widgets.ModuleRef("mod-emp-turret"))}},
+		{Cells: []string{"alpha"}, Data: 0, Spec: widgets.RowSpec{Ref: widgets.PtrRef(widgets.ModuleRef("mod-autocannon-s"))}},
 		{Cells: []string{"bravo"}, Data: 1, Spec: widgets.RowSpec{Ref: &refBravo}},
 		{Cells: []string{"charlie"}, Data: 2, Spec: widgets.RowSpec{Ref: &refCharlie}},
 	})

@@ -1,46 +1,134 @@
 [
   {
-    "id": "charge-emp",
+    "id": "ammo-emp-s",
     "maker": "corp-burza",
-    "name": "EMP Charge",
-    "description": "Light charge that dumps its energy as an electromagnetic pulse. EM-biased damage.",
+    "name": "Small EMP Shell",
+    "description": "Small-calibre projectile that dumps its charge as an electromagnetic pulse on impact. EM-biased damage.",
     "category": "ammo",
     "volume": 0.01,
     "base_price": 120,
     "damage": { "em": 18, "thermal": 4, "kinetic": 2, "explosive": 1 },
-    "ammo_class": "light"
+    "ammo_class": "small"
   },
   {
-    "id": "charge-fusion",
+    "id": "ammo-fusion-s",
     "maker": "corp-burza",
-    "name": "Fusion Charge",
-    "description": "Volatile light charge that detonates on impact. Explosive-biased damage.",
+    "name": "Small Fusion Shell",
+    "description": "Small-calibre volatile shell that detonates on impact. Explosive-biased damage.",
     "category": "ammo",
     "volume": 0.01,
     "base_price": 110,
     "damage": { "em": 1, "thermal": 3, "kinetic": 4, "explosive": 19 },
-    "ammo_class": "light"
+    "ammo_class": "small"
   },
   {
-    "id": "charge-ap",
+    "id": "ammo-ap-s",
     "maker": "corp-burza",
-    "name": "Armor-Piercing Charge",
-    "description": "Dense penetrator slug for light turrets. Kinetic-biased damage.",
+    "name": "Small Armor-Piercing Shell",
+    "description": "Small-calibre dense penetrator. Kinetic-biased damage.",
     "category": "ammo",
     "volume": 0.01,
     "base_price": 95,
     "damage": { "em": 1, "thermal": 2, "kinetic": 21, "explosive": 2 },
-    "ammo_class": "light"
+    "ammo_class": "small"
   },
   {
-    "id": "charge-plutonium",
+    "id": "ammo-plutonium-s",
     "maker": "corp-burza",
-    "name": "Plutonium Charge",
-    "description": "Radioactive shell that burns through plating. Thermal-biased damage.",
+    "name": "Small Plutonium Shell",
+    "description": "Small-calibre radioactive shell that burns through plating. Thermal-biased damage.",
     "category": "ammo",
     "volume": 0.01,
     "base_price": 130,
     "damage": { "em": 2, "thermal": 19, "kinetic": 4, "explosive": 2 },
-    "ammo_class": "light"
+    "ammo_class": "small"
+  },
+  {
+    "id": "ammo-emp-m",
+    "maker": "corp-burza",
+    "name": "Medium EMP Shell",
+    "description": "Medium-calibre projectile that dumps its charge as an electromagnetic pulse on impact. EM-biased damage.",
+    "category": "ammo",
+    "volume": 0.01,
+    "base_price": 240,
+    "damage": { "em": 36, "thermal": 8, "kinetic": 4, "explosive": 2 },
+    "ammo_class": "medium"
+  },
+  {
+    "id": "ammo-fusion-m",
+    "maker": "corp-burza",
+    "name": "Medium Fusion Shell",
+    "description": "Medium-calibre volatile shell that detonates on impact. Explosive-biased damage.",
+    "category": "ammo",
+    "volume": 0.01,
+    "base_price": 220,
+    "damage": { "em": 2, "thermal": 6, "kinetic": 8, "explosive": 38 },
+    "ammo_class": "medium"
+  },
+  {
+    "id": "ammo-ap-m",
+    "maker": "corp-burza",
+    "name": "Medium Armor-Piercing Shell",
+    "description": "Medium-calibre dense penetrator. Kinetic-biased damage.",
+    "category": "ammo",
+    "volume": 0.01,
+    "base_price": 190,
+    "damage": { "em": 2, "thermal": 4, "kinetic": 42, "explosive": 4 },
+    "ammo_class": "medium"
+  },
+  {
+    "id": "ammo-plutonium-m",
+    "maker": "corp-burza",
+    "name": "Medium Plutonium Shell",
+    "description": "Medium-calibre radioactive shell that burns through plating. Thermal-biased damage.",
+    "category": "ammo",
+    "volume": 0.01,
+    "base_price": 260,
+    "damage": { "em": 4, "thermal": 38, "kinetic": 8, "explosive": 4 },
+    "ammo_class": "medium"
+  },
+  {
+    "id": "ammo-emp-l",
+    "maker": "corp-burza",
+    "name": "Large EMP Shell",
+    "description": "Large-calibre projectile that dumps its charge as an electromagnetic pulse on impact. EM-biased damage.",
+    "category": "ammo",
+    "volume": 0.01,
+    "base_price": 480,
+    "damage": { "em": 72, "thermal": 16, "kinetic": 8, "explosive": 4 },
+    "ammo_class": "large"
+  },
+  {
+    "id": "ammo-fusion-l",
+    "maker": "corp-burza",
+    "name": "Large Fusion Shell",
+    "description": "Large-calibre volatile shell that detonates on impact. Explosive-biased damage.",
+    "category": "ammo",
+    "volume": 0.01,
+    "base_price": 440,
+    "damage": { "em": 4, "thermal": 12, "kinetic": 16, "explosive": 76 },
+    "ammo_class": "large"
+  },
+  {
+    "id": "ammo-ap-l",
+    "maker": "corp-burza",
+    "name": "Large Armor-Piercing Shell",
+    "description": "Large-calibre dense penetrator. Kinetic-biased damage.",
+    "category": "ammo",
+    "volume": 0.01,
+    "base_price": 380,
+    "damage": { "em": 4, "thermal": 8, "kinetic": 84, "explosive": 8 },
+    "ammo_class": "large"
+  },
+  {
+    "id": "ammo-plutonium-l",
+    "maker": "corp-burza",
+    "name": "Large Plutonium Shell",
+    "description": "Large-calibre radioactive shell that burns through plating. Thermal-biased damage.",
+    "category": "ammo",
+    "volume": 0.01,
+    "base_price": 520,
+    "damage": { "em": 8, "thermal": 76, "kinetic": 16, "explosive": 8 },
+    "ammo_class": "large"
   }
 ]

@@ -53,7 +53,7 @@ func TestWindowFadeAndTranslucencyCapture(t *testing.T) {
 	// belongs to the window it names — no other window paints over it.
 	k.OverviewWindow().SetLocation(image.Rect(64, 8, 444, 428))
 	k.SelectedWindow().SetLocation(image.Rect(64, 436, 514, 696))
-	k.ShowInfo(widgets.ItemRef("charge-emp"))
+	k.ShowInfo(widgets.ItemRef("ammo-emp-s"))
 	k.InfoWindow().SetLocation(image.Rect(460, 8, 880, 468))
 	log := NewLog(k.Env())
 	k.AddWindow(log.Win())

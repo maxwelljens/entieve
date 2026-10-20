@@ -10,7 +10,7 @@
     },
     "ship": "ship-sloop",
     "fit": [
-      "mod-emp-turret",
+      "mod-autocannon-s",
       "mod-mining-laser",
       "mod-rocket-pod",
       "mod-afterburner",
@@ -21,19 +21,19 @@
     ],
     "cargo": [
       {
-        "item": "charge-emp",
+        "item": "ammo-emp-s",
         "qty": 12
       },
       {
-        "item": "charge-fusion",
+        "item": "ammo-fusion-s",
         "qty": 12
       },
       {
-        "item": "charge-ap",
+        "item": "ammo-ap-s",
         "qty": 12
       },
       {
-        "item": "charge-plutonium",
+        "item": "ammo-plutonium-s",
         "qty": 12
       },
       {
@@ -67,22 +67,22 @@
     {
       "name": "Fitting: one module of every kind",
       "feature": "fitting-all-kinds",
-      "detail": "Start fit fills the Väktare's whole 3/3/2 rack: 3 high (mod-emp-turret, mod-mining-laser, mod-rocket-pod), 3 mid (mod-afterburner, mod-shield-boost, mod-stasis-web), 2 low (mod-armor-rep, mod-cap-recharger). Observe in the Fitting window or the sim Fitting store: High/Mid/Low hold 3/3/2 ModuleIDs; the remaining kinds (shield-extender, armor-plate, resist-coat, cap-booster, warp-scram) are exercised via module-fit/module-unfit below."
+      "detail": "Start fit fills the Väktare's whole 3/3/2 rack: 3 high (mod-autocannon-s, mod-mining-laser, mod-rocket-pod), 3 mid (mod-afterburner, mod-shield-boost, mod-stasis-web), 2 low (mod-armor-rep, mod-cap-recharger). Observe in the Fitting window or the sim Fitting store: High/Mid/Low hold 3/3/2 ModuleIDs; the remaining kinds (shield-extender, armor-plate, resist-coat, cap-booster, warp-scram) are exercised via module-fit/module-unfit below."
     },
     {
       "name": "Module activation and cycles",
       "feature": "module-activation",
-      "detail": "CmdActivate(0) fires the EMP turret: EvtModuleActive is emitted, the module runtime shows a 3 s cycle, CmdDeactivate stops it. Repeat for F1-F8 mapped high modules."
+      "detail": "CmdActivate(0) fires the small autocannon: EvtModuleActive is emitted, the module runtime shows a 3 s cycle, CmdDeactivate stops it. Repeat for F1-F8 mapped high modules."
     },
     {
       "name": "Ammo consumption per shot",
       "feature": "ammo-consumption",
-      "detail": "With 12 charges of each light ammo type in cargo, each turret shot consumes exactly one: stacks run down in cargo order and the gun finally reports 'no charges'."
+      "detail": "With 12 shells of each small shell type in cargo, each shot consumes exactly one: stacks run down in cargo order and the gun finally reports 'no charges'."
     },
     {
       "name": "Dry gun refuses to fire",
       "feature": "dry-gun",
-      "detail": "Fire a turret with no matching charge left in cargo: exactly one 'no charges' warning per dry cycle, then the module deactivates (the scripted late-game activation on the respawned Scuttler demonstrates it)."
+      "detail": "Fire a gun with no matching shell left in cargo: exactly one 'no charges' warning per dry cycle, then the module deactivates (the scripted late-game activation on the respawned Scuttler demonstrates it)."
     },
     {
       "name": "Turret hit chance",
@@ -97,7 +97,7 @@
     {
       "name": "Four damage types",
       "feature": "four-damage-types",
-      "detail": "The turret consumes all four light charge profiles in cargo order - charge-emp (EM), charge-fusion (explosive), charge-ap (kinetic), charge-plutonium (thermal): each volley carries its charge's damage mix into the damage log."
+      "detail": "The gun consumes all four small shell profiles in cargo order - ammo-emp-s (EM), ammo-fusion-s (explosive), ammo-ap-s (kinetic), ammo-plutonium-s (thermal): each volley carries its shell's damage mix into the damage log."
     },
     {
       "name": "Resists reduce damage",
@@ -107,7 +107,7 @@
     {
       "name": "Capacitor drain",
       "feature": "capacitor-drain",
-      "detail": "Every activation costs GJ: the HUD capacitor bar drops 15 GJ per turret cycle, 40 GJ per shield-boost cycle, 25 GJ per afterburner cycle (sim Capacitor.Current)."
+      "detail": "Active modules cost GJ (projectile guns draw none): the HUD capacitor bar drops 40 GJ per shield-boost cycle and 25 GJ per afterburner cycle (sim Capacitor.Current)."
     },
     {
       "name": "Capacitor recharge curve",
@@ -237,7 +237,7 @@
     {
       "name": "Market buy",
       "feature": "market-buy",
-      "detail": "CmdBuy for a hull order (ship-sloop, cast to ItemID) or a module order (mod-rail-turret): EvtMarket fires, wallet decreases by price x qty, the item appears in station inventory."
+      "detail": "CmdBuy for a hull order (ship-sloop, cast to ItemID) or a module order (mod-artillery-s): EvtMarket fires, wallet decreases by price x qty, the item appears in station inventory."
     },
     {
       "name": "Market sell",
@@ -292,7 +292,7 @@
     {
       "name": "Ammo selection",
       "feature": "ammo-selection",
-      "detail": "CmdSetAmmo (script action 'setammo', right-click a weapon slot in game) sets a weapon's preferred charge: the turret consumes that exact item first and falls back to other charges of its class."
+      "detail": "CmdSetAmmo (script action 'setammo', right-click a weapon slot in game) sets a weapon's preferred shell: the gun consumes that exact item first and falls back to other shells of its calibre."
     },
     {
       "name": "Warp to within",

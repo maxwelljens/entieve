@@ -101,7 +101,7 @@ func TestWreckingShotForcedViaSeed(t *testing.T) {
 	s := newTestSim(t)
 	dummy := dummyTarget(t, s, v(1e7+2000, 500), content.Resists{})
 	lockInstantly(t, s, dummy)
-	giveCargo(s, "charge-emp", 10)
+	giveCargo(s, "ammo-emp-s", 10)
 	slot := SlotRef{Class: content.SlotHigh, Index: 0} // world-fit turret
 
 	st, ok := findWreckingSeed()
@@ -119,7 +119,7 @@ func TestWreckingShotForcedViaSeed(t *testing.T) {
 	if findEvent(evs, EvLog, "Wrecking hit!") == nil {
 		t.Fatalf("expected wrecking hit event: %v", evs)
 	}
-	// Volley = charge-emp {EM10, Thermal2} x3 = 36 total at zero resists.
+	// Volley = ammo-emp-s {EM10, Thermal2} x3 = 36 total at zero resists.
 	want := 1000.0 - (10*3 + 2*3)
 	if math.Abs(ship.Shield-want) > 1e-9 {
 		t.Fatalf("shield=%v want %v (wrecking x3)", ship.Shield, want)
@@ -130,17 +130,17 @@ func TestAmmoConsumedPerShot(t *testing.T) {
 	s := newTestSim(t)
 	npc := spawnNearPlayer(t, s)
 	forceLock(s, npc)
-	if got := cargoCount(s, "charge-emp"); got != 20 {
+	if got := cargoCount(s, "ammo-emp-s"); got != 20 {
 		t.Fatalf("start ammo=%d", got)
 	}
 	slot := SlotRef{Class: content.SlotHigh, Index: 0}
 	s.Queue(CmdActivate{Slot: slot, Target: npc})
 	s.Step() // first shot resolves on activation
-	if got := cargoCount(s, "charge-emp"); got != 19 {
+	if got := cargoCount(s, "ammo-emp-s"); got != 19 {
 		t.Fatalf("ammo after shot=%d want 19", got)
 	}
 	stepN(s, 130) // ShotTime = 2s = 120 ticks -> one more shot
-	if got := cargoCount(s, "charge-emp"); got != 18 {
+	if got := cargoCount(s, "ammo-emp-s"); got != 18 {
 		t.Fatalf("ammo after 2nd cycle=%d want 18", got)
 	}
 }
@@ -198,10 +198,10 @@ func TestDamageProfileMatchesAmmo(t *testing.T) {
 	lockInstantly(t, s, dummy)
 	slot := SlotRef{Class: content.SlotHigh, Index: 0}
 	base := content.Damage{EM: 10, Thermal: 2}   // turret base volley
-	ammoAP := content.Damage{EM: 0, Kinetic: 12} // charge-ap profile
+	ammoAP := content.Damage{EM: 0, Kinetic: 12} // ammo-ap-s profile
 
 	// Shot 1: EMP charges -> profile {EM10, Thermal2}.
-	giveCargo(s, "charge-emp", 5)
+	giveCargo(s, "ammo-emp-s", 5)
 	state1 := s.RNG.Snapshot()
 	s.Queue(CmdActivate{Slot: slot, Target: dummy})
 	s.Step()
@@ -220,7 +220,7 @@ func TestDamageProfileMatchesAmmo(t *testing.T) {
 	// Shot 2: AP charges -> profile replaces the base volley.
 	cargo, _ := s.Cargos.Get(s.player)
 	cargo.Stacks = nil
-	giveCargo(s, "charge-ap", 5)
+	giveCargo(s, "ammo-ap-s", 5)
 	stepN(s, 130) // cycle finished; deactivate and reactivate cleanly
 	s.Queue(CmdDeactivate{Slot: slot})
 	s.Step()
@@ -239,8 +239,8 @@ func TestDamageProfileMatchesAmmo(t *testing.T) {
 	if math.Abs(hit.Value-want) > 1e-9 {
 		t.Fatalf("AP shot value=%v want %v (ammo profile not applied?)", hit.Value, want)
 	}
-	if cargoCount(s, "charge-ap") != 3 {
-		t.Fatalf("ap ammo=%d want 3 (one spare cycle fired en route)", cargoCount(s, "charge-ap"))
+	if cargoCount(s, "ammo-ap-s") != 3 {
+		t.Fatalf("ap ammo=%d want 3 (one spare cycle fired en route)", cargoCount(s, "ammo-ap-s"))
 	}
 }
 
@@ -398,7 +398,7 @@ func TestBountyPaidOnPlayerKillOnly(t *testing.T) {
 
 func TestPlayerDeathRespawnsInSloop(t *testing.T) {
 	s := newTestSim(t)
-	giveCargo(s, "charge-emp", 30)
+	giveCargo(s, "ammo-emp-s", 30)
 	walletBefore := s.Wallet()
 	// Park the player far from any station so the respawn move is obvious.
 	setPlayerPos(s, v(2e7, 2e7))
@@ -421,7 +421,7 @@ func TestPlayerDeathRespawnsInSloop(t *testing.T) {
 		ship.Structure != ship.MaxStructure {
 		t.Fatal("respawn ship should be at full layers")
 	}
-	if cargoCount(s, "charge-emp") != 0 {
+	if cargoCount(s, "ammo-emp-s") != 0 {
 		t.Fatal("cargo should be lost on death (EVE spirit)")
 	}
 	if s.Wallet() != walletBefore {
@@ -433,7 +433,7 @@ func TestPlayerDeathRespawnsInSloop(t *testing.T) {
 		t.Fatalf("respawn pos=%v want (10005000, 0)", pos)
 	}
 	fit, _ := s.Fittings.Get(s.player)
-	if len(fit.High) != 1 || fit.High[0] != "mod-emp-turret" {
+	if len(fit.High) != 1 || fit.High[0] != "mod-autocannon-s" {
 		t.Fatalf("respawn fit=%v", fit.High)
 	}
 }

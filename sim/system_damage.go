@@ -363,8 +363,8 @@ func (s *Sim) respawnPlayer() {
 	}
 
 	fitIDs := []content.ModuleID{}
-	if _, ok := s.Content.Module("mod-emp-turret"); ok {
-		fitIDs = append(fitIDs, "mod-emp-turret")
+	if _, ok := s.Content.Module("mod-autocannon-s"); ok {
+		fitIDs = append(fitIDs, "mod-autocannon-s")
 	}
 	fit, ferr := s.buildFitting(fitIDs, hull)
 	if ferr != nil {

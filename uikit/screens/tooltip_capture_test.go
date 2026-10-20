@@ -45,9 +45,9 @@ func TestTooltipCaptureFrame(t *testing.T) {
 	c.AddPanel(r.Container(), r)
 	c.Frame(t, 1280, 720) // Sync fills the cells, so the tile has a rect
 
-	def, ok := env.Content.Module("mod-emp-turret")
+	def, ok := env.Content.Module("mod-autocannon-s")
 	if !ok {
-		t.Fatal("fixture: mod-emp-turret missing")
+		t.Fatal("fixture: mod-autocannon-s missing")
 	}
 	_, build := r.cellTip(def, sim.SlotRef{Class: content.SlotHigh, Index: 0})
 	model := build()

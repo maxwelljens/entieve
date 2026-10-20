@@ -49,7 +49,7 @@ func NpcRef(id content.NpcID) InfoRef       { return InfoRef{Kind: InfoNpc, ID: 
 // the Content's job).
 func (r InfoRef) Valid() bool { return r.ID != "" }
 
-// String renders the ref for logs and tests ("module/mod-emp-turret").
+// String renders the ref for logs and tests ("module/mod-autocannon-s").
 func (r InfoRef) String() string {
 	var kind string
 	switch r.Kind {

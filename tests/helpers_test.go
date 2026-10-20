@@ -197,7 +197,7 @@ func (e *evidence) walletDelta() float64 {
 // allChargeTypesBurned reports whether every light charge type was consumed
 // (each carries its own damage profile into the volley).
 func (e *evidence) allChargeTypesBurned() bool {
-	for _, id := range []content.ItemID{"charge-emp", "charge-fusion", "charge-ap", "charge-plutonium"} {
+	for _, id := range []content.ItemID{"ammo-emp-s", "ammo-fusion-s", "ammo-ap-s", "ammo-plutonium-s"} {
 		if e.itemQtyDropped(id) <= 0 {
 			return false
 		}
@@ -237,25 +237,37 @@ type hitObservation struct {
 }
 
 // resistCeiling computes the maximum possible penetrating damage of one
-// non-wrecking player volley against a hull: every volley the player's guns
-// can fire (base profiles plus every charge type), maximised per hull's
+// non-wrecking player volley against a hull: every volley the saved player
+// fit can fire (its base profiles, and for an ammo gun every shell of its
+// class scaled by the gun's damage multiplier), maximised per hull's
 // effective resists (hull base plus passive module bonuses from an NPC fit).
-func resistCeiling(c *content.Content, hull *content.ShipDef, fit []content.ModuleID) float64 {
+func resistCeiling(c *content.Content, hull *content.ShipDef, fit []content.ModuleID, player *sim.SavedEntity) float64 {
 	res := hull.Resists
 	for _, mid := range fit {
 		if def, ok := c.Module(mid); ok && def.Passive != nil {
 			res = res.Add(def.Passive.ResistBonus)
 		}
 	}
-	volleys := []content.Damage{}
-	for _, def := range c.Modules {
-		if def.Kind == content.KindWeapon && def.Weapon != nil {
-			volleys = append(volleys, def.Weapon.Damage)
-		}
+	var fitted []content.ModuleID
+	if player != nil && player.Fitting != nil {
+		fitted = append(fitted, player.Fitting.High...)
+		fitted = append(fitted, player.Fitting.Mid...)
+		fitted = append(fitted, player.Fitting.Low...)
 	}
-	for _, def := range c.Items {
-		if def.Damage != nil {
-			volleys = append(volleys, *def.Damage)
+	volleys := []content.Damage{}
+	for _, mid := range fitted {
+		def, ok := c.Module(mid)
+		if !ok || def.Kind != content.KindWeapon || def.Weapon == nil {
+			continue
+		}
+		volleys = append(volleys, def.Weapon.Damage)
+		if def.Weapon.AmmoClass == "" {
+			continue
+		}
+		for _, item := range c.Items {
+			if item.Damage != nil && item.AmmoClass == def.Weapon.AmmoClass {
+				volleys = append(volleys, item.Damage.Scale(def.Weapon.Mult()))
+			}
 		}
 	}
 	best := 0.0

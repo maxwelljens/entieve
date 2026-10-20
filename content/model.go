@@ -143,7 +143,7 @@ type ItemDef struct {
 	BasePrice   float64            `json:"base_price"`             // credits per unit
 	RefineYield map[ItemID]float64 `json:"refine_yield,omitempty"` // ore: fraction of one unit refining into minerals, sums <= 1
 	Damage      *Damage            `json:"damage,omitempty"`       // ammo: damage per shot
-	AmmoClass   string             `json:"ammo_class,omitempty"`   // ammo: e.g. "light"; "" for non-ammo
+	AmmoClass   string             `json:"ammo_class,omitempty"`   // ammo: the calibre ("small"/"medium"/"large"); "" for non-ammo
 }
 
 // Ship slots.
@@ -205,12 +205,22 @@ const (
 
 // WeaponAttrs are weapon-module parameters.
 type WeaponAttrs struct {
-	Damage    Damage  `json:"damage"`     // base volley before ammo; ammo Damage (if any) replaces this per shot
-	Optimal   float64 `json:"optimal"`    // m
-	Falloff   float64 `json:"falloff"`    // m
-	Tracking  float64 `json:"tracking"`   // rad/s
-	AmmoClass string  `json:"ammo_class"` // "" = no ammo needed
-	ShotTime  float64 `json:"shot_time"`  // seconds between shots
+	Damage     Damage  `json:"damage"`                      // base volley before ammo; ammo Damage (if any) replaces this per shot
+	Optimal    float64 `json:"optimal"`                     // m
+	Falloff    float64 `json:"falloff"`                     // m
+	Tracking   float64 `json:"tracking"`                    // rad/s
+	AmmoClass  string  `json:"ammo_class"`                  // "" = no ammo needed
+	ShotTime   float64 `json:"shot_time"`                   // seconds between shots
+	DamageMult float64 `json:"damage_multiplier,omitempty"` // ammo shell damage is scaled by this (0 reads as 1)
+}
+
+// Mult returns the weapon's damage multiplier: the gun's share of a shot's
+// damage, applied to the loaded shell's damage profile.
+func (w WeaponAttrs) Mult() float64 {
+	if w.DamageMult <= 0 {
+		return 1
+	}
+	return w.DamageMult
 }
 
 // MiningAttrs are mining-module parameters.

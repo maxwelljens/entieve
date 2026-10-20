@@ -62,7 +62,7 @@ var rules = map[string]featureRule{
 		return e.kindSeen(sim.EvModule, "") || e.eventRe(`activat`), "no module activation event"
 	},
 	"ammo-consumption": func(c *content.Content, e *evidence) (bool, string) {
-		for _, id := range []content.ItemID{"charge-emp", "charge-fusion", "charge-ap", "charge-plutonium"} {
+		for _, id := range []content.ItemID{"ammo-emp-s", "ammo-fusion-s", "ammo-ap-s", "ammo-plutonium-s"} {
 			if e.itemQtyDropped(id) > 0 {
 				return true, ""
 			}
@@ -99,7 +99,7 @@ var rules = map[string]featureRule{
 			if hull == nil {
 				continue // not a rat hull we can price
 			}
-			ceiling := resistCeiling(c, hull, fit)
+			ceiling := resistCeiling(c, hull, fit, playerOf(e.Start))
 			max := 0.0
 			for _, v := range vals {
 				if v > max {

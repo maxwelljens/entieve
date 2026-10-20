@@ -19,7 +19,7 @@
       "from": "cel-gate-kamieniec",
       "to": "cel-gate-gloam",
       "hull": "ship-npc-hauler",
-      "cargo": { "item": "charge-emp", "qty": 400 },
+      "cargo": { "item": "ammo-emp-s", "qty": 400 },
       "interval_ticks": 1800
     },
     {

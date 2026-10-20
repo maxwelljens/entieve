@@ -27,7 +27,7 @@ func TestParseValid(t *testing.T) {
 		{"at_tick": 300, "action": "warp", "target": "Cel Solace Belt", "note": "go"},
 		{"at_tick": 0, "action": "lock", "target": "Rat Scuttler"},
 		{"at_tick": 60, "action": "activate", "slot": "high0", "target": "Rat Scuttler"},
-		{"at_tick": 90, "action": "buy", "item": "mod-emp-turret", "qty": 1},
+		{"at_tick": 90, "action": "buy", "item": "mod-autocannon-s", "qty": 1},
 		{"at_tick": 120, "action": "orbit", "target": "Rat Scuttler", "range": 5000},
 		{"at_tick": 150, "action": "repair"}
 	]`)

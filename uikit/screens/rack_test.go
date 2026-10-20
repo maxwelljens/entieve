@@ -58,7 +58,7 @@ func TestRackConstruction(t *testing.T) {
 
 	// Module short names: first word of the module name per cell.
 	for row, ids := range map[int][]content.ModuleID{
-		0: {"mod-emp-turret", "mod-mining-laser", "mod-rocket-pod"},
+		0: {"mod-autocannon-s", "mod-mining-laser", "mod-rocket-pod"},
 		1: {"mod-afterburner", "mod-shield-boost", "mod-stasis-web"},
 		2: {"mod-armor-rep", "mod-cap-recharger"},
 	} {
@@ -159,23 +159,22 @@ func TestRackTooltipStats(t *testing.T) {
 	c.Frame(t, 1280, 720)
 
 	gun := r.cells[0][0].tip.View.Model()
-	if gun.Icon != "mod_weapon" || gun.Title != "EMP Turret" || gun.Sub != "High slot 1 · Weapon" {
-		t.Errorf("gun header = %q/%q/%q, want mod_weapon / EMP Turret / High slot 1 · Weapon",
+	if gun.Icon != "mod_weapon" || gun.Title != "Small Autocannon" || gun.Sub != "High slot 1 · Weapon" {
+		t.Errorf("gun header = %q/%q/%q, want mod_weapon / Small Autocannon / High slot 1 · Weapon",
 			gun.Icon, gun.Title, gun.Sub)
 	}
 	// Every line the plain-text tooltip had, as rows.
 	for _, want := range []struct{ sec, label, value string }{
-		{"DAMAGE", "Per shot", "24.0"},
-		{"DAMAGE", "Electro-magnetic", "16.0"},
-		{"DAMAGE", "Thermal", "5.0"},
-		{"DAMAGE", "Kinetic", "2.0"},
-		{"DAMAGE", "Explosive", "1.0"},
-		{"RANGE", "Optimal", "12.0 km"},
-		{"RANGE", "Falloff", "6.0 km"},
-		{"FIRING", "Tracking", "145.00 rad/s"},
+		{"DAMAGE", "Per shot", "25.0"},
+		{"DAMAGE", "Electro-magnetic", "8.0"},
+		{"DAMAGE", "Thermal", "6.0"},
+		{"DAMAGE", "Kinetic", "6.0"},
+		{"DAMAGE", "Explosive", "5.0"},
+		{"RANGE", "Optimal", "4.0 km"},
+		{"RANGE", "Falloff", "9.0 km"},
+		{"FIRING", "Tracking", "160.00 rad/s"},
 		{"CHARGE", "Loaded", "Auto"},
 		{"ACTIVATION", "Cycle", "3.0 s"},
-		{"ACTIVATION", "Cap use", "2.0 GJ"},
 	} {
 		if got := tipValue(gun, want.sec, want.label); got != want.value {
 			t.Errorf("gun %s/%s = %q, want %q (sections %v)",
@@ -267,8 +266,8 @@ func TestRackRightClickCyclesAmmo(t *testing.T) {
 	c.Frame(t, 1280, 720) // Sync + Update registers the click handlers
 
 	// Candidates: Auto first, then the light charges in cargo by item id.
-	wantCands := []content.ItemID{"", "charge-ap", "charge-emp", "charge-fusion", "charge-plutonium"}
-	got := r.ammoCandidates("light")
+	wantCands := []content.ItemID{"", "ammo-ap-s", "ammo-emp-s", "ammo-fusion-s", "ammo-plutonium-s"}
+	got := r.ammoCandidates("small")
 	if len(got) != len(wantCands) {
 		t.Fatalf("candidates = %v, want %v", got, wantCands)
 	}
@@ -296,7 +295,7 @@ func TestRackRightClickCyclesAmmo(t *testing.T) {
 	}
 	m.Esc()
 
-	wantItems := []content.ItemID{"charge-ap", "charge-emp", "charge-fusion", "charge-plutonium", ""}
+	wantItems := []content.ItemID{"ammo-ap-s", "ammo-emp-s", "ammo-fusion-s", "ammo-plutonium-s", ""}
 	for i, want := range wantItems {
 		before := len(*cmds)
 		pickMenuEntry(t, c, env, gun.btn, "Cycle charge")
@@ -322,10 +321,10 @@ func TestRackRightClickCyclesAmmo(t *testing.T) {
 	// With a charge preferred, the menu carries its Show Info ref too
 	// (Sync rebuilds the cells' declared specs — production syncs every
 	// frame, so the menu always reads the current preference).
-	r.ammoPref[slot] = "charge-fusion"
+	r.ammoPref[slot] = "ammo-fusion-s"
 	r.Sync()
 	rightClick(c, t, gun.btn)
-	if ents := env.Menu().Entries(); len(ents) != 4 || ents[1].Label != "Show Info — "+r.ammoName("charge-fusion") {
+	if ents := env.Menu().Entries(); len(ents) != 4 || ents[1].Label != "Show Info — "+r.ammoName("ammo-fusion-s") {
 		t.Fatalf("menu with a preferred charge = %+v", ents)
 	}
 	env.Menu().Esc()
@@ -591,9 +590,9 @@ func TestRackCellSpecData(t *testing.T) {
 	c.AddPanel(r.Container(), r)
 	c.Frame(t, 1280, 720)
 
-	gun := r.cells[0][0] // EMP Turret: a weapon with the "light" ammo class
-	if gun.spec.Ref == nil || *gun.spec.Ref != widgets.ModuleRef("mod-emp-turret") {
-		t.Fatalf("gun Ref = %v, want module/mod-emp-turret", gun.spec.Ref)
+	gun := r.cells[0][0] // EMP Turret: a weapon with the "small" ammo class
+	if gun.spec.Ref == nil || *gun.spec.Ref != widgets.ModuleRef("mod-autocannon-s") {
+		t.Fatalf("gun Ref = %v, want module/mod-autocannon-s", gun.spec.Ref)
 	}
 	if gun.spec.SecRef != nil {
 		t.Errorf("gun declares a secondary ref before any charge is preferred: %v", *gun.spec.SecRef)
@@ -611,10 +610,10 @@ func TestRackCellSpecData(t *testing.T) {
 	// A charge preference appears as the secondary ref after a Sync
 	// (production syncs every frame, so the menu always reads it).
 	slot := sim.SlotRef{Class: content.SlotHigh, Index: 0}
-	r.ammoPref[slot] = "charge-fusion"
+	r.ammoPref[slot] = "ammo-fusion-s"
 	r.Sync()
-	if gun.spec.SecRef == nil || *gun.spec.SecRef != widgets.ItemRef("charge-fusion") {
-		t.Errorf("gun SecRef = %v, want item/charge-fusion", gun.spec.SecRef)
+	if gun.spec.SecRef == nil || *gun.spec.SecRef != widgets.ItemRef("ammo-fusion-s") {
+		t.Errorf("gun SecRef = %v, want item/ammo-fusion-s", gun.spec.SecRef)
 	}
 	r.ammoPref[slot] = ""
 	r.Sync()
@@ -667,8 +666,8 @@ func TestRackDoubleClickShowsInfoWithoutToggle(t *testing.T) {
 	if !env.InfoWindow().IsOpen() {
 		t.Fatal("double-click did not open Show Info")
 	}
-	if got, _ := env.InfoWindow().Ref(); got != widgets.ModuleRef("mod-emp-turret") {
-		t.Errorf("Show Info ref = %v, want module/mod-emp-turret", got)
+	if got, _ := env.InfoWindow().Ref(); got != widgets.ModuleRef("mod-autocannon-s") {
+		t.Errorf("Show Info ref = %v, want module/mod-autocannon-s", got)
 	}
 	if len(*cmds) != 1 {
 		t.Fatalf("double-click queued %d commands, want 1 — the repeat click must not toggle", len(*cmds))

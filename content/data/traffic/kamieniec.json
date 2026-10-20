@@ -6,7 +6,7 @@
       "to": "cel-kantor",
       "to_system": "sys-glusza",
       "hull": "ship-npc-hauler",
-      "cargo": { "item": "charge-emp", "qty": 500 },
+      "cargo": { "item": "ammo-emp-s", "qty": 500 },
       "interval_ticks": 7200
     },
     {
@@ -14,7 +14,7 @@
       "to": "cel-kantor",
       "to_system": "sys-glusza",
       "hull": "ship-npc-hauler",
-      "cargo": { "item": "charge-fusion", "qty": 500 },
+      "cargo": { "item": "ammo-fusion-s", "qty": 500 },
       "interval_ticks": 7200
     },
     {
@@ -22,7 +22,7 @@
       "to": "cel-penumbra-port",
       "to_system": "sys-penumbra",
       "hull": "ship-npc-hauler",
-      "cargo": { "item": "charge-emp", "qty": 500 },
+      "cargo": { "item": "ammo-emp-s", "qty": 500 },
       "interval_ticks": 7200
     }
   ],

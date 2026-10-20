@@ -41,7 +41,7 @@ func TestSameTickCommandOrdering(t *testing.T) {
 			cmds: func(station, _ ecs.Entity) []Command {
 				return []Command{
 					CmdDock{Station: station},
-					CmdBuy{Item: "charge-emp", Qty: 10},
+					CmdBuy{Item: "ammo-emp-s", Qty: 10},
 				}
 			},
 			// travel (13) runs after economy (12): the buy sees no station.
@@ -56,7 +56,7 @@ func TestSameTickCommandOrdering(t *testing.T) {
 			docked: false,
 			cmds: func(station, _ ecs.Entity) []Command {
 				return []Command{
-					CmdBuy{Item: "charge-emp", Qty: 10},
+					CmdBuy{Item: "ammo-emp-s", Qty: 10},
 					CmdDock{Station: station},
 				}
 			},
@@ -173,7 +173,7 @@ func TestSameTickCommandOrdering(t *testing.T) {
 			if s.Wallet() != 100000 {
 				t.Fatalf("wallet=%v want 100000", s.Wallet())
 			}
-			if n := hangarCount(s, "charge-emp"); n != 0 {
+			if n := hangarCount(s, "ammo-emp-s"); n != 0 {
 				t.Fatalf("hangar holds %d charges, want 0", n)
 			}
 		})

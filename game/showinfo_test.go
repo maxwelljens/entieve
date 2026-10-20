@@ -204,7 +204,7 @@ func TestInfoWindowSidecarGeometryOnly(t *testing.T) {
 	// The player's arrangement: a moved, resized, shown window.
 	want := image.Rect(500, 180, 940, 680)
 	g.kit.InfoWindow().SetLocation(want)
-	g.kit.ShowInfo(widgets.ModuleRef("mod-emp-turret"))
+	g.kit.ShowInfo(widgets.ModuleRef("mod-autocannon-s"))
 	pump(t, g, 1280, 720)
 	if !g.kit.InfoOpen() {
 		t.Fatal("fixture: window did not open")

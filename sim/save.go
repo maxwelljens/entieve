@@ -312,6 +312,10 @@ func (s *Sim) restore(save *Save) error {
 	if _, ok := s.Content.System(save.System); !ok {
 		return errf("sim: save references unknown system %s", save.System)
 	}
+	// The laser turrets and their charges became shell-firing guns and
+	// shells; a save from before the rename is remapped in place (schema is
+	// unchanged: this is a content-id migration, not a state change).
+	migrateLegacyIDs(save)
 
 	// Canonicalize the saved entity order.
 	saved := append([]SavedEntity(nil), save.Entities...)
@@ -707,4 +711,135 @@ func cloneHangar(h *Hangar) *Hangar {
 		}
 	}
 	return out
+}
+
+// ---------------------------------------------------------------------------
+// Content-id migration: laser turrets + charges -> shell guns + shells
+// ---------------------------------------------------------------------------
+
+// legacyItemIDs maps the retired charge ids onto the small-calibre shell of
+// the same damage profile (the only calibre those guns could load).
+var legacyItemIDs = map[content.ItemID]content.ItemID{
+	"charge-emp":       "ammo-emp-s",
+	"charge-fusion":    "ammo-fusion-s",
+	"charge-ap":        "ammo-ap-s",
+	"charge-plutonium": "ammo-plutonium-s",
+}
+
+// legacyModuleIDs maps the retired turrets onto the small-calibre guns of
+// their family (EMP turret: fast light turret -> autocannon; rail: long-range
+// sniper -> artillery).
+var legacyModuleIDs = map[content.ModuleID]content.ModuleID{
+	"mod-emp-turret":  "mod-autocannon-s",
+	"mod-rail-turret": "mod-artillery-s",
+}
+
+// legacyRecipeIDs maps the retired production runs onto the shell recipes.
+var legacyRecipeIDs = map[content.RecipeID]content.RecipeID{
+	"rec-charge-emp":       "rec-ammo-emp-s",
+	"rec-charge-fusion":    "rec-ammo-fusion-s",
+	"rec-charge-ap":        "rec-ammo-ap-s",
+	"rec-charge-plutonium": "rec-ammo-plutonium-s",
+}
+
+// migrateLegacyIDs rewrites every content id a save carries into the current
+// vocabulary: hangar items and stored ships, cargo (space and ore holds),
+// fittings (and their runtimes), wreck loot, convoy shipments, resting
+// market orders and last-trade rungs, industry jobs, ledger-agent
+// inventories/beliefs/wishes and parked shipments. The
+// maps are static, so a save that already uses current ids restores
+// byte-identically; stack order is preserved (a rename never merges stacks).
+func migrateLegacyIDs(save *Save) {
+	item := func(id *content.ItemID) {
+		if n, ok := legacyItemIDs[*id]; ok {
+			*id = n
+		}
+	}
+	mod := func(id *content.ModuleID) {
+		if n, ok := legacyModuleIDs[*id]; ok {
+			*id = n
+		}
+	}
+	fits := func(ids []content.ModuleID) {
+		for i := range ids {
+			mod(&ids[i])
+		}
+	}
+	stacks := func(s []content.CargoStack) {
+		for i := range s {
+			item(&s[i].Item)
+		}
+	}
+
+	// Hangar.
+	stacks(save.Hangar.Items)
+	for i := range save.Hangar.Ships {
+		fits(save.Hangar.Ships[i].Fit)
+		stacks(save.Hangar.Ships[i].Cargo)
+	}
+
+	// Market books and the price ladder.
+	for _, orders := range save.Market {
+		for i := range orders {
+			item(&orders[i].Item)
+		}
+	}
+	for i := range save.MarketLasts {
+		item(&save.MarketLasts[i].Item)
+	}
+
+	// Entities: holds, fittings, wreck loot.
+	for i := range save.Entities {
+		se := &save.Entities[i]
+		if se.Cargo != nil {
+			stacks(se.Cargo.Stacks)
+			stacks(se.Cargo.Ore)
+		}
+		if se.Fitting != nil {
+			fits(se.Fitting.High)
+			fits(se.Fitting.Mid)
+			fits(se.Fitting.Low)
+			// Runtimes carry their own Def: a stale id there would stop
+			// resolving the module on the very next cycle.
+			for _, rts := range [][]ModuleRuntime{se.Fitting.HighRT, se.Fitting.MidRT, se.Fitting.LowRT} {
+				for j := range rts {
+					mod(&rts[j].Def)
+				}
+			}
+		}
+		if se.Wreck != nil {
+			stacks(se.Wreck.Loot)
+		}
+		if se.Traffic != nil {
+			item(&se.Traffic.Item) // the shipment a convoy is flying
+		}
+	}
+
+	// Industry jobs reference a recipe id.
+	for i := range save.Jobs {
+		if n, ok := legacyRecipeIDs[save.Jobs[i].Recipe]; ok {
+			save.Jobs[i].Recipe = n
+		}
+	}
+
+	// Ledger agents: inventory, beliefs, margins, haul wishes.
+	for i := range save.Agents {
+		a := &save.Agents[i]
+		stacks(a.Inventory)
+		for _, vals := range [][]SavedAgentVal{a.Beliefs, a.Margin} {
+			for j := range vals {
+				item(&vals[j].Item)
+			}
+		}
+		for _, ws := range [][]HaulWish{a.Wishes, a.InFlight} {
+			for j := range ws {
+				item(&ws[j].Item)
+			}
+		}
+	}
+
+	// Parked shipments between grids.
+	for i := range save.TrafficJourneys {
+		item(&save.TrafficJourneys[i].Item)
+	}
 }

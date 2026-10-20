@@ -6,11 +6,11 @@
     "system": "sys-solace",
     "position": { "X": 843007620248, "Y": 502580312071 },
     "ship": "ship-sloop",
-    "fit": ["mod-emp-turret", "mod-afterburner", "mod-armor-rep"],
+    "fit": ["mod-autocannon-s", "mod-afterburner", "mod-armor-rep"],
     "cargo": [
-      { "item": "charge-emp", "qty": 80 },
-      { "item": "charge-fusion", "qty": 40 },
-      { "item": "charge-ap", "qty": 20 }
+      { "item": "ammo-emp-s", "qty": 80 },
+      { "item": "ammo-fusion-s", "qty": 40 },
+      { "item": "ammo-ap-s", "qty": 20 }
     ],
     "wallet": 500000
   }

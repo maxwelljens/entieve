@@ -115,9 +115,9 @@ func TestFactoryPanelGatingAndEnqueue(t *testing.T) {
 		}
 	}
 	// The charge row's inputs read have/need at the stepper quantity.
-	chargeRow := recipeRowFor(f, "charge-emp")
+	chargeRow := recipeRowFor(f, "ammo-emp-s")
 	if chargeRow < 0 {
-		t.Fatal("no charge-emp recipe row")
+		t.Fatal("no ammo-emp-s recipe row")
 	}
 	if !strings.Contains(f.recipes.Rows[chargeRow].Cells[3], "Ferrite 0/720") {
 		t.Errorf("inputs cell = %q, want the have/need readout", f.recipes.Rows[chargeRow].Cells[3])
@@ -149,9 +149,9 @@ func TestFactoryPanelGatingAndEnqueue(t *testing.T) {
 	}
 
 	// Stock the charge recipe and select its row: Start arms.
-	rec := env.Content.Recipes["rec-charge-emp"]
+	rec := env.Content.Recipes["rec-ammo-emp-s"]
 	if rec == nil {
-		t.Fatal("fixture: rec-charge-emp missing")
+		t.Fatal("fixture: rec-ammo-emp-s missing")
 	}
 	mats := env.Sim.JobMaterials(factoryStation, rec.ID, 1)
 	if len(mats) == 0 {
@@ -250,16 +250,16 @@ func TestFactoryRowsShowInfo(t *testing.T) {
 
 	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: factoryStation})
 	frame()
-	chargeRow := recipeRowFor(f, "charge-emp")
+	chargeRow := recipeRowFor(f, "ammo-emp-s")
 	if chargeRow < 0 {
-		t.Fatal("no charge-emp recipe row")
+		t.Fatal("no ammo-emp-s recipe row")
 	}
 
 	// Double-click (two clicks inside the window) swaps Show Info onto the
 	// product — the ref resolves through InfoRefOf's factoryRow case.
 	ref, ok := env.InfoRefOf(f.recipes.Rows[chargeRow].Data)
-	if !ok || ref != widgets.ItemRef("charge-emp") {
-		t.Fatalf("row ref = %v (%v), want item/charge-emp", ref, ok)
+	if !ok || ref != widgets.ItemRef("ammo-emp-s") {
+		t.Fatalf("row ref = %v (%v), want item/ammo-emp-s", ref, ok)
 	}
 	clickRow(ui, f.recipes, chargeRow)
 	clickRow(ui, f.recipes, chargeRow)
@@ -303,7 +303,7 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 	env, _ := newChromeEnv(t)
 
 	// Product page (charge): MANUFACTURED FROM with label-side links.
-	page, ok := infoPageFor(env, widgets.ItemRef("charge-emp"))
+	page, ok := infoPageFor(env, widgets.ItemRef("ammo-emp-s"))
 	if !ok {
 		t.Fatal("charge page did not resolve")
 	}
@@ -340,12 +340,12 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 	if ui == nil {
 		t.Fatalf("mineral page has no USED IN (sections %v)", sectionLabels(page))
 	}
-	emp := rowIn(t, ui, "EMP Charge")
+	emp := rowIn(t, ui, "Small EMP Shell")
 	if emp.Value != "×100" {
 		t.Errorf("USED IN value = %q, want the product's per-run output ×100", emp.Value)
 	}
-	if emp.Ref == nil || *emp.Ref != widgets.ItemRef("charge-emp") {
-		t.Errorf("USED IN ref = %v, want item/charge-emp", emp.Ref)
+	if emp.Ref == nil || *emp.Ref != widgets.ItemRef("ammo-emp-s") {
+		t.Errorf("USED IN ref = %v, want item/ammo-emp-s", emp.Ref)
 	}
 	// The hull recipe consuming the same mineral is listed too (the
 	// shipped barge hull is named Havíř).
@@ -372,7 +372,7 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 	}
 
 	// Module page: manufactured from its minerals.
-	page, ok = infoPageFor(env, widgets.ModuleRef("mod-emp-turret"))
+	page, ok = infoPageFor(env, widgets.ModuleRef("mod-autocannon-s"))
 	if !ok {
 		t.Fatal("module page did not resolve")
 	}
@@ -467,9 +467,9 @@ func TestInfoWindowChainRefSwap(t *testing.T) {
 	frame := func() { uitest.PumpWindow(t, ui, w.Sync, 1024, 700) }
 	frame()
 
-	env.ShowInfo(widgets.ItemRef("charge-emp"))
+	env.ShowInfo(widgets.ItemRef("ammo-emp-s"))
 	frame()
-	if got, _ := w.Ref(); got != widgets.ItemRef("charge-emp") {
+	if got, _ := w.Ref(); got != widgets.ItemRef("ammo-emp-s") {
 		t.Fatalf("window ref = %v, want the charge", got)
 	}
 	find := func(ref widgets.InfoRef) *InfoRefRow {
@@ -507,7 +507,7 @@ func TestInfoWindowChainRefSwap(t *testing.T) {
 	// The swapped page carries USED IN back to the product; double-click
 	// its row to swap home.
 	frame()
-	back := find(widgets.ItemRef("charge-emp"))
+	back := find(widgets.ItemRef("ammo-emp-s"))
 	if back == nil {
 		t.Fatalf("mineral page has no USED IN ref row (rows %+v)", w.RefRows())
 	}
@@ -523,7 +523,7 @@ func TestInfoWindowChainRefSwap(t *testing.T) {
 		t.Fatalf("single click swapped the window (ref = %v)", got)
 	}
 	click(back)
-	if got, _ := w.Ref(); got != widgets.ItemRef("charge-emp") {
+	if got, _ := w.Ref(); got != widgets.ItemRef("ammo-emp-s") {
 		t.Fatalf("double-click ref = %v, want the charge back", got)
 	}
 }

@@ -6,9 +6,9 @@
     "faction": "Charter Authority",
     "ship": "ship-npc-patrol",
     "fit": [
-      "mod-rail-turret",
-      "mod-rail-turret",
-      "mod-rail-turret",
+      "mod-autocannon-s",
+      "mod-autocannon-s",
+      "mod-autocannon-s",
       "mod-shield-boost"
     ],
     "aggro_range": 6000,

@@ -109,13 +109,13 @@ func TestPlaceOrderCommandCrossesAndRests(t *testing.T) {
 	station := StationID("cel-station-a")
 	walletBefore := s.Wallet()
 
-	// 100 charge-emp @ 5.00 rest founding; bid 120 @ 5.00: 100 fill, 20 rest.
-	evs := placeCmd(s, OrderBuy, "charge-emp", 120, 5)
+	// 100 ammo-emp-s @ 5.00 rest founding; bid 120 @ 5.00: 100 fill, 20 rest.
+	evs := placeCmd(s, OrderBuy, "ammo-emp-s", 120, 5)
 	if !hasEvent(evs, EvMarket, "Bought 100 x EMP Charge for 500.00 €") {
 		t.Fatalf("no fill line: %v", evs)
 	}
-	if hangarCount(s, "charge-emp") != 100 {
-		t.Fatalf("hangar = %d, want 100 delivered", hangarCount(s, "charge-emp"))
+	if hangarCount(s, "ammo-emp-s") != 100 {
+		t.Fatalf("hangar = %d, want 100 delivered", hangarCount(s, "ammo-emp-s"))
 	}
 	fee := MarketBrokerFee * (5 * 120.0) // fee on the placed value
 	if s.Wallet() != walletBefore-(600+fee) {
@@ -124,7 +124,7 @@ func TestPlaceOrderCommandCrossesAndRests(t *testing.T) {
 	}
 	var rest []MarketStock
 	for _, o := range playerOrdersAt(s, station) {
-		if o.Item == "charge-emp" {
+		if o.Item == "ammo-emp-s" {
 			rest = append(rest, o)
 		}
 	}

@@ -44,8 +44,8 @@ func TestFittingRowTooltips(t *testing.T) {
 		t.Fatalf("fitted slot row carries %d tooltips, want 1", len(got))
 	}
 	m := f.slots.Tips[fitted].View.Model()
-	if m.Title != "EMP Turret" || m.Sub != "High slot 1 · Weapon" {
-		t.Errorf("slot row tooltip = %q/%q, want EMP Turret / High slot 1 · Weapon", m.Title, m.Sub)
+	if m.Title != "Small Autocannon" || m.Sub != "High slot 1 · Weapon" {
+		t.Errorf("slot row tooltip = %q/%q, want Small Autocannon / High slot 1 · Weapon", m.Title, m.Sub)
 	}
 	if m.Icon != "mod_weapon" {
 		t.Errorf("slot row icon = %q, want mod_weapon", m.Icon)
@@ -66,7 +66,7 @@ func TestFittingRowTooltips(t *testing.T) {
 
 	// Hangar: fit-able modules get the slotless panel, stored hulls none.
 	env.Sim.Hangar.Items = append(env.Sim.Hangar.Items,
-		content.CargoStack{Item: "mod-rail-turret", Qty: 1})
+		content.CargoStack{Item: "mod-artillery-s", Qty: 1})
 	env.Sim.Hangar.Ships = append(env.Sim.Hangar.Ships, sim.StoredShip{Hull: "ship-sloop"})
 	frame()
 	if len(f.hangar.Rows) == 0 {

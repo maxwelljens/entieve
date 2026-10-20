@@ -103,9 +103,10 @@ DmgExplosive`. `Damage` is a struct `{EM, Thermal, Kinetic, Explosive float64}`;
 Ore defs carry `refine_yield: {"min-ferrite": 0.45, ...}` fractions per m³.
 
 **Ammunition** (`content/data/items/ammo.json`) — each has a `damage`
-profile; turrets consume 1 charge/shot:
-`charge-emp` (EM-biased), `charge-fusion` (explosive-biased),
-`charge-ap` (kinetic-biased), `charge-plutonium` (thermal-biased),
+profile and a calibre `ammo_class`; guns consume 1 shell/shot:
+`ammo-emp-s` (EM-biased), `ammo-fusion-s` (explosive-biased),
+`ammo-ap-s` (kinetic-biased), `ammo-plutonium-s` (thermal-biased), with the
+`-m`/`-l` sets for the medium and large calibres;
 `charge-cap-cell` (cap booster fuel, not ammo).
 
 **Loot** (`content/data/items/loot.json`):
@@ -121,9 +122,10 @@ profile; turrets consume 1 charge/shot:
 `ship-npc-patrol` (system security interceptor).
 
 **Modules** (`content/data/modules/*.json`, grouped by category):
-- weapons: `mod-emp-turret` (uses `charge-*` ammo class `light`),
-  `mod-rail-turret` (ammo class `light`), `mod-rocket-pod` (no ammo,
-  explosive rockets);
+- weapons: `mod-autocannon-s/m/l` (fast cycle, high tracking, short reach)
+  and `mod-artillery-s/m/l` (slow cycle, low tracking, long reach, heavier
+  volley), each loading the shells of its own calibre (`small`/`medium`/
+  `large`); `mod-rocket-pod` (no ammo, explosive rockets);
 - tank: `mod-shield-boost` (active), `mod-shield-extender` (passive raw HP),
   `mod-armor-rep` (active), `mod-armor-plate` (passive raw HP),
   `mod-resist-coat` (passive resist buff);
@@ -193,7 +195,7 @@ system list with starmap positions, `start_system: "sys-solace"`.
 pinned to one station (`station` = offering station; kinds `kill`, `deliver`,
 `mine`; objectives reference NPC IDs / cargo items / stations, validated):
 - `contract-solace-cleanup-1` (kill 1 scuttler), `contract-solace-supply-run-1`
-  (deliver 2 m³ charge-emp to `cel-penumbra-port`), `contract-solace-cordite-1`
+  (deliver 2 m³ ammo-emp-s to `cel-penumbra-port`), `contract-solace-cordite-1`
   (mine 400 m³ ore-cordite) — the `cel-haven-rest` board (level 1, standing 0).
 - `contract-penumbra-den-hunt-1` (kill 1 marauder), `contract-penumbra-lucidite-1`
   (mine 500 m³ ore-lucidite) — the `cel-penumbra-port` board (level 2,
@@ -221,7 +223,7 @@ type ItemDef struct {
     BasePrice float64          // ISK-analog "euro"
     RefineYield map[ItemID]float64 // ore only, fractions summing to <= 1
     Damage *Damage             // ammo only, applied per shot
-    AmmoClass string           // ammo only, e.g. "light"; "" for non-ammo
+    AmmoClass string           // ammo only: calibre (small/medium/large); "" for non-ammo
 }
 type ShipDef struct {
     ID ShipID; Name, Class, Description string
@@ -243,7 +245,7 @@ type ModuleDef struct {
     ActivationCost float64     // GJ per activation (0 for passive)
     ActivationTime float64     // seconds per cycle (0 for passive)
     Passive struct{ ShieldHP, ArmorHP float64; Capacitor float64; Recharge float64; ShieldBoost, ArmorRep float64; ResistBonus Resists; SpeedBonus float64 } // passive modules fill relevant fields
-    Weapon *WeaponAttrs        // Damage Damage; Optimal, Falloff, Tracking float64; AmmoClass string; VolleyTime float64 (s); ChargeSize int
+    Weapon *WeaponAttrs        // Damage; Optimal, Falloff, Tracking float64; AmmoClass string (calibre); ShotTime float64 (s); DamageMult float64 (0 reads as 1)
     Mining *MiningAttrs        // VolumePerCycle float64 (m³); CycleTime float64
     Boost  *BoostAttrs         // ShieldBoostPerCycle / ArmorRepPerCycle float64; SpeedMultiplier float64; WebStrength float64; ScramDuration float64; CapRestore float64
 }

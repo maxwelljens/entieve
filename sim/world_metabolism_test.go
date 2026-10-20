@@ -356,12 +356,12 @@ func TestWreckReclaimFloorAndScope(t *testing.T) {
 
 // guardContent extends the fixture with a guard spawn group at the market
 // station and the book stock its requisition buys: hull, fitted module and
-// the charge basket's ammo (charge-ap is the canonical first light charge).
+// the charge basket's ammo (ammo-ap-s is the canonical first light charge).
 func guardContent() *content.Content {
 	c := testContent()
 	c.NPCs["npc-guard-test"] = &content.NpcDef{
 		ID: "npc-guard-test", Name: "Fixture Guard", Faction: "Charter Authority",
-		Ship: "ship-barge", Fit: []content.ModuleID{"mod-armor-plate", "mod-emp-turret"},
+		Ship: "ship-barge", Fit: []content.ModuleID{"mod-armor-plate", "mod-autocannon-s"},
 		OrbitRange: 1500, FleeThreshold: 0.25,
 	}
 	sysA := c.Systems["sys-a"]
@@ -373,8 +373,8 @@ func guardContent() *content.Content {
 			{NpcID: "npc-guard-test", Count: 1, RespawnSec: 60},
 		}
 		sysA.Celestials[i].Station.Market = append(sysA.Celestials[i].Station.Market,
-			content.MarketOrderDef{Item: "mod-emp-turret", Qty: 10, Price: 500},
-			content.MarketOrderDef{Item: "charge-ap", Qty: 5000, Price: 5},
+			content.MarketOrderDef{Item: "mod-autocannon-s", Qty: 10, Price: 500},
+			content.MarketOrderDef{Item: "ammo-ap-s", Qty: 5000, Price: 5},
 		)
 	}
 	return c
@@ -442,11 +442,11 @@ func TestRespawnGuardBuysHullFitAndCharges(t *testing.T) {
 	if got := bookAskQty(s, station, "mod-armor-plate"); got != 9 {
 		t.Errorf("plate asks = %d, want 9", got)
 	}
-	if got := bookAskQty(s, station, "mod-emp-turret"); got != 9 {
+	if got := bookAskQty(s, station, "mod-autocannon-s"); got != 9 {
 		t.Errorf("turret asks = %d, want 9", got)
 	}
-	if got := bookAskQty(s, station, "charge-ap"); got != 4000 {
-		t.Errorf("charge-ap asks = %d, want 4000 (1000-round basket)", got)
+	if got := bookAskQty(s, station, "ammo-ap-s"); got != 4000 {
+		t.Errorf("ammo-ap-s asks = %d, want 4000 (1000-round basket)", got)
 	}
 	// Ledger debited: hull 50,000 + plate 1,000 + turret 500 + basket 5,000.
 	bal := s.factionLedger["Charter Authority"]
@@ -466,12 +466,12 @@ func TestRespawnGuardBuysHullFitAndCharges(t *testing.T) {
 		t.Fatal("guard did not respawn")
 	}
 	fit, ok := s.Fittings.Get(nw)
-	if !ok || len(fit.High) != 1 || fit.High[0] != "mod-emp-turret" || len(fit.Low) != 1 || fit.Low[0] != "mod-armor-plate" {
+	if !ok || len(fit.High) != 1 || fit.High[0] != "mod-autocannon-s" || len(fit.Low) != 1 || fit.Low[0] != "mod-armor-plate" {
 		t.Fatalf("fit = %+v, want turret + plate", fit)
 	}
 	cargo, _ := s.Cargos.Get(nw)
-	if len(cargo.Stacks) != 1 || cargo.Stacks[0].Item != "charge-ap" || cargo.Stacks[0].Qty != 1000 {
-		t.Fatalf("basket = %+v, want 1000 charge-ap", cargo.Stacks)
+	if len(cargo.Stacks) != 1 || cargo.Stacks[0].Item != "ammo-ap-s" || cargo.Stacks[0].Qty != 1000 {
+		t.Fatalf("basket = %+v, want 1000 ammo-ap-s", cargo.Stacks)
 	}
 	if len(s.respawns) != 0 {
 		t.Fatalf("timer not consumed: %+v", s.respawns)
@@ -570,7 +570,7 @@ func TestRespawnRatDrawsOreFromBelt(t *testing.T) {
 		t.Fatalf("live rock = %v, want %v", ast.Remaining, before-cost)
 	}
 	// The basket is bought only when listed; the fixture does not sell the
-	// canonical charge (charge-ap), so the RESPAWNED hull carries none
+	// canonical charge (ammo-ap-s), so the RESPAWNED hull carries none
 	// (possibly-0 rule) while the initial spawn keeps its founding grant.
 	empty, loaded := 0, 0
 	for _, e := range sortedEntities(s.AIs) {

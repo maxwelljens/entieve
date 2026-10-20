@@ -20,14 +20,14 @@ import (
 func recipeContent() *content.Content {
 	c := testContent()
 	c.Recipes = map[content.RecipeID]*content.RecipeDef{
-		"rec-charge-emp": {
-			ID: "rec-charge-emp", Product: "charge-emp", Qty: 100,
+		"rec-ammo-emp-s": {
+			ID: "rec-ammo-emp-s", Product: "ammo-emp-s", Qty: 100,
 			// 5.5 exercises the ceil commit; 3 the integer-exact path.
 			Inputs: []content.RecipeInput{{Item: "min-ferrite", Qty: 5.5}, {Item: "min-nickel", Qty: 3}},
 			Time:   45, Family: content.FamilyCharges,
 		},
-		"rec-mod-emp-turret": {
-			ID: "rec-mod-emp-turret", Product: "mod-emp-turret", Qty: 1,
+		"rec-mod-autocannon-s": {
+			ID: "rec-mod-autocannon-s", Product: "mod-autocannon-s", Qty: 1,
 			Inputs: []content.RecipeInput{{Item: "min-ferrite", Qty: 1}},
 			Time:   30, Family: content.FamilyModules,
 		},
@@ -103,7 +103,7 @@ func TestIndustryJobLifecycle(t *testing.T) {
 	giveCargo(s, "min-ferrite", 1000)
 	giveCargo(s, "min-nickel", 100)
 
-	s.Queue(CmdStartJob{Recipe: "rec-charge-emp", Runs: 2})
+	s.Queue(CmdStartJob{Recipe: "rec-ammo-emp-s", Runs: 2})
 	s.Step()
 	evs := drain(s)
 	if !hasEvent(evs, EvLog, "Industry: EMP Charge started at Haven Rest") {
@@ -114,7 +114,7 @@ func TestIndustryJobLifecycle(t *testing.T) {
 		t.Fatalf("jobs = %d, want 1", len(jobs))
 	}
 	j := jobs[0]
-	if j.ID != 1 || j.Recipe != "rec-charge-emp" || j.Runs != 2 ||
+	if j.ID != 1 || j.Recipe != "rec-ammo-emp-s" || j.Runs != 2 ||
 		j.State != JobRunning || j.Owner != OwnerPlayer || j.Station != "cel-station-a" {
 		t.Fatalf("job = %+v", j)
 	}
@@ -148,8 +148,8 @@ func TestIndustryJobLifecycle(t *testing.T) {
 	if got := s.craftRuns("cel-station-a", content.FamilyCharges); got != 2 {
 		t.Errorf("craft runs = %v, want 2", got)
 	}
-	if s.Hangar != nil && hangarCount(s, "charge-emp") != 0 {
-		t.Errorf("output delivered before collect (%d in hangar)", hangarCount(s, "charge-emp"))
+	if s.Hangar != nil && hangarCount(s, "ammo-emp-s") != 0 {
+		t.Errorf("output delivered before collect (%d in hangar)", hangarCount(s, "ammo-emp-s"))
 	}
 
 	// Collect: 100 × 2 charges into the hangar, slot freed, line logged.
@@ -159,7 +159,7 @@ func TestIndustryJobLifecycle(t *testing.T) {
 	if !hasEvent(evs, EvLog, "Industry: EMP Charge collected at Haven Rest") {
 		t.Fatalf("missing collect line: %v", evs)
 	}
-	if got := hangarCount(s, "charge-emp"); got != 200 {
+	if got := hangarCount(s, "ammo-emp-s"); got != 200 {
 		t.Errorf("hangar charges = %d, want 200 (100 × 2 runs)", got)
 	}
 	if jobs := s.Jobs("cel-station-a"); len(jobs) != 0 {
@@ -182,7 +182,7 @@ func TestIndustryJobCompletingCraftsUp(t *testing.T) {
 	drain(s)
 	giveCargo(s, "min-ferrite", 100)
 
-	s.Queue(CmdStartJob{Recipe: "rec-mod-emp-turret", Runs: 4})
+	s.Queue(CmdStartJob{Recipe: "rec-mod-autocannon-s", Runs: 4})
 	s.Step()
 	drain(s)
 	if _, ok := jobAt(s, "cel-station-a", 1); !ok {
@@ -213,7 +213,7 @@ func TestIndustryMaterialCeilMath(t *testing.T) {
 	s := newIndustrySim(t)
 	st := StationID("cel-station-a")
 
-	mats := s.JobMaterials(st, "rec-charge-emp", 2)
+	mats := s.JobMaterials(st, "rec-ammo-emp-s", 2)
 	want := []content.CargoStack{{Item: "min-ferrite", Qty: 11}, {Item: "min-nickel", Qty: 6}}
 	if len(mats) != len(want) {
 		t.Fatalf("materials = %+v, want %+v", mats, want)
@@ -224,7 +224,7 @@ func TestIndustryMaterialCeilMath(t *testing.T) {
 		}
 	}
 	// The fractional input at one run: ceil(5.5) = 6.
-	if got := s.JobMaterials(st, "rec-charge-emp", 1)[0].Qty; got != 6 {
+	if got := s.JobMaterials(st, "rec-ammo-emp-s", 1)[0].Qty; got != 6 {
 		t.Errorf("ceil commit = %d, want 6 (5.5 rounded up)", got)
 	}
 	// L5: the material factor is 1 - 0.02·4 = 0.92.
@@ -232,7 +232,7 @@ func TestIndustryMaterialCeilMath(t *testing.T) {
 	if got := s.CraftLevel(st, content.FamilyCharges); got != 5 {
 		t.Fatalf("fixture: level = %d, want 5 (capped)", got)
 	}
-	mats = s.JobMaterials(st, "rec-charge-emp", 1)
+	mats = s.JobMaterials(st, "rec-ammo-emp-s", 1)
 	if mats[0].Qty != 6 { // ceil(5.5 × 0.92) = ceil(5.06) = 6
 		t.Errorf("L5 ferrite = %d, want 6", mats[0].Qty)
 	}
@@ -243,7 +243,7 @@ func TestIndustryMaterialCeilMath(t *testing.T) {
 	if got := s.JobMaterials(st, "rec-nope", 1); got != nil {
 		t.Errorf("unknown recipe materials = %+v, want nil", got)
 	}
-	if got := s.JobMaterials(st, "rec-charge-emp", 0); got != nil {
+	if got := s.JobMaterials(st, "rec-ammo-emp-s", 0); got != nil {
 		t.Errorf("zero-run materials = %+v, want nil", got)
 	}
 }
@@ -281,11 +281,11 @@ func TestIndustryCraftFormulas(t *testing.T) {
 	// factor, with the level read live from the station's counter.
 	s := newIndustrySim(t)
 	st := StationID("cel-station-a")
-	if got := s.JobDuration(st, "rec-charge-emp", 3); got != 135 {
+	if got := s.JobDuration(st, "rec-ammo-emp-s", 3); got != 135 {
 		t.Errorf("L1 duration = %v, want 135 (45 × 3)", got)
 	}
 	s.craftComplete(st, content.FamilyCharges, 100) // L5
-	got := s.JobDuration(st, "rec-charge-emp", 3)
+	got := s.JobDuration(st, "rec-ammo-emp-s", 3)
 	if want := 45 * 3 * 0.84; math.Abs(got-want) > 1e-9 {
 		t.Errorf("L5 duration = %v, want %v (45 × 3 × 0.84)", got, want)
 	}
@@ -370,7 +370,7 @@ func TestIndustryRefusals(t *testing.T) {
 
 	t.Run("invalid run count", func(t *testing.T) {
 		s := newIndustrySim(t)
-		if _, ok := s.StartJob("cel-station-a", "rec-charge-emp", 0, OwnerPlayer); ok {
+		if _, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 0, OwnerPlayer); ok {
 			t.Fatal("zero-run job accepted")
 		}
 		if evs := drain(s); !hasEvent(evs, EvLog, "Industry: Invalid job quantity") {
@@ -385,7 +385,7 @@ func TestIndustryRefusals(t *testing.T) {
 		if err != nil {
 			t.Fatalf("New: %v", err)
 		}
-		if _, ok := s.StartJob("cel-station-a", "rec-charge-emp", 1, OwnerPlayer); ok {
+		if _, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 1, OwnerPlayer); ok {
 			t.Fatal("job accepted at a station without the industry service")
 		}
 		if evs := drain(s); !hasEvent(evs, EvLog, "Industry: This station does not offer industry") {
@@ -395,7 +395,7 @@ func TestIndustryRefusals(t *testing.T) {
 
 	t.Run("must be docked", func(t *testing.T) {
 		s := newIndustrySim(t)
-		s.Queue(CmdStartJob{Recipe: "rec-charge-emp", Runs: 1})
+		s.Queue(CmdStartJob{Recipe: "rec-ammo-emp-s", Runs: 1})
 		s.Step()
 		if evs := drain(s); !hasEvent(evs, EvLog, "must be docked") {
 			t.Fatalf("missing dock gate: %v", evs)
@@ -409,7 +409,7 @@ func TestIndustryRefusals(t *testing.T) {
 		s := newIndustrySim(t)
 		dockAtHaven(t, s)
 		drain(s)
-		if _, ok := s.StartJob("cel-station-a", "rec-charge-emp", 1, OwnerPlayer); ok {
+		if _, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 1, OwnerPlayer); ok {
 			t.Fatal("job accepted with an empty hold")
 		}
 		evs := drain(s)
@@ -423,13 +423,13 @@ func TestIndustryRefusals(t *testing.T) {
 			t.Fatalf("refused start committed materials: %d", got)
 		}
 		// CanStartJob mirrors the same verdict, silently.
-		if s.CanStartJob("cel-station-a", "rec-charge-emp", 1) {
+		if s.CanStartJob("cel-station-a", "rec-ammo-emp-s", 1) {
 			t.Error("CanStartJob disagrees with the refusal")
 		}
 		// Exactly the L1 need: ceil(5.5) ferrite and 3 nickel.
 		giveCargo(s, "min-ferrite", 6)
 		giveCargo(s, "min-nickel", 3)
-		if !s.CanStartJob("cel-station-a", "rec-charge-emp", 1) {
+		if !s.CanStartJob("cel-station-a", "rec-ammo-emp-s", 1) {
 			t.Error("CanStartJob refused a stocked start")
 		}
 	})
@@ -440,7 +440,7 @@ func TestIndustryRefusals(t *testing.T) {
 		drain(s)
 		giveCargo(s, "min-ferrite", 10)
 		giveCargo(s, "min-nickel", 10)
-		id, ok := s.StartJob("cel-station-a", "rec-charge-emp", 1, OwnerPlayer)
+		id, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 1, OwnerPlayer)
 		if !ok {
 			t.Fatal("fixture start failed")
 		}
@@ -469,12 +469,12 @@ func TestIndustrySlotCap(t *testing.T) {
 	giveCargo(s, "min-nickel", 100)
 
 	for i := 0; i < industrySlots; i++ {
-		if _, ok := s.StartJob("cel-station-a", "rec-charge-emp", 1, OwnerPlayer); !ok {
+		if _, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 1, OwnerPlayer); !ok {
 			t.Fatalf("job %d refused with slots free", i+1)
 		}
 	}
 	ferrite := cargoCount(s, "min-ferrite")
-	if _, ok := s.StartJob("cel-station-a", "rec-charge-emp", 1, OwnerPlayer); ok {
+	if _, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 1, OwnerPlayer); ok {
 		t.Fatal("third job accepted over the slot cap")
 	}
 	evs := drain(s)
@@ -489,7 +489,7 @@ func TestIndustrySlotCap(t *testing.T) {
 	if j.ID == 0 {
 		t.Fatal("fixture job missing")
 	}
-	if _, ok := s.StartJob("cel-station-a", "rec-charge-emp", 1, OwnerPlayer); ok {
+	if _, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 1, OwnerPlayer); ok {
 		t.Fatal("slot freed by completion instead of collection")
 	}
 	drain(s)
@@ -498,7 +498,7 @@ func TestIndustrySlotCap(t *testing.T) {
 		t.Fatal("collect failed")
 	}
 	drain(s)
-	if _, ok := s.StartJob("cel-station-a", "rec-charge-emp", 1, OwnerPlayer); !ok {
+	if _, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 1, OwnerPlayer); !ok {
 		t.Fatal("slot not freed by collection")
 	}
 }
@@ -520,11 +520,11 @@ func TestIndustrySaveRestoreAndHash(t *testing.T) {
 	// One running job plus one finished-but-uncollected job (both occupy
 	// slots until collect), craft counters for two families (one with an
 	// idle clock mid-countdown).
-	if _, ok := s.StartJob("cel-station-a", "rec-charge-emp", 2, OwnerPlayer); !ok {
+	if _, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 2, OwnerPlayer); !ok {
 		t.Fatal("job 1 refused")
 	}
 	stepN(s, 10)
-	if _, ok := s.StartJob("cel-station-a", "rec-mod-emp-turret", 1, OwnerPlayer); !ok {
+	if _, ok := s.StartJob("cel-station-a", "rec-mod-autocannon-s", 1, OwnerPlayer); !ok {
 		t.Fatal("job 2 refused")
 	}
 	stepUntilDone(t, s, "cel-station-a", 2)
@@ -587,7 +587,7 @@ func TestIndustrySaveRestoreAndHash(t *testing.T) {
 		t.Fatalf("restored hash=%016x want %016x", got, wantHash)
 	}
 	if jobs := b.Jobs("cel-station-a"); len(jobs) != 2 ||
-		jobs[0].Recipe != "rec-charge-emp" || jobs[1].State != JobDone {
+		jobs[0].Recipe != "rec-ammo-emp-s" || jobs[1].State != JobDone {
 		t.Fatalf("restored jobs = %+v", jobs)
 	}
 	if got := b.CraftLevel("cel-station-a", content.FamilyHulls); got != 3 {
@@ -634,9 +634,9 @@ func industryScripted(t *testing.T, seed int64, ticks int, checkpoints map[int]b
 	for i := 0; i < ticks; i++ {
 		switch i {
 		case 5:
-			s.Queue(CmdStartJob{Recipe: "rec-charge-emp", Runs: 1}) // 45 s
+			s.Queue(CmdStartJob{Recipe: "rec-ammo-emp-s", Runs: 1}) // 45 s
 		case 6:
-			s.Queue(CmdStartJob{Recipe: "rec-mod-emp-turret", Runs: 2}) // 60 s
+			s.Queue(CmdStartJob{Recipe: "rec-mod-autocannon-s", Runs: 2}) // 60 s
 		case 7:
 			s.Queue(CmdStartJob{Recipe: "rec-ship-sloop", Runs: 1}) // over the cap: refused
 		case 1815: // module job done (~1806)
@@ -694,7 +694,7 @@ func TestIndustryNoRNGDraws(t *testing.T) {
 	giveCargo(s, "min-nickel", 100)
 
 	before := s.RNG.Snapshot()
-	if _, ok := s.StartJob("cel-station-a", "rec-charge-emp", 1, OwnerPlayer); !ok {
+	if _, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 1, OwnerPlayer); !ok {
 		t.Fatal("start refused")
 	}
 	stepUntilDone(t, s, "cel-station-a", 1)
@@ -745,7 +745,7 @@ func TestIndustryRestoreRejectsCorruptJobs(t *testing.T) {
 		drain(s)
 		giveCargo(s, "min-ferrite", 10)
 		giveCargo(s, "min-nickel", 10)
-		if _, ok := s.StartJob("cel-station-a", "rec-charge-emp", 1, OwnerPlayer); !ok {
+		if _, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 1, OwnerPlayer); !ok {
 			t.Fatal("fixture start refused")
 		}
 		save, err := s.Snapshot()

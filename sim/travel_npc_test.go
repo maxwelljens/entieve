@@ -109,7 +109,7 @@ func TestJumpRebuildsSystem(t *testing.T) {
 	if s.Wallet() != 100000 {
 		t.Fatal("wallet lost on jump")
 	}
-	if cargoCount(s, "charge-emp") != 20 {
+	if cargoCount(s, "ammo-emp-s") != 20 {
 		t.Fatal("cargo lost on jump")
 	}
 	// Player placed at the destination gate.

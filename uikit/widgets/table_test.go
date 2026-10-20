@@ -726,7 +726,7 @@ func TestTableRichRowLineRefRoutes(t *testing.T) {
 			env.Menu().Open(om.Entries, om.At) // what the host's sink does
 		}
 	}))
-	ref := ItemRef("charge-emp")
+	ref := ItemRef("ammo-emp-s")
 	tbl, ui := newRichTable(t, seams, []TableRow{{
 		Cells: []string{"emp"},
 		Stack: []RowLine{

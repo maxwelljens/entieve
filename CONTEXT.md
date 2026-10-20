@@ -11,7 +11,9 @@ names the *modules and seams* we build that vocabulary into.
 | **Corporation** | a named manufacturing house (`corp-*`, `content.AllCorps`): the maker of a hull, module or charge, carrying a display name and an emblem; a supplier layer, never a power bloc |
 | **Hull** | a ship chassis (`ship-*`); flyable or machine |
 | **Module** | a fitted component (`mod-*`); slot-classed high/mid/low |
-| **Item** | everything else tradeable: ore, mineral, charge, ammo, loot (`item-*`/`ore-*`/`min-*`/`charge-*`/`loot-*`) |
+| **Item** | everything else tradeable: ore, mineral, charge, shell, loot (`ore-*`/`min-*`/`ammo-*`/`charge-*`/`loot-*`) |
+| **Calibre** | a shell size class (`ammo_class`): `small`, `medium`, `large`; both projectile gun families at a calibre load the same shells |
+| **Shell** | the ammunition item (`ammo-*`) a projectile gun loads: calibre + one of the four damage profiles; the gun's `damage_multiplier` is its share of the shell's volley (autocannon light and fast, artillery heavy and slow) |
 | **Caste** | an Old Works machine archetype (`npc-*`: Scuttler, Marauder, Hierarch) + the Charter patrol (Custos) |
 | **Station** | a market/service node (a celestial); stations hold the order books |
 | **Order book** | per-station continuous double auction: asks + bids, never-crossed |

@@ -5,7 +5,7 @@
       "from": "cel-haven-rest",
       "to": "cel-gate-penumbra",
       "hull": "ship-npc-hauler",
-      "cargo": { "item": "charge-emp", "qty": 600 },
+      "cargo": { "item": "ammo-emp-s", "qty": 600 },
       "interval_ticks": 5400
     },
     {

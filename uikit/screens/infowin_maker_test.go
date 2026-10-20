@@ -27,8 +27,8 @@ func TestInfoPageMakerShipped(t *testing.T) {
 		makerName string
 	}{
 		{"hull", widgets.ShipRef("ship-sloop"), "Frigate · Borealis", "Borealis"},
-		{"module", widgets.ModuleRef("mod-emp-turret"), "Weapon · Nordvakt", "Nordvakt"},
-		{"charge", widgets.ItemRef("charge-emp"), "Ammo · Zakłady Burza", "Zakłady Burza"},
+		{"module", widgets.ModuleRef("mod-autocannon-s"), "Weapon · Nordvakt", "Nordvakt"},
+		{"charge", widgets.ItemRef("ammo-emp-s"), "Ammo · Zakłady Burza", "Zakłady Burza"},
 		{"charge-cap-cell", widgets.ItemRef("charge-cap-cell"), "Charge · Iskald", "Iskald"},
 	}
 	for _, tc := range cases {
@@ -155,7 +155,7 @@ func TestEveryCorpEmblemShows(t *testing.T) {
 		"corp-iskald":    widgets.ModuleRef("mod-cap-recharger"),
 		"corp-ferrum":    widgets.ShipRef("ship-hauler"),
 		"corp-druzstvo":  widgets.ShipRef("ship-barge"),
-		"corp-burza":     widgets.ItemRef("charge-plutonium"),
+		"corp-burza":     widgets.ItemRef("ammo-plutonium-s"),
 		"corp-celeritas": widgets.ModuleRef("mod-afterburner"),
 		"corp-praetor":   widgets.ShipRef("ship-npc-patrol"),
 		"corp-aldemar":   widgets.ModuleRef("mod-armor-rep"),
