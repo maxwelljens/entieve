@@ -60,7 +60,7 @@
     "at_tick": 7500,
     "action": "refine",
     "item": "ore-sterngrit",
-    "qty": 10
+    "qty": 100
   },
   {
     "at_tick": 7560,

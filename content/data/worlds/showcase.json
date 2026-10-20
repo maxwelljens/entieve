@@ -247,7 +247,7 @@
     {
       "name": "Refining ore",
       "feature": "refining",
-      "detail": "Dock where refine service exists, CmdRefine(ore-sterngrit, 10): cargo gains min-ferrite per refine_yield (0.45/unit -> 4-5 units), EvtMarket/log confirms."
+      "detail": "Dock where refine service exists, CmdRefine(ore-sterngrit, 100): one whole batch yields 45 min-ferrite (0.45/unit x 100), EvLog confirms."
     },
     {
       "name": "Ship assembly",
