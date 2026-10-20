@@ -244,6 +244,9 @@ func TestContractPayoutRatios(t *testing.T) {
 		return float64(count) * c.Items[item].BasePrice
 	}
 	deliverValue := func(item ItemID, count int) float64 {
+		if mod, ok := c.Modules[ModuleID(item)]; ok {
+			return float64(count) * mod.Price
+		}
 		units := float64(count) / c.Items[item].Volume
 		return units * c.Items[item].BasePrice
 	}

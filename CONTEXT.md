@@ -19,7 +19,10 @@ names the *modules and seams* we build that vocabulary into.
 | **Ask** | a standing *sell* order on a station book: sell at your price or better, resting until filled or cancelled |
 | **Open order** | a player's standing bid or ask resting on a book — up to 20 universe-wide, partial fills accumulate, cancelled by id (3% broker fee charged at placement and kept on cancel; 2.5% sales tax on executed sells) |
 | **Recipe** | two-tier manufacturing: minerals → products (`rec-*`) |
-| **Job** | one manufacturing run queue at a station (industry) |
+| **Job** | one manufacturing run queue at any station (industry); all stations share three global job slots |
+| **Manufacturing** | the industry window (key B): recipe board with per-run time and up-front fee, the three global slots, Start/Collect/Cancel. Renamed from Factory; its layout sidecar key is `manufacturing` (old `factory` files migrate on read) |
+| **Job fee** | 3% of a recipe's mineral value at base prices, per run, debited from the wallet at job start; kept on cancel |
+| **Refinery** | the ore→mineral window at a `refine` station: ore list from cargo + ore hold, `floor(refine_yield × qty)` preview, Refine |
 | **Craft level** | a station's learned skill per product family (grows with volume) |
 | **Belief** | an agent's EWMA of executed trade prices (its market view) |
 | **Haul wish** | an agent's cross-node arbitrage intent, flown as a real convoy |

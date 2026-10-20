@@ -315,7 +315,7 @@ func TestServicesViewButtonsOnTheRealStations(t *testing.T) {
 
 	// Every service button toggles a real spec row (Toggle carries the
 	// spec's own Title, so screenByTitle resolves it).
-	for _, title := range []string{"Market", "Fitting", "Factory", "Inventory"} {
+	for _, title := range []string{"Market", "Fitting", "Manufacturing", "Inventory"} {
 		if _, ok := screenByTitle[strings.ToLower(title)]; !ok {
 			t.Errorf("spec lost the row %q the services view toggles", title)
 		}

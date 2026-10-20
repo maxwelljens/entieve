@@ -99,7 +99,7 @@ const keyNone ebiten.Key = -1
 //	DockPolicy    floating / transient (not in the sidecar)
 //	Modal         the window is modal while up (map, help, menu)
 //	SpaceOnly     mounts only in space (the scanner's docked counterpart
-//	              rule); DockedOnly mounts only while docked (the factory
+//	              rule); DockedOnly mounts only while docked (the manufacturing
 //	              and the services view)
 //	Group         the rail's section: railEntries (game/rail.go) groups
 //	              and orders the entries by it (transients carry none and
@@ -177,13 +177,13 @@ var screens = []Screen{
 		// A station service that floats: it mounts only while docked and
 		// centres like the overlays on first open (its Screen row carries
 		// no Anchor, so the centred fallback applies).
-		ID: pFactory, Title: "Factory", Icon: "row_module",
-		Key: ebiten.KeyB, Action: "factory", Desc: "B — toggle factory window (manufacture while docked)",
-		DefaultRect: image.Rect(332, 130, 732, 560),
-		DockPolicy:  DockFloating, DockedOnly: true, SidecarName: "factory",
+		ID: pManufacturing, Title: "Manufacturing", Icon: "row_module",
+		Key: ebiten.KeyB, Action: "manufacturing", Desc: "B — toggle manufacturing window (manufacture while docked)",
+		DefaultRect: image.Rect(312, 120, 792, 600),
+		DockPolicy:  DockFloating, DockedOnly: true, SidecarName: "manufacturing",
 		Group: "Industry", Service: "industry",
-		Sync:  func(g *Game) { g.fact.Sync() },
-		Build: func(g *Game) *widget.Window { g.fact = uikit.NewFactory(g.env); return g.fact.Win() },
+		Sync:  func(g *Game) { g.manu.Sync() },
+		Build: func(g *Game) *widget.Window { g.manu = uikit.NewManufacturing(g.env); return g.manu.Win() },
 	},
 	{
 		// Space chrome: hidden while docked (legacy parity). Fixed in the
@@ -271,6 +271,18 @@ var screens = []Screen{
 		Group: "Station",
 		Sync:  func(g *Game) { g.svcUI.Sync() },
 		Build: func(g *Game) *widget.Window { return g.buildServicesWindow() },
+	},
+	{
+		// The refinery: an ore→mineral service window, docked-only like the
+		// manufacturing panel, centred on first open. Its own key would
+		// crowd the bindings; the rail and the services row open it.
+		ID: pRefinery, Title: "Refinery", Icon: "kind_belt",
+		Key:         keyNone,
+		DefaultRect: image.Rect(430, 160, 850, 560),
+		DockPolicy:  DockFloating, DockedOnly: true, SidecarName: "refinery",
+		Group: "Industry", Service: "refine",
+		Sync:  func(g *Game) { g.ref.Sync() },
+		Build: func(g *Game) *widget.Window { g.ref = uikit.NewRefinery(g.env); return g.ref.Win() },
 	},
 	{
 		// The wallet window: a floating read-only ledger, so it opens in

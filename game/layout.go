@@ -192,7 +192,21 @@ func (g *Game) readLayout() map[string]winLayout {
 	if f.Version != layoutVersion {
 		return nil
 	}
-	return f.Windows
+	return migrateLayoutNames(f.Windows)
+}
+
+// migrateLayoutNames carries window geometry across renames of persisted
+// windows: the manufacturing window's sidecar key was "factory" before the
+// Factory → Manufacturing rename, and its saved rect must survive. The new
+// key wins if both are present (a file written by a later build).
+func migrateLayoutNames(w map[string]winLayout) map[string]winLayout {
+	if v, ok := w["factory"]; ok {
+		if _, has := w["manufacturing"]; !has {
+			w["manufacturing"] = v
+		}
+		delete(w, "factory")
+	}
+	return w
 }
 
 // applyLayout restores the sidecar over the built-in defaults: geometry

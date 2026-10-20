@@ -1,0 +1,328 @@
+package screens
+
+import (
+	"image"
+	"slices"
+	"sort"
+
+	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
+)
+
+// Refinery is the station refinery window: every ore stack in the general
+// cargo and the ore hold, the minerals it would yield at the stepper
+// quantity (the sim's own floor(RefineYield × qty) math), and the Refine
+// action. The window predicts the EvCargoFull refusal (the output volume
+// against the general hold's free space) instead of letting the press be
+// the first warning.
+//
+// Gating follows the game's menu convention: the button stays VISIBLE and
+// grays out while undocked, at a station without the refine service, with
+// no ore selected or with nothing held — never hidden. Every action
+// enqueues a sim.Command (the kit never mutates sim state).
+type Refinery struct {
+	th  theme.Theme
+	cv  widgets.ContentView
+	as  widgets.ActionSink
+	win *widget.Window
+
+	ores   *widgets.Table
+	status *widget.Text
+
+	qtyLabel *widget.Text
+	qtyBar   *widget.Container
+
+	minus, plus *widget.Button
+	refine      *widget.Button
+
+	qtyIdx int
+	sel    refineryRow
+	hasSel bool
+}
+
+// refineryRow is one ore table row: the ore id plus its Show Info ref.
+type refineryRow struct {
+	ore content.ItemID
+	ref widgets.InfoRef
+}
+
+// InfoRefOf resolves the row payload inside the seam's Show Info resolver.
+func (r refineryRow) InfoRefOf(cv widgets.ContentView) (widgets.InfoRef, bool) {
+	return r.ref, widgets.InfoRefExists(cv, r.ref)
+}
+
+// NewRefinery builds the refinery window over the shared environment. Mount
+// it on a Kit with Kit.AddWindow and call Sync every frame.
+func NewRefinery(env widgets.Seams) *Refinery {
+	r := &Refinery{th: env, cv: env, as: env}
+	p := env.Pal()
+
+	cols := []widgets.Column{
+		{Key: "Ore", Title: "Ore", Priority: 0},
+		{Key: "Held", Title: "Held", Priority: 2, AlignRight: true},
+		{Key: "Yield", Title: "Yield @ qty", Priority: 1},
+	}
+	r.ores = widgets.NewTable(env, cols)
+	r.ores.SetSort("Ore", true)
+	r.ores.SetSortFunc(canonicalFirst("Ore", cols))
+	r.ores.OnSelect(func(row widgets.TableRow) {
+		if v, ok := row.Data.(refineryRow); ok {
+			r.sel, r.hasSel = v, true
+		}
+	})
+
+	r.status = widget.NewText(
+		widget.TextOpts.Text("Select an ore to refine.", env.Face(theme.StepSmall), theme.Solid(p.Text)),
+	)
+	r.qtyLabel = widget.NewText(
+		widget.TextOpts.Text("Qty 1", env.FaceMono(theme.StepSmall), theme.Solid(p.Accent)),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+			Position: widget.RowLayoutPositionCenter,
+		})),
+	)
+
+	newBtn := func(label string, clicked func()) *widget.Button {
+		return widget.NewButton(
+			widget.ButtonOpts.TextLabel(label),
+			widget.ButtonOpts.WidgetOpts(
+				widget.WidgetOpts.MinSize(theme.Px(40), theme.Px(40)),
+				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+			),
+			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
+		)
+	}
+	r.minus = newBtn("-", func() { r.stepQty(-1) })
+	r.plus = newBtn("+", func() { r.stepQty(1) })
+	r.refine = newBtn("Refine", r.refineClicked)
+
+	r.qtyBar = widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
+		)),
+	)
+	r.qtyBar.AddChild(r.minus, r.qtyLabel, r.plus, r.refine)
+
+	body := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(1),
+			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true, false, false}),
+			widget.GridLayoutOpts.Spacing(0, theme.Px(4)),
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
+		)),
+	)
+	body.AddChild(r.ores.Container(), r.status, r.qtyBar)
+
+	title, _ := theme.NewTitleBar(env, "Refinery", "kind_belt")
+
+	r.win = widget.NewWindow(
+		widget.WindowOpts.Contents(body),
+		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
+		widget.WindowOpts.MinSize(theme.Px(340), theme.Px(320)),
+		// Construction landing rect: the game centers it on first open.
+		widget.WindowOpts.Location(image.Rect(theme.Px(430), theme.Px(160), theme.Px(850), theme.Px(560))),
+	)
+	return r
+}
+
+// Win returns the refinery window for Kit.AddWindow.
+func (r *Refinery) Win() *widget.Window { return r.win }
+
+// oreStacks merges the general cargo and ore hold stacks into the ore list
+// in first-seen order (duplicates summed) — the two places CmdRefine
+// consumes from.
+func (r *Refinery) oreStacks() []content.CargoStack {
+	var out []content.CargoStack
+	add := func(st content.CargoStack) {
+		def, ok := r.cv.Defs().Item(st.Item)
+		if !ok || def.Category != content.CatOre || st.Qty <= 0 {
+			return
+		}
+		for i := range out {
+			if out[i].Item == st.Item {
+				out[i].Qty += st.Qty
+				return
+			}
+		}
+		out = append(out, st)
+	}
+	for _, st := range r.cv.CargoStacks() {
+		add(st)
+	}
+	for _, st := range r.cv.OreStacks() {
+		add(st)
+	}
+	return out
+}
+
+// refineOutputs is the exact conversion CmdRefine applies: floor(yield ×
+// qty) per mineral, in sorted mineral-id order, dropping zero yields.
+func refineOutputs(cv widgets.ContentView, def *content.ItemDef, qty int) []content.CargoStack {
+	if def == nil || qty < 1 {
+		return nil
+	}
+	ids := make([]content.ItemID, 0, len(def.RefineYield))
+	for id := range def.RefineYield {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	var out []content.CargoStack
+	for _, id := range ids {
+		n := int(def.RefineYield[id] * float64(qty))
+		if n > 0 {
+			out = append(out, content.CargoStack{Item: id, Qty: n})
+		}
+	}
+	return out
+}
+
+// outputsText renders an output list as "45 Ferrite · 30 Nickel" ("" for
+// an empty list).
+func (r *Refinery) outputsText(outs []content.CargoStack) string {
+	s := ""
+	for i, o := range outs {
+		if i > 0 {
+			s += " · "
+		}
+		s += theme.FormatInt(int64(o.Qty)) + " " + itemLabel(r.cv, o.Item)
+	}
+	return s
+}
+
+// cargoFits reports whether the outputs would fit the general hold, using
+// the sim's own volume math (cargoSpace over the general stacks).
+func (r *Refinery) cargoFits(outs []content.CargoStack) bool {
+	cargo, ok := r.cv.Cargo(r.cv.Player())
+	if !ok {
+		return false
+	}
+	free := cargo.Capacity
+	for _, st := range cargo.Stacks {
+		if def, ok := r.cv.Defs().Item(st.Item); ok {
+			free -= def.Volume * float64(st.Qty)
+		}
+	}
+	outVol := 0.0
+	for _, o := range outs {
+		if def, ok := r.cv.Defs().Item(o.Item); ok {
+			outVol += def.Volume * float64(o.Qty)
+		}
+	}
+	return outVol <= free+1e-9
+}
+
+// Sync refreshes the ore list, the yield preview and every gate from the
+// simulation. Call it every frame before Kit.Update.
+func (r *Refinery) Sync() {
+	ores := r.oreStacks()
+	qty := r.qty()
+	rows := make([]widgets.TableRow, 0, len(ores))
+	for _, st := range ores {
+		ref, _ := widgets.RefOfID(r.cv, string(st.Item))
+		row := refineryRow{ore: st.Item, ref: ref}
+		eff := min(qty, st.Qty)
+		def, _ := r.cv.Defs().Item(st.Item)
+		rows = append(rows, widgets.TableRow{
+			Cells: []string{
+				itemLabel(r.cv, st.Item),
+				theme.FormatInt(int64(st.Qty)),
+				r.outputsText(refineOutputs(r.cv, def, eff)),
+			},
+			Icons: []string{productIcon(r.cv, st.Item), "", ""},
+			Data:  row,
+			Spec: widgets.RowSpec{Ref: &row.ref, Actions: []widgets.RowAction{{
+				Label: "Refine", Disabled: !r.refineReadyFor(row),
+				Intent: widgets.Refine{Ore: row.ore, Qty: eff},
+			}}},
+		})
+	}
+	r.ores.SetRows(rows)
+	r.ores.Sync()
+
+	// Revalidate the cached selection against the rows themselves.
+	r.hasSel = false
+	if sel, ok := r.ores.Selected(); ok {
+		if row, isRow := sel.Data.(refineryRow); isRow && row.ore != "" {
+			r.sel, r.hasSel = row, true
+		}
+	}
+	if !r.hasSel {
+		r.sel = refineryRow{}
+	}
+
+	setStepperValue(r.qtyBar, r.qtyLabel, "Qty "+theme.FormatInt(int64(qty)))
+	r.refine.GetWidget().Disabled = !r.refineReadyFor(r.sel)
+
+	if !r.hasSel {
+		r.status.Label = "Select an ore to refine."
+	} else {
+		def, _ := r.cv.Defs().Item(r.sel.ore)
+		eff := min(qty, r.stockOf(r.sel.ore))
+		outs := refineOutputs(r.cv, def, eff)
+		line := "Refine " + theme.FormatInt(int64(eff)) + " × " + itemLabel(r.cv, r.sel.ore) + " → "
+		if text := r.outputsText(outs); text != "" {
+			line += text
+		} else {
+			line += "nothing"
+		}
+		if !r.cargoFits(outs) {
+			line += " · cargo full — nothing will refine"
+		}
+		r.status.Label = line
+	}
+}
+
+// stockOf is the units of one ore in the two holds (the sim's own
+// availability read).
+func (r *Refinery) stockOf(ore content.ItemID) int {
+	n := 0
+	for _, st := range r.oreStacks() {
+		if st.Item == ore {
+			n += st.Qty
+		}
+	}
+	return n
+}
+
+// refineReadyFor is the Refine gate: a selected ore, the docked station's
+// refine service and a positive quantity that fits the hold's stock.
+func (r *Refinery) refineReadyFor(row refineryRow) bool {
+	if row.ore == "" || !r.refineService() {
+		return false
+	}
+	return min(r.qty(), r.stockOf(row.ore)) > 0
+}
+
+// refineService reports whether the docked station offers refine (in space
+// the sim's own stationAccess gate refuses).
+func (r *Refinery) refineService() bool {
+	info, ok := r.cv.DockedStation()
+	return ok && slices.Contains(info.Services, "refine")
+}
+
+// stepQty moves the quantity stepper one step (clamped).
+func (r *Refinery) stepQty(delta int) {
+	r.qtyIdx += delta
+	if r.qtyIdx < 0 {
+		r.qtyIdx = 0
+	}
+	if r.qtyIdx >= len(qtySteps) {
+		r.qtyIdx = len(qtySteps) - 1
+	}
+	setStepperValue(r.qtyBar, r.qtyLabel, "Qty "+theme.FormatInt(int64(r.qty())))
+}
+
+// qty is the current unit count the stepper drives.
+func (r *Refinery) qty() int { return qtySteps[r.qtyIdx] }
+
+// refineClicked emits Refine for the selected ore (gated even when called
+// directly, the market buttons' rule).
+func (r *Refinery) refineClicked() {
+	if !r.refineReadyFor(r.sel) {
+		return
+	}
+	r.as.Do(widgets.Refine{Ore: r.sel.ore, Qty: min(r.qty(), r.stockOf(r.sel.ore))})
+}

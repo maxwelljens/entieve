@@ -578,6 +578,11 @@ type (
 	// CmdCollectJob delivers a finished job's output into the player's
 	// hangar (docked at the job's station, industry service).
 	CmdCollectJob struct{ ID uint64 }
+
+	// CmdCancelJob cancels a RUNNING job at the docked station: the
+	// committed materials return to the player's hangar, the fee is kept
+	// and the slot frees. Finished jobs must be collected instead.
+	CmdCancelJob struct{ ID uint64 }
 )
 
 func (CmdStop) isCommand()           {}
@@ -610,6 +615,7 @@ func (CmdAcceptMission) isCommand()  {}
 func (CmdAbandonMission) isCommand() {}
 func (CmdStartJob) isCommand()       {}
 func (CmdCollectJob) isCommand()     {}
+func (CmdCancelJob) isCommand()      {}
 
 // ---------------------------------------------------------------------------
 // Events — the observation surface

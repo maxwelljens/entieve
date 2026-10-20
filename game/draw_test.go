@@ -379,7 +379,7 @@ func TestFrameReconcilesMounts(t *testing.T) {
 	if !g.open[pServices] || g.mounted[pServices] == nil {
 		t.Error("services view not opened by the dock frame")
 	}
-	for _, p := range []panelID{pMarket, pFitting, pFactory} {
+	for _, p := range []panelID{pMarket, pFitting, pManufacturing} {
 		if g.open[p] || g.mounted[p] != nil {
 			t.Errorf("docking opened %s as well — only the services view auto-opens", panelNames[p])
 		}

@@ -101,7 +101,8 @@ func TestServicesEmitsTypedIntents(t *testing.T) {
 		{"cargo", widgets.Toggle{Screen: "Inventory"}},
 		{"market", widgets.Toggle{Screen: "Market"}},
 		{"fitting", widgets.Toggle{Screen: "Fitting"}},
-		{"industry", widgets.Toggle{Screen: "Factory"}},
+		{"industry", widgets.Toggle{Screen: "Manufacturing"}},
+		{"refine", widgets.Toggle{Screen: "Refinery"}},
 	} {
 		fireRailClick(t, c, s.Button(tc.button))
 		if len(sink.got) != 1 {

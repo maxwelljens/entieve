@@ -14,10 +14,13 @@ import (
 // A job runs a recipe's Runs sequential runs at one station. The materials
 // for EVERY run are committed up front from the player's storage (integer
 // units per input: ceil((input.Qty × runs) × craft material factor)); the
-// output lands in the player's hangar when the job is collected. Timing is
-// pure clock math — Job.StartedAt/DoneAt against the sim clock — so the
-// subsystem draws no RNG at all, and every list it touches keeps a
-// canonical order (jobs ascending by id, craft by (station, family)).
+// output lands in the player's hangar when the job is collected. The fee
+// (jobFeeRate of the recipe's mineral value) is paid up front too and is
+// kept on cancel, which returns the materials. All stations share
+// industrySlots job slots. Timing is pure clock math — Job.StartedAt/DoneAt
+// against the sim clock — so the subsystem draws no RNG at all, and every
+// list it touches keeps a canonical order (jobs ascending by id, craft by
+// (station, family)).
 //
 // Craft growth is per station + per recipe family (hulls|modules|charges):
 //
@@ -43,9 +46,13 @@ import (
 // ---------------------------------------------------------------------------
 
 const (
-	// industrySlots is how many jobs one station runs concurrently. A
-	// completed-but-uncollected job still occupies its slot.
-	industrySlots = 2
+	// industrySlots is how many jobs ALL stations run concurrently: the
+	// slots are a global pool, not per station. A completed-but-uncollected
+	// job still occupies its slot.
+	industrySlots = 3
+	// jobFeeRate is the manufacturing fee: a share of the recipe's mineral
+	// value at base prices, paid up front from the wallet.
+	jobFeeRate = 0.03
 	// craftMax is the craft-level cap (L5).
 	craftMax = 5
 	// craftDecayTicks is the idle stretch (ticks) that costs a family one
@@ -221,6 +228,26 @@ func (s *Sim) JobDuration(station StationID, recipe content.RecipeID, runs int) 
 	return rec.Time * float64(runs) * craftTimeFactor(s.CraftLevel(station, rec.Family))
 }
 
+// JobFee is the up-front manufacturing fee of a job: jobFeeRate (3%) of
+// the recipe's mineral value at content base prices × runs. The fee does
+// not depend on the station, the craft level or the market, so it is
+// recomputable from the recipe and run count alone (it is never persisted
+// on the Job). Unknown recipes and non-positive runs cost nothing.
+func (s *Sim) JobFee(recipe content.RecipeID, runs int) float64 {
+	rec, ok := s.Content.Recipes[recipe]
+	if !ok || rec == nil || runs < 1 {
+		return 0
+	}
+	value := 0.0
+	for _, in := range rec.Inputs {
+		if in.Qty <= 0 {
+			continue
+		}
+		value += in.Qty * s.marketBasePrice(in.Item)
+	}
+	return value * float64(runs) * jobFeeRate
+}
+
 // JobMaterials is the per-input integer commit of a job at the station's
 // current craft level:
 //
@@ -248,6 +275,12 @@ func (s *Sim) JobMaterials(station StationID, recipe content.RecipeID, runs int)
 	return out
 }
 
+// AllJobs returns every job (all stations) in ascending id order — a copy,
+// so callers never mutate sim state. The manufacturing window reads it for
+// the player's job list (filtered by OwnerPlayer) and the global slot
+// count; jobs are visible everywhere, controllable only where docked.
+func (s *Sim) AllJobs() []Job { return append([]Job(nil), s.jobs...) }
+
 // Jobs returns one station's jobs in ascending id order (a copy — callers
 // never mutate sim state).
 func (s *Sim) Jobs(station StationID) []Job {
@@ -260,16 +293,8 @@ func (s *Sim) Jobs(station StationID) []Job {
 	return out
 }
 
-// jobCount is how many slots a station currently has taken.
-func (s *Sim) jobCount(station StationID) int {
-	n := 0
-	for i := range s.jobs {
-		if s.jobs[i].Station == station {
-			n++
-		}
-	}
-	return n
-}
+// jobCount is how many of the global slots every station's jobs take.
+func (s *Sim) jobCount() int { return len(s.jobs) }
 
 // startJobCheck is StartJob's validation as a predicate: it returns the
 // resolved recipe and either ok, or the refusal reason StartJob logs.
@@ -288,8 +313,8 @@ func (s *Sim) startJobCheck(station StationID, recipe content.RecipeID, runs int
 	if !s.stationService(station, "industry") {
 		return rec, "This station does not offer industry", false
 	}
-	if s.jobCount(station) >= industrySlots {
-		return rec, "All job slots busy at " + s.stationName(station), false
+	if s.jobCount() >= industrySlots {
+		return rec, "All job slots busy", false
 	}
 	for _, m := range s.JobMaterials(station, recipe, runs) {
 		have := s.playerStock(m.Item)
@@ -300,6 +325,11 @@ func (s *Sim) startJobCheck(station StationID, recipe content.RecipeID, runs int
 			return rec, "Not enough " + s.itemName(m.Item) + " to build " +
 				s.itemName(rec.Product), false
 		}
+	}
+	// The fee is a player wallet debit; agent jobs settle through the
+	// agent's own capital seam and are not charged here.
+	if owner == OwnerPlayer && s.wallet < s.JobFee(recipe, runs) {
+		return rec, "Not enough credits for the job fee", false
 	}
 	return rec, "", true
 }
@@ -354,6 +384,19 @@ func (s *Sim) StartJob(station StationID, recipe content.RecipeID, runs int, own
 	}
 
 	level := s.CraftLevel(station, rec.Family)
+	// The player's manufacturing fee is paid up front, before the job
+	// exists (startJobCheck already proved the wallet covers it). Agent
+	// owners settle through their own capital seam and pay no fee.
+	if owner == OwnerPlayer {
+		if fee := s.JobFee(recipe, runs); fee > 0 {
+			s.wallet -= fee
+			s.recordLedger(LedgerEntry{
+				What:   "Industry fee — " + itoaN(runs) + " x " + s.itemName(rec.Product),
+				Where:  s.stationName(station),
+				Amount: -fee,
+			})
+		}
+	}
 	s.jobSeq++
 	job := Job{
 		ID: s.jobSeq, Station: station, Recipe: recipe, Runs: runs,
@@ -401,6 +444,49 @@ func (s *Sim) CollectJob(station StationID, id uint64, owner string) bool {
 		s.jobs = append(s.jobs[:i], s.jobs[i+1:]...)
 		s.emit(Event{Kind: EvLog, Severity: SevGood, Actor: s.player, Item: rec.Product,
 			Text: "Industry: " + s.itemName(rec.Product) + " collected at " + s.stationName(station)})
+		return true
+	}
+	return false
+}
+
+// CancelJob removes a RUNNING job of owner at station and returns its
+// committed materials to that owner (player hangar; agent inventory), the
+// fee being kept. A finished job is never cancellable — collect it. Only
+// the job's own owner cancels. Refund quantities are recomputed with
+// JobMaterials (a craft level that moved mid-job can drift them by a
+// unit; shortcut: freeze per-job materials only if that ever matters).
+// The player path is Queue(CmdCancelJob{ID}).
+func (s *Sim) CancelJob(station StationID, id uint64, owner string) bool {
+	for i := range s.jobs {
+		j := &s.jobs[i]
+		if j.ID != id || j.Station != station {
+			continue
+		}
+		if j.Owner != owner {
+			return false
+		}
+		rec, ok := s.Content.Recipes[j.Recipe]
+		if !ok || rec == nil {
+			s.jobs = append(s.jobs[:i], s.jobs[i+1:]...)
+			s.industryRefusal("Recipe " + string(j.Recipe) + " is no longer loaded")
+			return false
+		}
+		if j.State != JobRunning {
+			s.industryRefusal("Job is ready — collect it at " + s.stationName(station))
+			return false
+		}
+		agent := s.agentByOwner(owner)
+		for _, m := range s.JobMaterials(station, j.Recipe, j.Runs) {
+			if agent != nil {
+				addInv(agent, m.Item, m.Qty)
+			} else {
+				s.storePlayerStock(m.Item, m.Qty)
+			}
+		}
+		s.jobs = append(s.jobs[:i], s.jobs[i+1:]...)
+		s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: s.player, Item: rec.Product,
+			Text: "Industry: " + s.itemName(rec.Product) + " cancelled at " +
+				s.stationName(station) + " — materials returned"})
 		return true
 	}
 	return false
@@ -458,6 +544,8 @@ func (s *Sim) systemIndustry() {
 			s.execStartJob(c)
 		case CmdCollectJob:
 			s.execCollectJob(c)
+		case CmdCancelJob:
+			s.execCancelJob(c)
 		}
 	}
 	s.deferIndustry = nil
@@ -498,3 +586,16 @@ func (s *Sim) execCollectJob(c CmdCollectJob) {
 	}
 	s.CollectJob(s.dockedStationID(), c.ID, OwnerPlayer)
 }
+
+// execCancelJob runs CmdCancelJob against the docked station (same gate
+// and local-only rule as CollectJob).
+func (s *Sim) execCancelJob(c CmdCancelJob) {
+	if _, ok := s.stationAccess("industry"); !ok {
+		return
+	}
+	s.CancelJob(s.dockedStationID(), c.ID, OwnerPlayer)
+}
+
+// StationName is the display name of a station celestial ("" when unknown)
+// — the manufacturing window's per-station job grouping.
+func (s *Sim) StationName(station StationID) string { return s.stationName(station) }

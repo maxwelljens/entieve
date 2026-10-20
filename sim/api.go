@@ -577,8 +577,8 @@ func (s *Sim) DockedIndustry() StationID {
 	return ""
 }
 
-// IndustrySlots is how many jobs one station runs concurrently (the
-// industrySlots design constant, for the factory panel's slot readout).
+// IndustrySlots is how many jobs ALL stations run concurrently (the
+// industrySlots design constant, for the manufacturing panel's readout).
 func IndustrySlots() int { return industrySlots }
 
 // PlayerStock is the units of item the player can spend: general hold, ore

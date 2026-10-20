@@ -805,7 +805,11 @@ func (v *validator) contracts() {
 				v.addf("%s: kill contract must not set item/destination", ctx)
 			}
 		case ContractDeliver:
-			if _, ok := v.c.Items[obj.Item]; !ok {
+			// Manufactured goods trade as cargo: modules have no volume
+			// (count reads as units), items keep the m³ rule.
+			if _, ok := v.c.Modules[ModuleID(obj.Item)]; ok {
+				// a manufacturable module id: units, no volume check
+			} else if _, ok := v.c.Items[obj.Item]; !ok {
 				v.addf("%s: unknown cargo item %q", ctx, obj.Item)
 			} else if def := v.c.Items[obj.Item]; def.Volume > 0 {
 				units := float64(obj.Count) / def.Volume
