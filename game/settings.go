@@ -189,6 +189,12 @@ func (g *Game) resetLayout() {
 	}
 	g.restored = map[*widget.Window]bool{}
 	g.placed = map[*widget.Window]image.Rectangle{}
+	// The pane proportions are layout state too: back to equal shares.
+	for _, name := range layoutNames {
+		for _, sm := range g.splitSeams(name) {
+			sm.Split.Reset()
+		}
+	}
 	g.placeDefaults(g.w, g.h)
 	g.clampRestored(g.w, g.h)
 	g.report(nil, "Window layout reset")

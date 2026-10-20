@@ -20,6 +20,7 @@ type Inventory struct {
 	win *widget.Window
 
 	cargo, ore, hangar *widgets.Table
+	split              *widgets.SplitPane
 
 	cargoLbl *widget.Text
 	oreLbl   *widget.Text
@@ -112,21 +113,24 @@ func NewInventory(env widgets.Seams) *Inventory {
 	inv.qtyBar = toolbar(inv.minus, inv.qtyLabel, inv.plus, inv.sell)
 	xferBar := toolbar(inv.toCargo, inv.toOre, inv.toHangar)
 
-	// Body: label/table pairs over the two button rows; the grid gives
-	// each table exactly its cell (bounded viewport, equal thirds).
+	// Body: the three label/table panes over the two button rows. The
+	// panes split the leftover height by seam ratio (equal thirds by
+	// default — a drag persists in the layout sidecar).
+	inv.split = widgets.NewSplitPane(env,
+		paneStack([]bool{false, true}, inv.cargoLbl, inv.cargo.Container()),
+		paneStack([]bool{false, true}, inv.oreLbl, inv.ore.Container()),
+		paneStack([]bool{false, true}, inv.hangLbl, inv.hangar.Container()),
+	)
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
-			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, true, false, true, false, true, false, false}),
+			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true, false, false}),
 			widget.GridLayoutOpts.Spacing(0, theme.Px(4)),
 			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	body.AddChild(inv.cargoLbl, inv.cargo.Container(),
-		inv.oreLbl, inv.ore.Container(),
-		inv.hangLbl, inv.hangar.Container(),
-		inv.qtyBar, xferBar)
+	body.AddChild(inv.split.Container(), inv.qtyBar, xferBar)
 
 	title, _ := theme.NewTitleBar(env, "Inventory", "svc_inventory")
 
@@ -146,6 +150,29 @@ func NewInventory(env widgets.Seams) *Inventory {
 
 // Win returns the inventory window for Kit.AddWindow.
 func (inv *Inventory) Win() *widget.Window { return inv.win }
+
+// Splits names the window's draggable seams for the layout sidecar: each
+// key names the hold pane below its seam.
+func (inv *Inventory) Splits() []widgets.Seam {
+	return []widgets.Seam{
+		{Name: "inventory-ore", Split: inv.split, Index: 0},
+		{Name: "inventory-hangar", Split: inv.split, Index: 1},
+	}
+}
+
+// paneStack stacks one split pane's rows in a single column: the rows
+// marked stretch take the pane's leftover height (its scroll body), the
+// rest keep their preferred height (labels, toolbars). Each body keeps
+// its own ScrollRail gutter.
+func paneStack(stretch []bool, rows ...widget.PreferredSizeLocateableWidget) *widget.Container {
+	c := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewGridLayout(
+		widget.GridLayoutOpts.Columns(1),
+		widget.GridLayoutOpts.Stretch([]bool{true}, stretch),
+		widget.GridLayoutOpts.Spacing(0, theme.Px(4)),
+	)))
+	c.AddChild(rows...)
+	return c
+}
 
 // selectFrom builds a per-section selection callback recording the
 // selected item and the hold it lives in.
@@ -173,6 +200,7 @@ func (inv *Inventory) tableFor(src string) *widgets.Table {
 // Sync refreshes the three sections, their totals and the action
 // gating. Call it every frame before Kit.Update.
 func (inv *Inventory) Sync() {
+	inv.split.Poll()
 	s := inv.cv
 	player := s.Player()
 

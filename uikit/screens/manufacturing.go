@@ -37,6 +37,7 @@ type Manufacturing struct {
 
 	recipes *widgets.Table
 	jobs    *widgets.Table
+	split   *widgets.SplitPane
 
 	craftLbl *widget.Text
 	jobsLbl  *widget.Text
@@ -155,21 +156,24 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	)
 	collectBar.AddChild(f.collect, f.cancel)
 
-	// Body: craft/readout lines over the two table sections and their
-	// toolbars; the grid gives each table its bounded cell (their own
-	// preferred height never grows the window).
+	// Body: the craft readout over two panes — the recipe board with its
+	// Start toolbar, the job list with Collect/Cancel — split by a
+	// draggable seam (equal halves by default; a drag persists in the
+	// layout sidecar).
+	f.split = widgets.NewSplitPane(env,
+		paneStack([]bool{true, false}, f.recipes.Container(), startBar),
+		paneStack([]bool{false, true, false}, f.jobsLbl, f.jobs.Container(), collectBar),
+	)
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
-			widget.GridLayoutOpts.Stretch([]bool{true},
-				[]bool{false, true, false, false, true, false}),
+			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, true}),
 			widget.GridLayoutOpts.Spacing(0, theme.Px(4)),
 			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	body.AddChild(f.craftLbl, f.recipes.Container(), startBar,
-		f.jobsLbl, f.jobs.Container(), collectBar)
+	body.AddChild(f.craftLbl, f.split.Container())
 
 	title, titleText := theme.NewTitleBar(env, "Manufacturing", "row_module")
 	f.title = titleText
@@ -189,6 +193,12 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 
 // Win returns the manufacturing window for Kit.AddWindow.
 func (f *Manufacturing) Win() *widget.Window { return f.win }
+
+// Splits names the window's draggable seam for the layout sidecar (the
+// job-list pane below it).
+func (f *Manufacturing) Splits() []widgets.Seam {
+	return []widgets.Seam{{Name: "manufacturing-jobs", Split: f.split, Index: 0}}
+}
 
 // canonicalFirst is the market table's sort rule: the given key keeps the
 // rows in the order Sync delivered them (canonical sim order), any other
@@ -224,6 +234,7 @@ func canonicalFirst(key string, cols []widgets.Column) func(string, bool, []widg
 // Sync refreshes the recipe board, the job list and every gate from the
 // simulation. Call it every frame before Kit.Update.
 func (f *Manufacturing) Sync() {
+	f.split.Poll()
 	s := f.cv
 	station := s.DockedIndustry()
 	runs := f.qty()

@@ -785,6 +785,23 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > deterministic world-input gate: the menu rect joins `Game.overUI`'s
 > exact-rect list, so a click over the popup can never reach world input.
 
+> **Split panes (2026-10):** a multi-pane window divides its leftover
+> height by **ratio**, not ebitenui's equal `GridLayout` shares, which
+> have no weights. `widgets.SplitPane` is a vertical stack with a
+> draggable seam between each pair: its own `Layouter` (so no upstream
+> change), a hairline seam with an 8 px grab band classified from the
+> cursor every frame (the window chrome's `gripStart` idiom and its
+> topmost-input-layer test, so a seam under another window is inert), an
+> NS-resize cursor write, and a 72 design-px pane floor. Each panel names
+> its seams (`Inventory.Splits`, `Fitting.Splits`,
+> `Manufacturing.Splits` → `widgets.Seam`) and the layout sidecar
+> persists them in the version-3 `splits` map (name → the fraction of the
+> stack above that seam; equal shares when a seam is absent). Version-2
+> sidecars still load — they carry no ratios, so every seam starts at its
+> equal share and the next write is v3. Wired: Inventory (cargo/ore,
+> ore/hangar), Fitting (slots/hangar), Manufacturing (recipes/jobs); the
+> market's splitter is a follow-up.
+
 - `render.Renderer` created with `(*content.Content)`; `Draw(dst *ebiten.Image,
   cam Camera, s *sim.Sim)` reads sim stores read-only. Vector art: ships as
   polygons per hull class, star glow, parallax starfield (seeded), grid dots,

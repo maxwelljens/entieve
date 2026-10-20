@@ -86,6 +86,14 @@ work; the opposite edge stays fixed and the window never shrinks below
 its minimum size), and click anywhere on a window to raise it to the
 front.
 
+**Multi-pane windows** — Inventory, Fitting and Manufacturing — carry
+**draggable seams** between their lists: the seam is a thin line with an
+about 8 px grab band (the cursor turns into the up/down arrow over it),
+and dragging it trades height between the two lists it separates, so a
+long hangar or job list can be given the room. Each pane keeps a minimum
+height, so nothing collapses, and the proportions are saved with the
+window's layout (see **Your layout persists**).
+
 Toggle keys open and close their window (`I`, `F`, `G`, `B`, `C`, `N`, `H`,
 `P`, `K`, `Shift+L`) — windows have no separate close button. The same
 toggles live on the **left navigation rail**: one glyph per window in
@@ -154,7 +162,10 @@ fitting, manufacturing, refinery, scanner, map, help) is saved to a sidecar file
 save — `<save path>.layout.json`, e.g.
 `os.UserConfigDir()/entieve/save.json.layout.json` — whenever you save
 (`Ctrl+S` / menu **Save**) and again when you quit cleanly from the
-menu. It is read back on startup and after loading a save, so a
+menu. The pane proportions of the split windows (inventory, fitting,
+manufacturing) ride along in the same file, so a dragged seam comes back
+with the rest of the arrangement. It is read back on startup and after
+loading a save, so a
 favorite arrangement survives restarts and loads. Restored windows are
 clamped to their minimum size and to the screen (always fully
 on-screen) — the clamp is re-established whenever you resize the game

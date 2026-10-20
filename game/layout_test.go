@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -18,11 +19,12 @@ import (
 type layoutDoc struct {
 	Version int `json:"version"`
 	Windows map[string]struct {
-		X    int  `json:"x"`
-		Y    int  `json:"y"`
-		W    int  `json:"w"`
-		H    int  `json:"h"`
-		Open bool `json:"open"`
+		X      int                `json:"x"`
+		Y      int                `json:"y"`
+		W      int                `json:"w"`
+		H      int                `json:"h"`
+		Open   bool               `json:"open"`
+		Splits map[string]float64 `json:"splits"`
 	} `json:"windows"`
 }
 
@@ -709,4 +711,180 @@ func TestStaleLayoutVersionIgnored(t *testing.T) {
 				panelNames[id], got, want)
 		}
 	}
+}
+
+// assertSplitTiled: a split's panes and hairlines fill its rect: no pane
+// collapsed and no gap (a resize or a restored ratio must never leave the
+// stack short).
+func assertSplitTiled(t *testing.T, name string, split *widgets.SplitPane) {
+	t.Helper()
+	root := split.Container().GetWidget().Rect
+	total := 0
+	for _, ch := range split.Container().Children() {
+		h := ch.GetWidget().Rect.Dy()
+		if h == 0 {
+			t.Errorf("%s: a split row is 0 px tall (%v)", name, ch.GetWidget().Rect)
+		}
+		total += h
+	}
+	if total != root.Dy() {
+		t.Errorf("%s: split rows fill %d px, want the %d px rect", name, total, root.Dy())
+	}
+}
+
+// seamRatio reads a window's named seam ratio through its panel.
+func seamRatio(name string, seams []widgets.Seam) float64 {
+	for _, sm := range seams {
+		if sm.Name == name {
+			return sm.Split.Ratio(sm.Index)
+		}
+	}
+	return -1
+}
+
+// TestSplitRatiosPersistAcrossRestart: a dragged seam writes its ratio
+// into the version-3 sidecar and a fresh session restores it exactly,
+// while a seam nobody touched keeps its equal share.
+func TestSplitRatiosPersistAcrossRestart(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	g := newShowcaseGameAt(t, path)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+
+	// Drag inventory's first seam and fitting's only one (through the same
+	// panels the windows expose to the sidecar).
+	inv := g.splitSeams("inventory")
+	inv[0].Split.SetRatio(inv[0].Index, 0.42)
+	fit := g.splitSeams("fitting")
+	fit[0].Split.SetRatio(fit[0].Index, 0.7)
+
+	if err := g.SaveGame(); err != nil {
+		t.Fatalf("SaveGame: %v", err)
+	}
+	doc := readDoc(t, g.layoutPath())
+	if doc.Version != 3 {
+		t.Fatalf("sidecar version = %d, want 3", doc.Version)
+	}
+	if got := doc.Windows["inventory"].Splits["inventory-ore"]; got != 0.42 {
+		t.Errorf("inventory-ore = %v, want the dragged 0.42", got)
+	}
+	if got := doc.Windows["inventory"].Splits["inventory-hangar"]; got != float64(2)/3 {
+		t.Errorf("inventory-hangar = %v, want the untouched equal share %v", got, float64(2)/3)
+	}
+	if got := doc.Windows["fitting"].Splits["fitting-hangar"]; got != 0.7 {
+		t.Errorf("fitting-hangar = %v, want the dragged 0.7", got)
+	}
+	if got := doc.Windows["manufacturing"].Splits["manufacturing-jobs"]; got != 0.5 {
+		t.Errorf("manufacturing-jobs = %v, want the equal-share default 0.5", got)
+	}
+
+	// Next session: the ratios come back exactly, then a viewport change
+	// still tiles every split (nothing collapsed by the pane floor).
+	g2 := newShowcaseGameAt(t, path)
+	g2.applySize(1280, 720)
+	// Mount the two windows whose splits are checked (both closed in the
+	// sidecar: a drag persists ratios, never the open flag).
+	g2.open[pInventory], g2.open[pFitting] = true, true
+	g2.syncMounts()
+	pump(t, g2, 1280, 720)
+	if got := seamRatio("inventory-ore", g2.splitSeams("inventory")); got != 0.42 {
+		t.Errorf("restored inventory-ore = %v, want 0.42", got)
+	}
+	if got := seamRatio("inventory-hangar", g2.splitSeams("inventory")); got != float64(2)/3 {
+		t.Errorf("restored inventory-hangar = %v, want the equal share", got)
+	}
+	if got := seamRatio("fitting-hangar", g2.splitSeams("fitting")); got != 0.7 {
+		t.Errorf("restored fitting-hangar = %v, want 0.7", got)
+	}
+	g2.applySize(1024, 700)
+	pump(t, g2, 1024, 700)
+	assertSplitTiled(t, "inventory", g2.splitSeams("inventory")[0].Split)
+	assertSplitTiled(t, "fitting", g2.splitSeams("fitting")[0].Split)
+}
+
+// TestSidecarV2MigratesToSplits: a hand-written version-2 sidecar (the
+// files existing players have) restores every rect and open flag exactly,
+// leaves the seams at their equal-share defaults, and is rewritten as
+// version 3 on the next save.
+func TestSidecarV2MigratesToSplits(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	if err := os.WriteFile(path+".layout.json", []byte(`{"version":2,"windows":{
+		"overview":{"x":200,"y":100,"w":400,"h":300,"open":true},
+		"inventory":{"x":120,"y":140,"w":320,"h":440,"open":true},
+		"factory":{"x":300,"y":200,"w":500,"h":400,"open":false}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	g := newShowcaseGameAt(t, path)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+
+	if got, want := g.inv.Win().GetContainer().GetWidget().Rect, image.Rect(120, 140, 440, 580); got != want {
+		t.Errorf("v2 inventory rect = %v, want the saved %v", got, want)
+	}
+	if !g.open[pInventory] {
+		t.Error("v2 inventory open flag not restored")
+	}
+	// The rename migration still applies to v2 files (the saved 500×400
+	// grows to the window's 420×440 content floor).
+	if got, want := g.manu.Win().GetContainer().GetWidget().Rect, image.Rect(300, 200, 800, 640); got != want {
+		t.Errorf("v2 factory rect migrated to %v, want %v", got, want)
+	}
+	if g.open[pManufacturing] {
+		t.Error("v2 manufacturing open flag not restored (want closed)")
+	}
+	for _, sm := range g.splitSeams("inventory") {
+		if got, want := sm.Split.Ratio(sm.Index), float64(sm.Index+1)/3; got != want {
+			t.Errorf("v2 %s = %v, want the equal-share default %v", sm.Name, got, want)
+		}
+	}
+	if got := seamRatio("fitting-hangar", g.splitSeams("fitting")); got != 0.5 {
+		t.Errorf("v2 fitting-hangar = %v, want the 0.5 default", got)
+	}
+
+	// The next write is version 3, rects and flags unchanged.
+	if err := g.writeLayout(); err != nil {
+		t.Fatalf("writeLayout: %v", err)
+	}
+	doc := readDoc(t, g.layoutPath())
+	if doc.Version != 3 {
+		t.Errorf("rewritten sidecar version = %d, want 3", doc.Version)
+	}
+	if e := doc.Windows["inventory"]; e.X != 120 || e.Y != 140 || e.W != 320 || e.H != 440 || !e.Open {
+		t.Errorf("rewritten inventory = %+v, want the v2 rect and flag kept", e)
+	}
+	if got := doc.Windows["inventory"].Splits["inventory-ore"]; got != float64(1)/3 {
+		t.Errorf("rewritten inventory-ore = %v, want the default %v", got, float64(1)/3)
+	}
+	if got := doc.Windows["fitting"].Splits["fitting-hangar"]; got != 0.5 {
+		t.Errorf("rewritten fitting-hangar = %v, want the default 0.5", got)
+	}
+}
+
+// TestSplitRatioOutOfRangeClamps: a corrupt sidecar ratio (far negative,
+// far over one) restores clamped to the widget's sane band, never a
+// collapsed or negative pane.
+func TestSplitRatioOutOfRangeClamps(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	if err := os.WriteFile(path+".layout.json", []byte(`{"version":3,"windows":{
+		"fitting":{"x":700,"y":260,"w":300,"h":430,"open":true,
+			"splits":{"fitting-hangar":2}},
+		"manufacturing":{"x":400,"y":120,"w":420,"h":440,"open":false,
+			"splits":{"manufacturing-jobs":-3}}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	g := newShowcaseGameAt(t, path)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+
+	if got := seamRatio("fitting-hangar", g.splitSeams("fitting")); got != widgets.SplitMaxRatio {
+		t.Errorf("fitting-hangar = %v, want the clamped max %v", got, widgets.SplitMaxRatio)
+	}
+	if got := seamRatio("manufacturing-jobs", g.splitSeams("manufacturing")); got != widgets.SplitMinRatio {
+		t.Errorf("manufacturing-jobs = %v, want the clamped min %v", got, widgets.SplitMinRatio)
+	}
+	// Fitting restores open, so its split is laid out; manufacturing is
+	// docked-only and closed here, so only its stored ratio is checked.
+	assertSplitTiled(t, "fitting", g.splitSeams("fitting")[0].Split)
 }

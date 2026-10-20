@@ -24,6 +24,7 @@ type Fitting struct {
 	resists *widgets.Table // EM/TH/KN/EX in one row
 	slots   *widgets.Table
 	hangar  *widgets.Table
+	split   *widgets.SplitPane
 
 	unfit    *widget.Button
 	fitMod   *widget.Button
@@ -104,13 +105,18 @@ func NewFitting(env widgets.Seams) *Fitting {
 		)
 	}
 
-	// Body: fixed rows for the stat block, resist table and section
-	// labels; the two data tables split the remaining height.
+	// Body: fixed rows for the stat block and resist table; the slots and
+	// hangar panes split the remaining height by seam ratio (equal halves
+	// by default — a drag persists in the layout sidecar).
+	f.split = widgets.NewSplitPane(env,
+		paneStack([]bool{false, true}, label("Slots"), f.slots.Container()),
+		paneStack([]bool{false, true}, label("Hangar"), f.hangar.Container()),
+	)
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
-			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, false, false, true, false, true, false}),
+			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, false, true, false}),
 			widget.GridLayoutOpts.Spacing(0, theme.Px(4)),
 			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
@@ -118,8 +124,7 @@ func NewFitting(env widgets.Seams) *Fitting {
 	body.AddChild(
 		f.stats,
 		f.resists.Container(),
-		label("Slots"), f.slots.Container(),
-		label("Hangar"), f.hangar.Container(),
+		f.split.Container(),
 		buttons,
 	)
 
@@ -143,10 +148,17 @@ func NewFitting(env widgets.Seams) *Fitting {
 // Win returns the fitting window for Kit.AddWindow.
 func (f *Fitting) Win() *widget.Window { return f.win }
 
+// Splits names the window's draggable seam for the layout sidecar (the
+// hangar pane below it).
+func (f *Fitting) Splits() []widgets.Seam {
+	return []widgets.Seam{{Name: "fitting-hangar", Split: f.split, Index: 0}}
+}
+
 // Sync refreshes the hull title, derived stats, resist row, slot rows,
 // hangar rows and the action gating. Call it every frame before
 // Kit.Update.
 func (f *Fitting) Sync() {
+	f.split.Poll()
 	s := f.cv
 	player := s.Player()
 
