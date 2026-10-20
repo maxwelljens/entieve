@@ -66,6 +66,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The pane splitter follows the cursor and its resize cursor no longer
+  flickers** (`uikit/widgets/splitpane.go`, `uikit/screens/kit.go`): a
+  vertical seam moved opposite to the drag — pulling up pushed it down —
+  and the splitter wrote its cursor from the Update phase while ebitenui's
+  AfterDraw rewrote the arrow at the end of the frame, so the two
+  alternated on every frame. The seam now trades extent with the cursor
+  (down grows the pane above it, right grows the pane before it) and the
+  hovered seam claims the cursor once per frame from the kit's post-Draw
+  pass, ahead of the window grips, which keep their edges and corners.
+  Stored seam ratios need no migration: they are still the fraction above
+  (or left of) the seam.
 - **Fast scrolling no longer oscillates** (`uikit/widgets/scrollrail.go`):
   the house rail mirrored the viewport every frame, and ebitenui treated
   that mirror as a user change, firing a deferred Changed that wrote the

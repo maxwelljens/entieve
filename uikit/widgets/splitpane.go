@@ -194,7 +194,7 @@ func (s *SplitPane) Step(cursor image.Point, rising, pressed bool) {
 			return
 		}
 		s.drag(cursor)
-		s.setCursor()
+		splitClaim = s
 		return
 	}
 	if rising {
@@ -209,11 +209,11 @@ func (s *SplitPane) Step(cursor image.Point, rising, pressed bool) {
 			return
 		}
 		s.seam, s.start = i, cursor
-		s.setCursor()
+		splitClaim = s
 		return
 	}
 	if s.seamAt(cursor) >= 0 {
-		s.setCursor()
+		splitClaim = s
 	}
 }
 
@@ -232,10 +232,10 @@ func (s *SplitPane) axisLen(r image.Rectangle) int {
 // laid-out extents, so the drag trades exact pixels (the shares a resize
 // rounded away must not leak a drift into the two panes).
 func (s *SplitPane) drag(cursor image.Point) {
-	// lead is the leading pane's growth: down the stack the house sign
-	// shrinks the pane above (the vertical windows' shipped behavior);
-	// a row grows the pane before the seam as the cursor moves right.
-	lead := s.start.Y - cursor.Y
+	// lead is the leading pane's growth: the seam follows the cursor, so
+	// dragging down the stack (or right in a row) grows the pane before
+	// it. Up/down was inverted once; the tests pin the cursor-aligned sign.
+	lead := cursor.Y - s.start.Y
 	if s.row {
 		lead = cursor.X - s.start.X
 	}
@@ -382,10 +382,30 @@ func SetSplitHeldForTest(f func() bool) func() {
 	return func() { splitHeld = prev }
 }
 
+// splitClaim is the split whose seam held the cursor at this frame's
+// Poll. ApplySplitCursor writes its shape from the kit's post-Draw pass:
+// a seam write during Update is reset to the arrow by ebitenui's
+// input.AfterDraw before the frame presents, so two writers alternated
+// the cursor every frame (the flicker this replaces).
+var splitClaim *SplitPane
+
+// ApplySplitCursor writes the claimed seam cursor. The kit calls it once
+// per frame after ui.Draw, before its chrome pass — a window grip still
+// wins in its own band. The claim is consumed, so a split that stopped
+// polling (its window unmounted mid-hover) cannot leave a stuck cursor.
+func ApplySplitCursor() {
+	s := splitClaim
+	splitClaim = nil
+	if s != nil {
+		s.setCursor()
+	}
+}
+
 // setCursor is the seam's cursor write: NS over a stack's horizontal
 // seam, EW over a row's vertical one — ebiten's own call (the window
 // chrome's setCursorShape idiom — ebitenui's name cache resets the OS
-// cursor every frame, so the hover rewrites it every frame too).
+// cursor every frame, so the hover rewrites it every frame too). Called
+// only by ApplySplitCursor, once per frame.
 func (s *SplitPane) setCursor() {
 	shape := ebiten.CursorShapeNSResize
 	if s.row {

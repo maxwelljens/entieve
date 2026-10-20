@@ -255,6 +255,10 @@ func (k *Kit) Draw(screen *ebiten.Image) {
 	// against live geometry (see unparkAnims).
 	k.unparkAnims()
 	k.relayAnimWindows()
+	// The hovered pane seam claims the cursor here — after ui.Draw's
+	// default reset, before the chrome pass, whose grips keep priority
+	// in the window edges (widgets.ApplySplitCursor).
+	widgets.ApplySplitCursor()
 	// Second chrome pass: input may have changed while drawing, and both
 	// drags recompute their rect absolutely from the press — this pass
 	// applies the fresh cursor (or derives an identical rect) so the
