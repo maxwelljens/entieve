@@ -88,6 +88,13 @@ type Renderer struct {
 	// on-screen celestial, rock, wreck and ship. Read by
 	// BodiesDrawnForTest — the frame-cost pin.
 	bodyPrims int
+
+	// shotPrims counts the gun-fire primitives the last effects pass drew,
+	// and shotStrokes the length of every bolt stroke. Read by the render
+	// tests — the "fire is per-shot, never a beam" pin. Tests only;
+	// production never reads them.
+	shotPrims   int
+	shotStrokes []float32
 }
 
 // New returns a Renderer over the loaded content.

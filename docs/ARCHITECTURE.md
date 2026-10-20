@@ -789,8 +789,9 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
   cam Camera, s *sim.Sim)` reads sim stores read-only. Vector art: ships as
   polygons per hull class, star glow, parallax starfield (seeded), grid dots,
   brackets (EVE-style corner brackets colored by standing: red NPC, blue
-  celestial, white player), warp tunnel lines, mining beam, muzzle flash,
-  wreck icons.
+  celestial, white player), warp tunnel lines, mining beam, gun fire as a
+  per-shot muzzle flash + travelling bolts + impact glow (never a
+  muzzle→target beam), wreck icons.
 - `uikit` widgets are pure layout+input over `*sim.Sim` state; window chrome
   EVE-dark (near-black panels, amber/white text, mono-ish gofont).
   Windows: Overview (table: icon, name, distance, velocity — sortable),
