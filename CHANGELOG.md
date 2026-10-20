@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Refining is atomic in 100-ore batches** (`sim/system_economy.go`,
+  `uikit/screens/refinery.go`): ore refines only in whole batches of 100, so
+  a fraction of a unit per ore can no longer floor to nothing while eating
+  the ore. The Refinery stepper offers 100, 200, 300, … capped at the
+  selected ore's stock (250 ore caps at 200), and under 100 ore the button
+  is grayed with a line saying a batch needs 100. `CmdRefine` with any other
+  quantity is refused untouched with a clear log line; a stock that is not a
+  multiple never refines partially.
 - **Factory is now Manufacturing** (`uikit/screens/manufacturing.go`, the
   `pManufacturing` Screen row, key `B` unchanged): the industry window is
   renamed per the approved design. The layout sidecar key follows

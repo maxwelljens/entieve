@@ -330,43 +330,73 @@ func TestSellFallsBackToHangar(t *testing.T) {
 	}
 }
 
-func TestRefineFloorPerMineral(t *testing.T) {
+func TestRefineWholeBatches(t *testing.T) {
 	s := newTestSim(t)
 	dockAtHaven(t, s)
-	giveCargo(s, "ore-sterngrit", 10)
-	s.Queue(CmdRefine{Item: "ore-sterngrit", Qty: 10})
+	giveCargo(s, "ore-sterngrit", 100)
+	s.Queue(CmdRefine{Item: "ore-sterngrit", Qty: 100})
 	s.Step()
 	evs := drain(s)
 
 	if cargoCount(s, "ore-sterngrit") != 0 {
 		t.Fatal("ore not consumed")
 	}
-	// floor(0.5*10) = 5 ferrite, floor(0.25*10) = 2 nickel.
-	if cargoCount(s, "min-ferrite") != 5 {
-		t.Fatalf("ferrite=%d want 5", cargoCount(s, "min-ferrite"))
+	// floor(0.5*100) = 50 ferrite, floor(0.25*100) = 25 nickel — a batch
+	// makes the fixture's fractions exact.
+	if cargoCount(s, "min-ferrite") != 50 {
+		t.Fatalf("ferrite=%d want 50", cargoCount(s, "min-ferrite"))
 	}
-	if cargoCount(s, "min-nickel") != 2 {
-		t.Fatalf("nickel=%d want 2", cargoCount(s, "min-nickel"))
+	if cargoCount(s, "min-nickel") != 25 {
+		t.Fatalf("nickel=%d want 25", cargoCount(s, "min-nickel"))
 	}
-	if !hasEvent(evs, EvLog, "Refined 10 x Sterngrit into 5 x Ferrite, 2 x Nickel") {
+	if !hasEvent(evs, EvLog, "Refined 100 x Sterngrit into 50 x Ferrite, 25 x Nickel") {
 		t.Fatalf("missing refine event: %v", evs)
 	}
 
-	// Floor test: 3 units -> ferrite floor(1.5)=1, nickel floor(0.75)=0.
-	giveCargo(s, "ore-sterngrit", 3)
-	s.Queue(CmdRefine{Item: "ore-sterngrit", Qty: 3})
+	// Partial lots are refused untouched: a unit or two would floor to
+	// nothing while still eating the ore.
+	giveCargo(s, "ore-sterngrit", 100)
+	for _, qty := range []int{1, 10, 50} {
+		s.Queue(CmdRefine{Item: "ore-sterngrit", Qty: qty})
+		s.Step()
+		evs = drain(s)
+		if findEvent(evs, EvLog, "partial batch") == nil {
+			t.Fatalf("qty %d: expected the batch refusal: %v", qty, evs)
+		}
+		if got := cargoCount(s, "ore-sterngrit"); got != 100 {
+			t.Fatalf("qty %d: refused refine consumed ore (left %d)", qty, got)
+		}
+	}
+
+	// A stock that is not a multiple of the batch never refines partially:
+	// asking 300 with 150 held refuses the clamped 150 outright.
+	giveCargo(s, "ore-sterngrit", 50)
+	s.Queue(CmdRefine{Item: "ore-sterngrit", Qty: 300})
+	s.Step()
+	evs = drain(s)
+	if findEvent(evs, EvLog, "150 x Sterngrit is a partial batch") == nil {
+		t.Fatalf("expected the partial-batch refusal: %v", evs)
+	}
+	if got := cargoCount(s, "ore-sterngrit"); got != 150 {
+		t.Fatalf("refused refine consumed ore (left %d)", got)
+	}
+
+	// One whole batch still goes through, leaving the odd 50 behind.
+	s.Queue(CmdRefine{Item: "ore-sterngrit", Qty: 100})
 	s.Step()
 	drain(s)
-	if cargoCount(s, "min-ferrite") != 6 || cargoCount(s, "min-nickel") != 2 {
-		t.Fatalf("after 2nd refine: ferrite=%d nickel=%d", cargoCount(s, "min-ferrite"),
-			cargoCount(s, "min-nickel"))
+	if got := cargoCount(s, "ore-sterngrit"); got != 50 {
+		t.Fatalf("ore left=%d want 50", got)
+	}
+	if got := cargoCount(s, "min-ferrite"); got != 100 {
+		t.Fatalf("ferrite=%d want 100", got)
 	}
 }
 
 func TestRefineRequiresOreAndService(t *testing.T) {
 	s := newTestSim(t)
 	// Not docked.
-	s.Queue(CmdRefine{Item: "ore-sterngrit", Qty: 1})
+	s.Queue(CmdRefine{Item: "ore-sterngrit", Qty: 100})
 	s.Step()
 	evs := drain(s)
 	if findEvent(evs, EvLog, "must be docked") == nil {
@@ -374,7 +404,7 @@ func TestRefineRequiresOreAndService(t *testing.T) {
 	}
 	// Docked but no ore.
 	dockAtHaven(t, s)
-	s.Queue(CmdRefine{Item: "ore-sterngrit", Qty: 5})
+	s.Queue(CmdRefine{Item: "ore-sterngrit", Qty: 100})
 	s.Step()
 	evs = drain(s)
 	if findEvent(evs, EvLog, "No Sterngrit to refine") == nil {

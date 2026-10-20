@@ -9,31 +9,36 @@ import (
 	"github.com/entieve/entieve/uikit/internal/uitest"
 )
 
-// TestRefineryWindow: the ore list, the yield preview (the sim's own
-// floor(RefineYield × qty) math), the typed CmdRefine enqueue end-to-end and
-// the EvCargoFull prediction.
+// TestRefineryWindow: the ore list, the whole-batch yield preview (the sim's
+// own floor(RefineYield × qty) math), the 100-ore stepper ladder, the typed
+// CmdRefine enqueue end-to-end and the EvCargoFull prediction.
 func TestRefineryWindow(t *testing.T) {
 	env, cmds := newChromeEnv(t)
 	r := NewRefinery(env)
 	ui := newWindowUI(t, env, r.Win())
 	frame := func() { uitest.PumpWindow(t, ui, r.Sync, 1024, 700) }
+	corditeRow := func() int {
+		for i, tr := range r.ores.Rows {
+			if d, ok := tr.Data.(refineryRow); ok && d.ore == "ore-cordite" {
+				return i
+			}
+		}
+		t.Fatalf("no cordite row in %+v", r.ores.Rows)
+		return -1
+	}
 
 	const home = sim.StationID("cel-haven-rest") // shipped: refine service
 	giveItem(env.Sim, "ore-cordite", 40)
 	frame()
 
 	// Undocked: the ore is listed, Refine is visible but grayed.
-	row := -1
-	for i, tr := range r.ores.Rows {
-		if d, ok := tr.Data.(refineryRow); ok && d.ore == "ore-cordite" {
-			row = i
-		}
-	}
-	if row < 0 {
-		t.Fatalf("no cordite row in %+v", r.ores.Rows)
-	}
+	row := corditeRow()
 	if got := r.ores.Rows[row].Cells[1]; got != "100" {
 		t.Errorf("held cell = %q, want 100 (60 shipped + 40 added)", got)
+	}
+	// The preview is one batch: floor(0.35×100)=35 ferrite, floor(0.3×100)=30 nickel.
+	if got := r.ores.Rows[row].Cells[2]; got != "35 Ferrite · 30 Nickel" {
+		t.Errorf("yield cell = %q, want 35 Ferrite · 30 Nickel", got)
 	}
 	if !r.refine.GetWidget().Disabled {
 		t.Fatal("Refine enabled while undocked")
@@ -50,18 +55,38 @@ func TestRefineryWindow(t *testing.T) {
 		t.Fatalf("selection = %+v (hasSel=%v), want cordite", r.sel, r.hasSel)
 	}
 	if r.refine.GetWidget().Disabled {
-		t.Fatal("Refine grayed at a refine station with ore")
+		t.Fatal("Refine grayed at a refine station with a whole batch")
+	}
+	if got := r.qtyLabel.Label; got != "Qty 100" {
+		t.Errorf("stepper = %q, want Qty 100", got)
+	}
+	if !strings.Contains(r.status.Label, "Refine 100 × Cordite Ore → 35 Ferrite · 30 Nickel") {
+		t.Errorf("status = %q, want the batch yield preview", r.status.Label)
 	}
 
-	// Stepper to 10: floor(0.35×10)=3 ferrite, floor(0.3×10)=3 nickel —
-	// the exact CmdRefine conversion, in sorted mineral order.
+	// The stepper offers whole batches only, capped at the stock: 100 held
+	// stays 100.
 	uitest.FireButton(ui, r.plus)
 	frame()
-	if got := r.ores.Rows[row].Cells[2]; got != "3 Ferrite · 3 Nickel" {
-		t.Errorf("yield cell = %q, want 3 Ferrite · 3 Nickel", got)
+	if got := r.qtyLabel.Label; got != "Qty 100" {
+		t.Errorf("stepper after + at 100 held = %q, want Qty 100", got)
 	}
-	if !strings.Contains(r.status.Label, "Refine 10 × Cordite Ore → 3 Ferrite · 3 Nickel") {
-		t.Errorf("status = %q, want the yield preview", r.status.Label)
+
+	// 250 held: the cap is 200 (two batches), never a partial 250.
+	giveItem(env.Sim, "ore-cordite", 150)
+	frame()
+	uitest.FireButton(ui, r.plus)
+	frame()
+	if got := r.qtyLabel.Label; got != "Qty 200" {
+		t.Errorf("stepper after + at 250 held = %q, want Qty 200", got)
+	}
+	uitest.FireButton(ui, r.plus)
+	frame()
+	if got := r.qtyLabel.Label; got != "Qty 200" {
+		t.Errorf("stepper over the cap = %q, want Qty 200", got)
+	}
+	if !strings.Contains(r.status.Label, "Refine 200 × Cordite Ore → 70 Ferrite · 60 Nickel") {
+		t.Errorf("status = %q, want the 200-ore preview", r.status.Label)
 	}
 
 	// The button enqueues the CmdRefine the sim executes.
@@ -70,30 +95,52 @@ func TestRefineryWindow(t *testing.T) {
 		t.Fatalf("refine enqueued %d commands, want 1", len(*cmds))
 	}
 	cmd, ok := (*cmds)[0].(sim.CmdRefine)
-	if !ok || cmd.Item != "ore-cordite" || cmd.Qty != 10 {
-		t.Fatalf("cmd = %#v, want CmdRefine{ore-cordite 10}", (*cmds)[0])
+	if !ok || cmd.Item != "ore-cordite" || cmd.Qty != 200 {
+		t.Fatalf("cmd = %#v, want CmdRefine{ore-cordite 200}", (*cmds)[0])
 	}
 	env.Sim.Queue(cmd)
 	env.Sim.Step()
-	if got := giveItemCount(env, "ore-cordite"); got != 90 {
-		t.Errorf("ore left = %d, want 90", got)
+	if got := giveItemCount(env, "ore-cordite"); got != 50 {
+		t.Errorf("ore left = %d, want 50", got)
 	}
-	if got := giveItemCount(env, "min-ferrite"); got != 3 {
-		t.Errorf("ferrite = %d, want 3", got)
+	if got := giveItemCount(env, "min-ferrite"); got != 70 {
+		t.Errorf("ferrite = %d, want 70", got)
 	}
-	if got := giveItemCount(env, "min-nickel"); got != 3 {
-		t.Errorf("nickel = %d, want 3", got)
+	if got := giveItemCount(env, "min-nickel"); got != 60 {
+		t.Errorf("nickel = %d, want 60", got)
+	}
+
+	// 50 left is under one batch: no valid quantity, Refine grayed and the
+	// status says what a batch needs.
+	frame()
+	if !r.refine.GetWidget().Disabled {
+		t.Fatal("Refine enabled with less than one batch")
+	}
+	if got := r.qtyLabel.Label; got != "Qty 0" {
+		t.Errorf("stepper = %q, want Qty 0 below one batch", got)
+	}
+	if !strings.Contains(r.status.Label, "One batch needs 100 ore — you hold 50 Cordite Ore.") {
+		t.Errorf("status = %q, want the one-batch message", r.status.Label)
 	}
 
 	// Cargo full: the window predicts it from the same volume math the sim
 	// uses, and the press still fires the sim's EvCargoFull (nothing moves).
+	giveItem(env.Sim, "ore-cordite", 150)
+	frame()
 	cargo, _ := env.Sim.Cargos.Get(env.Sim.Player())
-	cargo.Capacity = 90 // exactly the ore volume already held: zero free space
+	used := 0.0
+	for _, st := range cargo.Stacks {
+		if def, ok := env.Content.Item(st.Item); ok {
+			used += def.Volume * float64(st.Qty)
+		}
+	}
+	cargo.Capacity = used // zero free space
 	frame()
 	if !strings.Contains(r.status.Label, "cargo full") {
 		t.Errorf("status = %q, want the cargo-full warning", r.status.Label)
 	}
 	uitest.FireButton(ui, r.refine)
+	ui.Update()
 	if len(*cmds) != 2 {
 		t.Fatalf("refine enqueued %d commands total, want 2", len(*cmds))
 	}
@@ -108,8 +155,30 @@ func TestRefineryWindow(t *testing.T) {
 	if !full {
 		t.Fatal("refining into a full hold did not emit EvCargoFull")
 	}
-	if got := giveItemCount(env, "ore-cordite"); got != 90 {
-		t.Errorf("ore after the full-hold refusal = %d, want 90", got)
+	if got := giveItemCount(env, "ore-cordite"); got != 200 {
+		t.Errorf("ore after the full-hold refusal = %d, want 200", got)
+	}
+}
+
+// TestRefinePreviewWholeBatch pins the content table's per-batch yields: at
+// 100 ore every fraction lands on whole minerals, so the preview is exact.
+func TestRefinePreviewWholeBatch(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	r := &Refinery{cv: env}
+	want := map[content.ItemID]string{
+		"ore-sterngrit":  "45 Ferrite",
+		"ore-cordite":    "35 Ferrite · 30 Nickel",
+		"ore-lucidite":   "25 Cobalt · 30 Nickel · 20 Silex",
+		"ore-glacierite": "25 Argon · 35 Glacite",
+	}
+	for ore, w := range want {
+		def, ok := env.Content.Item(ore)
+		if !ok {
+			t.Fatalf("missing %s", ore)
+		}
+		if got := r.outputsText(refineOutputs(env, def, refineBatch)); got != w {
+			t.Errorf("%s at %d = %q, want %q", ore, refineBatch, got, w)
+		}
 	}
 }
 

@@ -799,8 +799,8 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
   Module rack (high/mid/low rows, F1–F8 activates high, deactivated state
   shown), Inventory (cargo + ore hold), Fitting (hull slots + stats),
   Manufacturing (jobs, fees, three global slots, craft levels and material
-  counts at a docked `industry` station), Refinery (ore→mineral yield
-  preview at a `refine` station), Station services (repair/market/refine/
+  counts at a docked `industry` station), Refinery (whole 100-ore batch
+  ore→mineral yield preview at a `refine` station), Station services (repair/market/refine/
   fitting tabs), Starmap (system graph, current system highlighted —
   click selects, gates are used in-system), Log (event feed).
 - `game`: scene stack. Space scene is the hub. The keyboard map is
