@@ -237,6 +237,52 @@ func TestMarketOrderBookScrolls(t *testing.T) {
 	}
 }
 
+// TestMarketBookWheelSettles: a fast flick on the order book lands and
+// stays. Two notches on consecutive frames, then silence: the offset may
+// not reverse and the rows may not jump — the rail's mirror and its
+// Changed write-back locked two frames apart and the book oscillated one
+// wheel step every frame.
+func TestMarketBookWheelSettles(t *testing.T) {
+	env, _ := newTestEnv(t)
+	m := NewMarket(env)
+	ui := newWindowUI(t, env, m.Win())
+	frame := func() { uitest.PumpWindow(t, ui, m.Sync, 1024, 700) }
+	frame()
+	frame()
+	clickRow(ui, m.tbl, 0) // fold the first item open: a book long enough to scroll
+	frame()
+
+	sc := m.tbl.ScrollForTest()
+	for i := 0; i < 2; i++ {
+		sc.GetWidget().ScrolledEvent.Fire(&widget.WidgetScrolledEventArgs{Y: -1})
+		frame()
+	}
+	var tops []float64
+	for f := 0; f < 30; f++ {
+		frame()
+		tops = append(tops, sc.ScrollTop)
+	}
+	if tops[len(tops)-1] <= 0 {
+		t.Fatalf("the flick scrolled nothing (ScrollTop %.5f)", tops[len(tops)-1])
+	}
+	for i := 2; i < len(tops); i++ {
+		if (tops[i]-tops[i-1])*(tops[i-1]-tops[i-2]) < 0 {
+			t.Fatalf("offset reversed with no wheel input at frame %d: %.5f -> %.5f -> %.5f",
+				i, tops[i-2], tops[i-1], tops[i])
+		}
+	}
+	// ebitenui re-anchors the rows from ScrollTop every frame: a still
+	// frame with a moving content top is the jump the user sees.
+	last := sc.ContentRect().Min.Y
+	for f := 0; f < 10; f++ {
+		frame()
+		y := sc.ContentRect().Min.Y
+		if y != last {
+			t.Fatalf("book content jumped from y=%d to y=%d with no input", last, y)
+		}
+	}
+}
+
 // TestMarketTitleShowsPriceAndFee: unselected, the title carries the
 // wallet; selected, it switches to the item's displayed price (the price
 // ladder) and the fee schedule — the view's last-price + fee display.

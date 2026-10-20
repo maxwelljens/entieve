@@ -64,6 +64,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   re-leans the 24 economy agents to 8 industrialists, 8 traders and 8 miners
   (was 6/9/9) — the same four per station, no ids or homes moved.
 
+### Fixed
+
+- **Fast scrolling no longer oscillates** (`uikit/widgets/scrollrail.go`):
+  the house rail mirrored the viewport every frame, and ebitenui treated
+  that mirror as a user change, firing a deferred Changed that wrote the
+  previous frame's offset back — two wheel notches on consecutive frames
+  locked mirror and write-back one frame apart and the Market, My orders,
+  Inventory, Fitting, Manufacturing, Info and nav lists slid up and down a
+  wheel step every frame. A rail-originated write now skips exactly one
+  mirror; drags and wheel-over-the-gutter keep scrolling the list, and the
+  rail keeps up from the frame after.
+
 ### Added
 
 - **Market as a per-item tree** (`uikit/screens/market.go`): the order book
