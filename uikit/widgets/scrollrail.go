@@ -26,6 +26,11 @@ type ScrollRail struct {
 	bar     *widget.Slider
 	scroll  *widget.ScrollContainer
 	content widget.PreferredSizeLocateableWidget
+	// dirty is set by a rail-originated write (a drag, a wheel notch over
+	// the gutter, or the deferred Changed they fire) and skips the one
+	// Sync mirror that would otherwise publish the pre-write offset back
+	// onto the rail — the two-frame oscillation of scrollrail_osc_test.go.
+	dirty bool
 }
 
 // NewScrollRail wraps block in the reserved gutter and wires the rail to
@@ -35,6 +40,7 @@ type ScrollRail struct {
 // LayoutData (a row layout needs Stretch; an anchor layout needs the
 // both-stretch AnchorLayoutData).
 func NewScrollRail(env Seams, block widget.PreferredSizeLocateableWidget, scroll *widget.ScrollContainer, content widget.PreferredSizeLocateableWidget) *ScrollRail {
+	r := &ScrollRail{scroll: scroll, content: content}
 	bar := widget.NewSlider(
 		widget.SliderOpts.Orientation(widget.DirectionVertical),
 		widget.SliderOpts.MinMax(0, RailSteps),
@@ -45,6 +51,7 @@ func NewScrollRail(env Seams, block widget.PreferredSizeLocateableWidget, scroll
 			}),
 		),
 		widget.SliderOpts.ChangedHandler(func(a *widget.SliderChangedEventArgs) {
+			r.dirty = true
 			scroll.ScrollTop = float64(a.Current) / RailSteps
 		}),
 	)
@@ -72,7 +79,8 @@ func NewScrollRail(env Seams, block widget.PreferredSizeLocateableWidget, scroll
 		widget.GridLayoutOpts.Stretch([]bool{true, false}, []bool{true}),
 	)))
 	root.AddChild(block, gutter)
-	return &ScrollRail{root: root, bar: bar, scroll: scroll, content: content}
+	r.root, r.bar = root, bar
+	return r
 }
 
 // Container returns the wrapper to place in the block's slot.
@@ -93,6 +101,14 @@ func (r *ScrollRail) Overflow() float64 {
 // the visibility flip is guarded, so a Sync per frame is cheap.
 func (r *ScrollRail) Sync() {
 	theme.ShowWidget(r.bar.GetWidget(), r.Overflow() > 0)
+	// A rail write already set the offset the user asked for; mirroring it
+	// back this frame would republish the offset from before that write and
+	// re-fire Changed with it, locking mirror and write out of phase one
+	// frame apart. Skip exactly that mirror; the next Sync resumes.
+	if r.dirty {
+		r.dirty = false
+		return
+	}
 	if cur := int(math.Round(r.scroll.ScrollTop * RailSteps)); r.bar.Current != cur {
 		r.bar.Current = cur
 	}
