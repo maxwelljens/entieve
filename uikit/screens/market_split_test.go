@@ -57,15 +57,15 @@ func TestMarketSplitDragTradesWidths(t *testing.T) {
 	m := NewMarket(env)
 	ui := newWindowUI(t, env, m.Win())
 	// A bare ebitenui.UI has no Kit.Draw, so the frame's seam-cursor apply
-	// (the kit's post-Draw pass) is explicit in this frame model.
+	// (the kit's one per-frame write) is explicit in this frame model.
 	pump := func() {
 		uitest.PumpWindow(t, ui, m.Sync, 1024, 700)
-		widgets.ApplySplitCursor()
+		widgets.ApplyCursor()
 	}
 	pump()
 
 	var shape ebiten.CursorShapeType
-	defer widgets.SetSplitCursorForTest(func(c ebiten.CursorShapeType) { shape = c })()
+	defer widgets.SetCursorShapeForTest(func(c ebiten.CursorShapeType) { shape = c })()
 	before := splitPanes(m.split)
 	seam := splitSeam(m.split, 0)
 	cur := image.Pt(seam.Min.X, (seam.Min.Y+seam.Max.Y)/2)

@@ -194,7 +194,7 @@ func (s *SplitPane) Step(cursor image.Point, rising, pressed bool) {
 			return
 		}
 		s.drag(cursor)
-		splitClaim = s
+		s.setCursor()
 		return
 	}
 	if rising {
@@ -209,11 +209,11 @@ func (s *SplitPane) Step(cursor image.Point, rising, pressed bool) {
 			return
 		}
 		s.seam, s.start = i, cursor
-		splitClaim = s
+		s.setCursor()
 		return
 	}
 	if s.seamAt(cursor) >= 0 {
-		splitClaim = s
+		s.setCursor()
 	}
 }
 
@@ -382,45 +382,14 @@ func SetSplitHeldForTest(f func() bool) func() {
 	return func() { splitHeld = prev }
 }
 
-// splitClaim is the split whose seam held the cursor at this frame's
-// Poll. ApplySplitCursor writes its shape from the kit's post-Draw pass:
-// a seam write during Update is reset to the arrow by ebitenui's
-// input.AfterDraw before the frame presents, so two writers alternated
-// the cursor every frame (the flicker this replaces).
-var splitClaim *SplitPane
-
-// ApplySplitCursor writes the claimed seam cursor. The kit calls it once
-// per frame after ui.Draw, before its chrome pass — a window grip still
-// wins in its own band. The claim is consumed, so a split that stopped
-// polling (its window unmounted mid-hover) cannot leave a stuck cursor.
-func ApplySplitCursor() {
-	s := splitClaim
-	splitClaim = nil
-	if s != nil {
-		s.setCursor()
-	}
-}
-
-// setCursor is the seam's cursor write: NS over a stack's horizontal
-// seam, EW over a row's vertical one — ebiten's own call (the window
-// chrome's setCursorShape idiom — ebitenui's name cache resets the OS
-// cursor every frame, so the hover rewrites it every frame too). Called
-// only by ApplySplitCursor, once per frame.
+// setCursor claims the seam's cursor: NS over a stack's horizontal seam,
+// EW over a row's vertical one. It only declares the shape — the kit's
+// single ApplyCursor writes it after the chrome pass, so a window grip
+// still wins in its own band.
 func (s *SplitPane) setCursor() {
 	shape := ebiten.CursorShapeNSResize
 	if s.row {
 		shape = ebiten.CursorShapeEWResize
 	}
-	setSplitCursor(shape)
-}
-
-var setSplitCursor = ebiten.SetCursorShape
-
-// SetSplitCursorForTest overrides the seam cursor write for a headless
-// test and returns a restore func. Test-only seam: never call it from
-// production code.
-func SetSplitCursorForTest(f func(ebiten.CursorShapeType)) func() {
-	prev := setSplitCursor
-	setSplitCursor = f
-	return func() { setSplitCursor = prev }
+	ClaimCursor(shape)
 }

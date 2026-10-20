@@ -72,9 +72,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the splitter wrote its cursor from the Update phase while ebitenui's
   AfterDraw rewrote the arrow at the end of the frame, so the two
   alternated on every frame. The seam now trades extent with the cursor
-  (down grows the pane above it, right grows the pane before it) and the
-  hovered seam claims the cursor once per frame from the kit's post-Draw
-  pass, ahead of the window grips, which keep their edges and corners.
+  (down grows the pane above it, right grows the pane before it). The kit
+  is the cursor's single writer: ebitenui's own cursor management is off,
+  pane seams and the window edge/corner grips only declare a shape
+  (`widgets.ClaimCursor`, grips outranking seams), and one post-Draw
+  `widgets.ApplyCursor` makes the frame's only OS write — so the arrow no
+  longer alternates with the resize shape over seams or window edges.
   Stored seam ratios need no migration: they are still the fraction above
   (or left of) the seam.
 - **Fast scrolling no longer oscillates** (`uikit/widgets/scrollrail.go`):
