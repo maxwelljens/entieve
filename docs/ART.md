@@ -121,6 +121,46 @@ window title.
 - **Fallback**: an unknown name renders the neutral gear, so a new kind can
   never show a missing-image artifact.
 
+## Hull portraits
+
+The HUD and Show Info carry a top-down portrait of the selected hull beside
+its name — the fleet's nine hulls, drawn to be told apart by silhouette at
+72 px.
+
+- **Where**: `uikit/hulls/svg/<hull-id>.svg` (sources) → `uikit/hulls/<hull-id>-120.png`
+  and `-240.png` (committed rasters) + `manifest.json` (hashes). The package
+  embeds all three via `//go:embed`; any hull id in `content/data/ships`
+  resolves, and `uikit/hulls.Get` returns the smallest committed raster at or
+  above the requested size (else the largest), `nil` for another id.
+- **Look**: flat vector, nose to the right (+X, like the world sprites),
+  mirrored about the hull's centreline, filling the frame with a slight
+  margin. Steel/hull greys (`#8fa3bd` family, matching the world fill) plus
+  **one restrained accent light per hull** (engine glow / running lights /
+  core), 3–6 flat fills, no gradients. Class silhouettes follow the world
+  render: sloop sleek frigate, patrol blunt cutter, cutlass long destroyer,
+  barge drill-and-gantry miner, hauler refined box, npc-hauler caged crate
+  ship, scuttler spindly worker, marauder clawed heavy, hierarch layered
+  overseer (accents: ice, amber, ember, safety orange, pale cyan, rust,
+  acid green, ember orange, violet).
+- **Pipeline**: build-time only. `tools/hullraster` is a separate module (the
+  game never links a rasterizer) that rasterizes the SVG sources through
+  `srwiley/rasterx`. It accepts the filled subset — `rect`, `circle`,
+  `ellipse`, `polygon`, `path` (`M/L/H/V/C/Q/Z`, absolute and relative) with a
+  flat hex fill; no strokes, transforms, gradients or text. Output is
+  deterministic (same bytes on a rerun), which the manifest hashes pin.
+- **Sizes**: 120 and 240 px (2× headroom for the 0.75–2.5 UI scale ladder).
+  Authoring viewBox is `0 0 120 120`, one design unit per pixel of the small
+  raster.
+- **Regenerate** after editing a source:
+
+  ```sh
+  cd tools/hullraster && go run . -svg ../../uikit/hulls/svg -out ../../uikit/hulls
+  ```
+
+  (or `go generate ./uikit/hulls`). Same pattern as the corporation emblems
+  in `uikit/emblems` + `tools/emblemraster`; the portraits are original
+  artwork and carry the manifest's `original artwork` credit.
+
 ## Typeface
 
 The interface is set in **IBM Plex Sans** (the display face) with **IBM

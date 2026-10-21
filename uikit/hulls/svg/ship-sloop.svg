@@ -1,0 +1,16 @@
+<!-- Entieve original artwork — the Väktare sloop portrait (sleek frigate). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <polygon fill="#39465a" points="114,60 100,50 78,45 40,46 20,50 14,56 12,60 14,64 20,70 40,74 78,75 100,70"/>
+  <polygon fill="#39465a" points="70,47 50,32 43,32 56,48 56,72 43,88 50,88 70,73"/>
+  <polygon fill="#39465a" points="30,51 20,42 14,43 24,53 24,67 14,77 20,78 30,69"/>
+  <polygon fill="#8fa3bd" points="108,60 96,53 78,49 40,50 24,53 18,57 16,60 18,63 24,67 40,70 78,71 96,67"/>
+  <polygon fill="#5d6f87" points="68,48 52,35 48,35 59,48 59,72 48,85 52,85 68,72"/>
+  <polygon fill="#5d6f87" points="108,60 96,53 78,49 82,60 78,71 96,67"/>
+  <rect fill="#5d6f87" x="16" y="54" width="5" height="12"/>
+  <rect fill="#c2d0e2" x="34" y="58.6" width="44" height="2.8"/>
+  <polygon fill="#6fc3ff" points="96,60 86,56 80,60 86,64"/>
+  <rect fill="#6fc3ff" x="12" y="54.5" width="3.5" height="4"/>
+  <rect fill="#6fc3ff" x="12" y="61.5" width="3.5" height="4"/>
+  <rect fill="#c2d0e2" x="48" y="33.4" width="6" height="1.8"/>
+  <rect fill="#c2d0e2" x="48" y="84.8" width="6" height="1.8"/>
+</svg>

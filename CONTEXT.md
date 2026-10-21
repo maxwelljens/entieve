@@ -10,6 +10,7 @@ names the *modules and seams* we build that vocabulary into.
 |---|---|
 | **Corporation** | a named manufacturing house (`corp-*`, `content.AllCorps`): the maker of a hull, module or charge, carrying a display name and an emblem; a supplier layer, never a power bloc |
 | **Hull** | a ship chassis (`ship-*`); flyable or machine |
+| **Hull portrait** | top-down full-colour art of a hull for the HUD/Show Info (`uikit/hulls`): a flat SVG source in `svg/` rasterized at build time to committed 120/240 px PNGs, keyed by hull id (`Get`/`Has`) |
 | **Module** | a fitted component (`mod-*`); slot-classed high/mid/low |
 | **Item** | everything else tradeable: ore, mineral, charge, shell, loot (`ore-*`/`min-*`/`ammo-*`/`charge-*`/`loot-*`) |
 | **Calibre** | a shell size class (`ammo_class`): `small`, `medium`, `large`; both projectile gun families at a calibre load the same shells |
