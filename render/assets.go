@@ -3,6 +3,7 @@ package render
 import (
 	"fmt"
 	"image"
+	"image/jpeg"
 	"image/png"
 	"io/fs"
 	"math"
@@ -19,7 +20,8 @@ import (
 // "draw the vector art", so an empty assets/ directory plays identically.
 // assets/backgrounds/ is the one exception: those PNGs are starfield plates,
 // indexed here but decoded only for the current star system (see plateKey,
-// platePath and Renderer.plate).
+// platePath and Renderer.plate). assets/artwork/ is the second: full-window
+// plates (JPEG allowed) decoded eagerly and held — see DockedArtwork.
 
 // sprites holds the loaded art keyed by convention path relative to the
 // asset root ("hulls/ship-sloop"). spritesTried records that the lazy root
@@ -35,11 +37,12 @@ var (
 	platePaths   map[string]string
 )
 
-// LoadAssets loads every PNG under dir into the sprite registry, replacing
-// whatever was loaded before. dir may be "" or absent: the registry simply
-// ends up empty, never an error. An explicit load also marks the registry
-// probed, so the lazy ./assets auto-load stays off afterwards. Additive
-// entry point for tests and callers that keep art somewhere specific.
+// LoadAssets loads every PNG sprite under dir into the sprite registry —
+// plus the artwork/ plates, which may also be JPEG — replacing whatever was
+// loaded before. dir may be "" or absent: the registry simply ends up
+// empty, never an error. An explicit load also marks the registry probed,
+// so the lazy ./assets auto-load stays off afterwards. Additive entry point
+// for tests and callers that keep art somewhere specific.
 func LoadAssets(dir string) {
 	sprites = map[string]*ebiten.Image{}
 	platePaths = map[string]string{}
@@ -52,20 +55,27 @@ func LoadAssets(dir string) {
 			return nil // unreadable entries are skipped, never fatal
 		}
 		ext := filepath.Ext(path)
-		if !strings.EqualFold(ext, ".png") {
-			return nil
-		}
 		rel, rerr := filepath.Rel(dir, path)
 		if rerr != nil {
 			return nil
 		}
 		key := strings.TrimSuffix(filepath.ToSlash(rel), ext)
-		if strings.HasPrefix(key, "backgrounds/") {
-			platePaths[key] = path // indexed, decoded on demand per system
-			return nil
-		}
-		if img := loadPNG(path); img != nil {
-			sprites[key] = img
+		switch {
+		case strings.EqualFold(ext, ".png"):
+			if strings.HasPrefix(key, "backgrounds/") {
+				platePaths[key] = path // indexed, decoded on demand per system
+				return nil
+			}
+			if img := loadPNG(path); img != nil {
+				sprites[key] = img
+			}
+		// JPEG is the artwork kind's format only (the docked plate ships as
+		// a JPG); sprites stay PNG.
+		case strings.HasPrefix(key, artworkRoot) &&
+			(strings.EqualFold(ext, ".jpg") || strings.EqualFold(ext, ".jpeg")):
+			if img := loadJPEG(path); img != nil {
+				sprites[key] = img
+			}
 		}
 		return nil
 	})
@@ -79,6 +89,20 @@ func spriteFor(key string) *ebiten.Image {
 	ensureSprites()
 	return sprites[key]
 }
+
+// artworkRoot is the full-window plate kind: assets/artwork/<name>.(png|jpg).
+const artworkRoot = "artwork/"
+
+// artworkDocked is the docked-station backdrop's convention key
+// (assets/artwork/spaceship_hangar.jpg). The plate is one per session: it
+// decodes on the first dock and stays in the sprite registry (~17 MB decoded
+// for the shipped 2512×1680 file). Filename is spaceship_, not starship_.
+const artworkDocked = artworkRoot + "spaceship_hangar"
+
+// DockedArtwork returns the docked-station backdrop plate, or nil when the
+// asset root ships none — the caller then keeps its plain veil (release
+// builds don't carry assets/). Same nil-means-fallback contract as spriteFor.
+func DockedArtwork() *ebiten.Image { return spriteFor(artworkDocked) }
 
 // defaultPlateID is the pseudo-system whose plates serve every star system:
 // `backgrounds/default.png` (layer 0), `backgrounds/default-01.png` (layer 1),
@@ -159,6 +183,22 @@ func decodePNG(path string) (image.Image, bool) {
 		return nil, false
 	}
 	return img, true
+}
+
+// loadJPEG decodes one JPEG into a GPU image — the artwork kind's loader. The
+// same contract as loadPNG: nil for anything unreadable or not a JPEG, a
+// corrupt drop-in must never crash the game.
+func loadJPEG(path string) *ebiten.Image {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+	img, err := jpeg.Decode(f)
+	if err != nil {
+		return nil
+	}
+	return ebiten.NewImageFromImage(img)
 }
 
 // plateSky samples a sparse pixel grid of a decoded plate and reports whether

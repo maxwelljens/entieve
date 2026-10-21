@@ -26,15 +26,31 @@ it decorates. IDs are the same kebab-case strings the content JSON uses
 | `assets/stations/` | celestial ID (`CelestialDef.id` in `content/data/systems/*.json`) — stations, gates, belts, other structures | `cel-haven-rest.png`, `cel-gate-penumbra.png` | unrotated |
 | `assets/asteroids/` | ore ID the belt's asteroids carry (`items/ores.json`) | `ore-cordite.png` | unrotated |
 | `assets/backgrounds/` | system ID (`sys-*.json`) or `default` | `default.png` | unrotated |
+| `assets/artwork/` | fixed names (no content id) | `spaceship_hangar.jpg` | unrotated, cover-fit |
 
 Sub-JSON lookup is exactly `<directory>/<id>.png`; other files and
-directories are ignored.
+directories are ignored. `assets/artwork/` is the one kind that also accepts
+JPEG (the docked-station plate ships as a `.jpg`); sprites stay PNG-only.
+
+## Docked backdrop
+
+While the player is docked, `assets/artwork/spaceship_hangar.jpg` (2512×1680,
+JPEG) fades in over 12 frames as the full-window backdrop *under* every window
+and the rail, with the caption **Docked: &lt;station name&gt;** in the lower-centre
+band. The plate is scaled to *cover* the window (aspect preserved, centred,
+overflow cropped) and decoded once on the first dock (~17 MB for the shipped
+file). No `assets/` directory (released binaries don't ship one) or no
+`artwork/` plate: the station view keeps its plain black veil, exactly as
+before. The caption's format string is registered in
+[lore/NAMING.md](lore/NAMING.md#interface-strings).
 
 ## PNG requirements
 
 - **Format**: PNG with an alpha channel, straight (non-premultiplied) alpha —
   what every PNG encoder writes by default. Transparent background for
-  sprites; the game composites them exactly like the vector art.
+  sprites; the game composites them exactly like the vector art. The one
+  exception is `assets/artwork/`, whose full-window plates may be JPEG (no
+  alpha; the plate is opaque).
 - **Size**: any pixel size — sprites are scaled at draw time, so **bigger is
   always safe**. Author at ≥2× the largest size the game will draw at for
   crispness: 512×512 works for every kind, 256×256 is the practical floor.
@@ -82,7 +98,8 @@ constants:
 
 - Missing `assets/` directory (or a missing file for an ID): no error, no
   log — the procedural vector art draws, exactly as before.
-- Corrupt / non-PNG file: skipped silently, that ID falls back.
+- Corrupt / non-PNG file: skipped silently, that ID falls back (the
+  `artwork/` kind also reads JPEG; a corrupt one falls back to the veil).
 - Search order for the root: `./assets` (working directory) first, then
   `assets/` next to the executable; the first one that exists wins. The
   probe happens once, lazily, on the first draw.

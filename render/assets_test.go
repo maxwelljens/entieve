@@ -3,6 +3,7 @@ package render
 import (
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"math"
 	"os"
@@ -65,6 +66,49 @@ func TestLoadAssetsLoadsPNGByConvention(t *testing.T) {
 	}
 	if b := st.Bounds(); b.Dx() != 48 || b.Dy() != 96 {
 		t.Errorf("station sprite = %dx%d, want 48x96", b.Dx(), b.Dy())
+	}
+}
+
+// writeJPEG drops a w×h opaque JPEG at path, creating the parent directories.
+func writeJPEG(t *testing.T, path string, w, h int) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+	}
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	img.SetRGBA(1, 1, color.RGBA{255, 64, 32, 255})
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create %s: %v", path, err)
+	}
+	defer f.Close()
+	if err := jpeg.Encode(f, img, nil); err != nil {
+		t.Fatalf("encode %s: %v", path, err)
+	}
+}
+
+// TestDockedArtworkAcceptsJPEGOnlyUnderArtwork: the artwork kind loads JPEG
+// (the docked backdrop ships as spaceship_hangar.jpg) and nothing else does —
+// sprite kinds stay PNG-only. No plate = nil, the game's veil fallback.
+func TestDockedArtworkAcceptsJPEGOnlyUnderArtwork(t *testing.T) {
+	dir := t.TempDir()
+	writeJPEG(t, filepath.Join(dir, "artwork", "spaceship_hangar.jpg"), 32, 18)
+	writeJPEG(t, filepath.Join(dir, "hulls", "ship-sloop.jpg"), 32, 18)
+	stashAssets(t, dir)
+
+	art := DockedArtwork()
+	if art == nil {
+		t.Fatal("artwork/spaceship_hangar.jpg did not load")
+	}
+	if b := art.Bounds(); b.Dx() != 32 || b.Dy() != 18 {
+		t.Errorf("artwork plate = %dx%d, want 32x18", b.Dx(), b.Dy())
+	}
+	if spriteFor("hulls/ship-sloop") != nil {
+		t.Error("a hull .jpg must not load (sprite kinds are PNG-only)")
+	}
+	stashAssets(t, "")
+	if DockedArtwork() != nil {
+		t.Error("no artwork root must mean no plate (the veil fallback)")
 	}
 }
 
