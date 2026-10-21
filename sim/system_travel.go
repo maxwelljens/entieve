@@ -43,6 +43,10 @@ func (s *Sim) execDock(c CmdDock) {
 		return
 	}
 	s.Docked.Set(p, Docked{At: cel.Cel})
+	// Docking restores the ship: nothing runs and the hull, its layers and the
+	// capacitor come back full — Free, no wallet or ledger movement.
+	s.stopAllModules(p)
+	s.healToFull(p)
 	if tr, ok := s.Transforms.Get(c.Station); ok {
 		if ptr, ok := s.Transforms.Get(p); ok {
 			ptr.Pos = tr.Pos // sit at the station while inside
@@ -69,6 +73,9 @@ func (s *Sim) execUndock() {
 	}
 	station := s.stationAt(d.At)
 	s.Docked.Remove(p)
+	// Undock leaves everything off: a module switched on inside the station
+	// does not follow the ship out.
+	s.stopAllModules(p)
 	if station.IsZero() {
 		s.log(SevWarning, p, "No station to undock from")
 		return

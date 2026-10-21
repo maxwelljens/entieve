@@ -35,7 +35,7 @@ run in this fixed order:
 | 10 | npc | `sim/system_npc.go` | rat/guard behavior state machine |
 | 11 | loot | `sim/system_loot.go` | loot command → cargo; bounties |
 | 12 | economy | `sim/system_economy.go` | station services (the `content.Services` ids): buy/sell/refine/repair/fitting |
-| 13 | travel | `sim/system_travel.go` | dock/undock/jump: grid swaps |
+| 13 | travel | `sim/system_travel.go` | dock (free full restore, all modules off) / undock (modules off) / jump: grid swaps |
 | 14 | mission | `sim/system_mission.go` | contract accept/abandon, objectives, auto-claim |
 | 15 | respawn | `sim/system_respawn.go` | funded NPC replacement timers |
 | 16 | traffic | `sim/system_traffic.go` | convoys, ambushes, patrols, book supply, journeys |
@@ -126,6 +126,35 @@ shipment). `Severity` is `SevInfo | SevGood | SevWarning | SevDanger`.
 industry commands ride same-Step deferral buckets (`deferEcon`,
 `deferIndustry`) to the systems that own them; refusals are events, never
 silent.
+
+### Module cycles and docking
+
+Every cyclic module resolves its first cycle the tick it is activated: the
+activation cost is paid and the effect applied then (`activate` sets
+`CycleEnds = now`, `systemModules` pays and applies), and the same happens
+at every later boundary — `ActivationTime` for tank/cap/prop/ewar,
+`Weapon.ShotTime` for guns, `Mining.CycleTime` for lasers. `CycleEnds` is
+the boundary of the cycle **in flight**.
+
+`CmdDeactivate` cancels the repeat, not the cycle: the module switches off
+at once (an afterburner's speed multiplier drops, tanking and webs stop
+refreshing) and the cycle clock is **kept**. Re-activating inside that
+cycle cancels the pending stop and resumes at the original boundary — no
+restart, no extra effect — and nothing resolves while a module is off, so
+toggling can never buy more than one effect per cycle time (the pre-fix
+clock reset let a deactivate/activate pair replay the effect every tick;
+`sim/cycle_semantics_test.go` pins the exploit shut). NPCs run the same
+`activate`/`deactivate` core through `npcActivate`, so they obey the same
+boundary rule.
+
+Docking (`execDock`, `sim/system_travel.go`) is a free full restore: every
+fitted module is cleared (active state *and* cycle clock, which also drops
+the afterburner multiplier) and shield, armor, structure and capacitor are
+set to their maxima. No wallet movement, no ledger entry and no repair
+service involved — `CmdRepair`/`execRepair` stay unchanged. `execUndock`
+clears the modules again, so a ship always undocks with everything off.
+No save field was added: the cycle clock already exists and the state
+transition is deterministic.
 
 ### Save schema v2 and `Hash()`
 

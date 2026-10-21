@@ -110,7 +110,7 @@ type SlotRef struct {
 type ModuleRuntime struct {
 	Def       content.ModuleID
 	Active    bool
-	CycleEnds float64 // sim time the current cycle completes (0 = idle)
+	CycleEnds float64 // sim time the cycle in flight completes (0 = none)
 	LastWarn  float64 // sim time of last "cannot activate" warning
 }
 

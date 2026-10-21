@@ -180,7 +180,8 @@ func (s *Sim) applyActiveEffect(e ecs.Entity, def *content.ModuleDef, slot SlotR
 
 // activate validates and switches on one module. It reports whether the
 // module is (now) active; quiet suppresses warning logs (NPC AI retries).
-// On success the module's first cycle resolves immediately this tick.
+// On success the module's first cycle resolves immediately this tick unless a
+// cancelled cycle is still running: then the module resumes that cycle.
 func (s *Sim) activate(e ecs.Entity, slot SlotRef, target ecs.Entity, quiet bool) bool {
 	_, rt, ok := s.moduleRuntime(e, slot)
 	if !ok {
@@ -247,7 +248,12 @@ func (s *Sim) activate(e ecs.Entity, slot SlotRef, target ecs.Entity, quiet bool
 	}
 
 	rt.Active = true
-	rt.CycleEnds = s.time
+	// A cancelled cycle keeps its clock: switching a module back on inside the
+	// cycle it was cancelled in resumes at that boundary instead of restarting
+	// it, so toggling can never buy more than one effect per cycle time.
+	if rt.CycleEnds <= s.time {
+		rt.CycleEnds = s.time
+	}
 	s.setModTarget(e, slot, target)
 	if def.Kind == content.KindAfterburner {
 		s.recomputeFit(e) // raises Motion.SpeedMultiplier while active
@@ -264,6 +270,10 @@ func (s *Sim) activate(e ecs.Entity, slot SlotRef, target ecs.Entity, quiet bool
 // deactivate switches a module off, optionally logging the reason, and
 // recomputes fit-derived stats when the module carried a passive-style
 // effect (the afterburner speed multiplier ends with activation).
+//
+// The cycle clock is kept: the cycle in flight runs out untouched (an
+// activation inside it resumes at the same boundary — no clock reset, no
+// replay), and nothing resolves while the module is off.
 func (s *Sim) deactivate(e ecs.Entity, slot SlotRef, reason string, sev Severity) {
 	_, rt, ok := s.moduleRuntime(e, slot)
 	if !ok || !rt.Active {
@@ -276,7 +286,6 @@ func (s *Sim) deactivate(e ecs.Entity, slot SlotRef, reason string, sev Severity
 		isAB = def.Kind == content.KindAfterburner
 	}
 	rt.Active = false
-	rt.CycleEnds = 0
 	if reason != "" {
 		s.log(sev, e, name+" deactivated ("+reason+")")
 	}
@@ -284,6 +293,22 @@ func (s *Sim) deactivate(e ecs.Entity, slot SlotRef, reason string, sev Severity
 		s.recomputeFit(e)
 	}
 	s.emit(Event{Kind: EvModule, Actor: e, Text: name + " deactivated"})
+}
+
+// stopAllModules clears every fitted module's active state and cycle clock.
+// Docking and undocking use it so the ship leaves the station with nothing
+// running and no cycle already in flight.
+func (s *Sim) stopAllModules(e ecs.Entity) {
+	if fit, ok := s.Fittings.Get(e); ok {
+		for _, class := range slotClasses {
+			rts := fit.Runtimes(class)
+			for i := range rts {
+				rts[i].Active = false
+				rts[i].CycleEnds = 0
+			}
+		}
+	}
+	s.recomputeFit(e) // drops the afterburner speed multiplier
 }
 
 // warnOnce emits a rate-limited activation warning for one module.

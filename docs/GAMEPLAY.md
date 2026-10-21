@@ -286,6 +286,16 @@ capacity and recharge time). Running dry means guns and tanks stop cycling —
 manage it like EVE: inactive modules when you don't need them, cap boosters
 when you do.
 
+**Cycles are bound by time, not by toggling.** Activating a module resolves
+its first cycle at once and then repeats every cycle time. Switching it off
+(`F1…F8` again) stops it immediately but does not reset the cycle: switching
+it back on inside the same cycle resumes at the original boundary, so
+flicking modules on and off can never buy extra shots, repairs or boosts.
+
+**Docking restores the ship.** Docking switches every module off and brings
+shield, armor, structure and capacitor back to full, free of charge — and
+undocking always leaves with everything switched off.
+
 **Turret tracking.** Chance to hit follows EVE's formula: angular velocity vs.
 tracking (scaled by signature radius), plus distance beyond optimal vs.
 falloff. Fast, small, transversal-moving targets are hard to hit; wrecking

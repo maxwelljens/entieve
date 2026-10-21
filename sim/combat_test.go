@@ -221,10 +221,11 @@ func TestDamageProfileMatchesAmmo(t *testing.T) {
 	cargo, _ := s.Cargos.Get(s.player)
 	cargo.Stacks = nil
 	giveCargo(s, "ammo-ap-s", 5)
-	stepN(s, 130) // cycle finished; deactivate and reactivate cleanly
+	stepN(s, 130) // the 2 s cycle fires once more (AP) en route
 	s.Queue(CmdDeactivate{Slot: slot})
 	s.Step()
 	drain(s)
+	stepN(s, 110) // let the cancelled cycle clock run out while the gun is off
 	state2 := s.RNG.Snapshot()
 	s.Queue(CmdActivate{Slot: slot, Target: dummy})
 	s.Step()
