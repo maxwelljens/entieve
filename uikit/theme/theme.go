@@ -76,6 +76,28 @@ func OwnedRowTint(p Palette) color.RGBA {
 	return c
 }
 
+// RailGroupColor returns the navigation rail's glyph tint for one section:
+// the palette role that section's windows serve. The names are the rail's
+// six section names (game/rail.go railGroups, docs/GAMEPLAY.md); any other
+// group falls back to the body text colour.
+func RailGroupColor(p Palette, group string) color.RGBA {
+	switch group {
+	case "Ship":
+		return p.Player // cyan — your ship
+	case "Trade":
+		return p.Good // green
+	case "Industry":
+		return p.Warn // orange
+	case "Station":
+		return p.Accent // gold
+	case "World":
+		return p.Info // blue
+	case "Help & System":
+		return p.Struct // silver
+	}
+	return p.Text
+}
+
 // mustHex parses a palette color; invalid constants would be a build bug.
 func mustHex(s string) color.RGBA {
 	c, err := render.ParseHex(s)

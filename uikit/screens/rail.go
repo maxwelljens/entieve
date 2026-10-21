@@ -471,7 +471,10 @@ func (r *Rail) Sync() {
 		// The glyph lives beside the button in the cell now, so its
 		// grayed look is written here — state writes only (Set is a
 		// string compare when nothing moved).
-		tint := p.Text
+		// The glyph takes its section's role colour (theme.RailGroupColor):
+		// the rail reads group-first at a glance; grayed still wins. The
+		// six fixed tints keep the icon cache at name×size×6.
+		tint := theme.RailGroupColor(p, e.Group)
 		if !enabled {
 			tint = iconColor(p.Dim, theme.IconDisabledA)
 		}

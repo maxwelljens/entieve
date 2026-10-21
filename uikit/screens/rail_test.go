@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"image/color"
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
@@ -483,6 +484,71 @@ func fireRailClick(t *testing.T, c *chromeUI, b *widget.Button) {
 		Button: ebiten.MouseButtonLeft,
 	})
 	c.Update(t)
+}
+
+// TestRailGroupTints: the navbar glyphs are colour-coded by section —
+// theme.RailGroupColor's six palette roles (Ship cyan / Trade green /
+// Industry orange / Station gold / World blue / Help & System silver).
+// State wins over the group: a grayed entry draws the disabled dim, and
+// the open-state cell chrome (the accent glow) leaves the tint alone.
+// The tint feeds icons.Get, which caches per name|size|tint — six fixed
+// tints per glyph keep the cache small (the rail's memory pin,
+// TestMemoryFootprintPump, covers the draw path).
+func TestRailGroupTints(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	c := newChromeUI(env)
+	open := false
+	entries := []RailEntry{
+		{Icon: "kind_ship", Title: "Overview", Group: "Ship", Open: func() bool { return open }},
+		{Icon: "svc_market", Title: "Market", Group: "Trade"},
+		{Icon: "svc_fitting", Title: "Fitting", Group: "Industry"},
+		{Icon: "kind_station", Title: "Services", Group: "Station"},
+		{Icon: "svc_scanner", Title: "Scanner", Group: "World"},
+		{Icon: "act_lock", Title: "Help", Group: "Help & System"},
+		// Grayed here (space), so its group colour never reaches the glyph.
+		{Icon: "kind_station", Title: "Gated", Group: "Station", DockedOnly: true},
+	}
+	r := NewRail(env, entries)
+	c.AddPanel(r.Container(), r)
+	c.Frame(t, 1280, 720)
+
+	p := env.Pal()
+	glyph := func(name string, tint color.RGBA) *ebiten.Image {
+		return icons.Get(name, theme.Px(railIcon), tint)
+	}
+	for i, e := range entries[:len(entries)-1] {
+		want := theme.RailGroupColor(p, e.Group)
+		if want == p.Text {
+			t.Errorf("%s: group %q has no role colour (fell back to Text)", e.Title, e.Group)
+		}
+		if got := glyph(e.Icon, want); r.icons[i].Widget().Image != got {
+			t.Errorf("%s: glyph is not the %s group tint", e.Title, e.Group)
+		}
+	}
+	// The six roles are six distinct colours.
+	seen := map[color.RGBA]string{}
+	for _, e := range entries[:len(entries)-1] {
+		tint := theme.RailGroupColor(p, e.Group)
+		if prev, dup := seen[tint]; dup {
+			t.Errorf("groups %q and %q share the tint %v", prev, e.Group, tint)
+		}
+		seen[tint] = e.Group
+	}
+	// Grayed wins over the group: the Gated entry is docked-only.
+	gated := len(entries) - 1
+	want := iconColor(p.Dim, theme.IconDisabledA)
+	if got := glyph(entries[gated].Icon, want); r.icons[gated].Widget().Image != got {
+		t.Error("grayed entry does not draw the disabled dim over its group colour")
+	}
+	// Open-state chrome: the accent cell glow while the tint keeps its role.
+	open = true
+	r.Sync()
+	if got := glyph(entries[0].Icon, theme.RailGroupColor(p, entries[0].Group)); r.icons[0].Widget().Image != got {
+		t.Error("open state changed the glyph tint")
+	}
+	if r.Button("Overview").Image().Idle != r.imgOpen.Idle {
+		t.Error("open state lost the accent cell chrome")
+	}
 }
 
 // TestDefaultWindowRectsClearTheRailGutter: every default window rect a

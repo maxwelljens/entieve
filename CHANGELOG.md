@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Gate (<destination>)**, e.g. `Gate (Kuźnica)` where the old form read
   `Kuźnica Gate`. Ids are unchanged; [docs/lore/NAMING.md](docs/lore/NAMING.md)
   carries the new convention.
+### Added
+
+- **Rail glyphs are colour-coded by section**: Ship cyan, Trade green,
+  Industry orange, Station gold, World blue, Help & System silver
+  (`theme.RailGroupColor`, palette roles only). A grayed entry keeps its
+  dim look whatever its group, and the open-state amber cell glow is
+  unchanged.
+- **Docked hangar backdrop**: while docked, `assets/artwork/spaceship_hangar.jpg`
+  fades in over 12 frames as the full-window backdrop under every window and
+  the rail, cover-fit to the window and captioned **Docked: &lt;station name&gt;**
+  in the lower-centre band. The `assets/artwork/` kind accepts JPEG; with no
+  artwork the station view keeps its plain black veil, exactly as before.
+  Undocking cuts straight to the world (the fade is entry-only).
 
 ## [0.7.0] - 2026-10-21
 

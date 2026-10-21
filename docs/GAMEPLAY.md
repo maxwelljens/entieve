@@ -107,7 +107,11 @@ again to close it. An entry you cannot use right now is **grayed, never
 hidden** (the services view and manufacturing in space, the scanner while
 docked, fitting at a station without the fitting service); clicking a
 grayed entry does nothing. A window that is open wears the entry's amber
-glow, and the slim tab at the rail's top edge collapses the rail to its
+glow, and the glyphs are colour-coded by section — **Ship** cyan,
+**Trade** green, **Industry** orange, **Station** gold, **World** blue,
+**Help & System** silver — so the rail reads group-first at a glance
+(a grayed entry stays dim whatever its group). The slim tab at the rail's
+top edge collapses the rail to its
 tab — a setting that persists as `rail_collapsed` in
 `<save>.settings.json` (a missing key means expanded). The ship status
 and the module rack are permanent ship chrome and have no rail entries, and
@@ -209,6 +213,13 @@ pair, and resets the camera view. The layout sidecar records the state
 you last saw (nothing is force-open any more), so quitting while docked
 reopens precisely that arrangement. The log stays mounted while docked
 so its history comes with you.
+
+While docked the **hangar backdrop** fades in over 12 frames under every
+window and the rail — `assets/artwork/spaceship_hangar.jpg`, cover-fit to
+the window, captioned **Docked: &lt;station name&gt;** in the lower-centre band
+(see [ART.md](ART.md#docked-backdrop)). Without that asset (released
+binaries ship no `assets/`) the station view keeps its plain black veil.
+Undocking cuts straight back to the world — the fade is entry-only.
 
 ### Overview (top-left)
 
