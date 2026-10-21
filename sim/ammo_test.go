@@ -63,10 +63,12 @@ func TestCmdSetAmmoFallsBackWhenPreferredRunsOut(t *testing.T) {
 		t.Fatalf("ap=%d want 0", got)
 	}
 	// Shot 2: preference exhausted -> automatic fallback (canonical first
-	// stack = ammo-emp-s), no warning required.
+	// stack = ammo-emp-s), no warning required. The cancelled cycle still owns
+	// its clock (docs/SIM.md §2), so the next activation waits it out.
 	s.Queue(CmdDeactivate{Slot: ammoSlot()})
 	s.Step()
 	drain(s)
+	stepN(s, 120) // the 2 s shot time runs out while the gun is off
 	s.Queue(CmdActivate{Slot: ammoSlot(), Target: npc})
 	s.Step()
 	drain(s)

@@ -31,6 +31,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Cycles can be cancelled, not replayed**: deactivating a module stops it
+  at once but keeps its cycle clock, so re-activating inside the running
+  cycle resumes at the original boundary instead of restarting it. The old
+  clock reset let a deactivate/activate pair replay the effect every tick —
+  afterburners, tank, ewar, cap boosters, guns, mining lasers and NPCs (same
+  `activate`/`deactivate` core) are now bounded by one effect per cycle time
+  under any toggle pattern.
+- **Docking restores the ship, free**: docking clears every module's active
+  state and cycle clock and refills shield, armor, structure and capacitor;
+  no wallet movement, no ledger entry, no repair service needed. Undocking
+  always leaves with everything off.
 - **One legacy-id registry, and restore finds every content id itself**:
   `content.LegacyIDs` is the single retired-id table — validation
   (`content.RetiredIDs`) and save restore read the same list — and restore
