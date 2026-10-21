@@ -75,6 +75,14 @@ type ContentView interface {
 	HangarItems() []content.CargoStack
 	HangarShips() []sim.StoredShip
 
+	// PredictedAmmo is the charge the sim would load into one fitted
+	// weapon slot right now — the fitting summary's DPS figure reads it.
+	// The rule is the sim's findCharge (sim/system_weapons.go): the slot's
+	// CmdSetAmmo preference while it still sits in cargo and matches the
+	// gun's ammo class, else the first cargo stack of that class in
+	// canonical order. "" = dry, or not a weapon slot.
+	PredictedAmmo(sim.SlotRef) content.ItemID
+
 	// Market books and prices.
 	Market(content.SystemID) []sim.MarketStock
 	BookOrders(sim.StationID) []sim.MarketStock
@@ -291,6 +299,50 @@ func (v *view) HangarShips() []sim.StoredShip {
 		return nil
 	}
 	return v.s.Hangar.Ships
+}
+
+// PredictedAmmo mirrors the sim's findCharge once, over the player's
+// fitting and cargo: it names the shell the next shot would consume, so
+// the predicted DPS figure never disagrees with what the gun fires.
+func (v *view) PredictedAmmo(slot sim.SlotRef) content.ItemID {
+	fit, ok := v.s.Fittings.Get(v.s.Player())
+	if !ok {
+		return ""
+	}
+	defs := fit.Defs(slot.Class)
+	if slot.Index < 0 || slot.Index >= len(defs) {
+		return ""
+	}
+	def, ok := v.c.Module(defs[slot.Index])
+	if !ok || def.Weapon == nil || def.Weapon.AmmoClass == "" {
+		return ""
+	}
+	cargo, ok := v.s.Cargos.Get(v.s.Player())
+	if !ok {
+		return ""
+	}
+	class := def.Weapon.AmmoClass
+	if pref := v.s.AmmoPref(v.s.Player(), slot); pref != "" {
+		for _, st := range cargo.Stacks {
+			if st.Item != pref || st.Qty <= 0 {
+				continue
+			}
+			if item, ok := v.c.Item(pref); ok && item.AmmoClass == class {
+				return pref
+			}
+			break
+		}
+	}
+	for _, st := range cargo.Stacks {
+		if st.Qty <= 0 {
+			continue
+		}
+		item, ok := v.c.Item(st.Item)
+		if ok && item.AmmoClass == class {
+			return st.Item
+		}
+	}
+	return ""
 }
 
 func (v *view) Market(id content.SystemID) []sim.MarketStock { return v.s.Market(id) }

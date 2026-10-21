@@ -267,8 +267,8 @@ func TestFittingActions(t *testing.T) {
 	frame()
 	frame()
 
-	if len(f.slots.Rows) == 0 {
-		t.Fatal("slot table is empty")
+	if !fitTileShown(f.tiles[0][0]) {
+		t.Fatal("slot grid is empty")
 	}
 	if !f.unfit.GetWidget().Disabled || !f.fitMod.GetWidget().Disabled ||
 		!f.assemble.GetWidget().Disabled {
@@ -286,13 +286,15 @@ func TestFittingActions(t *testing.T) {
 
 	fitted := -1
 	empty := -1
-	for i, r := range f.slots.Rows {
-		pick := r.Data.(widgets.SlotPick)
-		if pick.Mod != "" && fitted < 0 {
-			fitted = i
+	for idx, tile := range f.tiles[0] {
+		if !fitTileShown(tile) {
+			continue
 		}
-		if pick.Mod == "" && pick.Ref.Class == content.SlotHigh && empty < 0 {
-			empty = i
+		if tile.mod != "" && fitted < 0 {
+			fitted = idx
+		}
+		if tile.mod == "" && empty < 0 {
+			empty = idx
 		}
 	}
 	if fitted < 0 || empty < 0 {
@@ -300,7 +302,7 @@ func TestFittingActions(t *testing.T) {
 	}
 
 	// Unfit the selected fitted slot.
-	clickRow(ui, f.slots, fitted)
+	clickFitTile(ui, f.tiles[0][fitted])
 	frame()
 	if f.unfit.GetWidget().Disabled {
 		t.Fatal("Unfit disabled for a fitted slot")
@@ -331,7 +333,7 @@ func TestFittingActions(t *testing.T) {
 		t.Fatal("hangar module row missing")
 	}
 	clickRow(ui, f.hangar, modRow)
-	clickRow(ui, f.slots, empty)
+	clickFitTile(ui, f.tiles[0][empty])
 	frame()
 	if f.fitMod.GetWidget().Disabled {
 		t.Fatal("Fit disabled for a hangar module and a free slot")
@@ -427,8 +429,6 @@ func TestStationWindowsDrawSmoke(t *testing.T) {
 			"inv.cargo":     inventory.cargo,
 			"inv.ore":       inventory.ore,
 			"inv.hangar":    inventory.hangar,
-			"fit.resists":   fitting.resists,
-			"fit.slots":     fitting.slots,
 			"fit.hangar":    fitting.hangar,
 			"overview.rows": k.ov.tbl,
 		} {

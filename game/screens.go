@@ -154,7 +154,7 @@ var screens = []Screen{
 	{
 		ID: pFitting, Title: "Fitting", Icon: "svc_fitting",
 		Key: ebiten.KeyF, Action: "fitting", Desc: "F — toggle fitting",
-		DefaultRect: image.Rect(709, 256, 1014, 690), Anchor: AnchorFixed,
+		DefaultRect: image.Rect(370, 8, 1014, 690), Anchor: AnchorFixed,
 		DockPolicy: DockFloating, SidecarName: "fitting",
 		Group: "Ship", Service: "fitting",
 		Sync:  func(g *Game) { g.fitt.Sync() },

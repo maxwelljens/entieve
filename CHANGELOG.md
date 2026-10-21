@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The Fitting window, rebuilt on EVE's shape** (`uikit/screens/fitting.go`):
+  four zones over the same three actions and the same `fitting-hangar`
+  seam. The left column leads with the fitted hull's framed portrait, its
+  name and a `class · maker` line carrying the corporation's emblem; the
+  old stat text blob becomes dense label/value rows (shield / armor /
+  structure, capacitor, navigation, targeting, cargo) with a per-type
+  **EHP** row, `(max shield + armor + structure) / (1 − resist)`. The high
+  / mid / low slot table becomes a **tile grid** in the rack's visual
+  language: one 50×40 tile per hull slot, the module's class glyph and
+  short name on fitted cells, a dashed placeholder where a slot is empty.
+  A **Fitting summary** strip shows the fit's **Total DPS** (each fitted
+  weapon's loaded shell over its fire period — the ammo preference and
+  cargo order the sim itself uses), the **Cap drain** of the running
+  modules against the **Cap recharge** curve's peak, and the **Cap stable**
+  / **Cap unstable (~Ns)** verdict over a drain-vs-recharge bar; the window
+  moves to a 644×682 default at (370, 8) to hold it (was 305×434 at 709, 256).
+- **Double-click a hangar module to fit it** into the first empty slot of
+  its class; the row menu's Fit-into-selected-slot stays as the fallback,
+  and Show Info stays on the hangar row menu (double-click on a slot tile
+  still opens it).
+- **`ContentView.PredictedAmmo(sim.SlotRef)`**: the charge the sim would
+  load into a fitted weapon slot right now (the `findCharge` rule once:
+  the `CmdSetAmmo` preference while it sits in cargo and matches the
+  gun's class, else the first cargo stack of that class).
+
 - **Hull portraits** (`uikit/hulls`): nine original top-down portraits — one
   per fleet hull — embedded at 120 and 240 px and keyed by `ShipID`
   (`Get`/`Has`). Flat SVG sources under `uikit/hulls/svg/` are rasterized at

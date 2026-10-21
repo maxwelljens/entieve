@@ -277,18 +277,12 @@ func TestInventoryAndFittingMenus(t *testing.T) {
 	uiFit := newWindowUI(t, env, f.Win())
 	uitest.PumpWindow(t, uiFit, f.Sync, 1024, 700)
 	uitest.PumpWindow(t, uiFit, f.Sync, 1024, 700)
-	fitted := -1
-	for i, r := range f.slots.Rows {
-		if pick, ok := r.Data.(widgets.SlotPick); ok && pick.Mod != "" {
-			fitted = i
-			break
-		}
-	}
-	if fitted < 0 {
-		t.Fatal("fixture: no fitted slot row")
+	tile := fitTileAt(f, sim.SlotRef{Class: content.SlotHigh, Index: 0})
+	if tile == nil || tile.mod == "" {
+		t.Fatal("fixture: no fitted slot tile")
 	}
 	before := len(*cmds)
-	rightClickRow(t, uiFit, f.slots, fitted)
+	rightClickFitTile(t, uiFit, tile)
 	// The right-clicked row is now the selection: Unefit is armed, Fit is
 	// not (the slot is filled).
 	if e := entry(t, env, "Unefit slot"); e.Disabled {

@@ -516,6 +516,13 @@ func (s *Sim) ammoPref(e ecs.Entity, slot SlotRef) content.ItemID {
 	return s.ammoPrefs[modKey{owner: uint64(e), class: slot.Class, index: slot.Index}]
 }
 
+// AmmoPref is the read-only form of ammoPref: one weapon slot's preferred
+// charge ("" = automatic). The interface's predicted-DPS figure reads it
+// so it names the shell the sim would actually load.
+func (s *Sim) AmmoPref(e ecs.Entity, slot SlotRef) content.ItemID {
+	return s.ammoPref(e, slot)
+}
+
 // shiftAmmoPrefs drops the preferred charge of the module removed at
 // removedIndex and re-keys preferences of higher indexes in that slot
 // class. Collect-then-mutate keeps it independent of map iteration order

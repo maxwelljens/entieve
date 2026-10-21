@@ -162,6 +162,25 @@ type RowDouble struct {
 	Armed bool
 }
 
+// Gesture runs one left click through the same timer for a surface whose
+// second click means something other than Show Info (the fitting hangar's
+// Fit verb): fire runs when a repeat click on the same resolvable Ref
+// lands inside the window. Show Info never fires from here.
+func (d *RowDouble) Gesture(cv ContentView, spec RowSpec, fire func()) bool {
+	now := time.Now()
+	ref, ok := InfoRef{}, false
+	if spec.Ref != nil && InfoRefExists(cv, *spec.Ref) {
+		ref, ok = *spec.Ref, true
+	}
+	hit := ok && d.Armed && d.ref == ref && now.Sub(d.at) < doubleClickWindow
+	d.ref, d.at, d.Armed = ref, now, true
+	if hit {
+		d.Armed = false
+		fire()
+	}
+	return hit
+}
+
 // Click runs one left click through the double-click rule (see
 // RowDouble): true = the gesture completed and Show Info opened.
 func (d *RowDouble) Click(cv ContentView, as ActionSink, spec RowSpec) bool {
