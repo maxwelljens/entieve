@@ -301,7 +301,7 @@ func (s *Sim) systemTraffic() {
 	s.trafficSpawnWishHaulers(sys)
 	s.trafficDriveHaulers(sys, td, sec)
 	s.trafficDriveAttacks(sys, td, sec)
-	s.trafficDrivePatrols()
+	s.trafficDrivePatrols(sys, td, sec)
 	s.trafficExpireLeaves()
 }
 
@@ -1774,9 +1774,10 @@ func (s *Sim) patrolResponding(e ecs.Entity) bool {
 
 // trafficDrivePatrols runs responding/returning patrols: warp to the
 // incident, lock and shoot raiders inside engagement range, then return to
-// the anchor and resume the idle guard circle. Only idle AI states are
-// driven here — an aggroed patrol belongs to systemNpc.
-func (s *Sim) trafficDrivePatrols() {
+// the anchor and resume the idle guard circle. It also dispatches idle
+// patrols onto occupied high-sec belts (patrolSweepDispatch). Only idle AI
+// states are driven here — an aggroed patrol belongs to systemNpc.
+func (s *Sim) trafficDrivePatrols(sys *content.SystemDef, td *content.TrafficDef, sec string) {
 	for _, e := range sortedEntities(s.Patrols) {
 		p, ok := s.Patrols.Get(e)
 		if !ok {
@@ -1794,16 +1795,83 @@ func (s *Sim) trafficDrivePatrols() {
 		}
 		switch p.State {
 		case PatrolRespond:
-			s.patrolRespondStep(e, p, ai)
+			s.patrolRespondStep(e, p, ai, sec)
 		case PatrolReturn:
 			s.patrolReturnStep(e, p, ai)
+		case PatrolIdle:
+			s.patrolSweepDispatch(p, sys, td, sec)
 		}
 	}
 }
 
+// trafficBeltSweepBeat is the patrol beat (ticks) between belt-sweep
+// considerations: the authored patrol cadence scaled by security exactly like
+// the patrol spawn schedule (trafficPatrolInterval) — a patrol answers a belt
+// when its beat comes round, not the tick the belt is first occupied, so a
+// pilot already on the belt keeps first claim on the rats. 0 when the system
+// has no patrol definition (or null space, where no patrol flies).
+func trafficBeltSweepBeat(td *content.TrafficDef, sec string) int64 {
+	if td == nil || td.Patrol == nil {
+		return 0
+	}
+	interval, ok := trafficPatrolInterval(td.Patrol.IntervalTicks, sec)
+	if !ok {
+		return 0
+	}
+	return interval
+}
+
+// patrolSweepDispatch sends an idle patrol to a high-sec belt holding live,
+// unmolested rats, one beat at a time. Patrol.Next carries the beat deadline
+// (the field already exists for the warp-retry cooldown, so the save schema is
+// unchanged); the decision itself is recomputed from world state every beat,
+// and the sweep re-arms after it returns home. Low/null space gets no sweep.
+func (s *Sim) patrolSweepDispatch(p *Patrol, sys *content.SystemDef, td *content.TrafficDef, sec string) {
+	beat := trafficBeltSweepBeat(td, sec)
+	if beat <= 0 {
+		return // no patrol schedule here: nothing to sweep with
+	}
+	if p.Next == 0 {
+		// Coming on duty (or back from an incident): the first sweep
+		// consideration waits one full beat.
+		p.Next = s.time + float64(beat)*DT
+		return
+	}
+	if s.time < p.Next {
+		return
+	}
+	p.Next = s.time + float64(beat)*DT
+	if sec != "high" || sys == nil {
+		return
+	}
+	if belt := s.occupiedBelt(sys, sec); !belt.IsZero() {
+		p.State = PatrolRespond
+		p.Incident = belt
+		p.Next = 0
+	}
+}
+
+// occupiedBelt returns the celestial entity of the first belt in the system
+// (celestial order) holding a live unmolested rat, or zero.
+func (s *Sim) occupiedBelt(sys *content.SystemDef, sec string) ecs.Entity {
+	for i := range sys.Celestials {
+		cel := &sys.Celestials[i]
+		if cel.Kind != content.CelBelt || s.idleRatAt(cel.Position, sec).IsZero() {
+			continue
+		}
+		return s.celEntity(cel.ID)
+	}
+	return 0
+}
+
 // patrolRespondStep advances one responding patrol toward and into the
-// fight, or sends it home when the raid is over.
-func (s *Sim) patrolRespondStep(e ecs.Entity, p *Patrol, ai *NpcAI) {
+// fight, or sends it home when the raid is over. A belt incident (the
+// celestial entity of an occupied high-sec belt) is a sweep instead.
+func (s *Sim) patrolRespondStep(e ecs.Entity, p *Patrol, ai *NpcAI, sec string) {
+	if c, ok := s.Celestials.Get(p.Incident); ok && c.Kind == content.CelBelt {
+		s.patrolSweepStep(e, p, ai, sec)
+		return
+	}
 	atk := s.trafficAttackOf(p.Incident)
 	if atk == nil || !hasLiveRaiders(s, atk) {
 		p.State = PatrolReturn
@@ -1856,6 +1924,49 @@ func (s *Sim) patrolRespondStep(e ecs.Entity, p *Patrol, ai *NpcAI) {
 	s.npcActivate(e, ai, target)
 }
 
+// patrolSweepStep advances one patrol sweeping an occupied belt: warp to the
+// belt until a rat is inside engagement range, then lock and shoot the
+// closest live unmolested one; with none left it goes home (patrolReturnStep
+// flies it back). Rats respawn on their own timers, so the next beat re-arms
+// the sweep — ongoing skirmishes, no suppression.
+func (s *Sim) patrolSweepStep(e ecs.Entity, p *Patrol, ai *NpcAI, sec string) {
+	if s.Warps.Has(e) {
+		return // warp state machine owns movement
+	}
+	// Hold station on the belt: systemNpc skips the idle-patrol circle while
+	// the patrol is responding, and a stale patrol intent must not steer it
+	// away from the rats (same rule as an ambush response).
+	s.Intents.Set(e, Intent{Kind: IntentStop})
+	bp, ok := s.posOf(p.Incident)
+	if !ok {
+		p.State = PatrolReturn
+		p.Incident = 0
+		p.Next = 0
+		return
+	}
+	target := s.idleRatAt(bp, sec)
+	if target.IsZero() {
+		p.State = PatrolReturn
+		p.Incident = 0
+		p.Next = 0
+		return
+	}
+	ep, ok := s.posOf(e)
+	if !ok {
+		return
+	}
+	if tp, ok := s.posOf(target); !ok || ep.Dist(tp) > trafficPatrolEngageRange {
+		if s.time >= p.Next && s.warpToPoint(e, bp) {
+			p.Next = s.time + trafficWarpRetrySec
+		}
+		return
+	}
+	s.retargetWeapons(e, target)
+	s.npcEnsureLock(e, target)
+	s.npcActivate(e, ai, target)
+	s.ratDefend(target, e)
+}
+
 // patrolReturnStep flies a patrol back to its anchor and resumes the idle
 // guard circle on arrival.
 func (s *Sim) patrolReturnStep(e ecs.Entity, p *Patrol, ai *NpcAI) {
@@ -1868,6 +1979,7 @@ func (s *Sim) patrolReturnStep(e ecs.Entity, p *Patrol, ai *NpcAI) {
 	}
 	if ep.Dist(ai.Home) <= warpLandRange {
 		p.State = PatrolIdle
+		p.Next = 0 // a fresh beat starts when the patrol is back on duty
 		return
 	}
 	if s.time >= p.Next && s.warpToPoint(e, ai.Home) {

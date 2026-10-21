@@ -10,14 +10,22 @@ import (
 
 // ---------------------------------------------------------------------------
 // Guard neutrality: friendly security patrols (npc-guard-*) never initiate
-// on the player. The threat-response triggers — proximity, intrusion near
+// on the PLAYER. The threat-response triggers — proximity, intrusion near
 // Home, recent player work — exist so pirate rats are not passive; they
 // must not make friendly security open fire on a pilot who is merely
 // flying near the guard's anchor. A guard turns hostile only on
 // player-sourced damage (self-defense), and keeps working incidents.
+//
+// Scope (re-targeted when the belt response landed): guards DO initiate on
+// pirate rats anchored at their own celestial in a high-security system
+// (the ambient security rule, sim/patrol_belt_test.go) — the rat case is
+// the exception this pin deliberately does not cover. Nothing here changes:
+// the player is still the one target a guard never opens on unprovoked.
 // ---------------------------------------------------------------------------
 
 // spawnIdleGuard places a fixture guard patrol exactly at home, on duty.
+// It carries Patrol state, i.e. it is a TRAFFIC patrol: the belt sweep owns
+// it and the static-guard rat rule (which this pin is about) never applies.
 func spawnIdleGuard(t *testing.T, s *Sim, home core.Vec2) ecs.Entity {
 	t.Helper()
 	e := s.spawnNpc("npc-guard-test", home, 0)

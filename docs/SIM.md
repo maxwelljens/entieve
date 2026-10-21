@@ -84,7 +84,7 @@ last so the rebuilt grid is never observed mid-Step.
   skipped spawn attempt never reschedules anything.
 - **The beat — paced commencement.** Nothing commences the tick it first
   becomes possible (CONTEXT.md: departure beat / gate cycle / turnaround /
-  agent cooldown): spawns and resumes hold a departure beat (120–480
+  agent cooldown / belt sweep): spawns and resumes hold a departure beat (120–480
   ticks), gate arrivals hold a gate cycle (dwell 120–300, then a jump
   cycle of 60–180 between hop-out and materializing at the destination
   gate), station arrivals run a turnaround (approach 120–240, then a
@@ -94,7 +94,11 @@ last so the rebuilt grid is never observed mid-Step.
   step per act. Every window is jittered by `trafficBeat` — a pure hash of
   (tick, canonical key), no entropy — and the running deadlines ride the
   already-persisted `Traffic.Next`/`Traffic.Phase` fields, so the beat
-  changes no save schema.
+  changes no save schema. A patrol's belt sweep is a beat too, but not a
+  jittered one: it waits one **patrol beat** (`trafficBeltSweepBeat` — the
+  authored patrol cadence, security-scaled like the patrol schedule) after
+  the patrol comes on duty, and the deadline rides the already-persisted
+  `Patrol.Next`.
 - **Twin-run tests.** `sim/determinism_test.go`, `sim/world_metabolism_test.go`,
   `sim/traffic_test.go` and friends drive two sims through the same
   commands and compare `Hash()`.
@@ -272,7 +276,9 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    touched the destination book. The loss surfaces as an event-only
    supply-risk signal ("Risk premium — …" in the log), not a price step.
    Player cargo is lost on death; NPC death drops a wreck and pays the
-   bounty.
+   bounty. The bounty is paid only for kills attributed to you: a belt rat
+   the Charter's patrols grind down leaves the same lootable wreck and pays
+   nobody.
 7. **Reprocessing — wreck reclaim.** A destroyed ship's wreck carries
    `floor(0.4 × hull-recipe mineral inputs)` as reclaimed minerals — the
    Scuttler's 19,900 ferrite + 2,800 silex bill reclaims 7,960 + 1,120
