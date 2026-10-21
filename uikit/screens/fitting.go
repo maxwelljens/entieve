@@ -290,7 +290,7 @@ func (f *Fitting) slotRows(ship sim.ShipState, hasShip bool) []widgets.TableRow 
 			icon := ""
 			if i < len(defs) {
 				pick.Mod = defs[i]
-				name = itemLabel(f.cv, content.ItemID(defs[i]))
+				name = f.cv.TradeableName(content.ItemID(defs[i]))
 				if def, ok := f.cv.Defs().Module(defs[i]); ok {
 					icon = theme.ModuleIcon(def.Kind)
 				}

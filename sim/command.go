@@ -140,11 +140,11 @@ func holdLabel(hold string) string {
 	return hold
 }
 
-// kmLabel renders a metre distance as the kilometre figure the refusal
-// log lines quote ("150 km" for WarpMinRange). Beyond 99,999 km it
-// switches like theme.FormatDistance: "<0.01 AU" below 0.01 AU, then
-// two-decimal AU. Mirrored byte-identical in uikit/screens.kmLabel.
-func kmLabel(m float64) string {
+// KmLabel renders a metre distance as the kilometre figure the refusal
+// log lines and the UI hints quote ("150 km" for WarpMinRange). Beyond
+// 99,999 km it switches like theme.FormatDistance: "<0.01 AU" below
+// 0.01 AU, then two-decimal AU.
+func KmLabel(m float64) string {
 	switch {
 	case m <= 9.9999e7:
 		return strconv.FormatFloat(m/1000, 'f', -1, 64) + " km"
@@ -373,7 +373,7 @@ func (s *Sim) beginWarp(target ecs.Entity, rangeM float64) {
 	// EVE's minimum warp range: the drive cannot engage a target the
 	// ship is already inside 150 km of (distance at command time).
 	if d := s.distBetween(p, target); d < WarpMinRange {
-		s.log(SevWarning, p, "Target within warp minimum range ("+kmLabel(WarpMinRange)+")")
+		s.log(SevWarning, p, "Target within warp minimum range ("+KmLabel(WarpMinRange)+")")
 		return
 	}
 	if sh, ok := s.Ships.Get(p); ok && sh.ScrambledUntil > s.time {

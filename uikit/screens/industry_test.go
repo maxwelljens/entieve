@@ -102,7 +102,7 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 		if len(r.Cells) != 5 {
 			t.Fatalf("row %d has %d cells, want 5", i, len(r.Cells))
 		}
-		if r.Cells[0] != itemLabel(env, want[i].Product) {
+		if r.Cells[0] != env.TradeableName(want[i].Product) {
 			t.Fatalf("row %d = %q, want %q (canonical order)", i, r.Cells[0], want[i].Product)
 		}
 		if r.Cells[1] != want[i].Family {
@@ -180,10 +180,10 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 
 	// Stepping to 10 runs re-prices the need: the same cell now quotes the
 	// ten-run commit and Start grays out again (materials for 10 missing).
-	uitest.FireButton(ui, f.plus)
+	uitest.FireButton(ui, f.stepper.Plus())
 	frame()
-	if f.qty() != 10 {
-		t.Fatalf("qty = %d, want 10", f.qty())
+	if f.stepper.Value() != 10 {
+		t.Fatalf("qty = %d, want 10", f.stepper.Value())
 	}
 	cell := f.recipes.Rows[chargeRow].Cells[4]
 	if !strings.Contains(cell, "/7,200") {

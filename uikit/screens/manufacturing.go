@@ -41,14 +41,11 @@ type Manufacturing struct {
 
 	craftLbl *widget.Text
 	jobsLbl  *widget.Text
-	qtyLabel *widget.Text
-	qtyBar   *widget.Container // stepper row: relaid when the readout changes
+	stepper  *widgets.QtyStepper
 	title    *widget.Text
 
-	minus, plus            *widget.Button
 	start, collect, cancel *widget.Button
 
-	qtyIdx int
 	sel    manufacturingRow
 	hasSel bool
 }
@@ -117,12 +114,7 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	f.jobsLbl = widget.NewText(
 		widget.TextOpts.Text("Jobs", env.Face(theme.StepTiny), theme.Solid(p.Accent)),
 	)
-	f.qtyLabel = widget.NewText(
-		widget.TextOpts.Text("Qty 1", env.FaceMono(theme.StepSmall), theme.Solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-			Position: widget.RowLayoutPositionCenter,
-		})),
-	)
+	f.stepper = widgets.NewQtyStepper(env, qtySteps[:])
 
 	newBtn := func(label string, clicked func()) *widget.Button {
 		return widget.NewButton(
@@ -134,20 +126,12 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
 		)
 	}
-	f.minus = newBtn("-", func() { f.stepQty(-1) })
-	f.plus = newBtn("+", func() { f.stepQty(1) })
 	f.start = newBtn("Start", f.startClicked)
 	f.collect = newBtn("Collect", f.collectClicked)
 	f.cancel = newBtn("Cancel", f.cancelClicked)
 
-	startBar := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
-		)),
-	)
-	startBar.AddChild(f.minus, f.qtyLabel, f.plus, f.start)
-	f.qtyBar = startBar
+	startBar := f.stepper.Row()
+	startBar.AddChild(f.start)
 	collectBar := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
@@ -237,7 +221,7 @@ func (f *Manufacturing) Sync() {
 	f.split.Poll()
 	s := f.cv
 	station := s.DockedIndustry()
-	runs := f.qty()
+	runs := f.stepper.Value()
 
 	// Recipe board: the content's canonical order, one row per recipe.
 	recRows := make([]widgets.TableRow, 0, len(f.cv.Defs().Recipes))
@@ -246,7 +230,7 @@ func (f *Manufacturing) Sync() {
 		row := manufacturingRow{recipe: rec.ID, ref: f.productRef(rec.Product)}
 		recRows = append(recRows, widgets.TableRow{
 			Cells: []string{
-				itemLabel(f.cv, rec.Product),
+				f.cv.TradeableName(rec.Product),
 				rec.Family,
 				theme.GroupFloat(s.JobDuration(station, rec.ID, 1), 1) + " s",
 				theme.FormatCredits(s.JobFee(rec.ID, runs)),
@@ -281,7 +265,7 @@ func (f *Manufacturing) Sync() {
 		row := manufacturingRow{job: j.ID, ref: f.productRef(f.productOfJob(j))}
 		jobRows = append(jobRows, widgets.TableRow{
 			Cells: []string{
-				itemLabel(f.cv, f.productOfJob(j)),
+				f.cv.TradeableName(f.productOfJob(j)),
 				s.StationName(j.Station),
 				theme.FormatInt(int64(j.Runs)),
 				f.progressOf(j),
@@ -325,7 +309,6 @@ func (f *Manufacturing) Sync() {
 	slotsUsed := len(all)
 	f.jobsLbl.Label = "Jobs — " + theme.FormatInt(int64(slotsUsed)) + "/" + theme.FormatInt(int64(slots)) + " slots"
 
-	setStepperValue(f.qtyBar, f.qtyLabel, "Qty "+theme.FormatInt(int64(runs)))
 	f.start.GetWidget().Disabled = !f.startReadyFor(f.sel)
 	f.collect.GetWidget().Disabled = !f.collectReadyFor(f.sel)
 	f.cancel.GetWidget().Disabled = !f.cancelReadyFor(f.sel)
@@ -334,7 +317,7 @@ func (f *Manufacturing) Sync() {
 	if f.hasSel && f.sel.recipe != "" {
 		if rec, ok := f.cv.Defs().Recipes[f.sel.recipe]; ok {
 			level := s.CraftLevel(station, rec.Family)
-			f.title.Label = "Manufacturing — " + itemLabel(f.cv, rec.Product) + " · " +
+			f.title.Label = "Manufacturing — " + f.cv.TradeableName(rec.Product) + " · " +
 				theme.GroupFloat(s.JobDuration(station, rec.ID, runs), 1) + " s · fee " +
 				theme.FormatCredits(s.JobFee(rec.ID, runs)) + " · L" +
 				theme.FormatInt(int64(level)) + " · " + slotsLbl
@@ -430,7 +413,7 @@ func (f *Manufacturing) startReadyFor(row manufacturingRow) bool {
 	if row.recipe == "" {
 		return false
 	}
-	return f.cv.CanStartJob(f.cv.DockedIndustry(), row.recipe, f.qty())
+	return f.cv.CanStartJob(f.cv.DockedIndustry(), row.recipe, f.stepper.Value())
 }
 
 // collectReadyFor is the Collect gate for one job row: the docked
@@ -478,7 +461,7 @@ func (f *Manufacturing) rowActions(row manufacturingRow) []widgets.RowAction {
 	switch {
 	case row.recipe != "":
 		return []widgets.RowAction{{Label: "Start", Disabled: !f.startReadyFor(row),
-			Intent: widgets.StartJob{Recipe: row.recipe, Runs: f.qty()}}}
+			Intent: widgets.StartJob{Recipe: row.recipe, Runs: f.stepper.Value()}}}
 	case row.job != 0:
 		if f.collectReadyFor(row) {
 			return []widgets.RowAction{{Label: "Collect",
@@ -490,21 +473,6 @@ func (f *Manufacturing) rowActions(row manufacturingRow) []widgets.RowAction {
 	return []widgets.RowAction{{Label: "Start", Disabled: true}}
 }
 
-// stepQty moves the quantity stepper one step (clamped).
-func (f *Manufacturing) stepQty(delta int) {
-	f.qtyIdx += delta
-	if f.qtyIdx < 0 {
-		f.qtyIdx = 0
-	}
-	if f.qtyIdx >= len(qtySteps) {
-		f.qtyIdx = len(qtySteps) - 1
-	}
-	setStepperValue(f.qtyBar, f.qtyLabel, "Qty "+theme.FormatInt(int64(f.qty())))
-}
-
-// qty is the current run count the stepper drives.
-func (f *Manufacturing) qty() int { return qtySteps[f.qtyIdx] }
-
 // startClicked emits StartJob for the selected recipe and quantity.
 func (f *Manufacturing) startClicked() { f.startWith(f.sel) }
 
@@ -514,7 +482,7 @@ func (f *Manufacturing) startWith(row manufacturingRow) {
 	if !f.startReadyFor(row) {
 		return
 	}
-	f.as.Do(widgets.StartJob{Recipe: row.recipe, Runs: f.qty()})
+	f.as.Do(widgets.StartJob{Recipe: row.recipe, Runs: f.stepper.Value()})
 }
 
 // collectClicked emits CollectJob for the selected job.

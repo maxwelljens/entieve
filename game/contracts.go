@@ -152,14 +152,14 @@ func (g *Game) buildStationBoard() stationBoardModel {
 		r := boardRowModel{
 			ID:      def.ID,
 			Title:   def.Title,
-			Summary: objectiveSummary(c, def),
+			Summary: objectiveSummary(g.env, def),
 			Reward:  rewardText(def),
 			Icon:    theme.ContractIcon(def.Kind),
 			Action:  "Accept",
 		}
 		if accepted[def.ID] {
 			r.Action, r.Disabled = "Accepted", true
-		} else if m.Standing+1e-9 < def.MinStanding { // same epsilon as sim's gate
+		} else if !g.env.MeetsStanding(def.MinStanding) { // the sim's accept gate, epsilon included
 			r.Require = fmt.Sprintf("Requires standing %.2f", def.MinStanding)
 			r.Disabled = true
 		}
@@ -187,7 +187,7 @@ func (g *Game) buildStationBoard() stationBoardModel {
 		a := active[i]
 		have := a.ms.Progress
 		if a.def.Kind == content.ContractDeliver {
-			have = g.cargoProgress(a.def) // the sim counts deliver objectives only at the claim
+			have = g.env.DeliverProgress(a.def) // the sim counts deliver objectives only at the claim
 		}
 		m.Active = append(m.Active, boardRowModel{
 			ID:     a.ms.ID,
@@ -429,7 +429,8 @@ func (g *Game) objectiveRef(id content.ContractID) (widgets.InfoRef, bool) {
 // objectiveSummary renders the contract's kind + objective, e.g.
 // "Destroy 1× Scuttler", "Deliver 2 m³ EMP Charge to Przystań",
 // "Mine 400 m³ Cordite Ore".
-func objectiveSummary(c *content.Content, def *content.ContractDef) string {
+func objectiveSummary(cv widgets.ContentView, def *content.ContractDef) string {
+	c := cv.Defs()
 	switch def.Kind {
 	case content.ContractKill:
 		name := string(def.Objective.Target)
@@ -441,15 +442,15 @@ func objectiveSummary(c *content.Content, def *content.ContractDef) string {
 		// Modules trade as cargo units (no volume); items keep the m³ line.
 		if _, ok := c.Module(content.ModuleID(def.Objective.Item)); ok {
 			return fmt.Sprintf("Deliver %d× %s to %s",
-				def.Objective.Count, itemName(c, def.Objective.Item),
+				def.Objective.Count, cv.TradeableName(def.Objective.Item),
 				celName(c, def.Objective.Destination))
 		}
 		return fmt.Sprintf("Deliver %d m³ %s to %s",
-			def.Objective.Count, itemName(c, def.Objective.Item),
+			def.Objective.Count, cv.TradeableName(def.Objective.Item),
 			celName(c, def.Objective.Destination))
 	case content.ContractMine:
 		return fmt.Sprintf("Mine %d m³ %s",
-			def.Objective.Count, itemName(c, def.Objective.Item))
+			def.Objective.Count, cv.TradeableName(def.Objective.Item))
 	}
 	return string(def.Kind) // validator-unknown kind: show the raw kind
 }
@@ -463,48 +464,6 @@ func rewardText(def *content.ContractDef) string {
 		s += fmt.Sprintf(" · %+.2f standing", def.Reward.StandingGain)
 	}
 	return s
-}
-
-// cargoProgress counts a deliver contract's objective cargo in the hold,
-// clamped to the objective: the sim only counts deliver objectives at the
-// claim, so the board shows what is actually aboard.
-func (g *Game) cargoProgress(def *content.ContractDef) float64 {
-	cargo, ok := g.s.Cargos.Get(g.s.Player())
-	if !ok {
-		return 0
-	}
-	qty := 0
-	for _, st := range cargo.Stacks {
-		if st.Item == def.Objective.Item {
-			qty += st.Qty
-		}
-	}
-	for _, st := range cargo.Ore {
-		if st.Item == def.Objective.Item {
-			qty += st.Qty
-		}
-	}
-	item, ok := g.opts.Content.Item(def.Objective.Item)
-	if !ok || item.Volume <= 0 {
-		// A volume-less cargo unit (a module) counts as whole units.
-		return math.Min(float64(qty), float64(def.Objective.Count))
-	}
-	have := float64(qty) * item.Volume
-	if want := float64(def.Objective.Count); have > want {
-		have = want
-	}
-	return have
-}
-
-// itemName resolves an item id to its display name.
-func itemName(c *content.Content, id content.ItemID) string {
-	if def, ok := c.Item(id); ok {
-		return def.Name
-	}
-	if def, ok := c.Module(content.ModuleID(id)); ok {
-		return def.Name
-	}
-	return string(id)
 }
 
 // celName resolves a celestial id to its display name across systems (a

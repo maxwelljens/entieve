@@ -62,6 +62,15 @@ func (v *stubView) System() *content.SystemDef { return &content.SystemDef{ID: "
 
 func (v *stubView) MarketPrice(sim.StationID, content.ItemID) float64 { return 42 }
 
+func (v *stubView) PriceLadder(sim.StationID, content.ItemID) float64 { return 42 }
+
+func (v *stubView) TradeableName(id content.ItemID) string {
+	if def, ok := v.c.Item(id); ok {
+		return def.Name
+	}
+	return string(id)
+}
+
 func (v *stubView) Wallet() float64 { return v.wallet }
 
 func (v *stubView) InfoRefOf(data any) (widgets.InfoRef, bool) {

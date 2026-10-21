@@ -25,16 +25,13 @@ type Inventory struct {
 	cargoLbl *widget.Text
 	oreLbl   *widget.Text
 	hangLbl  *widget.Text
-	qtyLabel *widget.Text
-	qtyBar   *widget.Container // stepper row: relaid when the readout changes
+	stepper  *widgets.QtyStepper
 
-	minus, plus *widget.Button
-	toCargo     *widget.Button
-	toOre       *widget.Button
-	toHangar    *widget.Button
-	sell        *widget.Button
+	toCargo  *widget.Button
+	toOre    *widget.Button
+	toHangar *widget.Button
+	sell     *widget.Button
 
-	qtyIdx int
 	sel    content.ItemID
 	src    string // hold the selected row belongs to
 	hasSel bool
@@ -76,12 +73,7 @@ func NewInventory(env widgets.Seams) *Inventory {
 	inv.oreLbl = newLabel("Ore hold")
 	inv.hangLbl = newLabel("Station hangar")
 
-	inv.qtyLabel = widget.NewText(
-		widget.TextOpts.Text("Qty 1", env.FaceMono(theme.StepSmall), theme.Solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-			Position: widget.RowLayoutPositionCenter,
-		})),
-	)
+	inv.stepper = widgets.NewQtyStepper(env, qtySteps[:])
 
 	newBtn := func(label string, clicked func()) *widget.Button {
 		return widget.NewButton(
@@ -93,8 +85,6 @@ func NewInventory(env widgets.Seams) *Inventory {
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
 		)
 	}
-	inv.minus = newBtn("-", func() { inv.stepQty(-1) })
-	inv.plus = newBtn("+", func() { inv.stepQty(1) })
 	inv.toCargo = newBtn("To Cargo", func() { inv.transfer("cargo") })
 	inv.toOre = newBtn("To Ore", func() { inv.transfer("ore") })
 	inv.toHangar = newBtn("To Hangar", func() { inv.transfer("hangar") })
@@ -110,7 +100,7 @@ func NewInventory(env widgets.Seams) *Inventory {
 		c.AddChild(children...)
 		return c
 	}
-	inv.qtyBar = toolbar(inv.minus, inv.qtyLabel, inv.plus, inv.sell)
+	inv.stepper.Row().AddChild(inv.sell)
 	xferBar := toolbar(inv.toCargo, inv.toOre, inv.toHangar)
 
 	// Body: the three label/table panes over the two button rows. The
@@ -130,7 +120,7 @@ func NewInventory(env widgets.Seams) *Inventory {
 			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	body.AddChild(inv.split.Container(), inv.qtyBar, xferBar)
+	body.AddChild(inv.split.Container(), inv.stepper.Row(), xferBar)
 
 	title, _ := theme.NewTitleBar(env, "Inventory", "svc_inventory")
 
@@ -210,11 +200,10 @@ func (inv *Inventory) Sync() {
 	inv.ore.SetRows(inv.oreRows(cargo, hasCargo))
 	inv.hangar.SetRows(inv.rowsOf(inv.hangarRows()))
 
-	inv.cargoLbl.Label = inv.section("Cargo", cargo, hasCargo)
-	inv.oreLbl.Label = inv.oreSection(cargo, hasCargo)
+	inv.cargoLbl.Label = inv.section("Cargo")
+	inv.oreLbl.Label = inv.oreSection()
 	inv.hangLbl.Label = "Station hangar · " + theme.FormatInt(int64(len(inv.hangarRows()))) + " stacks"
 
-	setStepperValue(inv.qtyBar, inv.qtyLabel, "Qty "+theme.FormatInt(int64(inv.qty())))
 	inv.cargo.Sync()
 	inv.ore.Sync()
 	inv.hangar.Sync()
@@ -271,7 +260,7 @@ func (inv *Inventory) rowsOf(stacks []content.CargoStack) []widgets.TableRow {
 	rows := make([]widgets.TableRow, 0, len(stacks))
 	docked := inv.cv.PlayerDocked()
 	for _, st := range stacks {
-		vol, name := 0.0, itemLabel(inv.cv, st.Item)
+		vol, name := 0.0, inv.cv.TradeableName(st.Item)
 		if def, ok := inv.cv.Defs().Item(st.Item); ok {
 			vol = def.Volume * float64(st.Qty)
 		}
@@ -291,48 +280,23 @@ func (inv *Inventory) rowsOf(stacks []content.CargoStack) []widgets.TableRow {
 	return rows
 }
 
-// section renders a section header with used/capacity totals.
-func (inv *Inventory) section(title string, cargo sim.Cargo, hasCargo bool) string {
-	if !hasCargo {
+// section renders the general hold's header with used/capacity totals.
+func (inv *Inventory) section(title string) string {
+	used, cap, ok := inv.cv.Hold("cargo")
+	if !ok {
 		return title + " · no cargo hold"
 	}
-	used := 0.0
-	for _, st := range cargo.Stacks {
-		if def, ok := inv.cv.Defs().Item(st.Item); ok {
-			used += def.Volume * float64(st.Qty)
-		}
-	}
-	return title + " · " + theme.FormatVolume(used) + " / " + theme.FormatVolume(cargo.Capacity)
+	return title + " · " + theme.FormatVolume(used) + " / " + theme.FormatVolume(cap)
 }
 
 // oreSection renders the ore hold header with used/capacity totals.
-func (inv *Inventory) oreSection(cargo sim.Cargo, hasCargo bool) string {
-	if !hasCargo || cargo.OreCapacity <= 0 {
+func (inv *Inventory) oreSection() string {
+	used, cap, ok := inv.cv.Hold("ore")
+	if !ok {
 		return "Ore hold · not fitted"
 	}
-	used := 0.0
-	for _, st := range cargo.Ore {
-		if def, ok := inv.cv.Defs().Item(st.Item); ok {
-			used += def.Volume * float64(st.Qty)
-		}
-	}
-	return "Ore hold · " + theme.FormatVolume(used) + " / " + theme.FormatVolume(cargo.OreCapacity)
+	return "Ore hold · " + theme.FormatVolume(used) + " / " + theme.FormatVolume(cap)
 }
-
-// stepQty moves the quantity stepper one step (clamped).
-func (inv *Inventory) stepQty(delta int) {
-	inv.qtyIdx += delta
-	if inv.qtyIdx < 0 {
-		inv.qtyIdx = 0
-	}
-	if inv.qtyIdx >= len(qtySteps) {
-		inv.qtyIdx = len(qtySteps) - 1
-	}
-	setStepperValue(inv.qtyBar, inv.qtyLabel, "Qty "+theme.FormatInt(int64(inv.qty())))
-}
-
-// qty is the current transfer/sell quantity.
-func (inv *Inventory) qty() int { return qtySteps[inv.qtyIdx] }
 
 // transfer moves the selected stack from its section to hold ("cargo",
 // "ore" or "hangar") with the stepper quantity.
@@ -352,7 +316,7 @@ func (inv *Inventory) transfer(to string) {
 	}
 	inv.as.Do(widgets.Transfer{
 		Item: inv.sel,
-		Qty:  inv.qty(),
+		Qty:  inv.stepper.Value(),
 		From: inv.src,
 		To:   to,
 	})
@@ -363,5 +327,5 @@ func (inv *Inventory) sellClicked() {
 	if !inv.hasSel || !inv.cv.PlayerDocked() {
 		return
 	}
-	inv.as.Do(widgets.Sell{Item: inv.sel, Qty: inv.qty()})
+	inv.as.Do(widgets.Sell{Item: inv.sel, Qty: inv.stepper.Value()})
 }

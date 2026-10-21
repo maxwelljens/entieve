@@ -45,6 +45,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The rack's 4 px cycle bar is gone in favour of the tile cycle ring; tile
   size, glyph centering, names, hit areas, tooltips and menus are
   unchanged.
+- The four quantity steppers (Market, Inventory, Manufacturing, Refinery)
+  are one `widgets.QtyStepper`: same ± hit boxes, tabular readout and
+  relayout rule everywhere, with the refinery's batch ladder supplied as
+  steps. Screens now read the derived figures (hold use/capacity, price
+  ladder, contract progress/standing, tradeable name) from the ContentView
+  seam instead of re-deriving them; the refine batch size (`sim.RefineBatch`)
+  and the km distance label (`sim.KmLabel`) are single-sourced.
 
 ## [0.6.0] - 2026-10-21
 

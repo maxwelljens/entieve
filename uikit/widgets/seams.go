@@ -81,11 +81,21 @@ type ContentView interface {
 	MarketPrice(sim.StationID, content.ItemID) float64
 	DockedMarket() sim.StationID
 
+	// PriceLadder is an item's displayed price: at a station, its book's
+	// ladder (last trade, best ask, best bid, base); with station "" the
+	// undocked fallback view's ladder over the shown system's orders
+	// (best ask, best bid, base — no station book, no last trade).
+	PriceLadder(sim.StationID, content.ItemID) float64
+
+	// TradeableName is the display name of any marketable id — item,
+	// module or hull — falling back to the raw id. The one name read the
+	// market, orders, contract board and tooltips share.
+	TradeableName(content.ItemID) string
+
 	// Industry: the manufacturing jobs, materials, fees, gating and craft
 	// reads. Jobs are the GLOBAL list (every station) — controls gate on
 	// DockedIndustry.
 	DockedIndustry() sim.StationID
-	Jobs(sim.StationID) []sim.Job
 	AllJobs() []sim.Job
 	StationName(sim.StationID) string
 	JobMaterials(sim.StationID, content.RecipeID, int) []content.CargoStack
@@ -99,6 +109,20 @@ type ContentView interface {
 	// the dedicated ore hold (the two places CmdRefine consumes from).
 	CargoStacks() []content.CargoStack
 	OreStacks() []content.CargoStack
+
+	// Hold is one hold's m³: used volume and capacity, for the hold name
+	// CmdTransfer takes ("cargo", "ore"). ok is false when the player has
+	// no such hold (no cargo at all, or no ore hold fitted).
+	Hold(kind string) (used, capacity float64, ok bool)
+
+	// DeliverProgress is a deliver contract's live objective progress in
+	// the objective's own unit — m³ for volume items, whole units for
+	// volume-less cargo (modules) — capped at the objective's count.
+	DeliverProgress(*content.ContractDef) float64
+
+	// MeetsStanding reports whether the player's standing clears a
+	// minimum (the sim's contract-accept gate, epsilon included).
+	MeetsStanding(float64) bool
 
 	// Show Info reference resolution (the info catalog seam).
 	InfoRefFor(ecs.Entity) (InfoRef, bool)
@@ -279,9 +303,56 @@ func (v *view) MarketPrice(st sim.StationID, item content.ItemID) float64 {
 
 func (v *view) DockedMarket() sim.StationID { return v.s.DockedMarket() }
 
-func (v *view) DockedIndustry() sim.StationID { return v.s.DockedIndustry() }
+// PriceLadder: a station's book carries sim's full ladder (last trade,
+// ask, bid, base); the undocked view has no single book, so it walks the
+// shown system's orders for the ask/bid rungs and lets the base rung come
+// from the same sim read.
+func (v *view) PriceLadder(station sim.StationID, item content.ItemID) float64 {
+	if station != "" {
+		return v.s.MarketPrice(station, item)
+	}
+	ask, bid := -1.0, -1.0
+	if sys := v.s.System(); sys != nil {
+		// shortcut: the undocked quote re-copies the system book per
+		// item; memoise per frame if the catalog grows into the hundreds.
+		for _, o := range v.s.Market(sys.ID) {
+			if o.Item != item {
+				continue
+			}
+			if o.Side == sim.OrderSell {
+				if ask < 0 || o.Price < ask {
+					ask = o.Price
+				}
+			} else if o.Price > bid {
+				bid = o.Price
+			}
+		}
+	}
+	if ask >= 0 {
+		return ask
+	}
+	if bid >= 0 {
+		return bid
+	}
+	return v.s.MarketPrice("", item) // base price
+}
 
-func (v *view) Jobs(st sim.StationID) []sim.Job { return v.s.Jobs(st) }
+// TradeableName mirrors the sim's own itemName (items, modules, hulls) so
+// the UI names an id exactly as the log lines do.
+func (v *view) TradeableName(id content.ItemID) string {
+	if d, ok := v.c.Item(id); ok {
+		return d.Name
+	}
+	if d, ok := v.c.Module(content.ModuleID(id)); ok {
+		return d.Name
+	}
+	if d, ok := v.c.Ship(content.ShipID(id)); ok {
+		return d.Name
+	}
+	return string(id)
+}
+
+func (v *view) DockedIndustry() sim.StationID { return v.s.DockedIndustry() }
 
 func (v *view) AllJobs() []sim.Job { return v.s.AllJobs() }
 
@@ -300,6 +371,69 @@ func (v *view) OreStacks() []content.CargoStack {
 	}
 	return nil
 }
+
+// Hold is the hold-volume rule once: used m³ from the item defs (unknown
+// and volume-less ids occupy nothing, the sim's itemVolume rule) and the
+// capacity the hull built.
+func (v *view) Hold(kind string) (used, capacity float64, ok bool) {
+	c, ok := v.s.Cargos.Get(v.s.Player())
+	if !ok {
+		return 0, 0, false
+	}
+	var st []content.CargoStack
+	switch kind {
+	case "cargo":
+		st, capacity = c.Stacks, c.Capacity
+	case "ore":
+		if c.OreCapacity <= 0 {
+			return 0, 0, false
+		}
+		st, capacity = c.Ore, c.OreCapacity
+	default:
+		return 0, 0, false
+	}
+	for _, s := range st {
+		if d, ok := v.c.Item(s.Item); ok && d.Volume > 0 {
+			used += d.Volume * float64(s.Qty)
+		}
+	}
+	return used, capacity, true
+}
+
+// DeliverProgress counts the objective item in both holds — the two places
+// the sim consumes a deliver objective from — in the unit the contract's
+// count is written in: m³ for a volume item, whole units for a module.
+func (v *view) DeliverProgress(def *content.ContractDef) float64 {
+	if def == nil {
+		return 0
+	}
+	qty := 0
+	if c, ok := v.s.Cargos.Get(v.s.Player()); ok {
+		for _, st := range c.Stacks {
+			if st.Item == def.Objective.Item {
+				qty += st.Qty
+			}
+		}
+		for _, st := range c.Ore {
+			if st.Item == def.Objective.Item {
+				qty += st.Qty
+			}
+		}
+	}
+	need := float64(def.Objective.Count)
+	var have float64
+	if d, ok := v.c.Item(def.Objective.Item); ok && d.Volume > 0 {
+		have = float64(qty) * d.Volume
+	} else {
+		have = float64(qty)
+	}
+	if have > need {
+		have = need
+	}
+	return have
+}
+
+func (v *view) MeetsStanding(min float64) bool { return v.s.Standing()+1e-9 >= min }
 
 func (v *view) JobMaterials(st sim.StationID, rec content.RecipeID, runs int) []content.CargoStack {
 	return v.s.JobMaterials(st, rec, runs)
