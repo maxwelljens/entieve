@@ -2,11 +2,21 @@ package sim
 
 import (
 	"math"
+	"strings"
 
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/ecs"
 )
+
+// ratNpcPrefix is the id prefix of the pirate rat hulls (npc-rat-*): the NPC
+// population security forces clear from high-sec belts.
+const ratNpcPrefix = "npc-rat-"
+
+// isRatNpc reports whether def is a pirate rat (an Old Works belt/raid hull).
+func isRatNpc(def *content.NpcDef) bool {
+	return strings.HasPrefix(string(def.ID), ratNpcPrefix)
+}
 
 // npcFleeSeconds is how long a fleeing NPC burns away from the player
 // before despawning quietly (Intent.Range stores the flee start time —
@@ -67,8 +77,13 @@ const npcPatrolMaxRadius = 2500
 // work there) can never open fire unprovoked. Only trigger (b),
 // player-sourced damage, turns a guard hostile (self-defense); its
 // incident response (convoy ambushes) is driven by the traffic system and
-// is unaffected. The threat triggers exist so pirate rats are not
-// passive, and apply to every non-guard NPC exactly as before.
+// is unaffected. Guards do have one threat of their own: in a HIGH-security
+// system a static guard clears pirate rats (npc-rat-*) anchored at its own
+// celestial whenever they are not already engaged (guardEngageRat) — the
+// ambient security rule. Traffic patrols are exempt from that rule (their
+// belt sweep lives in systemTraffic) and low/null space keeps guards
+// passive. The threat triggers exist so pirate rats are not passive, and
+// apply to every non-guard NPC exactly as before.
 //
 // The pursuit leash is leash = npcLeashFactor * effAggro measured from the
 // NPC's Home: an engaged NPC chases/engages while the player stays inside
@@ -175,7 +190,18 @@ func (s *Sim) systemNpc() {
 				ai.State = NpcApproach
 				ai.Target = s.player
 				s.log(SevWarning, e, s.nameOf(e)+" is attacking you")
-			} else if !s.patrolResponding(e) {
+				break
+			}
+			// The ambient security rule: a high-sec guard clears the rats
+			// anchored at its own celestial (see the systemNpc doc). Traffic
+			// patrols are driven by the belt sweep in systemTraffic instead.
+			if isGuard && security == "high" && !s.Patrols.Has(e) {
+				if rat := s.idleRatAt(ai.Home, security); !rat.IsZero() {
+					s.guardEngageRat(e, ai, tr, rat, def)
+					break
+				}
+			}
+			if !s.patrolResponding(e) {
 				// Guards never sit still: slow patrol around Home — but a
 				// patrol working an incident (PatrolRespond) holds station:
 				// steering it back to its Home circle mid-fight would drift
@@ -311,6 +337,87 @@ func (s *Sim) npcPatrol(e ecs.Entity, ai *NpcAI, tr *Transform, def *content.Npc
 		dir = core.Vec2{X: -math.Sin(theta), Y: math.Cos(theta)}
 	}
 	s.Intents.Set(e, Intent{Kind: IntentManual, Dir: dir.Norm(), SpeedFrac: npcPatrolSpeedFrac})
+}
+
+// idleRatAt returns the first live rat (npc-rat-*) anchored at home that the
+// security forces may engage, in canonical handle order — the target a
+// high-sec guard clears, and the belt occupancy a patrol sweep looks for.
+// Zero when none. Home is the spawn anchor (the celestial position), so the
+// match is an exact comparison: no distance scan, no persisted state, and the
+// chase that follows is whatever the belt's own scatter gives.
+func (s *Sim) idleRatAt(home core.Vec2, sec string) ecs.Entity {
+	for _, e := range sortedEntities(s.AIs) {
+		ai, ok := s.AIs.Get(e)
+		if !ok || ai.Home != home || !s.ratFree(ai, sec) {
+			continue
+		}
+		if def, ok := s.Content.Npc(ai.Npc); ok && isRatNpc(def) {
+			return e
+		}
+	}
+	return 0
+}
+
+// ratFree reports whether a rat is free for the security forces to engage:
+// idle, or holding a pursuit the player has already left — outside the rat's
+// own leash, which systemNpc breaks off on the next tick (trigger (b) never
+// expires, so a rat the player damaged and flew away from flinches onto the
+// player every few ticks; that flinch is not a fight). A rat the player is
+// actually fighting stays the player's, and a fleeing one is left alone.
+func (s *Sim) ratFree(ai *NpcAI, sec string) bool {
+	switch ai.State {
+	case NpcIdle, "":
+		return true
+	case NpcApproach, NpcOrbit, NpcReturn:
+		def, ok := s.Content.Npc(ai.Npc)
+		if !ok {
+			return false
+		}
+		effAggro, _ := npcTemperament(sec, def)
+		pp, ok := s.posOf(s.player)
+		return !ok || ai.Home.Dist(pp) > npcLeashFactor*effAggro
+	}
+	return false
+}
+
+// guardEngageRat drives a static high-sec guard onto a belt rat: close to
+// orbit range, lock, and fire through the normal module pipeline. The
+// guard's AI state stays idle — guards remain friendly on the overview and
+// the player-centric state machine above is untouched — and the target is
+// recomputed from world state every tick, so a killed rat needs no cleanup:
+// the next tick finds the next rat or resumes the idle patrol.
+func (s *Sim) guardEngageRat(e ecs.Entity, ai *NpcAI, tr *Transform, rat ecs.Entity, def *content.NpcDef) {
+	rp, ok := s.posOf(rat)
+	if !ok {
+		return
+	}
+	if tr.Pos.Dist(rp) <= def.OrbitRange+50 {
+		s.Intents.Set(e, Intent{Kind: IntentOrbit, Target: rat, Range: def.OrbitRange})
+	} else {
+		s.Intents.Set(e, Intent{Kind: IntentApproach, Target: rat})
+	}
+	s.npcEnsureLock(e, rat)
+	s.npcActivate(e, ai, rat)
+	s.ratDefend(rat, e)
+}
+
+// ratDefend points an idle rat's weapons at the security ship clearing it —
+// the trafficRaidersAct pattern (an idle NPC's weapons are driven at an
+// explicit target without touching its AI state). The rat's own state
+// machine stays player-centric, so its return fire can never pull it onto
+// the player; it fights the patrol to the death while it lives.
+//
+// No retargetWeapons here: several security ships can work one rat, and
+// re-pointing a running gun between them every tick would churn
+// activate/deactivate forever. The gun binds to the first attacker it locks
+// and the module system re-arms it when that target dies.
+func (s *Sim) ratDefend(rat, attacker ecs.Entity) {
+	ai, ok := s.AIs.Get(rat)
+	if !ok || ai.State != NpcIdle {
+		return
+	}
+	s.npcEnsureLock(rat, attacker)
+	s.npcActivate(rat, ai, attacker)
 }
 
 // patrolPhase maps an entity handle to its patrol start angle in [0, 2π)

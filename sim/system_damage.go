@@ -224,6 +224,7 @@ func (s *Sim) handleDeath(e, src ecs.Entity) {
 	if hasAI {
 		s.recordRespawn(e, ai)
 		s.checkAnomalyCleared(ai)
+		s.checkBeltCleared(ai)
 	}
 	s.destroy(e)
 }
@@ -307,6 +308,42 @@ func (s *Sim) checkAnomalyCleared(ai *NpcAI) {
 		}
 	}
 	s.emit(Event{Kind: EvAnomalyCleared, Severity: SevGood, Actor: s.player,
+		Text: s.nameOf(cel) + " cleared"})
+}
+
+// checkBeltCleared reports the good news when the last live rat of a
+// HIGH-sec belt dies — whoever landed the kill (the dying rat is skipped by
+// identity). The belt's own respawn timers re-arm the rats, so this is a
+// moment of news, not a permanent state. Rats only: a guard dying at a belt
+// is not a cleared belt.
+func (s *Sim) checkBeltCleared(ai *NpcAI) {
+	sys := s.System()
+	if sys == nil || sys.Security != "high" {
+		return
+	}
+	if def, ok := s.Content.Npc(ai.Npc); !ok || !isRatNpc(def) {
+		return
+	}
+	cel := s.nearestCelestial(ai.Home)
+	if cel.IsZero() {
+		return
+	}
+	c, ok := s.Celestials.Get(cel)
+	if !ok || c.Kind != content.CelBelt {
+		return
+	}
+	// The dying rat is still in the store at this point (destroy runs after
+	// this hook), so the survivor scan skips it by identity.
+	for _, e := range sortedEntities(s.AIs) {
+		other, ok := s.AIs.Get(e)
+		if !ok || other == ai || other.Home != ai.Home {
+			continue
+		}
+		if def, ok := s.Content.Npc(other.Npc); ok && isRatNpc(def) {
+			return // a rat survives: the belt is not cleared
+		}
+	}
+	s.emit(Event{Kind: EvLog, Severity: SevGood, Actor: cel,
 		Text: s.nameOf(cel) + " cleared"})
 }
 

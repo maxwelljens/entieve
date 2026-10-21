@@ -587,7 +587,13 @@ defend themselves if you attack them first. Charter patrols (overview name
 **Custos**) circle their anchor station and warp to a convoy ambush when
 one breaks out, scaled by zone: a three-ship wing lands on the spot in
 Charter space, a single responder arrives after about 15 seconds in the
-Fringe, and Unincorporated Pustkowie has no patrols at all.
+Fringe, and Unincorporated Pustkowie has no patrols at all. In Charter
+space they also work the belts: a static guard takes on the pirate rats
+anchored at its own celestial, and a patrol sweeps an occupied belt once a
+beat, kills the rats and flies home. Either way they leave rats that are
+already fighting alone — a belt you are working stays yours. A rat they
+kill leaves the same lootable wreck as any other kill; the bounty is paid
+only when the kill is yours.
 
 **Rats ambush convoys in the Fringe and Unincorporated.** Every convoy
 transit in Kuźnica has roughly a 1-in-6 chance of being jumped, Pustkowie
@@ -605,6 +611,11 @@ the raiders' guns off it. The incident ends one of three ways:
 
 You can intervene in any of them: strip the wreck, guard the convoy
 yourself, or let the rats do the work and take the loot.
+
+**Rats also hold the belts.** They sit on every belt, the Charter-space
+belts included — that is what the belt-cleanup contracts are for — and in
+Charter space the patrols grind them down on their own: the wreck is left
+for whoever gets there first, and the belt repopulates on its own timers.
 
 **Deliveries land in the market.** A convoy's cargo is real: it is bought
 from the origin station's own stock (or drawn from the belt, or imported

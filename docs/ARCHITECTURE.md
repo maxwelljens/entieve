@@ -141,12 +141,15 @@ profile and a calibre `ammo_class`; guns consume 1 shell/shot:
 hull, fit, behavior (aggro range, orbit range, flee threshold), bounty, loot
 table. Guard loadouts (`content/data/npcs/guards.json`, prefix
 `npc-guard-`) are non-rat NPCs: zero bounty, no loot table, spawned by the
-traffic system rather than spawn groups — `npc-guard-patrol` (hull
-`ship-npc-patrol`, registered per patrol hull via `Content.GuardFor`).
+traffic system or as a celestial's static spawn group — `npc-guard-patrol`
+(hull `ship-npc-patrol`, registered per patrol hull via `Content.GuardFor`).
 That same prefix classifies them as friendly: `NpcDef.IsGuard` gates the
 aggro state machine, so guards never *initiate* on the player (the
 proximity/intrusion/recent-work triggers are rat-only) — only
-player-sourced damage turns a patrol hostile.
+player-sourced damage turns a patrol hostile. In high security they do
+clear the pirate rats anchored at their own celestial (the belt sweep,
+`sim/system_npc.go` / `sim/system_traffic.go`, pinned by
+`sim/patrol_belt_test.go`); rats already fighting are left alone.
 
 **Systems** (`content/data/systems/*.json`, one file per system; display
 names are registered in `docs/lore/NAMING.md` — the ids below are frozen):

@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Gate (<destination>)**, e.g. `Gate (Kuźnica)` where the old form read
   `Kuźnica Gate`. Ids are unchanged; [docs/lore/NAMING.md](docs/lore/NAMING.md)
   carries the new convention.
+- **Security forces clear the belts** (`sim/system_npc.go`,
+  `sim/system_traffic.go`, `sim/system_damage.go`): a static guard now
+  engages the pirate rats anchored at its own celestial in a high-security
+  system, and a traffic patrol sweeps an occupied high-sec belt once a
+  patrol beat — warping there, killing the rats and flying home. Rats
+  already fighting are left alone (a belt you are working stays yours), the
+  Fringe and Unincorporated get no response, and the last rat of a belt
+  dying logs one `<belt> cleared` line while the belt's own respawn timers
+  re-arm it. The rats return fire, and their wrecks are lootable exactly as
+  after any other kill — the bounty is still paid only for kills
+  attributed to you. New vocabulary: CONTEXT.md "Belt sweep",
+  [docs/SIM.md](docs/SIM.md) ("The beat"),
+  [docs/GAMEPLAY.md](docs/GAMEPLAY.md) ("Guard patrols …").
 ### Added
 
 - **Rail glyphs are colour-coded by section**: Ship cyan, Trade green,
