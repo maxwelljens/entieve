@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   integration.
 - **Velocity wedge**: a vertical triangle widening bottom→top, filled
   bottom-up with current / base max speed (`Motion.MaxSpeed`, a stable
-  top), with the `m/s` figure under it.
+  top), sitting in the health bars' band with the `m/s` figure beneath it
+  (see Changed: the wedge moved beside the bars).
 - **Clock icon** (`hud_time`, game-icons.net `stopwatch` by Lorc, CC BY
   3.0) on the new time/wallet strip.
 - **Cycle rings** over the rack tiles: a thin ring depletes clockwise from
@@ -42,6 +43,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   state and cycle clock and refills shield, armor, structure and capacitor;
   no wallet movement, no ledger entry, no repair service needed. Undocking
   always leaves with everything off.
+- **The velocity wedge sits beside the health bars** (`uikit/screens/hud.go`):
+  the wedge and its `m/s` figure moved from a stack under the bars onto the
+  bars' own band, to their right. The health block narrows to 98 design px
+  (bars + gap + wedge = the capacitor bar's 128 px, which still spans the
+  column beneath), the status panel drops from 223 to 150 px of height, and
+  the recharging hint no longer changes the panel's height when it appears.
+  The bottom-center pair stays 556 design px wide, so its 1280×720 clearance
+  from the log pocket is unchanged; the pair's top edge rises from 457 to
+  514 (the rack sets the pair height now).
+- **Show Info descriptions word-wrap to the window** (`uikit/screens/infowin.go`):
+  the description paragraph wraps at the scroll viewport's inner width —
+  not at the page body's own width, which a long paragraph used to pin
+  wider than the window, clipping its tail — and re-wraps when the window
+  is resized or a new page is swapped in at the same width.
 - **One legacy-id registry, and restore finds every content id itself**:
   `content.LegacyIDs` is the single retired-id table — validation
   (`content.RetiredIDs`) and save restore read the same list — and restore

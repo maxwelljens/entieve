@@ -26,20 +26,31 @@ import (
 const (
 	hudPortrait  = 120  // hull portrait box (design px)
 	hudBarH      = 18   // one health/capacitor bar height (px)
-	hudBarMin    = 128  // bar width: fits the "1,800.0/1,800.0 GJ" value (px)
+	hudBarMin    = 128  // capacitor bar width: fits the "1,800.0/1,800.0 GJ" value (px)
 	hudHpGap     = 2    // gap between the three health bars (px)
 	hudColGap    = 4    // gap between readout groups in the status column (px)
 	hudStatusGap = 6    // portrait → readout column gap (px)
 	hudPairGap   = 8    // status column → rack gap (px)
 	hudStripH    = 26   // time/wallet strip height (px)
-	hudHintH     = 18   // reserved recharge-hint line (no layout jump) (px)
+	hudHintH     = 19   // reserved recharge-hint line: one StepTiny line box (no layout jump) (px)
 	hudWedgeW    = 26   // velocity wedge width (px)
-	hudWedgeH    = 72   // velocity wedge height (px)
 	hudCapMax    = 1000 // capacitor bar resolution (0.1 % steps)
 	hudBoxPool   = 7    // target-box slots (hulls top out at 4 locks)
 	hudBoxW      = 132  // one target box width (px)
 	hudBoxH      = 83   // one target box height (px, fixed)
 	hudBoxGap    = 5    // gap between target boxes
+)
+
+// The velocity wedge shares the health block's band: it is exactly as tall
+// as the three bars, and the bars fill the column left of it, so bars + gap
+// + wedge add up to the capacitor bar's full width.
+//
+// shortcut: the 98 px bars fit the content's largest "1,200 / 1,200" value;
+// a hull past ~1,300 HP overruns them — widen the column (and re-check the
+// 1280 log clearance) before authoring one.
+const (
+	hudWedgeH  = hudHealthH
+	hudHealthW = hudBarMin - hudColGap - hudWedgeW
 )
 
 // Target-card layout constants. The card (hudBoxW × hudBoxH) insets by
@@ -178,6 +189,7 @@ type Hud struct {
 	capValue   *widget.Text
 	recharging *widget.Text
 	wedge      *ebiten.Image
+	wedgeGfx   *widget.Graphic
 	wedgeFrac  float64
 	wedgeDraws int // wedge repaint count (fraction changes only)
 	speedLbl   *widget.Text
@@ -235,8 +247,8 @@ func NewHud(env interface {
 
 	// Health: three self-drawn bars with "current / max" printed inside
 	// (the capacitor-bar styling, drawn together so each keeps its own
-	// palette color).
-	h.health = ebiten.NewImage(theme.Px(hudBarMin), theme.Px(hudHealthH))
+	// palette color). They share one band with the velocity wedge.
+	h.health = ebiten.NewImage(theme.Px(hudHealthW), theme.Px(hudHealthH))
 	h.healthGfx = widget.NewGraphic(
 		widget.GraphicOpts.Image(h.health),
 		widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
@@ -262,15 +274,18 @@ func NewHud(env interface {
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
 		)),
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, theme.Px(hudHintH))),
+		// A column-wide floor keeps the reserved line in the column's
+		// preferred height while the caption is hidden.
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(hudBarMin), theme.Px(hudHintH))),
 	)
 	rechargeRow.AddChild(h.recharging)
 
 	// Velocity: a vertical wedge widening bottom→top, filled bottom-up with
 	// current / base max speed (a stable top; EffectiveMaxSpeed would move
-	// the ceiling with afterburner/web) and the m/s figure under it.
+	// the ceiling with afterburner/web). It sits in the health bars' band,
+	// with the m/s figure right-aligned under the wedge.
 	h.wedge = ebiten.NewImage(theme.Px(hudWedgeW), theme.Px(hudWedgeH))
-	wedgeGfx := widget.NewGraphic(
+	h.wedgeGfx = widget.NewGraphic(
 		widget.GraphicOpts.Image(h.wedge),
 		widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 			Position: widget.RowLayoutPositionCenter,
@@ -278,16 +293,17 @@ func NewHud(env interface {
 	)
 	h.speedLbl = widget.NewText(
 		widget.TextOpts.Text("", env.FaceBold(theme.StepBase), theme.Solid(p.Text)),
-		widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionStart),
+		widget.TextOpts.Position(widget.TextPositionEnd, widget.TextPositionStart),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
-	velocity := widget.NewContainer(
+	speedRow := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(theme.Px(2)),
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(theme.Px(hudColGap)),
 		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
-	velocity.AddChild(wedgeGfx, h.speedLbl)
+	speedRow.AddChild(h.healthGfx, h.wedgeGfx)
 
 	readouts := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -295,7 +311,7 @@ func NewHud(env interface {
 			widget.RowLayoutOpts.Spacing(theme.Px(hudColGap)),
 		)),
 	)
-	readouts.AddChild(h.healthGfx, capStack, rechargeRow, velocity)
+	readouts.AddChild(speedRow, h.speedLbl, capStack, rechargeRow)
 
 	// Hull portrait: the left slot of the status panel, drawn from the
 	// hulls package into a self-drawn image (repainted on hull change).
@@ -451,7 +467,7 @@ func (h *Hud) paintHealth() {
 	face := h.th.Face(theme.StepTiny)
 	for i, st := range h.hp {
 		y := theme.Px(i * (hudBarH + hudHpGap))
-		bar := image.Rect(0, y, theme.Px(hudBarMin), y+theme.Px(hudBarH))
+		bar := image.Rect(0, y, theme.Px(hudHealthW), y+theme.Px(hudBarH))
 		theme.FillRect(h.health, bar, theme.Solid(p.Cell))
 		if f := barFill(bar, st.frac); f.Dx() > 0 {
 			theme.FillRect(h.health, f, theme.Solid(cols[i]))

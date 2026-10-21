@@ -762,12 +762,14 @@ func (w *InfoWin) scrollBy(notches float64) {
 
 // rewrap keeps the description paragraph at the page's inner width: the
 // window is resizable, widget.Text wraps at MaxWidth rather than at its
-// rect, so the two are pushed back together when they drift.
+// rect, so the width comes from the scroll viewport (never from the page
+// body — a long paragraph would pin the body wider than the window and
+// clip itself) and the page is relaid out around the new wrap width.
 func (w *InfoWin) rewrap() {
 	if w.prose == nil {
 		return
 	}
-	d := w.page.GetWidget().Rect.Dx() - 2*theme.Px(theme.ContentsPad)
+	d := w.scroll.ViewRect().Dx() - 2*theme.Px(theme.ContentsPad)
 	if d <= 0 {
 		return
 	}
@@ -852,6 +854,7 @@ func (w *InfoWin) render(p infoPage) {
 			widget.TextOpts.MaxWidth(infoInnerW()),
 			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 		)
+		w.proseW = 0 // a new paragraph carries the default width: rewrap must re-apply
 		w.page.AddChild(w.prose)
 	}
 

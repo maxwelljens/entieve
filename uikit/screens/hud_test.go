@@ -170,6 +170,9 @@ func TestHudVelocityWedge(t *testing.T) {
 	if h.wedgeFrac != 0 || h.wedgeDraws != 1 {
 		t.Fatalf("at-rest wedge = %v (draws %d), want 0 / one paint", h.wedgeFrac, h.wedgeDraws)
 	}
+	if b := h.wedge.Bounds(); b.Dx() != hudWedgeW || b.Dy() != hudWedgeH {
+		t.Errorf("wedge image %v, want %dx%d (the health band's height)", b, hudWedgeW, hudWedgeH)
+	}
 	m, ok := env.Sim.Motions.Get(env.Sim.Player())
 	if !ok {
 		t.Fatal("player has no motion")
@@ -363,6 +366,31 @@ func TestHudDrawSmoke(t *testing.T) {
 	}
 	if strip.Max.Y > status.Min.Y || strip.Dx() != status.Dx() || strip.Min.X != status.Min.X {
 		t.Errorf("strip %v, want same width immediately above the status %v", strip, status)
+	}
+
+	// The velocity wedge shares the health bars' band (bars left, wedge
+	// right) and the capacitor bar spans the whole column beneath them.
+	hp := h.healthGfx.GetWidget().Rect
+	wedge := h.wedgeGfx.GetWidget().Rect
+	capr := h.capBar.GetWidget().Rect
+	if wedge.Min.Y != hp.Min.Y || wedge.Max.Y != hp.Max.Y {
+		t.Errorf("wedge %v, want the health bars' band %v", wedge, hp)
+	}
+	if wedge.Min.X != hp.Max.X+theme.Px(hudColGap) {
+		t.Errorf("wedge %v, want immediately right of the health bars %v", wedge, hp)
+	}
+	if capr.Min.X != hp.Min.X || capr.Max.X != wedge.Max.X {
+		t.Errorf("capacitor %v, want the full column %d..%d", capr, hp.Min.X, wedge.Max.X)
+	}
+	if capr.Min.Y <= hp.Max.Y {
+		t.Errorf("capacitor %v, want beneath the health/wedge band %v", capr, hp)
+	}
+	speed := h.speedLbl.GetWidget().Rect
+	if speed.Max.X != capr.Max.X || speed.Min.Y < hp.Max.Y {
+		t.Errorf("speed %v, want right-aligned under the wedge (column right edge %d)", speed, capr.Max.X)
+	}
+	if status.Dy() != 150 {
+		t.Errorf("status height = %d, want 150 (the wedge's stack cost 223 before)", status.Dy())
 	}
 	row := h.targetRow.GetWidget().Rect
 	if row.Min.Y < 9 || row.Min.Y > 11 {

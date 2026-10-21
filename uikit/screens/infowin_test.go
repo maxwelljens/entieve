@@ -670,3 +670,88 @@ func TestInfoWindowScrollbarGutter(t *testing.T) {
 		})
 	}
 }
+
+// TestInfoWindowProseWraps: the description paragraph word-wraps to the
+// content column and keeps wrapping when the window narrows — no line of
+// the text overruns the column at either width, the page never grows wider
+// than the scroll viewport, and every block under the prose stays inside
+// the page. (widget.Text wraps at MaxWidth, which Sync refits to the
+// viewport; a page body pinned by its own long line used to clip itself.)
+func TestInfoWindowProseWraps(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	w := env.InfoWindow()
+	ui := newWindowUI(t, env, w.Win())
+	frame := func() { uitest.PumpWindow(t, ui, w.Sync, 1280, 720) }
+	for i := 0; i < 2; i++ {
+		frame()
+	}
+
+	// One wordy paragraph, no hard breaks: it must break at spaces.
+	wordy := strings.Repeat("The dossier prose runs long with ordinary words and no breaks at all. ", 12)
+	fixtureItem(t, env, "itm-fixture-wordy", &content.ItemDef{
+		Name: "Wordy", Description: wordy, BasePrice: 1000,
+	})
+	if !w.Show(widgets.ItemRef("itm-fixture-wordy")) {
+		t.Fatal("wordy ref did not resolve")
+	}
+	for i := 0; i < 3; i++ {
+		frame()
+	}
+
+	check := func(tag string) {
+		t.Helper()
+		if w.prose == nil {
+			t.Fatalf("%s: no prose block", tag)
+		}
+		inner := float64(w.scroll.ViewRect().Dx() - 2*theme.Px(theme.ContentsPad))
+		if inner <= 0 {
+			t.Fatalf("%s: no content width (viewport %v)", tag, w.scroll.ViewRect())
+		}
+		if w.prose.MaxWidth != inner {
+			t.Errorf("%s: prose wrap width = %v, want the content column %v", tag, w.prose.MaxWidth, inner)
+		}
+		if pw, _ := w.prose.PreferredSize(); float64(pw) > inner {
+			t.Errorf("%s: longest prose line = %d px, want ≤ %v (the content column)", tag, pw, inner)
+		}
+		page, view := w.page.GetWidget().Rect, w.scroll.ViewRect()
+		if page.Min.X < view.Min.X || page.Max.X > view.Max.X {
+			t.Errorf("%s: page %v sticks out of the viewport %v", tag, page, view)
+		}
+		left, right := page.Min.X+theme.Px(theme.ContentsPad), page.Max.X-theme.Px(theme.ContentsPad)
+		for i, ch := range w.page.Children() {
+			if r := ch.GetWidget().Rect; r.Min.X < left || r.Max.X > right {
+				t.Errorf("%s: page block %d %v leaves the content column %d..%d", tag, i, r, left, right)
+			}
+		}
+	}
+	check("default width")
+	wide := w.prose.MaxWidth
+
+	// A page swap at the same width re-wraps too: a fresh Text starts at
+	// the default width, so the refit must re-apply rather than notice a
+	// change.
+	fixtureItem(t, env, "itm-fixture-wordy2", &content.ItemDef{
+		Name: "Wordy II", Description: strings.Repeat("Another paragraph with words between its breaks. ", 12),
+	})
+	if !w.Show(widgets.ItemRef("itm-fixture-wordy2")) {
+		t.Fatal("second wordy ref did not resolve")
+	}
+	for i := 0; i < 2; i++ {
+		frame()
+	}
+	check("page swap")
+
+	// Narrow the window: the paragraph re-wraps to the smaller column and
+	// the following blocks reflow inside it.
+	win := w.Win().GetContainer().GetWidget().Rect
+	win.Max.X = win.Min.X + 340
+	w.Win().SetLocation(win)
+	for i := 0; i < 3; i++ {
+		frame()
+	}
+	check("narrowed")
+	if w.prose.MaxWidth >= wide || w.prose.MaxWidth > float64(w.scroll.ViewRect().Dx()) {
+		t.Errorf("narrowed wrap width = %v, want under %v and the viewport %d",
+			w.prose.MaxWidth, wide, w.scroll.ViewRect().Dx())
+	}
+}
