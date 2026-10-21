@@ -117,6 +117,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seam instead of re-deriving them; the refine batch size (`sim.RefineBatch`)
   and the km distance label (`sim.KmLabel`) are single-sourced.
 
+### Fixed
+
+- **Refined minerals go to the station hangar, always** (`sim/system_economy.go`,
+  `uikit/screens/refinery.go`): `CmdRefine` used to add its output to the
+  ship's general cargo and refuse with a cargo-full event when it would not
+  fit. The output now lands in the station hangar (the store market buys
+  already land in, which has no capacity model), so a full ship hold never
+  blocks a refine; the window's cargo-full prediction is gone and its yield
+  preview and status name the destination (`→ hangar`). Ore input is
+  unchanged — general cargo first, then the ore hold.
+
 ## [0.6.0] - 2026-10-21
 
 ### Added

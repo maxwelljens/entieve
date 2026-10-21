@@ -17,9 +17,8 @@ import (
 // quantity (the sim's own floor(RefineYield × qty) math), and the Refine
 // action. Ore refines in whole 100-ore batches only: the stepper offers
 // 100, 200, 300, … capped at the selected ore's stock, and a stock under
-// one batch disables Refine. The window predicts the EvCargoFull refusal
-// (the output volume against the general hold's free space) instead of
-// letting the press be the first warning.
+// one batch disables Refine. Refined minerals always land in the station
+// hangar (never the ship's hold), which is unlimited — so nothing to warn.
 //
 // Gating follows the game's menu convention: the button stays VISIBLE and
 // grays out while undocked, at a station without the refine service, with
@@ -62,7 +61,7 @@ func NewRefinery(env widgets.Seams) *Refinery {
 	cols := []widgets.Column{
 		{Key: "Ore", Title: "Ore", Priority: 0},
 		{Key: "Held", Title: "Held", Priority: 2, AlignRight: true},
-		{Key: "Yield", Title: "Yield @ qty", Priority: 1},
+		{Key: "Yield", Title: "Yield @ qty → hangar", Priority: 1},
 	}
 	r.ores = widgets.NewTable(env, cols)
 	r.ores.SetSort("Ore", true)
@@ -180,22 +179,6 @@ func (r *Refinery) outputsText(outs []content.CargoStack) string {
 	return s
 }
 
-// cargoFits reports whether the outputs would fit the general hold, using
-// the seam's hold read (the same volume math the sim's cargoSpace uses).
-func (r *Refinery) cargoFits(outs []content.CargoStack) bool {
-	used, capacity, ok := r.cv.Hold("cargo")
-	if !ok {
-		return false
-	}
-	outVol := 0.0
-	for _, o := range outs {
-		if def, ok := r.cv.Defs().Item(o.Item); ok {
-			outVol += def.Volume * float64(o.Qty)
-		}
-	}
-	return outVol <= capacity-used+1e-9
-}
-
 // Sync refreshes the ore list, the yield preview and every gate from the
 // simulation. Call it every frame before Kit.Update.
 func (r *Refinery) Sync() {
@@ -254,10 +237,7 @@ func (r *Refinery) Sync() {
 		} else {
 			line += "nothing"
 		}
-		if !r.cargoFits(outs) {
-			line += " · cargo full — nothing will refine"
-		}
-		r.status.Label = line
+		r.status.Label = line + " → hangar"
 	}
 }
 

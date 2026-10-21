@@ -471,8 +471,9 @@ previews exactly what **Refine** would yield — `floor(refine_yield × qty)`
 per mineral. Refining runs in whole **100-ore batches**: the stepper offers
 100, 200, 300, … capped at the selected ore's stock, so 250 ore refines as
 two batches and 50 ore cannot be refined at all (the window says a batch
-needs 100 ore). Refined minerals land in the general hold; if they do not
-fit, the window warns and the sim refuses with a cargo-full event. **Huta**
+needs 100 ore). Refined minerals always land in the station hangar — never
+in your ship's hold — and the hangar is unlimited, so a full hold never
+blocks a refine; the yield preview and status say `→ hangar`. **Huta**
 at Młynów and **Jernborg** run refineries.
 
 Stations get better at their own work: every completed run raises that

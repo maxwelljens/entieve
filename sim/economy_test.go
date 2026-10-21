@@ -342,14 +342,18 @@ func TestRefineWholeBatches(t *testing.T) {
 		t.Fatal("ore not consumed")
 	}
 	// floor(0.5*100) = 50 ferrite, floor(0.25*100) = 25 nickel — a batch
-	// makes the fixture's fractions exact.
-	if cargoCount(s, "min-ferrite") != 50 {
-		t.Fatalf("ferrite=%d want 50", cargoCount(s, "min-ferrite"))
+	// makes the fixture's fractions exact. Refined minerals land in the
+	// station hangar, never the ship's hold.
+	if cargoCount(s, "min-ferrite") != 0 || cargoCount(s, "min-nickel") != 0 {
+		t.Fatal("minerals landed in the ship's cargo")
 	}
-	if cargoCount(s, "min-nickel") != 25 {
-		t.Fatalf("nickel=%d want 25", cargoCount(s, "min-nickel"))
+	if hangarCount(s, "min-ferrite") != 50 {
+		t.Fatalf("ferrite=%d want 50", hangarCount(s, "min-ferrite"))
 	}
-	if !hasEvent(evs, EvLog, "Refined 100 x Sterngrit into 50 x Ferrite, 25 x Nickel") {
+	if hangarCount(s, "min-nickel") != 25 {
+		t.Fatalf("nickel=%d want 25", hangarCount(s, "min-nickel"))
+	}
+	if !hasEvent(evs, EvLog, "Refined 100 x Sterngrit into 50 x Ferrite, 25 x Nickel (station hangar)") {
 		t.Fatalf("missing refine event: %v", evs)
 	}
 
@@ -388,8 +392,40 @@ func TestRefineWholeBatches(t *testing.T) {
 	if got := cargoCount(s, "ore-sterngrit"); got != 50 {
 		t.Fatalf("ore left=%d want 50", got)
 	}
-	if got := cargoCount(s, "min-ferrite"); got != 100 {
+	if got := hangarCount(s, "min-ferrite"); got != 100 {
 		t.Fatalf("ferrite=%d want 100", got)
+	}
+
+	// The output never needs ship space: with the general hold packed to
+	// its capacity the batch still refines, minerals into the hangar (the
+	// hangar has no capacity model — that is the "always only station"
+	// pin). Ore comes from the ore hold here, so the full cargo stays full.
+	cargo, _ := s.Cargos.Get(s.player)
+	used := 0.0
+	for _, st := range cargo.Stacks {
+		if def, ok := s.Content.Item(st.Item); ok {
+			used += def.Volume * float64(st.Qty)
+		}
+	}
+	cargo.Capacity = used
+	cargo.Ore = addStacks(cargo.Ore, "ore-sterngrit", 100)
+	s.Queue(CmdRefine{Item: "ore-sterngrit", Qty: 100})
+	s.Step()
+	evs = drain(s)
+	if !hasEvent(evs, EvLog, "Refined 100 x Sterngrit") {
+		t.Fatalf("full cargo blocked the refine: %v", evs)
+	}
+	if got := stacksCount(cargo.Ore, "ore-sterngrit"); got != 50 {
+		t.Fatalf("ore hold left=%d want 50 (general hold drained first)", got)
+	}
+	if got := cargoCount(s, "ore-sterngrit"); got != 0 {
+		t.Fatalf("general hold ore left=%d want 0", got)
+	}
+	if got := hangarCount(s, "min-ferrite"); got != 150 {
+		t.Fatalf("ferrite=%d want 150", got)
+	}
+	if got := hangarCount(s, "min-nickel"); got != 75 {
+		t.Fatalf("nickel=%d want 75", got)
 	}
 }
 

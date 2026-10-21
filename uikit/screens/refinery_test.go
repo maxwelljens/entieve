@@ -11,7 +11,8 @@ import (
 
 // TestRefineryWindow: the ore list, the whole-batch yield preview (the sim's
 // own floor(RefineYield × qty) math), the 100-ore stepper ladder, the typed
-// CmdRefine enqueue end-to-end and the EvCargoFull prediction.
+// CmdRefine enqueue end-to-end, and the hangar destination (a full ship hold
+// never blocks a refine).
 func TestRefineryWindow(t *testing.T) {
 	env, cmds := newChromeEnv(t)
 	r := NewRefinery(env)
@@ -60,8 +61,8 @@ func TestRefineryWindow(t *testing.T) {
 	if got := r.stepper.Label().Label; got != "Qty 100" {
 		t.Errorf("stepper = %q, want Qty 100", got)
 	}
-	if !strings.Contains(r.status.Label, "Refine 100 × Cordite Ore → 35 Ferrite · 30 Nickel") {
-		t.Errorf("status = %q, want the batch yield preview", r.status.Label)
+	if !strings.Contains(r.status.Label, "Refine 100 × Cordite Ore → 35 Ferrite · 30 Nickel → hangar") {
+		t.Errorf("status = %q, want the batch yield preview with its destination", r.status.Label)
 	}
 
 	// The stepper offers whole batches only, capped at the stock: 100 held
@@ -103,11 +104,14 @@ func TestRefineryWindow(t *testing.T) {
 	if got := giveItemCount(env, "ore-cordite"); got != 50 {
 		t.Errorf("ore left = %d, want 50", got)
 	}
-	if got := giveItemCount(env, "min-ferrite"); got != 70 {
-		t.Errorf("ferrite = %d, want 70", got)
+	if got := hangarItemCount(env, "min-ferrite"); got != 70 {
+		t.Errorf("ferrite in the hangar = %d, want 70", got)
 	}
-	if got := giveItemCount(env, "min-nickel"); got != 60 {
-		t.Errorf("nickel = %d, want 60", got)
+	if got := hangarItemCount(env, "min-nickel"); got != 60 {
+		t.Errorf("nickel in the hangar = %d, want 60", got)
+	}
+	if got := giveItemCount(env, "min-ferrite") + giveItemCount(env, "min-nickel"); got != 0 {
+		t.Errorf("minerals landed in the ship's cargo (%d units)", got)
 	}
 
 	// 50 left is under one batch: no valid quantity, Refine grayed and the
@@ -123,8 +127,8 @@ func TestRefineryWindow(t *testing.T) {
 		t.Errorf("status = %q, want the one-batch message", r.status.Label)
 	}
 
-	// Cargo full: the window predicts it from the same volume math the sim
-	// uses, and the press still fires the sim's EvCargoFull (nothing moves).
+	// A packed-to-capacity hold never blocks a refine: the minerals always
+	// land in the station hangar, so the window makes no cargo-full prediction.
 	giveItem(env.Sim, "ore-cordite", 150)
 	frame()
 	cargo, _ := env.Sim.Cargos.Get(env.Sim.Player())
@@ -136,8 +140,11 @@ func TestRefineryWindow(t *testing.T) {
 	}
 	cargo.Capacity = used // zero free space
 	frame()
-	if !strings.Contains(r.status.Label, "cargo full") {
-		t.Errorf("status = %q, want the cargo-full warning", r.status.Label)
+	if strings.Contains(r.status.Label, "cargo full") {
+		t.Errorf("status = %q, want no cargo-full warning", r.status.Label)
+	}
+	if !strings.Contains(r.status.Label, "→ hangar") {
+		t.Errorf("status = %q, want the hangar destination", r.status.Label)
 	}
 	uitest.FireButton(ui, r.refine)
 	ui.Update()
@@ -146,17 +153,11 @@ func TestRefineryWindow(t *testing.T) {
 	}
 	env.Sim.Queue((*cmds)[1])
 	env.Sim.Step()
-	full := false
-	for _, ev := range env.Sim.Events() {
-		if ev.Kind == sim.EvCargoFull {
-			full = true
-		}
+	if got := giveItemCount(env, "ore-cordite"); got != 100 {
+		t.Errorf("ore after refining a full hold = %d, want 100", got)
 	}
-	if !full {
-		t.Fatal("refining into a full hold did not emit EvCargoFull")
-	}
-	if got := giveItemCount(env, "ore-cordite"); got != 200 {
-		t.Errorf("ore after the full-hold refusal = %d, want 200", got)
+	if got := hangarItemCount(env, "min-ferrite"); got != 105 {
+		t.Errorf("ferrite in the hangar = %d, want 105 (70 + floor(0.35×100))", got)
 	}
 }
 
@@ -180,6 +181,17 @@ func TestRefinePreviewWholeBatch(t *testing.T) {
 			t.Errorf("%s at %d = %q, want %q", ore, sim.RefineBatch, got, w)
 		}
 	}
+}
+
+// hangarItemCount counts an item in the station hangar.
+func hangarItemCount(env *testEnv, item content.ItemID) int {
+	n := 0
+	for _, st := range env.Sim.Hangar.Items {
+		if st.Item == item {
+			n += st.Qty
+		}
+	}
+	return n
 }
 
 // giveItemCount counts an item in the player's general cargo.
