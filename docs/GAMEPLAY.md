@@ -126,9 +126,11 @@ layout works at every scale. Icons (from
 kinds and contract types — monochrome glyphs tinted to the theme, and
 every icon keeps its text label. Two panels are
 **always-on chrome** and cannot be closed or moved: the **ship status**
-panel (bottom center left half: the hull portrait, shield / armor /
-structure bars with their current/max values inside, the capacitor bar
-and the velocity wedge with its m/s figure) and the **module rack**
+panel (bottom center left half: the hull portrait, then a readout
+column — shield / armor / structure bars with their current/max values
+inside, the velocity wedge and its m/s figure immediately right of them
+on the same band, and the capacitor bar spanning the full column
+beneath) and the **module rack**
 (bottom center right half; each cell is a class-glyph tile with the
 module's name under it and a cycle ring that depletes clockwise over the
 tile while the module runs). A small strip above the status carries the
@@ -247,7 +249,10 @@ Only fields that exist are shown, grouped per kind:
 | Item | PROPERTIES / MARKET / REFINES TO / DAMAGE |
 | Machine caste | dossier prose / DOSSIER (faction, hull, bounty) / BEHAVIOR / LOOT |
 
-Every window opens with the def's description prose. The menus per
+Every window opens with the def's description prose, word-wrapped to the
+window's own width and re-wrapped whenever the window is resized narrower
+or wider; long pages scroll inside the body instead of pushing the rows
+out of view. The menus per
 surface: rack cells — Show Info (module) / Show Info — `<charge>` / ─ /
 **Cycle charge**; fitting rows — Show Info / Fit / Unequip; market rows —
 Show Info / Buy / Sell (grayed while undocked); inventory rows — Show
