@@ -544,8 +544,19 @@ country, deliberately dangerous: glacierite belt ore and heavy spawns
 including Hierarchs, with no patrols and no station at all. **Głusza** is
 quiet in the wrong way; its Unincorporated freeport **Kantor** runs a
 market and little else. Travel system-to-system by flying to a stargate
-and pressing `J` — the starmap (`N`) shows the gate graph with your
-current system highlighted.
+and pressing `J` — the starmap (`N`) shows the gate graph with every
+system under its own name and your current system highlighted.
+
+**The starmap is an interactive window** (a normal one: no dimmed
+backdrop, draggable and stacking with the rest). Hovering a system lights
+it and its name; **click** it to open its card in the window's top-left
+corner — display name, zone, its stations and every gate destination.
+**Click the selected system again** to set it as your **destination**: the
+shortest gate route from your current system is drawn in amber, the
+destination wears the widest ring, and the card counts the jumps. Click
+the destination once more (or set the system you are already in) to clear
+it. Destination, selection and hover are session-only view state — they
+are never saved and never command your ship.
 
 ## Living universe
 

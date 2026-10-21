@@ -271,8 +271,8 @@ func (g *Game) applySplits(name string, ratios map[string]float64) {
 
 // applyLayout restores the sidecar over the built-in defaults: geometry
 // (clamped to MinSize and the screen) for every named window present,
-// open state for the toggleable ones, and the scene stack for the map
-// and help overlays, which only exist while their scene is up. Call it
+// open state for the toggleable ones, and the scene stack for the help
+// overlay, which only exists while its scene is up. Call it
 // after the kit is built and the first real screen size is known —
 // startup (first applySize) and after LoadGame's rebuild. A partial
 // sidecar only restores the windows it holds, and each restored window
@@ -337,8 +337,10 @@ func (g *Game) applyLayout(screenW, screenH int) {
 		// keeps its equal-share default.
 		g.applySplits(name, e.Splits)
 	}
-	// The map and help windows only exist through their overlay scenes
-	// (modal + dim backdrop): sync the stack to the restored flags.
+	// The help window only exists through its overlay scene (modal + dim
+	// backdrop): sync the stack to the restored flag. The starmap is an
+	// ordinary window now — its restored open flag mounts it like the
+	// rest (syncMounts below).
 	syncOverlay := func(open bool, is func(Scene) bool, make func() Scene) {
 		has := g.findScene(is)
 		switch {
@@ -348,9 +350,6 @@ func (g *Game) applyLayout(screenW, screenH int) {
 			g.pop() // OnLeave re-asserts open=false
 		}
 	}
-	syncOverlay(g.open[pMap],
-		func(s Scene) bool { _, ok := s.(*MapScene); return ok },
-		func() Scene { return &MapScene{g: g} })
 	syncOverlay(g.open[pHelp],
 		func(s Scene) bool { _, ok := s.(*HelpScene); return ok },
 		func() Scene { return &HelpScene{g: g} })

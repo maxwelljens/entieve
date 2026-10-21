@@ -22,8 +22,8 @@ import (
 // test label map all follow from the rows — each derivation below names
 // what it feeds.
 //
-// The rows are declarative. Behaviour that belongs to a scene (the map,
-// help and Esc overlays) stays where it is; a row reaches it through Modal
+// The rows are declarative. Behaviour that belongs to a scene (the help
+// and Esc overlays) stays where it is; a row reaches it through Modal
 // instead of carrying the logic. screenSpecErrors is the well-formedness
 // rule for the whole
 // table (New refuses to build on a bad spec, the tests drive it with
@@ -93,12 +93,12 @@ const keyNone ebiten.Key = -1
 //	              the KeyMap row that derives from it, which is also what
 //	              the help overlay renders and what the rail's tooltip
 //	              quotes as its hint. A MODAL screen's key is wired to its
-//	              scene instead (Esc → onEscape, N → map, H → help), so
-//	              Modal rows are never flag-toggled here
+//	              scene instead (Esc → onEscape, H → help), so Modal rows
+//	              are never flag-toggled here
 //	DefaultRect   default geometry in design units (see Anchor for which
 //	              parts the composition reads)
 //	DockPolicy    floating / transient (not in the sidecar)
-//	Modal         the window is modal while up (map, help, menu)
+//	Modal         the window is modal while up (help, menu)
 //	SpaceOnly     mounts only in space (the scanner's docked counterpart
 //	              rule); DockedOnly mounts only while docked (the manufacturing
 //	              and the services view)
@@ -202,12 +202,13 @@ var screens = []Screen{
 		Build: func(g *Game) *widget.Window { g.scan = uikit.NewScanner(g.env); return g.scan.Win() },
 	},
 	{
-		// Modal overlay driven by MapScene: N pushes/pops the scene, the
-		// scene owns the open flag (see handleKeys and scenes.go).
+		// An ordinary floating window: N flips its flag like every other
+		// keyed row, and the graph's own hover/select/destination live in
+		// the view (uikit/screens/mapview.go).
 		ID: pMap, Title: "Starmap", Icon: "svc_map",
 		Key: ebiten.KeyN, Action: "starmap", Desc: "N — toggle starmap",
 		DefaultRect: image.Rect(160, 80, 870, 634), // uikit.NewMapView's landing rect
-		DockPolicy:  DockFloating, Modal: true, SidecarName: "map",
+		DockPolicy:  DockFloating, SidecarName: "map",
 		Group: "World",
 		Sync:  func(g *Game) { g.mp.Sync() },
 		Build: func(g *Game) *widget.Window { g.mp = uikit.NewMapView(g.env); return g.mp.Win() },
@@ -429,7 +430,7 @@ func screenLabel(s Screen) string {
 
 // pressScreen toggles the flag of the keyed, non-modal screen bound to
 // (k, shift) and reports whether one claimed the key. The modal screens
-// (map, help, menu) are scene-owned: their keys push/pop the scene in
+// (help, menu) are scene-owned: their keys push/pop the scene in
 // handleKeys instead of flipping a flag, so they are skipped here.
 func (g *Game) pressScreen(k ebiten.Key, shift bool) bool {
 	for _, s := range screens {

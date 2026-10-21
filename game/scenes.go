@@ -63,28 +63,6 @@ func (sc *StationScene) Draw(dst *ebiten.Image) {
 }
 
 // ---------------------------------------------------------------------------
-// MapScene (starmap overlay)
-// ---------------------------------------------------------------------------
-
-// MapScene shows the MapView window over a dimmed screen. The window is
-// modal, so no click leaks to the world or the panels underneath.
-type MapScene struct{ g *Game }
-
-// OnEnter implements Scene (the window follows the scene).
-func (sc *MapScene) OnEnter() { sc.g.open[pMap] = true }
-
-// OnLeave implements Scene: closing the scene closes the window.
-func (sc *MapScene) OnLeave() { sc.g.open[pMap] = false }
-
-// Update is a no-op: N / Esc close the scene, clicks stay in the window.
-func (sc *MapScene) Update(in Input) error { return nil }
-
-// Draw renders the dimmed backdrop; the window itself is drawn by the kit.
-func (sc *MapScene) Draw(dst *ebiten.Image) {
-	dimScreen(dst, sc.g.w, sc.g.h, 170)
-}
-
-// ---------------------------------------------------------------------------
 // HelpScene (key map overlay)
 // ---------------------------------------------------------------------------
 

@@ -43,14 +43,14 @@ func TestDoHandlesHostIntents(t *testing.T) {
 		t.Error("closed Market screen stayed mounted (setPanel handler not reached)")
 	}
 
-	// A Modal row pushes/pops its scene, the way its key does.
+	// A non-modal row flips its open flag, the way its key does.
 	g.Do(widgets.Toggle{Screen: "Starmap"})
-	if _, ok := g.top().(*MapScene); !ok {
-		t.Errorf("top scene = %T, want *MapScene", g.top())
+	if !g.open[pMap] {
+		t.Error("Starmap toggle did not open the window")
 	}
 	g.Do(widgets.Toggle{Screen: "Starmap"})
-	if _, ok := g.top().(*MapScene); ok {
-		t.Error("second Starmap toggle did not pop the scene")
+	if g.open[pMap] {
+		t.Error("second Starmap toggle did not close the window")
 	}
 
 	// The Esc menu's verbs: Save writes the session's save file (the

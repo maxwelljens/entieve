@@ -252,9 +252,9 @@ func assertNoOverlap(t *testing.T, g *Game, w, h int) {
 func pairPair(a, b string) bool { return (a == "log" && b == "hud.1") || (a == "hud.1" && b == "log") }
 
 // TestSceneDrawSmoke draws every scene (space world + interface, help
-// overlay, starmap overlay, Esc menu, station view) at the design and
-// minimum window sizes — headless offscreen only; geometry bugs surface
-// as panics or out-of-bounds windows.
+// overlay, starmap window over it, Esc menu, station view) at the design
+// and minimum window sizes — headless offscreen only; geometry bugs
+// surface as panics or out-of-bounds windows.
 func TestSceneDrawSmoke(t *testing.T) {
 	for _, size := range [][2]int{{1280, 720}, {1024, 700}} {
 		g := newSmokeGame(t)
@@ -275,8 +275,9 @@ func TestSceneDrawSmoke(t *testing.T) {
 		pump(t, g, size[0], size[1])
 		g.Draw(img)
 
-		// Starmap overlay on top of the help overlay.
-		g.push(&MapScene{g: g})
+		// Starmap: an ordinary window now, so it stacks over the help
+		// overlay without a modal scene or a dim backdrop.
+		g.open[pMap] = true
 		g.syncMounts()
 		pump(t, g, size[0], size[1])
 		g.Draw(img)
@@ -288,7 +289,7 @@ func TestSceneDrawSmoke(t *testing.T) {
 		g.Draw(img)
 		g.pop()
 		g.pop()
-		g.pop()
+		g.open[pMap] = false
 		g.syncMounts()
 
 		// Station view: docked chrome + the services view.

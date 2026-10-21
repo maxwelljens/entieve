@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The starmap is interactive and named** (`uikit/screens/mapview.go`):
+  nodes carry their system's display name (Starogród, Kuźnica, Pustkowie …)
+  instead of the internal `sys-*` id. Hovering a system lights it and its
+  name; a click opens that system's card in the window's top-left corner
+  (display name, zone, its stations, every gate destination); clicking the
+  selected system again sets it as the destination and draws the shortest
+  gate route from your current system in amber, with the destination ringed
+  and the jump count on the card (click again, or pick the system you are
+  in, to clear it). Pointer input is read through the kit's shared cursor /
+  press seams, so clicks reach the window body and the window rect keeps
+  gating the world. Hover, selection and destination are session-only view
+  state — never saved, never a sim command.
+
+### Changed
+
+- **The starmap is an ordinary window, not a modal overlay**: `N` toggles it
+  like every other keyed window (the rail entry, the × and the sidecar
+  restore behave the same way), and the dimmed full-screen `MapScene`
+  backdrop is gone, so the map no longer blocks the windows under it or Esc.
+
 ## [0.7.0] - 2026-10-21
 
 ### Added

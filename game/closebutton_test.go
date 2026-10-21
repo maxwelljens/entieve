@@ -12,12 +12,10 @@ import (
 // same toggle (the rail's and the key's path, unchanged). The one row
 // without a title bar (Station Services) attaches no button by design.
 //
-// rowScene returns the scene a modal row's window is owned by (nil for
-// a non-modal row).
+// rowScene returns the scene a modal row's window is owned by (nil for a
+// non-modal row — the starmap is one of those now).
 func rowScene(g *Game, id panelID) Scene {
 	switch id {
-	case pMap:
-		return &MapScene{g: g}
 	case pHelp:
 		return &HelpScene{g: g}
 	case pMenu:
@@ -30,9 +28,6 @@ func rowScene(g *Game, id panelID) Scene {
 func sceneUp(g *Game, id panelID) bool {
 	return g.findScene(func(sc Scene) bool {
 		switch id {
-		case pMap:
-			_, ok := sc.(*MapScene)
-			return ok
 		case pHelp:
 			_, ok := sc.(*HelpScene)
 			return ok
