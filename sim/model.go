@@ -249,7 +249,7 @@ type Stargate struct {
 	ToCel    content.CelID
 }
 
-// Station offers services (content: "repair"|"market"|"refine"|"fitting").
+// Station offers services (content.Services ids: "repair"|"market"|"refine"|"fitting"|"industry").
 type Station struct{ Services []string }
 
 // Docked marks an entity inside a station (off-grid).

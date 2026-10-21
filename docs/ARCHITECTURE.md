@@ -26,7 +26,7 @@ library. **Unit tests use only the standard `testing` package.**
 |---------------|----------------|
 | `core/`       | Deterministic math (`Vec2`) and PRNG (`RNG`, SplitMix64). |
 | `ecs/`        | Minimal deterministic ECS: `World`, `Entity`, `Store[T]`. |
-| `content/`    | Data schema (`model.go`), JSON loading (`load.go`), cross-reference validation (`validate.go`), embedded game data (`data/`). |
+| `content/`    | Data schema (`model.go`), the station service vocabulary (`services.go`: ids, labels, icons, windows), JSON loading (`load.go`), cross-reference validation (`validate.go`), embedded game data (`data/`). |
 | `sim/`        | The deterministic game simulation: components, commands, events, systems. Headless — never imports Ebitengine. |
 | `render/`     | Draws `sim` state: starfield, grid, ships (vector art), brackets, effects. |
 | `uikit/`      | The UI platform (ebitenui v0.7.3): EVE-style windows — overview, HUD, module rack, selected item, inventory, fitting, manufacturing, refinery, station services, starmap, log — plus the Show Info window (`infowin.go`), the flat context menu (`menu.go`) and the icon set (`icons/`). The legacy hand-drawn `ui/` package is retired. |

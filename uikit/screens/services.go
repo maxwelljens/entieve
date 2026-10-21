@@ -2,6 +2,7 @@ package screens
 
 import (
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -88,18 +89,26 @@ func NewServices(env widgets.Seams, innerWidth int) *Services {
 		widget.TextOpts.Text("", face, theme.Solid(p.Text)),
 		widget.TextOpts.Position(widget.TextPositionStart, widget.TextPositionCenter),
 	)
-	// The row's buttons, in order: leave, cargo, then one per service.
-	// The icon names match the Screen spec's own Icon per window, so the
-	// services view and the rail draw the same glyph for the same
-	// window. Icons are 20 px (IconButton), the cell box keeps the
-	// strip header's 40 px row height.
+	// The row's buttons, in order: leave, cargo, then one per service of
+	// content.Services that owns a window (repair has none — the sim's
+	// CmdRepair — so it draws no button). The table is the single owner of
+	// the id/label/icon/toggle tuple: a renamed window fails the host's
+	// pin instead of leaving a button that toggles nothing. The icon names
+	// match the Screen spec's own Icon per window, so the services view
+	// and the rail draw the same glyph for the same window. Icons are 20 px
+	// (IconButton), the cell box keeps the strip header's 40 px row height.
 	s.btns = []svcButton{
 		{name: "undock", icon: "act_undock", label: "Undock"},
 		{name: "cargo", icon: "svc_inventory", screen: "Inventory", label: "Cargo"},
-		{name: "market", icon: "svc_market", screen: "Market", service: "market", label: "Market"},
-		{name: "fitting", icon: "svc_fitting", screen: "Fitting", service: "fitting", label: "Fitting"},
-		{name: "industry", icon: "svc_manufacturing", screen: "Manufacturing", service: "industry", label: "Manufacturing"},
-		{name: "refine", icon: "svc_refinery", screen: "Refinery", service: "refine", label: "Refinery"},
+	}
+	for _, svc := range content.Services {
+		if svc.Window == "" {
+			continue
+		}
+		s.btns = append(s.btns, svcButton{
+			name: svc.ID, icon: svc.Icon, screen: svc.Window,
+			service: svc.ID, label: svc.Label,
+		})
 	}
 	s.tips = make([]widgets.RowTip, len(s.btns))
 	for i := range s.btns {

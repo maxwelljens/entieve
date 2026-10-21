@@ -161,7 +161,7 @@ func (s *Sim) stationSystem(station StationID) (content.SystemID, bool) {
 // the definition side, for celestials that may be off-grid).
 func hasMarketService(st *content.StationDef) bool {
 	for _, svc := range st.Services {
-		if svc == "market" {
+		if svc == content.SvcMarket {
 			return true
 		}
 	}
@@ -344,7 +344,7 @@ func (s *Sim) storePlayerStock(item content.ItemID, qty int) {
 // prices, a broker fee on the executed value, nothing rests — whatever
 // the book cannot fill simply stays with the buyer (never conjured).
 func (s *Sim) execBuy(c CmdBuy) {
-	if _, ok := s.stationAccess("market"); !ok {
+	if _, ok := s.stationAccess(content.SvcMarket); !ok {
 		return
 	}
 	if c.Qty <= 0 {
@@ -390,7 +390,7 @@ func (s *Sim) execBuy(c CmdBuy) {
 // quantity from the general hold, then the ore hold, then the hangar —
 // stored hulls sell one at a time.
 func (s *Sim) execSell(c CmdSell) {
-	if _, ok := s.stationAccess("market"); !ok {
+	if _, ok := s.stationAccess(content.SvcMarket); !ok {
 		return
 	}
 	if c.Qty <= 0 {
@@ -468,7 +468,7 @@ func (s *Sim) playerOrderCount() int {
 // wallet (bid: price×qty + 3% broker fee) or the goods (ask) and emits the
 // fill and placement lines. Any positive price is legal.
 func (s *Sim) execPlaceOrder(c CmdPlaceOrder) {
-	if _, ok := s.stationAccess("market"); !ok {
+	if _, ok := s.stationAccess(content.SvcMarket); !ok {
 		return
 	}
 	if c.Side != OrderBuy && c.Side != OrderSell {
@@ -544,7 +544,7 @@ func (s *Sim) execPlaceOrder(c CmdPlaceOrder) {
 // leftover wallet, an ask's goods into the station hangar); the placement
 // broker fee stays — EVE's rule, kept by CancelOrder.
 func (s *Sim) execCancelOrder(c CmdCancelOrder) {
-	if _, ok := s.stationAccess("market"); !ok {
+	if _, ok := s.stationAccess(content.SvcMarket); !ok {
 		return
 	}
 	if c.ID == 0 || !s.CancelOrder(s.dockedStationID(), c.ID, OwnerPlayer) {
@@ -732,7 +732,7 @@ const refineBatch = 100
 // when the outputs do not fit in the general hold, nothing is refined and
 // EvtCargoFull fires.
 func (s *Sim) execRefine(c CmdRefine) {
-	if _, ok := s.stationAccess("refine"); !ok {
+	if _, ok := s.stationAccess(content.SvcRefine); !ok {
 		return
 	}
 	def, ok := s.Content.Item(c.Item)
@@ -817,7 +817,7 @@ func (s *Sim) execRefine(c CmdRefine) {
 
 // execRepair restores all three layers to maximum for 2 euro per missing HP.
 func (s *Sim) execRepair() {
-	if _, ok := s.stationAccess("repair"); !ok {
+	if _, ok := s.stationAccess(content.SvcRepair); !ok {
 		return
 	}
 	ship, ok := s.Ships.Get(s.player)
@@ -854,7 +854,7 @@ func (s *Sim) execRepair() {
 
 // execFit moves a module from the hangar into a hull slot (fitting service).
 func (s *Sim) execFit(c CmdFitModule) {
-	if _, ok := s.stationAccess("fitting"); !ok {
+	if _, ok := s.stationAccess(content.SvcFitting); !ok {
 		return
 	}
 	def, ok := s.Content.Module(c.Item)
@@ -914,7 +914,7 @@ func (s *Sim) execFit(c CmdFitModule) {
 
 // execUnfit moves a fitted module back into the hangar (fitting service).
 func (s *Sim) execUnfit(c CmdUnfitModule) {
-	if _, ok := s.stationAccess("fitting"); !ok {
+	if _, ok := s.stationAccess(content.SvcFitting); !ok {
 		return
 	}
 	fit, ok := s.Fittings.Get(s.player)
@@ -973,7 +973,7 @@ func (s *Sim) execUnfit(c CmdUnfitModule) {
 // (fitting service). Cargo travels with each hull; stored hulls always carry
 // full HP (StoredShip has no HP field — documented simplification).
 func (s *Sim) execAssemble(c CmdAssemble) {
-	if _, ok := s.stationAccess("fitting"); !ok {
+	if _, ok := s.stationAccess(content.SvcFitting); !ok {
 		return
 	}
 	storedIdx := -1

@@ -45,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The rack's 4 px cycle bar is gone in favour of the tile cycle ring; tile
   size, glyph centering, names, hit areas, tooltips and menus are
   unchanged.
+- **Station services have one owner** (`content/services.go`): the service
+  ids, display labels, icons and the window each opens live in
+  `content.Services`, and the rail's service gate, the services-row buttons
+  and the sim's command gates derive from it. A renamed window now fails a
+  test instead of leaving a button that toggles nothing.
 
 ## [0.6.0] - 2026-10-21
 

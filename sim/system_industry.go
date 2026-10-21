@@ -310,7 +310,7 @@ func (s *Sim) startJobCheck(station StationID, recipe content.RecipeID, runs int
 	if runs < 1 {
 		return rec, "Invalid job quantity", false
 	}
-	if !s.stationService(station, "industry") {
+	if !s.stationService(station, content.SvcIndustry) {
 		return rec, "This station does not offer industry", false
 	}
 	if s.jobCount() >= industrySlots {
@@ -572,7 +572,7 @@ func (s *Sim) systemIndustry() {
 // execStartJob runs CmdStartJob: the docked-station service gate first
 // (stationAccess), then the shared job path as the player.
 func (s *Sim) execStartJob(c CmdStartJob) {
-	if _, ok := s.stationAccess("industry"); !ok {
+	if _, ok := s.stationAccess(content.SvcIndustry); !ok {
 		return
 	}
 	s.StartJob(s.dockedStationID(), c.Recipe, c.Runs, OwnerPlayer)
@@ -581,7 +581,7 @@ func (s *Sim) execStartJob(c CmdStartJob) {
 // execCollectJob runs CmdCollectJob against the station the player is
 // docked at (a job at another station never collects from here).
 func (s *Sim) execCollectJob(c CmdCollectJob) {
-	if _, ok := s.stationAccess("industry"); !ok {
+	if _, ok := s.stationAccess(content.SvcIndustry); !ok {
 		return
 	}
 	s.CollectJob(s.dockedStationID(), c.ID, OwnerPlayer)
@@ -590,7 +590,7 @@ func (s *Sim) execCollectJob(c CmdCollectJob) {
 // execCancelJob runs CmdCancelJob against the docked station (same gate
 // and local-only rule as CollectJob).
 func (s *Sim) execCancelJob(c CmdCancelJob) {
-	if _, ok := s.stationAccess("industry"); !ok {
+	if _, ok := s.stationAccess(content.SvcIndustry); !ok {
 		return
 	}
 	s.CancelJob(s.dockedStationID(), c.ID, OwnerPlayer)

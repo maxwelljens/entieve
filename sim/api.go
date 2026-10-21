@@ -542,13 +542,17 @@ func (s *Sim) MarketPrice(station StationID, item content.ItemID) float64 {
 
 // DockedMarket returns the station the player is docked at when it offers
 // the market service ("" otherwise) — the book a market view shows.
-func (s *Sim) DockedMarket() StationID {
+func (s *Sim) DockedMarket() StationID { return s.dockedStationFor(content.SvcMarket) }
+
+// dockedStationFor returns the station the player is docked at when it
+// offers svc ("" otherwise) — the service accessor every panel reads.
+func (s *Sim) dockedStationFor(svc string) StationID {
 	e := s.dockedStation()
 	if e.IsZero() {
 		return ""
 	}
 	st, ok := s.Stations.Get(e)
-	if !ok || !hasService(st, "market") {
+	if !ok || !hasService(st, svc) {
 		return ""
 	}
 	if c, ok := s.Celestials.Get(e); ok {
@@ -562,20 +566,7 @@ func (s *Sim) DockedMarket() StationID {
 // DockedIndustry returns the station the player is docked at when it
 // offers the industry service ("" otherwise) — the station the factory
 // panel reads jobs, craft levels and job gating from.
-func (s *Sim) DockedIndustry() StationID {
-	e := s.dockedStation()
-	if e.IsZero() {
-		return ""
-	}
-	st, ok := s.Stations.Get(e)
-	if !ok || !hasService(st, "industry") {
-		return ""
-	}
-	if c, ok := s.Celestials.Get(e); ok {
-		return c.Cel
-	}
-	return ""
-}
+func (s *Sim) DockedIndustry() StationID { return s.dockedStationFor(content.SvcIndustry) }
 
 // IndustrySlots is how many jobs ALL stations run concurrently (the
 // industrySlots design constant, for the manufacturing panel's readout).

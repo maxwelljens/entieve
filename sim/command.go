@@ -194,7 +194,7 @@ func (s *Sim) execTransfer(c CmdTransfer) {
 			s.log(SevWarning, p, "Must be docked to access the hangar")
 			return
 		}
-		if _, ok := s.stationAccess("fitting"); !ok {
+		if _, ok := s.stationAccess(content.SvcFitting); !ok {
 			return
 		}
 	}

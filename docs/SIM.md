@@ -34,7 +34,7 @@ run in this fixed order:
 | 9 | mining | `sim/system_mining.go` | cycle yields into the ore hold; belt-state decrement |
 | 10 | npc | `sim/system_npc.go` | rat/guard behavior state machine |
 | 11 | loot | `sim/system_loot.go` | loot command → cargo; bounties |
-| 12 | economy | `sim/system_economy.go` | station services: buy/sell/refine/repair/fitting |
+| 12 | economy | `sim/system_economy.go` | station services (the `content.Services` ids): buy/sell/refine/repair/fitting |
 | 13 | travel | `sim/system_travel.go` | dock/undock/jump: grid swaps |
 | 14 | mission | `sim/system_mission.go` | contract accept/abandon, objectives, auto-claim |
 | 15 | respawn | `sim/system_respawn.go` | funded NPC replacement timers |

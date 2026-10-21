@@ -242,6 +242,7 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | Refinery window title (`game/screens.go`, `uikit/screens/refinery.go`) | — | **Refinery** | trade | the ore→mineral service window at a `refine` station: ore list, yield preview, Refine. Plain trade noun. Approved 2026-10-20 |
 | Refinery batch strings (`uikit/screens/refinery.go`, `sim/system_economy.go`) | — | **One batch needs 100 ore — you hold &lt;n&gt; &lt;ore&gt;.** / **Refining runs in whole batches of 100 ore** | trade | refining is atomic in 100-ore batches: the window's status names the shortfall (Refine grayed below one batch) and the sim's refusal log names the partial quantity. Approved 2026-10-20 |
 | Market item row's Side cell (`uikit/screens/market.go`) | — | **—** | trade | the tree's parent rows carry no side of their own (the order rows folded beneath them keep Ask/Bid); the em dash reads as "none" while keeping the column visibly present. Approved 2026-10-20 |
+| Station service labels (`content/services.go`) | — | **Repair** · **Market** · **Fitting** · **Manufacturing** · **Refinery** | trade | the `content.Services` table's display names: the services row's button tooltips and, for the four with a window, the window titles already registered above (Market/Fitting/Manufacturing/Refinery). `repair` has no window — the sim repairs on `CmdRepair` — so it draws no button. Approved 2026-10-21 |
 
 ## Money strings
 
