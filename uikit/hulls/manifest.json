@@ -1,0 +1,91 @@
+{
+  "credit": "original artwork",
+  "generator": "tools/hullraster",
+  "sizes": [
+    120,
+    240
+  ],
+  "hulls": {
+    "ship-barge": {
+      "credit": "original artwork",
+      "svg": "svg/ship-barge.svg",
+      "svg_sha256": "42297422128262130f450f6964802bf17cd9d1f42dc5b41e124e54c9efd5bcd4",
+      "png_sha256": {
+        "120": "6ed35611c82652218d7ae6e80f4e64151b0a44847137a5ebbbde3908731ce01a",
+        "240": "d796c1e96b4d9e8821ff4c92fa13b85c2eca68e4a0032c8377d679fe88c94155"
+      }
+    },
+    "ship-cutlass": {
+      "credit": "original artwork",
+      "svg": "svg/ship-cutlass.svg",
+      "svg_sha256": "4da2070c468271036237da63ac9c03a48bfcc65bbf5ce5c954adea2d1b6b103e",
+      "png_sha256": {
+        "120": "0c7565a8f61a139e0e6e5f49ad81c0f062d4cc60d6a464e141052adfa43a4f60",
+        "240": "8592f701a4e1de07bc403d7d1f18cc779cdd590014028be2ab0bd12fc2c5dfc6"
+      }
+    },
+    "ship-hauler": {
+      "credit": "original artwork",
+      "svg": "svg/ship-hauler.svg",
+      "svg_sha256": "b75c6335df5b1154369a6168bfc1fa21ce4e427e4348be1c2f802db8c5263279",
+      "png_sha256": {
+        "120": "2e63ed199d73c8b57fc3581d5e9bfa5812bd66bf85853f15c1da6a20b755db21",
+        "240": "cdf73cfc29fbb8c61c25ef1c79a10980f695fb6b91496a87825d357ef9562746"
+      }
+    },
+    "ship-npc-hauler": {
+      "credit": "original artwork",
+      "svg": "svg/ship-npc-hauler.svg",
+      "svg_sha256": "9e328695593a4f3ca3ee9436a880c829eec7f7adb533e3fe9441dede2a6814ab",
+      "png_sha256": {
+        "120": "8f6fa1c8e3588f9ba1a0b950fe5b5899b718a573e811bc1f0abefd93be73f85a",
+        "240": "a44f1e8b92c45ab698062c50d69f632b816d6263ba4791ff8cbb9e39a25289f9"
+      }
+    },
+    "ship-npc-patrol": {
+      "credit": "original artwork",
+      "svg": "svg/ship-npc-patrol.svg",
+      "svg_sha256": "300d048a12653a9bf81518fc530b3c12361f23f5b963e3152808880cc2cd9a01",
+      "png_sha256": {
+        "120": "442b2c9af5c50d51a2fdf9341e97097d937a7ff10c2c9f8783ff6d981b4ba4da",
+        "240": "1e2f26bab32102257273cec500ed08de532246c6300d5963c2f7f55a5d1ec1a8"
+      }
+    },
+    "ship-rat-hierarch": {
+      "credit": "original artwork",
+      "svg": "svg/ship-rat-hierarch.svg",
+      "svg_sha256": "ebc4db4bf76ad97dc509e4e444454b8d3af80eb3ea5602ffdaa31c4a6287c414",
+      "png_sha256": {
+        "120": "37227a0415ecb2e05318c62db21883bd1b7c6d8066e2969c3323172943c9fc21",
+        "240": "9a75e1c95cdc122160b645792a863e6677f67497c7a2289c5114d97daaf7e97d"
+      }
+    },
+    "ship-rat-marauder": {
+      "credit": "original artwork",
+      "svg": "svg/ship-rat-marauder.svg",
+      "svg_sha256": "e96b92ba44629588691e2d8afaf7988816e41039191801dc19346180be5c61f9",
+      "png_sha256": {
+        "120": "0de99dd1ca703a69c41ebc72047357083b16e1066f1023635528d1f195845e66",
+        "240": "df493a6ffb279b5bccb9648d208030cdf10e8515e21123b560674eb49bfc49f1"
+      }
+    },
+    "ship-rat-scuttler": {
+      "credit": "original artwork",
+      "svg": "svg/ship-rat-scuttler.svg",
+      "svg_sha256": "88eaa7382f9d19fb04ecf525d78a3b6c6883afaf5ed810dc75518a802e3e5b38",
+      "png_sha256": {
+        "120": "c86482ecafb8306bb404dedfaa3ba232f13b47b082f21c719075ee2f6f39734d",
+        "240": "ebd93362ff1231df99c31971560ff02b0d43a379a2aff31e093d760bbbb468fc"
+      }
+    },
+    "ship-sloop": {
+      "credit": "original artwork",
+      "svg": "svg/ship-sloop.svg",
+      "svg_sha256": "462634c7792e3a72a50567b0822c19f1671826161f30961e60b6bf0d34932b86",
+      "png_sha256": {
+        "120": "854e283b496f7e4cd0a8826ed82971e10a24d603f4c4d204868728e53f99ea63",
+        "240": "3548d860c0d1da8d60c5dea7b5872af0f21af77f8cd790d56bc816b86323185d"
+      }
+    }
+  }
+}

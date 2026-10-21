@@ -1,0 +1,16 @@
+<!-- Entieve original artwork — the Scuttler worker frame portrait (spindly). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <polygon fill="#39465a" points="110,60 100,53 78,51 52,51 34,55 26,58 24,60 26,62 34,65 52,69 78,69 100,67"/>
+  <polygon fill="#39465a" points="96,56 72,43 68,44 90,57 90,63 68,76 72,77 96,64"/>
+  <polygon fill="#39465a" points="40,53 20,39 15,40 32,55 32,65 15,80 20,81 40,67"/>
+  <polygon fill="#7d8a92" points="106,60 98,55 78,53 52,53 34,57 28,60 34,63 52,67 78,67 98,65"/>
+  <polygon fill="#5d6f87" points="88,60 80,54 52,54 40,57 36,60 40,63 52,66 80,66"/>
+  <rect fill="#39465a" x="44" y="50" width="26" height="20"/>
+  <circle fill="#a6d84a" cx="57" cy="60" r="5"/>
+  <circle fill="#c8e87a" cx="57" cy="60" r="2.4"/>
+  <rect fill="#5d6f87" x="22" y="54" width="10" height="5"/>
+  <rect fill="#5d6f87" x="22" y="61" width="10" height="5"/>
+  <rect fill="#a6d84a" x="22" y="55.4" width="3" height="2.2"/>
+  <rect fill="#a6d84a" x="22" y="62.4" width="3" height="2.2"/>
+  <circle fill="#a6d84a" cx="104" cy="60" r="1.6"/>
+</svg>

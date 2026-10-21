@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Hull portraits** (`uikit/hulls`): nine original top-down portraits — one
+  per fleet hull — embedded at 120 and 240 px and keyed by `ShipID`
+  (`Get`/`Has`). Flat SVG sources under `uikit/hulls/svg/` are rasterized at
+  build time by `tools/hullraster` (a separate module, no runtime
+  dependency); the manifest hashes pin the committed PNGs to their sources.
+  The art is original, in steel greys with one accent light per hull, and
+  reads at 72 px.
+
 ## [0.6.0] - 2026-10-21
 
 ### Added

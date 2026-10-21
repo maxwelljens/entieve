@@ -1,0 +1,40 @@
+<!-- Entieve original artwork — the Tabor convoy freighter portrait (bolted industrial). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <polygon fill="#39465a" points="106,60 96,48 64,44 26,46 13,52 9,60 13,68 26,74 64,76 96,72"/>
+  <polygon fill="#8fa3bd" points="102,60 94,51 64,48 28,49 17,54 13,60 17,66 28,71 64,72 94,69"/>
+  <polygon fill="#8fa3bd" points="74,60 74,48 30,48 17,54 17,60 17,66 30,72 74,72"/>
+  <polygon fill="#8fa3bd" points="74,60 74,72 30,72 17,66 17,60 17,54 30,48 74,48"/>
+  <rect fill="#a9713f" x="41" y="50" width="15" height="8"/>
+  <rect fill="#a9713f" x="41" y="62" width="15" height="8"/>
+  <rect fill="#a9713f" x="41" y="62" width="15" height="8"/>
+  <rect fill="#a9713f" x="41" y="50" width="15" height="8"/>
+  <rect fill="#5d6f87" x="61" y="49" width="11" height="6"/>
+  <rect fill="#5d6f87" x="61" y="65" width="11" height="6"/>
+  <rect fill="#5d6f87" x="61" y="65" width="11" height="6"/>
+  <rect fill="#5d6f87" x="61" y="49" width="11" height="6"/>
+  <rect fill="#39465a" x="90" y="51" width="14" height="18"/>
+  <rect fill="#5d6f87" x="16" y="33" width="72" height="4"/>
+  <rect fill="#5d6f87" x="16" y="83" width="72" height="4"/>
+  <rect fill="#5d6f87" x="16" y="83" width="72" height="4"/>
+  <rect fill="#5d6f87" x="16" y="33" width="72" height="4"/>
+  <rect fill="#5d6f87" x="30" y="33" width="3" height="8"/>
+  <rect fill="#5d6f87" x="30" y="79" width="3" height="8"/>
+  <rect fill="#5d6f87" x="30" y="79" width="3" height="8"/>
+  <rect fill="#5d6f87" x="30" y="33" width="3" height="8"/>
+  <rect fill="#5d6f87" x="50" y="33" width="3" height="8"/>
+  <rect fill="#5d6f87" x="50" y="79" width="3" height="8"/>
+  <rect fill="#5d6f87" x="50" y="79" width="3" height="8"/>
+  <rect fill="#5d6f87" x="50" y="33" width="3" height="8"/>
+  <rect fill="#5d6f87" x="70" y="33" width="3" height="8"/>
+  <rect fill="#5d6f87" x="70" y="79" width="3" height="8"/>
+  <rect fill="#5d6f87" x="70" y="79" width="3" height="8"/>
+  <rect fill="#5d6f87" x="70" y="33" width="3" height="8"/>
+  <rect fill="#39465a" x="12" y="52" width="8" height="6"/>
+  <rect fill="#39465a" x="12" y="62" width="8" height="6"/>
+  <rect fill="#39465a" x="12" y="62" width="8" height="6"/>
+  <rect fill="#39465a" x="12" y="52" width="8" height="6"/>
+  <rect fill="#ffcf6a" x="10" y="54" width="3" height="2.4"/>
+  <rect fill="#ffcf6a" x="10" y="63.6" width="3" height="2.4"/>
+  <rect fill="#ffcf6a" x="10" y="63.6" width="3" height="2.4"/>
+  <rect fill="#ffcf6a" x="10" y="54" width="3" height="2.4"/>
+</svg>
