@@ -30,7 +30,7 @@
     },
     {
       "id": "cel-penumbra-belt",
-      "name": "Kuźnica Belt",
+      "name": "Asteroid Belt I",
       "kind": "belt",
       "position": {
         "X": -959446719972,
@@ -92,7 +92,7 @@
     },
     {
       "id": "cel-gate-solace",
-      "name": "Starogród Gate",
+      "name": "Gate (Starogród)",
       "kind": "gate",
       "position": {
         "X": -3110398816844,
@@ -109,7 +109,7 @@
     },
     {
       "id": "cel-gate-gloam",
-      "name": "Pustkowie Gate",
+      "name": "Gate (Pustkowie)",
       "kind": "gate",
       "position": {
         "X": 3316068789411,
@@ -167,7 +167,7 @@
     },
     {
       "id": "cel-gate-mlynow",
-      "name": "Młynów Gate",
+      "name": "Gate (Młynów)",
       "kind": "gate",
       "position": {
         "X": -3327077444731,
@@ -184,7 +184,7 @@
     },
     {
       "id": "cel-gate-kamieniec",
-      "name": "Kamieniec Gate",
+      "name": "Gate (Kamieniec)",
       "kind": "gate",
       "position": {
         "X": 1807211319445,

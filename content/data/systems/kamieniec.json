@@ -79,7 +79,7 @@
     },
     {
       "id": "cel-kamieniec-belt",
-      "name": "Kamieniec Belt",
+      "name": "Asteroid Belt I",
       "kind": "belt",
       "position": { "X": -330134854342, "Y": 476861456272 },
       "radius": 290000,
@@ -98,7 +98,7 @@
     },
     {
       "id": "cel-gate-penumbra",
-      "name": "Kuźnica Gate",
+      "name": "Gate (Kuźnica)",
       "kind": "gate",
       "position": { "X": 3117105713934, "Y": -1934755270718 },
       "radius": 2500,
@@ -110,7 +110,7 @@
     },
     {
       "id": "cel-gate-glusza",
-      "name": "Głusza Gate",
+      "name": "Gate (Głusza)",
       "kind": "gate",
       "position": { "X": 4098724975052, "Y": 2884287945407 },
       "radius": 2500,

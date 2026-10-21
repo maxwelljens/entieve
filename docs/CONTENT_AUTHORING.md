@@ -204,7 +204,7 @@ complete, valid two-celestial system with a gate back to Starogród):
     },
     {
       "id": "cel-cinder-belt",
-      "name": "Cinder Belt",
+      "name": "Asteroid Belt I",
       "kind": "belt",
       "position": { "X": -700000000000, "Y": 550000000000 },
       "radius": 250000,
@@ -220,7 +220,7 @@ complete, valid two-celestial system with a gate back to Starogród):
     },
     {
       "id": "cel-gate-solace",
-      "name": "Starogród Gate",
+      "name": "Gate (Starogród)",
       "kind": "gate",
       "position": { "X": 3200000000000, "Y": -2240000000000 },
       "radius": 2500,
@@ -237,7 +237,7 @@ complete, valid two-celestial system with a gate back to Starogród):
 ```json
 {
   "id": "cel-gate-cinder",
-  "name": "Cinder Gate",
+  "name": "Gate (Cinder)",
   "kind": "gate",
   "position": { "X": -3200000000000, "Y": 1200000000000 },
   "radius": 2500,

@@ -76,7 +76,7 @@
     },
     {
       "id": "cel-mlynow-belt",
-      "name": "Młynów Belt",
+      "name": "Asteroid Belt I",
       "kind": "belt",
       "position": { "X": -559868967560, "Y": -712560504167 },
       "radius": 280000,
@@ -94,7 +94,7 @@
     },
     {
       "id": "cel-gate-rudnik",
-      "name": "Rudnik Gate",
+      "name": "Gate (Rudnik)",
       "kind": "gate",
       "position": { "X": 2853755567647, "Y": 2283004454117 },
       "radius": 2500,
@@ -106,7 +106,7 @@
     },
     {
       "id": "cel-gate-penumbra",
-      "name": "Kuźnica Gate",
+      "name": "Gate (Kuźnica)",
       "kind": "gate",
       "position": { "X": -4913469412868, "Y": 1052886302757 },
       "radius": 2500,

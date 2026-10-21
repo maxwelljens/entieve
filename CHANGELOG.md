@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Belts are numbered, gates name their destination** (`content/data/systems`):
+  every belt is now **Asteroid Belt I** (numbered per system in celestial
+  order — the next belt in a system becomes II), and every gate is
+  **Gate (<destination>)**, e.g. `Gate (Kuźnica)` where the old form read
+  `Kuźnica Gate`. Ids are unchanged; [docs/lore/NAMING.md](docs/lore/NAMING.md)
+  carries the new convention.
+
 ## [0.7.0] - 2026-10-21
 
 ### Added

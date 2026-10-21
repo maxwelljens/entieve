@@ -78,6 +78,37 @@ func TestGateTopologyPairs(t *testing.T) {
 	}
 }
 
+// beltNumerals numbers a system's belts in celestial order; extend the table
+// when a system ships a sixth belt.
+var beltNumerals = []string{"I", "II", "III", "IV", "V"}
+
+// TestCelestialNamesFollowConventions: belt names number per system ("Asteroid
+// Belt I", II, …) and gate names carry their destination's display name — the
+// registry rows in docs/lore/NAMING.md ([Celestials]).
+func TestCelestialNamesFollowConventions(t *testing.T) {
+	c := MustLoad()
+	for _, id := range keys(c.Systems) {
+		sys := c.Systems[id]
+		belts := 0
+		for i := range sys.Celestials {
+			cel := &sys.Celestials[i]
+			if cel.Kind == CelBelt {
+				belts++
+				if belts > len(beltNumerals) {
+					t.Errorf("%s/%s: belt %d, extend beltNumerals", id, cel.ID, belts)
+				} else if want := "Asteroid Belt " + beltNumerals[belts-1]; cel.Name != want {
+					t.Errorf("%s/%s: name %q, want %q", id, cel.ID, cel.Name, want)
+				}
+			}
+			if cel.Gate != nil {
+				if want := "Gate (" + c.Systems[cel.Gate.ToSystem].Name + ")"; cel.Name != want {
+					t.Errorf("%s/%s: name %q, want %q", id, cel.ID, cel.Name, want)
+				}
+			}
+		}
+	}
+}
+
 // TestShippedStationsServeAndStock: every station carries at least one
 // service from the allowed set and the market service; the four new
 // stations ship a founding market block (their endowment is the only
