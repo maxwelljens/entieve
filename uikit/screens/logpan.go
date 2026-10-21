@@ -18,17 +18,18 @@ import (
 // place), and the window defaults. The log is a normal draggable/
 // resizable window docked bottom-left: with the rail gutter (RailInset)
 // on its left, 264 keeps its right edge at the historical 361. That edge
-// is clear of the HUD bar at 1280×720 but NOT at the 1024×700 minimum
-// (the bar's container starts at 292 there): the window's content floor
-// (logMinW = 260) is wider than the pocket left of the bar, so the two
-// overlap there — inherent, and pinned by game's TestVirginPlacementTable.
+// is clear of the HUD pair (ship status + rack) at 1280×720 but NOT at the
+// 1024×700 minimum (the pair starts at 263 there, 234 on a four-slot
+// hull): the window's content floor (logMinW = 260) is wider than the
+// pocket left of the pair, so the two overlap there — inherent, and
+// pinned by game's TestVirginPlacementTable.
 const (
 	logViewLines = 5
 	logViewW     = 240
 	logViewH     = logViewLines * 23 // lines × lineH(FontSmall)
 	logMaxLines  = 200
 
-	logDefaultW = 264 // 361 − (10 + RailInset): the pocket's right edge (clear of the HUD bar at 1280×720; see the note above)
+	logDefaultW = 264 // 361 − (10 + RailInset): the pocket's right edge (clear of the HUD pair at 1280×720; see the note above)
 	logDefaultH = 240
 	logMinW     = logViewW + 2*theme.ContentsPad                   // text-area floor + body padding
 	logMinH     = theme.TitleBarH + logViewH + 2*theme.ContentsPad // + title bar

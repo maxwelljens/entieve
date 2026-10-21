@@ -16,6 +16,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dependency); the manifest hashes pin the committed PNGs to their sources.
   The art is original, in steel greys with one accent light per hull, and
   reads at 72 px.
+- **Hull portrait** in the ship status panel: the fitted hull's 120 px
+  portrait (art stream package `uikit/hulls`) replaces the placeholder
+  diamond and the three concentric damage arcs, and repaints when the hull
+  changes. A stub `uikit/hulls` ships this batch and is dropped at
+  integration.
+- **Velocity wedge**: a vertical triangle widening bottom→top, filled
+  bottom-up with current / base max speed (`Motion.MaxSpeed`, a stable
+  top), with the `m/s` figure under it.
+- **Clock icon** (`hud_time`, game-icons.net `stopwatch` by Lorc, CC BY
+  3.0) on the new time/wallet strip.
+- **Cycle rings** over the rack tiles: a thin ring depletes clockwise from
+  full at activation (time remaining), shown only while the module runs.
+
+### Changed
+
+- **HUD and module rack are one centered bottom pair**: the ship status
+  (hull portrait, shield / armor / structure bars, capacitor, velocity)
+  sits left, the rack immediately right, both on the 10 px bottom-center
+  baseline; the target-box row stays top-center.
+- **Health is three bars** with `current / max` printed inside each
+  (shield/armor/structure palette), replacing the three text lines; the
+  capacitor bar keeps its value inside and loses its "capacitor" caption
+  (the recharge hint keeps a reserved line).
+- **Time multiplier and wallet moved to a strip above the status**, with a
+  clock glyph; the old `×N time` line leaves the status panel. No sim
+  clock is shown.
+- The rack's 4 px cycle bar is gone in favour of the tile cycle ring; tile
+  size, glyph centering, names, hit areas, tooltips and menus are
+  unchanged.
 
 ## [0.6.0] - 2026-10-21
 

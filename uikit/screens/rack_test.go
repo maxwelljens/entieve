@@ -3,7 +3,6 @@ package screens
 import (
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
-	"image"
 	"image/color"
 	"strings"
 	"testing"
@@ -108,8 +107,8 @@ func TestRackConstruction(t *testing.T) {
 }
 
 // TestRackActiveAndCycle covers the runtime states: inactive modules wear
-// the disabled look, active ones light up with a cycle progress bar read
-// from ModuleRuntime.Active/CycleEnds against Sim.Time().
+// the disabled look and no ring, active ones light up with a cycle ring
+// read from ModuleRuntime.Active/CycleEnds against Sim.Time().
 func TestRackActiveAndCycle(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	r := NewRack(env)
@@ -121,21 +120,40 @@ func TestRackActiveAndCycle(t *testing.T) {
 	if !cell.btn.GetWidget().Disabled {
 		t.Fatal("inactive module is not disabled")
 	}
-	if cell.bar.GetCurrent() != 0 {
-		t.Errorf("idle cycle bar = %d, want 0", cell.bar.GetCurrent())
+	if cell.ringOn || cell.ringFrac != 0 {
+		t.Errorf("inactive module ring = on:%v frac:%v, want no ring", cell.ringOn, cell.ringFrac)
+	}
+	if vis := cell.ringGfx.GetWidget().GetVisibility(); vis != widget.Visibility_Hide {
+		t.Errorf("inactive ring visibility = %d, want hidden", vis)
 	}
 
 	fit, _ := env.Sim.Fittings.Get(env.Sim.Player())
 	rt := &fit.HighRT[0]
 	rt.Active = true
-	rt.CycleEnds = env.Sim.Time() + 1.5 // half of the 3 s cycle elapsed
+	rt.CycleEnds = env.Sim.Time() + 1.5 // half of the 3 s cycle remaining
 	r.Sync()
 	if cell.btn.GetWidget().Disabled {
 		t.Error("active module is disabled")
 	}
-	// (now - (CycleEnds - ActivationTime)) / ActivationTime = 1.5 / 3
-	if got := cell.bar.GetCurrent(); got != rackCycleMax/2 {
-		t.Errorf("cycle bar = %d, want %d", got, rackCycleMax/2)
+	// remaining = 1 − (now − (CycleEnds − ActivationTime)) / ActivationTime
+	// = 1.5 / 3
+	if !cell.ringOn || cell.ringFrac != 0.5 {
+		t.Errorf("cycle ring = on:%v frac:%v, want on / 0.5", cell.ringOn, cell.ringFrac)
+	}
+	if vis := cell.ringGfx.GetWidget().GetVisibility(); vis != widget.Visibility_Show {
+		t.Errorf("active ring visibility = %d, want shown", vis)
+	}
+
+	// Clockwise depletion: as now−start grows the remaining fraction shrinks.
+	rt.CycleEnds = env.Sim.Time() + 0.75
+	r.Sync()
+	if cell.ringFrac != 0.25 {
+		t.Errorf("cycle ring after three quarters = %v, want 0.25", cell.ringFrac)
+	}
+	rt.CycleEnds = env.Sim.Time() + 0.001
+	r.Sync()
+	if cell.ringFrac != 0 {
+		t.Errorf("cycle ring at the end of the window = %v, want 0", cell.ringFrac)
 	}
 
 	rt.Active = false
@@ -143,8 +161,8 @@ func TestRackActiveAndCycle(t *testing.T) {
 	if !cell.btn.GetWidget().Disabled {
 		t.Error("deactivated module is not disabled")
 	}
-	if got := cell.bar.GetCurrent(); got != 0 {
-		t.Errorf("deactivated cycle bar = %d, want 0", got)
+	if cell.ringOn || cell.ringFrac != 0 {
+		t.Errorf("deactivated ring = on:%v frac:%v, want no ring", cell.ringOn, cell.ringFrac)
 	}
 }
 
@@ -347,18 +365,30 @@ func TestRackRightClickCyclesAmmo(t *testing.T) {
 	}
 }
 
-// TestRackDrawSmoke draws the rack at both design sizes inside an
-// interface root; the panel must anchor bottom-right.
+// TestRackDrawSmoke draws the rack in the HUD's bottom-center pair at both
+// design sizes: the rack is the pair's right half, sharing its baseline.
 func TestRackDrawSmoke(t *testing.T) {
 	env, _ := newChromeEnv(t)
+	h := NewHud(env)
 	r := NewRack(env)
+	h.MountRack(r.Container())
 	c := newChromeUI(env)
-	c.AddPanel(r.Container(), r)
+	c.AddPanel(h.Container(), h)
 	c.Frame(t, 1280, 720)
 
+	pair := h.pair.GetWidget().Rect
 	rect := r.Container().GetWidget().Rect
-	if rect.Max.X < 1269 || rect.Max.X > 1271 || rect.Max.Y < 709 || rect.Max.Y > 711 {
-		t.Errorf("rack rect %v, want a bottom-right corner at (1270,710)", rect)
+	status := h.status.GetWidget().Rect
+	if rect.Max.Y != pair.Max.Y || status.Max.Y != pair.Max.Y {
+		t.Errorf("rack/status bottoms = %d/%d, want the pair baseline %d",
+			rect.Max.Y, status.Max.Y, pair.Max.Y)
+	}
+	if rect.Min.X != status.Max.X+theme.Px(hudPairGap) {
+		t.Errorf("rack left = %d, want %d (immediately right of the status)",
+			rect.Min.X, status.Max.X+theme.Px(hudPairGap))
+	}
+	if pair.Max.Y < 709 || pair.Max.Y > 711 {
+		t.Errorf("pair bottom = %d, want 710", pair.Max.Y)
 	}
 	c.Smoke(t)
 }
@@ -536,10 +566,10 @@ func TestRackClickTargetsSelection(t *testing.T) {
 	}
 }
 
-// TestRackCellStacksTileNameAndBar pins the cell column: the icon tile on
-// top (its 40 px hit area intact), the module's name under it and the
-// cycle bar at the bottom — three disjoint rects, all inside the cell.
-func TestRackCellStacksTileNameAndBar(t *testing.T) {
+// TestRackCellStacksTileAndName pins the cell column: the icon tile (with
+// its cycle ring stacked over it) on top, the module's name under it — two
+// disjoint, contiguous rects, all inside the cell.
+func TestRackCellStacksTileAndName(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	r := NewRack(env)
 	c := newChromeUI(env)
@@ -552,26 +582,31 @@ func TestRackCellStacksTileNameAndBar(t *testing.T) {
 				continue // hidden slots have no rects to check
 			}
 			tile := cell.btn.GetWidget().Rect
+			stack := cell.stack.GetWidget().Rect
 			name := cell.name.GetWidget().Rect
-			bar := cell.bar.GetWidget().Rect
 			root := cell.root.GetWidget().Rect
 			if tile.Dy() < rackCellH || tile.Dx() < rackCellW {
 				t.Errorf("cell(%d,%d) tile = %v, want at least %d×%d",
 					row, idx, tile, rackCellW, rackCellH)
 			}
+			if stack != tile {
+				t.Errorf("cell(%d,%d) tile stack = %v, want the tile rect %v", row, idx, stack, tile)
+			}
+			if !cell.ringGfx.GetWidget().Rect.In(tile) {
+				t.Errorf("cell(%d,%d) cycle ring %v escapes the tile %v",
+					row, idx, cell.ringGfx.GetWidget().Rect, tile)
+			}
 			if name.Dy() <= 0 {
 				t.Errorf("cell(%d,%d) name line = %v, want a measured line", row, idx, name)
 			}
-			for _, pair := range [][2]image.Rectangle{{tile, name}, {name, bar}, {tile, bar}} {
-				if pair[0].Overlaps(pair[1]) {
-					t.Errorf("cell(%d,%d): %v overlaps %v", row, idx, pair[0], pair[1])
-				}
+			if tile.Overlaps(name) {
+				t.Errorf("cell(%d,%d): tile %v overlaps the name %v", row, idx, tile, name)
 			}
-			if tile.Max.Y != name.Min.Y || name.Max.Y != bar.Min.Y {
-				t.Errorf("cell(%d,%d) stack = tile %v / name %v / bar %v, want contiguous",
-					row, idx, tile, name, bar)
+			if stack.Max.Y != name.Min.Y {
+				t.Errorf("cell(%d,%d) stack = tile %v / name %v, want contiguous",
+					row, idx, tile, name)
 			}
-			if !tile.In(root) || !name.In(root) || !bar.In(root) {
+			if !stack.In(root) || !name.In(root) {
 				t.Errorf("cell(%d,%d) children escape the cell %v", row, idx, root)
 			}
 		}

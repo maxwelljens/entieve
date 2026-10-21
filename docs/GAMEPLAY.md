@@ -109,8 +109,8 @@ docked, fitting at a station without the fitting service); clicking a
 grayed entry does nothing. A window that is open wears the entry's amber
 glow, and the slim tab at the rail's top edge collapses the rail to its
 tab — a setting that persists as `rail_collapsed` in
-`<save>.settings.json` (a missing key means expanded). The HUD bar and
-the module rack are permanent ship chrome and have no rail entries, and
+`<save>.settings.json` (a missing key means expanded). The ship status
+and the module rack are permanent ship chrome and have no rail entries, and
 the Esc menu keeps its own key — the rail is not its launcher.
 
 The **Settings**
@@ -125,10 +125,15 @@ layout works at every scale. Icons (from
 `uikit/icons/CREDITS.md`) mark service titles, action buttons, overview
 kinds and contract types — monochrome glyphs tinted to the theme, and
 every icon keeps its text label. Two panels are
-**always-on chrome** and cannot be closed or moved: the ship **HUD bar**
-(bottom center, with the target-box row at top center) and the
-**module rack** (bottom right; each cell is a class-glyph tile with the
-module's name under it). The **log** is a normal window now —
+**always-on chrome** and cannot be closed or moved: the **ship status**
+panel (bottom center left half: the hull portrait, shield / armor /
+structure bars with their current/max values inside, the capacitor bar
+and the velocity wedge with its m/s figure) and the **module rack**
+(bottom center right half; each cell is a class-glyph tile with the
+module's name under it and a cycle ring that depletes clockwise over the
+tile while the module runs). A small strip above the status carries the
+time multiplier and the wallet, and the **target-box row** sits at top
+center. The **log** is a normal window now —
 bottom left by default, toggle with `Shift+L`, draggable and resizable
 like the rest. The **Overview** (top right) and **Selected Item** window
 (top left) are open by default (the rail's Ship entries close and
@@ -142,8 +147,8 @@ command. Warp, Orbit, `Z` and `Q` all act at the range their selector
 currently shows.
 
 Default positions: overview top-right, selected item top-left, scanner
-in the center column under the top row, log bottom-left, HUD
-bottom-center, module rack bottom-right, starmap and the Esc menu
+in the center column under the top row, log bottom-left, the HUD pair
+(ship status + module rack) bottom-center, starmap and the Esc menu
 centered, help top-center. Every window type also carries its own default
 size and position for its first open — the market's square, the inventory
 and fitting rects, the manufacturing and refinery, finances and settings — and a genuinely
@@ -189,7 +194,7 @@ a **Cargo** button and one button per service *this* station offers
 (Market, Fitting, Industry — a service the station lacks is not offered
 at all) over the contract board (see
 [Contracts & standing](#contracts--standing)) — and hides the space
-chrome (HUD bar, module rack, scanner) together with the
+chrome (ship status, module rack, scanner) together with the
 **Overview** and **Selected Item** windows. Nothing else auto-opens:
 the market, fitting, inventory and manufacturing are ordinary windows you
 open from the services view, their keys, or the rail, and they open at
@@ -559,7 +564,8 @@ another system hops the gates and finishes its run there.
 ## Time acceleration
 
 `]` / `=` cycle time forward (1× → 2× → 4× → 8×), `[` / `-` cycle back. The
-HUD shows the current `×N` next to the speed readout. Acceleration simply
+strip above the ship status shows the current `×N` (with a clock glyph)
+beside the wallet. Acceleration simply
 runs more fixed 60 Hz simulation steps per rendered frame — determinism and
 replays are unaffected.
 

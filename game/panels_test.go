@@ -292,12 +292,12 @@ func TestWorldInputGating(t *testing.T) {
 		x, y := centerOf(t, p.rect)
 		mustHit = append(mustHit, point{p.name, x, y})
 	}
-	// The HUD bar: the bottom-anchored child of the HUD container.
+	// The HUD pair: the bottom-anchored child of the HUD container.
 	for _, ch := range g.hud.Container().Children() {
 		w := ch.GetWidget()
 		if w.Rect.Dx() > 0 && w.Rect.Min.Y > 400 {
 			x, y := centerOf(t, w.Rect)
-			mustHit = append(mustHit, point{"hud bar", x, y})
+			mustHit = append(mustHit, point{"hud pair", x, y})
 			break
 		}
 	}
@@ -326,8 +326,9 @@ func TestWorldInputGating(t *testing.T) {
 		}
 	}
 
-	// Off-panel: a clear point on empty space — the handlers run.
-	const cx, cy = 640.0, 500.0
+	// Off-panel: a clear point on empty space above the bottom chrome —
+	// the handlers run.
+	const cx, cy = 640.0, 300.0
 	if g.overUI(cx, cy) {
 		t.Fatalf("overUI(%v, %v) = true on empty space", cx, cy)
 	}

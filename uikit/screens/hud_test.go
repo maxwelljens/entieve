@@ -1,14 +1,14 @@
 package screens
 
 import (
-	"github.com/entieve/entieve/uikit/theme"
 	"image"
-	"image/color"
-	"math"
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/hulls"
+	"github.com/entieve/entieve/uikit/theme"
 )
 
 // TestHudConstruction checks the panel builds and Sync fills it from the
@@ -19,12 +19,12 @@ func TestHudConstruction(t *testing.T) {
 	if h.Container() == nil {
 		t.Fatal("Hud.Container() is nil")
 	}
-	if h.shieldLbl.Label != "" {
-		t.Errorf("shield label before Sync = %q, want empty", h.shieldLbl.Label)
+	if h.hp[0].label != "" {
+		t.Errorf("shield value before Sync = %q, want empty", h.hp[0].label)
 	}
 	h.Sync()
-	if h.shieldLbl.Label == "" {
-		t.Error("Sync did not populate the shield label")
+	if h.hp[0].label == "" {
+		t.Error("Sync did not populate the shield value")
 	}
 }
 
@@ -37,9 +37,9 @@ func TestHudSyncReadouts(t *testing.T) {
 	// showcase start: sloop 500/500 shield, 500/500 armor, 600/600
 	// structure, cap 1800/1800 GJ, wallet 10,000,000.00 €, speed 0.
 	for _, c := range []struct{ name, got, want string }{
-		{"shield", h.shieldLbl.Label, "Shield 500/500"},
-		{"armor", h.armorLbl.Label, "Armor 500/500"},
-		{"structure", h.structLbl.Label, "Structure 600/600"},
+		{"shield", h.hp[0].label, "500 / 500"},
+		{"armor", h.hp[1].label, "500 / 500"},
+		{"structure", h.hp[2].label, "600 / 600"},
 		{"speed", h.speedLbl.Label, theme.FormatSpeed(0)},
 		{"time", h.timeLbl.Label, "×1 time"},
 		{"wallet", h.walletLbl.Label, "10,000,000.00 €"},
@@ -103,41 +103,99 @@ func TestHudSyncReadouts(t *testing.T) {
 	}
 }
 
-// TestHudRingRedrawsOnDamage pins the arc image to the damage state: the
-// ring repaints when a layer fraction moves and stays untouched otherwise.
-func TestHudRingRedrawsOnDamage(t *testing.T) {
+// TestHudStatusOnDamage pins the health bars, the inside values and the
+// hull portrait: bars deplete with the layer fractions, the portrait
+// repaints only when the hull changes and is the fitted hull's raster.
+func TestHudStatusOnDamage(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	h := NewHud(env)
 	h.Sync()
-	if h.ringFrac != [3]float64{1, 1, 1} {
-		t.Fatalf("ring fractions = %v, want all full", h.ringFrac)
-	}
-	if h.redraws != 1 {
-		t.Fatalf("first Sync repainted %d times, want 1", h.redraws)
-	}
-	if b := h.ring.Bounds(); b.Dx() != hudRingSize || b.Dy() != hudRingSize {
-		t.Fatalf("ring image %v, want %dx%d", b, hudRingSize, hudRingSize)
-	}
-
-	h.Sync() // nothing changed → no repaint
-	if h.redraws != 1 {
-		t.Errorf("idle Sync repainted the ring (%d)", h.redraws)
-	}
-
 	sh, ok := env.Sim.Ships.Get(env.Sim.Player())
 	if !ok {
 		t.Fatal("player has no ship")
 	}
+	if h.hp[0].frac != 1 || h.hp[1].frac != 1 || h.hp[2].frac != 1 {
+		t.Fatalf("full health fractions = %v, want all full", h.hp)
+	}
+	if h.hpDraws != 1 {
+		t.Fatalf("first Sync repainted the health bars %d times, want 1", h.hpDraws)
+	}
+	if h.portraitDraws != 1 || h.portraitHull != sh.Hull {
+		t.Fatalf("portrait draws=%d hull=%q, want one paint of %q",
+			h.portraitDraws, h.portraitHull, sh.Hull)
+	}
+	if !hulls.Has(sh.Hull) {
+		t.Errorf("hulls.Has(%q) = false for the fitted hull", sh.Hull)
+	}
+	if b := h.portrait.Bounds(); b.Dx() != hudPortrait || b.Dy() != hudPortrait {
+		t.Fatalf("portrait image %v, want %dx%d", b, hudPortrait, hudPortrait)
+	}
+
+	h.Sync() // nothing changed → no portrait repaint
+	if h.portraitDraws != 1 {
+		t.Errorf("idle Sync repainted the portrait (%d)", h.portraitDraws)
+	}
+
 	sh.Shield = 125 // 25 %
 	h.Sync()
-	if h.ringFrac[0] != 0.25 {
-		t.Errorf("shield fraction = %v, want 0.25", h.ringFrac[0])
+	if h.hp[0].frac != 0.25 || h.hpDraws != 2 {
+		t.Errorf("shield bar = %v (draws %d), want 0.25 / 2", h.hp[0].frac, h.hpDraws)
 	}
-	if h.redraws != 2 {
-		t.Errorf("damage repainted %d times, want 2", h.redraws)
+	if h.hp[0].label != "125 / 500" {
+		t.Errorf("shield value = %q", h.hp[0].label)
 	}
-	if h.shieldLbl.Label != "Shield 125/500" {
-		t.Errorf("shield label = %q", h.shieldLbl.Label)
+	if h.hp[1].label != "500 / 500" || h.hp[2].label != "600 / 600" {
+		t.Errorf("armor/structure values = %q/%q, want untouched", h.hp[1].label, h.hp[2].label)
+	}
+	h.Sync()
+	if h.hpDraws != 2 {
+		t.Errorf("idle Sync repainted the health bars (%d)", h.hpDraws)
+	}
+
+	// A hull change repaints the portrait (the art follows the hull).
+	sh.Hull = "ship-other"
+	h.Sync()
+	if h.portraitDraws != 2 || h.portraitHull != "ship-other" {
+		t.Errorf("hull change draws=%d hull=%q, want 2 / ship-other",
+			h.portraitDraws, h.portraitHull)
+	}
+}
+
+// TestHudVelocityWedge pins the wedge fraction: current / base max speed
+// (a stable top), clamped, zero when max is unknown.
+func TestHudVelocityWedge(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	h := NewHud(env)
+	h.Sync()
+	if h.wedgeFrac != 0 || h.wedgeDraws != 1 {
+		t.Fatalf("at-rest wedge = %v (draws %d), want 0 / one paint", h.wedgeFrac, h.wedgeDraws)
+	}
+	m, ok := env.Sim.Motions.Get(env.Sim.Player())
+	if !ok {
+		t.Fatal("player has no motion")
+	}
+	m.MaxSpeed = 400
+	m.Vel = core.V(100, 0)
+	h.Sync()
+	if h.wedgeFrac != 0.25 || h.wedgeDraws != 2 {
+		t.Errorf("wedge = %v (draws %d), want 0.25 / 2", h.wedgeFrac, h.wedgeDraws)
+	}
+	if h.speedLbl.Label != theme.FormatSpeed(100) {
+		t.Errorf("speed = %q, want %q", h.speedLbl.Label, theme.FormatSpeed(100))
+	}
+	h.Sync()
+	if h.wedgeDraws != 2 {
+		t.Errorf("idle Sync repainted the wedge (%d)", h.wedgeDraws)
+	}
+	m.Vel = core.V(10_000, 0) // clamped to full
+	h.Sync()
+	if h.wedgeFrac != 1 {
+		t.Errorf("over-speed wedge = %v, want 1", h.wedgeFrac)
+	}
+	m.MaxSpeed = 0
+	h.Sync()
+	if h.wedgeFrac != 0 {
+		t.Errorf("unknown max speed wedge = %v, want 0", h.wedgeFrac)
 	}
 }
 
@@ -257,12 +315,14 @@ func TestHudTargetBoxes(t *testing.T) {
 	}
 }
 
-// TestHudDrawSmoke draws the HUD at both design sizes inside an interface
-// root and checks the anchor contract: bar bottom-center, target row
-// top-center.
+// TestHudDrawSmoke draws the HUD + rack at both design sizes inside an
+// interface root and checks the anchor contract: one bottom-center pair
+// (status left, rack right, one baseline), the strip above the status, and
+// the target row top-center. At 1280 the pair clears the log's left pocket.
 func TestHudDrawSmoke(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	h := NewHud(env)
+	h.MountRack(NewRack(env).Container())
 	c := newChromeUI(env)
 	c.AddPanel(h.Container(), h)
 	c.Frame(t, 1280, 720)
@@ -282,12 +342,27 @@ func TestHudDrawSmoke(t *testing.T) {
 	tg.Locks = []sim.Lock{{Target: target.Entity, Progress: 1}}
 	c.Frame(t, 1280, 720)
 
-	bar := h.bar.GetWidget().Rect
-	if bar.Max.Y < 709 || bar.Max.Y > 711 {
-		t.Errorf("bar bottom = %d, want 710 (bottom-centred)", bar.Max.Y)
+	pair := h.pair.GetWidget().Rect
+	status := h.status.GetWidget().Rect
+	strip := h.strip.GetWidget().Rect
+	rack := h.pair.Children()[1].GetWidget().Rect
+	if pair.Max.Y < 709 || pair.Max.Y > 711 {
+		t.Errorf("pair bottom = %d, want 710 (bottom-centred)", pair.Max.Y)
 	}
-	if want := (1280 - bar.Dx()) / 2; bar.Min.X < want-1 || bar.Min.X > want+1 {
-		t.Errorf("bar x = %d, want %d (centred)", bar.Min.X, want)
+	if want := (1280 - pair.Dx()) / 2; pair.Min.X < want-1 || pair.Min.X > want+1 {
+		t.Errorf("pair x = %d, want %d (centred)", pair.Min.X, want)
+	}
+	if pair.Min.X <= 361 {
+		t.Errorf("pair left = %d, want clear of the log pocket (right edge 361)", pair.Min.X)
+	}
+	if status.Max.Y != pair.Max.Y {
+		t.Errorf("status bottom = %d, want the pair baseline %d", status.Max.Y, pair.Max.Y)
+	}
+	if rack.Max.Y != pair.Max.Y || rack.Min.X != status.Max.X+theme.Px(hudPairGap) {
+		t.Errorf("rack %v, want bottom-aligned right of the status %v", rack, status)
+	}
+	if strip.Max.Y > status.Min.Y || strip.Dx() != status.Dx() || strip.Min.X != status.Min.X {
+		t.Errorf("strip %v, want same width immediately above the status %v", strip, status)
 	}
 	row := h.targetRow.GetWidget().Rect
 	if row.Min.Y < 9 || row.Min.Y > 11 {
@@ -404,57 +479,5 @@ func TestBarFill(t *testing.T) {
 	cardBar := image.Rect(4, 46, 128, 54)
 	if got := barFill(cardBar, 0.25); got != image.Rect(4, 46, 35, 54) {
 		t.Errorf("barFill(card, 0.25) = %v, want (4,46)-(35,54)", got)
-	}
-}
-
-// TestRingSweepAndTicks pins the ring math: sweep at 0/25/50/100 % is
-// 0/quarter/half/full, ticks sit at the quarter marks, and the depleted
-// track dims in RGB (never alpha).
-func TestRingSweepAndTicks(t *testing.T) {
-	for _, c := range []struct {
-		frac float64
-		want float64
-	}{
-		{0, 0},
-		{0.25, math.Pi / 2},
-		{0.5, math.Pi},
-		{1, 2 * math.Pi},
-		{1.7, 2 * math.Pi}, // clamped
-		{-3, 0},            // clamped
-	} {
-		if got := ringSweep(c.frac); got != c.want {
-			t.Errorf("ringSweep(%v) = %v, want %v", c.frac, got, c.want)
-		}
-	}
-	ticks := ringTicks()
-	want := [3]float64{math.Pi / 2, math.Pi, ringSweep(0.75)}
-	for i := range want {
-		if ticks[i] != want[i] {
-			t.Errorf("ringTicks()[%d] = %v, want %v", i, ticks[i], want[i])
-		}
-	}
-	for i := 1; i < len(ticks); i++ {
-		if d := ticks[i] - ticks[i-1]; math.Abs(d-math.Pi/2) > 1e-12 {
-			t.Errorf("tick spacing %d = %v, want π/2", i, d)
-		}
-	}
-
-	// The dim track: layer color scaled to 25 % in RGB at full alpha.
-	for _, c := range []struct {
-		name string
-		in   color.RGBA
-		want color.RGBA
-	}{
-		{"shield", color.RGBA{111, 168, 255, 255}, color.RGBA{27, 42, 63, 255}},
-		{"armor", color.RGBA{224, 163, 60, 255}, color.RGBA{56, 40, 15, 255}},
-		{"hull", color.RGBA{201, 206, 214, 255}, color.RGBA{50, 51, 53, 255}},
-	} {
-		got := ringTrackColor(c.in)
-		if got != c.want {
-			t.Errorf("ringTrackColor(%s) = %v, want %v", c.name, got, c.want)
-		}
-		if got.A != 255 {
-			t.Errorf("ringTrackColor(%s) alpha = %d, want 255 (dim in RGB, not alpha)", c.name, got.A)
-		}
 	}
 }
