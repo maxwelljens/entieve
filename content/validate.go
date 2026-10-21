@@ -63,15 +63,6 @@ var (
 	}
 )
 
-// retiredIDs are content ids that must never return: the shell-weapons
-// rename replaced the laser turrets and their charge ammunition
-// (docs/CONTENT_AUTHORING.md — Weapons and shells). Saves carrying them are
-// remapped at restore (sim/save.go migrateLegacyIDs).
-var retiredIDs = map[string]bool{
-	"charge-emp": true, "charge-fusion": true, "charge-ap": true, "charge-plutonium": true,
-	"mod-emp-turret": true, "mod-rail-turret": true,
-}
-
 type validator struct {
 	c    *Content
 	errs []string
@@ -130,7 +121,7 @@ func (v *validator) items() {
 			continue
 		}
 		ctx := "items/" + string(id)
-		if retiredIDs[string(id)] {
+		if RetiredIDs[string(id)] {
 			v.addf("%s: id is retired (replaced in the shell-weapons rename)", ctx)
 		}
 		if it.Name == "" {
@@ -269,7 +260,7 @@ func (v *validator) modules() {
 			continue
 		}
 		ctx := "modules/" + string(id)
-		if retiredIDs[string(id)] {
+		if RetiredIDs[string(id)] {
 			v.addf("%s: id is retired (replaced in the shell-weapons rename)", ctx)
 		}
 		if m.Name == "" {

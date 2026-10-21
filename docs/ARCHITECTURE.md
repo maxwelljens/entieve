@@ -573,6 +573,16 @@ non-serializable state instead of fingerprinting partial state).
 `sim/save_completeness_test.go` classifies every `Sim` field as
 save-carried / derived / per-Step transient / documented exception and
 fails on unclassified additions.
+Saves written before a content-id rename are remapped at restore:
+`sim.walkContentIDs` reflects over the `Save` type graph (every
+`content.ItemID` / `ModuleID` / `ShipID` / `RecipeID`, through slices,
+arrays, map values and nested structs) and applies the one registry
+(`content.LegacyIDs`), which is also what `content/validate.go` reads to
+reject retired ids — one list, two consumers. The schema stays 2 (an id
+remap is not a state change); `sim/save_migration_test.go`'s
+`TestWalkContentIDsCoversEveryField` materializes the whole type graph and
+fails on any id field the walk cannot reach, so a new id-bearing field is
+migrated without a second hand-written list.
 
 ### Turret formula (EVE-faithful)
 

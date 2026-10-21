@@ -1,6 +1,9 @@
 package sim
 
 import (
+	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/entieve/entieve/content"
@@ -13,9 +16,9 @@ import (
 // ---------------------------------------------------------------------------
 
 // legacyOf maps a current id back to the retired id it replaced (the inverse
-// of the production tables, so the test fixtures cannot drift from them).
+// of the registry, so the test fixtures cannot drift from it).
 func legacyOfItem(id content.ItemID) content.ItemID {
-	for old, cur := range legacyItemIDs {
+	for old, cur := range content.LegacyIDs.Items {
 		if cur == id {
 			return old
 		}
@@ -24,7 +27,7 @@ func legacyOfItem(id content.ItemID) content.ItemID {
 }
 
 func legacyOfModule(id content.ModuleID) content.ModuleID {
-	for old, cur := range legacyModuleIDs {
+	for old, cur := range content.LegacyIDs.Modules {
 		if cur == id {
 			return old
 		}
@@ -63,9 +66,14 @@ func TestMigrateLegacyIDsEveryField(t *testing.T) {
 				Low:    []content.ModuleID{legacyOfModule("mod-autocannon-s")},
 				HighRT: []ModuleRuntime{{Def: legacyOfModule("mod-artillery-s"), Active: true}},
 			},
-			Wreck:   &Wreck{Loot: []content.CargoStack{old("ammo-plutonium-s")}},
-			Traffic: &Traffic{Item: legacyOfItem("ammo-fusion-s")},
+			// Ore is an ItemID, so it rides the same registry as cargo.
+			Asteroid: &Asteroid{Ore: legacyOfItem("ammo-emp-s")},
+			Wreck:    &Wreck{Loot: []content.CargoStack{old("ammo-plutonium-s")}},
+			Traffic:  &Traffic{Item: legacyOfItem("ammo-fusion-s")},
 		}},
+		// Belt state carries its own ore per rock.
+		Belts: []BeltState{{System: "sys-a", Cel: "cel-belt-a",
+			Rocks: []BeltRock{{Ore: legacyOfItem("ammo-ap-s")}}}},
 		Jobs: []Job{{ID: 1, Station: "cel-station-a", Recipe: "rec-charge-emp", Runs: 1}},
 		Agents: []SavedAgent{{
 			ID:        "agent-1",
@@ -73,7 +81,7 @@ func TestMigrateLegacyIDsEveryField(t *testing.T) {
 			Beliefs:   []SavedAgentVal{{Item: legacyOfItem("ammo-emp-s"), Val: 5}},
 			Wishes:    []HaulWish{{Owner: "agent-1", Item: legacyOfItem("ammo-ap-s")}},
 		}},
-		TrafficJourneys: []TrafficJourney{{Item: legacyOfItem("ammo-fusion-s")}},
+		TrafficJourneys: []TrafficJourney{{Item: legacyOfItem("ammo-fusion-s"), Hull: "ship-sloop"}},
 	}
 	migrateLegacyIDs(save)
 
@@ -100,6 +108,12 @@ func TestMigrateLegacyIDsEveryField(t *testing.T) {
 	if se.Wreck.Loot[0].Item != "ammo-plutonium-s" {
 		t.Errorf("wreck loot = %+v, want ammo-plutonium-s", se.Wreck.Loot)
 	}
+	if se.Asteroid.Ore != "ammo-emp-s" {
+		t.Errorf("asteroid ore = %s, want ammo-emp-s", se.Asteroid.Ore)
+	}
+	if save.Belts[0].Rocks[0].Ore != "ammo-ap-s" {
+		t.Errorf("belt rock ore = %s, want ammo-ap-s", save.Belts[0].Rocks[0].Ore)
+	}
 	if se.Traffic.Item != "ammo-fusion-s" {
 		t.Errorf("convoy shipment = %s, want ammo-fusion-s", se.Traffic.Item)
 	}
@@ -112,6 +126,11 @@ func TestMigrateLegacyIDsEveryField(t *testing.T) {
 	}
 	if save.TrafficJourneys[0].Item != "ammo-fusion-s" {
 		t.Errorf("journey item = %s, want ammo-fusion-s", save.TrafficJourneys[0].Item)
+	}
+	// No hull has been renamed, so a ship id passes through verbatim — the
+	// walk covers ShipID regardless (TestWalkContentIDsCoversEveryField).
+	if save.TrafficJourneys[0].Hull != "ship-sloop" {
+		t.Errorf("journey hull = %s, want ship-sloop (no ship id is retired)", save.TrafficJourneys[0].Hull)
 	}
 
 	// Idempotent: the mapping is one-way and current ids are not keys.
@@ -196,5 +215,160 @@ func TestRestoreMigratesLegacySave(t *testing.T) {
 	stepN(twin, 30)
 	if s.Hash() != twin.Hash() {
 		t.Fatal("twin runs diverged after restoring a legacy save")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// The walker is the migration: every id-bearing field is found by reflection,
+// not by a second hand-written list.
+// ---------------------------------------------------------------------------
+
+// walkCanary marks every content id in a materialized Save until the walk
+// rewrites it.
+const walkCanary = "id-walk-canary"
+
+// materialize builds a value of t with every container populated — pointers
+// allocated, one element in each slice/array/map — and every content id set to
+// walkCanary, so the id walk meets a value at every place the Save type graph
+// can carry one.
+func materialize(rt reflect.Type) reflect.Value {
+	v := reflect.New(rt).Elem()
+	switch {
+	case contentIDTypes[rt]:
+		v.SetString(walkCanary)
+	case rt.Kind() == reflect.Pointer:
+		p := reflect.New(rt.Elem())
+		p.Elem().Set(materialize(rt.Elem()))
+		v.Set(p)
+	case rt.Kind() == reflect.Struct:
+		for i := 0; i < rt.NumField(); i++ {
+			if f := v.Field(i); f.CanSet() { // exported only: Save is a JSON type
+				f.Set(materialize(rt.Field(i).Type))
+			}
+		}
+	case rt.Kind() == reflect.Slice:
+		s := reflect.MakeSlice(rt, 1, 1)
+		s.Index(0).Set(materialize(rt.Elem()))
+		v.Set(s)
+	case rt.Kind() == reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			v.Index(i).Set(materialize(rt.Elem()))
+		}
+	case rt.Kind() == reflect.Map:
+		m := reflect.MakeMap(rt)
+		m.SetMapIndex(reflect.New(rt.Key()).Elem(), materialize(rt.Elem()))
+		v.Set(m)
+	}
+	return v
+}
+
+// leftoverIDs lists the paths still holding walkCanary: every place the type
+// graph carries an id that walkContentIDs never visited.
+func leftoverIDs(v reflect.Value, path string, out []string) []string {
+	switch v.Kind() {
+	case reflect.Pointer:
+		if !v.IsNil() {
+			out = leftoverIDs(v.Elem(), path, out)
+		}
+	case reflect.Struct:
+		for i := 0; i < v.NumField(); i++ {
+			out = leftoverIDs(v.Field(i), path+"."+v.Type().Field(i).Name, out)
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			out = leftoverIDs(v.Index(i), fmt.Sprintf("%s[%d]", path, i), out)
+		}
+	case reflect.Map:
+		for _, k := range v.MapKeys() {
+			out = leftoverIDs(v.MapIndex(k), fmt.Sprintf("%s[%v]", path, k), out)
+		}
+	case reflect.String:
+		if contentIDTypes[v.Type()] && v.String() == walkCanary {
+			out = append(out, path)
+		}
+	}
+	return out
+}
+
+// TestWalkContentIDsCoversEveryField is what keeps the walk deep: a
+// materialized Save carries walkCanary in every content id its type graph can
+// reach, the walk must rewrite every one of them, and any leftover names the
+// id-bearing field the walker cannot see. A new id field anywhere in Save
+// fails here instead of quietly escaping restore migration.
+func TestWalkContentIDsCoversEveryField(t *testing.T) {
+	save := materialize(reflect.TypeOf(Save{})).Addr().Interface().(*Save)
+	planted := len(leftoverIDs(reflect.ValueOf(save).Elem(), "Save", nil))
+	if planted == 0 {
+		t.Fatal("fixture planted no ids")
+	}
+	visited := 0
+	walkContentIDs(save, func(id reflect.Value) {
+		if id.String() == walkCanary {
+			id.SetString("walked")
+			visited++
+		}
+	})
+	if left := leftoverIDs(reflect.ValueOf(save).Elem(), "Save", nil); len(left) > 0 {
+		t.Errorf("walkContentIDs missed %d id field(s): %s", len(left), strings.Join(left, ", "))
+	}
+	if visited != planted {
+		t.Errorf("walk visited %d of %d planted ids", visited, planted)
+	}
+}
+
+// TestRestoreMigratesOreAndHullIDs pins the three id fields the hand-written
+// walk never visited: an asteroid's ore, a belt rock's ore and a parked
+// journey's hull. Ore fields are ItemID, so a retired item id stored there now
+// migrates; hulls have no retired ids yet and ride through verbatim.
+func TestRestoreMigratesOreAndHullIDs(t *testing.T) {
+	s := newTestSim(t)
+	save, err := s.Snapshot()
+	if err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
+	legacyOre := legacyOfItem("ammo-emp-s") // "charge-emp": a retired item id
+	rocks := 0
+	for i := range save.Entities {
+		if a := save.Entities[i].Asteroid; a != nil {
+			a.Ore = legacyOre
+			rocks++
+		}
+	}
+	if rocks == 0 {
+		t.Fatal("fixture: no asteroid entities on the grid")
+	}
+	if len(save.Belts) == 0 || len(save.Belts[0].Rocks) == 0 {
+		t.Fatal("fixture: no belt state")
+	}
+	save.Belts[0].Rocks[0].Ore = legacyOre
+	save.TrafficJourneys = []TrafficJourney{{System: save.System, Item: legacyOre, Qty: 1, Hull: "ship-sloop"}}
+
+	restored := newTestSim(t)
+	if err := restored.Restore(save); err != nil {
+		t.Fatalf("restore legacy ore save: %v", err)
+	}
+	got, err := restored.Snapshot()
+	if err != nil {
+		t.Fatalf("re-snapshot: %v", err)
+	}
+	mapped := 0
+	for i := range got.Entities {
+		if a := got.Entities[i].Asteroid; a != nil {
+			if a.Ore == legacyOre {
+				t.Errorf("entity %d asteroid ore still %s", got.Entities[i].ID, a.Ore)
+			}
+			if a.Ore == "ammo-emp-s" {
+				mapped++
+			}
+		}
+	}
+	if mapped != rocks {
+		t.Errorf("migrated %d of %d asteroid ores", mapped, rocks)
+	}
+	if ore := got.Belts[0].Rocks[0].Ore; ore != "ammo-emp-s" {
+		t.Errorf("belt rock ore = %s, want ammo-emp-s", ore)
+	}
+	if j := got.TrafficJourneys[0]; j.Item != "ammo-emp-s" || j.Hull != "ship-sloop" {
+		t.Errorf("journey = %+v, want the migrated item and the hull verbatim", j)
 	}
 }
