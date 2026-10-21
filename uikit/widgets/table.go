@@ -416,6 +416,7 @@ type Table struct {
 	sortAsc   bool
 	sortFn    func(key string, asc bool, rows []TableRow)
 	onSelect  func(row TableRow)
+	onDouble  func(row TableRow) // double-click override (nil = Show Info)
 
 	selIdx  int // selected row index, -1 = none
 	selData any // Data of the selected row (identity across rebuilds)
@@ -611,6 +612,11 @@ func (t *Table) SelectData(v any) {
 }
 
 // OnSelect registers the row-click callback (fires on every click).
+// OnDouble replaces the table's Show Info double-click with fn: the second
+// click on the same row runs fn instead of the Show Info gesture (the
+// fitting hangar's Fit verb). The row menu still offers Show Info.
+func (t *Table) OnDouble(fn func(row TableRow)) { t.onDouble = fn }
+
 func (t *Table) OnSelect(fn func(row TableRow)) { t.onSelect = fn }
 
 // Selected returns the currently selected row in display order and
@@ -1055,6 +1061,10 @@ func (t *Table) rowClicked(i int) {
 	}
 	if t.onSelect != nil {
 		t.onSelect(row)
+	}
+	if t.onDouble != nil {
+		t.dbl.Gesture(t.cv, row.Spec, func() { t.onDouble(row) })
+		return
 	}
 	t.dbl.Click(t.cv, t.as, row.Spec)
 }

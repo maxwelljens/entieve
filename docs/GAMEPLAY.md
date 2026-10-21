@@ -60,11 +60,11 @@ in-game help window renders.
 | Left drag | On any window **edge or corner** (≈8 px grip): resize from all four sides — the opposite edge stays fixed, the window never shrinks past its minimum |
 | Left click | On an overview column header: sort (click again flips direction) |
 | `Ctrl` + left click | Lock target under cursor |
-| Left double-click | Show Info — open the item's details window directly, anywhere the item appears (rack, fitting, market, inventory, overview, contract rows); on empty space, fly straight toward that point |
+| Left double-click | Show Info — open the item's details window directly, anywhere the item appears (rack, fitting slots and hangar modules, market, inventory, overview, contract rows); on a **hangar module** it fits that module into the first empty slot of its class; on empty space, fly straight toward that point |
 | Right click | Orbit target under cursor (2,500 m) — in the world; unchanged |
 | Right click | On an item anywhere it appears: flat context menu — **Show Info** first (always bold), then the surface's actions (grayed-but-visible when impossible); on a weapon cell in the module rack: Show Info / Show Info — `<charge>` / ─ / **Cycle charge** |
 | Middle drag | Pan camera |
-| Wheel | Zoom (2×10⁻⁹ – 4×: the whole system down to a grid); over a table (overview, market, inventory, fitting), scroll it — wheel up moves toward the top |
+| Wheel | Zoom (2×10⁻⁹ – 4×: the whole system down to a grid); over a table (overview, market, inventory, fitting, hangar), scroll it — wheel up moves toward the top |
 
 Mouse handling is fully context-aware: a click, drag or wheel over *any*
 window or the HUD chrome never reaches the world behind it.
@@ -254,7 +254,8 @@ window's own width and re-wrapped whenever the window is resized narrower
 or wider; long pages scroll inside the body instead of pushing the rows
 out of view. The menus per
 surface: rack cells — Show Info (module) / Show Info — `<charge>` / ─ /
-**Cycle charge**; fitting rows — Show Info / Fit / Unequip; market rows —
+**Cycle charge**; fitting slot tiles and hangar rows — Show Info / Fit /
+Unequip; market rows —
 Show Info / Buy / Sell (grayed while undocked); inventory rows — Show
 Info; overview rows — Show Info / Warp to / Orbit / Approach / Lock target
 (the entity's hull or caste info plus the usual commands); contract board
@@ -265,10 +266,28 @@ Show Info.
 
 **Slots.** Hulls have **high**, **mid** and **low** slots. High slots hold
 weapons and mining lasers (toggled with `F1…F8`). Mid slots hold propulsion,
-ewar and capacitor modules. Low slots hold tank (armor/resist) modules. The
-fitting window (`F`) shows the hull, the slots and the derived stats; its
-**Hangar** section lets you **fit** modules from the hangar into their first
-free slot and **unfit** them back, and **assemble** stored hulls.
+ewar and capacitor modules. Low slots hold tank (armor/resist) modules.
+
+**The fitting window** (`F`) is laid out like EVE's: the hull's portrait,
+name, class · maker and corporation emblem head the left column, with the
+derived stats beneath it — shield / armor / structure maxima, capacitor
+capacity and recharge, speed / align / signature, warp / targets / scan,
+cargo — as dense label/value rows, plus a per-type **EHP** row (the three
+layer maxima over the penetrating share each of the four resists leaves).
+The **slot grid** sits right of it: one 50×40 tile per hull slot, the
+module's class glyph and short name on the fitted ones, a dashed
+placeholder where a slot is empty, so the grid always shows the hull's
+shape. Click a tile to select it, right-click for **Show Info** /
+**Fit module** / **Unefit slot**, double-click a fitted tile for its
+details. Under the grid sits the **Hangar**: **fit** modules from it into
+their first free slot (double-click a module does exactly that) and
+**unfit** them back, and **assemble** stored hulls. A **Fitting summary**
+strip closes the window: the fit's **Total DPS** (each weapon's loaded
+shell over its fire period, following the ammo preference and cargo
+order the sim uses), the **Cap drain** of the running modules against the
+**Cap recharge** curve's peak, and the verdict — **Cap stable** or
+**Cap unstable (~Ns)** — over a drain-vs-recharge bar. The slots/hangar
+seam still drags, and the arrangement persists.
 
 **Weapons and shells.** Projectile guns come in two families:
 **autocannons** (fast cycle, high tracking, short optimal range) and

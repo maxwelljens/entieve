@@ -842,7 +842,9 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
   Selected Item (actions: approach/orbit/warp/lock/dock/jump/loot), HUD
   (shield/armor/structure arcs, capacitor bar, speed, targeting list),
   Module rack (high/mid/low rows, F1–F8 activates high, deactivated state
-  shown), Inventory (cargo + ore hold), Fitting (hull slots + stats),
+  shown), Inventory (cargo + ore hold), Fitting (hull identity + stats
+  with per-type EHP, the slot tile grid, the DPS/capacitor summary and the
+  hangar),
   Manufacturing (jobs, fees, three global slots, craft levels and material
   counts at a docked `industry` station), Refinery (whole 100-ore batch
   ore→mineral yield preview at a `refine` station), Station services (repair/market/refine/

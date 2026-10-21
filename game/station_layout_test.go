@@ -22,12 +22,13 @@ const stationBoardWorstCaseH = 426
 // serviceDefaults are the three service windows' per-type defaults (their
 // Screen rows), in design units == px at the identity scale: the market's
 // square (546×546, the largest side that stays right of the rail gutter
-// and fits the 1024×700 minimum) and the inventory/fitting rects beside
-// each other below it.
+// and fits the 1024×700 minimum), the inventory rect below it and the
+// fitting window's 644×682 column at the screen's top-right (the EVE
+// fitting shape needs the room; it clears the log pocket at every size).
 var serviceDefaults = map[panelID]image.Rectangle{
 	pMarket:    image.Rect(396, 8, 942, 554),
 	pInventory: image.Rect(396, 256, 701, 690),
-	pFitting:   image.Rect(709, 256, 1014, 690),
+	pFitting:   image.Rect(370, 8, 1014, 690),
 }
 
 // TestServiceDefaultsAreDeclared pins the spec rows themselves: each

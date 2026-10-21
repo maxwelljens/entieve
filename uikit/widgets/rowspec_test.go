@@ -130,3 +130,44 @@ func TestRowSpecMenuAtScale(t *testing.T) {
 		}
 	}
 }
+
+// TestRowDoubleGesture pins the override half of the double-click rule: a
+// surface whose repeat click means its own verb (the fitting hangar's Fit)
+// fires that verb, never Show Info, and a click on a different ref only
+// re-arms the timer.
+func TestRowDoubleGesture(t *testing.T) {
+	env, _ := newTestEnv(t)
+	var intents []Intent
+	var d RowDouble
+	fired := 0
+	mod, ore := ItemRef("ammo-emp-s"), ItemRef("ore-sterngrit")
+	if !InfoRefExists(env, mod) || !InfoRefExists(env, ore) {
+		t.Fatal("fixture: refs missing from the showcase content")
+	}
+
+	// First click: arms only.
+	if d.Gesture(env, RowSpec{Ref: &mod}, func() { fired++ }) {
+		t.Fatal("a lone click completed the gesture")
+	}
+	if fired != 0 || len(intents) != 0 {
+		t.Fatalf("first click fired %d verbs / %d intents, want 0", fired, len(intents))
+	}
+	// A different ref re-arms instead of firing.
+	if d.Gesture(env, RowSpec{Ref: &ore}, func() { fired++ }) {
+		t.Fatal("a click on another row completed the gesture")
+	}
+	if fired != 0 {
+		t.Fatalf("a different ref fired %d verbs, want 0", fired)
+	}
+	// Back on the first ref, twice: the repeat fires the surface's verb.
+	d.Gesture(env, RowSpec{Ref: &mod}, func() { fired++ })
+	if !d.Gesture(env, RowSpec{Ref: &mod}, func() { fired++ }) {
+		t.Fatal("the repeat click did not complete the gesture")
+	}
+	if fired != 1 {
+		t.Errorf("gesture fired %d verbs, want 1", fired)
+	}
+	if len(intents) != 0 {
+		t.Errorf("gesture emitted %d intents, want none (Show Info is the menu's)", len(intents))
+	}
+}
