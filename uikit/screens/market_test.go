@@ -224,13 +224,13 @@ func TestMarketOrderBookScrolls(t *testing.T) {
 	// The window's own rows are untouched: title line, stepper row
 	// (minus/readout/plus/buy/sell), then the book under them.
 	title := m.title.GetWidget().Rect
-	stepper := m.qtyBar.GetWidget().Rect
+	stepper := m.stepper.Row().GetWidget().Rect
 	table := m.tbl.Container().GetWidget().Rect
 	if !(title.Max.Y <= stepper.Min.Y && stepper.Max.Y <= table.Min.Y) {
 		t.Errorf("stacking changed: title %v, stepper %v, book %v (want stacked top to bottom)",
 			title, stepper, table)
 	}
-	for name, b := range map[string]*widget.Button{"-": m.minus, "+": m.plus, "Buy": m.buy, "Sell": m.sell} {
+	for name, b := range map[string]*widget.Button{"-": m.stepper.Minus(), "+": m.stepper.Plus(), "Buy": m.buy, "Sell": m.sell} {
 		if r := b.GetWidget().Rect; !r.In(stepper) {
 			t.Errorf("%s button %v outside the stepper row %v", name, r, stepper)
 		}
@@ -305,7 +305,7 @@ func TestMarketTitleShowsPriceAndFee(t *testing.T) {
 	}
 	// The title quotes the shown book: the selected row's own price for the
 	// item, plus the fee schedule.
-	want := "Market — " + itemLabel(env, m.sel) + " " + m.tbl.Rows[0].Cells[1] +
+	want := "Market — " + env.TradeableName(m.sel) + " " + m.tbl.Rows[0].Cells[1] +
 		" · fee " + feePct(sim.MarketBrokerFee) + "+" + feePct(sim.MarketSalesTax)
 	if m.title.Label != want {
 		t.Fatalf("title = %q, want %q", m.title.Label, want)
@@ -317,10 +317,10 @@ func TestMarketTitleShowsPriceAndFee(t *testing.T) {
 }
 
 // TestStepperReadoutFitsItsValue (Defect B regression): the qty readout
-// resizes to its current value through the row relayout — "Qty 1,000,000"
-// owns a box big enough for itself and never reaches the + button, at
-// scale 1 and 1.5 — and the stepped path (up to the ladder's 100) stays
-// overlap-free too.
+// resizes to its current value as the stepper steps — "Qty 1" grows to
+// "Qty 100" and never reaches the + button, at scale 1 and 1.5. (The
+// million-digit case lives beside the widget: widgets
+// TestQtyStepperReadoutGrows.)
 func TestStepperReadoutFitsItsValue(t *testing.T) {
 	defer theme.SetScale(1)
 	for _, sc := range []float64{1, 1.5} {
@@ -331,21 +331,14 @@ func TestStepperReadoutFitsItsValue(t *testing.T) {
 		inv.Sync()
 		uitest.PumpWindow(t, ui, inv.Sync, 1280, 720)
 
-		// doSync runs the panel Sync first (the production frame order);
-		// the white-box big-value checks skip it because Sync re-derives
-		// the readout from the clamped ladder.
-		check := func(want string, doSync bool) {
+		check := func(want string) {
 			t.Helper()
-			var sync func()
-			if doSync {
-				sync = inv.Sync
-			}
-			uitest.PumpWindow(t, ui, sync, 1280, 720)
-			lbl := inv.qtyLabel.GetWidget().Rect
-			plus := inv.plus.GetWidget().Rect
-			minus := inv.minus.GetWidget().Rect
-			if inv.qtyLabel.Label != want {
-				t.Errorf("scale %v: readout = %q, want %q", sc, inv.qtyLabel.Label, want)
+			uitest.PumpWindow(t, ui, inv.Sync, 1280, 720)
+			lbl := inv.stepper.Label().GetWidget().Rect
+			plus := inv.stepper.Plus().GetWidget().Rect
+			minus := inv.stepper.Minus().GetWidget().Rect
+			if got := inv.stepper.Label().Label; got != want {
+				t.Errorf("scale %v: readout = %q, want %q", sc, got, want)
 			}
 			// The box measures the value itself (same face, no h-padding).
 			need, _ := text.Measure(want, *env.FaceMono(theme.StepSmall), 0)
@@ -361,15 +354,10 @@ func TestStepperReadoutFitsItsValue(t *testing.T) {
 			}
 		}
 
-		// The stepped path (clamped ladder top), then the wide value the
-		// readout must grow for — setStepperValue is exactly what Sync and
-		// stepQty call, so this is the production path with a big number.
-		inv.qtyIdx = len(qtySteps) - 1
-		inv.stepQty(1)
-		check("Qty 100", true)
-		setStepperValue(inv.qtyBar, inv.qtyLabel, "Qty 1,000,000")
-		check("Qty 1,000,000", false)
-		inv.qtyIdx = 0
-		check("Qty 1", true)
+		check("Qty 1")
+		inv.stepper.Step(2) // the ladder's top, 100
+		check("Qty 100")
+		inv.stepper.Step(-2)
+		check("Qty 1")
 	}
 }

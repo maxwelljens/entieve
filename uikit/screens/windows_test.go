@@ -61,9 +61,9 @@ func TestMarketGatingAndEnqueue(t *testing.T) {
 
 	// Select the first order, step the quantity to 10 and trade.
 	clickRow(ui, m.tbl, 0)
-	uitest.FireButton(ui, m.plus)
-	if m.qty() != 10 {
-		t.Fatalf("qty = %d, want 10", m.qty())
+	uitest.FireButton(ui, m.stepper.Plus())
+	if m.stepper.Value() != 10 {
+		t.Fatalf("qty = %d, want 10", m.stepper.Value())
 	}
 	uitest.FireButton(ui, m.buy)
 	if len(*cmds) != 1 {
@@ -577,7 +577,7 @@ func TestScaleDoublesConstructionMetrics(t *testing.T) {
 	// Pump once: the buttons carry no images of their own and validate
 	// against the window's theme (an unthemed PreferredSize panics).
 	uitest.PumpWindow(t, newWindowUI(t, env1, inv1.Win()), nil, 1280, 720)
-	bar1W, _ := inv1.qtyBar.PreferredSize()
+	bar1W, _ := inv1.stepper.Row().PreferredSize()
 
 	uitest.UseScale(t, 2)
 	env, _ := newTestEnv(t)
@@ -599,8 +599,8 @@ func TestScaleDoublesConstructionMetrics(t *testing.T) {
 	if loc := inv.Win().GetContainer().GetWidget().Rect; loc != image.Rect(theme.Px(396), theme.Px(256), theme.Px(701), theme.Px(690)) {
 		t.Errorf("fallback Location at 2 = %v, want %v", loc, image.Rect(theme.Px(396), theme.Px(256), theme.Px(701), theme.Px(690)))
 	}
-	if w := inv.plus.GetWidget().MinWidth; w != 80 || inv.plus.GetWidget().MinHeight != 80 {
-		t.Errorf("stepper + MinSize at 2 = %d×%d, want 80×80 (40 design hit box)", w, inv.plus.GetWidget().MinHeight)
+	if w := inv.stepper.Plus().GetWidget().MinWidth; w != 80 || inv.stepper.Plus().GetWidget().MinHeight != 80 {
+		t.Errorf("stepper + MinSize at 2 = %d×%d, want 80×80 (40 design hit box)", w, inv.stepper.Plus().GetWidget().MinHeight)
 	}
 
 	// Title bar: pump the window — the title child is exactly Px(44).
@@ -624,7 +624,7 @@ func TestScaleDoublesConstructionMetrics(t *testing.T) {
 	// PreferredSize doubles: the stepper row's preferred width is all
 	// scaled pieces (40 px floors, gaps, measured labels). Glyph
 	// advances quantize per size, so "2×" holds to a couple of percent.
-	bar2W, _ := inv.qtyBar.PreferredSize()
+	bar2W, _ := inv.stepper.Row().PreferredSize()
 	if math.Abs(float64(bar2W)-2*float64(bar1W)) > 0.05*float64(bar2W) {
 		t.Errorf("stepper row preferred width 1×=%d 2×=%d, want ≈2× (±5%%)", bar1W, bar2W)
 	}

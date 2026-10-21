@@ -7,6 +7,7 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 )
@@ -33,21 +34,13 @@ type Refinery struct {
 	ores   *widgets.Table
 	status *widget.Text
 
-	qtyLabel *widget.Text
-	qtyBar   *widget.Container
+	stepper *widgets.QtyStepper
 
-	minus, plus *widget.Button
-	refine      *widget.Button
+	refine *widget.Button
 
-	qtyIdx int
 	sel    refineryRow
 	hasSel bool
 }
-
-// refineBatch is the refinery's only quantity step: ore refines in whole
-// 100-ore batches (the sim refuses anything else), because the yields are
-// fractions of a unit per ore and a smaller lot floors to nothing.
-const refineBatch = 100
 
 // refineryRow is one ore table row: the ore id plus its Show Info ref.
 type refineryRow struct {
@@ -83,12 +76,9 @@ func NewRefinery(env widgets.Seams) *Refinery {
 	r.status = widget.NewText(
 		widget.TextOpts.Text("Select an ore to refine.", env.Face(theme.StepSmall), theme.Solid(p.Text)),
 	)
-	r.qtyLabel = widget.NewText(
-		widget.TextOpts.Text("Qty 1", env.FaceMono(theme.StepSmall), theme.Solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-			Position: widget.RowLayoutPositionCenter,
-		})),
-	)
+	// The ladder is the selected ore's whole batches: SetSteps in Sync
+	// re-points it as the selection and the stock move.
+	r.stepper = widgets.NewQtyStepper(env, nil)
 
 	newBtn := func(label string, clicked func()) *widget.Button {
 		return widget.NewButton(
@@ -100,17 +90,8 @@ func NewRefinery(env widgets.Seams) *Refinery {
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
 		)
 	}
-	r.minus = newBtn("-", func() { r.stepQty(-1) })
-	r.plus = newBtn("+", func() { r.stepQty(1) })
 	r.refine = newBtn("Refine", r.refineClicked)
-
-	r.qtyBar = widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
-		)),
-	)
-	r.qtyBar.AddChild(r.minus, r.qtyLabel, r.plus, r.refine)
+	r.stepper.Row().AddChild(r.refine)
 
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
@@ -121,7 +102,7 @@ func NewRefinery(env widgets.Seams) *Refinery {
 			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	body.AddChild(r.ores.Container(), r.status, r.qtyBar)
+	body.AddChild(r.ores.Container(), r.status, r.stepper.Row())
 
 	title, _ := theme.NewTitleBar(env, "Refinery", "svc_refinery")
 
@@ -194,23 +175,17 @@ func (r *Refinery) outputsText(outs []content.CargoStack) string {
 		if i > 0 {
 			s += " · "
 		}
-		s += theme.FormatInt(int64(o.Qty)) + " " + itemLabel(r.cv, o.Item)
+		s += theme.FormatInt(int64(o.Qty)) + " " + r.cv.TradeableName(o.Item)
 	}
 	return s
 }
 
 // cargoFits reports whether the outputs would fit the general hold, using
-// the sim's own volume math (cargoSpace over the general stacks).
+// the seam's hold read (the same volume math the sim's cargoSpace uses).
 func (r *Refinery) cargoFits(outs []content.CargoStack) bool {
-	cargo, ok := r.cv.Cargo(r.cv.Player())
+	used, capacity, ok := r.cv.Hold("cargo")
 	if !ok {
 		return false
-	}
-	free := cargo.Capacity
-	for _, st := range cargo.Stacks {
-		if def, ok := r.cv.Defs().Item(st.Item); ok {
-			free -= def.Volume * float64(st.Qty)
-		}
 	}
 	outVol := 0.0
 	for _, o := range outs {
@@ -218,7 +193,7 @@ func (r *Refinery) cargoFits(outs []content.CargoStack) bool {
 			outVol += def.Volume * float64(o.Qty)
 		}
 	}
-	return outVol <= free+1e-9
+	return outVol <= capacity-used+1e-9
 }
 
 // Sync refreshes the ore list, the yield preview and every gate from the
@@ -233,7 +208,7 @@ func (r *Refinery) Sync() {
 		def, _ := r.cv.Defs().Item(st.Item)
 		rows = append(rows, widgets.TableRow{
 			Cells: []string{
-				itemLabel(r.cv, st.Item),
+				r.cv.TradeableName(st.Item),
 				theme.FormatInt(int64(st.Qty)),
 				r.outputsText(refineOutputs(r.cv, def, eff)),
 			},
@@ -259,21 +234,21 @@ func (r *Refinery) Sync() {
 		r.sel = refineryRow{}
 	}
 
-	// A smaller selection can drop the stepper's cap: stay on a whole batch.
-	r.qtyIdx = min(r.qtyIdx, max(0, r.batches()-1))
-	qty := r.qty()
-	setStepperValue(r.qtyBar, r.qtyLabel, "Qty "+theme.FormatInt(int64(qty)))
+	// A smaller selection can drop the stepper's cap: the ladder is the
+	// selected ore's whole batches, so the widget clamps to a whole batch.
+	r.stepper.SetSteps(batchSteps(r.stockOf(r.sel.ore)))
+	qty := r.stepper.Value()
 	r.refine.GetWidget().Disabled = !r.refineReadyFor(r.sel)
 
 	if !r.hasSel {
 		r.status.Label = "Select an ore to refine."
-	} else if qty < refineBatch {
-		r.status.Label = "One batch needs 100 ore — you hold " +
-			theme.FormatInt(int64(r.stockOf(r.sel.ore))) + " " + itemLabel(r.cv, r.sel.ore) + "."
+	} else if qty < sim.RefineBatch {
+		r.status.Label = "One batch needs " + theme.FormatInt(int64(sim.RefineBatch)) + " ore — you hold " +
+			theme.FormatInt(int64(r.stockOf(r.sel.ore))) + " " + r.cv.TradeableName(r.sel.ore) + "."
 	} else {
 		def, _ := r.cv.Defs().Item(r.sel.ore)
 		outs := refineOutputs(r.cv, def, qty)
-		line := "Refine " + theme.FormatInt(int64(qty)) + " × " + itemLabel(r.cv, r.sel.ore) + " → "
+		line := "Refine " + theme.FormatInt(int64(qty)) + " × " + r.cv.TradeableName(r.sel.ore) + " → "
 		if text := r.outputsText(outs); text != "" {
 			line += text
 		} else {
@@ -304,7 +279,7 @@ func (r *Refinery) refineReadyFor(row refineryRow) bool {
 	if row.ore == "" || !r.refineService() {
 		return false
 	}
-	return r.qtyFor(r.stockOf(row.ore)) >= refineBatch
+	return r.qtyFor(r.stockOf(row.ore)) >= sim.RefineBatch
 }
 
 // refineService reports whether the docked station offers refine (in space
@@ -314,28 +289,30 @@ func (r *Refinery) refineService() bool {
 	return ok && slices.Contains(info.Services, "refine")
 }
 
-// stepQty moves the quantity stepper one batch (clamped to the selected
-// ore's whole batches).
-func (r *Refinery) stepQty(delta int) {
-	r.qtyIdx = min(max(r.qtyIdx+delta, 0), max(0, r.batches()-1))
-	setStepperValue(r.qtyBar, r.qtyLabel, "Qty "+theme.FormatInt(int64(r.qty())))
+// batchSteps is the stepper ladder for an ore holding stock units: one
+// rung per whole batch of 100, none below a batch.
+func batchSteps(stock int) []int {
+	n := stock / sim.RefineBatch
+	if n < 1 {
+		return nil
+	}
+	steps := make([]int, n)
+	for i := range steps {
+		steps[i] = (i + 1) * sim.RefineBatch
+	}
+	return steps
 }
 
-// batches is how many whole 100-ore batches the selected ore covers.
-func (r *Refinery) batches() int { return r.stockOf(r.sel.ore) / refineBatch }
-
-// qtyFor is the stepper's unit count for an ore holding stock units: whole
-// batches only, capped by the stepper position and that stack's stock.
+// qtyFor is the stepper's unit count for an ore holding stock units:
+// whole batches only, capped by the stepper position and that stack's
+// stock.
 func (r *Refinery) qtyFor(stock int) int {
-	n := min(r.qtyIdx+1, stock/refineBatch)
+	n := min(r.stepper.Index()+1, stock/sim.RefineBatch)
 	if n < 1 {
 		return 0
 	}
-	return n * refineBatch
+	return n * sim.RefineBatch
 }
-
-// qty is the unit count the stepper drives for the selected ore.
-func (r *Refinery) qty() int { return r.qtyFor(r.stockOf(r.sel.ore)) }
 
 // refineClicked emits Refine for the selected ore (gated even when called
 // directly, the market buttons' rule).
@@ -343,5 +320,5 @@ func (r *Refinery) refineClicked() {
 	if !r.refineReadyFor(r.sel) {
 		return
 	}
-	r.as.Do(widgets.Refine{Ore: r.sel.ore, Qty: r.qty()})
+	r.as.Do(widgets.Refine{Ore: r.sel.ore, Qty: r.stepper.Value()})
 }

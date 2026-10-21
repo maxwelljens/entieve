@@ -165,7 +165,7 @@ func (o *OrderWin) Show(item content.ItemID, side sim.OrderSide, qty int) bool {
 		qty = 1
 	}
 	o.sellQty = qty
-	o.title.Label = itemLabel(o.cv, item) + " — Order"
+	o.title.Label = o.cv.TradeableName(item) + " — Order"
 	o.setMode(side)
 	// Open unfocused: the player clicks a field to type, and until then the
 	// world hotkeys stay live (the game gates on OrderTyping).

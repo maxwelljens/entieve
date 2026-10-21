@@ -57,7 +57,7 @@ func TestRefineryWindow(t *testing.T) {
 	if r.refine.GetWidget().Disabled {
 		t.Fatal("Refine grayed at a refine station with a whole batch")
 	}
-	if got := r.qtyLabel.Label; got != "Qty 100" {
+	if got := r.stepper.Label().Label; got != "Qty 100" {
 		t.Errorf("stepper = %q, want Qty 100", got)
 	}
 	if !strings.Contains(r.status.Label, "Refine 100 × Cordite Ore → 35 Ferrite · 30 Nickel") {
@@ -66,23 +66,23 @@ func TestRefineryWindow(t *testing.T) {
 
 	// The stepper offers whole batches only, capped at the stock: 100 held
 	// stays 100.
-	uitest.FireButton(ui, r.plus)
+	uitest.FireButton(ui, r.stepper.Plus())
 	frame()
-	if got := r.qtyLabel.Label; got != "Qty 100" {
+	if got := r.stepper.Label().Label; got != "Qty 100" {
 		t.Errorf("stepper after + at 100 held = %q, want Qty 100", got)
 	}
 
 	// 250 held: the cap is 200 (two batches), never a partial 250.
 	giveItem(env.Sim, "ore-cordite", 150)
 	frame()
-	uitest.FireButton(ui, r.plus)
+	uitest.FireButton(ui, r.stepper.Plus())
 	frame()
-	if got := r.qtyLabel.Label; got != "Qty 200" {
+	if got := r.stepper.Label().Label; got != "Qty 200" {
 		t.Errorf("stepper after + at 250 held = %q, want Qty 200", got)
 	}
-	uitest.FireButton(ui, r.plus)
+	uitest.FireButton(ui, r.stepper.Plus())
 	frame()
-	if got := r.qtyLabel.Label; got != "Qty 200" {
+	if got := r.stepper.Label().Label; got != "Qty 200" {
 		t.Errorf("stepper over the cap = %q, want Qty 200", got)
 	}
 	if !strings.Contains(r.status.Label, "Refine 200 × Cordite Ore → 70 Ferrite · 60 Nickel") {
@@ -116,7 +116,7 @@ func TestRefineryWindow(t *testing.T) {
 	if !r.refine.GetWidget().Disabled {
 		t.Fatal("Refine enabled with less than one batch")
 	}
-	if got := r.qtyLabel.Label; got != "Qty 0" {
+	if got := r.stepper.Label().Label; got != "Qty 0" {
 		t.Errorf("stepper = %q, want Qty 0 below one batch", got)
 	}
 	if !strings.Contains(r.status.Label, "One batch needs 100 ore — you hold 50 Cordite Ore.") {
@@ -176,8 +176,8 @@ func TestRefinePreviewWholeBatch(t *testing.T) {
 		if !ok {
 			t.Fatalf("missing %s", ore)
 		}
-		if got := r.outputsText(refineOutputs(env, def, refineBatch)); got != w {
-			t.Errorf("%s at %d = %q, want %q", ore, refineBatch, got, w)
+		if got := r.outputsText(refineOutputs(env, def, sim.RefineBatch)); got != w {
+			t.Errorf("%s at %d = %q, want %q", ore, sim.RefineBatch, got, w)
 		}
 	}
 }

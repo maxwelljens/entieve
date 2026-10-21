@@ -4,7 +4,6 @@ import (
 	"image"
 	"image/color"
 	"math"
-	"strconv"
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
@@ -383,7 +382,7 @@ func (k *Kit) syncSelected() {
 	sp.loot.GetWidget().Disabled = noSel || !info.CanLoot
 	sp.mine.GetWidget().Disabled = noSel || !info.CanMine
 	if tooClose {
-		reason := "Target within warp minimum range (" + kmLabel(sim.WarpMinRange) + ")"
+		reason := "Target within warp minimum range (" + sim.KmLabel(sim.WarpMinRange) + ")"
 		if sp.warpTipKey != reason {
 			sp.warpTipKey = reason
 			sp.warpTipView.SetModel(widgets.TooltipModel{
@@ -396,22 +395,6 @@ func (k *Kit) syncSelected() {
 	} else {
 		sp.warpTipKey = ""
 		sp.warp.GetWidget().ToolTips = nil
-	}
-}
-
-// kmLabel renders a metre distance as the kilometre figure quoted in
-// hints ("150 km" for sim.WarpMinRange) — mirrors sim.kmLabel so the
-// panel and the refusal log line word it identically. Beyond 99,999 km it
-// switches like theme.FormatDistance: "<0.01 AU" below 0.01 AU, then
-// two-decimal AU.
-func kmLabel(m float64) string {
-	switch {
-	case m <= 9.9999e7:
-		return strconv.FormatFloat(m/1000, 'f', -1, 64) + " km"
-	case m < 1.496e9:
-		return "<0.01 AU"
-	default:
-		return strconv.FormatFloat(m/1.496e11, 'f', 2, 64) + " AU"
 	}
 }
 

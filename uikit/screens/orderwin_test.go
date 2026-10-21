@@ -240,7 +240,7 @@ func TestOrderWindowSingleInstance(t *testing.T) {
 	if !k.OrderOpen() {
 		t.Fatal("OpenOrder did not open the window")
 	}
-	if got, want := k.OrderWin().TitleText(), itemLabel(k.Env(), a)+" — Order"; got != want {
+	if got, want := k.OrderWin().TitleText(), k.Env().TradeableName(a)+" — Order"; got != want {
 		t.Errorf("title = %q, want %q", got, want)
 	}
 	if got, want := k.OrderWin().qty.GetText(), "4"; got != want {
@@ -259,7 +259,7 @@ func TestOrderWindowSingleInstance(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("order window mounted %d times, want the single instance", count)
 	}
-	if got, want := k.OrderWin().TitleText(), itemLabel(k.Env(), b)+" — Order"; got != want {
+	if got, want := k.OrderWin().TitleText(), k.Env().TradeableName(b)+" — Order"; got != want {
 		t.Errorf("retargeted title = %q, want %q", got, want)
 	}
 	if got, want := k.OrderWin().modeBtn.Text().Label, "Request"; got != want {

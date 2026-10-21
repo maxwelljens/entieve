@@ -513,8 +513,8 @@ func TestWarpMinimumRangeGate(t *testing.T) {
 			m.Icon, m.Title, m.Sub)
 	}
 	// The hint quotes sim.WarpMinRange, not a literal.
-	if kmLabel(sim.WarpMinRange) != "150 km" {
-		t.Fatalf("kmLabel(%v) = %q, want 150 km", sim.WarpMinRange, kmLabel(sim.WarpMinRange))
+	if sim.KmLabel(sim.WarpMinRange) != "150 km" {
+		t.Fatalf("KmLabel(%v) = %q, want 150 km", sim.WarpMinRange, sim.KmLabel(sim.WarpMinRange))
 	}
 
 	// Exactly at the minimum the drive may engage (== is allowed).
@@ -530,26 +530,6 @@ func TestWarpMinimumRangeGate(t *testing.T) {
 		t.Error("warp selector disabled inside the minimum range")
 	}
 	_ = tr
-}
-
-// TestKmLabelBands pins kmLabel's unit switch — whole-km style through
-// 99,999 km, "<0.01 AU" below 0.01 AU, two-decimal AU beyond. sim.kmLabel
-// is unexported and unreachable from here without a test seam, so both
-// sides pin the same golden table (sim side: TestKmLabelBands in
-// sim/helpers_test.go) to keep the hint and refusal wording identical.
-func TestKmLabelBands(t *testing.T) {
-	for m, want := range map[float64]string{
-		sim.WarpMinRange: "150 km",
-		9.9999e7:         "99999 km",
-		1e8:              "<0.01 AU",
-		1.4e9:            "<0.01 AU",
-		1.496e9:          "0.01 AU",
-		3e11:             "2.01 AU",
-	} {
-		if got := kmLabel(m); got != want {
-			t.Errorf("kmLabel(%v) = %q, want %q", m, got, want)
-		}
-	}
 }
 
 // TestSelectedButtonContentFitsItsCell: an icon+label action button never

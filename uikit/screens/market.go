@@ -49,14 +49,12 @@ const (
 	mineWheelRows = 3
 )
 
-// setStepperValue writes a stepper readout (market/inventory/manufacturing qty)
-// and re-lays its row out. widget.Text.Label changes do NOT invalidate
-// layout, so without the relayout the readout keeps the box measured for
-// its previous value and a wider number draws under the + button
-// (Defect B: the readout must resize to fit its current value, so the
-// row re-measures it — the label's box grows and the buttons slide
-// right). The label carries the tabular contents face, so digit widths
-// stay stable while the value steps.
+// setStepperValue writes a stepper readout that is NOT a quantity stepper
+// (the settings scale row) and re-lays its row out. widget.Text.Label
+// changes do NOT invalidate layout, so without the relayout the readout
+// keeps the box measured for its previous value and a wider number draws
+// under the + button. The label carries the tabular contents face, so
+// digit widths stay stable while the value steps.
 func setStepperValue(bar *widget.Container, lbl *widget.Text, s string) {
 	if lbl.Label == s {
 		return
@@ -93,15 +91,12 @@ type Market struct {
 	as  widgets.ActionSink
 	win *widget.Window
 
-	tbl      *widgets.Table
-	qtyLabel *widget.Text
-	qtyBar   *widget.Container // stepper row: relaid when the readout changes
-	bar      *widget.Slider    // order-book scrollbar rail (mirrors ScrollTop)
-	title    *widget.Text
-	buy      *widget.Button
-	sell     *widget.Button
-	minus    *widget.Button
-	plus     *widget.Button
+	tbl     *widgets.Table
+	stepper *widgets.QtyStepper
+	bar     *widget.Slider // order-book scrollbar rail (mirrors ScrollTop)
+	title   *widget.Text
+	buy     *widget.Button
+	sell    *widget.Button
 
 	// split is the book | My-orders row: the seam trades width between
 	// the two panes (the old fixed 240 px column is its opening share).
@@ -123,7 +118,6 @@ type Market struct {
 	mineRows   []*widgets.StackRow
 	mineKey    string // change signature of the My orders rows
 
-	qtyIdx int
 	sel    content.ItemID
 	hasSel bool
 }
@@ -285,12 +279,7 @@ func NewMarket(env widgets.Seams) *Market {
 		}
 	})
 
-	m.qtyLabel = widget.NewText(
-		widget.TextOpts.Text("Qty 1", env.FaceMono(theme.StepSmall), theme.Solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-			Position: widget.RowLayoutPositionCenter,
-		})),
-	)
+	m.stepper = widgets.NewQtyStepper(env, qtySteps[:])
 
 	newBtn := func(label string, clicked func()) *widget.Button {
 		return widget.NewButton(
@@ -302,18 +291,9 @@ func NewMarket(env widgets.Seams) *Market {
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
 		)
 	}
-	m.minus = newBtn("-", func() { m.stepQty(-1) })
-	m.plus = newBtn("+", func() { m.stepQty(1) })
 	m.buy = newBtn("Buy", m.buyClicked)
 	m.sell = newBtn("Sell", m.sellClicked)
-
-	m.qtyBar = widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
-		)),
-	)
-	m.qtyBar.AddChild(m.minus, m.qtyLabel, m.plus, m.buy, m.sell)
+	m.stepper.Row().AddChild(m.buy, m.sell)
 
 	// The book row: the order table — widgets.Table owns its scroll
 	// viewport, its wheel wiring AND the scrollbar rail beside it (the
@@ -382,7 +362,7 @@ func NewMarket(env widgets.Seams) *Market {
 			widget.GridLayoutOpts.Spacing(0, theme.Px(4)),
 		)),
 	)
-	left.AddChild(m.qtyBar, book)
+	left.AddChild(m.stepper.Row(), book)
 
 	// Body: book | seam | My orders. The row split replaces the old fixed
 	// 240 px column with a draggable seam; it opens at today's proportion
@@ -446,44 +426,6 @@ func (m *Market) orders() []sim.MarketStock {
 	return m.cv.Market(sys.ID)
 }
 
-// priceOf quotes an item's displayed price for the shown view: the
-// docked station's full ladder (last trade, best ask, best bid, base)
-// when docked at a market station, else the shown orders' own ladder
-// (best ask, then best bid, then the def base price) — the undocked
-// fallback view has no station ladder to read.
-func (m *Market) priceOf(item content.ItemID) float64 {
-	station := m.cv.DockedMarket()
-	if station != "" {
-		return m.cv.MarketPrice(station, item)
-	}
-	return m.bookPrice(item, m.orders())
-}
-
-// bookPrice is the undocked half of priceOf's ladder, against an order set
-// the caller already holds (Sync quotes every item once from one copy).
-func (m *Market) bookPrice(item content.ItemID, orders []sim.MarketStock) float64 {
-	ask, bid := -1.0, -1.0
-	for _, o := range orders {
-		if o.Item != item {
-			continue
-		}
-		if o.Side == sim.OrderSell {
-			if ask < 0 || o.Price < ask {
-				ask = o.Price
-			}
-		} else if o.Price > bid {
-			bid = o.Price
-		}
-	}
-	if ask >= 0 {
-		return ask
-	}
-	if bid >= 0 {
-		return bid
-	}
-	return m.cv.MarketPrice("", item) // def base price
-}
-
 // marketCatalog is the market's item universe in canonical order: every
 // item (ore, mineral, loot, ammo, charge), module and hull the book can
 // list, ascending by id — the order the book always used. Built once; the
@@ -524,14 +466,10 @@ func (m *Market) Sync() {
 	// Trades only happen docked at a station — the same gate feeds the
 	// buttons below and every row's declared Buy/Sell actions.
 	gated := !m.docked()
-	// One quote per item for the parent rows: the station ladder docked,
-	// else the shown book's own best ask/bid walked once (not once per
-	// row over a fresh copy of the system book).
+	// One quote per item for the parent rows, through the seam's ladder:
+	// the station's book docked, the shown system's orders in space.
 	docked := m.cv.DockedMarket()
-	quote := func(item content.ItemID) float64 { return m.cv.MarketPrice(docked, item) }
-	if docked == "" {
-		quote = func(item content.ItemID) float64 { return m.bookPrice(item, orders) }
-	}
+	quote := func(item content.ItemID) float64 { return m.cv.PriceLadder(docked, item) }
 	by := make(map[content.ItemID][]sim.MarketStock, len(m.items))
 	for _, o := range orders {
 		by[o.Item] = append(by[o.Item], o)
@@ -563,8 +501,6 @@ func (m *Market) Sync() {
 		}
 	}
 
-	setStepperValue(m.qtyBar, m.qtyLabel, "Qty "+theme.FormatInt(int64(m.qty())))
-
 	// The station's own standing orders (rebuilt only when they move).
 	m.syncMine(gated)
 
@@ -582,7 +518,8 @@ func (m *Market) Sync() {
 		if m.hasSel {
 			// Selected: the book's price voice for this item (last trade,
 			// best ask, best bid, then base) and the fee schedule.
-			label = "Market — " + itemLabel(m.cv, m.sel) + " " + theme.FormatCredits(m.priceOf(m.sel)) +
+			label = "Market — " + m.cv.TradeableName(m.sel) + " " +
+				theme.FormatCredits(m.cv.PriceLadder(docked, m.sel)) +
 				" · fee " + feePct(sim.MarketBrokerFee) + "+" + feePct(sim.MarketSalesTax)
 		}
 		m.title.Label = label
@@ -607,7 +544,7 @@ func (m *Market) itemRow(item content.ItemID, ords []sim.MarketStock, price floa
 	}
 	row := widgets.TableRow{
 		Cells: []string{
-			itemLabel(m.cv, item),
+			m.cv.TradeableName(item),
 			theme.FormatCredits(price),
 			theme.FormatInt(int64(total)),
 			mktNoSide,
@@ -653,8 +590,8 @@ func (m *Market) rowSpec(item content.ItemID, gated bool) widgets.RowSpec {
 	return widgets.RowSpec{
 		Ref: widgets.RowRef(m.cv, item),
 		Actions: []widgets.RowAction{
-			{Label: "Buy", Disabled: gated, Intent: widgets.Buy{Item: item, Qty: m.qty()}},
-			{Label: "Sell", Disabled: gated, Intent: widgets.Sell{Item: item, Qty: m.qty()}},
+			{Label: "Buy", Disabled: gated, Intent: widgets.Buy{Item: item, Qty: m.stepper.Value()}},
+			{Label: "Sell", Disabled: gated, Intent: widgets.Sell{Item: item, Qty: m.stepper.Value()}},
 			{Label: "Sell on Market", Disabled: gated,
 				Intent: widgets.OpenOrder{Item: item, Side: sim.OrderSell, Qty: m.cv.PlayerStock(item)}},
 			{Label: "Request on Market", Disabled: gated,
@@ -662,21 +599,6 @@ func (m *Market) rowSpec(item content.ItemID, gated bool) widgets.RowSpec {
 		},
 	}
 }
-
-// stepQty moves the quantity stepper one step (clamped).
-func (m *Market) stepQty(delta int) {
-	m.qtyIdx += delta
-	if m.qtyIdx < 0 {
-		m.qtyIdx = 0
-	}
-	if m.qtyIdx >= len(qtySteps) {
-		m.qtyIdx = len(qtySteps) - 1
-	}
-	setStepperValue(m.qtyBar, m.qtyLabel, "Qty "+theme.FormatInt(int64(m.qty())))
-}
-
-// qty is the current trade quantity.
-func (m *Market) qty() int { return qtySteps[m.qtyIdx] }
 
 // docked reports whether the player is docked (the trade precondition).
 func (m *Market) docked() bool {
@@ -691,7 +613,7 @@ func (m *Market) buyClicked() {
 	if !m.docked() || !m.hasSel {
 		return
 	}
-	m.as.Do(widgets.Buy{Item: m.sel, Qty: m.qty()})
+	m.as.Do(widgets.Buy{Item: m.sel, Qty: m.stepper.Value()})
 }
 
 // sellClicked emits Sell for the selected order and quantity.
@@ -699,7 +621,7 @@ func (m *Market) sellClicked() {
 	if !m.docked() || !m.hasSel {
 		return
 	}
-	m.as.Do(widgets.Sell{Item: m.sel, Qty: m.qty()})
+	m.as.Do(widgets.Sell{Item: m.sel, Qty: m.stepper.Value()})
 }
 
 // mineOrders returns the player's resting orders at the docked station —
@@ -754,10 +676,10 @@ func (m *Market) orderRow(o sim.MarketStock, gated bool) *widgets.StackRow {
 		side, tint = "Bid", p.Info
 	}
 	row := widgets.TableRow{
-		Cells: []string{itemLabel(m.cv, o.Item), side, theme.FormatCredits(o.Price), theme.FormatInt(int64(o.Qty))},
+		Cells: []string{m.cv.TradeableName(o.Item), side, theme.FormatCredits(o.Price), theme.FormatInt(int64(o.Qty))},
 		Data:  o.ID,
 		Stack: []widgets.RowLine{
-			{Segs: []widgets.RowSeg{{Text: itemLabel(m.cv, o.Item), Step: theme.StepSmall, Tint: p.Accent}}},
+			{Segs: []widgets.RowSeg{{Text: m.cv.TradeableName(o.Item), Step: theme.StepSmall, Tint: p.Accent}}},
 			{Segs: []widgets.RowSeg{
 				{Text: side, Tint: tint, Step: theme.StepTiny},
 				{Text: theme.FormatCredits(o.Price), Step: theme.StepTiny},
@@ -814,19 +736,4 @@ func mineKey(orders []sim.MarketStock, gated bool) string {
 		b.WriteByte(';')
 	}
 	return b.String()
-}
-
-// itemLabel resolves a market/hangar ID to a display name (items, ships
-// and modules are all addressable as IDs; mirrors ui.UI.itemName).
-func itemLabel(cv widgets.ContentView, id content.ItemID) string {
-	if def, ok := cv.Defs().Item(id); ok {
-		return def.Name
-	}
-	if def, ok := cv.Defs().Ship(content.ShipID(id)); ok {
-		return def.Name
-	}
-	if def, ok := cv.Defs().Module(content.ModuleID(id)); ok {
-		return def.Name
-	}
-	return string(id)
 }
