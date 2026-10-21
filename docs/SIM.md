@@ -206,8 +206,9 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    `sim/system_economy.go`), in whole **100-ore batches** only: any quantity
    that is not a positive multiple of 100 is refused untouched (never floored
    to nothing while eating the ore), and a stock that is not a multiple refines
-   only its whole batches. Tier 1 of the two-tier recipe economy; outputs land
-   in the general hold.
+   only its whole batches. Tier 1 of the two-tier recipe economy; outputs
+   always land in the station hangar (unlimited — no capacity model), never
+   in the ship's hold.
 3. **Manufacturing — jobs, fees and craft growth.** Tier 2: `RecipeDef`
    (`content/data/recipes/`, `rec-*`) turns minerals into ships, modules or
    charges at an `industry` station. `CmdStartJob` commits the materials

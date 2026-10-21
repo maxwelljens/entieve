@@ -728,9 +728,8 @@ const RefineBatch = 100
 
 // execRefine converts ore units into minerals via RefineYield at a refine
 // service station. Quantities are whole 100-ore batches — anything else is
-// refused untouched. Output is floor(yield * qty) per mineral (documented);
-// when the outputs do not fit in the general hold, nothing is refined and
-// EvtCargoFull fires.
+// refused untouched. Output is floor(yield * qty) per mineral (documented)
+// and always lands in the station hangar, whose space is unlimited.
 func (s *Sim) execRefine(c CmdRefine) {
 	if _, ok := s.stationAccess(content.SvcRefine); !ok {
 		return
@@ -773,18 +772,11 @@ func (s *Sim) execRefine(c CmdRefine) {
 		qty  int
 	}
 	var results []outStack
-	var outVol float64
 	for _, id := range outs {
 		n := int(math.Floor(def.RefineYield[id] * float64(qty)))
 		if n > 0 {
 			results = append(results, outStack{id, n})
-			outVol += s.itemVolume(id) * float64(n)
 		}
-	}
-	if space := s.cargoSpace(cargo.Stacks, cargo.Capacity); outVol > space+1e-9 {
-		s.emit(Event{Kind: EvCargoFull, Severity: SevWarning, Actor: s.player,
-			Text: "Cargo hold full: cannot store refined minerals"})
-		return
 	}
 
 	// Consume ore (general hold first, then ore hold).
@@ -797,7 +789,7 @@ func (s *Sim) execRefine(c CmdRefine) {
 		return
 	}
 	for _, r := range results {
-		cargo.Stacks = addStacks(cargo.Stacks, r.item, r.qty)
+		s.storePlayerStock(r.item, r.qty)
 	}
 
 	parts := ""
@@ -811,7 +803,7 @@ func (s *Sim) execRefine(c CmdRefine) {
 		parts = "nothing"
 	}
 	s.emit(Event{Kind: EvLog, Severity: SevGood, Actor: s.player, Item: c.Item,
-		Text:  "Refined " + itoaN(qty) + " x " + def.Name + " into " + parts,
+		Text:  "Refined " + itoaN(qty) + " x " + def.Name + " into " + parts + " (station hangar)",
 		Value: float64(qty)})
 }
 

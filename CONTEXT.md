@@ -26,7 +26,7 @@ names the *modules and seams* we build that vocabulary into.
 | **Job** | one manufacturing run queue at any station (industry); all stations share three global job slots |
 | **Manufacturing** | the industry window (key B): recipe board with per-run time and up-front fee, the three global slots, Start/Collect/Cancel. Renamed from Factory; its layout sidecar key is `manufacturing` (old `factory` files migrate on read) |
 | **Job fee** | 3% of a recipe's mineral value at base prices, per run, debited from the wallet at job start; kept on cancel |
-| **Refinery** | the ore→mineral window at a `refine` station: ore list from cargo + ore hold, `floor(refine_yield × qty)` preview, Refine. Ore refines in whole **100-ore batches** (the stepper offers 100/200/300…, capped at the selected ore's stock; under 100 ore nothing refines) |
+| **Refinery** | the ore→mineral window at a `refine` station: ore list from cargo + ore hold, `floor(refine_yield × qty)` preview, Refine. Ore refines in whole **100-ore batches** (the stepper offers 100/200/300…, capped at the selected ore's stock; under 100 ore nothing refines) and the minerals always land in the station hangar, never the ship's hold |
 | **Craft level** | a station's learned skill per product family (grows with volume) |
 | **Belief** | an agent's EWMA of executed trade prices (its market view) |
 | **Haul wish** | an agent's cross-node arbitrage intent, flown as a real convoy |
