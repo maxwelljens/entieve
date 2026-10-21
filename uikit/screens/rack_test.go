@@ -106,9 +106,11 @@ func TestRackConstruction(t *testing.T) {
 	}
 }
 
-// TestRackActiveAndCycle covers the runtime states: inactive modules wear
-// the disabled look and no ring, active ones light up with a cycle ring
-// read from ModuleRuntime.Active/CycleEnds against Sim.Time().
+// TestRackActiveAndCycle covers the runtime states: idle modules wear the
+// disabled look and no ring, active ones light up with a cycle ring read
+// from ModuleRuntime.Active/CycleEnds against Sim.Time(), and a CANCELLED
+// module keeps its clock — its ring stays visible but greyed until the
+// boundary passes, so cancelled never reads as plain idle.
 func TestRackActiveAndCycle(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	r := NewRack(env)
@@ -137,8 +139,8 @@ func TestRackActiveAndCycle(t *testing.T) {
 	}
 	// remaining = 1 − (now − (CycleEnds − ActivationTime)) / ActivationTime
 	// = 1.5 / 3
-	if !cell.ringOn || cell.ringFrac != 0.5 {
-		t.Errorf("cycle ring = on:%v frac:%v, want on / 0.5", cell.ringOn, cell.ringFrac)
+	if !cell.ringOn || cell.ringFrac != 0.5 || !cell.ringLit {
+		t.Errorf("cycle ring = on:%v frac:%v lit:%v, want lit on / 0.5", cell.ringOn, cell.ringFrac, cell.ringLit)
 	}
 	if vis := cell.ringGfx.GetWidget().GetVisibility(); vis != widget.Visibility_Show {
 		t.Errorf("active ring visibility = %d, want shown", vis)
@@ -161,8 +163,24 @@ func TestRackActiveAndCycle(t *testing.T) {
 	if !cell.btn.GetWidget().Disabled {
 		t.Error("deactivated module is not disabled")
 	}
-	if cell.ringOn || cell.ringFrac != 0 {
-		t.Errorf("deactivated ring = on:%v frac:%v, want no ring", cell.ringOn, cell.ringFrac)
+	// The cancelled cycle still runs out (CycleEnds is ahead of now): the
+	// ring stays visible but GREYED — cancelled-with-cooldown reads
+	// differently from plain idle.
+	if !cell.ringOn || cell.ringFrac != 0 || cell.ringLit {
+		t.Errorf("cancelled ring = on:%v frac:%v lit:%v, want greyed ring at 0", cell.ringOn, cell.ringFrac, cell.ringLit)
+	}
+	if vis := cell.ringGfx.GetWidget().GetVisibility(); vis != widget.Visibility_Show {
+		t.Errorf("cancelled ring visibility = %d, want shown", vis)
+	}
+
+	// Once the cancelled boundary passes, the module is plain idle: no ring.
+	rt.CycleEnds = env.Sim.Time()
+	r.Sync()
+	if cell.ringOn {
+		t.Error("ring after the cancelled cycle ran out, want none")
+	}
+	if vis := cell.ringGfx.GetWidget().GetVisibility(); vis != widget.Visibility_Hide {
+		t.Errorf("ring visibility after the boundary = %d, want hidden", vis)
 	}
 }
 

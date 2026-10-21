@@ -105,8 +105,9 @@ type rackCell struct {
 	ring     *ebiten.Image
 	ringGfx  *widget.Graphic
 	name     *widget.Text
-	ringOn   bool             // ring visible at the last Sync (Active modules only)
+	ringOn   bool             // ring visible at the last Sync (a cycle in flight)
 	ringFrac float64          // ring fill at the last Sync (1 = just activated, 0 = done)
+	ringLit  bool             // ring colour: lit while repeating, greyed while cancelled
 	tip      widgets.RowTip   // structured hover tooltip (built on first fit)
 	spec     widgets.RowSpec  // declared interactions, rebuilt by syncCell
 	module   content.ModuleID // module currently shown ("" = empty slot)
@@ -353,8 +354,13 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 		def, _ = r.cv.Defs().Module(id)
 	}
 	active := rt != nil && rt.Active
+	// A cancelled module keeps its cycle clock (the boundary rule in the
+	// sim): while that clock is still ahead of now, a cycle is in flight
+	// and the ring must show it — greyed — so a cancelled module never
+	// reads as a plain idle one.
+	pending := !active && rt != nil && rt.CycleEnds > 0 && rt.CycleEnds > now
 	progress := 0.0
-	if def != nil && active && rt.CycleEnds > 0 && def.ActivationTime > 0 {
+	if def != nil && rt != nil && rt.CycleEnds > 0 && def.ActivationTime > 0 && (active || pending) {
 		// Same expression as the legacy rack: position inside the current
 		// cycle window (CycleEnds - ActivationTime .. CycleEnds).
 		progress = hudFrac01((now - (rt.CycleEnds - def.ActivationTime)) / def.ActivationTime)
@@ -391,41 +397,47 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 	cell.spec = r.cellSpec(cell, def)
 	cell.tip.Set(r.th, cell.btn.GetWidget(), cell.spec.Tip.Key, cell.spec.Tip.Build)
 	cell.btn.GetWidget().Disabled = !active
-	r.syncRing(cell, active, 1-progress)
+	r.syncRing(cell, active || pending, active, 1-progress)
 }
 
-// syncRing shows the cycle ring only on a running module and repaints it
-// when the remaining fraction moved. Depleting clockwise from full at
-// activation: remaining = 1 − (now − start) / ActivationTime, the same
-// cycle window the old bar read.
-func (r *Rack) syncRing(cell *rackCell, active bool, remaining float64) {
-	theme.ShowWidget(cell.ringGfx.GetWidget(), active)
-	if !active {
+// syncRing shows the cycle ring while a cycle is in flight: lit on a
+// repeating module, greyed on one whose autocycle was cancelled but whose
+// clock has not run out yet. Depleting clockwise from full at activation:
+// remaining = 1 − (now − start) / ActivationTime, the same cycle window the
+// old bar read.
+func (r *Rack) syncRing(cell *rackCell, show, lit bool, remaining float64) {
+	theme.ShowWidget(cell.ringGfx.GetWidget(), show)
+	if !show {
 		// Clear only on the falling edge: a Clear outside ebiten's frame
 		// loop queues a deferred atlas command, so an idle cell must not
 		// repaint every Sync (the memory guard catches the backlog).
 		if cell.ringOn {
 			cell.ring.Clear()
 		}
-		cell.ringOn, cell.ringFrac = false, 0
+		cell.ringOn, cell.ringFrac, cell.ringLit = false, 0, false
 		return
 	}
 	remaining = math.Round(hudFrac01(remaining)*rackCycleMax) / rackCycleMax
-	if cell.ringOn && remaining == cell.ringFrac {
+	if cell.ringOn && remaining == cell.ringFrac && lit == cell.ringLit {
 		return
 	}
-	cell.ringOn, cell.ringFrac = true, remaining
+	cell.ringOn, cell.ringFrac, cell.ringLit = true, remaining, lit
 	cell.ring.Clear()
 	s := theme.Scale()
 	cx, cy := float64(theme.Px(rackCellW))/2, float64(theme.Px(rackCellH))/2
 	rad := float64(rackRingR) * s
 	const start = -math.Pi / 2
 	p := r.th.Pal()
+	track, fill := iconColor(p.Accent, 60), p.Accent
+	if !lit {
+		// Cancelled: the cycle still runs out, visibly greyed.
+		track, fill = iconColor(p.Dim, 60), p.Dim
+	}
 	render.Arc(cell.ring, float32(cx), float32(cy), float32(rad),
-		start, start+2*math.Pi, float32(rackRingW*s), iconColor(p.Accent, 60))
+		start, start+2*math.Pi, float32(rackRingW*s), track)
 	if remaining > 0 {
 		render.Arc(cell.ring, float32(cx), float32(cy), float32(rad),
-			start, start+float32(hudFrac01(remaining)*2*math.Pi), float32(rackRingW*s), p.Accent)
+			start, start+float32(hudFrac01(remaining)*2*math.Pi), float32(rackRingW*s), fill)
 	}
 }
 
