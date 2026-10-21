@@ -768,6 +768,9 @@ func (g *Game) buildKit() error {
 
 	g.hud = uikit.NewHud(env)
 	g.rack = uikit.NewRack(env)
+	// The rack is the right half of the HUD's bottom-center pair: the HUD
+	// owns the slot, the rack keeps its own container (Sync, hover, rects).
+	g.hud.MountRack(g.rack.Container())
 	// Click-activation targets the player's selected entity first — the
 	// same source the F-key module toggles use — before falling back to
 	// the first suitable lock.
@@ -803,18 +806,14 @@ func (g *Game) buildKit() error {
 
 	// Always-on chrome mounts straight onto the kit's root overlay — no
 	// full-screen wrapper windows: the HUD stretches across the root and
-	// anchors its own bar/target row, the rack takes the bottom-right
-	// corner, the navigation rail the left edge. (The log used to anchor
+	// anchors its own pair (status + rack) and target row, the navigation
+	// rail the left edge. The rack itself rides the HUD's pair
+	// (MountRack), so it is not a root child. (The log used to anchor
 	// here too; it is a window now and mounts through syncMounts like
 	// the other panels.)
 	kit.AddContainer(g.hud.Container(), widget.AnchorLayoutData{
 		StretchHorizontal: true,
 		StretchVertical:   true,
-	})
-	kit.AddContainer(g.rack.Container(), widget.AnchorLayoutData{
-		HorizontalPosition: widget.AnchorLayoutPositionEnd,
-		VerticalPosition:   widget.AnchorLayoutPositionEnd,
-		Padding:            &widget.Insets{Right: theme.Px(10), Bottom: theme.Px(10)},
 	})
 	// The rail is derived from the spec in one pass (game/rail.go) and
 	// pinned to the left edge, top-flush with the window row below the
@@ -899,7 +898,7 @@ func (g *Game) placeDefaults(w, h int) {
 	}
 	// The screens themselves: declared geometry, one rule per row. The
 	// log keeps its bottom-left pocket — its content floor (logMinW = 260
-	// design px) is wider than the pocket left of the HUD bar at the
+	// design px) is wider than the pocket left of the HUD pair at the
 	// 1024×700 minimum, so that one overlap is inherent (see
 	// TestVirginPlacementTable); every other row clears the rail gutter
 	// and stays on screen.

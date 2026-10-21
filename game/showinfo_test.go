@@ -288,8 +288,9 @@ func TestContextMenuGatesWorldInput(t *testing.T) {
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
 
-	// Off-panel point (the same clear space TestWorldInputGating uses).
-	const cx, cy = 640.0, 500.0
+	// Off-panel point (clear space above the bottom-center pair, and clear
+	// of the popup this test opens at (600,300)).
+	const cx, cy = 640.0, 200.0
 	if g.overUI(cx, cy) {
 		t.Fatalf("fixture: overUI(%v, %v) already true", cx, cy)
 	}

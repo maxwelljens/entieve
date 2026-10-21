@@ -225,11 +225,11 @@ var screens = []Screen{
 		Build: func(g *Game) *widget.Window { g.help = uikit.NewHelp(g.env, helpRows()); return g.help.Win() },
 	},
 	{
-		// Bottom-left pocket beside the HUD bar: left/bottom insets of 10
+		// Bottom-left pocket beside the HUD pair: left/bottom insets of 10
 		// against the design viewport (uikit logDefaultW/H = 264×240).
 		// The pocket starts clear of the rail and keeps the historical
 		// 361 right edge, so the log narrows by the rail inset to its
-		// content floor (its overlap with the HUD bar at the 1024×700
+		// content floor (its overlap with the HUD pair at the 1024×700
 		// minimum is inherent — see TestVirginPlacementTable).
 		ID: pLog, Title: "Log", Icon: "svc_log",
 		Key: ebiten.KeyL, Shift: true, Action: "log", Desc: "Shift+L — toggle log window",

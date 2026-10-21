@@ -7,8 +7,9 @@ import (
 	"strconv"
 
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/render"
+	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/hulls"
 	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
@@ -17,21 +18,28 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-// HUD geometry. The ring diameter, arc radii and gaps mirror ui/layout.go's
-// hudRingR/hudRingStep at the 21 px type scale (hudH = 132 there, so the
-// 120 px ring image leaves the same margins inside the 130 px panel).
+// HUD geometry. The ship-status panel and the module rack form one
+// bottom-center pair (status left, rack right); the time/wallet strip sits
+// above the status. Widths are the 1280×720 / 1024×700 no-overlap contract:
+// the pair is 556 design px, which keeps its left edge right of the log's
+// 361 px pocket at 1280 wide.
 const (
-	hudRingSize = 120  // ring graphic diameter (px)
-	hudRingR    = 56.0 // shield arc radius (outermost layer)
-	hudRingStep = 12.0 // radial gap between the three layers
-	hudArcW     = 4.0  // arc stroke width (px)
-	hudTickLen  = 6.0  // gauge tick length across a ring (px)
-	hudCapMax   = 1000 // capacitor bar resolution (0.1 % steps)
-	hudBarMin   = 140  // capacitor bar minimum width (px)
-	hudBoxPool  = 7    // target-box slots (hulls top out at 4 locks)
-	hudBoxW     = 132  // one target box width (px)
-	hudBoxH     = 83   // one target box height (px, fixed)
-	hudBoxGap   = 5    // gap between target boxes
+	hudPortrait  = 120  // hull portrait box (design px)
+	hudBarH      = 18   // one health/capacitor bar height (px)
+	hudBarMin    = 128  // bar width: fits the "1,800.0/1,800.0 GJ" value (px)
+	hudHpGap     = 2    // gap between the three health bars (px)
+	hudColGap    = 4    // gap between readout groups in the status column (px)
+	hudStatusGap = 6    // portrait → readout column gap (px)
+	hudPairGap   = 8    // status column → rack gap (px)
+	hudStripH    = 26   // time/wallet strip height (px)
+	hudHintH     = 18   // reserved recharge-hint line (no layout jump) (px)
+	hudWedgeW    = 26   // velocity wedge width (px)
+	hudWedgeH    = 72   // velocity wedge height (px)
+	hudCapMax    = 1000 // capacitor bar resolution (0.1 % steps)
+	hudBoxPool   = 7    // target-box slots (hulls top out at 4 locks)
+	hudBoxW      = 132  // one target box width (px)
+	hudBoxH      = 83   // one target box height (px, fixed)
+	hudBoxGap    = 5    // gap between target boxes
 )
 
 // Target-card layout constants. The card (hudBoxW × hudBoxH) insets by
@@ -139,43 +147,39 @@ func barFill(bar image.Rectangle, frac float64) image.Rectangle {
 	return image.Rect(bar.Min.X, bar.Min.Y, bar.Min.X+w, bar.Max.Y)
 }
 
-// ringSweep maps an HP fraction to the fill arc's sweep in radians,
-// clockwise from the 12 o'clock start. Clamped to 0..1 → 0..2π.
-func ringSweep(frac float64) float64 {
-	return hudFrac01(frac) * 2 * math.Pi
-}
-
-// ringTicks returns the gauge tick angles (radians clockwise from 12
-// o'clock) at the quarter, half and three-quarter marks — EVE-style ticks
-// that let the eye read a sweep without the numeric label.
-func ringTicks() [3]float64 {
-	return [3]float64{ringSweep(0.25), ringSweep(0.5), ringSweep(0.75)}
-}
-
-// Hud is the always-on ship HUD: the shield/armor/structure arc stack around
-// a hull silhouette, the capacitor, speed/time/wallet readouts and the
-// top-center target-box row. One root container holds both halves — the bar
-// anchors bottom-center, the target boxes top-center — so the integrator adds
-// a single stretched child to the interface root.
+// Hud is the always-on ship HUD: the bottom-center pair (ship status beside
+// the module rack), the time/wallet strip above the status, and the
+// top-center target-box row. One root container holds them all, so the
+// integrator adds a single stretched child to the interface root; the game
+// slots the rack into the pair through MountRack.
 type Hud struct {
 	th theme.Theme
 	cv widgets.ContentView
 
 	container *widget.Container
 	targetRow *widget.Container
-	bar       *widget.Container
+	pair      *widget.Container // bottom-center: status column + rack slot
+	strip     *widget.Container
+	status    *widget.Container
 	boxes     [hudBoxPool]*hudBox
 
-	ring     *ebiten.Image
-	ringFrac [3]float64
-	redraws  int // ring repaint count (TestHudRingRedraws watches it)
+	portrait      *ebiten.Image
+	portraitGfx   *widget.Graphic
+	portraitHull  content.ShipID
+	portraitDraws int // portrait repaint count (hull changes only)
 
-	shieldLbl  *widget.Text
-	armorLbl   *widget.Text
-	structLbl  *widget.Text
+	health     *ebiten.Image
+	healthGfx  *widget.Graphic
+	hp         [3]hudHealth // staged: shield / armor / structure
+	hpDrawn    [3]hudHealth // last painted
+	hpPainted  bool
+	hpDraws    int // health repaint count (state changes only)
 	capBar     *widget.ProgressBar
 	capValue   *widget.Text
 	recharging *widget.Text
+	wedge      *ebiten.Image
+	wedgeFrac  float64
+	wedgeDraws int // wedge repaint count (fraction changes only)
 	speedLbl   *widget.Text
 	timeLbl    *widget.Text
 	walletLbl  *widget.Text
@@ -217,7 +221,7 @@ func NewHud(env interface {
 	widgets.ContentView
 }) *Hud {
 	p := env.Pal()
-	h := &Hud{th: env, cv: env, timeScale: 1}
+	h := &Hud{th: env, cv: env, timeScale: 1, wedgeFrac: -1}
 	faceSmall := env.Face(theme.StepSmall)
 	h.measure = func(s string) float64 {
 		w, _ := text.Measure(s, *faceSmall, 0)
@@ -229,75 +233,144 @@ func NewHud(env interface {
 		return w
 	}
 
-	h.shieldLbl = widget.NewText(widget.TextOpts.Text("", faceSmall, theme.Solid(p.Shield)))
-	h.armorLbl = widget.NewText(widget.TextOpts.Text("", faceSmall, theme.Solid(p.Warn)))
-	h.structLbl = widget.NewText(widget.TextOpts.Text("", faceSmall, theme.Solid(p.Struct)))
+	// Health: three self-drawn bars with "current / max" printed inside
+	// (the capacitor-bar styling, drawn together so each keeps its own
+	// palette color).
+	h.health = ebiten.NewImage(theme.Px(hudBarMin), theme.Px(hudHealthH))
+	h.healthGfx = widget.NewGraphic(
+		widget.GraphicOpts.Image(h.health),
+		widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+	)
 
+	// Capacitor: the same bar idiom, value inside; the "capacitor" caption
+	// is gone (the green bar is the capacitor). The recharge hint keeps a
+	// reserved line so the pair never jumps when it appears.
 	h.capBar = widget.NewProgressBar(
-		widget.ProgressBarOpts.Values(0, hudCapMax, hudCapMax),
+		widget.ProgressBarOpts.Values(0, hudCapMax, 0),
 		widget.ProgressBarOpts.FillImage(&widget.ProgressBarImage{Idle: theme.NineSlice(theme.Solid(p.Cap))}),
-		widget.ProgressBarOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(hudBarMin), theme.Px(20))),
+		widget.ProgressBarOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(hudBarMin), theme.Px(hudBarH))),
 	)
 	h.capValue = widget.NewText(widget.TextOpts.Text("", env.Face(theme.StepTiny), theme.Solid(p.BGHard)),
 		widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionCenter))
-	h.recharging = widget.NewText(widget.TextOpts.Text("recharging", env.Face(theme.StepTiny), theme.Solid(p.Warn)))
 	capStack := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewStackedLayout()),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
 	capStack.AddChild(h.capBar, h.capValue)
-
-	capCaption := widget.NewContainer(
+	h.recharging = widget.NewText(widget.TextOpts.Text("recharging", env.Face(theme.StepTiny), theme.Solid(p.Warn)))
+	rechargeRow := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(5)),
 		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, theme.Px(hudHintH))),
 	)
-	capCaption.AddChild(
-		widget.NewText(widget.TextOpts.Text("capacitor", env.Face(theme.StepTiny), theme.Solid(p.Dim))),
-		h.recharging,
-	)
+	rechargeRow.AddChild(h.recharging)
 
-	mid := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-		)),
+	// Velocity: a vertical wedge widening bottom→top, filled bottom-up with
+	// current / base max speed (a stable top; EffectiveMaxSpeed would move
+	// the ceiling with afterburner/web) and the m/s figure under it.
+	h.wedge = ebiten.NewImage(theme.Px(hudWedgeW), theme.Px(hudWedgeH))
+	wedgeGfx := widget.NewGraphic(
+		widget.GraphicOpts.Image(h.wedge),
+		widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+			Position: widget.RowLayoutPositionCenter,
+		})),
 	)
-	mid.AddChild(h.shieldLbl, h.armorLbl, h.structLbl, capStack, capCaption)
-
 	h.speedLbl = widget.NewText(
 		widget.TextOpts.Text("", env.FaceBold(theme.StepBase), theme.Solid(p.Text)),
-		widget.TextOpts.Position(widget.TextPositionEnd, widget.TextPositionStart),
+		widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionStart),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
+	velocity := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Spacing(theme.Px(2)),
+		)),
+	)
+	velocity.AddChild(wedgeGfx, h.speedLbl)
+
+	readouts := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Spacing(theme.Px(hudColGap)),
+		)),
+	)
+	readouts.AddChild(h.healthGfx, capStack, rechargeRow, velocity)
+
+	// Hull portrait: the left slot of the status panel, drawn from the
+	// hulls package into a self-drawn image (repainted on hull change).
+	h.portrait = ebiten.NewImage(theme.Px(hudPortrait), theme.Px(hudPortrait))
+	h.portraitGfx = widget.NewGraphic(
+		widget.GraphicOpts.Image(h.portrait),
+		widget.GraphicOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(theme.Px(hudPortrait), theme.Px(hudPortrait)),
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}),
+		),
+	)
+
+	h.status = widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(theme.Px(hudStatusGap)),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
+		)),
+	)
+	h.status.AddChild(h.portraitGfx, readouts)
+
+	// Time/wallet strip above the status: clock + multiplier left, the
+	// wallet right. No sim clock (the multiplier is the settled readout).
 	h.timeLbl = widget.NewText(
 		widget.TextOpts.Text("", env.FaceBold(theme.StepSmall), theme.Solid(p.Accent)),
-		widget.TextOpts.Position(widget.TextPositionEnd, widget.TextPositionStart),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionStart,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			Padding:            &widget.Insets{Left: theme.Px(theme.ContentsPad + theme.IconInline + theme.IconGap)},
+		})),
 	)
 	h.walletLbl = widget.NewText(
 		// Tabular contents face: the wallet is a dynamic number and mono
 		// digits keep its right edge steady while it ticks.
 		widget.TextOpts.Text("", env.FaceMono(theme.StepSmall), theme.Solid(p.Good)),
-		widget.TextOpts.Position(widget.TextPositionEnd, widget.TextPositionStart),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionEnd,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			Padding:            &widget.Insets{Right: theme.Px(theme.ContentsPad)},
+		})),
 	)
-	right := widget.NewContainer(
+	clock := theme.NewIcon("hud_time", theme.IconInline, p.Accent)
+	clock.GetWidget().LayoutData = widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		Padding:            &widget.Insets{Left: theme.Px(theme.ContentsPad)},
+	}
+	h.strip = widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+		widget.ContainerOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(0, theme.Px(hudStripH)),
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+		),
+	)
+	h.strip.AddChild(clock, h.timeLbl, h.walletLbl)
+
+	// The left column: strip over status, bottom-aligned in the pair (the
+	// rack is taller, so the pair's own bottom is the shared baseline).
+	left := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Spacing(theme.Px(hudColGap)),
 		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+			Position: widget.RowLayoutPositionEnd,
+		})),
 	)
-	right.AddChild(h.speedLbl, h.timeLbl, h.walletLbl)
+	left.AddChild(h.strip, h.status)
 
-	h.ring = ebiten.NewImage(theme.Px(hudRingSize), theme.Px(hudRingSize))
-	ringGfx := widget.NewGraphic(widget.GraphicOpts.Image(h.ring))
-
-	bar := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BG), theme.NRGBA(p.Border, 200), 1)),
+	h.pair = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(10)),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
+			widget.RowLayoutOpts.Spacing(theme.Px(hudPairGap)),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionCenter,
@@ -305,8 +378,7 @@ func NewHud(env interface {
 			Padding:            &widget.Insets{Left: theme.Px(10), Right: theme.Px(10), Bottom: theme.Px(10)},
 		})),
 	)
-	bar.AddChild(ringGfx, mid, right)
-	h.bar = bar
+	h.pair.AddChild(left)
 
 	// Target boxes: a top-center row, hidden while nothing is locked.
 	h.targetRow = widget.NewContainer(
@@ -333,8 +405,64 @@ func NewHud(env interface {
 			StretchVertical:   true,
 		})),
 	)
-	h.container.AddChild(h.targetRow, bar)
+	h.container.AddChild(h.targetRow, h.pair)
 	return h
+}
+
+// MountRack slots the module rack into the bottom-center pair, immediately
+// right of the status column. The rack keeps its own container (Sync, hover,
+// hit rects); only its layout slot changes.
+func (h *Hud) MountRack(c *widget.Container) {
+	c.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionEnd}
+	h.pair.AddChild(c)
+}
+
+// hudHealth is one staged health bar: its fraction and its "current / max"
+// label. Deliberately comparable so paintHealth skips unchanged frames.
+type hudHealth struct {
+	frac  float64
+	label string
+}
+
+// hudHealthH is the three-bar block's height: three bars and the gaps.
+const hudHealthH = 3*hudBarH + 2*hudHpGap
+
+// setHealth stages the three layer bars and repaints on a state change.
+func (h *Hud) setHealth(shield, armor, structure hudHealth) {
+	h.hp = [3]hudHealth{shield, armor, structure}
+	if h.hpPainted && h.hpDrawn == h.hp {
+		return
+	}
+	h.hpPainted = true
+	h.hpDrawn = h.hp
+	h.hpDraws++
+	h.paintHealth()
+}
+
+// paintHealth paints the three bars: palette track, the layer color up to the
+// fraction, a hairline border and the centered "current / max" value — the
+// capacitor-bar look, self-drawn so each bar keeps its own color (ebitenui's
+// progress bars share one theme fill struct).
+func (h *Hud) paintHealth() {
+	h.health.Clear()
+	p := h.th.Pal()
+	cols := [3]color.RGBA{p.Shield, p.Warn, p.Struct}
+	s := float32(theme.Scale())
+	face := h.th.Face(theme.StepTiny)
+	for i, st := range h.hp {
+		y := theme.Px(i * (hudBarH + hudHpGap))
+		bar := image.Rect(0, y, theme.Px(hudBarMin), y+theme.Px(hudBarH))
+		theme.FillRect(h.health, bar, theme.Solid(p.Cell))
+		if f := barFill(bar, st.frac); f.Dx() > 0 {
+			theme.FillRect(h.health, f, theme.Solid(cols[i]))
+		}
+		vector.StrokeRect(h.health,
+			float32(bar.Min.X)+s/2, float32(bar.Min.Y)+s/2,
+			float32(bar.Dx())-s, float32(bar.Dy())-s,
+			s, theme.NRGBA(p.Border, 160), false)
+		x := bar.Min.X + (bar.Dx()-int(math.Round(h.measureTiny(st.label))))/2
+		theme.DrawCardText(h.health, st.label, face, x, bar.Min.Y, theme.Solid(p.BGHard))
+	}
 }
 
 // newBox builds one target card from the fixed widget pool: a container
@@ -459,8 +587,9 @@ func (h *Hud) SetTimeScale(n int) {
 	h.timeScale = n
 }
 
-// Sync refreshes every readout — arcs, capacitor, speed, wallet and target
-// boxes — from the sim. Call it once per frame before Update.
+// Sync refreshes every readout — health, capacitor, speed, time, wallet,
+// portrait and target boxes — from the sim. Call it once per frame before
+// Update.
 func (h *Hud) Sync() {
 	s := h.cv
 	if s == nil {
@@ -468,23 +597,19 @@ func (h *Hud) Sync() {
 	}
 	player := s.Player()
 
-	// 1 — the three damage-layer arcs (redrawn only when a fraction moved).
-	shield, armor, structure := 1.0, 1.0, 1.0
+	// 1 — the three health bars and the hull portrait (the portrait
+	// repaints only when the hull changes).
 	if sh, ok := s.ShipState(player); ok {
-		shield = hudFrac(sh.Shield, sh.MaxShield)
-		armor = hudFrac(sh.Armor, sh.MaxArmor)
-		structure = hudFrac(sh.Structure, sh.MaxStructure)
-		h.shieldLbl.Label = "Shield " + hudHP(sh.Shield) + "/" + hudHP(sh.MaxShield)
-		h.armorLbl.Label = "Armor " + hudHP(sh.Armor) + "/" + hudHP(sh.MaxArmor)
-		h.structLbl.Label = "Structure " + hudHP(sh.Structure) + "/" + hudHP(sh.MaxStructure)
+		h.setHealth(
+			hudHealth{hudFrac(sh.Shield, sh.MaxShield), hudHP(sh.Shield) + " / " + hudHP(sh.MaxShield)},
+			hudHealth{hudFrac(sh.Armor, sh.MaxArmor), hudHP(sh.Armor) + " / " + hudHP(sh.MaxArmor)},
+			hudHealth{hudFrac(sh.Structure, sh.MaxStructure), hudHP(sh.Structure) + " / " + hudHP(sh.MaxStructure)},
+		)
+		if sh.Hull != h.portraitHull {
+			h.paintPortrait(sh.Hull)
+		}
 	} else {
-		h.shieldLbl.Label = "No ship"
-		h.armorLbl.Label = ""
-		h.structLbl.Label = ""
-	}
-	if want := [3]float64{shield, armor, structure}; h.ringFrac != want {
-		h.ringFrac = want
-		h.drawRing(shield, armor, structure)
+		h.setHealth(hudHealth{}, hudHealth{}, hudHealth{})
 	}
 
 	// 2 — capacitor bar + value label + recharge state.
@@ -497,10 +622,18 @@ func (h *Hud) Sync() {
 	h.capValue.Label = capLabel
 	theme.ShowWidget(h.recharging.GetWidget(), frac < 0.999)
 
-	// 3 — speed, time acceleration and wallet.
-	speed := 0.0
+	// 3 — velocity wedge, speed figure, time acceleration and wallet.
+	speed, maxSpeed := 0.0, 0.0
 	if m, ok := s.Motion(player); ok {
 		speed = m.Vel.Len()
+		maxSpeed = m.MaxSpeed
+	}
+	wedge := 0.0
+	if maxSpeed > 0 {
+		wedge = hudFrac01(speed / maxSpeed)
+	}
+	if wedge != h.wedgeFrac {
+		h.paintWedge(wedge)
 	}
 	h.speedLbl.Label = theme.FormatSpeed(speed)
 	h.timeLbl.Label = "×" + strconv.Itoa(h.timeScale) + " time"
@@ -556,76 +689,59 @@ func (h *Hud) Sync() {
 	}
 }
 
-// hudTrackDim scales a layer color down for the depleted remainder of its
-// ring. Dimming happens in RGB, never in alpha: render.Arc keeps RGB at
-// full strength, so an alpha-dimmed track composites to nearly the same
-// pixel as the fill against the near-opaque panel behind the ring image
-// (that exact bug is pinned by TestHudCaptureFrame).
-const hudTrackDim = 0.25
-
-// ringTrackColor returns the dim track color for a layer's fill color.
-func ringTrackColor(col color.RGBA) color.RGBA {
-	dim := func(v uint8) uint8 { return uint8(float64(v) * hudTrackDim) }
-	return color.RGBA{R: dim(col.R), G: dim(col.G), B: dim(col.B), A: 255}
+// paintPortrait repaints the hull portrait: the hull's raster scaled into
+// the design-square box (the image is built at Px(hudPortrait), so a scale
+// change rebuilds the kit and the portrait with it).
+func (h *Hud) paintPortrait(hull content.ShipID) {
+	h.portraitHull = hull
+	h.portraitDraws++
+	h.portrait.Clear()
+	src := hulls.Get(hull, theme.Px(hudPortrait))
+	if src == nil {
+		return
+	}
+	b := src.Bounds()
+	box := float64(theme.Px(hudPortrait))
+	scale := math.Min(box/float64(b.Dx()), box/float64(b.Dy()))
+	var opts ebiten.DrawImageOptions
+	opts.GeoM.Scale(scale, scale)
+	opts.GeoM.Translate((box-float64(b.Dx())*scale)/2, (box-float64(b.Dy())*scale)/2)
+	h.portrait.DrawImage(ebiten.NewImageFromImage(src), &opts)
 }
 
-// drawRing repaints the ring image: a dim track plus a fraction fill per
-// layer (sweep from ringSweep), quarter/half gauge ticks across every
-// ring, and the hull silhouette in the middle.
-func (h *Hud) drawRing(shield, armor, structure float64) {
-	h.redraws++
-	h.ring.Clear()
-	// The ring image was built Px(hudRingSize) wide: every radius and
-	// stroke below scales with it (identity at scale 1).
-	s := theme.Scale()
-	c := float64(theme.Px(hudRingSize)) / 2
-	const twoPi = 2 * math.Pi
-	start := -math.Pi / 2
+// hudColorScale converts a straight-alpha palette color for vector fills.
+func hudColorScale(c color.RGBA) ebiten.ColorScale {
+	var cs ebiten.ColorScale
+	cs.Scale(float32(c.R)/255, float32(c.G)/255, float32(c.B)/255, float32(c.A)/255)
+	return cs
+}
+
+// paintWedge repaints the velocity wedge: a dim full triangle with a
+// bottom-up fill up to frac (current / base max speed).
+func (h *Hud) paintWedge(frac float64) {
+	h.wedgeFrac = frac
+	h.wedgeDraws++
+	h.wedge.Clear()
 	p := h.th.Pal()
-	layers := [...]struct {
-		rad, frac float64
-		col       color.RGBA
-	}{
-		{hudRingR * s, shield, p.Shield},
-		{(hudRingR - hudRingStep) * s, armor, p.Warn},
-		{(hudRingR - 2*hudRingStep) * s, structure, p.Struct},
-	}
-	for _, l := range layers {
-		render.Arc(h.ring, float32(c), float32(c), float32(l.rad),
-			float32(start), float32(start+twoPi), float32(hudArcW*s), ringTrackColor(l.col))
-		if l.frac > 0 {
-			render.Arc(h.ring, float32(c), float32(c), float32(l.rad),
-				float32(start), float32(start+ringSweep(l.frac)), float32(hudArcW*s), l.col)
-		}
-	}
-	// Gauge ticks at the quarter/half/three-quarter marks, crossing each
-	// ring like EVE's HUD, drawn over track and fill alike.
-	tick := p.Dim
-	for _, t := range ringTicks() {
-		a := start + t
-		dx, dy := math.Cos(a), math.Sin(a)
-		for _, l := range layers {
-			r0, r1 := l.rad-hudTickLen*s/2, l.rad+hudTickLen*s/2
-			vector.StrokeLine(h.ring,
-				float32(c+dx*r0), float32(c+dy*r0),
-				float32(c+dx*r1), float32(c+dy*r1),
-				float32(1.5*s), tick, true)
-		}
-	}
-	// Hull silhouette (the legacy four-point ship glyph, scaled to the rings).
-	R := hudRingR * s
-	pts := [][2]float64{
-		{0, -R * 0.30},
-		{R * 0.19, R * 0.24},
-		{0, R * 0.08},
-		{-R * 0.19, R * 0.24},
-	}
-	for i := range pts {
-		a, b := pts[i], pts[(i+1)%len(pts)]
-		vector.StrokeLine(h.ring,
-			float32(c+a[0]), float32(c+a[1]),
-			float32(c+b[0]), float32(c+b[1]),
-			float32(1.5*s), p.Struct, true)
+	w, hh := float32(theme.Px(hudWedgeW)), float32(theme.Px(hudWedgeH))
+	cx := w / 2
+	// Track: apex at the bottom centre, base along the top edge.
+	var track vector.Path
+	track.MoveTo(cx, hh)
+	track.LineTo(0, 0)
+	track.LineTo(w, 0)
+	track.Close()
+	vector.FillPath(h.wedge, &track, nil, &vector.DrawPathOptions{AntiAlias: true, ColorScale: hudColorScale(p.Cell)})
+	// Fill: the trapezoid between the frac line and the apex.
+	if frac > 0 {
+		y := hh - float32(frac)*hh
+		half := (hh - y) / hh * cx
+		var fill vector.Path
+		fill.MoveTo(cx, hh)
+		fill.LineTo(cx-half, y)
+		fill.LineTo(cx+half, y)
+		fill.Close()
+		vector.FillPath(h.wedge, &fill, nil, &vector.DrawPathOptions{AntiAlias: true, ColorScale: hudColorScale(p.Accent)})
 	}
 }
 

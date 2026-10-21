@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image"
 	"image/png"
-	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,9 +22,10 @@ const hudCaptureFrames = 3
 // TestHudCaptureFrame renders the HUD + rack through a real ebiten game
 // loop — pixel readback (Image.At) panics before the game starts — then
 // screenshots the frame and asserts the drawn geometry:
-//   - each ship ring must DEPLETE: full-strength color inside the sweep,
-//     the dim RGB track outside it (an alpha-dimmed track composites to
-//     nearly the fill pixel against the opaque panel — the exact defect);
+//   - the hull portrait carries ink;
+//   - each health bar must DEPLETE: the layer color up to the fraction and
+//     the dark panel beyond it (50/75/90 % damage);
+//   - the time/wallet strip sits above the status and its clock icon has ink;
 //   - each target card must show glyph pixels on its text line, a
 //     fraction-filled layer bar and an empty tail beyond the fraction.
 //
@@ -44,9 +44,10 @@ func TestHudCaptureFrame(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	h := NewHud(env)
 	r := NewRack(env)
+	h.MountRack(r.Container())
 	c := newChromeUI(env)
 	c.AddPanel(h.Container(), h)
-	c.AddPanel(r.Container(), r)
+	c.panels = append(c.panels, r) // the rack rides the HUD pair; Sync it as the game does
 
 	// --- Scenario: a damaged player, two locks (damaged ship + rock), one
 	// active module. Everything mutates the sim's read surface directly,
@@ -146,56 +147,52 @@ func (g *hudCaptureGame) verify(img *ebiten.Image) {
 		errs = append(errs, fmt.Sprintf(format, args...))
 	}
 
-	// --- 1. Ring arcs deplete: brightest green channel in an 8 px radial
-	// band at each sample angle. Filled sweep = full layer color; the
-	// depleted remainder = ringTrackColor (25 % RGB). An alpha-only dim
-	// track would read ~168 here and fail.
-	ringRect := g.h.bar.Children()[0].GetWidget().Rect
-	cx := float64(ringRect.Min.X) + float64(ringRect.Dx())/2
-	cy := float64(ringRect.Min.Y) + float64(ringRect.Dy())/2
-
-	bandG := func(rad, thetaDeg float64) int {
-		th := thetaDeg * math.Pi / 180
-		best := 0
-		for dr := -4.0; dr <= 4; dr++ {
-			x := int(cx + math.Sin(th)*(rad+dr) + 0.5)
-			y := int(cy - math.Cos(th)*(rad+dr) + 0.5)
-			_, gch, _, _ := img.At(x, y).RGBA()
-			if v := int(gch >> 8); v > best {
-				best = v
-			}
-		}
-		return best
+	// --- 1. Hull portrait: the box carries the placeholder hull's ink.
+	if box := g.h.portraitGfx.GetWidget().Rect; uitest.InkIn(img, box) < 200 {
+		fail("hull portrait box %v has %d ink pixels, want a drawn portrait",
+			box, uitest.InkIn(img, box))
 	}
 
-	ringCases := []struct {
-		name    string
-		rad     float64
-		inside  []float64
-		outside []float64
+	// --- 2. Health bars deplete at 50/75/90 %: the layer colour inside the
+	// fill (sampled left of the printed value), the dark panel in the tail.
+	rgb := func(x, y int) (int, int, int) {
+		r, gch, b, _ := img.At(x, y).RGBA()
+		return int(r >> 8), int(gch >> 8), int(b >> 8)
+	}
+	hpBox := g.h.healthGfx.GetWidget().Rect
+	for _, bar := range []struct {
+		name  string
+		rect  image.Rectangle
+		check func(r, gch, b int) bool
 	}{
-		{"shield@50%", hudRingR, []float64{45, 135}, []float64{225, 315}},
-		{"armor@75%", hudRingR - hudRingStep, []float64{45, 135, 225}, []float64{315, 340}},
-		{"structure@90%", hudRingR - 2*hudRingStep, []float64{45, 135, 225}, []float64{340, 350}},
+		{"shield@50%", image.Rect(hpBox.Min.X, hpBox.Min.Y, hpBox.Max.X, hpBox.Min.Y+hudBarH), func(r, gch, b int) bool { return b > 200 && b > r+40 }},
+		{"armor@75%", image.Rect(hpBox.Min.X, hpBox.Min.Y+hudBarH+hudHpGap, hpBox.Max.X, hpBox.Min.Y+2*hudBarH+hudHpGap), func(r, gch, b int) bool { return r > 180 && b < 120 }},
+		{"structure@90%", image.Rect(hpBox.Min.X, hpBox.Min.Y+2*(hudBarH+hudHpGap), hpBox.Max.X, hpBox.Min.Y+3*hudBarH+2*hudHpGap), func(r, gch, b int) bool { return r > 170 && gch > 170 && b > 170 }},
+	} {
+		y := (bar.rect.Min.Y + bar.rect.Max.Y) / 2
+		r, gch, b := rgb(bar.rect.Min.X+12, y)
+		if !bar.check(r, gch, b) {
+			fail("%s: fill pixel = (%d,%d,%d), want the layer colour", bar.name, r, gch, b)
+		}
+		tr, tg, tb := rgb(bar.rect.Max.X-4, y)
+		if tr > 80 || tg > 80 || tb > 80 {
+			fail("%s: tail pixel = (%d,%d,%d), want the dark panel past the fraction",
+				bar.name, tr, tg, tb)
+		}
 	}
-	for _, rc := range ringCases {
-		inMin, outMax := 255, 0
-		for _, a := range rc.inside {
-			if v := bandG(rc.rad, a); v < inMin {
-				inMin = v
-			}
-		}
-		for _, a := range rc.outside {
-			if v := bandG(rc.rad, a); v > outMax {
-				outMax = v
-			}
-		}
-		switch {
-		case inMin < 150:
-			fail("%s: filled arc green %d, want >= 150 (full layer color)", rc.name, inMin)
-		case outMax > 90:
-			fail("%s: depleted arc green %d vs filled %d — track is not dim", rc.name, outMax, inMin)
-		}
+
+	// --- 3. Strip: above the status panel, clock icon inked, wallet at the
+	// right edge.
+	strip := g.h.strip.GetWidget().Rect
+	status := g.h.status.GetWidget().Rect
+	if strip.Max.Y > status.Min.Y {
+		fail("strip %v is not above the status %v", strip, status)
+	}
+	if clock := g.h.strip.Children()[0].GetWidget().Rect; uitest.InkIn(img, clock) < 8 {
+		fail("clock icon box %v has too little ink", clock)
+	}
+	if wallet := g.h.walletLbl.GetWidget().Rect; wallet.Max.X < strip.Max.X-10 || wallet.Max.X > strip.Max.X {
+		fail("wallet %v is not right-anchored in the strip %v", wallet, strip)
 	}
 
 	// --- 2. Target card: glyph pixels on the text line, a 60 % shield

@@ -34,7 +34,7 @@ func TestWorldClickSelection(t *testing.T) {
 	if target.Entity.IsZero() {
 		t.Fatal("no visible entity to click")
 	}
-	const clickX, clickY = 640.0, 500.0 // a clear off-panel point
+	const clickX, clickY = 640.0, 300.0 // a clear off-panel point (above the bottom pair)
 	cam := sc.Camera(1280, 720)
 	// Pan the camera so the target lands on that point: the camera
 	// center is player + pan, and screen = (world − center)·zoom + size/2.
@@ -66,11 +66,12 @@ func TestWorldClickSelection(t *testing.T) {
 	}
 }
 
-// TestChromeOnRootOverlay: HUD, rack and the navigation rail mount
-// directly on the kit's root overlay (no full-screen wrapper windows),
-// the rack and rail track hover, and their exact rects gate the world
-// while empty space does not. The log moved off the root — it is a
-// window now (see TestLogWindowGate).
+// TestChromeOnRootOverlay: the HUD (status + rack pair) and the navigation
+// rail mount directly on the kit's root overlay (no full-screen wrapper
+// windows), the rack and rail track hover, and their exact rects gate the
+// world while empty space does not. The rack rides the HUD's pair, not the
+// root. The log moved off the root — it is a window now (see
+// TestLogWindowGate).
 func TestChromeOnRootOverlay(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
@@ -85,15 +86,23 @@ func TestChromeOnRootOverlay(t *testing.T) {
 		}
 		mounted[c] = true
 	}
-	if len(kids) != 3 {
-		t.Errorf("root overlay has %d children, want exactly the HUD, rack and rail", len(kids))
+	if len(kids) != 2 {
+		t.Errorf("root overlay has %d children, want exactly the HUD and rail", len(kids))
 	}
 	for name, c := range map[string]*widget.Container{
-		"hud": g.hud.Container(), "rack": g.rack.Container(), "rail": g.rail.Container(),
+		"hud": g.hud.Container(), "rail": g.rail.Container(),
 	} {
 		if !mounted[c] {
 			t.Errorf("%s is not mounted on the root overlay", name)
 		}
+	}
+	// The rack rides the HUD's pair (the right half), not the root.
+	if mounted[g.rack.Container()] {
+		t.Error("rack is mounted on the root overlay (it belongs to the HUD pair)")
+	}
+	if !g.rack.Container().GetWidget().Rect.In(g.hud.Container().GetWidget().Rect) {
+		t.Errorf("rack %v is not inside the HUD container %v",
+			g.rack.Container().GetWidget().Rect, g.hud.Container().GetWidget().Rect)
 	}
 	if mounted[g.logP.Container()] {
 		t.Error("log still rides the root overlay (it is a window now)")
@@ -110,21 +119,21 @@ func TestChromeOnRootOverlay(t *testing.T) {
 		t.Error("HUD container tracks hover (it spans the whole screen)")
 	}
 
-	// overUI covers every chrome rect exactly: the HUD bar (the visible
-	// bottom child), the rack and the log.
+	// overUI covers every chrome rect exactly: the HUD's bottom pair (the
+	// visible bottom child, which carries the rack) and the log.
 	hudGated := false
 	for _, ch := range g.hud.Container().Children() {
 		w := ch.GetWidget()
 		if w.IsVisible() && w.Rect.Dx() > 0 && w.Rect.Min.Y > 400 {
 			x, y := centerOf(t, w.Rect)
 			if !g.overUI(x, y) {
-				t.Errorf("hud bar: overUI(%v, %v) = false, want true", x, y)
+				t.Errorf("hud pair: overUI(%v, %v) = false, want true", x, y)
 			}
 			hudGated = true
 		}
 	}
 	if !hudGated {
-		t.Error("no visible HUD bar laid out")
+		t.Error("no visible HUD pair laid out")
 	}
 	for _, p := range []struct {
 		name string
@@ -141,8 +150,9 @@ func TestChromeOnRootOverlay(t *testing.T) {
 	}
 
 	// Empty space stays free: a full-screen wrapper window around the
-	// chrome would gate the whole screen.
-	if g.overUI(640, 500) {
+	// chrome would gate the whole screen. (640,300) sits above the
+	// bottom-center pair, between the top windows.
+	if g.overUI(640, 300) {
 		t.Error("empty space is gated (a full-screen chrome wrapper window is back)")
 	}
 }

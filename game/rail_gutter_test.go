@@ -83,19 +83,21 @@ func TestPlacedDefaultRectsClearTheRailGutter(t *testing.T) {
 //     the player reads first gets the corner), the log its bottom-left
 //     pocket;
 //   - the market's construction-time default rect is square — on screen,
-//     right of the rail gutter and clear of the log pocket and the HUD
-//     bar.
+//     right of the rail gutter and clear of the log pocket.
 //
 // Two deliberate limits, both pinned by the facts they name:
-//   - the market's default square covers the module rack at the 1024×700
-//     minimum (it clears it at 1280×720): no side ≥ the 522 px its body
-//     needs stays out of both the rack's x range and the log pocket, so
-//     the default keeps the body usable and the rack loses;
-//   - the log overlaps the HUD bar at the 1024×700 minimum, in space
+//   - the market's default square covers the bottom-center HUD pair
+//     (status + module rack) at both sizes: no side ≥ the 522 px its body
+//     needs stays out of both a centered pair's x range and the log
+//     pocket, so the default keeps the body usable and the pair loses.
+//     (The old right-anchored rack cleared the square at 1280×720; the
+//     centered pair cannot.)
+//   - the log overlaps the HUD pair at the 1024×700 minimum, in space
 //     only and pre-existing: the log's content floor (logMinW = 260
-//     design px) is wider than the pocket left of the bar there (its left
-//     edge is 292 while the log starts at 97), and raising the log above
-//     the bar would put it under the docked station column instead.
+//     design px) is wider than the pocket left of the pair there (its
+//     left edge is 234 while the log starts at 97), and raising the log
+//     above the pair would put it under the docked station column
+//     instead.
 func TestVirginPlacementTable(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -169,7 +171,7 @@ func TestVirginPlacementTable(t *testing.T) {
 				// rack at the minimum); the log's HUD-bar overlap at
 				// 1024×700 is the documented exception above.
 				for _, cr := range mountedRects(g) {
-					if cr.name != "hud.1" && cr.name != "rack" {
+					if cr.name != "hud.1" {
 						continue
 					}
 					for _, bw := range []struct {
@@ -177,7 +179,7 @@ func TestVirginPlacementTable(t *testing.T) {
 						r    image.Rectangle
 					}{{"overview", ov}, {"selected item", sp}, {"log", lg}} {
 						if bw.name == "log" && cr.name == "hud.1" {
-							continue // documented: the log's content floor cannot clear the bar
+							continue // documented: the log's content floor cannot clear the pair
 						}
 						if bw.r.Overlaps(cr.rect) {
 							t.Errorf("%dx%d @%v: default %s %v overlaps the %s %v",
@@ -187,8 +189,8 @@ func TestVirginPlacementTable(t *testing.T) {
 				}
 
 				// The market's default rect: square, on screen, clear of
-				// the rail gutter, the log pocket and the HUD bar (the
-				// rack only at the design size — see the doc comment).
+				// the rail gutter and the log pocket (the pair is the
+				// documented limit — see the doc comment).
 				mkt := uikit.NewMarket(g.env).Win().GetContainer().GetWidget().Rect
 				if mkt.Dx() != mkt.Dy() {
 					t.Errorf("%dx%d @%v: market default %v is not square: %d×%d",
@@ -196,19 +198,9 @@ func TestVirginPlacementTable(t *testing.T) {
 				}
 				check("market default", mkt)
 				for _, cr := range mountedRects(g) {
-					if cr.name == "log" || cr.name == "hud.1" {
-						if mkt.Overlaps(cr.rect) {
-							t.Errorf("%dx%d @%v: market default %v overlaps the %s %v",
-								w, h, tc.dev, mkt, cr.name, cr.rect)
-						}
-					}
-				}
-				if w >= 1280 {
-					for _, cr := range mountedRects(g) {
-						if cr.name == "rack" && mkt.Overlaps(cr.rect) {
-							t.Errorf("%dx%d @%v: market default %v overlaps the module rack %v",
-								w, h, tc.dev, mkt, cr.rect)
-						}
+					if cr.name == "log" && mkt.Overlaps(cr.rect) {
+						t.Errorf("%dx%d @%v: market default %v overlaps the log %v",
+							w, h, tc.dev, mkt, cr.rect)
 					}
 				}
 			}

@@ -2,6 +2,7 @@ package screens
 
 import (
 	"image/color"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
+	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
@@ -33,9 +35,10 @@ const (
 	rackCellW    = 50   // cell width
 	rackCellH    = 40   // cell height (minimum hit area)
 	rackNameH    = 19   // name line under a tile (fits StepTiny line box)
-	rackCycleH   = 4    // cycle bar height under a cell
 	rackLabelW   = 30   // "High"/"Mid"/"Low" label column
-	rackCycleMax = 1000 // cycle bar resolution (0.1 % steps)
+	rackCycleMax = 1000 // cycle-ring resolution (0.1 % steps)
+	rackRingR    = 16   // cycle ring radius over the tile centre (px)
+	rackRingW    = 2    // cycle ring stroke width (px)
 	rackRowGap   = 8    // gap between slot rows
 	// rackIconSpacing is ebitenui's fixed spacing between a graphic
 	// button's text and graphic (widget/button.go hardcodes it).
@@ -56,9 +59,10 @@ var (
 	rackRowLabels = [rackRows]string{"High", "Mid", "Low"}
 )
 
-// Rack is the bottom-right module rack: one cell per slot showing the
-// module short name, an amber glow while active, a cycle progress bar and a
-// hover tooltip with the module's key stats. Left-clicking a cell toggles
+// Rack is the module rack (the right half of the HUD's bottom-center pair):
+// one cell per slot showing the module short name, an amber glow while
+// active, a cycle ring depleting clockwise over the tile while the module
+// runs, and a hover tooltip with the module's key stats. Left-clicking a cell toggles
 // the module (enqueueing CmdActivate/CmdDeactivate; empty slots are inert);
 // a second click inside the double-click window shows Show Info instead of
 // toggling — the click that completes the gesture is Show Info, strictly
@@ -87,28 +91,33 @@ type Rack struct {
 	dbl widgets.RowDouble
 }
 
-// rackCell is one slot: a cell column (icon tile + name line + cycle bar)
-// plus its tooltip widgets. Cells are persistent, so a fitting change only
-// rewrites their name, glyph, spec (menu + tooltip data) and enabled state.
-// active mirrors ModuleRuntime.Active for the click toggle (the visual
-// rides the button's Disabled state: dim cell while off, amber cell while
-// running).
+// rackCell is one slot: a cell column (icon tile with the cycle ring drawn
+// over it + name line) plus its tooltip widgets. Cells are persistent, so a
+// fitting change only rewrites their name, glyph, spec (menu + tooltip data)
+// and enabled state. active mirrors ModuleRuntime.Active for the click toggle
+// (the visual rides the button's Disabled state: dim cell while off, amber
+// cell while running).
 type rackCell struct {
-	slot   sim.SlotRef
-	root   *widget.Container
-	btn    *widget.Button
-	name   *widget.Text
-	bar    *widget.ProgressBar
-	tip    widgets.RowTip   // structured hover tooltip (built on first fit)
-	spec   widgets.RowSpec  // declared interactions, rebuilt by syncCell
-	module content.ModuleID // module currently shown ("" = empty slot)
-	icon   string           // glyph the tile currently shows ("" = none)
-	active bool             // runtime Active at the last Sync
+	slot     sim.SlotRef
+	root     *widget.Container
+	stack    *widget.Container // tile + cycle-ring overlay
+	btn      *widget.Button
+	ring     *ebiten.Image
+	ringGfx  *widget.Graphic
+	name     *widget.Text
+	ringOn   bool             // ring visible at the last Sync (Active modules only)
+	ringFrac float64          // ring fill at the last Sync (1 = just activated, 0 = done)
+	tip      widgets.RowTip   // structured hover tooltip (built on first fit)
+	spec     widgets.RowSpec  // declared interactions, rebuilt by syncCell
+	module   content.ModuleID // module currently shown ("" = empty slot)
+	icon     string           // glyph the tile currently shows ("" = none)
+	active   bool             // runtime Active at the last Sync
 }
 
-// NewRack builds the module rack over the given seams. Its container
-// anchors bottom-right in an anchor-layout root; Sync refreshes every cell
-// from the player's fitting.
+// NewRack builds the module rack over the given seams. The container keeps
+// its standalone bottom-right anchor (tests mount it alone); the game slots
+// it into the HUD's bottom-center pair with MountRack. Sync refreshes every
+// cell from the player's fitting.
 func NewRack(env widgets.Seams) *Rack {
 	p := env.Pal()
 	faceTiny := env.Face(theme.StepTiny)
@@ -180,11 +189,11 @@ func NewRack(env widgets.Seams) *Rack {
 }
 
 // newCell builds one slot cell: a 50×40 icon tile (the module's class
-// glyph; right-click cycles a weapon's charge) over its name line and the
-// cycle progress bar. The cell's structured hover tooltip is built on its
-// first fit (see rowTip). The glyph lives in the tile and the name under
-// it, so the label keeps the full cell width — an icon beside it would
-// push the row past the HUD at the 1024×700 minimum.
+// glyph; right-click cycles a weapon's charge) with the cycle ring drawn
+// over it, and the name line under it. The cell's structured hover tooltip
+// is built on its first fit (see rowTip). The glyph lives in the tile and
+// the name under it, so the label keeps the full cell width — an icon beside
+// it would push the row past the HUD at the 1024×700 minimum.
 func (r *Rack) newCell(row, idx int) *rackCell {
 	p := r.th.Pal()
 	cell := &rackCell{slot: sim.SlotRef{Class: rackClasses[row], Index: idx}}
@@ -237,16 +246,21 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 			}),
 		),
 	)
-	cell.bar = widget.NewProgressBar(
-		widget.ProgressBarOpts.Values(0, rackCycleMax, 0),
-		widget.ProgressBarOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, theme.Px(rackCycleH))),
+	// The cycle ring is a transparent overlay in the tile's stack: the
+	// button keeps every click and the ring only paints.
+	cell.ring = ebiten.NewImage(theme.Px(rackCellW), theme.Px(rackCellH))
+	cell.ringGfx = widget.NewGraphic(widget.GraphicOpts.Image(cell.ring))
+	theme.ShowWidget(cell.ringGfx.GetWidget(), false)
+	cell.stack = widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewStackedLayout()),
 	)
+	cell.stack.AddChild(cell.btn, cell.ringGfx)
 	cell.root = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 		)),
 	)
-	cell.root.AddChild(cell.btn, cell.name, cell.bar)
+	cell.root.AddChild(cell.stack, cell.name)
 	return cell
 }
 
@@ -332,7 +346,7 @@ func (r *Rack) Sync() {
 	}
 }
 
-// syncCell rewrites one cell's label, tooltip, glow and cycle bar.
+// syncCell rewrites one cell's label, tooltip, glow and cycle ring.
 func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRuntime, now float64) {
 	var def *content.ModuleDef
 	if id != "" {
@@ -377,7 +391,42 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 	cell.spec = r.cellSpec(cell, def)
 	cell.tip.Set(r.th, cell.btn.GetWidget(), cell.spec.Tip.Key, cell.spec.Tip.Build)
 	cell.btn.GetWidget().Disabled = !active
-	cell.bar.SetCurrent(int(progress * rackCycleMax))
+	r.syncRing(cell, active, 1-progress)
+}
+
+// syncRing shows the cycle ring only on a running module and repaints it
+// when the remaining fraction moved. Depleting clockwise from full at
+// activation: remaining = 1 − (now − start) / ActivationTime, the same
+// cycle window the old bar read.
+func (r *Rack) syncRing(cell *rackCell, active bool, remaining float64) {
+	theme.ShowWidget(cell.ringGfx.GetWidget(), active)
+	if !active {
+		// Clear only on the falling edge: a Clear outside ebiten's frame
+		// loop queues a deferred atlas command, so an idle cell must not
+		// repaint every Sync (the memory guard catches the backlog).
+		if cell.ringOn {
+			cell.ring.Clear()
+		}
+		cell.ringOn, cell.ringFrac = false, 0
+		return
+	}
+	remaining = math.Round(hudFrac01(remaining)*rackCycleMax) / rackCycleMax
+	if cell.ringOn && remaining == cell.ringFrac {
+		return
+	}
+	cell.ringOn, cell.ringFrac = true, remaining
+	cell.ring.Clear()
+	s := theme.Scale()
+	cx, cy := float64(theme.Px(rackCellW))/2, float64(theme.Px(rackCellH))/2
+	rad := float64(rackRingR) * s
+	const start = -math.Pi / 2
+	p := r.th.Pal()
+	render.Arc(cell.ring, float32(cx), float32(cy), float32(rad),
+		start, start+2*math.Pi, float32(rackRingW*s), iconColor(p.Accent, 60))
+	if remaining > 0 {
+		render.Arc(cell.ring, float32(cx), float32(cy), float32(rad),
+			start, start+float32(hudFrac01(remaining)*2*math.Pi), float32(rackRingW*s), p.Accent)
+	}
 }
 
 // shortName is the label drawn in a cell: the module's first word, ellipsized
