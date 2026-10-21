@@ -49,37 +49,37 @@ entities here in the same format before their content lands.
 |---|---|---|---|---|
 | `cel-solace-star` | Solace | Starogród | place | star carries its system's name (existing convention) |
 | `cel-solace-prime` | Solace Prime | Starogród Prime | place | "<system> Prime" convention |
-| `cel-solace-belt` | Solace Belt | Starogród Belt | place | "<system> Belt" convention |
+| `cel-solace-belt` | Solace Belt | Asteroid Belt I | place | "Asteroid Belt <Roman numeral>" convention: numbered per system in celestial order (first belt = I) |
 | `cel-haven-rest` | Haven Rest | **Jernborg** | Nordic | Danish/Norwegian *jern* "iron" + *borg* "fort"; oldest town, Nordic trace |
-| `cel-gate-penumbra` | Penumbra Gate | Kuźnica Gate | place | gates named for the destination; four instances share this id (`sys-solace`, `sys-gloam`, `sys-mlynow`, `sys-kamieniec`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory) |
+| `cel-gate-penumbra` | Penumbra Gate | Gate (Kuźnica) | place | "Gate (<destination display name>)" convention; four instances share this id (`sys-solace`, `sys-gloam`, `sys-mlynow`, `sys-kamieniec`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory) |
 | `cel-penumbra-star` | Penumbra | Kuźnica | place | |
-| `cel-penumbra-belt` | Penumbra Belt | Kuźnica Belt | place | |
+| `cel-penumbra-belt` | Penumbra Belt | Asteroid Belt I | place | "Asteroid Belt <Roman numeral>" convention: numbered per system in celestial order (first belt = I) |
 | `cel-penumbra-den` | Penumbra Den | **Gniazdo** | place | "nest" (Polish); the Old Works anomaly in the system |
-| `cel-gate-solace` | Solace Gate | Starogród Gate | place | |
-| `cel-gate-gloam` | Gloam Gate | Pustkowie Gate | place | |
+| `cel-gate-solace` | Solace Gate | Gate (Starogród) | place | "Gate (<destination display name>)" convention |
+| `cel-gate-gloam` | Gloam Gate | Gate (Pustkowie) | place | "Gate (<destination display name>)" convention |
 | `cel-penumbra-port` | Penumbra Port | **Przystań** | place | *przystań* "harbour, landing" (Polish); the freeport |
 | `cel-gloam-star` | Gloam | Pustkowie | place | |
-| `cel-gloam-belt` | Gloam Belt | Pustkowie Belt | place | |
+| `cel-gloam-belt` | Gloam Belt | Asteroid Belt I | place | "Asteroid Belt <Roman numeral>" convention: numbered per system in celestial order (first belt = I) |
 | `cel-rudnik-star` | — | Rudnik | place | star carries its system's name (existing convention); approved 2026-10-13 |
 | `cel-rudnik-prime` | — | Rudnik Prime | place | "<system> Prime" convention; approved 2026-10-13 |
 | `cel-halda` | — | **Halda** | place | Polish *halda* "slag heap, spoil tip" (mining term); Rudnik's mining outpost; approved 2026-10-13 |
-| `cel-rudnik-belt` | — | Rudnik Belt | place | "<system> Belt" convention; approved 2026-10-13 |
-| `cel-gate-rudnik` | — | Rudnik Gate | place | gates named for the destination; two instances (`sys-solace`, `sys-mlynow`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory); approved 2026-10-13 |
+| `cel-rudnik-belt` | — | Asteroid Belt I | place | "Asteroid Belt <Roman numeral>" convention: numbered per system in celestial order (first belt = I); approved 2026-10-13 |
+| `cel-gate-rudnik` | — | Gate (Rudnik) | place | "Gate (<destination display name>)" convention; two instances (`sys-solace`, `sys-mlynow`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory); approved 2026-10-13 |
 | `cel-mlynow-star` | — | Młynów | place | star carries its system's name (existing convention); approved 2026-10-13 |
 | `cel-mlynow-prime` | — | Młynów Prime | place | "<system> Prime" convention; approved 2026-10-13 |
 | `cel-huta` | — | **Huta** | place | Polish *huta* "smelter, ironworks" (← German *Hütte*); Młynów's refinery platform; approved 2026-10-13 |
-| `cel-mlynow-belt` | — | Młynów Belt | place | "<system> Belt" convention; approved 2026-10-13 |
-| `cel-gate-mlynow` | — | Młynów Gate | place | gates named for the destination; two instances (`sys-rudnik`, `sys-penumbra`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory); approved 2026-10-13 |
+| `cel-mlynow-belt` | — | Asteroid Belt I | place | "Asteroid Belt <Roman numeral>" convention: numbered per system in celestial order (first belt = I); approved 2026-10-13 |
+| `cel-gate-mlynow` | — | Gate (Młynów) | place | "Gate (<destination display name>)" convention; two instances (`sys-rudnik`, `sys-penumbra`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory); approved 2026-10-13 |
 | `cel-kamieniec-star` | — | Kamieniec | place | star carries its system's name (existing convention); approved 2026-10-13 |
 | `cel-kamieniec-prime` | — | Kamieniec Prime | place | "<system> Prime" convention; approved 2026-10-13 |
 | `cel-doki` | — | **Doki** | place | Polish *doki* "the docks" (← *dok*); Kamieniec's shipyard & depot; approved 2026-10-13 |
-| `cel-kamieniec-belt` | — | Kamieniec Belt | place | "<system> Belt" convention; approved 2026-10-13 |
-| `cel-gate-kamieniec` | — | Kamieniec Gate | place | gates named for the destination; two instances (`sys-penumbra`, `sys-glusza`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory); approved 2026-10-13 |
+| `cel-kamieniec-belt` | — | Asteroid Belt I | place | "Asteroid Belt <Roman numeral>" convention: numbered per system in celestial order (first belt = I); approved 2026-10-13 |
+| `cel-gate-kamieniec` | — | Gate (Kamieniec) | place | "Gate (<destination display name>)" convention; two instances (`sys-penumbra`, `sys-glusza`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory); approved 2026-10-13 |
 | `cel-glusza-star` | — | Głusza | place | star carries its system's name (existing convention); approved 2026-10-13 |
 | `cel-glusza-prime` | — | Głusza Prime | place | "<system> Prime" convention; approved 2026-10-13 |
 | `cel-kantor` | — | **Kantor** | place | Polish *kantor* "trading post, exchange" (← German *Kontor*); Głusza's Unincorporated freeport; approved 2026-10-13 |
-| `cel-glusza-belt` | — | Głusza Belt | place | "<system> Belt" convention; approved 2026-10-13 |
-| `cel-gate-glusza` | — | Głusza Gate | place | gates named for the destination; two instances (`sys-kamieniec`, `sys-gloam`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory); approved 2026-10-13 |
+| `cel-glusza-belt` | — | Asteroid Belt I | place | "Asteroid Belt <Roman numeral>" convention: numbered per system in celestial order (first belt = I); approved 2026-10-13 |
+| `cel-gate-glusza` | — | Gate (Głusza) | place | "Gate (<destination display name>)" convention; two instances (`sys-kamieniec`, `sys-gloam`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory); approved 2026-10-13 |
 
 ### Corporations — manufacturers
 

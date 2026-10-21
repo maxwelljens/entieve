@@ -22,7 +22,7 @@
     },
     {
       "id": "cel-gloam-belt",
-      "name": "Pustkowie Belt",
+      "name": "Asteroid Belt I",
       "kind": "belt",
       "position": { "X": -492723823375, "Y": -766459280806 },
       "radius": 300000,
@@ -40,7 +40,7 @@
     },
     {
       "id": "cel-gate-penumbra",
-      "name": "Kuźnica Gate",
+      "name": "Gate (Kuźnica)",
       "kind": "gate",
       "position": { "X": 2788672514437, "Y": 1892313491939 },
       "radius": 2500,
@@ -52,7 +52,7 @@
     },
     {
       "id": "cel-gate-glusza",
-      "name": "Głusza Gate",
+      "name": "Gate (Głusza)",
       "kind": "gate",
       "position": { "X": -4064181929557, "Y": 2763643712099 },
       "radius": 2500,

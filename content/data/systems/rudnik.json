@@ -72,7 +72,7 @@
     },
     {
       "id": "cel-rudnik-belt",
-      "name": "Rudnik Belt",
+      "name": "Asteroid Belt I",
       "kind": "belt",
       "position": { "X": -371770736261, "Y": 294318499540 },
       "radius": 300000,
@@ -91,7 +91,7 @@
     },
     {
       "id": "cel-gate-solace",
-      "name": "Starogród Gate",
+      "name": "Gate (Starogród)",
       "kind": "gate",
       "position": { "X": -3492472586259, "Y": -1940262547922 },
       "radius": 2500,
@@ -103,7 +103,7 @@
     },
     {
       "id": "cel-gate-mlynow",
-      "name": "Młynów Gate",
+      "name": "Gate (Młynów)",
       "kind": "gate",
       "position": { "X": 4025289688051, "Y": 2631920180649 },
       "radius": 2500,

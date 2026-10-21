@@ -92,7 +92,7 @@
     },
     {
       "id": "cel-solace-belt",
-      "name": "Starogród Belt",
+      "name": "Asteroid Belt I",
       "kind": "belt",
       "position": { "X": -1054958828540, "Y": 767242784393 },
       "radius": 4000,
@@ -109,7 +109,7 @@
     },
     {
       "id": "cel-gate-penumbra",
-      "name": "Kuźnica Gate",
+      "name": "Gate (Kuźnica)",
       "kind": "gate",
       "position": { "X": 2945076955526, "Y": -2086096176831 },
       "radius": 2500,
@@ -121,7 +121,7 @@
     },
     {
       "id": "cel-gate-rudnik",
-      "name": "Rudnik Gate",
+      "name": "Gate (Rudnik)",
       "kind": "gate",
       "position": { "X": -4561869113906, "Y": 1710700917715 },
       "radius": 2500,
