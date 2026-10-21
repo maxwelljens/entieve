@@ -2,6 +2,7 @@ package sim
 
 import (
 	"encoding/json"
+	"reflect"
 	"sort"
 
 	"github.com/entieve/entieve/content"
@@ -714,132 +715,85 @@ func cloneHangar(h *Hangar) *Hangar {
 }
 
 // ---------------------------------------------------------------------------
-// Content-id migration: laser turrets + charges -> shell guns + shells
+// Content-id migration: retired ids -> their replacements
 // ---------------------------------------------------------------------------
 
-// legacyItemIDs maps the retired charge ids onto the small-calibre shell of
-// the same damage profile (the only calibre those guns could load).
-var legacyItemIDs = map[content.ItemID]content.ItemID{
-	"charge-emp":       "ammo-emp-s",
-	"charge-fusion":    "ammo-fusion-s",
-	"charge-ap":        "ammo-ap-s",
-	"charge-plutonium": "ammo-plutonium-s",
+// The content id types a save carries. Every other id type (systems,
+// celestials, NPCs, contracts, worlds) names content that has never been
+// renamed; a map key cannot be rewritten at all.
+var (
+	itemIDType     = reflect.TypeOf(content.ItemID(""))
+	moduleIDType   = reflect.TypeOf(content.ModuleID(""))
+	recipeIDType   = reflect.TypeOf(content.RecipeID(""))
+	contentIDTypes = map[reflect.Type]bool{
+		itemIDType:                         true,
+		moduleIDType:                       true,
+		recipeIDType:                       true,
+		reflect.TypeOf(content.ShipID("")): true,
+	}
+)
+
+// walkContentIDs visits every content id a save carries — through pointers,
+// struct fields, slices, arrays and map values — as an addressable string
+// value the visitor may rewrite in place. The walk is deterministic in
+// everything but map order, and a remap is order-independent.
+func walkContentIDs(save *Save, visit func(id reflect.Value)) {
+	walkIDs(reflect.ValueOf(save).Elem(), visit)
 }
 
-// legacyModuleIDs maps the retired turrets onto the small-calibre guns of
-// their family (EMP turret: fast light turret -> autocannon; rail: long-range
-// sniper -> artillery).
-var legacyModuleIDs = map[content.ModuleID]content.ModuleID{
-	"mod-emp-turret":  "mod-autocannon-s",
-	"mod-rail-turret": "mod-artillery-s",
+func walkIDs(v reflect.Value, visit func(id reflect.Value)) {
+	switch v.Kind() {
+	case reflect.Pointer:
+		if !v.IsNil() {
+			walkIDs(v.Elem(), visit)
+		}
+	case reflect.Struct:
+		for i := 0; i < v.NumField(); i++ {
+			walkIDs(v.Field(i), visit)
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			walkIDs(v.Index(i), visit)
+		}
+	case reflect.Map:
+		for _, k := range v.MapKeys() {
+			walkIDs(v.MapIndex(k), visit)
+		}
+	case reflect.String:
+		// shortcut: a map value of struct type is an unsettable copy, so an
+		// id inside one is skipped — no Save field does that today
+		// (TestWalkContentIDsCoversEveryField fails if one appears); upgrade
+		// to an addressable map walk when it does.
+		if v.CanSet() && contentIDTypes[v.Type()] {
+			visit(v)
+		}
+	}
 }
 
-// legacyRecipeIDs maps the retired production runs onto the shell recipes.
-var legacyRecipeIDs = map[content.RecipeID]content.RecipeID{
-	"rec-charge-emp":       "rec-ammo-emp-s",
-	"rec-charge-fusion":    "rec-ammo-fusion-s",
-	"rec-charge-ap":        "rec-ammo-ap-s",
-	"rec-charge-plutonium": "rec-ammo-plutonium-s",
+// remapLegacy rewrites one id through a registry table; current ids pass
+// through unchanged, so a second pass is a no-op.
+func remapLegacy[T ~string](id reflect.Value, legacy map[T]T) {
+	if n, ok := legacy[T(id.String())]; ok {
+		id.SetString(string(n))
+	}
 }
 
 // migrateLegacyIDs rewrites every content id a save carries into the current
-// vocabulary: hangar items and stored ships, cargo (space and ore holds),
-// fittings (and their runtimes), wreck loot, convoy shipments, resting
-// market orders and last-trade rungs, industry jobs, ledger-agent
-// inventories/beliefs/wishes and parked shipments. The
-// maps are static, so a save that already uses current ids restores
-// byte-identically; stack order is preserved (a rename never merges stacks).
+// vocabulary: the walker finds them all — hangar, cargo (space and ore
+// holds), fittings and their runtimes, wreck loot, convoy shipments, market
+// books and last-trade rungs, industry jobs, ledger agents, belt rocks, hulls
+// — and content.LegacyIDs supplies the replacements. The maps are static, so
+// a save that already uses current ids restores byte-identically; stack
+// order is preserved (a rename never merges stacks).
 func migrateLegacyIDs(save *Save) {
-	item := func(id *content.ItemID) {
-		if n, ok := legacyItemIDs[*id]; ok {
-			*id = n
+	walkContentIDs(save, func(id reflect.Value) {
+		switch id.Type() {
+		case itemIDType:
+			remapLegacy(id, content.LegacyIDs.Items)
+		case moduleIDType:
+			remapLegacy(id, content.LegacyIDs.Modules)
+		case recipeIDType:
+			remapLegacy(id, content.LegacyIDs.Recipes)
 		}
-	}
-	mod := func(id *content.ModuleID) {
-		if n, ok := legacyModuleIDs[*id]; ok {
-			*id = n
-		}
-	}
-	fits := func(ids []content.ModuleID) {
-		for i := range ids {
-			mod(&ids[i])
-		}
-	}
-	stacks := func(s []content.CargoStack) {
-		for i := range s {
-			item(&s[i].Item)
-		}
-	}
-
-	// Hangar.
-	stacks(save.Hangar.Items)
-	for i := range save.Hangar.Ships {
-		fits(save.Hangar.Ships[i].Fit)
-		stacks(save.Hangar.Ships[i].Cargo)
-	}
-
-	// Market books and the price ladder.
-	for _, orders := range save.Market {
-		for i := range orders {
-			item(&orders[i].Item)
-		}
-	}
-	for i := range save.MarketLasts {
-		item(&save.MarketLasts[i].Item)
-	}
-
-	// Entities: holds, fittings, wreck loot.
-	for i := range save.Entities {
-		se := &save.Entities[i]
-		if se.Cargo != nil {
-			stacks(se.Cargo.Stacks)
-			stacks(se.Cargo.Ore)
-		}
-		if se.Fitting != nil {
-			fits(se.Fitting.High)
-			fits(se.Fitting.Mid)
-			fits(se.Fitting.Low)
-			// Runtimes carry their own Def: a stale id there would stop
-			// resolving the module on the very next cycle.
-			for _, rts := range [][]ModuleRuntime{se.Fitting.HighRT, se.Fitting.MidRT, se.Fitting.LowRT} {
-				for j := range rts {
-					mod(&rts[j].Def)
-				}
-			}
-		}
-		if se.Wreck != nil {
-			stacks(se.Wreck.Loot)
-		}
-		if se.Traffic != nil {
-			item(&se.Traffic.Item) // the shipment a convoy is flying
-		}
-	}
-
-	// Industry jobs reference a recipe id.
-	for i := range save.Jobs {
-		if n, ok := legacyRecipeIDs[save.Jobs[i].Recipe]; ok {
-			save.Jobs[i].Recipe = n
-		}
-	}
-
-	// Ledger agents: inventory, beliefs, margins, haul wishes.
-	for i := range save.Agents {
-		a := &save.Agents[i]
-		stacks(a.Inventory)
-		for _, vals := range [][]SavedAgentVal{a.Beliefs, a.Margin} {
-			for j := range vals {
-				item(&vals[j].Item)
-			}
-		}
-		for _, ws := range [][]HaulWish{a.Wishes, a.InFlight} {
-			for j := range ws {
-				item(&ws[j].Item)
-			}
-		}
-	}
-
-	// Parked shipments between grids.
-	for i := range save.TrafficJourneys {
-		item(&save.TrafficJourneys[i].Item)
-	}
+	})
 }

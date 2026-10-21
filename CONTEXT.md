@@ -36,6 +36,7 @@ names the *modules and seams* we build that vocabulary into.
 | **Turnaround** | a station visit in stages: approach (2–4 s) → docked dwell (5–15 s, the cargo/market action fires partway through) → undock + departure beat |
 | **Hold** | a shipment parked upstream of a full gate queue: it waits in the journey ledger until the far queue drains, logging one line on entering the hold and one when it finally jumps |
 | **Agent cooldown** | per-agent jittered 1–10 s between behavior acts; one act moves capital at most once (its job / quotes / wish slot rotates on a stateless tick hash) |
+| **Legacy id** | a content id a rename retired, mapped onto its replacement in `content.LegacyIDs` (the keys are `content.RetiredIDs`): validation rejects them in shipped content, and restore remaps them in place — `sim.walkContentIDs` finds every id a save carries by reflection, so a new id-bearing field needs no second list |
 
 ## Architecture (the UI tranche)
 

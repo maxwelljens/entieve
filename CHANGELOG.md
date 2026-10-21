@@ -31,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One legacy-id registry, and restore finds every content id itself**:
+  `content.LegacyIDs` is the single retired-id table — validation
+  (`content.RetiredIDs`) and save restore read the same list — and restore
+  walks the whole `Save` type graph by reflection instead of a hand-written
+  field list, so retired ids in an ore hold, an asteroid or a belt rock now
+  migrate too (they silently did not before) and a new id-bearing save
+  field is covered the day it lands. Save schema stays 2, and saves using
+  current ids still restore byte-identically.
 - **HUD and module rack are one centered bottom pair**: the ship status
   (hull portrait, shield / armor / structure bars, capacitor, velocity)
   sits left, the rack immediately right, both on the 10 px bottom-center
