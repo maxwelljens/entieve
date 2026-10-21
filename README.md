@@ -198,7 +198,7 @@ go run ./cmd/entieve run --world world-default
 ```
 
 `simulate` executes tick-scheduled command scripts — JSON steps like
-`{"at_tick": 300, "action": "warp", "target": "Starogród Belt"}` — and prints
+`{"at_tick": 300, "action": "warp", "target": "Asteroid Belt I"}` — and prints
 every event plus a final state report (wallet, grid, state hash). Adding
 content without touching engine code is the intended workflow:
 [docs/CONTENT_AUTHORING.md](docs/CONTENT_AUTHORING.md) covers it, including

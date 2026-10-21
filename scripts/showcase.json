@@ -69,7 +69,7 @@
   {
     "at_tick": 7800,
     "action": "warp",
-    "target": "Starogród Belt"
+    "target": "Asteroid Belt I"
   },
   {
     "at_tick": 12060,
@@ -276,12 +276,12 @@
   {
     "at_tick": 53060,
     "action": "warp",
-    "target": "Kuźnica Gate"
+    "target": "Gate (Kuźnica)"
   },
   {
     "at_tick": 59060,
     "action": "jump",
-    "target": "Kuźnica Gate"
+    "target": "Gate (Kuźnica)"
   },
   {
     "at_tick": 59120,

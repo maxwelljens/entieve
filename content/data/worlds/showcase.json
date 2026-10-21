@@ -1,7 +1,7 @@
 {
   "id": "world-showcase",
   "name": "Showcase",
-  "description": "The test world: a fully fitted Väktare near the Starogród Belt whose scenario checkpoints exercise every Entieve feature. Driven headlessly by tests/showcase_test.go.",
+  "description": "The test world: a fully fitted Väktare near the Asteroid Belt I whose scenario checkpoints exercise every Entieve feature. Driven headlessly by tests/showcase_test.go.",
   "start": {
     "system": "sys-solace",
     "position": {
