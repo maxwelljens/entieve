@@ -422,10 +422,10 @@ func (g *Game) Update() error {
 }
 
 // handleKeys maps the global keyboard bindings: the KeyMap semantics the
-// legacy shell had (Esc menu, Ctrl+S / F9, time acceleration), the scene
-// overlays (N map, H help — their rows are Modal, i.e. scene-owned), the
-// panel toggles the Screen spec declares and, while no overlay scene is
-// on top, the world action keys.
+// legacy shell had (Esc menu, Ctrl+S / F9, time acceleration), the help
+// scene overlay (H — its row is Modal, i.e. scene-owned), the panel
+// toggles the Screen spec declares (the starmap's N among them) and, while
+// no overlay scene is on top, the world action keys.
 //
 // While the order mini-window has a focused price/qty field, the keys are
 // the field's: every hotkey yields so typing into it never fires a world
@@ -480,13 +480,12 @@ func (g *Game) handleKeys(in Input) error {
 			case g.menuModal:
 				// So is a context menu: it owns this frame's keys until
 				// the click or Esc that dismisses it has been spent.
-			case k == ebiten.KeyN:
-				g.toggleMap()
 			case k == ebiten.KeyH:
 				g.toggleHelp()
 			default:
 				// Every other keyed Screen flips its own flag from the
-				// spec (a Modal row is scene-owned and never reaches
+				// spec (the starmap included — it is a plain window now;
+				// a Modal row is scene-owned and never reaches
 				// pressScreen); an unclaimed key belongs to the world.
 				if !g.pressScreen(k, shift) && world {
 					g.worldKey(k, shift)
@@ -1016,21 +1015,12 @@ func (g *Game) onEscape() error {
 	switch g.top().(type) {
 	case *MenuScene:
 		g.pop()
-	case *MapScene, *HelpScene:
+	case *HelpScene:
 		g.pop()
 	default:
 		g.push(&MenuScene{g: g})
 	}
 	return nil
-}
-
-// toggleMap opens/closes the MapView overlay (N).
-func (g *Game) toggleMap() {
-	if _, ok := g.top().(*MapScene); ok {
-		g.pop() // OnLeave closes the map window
-		return
-	}
-	g.push(&MapScene{g: g})
 }
 
 // toggleHelp opens/closes the key-map overlay (H).

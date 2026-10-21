@@ -51,8 +51,6 @@ func (g *Game) toggleScreen(name string) {
 	}
 	if s.Modal {
 		switch s.ID {
-		case pMap:
-			g.toggleMap()
 		case pHelp:
 			g.toggleHelp()
 		case pMenu:

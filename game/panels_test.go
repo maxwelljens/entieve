@@ -213,18 +213,18 @@ func TestToggleKeys(t *testing.T) {
 		t.Error("plain L toggled the log (loot binding broken)")
 	}
 
-	// N toggles the MapView scene + window.
+	// N toggles the Starmap window (a plain window: no scene).
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyN}})
-	if _, ok := g.top().(*MapScene); !ok || !g.open[pMap] {
-		t.Fatal("N did not open the map scene")
+	if !g.open[pMap] {
+		t.Fatal("N did not open the starmap window")
 	}
 	g.syncMounts()
 	if g.mounted[pMap] == nil {
 		t.Fatal("map window not mounted")
 	}
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyN}})
-	if _, ok := g.top().(*MapScene); ok || g.open[pMap] {
-		t.Fatal("N did not close the map scene")
+	if g.open[pMap] {
+		t.Fatal("N did not close the starmap window")
 	}
 	g.syncMounts()
 	if g.mounted[pMap] != nil {
