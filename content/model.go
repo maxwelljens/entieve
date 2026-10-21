@@ -303,7 +303,7 @@ type GateDef struct {
 // orders (the economy's initial endowment: the book seeds every station
 // starts with; ongoing flow is never conjured).
 type StationDef struct {
-	Services []string         `json:"services"` // "repair" | "market" | "refine" | "fitting" | "industry"
+	Services []string         `json:"services"` // content.Services ids (repair | market | refine | fitting | industry)
 	Market   []MarketOrderDef `json:"market,omitempty"`
 }
 

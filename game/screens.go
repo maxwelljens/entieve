@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/uikit/icons"
 	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
@@ -579,7 +580,7 @@ func screenSpecErrors(rows []Screen) []string {
 		// Rail grouping and the station service the window needs:
 		// transients never enter the rail and must not claim a section,
 		// every other row must name a known group, and a service must be
-		// one the content model can offer.
+		// one the content table can offer (content.Services).
 		if s.DockPolicy == DockTransient {
 			if s.Group != "" {
 				add("row %d (%s): transient screen must not carry rail group %q", i, s.Title, s.Group)
@@ -589,8 +590,10 @@ func screenSpecErrors(rows []Screen) []string {
 		} else if !slices.Contains(railGroups[:], s.Group) {
 			add("row %d (%s): unknown rail group %q", i, s.Title, s.Group)
 		}
-		if s.Service != "" && !slices.Contains(stationServices[:], s.Service) {
-			add("row %d (%s): unknown station service %q", i, s.Title, s.Service)
+		if s.Service != "" {
+			if _, ok := content.Service(s.Service); !ok {
+				add("row %d (%s): unknown station service %q", i, s.Title, s.Service)
+			}
 		}
 	}
 	return probs

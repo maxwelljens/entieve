@@ -284,7 +284,7 @@ func (s *Sim) spawnAgents() {
 	}
 	per := max(1, agentRosterSize/len(stations))
 	for _, st := range stations {
-		industry := s.stationService(st, "industry")
+		industry := s.stationService(st, content.SvcIndustry)
 		for j := 0; j < per; j++ {
 			s.agents = append(s.agents, Agent{
 				ID:        fmt.Sprintf("ag-%03d", len(s.agents)+1),
@@ -778,7 +778,7 @@ func (s *Sim) agentPlan(a *Agent, V map[content.ItemID]float64) agentPlan {
 			}
 		}
 	case RoleIndustrialist:
-		if !s.stationService(a.Home, "industry") {
+		if !s.stationService(a.Home, content.SvcIndustry) {
 			break
 		}
 		found := false

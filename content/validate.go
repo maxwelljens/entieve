@@ -31,7 +31,15 @@ var (
 		CelStar: true, CelPlanet: true, CelMoon: true, CelStation: true,
 		CelBelt: true, CelGate: true, CelAnomaly: true,
 	}
-	validServices   = map[string]bool{"repair": true, "market": true, "refine": true, "fitting": true, "industry": true}
+	// validServices is the station service vocabulary of Services
+	// (services.go), the ids StationDef.Services may spell.
+	validServices = func() map[string]bool {
+		m := make(map[string]bool, len(Services))
+		for _, s := range Services {
+			m[s.ID] = true
+		}
+		return m
+	}()
 	validSecurities = map[string]bool{"high": true, "low": true, "null": true}
 	// recipeFamilies is the craft-growth vocabulary of RecipeDef.Family
 	// (model.go constants are authoritative).
@@ -622,7 +630,7 @@ func (v *validator) celestialBlocks(cctx string, sys *SystemDef, cel *CelestialD
 	if cel.Station != nil {
 		for _, s := range cel.Station.Services {
 			if !validServices[s] {
-				v.addf("%s: unknown station service %q (allowed: repair, market, refine, fitting, industry)", cctx, s)
+				v.addf("%s: unknown station service %q (see content.Services)", cctx, s)
 			}
 		}
 	}

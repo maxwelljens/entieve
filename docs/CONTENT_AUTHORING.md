@@ -469,6 +469,10 @@ trade should happen (the system must have ≥ 1 station):
 
 - `item`: ItemID, **ShipID cast to ItemID** (e.g. `"ship-kestrel"`), or
   ModuleID — see "Market orders" above.
+- `services`: `content.Services` ids only (`repair | market | refine |
+  fitting | industry`); that table (`content/services.go`) owns each id's
+  display label, icon and the window its services-row button toggles.
+  `just validate` rejects anything else.
 - `qty`: finite stock, ≥ 1; `price`: euro per unit, ≥ 0.
 - `side`: `"sell"` (an ask — the default when omitted) or `"buy"` (a bid).
 - Put hull orders at their balance price (frigate 200k–400k) and module

@@ -19,12 +19,6 @@ import (
 // and railEntries draws them in this order — spec order inside a section.
 var railGroups = [...]string{"Ship", "Trade", "Industry", "Station", "World", "Help & System"}
 
-// stationServices is the station service vocabulary a row's Service may
-// name — the mirror of content/validate.go's validServices (content does
-// not export it), so a typo'd service fails the spec instead of silently
-// never graying.
-var stationServices = [...]string{"repair", "market", "refine", "fitting", "industry"}
-
 // railEntries derives the rail's table from the spec plus the two core
 // windows: for each section in railGroups, the core entries that belong
 // to it (in declaration order), then every Screen row of that section in
