@@ -196,7 +196,7 @@ func (s *Sim) systemNpc() {
 			// anchored at its own celestial (see the systemNpc doc). Traffic
 			// patrols are driven by the belt sweep in systemTraffic instead.
 			if isGuard && security == "high" && !s.Patrols.Has(e) {
-				if rat := s.idleRatAt(ai.Home, security); !rat.IsZero() {
+				if rat := s.ratTargetAt(ai.Home, security); !rat.IsZero() {
 					s.guardEngageRat(e, ai, tr, rat, def)
 					break
 				}
@@ -339,31 +339,43 @@ func (s *Sim) npcPatrol(e ecs.Entity, ai *NpcAI, tr *Transform, def *content.Npc
 	s.Intents.Set(e, Intent{Kind: IntentManual, Dir: dir.Norm(), SpeedFrac: npcPatrolSpeedFrac})
 }
 
-// idleRatAt returns the first live rat (npc-rat-*) anchored at home that the
-// security forces may engage, in canonical handle order — the target a
+// ratTargetAt returns the rat (npc-rat-*) anchored at home the security
+// forces should engage next, in canonical handle order — the target a
 // high-sec guard clears, and the belt occupancy a patrol sweep looks for.
-// Zero when none. Home is the spawn anchor (the celestial position), so the
-// match is an exact comparison: no distance scan, no persisted state, and the
-// chase that follows is whatever the belt's own scatter gives.
-func (s *Sim) idleRatAt(home core.Vec2, sec string) ecs.Entity {
+// Free rats come first (a pilot's fight stays the pilot's while other rats
+// are free), but when none are free any live rat is returned: security
+// finishes the belt rather than leaving a player-touched rat parked there.
+// Zero only when the belt is empty. Home is the spawn anchor (the celestial
+// position), so the match is an exact comparison: no distance scan, no
+// persisted state, and the chase that follows is whatever the belt's own
+// scatter gives.
+func (s *Sim) ratTargetAt(home core.Vec2, sec string) ecs.Entity {
+	var live ecs.Entity
 	for _, e := range sortedEntities(s.AIs) {
 		ai, ok := s.AIs.Get(e)
-		if !ok || ai.Home != home || !s.ratFree(ai, sec) {
+		if !ok || ai.Home != home {
 			continue
 		}
-		if def, ok := s.Content.Npc(ai.Npc); ok && isRatNpc(def) {
+		if def, ok := s.Content.Npc(ai.Npc); !ok || !isRatNpc(def) {
+			continue
+		}
+		if s.ratFree(ai, sec) {
 			return e
 		}
+		if live.IsZero() {
+			live = e
+		}
 	}
-	return 0
+	return live
 }
 
-// ratFree reports whether a rat is free for the security forces to engage:
-// idle, or holding a pursuit the player has already left — outside the rat's
-// own leash, which systemNpc breaks off on the next tick (trigger (b) never
-// expires, so a rat the player damaged and flew away from flinches onto the
-// player every few ticks; that flinch is not a fight). A rat the player is
-// actually fighting stays the player's, and a fleeing one is left alone.
+// ratFree reports whether a rat is free to engage before the belt's
+// player-touched stragglers: idle, or holding a pursuit the player has
+// already left — outside the rat's own leash, which systemNpc breaks off on
+// the next tick (trigger (b) never expires, so a rat the player damaged and
+// flew away from flinches onto the player every few ticks; that flinch is
+// not a fight). A rat the player is actually fighting stays the player's
+// only while another rat is free; ratTargetAt falls back to it otherwise.
 func (s *Sim) ratFree(ai *NpcAI, sec string) bool {
 	switch ai.State {
 	case NpcIdle, "":

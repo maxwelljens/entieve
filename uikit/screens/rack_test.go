@@ -207,7 +207,7 @@ func TestRackTooltipStats(t *testing.T) {
 		{"DAMAGE", "Kinetic", "6.0"},
 		{"DAMAGE", "Explosive", "5.0"},
 		{"RANGE", "Optimal", "4.0 km"},
-		{"RANGE", "Falloff", "9.0 km"},
+		{"RANGE", "Falloff", "6.0 km"},
 		{"FIRING", "Tracking", "160.00 rad/s"},
 		{"CHARGE", "Loaded", "Auto"},
 		{"ACTIVATION", "Cycle", "3.0 s"},

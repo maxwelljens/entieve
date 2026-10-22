@@ -16,7 +16,7 @@
         "explosive": 5
       },
       "optimal": 4000,
-      "falloff": 9000,
+      "falloff": 6000,
       "tracking": 160,
       "ammo_class": "small",
       "shot_time": 3,

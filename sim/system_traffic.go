@@ -1852,11 +1852,12 @@ func (s *Sim) patrolSweepDispatch(p *Patrol, sys *content.SystemDef, td *content
 }
 
 // occupiedBelt returns the celestial entity of the first belt in the system
-// (celestial order) holding a live unmolested rat, or zero.
+// (celestial order) holding any live rat, or zero. Player-touched rats still
+// occupy the belt: the sweep is sent to finish it, free rats first.
 func (s *Sim) occupiedBelt(sys *content.SystemDef, sec string) ecs.Entity {
 	for i := range sys.Celestials {
 		cel := &sys.Celestials[i]
-		if cel.Kind != content.CelBelt || s.idleRatAt(cel.Position, sec).IsZero() {
+		if cel.Kind != content.CelBelt || s.ratTargetAt(cel.Position, sec).IsZero() {
 			continue
 		}
 		return s.celEntity(cel.ID)
@@ -1924,18 +1925,19 @@ func (s *Sim) patrolRespondStep(e ecs.Entity, p *Patrol, ai *NpcAI, sec string) 
 	s.npcActivate(e, ai, target)
 }
 
-// patrolSweepStep advances one patrol sweeping an occupied belt: warp to the
-// belt until a rat is inside engagement range, then lock and shoot the
-// closest live unmolested one; with none left it goes home (patrolReturnStep
-// flies it back). Rats respawn on their own timers, so the next beat re-arms
-// the sweep — ongoing skirmishes, no suppression.
+// patrolSweepStep advances one patrol sweeping an occupied belt: it hunts the
+// next rat (free ones first, then any the player left) — warping out to a
+// straggler beyond warp minimum range, thrusting after one closer — then
+// locks and shoots it. It goes home only when the belt is empty
+// (patrolReturnStep flies it back). Rats respawn on their own timers, so the
+// next beat re-arms the sweep — ongoing skirmishes, no suppression.
 func (s *Sim) patrolSweepStep(e ecs.Entity, p *Patrol, ai *NpcAI, sec string) {
 	if s.Warps.Has(e) {
 		return // warp state machine owns movement
 	}
-	// Hold station on the belt: systemNpc skips the idle-patrol circle while
-	// the patrol is responding, and a stale patrol intent must not steer it
-	// away from the rats (same rule as an ambush response).
+	// Hold station while in range: systemNpc skips the idle-patrol circle
+	// while the patrol is responding, and a stale patrol intent must not
+	// steer it away from the rats (same rule as an ambush response).
 	s.Intents.Set(e, Intent{Kind: IntentStop})
 	bp, ok := s.posOf(p.Incident)
 	if !ok {
@@ -1944,7 +1946,7 @@ func (s *Sim) patrolSweepStep(e ecs.Entity, p *Patrol, ai *NpcAI, sec string) {
 		p.Next = 0
 		return
 	}
-	target := s.idleRatAt(bp, sec)
+	target := s.ratTargetAt(bp, sec)
 	if target.IsZero() {
 		p.State = PatrolReturn
 		p.Incident = 0
@@ -1955,10 +1957,18 @@ func (s *Sim) patrolSweepStep(e ecs.Entity, p *Patrol, ai *NpcAI, sec string) {
 	if !ok {
 		return
 	}
-	if tp, ok := s.posOf(target); !ok || ep.Dist(tp) > trafficPatrolEngageRange {
-		if s.time >= p.Next && s.warpToPoint(e, bp) {
+	tp, ok := s.posOf(target)
+	if !ok {
+		return
+	}
+	if ep.Dist(tp) > trafficPatrolEngageRange {
+		// Hunt the straggler: warp out to it when it is beyond warp minimum
+		// range (the patrolRespondStep vocabulary), else close under thrust.
+		if ep.Dist(tp) >= WarpMinRange && s.time >= p.Next && s.warpToPoint(e, tp) {
 			p.Next = s.time + trafficWarpRetrySec
+			return
 		}
+		s.Intents.Set(e, Intent{Kind: IntentApproach, Target: target})
 		return
 	}
 	s.retargetWeapons(e, target)

@@ -149,7 +149,9 @@ proximity/intrusion/recent-work triggers are rat-only) — only
 player-sourced damage turns a patrol hostile. In high security they do
 clear the pirate rats anchored at their own celestial (the belt sweep,
 `sim/system_npc.go` / `sim/system_traffic.go`, pinned by
-`sim/patrol_belt_test.go`); rats already fighting are left alone.
+`sim/patrol_belt_test.go`): free rats are engaged first, but the sweep
+finishes the belt — a player-touched rat is hunted once it is the last one,
+and stragglers are chased off the anchor.
 
 **Systems** (`content/data/systems/*.json`, one file per system; display
 names are registered in `docs/lore/NAMING.md` — the ids below are frozen):

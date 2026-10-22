@@ -590,10 +590,11 @@ Charter space, a single responder arrives after about 15 seconds in the
 Fringe, and Unincorporated Pustkowie has no patrols at all. In Charter
 space they also work the belts: a static guard takes on the pirate rats
 anchored at its own celestial, and a patrol sweeps an occupied belt once a
-beat, kills the rats and flies home. Either way they leave rats that are
-already fighting alone — a belt you are working stays yours. A rat they
-kill leaves the same lootable wreck as any other kill; the bounty is paid
-only when the kill is yours.
+beat, hunts the rats down and flies home only once the belt is empty. Free
+rats come first — a belt you are working stays yours while there are others
+to shoot — but security finishes the job: if yours is the last rat left, the
+sweep takes it too. A rat they kill leaves the same lootable wreck as any
+other kill; the bounty is paid only when the kill is yours.
 
 **Rats ambush convoys in the Fringe and Unincorporated.** Every convoy
 transit in Kuźnica has roughly a 1-in-6 chance of being jumped, Pustkowie
