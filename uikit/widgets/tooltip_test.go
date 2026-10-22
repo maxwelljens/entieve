@@ -453,7 +453,7 @@ func TestModuleTipOmitsAbsentData(t *testing.T) {
 	m := ModuleTip(miner, "High slot 2", "", 0)
 	checkSections(t, "miner", m.Sections, []TooltipSection{
 		{Label: "YIELD", Rows: []TooltipRow{
-			{Label: "Per cycle", Value: "100.0 m³"},
+			{Label: "Per cycle", Value: "100 m³"},
 		}},
 		{Label: "ACTIVATION", Rows: []TooltipRow{
 			{Label: "Cycle", Value: "30.0 s"},

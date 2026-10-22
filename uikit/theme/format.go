@@ -68,9 +68,11 @@ func FormatCredits(v float64) string {
 	return s
 }
 
-// formatVolume renders a volume in m³ with one decimal: "123.4 m³".
+// formatVolume renders a volume in m³ at full precision with no trailing
+// zeroes: "0.005 m³", "123.4 m³", "400 m³" — small volumes (ammo rounds)
+// must not round away to 0.0.
 func FormatVolume(v float64) string {
-	return strconv.FormatFloat(v, 'f', 1, 64) + " m³"
+	return strconv.FormatFloat(v, 'f', -1, 64) + " m³"
 }
 
 // formatPct renders a fraction 0..1 as "87%".

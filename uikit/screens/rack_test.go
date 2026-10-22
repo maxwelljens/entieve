@@ -223,8 +223,8 @@ func TestRackTooltipStats(t *testing.T) {
 
 	// Mining laser: yield, cycle and capacitor draw — no charge section.
 	mining := r.cells[0][1].tip.View.Model()
-	if got := tipValue(mining, "YIELD", "Per cycle"); got != "100.0 m³" {
-		t.Errorf("miner yield = %q, want 100.0 m³", got)
+	if got := tipValue(mining, "YIELD", "Per cycle"); got != "100 m³" {
+		t.Errorf("miner yield = %q, want 100 m³", got)
 	}
 	if got := tipValue(mining, "ACTIVATION", "Cycle"); got != "30.0 s" {
 		t.Errorf("miner cycle = %q, want 30.0 s", got)

@@ -608,7 +608,7 @@ func ModuleSections(def *content.ModuleDef, charge string, chargeQty int) []Tool
 		}
 	case def.Mining != nil:
 		secs = append(secs, TooltipSection{Label: "YIELD", Rows: []TooltipRow{
-			{Label: "Per cycle", Value: theme.GroupFloat(def.Mining.VolumePerCycle, 1) + " m³"},
+			{Label: "Per cycle", Value: theme.FormatVolume(def.Mining.VolumePerCycle)},
 		}})
 	}
 

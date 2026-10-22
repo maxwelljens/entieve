@@ -173,7 +173,7 @@ func TestInfoPageHull(t *testing.T) {
 	if r := mustRow(t, page, "PROPULSION", "Align time"); r.Value != "32.0 s" {
 		t.Errorf("align = %+v (agility × 10)", r)
 	}
-	if r := mustRow(t, page, "CARGO", "Ore hold"); r.Value != "150.0 m³" {
+	if r := mustRow(t, page, "CARGO", "Ore hold"); r.Value != "150 m³" {
 		t.Errorf("ore hold = %+v", r)
 	}
 
