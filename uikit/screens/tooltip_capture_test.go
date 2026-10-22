@@ -12,8 +12,6 @@ import (
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/content"
-	"github.com/entieve/entieve/sim"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -49,7 +47,7 @@ func TestTooltipCaptureFrame(t *testing.T) {
 	if !ok {
 		t.Fatal("fixture: mod-autocannon-s missing")
 	}
-	_, build := r.cellTip(def, sim.SlotRef{Class: content.SlotHigh, Index: 0})
+	_, build := r.cellTip(r.cells[0][0], def)
 	model := build()
 	body, view := widgets.NewTipContent(env, model)
 

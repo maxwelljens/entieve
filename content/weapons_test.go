@@ -1,7 +1,6 @@
 package content
 
 import (
-	"math"
 	"strings"
 	"testing"
 )
@@ -170,7 +169,7 @@ func TestBayCalibration(t *testing.T) {
 				break
 			}
 		}
-		if got := int(math.Floor(m.Weapon.BayM3/vol + 1e-9)); got != want {
+		if got := m.BayRounds(vol); got != want {
 			t.Errorf("%s bay %v m³ / %v m³ = %d rounds, want %d", mid, m.Weapon.BayM3, vol, got, want)
 		}
 		if secs := float64(want) * m.Weapon.ShotTime; secs < 110 || secs > 130 {
@@ -181,8 +180,16 @@ func TestBayCalibration(t *testing.T) {
 	if booster == nil || booster.Boost == nil || booster.Boost.BayM3 != 0.25 {
 		t.Fatalf("cap booster bay = %+v, want 0.25 m³", booster)
 	}
-	if got := int(math.Floor(booster.Boost.BayM3/c.Items["charge-cap-cell"].Volume + 1e-9)); got != 25 {
+	if got := booster.BayRounds(c.Items["charge-cap-cell"].Volume); got != 25 {
 		t.Errorf("cap booster holds %d cells, want 25", got)
+	}
+	// The arithmetic lives in one place: no shell volume holds nothing, and
+	// a bayless module holds nothing whatever it is offered.
+	if got := booster.BayRounds(0); got != 0 {
+		t.Errorf("bay rounds of a volume-less shell = %d, want 0", got)
+	}
+	if pod := c.Modules["mod-rocket-pod"]; pod.BayRounds(0.005) != 0 {
+		t.Errorf("bayless weapon holds %d rounds", pod.BayRounds(0.005))
 	}
 	// The rocket pod stays charge-free: no bay, no ammo class.
 	if pod := c.Modules["mod-rocket-pod"]; pod.Weapon.AmmoClass != "" || pod.Weapon.BayM3 != 0 {

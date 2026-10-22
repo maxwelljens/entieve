@@ -3,7 +3,6 @@ package screens
 import (
 	"image/color"
 	"math"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 // iconColor is a palette color forced to the given opacity (the rack's
@@ -51,6 +51,11 @@ const (
 	// TestIconsCaptureFrame pins the result to the drawn pixels.
 	rackIconPad    = 20
 	rackIconEmptyW = 10
+	// rackBadgeR / rackBadgeInset place the waiting-state marker: a static
+	// palette dot in the tile's top-right corner, on its own overlay image
+	// so it shares the tile's rect without touching the glyph or the ring.
+	rackBadgeR     = 2 // dot radius (design px)
+	rackBadgeInset = 6 // dot centre inset from the tile's top-right corner
 )
 
 // rackClasses and rackRowLabels index the three slot rows.
@@ -67,10 +72,13 @@ var (
 // a second click inside the double-click window shows Show Info instead of
 // toggling — the click that completes the gesture is Show Info, strictly
 // (the old toggle+info dual gesture is gone; a lone click still toggles
-// exactly once). Right-clicking a cell opens its context menu from the
-// cell's declared RowSpec — Show Info, the loaded charge as a second ref,
-// and Cycle charge, which walks the old direct right-click's CmdSetAmmo
-// step (Auto → the weapon's ammo-class charges sitting in cargo → Auto).
+// exactly once). The one exception is a charge-fed cell in the WAITING
+// state (an empty bay with two or more round types in cargo and none
+// selected): its left-click opens the cell's menu — the charge picker —
+// and does not toggle. Right-clicking a cell opens its context menu from
+// the cell's declared RowSpec — Show Info, the selected charge as a second
+// ref, one "Load <round>" entry per round type in cargo, and Cycle charge,
+// which walks those types (each entry is a CmdSetAmmo).
 type Rack struct {
 	th        theme.Theme
 	cv        widgets.ContentView
@@ -100,16 +108,21 @@ type Rack struct {
 type rackCell struct {
 	slot     sim.SlotRef
 	root     *widget.Container
-	stack    *widget.Container // tile + cycle-ring overlay
+	stack    *widget.Container // tile + cycle-ring overlay + waiting badge
 	btn      *widget.Button
 	ring     *ebiten.Image
 	ringGfx  *widget.Graphic
+	badge    *ebiten.Image   // the waiting-state corner dot (static)
+	badgeGfx *widget.Graphic // its overlay, shown only while waiting
 	name     *widget.Text
 	ringOn   bool             // ring visible at the last Sync (a cycle in flight)
 	ringFrac float64          // ring fill at the last Sync (1 = just activated, 0 = done)
 	ringLit  bool             // ring colour: lit while repeating, greyed while cancelled
 	tip      widgets.RowTip   // structured hover tooltip (built on first fit)
 	spec     widgets.RowSpec  // declared interactions, rebuilt by syncCell
+	clip     sim.ClipState    // shell bay at the last Sync
+	hasClip  bool             // the fitted module loads rounds (sim.Clip ok)
+	waiting  bool             // empty bay, no selection, 2+ round types in cargo
 	module   content.ModuleID // module currently shown ("" = empty slot)
 	icon     string           // glyph the tile currently shows ("" = none)
 	active   bool             // runtime Active at the last Sync
@@ -198,6 +211,8 @@ func NewRack(env widgets.Seams) *Rack {
 func (r *Rack) newCell(row, idx int) *rackCell {
 	p := r.th.Pal()
 	cell := &rackCell{slot: sim.SlotRef{Class: rackClasses[row], Index: idx}}
+	// Both the tile and the name line share one click seam (see clickCell).
+	click := func(a *widget.WidgetMouseButtonClickedEventArgs) { r.clickCell(cell, a) }
 
 	// The tile carries the glyph only: ebitenui lays a graphic button out
 	// as [text][graphic] with a fixed 10 px spacing, so the graphic
@@ -214,17 +229,7 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 		widget.ButtonOpts.TextPadding(&widget.Insets{Left: theme.Px(3), Right: theme.Px(3), Top: theme.Px(2), Bottom: theme.Px(2)}),
 		widget.ButtonOpts.WidgetOpts(
 			widget.WidgetOpts.MinSize(theme.Px(rackCellW), theme.Px(rackCellH)),
-			widget.WidgetOpts.MouseButtonClickedHandler(func(a *widget.WidgetMouseButtonClickedEventArgs) {
-				switch a.Button {
-				case ebiten.MouseButtonLeft:
-					if r.dbl.Click(r.cv, r.as, cell.spec) {
-						return // double-click: Show Info opened, the click does not toggle
-					}
-					r.toggleModule(cell)
-				case ebiten.MouseButtonRight:
-					widgets.OpenRowMenu(r.cv, r.menuSink(), cell.spec, widgets.ClickPoint(a))
-				}
-			}),
+			widget.WidgetOpts.MouseButtonClickedHandler(click),
 		),
 	)
 	// The name line under the tile: the same click seam as the tile, so
@@ -234,17 +239,7 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 		widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionCenter),
 		widget.TextOpts.WidgetOpts(
 			widget.WidgetOpts.MinSize(0, theme.Px(rackNameH)),
-			widget.WidgetOpts.MouseButtonClickedHandler(func(a *widget.WidgetMouseButtonClickedEventArgs) {
-				switch a.Button {
-				case ebiten.MouseButtonLeft:
-					if r.dbl.Click(r.cv, r.as, cell.spec) {
-						return // double-click: Show Info opened, the click does not toggle
-					}
-					r.toggleModule(cell)
-				case ebiten.MouseButtonRight:
-					widgets.OpenRowMenu(r.cv, r.menuSink(), cell.spec, widgets.ClickPoint(a))
-				}
-			}),
+			widget.WidgetOpts.MouseButtonClickedHandler(click),
 		),
 	)
 	// The cycle ring is a transparent overlay in the tile's stack: the
@@ -252,10 +247,20 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 	cell.ring = ebiten.NewImage(theme.Px(rackCellW), theme.Px(rackCellH))
 	cell.ringGfx = widget.NewGraphic(widget.GraphicOpts.Image(cell.ring))
 	theme.ShowWidget(cell.ringGfx.GetWidget(), false)
+	// The waiting badge rides its own overlay for the same reason — and so
+	// the ring's falling-edge Clear can never wipe it: one static palette
+	// dot in the tile's top-right corner, hidden unless the bay waits.
+	cell.badge = ebiten.NewImage(theme.Px(rackCellW), theme.Px(rackCellH))
+	s := theme.Scale()
+	vector.DrawFilledCircle(cell.badge,
+		float32(float64(theme.Px(rackCellW))-rackBadgeInset*s), float32(rackBadgeInset*s),
+		float32(rackBadgeR*s), p.Info, false)
+	cell.badgeGfx = widget.NewGraphic(widget.GraphicOpts.Image(cell.badge))
+	theme.ShowWidget(cell.badgeGfx.GetWidget(), false)
 	cell.stack = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewStackedLayout()),
 	)
-	cell.stack.AddChild(cell.btn, cell.ringGfx)
+	cell.stack.AddChild(cell.btn, cell.ringGfx, cell.badgeGfx)
 	cell.root = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
@@ -263,6 +268,29 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 	)
 	cell.root.AddChild(cell.stack, cell.name)
 	return cell
+}
+
+// clickCell is the cell's one click seam (tile and name share it). Left
+// toggles the module — except on a waiting charge-fed cell, where it opens
+// the cell's own menu instead: the bay is dry and two or more round types
+// compete, so a toggle could only no-op until a type is chosen; the menu's
+// Load entries are the picker. The double-click gesture resolves first, so
+// a repeat click still shows info in every state. Right-click opens the
+// cell's declared menu.
+func (r *Rack) clickCell(cell *rackCell, a *widget.WidgetMouseButtonClickedEventArgs) {
+	switch a.Button {
+	case ebiten.MouseButtonLeft:
+		if r.dbl.Click(r.cv, r.as, cell.spec) {
+			return // double-click: Show Info opened, the click does not toggle
+		}
+		if cell.waiting {
+			widgets.OpenRowMenu(r.cv, r.menuSink(), cell.spec, widgets.ClickPoint(a))
+			return
+		}
+		r.toggleModule(cell)
+	case ebiten.MouseButtonRight:
+		widgets.OpenRowMenu(r.cv, r.menuSink(), cell.spec, widgets.ClickPoint(a))
+	}
 }
 
 // rackGlyph resolves one tile image: the module's class glyph in the given
@@ -369,9 +397,20 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 	// Rewriting the label every frame is cheap (Text.measure early-returns
 	// on an unchanged label) and keeps the empty-slot case honest without
 	// a separate "first sync" flag; the tooltip rebuilds only when its
-	// change key moves (module, charge or cargo count).
+	// change key moves (module, charge, cargo count or bay round).
 	cell.module = id
 	cell.active = active
+	// The bay is the sim's own read (Clip): loaded rounds, selection and
+	// every round type in cargo that fits. A waiting cell (empty bay, no
+	// selection, two or more types competing — sim fillClip's ambiguous
+	// case) wears the badge and its click opens the picker.
+	cell.clip, cell.hasClip = sim.ClipState{}, false
+	if def != nil {
+		cell.clip, cell.hasClip = r.cv.Clip(cell.slot)
+	}
+	cell.waiting = cell.hasClip && cell.clip.Rounds == 0 &&
+		cell.clip.Selection == "" && len(cell.clip.Options) >= 2
+	theme.ShowWidget(cell.badgeGfx.GetWidget(), cell.waiting)
 	// Glyph + name: the tile shows the module's class, the line under it
 	// keeps the short name (and the click seam) exactly where it was.
 	icon := ""
@@ -456,9 +495,12 @@ func (r *Rack) shortName(def *content.ModuleDef) string {
 
 // cellSpec is one fitted cell's declared interactions (RowSpec): Show
 // Info on the module first, the preferred charge as the secondary ref,
-// then the separator and Cycle charge — gated exactly where it could
-// no-op. An empty slot declares nothing: no menu, no tooltip, and its
-// double-click (like every click) never leaves the toggle's hands.
+// then the separator and the charge verbs — one "Load <round>" per round
+// type the bay could take (the picker a waiting cell's left-click opens),
+// and Cycle charge, which walks those same types (no auto entry: auto mode
+// is gone from the design). An empty slot declares nothing: no menu, no
+// tooltip, and its double-click (like every click) never leaves the
+// toggle's hands.
 func (r *Rack) cellSpec(cell *rackCell, def *content.ModuleDef) widgets.RowSpec {
 	if def == nil {
 		return widgets.RowSpec{}
@@ -470,25 +512,32 @@ func (r *Rack) cellSpec(cell *rackCell, def *content.ModuleDef) widgets.RowSpec 
 		secondary := widgets.ItemRef(id)
 		spec.SecRef = &secondary
 	}
+	for _, id := range cell.clip.Options {
+		spec.Actions = append(spec.Actions, widgets.RowAction{
+			Label:  "Load " + r.ammoName(id),
+			Intent: widgets.CycleCharge{Slot: cell.slot, Item: id}, // the same CmdSetAmmo
+		})
+	}
 	if def.Weapon != nil && def.Weapon.AmmoClass != "" {
-		next, advances := cycleNext(r.ammoCandidates(def.Weapon.AmmoClass), r.ammoPref[cell.slot])
+		next, advances := cycleNext(cell.clip.Options, r.ammoPref[cell.slot])
 		cycleable := advances && r.as != nil
-		spec.Actions = []widgets.RowAction{{
+		spec.Actions = append(spec.Actions, widgets.RowAction{
 			Label:    "Cycle charge",
 			Disabled: !cycleable,
 			Intent:   widgets.CycleCharge{Slot: cell.slot, Item: next},
-		}}
+		})
 	}
-	key, build := r.cellTip(def, cell.slot)
+	key, build := r.cellTip(cell, def)
 	spec.Tip = widgets.TipData{Key: key, Build: build}
 	return spec
 }
 
-// menuSink is the sink the row menu dispatches through: a Cycle charge
-// intent also advances the rack's own preferred-charge mirror on its way
-// out. The mirror is presentation state the sim keeps private (its pref
-// is unexported), and both the cell's SecRef and the cycle order read it
-// — so the rack updates it exactly when its own menu fires the intent.
+// menuSink is the sink the row menu dispatches through: a charge intent
+// (Cycle charge or a Load entry — both are CycleCharge, both a CmdSetAmmo)
+// also advances the rack's own preferred-charge mirror on its way out. The
+// mirror is presentation state the sim keeps private (its pref is
+// unexported), and both the cell's SecRef and the cycle order read it — so
+// the rack updates it exactly when its own menu fires the intent.
 func (r *Rack) menuSink() widgets.ActionSink {
 	return widgets.SinkFunc(func(i widgets.Intent) {
 		if cc, ok := i.(widgets.CycleCharge); ok {
@@ -500,17 +549,17 @@ func (r *Rack) menuSink() widgets.ActionSink {
 
 // cellTip builds one fitted cell's tooltip: the shared module model plus
 // what the rack alone knows — the slot, the preferred charge and its cargo
-// count — and the footer hints ("Right-click: module menu", "Click:
-// activate"). The returned key covers every input the model reads, so Sync
-// only re-builds the panel when it would actually change — the builder is
-// invoked through the row's Tip data exactly then (and on first attach),
-// never as a per-frame throwaway.
-func (r *Rack) cellTip(def *content.ModuleDef, slot sim.SlotRef) (string, func() widgets.TooltipModel) {
+// count — the bay row (ClipTip) and the footer hints ("Right-click: module
+// menu", "Click: activate"). The returned key covers every input the model
+// reads, so Sync only re-builds the panel when it would actually change —
+// the builder is invoked through the row's Tip data exactly then (and on
+// first attach), never as a per-frame throwaway.
+func (r *Rack) cellTip(cell *rackCell, def *content.ModuleDef) (string, func() widgets.TooltipModel) {
 	// The rack-only inputs: which charge this cell prefers and how many of
 	// it sit in cargo (the menu behind the hint shows the cycle action).
 	charge, qty := "", 0
 	if def.Weapon != nil && def.Weapon.AmmoClass != "" {
-		id := r.ammoPref[slot]
+		id := r.ammoPref[cell.slot]
 		charge = r.ammoName(id)
 		qty = r.cargoQty(id)
 	}
@@ -518,9 +567,22 @@ func (r *Rack) cellTip(def *content.ModuleDef, slot sim.SlotRef) (string, func()
 	if def.ActivationTime > 0 {
 		hints = append(hints, "Click: activate")
 	}
-	key := string(def.ID) + "|" + charge + "|" + strconv.Itoa(qty)
+	// The bay row counts rounds of the round the bay would load: its
+	// volume sets the count, so that type is part of the key. No type at
+	// all (a waiting bay) has no count to show — the row says so instead.
+	roundID := cell.clip.Item
+	if roundID == "" {
+		roundID = cell.clip.Selection
+	}
+	key := string(def.ID) + "|" + charge + "|" + strconv.Itoa(qty) + "|" + string(roundID)
 	return key, func() widgets.TooltipModel {
-		return widgets.ModuleTip(def, widgets.SlotLabel(slot), charge, qty, hints...)
+		var round *content.ItemDef
+		if roundID != "" {
+			if d, ok := r.cv.Defs().Item(roundID); ok {
+				round = d
+			}
+		}
+		return widgets.ClipTip(widgets.ModuleTip(def, widgets.SlotLabel(cell.slot), charge, qty, hints...), def, round)
 	}
 }
 
@@ -544,44 +606,16 @@ func (r *Rack) cargoQty(id content.ItemID) int {
 	return qty
 }
 
-// ammoName renders a charge preference for the tooltip ("" = Auto).
+// ammoName renders a charge preference for the tooltip ("" = None: the bay
+// waits for a choice, there is no auto mode any more).
 func (r *Rack) ammoName(id content.ItemID) string {
 	if id == "" {
-		return "Auto"
+		return "None"
 	}
 	if def, ok := r.cv.Defs().Item(id); ok {
 		return def.Name
 	}
 	return string(id)
-}
-
-// ammoCandidates returns the charge choices for a weapon class: "" (Auto)
-// first, then every distinct cargo item of that ammo class ordered by item
-// id for determinism.
-func (r *Rack) ammoCandidates(class string) []content.ItemID {
-	var stacks []content.CargoStack
-	if s := r.cv; s != nil {
-		if cg, ok := s.Cargo(s.Player()); ok {
-			stacks = cg.Stacks
-		}
-	}
-	seen := map[content.ItemID]bool{}
-	var ids []content.ItemID
-	for _, st := range stacks {
-		if st.Qty <= 0 || seen[st.Item] {
-			continue
-		}
-		def, ok := r.cv.Defs().Item(st.Item)
-		if !ok || def.AmmoClass != class {
-			continue
-		}
-		seen[st.Item] = true
-		ids = append(ids, st.Item)
-	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-	out := make([]content.ItemID, 0, len(ids)+1)
-	out = append(out, "")
-	return append(out, ids...)
 }
 
 // toggleModule emits the activation toggle for one cell: Deactivate

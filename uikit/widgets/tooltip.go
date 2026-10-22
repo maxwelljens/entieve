@@ -686,7 +686,7 @@ func ModuleSections(def *content.ModuleDef, charge string, chargeQty int) []Tool
 	return secs
 }
 
-// moduleTip builds the shared module tooltip model — the rack cells and the
+// ModuleTip builds the shared module tooltip model — the rack cells and the
 // Fitting window's module rows both come through here, so the two can never
 // disagree about a module's numbers.
 //
@@ -721,4 +721,54 @@ func ModuleTip(def *content.ModuleDef, slotText, charge string, chargeQty int, h
 		m.Sections = append(m.Sections, TooltipSection{Label: "ACTIVATION", Rows: rows})
 	}
 	return m
+}
+
+// ClipTip adds the bay ("clip") row to a charge-fed module's tooltip model:
+// the bay's m³, the whole rounds it holds of the round it would load and the
+// load cycle (one firing cycle). round is that charge (nil = the bay waits
+// for a choice, so the row says so and counts nothing). A module without a
+// bay comes back unchanged — no row, no placeholder.
+func ClipTip(m TooltipModel, def *content.ModuleDef, round *content.ItemDef) TooltipModel {
+	if clipBay(def) <= 0 {
+		return m
+	}
+	row := TooltipRow{Label: "Clip", Value: "waiting for ammo selection"}
+	if round != nil && round.Volume > 0 {
+		row.Value = theme.FormatVolume(clipBay(def)) + " · " +
+			theme.FormatInt(int64(def.BayRounds(round.Volume))) + " rounds · " +
+			theme.GroupFloat(clipCycle(def), 1) + " s"
+	}
+	// The bay belongs to the charge block; a model without one (the cap
+	// booster, whose charge the tooltip does not name) gets its own.
+	for i := range m.Sections {
+		if m.Sections[i].Label == "CHARGE" {
+			m.Sections[i].Rows = append(m.Sections[i].Rows, row)
+			return m
+		}
+	}
+	m.Sections = append(m.Sections, TooltipSection{Label: "CHARGE", Rows: []TooltipRow{row}})
+	return m
+}
+
+// clipBay is a module's bay capacity in m³ (0 = the module loads no rounds):
+// the gun's weapon bay, or the cap booster's cell bay.
+func clipBay(def *content.ModuleDef) float64 {
+	switch {
+	case def == nil:
+		return 0
+	case def.Weapon != nil:
+		return def.Weapon.BayM3
+	case def.Boost != nil:
+		return def.Boost.BayM3
+	}
+	return 0
+}
+
+// clipCycle is the time a bay load costs: one firing cycle (the shot time),
+// the activation time for the cap booster.
+func clipCycle(def *content.ModuleDef) float64 {
+	if def.Weapon != nil && def.Weapon.ShotTime > 0 {
+		return def.Weapon.ShotTime
+	}
+	return def.ActivationTime
 }

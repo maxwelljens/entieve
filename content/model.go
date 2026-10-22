@@ -7,6 +7,7 @@
 package content
 
 import (
+	"math"
 	"strings"
 
 	"github.com/entieve/entieve/core"
@@ -277,6 +278,26 @@ type ModuleDef struct {
 	Mining         *MiningAttrs  `json:"mining,omitempty"`
 	Boost          *BoostAttrs   `json:"boost,omitempty"`
 	Price          float64       `json:"price"` // credits, for market seeding
+}
+
+// BayRounds is how many whole rounds of a shell of the given m³ volume the
+// module's bay holds: the floor arithmetic the bay calibration pins (the
+// epsilon absorbs the binary rounding of decimal m³ volumes). 0 = no bay
+// on this module, or a shell larger than it.
+func (m *ModuleDef) BayRounds(shellVolume float64) int {
+	if m == nil || shellVolume <= 0 {
+		return 0
+	}
+	bay := 0.0
+	if m.Weapon != nil {
+		bay = m.Weapon.BayM3
+	} else if m.Boost != nil {
+		bay = m.Boost.BayM3
+	}
+	if bay <= 0 {
+		return 0
+	}
+	return int(math.Floor(bay/shellVolume + 1e-9))
 }
 
 // LootDrop is one entry of an NPC loot table.

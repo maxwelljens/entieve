@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Ammo selection on the rack — picker, Load entries, waiting badge, bay
+  row** (`uikit`): the magazine feature's UI half.
+  - A charge-fed cell whose bay **waits for a choice** (empty bay, two or
+    more round types in cargo, none selected) now says so: an `Info`-blue
+    corner dot on the tile (static, its own overlay — the glyph, the cycle
+    ring and the 50×40 hit area are untouched), and a left click opens the
+    cell's menu — the charge picker — instead of toggling. Every other
+    state toggles exactly as before; double-click is still Show Info.
+  - The cell menu lists one **Load** `<round name>` entry per round type
+    the bay could take that sits in cargo (item-id order; the cap booster
+    offers its cell too), in addition to Show Info, the charge ref and Cycle
+    charge. Every entry emits the same `CmdSetAmmo` Cycle charge does.
+  - **Cycle charge no longer passes through auto**: the `""` (none) entry
+    is gone and cycling walks only real round types in cargo, wrapping at
+    the end. The tooltip's charge row reads `None` instead of `Auto` while
+    nothing is chosen.
+  - The module tooltip gains a bay line on charge-fed modules — `Clip`
+    `0.2 m³ · 40 rounds · 3.0 s` (bay capacity, whole rounds of the round
+    it would load, one load cycle) or `waiting for ammo selection`. The
+    round count reuses content's calibration arithmetic through the new
+    `content.ModuleDef.BayRounds` (also used by `TestBayCalibration`); a
+    module with no bay shows no row.
+  - New read-only seam `widgets.ContentView.Clip` over `sim.Clip`; there is
+    one implementation (`view`), so no stub needed updating. Docs: GAMEPLAY
+    "Bays" / "Ammo cycling", NAMING rows (proposed).
 - **Market category tree and search** (`content`, `uikit`, `game`): every
   marketable def (`ItemDef`, `ModuleDef`, `ShipDef`) now carries a validated
   **`group`** path (1–3 segments, e.g. `Ships/Frigates`,

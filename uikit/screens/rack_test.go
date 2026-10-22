@@ -209,7 +209,7 @@ func TestRackTooltipStats(t *testing.T) {
 		{"RANGE", "Optimal", "4.0 km"},
 		{"RANGE", "Falloff", "6.0 km"},
 		{"FIRING", "Tracking", "160.00 rad/s"},
-		{"CHARGE", "Loaded", "Auto"},
+		{"CHARGE", "Loaded", "None"},
 		{"ACTIVATION", "Cycle", "3.0 s"},
 	} {
 		if got := tipValue(gun, want.sec, want.label); got != want.value {
@@ -262,7 +262,7 @@ func TestRackTooltipStats(t *testing.T) {
 	// The menu footer promises what a right-click opens (the module menu
 	// carries Cycle charge, gated to where it can act): stripping the
 	// cargo of that weapon's charges disarms Cycle charge but keeps the
-	// menu — Show Info still works (the charge block stays, reads Auto).
+	// menu — Show Info still works (the charge block stays, reads None).
 	cg, ok := env.Sim.Cargos.Get(env.Sim.Player())
 	if !ok {
 		t.Fatal("player has no cargo")
@@ -273,8 +273,8 @@ func TestRackTooltipStats(t *testing.T) {
 	if len(gun.Hints) != 2 || gun.Hints[0] != "Right-click: module menu" || gun.Hints[1] != "Click: activate" {
 		t.Errorf("disarmed gun hints = %q, want the menu and activate footers", gun.Hints)
 	}
-	if tipValue(gun, "CHARGE", "Loaded") != "Auto" {
-		t.Errorf("charge block = %+v, want Loaded Auto", tipSection(gun, "CHARGE"))
+	if tipValue(gun, "CHARGE", "Loaded") != "None" {
+		t.Errorf("charge block = %+v, want Loaded None", tipSection(gun, "CHARGE"))
 	}
 
 	// Empty slots keep their tooltip empty (the widget drops the ToolTips).
@@ -288,12 +288,13 @@ func TestRackTooltipStats(t *testing.T) {
 }
 
 // TestRackRightClickCyclesAmmo is the command-wiring test: right-clicking
-// the EMP turret opens its context menu (Show Info first and bold, then
-// the charge ref, a separator and Cycle charge), and picking Cycle charge
-// walks Auto → the four light charges in cargo (item-id order) → Auto,
-// each step enqueuing exactly one CmdSetAmmo — the same command the old
-// direct right-click issued. Non-weapon cells never enqueue (their menu
-// has no cycle entry at all).
+// the EMP turret opens its context menu (Show Info first and bold, then the
+// charge ref, a separator, one "Load <round>" per round type in cargo, and
+// Cycle charge last), and picking Cycle charge walks the four light rounds
+// in cargo (item-id order) and wraps back to the first, each step enqueuing
+// exactly one CmdSetAmmo. There is no Auto entry any more: the auto mode is
+// gone from the design, so cycling only ever walks real types. Non-weapon
+// cells never enqueue (their menu has no cycle entry at all).
 func TestRackRightClickCyclesAmmo(t *testing.T) {
 	env, cmds := newChromeEnv(t)
 	r := NewRack(env)
@@ -301,40 +302,49 @@ func TestRackRightClickCyclesAmmo(t *testing.T) {
 	c.AddPanel(r.Container(), r)
 	c.Frame(t, 1280, 720) // Sync + Update registers the click handlers
 
-	// Candidates: Auto first, then the gun's shells in cargo by item id. (The
-	// class is the fitted autocannon's family: shell families split from the
-	// bare calibre with the bay tranche.)
-	gunDef, _ := env.Content.Module("mod-autocannon-s")
-	wantCands := []content.ItemID{"", "ammo-ap-s", "ammo-emp-s", "ammo-fusion-s", "ammo-plutonium-s"}
-	got := r.ammoCandidates(gunDef.Weapon.AmmoClass)
-	if len(got) != len(wantCands) {
-		t.Fatalf("candidates = %v, want %v", got, wantCands)
-	}
-	for i := range wantCands {
-		if got[i] != wantCands[i] {
-			t.Fatalf("candidates = %v, want %v", got, wantCands)
-		}
-	}
-
 	gun := r.cells[0][0] // EMP Turret, high slot 1
 	slot := sim.SlotRef{Class: content.SlotHigh, Index: 0}
 
-	// The first menu: Show Info leads (bold), then the separator and
-	// Cycle charge (no charge preferred yet → no charge-ref row).
+	// Candidates: the gun's shells in cargo by item id — the sim's own bay
+	// read (Clip.Options), which is what the menu and the cycle walk. The
+	// class is the fitted autocannon's family: shell families split from the
+	// bare calibre with the bay tranche.
+	wantCands := []content.ItemID{"ammo-ap-s", "ammo-emp-s", "ammo-fusion-s", "ammo-plutonium-s"}
+	if !gun.hasClip {
+		t.Fatal("fixture gun declares no bay")
+	}
+	if got := gun.clip.Options; len(got) != len(wantCands) {
+		t.Fatalf("candidates = %v, want %v", got, wantCands)
+	} else {
+		for i := range wantCands {
+			if got[i] != wantCands[i] {
+				t.Fatalf("candidates = %v, want %v", got, wantCands)
+			}
+		}
+	}
+
+	// The first menu: Show Info leads (bold), then the separator, the four
+	// Load entries in item-id order and Cycle charge (no charge preferred
+	// yet → no charge-ref row).
 	rightClick(c, t, gun.btn)
 	m := env.Menu()
 	if !m.IsOpen() {
 		t.Fatal("rack right-click opened no menu")
 	}
-	if ents := m.Entries(); len(ents) != 3 ||
+	ents := m.Entries()
+	if len(ents) != 7 ||
 		ents[0].Label != "Show Info" || !ents[0].Bold || ents[0].Disabled ||
 		!ents[1].Sep ||
-		ents[2].Label != "Cycle charge" || ents[2].Disabled {
+		ents[2].Label != "Load 40mm armour-piercing" ||
+		ents[3].Label != "Load 40mm ion" ||
+		ents[4].Label != "Load 40mm high-explosive" ||
+		ents[5].Label != "Load 40mm plutonium" ||
+		ents[6].Label != "Cycle charge" || ents[6].Disabled {
 		t.Fatalf("rack menu entries = %+v", ents)
 	}
 	m.Esc()
 
-	wantItems := []content.ItemID{"ammo-ap-s", "ammo-emp-s", "ammo-fusion-s", "ammo-plutonium-s", ""}
+	wantItems := []content.ItemID{"ammo-ap-s", "ammo-emp-s", "ammo-fusion-s", "ammo-plutonium-s", "ammo-ap-s"}
 	for i, want := range wantItems {
 		before := len(*cmds)
 		pickMenuEntry(t, c, env, gun.btn, "Cycle charge")
@@ -363,25 +373,244 @@ func TestRackRightClickCyclesAmmo(t *testing.T) {
 	r.ammoPref[slot] = "ammo-fusion-s"
 	r.Sync()
 	rightClick(c, t, gun.btn)
-	if ents := env.Menu().Entries(); len(ents) != 4 || ents[1].Label != "Show Info — "+r.ammoName("ammo-fusion-s") {
+	if ents := env.Menu().Entries(); len(ents) != 8 || ents[1].Label != "Show Info — "+r.ammoName("ammo-fusion-s") {
 		t.Fatalf("menu with a preferred charge = %+v", ents)
 	}
 	env.Menu().Esc()
 	r.ammoPref[slot] = ""
 
 	// The mining laser and the ammo-less rocket pod never enqueue: their
-	// menus carry no Cycle charge entry to press.
+	// menus carry neither Cycle charge nor a Load entry.
 	for _, idx := range []int{1, 2} {
 		before := len(*cmds)
 		rightClick(c, t, r.cells[0][idx].btn)
 		for _, e := range env.Menu().Entries() {
-			if e.Label == "Cycle charge" {
-				t.Fatalf("non-weapon cell %d menu offers Cycle charge", idx)
+			if strings.HasPrefix(e.Label, "Load ") || e.Label == "Cycle charge" {
+				t.Fatalf("non-weapon cell %d menu offers %q", idx, e.Label)
 			}
 		}
 		env.Menu().Click(env.Menu().RowRect(0).Min) // any press closes it
 		if len(*cmds) != before {
 			t.Fatalf("non-weapon cell %d enqueued %d commands", idx, len(*cmds)-before)
+		}
+	}
+}
+
+// TestRackWaitingClickOpensPicker pins the context-aware click: a waiting
+// gun's left click opens its menu (the charge picker) and does NOT toggle,
+// while the same cell toggles exactly as before once a round type is chosen
+// — the single-click toggle contract the other tests hold.
+func TestRackWaitingClickOpensPicker(t *testing.T) {
+	env, cmds := newChromeEnv(t)
+	r := NewRack(env)
+	c := newChromeUI(env)
+	c.AddPanel(r.Container(), r)
+	c.Frame(t, 1280, 720)
+
+	gun := r.cells[0][0] // EMP Turret, high slot 1
+	slot := sim.SlotRef{Class: content.SlotHigh, Index: 0}
+	if !gun.waiting {
+		t.Fatalf("fixture gun is not waiting (rounds %d, selected %q, options %v)",
+			gun.clip.Rounds, gun.clip.Selection, gun.clip.Options)
+	}
+	if len(*cmds) != 0 {
+		t.Fatalf("fixture: %d commands already queued", len(*cmds))
+	}
+
+	// A lone click on the waiting cell: the picker, not a toggle.
+	spendDouble(r)
+	leftClick(c, t, gun.btn)
+	if len(*cmds) != 0 {
+		t.Fatalf("waiting click enqueued %d commands, want none (the picker, never a toggle)", len(*cmds))
+	}
+	if !env.Menu().IsOpen() {
+		t.Fatal("waiting click opened no menu")
+	}
+	// Picking a type is the whole point: one CmdSetAmmo, the sim's command.
+	pressMenuEntry(t, env, "Load 40mm ion")
+	if len(*cmds) != 1 {
+		t.Fatalf("Load press enqueued %d commands, want 1", len(*cmds))
+	}
+	if cmd, ok := (*cmds)[0].(sim.CmdSetAmmo); !ok || cmd.Slot != slot || cmd.Item != "ammo-emp-s" {
+		t.Fatalf("Load press = %+v (%T), want CmdSetAmmo on ammo-emp-s", (*cmds)[0], (*cmds)[0])
+	}
+
+	// The same cell with a chosen type toggles exactly once, as before.
+	selectCharge(env.Sim, slot)
+	*cmds = (*cmds)[:0]
+	r.Sync()
+	spendDouble(r)
+	leftClick(c, t, gun.btn)
+	if len(*cmds) != 1 {
+		t.Fatalf("non-waiting click enqueued %d commands, want the single toggle", len(*cmds))
+	}
+	if _, ok := (*cmds)[0].(sim.CmdActivate); !ok {
+		t.Fatalf("non-waiting click = %T, want sim.CmdActivate", (*cmds)[0])
+	}
+	if env.Menu().IsOpen() {
+		t.Error("non-waiting click opened the picker")
+	}
+}
+
+// TestRackLoadEntriesLoadTheChosenRound: the menu's "Load <round>" verbs are
+// the picker — one per round type in cargo, each enqueuing the CmdSetAmmo
+// for its own type — and the cap booster, a charge user that is no weapon,
+// offers its cell the same way (with no Cycle charge: one type cannot
+// cycle).
+func TestRackLoadEntriesLoadTheChosenRound(t *testing.T) {
+	env, cmds := newChromeEnv(t)
+	r := NewRack(env)
+	c := newChromeUI(env)
+	c.AddPanel(r.Container(), r)
+	c.Frame(t, 1280, 720)
+
+	gun := r.cells[0][0]
+	slot := sim.SlotRef{Class: content.SlotHigh, Index: 0}
+	before := len(*cmds)
+	rightClick(c, t, gun.btn)
+	pressMenuEntry(t, env, "Load 40mm high-explosive")
+	if len(*cmds) != before+1 {
+		t.Fatalf("Load press enqueued %d commands, want 1", len(*cmds)-before)
+	}
+	if cmd, ok := (*cmds)[before].(sim.CmdSetAmmo); !ok || cmd.Slot != slot || cmd.Item != "ammo-fusion-s" {
+		t.Fatalf("Load press = %+v (%T), want CmdSetAmmo on ammo-fusion-s", (*cmds)[before], (*cmds)[before])
+	}
+	if r.ammoPref[slot] != "ammo-fusion-s" {
+		t.Errorf("local ammo mirror = %q, want the loaded type", r.ammoPref[slot])
+	}
+
+	// The cap booster: fit it (the fixture flies a shield booster there) and
+	// give it cells, then its cell offers the cell type and nothing else.
+	fit, ok := env.Sim.Fittings.Get(env.Sim.Player())
+	if !ok {
+		t.Fatal("player has no fitting")
+	}
+	fit.Mid[1] = "mod-cap-booster"
+	fit.MidRT[1] = sim.ModuleRuntime{Def: "mod-cap-booster"}
+	cg, ok := env.Sim.Cargos.Get(env.Sim.Player())
+	if !ok {
+		t.Fatal("player has no cargo")
+	}
+	cg.Stacks = append(cg.Stacks, content.CargoStack{Item: "charge-cap-cell", Qty: 10})
+	r.Sync()
+
+	booster := r.cells[1][1]
+	if !booster.hasClip || booster.waiting {
+		t.Fatalf("booster bay = %+v (clip %v), want a loaded bay", booster.clip, booster.hasClip)
+	}
+	rightClick(c, t, booster.btn)
+	ents := env.Menu().Entries()
+	if len(ents) != 3 || ents[0].Label != "Show Info" || !ents[1].Sep ||
+		ents[2].Label != "Load Capacitor Booster Cell" || ents[2].Disabled {
+		t.Fatalf("booster menu entries = %+v", ents)
+	}
+	before = len(*cmds)
+	pressMenuEntry(t, env, "Load Capacitor Booster Cell")
+	if len(*cmds) != before+1 {
+		t.Fatalf("booster Load press enqueued %d commands, want 1", len(*cmds)-before)
+	}
+	if cmd, ok := (*cmds)[before].(sim.CmdSetAmmo); !ok ||
+		cmd.Slot != (sim.SlotRef{Class: content.SlotMid, Index: 1}) || cmd.Item != "charge-cap-cell" {
+		t.Fatalf("booster Load press = %+v (%T), want CmdSetAmmo on charge-cap-cell", (*cmds)[before], (*cmds)[before])
+	}
+}
+
+// TestRackWaitingBadge pins the waiting marker: a cell whose bay waits
+// wears the static corner dot, a cell whose bay has a chosen type does not,
+// and the badge leaves the cell's geometry, glyph and ring untouched (it is
+// its own overlay, not a change to the tile).
+func TestRackWaitingBadge(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	r := NewRack(env)
+	c := newChromeUI(env)
+	c.AddPanel(r.Container(), r)
+	c.Frame(t, 1280, 720)
+
+	gun := r.cells[0][0]
+	if !gun.waiting {
+		t.Fatalf("fixture gun is not waiting (rounds %d, options %v)", gun.clip.Rounds, gun.clip.Options)
+	}
+	shown := func() bool {
+		return gun.badgeGfx.GetWidget().GetVisibility() == widget.Visibility_Show
+	}
+	if !shown() {
+		t.Error("waiting cell wears no badge")
+	}
+	tile := gun.btn.GetWidget().Rect
+	name := gun.name.GetWidget().Rect
+	root := gun.root.GetWidget().Rect
+	glyph := gun.btn.GraphicImage().Idle
+	if badge := gun.badgeGfx.GetWidget().Rect; !badge.In(tile) {
+		t.Errorf("badge rect %v escapes the tile %v", badge, tile)
+	}
+	if gun.badge == gun.ring {
+		t.Error("badge shares the ring's image: the ring's clear would wipe it")
+	}
+	if gun.ringOn {
+		t.Error("an idle waiting cell drew a cycle ring")
+	}
+
+	// A chosen type ends the waiting state: the badge goes, nothing moves.
+	selectCharge(env.Sim, sim.SlotRef{Class: content.SlotHigh, Index: 0})
+	c.Frame(t, 1280, 720)
+	if gun.waiting {
+		t.Error("a chosen round type still reads as waiting")
+	}
+	if shown() {
+		t.Error("the badge is still shown with a chosen type")
+	}
+	if gun.btn.GetWidget().Rect != tile || gun.name.GetWidget().Rect != name ||
+		gun.root.GetWidget().Rect != root {
+		t.Error("the badge disturbed the cell geometry")
+	}
+	if gun.btn.GraphicImage().Idle != glyph {
+		t.Error("the badge replaced the tile glyph")
+	}
+
+	// Modules with no bay never wear it (the miner and the rocket pod).
+	for _, idx := range []int{1, 2} {
+		cell := r.cells[0][idx]
+		if cell.waiting || cell.badgeGfx.GetWidget().GetVisibility() == widget.Visibility_Show {
+			t.Errorf("bayless cell %d wears the waiting badge", idx)
+		}
+	}
+}
+
+// TestRackTooltipClipRow pins the bay row on the cell tooltip: the bay's
+// m³, the whole rounds it holds of the round it would load and the load
+// cycle, the waiting wording while no type is chosen (no count at all), and
+// nothing for charge-free modules.
+func TestRackTooltipClipRow(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	r := NewRack(env)
+	c := newChromeUI(env)
+	c.AddPanel(r.Container(), r)
+	c.Frame(t, 1280, 720)
+
+	gun := r.cells[0][0]
+	if !gun.waiting {
+		t.Fatal("fixture gun is not waiting")
+	}
+	if got := tipValue(gun.tip.View.Model(), "CHARGE", "Clip"); got != "waiting for ammo selection" {
+		t.Errorf("waiting clip row = %q, want the waiting wording", got)
+	}
+
+	// A chosen 40 mm shell: the 0.2 m³ bay holds 40 of them, one load costs
+	// the gun's 3 s cycle.
+	selectCharge(env.Sim, sim.SlotRef{Class: content.SlotHigh, Index: 0})
+	r.Sync()
+	if got := tipValue(gun.tip.View.Model(), "CHARGE", "Clip"); got != "0.2 m³ · 40 rounds · 3.0 s" {
+		t.Errorf("clip row = %q, want 0.2 m³ · 40 rounds · 3.0 s", got)
+	}
+
+	// Charge-free modules carry no clip row at all.
+	for _, idx := range []int{1, 2} { // mining laser, rocket pod
+		for _, sec := range r.cells[0][idx].tip.View.Model().Sections {
+			for _, row := range sec.Rows {
+				if row.Label == "Clip" {
+					t.Errorf("cell %d carries a clip row: %+v", idx, row)
+				}
+			}
 		}
 	}
 }
@@ -432,6 +661,19 @@ func leftClick(c *chromeUI, t *testing.T, btn *widget.Button) {
 // human-paced.
 func spendDouble(r *Rack) { r.dbl.Armed = false }
 
+// selectCharge gives a gun's bay a chosen round type. The fixture's cargo
+// carries four shell types, so a fresh bay has none selected and the cell
+// sits in the WAITING state — where a left click opens the charge picker
+// instead of toggling (TestRackWaitingClickOpensPicker). Every toggle
+// contract below needs the ordinary, non-waiting state.
+func selectCharge(s *sim.Sim, slot sim.SlotRef) {
+	fit, ok := s.Fittings.Get(s.Player())
+	if !ok {
+		return
+	}
+	fit.Runtimes(slot.Class)[slot.Index].Selection = "ammo-ap-s"
+}
+
 // TestRackLeftClickToggles is the command-wiring test for defect 3:
 // left-click enqueues CmdDeactivate for a running module and CmdActivate
 // for an idle one (target resolved from the locks), empty slots are inert,
@@ -447,6 +689,9 @@ func TestRackLeftClickToggles(t *testing.T) {
 	gun := r.cells[0][0] // EMP Turret, high slot 1 (a weapon)
 	miner := r.cells[0][1]
 	slot := sim.SlotRef{Class: content.SlotHigh, Index: 0}
+	// A chosen round type is the plain toggle state (see selectCharge).
+	selectCharge(s, slot)
+	r.Sync()
 
 	// Empty slots are inert: no fitting, no enqueue.
 	if len(*cmds) != 0 {
@@ -566,6 +811,7 @@ func TestRackClickTargetsSelection(t *testing.T) {
 	}
 	selected := second
 	r.SetTargetPicker(func() ecs.Entity { return selected })
+	selectCharge(s, sim.SlotRef{Class: content.SlotHigh, Index: 0}) // non-waiting: a click toggles
 	r.Sync()
 
 	gun := r.cells[0][0] // EMP Turret: a weapon
@@ -635,10 +881,11 @@ func TestRackCellStacksTileAndName(t *testing.T) {
 }
 
 // TestRackCellSpecData: what each cell DECLARES (its RowSpec) — the
-// fitted weapon declares its module Ref, the Cycle charge action and the
-// tooltip payload (and gains the charge's secondary ref once one is
-// preferred), a non-weapon declares no Cycle charge, and an empty slot
-// declares nothing at all (no menu, no tooltip).
+// fitted weapon declares its module Ref, one Load verb per round type in
+// cargo, the Cycle charge action and the tooltip payload (and gains the
+// charge's secondary ref once one is preferred), a non-weapon declares no
+// charge verbs, and an empty slot declares nothing at all (no menu, no
+// tooltip).
 func TestRackCellSpecData(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	r := NewRack(env)
@@ -646,18 +893,24 @@ func TestRackCellSpecData(t *testing.T) {
 	c.AddPanel(r.Container(), r)
 	c.Frame(t, 1280, 720)
 
-	gun := r.cells[0][0] // EMP Turret: a weapon with the "small" ammo class
+	gun := r.cells[0][0] // EMP Turret: a weapon with the "small-autocannon" family
 	if gun.spec.Ref == nil || *gun.spec.Ref != widgets.ModuleRef("mod-autocannon-s") {
 		t.Fatalf("gun Ref = %v, want module/mod-autocannon-s", gun.spec.Ref)
 	}
 	if gun.spec.SecRef != nil {
 		t.Errorf("gun declares a secondary ref before any charge is preferred: %v", *gun.spec.SecRef)
 	}
-	if len(gun.spec.Actions) != 1 || gun.spec.Actions[0].Label != "Cycle charge" {
-		t.Fatalf("gun actions = %+v, want the single Cycle charge", gun.spec.Actions)
+	acts := gun.spec.Actions
+	if len(acts) != 5 ||
+		acts[0].Label != "Load 40mm armour-piercing" ||
+		acts[1].Label != "Load 40mm ion" ||
+		acts[2].Label != "Load 40mm high-explosive" ||
+		acts[3].Label != "Load 40mm plutonium" ||
+		acts[4].Label != "Cycle charge" {
+		t.Fatalf("gun actions = %+v, want four Load entries then Cycle charge", acts)
 	}
-	if gun.spec.Actions[0].Disabled {
-		t.Error("Cycle charge grayed with light charges in cargo")
+	if acts[4].Disabled {
+		t.Error("Cycle charge grayed with four shell types in cargo")
 	}
 	if gun.spec.Tip.Key == "" || gun.spec.Tip.Build == nil {
 		t.Error("gun declares no tooltip payload")
@@ -706,6 +959,10 @@ func TestRackDoubleClickShowsInfoWithoutToggle(t *testing.T) {
 	if len(*cmds) != 0 {
 		t.Fatalf("fixture: %d commands queued", len(*cmds))
 	}
+	// A chosen round type keeps the cell out of the waiting state, where a
+	// click would open the charge picker instead of toggling.
+	selectCharge(env.Sim, sim.SlotRef{Class: content.SlotHigh, Index: 0})
+	r.Sync()
 
 	// A lone click toggles (single-click activation, preserved exactly).
 	leftClick(c, t, gun.btn)

@@ -494,6 +494,62 @@ func TestModuleTipOmitsAbsentData(t *testing.T) {
 	}
 }
 
+// TestClipTipBayRow pins the bay row a charge-fed module's tooltip gains:
+// the bay's m³, the whole rounds it holds of the round it would load and
+// the load cycle, the waiting wording while no round is chosen (no count),
+// and no row at all on a module without a bay. The count is the content
+// calibration's own arithmetic (ModuleDef.BayRounds), not a second copy.
+func TestClipTipBayRow(t *testing.T) {
+	c := content.MustLoad()
+	gun, ok := c.Module("mod-autocannon-s")
+	if !ok {
+		t.Fatal("content: mod-autocannon-s missing")
+	}
+	ion, ok := c.Item("ammo-emp-s")
+	if !ok {
+		t.Fatal("content: ammo-emp-s missing")
+	}
+	m := ClipTip(ModuleTip(gun, "High slot 1", "None", 0), gun, ion)
+	if got := tipValue(m, "CHARGE", "Clip"); got != "0.2 m³ · 40 rounds · 3.0 s" {
+		t.Errorf("small autocannon clip row = %q, want 0.2 m³ · 40 rounds · 3.0 s", got)
+	}
+	// No round chosen (a waiting bay): the row says so and counts nothing.
+	m = ClipTip(ModuleTip(gun, "High slot 1", "None", 0), gun, nil)
+	if got := tipValue(m, "CHARGE", "Clip"); got != "waiting for ammo selection" {
+		t.Errorf("waiting clip row = %q, want the waiting wording", got)
+	}
+
+	// The cap booster is a charge user too: its cell bay and 5 s cycle.
+	booster, ok := c.Module("mod-cap-booster")
+	if !ok {
+		t.Fatal("content: mod-cap-booster missing")
+	}
+	cell, ok := c.Item("charge-cap-cell")
+	if !ok {
+		t.Fatal("content: charge-cap-cell missing")
+	}
+	m = ClipTip(ModuleTip(booster, "Mid slot 1", "", 0), booster, cell)
+	if got := tipValue(m, "CHARGE", "Clip"); got != "0.25 m³ · 25 rounds · 5.0 s" {
+		t.Errorf("cap booster clip row = %q, want 0.25 m³ · 25 rounds · 5.0 s", got)
+	}
+
+	// Modules with no bay keep no Clip row (and no empty section either).
+	for _, id := range []content.ModuleID{"mod-rocket-pod", "mod-mining-laser"} {
+		def, ok := c.Module(id)
+		if !ok {
+			t.Fatalf("content: %s missing", id)
+		}
+		m = ClipTip(ModuleTip(def, "High slot 1", "", 0), def, nil)
+		for _, sec := range m.Sections {
+			for _, row := range sec.Rows {
+				if row.Label == "Clip" {
+					t.Errorf("%s carries a clip row: %+v", id, row)
+				}
+			}
+		}
+	}
+}
+
 // TestNewTipKeepsHoverContract pins the behaviour the plain-text tooltip
 // shipped with: the shared 300 ms delay, the cursor-sticky position and the
 // 12 px offset — the structured panel changes what is drawn, not when.
