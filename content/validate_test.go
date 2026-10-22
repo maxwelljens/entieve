@@ -22,7 +22,7 @@ func TestValidateRealContent(t *testing.T) {
 func baseContent() *Content {
 	return &Content{
 		Items: map[ItemID]*ItemDef{
-			"min-fer":     {ID: "min-fer", Name: "Ferrite", Group: "Materials/Minerals", Category: CatMineral, Volume: 0.01, BasePrice: 6},
+			"min-fer":     {ID: "min-fer", Name: "Sideron", Group: "Materials/Minerals", Category: CatMineral, Volume: 0.01, BasePrice: 6},
 			"ore-rock":    {ID: "ore-rock", Name: "Test Rock", Group: "Materials/Ore", Category: CatOre, Volume: 1, BasePrice: 20, RefineYield: map[ItemID]float64{"min-fer": 0.5}},
 			"charge-cell": {ID: "charge-cell", Name: "Cell", Group: "Ammunition/Cap cells", Category: CatCharge, Volume: 0.01, BasePrice: 100},
 			"charge-bolt": {ID: "charge-bolt", Name: "Bolt", Group: "Ammunition/Autocannon shells", Category: CatAmmo, Volume: 0.01, BasePrice: 10, Damage: &Damage{EM: 10}, AmmoClass: "light"},

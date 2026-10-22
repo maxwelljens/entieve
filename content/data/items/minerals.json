@@ -2,7 +2,7 @@
   {
     "id": "min-ferrite",
     "group": "Materials/Minerals",
-    "name": "Ferrite",
+    "name": "Sideron",
     "description": "Common base metal; the bread and butter of every industrial hull.",
     "category": "mineral",
     "volume": 0.01,
@@ -11,7 +11,7 @@
   {
     "id": "min-nickel",
     "group": "Materials/Minerals",
-    "name": "Nickel",
+    "name": "Nixium",
     "description": "Refined transition metal used in armor plating and reactor linings.",
     "category": "mineral",
     "volume": 0.01,
@@ -20,7 +20,7 @@
   {
     "id": "min-cobalt",
     "group": "Materials/Minerals",
-    "name": "Cobalt",
+    "name": "Zaffrite",
     "description": "Hard, heat-resistant metal; staple of high-grade plating.",
     "category": "mineral",
     "volume": 0.01,
@@ -29,7 +29,7 @@
   {
     "id": "min-silex",
     "group": "Materials/Minerals",
-    "name": "Silex",
+    "name": "Vetril",
     "description": "Crystalline silicate flake used in ceramics and sensor lattices.",
     "category": "mineral",
     "volume": 0.01,
@@ -38,7 +38,7 @@
   {
     "id": "min-glacite",
     "group": "Materials/Minerals",
-    "name": "Glacite",
+    "name": "Cryolith",
     "description": "Supercooled mineral ice recovered from frontier belts.",
     "category": "mineral",
     "volume": 0.01,
@@ -47,7 +47,7 @@
   {
     "id": "min-argon",
     "group": "Materials/Minerals",
-    "name": "Argon",
+    "name": "Helion",
     "description": "Inert gas prized as a laser coolant and reactor buffer.",
     "category": "mineral",
     "volume": 0.01,

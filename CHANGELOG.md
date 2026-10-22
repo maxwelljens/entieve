@@ -95,6 +95,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Naval calibre rename** (`content`, `docs`): ammunition display names now
+  carry calibre and payload (`40mm ion`, `57mm armour-piercing`,
+  `152mm high-explosive`, `203mm plutonium`, …; autocannon 40/57/76 mm,
+  artillery 127/152/203 mm) and the autocannon market branch reads
+  **Ammunition/Autocannon rounds**. Minerals read **Sideron**, **Nixium**,
+  **Zaffrite**, **Vetril**, **Cryolith**, **Helion**; the ores **Kerngrit
+  Ore** and **Borealite Ore** (contract "Kerngrit order"). Ids and all
+  balance numbers are unchanged; generic ammunition prose now says round.
+
 - **Station books stock artillery shells** (`content/data/systems`): every
   station that sells an artillery gun now lists its family's shells too, and
   the systems whose belts/anomalies spawn Hierarchs (Kuźnica, Głusza) stock

@@ -174,7 +174,7 @@ func chainVal(qty float64) string {
 
 // manufacturedRows builds the MANUFACTURED FROM rows: this product's
 // recipe inputs as label-side link rows carrying their per-run quantity
-// ("Ferrite ×720"). A hull's recipe also reports its family and base time
+// ("Sideron ×720"). A hull's recipe also reports its family and base time
 // (the craft curve the sim applies lives in the sim — this is the raw
 // recipe figure).
 func manufacturedRows(cv widgets.ContentView, id string) []infoRow {

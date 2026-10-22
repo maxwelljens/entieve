@@ -313,32 +313,32 @@ details. Under the grid sits the **Hangar**: **fit** modules from it into
 their first free slot (double-click a module does exactly that) and
 **unfit** them back, and **assemble** stored hulls. A **Fitting summary**
 strip closes the window: the fit's **Total DPS** (each weapon's loaded or
-selected shell over its fire period, exactly the shell the bay would fire),
+selected round over its fire period, exactly the round the bay would fire),
 the **Cap drain** of the running modules against the
 **Cap recharge** curve's peak, and the verdict — **Cap stable** or
 **Cap unstable (~Ns)** — over a drain-vs-recharge bar. The slots/hangar
 seam still drags, and the arrangement persists.
 
-**Weapons and shells.** Projectile guns come in two families:
+**Weapons and rounds.** Projectile guns come in two families:
 **autocannons** (fast cycle, high tracking, short optimal range) and
 **artillery** (slow cycle, poor tracking, long optimal range, a heavier
 volley out of a longer shell). Both are built in three calibres — small,
-medium, large — so there are six **shell families** (small/medium/large ×
-autocannon/artillery), each with four damage profiles (EMP, fusion,
-armor-piercing, plutonium). A gun loads only the shells of its own family.
-The shell carries the damage mix; the gun's multiplier and cycle decide how
+medium, large — so there are six **round families** (small/medium/large ×
+autocannon/artillery), each with four damage profiles (ion, high-explosive,
+armour-piercing, plutonium). A gun loads only the rounds of its own family.
+The round carries the damage mix; the gun's multiplier and cycle decide how
 hard and how often it lands. Projectile guns draw no capacitor.
 
-**Bays.** Every gun that loads shells — and the cap booster — carries a
+**Bays.** Every gun that loads rounds — and the cap booster — carries a
 **bay** sized in m³. A **load cycle** fills it from cargo with a full bay of
-one shell type and costs one firing cycle, so a reload pauses the gun for a
+one round type and costs one firing cycle, so a reload pauses the gun for a
 beat (about every forty small autocannon rounds, or every ~120 s of
-sustained fire; twenty-five cap booster cells). With one shell type in
+sustained fire; twenty-five cap booster cells). With one round type in
 cargo the bay looks after itself: pre-loaded when fitted, topped up while
 that type lasts, and switched when it runs out and one other type is left.
 With two or more types in cargo the gun **waits for a choice** — the rack's
 **Cycle charge** picks the type (`CmdSetAmmo`), dumping the loaded rounds
-back to cargo and loading the new ones. A gun with no matching shells at
+back to cargo and loading the new ones. A gun with no matching rounds at
 all is dry and warns `no charges`; a waiting gun stays quiet. Loaded rounds
 travel with the ship: unfitting the gun returns them to cargo, and a wreck
 carries whatever was in its bays when it came apart.
@@ -417,8 +417,8 @@ omniscience), enforced in the sim's read model and the renderer alike.
 
 **Ammo cycling.** Right-click a weapon cell in the module rack for its
 context menu: **Show Info** for the module, **Show Info —** the loaded
-shell, and **Cycle charge**, which steps the bay's shell **none → each
-shell of that weapon's family that sits in your cargo → none** (the sim
+round, and **Cycle charge**, which steps the bay's round **none → each
+round of that weapon's family that sits in your cargo → none** (the sim
 validates the family and cargo, dumps the old rounds back and logs the
 load). "None" is the waiting state: the gun reloads by itself only when a
 single type is left in cargo.
@@ -448,7 +448,7 @@ shows two sections.
 
 **Available contracts** — the docked station's board. Each row shows the
 title, the objective (`Destroy 1× Scuttler`,
-`Deliver 2 m³ EMP Charge to Przystań`, `Mine 400 m³ Cordite Ore` — every
+`Deliver 2 m³ 40mm ion to Przystań`, `Mine 400 m³ Kerngrit Ore` — every
 objective label right-clicks to **Show Info** on the item it names) and
 the reward (`40,000.00 € · +0.10 standing`). Press **Accept** to take it; a
 contract above your standing shows its requirement
@@ -538,7 +538,7 @@ in the middle and **My orders** on the right, with a draggable seam between
 each pair (both proportions persist with the layout). The tree is the
 content's own category path — `All` at the root, then `Ships`, `Modules`,
 `Ammunition`, `Materials` and `Loot` with their children (hull classes,
-slot/role groups, shell families). Clicking a branch expands it and scopes
+slot/role groups, round families). Clicking a branch expands it and scopes
 the catalog to its subtree; clicking an item highlights its branch. Every
 item is listed, including the hulls and wares no one sells here — a dim row
 whose **Buy** is grayed until some local order offers it (**Request on
@@ -608,7 +608,7 @@ outpost **Halda** (market and repairs), with gates back to Starogród and
 on to Młynów.
 
 **The Fringe.** **Kuźnica** is the junction of the rush — four gates, NPCs
-aggressive, the belt holding richer ore (cordite, lucidite), and the
+aggressive, the belt holding richer ore (kerngrit, lucidite), and the
 anomaly **Gniazdo** hiding Marauders plus a Hierarch boss with the best
 loot. Its station, **Przystań**, is a freeport: it runs the level-2 board,
 doubles as the local insurance point (see Contracts & standing) and builds
@@ -618,7 +618,7 @@ its platform **Huta** refines and manufactures (market, refine, industry).
 fitting, industry), and the lane on to Głusza.
 
 **Unincorporated.** **Pustkowie** is the dead-end frontier — Old Works
-country, deliberately dangerous: glacierite belt ore and heavy spawns
+country, deliberately dangerous: borealite belt ore and heavy spawns
 including Hierarchs, with no patrols and no station at all. **Głusza** is
 quiet in the wrong way; its Unincorporated freeport **Kantor** runs a
 market and little else. Travel system-to-system by flying to a stargate

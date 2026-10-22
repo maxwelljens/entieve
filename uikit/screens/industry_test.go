@@ -120,7 +120,7 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 	if chargeRow < 0 {
 		t.Fatal("no ammo-emp-s recipe row")
 	}
-	if !strings.Contains(f.recipes.Rows[chargeRow].Cells[4], "Ferrite 0/720") {
+	if !strings.Contains(f.recipes.Rows[chargeRow].Cells[4], "Sideron 0/720") {
 		t.Errorf("inputs cell = %q, want the have/need readout", f.recipes.Rows[chargeRow].Cells[4])
 	}
 
@@ -312,18 +312,18 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 	if mf == nil {
 		t.Fatalf("charge page has no MANUFACTURED FROM (sections %v)", sectionLabels(page))
 	}
-	ferrite := mustRow(t, page, "MANUFACTURED FROM", "Ferrite")
+	ferrite := mustRow(t, page, "MANUFACTURED FROM", "Sideron")
 	if ferrite.Value != "×720" {
-		t.Errorf("Ferrite qty = %q, want ×720", ferrite.Value)
+		t.Errorf("Sideron qty = %q, want ×720", ferrite.Value)
 	}
 	if ferrite.Ref == nil || *ferrite.Ref != widgets.ItemRef("min-ferrite") {
-		t.Errorf("Ferrite row ref = %v, want a label-side link to item/min-ferrite", ferrite.Ref)
+		t.Errorf("Sideron row ref = %v, want a label-side link to item/min-ferrite", ferrite.Ref)
 	}
 	if ferrite.RefOnValue {
 		t.Error("input rows must carry the link on the LABEL side")
 	}
-	if r := mustRow(t, page, "MANUFACTURED FROM", "Argon"); r.Value != "×60" {
-		t.Errorf("Argon qty = %q, want ×60", r.Value)
+	if r := mustRow(t, page, "MANUFACTURED FROM", "Helion"); r.Value != "×60" {
+		t.Errorf("Helion qty = %q, want ×60", r.Value)
 	}
 	if sectionOf(page, "USED IN") != nil {
 		t.Error("charge page rendered USED IN (charges are never recipe inputs)")
@@ -341,7 +341,7 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 	if ui == nil {
 		t.Fatalf("mineral page has no USED IN (sections %v)", sectionLabels(page))
 	}
-	emp := rowIn(t, ui, "Small EMP Shell")
+	emp := rowIn(t, ui, "40mm ion")
 	if emp.Value != "×100" {
 		t.Errorf("USED IN value = %q, want the product's per-run output ×100", emp.Value)
 	}
@@ -365,7 +365,7 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 	if r := mustRow(t, page, "MANUFACTURED FROM", "Base time"); r.Value != "600.0 s" {
 		t.Errorf("base time row = %+v, want 600.0 s", r)
 	}
-	if r := mustRow(t, page, "MANUFACTURED FROM", "Ferrite"); r.Value != "×44,700" {
+	if r := mustRow(t, page, "MANUFACTURED FROM", "Sideron"); r.Value != "×44,700" {
 		t.Errorf("input qty = %+v, want ×44,700", r)
 	}
 	if sectionOf(page, "USED IN") != nil {
@@ -377,7 +377,7 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 	if !ok {
 		t.Fatal("module page did not resolve")
 	}
-	if r := mustRow(t, page, "MANUFACTURED FROM", "Ferrite"); r.Value != "×13,750" {
+	if r := mustRow(t, page, "MANUFACTURED FROM", "Sideron"); r.Value != "×13,750" {
 		t.Errorf("module input qty = %+v, want ×13,750", r)
 	}
 

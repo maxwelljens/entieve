@@ -166,7 +166,7 @@ func refineOutputs(cv widgets.ContentView, def *content.ItemDef, qty int) []cont
 	return out
 }
 
-// outputsText renders an output list as "45 Ferrite · 30 Nickel" ("" for
+// outputsText renders an output list as "45 Sideron · 30 Nixium" ("" for
 // an empty list).
 func (r *Refinery) outputsText(outs []content.CargoStack) string {
 	s := ""

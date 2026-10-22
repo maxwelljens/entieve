@@ -59,7 +59,7 @@ registry come from this matrix; the layers follow the settlement history in
 | Institutions: authorities, corporations | Latinate register; one heritage form-word or root may carry the origin flavour | Far Moravia Charter Authority; the ten manufacturing houses: Borealis, Nordvakt, Iskald, Kombinat Ferrum, Družstvo, Zakłady Burza, Celeritas, Praetor, Aldemar Group, Vantera |
 | Ship hulls | origin-tagged trade nouns — **one origin per hull**, the name must read as that origin's trade | Havíř (Moravian), Kosa, Furman, Tabor (Polish), Väktare (Nordic), Custos (Latinate) |
 | Machine names | the caste names are canon and untouchable | Scuttler, Marauder, Hierarch |
-| Products: modules, charges, minerals, ores, loot | plain trade nouns of the lingua franca, mechanics-aligned | Rail Turret, EMP Charge, Ferrite, Sterngrit, Alloy Scrap |
+| Products: modules, charges, minerals, ores, loot | plain trade nouns of the lingua franca, mechanics-aligned; a mineral or ore may be coined from a real root when no trade word survives | Small Autocannon, 40mm ion, Sideron, Sterngrit, Alloy Scrap |
 
 Supporting rules:
 

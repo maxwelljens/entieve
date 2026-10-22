@@ -28,7 +28,7 @@ content/data/
 ├── items/
 │   ├── minerals.json        # min-* IDs
 │   ├── ores.json            # ore-* IDs (carry refine_yield)
-│   ├── ammo.json            # ammo-* shells: damage + calibre (category: ammo)
+│   ├── ammo.json            # ammo-* rounds: damage + calibre (category: ammo)
 │   ├── charges.json         # charge-cap-cell (category: charge)
 │   └── loot.json            # loot-* IDs
 ├── ships/                   # one hull per file, ship-* IDs
@@ -56,7 +56,7 @@ All IDs are kebab-case strings, cross-referenced everywhere:
 | Kind        | Prefix      | Example              | Uniqueness             |
 |-------------|-------------|----------------------|------------------------|
 | Item        | `min-`, `ore-`, `ammo-`, `charge-`, `loot-` | `min-ferrite` | global (all items share one map) |
-| Shell (ammo) | `ammo-` (artillery: `ammo-art-`) | `ammo-emp-s`, `ammo-art-emp-s` | global; `ammo_class` = shell family (`small-autocannon` … `large-artillery`): a calibre AND a gun family. Every shell of a family shares one volume |
+| Round (ammo) | `ammo-` (artillery: `ammo-art-`) | `ammo-emp-s`, `ammo-art-emp-s` | global; `ammo_class` = round family (`small-autocannon` … `large-artillery`): a calibre AND a gun family. Every round of a family shares one volume |
 | Corporation | `corp-`     | `corp-ferrum`        | global (the ten-firm maker roster, `content.AllCorps`; a registered extension of the frozen id list) |
 | Ship        | `ship-`     | `ship-sloop`         | global                 |
 | Module      | `mod-`      | `mod-autocannon-s`   | global (weapon families: autocannon, artillery — three calibres each) |
@@ -79,7 +79,7 @@ Every JSON file under `items/`, `ships/`, `modules/`, `npcs/`, `systems/`,
 object or an array of objects**:
 
 ```json
-{ "id": "min-ferrite", "name": "Ferrite", "category": "mineral", "volume": 0.01, "base_price": 6 }
+{ "id": "min-ferrite", "name": "Sideron", "category": "mineral", "volume": 0.01, "base_price": 6 }
 ```
 ```json
 [ { "id": "min-ferrite", ... }, { "id": "min-nickel", ... } ]
@@ -404,18 +404,18 @@ constants in `model.go`, and the matching attribute block is **required**:
 
 Rules: passive modules use `activation_cost: 0, activation_time: 0`; active
 modules need `activation_time > 0`; `weapon.ammo_class` must match
-`ammo_class` of at least one existing shell (or `""` for ammo-less weapons
+`ammo_class` of at least one existing round (or `""` for ammo-less weapons
 like `mod-rocket-pod`); `damage_multiplier` is the gun's share of a loaded
-shell's damage (`0` reads as `1`, so artillery throws a heavier shot from the
-same shell than an autocannon); `price` 10k–400k for standard mods.
-`weapon.bay_m3` is the gun's shell bay (required for every gun with an ammo
+round's damage (`0` reads as `1`, so artillery throws a heavier shot from the
+same round than an autocannon); `price` 10k–400k for standard mods.
+`weapon.bay_m3` is the gun's round bay (required for every gun with an ammo
 class, forbidden on an ammo-less one) and must hold at least one whole round
-of its family. Calibrate it as `rounds × shell volume` for a sustained-fire
+of its family. Calibrate it as `rounds × round volume` for a sustained-fire
 reload near 120 s — the shipped table: small autocannon 0.2 m³ / 40 rounds,
 small artillery 0.104 / 13, medium autocannon 0.33 / 33, medium artillery
 0.275 / 11, large autocannon 0.594 / 27, large artillery 0.297 / 9; the cap
 booster's `boost.bay_m3` is 0.25 m³ (25 cells). Validation rejects a family
-whose shells disagree on volume, a bay under one round, a missing bay, and a
+whose rounds disagree on volume, a bay under one round, a missing bay, and a
 bay on a module that loads nothing.
 
 **Mount and class demand.** `mount` and `size` exist only on high-slot
@@ -508,10 +508,10 @@ minerals per batch:
 ```
 
 Ammo (needs `damage` + `ammo_class`; ammo items are category `ammo`, and
-`ammo_class` is the **shell family** — `small-autocannon`, `small-artillery`,
+`ammo_class` is the **round family** — `small-autocannon`, `small-artillery`,
 `medium-autocannon`, `medium-artillery`, `large-autocannon`,
 `large-artillery` — which is both the calibre and the gun family that loads
-it. Every shell of one family must carry the same `volume`, because a bay's
+it. Every round of one family must carry the same `volume`, because a bay's
 whole-round count is family-wide. Shipped volumes: small-autocannon 0.005,
 small-artillery 0.008, medium-autocannon 0.01, medium-artillery 0.025,
 large-autocannon 0.022, large-artillery 0.033 m³. Existing ids are the
@@ -520,8 +520,8 @@ autocannon families; artillery uses `ammo-art-<profile>-<size>`):
 ```json
 {
   "id": "ammo-thermite-s",
-  "name": "Small Thermite Shell",
-  "description": "Burns hot. Thermal-biased small shell.",
+  "name": "40mm thermite",
+  "description": "Burns hot. Thermal-biased round.",
   "maker": "corp-burza",
   "category": "ammo",
   "volume": 0.005,
@@ -574,14 +574,14 @@ book holds, so a single missing side reads as a dead market to the player:
 a mined hold must be sellable and materials must be buyable at every port.
 
 - Prices stay anchored to `base_price`: the bid sits just under it
-  (ferrite 5 vs base 6), the ask just over it (ferrite 7) — the existing
+  (sideron 5 vs base 6), the ask just over it (sideron 7) — the existing
   style, and the reason a founding book never opens crossed.
 - Quantities follow value: tens of thousands for cheap minerals
-  (ferrite 25,000 bid / 12,000 ask), thousands for ore and the dear
+  (sideron 25,000 bid / 12,000 ask), thousands for ore and the dear
   minerals, hundreds for the rarest. Asks are modest stock; bids are the
   local industry's standing demand.
 - Przystań (`cel-penumbra-port`) had no `market` block at all before this
-  pass: its freeport now carries the same materials set plus the shells its
+  pass: its freeport now carries the same materials set plus the rounds its
   own raiders need (`TestRespawnAmmoIsOnTheLocalBook`).
 - The materials rows live at the end of each station's `market` array in
   two blocks — asks first, then bids, each ascending by item id. The

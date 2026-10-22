@@ -145,51 +145,51 @@ Rat hulls, ores, minerals and loot stay unattributed.
 
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
-| `ammo-emp-s` | — | **Small EMP Shell** | trade | approved 2026-10-20: calibre + damage profile (was EMP Charge); small-autocannon family |
-| `ammo-fusion-s` | — | **Small Fusion Shell** | trade | proposed 2026-10-20: (was Fusion Charge) |
-| `ammo-ap-s` | — | **Small Armor-Piercing Shell** | trade | proposed 2026-10-20: (was Armor-Piercing Charge) |
-| `ammo-plutonium-s` | — | **Small Plutonium Shell** | trade | proposed 2026-10-20: (was Plutonium Charge) |
-| `ammo-emp-m` | — | **Medium EMP Shell** | trade | proposed 2026-10-20 |
-| `ammo-fusion-m` | — | **Medium Fusion Shell** | trade | proposed 2026-10-20 |
-| `ammo-ap-m` | — | **Medium Armor-Piercing Shell** | trade | proposed 2026-10-20 |
-| `ammo-plutonium-m` | — | **Medium Plutonium Shell** | trade | proposed 2026-10-20 |
-| `ammo-emp-l` | — | **Large EMP Shell** | trade | proposed 2026-10-20 |
-| `ammo-fusion-l` | — | **Large Fusion Shell** | trade | proposed 2026-10-20 |
-| `ammo-ap-l` | — | **Large Armor-Piercing Shell** | trade | proposed 2026-10-20 |
-| `ammo-plutonium-l` | — | **Large Plutonium Shell** | trade | proposed 2026-10-20 |
-| `ammo-art-emp-s` | — | **Small EMP Artillery Shell** | trade | proposed 2026-10-22: artillery family (`ammo-art-<profile>-<size>`); the long-bodied shell of the small calibre |
-| `ammo-art-fusion-s` | — | **Small Fusion Artillery Shell** | trade | proposed 2026-10-22: artillery family |
-| `ammo-art-ap-s` | — | **Small Armor-Piercing Artillery Shell** | trade | proposed 2026-10-22: artillery family |
-| `ammo-art-plutonium-s` | — | **Small Plutonium Artillery Shell** | trade | proposed 2026-10-22: artillery family |
-| `ammo-art-emp-m` | — | **Medium EMP Artillery Shell** | trade | proposed 2026-10-22: artillery family |
-| `ammo-art-fusion-m` | — | **Medium Fusion Artillery Shell** | trade | proposed 2026-10-22: artillery family |
-| `ammo-art-ap-m` | — | **Medium Armor-Piercing Artillery Shell** | trade | proposed 2026-10-22: artillery family |
-| `ammo-art-plutonium-m` | — | **Medium Plutonium Artillery Shell** | trade | proposed 2026-10-22: artillery family |
-| `ammo-art-emp-l` | — | **Large EMP Artillery Shell** | trade | proposed 2026-10-22: artillery family |
-| `ammo-art-fusion-l` | — | **Large Fusion Artillery Shell** | trade | proposed 2026-10-22: artillery family |
-| `ammo-art-ap-l` | — | **Large Armor-Piercing Artillery Shell** | trade | proposed 2026-10-22: artillery family |
-| `ammo-art-plutonium-l` | — | **Large Plutonium Artillery Shell** | trade | proposed 2026-10-22: artillery family |
+| `ammo-emp-s` | — | **40mm ion** | trade | approved 2026-10-22, naval calibre line; small-autocannon family (was Small EMP Shell) |
+| `ammo-fusion-s` | — | **40mm high-explosive** | trade | approved 2026-10-22, naval calibre line; small-autocannon family (was Small Fusion Shell) |
+| `ammo-ap-s` | — | **40mm armour-piercing** | trade | approved 2026-10-22, naval calibre line; small-autocannon family (was Small Armor-Piercing Shell) |
+| `ammo-plutonium-s` | — | **40mm plutonium** | trade | approved 2026-10-22, naval calibre line; small-autocannon family (was Small Plutonium Shell) |
+| `ammo-emp-m` | — | **57mm ion** | trade | approved 2026-10-22, naval calibre line; medium-autocannon family (was Medium EMP Shell) |
+| `ammo-fusion-m` | — | **57mm high-explosive** | trade | approved 2026-10-22, naval calibre line; medium-autocannon family (was Medium Fusion Shell) |
+| `ammo-ap-m` | — | **57mm armour-piercing** | trade | approved 2026-10-22, naval calibre line; medium-autocannon family (was Medium Armor-Piercing Shell) |
+| `ammo-plutonium-m` | — | **57mm plutonium** | trade | approved 2026-10-22, naval calibre line; medium-autocannon family (was Medium Plutonium Shell) |
+| `ammo-emp-l` | — | **76mm ion** | trade | approved 2026-10-22, naval calibre line; large-autocannon family (was Large EMP Shell) |
+| `ammo-fusion-l` | — | **76mm high-explosive** | trade | approved 2026-10-22, naval calibre line; large-autocannon family (was Large Fusion Shell) |
+| `ammo-ap-l` | — | **76mm armour-piercing** | trade | approved 2026-10-22, naval calibre line; large-autocannon family (was Large Armor-Piercing Shell) |
+| `ammo-plutonium-l` | — | **76mm plutonium** | trade | approved 2026-10-22, naval calibre line; large-autocannon family (was Large Plutonium Shell) |
+| `ammo-art-emp-s` | — | **127mm ion** | trade | approved 2026-10-22, naval calibre line; small-artillery family (was Small EMP Artillery Shell) |
+| `ammo-art-fusion-s` | — | **127mm high-explosive** | trade | approved 2026-10-22, naval calibre line; small-artillery family (was Small Fusion Artillery Shell) |
+| `ammo-art-ap-s` | — | **127mm armour-piercing** | trade | approved 2026-10-22, naval calibre line; small-artillery family (was Small Armor-Piercing Artillery Shell) |
+| `ammo-art-plutonium-s` | — | **127mm plutonium** | trade | approved 2026-10-22, naval calibre line; small-artillery family (was Small Plutonium Artillery Shell) |
+| `ammo-art-emp-m` | — | **152mm ion** | trade | approved 2026-10-22, naval calibre line; medium-artillery family (was Medium EMP Artillery Shell) |
+| `ammo-art-fusion-m` | — | **152mm high-explosive** | trade | approved 2026-10-22, naval calibre line; medium-artillery family (was Medium Fusion Artillery Shell) |
+| `ammo-art-ap-m` | — | **152mm armour-piercing** | trade | approved 2026-10-22, naval calibre line; medium-artillery family (was Medium Armor-Piercing Artillery Shell) |
+| `ammo-art-plutonium-m` | — | **152mm plutonium** | trade | approved 2026-10-22, naval calibre line; medium-artillery family (was Medium Plutonium Artillery Shell) |
+| `ammo-art-emp-l` | — | **203mm ion** | trade | approved 2026-10-22, naval calibre line; large-artillery family (was Large EMP Artillery Shell) |
+| `ammo-art-fusion-l` | — | **203mm high-explosive** | trade | approved 2026-10-22, naval calibre line; large-artillery family (was Large Fusion Artillery Shell) |
+| `ammo-art-ap-l` | — | **203mm armour-piercing** | trade | approved 2026-10-22, naval calibre line; large-artillery family (was Large Armor-Piercing Artillery Shell) |
+| `ammo-art-plutonium-l` | — | **203mm plutonium** | trade | approved 2026-10-22, naval calibre line; large-artillery family (was Large Plutonium Artillery Shell) |
 | `charge-cap-cell` | Capacitor Booster Cell | keep | trade | cap booster fuel, not gun ammo; burned from the booster's cell bay |
 
 ### Items — minerals
 
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
-| `min-ferrite` | Ferrite | keep | trade | |
-| `min-nickel` | Nickel | keep | trade | |
-| `min-cobalt` | Cobalt | keep | trade | |
-| `min-silex` | Silex | keep | trade | Latin *silex* "flint, silica" |
-| `min-glacite` | Glacite | keep | trade | coined from Latin *glacies* "ice" |
-| `min-argon` | Argon | keep | trade | |
+| `min-ferrite` | Ferrite | **Sideron** | trade | Greek *sideros* "iron"; renamed 2026-10-22 |
+| `min-nickel` | Nickel | **Nixium** | trade | coined from *nickel*; renamed 2026-10-22 |
+| `min-cobalt` | Cobalt | **Zaffrite** | trade | *zaffer*, the historical cobalt oxide pigment; renamed 2026-10-22 |
+| `min-silex` | Silex | **Vetril** | trade | Latin *vitrum* "glass"; renamed 2026-10-22 |
+| `min-glacite` | Glacite | **Cryolith** | trade | Greek *kryos* "ice" + *lithos* "stone"; renamed 2026-10-22 |
+| `min-argon` | Argon | **Helion** | trade | coined from *helium*; renamed 2026-10-22 |
 
 ### Items — ores
 
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
 | `ore-sterngrit` | Sterngrit Ore | keep | trade | *stern* "star" (Germanic/Nordic root) + grit; miner's name |
-| `ore-cordite` | Cordite Ore | keep | trade | nit for review: shares its name with the historical propellant; acceptable as miner's slang, rename at the author's discretion |
+| `ore-cordite` | Cordite Ore | **Kerngrit Ore** | trade | *kern* "core" + grit, kin of Sterngrit; renamed 2026-10-22 |
 | `ore-lucidite` | Lucidite Ore | keep | trade | Latin *lucidus* "clear, glassy"; description says "low-sec favorite" → "Fringe favourite" in the content pass |
-| `ore-glacierite` | Glacierite Ore | keep | trade | |
+| `ore-glacierite` | Glacierite Ore | **Borealite Ore** | trade | Latin *boreas* "north wind"; renamed 2026-10-22 |
 
 ### Items — loot
 
@@ -215,7 +215,7 @@ Rat hulls, ores, minerals and loot stay unattributed.
 |---|---|---|---|---|
 | `contract-solace-cleanup-1` | Belt cleanup | keep | trade | description: "Mire Corsairs", "Solace belts", "Haven Rest" → "the Old Works", "Starogród belt", "Jernborg" |
 | `contract-solace-supply-run-1` | Supply run to Penumbra Port | **Supply run to Przystań** | place | description: "Haven Rest market", "low security" → "Jernborg market", "the Fringe" |
-| `contract-solace-cordite-1` | Cordite order | keep | trade | description: "Haven Rest's refinery", "Solace belt" → "Jernborg's refinery", "Starogród belt" |
+| `contract-solace-cordite-1` | Cordite order | **Kerngrit order** | trade | renamed 2026-10-22 with the ore; description: "Haven Rest's refinery", "Solace belt" → "Jernborg's refinery", "Starogród belt" |
 | `contract-penumbra-den-hunt-1` | Den hunt | **Gniazdo hunt** | place | description: "the Penumbra Den", "the Port office" → "Gniazdo", "the Przystań office" |
 | `contract-penumbra-lucidite-1` | Lucidite contract | keep | trade | description: "the Port", "the Penumbra belt" → "Przystań", "the Kuźnica belt" |
 | `contract-manufacturing-shield-1` | — | **Shield booster order** | trade | durable manufactured goods (Shield Booster, a non-weapon module); offering Doki, delivery Przystań |
@@ -255,17 +255,17 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | Refinery batch strings (`uikit/screens/refinery.go`, `sim/system_economy.go`) | — | **One batch needs 100 ore — you hold &lt;n&gt; &lt;ore&gt;.** / **Refining runs in whole batches of 100 ore** | trade | refining is atomic in 100-ore batches: the window's status names the shortfall (Refine grayed below one batch) and the sim's refusal log names the partial quantity. Approved 2026-10-20 |
 | Refinery destination strings (`uikit/screens/refinery.go`, `sim/system_economy.go`) | — | **Yield @ qty → hangar** (column) / **→ hangar** (status suffix) / **(station hangar)** (log suffix) | trade | refined minerals always land in the station hangar, never the ship's hold: the preview column names where the yield goes, the status line ends input → output → destination, and the sim's "Refined …" log line closes with the store. Approved 2026-10-21 |
 | Market item row's Side cell (`uikit/screens/market.go`) | — | **—** | trade | the tree's parent rows carry no side of their own (the order rows folded beneath them keep Ask/Bid); the em dash reads as "none" while keeping the column visibly present. Approved 2026-10-20 |
-| Market browse tree (`uikit/screens/market.go`, `content/data/**` `group`) | — | **All** · **Ships** · **Modules** · **Ammunition** · **Materials** · **Loot** (+ children: **Frigates**, **Destroyers**, **Industrials**, **Barges**, **Rat hulls**; **High/Mid/Low** with **Turrets**, **Launchers**, **Propulsion**, **Shield**, **EWAR**, **Capacitor**, **Armor**; **Autocannon shells**, **Artillery shells**, **Cap cells**; **Ore**, **Minerals**) | trade | the browse pane's branch labels: the window's own `All` root over the content `group` paths. Plain trade/class nouns — the same words the hull and module classes already use; `Rat hulls` names the Old Works hulls that stay listed though they cannot be bought. No coined term. Proposed 2026-10-22, awaiting user approval |
+| Market browse tree (`uikit/screens/market.go`, `content/data/**` `group`) | — | **All** · **Ships** · **Modules** · **Ammunition** · **Materials** · **Loot** (+ children: **Frigates**, **Destroyers**, **Industrials**, **Barges**, **Rat hulls**; **High/Mid/Low** with **Turrets**, **Launchers**, **Propulsion**, **Shield**, **EWAR**, **Capacitor**, **Armor**; **Autocannon rounds**, **Artillery shells**, **Cap cells**; **Ore**, **Minerals**) | trade | the browse pane's branch labels: the window's own `All` root over the content `group` paths. Plain trade/class nouns — the same words the hull and module classes already use; `Rat hulls` names the Old Works hulls that stay listed though they cannot be bought. No coined term. Amended 2026-10-22: **Autocannon rounds** (was Autocannon shells), renamed with the naval calibre line. Proposed 2026-10-22, awaiting user approval |
 | Market tree header (`uikit/screens/market.go`) | — | **Browse** | trade | the browse pane's fixed column header (it sorts nothing; the branch order is the content tree's). Proposed 2026-10-22, awaiting user approval |
 | Market search field (`uikit/screens/market.go`) | — | placeholder **Search** | trade | the field above the tree: filters the selected branch live by name, group path and maker; `Ctrl+F` focuses it. Plain imperative noun, no legend. Proposed 2026-10-22, awaiting user approval |
 | Market search empty state (`uikit/screens/market.go`) | — | **No matches** | trade | the one dim row a query with no hits renders (never an empty table); the clearing rule is the field's own. Proposed 2026-10-22, awaiting user approval |
 | Market cross-station availability (`uikit/screens/market.go`) | — | Qty suffix **&lt;n&gt; · &lt;m&gt; more** · title detail **· cheapest &lt;station&gt; &lt;price&gt;** | trade | the Qty cell's dim suffix counts the OTHER market stations whose books hold an ask for the item; the selected row's title names the cheapest such station and ask (e.g. `· cheapest Doki 112 €`). Local columns stay local; the suffix is a lead, not a merged book. Proposed 2026-10-22, awaiting user approval |
 | Fitting summary capacitor verdict (`uikit/screens/fitting.go`) | — | **Cap stable** / **Cap unstable (~<n> s)** | ship | the fitting window's projected capacitor verdict under the fit's running modules: stable while their summed GJ/s stays under the recharge curve's peak rate, else the seconds the charge lasts, with a drain-vs-recharge bar under it. The three summary row labels are **Total DPS** · **Cap drain** · **Cap recharge**. Proposed 2026-10-21, awaiting user approval |
 | Station service labels (`content/services.go`) | — | **Repair** · **Market** · **Fitting** · **Manufacturing** · **Refinery** | trade | the `content.Services` table's display names: the services row's button tooltips and, for the four with a window, the window titles already registered above (Market/Fitting/Manufacturing/Refinery). `repair` has no window — the sim repairs on `CmdRepair` — so it draws no button. Approved 2026-10-21 |
-| Bay load log (`sim/clips.go`) | — | **&lt;module&gt; loaded with &lt;shell name&gt; (&lt;n&gt; rounds)** | trade | the one quiet line per completed bay load, `EvModule`, player modules only — the same line confirms a `CmdSetAmmo` choice (`<module> loaded with <shell> (<n> rounds)`, the words the ammo-selection proof reads). Proposed 2026-10-22, awaiting user approval |
-| Waiting-for-ammo log (`sim/system_weapons.go`, `sim/command.go`) | — | **&lt;module&gt; waiting for ammo selection** | trade | a bay empty with two or more shell types in cargo and none selected: one `SevInfo` line, then a silent deactivate — never the dry-gun warning. Proposed 2026-10-22, awaiting user approval |
+| Bay load log (`sim/clips.go`) | — | **&lt;module&gt; loaded with &lt;round name&gt; (&lt;n&gt; rounds)** | trade | the one quiet line per completed bay load, `EvModule`, player modules only — the same line confirms a `CmdSetAmmo` choice (`<module> loaded with <round> (<n> rounds)`, the words the ammo-selection proof reads). Proposed 2026-10-22, awaiting user approval |
+| Waiting-for-ammo log (`sim/system_weapons.go`, `sim/command.go`) | — | **&lt;module&gt; waiting for ammo selection** | trade | a bay empty with two or more round types in cargo and none selected: one `SevInfo` line, then a silent deactivate — never the dry-gun warning. Proposed 2026-10-22, awaiting user approval |
 | Ammo selection cleared (`sim/command.go`) | — | **&lt;module&gt; ammo selection cleared** | trade | `CmdSetAmmo ""`: the bay dumped to cargo and the gun re-resolved by the bay rule (auto-load one type, wait on two or more). Replaces the retired "set to auto ammo". Proposed 2026-10-22, awaiting user approval |
-| Bay refusals (`sim/command.go`) | — | **Cannot load &lt;shell&gt; into &lt;module&gt;** | trade | unchanged wording; now also covers a shell of another family and a reload with no rounds in cargo. Proposed 2026-10-22, awaiting user approval |
+| Bay refusals (`sim/command.go`) | — | **Cannot load &lt;round&gt; into &lt;module&gt;** | trade | unchanged wording; now also covers a round of another family and a reload with no rounds in cargo. Proposed 2026-10-22, awaiting user approval |
 | Belt-cleared log (`sim/system_damage.go`) | — | **&lt;belt name&gt; cleared** | trade | the high-sec belt response's news line: the last live rat of a belt died, whoever landed the kill (the anomaly-cleared line already uses the same "&lt;place&gt; cleared" form). Proposed 2026-10-21, awaiting user approval |
 | Docked backdrop caption (`game/scenes.go`) | — | **Docked: &lt;station name&gt;** | trade | the station view's backdrop caption: the docked-at station's display name after a plain colon, set in the display face lower-centre over the hangar plate. No coined term — the player reads where they are. Approved 2026-10-21 |
 | High-slot mount labels (`uikit/screens/fitting.go`) | — | **Turret mount** / **Launcher mount** | ship | the two mount kinds drawn on an empty high-slot tile and in the hull's SLOTS section: guns and the mining laser are turret-mounted, rockets and missiles launcher-mounted (EVE's split). The short tile form is **Turret** / **Launcher**. Proposed 2026-10-22, awaiting user approval |
