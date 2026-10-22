@@ -72,6 +72,13 @@
     "target": "Asteroid Belt I"
   },
   {
+    "at_tick": 11060,
+    "action": "setammo",
+    "slot": "high0",
+    "item": "ammo-emp-s",
+    "note": "wake the fresh gun: four shell types in cargo make it wait for a choice, so pick EMP before the first lock"
+  },
+  {
     "at_tick": 12060,
     "action": "lock",
     "target": "Scuttler",
@@ -113,7 +120,7 @@
     "action": "activate",
     "slot": "high0",
     "target": "Scuttler",
-    "note": "emp turret: cycles the small charge profiles"
+    "note": "emp turret: burns the EMP damage profile"
   },
   {
     "at_tick": 13560,
@@ -123,24 +130,44 @@
     "note": "rocket pod"
   },
   {
+    "at_tick": 16060,
+    "action": "setammo",
+    "slot": "high0",
+    "item": "ammo-fusion-s",
+    "note": "EMP left the gun waiting; load the explosive profile, then take the next rat with it"
+  },
+  {
+    "at_tick": 16140,
+    "action": "lock",
+    "target": "Scuttler",
+    "note": "fight 1b: the second belt rat takes the fusion pass"
+  },
+  {
+    "at_tick": 16500,
+    "action": "activate",
+    "slot": "high0",
+    "target": "Scuttler",
+    "note": "fusion turret"
+  },
+  {
     "at_tick": 18060,
     "action": "lock",
     "target": "Scuttler",
-    "note": "fight 2: the second rat meets the dry turret and the rockets"
+    "note": "fight 2: the second rat meets the fusion-hungry turret and the rockets"
   },
   {
     "at_tick": 18120,
     "action": "setammo",
     "slot": "high0",
     "item": "ammo-plutonium-s",
-    "note": "load plutonium first: the turret consumes the preferred charge"
+    "note": "load plutonium for fight 2: the bay reloads only the selected type"
   },
   {
     "at_tick": 19260,
     "action": "activate",
     "slot": "high0",
     "target": "Scuttler",
-    "note": "emp turret"
+    "note": "plutonium turret"
   },
   {
     "at_tick": 19320,
@@ -156,7 +183,9 @@
   {
     "at_tick": 30060,
     "action": "loot",
-    "target": "Scuttler Wreck"
+    "target": "Scuttler Wreck",
+    "item": "loot-alloy-scrap",
+    "note": "take only the salvage: the wreck's 34 armor-piercing rounds would out-weigh the AP we fire (the four-damage proof is a net drop)"
   },
   {
     "at_tick": 30600,
@@ -210,6 +239,13 @@
     "target": "Jernborg"
   },
   {
+    "at_tick": 50060,
+    "action": "setammo",
+    "slot": "high0",
+    "item": "",
+    "note": "dump the bay to cargo before docking (dock never touches a bay) so the dock stash can empty the ship completely: the gun then waits, and with no shells aboard the fight-3 cycle warns 'no charges'"
+  },
+  {
     "at_tick": 51060,
     "action": "dock",
     "target": "Jernborg",
@@ -247,24 +283,24 @@
     "at_tick": 51310,
     "action": "transfer",
     "item": "ammo-fusion-s",
-    "qty": 10,
+    "qty": 3,
     "from": "cargo",
     "to": "hangar",
-    "note": "stash the leftover shells: the fight-3 turret cycle has no charge left and warns"
+    "note": "stash every leftover shell (the bay was dumped at 50060); the last two types leave on the same tick so the idle gun never sees a single type it would auto-load, and with no matching round in cargo the fight-3 cycle is truly dry"
+  },
+  {
+    "at_tick": 51320,
+    "action": "transfer",
+    "item": "ammo-plutonium-s",
+    "qty": 4,
+    "from": "cargo",
+    "to": "hangar"
   },
   {
     "at_tick": 51320,
     "action": "transfer",
     "item": "ammo-ap-s",
     "qty": 11,
-    "from": "cargo",
-    "to": "hangar"
-  },
-  {
-    "at_tick": 51330,
-    "action": "transfer",
-    "item": "ammo-plutonium-s",
-    "qty": 7,
     "from": "cargo",
     "to": "hangar"
   },

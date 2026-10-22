@@ -40,8 +40,8 @@ func setCargo(s *Sim, stacks ...content.CargoStack) {
 }
 
 // TestFreshFitPreloadsTheBay: a fresh fit loads a full bay from cargo before
-// the first shot — one quiet "<module> loaded N rounds" line, cargo down by
-// exactly the loaded rounds.
+// the first shot — one quiet "<module> loaded with <shell> (N rounds)" line,
+// cargo down by exactly the loaded rounds.
 func TestFreshFitPreloadsTheBay(t *testing.T) {
 	s := newTestSim(t)
 	if got := bayRounds(s, ammoSlot()); got != 5 {
@@ -53,7 +53,7 @@ func TestFreshFitPreloadsTheBay(t *testing.T) {
 	if got := ammoTotal(s, "ammo-emp-s"); got != 20 {
 		t.Fatalf("total emp = %d, want 20 (conserved)", got)
 	}
-	if findEvent(drain(s), EvModule, "EMP Turret loaded 5 rounds") == nil {
+	if findEvent(drain(s), EvModule, "EMP Turret loaded with EMP Charge (5 rounds)") == nil {
 		t.Fatal("missing load line")
 	}
 }
@@ -104,7 +104,7 @@ func TestBayReloadsWhenEmpty(t *testing.T) {
 	if hasEvent(evs, EvLog, "Sloop hits") || hasEvent(evs, EvLog, "Sloop misses") {
 		t.Fatalf("a load cycle fired a shot: %v", evs)
 	}
-	if findEvent(evs, EvModule, "EMP Turret loaded 5 rounds (EMP Charge)") == nil {
+	if findEvent(evs, EvModule, "EMP Turret loaded with EMP Charge (5 rounds)") == nil {
 		t.Fatalf("missing reload line: %v", evs)
 	}
 
@@ -182,7 +182,7 @@ func TestBayAutoSwitchesToTheLastType(t *testing.T) {
 	// fusion as the only remaining type and loads it.
 	stepN(s, 240)
 	evs := drain(s)
-	if findEvent(evs, EvModule, "EMP Turret loaded 5 rounds (Fusion Charge)") == nil {
+	if findEvent(evs, EvModule, "EMP Turret loaded with Fusion Charge (5 rounds)") == nil {
 		t.Fatalf("missing auto-switch load: %v", evs)
 	}
 	if got := ammoTotal(s, "ammo-fusion-s"); got != 5 {
@@ -211,7 +211,7 @@ func TestCmdSetAmmoDumpsAndReloads(t *testing.T) {
 
 	before := ammoTotal(s, "ammo-emp-s")
 	evs := setAmmo(s, "ammo-ap-s")
-	if findEvent(evs, EvModule, "EMP Turret loaded 4 rounds (AP Charge)") == nil {
+	if findEvent(evs, EvModule, "EMP Turret loaded with AP Charge (4 rounds)") == nil {
 		t.Fatalf("missing load line: %v", evs)
 	}
 	// The five EMP rounds went back to cargo; the AP rounds loaded.

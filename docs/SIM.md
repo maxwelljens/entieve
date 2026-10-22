@@ -164,7 +164,7 @@ machinery:
   deferred by `CycleEnds = now + ShotTime`. Loading costs no capacitor.
   A fresh fit pre-loads (and `sim.New` runs the bay pass once, before the
   first tick); one quiet `EvModule` line per completed load
-  (`<module> loaded N rounds (<shell>)`).
+  (`<module> loaded with <shell> (N rounds)`).
 - **Selection.** `ModuleRuntime.Selection` names the shell type the bay
   tops up from. The rule is the only automatic behaviour: while the selected
   type has cargo stock the bay reloads it; when it runs out the bay switches
