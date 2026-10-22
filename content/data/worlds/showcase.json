@@ -82,7 +82,7 @@
     {
       "name": "Dry gun refuses to fire",
       "feature": "dry-gun",
-      "detail": "Fire a gun with no matching shell left in cargo: exactly one 'no charges' warning per dry cycle, then the module deactivates (the scripted late-game activation on the respawned Scuttler demonstrates it)."
+      "detail": "Fire a gun with no matching shell left in cargo: exactly one 'no charges' warning per dry cycle, then the module deactivates (the tour stashes its leftover shells in the Jernborg hangar, so the fight-3 activation on the Marauder demonstrates it)."
     },
     {
       "name": "Turret hit chance",
@@ -197,7 +197,7 @@
     {
       "name": "Mining cycle",
       "feature": "mining",
-      "detail": "Lock an asteroid in cel-solace-belt, CmdMine(asteroid, index of mod-mining-laser): every 30 s cycle moves 40 m³ - EvtLog cycle line, cargo/ore-hold total rises."
+      "detail": "Lock an asteroid in cel-solace-belt, CmdMine(asteroid, index of mod-mining-laser): every 30 s cycle moves up to 100 m³ - EvtLog cycle line, cargo/ore-hold total rises."
     },
     {
       "name": "Asteroid depletion",

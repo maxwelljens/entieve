@@ -113,7 +113,7 @@
     "action": "activate",
     "slot": "high0",
     "target": "Scuttler",
-    "note": "emp turret: cycles all four charge profiles then runs dry"
+    "note": "emp turret: cycles the small charge profiles"
   },
   {
     "at_tick": 13560,
@@ -140,7 +140,7 @@
     "action": "activate",
     "slot": "high0",
     "target": "Scuttler",
-    "note": "emp turret (dry gun)"
+    "note": "emp turret"
   },
   {
     "at_tick": 19320,
@@ -162,14 +162,21 @@
     "at_tick": 30600,
     "action": "lock",
     "target": "Scuttler",
-    "note": "the respawned rat; the dry turret keeps re-cycling until it warns"
+    "note": "the respawned rat"
+  },
+  {
+    "at_tick": 31000,
+    "action": "setammo",
+    "slot": "high0",
+    "item": "ammo-ap-s",
+    "note": "burn the last untouched damage profile: the 31800 cycle loads armor-piercing"
   },
   {
     "at_tick": 31800,
     "action": "activate",
     "slot": "high0",
     "target": "Scuttler",
-    "note": "dry gun once the charges are gone"
+    "note": "turret pass on the respawned rat"
   },
   {
     "at_tick": 34060,
@@ -182,6 +189,13 @@
     "target": "Sterngrit Ore Asteroid",
     "slot": "high1",
     "note": "mining into the hold until the rock depletes"
+  },
+  {
+    "at_tick": 38000,
+    "action": "mine",
+    "target": "Sterngrit Ore Asteroid",
+    "slot": "high1",
+    "note": "the first rock is spent; a second sterngrit rock keeps the hold filling"
   },
   {
     "at_tick": 42060,
@@ -228,6 +242,31 @@
     "from": "cargo",
     "to": "hangar",
     "note": "the mined haul goes into the hangar"
+  },
+  {
+    "at_tick": 51310,
+    "action": "transfer",
+    "item": "ammo-fusion-s",
+    "qty": 10,
+    "from": "cargo",
+    "to": "hangar",
+    "note": "stash the leftover shells: the fight-3 turret cycle has no charge left and warns"
+  },
+  {
+    "at_tick": 51320,
+    "action": "transfer",
+    "item": "ammo-ap-s",
+    "qty": 11,
+    "from": "cargo",
+    "to": "hangar"
+  },
+  {
+    "at_tick": 51330,
+    "action": "transfer",
+    "item": "ammo-plutonium-s",
+    "qty": 7,
+    "from": "cargo",
+    "to": "hangar"
   },
   {
     "at_tick": 51360,
@@ -304,7 +343,8 @@
     "at_tick": 61280,
     "action": "activate",
     "slot": "high0",
-    "target": "Marauder"
+    "target": "Marauder",
+    "note": "dry gun: the shells were stashed in the hangar, so this cycle warns 'no charges'"
   },
   {
     "at_tick": 61340,
