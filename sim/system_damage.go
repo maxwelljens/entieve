@@ -211,6 +211,21 @@ func (s *Sim) handleDeath(e, src ecs.Entity) {
 			Text: "Bounty paid: " + euro(def.Bounty), Value: def.Bounty})
 	}
 
+	// The dying ship's bays are part of the wreck: rounds loaded when it came
+	// apart are lootable with the rest (cargo stays where it always did — the
+	// wreck carries the bay only).
+	if fit, ok := s.Fittings.Get(e); ok {
+		for _, class := range slotClasses {
+			rts := fit.Runtimes(class)
+			for i := range rts {
+				if rt := &rts[i]; rt.Clip.Qty > 0 {
+					loot = addStacks(loot, rt.Clip.Item, rt.Clip.Qty)
+					rt.Clip = content.CargoStack{}
+				}
+			}
+		}
+	}
+
 	if len(loot) > 0 {
 		w := s.create()
 		s.Names.Set(w, Name{Value: name + " Wreck"})

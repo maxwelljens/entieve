@@ -83,7 +83,7 @@ func trafficContent() *content.Content {
 		Kind: content.KindWeapon, ActivationCost: 10, ActivationTime: 2, Price: 1000,
 		Weapon: &content.WeaponAttrs{
 			Damage: content.Damage{EM: 10}, Optimal: 6000, Falloff: 3000,
-			Tracking: 145, AmmoClass: "small", ShotTime: 2,
+			Tracking: 145, AmmoClass: "small", ShotTime: 2, BayM3: 0.05, // 5 rounds
 		},
 	}
 	c.Ships["ship-guard"] = &content.ShipDef{

@@ -308,9 +308,9 @@ shape. Click a tile to select it, right-click for **Show Info** /
 details. Under the grid sits the **Hangar**: **fit** modules from it into
 their first free slot (double-click a module does exactly that) and
 **unfit** them back, and **assemble** stored hulls. A **Fitting summary**
-strip closes the window: the fit's **Total DPS** (each weapon's loaded
-shell over its fire period, following the ammo preference and cargo
-order the sim uses), the **Cap drain** of the running modules against the
+strip closes the window: the fit's **Total DPS** (each weapon's loaded or
+selected shell over its fire period, exactly the shell the bay would fire),
+the **Cap drain** of the running modules against the
 **Cap recharge** curve's peak, and the verdict — **Cap stable** or
 **Cap unstable (~Ns)** — over a drain-vs-recharge bar. The slots/hangar
 seam still drags, and the arrangement persists.
@@ -318,11 +318,26 @@ seam still drags, and the arrangement persists.
 **Weapons and shells.** Projectile guns come in two families:
 **autocannons** (fast cycle, high tracking, short optimal range) and
 **artillery** (slow cycle, poor tracking, long optimal range, a heavier
-volley out of the same shell). Both are built in three calibres — small,
-medium, large — and a gun loads only the **shells** of its own calibre:
-four damage profiles (EMP, fusion, armor-piercing, plutonium) per calibre.
+volley out of a longer shell). Both are built in three calibres — small,
+medium, large — so there are six **shell families** (small/medium/large ×
+autocannon/artillery), each with four damage profiles (EMP, fusion,
+armor-piercing, plutonium). A gun loads only the shells of its own family.
 The shell carries the damage mix; the gun's multiplier and cycle decide how
 hard and how often it lands. Projectile guns draw no capacitor.
+
+**Bays.** Every gun that loads shells — and the cap booster — carries a
+**bay** sized in m³. A **load cycle** fills it from cargo with a full bay of
+one shell type and costs one firing cycle, so a reload pauses the gun for a
+beat (about every forty small autocannon rounds, or every ~120 s of
+sustained fire; twenty-five cap booster cells). With one shell type in
+cargo the bay looks after itself: pre-loaded when fitted, topped up while
+that type lasts, and switched when it runs out and one other type is left.
+With two or more types in cargo the gun **waits for a choice** — the rack's
+**Cycle charge** picks the type (`CmdSetAmmo`), dumping the loaded rounds
+back to cargo and loading the new ones. A gun with no matching shells at
+all is dry and warns `no charges`; a waiting gun stays quiet. Loaded rounds
+travel with the ship: unfitting the gun returns them to cargo, and a wreck
+carries whatever was in its bays when it came apart.
 
 **Damage layers.** Damage hits **shield → armor → structure**, each reduced by
 the ship's four **resists** (EM, thermal, kinetic, explosive). Entieve uses a
@@ -398,9 +413,11 @@ omniscience), enforced in the sim's read model and the renderer alike.
 
 **Ammo cycling.** Right-click a weapon cell in the module rack for its
 context menu: **Show Info** for the module, **Show Info —** the loaded
-charge, and **Cycle charge**, which steps the loaded charge **Auto → each
-shell of that weapon's calibre that sits in your cargo → Auto** (the sim
-validates calibre and cargo, and logs every load).
+shell, and **Cycle charge**, which steps the bay's shell **none → each
+shell of that weapon's family that sits in your cargo → none** (the sim
+validates the family and cargo, dumps the old rounds back and logs the
+load). "None" is the waiting state: the gun reloads by itself only when a
+single type is left in cargo.
 The module tooltip — hover any rack cell for 300 ms — is a structured
 panel: class icon, **bold** module name, a dim `slot · class` line, then
 sectioned stats with values right-aligned on one column (damage mix,

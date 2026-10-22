@@ -46,6 +46,7 @@
           { "item": "mod-armor-rep", "qty": 10, "price": 210000 },
           { "item": "mod-armor-plate", "qty": 15, "price": 120000 },
           { "item": "ammo-emp-s", "qty": 3000, "price": 120 },
+          { "item": "ammo-art-emp-s", "qty": 3000, "price": 120 },
           { "item": "charge-cap-cell", "qty": 600, "price": 1000 },
           { "item": "ore-sterngrit", "qty": 4000, "price": 22, "side": "buy" },
           { "item": "ore-cordite", "qty": 3000, "price": 43, "side": "buy" },

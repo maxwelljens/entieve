@@ -13,6 +13,9 @@ import (
 // apply the effect, and schedule the next cycle. A failed validation
 // deactivates the module with a log event.
 func (s *Sim) systemModules() {
+	// Bays resolve before any cycle: this is what pre-loads a fresh fit and
+	// reloads an emptied gun the tick after it ran dry.
+	s.fillBays()
 	now := s.time
 	for _, e := range sortedEntities(s.Fittings) {
 		fit, ok := s.Fittings.Get(e)
@@ -39,6 +42,14 @@ func (s *Sim) systemModules() {
 					continue // passive: never cycles
 				}
 				slot := SlotRef{Class: class, Index: i}
+				// A cap booster burns its cells from a bay like a gun its
+				// shells: an empty bay loads first and spends this cycle.
+				if def.Kind == content.KindCapBooster {
+					if s.fillClip(e, def, rt) == clipFilled {
+						rt.CycleEnds = now + cyclePeriod(def)
+						continue
+					}
+				}
 				if reason, ok := s.checkCycle(e, def, slot); !ok {
 					s.deactivate(e, slot, reason, SevWarning)
 					continue
@@ -112,7 +123,8 @@ func (s *Sim) checkCycle(e ecs.Entity, def *content.ModuleDef, slot SlotRef) (st
 		}
 	}
 	if def.Kind == content.KindCapBooster {
-		if c, ok := s.Cargos.Get(e); !ok || stacksCount(c.Stacks, capCellID) < 1 {
+		_, rt, ok := s.moduleRuntime(e, slot)
+		if !ok || rt.Clip.Qty < 1 {
 			return "no cap booster charges", false
 		}
 	}
@@ -145,13 +157,14 @@ func (s *Sim) applyActiveEffect(e ecs.Entity, def *content.ModuleDef, slot SlotR
 			sh.Armor = clamp(sh.Armor+b.ArmorRepPerCycle, 0, sh.MaxArmor)
 		}
 	case content.KindCapBooster:
-		if c, ok := s.Cargos.Get(e); ok && b != nil {
-			if stacks, taken := takeStacks(c.Stacks, capCellID, 1); taken == 1 {
-				c.Stacks = stacks
-				if cap_, ok := s.Caps.Get(e); ok {
-					cap_.Current = clamp(cap_.Current+b.CapRestore, 0, cap_.Capacity)
-				}
-			}
+		// The cell comes from the module's bay, like a shell from a gun's.
+		_, rt, ok := s.moduleRuntime(e, slot)
+		if !ok || rt.Clip.Qty < 1 || b == nil {
+			return
+		}
+		rt.Clip.Qty--
+		if cap_, ok := s.Caps.Get(e); ok {
+			cap_.Current = clamp(cap_.Current+b.CapRestore, 0, cap_.Capacity)
 		}
 	case content.KindAfterburner:
 		// Cost is paid per cycle; the speed multiplier is maintained by
@@ -241,7 +254,8 @@ func (s *Sim) activate(e ecs.Entity, slot SlotRef, target ecs.Entity, quiet bool
 		}
 	}
 	if def.Kind == content.KindCapBooster {
-		if c, ok := s.Cargos.Get(e); !ok || stacksCount(c.Stacks, capCellID) < 1 {
+		s.fillClip(e, def, rt) // a fresh fit loads its cells on demand
+		if rt.Clip.Qty < 1 {
 			s.warnOnce(e, rt, "No cap booster charges in cargo", quiet)
 			return false
 		}

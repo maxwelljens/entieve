@@ -562,9 +562,9 @@ func TestIndustrySaveRestoreAndHash(t *testing.T) {
 	if save.Craft[0].Runs != 16 {
 		t.Errorf("Save.Craft hulls runs = %v, want 16", save.Craft[0].Runs)
 	}
-	if save.Schema != saveSchemaV2 {
-		t.Errorf("Save.Schema = %d, want %d (industry extends the v2 schema)",
-			save.Schema, saveSchemaV2)
+	if save.Schema != saveSchemaV3 {
+		t.Errorf("Save.Schema = %d, want %d (industry rides the v3 schema)",
+			save.Schema, saveSchemaV3)
 	}
 
 	// Plain JSON round-trip restores identically (Hash covers the new

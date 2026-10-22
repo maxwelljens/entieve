@@ -126,22 +126,31 @@ func TestWreckingShotForcedViaSeed(t *testing.T) {
 	}
 }
 
+// TestAmmoConsumedPerShot is the bay rule at the firing path: the fresh fit
+// loaded its 5-round bay (cargo 20 -> 15), and shots draw from the bay — cargo
+// only moves when the bay reloads.
 func TestAmmoConsumedPerShot(t *testing.T) {
 	s := newTestSim(t)
 	npc := spawnNearPlayer(t, s)
 	forceLock(s, npc)
-	if got := cargoCount(s, "ammo-emp-s"); got != 20 {
-		t.Fatalf("start ammo=%d", got)
+	if got, want := cargoCount(s, "ammo-emp-s"), 15; got != want {
+		t.Fatalf("start cargo ammo=%d want %d (5 in the bay)", got, want)
+	}
+	if got, want := bayRounds(s, ammoSlot()), 5; got != want {
+		t.Fatalf("start bay=%d want %d", got, want)
 	}
 	slot := SlotRef{Class: content.SlotHigh, Index: 0}
 	s.Queue(CmdActivate{Slot: slot, Target: npc})
 	s.Step() // first shot resolves on activation
-	if got := cargoCount(s, "ammo-emp-s"); got != 19 {
-		t.Fatalf("ammo after shot=%d want 19", got)
+	if got, want := bayRounds(s, slot), 4; got != want {
+		t.Fatalf("bay after shot=%d want %d", got, want)
+	}
+	if got, want := cargoCount(s, "ammo-emp-s"), 15; got != want {
+		t.Fatalf("cargo after shot=%d want %d (untouched)", got, want)
 	}
 	stepN(s, 130) // ShotTime = 2s = 120 ticks -> one more shot
-	if got := cargoCount(s, "ammo-emp-s"); got != 18 {
-		t.Fatalf("ammo after 2nd cycle=%d want 18", got)
+	if got, want := bayRounds(s, slot), 3; got != want {
+		t.Fatalf("bay after 2nd cycle=%d want %d", got, want)
 	}
 }
 
@@ -149,9 +158,12 @@ func TestDryGunWarnsAndDeactivates(t *testing.T) {
 	s := newTestSim(t)
 	npc := spawnNearPlayer(t, s)
 	forceLock(s, npc)
-	// Empty the cargo of light charges.
+	// Empty the cargo AND the bay (the fresh fit pre-loaded 5 rounds).
 	cargo, _ := s.Cargos.Get(s.player)
 	cargo.Stacks = nil
+	if _, rt, ok := s.moduleRuntime(s.player, ammoSlot()); ok {
+		rt.Clip = content.CargoStack{}
+	}
 
 	slot := SlotRef{Class: content.SlotHigh, Index: 0}
 	s.Queue(CmdActivate{Slot: slot, Target: npc})
@@ -217,18 +229,13 @@ func TestDamageProfileMatchesAmmo(t *testing.T) {
 		t.Fatalf("EMP shot value=%v want %v (ammo profile not applied?)", hit.Value, want)
 	}
 
-	// Shot 2: AP charges -> profile replaces the base volley.
-	cargo, _ := s.Cargos.Get(s.player)
-	cargo.Stacks = nil
+	// Shot 2: switch the bay to AP shells (CmdSetAmmo dumps the EMP rounds
+	// back and loads AP); the load cycle defers the next shot by one cycle.
 	giveCargo(s, "ammo-ap-s", 5)
-	stepN(s, 130) // the 2 s cycle fires once more (AP) en route
-	s.Queue(CmdDeactivate{Slot: slot})
-	s.Step()
+	setAmmo(s, "ammo-ap-s")
 	drain(s)
-	stepN(s, 110) // let the cancelled cycle clock run out while the gun is off
 	state2 := s.RNG.Snapshot()
-	s.Queue(CmdActivate{Slot: slot, Target: dummy})
-	s.Step()
+	stepN(s, 125) // the 2 s load cycle ends and the AP shot fires
 	evs = drain(s)
 	hit = findEvent(evs, EvLog, "Practice Drone")
 	if hit == nil {
@@ -240,8 +247,11 @@ func TestDamageProfileMatchesAmmo(t *testing.T) {
 	if math.Abs(hit.Value-want) > 1e-9 {
 		t.Fatalf("AP shot value=%v want %v (ammo profile not applied?)", hit.Value, want)
 	}
-	if cargoCount(s, "ammo-ap-s") != 3 {
-		t.Fatalf("ap ammo=%d want 3 (one spare cycle fired en route)", cargoCount(s, "ammo-ap-s"))
+	if got, wantRounds := bayRounds(s, slot), 4; got != wantRounds {
+		t.Fatalf("AP bay=%d want %d (one round fired)", got, wantRounds)
+	}
+	if got := ammoTotal(s, "ammo-ap-s"); got != 4 {
+		t.Fatalf("AP rounds=%d want 4 (5 loaded, one fired)", got)
 	}
 }
 
@@ -356,11 +366,19 @@ func TestNpcDeathCreatesWreckWithLootBounds(t *testing.T) {
 	}
 	for _, w := range wrecks {
 		wr, _ := s.Wrecks.Get(w)
-		if len(wr.Loot) != 1 || wr.Loot[0].Item != "loot-alloy-scrap" {
-			t.Fatalf("loot=%+v", wr.Loot)
+		// The rolled table entry, plus the rounds the rat had loaded when it
+		// came apart (its bay is part of the wreck).
+		scrap := -1
+		for i, st := range wr.Loot {
+			if st.Item == "loot-alloy-scrap" {
+				scrap = i
+			}
 		}
-		if wr.Loot[0].Qty < 1 || wr.Loot[0].Qty > 2 {
-			t.Fatalf("loot qty %d out of bounds [1,2]", wr.Loot[0].Qty)
+		if scrap < 0 {
+			t.Fatalf("no rolled loot in %+v", wr.Loot)
+		}
+		if q := wr.Loot[scrap].Qty; q < 1 || q > 2 {
+			t.Fatalf("loot qty %d out of bounds [1,2]", q)
 		}
 		// Wrecks expire 300s after creation, which happened within the last
 		// few ticks of this test (time advanced by DT per Step).
@@ -501,17 +519,14 @@ func TestCapBoosterConsumesCellAndRestores(t *testing.T) {
 	slot := injectModule(t, s, "mod-cap-booster")
 	c, _ := s.Caps.Get(s.player)
 	c.Current = 50
-	if got := cargoCount(s, "charge-cap-cell"); got != 5 {
-		t.Fatalf("cells=%d", got)
-	}
 	s.Queue(CmdActivate{Slot: slot, Target: 0})
 	s.Step()
 	drain(s)
 	if math.Abs(c.Current-150) > 1.25*DT+1e-12 {
 		t.Fatalf("cap=%v want ~150 (50 + CapRestore 100)", c.Current)
 	}
-	if got := cargoCount(s, "charge-cap-cell"); got != 4 {
-		t.Fatalf("cells after boost=%d want 4", got)
+	if got := bayRounds(s, slot); got != 4 {
+		t.Fatalf("bay after boost=%d want 4 (one cell burned)", got)
 	}
 }
 

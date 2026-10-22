@@ -74,6 +74,9 @@ var (
 type validator struct {
 	c    *Content
 	errs []string
+	// familyVolume records the shell volume of each ammo class so every
+	// family stays one calibre (items pass).
+	familyVolume map[string]float64
 }
 
 func (v *validator) addf(format string, args ...any) {
@@ -150,6 +153,20 @@ func (v *validator) items() {
 		}
 		if it.Damage != nil && (it.Damage.EM < 0 || it.Damage.Thermal < 0 || it.Damage.Kinetic < 0 || it.Damage.Explosive < 0) {
 			v.addf("%s: negative damage component", ctx)
+		}
+		if it.Category == CatAmmo && it.AmmoClass == "" {
+			v.addf("%s: ammo item declares no ammo class", ctx)
+		}
+		if v.familyVolume == nil {
+			v.familyVolume = map[string]float64{}
+		}
+		if it.AmmoClass != "" {
+			// A shell family is one calibre: every shell of it occupies the
+			// same volume, so a bay's whole-round count is family-wide.
+			if vol, ok := v.familyVolume[it.AmmoClass]; ok && vol != it.Volume {
+				v.addf("%s: ammo class %q mixes volumes %v and %v (one family = one calibre)", ctx, it.AmmoClass, vol, it.Volume)
+			}
+			v.familyVolume[it.AmmoClass] = it.Volume
 		}
 	}
 }
@@ -377,6 +394,18 @@ func (v *validator) modules() {
 			if w.AmmoClass != "" && !v.ammoClassExists(w.AmmoClass) {
 				v.addf("%s: weapon ammo class %q matches no ammo or charge item", ctx, w.AmmoClass)
 			}
+			// A charge-fed gun carries a bay and at least one whole round of
+			// its calibre fits it; a charge-free gun has none.
+			switch {
+			case w.AmmoClass == "" && w.BayM3 != 0:
+				v.addf("%s: weapon needs no ammo but declares a bay of %v m³", ctx, w.BayM3)
+			case w.AmmoClass != "" && w.BayM3 <= 0:
+				v.addf("%s: weapon loads %q but declares no bay capacity", ctx, w.AmmoClass)
+			case w.AmmoClass != "":
+				if vol := v.familyVolume[w.AmmoClass]; w.BayM3 < vol {
+					v.addf("%s: bay %v m³ holds no whole round of %q (one shell is %v m³)", ctx, w.BayM3, w.AmmoClass, vol)
+				}
+			}
 		}
 		if m.Passive != nil {
 			p := m.Passive
@@ -410,6 +439,15 @@ func (v *validator) modules() {
 			}
 			if b.ScramDuration < 0 {
 				v.addf("%s: negative scram duration %v", ctx, b.ScramDuration)
+			}
+			// The cap booster burns cells from a bay like a gun burns shells;
+			// no other boosted kind carries one.
+			if m.Kind == KindCapBooster {
+				if b.BayM3 <= 0 {
+					v.addf("%s: cap booster declares no cell bay capacity", ctx)
+				}
+			} else if b.BayM3 != 0 {
+				v.addf("%s: kind %q declares a bay of %v m³", ctx, m.Kind, b.BayM3)
 			}
 		}
 	}

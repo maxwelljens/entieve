@@ -152,6 +152,8 @@
           { "item": "ammo-emp-s", "qty": 3000, "price": 150 },
           { "item": "ammo-emp-m", "qty": 800, "price": 300 },
           { "item": "ammo-emp-l", "qty": 200, "price": 600 },
+          { "item": "ammo-art-emp-m", "qty": 800, "price": 300 },
+          { "item": "ammo-art-emp-l", "qty": 600, "price": 480 },
           { "item": "min-argon", "qty": 1200, "price": 48, "side": "buy" },
           { "item": "min-cobalt", "qty": 6000, "price": 18, "side": "buy" },
           { "item": "min-ferrite", "qty": 25000, "price": 5, "side": "buy" },

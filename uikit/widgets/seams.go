@@ -321,6 +321,16 @@ func (v *view) PredictedAmmo(slot sim.SlotRef) content.ItemID {
 	if !ok {
 		return ""
 	}
+	// The bay is the consumer now: a loaded or selected shell is what the gun
+	// fires, whether or not its rounds still sit in cargo.
+	if cs, ok := v.s.Clip(v.s.Player(), slot); ok {
+		if cs.Item != "" {
+			return cs.Item
+		}
+		if cs.Selection != "" {
+			return cs.Selection
+		}
+	}
 	class := def.Weapon.AmmoClass
 	if pref := v.s.AmmoPref(v.s.Player(), slot); pref != "" {
 		for _, st := range cargo.Stacks {

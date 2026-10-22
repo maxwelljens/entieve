@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Shell bays (clips)** (`content`, `sim`): every charge-fed module — the
+  six projectile guns and the cap booster — now carries a m³ **bay** that
+  holds whole rounds of exactly one shell type. A **load cycle** fills it
+  from cargo with a full bay in exactly one firing cycle (no capacitor
+  cost), deferring the next shot by that cycle; each shot draws one round
+  from the bay. A fresh fit pre-loads, and the bay resolves itself while the
+  selected type lasts: it reloads from that type, and when it runs out it
+  switches if exactly one other type remains in cargo or waits (quietly, one
+  line) when two or more compete. `CmdSetAmmo` picks a type — dumping the
+  bay back to cargo, loading the new one and resuming after its load cycle —
+  and `""` now clears the selection (the old auto-follow-cargo mode is
+  gone). A gun with no matching rounds anywhere still logs `no charges` and
+  deactivates, unchanged. Loaded rounds travel with the ship: unfitting or
+  assembling returns them to cargo, and a wreck carries whatever was in its
+  bays. The UI reads a bay through `sim.Clip` (`ClipState`: loaded item,
+  rounds, capacity, selection, competing cargo types). Bays are calibrated
+  for a ~120 s sustained-fire reload: small autocannon 0.2 m³ / 40 rounds,
+  small artillery 0.104 / 13, medium autocannon 0.33 / 33, medium artillery
+  0.275 / 11, large autocannon 0.594 / 27, large artillery 0.297 / 9, cap
+  booster 0.25 m³ / 25 cells. Vocabulary: CONTEXT.md "Shell family", "Bay"
+  (clip), "Load cycle", "Waiting state"; authoring table in
+  [docs/CONTENT_AUTHORING.md](docs/CONTENT_AUTHORING.md); rules in
+  [docs/SIM.md](docs/SIM.md#shell-bays-clips).
+- **Six shell families** (`content/data/items/ammo.json`,
+  `content/data/modules/weapons.json`): ammunition splits into
+  family-calibres so an autocannon and an artillery of the same size no
+  longer share shells. The twelve existing `ammo-*-s/m/l` ids stay and become
+  the **autocannon** families (`small-autocannon`, `medium-autocannon`,
+  `large-autocannon`) at 0.005 / 0.01 / 0.022 m³ per shell; twelve new
+  artillery shells (`ammo-art-<profile>-<size>`) cover the artillery
+  families at 0.008 / 0.025 / 0.033 m³, with recipes and display names. One
+  family is one calibre: every shell of it has the same volume, which
+  validation enforces alongside the bay rules.
+- **Save schema 3** (`sim/save.go`): per-slot loaded rounds and ammo
+  selections persist with the fitting runtime (`ModuleRuntime.Clip` /
+  `.Selection`). A v2 save is migrated in place on restore — empty bays, no
+  selections, and the bay rule then auto-resolves each gun — while v0/v1
+  saves are still rejected. This supersedes the old "schema stays 2" note in
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 - **Fitting limits: mounts and class quotas** (`content/fit.go`,
   `content/data/{ships,modules}`, `sim`): high slots are now **mounts** — a
   turret or launcher of small, medium or large size — and a module fits only a
@@ -32,6 +72,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   untouched (schema 2: defs carry the limits, saves carry module ids).
 
 ### Changed
+
+- **Station books stock artillery shells** (`content/data/systems`): every
+  station that sells an artillery gun now lists its family's shells too, and
+  the systems whose belts/anomalies spawn Hierarchs (Kuźnica, Głusza) stock
+  large artillery shells so respawn requisitions can buy them. The Jernborg
+  supply-run contract's objective is 1 m³ (200 small autocannon shells at the
+  new 0.005 m³ volume) for the same 86,000 € reward.
 
 - **Belts are numbered, gates name their destination** (`content/data/systems`):
   every belt is now **Asteroid Belt I** (numbered per system in celestial

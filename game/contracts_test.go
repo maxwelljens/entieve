@@ -306,7 +306,7 @@ func TestStationBoardRendersShippedContent(t *testing.T) {
 		t.Errorf("cleanup reward = %q, want %q", got, want)
 	}
 	if got, want := availLine(t, g, "contract-solace-supply-run-1", 1),
-		"Deliver 2 m³ Small EMP Shell to Przystań"; got != want {
+		"Deliver 1 m³ Small EMP Shell to Przystań"; got != want {
 		t.Errorf("supply summary = %q, want %q", got, want)
 	}
 	if got, want := availLine(t, g, "contract-solace-cordite-1", 1), "Mine 400 m³ Cordite Ore"; got != want {

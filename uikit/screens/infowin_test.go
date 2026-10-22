@@ -227,7 +227,7 @@ func TestInfoPageModule(t *testing.T) {
 			Optimal:   12000,
 			Falloff:   6000,
 			Tracking:  145,
-			AmmoClass: "small",
+			AmmoClass: "small-autocannon",
 		},
 	})
 	page, ok := infoPageFor(env, widgets.ModuleRef("mod-fixture-weapon"))
@@ -264,8 +264,8 @@ func TestInfoPageModule(t *testing.T) {
 	if charges == nil {
 		t.Fatal("no CHARGES section")
 	}
-	if cls, _ := rowOf(charges, "Class"); cls.Value != "Small" {
-		t.Errorf("ammo class row = %+v, want Small", cls)
+	if cls, _ := rowOf(charges, "Class"); cls.Value != "Small-autocannon" {
+		t.Errorf("ammo class row = %+v, want Small-autocannon", cls)
 	}
 	// Every compatible charge is a link to a loaded item def.
 	links := 0
@@ -329,7 +329,7 @@ func TestInfoPageItem(t *testing.T) {
 		Name:      "Fixture Lance",
 		Category:  content.CatAmmo,
 		Volume:    0.001,
-		AmmoClass: "small",
+		AmmoClass: "small-autocannon",
 		Damage:    &content.Damage{EM: 10, Thermal: 4, Kinetic: 3, Explosive: 2},
 	})
 
@@ -524,7 +524,7 @@ func TestInfoWindowShowAndRefSwap(t *testing.T) {
 		Slot:           content.SlotHigh,
 		Kind:           content.KindWeapon,
 		ActivationTime: 1,
-		Weapon:         &content.WeaponAttrs{AmmoClass: "small", Optimal: 1000},
+		Weapon:         &content.WeaponAttrs{AmmoClass: "small-autocannon", Optimal: 1000},
 	})
 	env.ShowInfo(widgets.ModuleRef("mod-fixture-links"))
 	frame()

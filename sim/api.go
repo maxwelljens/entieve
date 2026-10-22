@@ -123,18 +123,10 @@ type Sim struct {
 	// never refilled.
 	upkeep map[StationID]float64
 
-	// ammoPrefs is the per-(owner, slot) preferred charge item set by
-	// CmdSetAmmo ("" entry = automatic). Point-looked-up only — never
-	// iterated by behavior, so map order cannot leak into the simulation.
-	// Documented limitation: not part of Save (the schema is versioned by
-	// Save.Schema), so preferences reset on Restore.
-	ammoPrefs map[modKey]content.ItemID
-
 	// lastPlayerWork is where/when the player last fired a weapon or
 	// completed a mining cycle — the recent-activity aggro trigger for NPCs
-	// (see systemNpc). at == playerWorkNever means "never this run"; like
-	// ammoPrefs it is intentionally outside the versioned Save schema and
-	// resets on Restore.
+	// (see systemNpc). at == playerWorkNever means "never this run"; it is
+	// intentionally outside the versioned Save schema and resets on Restore.
 	lastPlayerWork struct {
 		pos core.Vec2
 		at  float64
@@ -200,10 +192,9 @@ func New(c *content.Content, w *content.WorldDef, seed int64) (*Sim, error) {
 		systemID:   w.Start.System,
 		wallet:     w.Start.Wallet,
 		modTargets: make(map[modKey]ecs.Entity),
-		ammoPrefs:  make(map[modKey]content.ItemID),
 		market:     books,
 		marketSeq:  seq,
-		schema:     saveSchemaV2,
+		schema:     saveSchemaV3,
 	}
 	s.lastPlayerWork.at = playerWorkNever
 	// Fork the living-universe stream from the fresh master state: same seed
@@ -222,6 +213,8 @@ func New(c *content.Content, w *content.WorldDef, seed int64) (*Sim, error) {
 	if agentWorlds[w.ID] {
 		s.spawnAgents()
 	}
+	// Fresh fits pre-load: every bay fills from cargo before the first Step.
+	s.fillBays()
 	return s, nil
 }
 
@@ -304,6 +297,44 @@ func (s *Sim) Events() []Event {
 
 // DrainEvents is an alias of Events (docs/ARCHITECTURE.md names both).
 func (s *Sim) DrainEvents() []Event { return s.Events() }
+
+// ClipState is one charge module's shell bay as the UI reads it: the loaded
+// rounds and the bay's capacity for that shell (in whole rounds), the shell
+// type the bay tops up from, and every shell type in cargo that fits it
+// (sorted by id). An empty bay with two or more Options is the waiting state
+// — the player must choose (CmdSetAmmo) before the gun fires again.
+type ClipState struct {
+	Item      content.ItemID
+	Rounds    int
+	Capacity  int
+	Selection content.ItemID
+	Options   []content.ItemID
+}
+
+// Clip reports one slot's shell bay; ok is false when the slot holds no bay
+// (no such module, a charge-free weapon, or a non-charge module).
+func (s *Sim) Clip(e ecs.Entity, slot SlotRef) (ClipState, bool) {
+	def, rt, ok := s.moduleDef(e, slot)
+	if !ok || clipBay(def) <= 0 {
+		return ClipState{}, false
+	}
+	cargo, _ := s.Cargos.Get(e)
+	var stacks []content.CargoStack
+	if cargo != nil {
+		stacks = cargo.Stacks
+	}
+	item := rt.Clip.Item
+	if item == "" {
+		item = rt.Selection
+	}
+	return ClipState{
+		Item:      rt.Clip.Item,
+		Rounds:    rt.Clip.Qty,
+		Capacity:  s.clipRounds(def, item),
+		Selection: rt.Selection,
+		Options:   s.clipTypes(def, stacks),
+	}, true
+}
 
 // Time returns simulated seconds since world start.
 func (s *Sim) Time() float64 { return s.time }

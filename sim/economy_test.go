@@ -574,7 +574,7 @@ func TestAssembleSwapsHullsAndPreservesBoth(t *testing.T) {
 	s := newTestSim(t)
 	dockAtHaven(t, s)
 	ship, _ := s.Ships.Get(s.player)
-	ammoBefore := cargoCount(s, "ammo-emp-s")
+	ammoBefore := ammoTotal(s, "ammo-emp-s")
 
 	// The hangar holds a barge with its own fit and cargo.
 	s.Hangar.Ships = append(s.Hangar.Ships, StoredShip{
@@ -608,7 +608,7 @@ func TestAssembleSwapsHullsAndPreservesBoth(t *testing.T) {
 		t.Fatalf("stored fit=%v", stored.Fit)
 	}
 	if stacksCount(stored.Cargo, "ammo-emp-s") != ammoBefore {
-		t.Fatalf("stored cargo=%+v", stored.Cargo)
+		t.Fatalf("stored cargo=%+v, want %d rounds (bay dumped into the hold)", stored.Cargo, ammoBefore)
 	}
 	if !hasEvent(evs, EvLog, "Assembled Ore Barge") {
 		t.Fatalf("missing assemble event: %v", evs)
@@ -621,7 +621,7 @@ func TestAssembleSwapsHullsAndPreservesBoth(t *testing.T) {
 	if ship.Hull != "ship-sloop" {
 		t.Fatalf("hull after swap back=%s", ship.Hull)
 	}
-	if cargoCount(s, "ammo-emp-s") != ammoBefore {
+	if ammoTotal(s, "ammo-emp-s") != ammoBefore {
 		t.Fatal("sloop cargo not restored")
 	}
 	fit, _ = s.Fittings.Get(s.player)

@@ -268,21 +268,23 @@ func (s *Sim) moduleDef(e ecs.Entity, slot SlotRef) (*content.ModuleDef, *Module
 	return def, rt, true
 }
 
-// execSetAmmo applies a CmdSetAmmo: the slot must be a weapon that consumes
-// charges, and a non-empty item must exist, match the weapon's AmmoClass
-// and sit in cargo. Success records the per-slot preference and emits
-// EvModule ("<module> loaded with <charge>", or "<module> set to auto
-// ammo" when resetting to ""). Every rejection logs a SevWarning
-// "Cannot load X into Y" and leaves the preference unchanged.
+// execSetAmmo applies a CmdSetAmmo: the slot must be a charge-fed weapon, a
+// non-empty item must exist, match the weapon's shell family and sit in
+// cargo, and choosing it dumps the bay back to cargo and starts a full-bay
+// load of the new type immediately (the module stays Active and resumes when
+// the load cycle ends). Item "" clears the selection: the bay dumps and the
+// gun re-resolves by the bay rule — auto-load if exactly one type is left in
+// cargo, otherwise it waits for a choice. Every rejection logs a SevWarning
+// "Cannot load X into Y" and changes nothing.
 func (s *Sim) execSetAmmo(c CmdSetAmmo) {
 	p := s.player
-	def, _, ok := s.moduleDef(p, c.Slot)
+	def, rt, ok := s.moduleDef(p, c.Slot)
 	if !ok {
 		s.log(SevWarning, p, "No such module slot")
 		return
 	}
 	// Label for warning text: the charge's display name (raw ID when
-	// unknown, "ammo" for the automatic reset).
+	// unknown, "ammo" for the clear).
 	label := string(c.Item)
 	if c.Item == "" {
 		label = "ammo"
@@ -297,12 +299,17 @@ func (s *Sim) execSetAmmo(c CmdSetAmmo) {
 		return
 	}
 	if c.Item == "" {
-		s.setAmmoPref(p, c.Slot, "")
-		s.emit(Event{Kind: EvModule, Actor: p, Text: def.Name + " set to auto ammo"})
+		s.dumpClip(p, rt)
+		rt.Selection = ""
+		s.emit(Event{Kind: EvModule, Actor: p, Text: def.Name + " ammo selection cleared"})
+		if s.fillClip(p, def, rt) == clipAmbiguous {
+			s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: p,
+				Text: def.Name + " waiting for ammo selection"})
+		}
 		return
 	}
 	item, ok := s.Content.Item(c.Item)
-	if !ok || item.AmmoClass != def.Weapon.AmmoClass {
+	if !ok || !clipRound(def, item) {
 		cannot()
 		return
 	}
@@ -310,9 +317,18 @@ func (s *Sim) execSetAmmo(c CmdSetAmmo) {
 		cannot()
 		return
 	}
-	s.setAmmoPref(p, c.Slot, c.Item)
-	s.emit(Event{Kind: EvModule, Actor: p,
-		Text: def.Name + " loaded with " + item.Name})
+	cargo, _ := s.Cargos.Get(p)
+	s.dumpClip(p, rt)
+	if n := s.loadClip(cargo, def, rt, c.Item); n > 0 {
+		s.logLoad(p, def, rt.Clip.Item, n)
+		// The switch costs one firing cycle: an active gun resumes after the
+		// load rather than firing the instant the command lands.
+		if due := s.time + cyclePeriod(def); rt.Active && rt.CycleEnds < due {
+			rt.CycleEnds = due
+		}
+	} else {
+		cannot()
+	}
 }
 
 // cmdLock starts locking a target from the player's ship.

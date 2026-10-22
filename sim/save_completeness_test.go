@@ -95,7 +95,6 @@ var simFieldClasses = map[string]fieldClass{
 
 	// Documented exceptions: persistent, deliberately not in Save.
 	"events":         {exempt: "drained by Events(), capped at emit time — observation surface, not sim state"},
-	"ammoPrefs":      {exempt: "frozen Save schema: per-slot charge preferences reset on restore (intentional)"},
 	"lastPlayerWork": {exempt: "frozen Save schema: the recent-work aggro marker resets on restore (intentional)"},
 
 	// --- industry (jobs + station craft growth) ---
@@ -341,20 +340,25 @@ func TestLastStationPersistsOffGrid(t *testing.T) {
 	}
 }
 
-// TestRestoreResetsDocumentedPreferences pins the two INTENTIONAL gaps in
-// the frozen Save schema: per-slot ammo preferences and the recent-player-
-// work marker survive in the live sim but reset on restore. A future change
-// to either must fail here first (and update simFieldClasses + the schema
-// registry note in docs/ARCHITECTURE.md).
-func TestRestoreResetsDocumentedPreferences(t *testing.T) {
+// TestRestoreKeepsBaysAndResetsPlayerWork pins the split the v3 schema made:
+// a slot's loaded bay and its ammo selection now ride the fitting runtime and
+// survive restore, while the recent-player-work aggro marker stays outside the
+// Save and resets (pinned; update simFieldClasses and docs/ARCHITECTURE.md if
+// either changes).
+func TestRestoreKeepsBaysAndResetsPlayerWork(t *testing.T) {
 	s := newTestSim(t)
 	dockAtHaven(t, s)
 	slot := SlotRef{Class: content.SlotHigh, Index: 0}
-	s.Queue(CmdSetAmmo{Slot: slot, Item: "ammo-emp-s"})
+	giveCargo(s, "ammo-ap-s", 3)
+	s.Queue(CmdSetAmmo{Slot: slot, Item: "ammo-ap-s"})
 	s.Step()
 	drain(s)
-	if got := s.ammoPref(s.player, slot); got != "ammo-emp-s" {
-		t.Fatalf("ammo pref=%q want ammo-emp-s", got)
+	if got := s.ammoPref(s.player, slot); got != "ammo-ap-s" {
+		t.Fatalf("selection=%q want ammo-ap-s", got)
+	}
+	loaded := bayRounds(s, slot)
+	if loaded != 3 {
+		t.Fatalf("bay=%d want 3", loaded)
 	}
 	s.recordPlayerWork(v(1e7, 500))
 	if s.lastPlayerWork.at == playerWorkNever {
@@ -373,17 +377,17 @@ func TestRestoreResetsDocumentedPreferences(t *testing.T) {
 		t.Fatalf("restore: %v", err)
 	}
 
-	// The live sim keeps both.
-	if got := s.ammoPref(s.player, slot); got != "ammo-emp-s" {
-		t.Fatalf("live ammo pref=%q, want it kept", got)
+	// The bay and the selection are sim state now: they survive restore.
+	if got := b.ammoPref(b.player, slot); got != "ammo-ap-s" {
+		t.Fatalf("restored selection=%q want ammo-ap-s", got)
 	}
-	if s.lastPlayerWork.at == playerWorkNever {
-		t.Fatal("live sim lost its player-work marker")
+	if got := bayRounds(b, slot); got != loaded {
+		t.Fatalf("restored bay=%d want %d", got, loaded)
 	}
-	// The restored sim resets both — intentional, pinned.
-	if got := b.ammoPref(b.player, slot); got != "" {
-		t.Fatalf("restored ammo pref=%q want \"\" (automatic)", got)
+	if got, want := b.Hash(), s.Hash(); got != want {
+		t.Fatalf("hash after restore=%016x want %016x", got, want)
 	}
+	// The player-work marker is still outside the Save — intentional, pinned.
 	if b.lastPlayerWork.at != playerWorkNever || b.lastPlayerWork.pos != (core.Vec2{}) {
 		t.Fatalf("restored lastPlayerWork={%v %v} want cleared", b.lastPlayerWork.pos, b.lastPlayerWork.at)
 	}

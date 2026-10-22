@@ -301,9 +301,12 @@ func TestRackRightClickCyclesAmmo(t *testing.T) {
 	c.AddPanel(r.Container(), r)
 	c.Frame(t, 1280, 720) // Sync + Update registers the click handlers
 
-	// Candidates: Auto first, then the light charges in cargo by item id.
+	// Candidates: Auto first, then the gun's shells in cargo by item id. (The
+	// class is the fitted autocannon's family: shell families split from the
+	// bare calibre with the bay tranche.)
+	gunDef, _ := env.Content.Module("mod-autocannon-s")
 	wantCands := []content.ItemID{"", "ammo-ap-s", "ammo-emp-s", "ammo-fusion-s", "ammo-plutonium-s"}
-	got := r.ammoCandidates("small")
+	got := r.ammoCandidates(gunDef.Weapon.AmmoClass)
 	if len(got) != len(wantCands) {
 		t.Fatalf("candidates = %v, want %v", got, wantCands)
 	}

@@ -71,8 +71,8 @@ func TestLoadEmbedded(t *testing.T) {
 	if turret.Weapon == nil {
 		t.Fatal("mod-autocannon-s has no weapon block")
 	}
-	if turret.Weapon.AmmoClass != "small" {
-		t.Errorf("mod-autocannon-s ammo class = %q, want small", turret.Weapon.AmmoClass)
+	if turret.Weapon.AmmoClass != "small-autocannon" {
+		t.Errorf("mod-autocannon-s ammo class = %q, want small-autocannon", turret.Weapon.AmmoClass)
 	}
 	if len(c.Modules) < 14 {
 		t.Errorf("len(Modules) = %d, want >= 14", len(c.Modules))

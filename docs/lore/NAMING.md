@@ -145,7 +145,7 @@ Rat hulls, ores, minerals and loot stay unattributed.
 
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
-| `ammo-emp-s` | — | **Small EMP Shell** | trade | proposed 2026-10-20: calibre + damage profile (was EMP Charge) |
+| `ammo-emp-s` | — | **Small EMP Shell** | trade | approved 2026-10-20: calibre + damage profile (was EMP Charge); small-autocannon family |
 | `ammo-fusion-s` | — | **Small Fusion Shell** | trade | proposed 2026-10-20: (was Fusion Charge) |
 | `ammo-ap-s` | — | **Small Armor-Piercing Shell** | trade | proposed 2026-10-20: (was Armor-Piercing Charge) |
 | `ammo-plutonium-s` | — | **Small Plutonium Shell** | trade | proposed 2026-10-20: (was Plutonium Charge) |
@@ -157,7 +157,19 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | `ammo-fusion-l` | — | **Large Fusion Shell** | trade | proposed 2026-10-20 |
 | `ammo-ap-l` | — | **Large Armor-Piercing Shell** | trade | proposed 2026-10-20 |
 | `ammo-plutonium-l` | — | **Large Plutonium Shell** | trade | proposed 2026-10-20 |
-| `charge-cap-cell` | Capacitor Booster Cell | keep | trade | cap booster fuel, not gun ammo |
+| `ammo-art-emp-s` | — | **Small EMP Artillery Shell** | trade | proposed 2026-10-22: artillery family (`ammo-art-<profile>-<size>`); the long-bodied shell of the small calibre |
+| `ammo-art-fusion-s` | — | **Small Fusion Artillery Shell** | trade | proposed 2026-10-22: artillery family |
+| `ammo-art-ap-s` | — | **Small Armor-Piercing Artillery Shell** | trade | proposed 2026-10-22: artillery family |
+| `ammo-art-plutonium-s` | — | **Small Plutonium Artillery Shell** | trade | proposed 2026-10-22: artillery family |
+| `ammo-art-emp-m` | — | **Medium EMP Artillery Shell** | trade | proposed 2026-10-22: artillery family |
+| `ammo-art-fusion-m` | — | **Medium Fusion Artillery Shell** | trade | proposed 2026-10-22: artillery family |
+| `ammo-art-ap-m` | — | **Medium Armor-Piercing Artillery Shell** | trade | proposed 2026-10-22: artillery family |
+| `ammo-art-plutonium-m` | — | **Medium Plutonium Artillery Shell** | trade | proposed 2026-10-22: artillery family |
+| `ammo-art-emp-l` | — | **Large EMP Artillery Shell** | trade | proposed 2026-10-22: artillery family |
+| `ammo-art-fusion-l` | — | **Large Fusion Artillery Shell** | trade | proposed 2026-10-22: artillery family |
+| `ammo-art-ap-l` | — | **Large Armor-Piercing Artillery Shell** | trade | proposed 2026-10-22: artillery family |
+| `ammo-art-plutonium-l` | — | **Large Plutonium Artillery Shell** | trade | proposed 2026-10-22: artillery family |
+| `charge-cap-cell` | Capacitor Booster Cell | keep | trade | cap booster fuel, not gun ammo; burned from the booster's cell bay |
 
 ### Items — minerals
 
@@ -245,6 +257,10 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | Market item row's Side cell (`uikit/screens/market.go`) | — | **—** | trade | the tree's parent rows carry no side of their own (the order rows folded beneath them keep Ask/Bid); the em dash reads as "none" while keeping the column visibly present. Approved 2026-10-20 |
 | Fitting summary capacitor verdict (`uikit/screens/fitting.go`) | — | **Cap stable** / **Cap unstable (~<n> s)** | ship | the fitting window's projected capacitor verdict under the fit's running modules: stable while their summed GJ/s stays under the recharge curve's peak rate, else the seconds the charge lasts, with a drain-vs-recharge bar under it. The three summary row labels are **Total DPS** · **Cap drain** · **Cap recharge**. Proposed 2026-10-21, awaiting user approval |
 | Station service labels (`content/services.go`) | — | **Repair** · **Market** · **Fitting** · **Manufacturing** · **Refinery** | trade | the `content.Services` table's display names: the services row's button tooltips and, for the four with a window, the window titles already registered above (Market/Fitting/Manufacturing/Refinery). `repair` has no window — the sim repairs on `CmdRepair` — so it draws no button. Approved 2026-10-21 |
+| Bay load log (`sim/clips.go`) | — | **&lt;module&gt; loaded &lt;n&gt; rounds (&lt;shell name&gt;)** | trade | the one quiet line per completed bay load, `EvModule`, player modules only. Proposed 2026-10-22, awaiting user approval |
+| Waiting-for-ammo log (`sim/system_weapons.go`, `sim/command.go`) | — | **&lt;module&gt; waiting for ammo selection** | trade | a bay empty with two or more shell types in cargo and none selected: one `SevInfo` line, then a silent deactivate — never the dry-gun warning. Proposed 2026-10-22, awaiting user approval |
+| Ammo selection cleared (`sim/command.go`) | — | **&lt;module&gt; ammo selection cleared** | trade | `CmdSetAmmo ""`: the bay dumped to cargo and the gun re-resolved by the bay rule (auto-load one type, wait on two or more). Replaces the retired "set to auto ammo". Proposed 2026-10-22, awaiting user approval |
+| Bay refusals (`sim/command.go`) | — | **Cannot load &lt;shell&gt; into &lt;module&gt;** | trade | unchanged wording; now also covers a shell of another family and a reload with no rounds in cargo. Proposed 2026-10-22, awaiting user approval |
 | Belt-cleared log (`sim/system_damage.go`) | — | **&lt;belt name&gt; cleared** | trade | the high-sec belt response's news line: the last live rat of a belt died, whoever landed the kill (the anomaly-cleared line already uses the same "&lt;place&gt; cleared" form). Proposed 2026-10-21, awaiting user approval |
 | Docked backdrop caption (`game/scenes.go`) | — | **Docked: &lt;station name&gt;** | trade | the station view's backdrop caption: the docked-at station's display name after a plain colon, set in the display face lower-centre over the hangar plate. No coined term — the player reads where they are. Approved 2026-10-21 |
 | High-slot mount labels (`uikit/screens/fitting.go`) | — | **Turret mount** / **Launcher mount** | ship | the two mount kinds drawn on an empty high-slot tile and in the hull's SLOTS section: guns and the mining laser are turret-mounted, rockets and missiles launcher-mounted (EVE's split). The short tile form is **Turret** / **Launcher**. Proposed 2026-10-22, awaiting user approval |
