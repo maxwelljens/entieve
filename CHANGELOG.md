@@ -19,15 +19,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sim/system_traffic.go`, `sim/system_damage.go`): a static guard now
   engages the pirate rats anchored at its own celestial in a high-security
   system, and a traffic patrol sweeps an occupied high-sec belt once a
-  patrol beat — warping there, killing the rats and flying home. Rats
-  already fighting are left alone (a belt you are working stays yours), the
-  Fringe and Unincorporated get no response, and the last rat of a belt
-  dying logs one `<belt> cleared` line while the belt's own respawn timers
-  re-arm it. The rats return fire, and their wrecks are lootable exactly as
-  after any other kill — the bounty is still paid only for kills
-  attributed to you. New vocabulary: CONTEXT.md "Belt sweep",
-  [docs/SIM.md](docs/SIM.md) ("The beat"),
+  patrol beat — warping there, killing the rats and flying home only when
+  the belt is empty. A sweep hunts stragglers off the anchor instead of
+  holding station, engages free rats first (a belt you are working stays
+  yours while others are free) and finishes the belt over kill-stealing
+  when a player-touched rat is the last one left; the Fringe and
+  Unincorporated get no response, and the last rat of a belt dying logs one
+  `<belt> cleared` line while the belt's own respawn timers re-arm it. The
+  rats return fire, and their wrecks are lootable exactly as after any
+  other kill — the bounty is still paid only for kills attributed to you.
+  Rudnik (Charter space) now fields the standard patrol schedule too, so
+  its belts get sweeps instead of static guards alone. New vocabulary:
+  CONTEXT.md "Belt sweep", [docs/SIM.md](docs/SIM.md) ("The beat"),
   [docs/GAMEPLAY.md](docs/GAMEPLAY.md) ("Guard patrols …").
+- **Small autocannon reach is 10 km** (`content/data/modules/weapons.json`):
+  the small autocannon's falloff drops 9000 → 6000 m (optimal 4000 m and the
+  3 s cycle unchanged), so its 50 % range is 10 km and the tail dies by
+  ~16 km — the Scuttler's 17 km pokes no longer land. Medium and large
+  autocannons and the artillery family are unchanged, pending their own
+  review. The fitting tooltip and the weapons pin follow the new number.
 ### Added
 
 - **Rail glyphs are colour-coded by section**: Ship cyan, Trade green,

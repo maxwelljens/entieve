@@ -86,6 +86,11 @@ func TestGunFamiliesAndCalibres(t *testing.T) {
 		if ar.Weapon.Optimal <= ac.Weapon.Optimal {
 			t.Errorf("%s optimal %v must exceed %s optimal %v", ar.ID, ar.Weapon.Optimal, ac.ID, ac.Weapon.Optimal)
 		}
+		// The small autocannon was retuned to a 10 km reach (optimal 4 km +
+		// falloff 6 km); the medium/large are awaiting their own review.
+		if ac.ID == "mod-autocannon-s" && ac.Weapon.Falloff != 6000 {
+			t.Errorf("%s falloff = %v, want 6000", ac.ID, ac.Weapon.Falloff)
+		}
 		// Per-volley damage: the artillery throws a heavier shot out of the
 		// same shell (its damage multiplier is the family's share).
 		if ar.Weapon.Mult() <= ac.Weapon.Mult() {

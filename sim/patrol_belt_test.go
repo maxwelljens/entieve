@@ -381,6 +381,92 @@ func TestPatrolBeltSweepTwinRunAndSaveRestoreIdentical(t *testing.T) {
 	}
 }
 
+// beltClearedLines counts the "<belt> cleared" lines in evs.
+func beltClearedLines(evs []Event) int {
+	n := 0
+	for _, ev := range evs {
+		if ev.Kind == EvLog && ev.Text == "Fixture Belt cleared" {
+			n++
+		}
+	}
+	return n
+}
+
+// TestPatrolSweepFinishesTheBelt: the sweep stays until the belt is empty.
+// The two rats the old rule abandoned are still there — one flinching at a
+// nearby player (trigger (b) never expires, so ratFree treated it as engaged
+// forever), one far off its Home anchor — and the patrol must clear both
+// before it logs and flies home.
+func TestPatrolSweepFinishesTheBelt(t *testing.T) {
+	s := newBeltSim(t, trafficContent(), 7) // sys-a: high, patrol beat 600
+	belt := beltPosOf(t, s, "cel-belt-a")
+	// The player sits inside the fixture scuttler's high-sec leash (2.5 ×
+	// 6 km) but outside every trigger radius, chips one rat, then stops
+	// fighting: that rat keeps flinching onto the player and is never "free".
+	setPlayerPos(s, belt.Add(core.Vec2{X: 12000}))
+	flinch := s.spawnNpc("npc-rat-scuttler", belt, 100)
+	damageNPC(s, s.player, flinch, scratchDamage(), false)
+	straggler := s.spawnNpc("npc-rat-scuttler", belt, 100)
+	teleport(s, straggler, belt.Add(core.Vec2{X: -300000}))
+	drain(s)
+
+	var evs []Event
+	for i := 0; i < 30000 && (s.World.Alive(flinch) || s.World.Alive(straggler)); i++ {
+		s.Step()
+		evs = append(evs, drain(s)...)
+	}
+	if s.World.Alive(flinch) {
+		t.Fatalf("the sweep left the flinching rat alive (state=%s)", aiState(s, flinch))
+	}
+	if s.World.Alive(straggler) {
+		t.Fatalf("the sweep left the straggler alive (state=%s)", aiState(s, straggler))
+	}
+	if n := beltClearedLines(evs); n != 1 {
+		t.Fatalf("cleared lines=%d after emptying the belt, want exactly 1", n)
+	}
+	var home []Event
+	stepCollect(s, &home, 6000)
+	for _, e := range sortedEntities(s.Patrols) {
+		if p, ok := s.Patrols.Get(e); ok && p.State != PatrolIdle {
+			t.Fatalf("patrol %v still %s after the belt emptied", e, p.State)
+		}
+	}
+}
+
+// TestHighSecGuardFinishesPlayerTouchedRat: the static guard's completion
+// rule — it fights the belt to empty even when the only rat left is
+// flinching at a nearby player, and it still never initiates on the player.
+func TestHighSecGuardFinishesPlayerTouchedRat(t *testing.T) {
+	c := trafficContent()
+	c.Traffic["sys-a"].Patrol = nil // isolate: no scheduled patrols in this pin
+	c.NPCs["npc-rat-scuttler"].Fit = []content.ModuleID{"mod-test-turret"}
+	s := newBeltSim(t, c, 7)
+	belt := beltPosOf(t, s, "cel-belt-a")
+	setPlayerPos(s, belt.Add(core.Vec2{X: 12000}))
+	guard := spawnStaticGuard(t, s, belt)
+	rat := s.spawnNpc("npc-rat-scuttler", belt, 100)
+	if rat.IsZero() {
+		t.Fatal("spawnNpc(npc-rat-scuttler) failed")
+	}
+	damageNPC(s, s.player, rat, scratchDamage(), false)
+	drain(s)
+
+	var evs []Event
+	for i := 0; i < 40000 && s.World.Alive(rat); i++ {
+		s.Step()
+		evs = append(evs, drain(s)...)
+	}
+	if s.World.Alive(rat) {
+		t.Fatalf("the guard left a player-touched rat alive (state=%s)", aiState(s, rat))
+	}
+	if hasEvent(evs, EvLog, "Guard is attacking you") {
+		t.Fatal("a friendly guard aggroed the player")
+	}
+	if infoHostile(s, guard) {
+		t.Fatal("an engaged guard must stay friendly on the overview")
+	}
+}
+
 // aiState is a small readback for failure messages.
 func aiState(s *Sim, e ecs.Entity) string {
 	if ai, ok := s.AIs.Get(e); ok {

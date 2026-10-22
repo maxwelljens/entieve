@@ -17,5 +17,6 @@
       "cargo": { "item": "ore-cordite", "qty": 400 },
       "interval_ticks": 7200
     }
-  ]
+  ],
+  "patrol": { "hulls": ["ship-npc-patrol"], "interval_ticks": 9000 }
 }
