@@ -98,6 +98,13 @@ height, so nothing collapses, and the proportions are saved with the
 window's layout (see **Your layout persists**). The market's two seams
 run left/right and trade width the same way.
 
+The **Refinery** and **Manufacturing** windows carry an artwork **header band**
+under their title bar — `assets/artwork/refining_header.jpg` and
+`manufacturing_header.jpg` (see [ART.md](ART.md#window-headers)) — with the
+lists scrolling over it. The band fades in with the window, and a build
+without those plates (every release ships no `assets/`) draws the plain panel,
+exactly as before.
+
 Toggle keys open and close their window (`I`, `F`, `G`, `B`, `C`, `N`, `H`,
 `P`, `K`, `Shift+L`) — windows have no separate close button. The same
 toggles live on the **left navigation rail**: one glyph per window in

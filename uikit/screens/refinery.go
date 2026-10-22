@@ -7,6 +7,7 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
@@ -93,7 +94,6 @@ func NewRefinery(env widgets.Seams) *Refinery {
 	r.stepper.Row().AddChild(r.refine)
 
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true, false, false}),
@@ -105,8 +105,12 @@ func NewRefinery(env widgets.Seams) *Refinery {
 
 	title, _ := theme.NewTitleBar(env, "Refinery", "svc_refinery")
 
+	// The body panel is the header band's: it paints the panel, the refining
+	// plate over it and then the body (docs/ART.md "Window headers").
+	panel := theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)
+
 	r.win = widget.NewWindow(
-		widget.WindowOpts.Contents(body),
+		widget.WindowOpts.Contents(newHeaderBand(body, panel, render.RefiningHeader)),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
 		widget.WindowOpts.MinSize(theme.Px(340), theme.Px(320)),
 		// Construction landing rect: the game centers it on first open.

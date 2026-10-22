@@ -88,7 +88,7 @@ func (k *Kit) addWindow(w *widget.Window, animate bool) widget.RemoveWindowFunc 
 		if animate {
 			// The still-mounted reopen path (a × close deferred its
 			// unmount): fade back in.
-			k.anims[w] = &winAnim{open: true}
+			k.startOpen(w)
 		}
 		return m.remove
 	}
@@ -138,7 +138,7 @@ func (k *Kit) addWindow(w *widget.Window, animate bool) widget.RemoveWindowFunc 
 		real()
 	}
 	if animate {
-		k.anims[w] = &winAnim{open: true}
+		k.startOpen(w)
 	}
 	k.stack = append(k.stack, m)
 	return m.remove
