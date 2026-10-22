@@ -37,9 +37,9 @@ func TestRefineryWindow(t *testing.T) {
 	if got := r.ores.Rows[row].Cells[1]; got != "100" {
 		t.Errorf("held cell = %q, want 100 (60 shipped + 40 added)", got)
 	}
-	// The preview is one batch: floor(0.35×100)=35 ferrite, floor(0.3×100)=30 nickel.
-	if got := r.ores.Rows[row].Cells[2]; got != "35 Ferrite · 30 Nickel" {
-		t.Errorf("yield cell = %q, want 35 Ferrite · 30 Nickel", got)
+	// The preview is one batch: floor(0.35×100)=35 sideron, floor(0.3×100)=30 nixium.
+	if got := r.ores.Rows[row].Cells[2]; got != "35 Sideron · 30 Nixium" {
+		t.Errorf("yield cell = %q, want 35 Sideron · 30 Nixium", got)
 	}
 	if !r.refine.GetWidget().Disabled {
 		t.Fatal("Refine enabled while undocked")
@@ -61,7 +61,7 @@ func TestRefineryWindow(t *testing.T) {
 	if got := r.stepper.Label().Label; got != "Qty 100" {
 		t.Errorf("stepper = %q, want Qty 100", got)
 	}
-	if !strings.Contains(r.status.Label, "Refine 100 × Cordite Ore → 35 Ferrite · 30 Nickel → hangar") {
+	if !strings.Contains(r.status.Label, "Refine 100 × Kerngrit Ore → 35 Sideron · 30 Nixium → hangar") {
 		t.Errorf("status = %q, want the batch yield preview with its destination", r.status.Label)
 	}
 
@@ -86,7 +86,7 @@ func TestRefineryWindow(t *testing.T) {
 	if got := r.stepper.Label().Label; got != "Qty 200" {
 		t.Errorf("stepper over the cap = %q, want Qty 200", got)
 	}
-	if !strings.Contains(r.status.Label, "Refine 200 × Cordite Ore → 70 Ferrite · 60 Nickel") {
+	if !strings.Contains(r.status.Label, "Refine 200 × Kerngrit Ore → 70 Sideron · 60 Nixium") {
 		t.Errorf("status = %q, want the 200-ore preview", r.status.Label)
 	}
 
@@ -123,7 +123,7 @@ func TestRefineryWindow(t *testing.T) {
 	if got := r.stepper.Label().Label; got != "Qty 0" {
 		t.Errorf("stepper = %q, want Qty 0 below one batch", got)
 	}
-	if !strings.Contains(r.status.Label, "One batch needs 100 ore — you hold 50 Cordite Ore.") {
+	if !strings.Contains(r.status.Label, "One batch needs 100 ore — you hold 50 Kerngrit Ore.") {
 		t.Errorf("status = %q, want the one-batch message", r.status.Label)
 	}
 
@@ -167,10 +167,10 @@ func TestRefinePreviewWholeBatch(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	r := &Refinery{cv: env}
 	want := map[content.ItemID]string{
-		"ore-sterngrit":  "45 Ferrite",
-		"ore-cordite":    "35 Ferrite · 30 Nickel",
-		"ore-lucidite":   "25 Cobalt · 30 Nickel · 20 Silex",
-		"ore-glacierite": "25 Argon · 35 Glacite",
+		"ore-sterngrit":  "45 Sideron",
+		"ore-cordite":    "35 Sideron · 30 Nixium",
+		"ore-lucidite":   "25 Zaffrite · 30 Nixium · 20 Vetril",
+		"ore-glacierite": "25 Helion · 35 Cryolith",
 	}
 	for ore, w := range want {
 		def, ok := env.Content.Item(ore)

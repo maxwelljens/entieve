@@ -306,10 +306,10 @@ func TestStationBoardRendersShippedContent(t *testing.T) {
 		t.Errorf("cleanup reward = %q, want %q", got, want)
 	}
 	if got, want := availLine(t, g, "contract-solace-supply-run-1", 1),
-		"Deliver 1 m³ Small EMP Shell to Przystań"; got != want {
+		"Deliver 1 m³ 40mm ion to Przystań"; got != want {
 		t.Errorf("supply summary = %q, want %q", got, want)
 	}
-	if got, want := availLine(t, g, "contract-solace-cordite-1", 1), "Mine 400 m³ Cordite Ore"; got != want {
+	if got, want := availLine(t, g, "contract-solace-cordite-1", 1), "Mine 400 m³ Kerngrit Ore"; got != want {
 		t.Errorf("cordite summary = %q, want %q", got, want)
 	}
 	for _, id := range []content.ContractID{
@@ -470,7 +470,7 @@ func TestStationBoardRefreshesOnEvMission(t *testing.T) {
 	setMissions(t, g, sim.MissionState{ID: "contract-solace-cordite-1", Progress: 0})
 	g.syncMounts()
 	pump(t, g, 1280, 720)
-	if got, want := activeTitle(t, g, 0), "Cordite order — 0/400"; got != want {
+	if got, want := activeTitle(t, g, 0), "Kerngrit order — 0/400"; got != want {
 		t.Fatalf("active row = %q, want %q", got, want)
 	}
 
@@ -478,18 +478,18 @@ func TestStationBoardRefreshesOnEvMission(t *testing.T) {
 	// picks it up (the board re-syncs every frame while docked).
 	setMissions(t, g, sim.MissionState{ID: "contract-solace-cordite-1", Progress: 120})
 	pump(t, g, 1280, 720)
-	if got, want := activeTitle(t, g, 0), "Cordite order — 120/400"; got != want {
+	if got, want := activeTitle(t, g, 0), "Kerngrit order — 120/400"; got != want {
 		t.Fatalf("row after a frame = %q, want %q", got, want)
 	}
 
 	// The event path refreshes synchronously: no frame in between, the
 	// row must show the new progress right after the event drains.
 	setMissions(t, g, sim.MissionState{ID: "contract-solace-cordite-1", Progress: 240})
-	if got := activeTitle(t, g, 0); got != "Cordite order — 120/400" {
+	if got := activeTitle(t, g, 0); got != "Kerngrit order — 120/400" {
 		t.Fatalf("row changed before the event (fixture): %q", got)
 	}
 	g.onEvents([]sim.Event{{Kind: sim.EvMission, Phase: sim.MissionProgress}})
-	if got, want := activeTitle(t, g, 0), "Cordite order — 240/400"; got != want {
+	if got, want := activeTitle(t, g, 0), "Kerngrit order — 240/400"; got != want {
 		t.Fatalf("after EvMission: row = %q, want %q", got, want)
 	}
 }

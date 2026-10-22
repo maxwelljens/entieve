@@ -98,17 +98,17 @@ DmgExplosive`. `Damage` is a struct `{EM, Thermal, Kinetic, Explosive float64}`;
 `min-argon`.
 
 **Ores** (`content/data/items/ores.json`):
-`ore-sterngrit` (yields ferrite), `ore-cordite` (ferrite, nickel),
-`ore-lucidite` (nickel, cobalt, silex), `ore-glacierite` (glacite, argon).
+`ore-sterngrit` (yields sideron), `ore-cordite` (sideron, nixium),
+`ore-lucidite` (nixium, zaffrite, vetril), `ore-glacierite` (cryolith, helion).
 Ore defs carry `refine_yield: {"min-ferrite": 0.45, ...}` fractions per m³.
 
-**Ammunition** (`content/data/items/ammo.json`) — six **shell families**, one
+**Ammunition** (`content/data/items/ammo.json`) — six **round families**, one
 `ammo_class` per family-calibre, four damage profiles per family
-(`emp` EM-biased, `fusion` explosive-biased, `ap` kinetic-biased,
-`plutonium` thermal-biased). The autocannon families (`small-autocannon`,
+(`emp`/ion EM-biased, `fusion`/high-explosive explosive-biased,
+`ap`/armour-piercing kinetic-biased, `plutonium` thermal-biased). The autocannon families (`small-autocannon`,
 `medium-autocannon`, `large-autocannon`) are the original `ammo-*-s/m/l` ids;
 the artillery families are `ammo-art-<profile>-<size>` (e.g.
-`ammo-art-emp-s`). Every shell of a family has the same m³ volume —
+`ammo-art-emp-s`). Every round of a family has the same m³ volume —
 small-autocannon 0.005, small-artillery 0.008, medium-autocannon 0.01,
 medium-artillery 0.025, large-autocannon 0.022, large-artillery 0.033 —
 so a bay's whole-round count is family-wide. `charge-cap-cell` (0.01 m³) is
@@ -129,8 +129,8 @@ the cap booster's fuel, not gun ammo.
 **Modules** (`content/data/modules/*.json`, grouped by category):
 - weapons: `mod-autocannon-s/m/l` (fast cycle, high tracking, short reach)
   and `mod-artillery-s/m/l` (slow cycle, low tracking, long reach, heavier
-  volley), each loading the shells of its own family-calibre and carrying a
-  m³ shell bay (`weapon.bay_m3`, ~40 rounds ≈ 0.2 m³ for the small
+  volley), each loading the rounds of its own family-calibre and carrying a
+  m³ round bay (`weapon.bay_m3`, ~40 rounds ≈ 0.2 m³ for the small
   autocannon, calibrated so sustained fire reloads about every 120 s);
   `mod-rocket-pod` (no ammo, explosive rockets, no bay);
 - tank: `mod-shield-boost` (active), `mod-shield-extender` (passive raw HP),
@@ -236,7 +236,7 @@ type ItemDef struct {
     BasePrice float64          // ISK-analog "euro"
     RefineYield map[ItemID]float64 // ore only, fractions summing to <= 1
     Damage *Damage             // ammo only, applied per shot
-    AmmoClass string           // ammo only: shell family (small-autocannon …); "" for non-ammo
+    AmmoClass string           // ammo only: round family (small-autocannon …); "" for non-ammo
 }
 type ShipDef struct {
     ID ShipID; Name, Class, Description string
@@ -266,7 +266,7 @@ type ModuleDef struct {
     ActivationCost float64     // GJ per activation (0 for passive)
     ActivationTime float64     // seconds per cycle (0 for passive)
     Passive struct{ ShieldHP, ArmorHP float64; Capacitor float64; Recharge float64; ShieldBoost, ArmorRep float64; ResistBonus Resists; SpeedBonus float64 } // passive modules fill relevant fields
-    Weapon *WeaponAttrs        // Damage; Optimal, Falloff, Tracking float64; AmmoClass string (shell family); ShotTime float64 (s); DamageMult float64 (0 reads as 1); BayM3 float64 (shell bay m³)
+    Weapon *WeaponAttrs        // Damage; Optimal, Falloff, Tracking float64; AmmoClass string (round family); ShotTime float64 (s); DamageMult float64 (0 reads as 1); BayM3 float64 (round bay m³)
     Mining *MiningAttrs        // VolumePerCycle float64 (m³); CycleTime float64
     Boost  *BoostAttrs         // ShieldBoostPerCycle / ArmorRepPerCycle float64; SpeedMultiplier float64; WebStrength float64; ScramDuration float64; CapRestore float64; BayM3 float64 (cap booster cell bay)
 }
@@ -601,9 +601,9 @@ persist in `Save.Market`.
 migrates v2 in place — `migrateSaveV2ToV3` clears every bay and selection,
 and the bay rule then resolves each gun — and rejects anything older, the
 clean break of the per-station market tranche, v0.2.0 era). v3 added the
-shell-bay state, which rides the existing fitting runtime instead of a new
+round-bay state, which rides the existing fitting runtime instead of a new
 Save field: each `ModuleRuntime` carries `Clip` (`{Item, Qty}` loaded rounds)
-and `Selection` (the shell type the bay tops up from, `""` = none/waiting).
+and `Selection` (the round type the bay tops up from, `""` = none/waiting).
 The living-economy fields riding the schema: `Market` / `MarketLasts` /
 `MarketSeq` (per-station books and the price-time clock), `Belts`
 (persistent belt state), `FactionLedger` (respawn requisition money),
