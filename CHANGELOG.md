@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the market: `ShipDef` gained **`base_price`**, the price ladder's last
   rung. Docs: GAMEPLAY "The market window", CONTENT_AUTHORING "The market
   tree", CONTEXT "Market tree", NAMING rows (proposed).
-- **Shell bays (clips)**- **Shell bays (clips)** (`content`, `sim`): every charge-fed module — the
+- **Shell bays (clips)** (`content`, `sim`): every charge-fed module — the
   six projectile guns and the cap booster — now carries a m³ **bay** that
   holds whole rounds of exactly one shell type. A **load cycle** fills it
   from cargo with a full bay in exactly one firing cycle (no capacitor
