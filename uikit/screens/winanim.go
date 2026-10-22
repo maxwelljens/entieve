@@ -92,6 +92,16 @@ func closeAnim(frame int) uint8 {
 	return uint8((closeFrames - frame) * 255 / closeFrames)
 }
 
+// startOpen begins a window's open animation — a fresh mount, or a reopen
+// while the close fade still runs. The artwork header fades in with it: a
+// window's header is new on every open.
+func (k *Kit) startOpen(w *widget.Window) {
+	k.anims[w] = &winAnim{open: true}
+	if hb := headerBandOf(w); hb != nil {
+		hb.fade = 0
+	}
+}
+
 // SetWindowClose registers win's close semantics — the callback the
 // title bar's × runs — and attaches the × itself (once, and only when
 // the window has a title bar: the station services view owns no title

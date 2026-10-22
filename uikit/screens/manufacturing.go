@@ -8,6 +8,7 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
@@ -149,7 +150,6 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 		paneStack([]bool{false, true, false}, f.jobsLbl, f.jobs.Container(), collectBar),
 	)
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, true}),
@@ -162,8 +162,13 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	title, titleText := theme.NewTitleBar(env, "Manufacturing", "svc_manufacturing")
 	f.title = titleText
 
+	// The body panel is the header band's: it paints the panel, the
+	// manufacturing plate over it and then the body (docs/ART.md "Window
+	// headers").
+	panel := theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)
+
 	f.win = widget.NewWindow(
-		widget.WindowOpts.Contents(body),
+		widget.WindowOpts.Contents(newHeaderBand(body, panel, render.ManufacturingHeader)),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
 		// Content floor: the craft line, a few rows of each table and
 		// both toolbars.

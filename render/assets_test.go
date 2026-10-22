@@ -112,6 +112,28 @@ func TestDockedArtworkAcceptsJPEGOnlyUnderArtwork(t *testing.T) {
 	}
 }
 
+// TestWindowHeaderPlatesResolveByName: the two service-window header plates
+// load as artwork JPEGs by their fixed names, and an asset root without them
+// yields nil — the windows then draw their plain body.
+func TestWindowHeaderPlatesResolveByName(t *testing.T) {
+	dir := t.TempDir()
+	writeJPEG(t, filepath.Join(dir, "artwork", "refining_header.jpg"), 40, 22)
+	writeJPEG(t, filepath.Join(dir, "artwork", "manufacturing_header.jpg"), 48, 26)
+	stashAssets(t, dir)
+
+	if b := RefiningHeader(); b == nil || b.Bounds().Dx() != 40 {
+		t.Errorf("refining header = %v, want the 40×22 plate", b)
+	}
+	if b := ManufacturingHeader(); b == nil || b.Bounds().Dx() != 48 {
+		t.Errorf("manufacturing header = %v, want the 48×26 plate", b)
+	}
+
+	stashAssets(t, filepath.Join(t.TempDir(), "no-such-dir"))
+	if RefiningHeader() != nil || ManufacturingHeader() != nil {
+		t.Error("no asset root must mean no header plates (the plain body)")
+	}
+}
+
 // TestLoadAssetsMissingAndGarbageAreNil: absent file, corrupt file and
 // absent root dir all yield nil (procedural fallback) and never panic.
 func TestLoadAssetsMissingAndGarbageAreNil(t *testing.T) {

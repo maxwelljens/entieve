@@ -44,6 +44,30 @@ file). No `assets/` directory (released binaries don't ship one) or no
 before. The caption's format string is registered in
 [lore/NAMING.md](lore/NAMING.md#interface-strings).
 
+## Window headers
+
+The **Refinery** and **Manufacturing** windows carry a plate of their own, in
+a band directly under the title bar — part of the window background, drawn
+behind the content, so the first rows of the list sit on the image:
+
+| Window | File | Band |
+|---|---|---|
+| Refinery | `assets/artwork/refining_header.jpg` | 120 design px under the title, full body width |
+| Manufacturing | `assets/artwork/manufacturing_header.jpg` | same |
+
+The 16:9 plate is scaled to *cover* the band (aspect preserved, centred,
+overflow cropped) and composited at 180/255 on the title edge, fading linearly
+to fully transparent at the band's bottom edge, so the list further down reads
+on the plain panel. It fades in over the house 12 frames when the window
+opens, and the band is pinned under the title while the lists scroll over it
+(the body is drawn whole above it). No `assets/` directory (released binaries)
+or no plate: no band, the plain window body, exactly as before — the plate is
+just another `assets/artwork/` file, decoded eagerly with the rest.
+
+Because the band is behind the content, the rows' own translucent fills
+composite over it: the plate reads at full strength in the body's padding and
+the gaps between rows, and as a tint under the rows themselves.
+
 ## PNG requirements
 
 - **Format**: PNG with an alpha channel, straight (non-premultiplied) alpha —

@@ -104,6 +104,21 @@ const artworkDocked = artworkRoot + "spaceship_hangar"
 // builds don't carry assets/). Same nil-means-fallback contract as spriteFor.
 func DockedArtwork() *ebiten.Image { return spriteFor(artworkDocked) }
 
+// Window header plates (assets/artwork/<name>.jpg): one per service window,
+// drawn in the band under the window's title bar (uikit/screens/winheader.go).
+const (
+	artworkRefiningHeader      = artworkRoot + "refining_header"
+	artworkManufacturingHeader = artworkRoot + "manufacturing_header"
+)
+
+// RefiningHeader returns the Refinery window's header plate, or nil when the
+// asset root ships none — the window then draws its plain body, as before.
+func RefiningHeader() *ebiten.Image { return spriteFor(artworkRefiningHeader) }
+
+// ManufacturingHeader returns the Manufacturing window's header plate, or nil
+// when the asset root ships none.
+func ManufacturingHeader() *ebiten.Image { return spriteFor(artworkManufacturingHeader) }
+
 // defaultPlateID is the pseudo-system whose plates serve every star system:
 // `backgrounds/default.png` (layer 0), `backgrounds/default-01.png` (layer 1),
 // `backgrounds/default-02.png` (layer 2). A system's own plate wins over the
@@ -254,6 +269,17 @@ func fitSprite(w, h int, logicalRadius float64) (dw, dh float64) {
 	box := 2 * logicalRadius
 	s := math.Min(box/float64(w), box/float64(h))
 	return float64(w) * s, float64(h) * s
+}
+
+// CoverScale is the cover fit of a sw×sh plate into a w×h frame: the larger
+// axis scale, so the plate fills the frame and the overflow is cropped. 0 for
+// an empty plate or frame, so callers skip the draw. The docked backdrop fits
+// its plate the same way (game/scenes.go's coverScale).
+func CoverScale(sw, sh, w, h int) float64 {
+	if sw <= 0 || sh <= 0 || w <= 0 || h <= 0 {
+		return 0
+	}
+	return math.Max(float64(w)/float64(sw), float64(h)/float64(sh))
 }
 
 // spriteOptions builds the transform for a w×h sprite drawn at dw×dh px,

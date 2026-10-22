@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Window artwork headers** (`render`, `uikit`): the Refinery and
+  Manufacturing windows can carry a plate of their own,
+  `assets/artwork/refining_header.jpg` and `manufacturing_header.jpg`
+  (1280×720 JPEG), in a 120 design-px band directly under the title bar —
+  part of the window background and behind the content, so the first rows of
+  the list sit on the image and the band stays pinned while they scroll. The
+  plate is cover-fitted (centre-cropped), composited at α180 on the title
+  edge fading linearly to nothing at the band's bottom, and fades in over the
+  window's 12-frame open. No `assets/` (released binaries) or no plate: no
+  band, the plain window body byte for byte. Docs: ART "Window headers",
+  GAMEPLAY "Windows".
 - **Market category tree and search** (`content`, `uikit`, `game`): every
   marketable def (`ItemDef`, `ModuleDef`, `ShipDef`) now carries a validated
   **`group`** path (1–3 segments, e.g. `Ships/Frigates`,
