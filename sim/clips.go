@@ -184,7 +184,7 @@ func (s *Sim) logLoad(e ecs.Entity, def *content.ModuleDef, item content.ItemID,
 		name = itemDef.Name
 	}
 	s.emit(Event{Kind: EvModule, Actor: e,
-		Text: def.Name + " loaded " + itoaN(n) + " rounds (" + name + ")"})
+		Text: def.Name + " loaded with " + name + " (" + itoaN(n) + " rounds)"})
 }
 
 // fillBays fills every IDLE fitted bay from cargo before the cycle systems
