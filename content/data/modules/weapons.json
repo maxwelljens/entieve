@@ -6,6 +6,9 @@
     "description": "Small-calibre autocannon: a 3 s cycle and high tracking, built to brawl inside a few kilometres. Loads any small shell.",
     "slot": "high",
     "kind": "weapon",
+    "mount": "turret",
+    "size": "s",
+    "grid_class": "i",
     "activation_cost": 0,
     "activation_time": 3,
     "weapon": {
@@ -31,6 +34,9 @@
     "description": "Medium-calibre autocannon: a 3.6 s cycle and high tracking, built to brawl inside ten kilometres. Loads any medium shell.",
     "slot": "high",
     "kind": "weapon",
+    "mount": "turret",
+    "size": "m",
+    "grid_class": "ii",
     "activation_cost": 0,
     "activation_time": 3.6,
     "weapon": {
@@ -56,6 +62,9 @@
     "description": "Large-calibre autocannon: a 4.5 s cycle and high tracking, built to brawl inside sixteen kilometres. Loads any large shell.",
     "slot": "high",
     "kind": "weapon",
+    "mount": "turret",
+    "size": "l",
+    "grid_class": "iii",
     "activation_cost": 0,
     "activation_time": 4.5,
     "weapon": {
@@ -81,6 +90,9 @@
     "description": "Small-calibre artillery: a 9 s cycle that throws a heavy shell far past the autocannon's reach, at the cost of tracking. Loads any small shell.",
     "slot": "high",
     "kind": "weapon",
+    "mount": "turret",
+    "size": "s",
+    "grid_class": "i",
     "activation_cost": 0,
     "activation_time": 9,
     "weapon": {
@@ -106,6 +118,9 @@
     "description": "Medium-calibre artillery: a 10.8 s cycle that throws a heavy shell far past the autocannon's reach, at the cost of tracking. Loads any medium shell.",
     "slot": "high",
     "kind": "weapon",
+    "mount": "turret",
+    "size": "m",
+    "grid_class": "ii",
     "activation_cost": 0,
     "activation_time": 10.8,
     "weapon": {
@@ -131,6 +146,9 @@
     "description": "Large-calibre artillery: a 13.5 s cycle that throws a heavy shell far past the autocannon's reach, at the cost of tracking. Loads any large shell.",
     "slot": "high",
     "kind": "weapon",
+    "mount": "turret",
+    "size": "l",
+    "grid_class": "iii",
     "activation_cost": 0,
     "activation_time": 13.5,
     "weapon": {
@@ -156,6 +174,9 @@
     "description": "Short-range rocket pod with endless internal feedstock: no ammo, explosive volley, great tracking.",
     "slot": "high",
     "kind": "weapon",
+    "mount": "launcher",
+    "size": "s",
+    "grid_class": "i",
     "activation_cost": 1,
     "activation_time": 2.5,
     "weapon": {

@@ -155,29 +155,32 @@ type Slots struct {
 
 // ShipDef defines a flyable or NPC hull.
 type ShipDef struct {
-	ID             ShipID  `json:"id"`
-	Name           string  `json:"name"`
-	Class          string  `json:"class"` // "frigate"|"destroyer"|"barge"|"industrial"|"rat"
-	Description    string  `json:"description,omitempty"`
-	Origin         string  `json:"origin,omitempty"` // naming-layer heritage: "moravian"|"polish"|"nordic"|"latinate"|"old-works"
-	Maker          string  `json:"maker,omitempty"`  // manufacturer: a corp-* slug (Corp.ID); empty on the unattributed rat hulls
-	Slots          Slots   `json:"slots"`
-	Shield         float64 `json:"shield"`
-	Armor          float64 `json:"armor"`
-	Structure      float64 `json:"structure"`
-	Resists        Resists `json:"resists"`
-	Capacitor      float64 `json:"capacitor"`        // GJ
-	Recharge       float64 `json:"recharge"`         // capacitor time constant tau, seconds
-	MaxSpeed       float64 `json:"max_speed"`        // m/s
-	Agility        float64 `json:"agility"`          // align-time factor; align time = agility * 10 s
-	Mass           float64 `json:"mass"`             // kg
-	SigRadius      float64 `json:"sig_radius"`       // m
-	Cargo          float64 `json:"cargo"`            // m³
-	OreHold        float64 `json:"ore_hold"`         // m³; 0 means ore uses cargo
-	WarpSpeed      float64 `json:"warp_speed"`       // AU/s
-	MaxTargetRange float64 `json:"max_target_range"` // m
-	MaxTargets     int     `json:"max_targets"`
-	ScanResolution float64 `json:"scan_resolution"` // mm/s-ish locking speed factor
+	ID             ShipID     `json:"id"`
+	Name           string     `json:"name"`
+	Class          string     `json:"class"` // "frigate"|"destroyer"|"barge"|"industrial"|"rat"
+	Description    string     `json:"description,omitempty"`
+	Origin         string     `json:"origin,omitempty"` // naming-layer heritage: "moravian"|"polish"|"nordic"|"latinate"|"old-works"
+	Maker          string     `json:"maker,omitempty"`  // manufacturer: a corp-* slug (Corp.ID); empty on the unattributed rat hulls
+	Slots          Slots      `json:"slots"`
+	Mounts         []Mount    `json:"high_mounts,omitempty"`  // one mount per high slot: a mounted module needs its kind at or above its size
+	GridClasses    ClassQuota `json:"grid_classes,omitempty"` // per-class fit allowance on the powergrid axis
+	CPUClasses     ClassQuota `json:"cpu_classes,omitempty"`  // per-class fit allowance on the cpu axis
+	Shield         float64    `json:"shield"`
+	Armor          float64    `json:"armor"`
+	Structure      float64    `json:"structure"`
+	Resists        Resists    `json:"resists"`
+	Capacitor      float64    `json:"capacitor"`        // GJ
+	Recharge       float64    `json:"recharge"`         // capacitor time constant tau, seconds
+	MaxSpeed       float64    `json:"max_speed"`        // m/s
+	Agility        float64    `json:"agility"`          // align-time factor; align time = agility * 10 s
+	Mass           float64    `json:"mass"`             // kg
+	SigRadius      float64    `json:"sig_radius"`       // m
+	Cargo          float64    `json:"cargo"`            // m³
+	OreHold        float64    `json:"ore_hold"`         // m³; 0 means ore uses cargo
+	WarpSpeed      float64    `json:"warp_speed"`       // AU/s
+	MaxTargetRange float64    `json:"max_target_range"` // m
+	MaxTargets     int        `json:"max_targets"`
+	ScanResolution float64    `json:"scan_resolution"` // mm/s-ish locking speed factor
 }
 
 // Module slot classes.
@@ -257,8 +260,12 @@ type ModuleDef struct {
 	Maker          string        `json:"maker,omitempty"` // manufacturer: a corp-* slug (Corp.ID)
 	Slot           string        `json:"slot"`            // "high" | "mid" | "low"
 	Kind           string        `json:"kind"`
-	ActivationCost float64       `json:"activation_cost"` // GJ per activation/cycle; 0 for passive
-	ActivationTime float64       `json:"activation_time"` // seconds per cycle; 0 for passive
+	Mount          string        `json:"mount,omitempty"`      // high slot only: turret | launcher
+	Size           string        `json:"size,omitempty"`       // mount size demand: s | m | l ("" fits any mount of its kind)
+	GridClass      string        `json:"grid_class,omitempty"` // powergrid class demand: i | ii | iii
+	CPUClass       string        `json:"cpu_class,omitempty"`  // cpu class demand: i | ii | iii
+	ActivationCost float64       `json:"activation_cost"`      // GJ per activation/cycle; 0 for passive
+	ActivationTime float64       `json:"activation_time"`      // seconds per cycle; 0 for passive
 	Passive        *PassiveAttrs `json:"passive,omitempty"`
 	Weapon         *WeaponAttrs  `json:"weapon,omitempty"`
 	Mining         *MiningAttrs  `json:"mining,omitempty"`

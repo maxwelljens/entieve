@@ -235,6 +235,26 @@ func (v *validator) ships() {
 		if s.Slots.High < 0 || s.Slots.Mid < 0 || s.Slots.Low < 0 {
 			v.addf("%s: negative slot count (high %d, mid %d, low %d)", ctx, s.Slots.High, s.Slots.Mid, s.Slots.Low)
 		}
+		if len(s.Mounts) > 0 && len(s.Mounts) != s.Slots.High {
+			v.addf("%s: high_mounts declares %d mounts for %d high slots", ctx, len(s.Mounts), s.Slots.High)
+		}
+		for i, m := range s.Mounts {
+			if !mountKinds[m.Kind] {
+				v.addf("%s: high_mounts[%d] unknown kind %q (want turret|launcher)", ctx, i, m.Kind)
+			}
+			if _, ok := mountSizes[m.Size]; !ok {
+				v.addf("%s: high_mounts[%d] unknown size %q (want s|m|l)", ctx, i, m.Size)
+			}
+		}
+		for _, q := range []struct {
+			axis  string
+			quota ClassQuota
+		}{{RuleGrid, s.GridClasses}, {RuleCPU, s.CPUClasses}} {
+			if q.quota.I < 0 || q.quota.II < 0 || q.quota.III < 0 {
+				v.addf("%s: negative %s class quota (i %d, ii %d, iii %d)",
+					ctx, q.axis, q.quota.I, q.quota.II, q.quota.III)
+			}
+		}
 		if s.MaxTargets < 0 {
 			v.addf("%s: negative max targets %d", ctx, s.MaxTargets)
 		}
@@ -279,6 +299,24 @@ func (v *validator) modules() {
 		}
 		if !validKinds[m.Kind] {
 			v.addf("%s: unknown kind %q", ctx, m.Kind)
+		}
+		if m.Mount != "" {
+			if m.Slot != SlotHigh {
+				v.addf("%s: mount kind %q on a %s-slot module (only high slots are mounts)", ctx, m.Mount, m.Slot)
+			}
+			if !mountKinds[m.Mount] {
+				v.addf("%s: unknown mount kind %q (want turret|launcher)", ctx, m.Mount)
+			}
+		}
+		if m.Size != "" {
+			if _, ok := mountSizes[m.Size]; !ok {
+				v.addf("%s: unknown size %q (want s|m|l)", ctx, m.Size)
+			}
+		}
+		for _, c := range []struct{ axis, class string }{{RuleGrid, m.GridClass}, {RuleCPU, m.CPUClass}} {
+			if c.class != "" && !moduleClasses[c.class] {
+				v.addf("%s: unknown %s class %q (want i|ii|iii)", ctx, c.axis, c.class)
+			}
 		}
 		v.maker(ctx, m.Maker)
 		if m.ActivationCost < 0 {
@@ -518,9 +556,11 @@ func (v *validator) npcs() {
 }
 
 // checkFit validates a fit list: every module must exist, classes must be
-// grouped high-then-mid-then-low, and no class may overflow the hull.
+// grouped high-then-mid-then-low, no class may overflow the hull, and every
+// module must clear the fitting limits (mount kind/size, class quotas).
 func (v *validator) checkFit(ctx string, fit []ModuleID, hull *ShipDef) {
 	var counts [3]int
+	var fitted []*ModuleDef
 	last := -1
 	for i, mid := range fit {
 		m, ok := v.c.Modules[mid]
@@ -538,6 +578,22 @@ func (v *validator) checkFit(ctx string, fit []ModuleID, hull *ShipDef) {
 			last = rank
 		}
 		counts[rank]++
+		if issue := hull.FitProblem(m, fitted); issue != nil {
+			switch {
+			case issue.Rule != RuleMount:
+				v.addf("%s[%d]: module %s exceeds hull %s's %s %s quota (%d modules, quota %d)",
+					ctx, i, mid, hull.ID, issue.Rule, ClassLabel(issue.Kind),
+					classDemand(fitted, issue.Rule, issue.Kind)+1,
+					axisQuota(hull, issue.Rule).Count(issue.Kind))
+			case issue.Oversize:
+				v.addf("%s[%d]: module %s is oversize for the %s mounts on hull %s",
+					ctx, i, mid, issue.Kind, hull.ID)
+			default:
+				v.addf("%s[%d]: module %s needs a %s mount and hull %s has none free",
+					ctx, i, mid, issue.Kind, hull.ID)
+			}
+		}
+		fitted = append(fitted, m)
 	}
 	limits := [3]int{hull.Slots.High, hull.Slots.Mid, hull.Slots.Low}
 	names := [3]string{SlotHigh, SlotMid, SlotLow}

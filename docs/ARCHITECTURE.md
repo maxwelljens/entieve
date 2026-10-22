@@ -234,6 +234,8 @@ type ShipDef struct {
     ID ShipID; Name, Class, Description string
     Origin string                  // naming-layer heritage: "moravian"|"polish"|"nordic"|"latinate"|"old-works"
     Slots struct{ High, Mid, Low int }
+    Mounts []Mount                 // high_mounts: one per high slot, {Kind "turret"|"launcher"; Size "s"|"m"|"l"}
+    GridClasses, CPUClasses ClassQuota // grid_classes / cpu_classes: {I,II,III int} fit allowance per module class
     Shield, Armor, Structure float64   // raw HP per layer
     Resists Resists                    // per-layer? No: single Resists struct applied to all layers (keep simple), fields EM/Thermal/Kinetic/Explosive in [0,1)
     Capacitor float64; Recharge float64  // capacity (GJ) and peak-ish recharge time constant tau (seconds)
@@ -247,6 +249,9 @@ type ModuleDef struct {
     ID ModuleID; Name, Description string
     Slot string                // "high" | "mid" | "low"
     Kind string                // "weapon" | "shield_boost" | "shield_extender" | "armor_rep" | "armor_plate" | "resist_coat" | "cap_booster" | "cap_recharger" | "afterburner" | "mining_laser" | "stasis_web" | "warp_scram"
+    Mount string               // high only: "turret" | "launcher" (guns and the mining laser are turrets)
+    Size string                // mount size demand: "s" | "m" | "l" ("" fits any mount of its kind)
+    GridClass, CPUClass string // class demand on each axis: "i" | "ii" | "iii" | "" (axis unused)
     ActivationCost float64     // GJ per activation (0 for passive)
     ActivationTime float64     // seconds per cycle (0 for passive)
     Passive struct{ ShieldHP, ArmorHP float64; Capacitor float64; Recharge float64; ShieldBoost, ArmorRep float64; ResistBonus Resists; SpeedBonus float64 } // passive modules fill relevant fields
@@ -339,9 +344,26 @@ hulls, cargo items (volume must fit the
 hull), intervals >= 1, non-empty route lists, raider presence for low/null
 security (a rat class spawned in that system), patrol hulls with an
 `npc-guard-*` definition; slot overflow
-in world fits and NPC fits; refine yields outside `[0,1]`; resists outside
+in world fits and NPC fits; fittings that break the **fitting limits** — a
+module whose mount kind/size the hull's racks cannot take, and a fit whose
+per-class grid/cpu demand exceeds the hull's class quotas (see the seam
+below); refine yields outside `[0,1]`; resists outside
 `[0,1]`; negative numbers; worlds referencing unknown systems; `world-showcase`
 present with a non-empty `scenario`.
+
+### The fitting-limit seam (`content/fit.go`)
+
+Fitting legality is one rule function, not arithmetic: `ShipDef.FitProblem(def,
+fitted)` returns the first rule a module would break alongside the modules
+already fitted — `RuleMount` (a high-slot module needs a free mount of its own
+kind at or above its size) or `RuleGrid`/`RuleCPU` (one unit of its class on
+that axis per module, bounded by the hull's `ClassQuota`). It is the only place
+the rules live: `content/validate.go`'s `checkFit` runs it over every authored
+fit (NPC fits, world starts) and `sim` runs it on both equip paths —
+`execFit` (CmdFitModule, refusal logged as a `SevWarning`) and `buildFitting`
+(load/assemble/stored fits, returning an error). Nothing numeric is stored:
+mounts and quotas live on the defs, and a save carries fitted module ids only
+(schema 2 unchanged).
 
 ## `sim` contract (`sim/model.go`, `sim/api.go`)
 

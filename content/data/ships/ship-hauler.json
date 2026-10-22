@@ -10,6 +10,19 @@
     "mid": 2,
     "low": 4
   },
+  "high_mounts": [
+    {
+      "kind": "turret",
+      "size": "s"
+    }
+  ],
+  "grid_classes": {
+    "i": 2,
+    "ii": 1
+  },
+  "cpu_classes": {
+    "i": 1
+  },
   "shield": 700,
   "armor": 1100,
   "structure": 1200,

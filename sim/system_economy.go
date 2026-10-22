@@ -880,6 +880,10 @@ func (s *Sim) execFit(c CmdFitModule) {
 		s.log(SevWarning, s.player, "Invalid slot index")
 		return
 	}
+	if issue := hull.FitProblem(def, s.fitDefs(fit)); issue != nil {
+		s.log(SevWarning, s.player, fitIssueText(def.Name, issue))
+		return
+	}
 	hangar, n := takeStacks(s.Hangar.Items, content.ItemID(c.Item), 1)
 	if n < 1 {
 		s.log(SevWarning, s.player, def.Name+" is not in the hangar")
@@ -1052,6 +1056,30 @@ func slotCapacity(hull *content.ShipDef, class string) int {
 		return hull.Slots.Low
 	}
 	return 0
+}
+
+// fitDefs returns the module defs of a fitting, skipping unknown ids.
+func (s *Sim) fitDefs(fit *Fitting) []*content.ModuleDef {
+	defs := make([]*content.ModuleDef, 0, len(fit.High)+len(fit.Mid)+len(fit.Low))
+	for _, class := range slotClasses {
+		for _, id := range fit.Defs(class) {
+			if def, ok := s.Content.Module(id); ok {
+				defs = append(defs, def)
+			}
+		}
+	}
+	return defs
+}
+
+// fitIssueText renders a fitting-limit refusal for a log line.
+func fitIssueText(name string, issue *content.FitIssue) string {
+	switch {
+	case issue.Rule != content.RuleMount:
+		return name + " exceeds the hull's " + issue.Rule + " " + content.ClassLabel(issue.Kind) + " quota"
+	case issue.Oversize:
+		return name + " is oversize for the hull's " + issue.Kind + " mounts"
+	}
+	return "No free " + issue.Kind + " mount for " + name
 }
 
 // itoaN formats an int for event text.
