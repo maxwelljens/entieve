@@ -64,9 +64,10 @@ opens, and the band is pinned under the title while the lists scroll over it
 or no plate: no band, the plain window body, exactly as before — the plate is
 just another `assets/artwork/` file, decoded eagerly with the rest.
 
-Because the band is behind the content, the rows' own translucent fills
-composite over it: the plate reads at full strength in the body's padding and
-the gaps between rows, and as a tint under the rows themselves.
+Because the band is behind the content, the list's viewport leaves its own
+body fill off under the band: the plate reads at full strength through the
+first rows and in the body's padding, and the fill returns — unchanged — at the
+band's bottom edge, so the rows further down sit on the plain panel.
 
 ## PNG requirements
 

@@ -79,7 +79,9 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 		{Key: "Fee", Title: "Fee", Priority: 3, AlignRight: true},
 		{Key: "Inputs", Title: "Inputs", Priority: 4},
 	}
-	f.recipes = widgets.NewTable(env, recipeCols)
+	f.recipes = widgets.NewTable(env, recipeCols, widgets.PlateBand(func() image.Rectangle {
+		return headerPlateBand(f.win)
+	}))
 	jobCols := []widgets.Column{
 		{Key: "Product", Title: "Product", Priority: 0},
 		{Key: "Station", Title: "Station", Priority: 1},

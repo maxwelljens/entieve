@@ -428,6 +428,13 @@ type Table struct {
 	selData any // Data of the selected row (identity across rebuilds)
 
 	dbl RowDouble // double-click bookkeeping: the installer's half
+
+	// plateBand, when set, is the artwork band a window paints behind this
+	// table (screens.headerPlateBand): the viewport leaves its body fill off
+	// above the band's bottom edge so the plate reads through the first rows.
+	// plateTop is the fill's device-px offset into the viewport, 0 = today.
+	plateBand func() image.Rectangle
+	plateTop  int
 }
 
 // TableOption adjusts a table at construction; a table built without
@@ -441,6 +448,17 @@ type TableOption func(*Table)
 // the header sort buttons keep the emphasis face.
 func ContentsFace(face *text.Face) TableOption {
 	return func(t *Table) { t.Face = face }
+}
+
+// PlateBand makes the scroll viewport show a window's artwork band through its
+// top rows: the viewport body fill starts at band's bottom edge instead of its
+// top, so the plate behind the table reads untinted under those rows. Only the
+// fill moves — the border and every row's hover/selection tint stay as they
+// are. band reports the band's screen rect (screens.headerPlateBand; an empty
+// rect means no band or no plate loaded, which leaves the viewport as today).
+// Opt-in: a table built without it paints exactly as before.
+func PlateBand(band func() image.Rectangle) TableOption {
+	return func(t *Table) { t.plateBand = band }
 }
 
 // NewTable builds a table with the given columns over the table's three
@@ -551,11 +569,7 @@ func NewTable(env Seams, cols []Column, opts ...TableOption) *Table {
 		// Columns are fitted to the view width, so the content stretches
 		// to fill it instead of scrolling horizontally at rest.
 		widget.ScrollContainerOpts.StretchContentWidth(),
-		widget.ScrollContainerOpts.Image(&widget.ScrollContainerImage{
-			Idle:     theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 160), 1),
-			Disabled: theme.Bordered(theme.NRGBA(p.Cell, 140), theme.NRGBA(p.Border, 110), 1),
-			Mask:     eimage.NewNineSliceColor(theme.WindowBody(p.BG)),
-		}),
+		widget.ScrollContainerOpts.Image(t.scrollImage(0)),
 	)
 	// Wheel scrolls the viewport; ScrollTop is a 0..1 fraction of the
 	// content overflow, so the step is scaled by the measured overflow.
@@ -680,6 +694,7 @@ func (t *Table) SetRows(rows []TableRow) {
 func (t *Table) Sync() {
 	t.clampScroll()
 	t.rail.Sync()
+	t.syncPlateBand()
 	avail := float64(t.root.GetWidget().Rect.Dx())
 	if avail > 0 && avail != t.fittedFor {
 		t.applyWidths()
@@ -689,6 +704,71 @@ func (t *Table) Sync() {
 // Refit re-measures and re-applies the column widths immediately (for
 // owners that resize the table outside the normal frame pump).
 func (t *Table) Refit() { t.applyWidths() }
+
+// scrollImage is the viewport's background: today's bordered body fill, or —
+// with the plate knob — the same border with the fill starting top device px
+// down, so the artwork band reads through the rows above that line.
+func (t *Table) scrollImage(top int) *widget.ScrollContainerImage {
+	p := t.th.Pal()
+	idle := theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 160), 1)
+	if top > 0 {
+		idle = banded(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 160), theme.Px(1), top)
+	}
+	return &widget.ScrollContainerImage{
+		Idle:     idle,
+		Disabled: theme.Bordered(theme.NRGBA(p.Cell, 140), theme.NRGBA(p.Border, 110), 1),
+		Mask:     eimage.NewNineSliceColor(theme.WindowBody(p.BG)),
+	}
+}
+
+// syncPlateBand rebuilds the viewport background when the artwork band's
+// offset into the viewport moves (first layout, resize, scale, plate unloaded).
+func (t *Table) syncPlateBand() {
+	if t.plateBand == nil {
+		return
+	}
+	top := plateFillTop(t.plateBand(), t.scroll.GetWidget().Rect)
+	if top > 0 {
+		// The band never outgrows the viewport: the bottom border stays put.
+		top = min(top, t.scroll.GetWidget().Rect.Dy()-theme.Px(1))
+	}
+	if top == t.plateTop {
+		return
+	}
+	t.plateTop = top
+	widget.ScrollContainerOpts.Image(t.scrollImage(top))(t.scroll)
+}
+
+// plateFillTop is how many px of the viewport the artwork band covers: the
+// fill starts below it. A band ending above the viewport leaves today's fill;
+// one covering all of it leaves no fill at all.
+func plateFillTop(band, view image.Rectangle) int {
+	switch {
+	case view.Empty() || band.Empty():
+		return 0
+	case band.Max.Y <= view.Min.Y, band.Min.Y >= view.Max.Y:
+		return 0 // no band over the viewport: today's fill
+	case band.Max.Y >= view.Max.Y:
+		return view.Dy() // the band covers the rest: no fill at all
+	default:
+		return band.Max.Y - view.Min.Y
+	}
+}
+
+// banded is theme.Bordered with the body fill starting top px down: the rows
+// above that line paint no fill, so a window's artwork band reads through
+// them. Border and fill below the line are the plain Bordered ones — built
+// with the same Fill/Set calls so they stay byte-identical.
+func banded(body, edge color.NRGBA, w, top int) *eimage.NineSlice {
+	top = max(top, w) // the band never eats the top border line
+	img := ebiten.NewImage(2*w+1, top+1+w)
+	img.Fill(edge)
+	if top > w {
+		img.SubImage(image.Rect(w, w, w+1, top)).(*ebiten.Image).Clear()
+	}
+	img.Set(w, top, body)
+	return eimage.NewNineSlice(img, [3]int{w, 1, w}, [3]int{top, 1, w})
+}
 
 // headerClicked toggles the sort column/direction on a header click.
 func (t *Table) headerClicked(i int) {

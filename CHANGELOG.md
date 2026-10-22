@@ -42,8 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the list sit on the image and the band stays pinned while they scroll. The
   plate is cover-fitted (centre-cropped), composited at α180 on the title
   edge fading linearly to nothing at the band's bottom, and fades in over the
-  window's 12-frame open. No `assets/` (released binaries) or no plate: no
-  band, the plain window body byte for byte. Docs: ART "Window headers",
+  window's 12-frame open. The list lets the plate through: the tables' scroll
+  viewport leaves its body fill off under the band (a `widgets.PlateBand`
+  option only these two windows pass), so the first rows read on the art and
+  the fill — and every row below the band — stays exactly as before. No
+  `assets/` (released binaries) or no plate: no band, the plain window body
+  byte for byte. Docs: ART "Window headers",
   GAMEPLAY "Windows".
 - **Market category tree and search** (`content`, `uikit`, `game`): every
   marketable def (`ItemDef`, `ModuleDef`, `ShipDef`) now carries a validated

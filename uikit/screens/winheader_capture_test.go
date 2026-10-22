@@ -12,6 +12,7 @@ import (
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/uikit/internal/uitest"
 	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -107,13 +108,23 @@ func (g *headerCaptureGame) Draw(screen *ebiten.Image) {
 func (g *headerCaptureGame) Layout(w, h int) (int, int) { return 1280, 720 }
 
 // verify compares the settled frame (plates loaded) with the plain one (empty
-// registry, same state).
+// registry, same widgets) and with the release frame (empty registry, the
+// tables pumped so their viewports are today's filled ones).
 func (g *headerCaptureGame) verify(img *ebiten.Image) error {
 	plates := render.RefiningHeader() != nil && render.ManufacturingHeader() != nil
 	render.LoadAssets("")
+	// The plain frame: the same widget state (the banded viewport still in
+	// place) with the plate gone — what the band contributes.
 	plain := ebiten.NewImage(1280, 720)
 	plain.Fill(color.White)
 	g.k.Draw(plain)
+	// The release frame: no plate, so the tables pump the empty band and the
+	// viewport is today's again (the fill covers it) — the old look.
+	g.ref.Sync()
+	g.man.Sync()
+	today := ebiten.NewImage(1280, 720)
+	today.Fill(color.White)
+	g.k.Draw(today)
 	g.plates = plates
 
 	f, err := os.Create(g.out)
@@ -129,7 +140,7 @@ func (g *headerCaptureGame) verify(img *ebiten.Image) error {
 	}
 	g.saved = true
 
-	shot, was := readFrame(img), readFrame(plain)
+	shot, was, now := readFrame(img), readFrame(plain), readFrame(today)
 
 	refBody := g.ref.Win().Contents.(*headerBand).GetWidget().Rect
 	manBody := g.man.Win().Contents.(*headerBand).GetWidget().Rect
@@ -165,7 +176,71 @@ func (g *headerCaptureGame) verify(img *ebiten.Image) error {
 		panel := shot.px(w.body.Min.X+4, w.body.Max.Y-4)
 		checkBand(w.name, w.band, w.body, panel, shot, was, fail)
 	}
+	// The rows on the band let it through: their background moves far from
+	// the no-plate frame, while a row below the band is byte-identical (the
+	// viewport's fill starts at the band's bottom edge only).
+	for _, w := range []struct {
+		name string
+		tbl  *widgets.Table
+		band image.Rectangle
+	}{
+		{"refinery", g.ref.ores, bands[0]},
+		{"manufacturing", g.man.recipes, bands[1]},
+	} {
+		checkHeaderRows(w.name, w.tbl, w.band, shot, now, fail)
+	}
 	return joinErrs(g.out, errs)
+}
+
+// checkHeaderRows pins the plate reading through the table rows on the band:
+// a row's background inside the band changes substantially against the
+// no-plate frame (the art shows where the viewport used to paint its fill),
+// and a row below the band is byte-identical (the fill still covers it
+// exactly as before).
+func checkHeaderRows(name string, tbl *widgets.Table, band image.Rectangle, shot, was *frame, fail func(string, ...any)) {
+	inBand := -1
+	for i := range tbl.Rows {
+		rr := tbl.RowWidget(i).GetWidget().Rect
+		if rr.Empty() {
+			continue
+		}
+		if inBand < 0 && rr.Max.Y <= band.Max.Y {
+			inBand = i
+		}
+	}
+	if inBand < 0 {
+		fail("%s: no table row sits fully inside the band %v — the band misses the rows", name, band)
+		return
+	}
+	rr := tbl.RowWidget(inBand).GetWidget().Rect
+	// The row's top/bottom padding scanlines: background under and over the
+	// text, never a glyph. Measured against the release frame: 106/255
+	// (refinery) and 37/255 (manufacturing) now; with the fill still painted
+	// over the art the same probe moved 9 and 2.
+	strongest := 0
+	for _, y := range []int{rr.Min.Y + theme.Px(3), rr.Max.Y - theme.Px(2)} {
+		for x := rr.Min.X + theme.Px(2); x < rr.Max.X-theme.Px(2); x++ {
+			if d := shot.diff(was, x, y); d > strongest {
+				strongest = d
+			}
+		}
+	}
+	if strongest < 12 {
+		fail("%s: row %d background inside the band moved %d/255 from the no-plate frame — the plate is buried again",
+			name, inBand, strongest)
+	}
+	// From the band's bottom edge down the viewport paints exactly the
+	// no-plate frame: rows, gaps, border and fill all unchanged.
+	view := tbl.ScrollForTest().ViewRect()
+	for y := band.Max.Y; y < view.Max.Y; y++ {
+		for x := view.Min.X; x < view.Max.X; x++ {
+			if d := shot.diff(was, x, y); d != 0 {
+				fail("%s: viewport pixel (%d,%d) below the band moved %d/255 — the banded viewport must keep today's fill there",
+					name, x, y, d)
+				return
+			}
+		}
+	}
 }
 
 // checkBand pins one window's band: full body width, the plate painting at
