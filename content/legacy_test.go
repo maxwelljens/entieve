@@ -44,10 +44,10 @@ func TestLegacyRegistry(t *testing.T) {
 func TestValidateRejectsRetiredIDs(t *testing.T) {
 	c := baseContent()
 	c.Items["charge-emp"] = &ItemDef{
-		ID: "charge-emp", Name: "EMP Charge", Category: CatCharge, Volume: 0.01, BasePrice: 100,
+		ID: "charge-emp", Name: "EMP Charge", Group: "Ammunition/Cap cells", Category: CatCharge, Volume: 0.01, BasePrice: 100,
 	}
 	c.Modules["mod-emp-turret"] = &ModuleDef{
-		ID: "mod-emp-turret", Name: "EMP Turret", Slot: SlotHigh, Kind: KindWeapon,
+		ID: "mod-emp-turret", Name: "EMP Turret", Group: "Modules/High/Turrets", Slot: SlotHigh, Kind: KindWeapon,
 		ActivationCost: 10, ActivationTime: 2, Price: 10000,
 		Weapon: &WeaponAttrs{Damage: Damage{EM: 10}, Optimal: 8000, Falloff: 4000,
 			Tracking: 0.4, AmmoClass: "light", ShotTime: 2, BayM3: 0.1},

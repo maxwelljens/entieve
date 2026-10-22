@@ -1,5 +1,7 @@
 {
   "id": "ship-rat-hierarch",
+  "group": "Ships/Rat hulls",
+  "base_price": 1600000,
   "name": "Hierarch",
   "class": "rat",
   "description": "The Old Works overseer: heavy tank, four turrets, and nothing that can call it off - it fights to the last.",

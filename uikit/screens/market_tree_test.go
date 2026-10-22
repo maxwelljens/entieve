@@ -97,13 +97,15 @@ func TestMarketTreeParents(t *testing.T) {
 		if row.Spec.Ref == nil {
 			t.Errorf("%s item row declares no Show Info ref", name)
 		}
-		// Grayed is not gated: every verb stays live while docked.
+		// Grayed is not gated: every verb stays live while docked except
+		// Buy on a row whose local book holds no ask to lift.
 		if len(row.Spec.Actions) != 4 {
 			t.Fatalf("%s item row offers %d verbs, want 4", name, len(row.Spec.Actions))
 		}
 		for _, a := range row.Spec.Actions {
-			if a.Disabled {
-				t.Errorf("%s item row grays %q while docked", name, a.Label)
+			wantOff := a.Label == "Buy" && name == "empty"
+			if a.Disabled != wantOff {
+				t.Errorf("%s item row %q Disabled = %v, want %v", name, a.Label, a.Disabled, wantOff)
 			}
 		}
 	}
@@ -175,12 +177,25 @@ func TestMarketTreeForgetsFoldsOnClose(t *testing.T) {
 		t.Fatal("fixture: the fold did not open")
 	}
 
+	// The browse branch state and the search query are session-only the
+	// same way.
+	m.branch, m.treeSel = "Modules", "Modules/High"
+	m.expanded["Modules"] = true
+	m.search.Insert("turret")
+
 	// What the kit's close does (winanim.startClose): the window goes
 	// hidden; the panel syncs once more while it fades.
 	theme.ShowWidget(m.Win().GetContainer().GetWidget(), false)
 	m.Sync()
 	if len(m.open) != 0 {
 		t.Fatalf("folds = %v after the window closed, want none", m.open)
+	}
+	if got := m.search.GetText(); got != "" {
+		t.Fatalf("search query = %q after the window closed, want it cleared", got)
+	}
+	if m.branch != "" || m.treeSel != "" || len(m.expanded) != 1 || !m.expanded[""] {
+		t.Fatalf("browse state = branch %q, highlight %q, expanded %v — want All only",
+			m.branch, m.treeSel, m.expanded)
 	}
 	theme.ShowWidget(m.Win().GetContainer().GetWidget(), true)
 	frame()

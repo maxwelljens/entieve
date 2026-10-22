@@ -82,16 +82,18 @@ func TestPlacedDefaultRectsClearTheRailGutter(t *testing.T) {
 //     Selected Item window the top-left (the user's default: the table
 //     the player reads first gets the corner), the log its bottom-left
 //     pocket;
-//   - the market's construction-time default rect is square — on screen,
-//     right of the rail gutter and clear of the log pocket.
+//   - the market's construction-time default rect (760×560) is on screen
+//     and right of the rail gutter; it lies over the log pocket — the big
+//     three-pane trade window wins that strip, and the log raises back on
+//     a click.
 //
-// Two deliberate limits, both pinned by the facts they name:
-//   - the market's default square covers the bottom-center HUD pair
-//     (status + module rack) at both sizes: no side ≥ the 522 px its body
-//     needs stays out of both a centered pair's x range and the log
+// One deliberate limit, pinned by the fact it names:
+//   - the market's default covers the bottom-center HUD pair
+//     (status + module rack) at both sizes: no width ≥ the three panes
+//     need stays out of both a centered pair's x range and the log
 //     pocket, so the default keeps the body usable and the pair loses.
-//     (The old right-anchored rack cleared the square at 1280×720; the
-//     centered pair cannot.)
+//     (The old right-anchored rack cleared the old square at 1280×720;
+//     the centered pair cannot.)
 //   - the log overlaps the HUD pair at the 1024×700 minimum, in space
 //     only and pre-existing: the log's content floor (logMinW = 260
 //     design px) is wider than the pocket left of the pair there (its
@@ -188,21 +190,11 @@ func TestVirginPlacementTable(t *testing.T) {
 					}
 				}
 
-				// The market's default rect: square, on screen, clear of
-				// the rail gutter and the log pocket (the pair is the
-				// documented limit — see the doc comment).
+				// The market's default rect: on screen and clear of the
+				// rail gutter; it may lie over the log pocket (the big
+				// three-pane trade window — the log raises back).
 				mkt := uikit.NewMarket(g.env).Win().GetContainer().GetWidget().Rect
-				if mkt.Dx() != mkt.Dy() {
-					t.Errorf("%dx%d @%v: market default %v is not square: %d×%d",
-						w, h, tc.dev, mkt, mkt.Dx(), mkt.Dy())
-				}
 				check("market default", mkt)
-				for _, cr := range mountedRects(g) {
-					if cr.name == "log" && mkt.Overlaps(cr.rect) {
-						t.Errorf("%dx%d @%v: market default %v overlaps the log %v",
-							w, h, tc.dev, mkt, cr.rect)
-					}
-				}
 			}
 		})
 	}

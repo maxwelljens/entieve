@@ -76,6 +76,12 @@ type TableRow struct {
 	Data     any
 	Spec     RowSpec
 	Stack    []RowLine
+	// CellRuns, when a cell's entry is non-empty, renders that cell as a
+	// run of styled segments instead of one label — the market's dim
+	// "· N more" availability suffix rides its Qty cell this way. The
+	// cell string stays the fit/sort source either way. Runs are drawn
+	// flush with the cell's own edge (left or right per the column).
+	CellRuns [][]RowSeg
 }
 
 // iconOf returns row cell i's icon name ("" when the row carries none).
@@ -756,7 +762,7 @@ func (t *Table) reconcileSelection() {
 // selection repaint through updateBg/updateIcon without touching the
 // layout.
 func (t *Table) updateRows() bool {
-	changed := len(t.RowCts) != len(t.Rows) || t.stackMoved()
+	changed := len(t.RowCts) != len(t.Rows) || t.stackMoved() || t.cellRunsMoved()
 	if changed {
 		t.body.RemoveChildren()
 		t.RowCts, t.Texts, t.Cells, t.rich, t.applied, t.rawRows, t.Tips = nil, nil, nil, nil, nil, nil, nil
@@ -785,7 +791,7 @@ func (t *Table) updateRows() bool {
 			if i >= len(t.rich) || t.rich[i] == nil {
 				for j := range t.cols {
 					cell := cellOf(row, j)
-					if tx := t.Texts[i][j]; tx.Label != cell {
+					if tx := t.Texts[i][j]; tx != nil && tx.Label != cell {
 						// Raw cell; applyWidths ellipsizes it to the fitted column.
 						tx.Label = cell
 					}
@@ -830,6 +836,21 @@ func (t *Table) stackMoved() bool {
 	return false
 }
 
+// cellRunsMoved reports whether a row's styled cell runs changed — a run
+// cell's widgets are built at row creation, so a moved suffix rebuilds the
+// row (the plain cells' own labels patch in place).
+func (t *Table) cellRunsMoved() bool {
+	for i, row := range t.Rows {
+		if i >= len(t.rawRows) {
+			continue
+		}
+		if !reflect.DeepEqual(t.rawRows[i].CellRuns, row.CellRuns) {
+			return true
+		}
+	}
+	return false
+}
+
 // snapshotRow copies the parts of a row its widgets render from — cell
 // text, icons and, for a rich row, its line stack plus the label and gate
 // of each trailing action — so the diff compares against data the caller
@@ -838,6 +859,12 @@ func snapshotRow(row TableRow) TableRow {
 	s := TableRow{
 		Cells: append([]string(nil), row.Cells...),
 		Icons: append([]string(nil), row.Icons...),
+	}
+	if len(row.CellRuns) > 0 {
+		s.CellRuns = make([][]RowSeg, len(row.CellRuns))
+		for i, runs := range row.CellRuns {
+			s.CellRuns[i] = append([]RowSeg(nil), runs...)
+		}
 	}
 	if len(row.Stack) > 0 {
 		s.Stack = copyStack(row.Stack)
@@ -913,7 +940,59 @@ func (t *Table) newRow(i int) *widget.Container {
 	)
 	var texts []*widget.Text
 	var cells []*tableCell
-	for _, c := range t.cols {
+	for j, c := range t.cols {
+		var runs []RowSeg
+		if j < len(t.Rows[i].CellRuns) {
+			runs = t.Rows[i].CellRuns[j]
+		}
+		if len(runs) > 0 {
+			// A run cell: its segments in one line, the line anchored to
+			// the cell's edge (right for a numeric column) so the runs
+			// share the plain cell's exact anchor.
+			pos := widget.AnchorLayoutPositionStart
+			pad := widget.Insets{Left: theme.Px(cellPad), Right: theme.Px(cellPad)}
+			if c.AlignRight {
+				pos = widget.AnchorLayoutPositionEnd
+			}
+			line := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
+				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+				widget.RowLayoutOpts.Spacing(0),
+			)))
+			for _, s := range runs {
+				col := s.Tint
+				if col.A == 0 {
+					col = t.th.Pal().Text
+					if tt := t.Rows[i].TextTint; tt.A != 0 {
+						col = tt
+					}
+				}
+				face := t.Face
+				if s.Step != "" {
+					face = t.th.Face(s.Step)
+				}
+				line.AddChild(widget.NewText(
+					widget.TextOpts.Text(s.Text, face, theme.Solid(col)),
+					widget.TextOpts.Position(widget.TextPositionStart, widget.TextPositionCenter),
+				))
+			}
+			line.GetWidget().LayoutData = widget.AnchorLayoutData{
+				HorizontalPosition: pos,
+				VerticalPosition:   widget.AnchorLayoutPositionCenter,
+				Padding:            &pad,
+			}
+			cell := widget.NewContainer(
+				widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+				widget.ContainerOpts.WidgetOpts(
+					widget.WidgetOpts.MinSize(0, int(t.rowH)),
+					widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+				),
+			)
+			cell.AddChild(line)
+			texts = append(texts, nil) // runs own their colours; no label to tint
+			cells = append(cells, &tableCell{ctr: cell, Box: theme.NewIconBox(theme.IconInline)})
+			ctr.AddChild(cell)
+			continue
+		}
 		// Left-aligned cells are icon cells: a fixed icon box then the
 		// label, both inside the column box. Right-aligned cells stay
 		// plain text so their numeric anchors never move — and they keep
@@ -1147,7 +1226,9 @@ func (t *Table) updateTextTint(i int) {
 	}
 	col := t.textColor(t.Rows[i])
 	for _, tx := range t.Texts[i] {
-		tx.SetColor(col)
+		if tx != nil {
+			tx.SetColor(col)
+		}
 	}
 }
 
@@ -1206,6 +1287,23 @@ func (t *Table) applyWidths() {
 			w = c.Width
 		}
 		for _, row := range t.Rows {
+			// A run cell is measured by its drawn segments (the plain
+			// string is only its sort key): the dim suffix counts.
+			if i < len(row.CellRuns) && len(row.CellRuns[i]) > 0 {
+				m := 2 * float64(theme.Px(cellPad))
+				for _, s := range row.CellRuns[i] {
+					face := t.Face
+					if s.Step != "" {
+						face = t.th.Face(s.Step)
+					}
+					rw, _ := text.Measure(s.Text, *face, 0)
+					m += rw
+				}
+				if m > w {
+					w = m
+				}
+				continue
+			}
 			m := t.measure(cellOf(row, i)) + 2*float64(theme.Px(cellPad))
 			if iconOf(row, i) != "" && !c.AlignRight {
 				m += float64(theme.Px(theme.IconInline) + theme.Px(theme.IconGap))
@@ -1272,6 +1370,9 @@ func (t *Table) layoutCells() {
 				inner = 0
 			}
 			tx := t.Texts[r][i]
+			if tx == nil {
+				continue // a run cell draws its own segments
+			}
 			tx.Label = Ellipsize(cellOf(t.Rows[r], i), inner, t.measure)
 			root := t.cellRoot(r, i)
 			root.MinWidth = w

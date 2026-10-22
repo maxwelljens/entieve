@@ -1,6 +1,7 @@
 [
   {
     "id": "mod-mining-laser",
+    "group": "Modules/High/Turrets",
     "maker": "corp-druzstvo",
     "name": "Mining Laser",
     "description": "Strip-mines 100 m³ of asteroid per 30 s cycle straight into the ore hold.",

@@ -21,19 +21,19 @@ const stationBoardWorstCaseH = 426
 
 // serviceDefaults are the three service windows' per-type defaults (their
 // Screen rows), in design units == px at the identity scale: the market's
-// square (546×546, the largest side that stays right of the rail gutter
-// and fits the 1024×700 minimum), the inventory rect below it and the
-// fitting window's 644×682 column at the screen's top-right (the EVE
-// fitting shape needs the room; it clears the log pocket at every size).
+// three-pane 760×560 rect on the rail gutter's clear line (it overlaps the
+// log pocket at the minimum — the big trade window wins that strip), the
+// inventory rect and the fitting window's 644×682 column at the screen's
+// top-right (the EVE fitting shape needs the room).
 var serviceDefaults = map[panelID]image.Rectangle{
-	pMarket:    image.Rect(396, 8, 942, 554),
+	pMarket:    image.Rect(97, 8, 857, 568),
 	pInventory: image.Rect(396, 256, 701, 690),
 	pFitting:   image.Rect(370, 8, 1014, 690),
 }
 
 // TestServiceDefaultsAreDeclared pins the spec rows themselves: each
-// service window declares its per-type default rect (AnchorFixed), and the
-// market's is square. A change to a row's geometry must be deliberate.
+// service window declares its per-type default rect (AnchorFixed). A
+// change to a row's geometry must be deliberate.
 func TestServiceDefaultsAreDeclared(t *testing.T) {
 	for id, want := range serviceDefaults {
 		row := screens[id]
@@ -44,8 +44,8 @@ func TestServiceDefaultsAreDeclared(t *testing.T) {
 			t.Errorf("%s Anchor = %v, want AnchorFixed", row.Title, row.Anchor)
 		}
 	}
-	if mkt := serviceDefaults[pMarket]; mkt.Dx() != mkt.Dy() {
-		t.Errorf("market default %v is not square: %d×%d", mkt, mkt.Dx(), mkt.Dy())
+	if mkt := serviceDefaults[pMarket]; mkt.Dx() != 760 || mkt.Dy() != 560 {
+		t.Errorf("market default %v is not the three-pane 760×560", mkt)
 	}
 }
 
@@ -81,7 +81,10 @@ func TestServiceWindowsOpenAtTheirDefaults(t *testing.T) {
 			if r.Min.X < floor {
 				t.Errorf("%dx%d: %s %v starts inside the rail gutter (%d)", w, h, panelNames[id], r, floor)
 			}
-			if r.Overlaps(log) {
+			// The market is the one window allowed over the log pocket:
+			// its three panes need the width, and the log raises back on
+			// a click (windows are a stack).
+			if id != pMarket && r.Overlaps(log) {
 				t.Errorf("%dx%d: %s %v overlaps the log pocket %v", w, h, panelNames[id], r, log)
 			}
 			if min := win.MinSize; min != nil && (r.Dx() < min.X || r.Dy() < min.Y) {

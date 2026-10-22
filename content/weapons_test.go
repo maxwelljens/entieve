@@ -233,11 +233,11 @@ func TestNpcFitsMatchHullCalibre(t *testing.T) {
 func TestValidateRejectsRetiredShellIDs(t *testing.T) {
 	c := &Content{
 		Items: map[ItemID]*ItemDef{
-			"charge-emp": {ID: "charge-emp", Name: "EMP Charge", Category: CatAmmo,
+			"charge-emp": {ID: "charge-emp", Name: "EMP Charge", Group: "Ammunition/Autocannon shells", Category: CatAmmo,
 				Volume: 0.01, BasePrice: 1, AmmoClass: "small"},
 		},
 		Modules: map[ModuleID]*ModuleDef{
-			"mod-emp-turret": {ID: "mod-emp-turret", Name: "EMP Turret", Slot: SlotHigh,
+			"mod-emp-turret": {ID: "mod-emp-turret", Name: "EMP Turret", Group: "Modules/High/Turrets", Slot: SlotHigh,
 				Kind: KindWeapon, Weapon: &WeaponAttrs{Damage: Damage{EM: 1}, ShotTime: 1}},
 		},
 	}
@@ -259,20 +259,20 @@ func TestValidateRejectsBadBays(t *testing.T) {
 	base := func() *Content {
 		return &Content{
 			Items: map[ItemID]*ItemDef{
-				"ammo-a": {ID: "ammo-a", Name: "A", Category: CatAmmo, Volume: 0.01,
+				"ammo-a": {ID: "ammo-a", Name: "A", Group: "Ammunition/Autocannon shells", Category: CatAmmo, Volume: 0.01,
 					BasePrice: 1, AmmoClass: "small-autocannon", Damage: &Damage{EM: 1}},
-				"ammo-b": {ID: "ammo-b", Name: "B", Category: CatAmmo, Volume: 0.01,
+				"ammo-b": {ID: "ammo-b", Name: "B", Group: "Ammunition/Autocannon shells", Category: CatAmmo, Volume: 0.01,
 					BasePrice: 1, AmmoClass: "small-autocannon", Damage: &Damage{EM: 1}},
-				"charge-cap-cell": {ID: "charge-cap-cell", Name: "Cell", Category: CatCharge,
+				"charge-cap-cell": {ID: "charge-cap-cell", Name: "Cell", Group: "Ammunition/Cap cells", Category: CatCharge,
 					Volume: 0.01, BasePrice: 1},
 			},
 			Modules: map[ModuleID]*ModuleDef{
-				"mod-gun": {ID: "mod-gun", Name: "Gun", Slot: SlotHigh, Kind: KindWeapon,
+				"mod-gun": {ID: "mod-gun", Name: "Gun", Group: "Modules/High/Turrets", Slot: SlotHigh, Kind: KindWeapon,
 					Weapon: &WeaponAttrs{Damage: Damage{EM: 1}, ShotTime: 1,
 						AmmoClass: "small-autocannon", BayM3: 0.1}},
-				"mod-pod": {ID: "mod-pod", Name: "Pod", Slot: SlotHigh, Kind: KindWeapon,
+				"mod-pod": {ID: "mod-pod", Name: "Pod", Group: "Modules/High/Launchers", Slot: SlotHigh, Kind: KindWeapon,
 					Weapon: &WeaponAttrs{Damage: Damage{EM: 1}, ShotTime: 1}},
-				"mod-boost": {ID: "mod-boost", Name: "Boost", Slot: SlotLow, Kind: KindCapBooster,
+				"mod-boost": {ID: "mod-boost", Name: "Boost", Group: "Modules/Mid/Capacitor", Slot: SlotLow, Kind: KindCapBooster,
 					Boost: &BoostAttrs{CapRestore: 1, BayM3: 0.25}},
 			},
 		}

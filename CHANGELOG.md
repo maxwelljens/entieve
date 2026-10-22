@@ -9,7 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Shell bays (clips)** (`content`, `sim`): every charge-fed module — the
+- **Market category tree and search** (`content`, `uikit`, `game`): every
+  marketable def (`ItemDef`, `ModuleDef`, `ShipDef`) now carries a validated
+  **`group`** path (1–3 segments, e.g. `Ships/Frigates`,
+  `Modules/High/Turrets`, `Materials/Ore`), and the market window is three
+  panes — **browse tree | catalog | My orders** — with two persisted seams
+  (`market-tree`, `market-orders`) at a 760×560 landing rect. The tree is
+  the content's own hierarchy (`All` root over Ships, Modules, Ammunition,
+  Materials and Loot); a branch click scopes the catalog, an item click
+  highlights its branch, and the expansion state is session-only like the
+  order folds. A live search field above the tree filters the selected
+  branch by name, group path and maker through
+  [`github.com/sahilm/fuzzy`](https://github.com/sahilm/fuzzy) (MIT,
+  stdlib-only): flat ranked results with the matched letters highlighted,
+  the header sort restored on clear, `Ctrl+F` to focus, `↑`/`↓` to walk the
+  results, `Enter` to select one and a two-step `Esc` (clear, then leave).
+  Cross-station availability is read-only: the Qty cell adds a dim
+  `· N more` suffix for the other books stocking the item and the title
+  line names the cheapest such ask; **Buy** greys while no local ask
+  exists (Request on Market stays live). Hulls can no longer quote 0 € in
+  the market: `ShipDef` gained **`base_price`**, the price ladder's last
+  rung. Docs: GAMEPLAY "The market window", CONTENT_AUTHORING "The market
+  tree", CONTEXT "Market tree", NAMING rows (proposed).
+- **Shell bays (clips)**- **Shell bays (clips)** (`content`, `sim`): every charge-fed module — the
   six projectile guns and the cap booster — now carries a m³ **bay** that
   holds whole rounds of exactly one shell type. A **load cycle** fills it
   from cargo with a full bay in exactly one firing cycle (no capacitor

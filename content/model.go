@@ -138,6 +138,7 @@ type ItemDef struct {
 	Name        string             `json:"name"`
 	Description string             `json:"description,omitempty"`
 	Maker       string             `json:"maker,omitempty"` // manufacturer: a corp-* slug (Corp.ID); empty for ores/minerals/loot
+	Group       string             `json:"group"`           // market tree path, e.g. "Materials/Ore" (1..3 slash-separated segments)
 	Category    string             `json:"category"`
 	Volume      float64            `json:"volume"`                 // m³ per unit
 	BasePrice   float64            `json:"base_price"`             // credits per unit
@@ -161,6 +162,8 @@ type ShipDef struct {
 	Description    string     `json:"description,omitempty"`
 	Origin         string     `json:"origin,omitempty"` // naming-layer heritage: "moravian"|"polish"|"nordic"|"latinate"|"old-works"
 	Maker          string     `json:"maker,omitempty"`  // manufacturer: a corp-* slug (Corp.ID); empty on the unattributed rat hulls
+	Group          string     `json:"group"`            // market tree path, e.g. "Ships/Frigates"
+	BasePrice      float64    `json:"base_price"`       // credits: the price ladder's last rung when a book has no trade
 	Slots          Slots      `json:"slots"`
 	Mounts         []Mount    `json:"high_mounts,omitempty"`  // one mount per high slot: a mounted module needs its kind at or above its size
 	GridClasses    ClassQuota `json:"grid_classes,omitempty"` // per-class fit allowance on the powergrid axis
@@ -260,6 +263,7 @@ type ModuleDef struct {
 	Name           string        `json:"name"`
 	Description    string        `json:"description,omitempty"`
 	Maker          string        `json:"maker,omitempty"` // manufacturer: a corp-* slug (Corp.ID)
+	Group          string        `json:"group"`           // market tree path, e.g. "Modules/High/Turrets"
 	Slot           string        `json:"slot"`            // "high" | "mid" | "low"
 	Kind           string        `json:"kind"`
 	Mount          string        `json:"mount,omitempty"`      // high slot only: turret | launcher

@@ -22,15 +22,15 @@ func TestValidateRealContent(t *testing.T) {
 func baseContent() *Content {
 	return &Content{
 		Items: map[ItemID]*ItemDef{
-			"min-fer":     {ID: "min-fer", Name: "Ferrite", Category: CatMineral, Volume: 0.01, BasePrice: 6},
-			"ore-rock":    {ID: "ore-rock", Name: "Test Rock", Category: CatOre, Volume: 1, BasePrice: 20, RefineYield: map[ItemID]float64{"min-fer": 0.5}},
-			"charge-cell": {ID: "charge-cell", Name: "Cell", Category: CatCharge, Volume: 0.01, BasePrice: 100},
-			"charge-bolt": {ID: "charge-bolt", Name: "Bolt", Category: CatAmmo, Volume: 0.01, BasePrice: 10, Damage: &Damage{EM: 10}, AmmoClass: "light"},
-			"loot-bit":    {ID: "loot-bit", Name: "Bit", Category: CatLoot, Volume: 0.1, BasePrice: 1000},
+			"min-fer":     {ID: "min-fer", Name: "Ferrite", Group: "Materials/Minerals", Category: CatMineral, Volume: 0.01, BasePrice: 6},
+			"ore-rock":    {ID: "ore-rock", Name: "Test Rock", Group: "Materials/Ore", Category: CatOre, Volume: 1, BasePrice: 20, RefineYield: map[ItemID]float64{"min-fer": 0.5}},
+			"charge-cell": {ID: "charge-cell", Name: "Cell", Group: "Ammunition/Cap cells", Category: CatCharge, Volume: 0.01, BasePrice: 100},
+			"charge-bolt": {ID: "charge-bolt", Name: "Bolt", Group: "Ammunition/Autocannon shells", Category: CatAmmo, Volume: 0.01, BasePrice: 10, Damage: &Damage{EM: 10}, AmmoClass: "light"},
+			"loot-bit":    {ID: "loot-bit", Name: "Bit", Group: "Loot", Category: CatLoot, Volume: 0.1, BasePrice: 1000},
 		},
 		Ships: map[ShipID]*ShipDef{
 			"ship-hull": {
-				ID: "ship-hull", Name: "Hull", Class: "frigate",
+				ID: "ship-hull", Name: "Hull", Class: "frigate", Group: "Ships/Frigates",
 				Slots:  Slots{High: 2, Mid: 2, Low: 2},
 				Shield: 100, Armor: 100, Structure: 100,
 				Resists:   Resists{EM: 0.2, Thermal: 0.2, Kinetic: 0.2, Explosive: 0.2},
@@ -41,18 +41,18 @@ func baseContent() *Content {
 		},
 		Modules: map[ModuleID]*ModuleDef{
 			"mod-gun": {
-				ID: "mod-gun", Name: "Gun", Slot: SlotHigh, Kind: KindWeapon,
+				ID: "mod-gun", Name: "Gun", Group: "Modules/High/Turrets", Slot: SlotHigh, Kind: KindWeapon,
 				ActivationCost: 10, ActivationTime: 2, Price: 10000,
 				Weapon: &WeaponAttrs{Damage: Damage{EM: 10}, Optimal: 8000, Falloff: 4000,
 					Tracking: 0.4, AmmoClass: "light", ShotTime: 2, BayM3: 0.1},
 			},
 			"mod-engine": {
-				ID: "mod-engine", Name: "Engine", Slot: SlotMid, Kind: KindAfterburner,
+				ID: "mod-engine", Name: "Engine", Group: "Modules/Mid/Propulsion", Slot: SlotMid, Kind: KindAfterburner,
 				ActivationCost: 20, ActivationTime: 5, Price: 20000,
 				Boost: &BoostAttrs{SpeedMultiplier: 1.5},
 			},
 			"mod-plate": {
-				ID: "mod-plate", Name: "Plate", Slot: SlotLow, Kind: KindArmorPlate,
+				ID: "mod-plate", Name: "Plate", Group: "Modules/Low/Armor", Slot: SlotLow, Kind: KindArmorPlate,
 				Price: 15000, Passive: &PassiveAttrs{ArmorHP: 200},
 			},
 		},

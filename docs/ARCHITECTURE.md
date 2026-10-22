@@ -241,6 +241,8 @@ type ItemDef struct {
 type ShipDef struct {
     ID ShipID; Name, Class, Description string
     Origin string                  // naming-layer heritage: "moravian"|"polish"|"nordic"|"latinate"|"old-works"
+    Group string                   // market tree path, e.g. "Ships/Frigates" (1..3 segments)
+    BasePrice float64              // credits: the price ladder's last rung for a hull
     Slots struct{ High, Mid, Low int }
     Mounts []Mount                 // high_mounts: one per high slot, {Kind "turret"|"launcher"; Size "s"|"m"|"l"}
     GridClasses, CPUClasses ClassQuota // grid_classes / cpu_classes: {I,II,III int} fit allowance per module class
@@ -255,6 +257,7 @@ type ShipDef struct {
 }
 type ModuleDef struct {
     ID ModuleID; Name, Description string
+    Group string               // market tree path, e.g. "Modules/High/Turrets"
     Slot string                // "high" | "mid" | "low"
     Kind string                // "weapon" | "shield_boost" | "shield_extender" | "armor_rep" | "armor_plate" | "resist_coat" | "cap_booster" | "cap_recharger" | "afterburner" | "mining_laser" | "stasis_web" | "warp_scram"
     Mount string               // high only: "turret" | "launcher" (guns and the mining laser are turrets)
@@ -866,9 +869,26 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > it sets one, as the market does). Version-2 sidecars still load — they
 > carry no ratios, so every seam starts at its default and the next write
 > is v3. Wired: Inventory (cargo/ore, ore/hangar), Fitting
-> (slots/hangar), Manufacturing (recipes/jobs), Market (book / My orders,
-> `market-orders`: the old fixed 240 px column is its opening share of the
-> window, the pane floor is `SplitMinPane`).
+> (slots/hangar), Manufacturing (recipes/jobs), Market (browse tree /
+> catalog / My orders — two seams, `market-tree` and `market-orders`: 176 px
+> of browse and the old fixed 240 px column are their opening shares of the
+> 760×560 landing rect; the pane floor is `SplitMinPane`).
+
+> **Market tree and search (2026-10):** the market's browse pane renders
+> `ItemDef`/`ModuleDef`/`ShipDef` `group` paths (content-validated, 1–3
+> segments) as a one-column table; a branch click scopes the catalog and the
+> search field filters the branch live. Matching is
+> `github.com/sahilm/fuzzy` (MIT, stdlib-only, the UI layer's one new
+> dependency) over display name + full group path + maker, ranked by its
+> score while a query is up (the header sort yields, restored on clear).
+> Result rows are rich stack rows whose name is split into accent-tinted
+> runs at `Match.MatchedIndexes`; the plain table grew
+> `TableRow.CellRuns` for the dim `· N more` cross-station Qty suffix
+> (read through the existing `BookOrders`/`StationName`/`Defs` seams — no
+> new seam). The search `TextInput` is the second typing surface:
+> `game.handleKeys` yields world keys while `Market.SearchFocused()` and
+> routes the arrows/Enter/two-step Esc through `Market.SearchKey`;
+> `Ctrl+F` opens the market and focuses the field.
 
 - `render.Renderer` created with `(*content.Content)`; `Draw(dst *ebiten.Image,
   cam Camera, s *sim.Sim)` reads sim stores read-only. Vector art: ships as

@@ -49,6 +49,7 @@ in-game help window renders.
 | `[` or `-` | Time acceleration down (8 → 4 → 2 → 1×) |
 | `]` or `=` | Time acceleration up (1 → 2 → 4 → 8×) |
 | `Ctrl+S` | Save game |
+| `Ctrl+F` | Find in the market (opens the market, focuses its search) |
 | `F9` | Load game |
 | Arrow keys | Pan camera |
 
@@ -86,14 +87,16 @@ work; the opposite edge stays fixed and the window never shrinks below
 its minimum size), and click anywhere on a window to raise it to the
 front.
 
-**Multi-pane windows** — Inventory, Fitting and Manufacturing — carry
+**Multi-pane windows** — Inventory, Fitting, Manufacturing and the
+Market (browse tree | catalog | My orders) — carry
 **draggable seams** between their lists: the seam is a recessed track with
 a dotted grip in its middle (the grip lights up under the pointer) and an
 about 8 px grab band (the cursor turns into the up/down arrow over it),
 and dragging it trades height between the two lists it separates, so a
 long hangar or job list can be given the room. Each pane keeps a minimum
 height, so nothing collapses, and the proportions are saved with the
-window's layout (see **Your layout persists**).
+window's layout (see **Your layout persists**). The market's two seams
+run left/right and trade width the same way.
 
 Toggle keys open and close their window (`I`, `F`, `G`, `B`, `C`, `N`, `H`,
 `P`, `K`, `Shift+L`) — windows have no separate close button. The same
@@ -156,8 +159,9 @@ Default positions: overview top-right, selected item top-left, scanner
 in the center column under the top row, log bottom-left, the HUD pair
 (ship status + module rack) bottom-center, starmap and the Esc menu
 centered, help top-center. Every window type also carries its own default
-size and position for its first open — the market's square, the inventory
-and fitting rects, the manufacturing and refinery, finances and settings — and a genuinely
+size and position for its first open — the market's 760×560 three-pane
+rect, the inventory and fitting rects, the manufacturing and refinery,
+finances and settings — and a genuinely
 new window type with no declared position opens centred. While docked the
 Station window (contract board included) takes the top-left column
 (overview and selected item step aside); the service windows open at
@@ -175,7 +179,7 @@ save — `<save path>.layout.json`, e.g.
 `os.UserConfigDir()/entieve/save.json.layout.json` — whenever you save
 (`Ctrl+S` / menu **Save**) and again when you quit cleanly from the
 menu. The pane proportions of the split windows (inventory, fitting,
-manufacturing) ride along in the same file, so a dragged seam comes back
+manufacturing, market) ride along in the same file, so a dragged seam comes back
 with the rest of the arrangement. It is read back on startup and after
 loading a save, so a
 favorite arrangement survives restarts and loads. Restored windows are
@@ -526,6 +530,37 @@ Unused craft decays slowly, so a station left idle slides back — and a
 job already running is never re-timed by a mid-job level-up.
 
 ## The economy
+
+### The market window
+
+The market is three panes: a **browse tree** on the left, the **catalog**
+in the middle and **My orders** on the right, with a draggable seam between
+each pair (both proportions persist with the layout). The tree is the
+content's own category path — `All` at the root, then `Ships`, `Modules`,
+`Ammunition`, `Materials` and `Loot` with their children (hull classes,
+slot/role groups, shell families). Clicking a branch expands it and scopes
+the catalog to its subtree; clicking an item highlights its branch. Every
+item is listed, including the hulls and wares no one sells here — a dim row
+whose **Buy** is grayed until some local order offers it (**Request on
+Market** stays live, and placing the first order is how a market wakes up).
+
+**Search.** The field above the tree filters the selected branch live as
+you type (name, group path and maker all match, case-insensitive). Results
+are flat and ranked by fuzzy score — best match first, the header sort
+yielding while the query is up — with the matched letters highlighted;
+clearing the query restores the branch view and its sort. The query
+survives a branch click, so re-scoping is one click. Focus the field with
+`Ctrl+F` or a click: while it holds focus the world hotkeys yield. `↑`/`↓`
+walk the results, `Enter` selects the highlighted one (the tree follows),
+and `Esc` clears the query first — a second `Esc` on the empty field leaves
+the field and then the window handles the key normally.
+
+**Cross-station availability.** The columns stay local (this station's
+ladder, this station's resting quantity), but when another station's book
+stocks the item the Qty cell carries a dim `· N more` suffix (how many
+other books ask for it), and selecting it adds the cheapest such ask to the
+title line — `· cheapest Doki 112 €` — so a trader can see at a glance
+whether the run is worth it.
 
 Every station's market is an **order book**: your Buy and Sell are market
 orders that take the best resting prices at that station and fill only

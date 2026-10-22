@@ -1,6 +1,7 @@
 [
   {
     "id": "loot-navdata",
+    "group": "Loot",
     "name": "Encrypted Navdata",
     "description": "Partially corrupted navigation core; fenced data brokers pay well for it.",
     "category": "loot",
@@ -9,6 +10,7 @@
   },
   {
     "id": "loot-alloy-scrap",
+    "group": "Loot",
     "name": "Alloy Scrap",
     "description": "Twisted plating and hull fragments scooped from wrecks.",
     "category": "loot",
@@ -17,6 +19,7 @@
   },
   {
     "id": "loot-iced-core",
+    "group": "Loot",
     "name": "Iced Core",
     "description": "Cryogenically sealed reactor core pulled from tougher rats.",
     "category": "loot",
@@ -25,6 +28,7 @@
   },
   {
     "id": "loot-hierarch-crest",
+    "group": "Loot",
     "name": "Hierarch's Crest",
     "description": "Salvage from a Pustkowie hierarch: a polished identification crest worth a fortune.",
     "category": "loot",

@@ -1,5 +1,7 @@
 {
   "id": "ship-rat-scuttler",
+  "group": "Ships/Rat hulls",
+  "base_price": 180000,
   "name": "Scuttler",
   "class": "rat",
   "description": "An Old Works worker frame: it cuts rock, strips wrecks and hauls scrap. Fragile, fast, and everywhere.",

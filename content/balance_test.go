@@ -175,9 +175,10 @@ const (
 )
 
 // hullReferencePrices pins reference prices for hulls that ship no market
-// order (hulls have no price field; the NPC hulls are not listed anywhere).
-// Market-listed hulls use their shipped order price instead — see
-// recipeReferencePrice.
+// order (the NPC hulls are not listed anywhere). Market-listed hulls use
+// their shipped order price instead — see recipeReferencePrice. A hull's
+// base_price is the market ladder's last rung, not the balance reference:
+// the envelope keeps measuring the order/pinned prices it was calibrated on.
 var hullReferencePrices = map[ShipID]float64{
 	"ship-rat-scuttler": 330000,
 	"ship-npc-patrol":   400000,
@@ -188,8 +189,7 @@ var hullReferencePrices = map[ShipID]float64{
 
 // recipeReferencePrice resolves the product's reference price: item
 // base_price, module price, or hull — the shipped market order price when
-// the hull is listed, else the pinned table (hulls have no price field and
-// the NPC hulls ship no order).
+// the hull is listed, else the pinned table (the NPC hulls ship no order).
 func recipeReferencePrice(t *testing.T, c *Content, product ItemID) float64 {
 	t.Helper()
 	if it, ok := c.Items[product]; ok {

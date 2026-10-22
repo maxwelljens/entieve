@@ -1,6 +1,7 @@
 [
   {
     "id": "ammo-emp-s",
+    "group": "Ammunition/Autocannon shells",
     "maker": "corp-burza",
     "name": "Small EMP Shell",
     "description": "Small-calibre autocannon projectile that dumps its charge as an electromagnetic pulse on impact. EM-biased damage.",
@@ -12,6 +13,7 @@
   },
   {
     "id": "ammo-fusion-s",
+    "group": "Ammunition/Autocannon shells",
     "maker": "corp-burza",
     "name": "Small Fusion Shell",
     "description": "Small-calibre autocannon shell that detonates on impact. Explosive-biased damage.",
@@ -23,6 +25,7 @@
   },
   {
     "id": "ammo-ap-s",
+    "group": "Ammunition/Autocannon shells",
     "maker": "corp-burza",
     "name": "Small Armor-Piercing Shell",
     "description": "Small-calibre autocannon penetrator. Kinetic-biased damage.",
@@ -34,6 +37,7 @@
   },
   {
     "id": "ammo-plutonium-s",
+    "group": "Ammunition/Autocannon shells",
     "maker": "corp-burza",
     "name": "Small Plutonium Shell",
     "description": "Small-calibre autocannon shell whose radioactive core burns through plating. Thermal-biased damage.",
@@ -45,6 +49,7 @@
   },
   {
     "id": "ammo-emp-m",
+    "group": "Ammunition/Autocannon shells",
     "maker": "corp-burza",
     "name": "Medium EMP Shell",
     "description": "Medium-calibre autocannon projectile that dumps its charge as an electromagnetic pulse on impact. EM-biased damage.",
@@ -56,6 +61,7 @@
   },
   {
     "id": "ammo-fusion-m",
+    "group": "Ammunition/Autocannon shells",
     "maker": "corp-burza",
     "name": "Medium Fusion Shell",
     "description": "Medium-calibre autocannon shell that detonates on impact. Explosive-biased damage.",
@@ -67,6 +73,7 @@
   },
   {
     "id": "ammo-ap-m",
+    "group": "Ammunition/Autocannon shells",
     "maker": "corp-burza",
     "name": "Medium Armor-Piercing Shell",
     "description": "Medium-calibre autocannon penetrator. Kinetic-biased damage.",
@@ -78,6 +85,7 @@
   },
   {
     "id": "ammo-plutonium-m",
+    "group": "Ammunition/Autocannon shells",
     "maker": "corp-burza",
     "name": "Medium Plutonium Shell",
     "description": "Medium-calibre autocannon shell whose radioactive core burns through plating. Thermal-biased damage.",
@@ -89,6 +97,7 @@
   },
   {
     "id": "ammo-emp-l",
+    "group": "Ammunition/Autocannon shells",
     "maker": "corp-burza",
     "name": "Large EMP Shell",
     "description": "Large-calibre autocannon projectile that dumps its charge as an electromagnetic pulse on impact. EM-biased damage.",
@@ -100,6 +109,7 @@
   },
   {
     "id": "ammo-fusion-l",
+    "group": "Ammunition/Autocannon shells",
     "maker": "corp-burza",
     "name": "Large Fusion Shell",
     "description": "Large-calibre autocannon shell that detonates on impact. Explosive-biased damage.",
@@ -111,6 +121,7 @@
   },
   {
     "id": "ammo-ap-l",
+    "group": "Ammunition/Autocannon shells",
     "maker": "corp-burza",
     "name": "Large Armor-Piercing Shell",
     "description": "Large-calibre autocannon penetrator. Kinetic-biased damage.",
@@ -122,6 +133,7 @@
   },
   {
     "id": "ammo-plutonium-l",
+    "group": "Ammunition/Autocannon shells",
     "maker": "corp-burza",
     "name": "Large Plutonium Shell",
     "description": "Large-calibre autocannon shell whose radioactive core burns through plating. Thermal-biased damage.",
@@ -133,6 +145,7 @@
   },
   {
     "id": "ammo-art-emp-s",
+    "group": "Ammunition/Artillery shells",
     "maker": "corp-burza",
     "name": "Small EMP Artillery Shell",
     "description": "Small-calibre artillery shell: a long-bodied projectile that dumps its charge as an electromagnetic pulse on impact. EM-biased damage.",
@@ -144,6 +157,7 @@
   },
   {
     "id": "ammo-art-fusion-s",
+    "group": "Ammunition/Artillery shells",
     "maker": "corp-burza",
     "name": "Small Fusion Artillery Shell",
     "description": "Small-calibre artillery shell with a volatile filler that detonates on impact. Explosive-biased damage.",
@@ -155,6 +169,7 @@
   },
   {
     "id": "ammo-art-ap-s",
+    "group": "Ammunition/Artillery shells",
     "maker": "corp-burza",
     "name": "Small Armor-Piercing Artillery Shell",
     "description": "Small-calibre artillery shell with a dense long-rod penetrator. Kinetic-biased damage.",
@@ -166,6 +181,7 @@
   },
   {
     "id": "ammo-art-plutonium-s",
+    "group": "Ammunition/Artillery shells",
     "maker": "corp-burza",
     "name": "Small Plutonium Artillery Shell",
     "description": "Small-calibre artillery shell whose radioactive core burns through plating. Thermal-biased damage.",
@@ -177,6 +193,7 @@
   },
   {
     "id": "ammo-art-emp-m",
+    "group": "Ammunition/Artillery shells",
     "maker": "corp-burza",
     "name": "Medium EMP Artillery Shell",
     "description": "Medium-calibre artillery shell: a long-bodied projectile that dumps its charge as an electromagnetic pulse on impact. EM-biased damage.",
@@ -188,6 +205,7 @@
   },
   {
     "id": "ammo-art-fusion-m",
+    "group": "Ammunition/Artillery shells",
     "maker": "corp-burza",
     "name": "Medium Fusion Artillery Shell",
     "description": "Medium-calibre artillery shell with a volatile filler that detonates on impact. Explosive-biased damage.",
@@ -199,6 +217,7 @@
   },
   {
     "id": "ammo-art-ap-m",
+    "group": "Ammunition/Artillery shells",
     "maker": "corp-burza",
     "name": "Medium Armor-Piercing Artillery Shell",
     "description": "Medium-calibre artillery shell with a dense long-rod penetrator. Kinetic-biased damage.",
@@ -210,6 +229,7 @@
   },
   {
     "id": "ammo-art-plutonium-m",
+    "group": "Ammunition/Artillery shells",
     "maker": "corp-burza",
     "name": "Medium Plutonium Artillery Shell",
     "description": "Medium-calibre artillery shell whose radioactive core burns through plating. Thermal-biased damage.",
@@ -221,6 +241,7 @@
   },
   {
     "id": "ammo-art-emp-l",
+    "group": "Ammunition/Artillery shells",
     "maker": "corp-burza",
     "name": "Large EMP Artillery Shell",
     "description": "Large-calibre artillery shell: a long-bodied projectile that dumps its charge as an electromagnetic pulse on impact. EM-biased damage.",
@@ -232,6 +253,7 @@
   },
   {
     "id": "ammo-art-fusion-l",
+    "group": "Ammunition/Artillery shells",
     "maker": "corp-burza",
     "name": "Large Fusion Artillery Shell",
     "description": "Large-calibre artillery shell with a volatile filler that detonates on impact. Explosive-biased damage.",
@@ -243,6 +265,7 @@
   },
   {
     "id": "ammo-art-ap-l",
+    "group": "Ammunition/Artillery shells",
     "maker": "corp-burza",
     "name": "Large Armor-Piercing Artillery Shell",
     "description": "Large-calibre artillery shell with a dense long-rod penetrator. Kinetic-biased damage.",
@@ -254,6 +277,7 @@
   },
   {
     "id": "ammo-art-plutonium-l",
+    "group": "Ammunition/Artillery shells",
     "maker": "corp-burza",
     "name": "Large Plutonium Artillery Shell",
     "description": "Large-calibre artillery shell whose radioactive core burns through plating. Thermal-biased damage.",
