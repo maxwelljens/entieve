@@ -537,8 +537,8 @@ func TestMarketBooksSurviveSaveRestore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("snapshot: %v", err)
 	}
-	if save.Schema != saveSchemaV2 {
-		t.Fatalf("Save.Schema = %d, want %d", save.Schema, saveSchemaV2)
+	if save.Schema != saveSchemaV3 {
+		t.Fatalf("Save.Schema = %d, want %d", save.Schema, saveSchemaV3)
 	}
 	if save.MarketSeq != s.marketSeq {
 		t.Fatalf("MarketSeq = %d, want %d", save.MarketSeq, s.marketSeq)
@@ -596,17 +596,17 @@ func TestMarketBooksSurviveSaveRestore(t *testing.T) {
 	}
 }
 
-// TestRestoreRejectsOldSchemas pins the clean break: the market tranche
-// bumped the save schema to v2, and any other version (v0/v1 saves, which
-// carried per-system stock lists) is rejected before touching state.
+// TestRestoreRejectsOldSchemas pins the clean break: v2 saves are migrated to
+// v3 (shell bays), and anything older (v0/v1 saves, which carried per-system
+// stock lists) is rejected before touching state.
 func TestRestoreRejectsOldSchemas(t *testing.T) {
 	s := newTestSim(t)
 	save, err := s.Snapshot()
 	if err != nil {
 		t.Fatalf("snapshot: %v", err)
 	}
-	if save.Schema != saveSchemaV2 || saveSchemaV2 != 2 {
-		t.Fatalf("schema = %d (const %d), want 2", save.Schema, saveSchemaV2)
+	if save.Schema != saveSchemaV3 || saveSchemaV3 != 3 {
+		t.Fatalf("schema = %d (const %d), want 3", save.Schema, saveSchemaV3)
 	}
 	save.Schema = 1 // a pre-v2 save: no books, no sides, no arrival ids
 	err = s.Restore(save)

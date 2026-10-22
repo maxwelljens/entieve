@@ -469,9 +469,19 @@ func TestRespawnGuardBuysHullFitAndCharges(t *testing.T) {
 	if !ok || len(fit.High) != 1 || fit.High[0] != "mod-autocannon-s" || len(fit.Low) != 1 || fit.Low[0] != "mod-armor-plate" {
 		t.Fatalf("fit = %+v, want turret + plate", fit)
 	}
+	// The grant is 1,000 rounds: some may already sit in the gun's bay, so
+	// count the bay with the hold.
 	cargo, _ := s.Cargos.Get(nw)
-	if len(cargo.Stacks) != 1 || cargo.Stacks[0].Item != "ammo-ap-s" || cargo.Stacks[0].Qty != 1000 {
-		t.Fatalf("basket = %+v, want 1000 ammo-ap-s", cargo.Stacks)
+	bayed := 0
+	if nfit, ok := s.Fittings.Get(nw); ok {
+		for _, rt := range nfit.HighRT {
+			if rt.Clip.Item == "ammo-ap-s" {
+				bayed += rt.Clip.Qty
+			}
+		}
+	}
+	if len(cargo.Stacks) != 1 || cargo.Stacks[0].Item != "ammo-ap-s" || cargo.Stacks[0].Qty+bayed != 1000 {
+		t.Fatalf("basket = %+v + %d in the bay, want 1000 ammo-ap-s", cargo.Stacks, bayed)
 	}
 	if len(s.respawns) != 0 {
 		t.Fatalf("timer not consumed: %+v", s.respawns)

@@ -109,8 +109,8 @@ func TestJumpRebuildsSystem(t *testing.T) {
 	if s.Wallet() != 100000 {
 		t.Fatal("wallet lost on jump")
 	}
-	if cargoCount(s, "ammo-emp-s") != 20 {
-		t.Fatal("cargo lost on jump")
+	if ammoTotal(s, "ammo-emp-s") != 20 {
+		t.Fatal("ammo lost on jump")
 	}
 	// Player placed at the destination gate.
 	destGate := entityByName(s, "Gate to Alpha")

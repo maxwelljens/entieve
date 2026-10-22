@@ -17,9 +17,9 @@
     "level": 1,
     "min_standing": 0.0,
     "station": "cel-haven-rest",
-    "objective": { "item": "ammo-emp-s", "count": 2, "destination": "cel-penumbra-port" },
+    "objective": { "item": "ammo-emp-s", "count": 1, "destination": "cel-penumbra-port" },
     "reward": { "credits": 86000, "item": null, "standing_gain": 0.1 },
-    "description": "Przystań is short on EMP charges. Buy 200 rounds (2 m³) on the Jernborg market and carry them to the Przystań hangar — one gate jump into the Fringe. The cargo is the delivery: do not spend it on the way."
+    "description": "Przystań is short on EMP charges. Buy 200 rounds (1 m³) on the Jernborg market and carry them to the Przystań hangar — one gate jump into the Fringe. The cargo is the delivery: do not spend it on the way."
   },
   {
     "id": "contract-solace-cordite-1",

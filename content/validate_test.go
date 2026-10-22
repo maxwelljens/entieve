@@ -44,7 +44,7 @@ func baseContent() *Content {
 				ID: "mod-gun", Name: "Gun", Slot: SlotHigh, Kind: KindWeapon,
 				ActivationCost: 10, ActivationTime: 2, Price: 10000,
 				Weapon: &WeaponAttrs{Damage: Damage{EM: 10}, Optimal: 8000, Falloff: 4000,
-					Tracking: 0.4, AmmoClass: "light", ShotTime: 2},
+					Tracking: 0.4, AmmoClass: "light", ShotTime: 2, BayM3: 0.1},
 			},
 			"mod-engine": {
 				ID: "mod-engine", Name: "Engine", Slot: SlotMid, Kind: KindAfterburner,

@@ -102,12 +102,17 @@ DmgExplosive`. `Damage` is a struct `{EM, Thermal, Kinetic, Explosive float64}`;
 `ore-lucidite` (nickel, cobalt, silex), `ore-glacierite` (glacite, argon).
 Ore defs carry `refine_yield: {"min-ferrite": 0.45, ...}` fractions per m³.
 
-**Ammunition** (`content/data/items/ammo.json`) — each has a `damage`
-profile and a calibre `ammo_class`; guns consume 1 shell/shot:
-`ammo-emp-s` (EM-biased), `ammo-fusion-s` (explosive-biased),
-`ammo-ap-s` (kinetic-biased), `ammo-plutonium-s` (thermal-biased), with the
-`-m`/`-l` sets for the medium and large calibres;
-`charge-cap-cell` (cap booster fuel, not ammo).
+**Ammunition** (`content/data/items/ammo.json`) — six **shell families**, one
+`ammo_class` per family-calibre, four damage profiles per family
+(`emp` EM-biased, `fusion` explosive-biased, `ap` kinetic-biased,
+`plutonium` thermal-biased). The autocannon families (`small-autocannon`,
+`medium-autocannon`, `large-autocannon`) are the original `ammo-*-s/m/l` ids;
+the artillery families are `ammo-art-<profile>-<size>` (e.g.
+`ammo-art-emp-s`). Every shell of a family has the same m³ volume —
+small-autocannon 0.005, small-artillery 0.008, medium-autocannon 0.01,
+medium-artillery 0.025, large-autocannon 0.022, large-artillery 0.033 —
+so a bay's whole-round count is family-wide. `charge-cap-cell` (0.01 m³) is
+the cap booster's fuel, not gun ammo.
 
 **Loot** (`content/data/items/loot.json`):
 `loot-navdata`, `loot-alloy-scrap`, `loot-iced-core`, `loot-hierarch-crest`.
@@ -124,12 +129,15 @@ profile and a calibre `ammo_class`; guns consume 1 shell/shot:
 **Modules** (`content/data/modules/*.json`, grouped by category):
 - weapons: `mod-autocannon-s/m/l` (fast cycle, high tracking, short reach)
   and `mod-artillery-s/m/l` (slow cycle, low tracking, long reach, heavier
-  volley), each loading the shells of its own calibre (`small`/`medium`/
-  `large`); `mod-rocket-pod` (no ammo, explosive rockets);
+  volley), each loading the shells of its own family-calibre and carrying a
+  m³ shell bay (`weapon.bay_m3`, ~40 rounds ≈ 0.2 m³ for the small
+  autocannon, calibrated so sustained fire reloads about every 120 s);
+  `mod-rocket-pod` (no ammo, explosive rockets, no bay);
 - tank: `mod-shield-boost` (active), `mod-shield-extender` (passive raw HP),
   `mod-armor-rep` (active), `mod-armor-plate` (passive raw HP),
   `mod-resist-coat` (passive resist buff);
-- cap: `mod-cap-booster` (active, consumes `charge-cap-cell` from cargo),
+- cap: `mod-cap-booster` (active, burns `charge-cap-cell` from a 0.25 m³
+  cell bay — 25 cells),
   `mod-cap-recharger` (passive recharge buff);
 - propulsion: `mod-afterburner` (active speed boost, cap cost);
 - mining: `mod-mining-laser`;
@@ -228,7 +236,7 @@ type ItemDef struct {
     BasePrice float64          // ISK-analog "euro"
     RefineYield map[ItemID]float64 // ore only, fractions summing to <= 1
     Damage *Damage             // ammo only, applied per shot
-    AmmoClass string           // ammo only: calibre (small/medium/large); "" for non-ammo
+    AmmoClass string           // ammo only: shell family (small-autocannon …); "" for non-ammo
 }
 type ShipDef struct {
     ID ShipID; Name, Class, Description string
@@ -255,9 +263,9 @@ type ModuleDef struct {
     ActivationCost float64     // GJ per activation (0 for passive)
     ActivationTime float64     // seconds per cycle (0 for passive)
     Passive struct{ ShieldHP, ArmorHP float64; Capacitor float64; Recharge float64; ShieldBoost, ArmorRep float64; ResistBonus Resists; SpeedBonus float64 } // passive modules fill relevant fields
-    Weapon *WeaponAttrs        // Damage; Optimal, Falloff, Tracking float64; AmmoClass string (calibre); ShotTime float64 (s); DamageMult float64 (0 reads as 1)
+    Weapon *WeaponAttrs        // Damage; Optimal, Falloff, Tracking float64; AmmoClass string (shell family); ShotTime float64 (s); DamageMult float64 (0 reads as 1); BayM3 float64 (shell bay m³)
     Mining *MiningAttrs        // VolumePerCycle float64 (m³); CycleTime float64
-    Boost  *BoostAttrs         // ShieldBoostPerCycle / ArmorRepPerCycle float64; SpeedMultiplier float64; WebStrength float64; ScramDuration float64; CapRestore float64
+    Boost  *BoostAttrs         // ShieldBoostPerCycle / ArmorRepPerCycle float64; SpeedMultiplier float64; WebStrength float64; ScramDuration float64; CapRestore float64; BayM3 float64 (cap booster cell bay)
 }
 type NpcDef struct {
     ID NpcID; Name, Faction, Description string // Description: machine-caste dossier prose
@@ -362,8 +370,9 @@ the rules live: `content/validate.go`'s `checkFit` runs it over every authored
 fit (NPC fits, world starts) and `sim` runs it on both equip paths —
 `execFit` (CmdFitModule, refusal logged as a `SevWarning`) and `buildFitting`
 (load/assemble/stored fits, returning an error). Nothing numeric is stored:
-mounts and quotas live on the defs, and a save carries fitted module ids only
-(schema 2 unchanged).
+mounts and quotas live on the defs, and a save carries fitted module ids
+(the slots' bays and ammo selections ride the same fitting runtime, schema
+3).
 
 ## `sim` contract (`sim/model.go`, `sim/api.go`)
 
@@ -585,9 +594,14 @@ outcomes are untouched. Hauler legs/ambushes persist as `Traffic`/`Patrol`
 components and `Save.TrafficLeaves` (scheduled raider break-offs); prices
 persist in `Save.Market`.
 
-**Save schema v2** (`Save.Schema` = 2, `saveSchemaV2`; `Restore` rejects
-anything else — the clean break of the per-station market tranche, v0.2.0
-era). The living-economy fields riding it: `Market` / `MarketLasts` /
+**Save schema v3** (`Save.Schema` = 3, `saveSchemaV3`; `Restore` accepts and
+migrates v2 in place — `migrateSaveV2ToV3` clears every bay and selection,
+and the bay rule then resolves each gun — and rejects anything older, the
+clean break of the per-station market tranche, v0.2.0 era). v3 added the
+shell-bay state, which rides the existing fitting runtime instead of a new
+Save field: each `ModuleRuntime` carries `Clip` (`{Item, Qty}` loaded rounds)
+and `Selection` (the shell type the bay tops up from, `""` = none/waiting).
+The living-economy fields riding the schema: `Market` / `MarketLasts` /
 `MarketSeq` (per-station books and the price-time clock), `Belts`
 (persistent belt state), `FactionLedger` (respawn requisition money),
 `Jobs` / `JobSeq` / `Craft` (manufacturing jobs and station craft
@@ -605,8 +619,8 @@ Saves written before a content-id rename are remapped at restore:
 `content.ItemID` / `ModuleID` / `ShipID` / `RecipeID`, through slices,
 arrays, map values and nested structs) and applies the one registry
 (`content.LegacyIDs`), which is also what `content/validate.go` reads to
-reject retired ids — one list, two consumers. The schema stays 2 (an id
-remap is not a state change); `sim/save_migration_test.go`'s
+reject retired ids — one list, two consumers. An id remap is not a state
+change, so it needs no schema bump; `sim/save_migration_test.go`'s
 `TestWalkContentIDsCoversEveryField` materializes the whole type graph and
 fails on any id field the walk cannot reach, so a new id-bearing field is
 migrated without a second hand-written list.

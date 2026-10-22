@@ -46,6 +46,8 @@
           { "item": "ammo-plutonium-s", "qty": 3000, "price": 182 },
           { "item": "ammo-emp-m", "qty": 1000, "price": 336 },
           { "item": "ammo-emp-l", "qty": 300, "price": 672 },
+          { "item": "ammo-art-emp-s", "qty": 4000, "price": 168 },
+          { "item": "ammo-art-emp-l", "qty": 300, "price": 672 },
           { "item": "charge-cap-cell", "qty": 600, "price": 1300 },
           { "item": "loot-alloy-scrap", "qty": 500, "price": 3200, "side": "buy" },
           { "item": "loot-navdata", "qty": 80, "price": 20000, "side": "buy" },

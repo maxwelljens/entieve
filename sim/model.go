@@ -110,8 +110,16 @@ type SlotRef struct {
 type ModuleRuntime struct {
 	Def       content.ModuleID
 	Active    bool
-	CycleEnds float64 // sim time the cycle in flight completes (0 = none)
+	CycleEnds float64 // sim time the cycle in flight completes (0 = none); during a load this is the load deadline
 	LastWarn  float64 // sim time of last "cannot activate" warning
+	// Clip is the rounds in the module's bay (Item "" = empty). A bay holds
+	// one shell type at a time; the load cycle moves a full bay from cargo
+	// and defers the next firing cycle by exactly CycleEnds.
+	Clip content.CargoStack
+	// Selection is the shell type the bay tops up from ("" = none: the gun
+	// waits for a choice when 2+ types compete in cargo). Persisted with the
+	// fitting in Save (schema 3).
+	Selection content.ItemID
 }
 
 // Fitting is a ship's module loadout. High/Mid/Low hold module IDs;
@@ -537,10 +545,13 @@ type (
 	// CmdUnfitModule moves a fitted module to the hangar.
 	CmdUnfitModule struct{ Slot SlotRef }
 
-	// CmdSetAmmo sets the preferred charge item for a weapon slot. The gun
-	// consumes this exact item first while it is in cargo, then falls back to
-	// any charge of its AmmoClass. Item "" restores automatic behaviour
-	// (first stack in canonical order). Emits EvModule.
+	// CmdSetAmmo selects the shell type for a weapon slot's bay. The bay is
+	// dumped back to cargo, the selection is set and a full-bay load of the
+	// new type starts at once (one firing cycle, module stays Active). Item
+	// "" clears the selection: the bay dumps to cargo and the gun re-resolves
+	// by the bay rule (auto-load when exactly one shell type is in cargo,
+	// wait when two or more compete) — there is no automatic cargo-order
+	// mode. Emits EvModule.
 	CmdSetAmmo struct {
 		Slot SlotRef
 		Item content.ItemID
@@ -1026,11 +1037,16 @@ type MissionState struct {
 	Progress float64            `json:"progress"`
 }
 
-// saveSchemaV2 is the save-schema version written since the per-station
-// market tranche (v0.2.0 era): order books, order ids, last-trade prices.
-// Restore rejects any other value — the clean-break policy for pre-v2
-// saves, which carried per-system stock lists with drifting prices.
-const saveSchemaV2 = 2
+// saveSchemaV3 is the save-schema version written since shell bays (v3):
+// per-slot loaded rounds and the ammo selection travel inside the fitting
+// runtime. Restore migrates v2 saves in place (empty bays, no selection —
+// the guns then auto-resolve per the bay rule) and still rejects older ones,
+// the clean-break policy for pre-v2 saves (per-system stock lists with
+// drifting prices).
+const (
+	saveSchemaV3 = 3
+	saveSchemaV2 = 2 // accepted and migrated to v3 on restore
+)
 
 // Save is a full serializable simulation snapshot.
 type Save struct {
@@ -1049,9 +1065,10 @@ type Save struct {
 	// Missions are the contracts currently accepted (with progress).
 	Missions []MissionState `json:"missions,omitempty"`
 	Hangar   Hangar         `json:"hangar"`
-	// Schema is the save-schema version (saveSchemaV2): Restore rejects any
-	// other value, so pre-v2 saves — which carried per-system stock lists
-	// and drifting prices instead of per-station order books — fail loudly
+	// Schema is the save-schema version (saveSchemaV3). Restore migrates a v2
+	// save in place (empty bays, no selections) and rejects anything older,
+	// so pre-v2 saves — which carried per-system stock lists and drifting
+	// prices instead of per-station order books — fail loudly
 	// instead of restoring into a different market.
 	Schema int `json:"schema"`
 	// Market carries every resting order, grouped by the system its station

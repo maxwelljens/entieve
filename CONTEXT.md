@@ -17,8 +17,11 @@ names the *modules and seams* we build that vocabulary into.
 | **Grid class / cpu class** | a module's powergrid or cpu demand as one of three classes — Class I / Class II / Class III — never a number; a module demanding both axes consumes one unit on each |
 | **Class quota** | a hull's per-class allowance on each axis (`grid_classes` / `cpu_classes`); a fit is legal while no class's module count exceeds its quota, which is what bounds a full rack |
 | **Item** | everything else tradeable: ore, mineral, charge, shell, loot (`ore-*`/`min-*`/`ammo-*`/`charge-*`/`loot-*`) |
-| **Calibre** | a shell size class (`ammo_class`): `small`, `medium`, `large`; both projectile gun families at a calibre load the same shells |
-| **Shell** | the ammunition item (`ammo-*`) a projectile gun loads: calibre + one of the four damage profiles; the gun's `damage_multiplier` is its share of the shell's volley (autocannon light and fast, artillery heavy and slow) |
+| **Shell family** | a shell size class **and** gun family as one `ammo_class`: `small-autocannon`, `small-artillery`, `medium-autocannon`, `medium-artillery`, `large-autocannon`, `large-artillery`. One family is one calibre: every shell of it has the same m³ volume, and only guns of that family load it |
+| **Shell** | the ammunition item (`ammo-*`) a projectile gun loads: its family + one of the four damage profiles; the gun's `damage_multiplier` is its share of the shell's volley (autocannon light and fast, artillery heavy and slow) |
+| **Bay** (clip) | a charge-consuming module's fixed m³ ammunition space (`weapon.bay_m3`, `boost.bay_m3` for the cap booster): whole rounds of exactly ONE shell type, sized so sustained fire reloads about every 120 s |
+| **Load cycle** | filling a bay from cargo: a full bay's rounds, taking exactly one firing cycle (no capacitor cost), so the next shot is deferred by it. Also what `CmdSetAmmo` starts when it switches a shell type |
+| **Waiting state** | a bay sitting empty while two or more shell types compete in cargo and none is selected: the gun logs one `<module> waiting for ammo selection` line, deactivates quietly, and fires only once `CmdSetAmmo` picks a type. Distinct from truly dry (empty bay, no matching cargo rounds = the `no charges` warning) |
 | **Caste** | an Old Works machine archetype (`npc-*`: Scuttler, Marauder, Hierarch) + the Charter patrol (Custos) |
 | **Station** | a market/service node (a celestial); stations hold the order books |
 | **Service** | a station's offered capability, owned by one table (`content.Services`): the id content files spell, its display label and icon, and the Screen window its services-row button toggles (`repair` opens none) |

@@ -21,8 +21,8 @@ import (
 // NPC's forked stream): a hit roll r1 < chance, then a damage roll r2 in
 // [0,1) giving multiplier 0.01 + r2*0.99, with a wrecking shot at x3 when
 // r2 < 0.01. Ammo with a damage profile replaces the base volley, scaled by
-// the gun's damage multiplier; guns without a matching shell in cargo are
-// dry: they log one warning per dry cycle and deactivate.
+// the gun's damage multiplier; a gun whose bay cannot be filled (no matching
+// shell in cargo) is dry: it logs one warning per dry cycle and deactivates.
 func (s *Sim) systemWeapons() {
 	now := s.time
 	for _, e := range sortedEntities(s.Fittings) {
@@ -48,41 +48,50 @@ func (s *Sim) systemWeapons() {
 	}
 }
 
-// fireWeapon resolves one weapon cycle: validate, pay, load ammo, roll,
-// and queue damage for the damage system.
+// fireWeapon resolves one weapon cycle: validate, pay, draw a round from the
+// shell bay, roll, and queue damage for the damage system. An empty bay is
+// refilled from cargo by a full-bay load cycle that defers this shot by one
+// firing cycle; 2+ competing shell types leave the gun waiting for a choice
+// (quiet, one line), and a bay with no matching rounds at all is dry: one
+// "no charges" warning per dry cycle, then the module deactivates.
 func (s *Sim) fireWeapon(e ecs.Entity, def *content.ModuleDef, slot SlotRef, rt *ModuleRuntime) {
 	w := def.Weapon
 	if reason, ok := s.checkCycle(e, def, slot); !ok {
 		s.deactivate(e, slot, reason, SevWarning)
 		return
 	}
-	s.payCap(e, def.ActivationCost)
+	period := cyclePeriod(def)
 
-	// Ammunition: consume one charge per shot when the weapon needs ammo.
+	// Ammunition: draw one round from the bay, loading it first when empty.
+	// A load cycle costs no capacitor (loading is not a firing cycle's work).
 	volley := w.Damage
 	if w.AmmoClass != "" {
-		cargo, ok := s.Cargos.Get(e)
-		if !ok {
-			s.deactivate(e, slot, "no cargo", SevWarning)
+		switch s.fillClip(e, def, rt) {
+		case clipFilled:
+			// The load cycle replaces this cycle: the shot waits it out.
+			rt.CycleEnds = s.time + period
+			return
+		case clipAmbiguous:
+			// Two or more shell types compete and none is selected: sit dry
+			// and wait for the player's choice, without the dry-gun warning.
+			s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: e,
+				Text: def.Name + " waiting for ammo selection"})
+			s.deactivate(e, slot, "", SevInfo)
 			return
 		}
-		ammoItem, ammoDef, ok := findCharge(s, e, slot, cargo.Stacks, w.AmmoClass)
-		if !ok {
+		if rt.Clip.Qty < 1 {
 			s.deactivate(e, slot, "no charges", SevWarning)
 			return
 		}
-		stacks, taken := takeStacks(cargo.Stacks, ammoItem, 1)
-		if taken != 1 {
-			s.deactivate(e, slot, "no charges", SevWarning)
-			return
-		}
-		cargo.Stacks = stacks
-		if ammoDef.Damage != nil {
+		rt.Clip.Qty--
+		if ammoDef, ok := s.Content.Item(rt.Clip.Item); ok && ammoDef.Damage != nil {
 			// The shell carries the damage profile; the gun's multiplier is
 			// its share of the shot (artillery throws a heavier volley).
 			volley = ammoDef.Damage.Scale(w.Mult())
 		}
 	}
+
+	s.payCap(e, def.ActivationCost)
 
 	tgt, _ := s.modTarget(e, slot)
 	tr, _ := s.Transforms.Get(e)
@@ -128,42 +137,7 @@ func (s *Sim) fireWeapon(e ecs.Entity, def *content.ModuleDef, slot SlotRef, rt 
 		})
 	}
 
-	period := w.ShotTime
-	if period <= 0 {
-		period = def.ActivationTime
-	}
-	if period <= 0 {
-		period = 1
-	}
 	rt.CycleEnds = s.time + period
-}
-
-// findCharge returns the charge the weapon should consume: the owner's
-// CmdSetAmmo preference when it is still in cargo and still matches the
-// weapon's ammo class, else the first cargo stack carrying any item of the
-// given ammo class (canonical stack order). A preference whose item ran
-// out or no longer matches silently falls back to automatic selection.
-func findCharge(s *Sim, e ecs.Entity, slot SlotRef, stacks []content.CargoStack, ammoClass string) (content.ItemID, *content.ItemDef, bool) {
-	if pref := s.ammoPref(e, slot); pref != "" {
-		if stacksCount(stacks, pref) > 0 {
-			if def, ok := s.Content.Item(pref); ok && def.AmmoClass == ammoClass {
-				return pref, def, true
-			}
-		}
-	}
-	for _, st := range stacks {
-		if st.Qty <= 0 {
-			continue
-		}
-		def, ok := s.Content.Item(st.Item)
-		if !ok {
-			continue
-		}
-		if def.AmmoClass != "" && def.AmmoClass == ammoClass {
-			return st.Item, def, true
-		}
-	}
-	return "", nil, false
 }
 
 // losKinematics returns the distance between shooter and target and the

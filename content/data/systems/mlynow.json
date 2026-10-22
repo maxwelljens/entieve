@@ -45,6 +45,8 @@
           { "item": "mod-resist-coat", "qty": 10, "price": 189750 },
           { "item": "ammo-fusion-s", "qty": 4000, "price": 132 },
           { "item": "ammo-ap-s", "qty": 4000, "price": 114 },
+          { "item": "ammo-art-fusion-s", "qty": 4000, "price": 110 },
+          { "item": "ammo-art-ap-s", "qty": 4000, "price": 95 },
           { "item": "ammo-fusion-m", "qty": 1200, "price": 264 },
           { "item": "ammo-ap-m", "qty": 1200, "price": 228 },
           { "item": "charge-cap-cell", "qty": 800, "price": 1200 },

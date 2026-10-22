@@ -212,9 +212,10 @@ type WeaponAttrs struct {
 	Optimal    float64 `json:"optimal"`                     // m
 	Falloff    float64 `json:"falloff"`                     // m
 	Tracking   float64 `json:"tracking"`                    // rad/s
-	AmmoClass  string  `json:"ammo_class"`                  // "" = no ammo needed
+	AmmoClass  string  `json:"ammo_class"`                  // shell family: "small-autocannon" … ; "" = no ammo needed
 	ShotTime   float64 `json:"shot_time"`                   // seconds between shots
 	DamageMult float64 `json:"damage_multiplier,omitempty"` // ammo shell damage is scaled by this (0 reads as 1)
+	BayM3      float64 `json:"bay_m3,omitempty"`            // shell bay capacity in m³; 0 = no bay
 }
 
 // Mult returns the weapon's damage multiplier: the gun's share of a shot's
@@ -240,6 +241,7 @@ type BoostAttrs struct {
 	SpeedMultiplier     float64 `json:"speed_multiplier,omitempty"` // afterburner: > 1
 	WebStrength         float64 `json:"web_strength,omitempty"`     // 0..1 target speed reduction
 	ScramDuration       float64 `json:"scram_duration,omitempty"`   // seconds of warp disruption
+	BayM3               float64 `json:"bay_m3,omitempty"`           // cap booster: cell bay capacity in m³
 }
 
 // PassiveAttrs are passive-module stat additions.

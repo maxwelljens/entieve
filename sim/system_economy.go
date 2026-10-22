@@ -922,6 +922,10 @@ func (s *Sim) execUnfit(c CmdUnfitModule) {
 		s.log(SevWarning, s.player, "Invalid slot index")
 		return
 	}
+	// The module leaves with an empty bay: its loaded rounds go back to cargo.
+	if rts := fit.Runtimes(c.Slot.Class); i < len(rts) {
+		s.dumpClip(s.player, &rts[i])
+	}
 	var id content.ModuleID
 	switch c.Slot.Class {
 	case content.SlotHigh:
@@ -952,10 +956,10 @@ func (s *Sim) execUnfit(c CmdUnfitModule) {
 		s.log(SevWarning, s.player, "Invalid slot class")
 		return
 	}
-	// Drop and re-key remembered activation targets and ammo preferences
-	// around the removed slot.
+	// Drop and re-key remembered activation targets around the removed slot
+	// (the slot's own ammo selection travels with its runtime, which the
+	// slice deletion removes).
 	s.shiftModTargets(s.player, c.Slot.Class, c.Slot.Index)
-	s.shiftAmmoPrefs(s.player, c.Slot.Class, c.Slot.Index)
 	s.Hangar.Items = addStacks(s.Hangar.Items, content.ItemID(id), 1)
 	s.recomputeFit(s.player)
 	name := string(id)
@@ -1003,9 +1007,17 @@ func (s *Sim) execAssemble(c CmdAssemble) {
 		return
 	}
 
-	// Snapshot the current hull + fit + cargo for the hangar.
+	// Snapshot the current hull + fit + cargo for the hangar. The barge's bays
+	// empty into cargo first: a stored ship has no runtime state, so the rounds
+	// travel with the hold and the incoming fit loads its own bay from it.
 	var curStored StoredShip
 	if fit, ok := s.Fittings.Get(s.player); ok {
+		for _, class := range slotClasses {
+			rts := fit.Runtimes(class)
+			for i := range rts {
+				s.dumpClip(s.player, &rts[i])
+			}
+		}
 		curStored.Fit = flatFit(fit)
 	}
 	if cargo, ok := s.Cargos.Get(s.player); ok {

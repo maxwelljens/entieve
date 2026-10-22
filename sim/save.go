@@ -303,12 +303,17 @@ func (s *Sim) restore(save *Save) error {
 		return errf("sim: save not deserializable: %v", err)
 	}
 	save = &sv
-	// Clean break: the market tranche bumped the schema to v2, so pre-v2
-	// saves (per-system stock lists, drifting prices) are rejected outright
-	// instead of restoring into a different market.
-	if save.Schema != saveSchemaV2 {
+	// Save schema: v2 saves are migrated to v3 (empty bays, no selection —
+	// the guns then auto-resolve by the bay rule); anything older is rejected
+	// outright (the pre-v2 market carried per-system stock lists and drifting
+	// prices, which cannot restore into today's order books).
+	switch save.Schema {
+	case saveSchemaV2:
+		migrateSaveV2ToV3(save)
+	case saveSchemaV3:
+	default:
 		return errf("sim: save schema %d is not supported (want %d): pre-v2 saves are rejected",
-			save.Schema, saveSchemaV2)
+			save.Schema, saveSchemaV3)
 	}
 	if _, ok := s.Content.System(save.System); !ok {
 		return errf("sim: save references unknown system %s", save.System)
@@ -333,9 +338,8 @@ func (s *Sim) restore(save *Save) error {
 	s.dockedThisTick = ""
 	s.free = nil
 	s.modTargets = make(map[modKey]ecs.Entity)
-	// Preferences and the recent-player-work marker live outside the frozen
-	// Save schema: a restored sim starts with automatic ammo and no record.
-	s.ammoPrefs = make(map[modKey]content.ItemID)
+	// The recent-player-work marker lives outside the Save schema: a restored
+	// sim starts with no record.
 	s.lastPlayerWork.pos, s.lastPlayerWork.at = core.Vec2{}, playerWorkNever
 
 	// Slot table extent.
@@ -611,6 +615,26 @@ func (s *Sim) restore(save *Save) error {
 	// (park order is the canonical serialization — see buildSave). ---
 	s.trafficJourneys = append([]TrafficJourney(nil), save.TrafficJourneys...)
 	return nil
+}
+
+// migrateSaveV2ToV3 upgrades a v2 save in place: shell bays did not exist, so
+// every runtime starts with an empty bay and no selection. The bay rule then
+// resolves each gun on the next tick — a single shell type in cargo loads
+// automatically, 2+ leave it waiting for a choice, exactly as a fresh fit.
+func migrateSaveV2ToV3(save *Save) {
+	for i := range save.Entities {
+		f := save.Entities[i].Fitting
+		if f == nil {
+			continue
+		}
+		for _, rts := range [][]ModuleRuntime{f.HighRT, f.MidRT, f.LowRT} {
+			for j := range rts {
+				rts[j].Clip = content.CargoStack{}
+				rts[j].Selection = ""
+			}
+		}
+	}
+	save.Schema = saveSchemaV3
 }
 
 // attach writes one saved entity's components back into the fresh stores.

@@ -56,7 +56,7 @@ All IDs are kebab-case strings, cross-referenced everywhere:
 | Kind        | Prefix      | Example              | Uniqueness             |
 |-------------|-------------|----------------------|------------------------|
 | Item        | `min-`, `ore-`, `ammo-`, `charge-`, `loot-` | `min-ferrite` | global (all items share one map) |
-| Shell (ammo) | `ammo-` | `ammo-emp-s` | global; `ammo_class` = calibre (`small`/`medium`/`large`), shared by both gun families |
+| Shell (ammo) | `ammo-` (artillery: `ammo-art-`) | `ammo-emp-s`, `ammo-art-emp-s` | global; `ammo_class` = shell family (`small-autocannon` … `large-artillery`): a calibre AND a gun family. Every shell of a family shares one volume |
 | Corporation | `corp-`     | `corp-ferrum`        | global (the ten-firm maker roster, `content.AllCorps`; a registered extension of the frozen id list) |
 | Ship        | `ship-`     | `ship-sloop`         | global                 |
 | Module      | `mod-`      | `mod-autocannon-s`   | global (weapon families: autocannon, artillery — three calibres each) |
@@ -370,9 +370,10 @@ constants in `model.go`, and the matching attribute block is **required**:
     "optimal": 30000,
     "falloff": 20000,
     "tracking": 30,
-    "ammo_class": "medium",
+    "ammo_class": "medium-artillery",
     "shot_time": 7,
-    "damage_multiplier": 2.75
+    "damage_multiplier": 2.75,
+    "bay_m3": 0.275
   },
   "price": 300000
 }
@@ -384,6 +385,15 @@ modules need `activation_time > 0`; `weapon.ammo_class` must match
 like `mod-rocket-pod`); `damage_multiplier` is the gun's share of a loaded
 shell's damage (`0` reads as `1`, so artillery throws a heavier shot from the
 same shell than an autocannon); `price` 10k–400k for standard mods.
+`weapon.bay_m3` is the gun's shell bay (required for every gun with an ammo
+class, forbidden on an ammo-less one) and must hold at least one whole round
+of its family. Calibrate it as `rounds × shell volume` for a sustained-fire
+reload near 120 s — the shipped table: small autocannon 0.2 m³ / 40 rounds,
+small artillery 0.104 / 13, medium autocannon 0.33 / 33, medium artillery
+0.275 / 11, large autocannon 0.594 / 27, large artillery 0.297 / 9; the cap
+booster's `boost.bay_m3` is 0.25 m³ (25 cells). Validation rejects a family
+whose shells disagree on volume, a bay under one round, a missing bay, and a
+bay on a module that loads nothing.
 
 **Mount and class demand.** `mount` and `size` exist only on high-slot
 modules (`mount` `turret|launcher`, `size` `s|m|l`): guns and the mining laser
@@ -475,8 +485,14 @@ minerals per batch:
 ```
 
 Ammo (needs `damage` + `ammo_class`; ammo items are category `ammo`, and
-`ammo_class` is the calibre — `small`/`medium`/`large` — which is what a gun
-loads: both projectile families at a calibre share its shells):
+`ammo_class` is the **shell family** — `small-autocannon`, `small-artillery`,
+`medium-autocannon`, `medium-artillery`, `large-autocannon`,
+`large-artillery` — which is both the calibre and the gun family that loads
+it. Every shell of one family must carry the same `volume`, because a bay's
+whole-round count is family-wide. Shipped volumes: small-autocannon 0.005,
+small-artillery 0.008, medium-autocannon 0.01, medium-artillery 0.025,
+large-autocannon 0.022, large-artillery 0.033 m³. Existing ids are the
+autocannon families; artillery uses `ammo-art-<profile>-<size>`):
 
 ```json
 {
@@ -485,10 +501,10 @@ loads: both projectile families at a calibre share its shells):
   "description": "Burns hot. Thermal-biased small shell.",
   "maker": "corp-burza",
   "category": "ammo",
-  "volume": 0.01,
+  "volume": 0.005,
   "base_price": 140,
   "damage": { "em": 2, "thermal": 20, "kinetic": 3, "explosive": 2 },
-  "ammo_class": "small"
+  "ammo_class": "small-autocannon"
 }
 ```
 

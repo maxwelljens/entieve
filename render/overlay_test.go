@@ -177,6 +177,9 @@ func TestShotSeamLandsOnRealFire(t *testing.T) {
 	if idx < 0 {
 		t.Fatal("start fit has no high-slot weapon")
 	}
+	// The showcase fit carries four shell types, so its bay starts in the
+	// waiting state: select one before firing (flag: bay tranche).
+	s.Queue(sim.CmdSetAmmo{Slot: sim.SlotRef{Class: content.SlotHigh, Index: idx}, Item: "ammo-emp-s"})
 	s.Queue(sim.CmdActivate{Slot: sim.SlotRef{Class: content.SlotHigh, Index: idx}, Target: npc})
 	for i := 0; i < 10*sim.TickRate; i++ {
 		s.Step()

@@ -25,8 +25,10 @@ func testContent() *content.Content {
 			Volume: 0.01, BasePrice: 5, AmmoClass: "small", Damage: dmg(10, 2, 0, 0)},
 		"ammo-ap-s": {ID: "ammo-ap-s", Name: "AP Charge", Category: content.CatAmmo,
 			Volume: 0.01, BasePrice: 6, AmmoClass: "small", Damage: dmg(0, 0, 12, 0)},
+		"ammo-fusion-s": {ID: "ammo-fusion-s", Name: "Fusion Charge", Category: content.CatAmmo,
+			Volume: 0.01, BasePrice: 7, AmmoClass: "small", Damage: dmg(0, 2, 0, 10)},
 		"charge-cap-cell": {ID: "charge-cap-cell", Name: "Cap Booster Cell", Category: content.CatCharge,
-			Volume: 0.1, BasePrice: 10},
+			Volume: 0.01, BasePrice: 10},
 		"ore-sterngrit": {ID: "ore-sterngrit", Name: "Sterngrit", Category: content.CatOre,
 			Volume: 1, BasePrice: 20,
 			RefineYield: map[content.ItemID]float64{"min-ferrite": 0.5, "min-nickel": 0.25}},
@@ -81,7 +83,7 @@ func testContent() *content.Content {
 			ActivationCost: 10, ActivationTime: 2, Price: 1000,
 			Weapon: &content.WeaponAttrs{
 				Damage: content.Damage{EM: 10, Thermal: 2}, Optimal: 6000, Falloff: 3000,
-				Tracking: 0.4, AmmoClass: "small", ShotTime: 2,
+				Tracking: 0.4, AmmoClass: "small", ShotTime: 2, BayM3: 0.05, // 5 rounds
 			},
 		},
 		"mod-rocket-pod": {
@@ -140,7 +142,7 @@ func testContent() *content.Content {
 		"mod-cap-booster": {
 			ID: "mod-cap-booster", Name: "Cap Booster", Slot: content.SlotLow, Kind: content.KindCapBooster,
 			ActivationCost: 0, ActivationTime: 10, Price: 300,
-			Boost: &content.BoostAttrs{CapRestore: 100},
+			Boost: &content.BoostAttrs{CapRestore: 100, BayM3: 0.25}, // 25 cells
 		},
 		"mod-cap-recharger": {
 			ID: "mod-cap-recharger", Name: "Cap Recharger", Slot: content.SlotLow, Kind: content.KindCapRecharger,
@@ -428,6 +430,22 @@ func giveCargo(s *Sim, item content.ItemID, qty int) {
 func cargoCount(s *Sim, item content.ItemID) int {
 	c, _ := s.Cargos.Get(s.player)
 	return stacksCount(c.Stacks, item)
+}
+
+// ammoTotal counts an item across the player's cargo and every fitted bay.
+func ammoTotal(s *Sim, item content.ItemID) int {
+	n := cargoCount(s, item)
+	if fit, ok := s.Fittings.Get(s.player); ok {
+		for _, class := range slotClasses {
+			rts := fit.Runtimes(class)
+			for i := range rts {
+				if rts[i].Clip.Item == item {
+					n += rts[i].Clip.Qty
+				}
+			}
+		}
+	}
+	return n
 }
 
 // hudModule resolves a player module runtime by slot for assertions.

@@ -27,8 +27,8 @@ run in this fixed order:
 | 2 | movement | `sim/system_move.go` | sublight accel toward desired velocity, web effects |
 | 3 | warp | `sim/system_warp.go` | align → warp → land state machine |
 | 4 | targeting | `sim/system_target.go` | lock progress (scan res vs. signature) |
-| 5 | modules | `sim/system_modules.go` | cycle timers, activation cost, passive aggregation |
-| 6 | weapons | `sim/system_weapons.go` | turret math, ammo consumption |
+| 5 | modules | `sim/system_modules.go` | cycle timers, activation cost, passive aggregation; idle bays refill |
+| 6 | weapons | `sim/system_weapons.go` | turret math, one round drawn from the shell bay per shot |
 | 7 | damage | `sim/system_damage.go` | shield → armor → structure; death → wreck |
 | 8 | capacitor | `sim/system_cap.go` | EVE recharge curve |
 | 9 | mining | `sim/system_mining.go` | cycle yields into the ore hold; belt-state decrement |
@@ -151,6 +151,42 @@ clock reset let a deactivate/activate pair replay the effect every tick;
 `activate`/`deactivate` core through `npcActivate`, so they obey the same
 boundary rule.
 
+### Shell bays (clips)
+
+Every charge-fed module — a projectile gun (`weapon.ammo_class != ""`) and
+the cap booster — carries a **bay** (`weapon.bay_m3` / `boost.bay_m3`) that
+holds whole rounds of exactly one shell type. `sim/clips.go` owns the
+machinery:
+
+- **Load cycle.** A load moves a *full bay* from cargo and takes exactly one
+  firing cycle: the rounds transfer at the start of the load (so a save
+  mid-load can neither duplicate nor lose them) and the next firing cycle is
+  deferred by `CycleEnds = now + ShotTime`. Loading costs no capacitor.
+  A fresh fit pre-loads (and `sim.New` runs the bay pass once, before the
+  first tick); one quiet `EvModule` line per completed load
+  (`<module> loaded N rounds (<shell>)`).
+- **Selection.** `ModuleRuntime.Selection` names the shell type the bay
+  tops up from. The rule is the only automatic behaviour: while the selected
+  type has cargo stock the bay reloads it; when it runs out the bay switches
+  if **exactly one** type remains in cargo and **waits** if two or more
+  compete. A fresh fit (no selection) does the same. There is no
+  cargo-order mode — `CmdSetAmmo ""` clears the selection (dumping the bay
+  back to cargo) and re-resolves by that rule.
+- **Waiting vs. dry.** Empty bay + 2+ types = the waiting state: one
+  `EvLog` line (`<module> waiting for ammo selection`, `SevInfo`) and a
+  silent deactivate — never the dry-gun warning. Empty bay + no matching
+  rounds at all is truly dry: the existing `no charges` warning and
+  deactivation, unchanged.
+- **Round travels.** `CmdUnfitModule` and `CmdAssemble` dump bays back to
+  cargo; a destroyed ship's loaded rounds land in its wreck's loot; docking
+  and undocking never touch a bay.
+- **Read surface for the UI.** `Sim.Clip(e, slot) (sim.ClipState, bool)`
+  reports `{Item, Rounds, Capacity, Selection, Options}` — `Options` is
+  every shell type in cargo that fits the bay (2+ with `Rounds == 0` is the
+  waiting state the rack will offer a choice from).
+- NPCs run the identical machinery; their single-type spawn grant resolves
+  to auto-load with no interaction.
+
 Docking (`execDock`, `sim/system_travel.go`) is a free full restore: every
 fitted module is cleared (active state *and* cycle clock, which also drops
 the afterburner multiplier) and shield, armor, structure and capacitor are
@@ -160,13 +196,15 @@ clears the modules again, so a ship always undocks with everything off.
 No save field was added: the cycle clock already exists and the state
 transition is deterministic.
 
-### Save schema v2 and `Hash()`
+### Save schema v3 and `Hash()`
 
 `Save` (`sim/model.go`) is the full serializable snapshot: world/system/
 ticks/seed, both RNG stream states, wallet, standing, missions, the hangar,
 every entity's components, the free-slot mirror (exact future handles), the
-respawn anchor, module target bindings — and the living-economy state the
-v2 schema added: `Market` (per-station books), `MarketLasts`,
+respawn anchor, module target bindings — each slot's bay rounds and ammo
+selection riding inside its fitting runtime (`ModuleRuntime.Clip` /
+`.Selection`) — and the living-economy state the v2 schema added: `Market`
+(per-station books), `MarketLasts`,
 `MarketSeq`, `Belts`, `FactionLedger`, `Jobs`, `JobSeq`, `Craft`,
 `Agents`, `Upkeep`, `TrafficJourneys` (plus `TrafficLeaves`).
 `Ledger` (`sim/ledger.go`) is the one additive field outside that break:
@@ -182,15 +220,19 @@ return a plausible-looking partial fingerprint. Because `hash()` and
 `Restore()` share the serialization, a snapshot → restore round trip
 preserves `Hash()` exactly.
 
-`Save.Schema` is `saveSchemaV2` = 2 and `Restore` rejects anything else —
-the **clean break** introduced with the per-station market tranche (the
-v0.2.0 era). Pre-v2 saves carried per-system stock lists with drifting
-prices; restoring one into a book-based economy would silently mean a
-different market, so it fails loudly instead. Two pieces of state are
-deliberately outside the versioned schema and reset on Restore by design:
-per-(owner, slot) ammo preferences and the recent-player-work aggro
-trigger (`sim/save_completeness_test.go` classifies every `Sim` field and
-fails on unclassified additions).
+`Save.Schema` is `saveSchemaV3` = 3. The shell-bay tranche added per-slot
+loaded rounds and ammo selections; both ride the existing fitting runtime
+(`ModuleRuntime.Clip` / `.Selection`, `{Item, Qty}` rounds), so no new Save
+field appeared. `Restore` accepts v2 and **migrates it in place**
+(`migrateSaveV2ToV3`: every bay empty, no selection — the next tick's bay
+rule auto-loads a single shell type or waits for a choice), and rejects
+anything older — the **clean break** introduced with the per-station market
+tranche (the v0.2.0 era). Pre-v2 saves carried per-system stock lists with
+drifting prices; restoring one into a book-based economy would silently mean
+a different market, so it fails loudly instead. One piece of state is
+deliberately outside the versioned schema and resets on Restore by design:
+the recent-player-work aggro trigger (`sim/save_completeness_test.go`
+classifies every `Sim` field and fails on unclassified additions).
 
 ## 3. World metabolism
 
@@ -429,9 +471,10 @@ canonical order (sorted slices; maps marshal sorted), a classification in
 `sim/save_completeness_test.go` (save-carried / derived / per-Step
 transient / documented exception), and — automatically — hash coverage:
 `Hash()` digests the whole Save JSON, so a field that serializes is a
-field that hashes. Additive fields ride schema 2 with `omitempty` (as
-`Belts`, `Jobs`, `Agents`, `Upkeep`, `TrafficJourneys` did); only a
-semantic break earns a new `Save.Schema` value and a Restore rejection.
+field that hashes. Additive fields ride the current schema with `omitempty`
+(as `Belts`, `Jobs`, `Agents`, `Upkeep`, `TrafficJourneys` did); only a
+semantic break earns a new `Save.Schema` value (with a Restore-side
+migration or rejection).
 
 **RNG discipline.** No `math/rand`, no wall clock. Master stream = player
 combat rolls + spawn entropy, nothing else (`rng_roles_test.go` pins it).

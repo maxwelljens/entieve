@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/core"
 )
 
 // ---------------------------------------------------------------------------
@@ -370,5 +371,78 @@ func TestRestoreMigratesOreAndHullIDs(t *testing.T) {
 	}
 	if j := got.TrafficJourneys[0]; j.Item != "ammo-emp-s" || j.Hull != "ship-sloop" {
 		t.Errorf("journey = %+v, want the migrated item and the hull verbatim", j)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Schema v2 -> v3: shell bays and per-slot ammo selections arrived with v3.
+// A v2 save has no bay state, so its rounds all sit in cargo; restoring it
+// migrates in place (schema 3, empty bays) and the bay rule then resolves
+// each gun — one shell type auto-loads, 2+ wait for a choice.
+// ---------------------------------------------------------------------------
+
+// TestRestoreMigratesV2Bays is the red-first pin for the schema bump.
+func TestRestoreMigratesV2Bays(t *testing.T) {
+	s := newTestSim(t)
+	slot := SlotRef{Class: content.SlotHigh, Index: 0}
+	if got, want := ammoTotal(s, "ammo-emp-s"), 20; got != want {
+		t.Fatalf("fixture total=%d want %d", got, want)
+	}
+
+	save, err := s.Snapshot()
+	if err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
+	// Rewrite the snapshot as a v2 save: no bays, no selections, every round
+	// back in the hold (exactly what the pre-bay engine persisted).
+	save.Schema = saveSchemaV2
+	for i := range save.Entities {
+		se := &save.Entities[i]
+		if se.Fitting == nil {
+			continue
+		}
+		for _, rts := range [][]ModuleRuntime{se.Fitting.HighRT, se.Fitting.MidRT, se.Fitting.LowRT} {
+			for j := range rts {
+				if rts[j].Clip.Qty > 0 && se.Cargo != nil {
+					se.Cargo.Stacks = addStacks(se.Cargo.Stacks, rts[j].Clip.Item, rts[j].Clip.Qty)
+				}
+				rts[j].Clip = content.CargoStack{}
+				rts[j].Selection = ""
+			}
+		}
+	}
+
+	b, err := New(testContent(), testWorld(), testSeed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Restore(save); err != nil {
+		t.Fatalf("restore v2: %v", err)
+	}
+	// The migration stamped the save v3 and left the bays empty…
+	if got, want := b.schema, saveSchemaV3; got != want {
+		t.Fatalf("restored schema=%d want %d", got, want)
+	}
+	if got, want := ammoTotal(b, "ammo-emp-s"), 20; got != want {
+		t.Fatalf("restored total=%d want %d (rounds conserved)", got, want)
+	}
+	if got := bayRounds(b, slot); got != 0 {
+		t.Fatalf("migrated bay=%d want 0 before the bay rule runs", got)
+	}
+	// …and the next tick resolves the single type: the gun auto-loads.
+	b.Step()
+	if got := bayRounds(b, slot); got != 5 {
+		t.Fatalf("bay after migrate+step=%d want 5 (auto-resolved)", got)
+	}
+	if got := b.ammoPref(b.player, slot); got != "ammo-emp-s" {
+		t.Fatalf("selection=%q want ammo-emp-s", got)
+	}
+	// The migrated save keeps working: the gun fires from its bay.
+	npc := b.spawnNpc("npc-rat-scuttler", core.Vec2{X: 1e7, Y: 2e3}, 100)
+	forceLock(b, npc)
+	b.Queue(CmdActivate{Slot: slot, Target: npc})
+	b.Step()
+	if got := bayRounds(b, slot); got != 4 {
+		t.Fatalf("bay after the migrated gun fired=%d want 4", got)
 	}
 }
