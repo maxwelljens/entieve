@@ -1,6 +1,7 @@
 [
   {
     "id": "mod-stasis-web",
+    "group": "Modules/Mid/EWAR",
     "maker": "corp-borealis",
     "name": "Stasis Web",
     "description": "Projects a stasis field that slows the locked target by 45% while active.",
@@ -17,6 +18,7 @@
   },
   {
     "id": "mod-warp-scram",
+    "group": "Modules/Mid/EWAR",
     "maker": "corp-borealis",
     "name": "Warp Scrambler",
     "description": "Disrupts the target's warp drive for 10 s per cycle: nothing gets away.",

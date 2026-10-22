@@ -137,7 +137,7 @@ func baseTraffic() *TrafficDef {
 func withTraffic(mutate func(*TrafficDef)) *Content {
 	c := baseContent()
 	c.Ships["ship-guard"] = &ShipDef{
-		ID: "ship-guard", Name: "Guard", Class: "frigate",
+		ID: "ship-guard", Name: "Guard", Class: "frigate", Group: "Ships/Frigates",
 		Slots:  Slots{High: 1, Mid: 1, Low: 1},
 		Shield: 100, Armor: 100, Structure: 100,
 		Resists:   Resists{EM: 0.1, Thermal: 0.1, Kinetic: 0.1, Explosive: 0.1},

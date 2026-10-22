@@ -163,6 +163,10 @@ type Game struct {
 	open    [numPanels]bool
 	mounted [numPanels]widget.RemoveWindowFunc
 
+	// mktSearchFocus opens the market for Ctrl+F and focuses its search
+	// field once the panel exists (the mount happens after the key pass).
+	mktSearchFocus bool
+
 	// screenWin is every Screen row's built window (Build's return
 	// value), refreshed with the kit — panelDefs resolves ids through it.
 	screenWin [numPanels]*widget.Window
@@ -400,6 +404,10 @@ func (g *Game) Update() error {
 	g.syncScenes()
 	g.syncPanels()
 	g.syncMounts()
+	if g.mktSearchFocus && g.mkt != nil {
+		g.mkt.FocusSearch()
+		g.mktSearchFocus = false
+	}
 
 	if err := g.kit.Update(); err != nil {
 		return err
@@ -448,6 +456,17 @@ func (g *Game) handleKeys(in Input) error {
 			}
 			continue
 		}
+		// The market's search field is the second typing surface: while it
+		// holds focus, arrows/Enter/Esc belong to the results and every
+		// world hotkey yields. Esc with text clears the query first; Esc
+		// on an empty field blurs (SearchKey's false) and falls through
+		// to the normal Esc handling below.
+		if g.mkt != nil && g.mkt.SearchFocused() {
+			consumed := g.mkt.SearchKey(k)
+			if consumed || k != ebiten.KeyEscape {
+				continue
+			}
+		}
 		switch {
 		case k == ebiten.KeyEscape:
 			// A context menu that was up this frame consumed the Esc
@@ -459,6 +478,11 @@ func (g *Game) handleKeys(in Input) error {
 			if err := g.onEscape(); err != nil {
 				return err
 			}
+		case ctrl && k == ebiten.KeyF:
+			// Ctrl+F opens the market (if closed) and focuses its search
+			// field; the focus lands after the mount, below.
+			g.open[pMarket] = true
+			g.mktSearchFocus = true
 		case ctrl && k == ebiten.KeyS:
 			g.report(g.SaveGame(), "Game saved")
 		case k == ebiten.KeyF9:

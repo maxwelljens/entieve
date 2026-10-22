@@ -142,6 +142,7 @@ func (v *validator) items() {
 			v.addf("%s: unknown category %q (want mineral|ore|ammo|charge|loot)", ctx, it.Category)
 		}
 		v.maker(ctx, it.Maker)
+		v.group(ctx, it.Group)
 		if it.Volume < 0 {
 			v.addf("%s: negative volume %v", ctx, it.Volume)
 		}
@@ -207,6 +208,10 @@ func (v *validator) ships() {
 			v.addf("%s: unknown origin %q (want moravian|polish|nordic|latinate|old-works)", ctx, s.Origin)
 		}
 		v.maker(ctx, s.Maker)
+		v.group(ctx, s.Group)
+		if s.BasePrice < 0 {
+			v.addf("%s: negative base price %v", ctx, s.BasePrice)
+		}
 		if s.Shield < 0 {
 			v.addf("%s: negative shield %v", ctx, s.Shield)
 		}
@@ -288,6 +293,27 @@ func (v *validator) maker(ctx, maker string) {
 	}
 }
 
+// group validates a market tree path (docs/CONTENT_AUTHORING.md): one to
+// three non-empty segments separated by single slashes — "Materials/Ore",
+// "Modules/High/Turrets". A leading, trailing or doubled slash leaves an
+// empty segment and is rejected with it.
+func (v *validator) group(ctx, g string) {
+	if g == "" {
+		v.addf("%s: missing group (a market tree path like \"Materials/Ore\")", ctx)
+		return
+	}
+	segs := strings.Split(g, "/")
+	if len(segs) > 3 {
+		v.addf("%s: group %q has %d segments (max 3)", ctx, g, len(segs))
+	}
+	for _, s := range segs {
+		if s == "" {
+			v.addf("%s: group %q has an empty segment (no leading, trailing or doubled slash)", ctx, g)
+			return
+		}
+	}
+}
+
 func (v *validator) resists(ctx string, r Resists) {
 	for _, t := range AllDamageTypes {
 		x := r.Of(t)
@@ -336,6 +362,7 @@ func (v *validator) modules() {
 			}
 		}
 		v.maker(ctx, m.Maker)
+		v.group(ctx, m.Group)
 		if m.ActivationCost < 0 {
 			v.addf("%s: negative activation cost %v", ctx, m.ActivationCost)
 		}

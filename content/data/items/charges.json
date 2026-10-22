@@ -1,6 +1,7 @@
 [
   {
     "id": "charge-cap-cell",
+    "group": "Ammunition/Cap cells",
     "maker": "corp-iskald",
     "name": "Capacitor Booster Cell",
     "description": "Single-use fuel cell burned by cap booster modules to instantly restore capacitor.",

@@ -43,7 +43,7 @@ import (
 //	                must not reopen on the next boot
 //
 // There is no docked special case any more: a service window opened while
-// docked is an ordinary floating window (the market's square default, the
+// docked is an ordinary floating window (the market's three-pane rect, the
 // inventory/fitting rects) exactly like it is in space. The one window
 // docking opens — the Station Services view — declares the station column
 // as its DefaultRect and is re-placed to the board's content height by
@@ -161,14 +161,14 @@ var screens = []Screen{
 		Build: func(g *Game) *widget.Window { g.fitt = uikit.NewFitting(g.env); return g.fitt.Win() },
 	},
 	{
-		// The market's per-type default is its square landing rect
-		// (uikit.NewMarket) — 546×546, the largest side that stays right of
-		// the rail gutter, fits the 1024×700 minimum and still lays the body
-		// out. Docked or in space it opens here; the old docked band
+		// The market's per-type default is its landing rect
+		// (uikit.NewMarket) — 760×560, the three-pane width that starts on
+		// the rail gutter's clear line and stays inside the 1024×700
+		// minimum. Docked or in space it opens here; the old docked band
 		// stretched it across the viewport.
 		ID: pMarket, Title: "Market", Icon: "svc_market",
 		Key: ebiten.KeyG, Action: "market", Desc: "G — toggle market window (trade while docked)",
-		DefaultRect: image.Rect(396, 8, 942, 554), Anchor: AnchorFixed,
+		DefaultRect: image.Rect(97, 8, 857, 568), Anchor: AnchorFixed,
 		DockPolicy: DockFloating, SidecarName: "market",
 		Group: "Trade", Service: "market",
 		Sync:  func(g *Game) { g.mkt.Sync() },

@@ -52,15 +52,39 @@ func TestMarketGatingAndEnqueue(t *testing.T) {
 		t.Fatalf("undocked trade enqueued %d commands, want 0", len(*cmds))
 	}
 
-	// Docked: the buttons unlock.
-	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	// Docked: Sell unlocks; Buy needs a row whose local book holds an ask
+	// to lift (no selection yet, so it stays greyed).
+	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-haven-rest"})
 	frame()
-	if m.buy.GetWidget().Disabled || m.sell.GetWidget().Disabled {
-		t.Fatal("trade buttons still disabled while docked")
+	if !m.buy.GetWidget().Disabled {
+		t.Fatal("Buy enabled with no item selected")
+	}
+	if m.sell.GetWidget().Disabled {
+		t.Fatal("Sell still disabled while docked")
+	}
+	ask := map[content.ItemID]bool{}
+	for _, o := range env.Sim.BookOrders("cel-haven-rest") {
+		if o.Side == sim.OrderSell {
+			ask[o.Item] = true
+		}
+	}
+	pick := -1
+	for i, r := range m.tbl.Rows {
+		if row, ok := r.Data.(mktItemRow); ok && ask[row.Item] {
+			pick = i
+			break
+		}
+	}
+	if pick < 0 {
+		t.Fatal("fixture: the docked book holds no ask")
 	}
 
-	// Select the first order, step the quantity to 10 and trade.
-	clickRow(ui, m.tbl, 0)
+	// Select that item, step the quantity to 10 and trade.
+	clickRow(ui, m.tbl, pick)
+	frame()
+	if m.buy.GetWidget().Disabled {
+		t.Fatal("Buy still disabled on a row with a local ask")
+	}
 	uitest.FireButton(ui, m.stepper.Plus())
 	if m.stepper.Value() != 10 {
 		t.Fatalf("qty = %d, want 10", m.stepper.Value())
@@ -75,7 +99,7 @@ func TestMarketGatingAndEnqueue(t *testing.T) {
 	}
 	// The table sorts by name, so the selected row — not the sim's
 	// canonical stock order — is the trade target.
-	wantItem := m.tbl.Rows[0].Data.(mktItemRow).Item
+	wantItem := m.tbl.Rows[pick].Data.(mktItemRow).Item
 	if buy.Item != wantItem || buy.Qty != 10 {
 		t.Errorf("CmdBuy = %+v, want {%s 10}", buy, wantItem)
 	}

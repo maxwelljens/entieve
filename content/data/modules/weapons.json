@@ -1,6 +1,7 @@
 [
   {
     "id": "mod-autocannon-s",
+    "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
     "name": "Small Autocannon",
     "description": "Small-calibre autocannon: a 3 s cycle and high tracking, built to brawl inside a few kilometres. Loads small autocannon shells.",
@@ -30,6 +31,7 @@
   },
   {
     "id": "mod-autocannon-m",
+    "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
     "name": "Medium Autocannon",
     "description": "Medium-calibre autocannon: a 3.6 s cycle and high tracking, built to brawl inside ten kilometres. Loads medium autocannon shells.",
@@ -59,6 +61,7 @@
   },
   {
     "id": "mod-autocannon-l",
+    "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
     "name": "Large Autocannon",
     "description": "Large-calibre autocannon: a 4.5 s cycle and high tracking, built to brawl inside sixteen kilometres. Loads large autocannon shells.",
@@ -88,6 +91,7 @@
   },
   {
     "id": "mod-artillery-s",
+    "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
     "name": "Small Artillery",
     "description": "Small-calibre artillery: a 9 s cycle that throws a heavy shell far past the autocannon's reach, at the cost of tracking. Loads small artillery shells.",
@@ -117,6 +121,7 @@
   },
   {
     "id": "mod-artillery-m",
+    "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
     "name": "Medium Artillery",
     "description": "Medium-calibre artillery: a 10.8 s cycle that throws a heavy shell far past the autocannon's reach, at the cost of tracking. Loads medium artillery shells.",
@@ -146,6 +151,7 @@
   },
   {
     "id": "mod-artillery-l",
+    "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
     "name": "Large Artillery",
     "description": "Large-calibre artillery: a 13.5 s cycle that throws a heavy shell far past the autocannon's reach, at the cost of tracking. Loads large artillery shells.",
@@ -175,6 +181,7 @@
   },
   {
     "id": "mod-rocket-pod",
+    "group": "Modules/High/Launchers",
     "maker": "corp-nordvakt",
     "name": "Rocket Pod",
     "description": "Short-range rocket pod with endless internal feedstock: no ammo, explosive volley, great tracking.",

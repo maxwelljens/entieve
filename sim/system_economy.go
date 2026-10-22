@@ -169,8 +169,8 @@ func hasMarketService(st *content.StationDef) bool {
 }
 
 // marketPrice is the price ladder for an item at a book: last trade price,
-// then best ask, then best bid, then the def base price (ItemDef.BasePrice
-// falling back to ModuleDef.Price; ships have no base price and report 0).
+// then best ask, then best bid, then the def base price (ItemDef.BasePrice,
+// ModuleDef.Price, ShipDef.BasePrice).
 func (s *Sim) marketPrice(book *MarketBook, item content.ItemID) float64 {
 	if book != nil {
 		if p, ok := book.lastPrice(item); ok {

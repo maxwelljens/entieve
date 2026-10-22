@@ -166,11 +166,34 @@ this order:
 
 1. an **ItemID** (`min-ferrite`, `ammo-emp-s`, ...),
 2. else a **ShipID cast to ItemID** (`ship-sloop`) — ships are listed on the
-   market this way; the price lives only on the order (`ShipDef` has no price
-   field),
+   market this way; a founding ask's price lives on the order, and the
+   hull's own `base_price` is the price ladder's last rung when its book
+   has no trade and no order,
 3. else a **ModuleID** (`mod-autocannon-s`).
 
 Anything that resolves to none of the three is a validation error.
+
+## The market tree: `group`
+
+Every marketable def (`ItemDef`, `ModuleDef`, `ShipDef`) declares **`group`**:
+its path in the market window's browse tree, one to three non-empty segments
+separated by single slashes. The tree is rendered straight from these paths,
+so the whole catalog is navigable without touching engine code.
+
+```json
+{ "id": "mod-autocannon-s", "group": "Modules/High/Turrets", ... }
+{ "id": "ore-cordite",      "group": "Materials/Ore", ... }
+{ "id": "ship-sloop",       "group": "Ships/Frigates", ... }
+```
+
+Rules (`content/validate.go`): required on every item, module and hull;
+missing, empty, a leading/trailing/doubled slash, or more than three
+segments is a validation error. The shipped paths are frozen in
+`content/groups_test.go` (`TestShippedMarketTree`) — moving a def between
+branches is a deliberate edit of that table, never a free re-home. Current
+top-level branches: `Ships`, `Modules`, `Ammunition`, `Materials`, `Loot`
+(plus the window's own `All` root). Every hull also carries **`base_price`**
+(credits, ≥ 0): the market's last-resort quote for it.
 
 ---
 
@@ -312,8 +335,8 @@ Create `content/data/ships/ship-<name>.json` (one file per hull). Populate
 ```
 
 Balance rules of thumb: small hull total HP (shield+armor+structure) 300–800;
-frigate price 200k–400k euro (put the price on a market order — ships have
-no price field); resists each in `[0,1)`; align time = `agility * 10` s, so
+frigate price 200k–400k euro (`base_price` on the hull, and a founding
+market order around it); resists each in `[0,1)`; align time = `agility * 10` s, so
 0.4 ≈ 4 s for a frigate, 2.4 ≈ 24 s for a hauler. Every hull needs ≥ 1 high
 slot unless it is an industrial/hauler.
 
@@ -850,7 +873,7 @@ Material cost per produced unit — `Σ(inputs.qty × mineral base_price) ÷ qty
 
 - item products: `ItemDef.base_price`;
 - modules: `ModuleDef.price`;
-- hulls: the shipped market order price (hulls have no price field); hulls
+- hulls: the shipped market order price, else the hull's `base_price`; hulls
   that ship no order use the pinned reference table in
   `content/balance_test.go`.
 

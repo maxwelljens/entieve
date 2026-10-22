@@ -26,6 +26,7 @@ names the *modules and seams* we build that vocabulary into.
 | **Station** | a market/service node (a celestial); stations hold the order books |
 | **Service** | a station's offered capability, owned by one table (`content.Services`): the id content files spell, its display label and icon, and the Screen window its services-row button toggles (`repair` opens none) |
 | **Order book** | per-station continuous double auction: asks + bids, never-crossed |
+| **Market tree** | the market window's browse hierarchy, built from every marketable def's `group` path (`Ships/Frigates`, `Modules/High/Turrets`, `Materials/Ore`, …): `All` at the root, a branch click scopes the catalog, and the search field filters the selected branch by name, path and maker |
 | **Bid** | a standing *buy* order on a station book: buy at your price or better, resting until filled or cancelled |
 | **Ask** | a standing *sell* order on a station book: sell at your price or better, resting until filled or cancelled |
 | **Open order** | a player's standing bid or ask resting on a book — up to 20 universe-wide, partial fills accumulate, cancelled by id (3% broker fee charged at placement and kept on cancel; 2.5% sales tax on executed sells) |

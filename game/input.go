@@ -58,6 +58,7 @@ var worldKeyMap = []Binding{
 	{Key: ebiten.KeyBracketRight, Action: "time-faster", Desc: "] — time acceleration up"},
 	{Key: ebiten.KeyEqual, Action: "time-faster", Desc: "= — time acceleration up"},
 	{Key: ebiten.KeyS, Ctrl: true, Action: "save", Desc: "Ctrl+S — save game"},
+	{Key: ebiten.KeyF, Ctrl: true, Action: "market-search", Desc: "Ctrl+F — find in the market"},
 	{Key: ebiten.KeyF9, Action: "load", Desc: "F9 — load game"},
 	{Key: ebiten.KeyArrowUp, Action: "pan-up", Desc: "Up arrow — pan camera up"},
 	{Key: ebiten.KeyArrowDown, Action: "pan-down", Desc: "Down arrow — pan camera down"},

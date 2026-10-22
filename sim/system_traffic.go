@@ -2002,15 +2002,18 @@ func (s *Sim) patrolReturnStep(e ecs.Entity, p *Patrol, ai *NpcAI) {
 // ---------------------------------------------------------------------------
 
 // marketBasePrice returns the reference (def base) price of an item: the
-// item's base price, else the module's authored price (ships have no base
-// price in the schema — documented). It is the price ladder's last rung
-// and a shipment's cost basis when its origin carries no book to draw from.
+// item's base price, the module's authored price, else the hull's base
+// price. It is the price ladder's last rung and a shipment's cost basis
+// when its origin carries no book to draw from.
 func (s *Sim) marketBasePrice(item content.ItemID) float64 {
 	if def, ok := s.Content.Item(item); ok {
 		return def.BasePrice
 	}
 	if def, ok := s.Content.Module(content.ModuleID(item)); ok {
 		return def.Price
+	}
+	if def, ok := s.Content.Ship(content.ShipID(item)); ok {
+		return def.BasePrice
 	}
 	return 0
 }

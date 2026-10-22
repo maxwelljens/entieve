@@ -1,6 +1,7 @@
 [
   {
     "id": "mod-shield-boost",
+    "group": "Modules/Mid/Shield",
     "maker": "corp-aldemar",
     "name": "Shield Booster",
     "description": "Active shield rep that burns capacitor to push shield HP back up every cycle.",
@@ -16,6 +17,7 @@
   },
   {
     "id": "mod-shield-extender",
+    "group": "Modules/Mid/Shield",
     "maker": "corp-vantera",
     "name": "Shield Extender",
     "description": "Passive bulkhead that adds raw shield HP at the cost of a bigger signature.",
@@ -31,6 +33,7 @@
   },
   {
     "id": "mod-armor-rep",
+    "group": "Modules/Low/Armor",
     "maker": "corp-aldemar",
     "name": "Armor Repairer",
     "description": "Active armor rep: welds plating back together every cycle while the capacitor holds.",
@@ -46,6 +49,7 @@
   },
   {
     "id": "mod-armor-plate",
+    "group": "Modules/Low/Armor",
     "maker": "corp-ferrum",
     "name": "Armor Plate",
     "description": "Passive layered plating that adds raw armor HP. Simple, cheap, effective.",
@@ -61,6 +65,7 @@
   },
   {
     "id": "mod-resist-coat",
+    "group": "Modules/Low/Armor",
     "maker": "corp-praetor",
     "name": "Resist Coat",
     "description": "Passive coating that hardens all layers against all four damage types.",

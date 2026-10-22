@@ -1,5 +1,7 @@
 {
   "id": "ship-rat-marauder",
+  "group": "Ships/Rat hulls",
+  "base_price": 750000,
   "name": "Marauder",
   "class": "rat",
   "description": "An Old Works assault frame: heavy plating, three rail mounts, and a habit of pinning whatever it jumps.",

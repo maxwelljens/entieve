@@ -148,13 +148,9 @@ func TestMarketMyOrdersListsEveryOrder(t *testing.T) {
 	}
 	// The uncapped list must not grow the window: the default rect stands
 	// (the scroll viewport bounds it, exactly like the order book). The
-	// default is a square — 546 × 546, the largest side that stays right
-	// of the rail gutter, fits the 1024×700 minimum, clears the log pocket
-	// and the HUD bar and still lays the body out (see NewMarket).
-	wantRect := image.Rect(theme.Px(396), theme.Px(8), theme.Px(942), theme.Px(554))
-	if wantRect.Dx() != wantRect.Dy() {
-		t.Fatalf("market default %v is not square: %dx%d", wantRect, wantRect.Dx(), wantRect.Dy())
-	}
+	// default is the three-pane landing rect — 760 × 560, on the rail
+	// gutter's clear line and inside the 1024×700 minimum (see NewMarket).
+	wantRect := image.Rect(theme.Px(97), theme.Px(8), theme.Px(857), theme.Px(568))
 	if got := m.Win().GetContainer().GetWidget().Rect; got != wantRect {
 		t.Errorf("window rect = %v, want the fixed rect %v (the list must not resize the window)", got, wantRect)
 	}

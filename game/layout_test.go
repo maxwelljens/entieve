@@ -909,30 +909,35 @@ func assertSplitRowTiled(t *testing.T, name string, split *widgets.SplitPane) {
 	}
 }
 
-// TestMarketSplitRatioPersists: the market's book | My orders seam is
-// exposed to the sidecar as market-orders, round-trips its ratio through
-// a version-3 file, restores it on a fresh session (tiling at the 1024
-// minimum), and "Reset window layout" returns it to the panel's own
-// opening share — today's 240 px column of the 546 px landing square.
-// A version-2 file names no ratio and keeps that opening share.
+// TestMarketSplitRatioPersists: the market's two seams (tree | catalog
+// and catalog | My orders) are exposed to the sidecar as market-tree and
+// market-orders, round-trip their ratios through a version-3 file, restore
+// them on a fresh session (tiling at the 1024 minimum), and "Reset window
+// layout" returns each to the panel's own opening share — 176 px of browse
+// and the old 240 px orders column of the 760 px landing rect.
 func TestMarketSplitRatioPersists(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "save.json")
 	g := newShowcaseGameAt(t, path)
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
 
-	// The opening share: 240 of the 526 px the split spans at the 546 px
-	// landing square (546 − 2·ContentsPad − the 4 px split seam).
-	const opening = 1 - 240.0/526
+	// The opening shares: 176 and (176+320) of the 736 px the split spans
+	// at the 760 px landing rect (760 − 2·ContentsPad − both 4 px seams).
+	const treeOpening = 176.0 / 736
+	const ordersOpening = (176.0 + 320) / 736
 	seams := g.splitSeams("market")
-	if len(seams) != 1 || seams[0].Name != "market-orders" {
-		t.Fatalf("market seams = %+v, want one named market-orders", seams)
+	if len(seams) != 2 || seams[0].Name != "market-tree" || seams[1].Name != "market-orders" {
+		t.Fatalf("market seams = %+v, want market-tree then market-orders", seams)
 	}
-	if got := seamRatio("market-orders", seams); math.Abs(got-opening) > 1e-9 {
-		t.Errorf("opening market ratio = %v, want %v", got, opening)
+	if got := seamRatio("market-tree", seams); math.Abs(got-treeOpening) > 1e-9 {
+		t.Errorf("opening market-tree ratio = %v, want %v", got, treeOpening)
+	}
+	if got := seamRatio("market-orders", seams); math.Abs(got-ordersOpening) > 1e-9 {
+		t.Errorf("opening market-orders ratio = %v, want %v", got, ordersOpening)
 	}
 
 	seams[0].Split.SetRatio(seams[0].Index, 0.32)
+	seams[1].Split.SetRatio(seams[1].Index, 0.71)
 	if err := g.SaveGame(); err != nil {
 		t.Fatalf("SaveGame: %v", err)
 	}
@@ -940,30 +945,40 @@ func TestMarketSplitRatioPersists(t *testing.T) {
 	if doc.Version != 3 {
 		t.Fatalf("sidecar version = %d, want 3", doc.Version)
 	}
-	if got := doc.Windows["market"].Splits["market-orders"]; got != 0.32 {
-		t.Errorf("market-orders = %v, want the dragged 0.32", got)
+	if got := doc.Windows["market"].Splits["market-tree"]; math.Abs(got-0.32) > 1e-9 {
+		t.Errorf("market-tree = %v, want the dragged 0.32", got)
+	}
+	if got := doc.Windows["market"].Splits["market-orders"]; math.Abs(got-0.71) > 1e-9 {
+		t.Errorf("market-orders = %v, want the dragged 0.71", got)
 	}
 
-	// Next session: the ratio comes back, mounted and laid out; a resize
+	// Next session: the ratios come back, mounted and laid out; a resize
 	// still tiles the row.
 	g2 := newShowcaseGameAt(t, path)
 	g2.applySize(1280, 720)
 	g2.open[pMarket] = true
 	g2.syncMounts()
 	pump(t, g2, 1280, 720)
-	if got := seamRatio("market-orders", g2.splitSeams("market")); got != 0.32 {
-		t.Errorf("restored market-orders = %v, want 0.32", got)
+	if got := seamRatio("market-tree", g2.splitSeams("market")); math.Abs(got-0.32) > 1e-9 {
+		t.Errorf("restored market-tree = %v, want 0.32", got)
+	}
+	if got := seamRatio("market-orders", g2.splitSeams("market")); math.Abs(got-0.71) > 1e-9 {
+		t.Errorf("restored market-orders = %v, want 0.71", got)
 	}
 	assertSplitRowTiled(t, "market", g2.splitSeams("market")[0].Split)
 	g2.applySize(1024, 700)
 	pump(t, g2, 1024, 700)
 	assertSplitRowTiled(t, "market", g2.splitSeams("market")[0].Split)
 
-	// Reset window layout: back to the market's opening share (the old
-	// 240 px column), not the widget's equal halves.
+	// Reset window layout: back to the market's opening shares (176 px of
+	// browse, the old 240 px column), not the widget's equal thirds.
 	g2.resetLayout()
-	if got := seamRatio("market-orders", g2.splitSeams("market")); math.Abs(got-opening) > 1e-9 {
-		t.Errorf("after reset market-orders = %v, want the opening share %v", got, opening)
+	seams = g2.splitSeams("market")
+	if got := seamRatio("market-tree", seams); math.Abs(got-treeOpening) > 1e-9 {
+		t.Errorf("after reset market-tree = %v, want the opening share %v", got, treeOpening)
+	}
+	if got := seamRatio("market-orders", seams); math.Abs(got-ordersOpening) > 1e-9 {
+		t.Errorf("after reset market-orders = %v, want the opening share %v", got, ordersOpening)
 	}
 }
 
@@ -973,10 +988,10 @@ func TestMarketSplitRatioPersists(t *testing.T) {
 func TestMarketSplitV2Default(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "save.json")
 	if err := os.WriteFile(path+".layout.json", []byte(`{"version":2,"windows":{
-		"market":{"x":396,"y":8,"w":546,"h":546,"open":true}}}`), 0o644); err != nil {
+		"market":{"x":97,"y":8,"w":760,"h":560,"open":true}}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	const opening = 1 - 240.0/526
+	const opening = (176.0 + 320) / 736
 
 	g := newShowcaseGameAt(t, path)
 	g.applySize(1280, 720)

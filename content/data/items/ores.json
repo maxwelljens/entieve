@@ -1,6 +1,7 @@
 [
   {
     "id": "ore-sterngrit",
+    "group": "Materials/Ore",
     "name": "Sterngrit Ore",
     "description": "Gritty iron-rich rock from inner belts; refines mostly into ferrite.",
     "category": "ore",
@@ -12,6 +13,7 @@
   },
   {
     "id": "ore-cordite",
+    "group": "Materials/Ore",
     "name": "Cordite Ore",
     "description": "Dense metallic ore with a nickel seam; a reliable mid-tier refinery feed.",
     "category": "ore",
@@ -24,6 +26,7 @@
   },
   {
     "id": "ore-lucidite",
+    "group": "Materials/Ore",
     "name": "Lucidite Ore",
     "description": "Glassy blue-black ore laced with cobalt and silex; a Fringe favourite.",
     "category": "ore",
@@ -37,6 +40,7 @@
   },
   {
     "id": "ore-glacierite",
+    "group": "Materials/Ore",
     "name": "Glacierite Ore",
     "description": "Frozen frontier ore that yields glacite crystals and trapped argon.",
     "category": "ore",
