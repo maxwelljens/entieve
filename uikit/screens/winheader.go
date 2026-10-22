@@ -17,9 +17,9 @@ import (
 // bar, as part of the window background: the band paints the panel, the plate
 // over it and only then the body, so the first rows of the list sit ON the
 // image and the lists scroll over it (the body is painted whole above the
-// band, never clipped out of it). The rows' own translucent fills composite
-// over the plate, so it reads at full strength in the body's padding and the
-// gaps between rows and as a tint under the rows.
+// band, never clipped out of it). The table leaves its own viewport fill off
+// under the band (widgets.PlateBand), so the plate reads through those rows;
+// the fill returns at the band's bottom edge.
 //
 // The plate is a centre crop of the 16:9 source at alpha headerTopAlpha on
 // the title edge, fading linearly to nothing at the band's bottom edge, and

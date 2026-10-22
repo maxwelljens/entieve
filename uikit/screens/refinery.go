@@ -64,7 +64,9 @@ func NewRefinery(env widgets.Seams) *Refinery {
 		{Key: "Held", Title: "Held", Priority: 2, AlignRight: true},
 		{Key: "Yield", Title: "Yield @ qty → hangar", Priority: 1},
 	}
-	r.ores = widgets.NewTable(env, cols)
+	r.ores = widgets.NewTable(env, cols, widgets.PlateBand(func() image.Rectangle {
+		return headerPlateBand(r.win)
+	}))
 	r.ores.SetSort("Ore", true)
 	r.ores.SetSortFunc(canonicalFirst("Ore", cols))
 	r.ores.OnSelect(func(row widgets.TableRow) {
@@ -121,6 +123,20 @@ func NewRefinery(env widgets.Seams) *Refinery {
 
 // Win returns the refinery window for Kit.AddWindow.
 func (r *Refinery) Win() *widget.Window { return r.win }
+
+// headerPlateBand is the band a table's PlateBand knob reads: the window's
+// artwork header rect, or empty when it carries no band or the build ships no
+// plate — the tables then paint exactly as before (docs/ART.md).
+func headerPlateBand(w *widget.Window) image.Rectangle {
+	if w == nil {
+		return image.Rectangle{}
+	}
+	hb := headerBandOf(w)
+	if hb == nil || hb.plate == nil || hb.plate() == nil {
+		return image.Rectangle{}
+	}
+	return headerBandRect(hb.GetWidget().Rect)
+}
 
 // oreStacks merges the general cargo and ore hold stacks into the ore list
 // in first-seen order (duplicates summed) — the two places CmdRefine
