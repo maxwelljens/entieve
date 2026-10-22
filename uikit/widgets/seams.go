@@ -83,6 +83,14 @@ type ContentView interface {
 	// canonical order. "" = dry, or not a weapon slot.
 	PredictedAmmo(sim.SlotRef) content.ItemID
 
+	// Clip is one fitted slot's shell bay as the rack reads it — loaded
+	// rounds, the bay's whole-round capacity for that round, the selected
+	// type and every compatible type in cargo (sorted). ok is false when
+	// the slot holds no bay (a charge-free weapon, a non-charge module).
+	// Rounds == 0 with two or more Options and no Selection is the waiting
+	// state (sim fillClip's clipAmbiguous case).
+	Clip(sim.SlotRef) (sim.ClipState, bool)
+
 	// Market books and prices.
 	Market(content.SystemID) []sim.MarketStock
 	BookOrders(sim.StationID) []sim.MarketStock
@@ -299,6 +307,11 @@ func (v *view) HangarShips() []sim.StoredShip {
 		return nil
 	}
 	return v.s.Hangar.Ships
+}
+
+// Clip reads one fitted slot's shell bay from the sim, for the player.
+func (v *view) Clip(slot sim.SlotRef) (sim.ClipState, bool) {
+	return v.s.Clip(v.s.Player(), slot)
 }
 
 // PredictedAmmo mirrors the sim's findCharge once, over the player's

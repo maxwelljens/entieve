@@ -63,7 +63,7 @@ in-game help window renders.
 | `Ctrl` + left click | Lock target under cursor |
 | Left double-click | Show Info — open the item's details window directly, anywhere the item appears (rack, fitting slots and hangar modules, market, inventory, overview, contract rows); on a **hangar module** it fits that module into the first empty slot of its class; on empty space, fly straight toward that point |
 | Right click | Orbit target under cursor (2,500 m) — in the world; unchanged |
-| Right click | On an item anywhere it appears: flat context menu — **Show Info** first (always bold), then the surface's actions (grayed-but-visible when impossible); on a weapon cell in the module rack: Show Info / Show Info — `<charge>` / ─ / **Cycle charge** |
+| Right click | On an item anywhere it appears: flat context menu — **Show Info** first (always bold), then the surface's actions (grayed-but-visible when impossible); on a charge-fed cell in the module rack: Show Info / Show Info — `<charge>` / ─ / **Load** `<round>` per round type in cargo / **Cycle charge** |
 | Middle drag | Pan camera |
 | Wheel | Zoom (2×10⁻⁹ – 4×: the whole system down to a grid); over a table (overview, market, inventory, fitting, hangar), scroll it — wheel up moves toward the top |
 
@@ -269,7 +269,7 @@ window's own width and re-wrapped whenever the window is resized narrower
 or wider; long pages scroll inside the body instead of pushing the rows
 out of view. The menus per
 surface: rack cells — Show Info (module) / Show Info — `<charge>` / ─ /
-**Cycle charge**; fitting slot tiles and hangar rows — Show Info / Fit /
+**Load** `<round>` (one per round type in cargo) / **Cycle charge**; fitting slot tiles and hangar rows — Show Info / Fit /
 Unequip; market rows —
 Show Info / Buy / Sell (grayed while undocked); inventory rows — Show
 Info; overview rows — Show Info / Warp to / Orbit / Approach / Lock target
@@ -336,12 +336,14 @@ beat (about every forty small autocannon rounds, or every ~120 s of
 sustained fire; twenty-five cap booster cells). With one round type in
 cargo the bay looks after itself: pre-loaded when fitted, topped up while
 that type lasts, and switched when it runs out and one other type is left.
-With two or more types in cargo the gun **waits for a choice** — the rack's
-**Cycle charge** picks the type (`CmdSetAmmo`), dumping the loaded rounds
-back to cargo and loading the new ones. A gun with no matching rounds at
-all is dry and warns `no charges`; a waiting gun stays quiet. Loaded rounds
-travel with the ship: unfitting the gun returns them to cargo, and a wreck
-carries whatever was in its bays when it came apart.
+With two or more types in cargo the gun **waits for a choice**: its rack
+cell wears a small blue corner dot, a left click on it opens the cell's
+menu (the charge picker) instead of toggling, and the menu's **Load
+`<round>`** entries pick the type (`CmdSetAmmo`), dumping the loaded
+rounds back to cargo and loading the new ones. A gun with no matching
+rounds at all is dry and warns `no charges`; a waiting gun stays quiet.
+Loaded rounds travel with the ship: unfitting the gun returns them to
+cargo, and a wreck carries whatever was in its bays when it came apart.
 
 **Damage layers.** Damage hits **shield → armor → structure**, each reduced by
 the ship's four **resists** (EM, thermal, kinetic, explosive). Entieve uses a
@@ -415,20 +417,24 @@ omniscience), enforced in the sim's read model and the renderer alike.
   the same split. Both selectors start at their first entry, so the
   default warp lands *on* the target and the default orbit is 2,500 m.
 
-**Ammo cycling.** Right-click a weapon cell in the module rack for its
-context menu: **Show Info** for the module, **Show Info —** the loaded
-round, and **Cycle charge**, which steps the bay's round **none → each
-round of that weapon's family that sits in your cargo → none** (the sim
-validates the family and cargo, dumps the old rounds back and logs the
-load). "None" is the waiting state: the gun reloads by itself only when a
-single type is left in cargo.
+**Ammo cycling.** Right-click a charge-fed cell in the module rack for its
+context menu: **Show Info** for the module, **Show Info —** the selected
+round, one **Load** `<round>` entry per round type of that module's family
+that sits in your cargo (the cap booster's cells included), and **Cycle
+charge**, which steps the bay through those same types in item-id order and
+wraps (the sim validates the family and cargo, dumps the old rounds back
+and logs the load). There is no auto/"none" entry: the bay only ever loads
+a real type. With two or more types in cargo and none chosen the cell shows
+the waiting badge and a left click opens that same menu — the charge
+picker — instead of toggling; every other cell toggles as always.
 The module tooltip — hover any rack cell for 300 ms — is a structured
 panel: class icon, **bold** module name, a dim `slot · class` line, then
 sectioned stats with values right-aligned on one column (damage mix,
-range, tracking, loaded charge + cargo count, cycle/capacitor) and
-footers for what the mouse does. The Fitting window's module rows show
-the same panel, and a warp inside 150 km explains itself as "Warp
-unavailable". Non-weapons don't cycle.
+range, tracking, loaded charge + cargo count, the bay's **Clip** line —
+`0.2 m³ · 40 rounds · 3.0 s`, or `waiting for ammo selection` while no
+type is chosen — cycle/capacitor) and footers for what the mouse does. The
+Fitting window's module rows show the same panel, and a warp inside 150 km
+explains itself as "Warp unavailable". Non-weapons don't cycle.
 
 ## Currency
 
