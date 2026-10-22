@@ -229,7 +229,7 @@ Undocking cuts straight back to the world — the fade is entry-only.
 
 A sortable, **scrollable** table of everything you can currently perceive:
 name, distance, kind, velocity. Click a column header to sort (click again to
-flip direction; the active column tints amber and shows ▲/▼), hover the wheel
+flip direction; the active column tints amber and shows ↑/↓), hover the wheel
 over it to scroll (wheel up moves toward the top of the list; rows clip to
 the panel), click a
 row to select. Numbers are right-aligned on fixed column anchors, so digits

@@ -345,9 +345,9 @@ func (m *Market) treeRow(path, label string, depth int) widgets.TableRow {
 	mark := "  "
 	if m.hasKids(path) {
 		if m.expanded[path] {
-			mark = "▾ "
+			mark = "↓ "
 		} else {
-			mark = "▸ "
+			mark = "→ "
 		}
 	}
 	return widgets.TableRow{
