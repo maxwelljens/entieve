@@ -6,6 +6,7 @@
     "description": "Active propulsion module: +75% max speed while it runs, paid for in capacitor.",
     "slot": "mid",
     "kind": "afterburner",
+    "grid_class": "ii",
     "activation_cost": 20,
     "activation_time": 10,
     "boost": {

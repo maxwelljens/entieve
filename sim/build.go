@@ -52,10 +52,14 @@ func initMarket(c *content.Content) (map[StationID]*MarketBook, uint64) {
 // classes, validating existence, slot class and hull capacity.
 func (s *Sim) buildFitting(ids []content.ModuleID, hull *content.ShipDef) (Fitting, error) {
 	var f Fitting
+	var fitted []*content.ModuleDef
 	for _, id := range ids {
 		def, ok := s.Content.Module(id)
 		if !ok {
 			return f, errf("sim: unknown module %s in fit", id)
+		}
+		if issue := hull.FitProblem(def, fitted); issue != nil {
+			return f, errf("sim: %s", fitIssueText(def.Name, issue))
 		}
 		rt := ModuleRuntime{Def: id}
 		switch def.Slot {
@@ -80,6 +84,7 @@ func (s *Sim) buildFitting(ids []content.ModuleID, hull *content.ShipDef) (Fitti
 		default:
 			return f, errf("sim: module %s has invalid slot %q", id, def.Slot)
 		}
+		fitted = append(fitted, def)
 	}
 	return f, nil
 }

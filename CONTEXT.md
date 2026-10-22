@@ -12,6 +12,10 @@ names the *modules and seams* we build that vocabulary into.
 | **Hull** | a ship chassis (`ship-*`); flyable or machine |
 | **Hull portrait** | top-down full-colour art of a hull for the HUD/Show Info (`uikit/hulls`): a flat SVG source in `svg/` rasterized at build time to committed 120/240 px PNGs, keyed by hull id (`Get`/`Has`) |
 | **Module** | a fitted component (`mod-*`); slot-classed high/mid/low |
+| **Mount** | a hull's high slot, declared as a kind and a size (`high_mounts`); a mounted module needs a mount of its own kind at or above its size, so a large gun never sits on a frigate |
+| **Turret mount / launcher mount** | the two mount kinds: guns and the mining laser are turret-mounted, rockets and missiles launcher-mounted |
+| **Grid class / cpu class** | a module's powergrid or cpu demand as one of three classes — Class I / Class II / Class III — never a number; a module demanding both axes consumes one unit on each |
+| **Class quota** | a hull's per-class allowance on each axis (`grid_classes` / `cpu_classes`); a fit is legal while no class's module count exceeds its quota, which is what bounds a full rack |
 | **Item** | everything else tradeable: ore, mineral, charge, shell, loot (`ore-*`/`min-*`/`ammo-*`/`charge-*`/`loot-*`) |
 | **Calibre** | a shell size class (`ammo_class`): `small`, `medium`, `large`; both projectile gun families at a calibre load the same shells |
 | **Shell** | the ammunition item (`ammo-*`) a projectile gun loads: calibre + one of the four damage profiles; the gun's `damage_multiplier` is its share of the shell's volley (autocannon light and fast, artillery heavy and slow) |

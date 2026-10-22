@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Fitting limits: mounts and class quotas** (`content/fit.go`,
+  `content/data/{ships,modules}`, `sim`): high slots are now **mounts** — a
+  turret or launcher of small, medium or large size — and a module fits only a
+  mount of its own kind at or above its size, so a large autocannon no longer
+  drops onto a frigate and a hull's mount sizes are its design identity
+  (small turrets on the frigate, destroyer and patrol; medium on the Old Works
+  Marauder; large on the Hierarch). Every module also declares a **grid
+  class** and a **cpu class** (Class I/II/III, or none on an axis it does not
+  use, a mining laser or ewar module paying on both) and every hull a
+  per-class **quota** per axis; a fit is legal only while no class's count
+  exceeds its quota, so free slots alone no longer buy another active module.
+  A refused fit logs why (`No free launcher mount for Rocket Pod`, `Large
+  Autocannon is oversize for the hull's turret mounts`, `Cap Booster exceeds
+  the hull's grid Class I quota`) and leaves the module in the hangar;
+  unfitting frees what it demanded. `just validate` rejects an authored fit
+  (NPC, traffic or world start) that breaks either rule. Vocabulary:
+  CONTEXT.md "Mount", "Turret mount / launcher mount", "Grid class / cpu
+  class", "Class quota"; authoring tables in
+  [docs/CONTENT_AUTHORING.md](docs/CONTENT_AUTHORING.md); the rule seam is
+  described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Saves are
+  untouched (schema 2: defs carry the limits, saves carry module ids).
+
 ### Changed
 
 - **Belts are numbered, gates name their destination** (`content/data/systems`):

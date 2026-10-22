@@ -6,6 +6,10 @@
     "description": "Strip-mines 100 m³ of asteroid per 30 s cycle straight into the ore hold.",
     "slot": "high",
     "kind": "mining_laser",
+    "mount": "turret",
+    "size": "s",
+    "grid_class": "i",
+    "cpu_class": "ii",
     "activation_cost": 20,
     "activation_time": 30,
     "mining": {

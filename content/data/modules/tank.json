@@ -6,6 +6,7 @@
     "description": "Active shield rep that burns capacitor to push shield HP back up every cycle.",
     "slot": "mid",
     "kind": "shield_boost",
+    "grid_class": "ii",
     "activation_cost": 30,
     "activation_time": 4,
     "boost": {
@@ -20,6 +21,7 @@
     "description": "Passive bulkhead that adds raw shield HP at the cost of a bigger signature.",
     "slot": "mid",
     "kind": "shield_extender",
+    "grid_class": "i",
     "activation_cost": 0,
     "activation_time": 0,
     "passive": {
@@ -34,6 +36,7 @@
     "description": "Active armor rep: welds plating back together every cycle while the capacitor holds.",
     "slot": "low",
     "kind": "armor_rep",
+    "grid_class": "ii",
     "activation_cost": 25,
     "activation_time": 5,
     "boost": {
@@ -48,6 +51,7 @@
     "description": "Passive layered plating that adds raw armor HP. Simple, cheap, effective.",
     "slot": "low",
     "kind": "armor_plate",
+    "grid_class": "i",
     "activation_cost": 0,
     "activation_time": 0,
     "passive": {
@@ -62,6 +66,7 @@
     "description": "Passive coating that hardens all layers against all four damage types.",
     "slot": "low",
     "kind": "resist_coat",
+    "grid_class": "i",
     "activation_cost": 0,
     "activation_time": 0,
     "passive": {

@@ -286,6 +286,12 @@ Create `content/data/ships/ship-<name>.json` (one file per hull). Populate
   "origin": "nordic",
   "maker": "corp-borealis",
   "slots": { "high": 2, "mid": 4, "low": 2 },
+  "high_mounts": [
+    { "kind": "turret", "size": "s" },
+    { "kind": "launcher", "size": "s" }
+  ],
+  "grid_classes": { "i": 4, "ii": 2 },
+  "cpu_classes": { "ii": 1 },
   "shield": 260,
   "armor": 140,
   "structure": 220,
@@ -310,6 +316,20 @@ frigate price 200k–400k euro (put the price on a market order — ships have
 no price field); resists each in `[0,1)`; align time = `agility * 10` s, so
 0.4 ≈ 4 s for a frigate, 2.4 ≈ 24 s for a hauler. Every hull needs ≥ 1 high
 slot unless it is an industrial/hauler.
+
+**Fitting limits are the hull's identity** (`content/fit.go`). `high_mounts`
+declares one mount per high slot, in slot order — `kind` `turret|launcher`,
+`size` `s|m|l`; a mounted module needs a free mount of its own kind at or
+above its size (guns and the mining laser are turrets, rockets/missiles are
+launchers). Sizes are a design decision, not a function of hull mass: the
+frigate and destroyer carry small mounts, the Marauder medium, the Hierarch
+large. `grid_classes` / `cpu_classes` are per-class quotas (`i`, `ii`, `iii`;
+omit an axis or a class for zero allowance): fitting a module consumes one
+unit of its demanded class on each axis it uses, and a fit is legal while no
+class's count exceeds its quota. Quotas must leave every authored fit of the
+hull legal (the validator rejects one that does not), and a full rack with no
+spare class is the normal budget: the frigate's `{ "i": 5, "ii": 3 }` grid is
+exactly its showcase fit.
 
 `origin` must be one of `moravian | polish | nordic | latinate | old-works`
 (Old Works machine hulls are `old-works`) — register the hull in
@@ -340,6 +360,9 @@ constants in `model.go`, and the matching attribute block is **required**:
   "maker": "corp-nordvakt",
   "slot": "high",
   "kind": "weapon",
+  "mount": "turret",
+  "size": "m",
+  "grid_class": "ii",
   "activation_cost": 0,
   "activation_time": 7,
   "weapon": {
@@ -361,6 +384,24 @@ modules need `activation_time > 0`; `weapon.ammo_class` must match
 like `mod-rocket-pod`); `damage_multiplier` is the gun's share of a loaded
 shell's damage (`0` reads as `1`, so artillery throws a heavier shot from the
 same shell than an autocannon); `price` 10k–400k for standard mods.
+
+**Mount and class demand.** `mount` and `size` exist only on high-slot
+modules (`mount` `turret|launcher`, `size` `s|m|l`): guns and the mining laser
+are turrets, rockets/missiles launchers; omit `size` only for a module that
+should take any mount of its kind. `grid_class` / `cpu_class`
+(`i|ii|iii`, omit an unused axis) state what one unit of the module costs
+against a hull's class quota. The shipped mapping is the convention:
+
+| family | `mount` / `size` | `grid_class` | `cpu_class` |
+|---|---|---|---|
+| autocannon / artillery (s, m, l) | turret / s, m, l | i, ii, iii | — |
+| rocket pod | launcher / s | i | — |
+| mining laser | turret / s | i | ii |
+| shield boost, armor rep (active tank) | — | ii | — |
+| shield extender, armor plate, resist coat (passive tank) | — | i | — |
+| afterburner | — | ii | — |
+| stasis web, warp scrambler (ewar) | — | i | ii |
+| cap booster, cap recharger | — | i | — |
 
 ## Recipe 4: add an NPC (and its loot)
 
@@ -386,7 +427,9 @@ Append to `content/data/npcs/rats.json`:
 ```
 
 Rules: `ship` must exist; the `fit` must exist module-by-module and fit the
-hull's slot counts (list high-slot modules first, then mid, then low);
+hull's slot counts (list high-slot modules first, then mid, then low) **and
+the hull's fitting limits** (mount kind/size and class quotas — the validator
+says which rule broke);
 `aggro_range`/`orbit_range` in meters; `flee_threshold` is a structure
 fraction in [0,1] (0 = never flees); `bounty` in euro (rats: 5k–250k);
 each loot row: existing item, `chance` in [0,1], `1 <= min_qty <= max_qty`.
@@ -536,7 +579,8 @@ a mined hold must be sellable and materials must be buyable at every port.
 
 Rules: `start.system`/`start.ship` must exist; `fit` modules must exist,
 listed **high slots first, then mid, then low**, each class within the hull's
-slot counts; cargo items must exist with `qty >= 1`; wallet ≥ 0;
+slot counts **and its fitting limits** (mounts, class quotas); cargo items
+must exist with `qty >= 1`; wallet ≥ 0;
 `scenario` checkpoints need `name` + `feature` (kebab-case).
 `world-showcase` must always exist with **≥ 10 checkpoints** — it drives
 `tests/showcase_test.go` — so when adding a feature, add a checkpoint there
@@ -852,7 +896,7 @@ weapon ids are not stable targets for them.
 3. **IDs unique** per the table above; you reused registry IDs instead of
    inventing near-duplicates.
 4. **Cross-references resolve**: gates both ways, fits exist and fit the
-   hull (high→mid→low order), belts reference ores, spawns reference NPCs,
+   hull (high→mid→low order, mounts and class quotas), belts reference ores, spawns reference NPCs,
    loot/market/cargo reference existing items-or-ships-or-modules,
    weapon `ammo_class` matches some ammo/charge, contract targets/destinations
    are real NPCs/items/stations; traffic endpoints/hulls/cargo/raiders

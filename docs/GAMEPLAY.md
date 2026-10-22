@@ -279,6 +279,21 @@ Show Info.
 weapons and mining lasers (toggled with `F1…F8`). Mid slots hold propulsion,
 ewar and capacitor modules. Low slots hold tank (armor/resist) modules.
 
+**Mounts and fitting limits.** Every high slot is a **mount**: a **turret**
+mount or a **launcher** mount, of a size — small, medium or large. Guns and
+the mining laser are turret-mounted; rockets and missiles are
+launcher-mounted. A module fits a mount only when the kinds match and the
+module is no bigger than the mount, so a hull's mounts are its design
+identity: a frigate's small turrets never take a large autocannon, a
+destroyer's battery of small turrets is a brawler, and only a heavy machine
+hull carries large mounts. Modules also declare a **grid class** and a **cpu
+class** (Class I, II or III, or none on an axis they do not use), and each
+hull carries a **class quota** per axis: a fit is legal only while no class's
+module count exceeds the hull's allowance. Slot count is therefore not the
+only limit — a hull with empty slots can still refuse another module
+because its grid or cpu class is spoken for. Refused fits log a warning and
+leave the module in the hangar; unfitting a module frees what it demanded.
+
 **The fitting window** (`F`) is laid out like EVE's: the hull's portrait,
 name, class · maker and corporation emblem head the left column, with the
 derived stats beneath it — shield / armor / structure maxima, capacitor

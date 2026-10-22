@@ -6,6 +6,7 @@
     "description": "Burns a capacitor booster cell from cargo to slam GJ back into the capacitor at once.",
     "slot": "mid",
     "kind": "cap_booster",
+    "grid_class": "i",
     "activation_cost": 2,
     "activation_time": 5,
     "boost": {
@@ -20,6 +21,7 @@
     "description": "Passive capacitor circuitry that shortens the recharge time constant.",
     "slot": "low",
     "kind": "cap_recharger",
+    "grid_class": "i",
     "activation_cost": 0,
     "activation_time": 0,
     "passive": {
