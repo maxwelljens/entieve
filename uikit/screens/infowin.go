@@ -72,6 +72,7 @@ type infoSection struct {
 // infoPage is one windowful of content: header, prose and sections.
 type infoPage struct {
 	Icon     string
+	IconSize int // header icon box in design units (0 = the 20 px tooltip box)
 	Title    string
 	Sub      string // category/maker line under the title
 	Prose    string // wrapped description ("" = no prose block at all)
@@ -388,7 +389,7 @@ func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
 // kind, cycle, capacitor draw), then the shared moduleTip stat sections,
 // the compatible charges as links and the market price.
 func modulePage(cv widgets.ContentView, def *content.ModuleDef) infoPage {
-	p := infoPage{Icon: theme.ModuleIcon(def.Kind), Title: def.Name, Prose: def.Description, Emblem: def.Maker}
+	p := infoPage{Icon: theme.ModuleIconFor(def), IconSize: theme.IconTitle, Title: def.Name, Prose: def.Description, Emblem: def.Maker}
 	if def.Kind != "" {
 		p.Sub = spacedKind(def.Kind)
 	}
@@ -801,12 +802,16 @@ func (w *InfoWin) render(p infoPage) {
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
 	if p.Icon != "" {
-		g := theme.NewIcon(p.Icon, widgets.TipIcon, pal.Text)
+		size := widgets.TipIcon
+		if p.IconSize > 0 {
+			size = p.IconSize
+		}
+		g := theme.NewIcon(p.Icon, size, pal.Text)
 		g.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
 		line.AddChild(g)
 		// Scaled ONCE here (it mirrors the drawn icon box + row gap);
 		// the spacer's MinSize below reads it already in live px.
-		iconW = theme.Px(widgets.TipIcon) + theme.Px(theme.IconGap)
+		iconW = theme.Px(size) + theme.Px(theme.IconGap)
 	}
 	line.AddChild(widget.NewText(
 		widget.TextOpts.Text(p.Title, env.FaceBold(theme.StepBase), theme.Solid(pal.Text)),

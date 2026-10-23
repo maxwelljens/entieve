@@ -28,8 +28,8 @@ func readManifest(t *testing.T) manifest {
 
 // TestManifestCreditsAndFiles pins the credits bookkeeping: every PNG has a
 // manifest entry, every manifest entry has a PNG, and every entry is credited
-// in CREDITS.md with its author and the CC BY 3.0 license (no orphan art, no
-// uncredited art).
+// in CREDITS.md — glyphs with their author and the CC BY 3.0 license, art
+// entries with the project source and CC0 (no orphan art, no uncredited art).
 func TestManifestCreditsAndFiles(t *testing.T) {
 	m := readManifest(t)
 	if m.License != "CC BY 3.0" {
@@ -58,18 +58,43 @@ func TestManifestCreditsAndFiles(t *testing.T) {
 		t.Fatal("no PNG art in the icon directory")
 	}
 
+	art := 0
 	used := map[string]bool{}
 	for name, e := range m.Icons {
 		if e.Slug == "" || e.Author == "" || e.URL == "" || e.File == "" {
 			t.Errorf("%s: incomplete record %+v", name, e)
 		}
-		if !strings.HasPrefix(e.URL, "https://game-icons.net/") {
-			t.Errorf("%s: url = %q, want a game-icons.net page", name, e.URL)
-		}
 		if !files[e.File] {
 			t.Errorf("%s: file %q is not in the icon directory", name, e.File)
 		}
 		used[e.File] = true
+
+		// Every entry must carry a credits line; what that line says depends
+		// on the art's origin.
+		var wants []string
+		switch e.Mode {
+		case ArtMode:
+			art++
+			if !strings.HasPrefix(e.URL, "https://github.com/maxwelljens/entieve") {
+				t.Errorf("%s: url = %q, want the project repository", name, e.URL)
+			}
+			if e.License == "" || e.LicenseURL == "" {
+				t.Errorf("%s: art entry missing license/license_url", name)
+			}
+			wants = []string{"Public domain", e.LicenseURL}
+		case "":
+			if !strings.HasPrefix(e.URL, "https://game-icons.net/") {
+				t.Errorf("%s: url = %q, want a game-icons.net page", name, e.URL)
+			}
+			wants = []string{
+				e.Slug,
+				"Icons made by " + e.Author + ". Available on https://game-icons.net",
+				"https://creativecommons.org/licenses/by/3.0/",
+			}
+		default:
+			t.Errorf("%s: unknown mode %q", name, e.Mode)
+			continue
+		}
 
 		var found bool
 		for _, ln := range lines {
@@ -77,11 +102,7 @@ func TestManifestCreditsAndFiles(t *testing.T) {
 				continue
 			}
 			found = true
-			for _, want := range []string{
-				e.Slug,
-				"Icons made by " + e.Author + ". Available on https://game-icons.net",
-				"https://creativecommons.org/licenses/by/3.0/",
-			} {
+			for _, want := range wants {
 				if !strings.Contains(ln, want) {
 					t.Errorf("%s: credits line missing %q:\n  %s", name, want, ln)
 				}
@@ -90,6 +111,9 @@ func TestManifestCreditsAndFiles(t *testing.T) {
 		if !found {
 			t.Errorf("%s: no CREDITS.md line", name)
 		}
+	}
+	if art == 0 {
+		t.Error("manifest has no art-mode entry")
 	}
 	for f := range files {
 		if !used[f] {
@@ -202,7 +226,7 @@ func TestFallbackNeverMisses(t *testing.T) {
 	if unknown != fallback {
 		t.Errorf("unknown name rendered its own image, want the %s image", Fallback)
 	}
-	for _, n := range names() {
+	for _, n := range Names() {
 		if !Has(n) {
 			t.Errorf("Has(%q) = false for a manifest icon", n)
 		}
@@ -292,7 +316,7 @@ func TestEveryIconRendersAtEverySize(t *testing.T) {
 		"text":     {R: 0xd8, G: 0xde, B: 0xe9, A: 255},
 		"disabled": {R: 0x7a, G: 0x84, B: 0x94, A: 102},
 	}
-	for _, name := range names() {
+	for _, name := range Names() {
 		e := registry[name]
 		for _, size := range []int{Inline, Button, Title} {
 			for tn, tint := range tints {
@@ -300,12 +324,79 @@ func TestEveryIconRendersAtEverySize(t *testing.T) {
 				if img.Bounds().Dx() != size || img.Bounds().Dy() != size {
 					t.Fatalf("%s@%d: bounds %v", name, size, img.Bounds())
 				}
-				if tn == "text" && !hasInk(tintBox(silhouette(e.File), size, e.Nudge, tint)) {
+				if tn != "text" {
+					continue
+				}
+				// Art is drawn full-colour (the silhouette path would flatten
+				// it white); glyphs go through the tinted silhouette.
+				if e.Mode == ArtMode {
+					if !nrgbaInk(artBox(e, size)) {
+						t.Errorf("%s@%d: art rendered no ink", name, size)
+					}
+				} else if !hasInk(tintBox(silhouette(e.File), size, e.Nudge, tint)) {
 					t.Errorf("%s@%d: rendered no ink", name, size)
 				}
 			}
 		}
 	}
+}
+
+// TestArtModeIsFullColourAndTintFree pins the art draw path: an art entry
+// ignores the requested tint (two tints share one cached image) and keeps the
+// render's own colours, where the glyph path would flatten everything to
+// white.
+func TestArtModeIsFullColourAndTintFree(t *testing.T) {
+	red := color.RGBA{R: 255, A: 255}
+	blue := color.RGBA{B: 255, A: 255}
+	checked := 0
+	for name, e := range readManifest(t).Icons {
+		if e.Mode != ArtMode {
+			continue
+		}
+		checked++
+		a, b := Get(name, Title, red), Get(name, Title, blue)
+		if a != b {
+			t.Errorf("%s: two tints rendered different art images (tint must be ignored)", name)
+		}
+		if !nrgbaColour(artBox(e, Title)) {
+			t.Errorf("%s: art rendered without a coloured pixel (flattened?)", name)
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no art-mode entries to check")
+	}
+}
+
+// artBox is the CPU-side art render Get hands to ebiten (the test's only
+// window into its pixels: a live ebiten image cannot be read headless).
+func artBox(e Entry, size int) *image.NRGBA {
+	return scaleBox(artImage(e.File), size, e.Nudge)
+}
+
+// nrgbaInk reports whether a CPU-side box has any visible pixel.
+func nrgbaInk(img *image.NRGBA) bool {
+	for i := 3; i < len(img.Pix); i += 4 {
+		if img.Pix[i] > 8 {
+			return true
+		}
+	}
+	return false
+}
+
+// nrgbaColour reports whether a CPU-side box carries a pixel whose channels
+// are clearly unequal (≈24/255): a flattened glyph would be white/grey only.
+func nrgbaColour(img *image.NRGBA) bool {
+	for i := 0; i < len(img.Pix); i += 4 {
+		if img.Pix[i+3] < 64 {
+			continue
+		}
+		hi := max(img.Pix[i], img.Pix[i+1], img.Pix[i+2])
+		lo := min(img.Pix[i], img.Pix[i+1], img.Pix[i+2])
+		if int(hi)-int(lo) > 24 {
+			return true
+		}
+	}
+	return false
 }
 
 // hasInk reports whether a CPU-side tinted box has any visible pixel.

@@ -71,6 +71,7 @@ type TableRow struct {
 	Cells    []string
 	Icons    []string
 	IconTint color.RGBA // icon palette role; zero = ColText
+	IconSize int        // icon box in design units (0 = theme.IconInline)
 	Tint     color.RGBA
 	TextTint color.RGBA // cell text colour; zero = the palette's text
 	Data     any
@@ -90,6 +91,14 @@ func iconOf(row TableRow, i int) string {
 		return ""
 	}
 	return row.Icons[i]
+}
+
+// iconSize is the row's icon box in design units (0 = the inline default).
+func (row TableRow) iconSize() int {
+	if row.IconSize > 0 {
+		return row.IconSize
+	}
+	return theme.IconInline
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +252,7 @@ func NewStackRow(env Seams, row TableRow, face *text.Face) *StackRow {
 		// reads as a misalignment.
 		inBox := 0
 		if li == 0 && iconOf(row, 0) != "" {
-			box := theme.NewIconBox(theme.IconInline)
+			box := theme.NewIconBox(row.iconSize())
 			box.Set(iconOf(row, 0), iconTint)
 			out.Icon = box
 			lead := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -1075,7 +1084,7 @@ func (t *Table) newRow(i int) *widget.Container {
 			)
 			cell.AddChild(line)
 			texts = append(texts, nil) // runs own their colours; no label to tint
-			cells = append(cells, &tableCell{ctr: cell, Box: theme.NewIconBox(theme.IconInline)})
+			cells = append(cells, &tableCell{ctr: cell, Box: theme.NewIconBox(t.Rows[i].iconSize())})
 			ctr.AddChild(cell)
 			continue
 		}
@@ -1129,7 +1138,7 @@ func (t *Table) newRow(i int) *widget.Container {
 				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 			),
 		)
-		box := theme.NewIconBox(theme.IconInline)
+		box := theme.NewIconBox(t.Rows[i].iconSize())
 		cell.AddChild(box.Widget(), tx)
 		texts = append(texts, tx)
 		cells = append(cells, &tableCell{ctr: cell, Box: box})
@@ -1428,7 +1437,7 @@ func (t *Table) ensureFrozen(avail float64) {
 			}
 			m := t.measure(cellOf(row, i)) + 2*float64(theme.Px(cellPad))
 			if iconOf(row, i) != "" && !c.AlignRight {
-				m += float64(theme.Px(theme.IconInline) + theme.Px(theme.IconGap))
+				m += float64(theme.Px(row.iconSize()) + theme.Px(theme.IconGap))
 			}
 			if m > w {
 				w = m
@@ -1502,7 +1511,7 @@ func (t *Table) layoutCells() {
 			}
 			inner := t.widths[i] - 2*float64(theme.Px(cellPad))
 			if t.Cells[r][i] != nil && iconOf(t.Rows[r], i) != "" {
-				inner -= float64(theme.Px(theme.IconInline) + theme.Px(theme.IconGap))
+				inner -= float64(theme.Px(t.Rows[r].iconSize()) + theme.Px(theme.IconGap))
 			}
 			if inner < 0 {
 				inner = 0

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Per-module weapon art** (`uikit/icons`, `content`, `uikit`): the five
+  autocannon/artillery modules show their own full-colour render instead of
+  the shared class glyph.
+  - The icon manifest gained a `"mode": "art"` sub-mode (full colour, no
+    tint, cached per name+size) and five CC0 256×256 downscales of the
+    project's renders; the game-icons glyph set is unchanged.
+  - `ModuleDef.icon` names an icon-manifest key. `theme.ModuleIconFor` uses
+    it when the registry knows it and falls back to the class glyph
+    otherwise; the fitting/rack tiles draw it at 32 px, the Show Info module
+    header and module tooltip at 24 px. `just validate` rejects an unknown
+    key (`content.WithIconKeys`).
+  - Every market item row (catalog, expanded orders, search hits) now carries
+    a 20 px icon — a module's art, else its category glyph (ammunition, loot,
+    minerals, ore, hulls) — through the new `TableRow.IconSize`; browse-tree
+    branch rows stay text-only.
+
 ## [0.8.0] - 2026-10-23
 
 ### Added

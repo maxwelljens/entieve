@@ -195,6 +195,15 @@ top-level branches: `Ships`, `Modules`, `Ammunition`, `Materials`, `Loot`
 (plus the window's own `All` root). Every hull also carries **`base_price`**
 (credits, ≥ 0): the market's last-resort quote for it.
 
+## Module icons: `icon`
+
+A module may carry **`icon`**, one key of the icon manifest
+(`uikit/icons/manifest.json`, e.g. `"mod_autocannon_s"`): its own art in the
+fitting/rack tiles, Show Info, module tooltips and market rows. Omit it and
+the module keeps its class glyph; an unknown key fails `just validate` (the
+CLI passes the manifest's names through `content.WithIconKeys`, so the
+content package stays free of the UI layer).
+
 ---
 
 ## Recipe 1: add a star system

@@ -267,6 +267,7 @@ type ModuleDef struct {
 	Group          string        `json:"group"`           // market tree path, e.g. "Modules/High/Turrets"
 	Slot           string        `json:"slot"`            // "high" | "mid" | "low"
 	Kind           string        `json:"kind"`
+	Icon           string        `json:"icon,omitempty"`       // icon-manifest key: market/tile art ("" = the class glyph)
 	Mount          string        `json:"mount,omitempty"`      // high slot only: turret | launcher
 	Size           string        `json:"size,omitempty"`       // mount size demand: s | m | l ("" fits any mount of its kind)
 	GridClass      string        `json:"grid_class,omitempty"` // powergrid class demand: i | ii | iii

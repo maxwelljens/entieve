@@ -1,8 +1,12 @@
 # Icon credits
 
-Every icon in this directory is a 512×512 transparent render fetched from [game-icons.net](https://game-icons.net), converted to a white silhouette at load and tinted from the palette. All of them are licensed [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) and must keep their author credit.
+Every glyph icon in this directory is a 512×512 transparent render fetched from [game-icons.net](https://game-icons.net), converted to a white silhouette at load and tinted from the palette. All of them are licensed [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) and must keep their author credit.
 
 Requested attribution format: *Icons made by {author}. Available on https://game-icons.net*
+
+The `mod_*` art rows below are Entieve's own full-colour module renders
+(downscaled to 256×256), dedicated to the public domain under CC0 —
+no attribution is requested, but the source is the project repository.
 
 | icon | slug | credit | source | license |
 | --- | --- | --- | --- | --- |
@@ -51,3 +55,8 @@ Requested attribution format: *Icons made by {author}. Available on https://game
 | `svc_refinery` | `furnace` | Icons made by Delapouite. Available on https://game-icons.net | [furnace](https://game-icons.net/1x1/delapouite/furnace.html) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | `svc_scanner` | `radar-sweep` | Icons made by Lorc. Available on https://game-icons.net | [radar-sweep](https://game-icons.net/1x1/lorc/radar-sweep.html) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | `ammo` | `artillery-shell` | Icons made by Quoting. Available on https://game-icons.net | [artillery-shell](https://game-icons.net/1x1/quoting/artillery-shell.html) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| `mod_autocannon_s` | `small-autocannon` | Public domain. No attribution requested. | [entieve](https://github.com/maxwelljens/entieve) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `mod_autocannon_m` | `medium-autocannon` | Public domain. No attribution requested. | [entieve](https://github.com/maxwelljens/entieve) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `mod_artillery_s` | `small-artillery` | Public domain. No attribution requested. | [entieve](https://github.com/maxwelljens/entieve) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `mod_artillery_m` | `medium-artillery` | Public domain. No attribution requested. | [entieve](https://github.com/maxwelljens/entieve) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| `mod_artillery_l` | `large-artillery` | Public domain. No attribution requested. | [entieve](https://github.com/maxwelljens/entieve) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |

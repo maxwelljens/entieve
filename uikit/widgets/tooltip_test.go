@@ -116,6 +116,26 @@ func checkTipLayout(t *testing.T, l tipLayout) {
 	}
 }
 
+// TestTipIconSize: an explicit model icon size (the module tooltip's 24 px
+// title box) widens the icon column and the title indent; models without one
+// keep the 20 px default.
+func TestTipIconSize(t *testing.T) {
+	env := tipTestEnv()
+	m := tipFixtureModel()
+	m.IconSize = theme.IconTitle
+	l := tipLayoutAt(env, m, tipInnerWidth(env, m))
+	if got := l.Icon.Dx(); got != theme.Px(theme.IconTitle) {
+		t.Errorf("icon box = %d, want the %d px title box", got, theme.Px(theme.IconTitle))
+	}
+	if want := TipPadX + theme.Px(theme.IconTitle) + tipIconGap; l.Title.Min.X != want {
+		t.Errorf("title x = %d, want %d (icon box + gap)", l.Title.Min.X, want)
+	}
+	m.IconSize = 0
+	if got := tipLayoutAt(env, m, tipInnerWidth(env, m)).Icon.Dx(); got != TipIcon {
+		t.Errorf("default icon box = %d, want %d", got, TipIcon)
+	}
+}
+
 // TestTipLayoutTilesAtBothWidths lays the fixture out at the 320 px cap and
 // at its content-sized width, pins the hand-computable x geometry (padding,
 // icon column, title indent, shared anchor) and runs the tiling contract on

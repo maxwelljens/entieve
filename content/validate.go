@@ -77,6 +77,21 @@ type validator struct {
 	// familyVolume records the shell volume of each ammo class so every
 	// family stays one calibre (items pass).
 	familyVolume map[string]float64
+	// iconKeys, when non-nil, is the icon registry's key set: a module's
+	// optional icon must name one of them (wired by the CLI, which links
+	// the UI; content itself never imports uikit).
+	iconKeys map[string]bool
+}
+
+// ValidateOption adds an optional cross-check to Validate. The zero options
+// keep the historical validator exactly (content alone cannot know the icon
+// registry).
+type ValidateOption func(*validator)
+
+// WithIconKeys enables the module-icon check: every non-empty ModuleDef.Icon
+// must be a key of keys (the icon manifest's semantic names).
+func WithIconKeys(keys map[string]bool) ValidateOption {
+	return func(v *validator) { v.iconKeys = keys }
 }
 
 func (v *validator) addf(format string, args ...any) {
@@ -96,16 +111,21 @@ func keys[K ~string, V any](m map[K]V) []K {
 
 // Validate cross-checks the whole content graph and returns ONE error whose
 // message lists every problem found, one per line, each prefixed with its
-// file/id context. It returns nil when the content is clean.
+// file/id context. It returns nil when the content is clean. Options add the
+// checks that need out-of-package knowledge (WithIconKeys); no option keeps
+// the historical behaviour.
 //
 // Load already rejects duplicate top-level IDs across files (with file
 // names); Validate covers everything else — including duplicate celestial
 // IDs, which survive loading because celestials live in slices.
-func (c *Content) Validate() error {
+func (c *Content) Validate(opts ...ValidateOption) error {
 	if c == nil {
 		return errors.New("content: nil content")
 	}
 	v := &validator{c: c}
+	for _, o := range opts {
+		o(v)
+	}
 	v.items()
 	v.ships()
 	v.modules()
@@ -342,6 +362,9 @@ func (v *validator) modules() {
 		}
 		if !validKinds[m.Kind] {
 			v.addf("%s: unknown kind %q", ctx, m.Kind)
+		}
+		if m.Icon != "" && v.iconKeys != nil && !v.iconKeys[m.Icon] {
+			v.addf("%s: unknown icon %q (not an icon-manifest key)", ctx, m.Icon)
 		}
 		if m.Mount != "" {
 			if m.Slot != SlotHigh {

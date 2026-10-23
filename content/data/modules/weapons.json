@@ -1,6 +1,7 @@
 [
   {
     "id": "mod-autocannon-s",
+    "icon": "mod_autocannon_s",
     "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
     "name": "Small Autocannon",
@@ -31,6 +32,7 @@
   },
   {
     "id": "mod-autocannon-m",
+    "icon": "mod_autocannon_m",
     "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
     "name": "Medium Autocannon",
@@ -61,6 +63,7 @@
   },
   {
     "id": "mod-autocannon-l",
+    "icon": "mod_autocannon_m",
     "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
     "name": "Large Autocannon",
@@ -91,6 +94,7 @@
   },
   {
     "id": "mod-artillery-s",
+    "icon": "mod_artillery_s",
     "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
     "name": "Small Artillery",
@@ -121,6 +125,7 @@
   },
   {
     "id": "mod-artillery-m",
+    "icon": "mod_artillery_m",
     "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
     "name": "Medium Artillery",
@@ -151,6 +156,7 @@
   },
   {
     "id": "mod-artillery-l",
+    "icon": "mod_artillery_l",
     "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
     "name": "Large Artillery",

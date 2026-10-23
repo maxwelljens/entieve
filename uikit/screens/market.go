@@ -249,6 +249,34 @@ func marketInfo(d *content.Content, items []content.ItemID) (group, maker map[co
 	return group, maker
 }
 
+// itemIcon picks one tradeable's row glyph: a module's own icon (its art,
+// else its class glyph), else the market group's glyph. Branch/parent rows
+// stay text-only; an unknown group returns "".
+func (m *Market) itemIcon(item content.ItemID) string {
+	if d := m.cv.Defs(); d != nil {
+		if def := d.Modules[content.ModuleID(item)]; def != nil {
+			return theme.ModuleIconFor(def)
+		}
+	}
+	switch g := m.group[item]; {
+	case strings.HasPrefix(g, "Ammunition/"):
+		return "ammo"
+	case g == "Loot":
+		return "act_loot"
+	case strings.HasPrefix(g, "Materials/Minerals"):
+		return "kind_belt"
+	case strings.HasPrefix(g, "Materials/Ore"):
+		return "kind_asteroid"
+	case strings.HasPrefix(g, "Ships/"):
+		return "row_hull"
+	}
+	return ""
+}
+
+// mktRowIcon is every market item row's icon box: 20 px (30 px of content in
+// the 31 px row — no density change).
+const mktRowIcon = theme.IconButton
+
 // mktNodes flattens the group tree in depth-first, label-sorted order: a
 // parent always precedes its children.
 func mktNodes(items []content.ItemID, group map[content.ItemID]string) []mktNode {
@@ -1041,8 +1069,10 @@ func (m *Market) itemRow(item content.ItemID, ords []sim.MarketStock, price floa
 			qty,
 			mktNoSide,
 		},
-		Data: mktItemRow{Item: item},
-		Spec: m.rowSpec(item, gated, !hasAsk),
+		Icons:    []string{m.itemIcon(item)},
+		IconSize: mktRowIcon,
+		Data:     mktItemRow{Item: item},
+		Spec:     m.rowSpec(item, gated, !hasAsk),
 	}
 	if a, ok := m.avail[item]; ok && a.Stations > 0 {
 		row.CellRuns = make([][]widgets.RowSeg, 4)
@@ -1072,10 +1102,12 @@ func (m *Market) resultRow(h mktHit, total int, price float64, hasAsk bool) widg
 	meta += "  " + m.group[h.Item]
 	segs = append(segs, widgets.RowSeg{Text: "   " + meta, Tint: m.th.Pal().Dim, Step: theme.StepTiny})
 	return widgets.TableRow{
-		Cells: []string{name, theme.FormatCredits(price), theme.FormatInt(int64(total)), mktNoSide},
-		Data:  mktItemRow{Item: h.Item},
-		Spec:  widgets.RowSpec{Ref: widgets.RowRef(m.cv, h.Item)},
-		Stack: []widgets.RowLine{{Segs: segs}},
+		Cells:    []string{name, theme.FormatCredits(price), theme.FormatInt(int64(total)), mktNoSide},
+		Icons:    []string{m.itemIcon(h.Item)},
+		IconSize: mktRowIcon,
+		Data:     mktItemRow{Item: h.Item},
+		Spec:     widgets.RowSpec{Ref: widgets.RowRef(m.cv, h.Item)},
+		Stack:    []widgets.RowLine{{Segs: segs}},
 	}
 }
 
@@ -1131,10 +1163,12 @@ func (m *Market) bookRow(o sim.MarketStock, gated bool) widgets.TableRow {
 		tint = theme.OwnedRowTint(m.th.Pal())
 	}
 	return widgets.TableRow{
-		Cells: []string{"", theme.FormatCredits(o.Price), theme.FormatInt(int64(o.Qty)), side},
-		Tint:  tint,
-		Data:  mktOrderRow{Item: o.Item, ID: o.ID},
-		Spec:  m.rowSpec(o.Item, gated, false),
+		Cells:    []string{"", theme.FormatCredits(o.Price), theme.FormatInt(int64(o.Qty)), side},
+		Icons:    []string{m.itemIcon(o.Item)},
+		IconSize: mktRowIcon,
+		Tint:     tint,
+		Data:     mktOrderRow{Item: o.Item, ID: o.ID},
+		Spec:     m.rowSpec(o.Item, gated, false),
 	}
 }
 

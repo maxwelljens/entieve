@@ -23,7 +23,7 @@ const iconsCaptureFrames = 13
 
 // TestIconsCaptureFrame renders the three icon-bearing core surfaces —
 // overview (kind column), Selected Item (kind glyph + action buttons) and
-// the module rack (class tiles) — through a real ebiten game loop, checks
+// the module rack (module icons) — through a real ebiten game loop, checks
 // that the glyphs actually landed on pixels (ink in each box, the tile
 // glyph centred in its tile) and screenshots the frame.
 //
@@ -154,10 +154,10 @@ func (g *iconsCaptureGame) verify(img *ebiten.Image) {
 		}
 	}
 
-	// --- 4. Rack tiles: a fitted cell's glyph sits centred in its tile.
-	// The tile body is flat, so the glyph is whatever differs from the
-	// body colour sampled in a corner the glyph can never reach (the
-	// glyph is 20 px centred in a 50×40 tile): disabled tiles draw at
+	// --- 4. Rack tiles: a fitted cell's icon (art or class glyph) sits
+	// centred in its tile. The tile body is flat, so the icon is whatever
+	// differs from the body colour sampled in a corner the icon can never
+	// reach (it is 32 px centred in a 50×40 tile): disabled tiles draw at
 	// 40 % and would fail an absolute brightness threshold.
 	// The tile's inner ink box must be centred on the tile to within a
 	// couple of pixels — a glyph hung off one side (the graphic-row

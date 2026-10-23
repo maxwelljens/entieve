@@ -588,6 +588,36 @@ func TestValidateNegativeCases(t *testing.T) {
 	}
 }
 
+// TestValidateModuleIcons covers the optional icon check the CLI wires
+// (WithIconKeys): a non-manifest key is rejected with the module and the key,
+// a known key passes and an empty icon stays optional.
+func TestValidateModuleIcons(t *testing.T) {
+	keys := map[string]bool{"mod_weapon": true, "mod_autocannon_s": true}
+	cases := []struct {
+		name, icon, want string
+	}{
+		{name: "unknown icon key", icon: "mod-ghost", want: `modules/mod-gun: unknown icon "mod-ghost"`},
+		{name: "known icon key", icon: "mod_autocannon_s"},
+		{name: "empty icon is optional", icon: ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := baseContent()
+			c.Modules["mod-gun"].Icon = tc.icon
+			err := c.Validate(WithIconKeys(keys))
+			if tc.want == "" {
+				if err != nil {
+					t.Fatalf("unexpected error:\n%v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want one containing %q", err, tc.want)
+			}
+		})
+	}
+}
+
 // TestBaseContentIsValid guards the fixture baseline itself.
 func TestBaseContentIsValid(t *testing.T) {
 	if err := baseContent().Validate(); err != nil {

@@ -33,6 +33,74 @@ func parseCredits(t *testing.T, s string) float64 {
 	return v
 }
 
+// TestMarketRowIcons pins the market's row glyphs: every item row (catalog
+// parent, expanded order, search hit) carries a 20 px icon — a module's own
+// art, else its group's glyph — while the browse-tree branch rows stay
+// text-only.
+func TestMarketRowIcons(t *testing.T) {
+	env, _ := newTestEnv(t)
+	m := NewMarket(env)
+	ui := newWindowUI(t, env, m.Win())
+	uitest.PumpWindow(t, ui, m.Sync, 1024, 700)
+
+	seen := map[string]bool{}
+	for _, r := range m.tbl.Rows {
+		it, ok := r.Data.(mktItemRow)
+		if !ok {
+			continue
+		}
+		if r.IconSize != mktRowIcon {
+			t.Errorf("%s: icon size = %d, want %d", it.Item, r.IconSize, mktRowIcon)
+		}
+		if len(r.Icons) != 1 || r.Icons[0] != m.itemIcon(it.Item) {
+			t.Errorf("%s: icon = %v, want %q", it.Item, r.Icons, m.itemIcon(it.Item))
+		}
+		seen[r.Icons[0]] = true
+	}
+	for _, want := range []string{"mod_autocannon_s", "ammo", "act_loot", "kind_belt", "kind_asteroid", "row_hull"} {
+		if !seen[want] {
+			t.Errorf("no catalog row carries %q (saw %v)", want, seen)
+		}
+	}
+
+	// Branch rows (All, Ammunition, …) are text-only.
+	for _, r := range m.tree.Rows {
+		if len(r.Icons) != 0 || r.IconSize != 0 {
+			t.Errorf("tree row %q carries an icon (%v)", r.Cells, r.Icons)
+		}
+	}
+
+	// An expanded item's order rows inherit its glyph (same 20 px box).
+	expanded := false
+	for _, r := range m.tbl.Rows {
+		it, ok := r.Data.(mktItemRow)
+		if !ok || expanded {
+			continue
+		}
+		if r.Cells[2] == "0" {
+			continue // no resting orders to fold out
+		}
+		m.open[it.Item] = true
+		expanded = true
+	}
+	if !expanded {
+		t.Fatal("fixture: no item with resting orders")
+	}
+	uitest.PumpWindow(t, ui, m.Sync, 1024, 700)
+	books := 0
+	for _, r := range m.tbl.Rows {
+		if o, ok := r.Data.(mktOrderRow); ok {
+			books++
+			if r.IconSize != mktRowIcon || len(r.Icons) != 1 || r.Icons[0] != m.itemIcon(o.Item) {
+				t.Errorf("order row icon = %v/%d, want the item glyph at %d", r.Icons, r.IconSize, mktRowIcon)
+			}
+		}
+	}
+	if books == 0 {
+		t.Error("fixture: no expanded order rows")
+	}
+}
+
 // TestMarketOrderBookRows pins the order-book tree: one parent row per
 // item of the tradeable catalog (canonical order, always listed), its
 // resting orders folded out beneath it on a click — asks (price

@@ -411,7 +411,7 @@ func productIcon(cv widgets.ContentView, product content.ItemID) string {
 		return "row_hull"
 	}
 	if def, ok := cv.Defs().Module(content.ModuleID(product)); ok {
-		return theme.ModuleIcon(def.Kind)
+		return theme.ModuleIconFor(def)
 	}
 	if _, ok := cv.Defs().Item(product); ok {
 		return icons.Fallback

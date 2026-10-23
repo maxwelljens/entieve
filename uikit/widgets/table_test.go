@@ -989,6 +989,34 @@ func TestTableScrollRailGutter(t *testing.T) {
 	}
 }
 
+// TestTableRowIconSizeReservesItsWidth: TableRow.IconSize widens the icon
+// reservation (natural width and the ellipsize budget) by exactly its growth
+// over the 16 px default, and a 20 px market row icon still fits the dense
+// 31 px row — no density change.
+func TestTableRowIconSizeReservesItsWidth(t *testing.T) {
+	env, _ := newTestEnv(t)
+	table := func(size int) *Table {
+		tbl := NewTable(env, []Column{{Key: "A", Title: "Name"}})
+		tbl.SetRows([]TableRow{{
+			Cells: []string{"alpha"}, Icons: []string{"kind_ship"}, IconSize: size,
+		}})
+		return tbl
+	}
+	inline, big := table(0), table(theme.IconButton)
+	t.Logf("Name-column natural width: 16 px icon %.1f px, 20 px icon %.1f px",
+		inline.base[0].Width, big.base[0].Width)
+	if got, want := big.base[0].Width-inline.base[0].Width,
+		float64(theme.Px(theme.IconButton-theme.IconInline)); math.Abs(got-want) > 1e-6 {
+		t.Errorf("20 px icon reserved %.1f px more than the 16 px default, want %.1f", got, want)
+	}
+	if got := math.Round(big.rowH); got != 31 {
+		t.Errorf("row height = %v, want 31 (a 20 px icon fits 20+2×%d)", got, entryPadV)
+	}
+	if float64(theme.Px(theme.IconButton)+2*theme.Px(entryPadV)) > big.rowH {
+		t.Errorf("a 20 px row icon does not fit the row (%v px)", big.rowH)
+	}
+}
+
 // TestTableRowDensityPins: information density in tables is deliberate
 // (EVE-like), so the furniture tokens never reach a row's VERTICAL
 // metrics — entryPadV stays its literal. The horizontal cell padding

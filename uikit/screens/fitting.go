@@ -523,6 +523,10 @@ func (f *Fitting) newTile(class string, idx int) *fitTile {
 		widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionCenter),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, theme.Px(fitTileNameH))),
 	)
+	// The 32 px tile icon makes the button's inner row wider than the cell;
+	// the cap keeps the 50×40 tile geometry (the icon overflows only its
+	// transparent padding, never the tile).
+	t.btn.GetWidget().LayoutData = widget.RowLayoutData{MaxWidth: theme.Px(fitTileW)}
 	t.root = widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
 		widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 	)))
@@ -530,14 +534,14 @@ func (f *Fitting) newTile(class string, idx int) *fitTile {
 	return t
 }
 
-// fitGlyph resolves one tile image: the module's class glyph in the given
-// tint ("" = an empty slot, which gets a transparent box of the same size
-// so no cell ever changes size when a module is fitted).
+// fitGlyph resolves one tile image: the module's icon (art, else its class
+// glyph) in the given tint ("" = an empty slot, which gets a transparent box
+// of the same size so no cell ever changes size when a module is fitted).
 func fitGlyph(name string, tint color.RGBA) *ebiten.Image {
 	if name == "" {
-		return icons.Get(icons.Fallback, theme.Px(theme.IconButton), color.RGBA{})
+		return icons.Get(icons.Fallback, theme.Px(theme.IconTile), color.RGBA{})
 	}
-	return icons.Get(name, theme.Px(theme.IconButton), tint)
+	return icons.Get(name, theme.Px(theme.IconTile), tint)
 }
 
 // fitTileImages builds the slot tile chrome: accent-edged cells for fitted
@@ -814,7 +818,7 @@ func (f *Fitting) syncTile(t *fitTile, id content.ModuleID) {
 	}
 	icon := ""
 	if def != nil {
-		icon = theme.ModuleIcon(def.Kind)
+		icon = theme.ModuleIconFor(def)
 	}
 	t.mod = id
 	if icon != t.icon || (def == nil) != t.empty {
@@ -1061,7 +1065,7 @@ func (f *Fitting) hangarRows() []widgets.TableRow {
 		id := content.ModuleID(st.Item)
 		rows = append(rows, widgets.TableRow{
 			Cells: []string{mod.Name, "×" + theme.FormatInt(int64(st.Qty))},
-			Icons: []string{theme.ModuleIcon(mod.Kind), ""},
+			Icons: []string{theme.ModuleIconFor(mod), ""},
 			Data:  id,
 			Spec:  f.hangarSpec(id),
 		})

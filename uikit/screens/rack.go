@@ -64,9 +64,11 @@ const (
 	// rackAmmoIcon / rackAmmoInset place the ready marker: a small round
 	// silhouette in the tile's bottom-right corner, on its own overlay, kept
 	// clear of the waiting dot (top-right = "needs you", bottom-right =
-	// "armed") and of the cycle ring.
+	// "armed") and of the cycle ring. The inset is 3 (not 5) because the
+	// 32 px tile icon's ink reaches x=37/y=30 of the 50×40 cell, where a
+	// 5 px-inset marker would sit on it.
 	rackAmmoIcon  = 10 // marker glyph size (design px)
-	rackAmmoInset = 5  // marker inset from the tile's bottom-right corner
+	rackAmmoInset = 3  // marker inset from the tile's bottom-right corner
 )
 
 // rackClasses and rackRowLabels index the three slot rows.
@@ -309,6 +311,10 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 	cell.stack = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewStackedLayout()),
 	)
+	// The 32 px tile icon makes the button's inner row wider than the cell;
+	// the cap keeps the 50×40 tile geometry (the icon overflows only its
+	// transparent padding, never the tile).
+	cell.stack.GetWidget().LayoutData = widget.RowLayoutData{MaxWidth: theme.Px(rackCellW)}
 	cell.stack.AddChild(cell.btn, cell.ringGfx, cell.badgeGfx, cell.ammoGfx)
 	cell.root = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -342,15 +348,15 @@ func (r *Rack) clickCell(cell *rackCell, a *widget.WidgetMouseButtonClickedEvent
 	}
 }
 
-// rackGlyph resolves one tile image: the module's class glyph in the given
-// tint ("" = an empty slot, which gets a transparent box of the same size
-// so no cell ever changes size when a module is fitted).
+// rackGlyph resolves one tile image: the module's icon (art, else its class
+// glyph) in the given tint ("" = an empty slot, which gets a transparent box
+// of the same size so no cell ever changes size when a module is fitted).
 func rackGlyph(name string, tint color.RGBA) *ebiten.Image {
-	// IconButton is a design unit: the glyph scales with the cell.
+	// IconTile is a design unit: the glyph scales with the cell.
 	if name == "" {
-		return icons.Get(icons.Fallback, theme.Px(theme.IconButton), color.RGBA{})
+		return icons.Get(icons.Fallback, theme.Px(theme.IconTile), color.RGBA{})
 	}
-	return icons.Get(name, theme.Px(theme.IconButton), tint)
+	return icons.Get(name, theme.Px(theme.IconTile), tint)
 }
 
 // rackCellImages builds the cell chrome: an amber-tinted glow for active
@@ -491,7 +497,7 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 	// keeps the short name (and the click seam) exactly where it was.
 	icon := ""
 	if def != nil {
-		icon = theme.ModuleIcon(def.Kind)
+		icon = theme.ModuleIconFor(def)
 	}
 	if cell.icon != icon {
 		cell.icon = icon

@@ -21,7 +21,7 @@ const fitCaptureFrames = 13
 // TestFittingCaptureFrame draws the fitting window through a real ebiten
 // loop and pins the pixels the headless suite cannot read back: the hull
 // portrait's ink inside its frame, the maker emblem beside the class ·
-// maker line, the class glyph centred in a fitted tile, and the dashed
+// maker line, the module icon centred in a fitted tile, and the dashed
 // outline (border ink, hollow centre) of an empty slot.
 //
 // Skipped unless ENTIEVE_CAPTURE=1; the PNG lands in $ENTIEVE_CAPTURE_DIR
@@ -150,7 +150,7 @@ func (g *fitCaptureGame) verify(img *ebiten.Image) error {
 		fail("emblem box %v has %d non-body pixels, want the maker mark", kids[0].GetWidget().Rect, got)
 	}
 
-	// A fitted tile's class glyph sits centred in the 50×40 cell (±4 px,
+	// A fitted tile's module icon sits centred in the 50×40 cell (±4 px,
 	// the rack's discipline); an empty placeholder is dashed (border ink
 	// with gaps) and hollow.
 	fitted, empty := 0, 0
