@@ -370,6 +370,13 @@ func (m *Menu) Poll() bool {
 	if m == nil || !m.open {
 		return false
 	}
+	// One gesture, one action: this frame's press already ran (an entry's
+	// Action may have reopened the popup), so a second poll in the same
+	// frame — Kit.Update's, after the host's MenuInput pass — must not run
+	// an entry again. Menu.TakeBlocked clears the latch in Kit.Update.
+	if m.blocked {
+		return true
+	}
 	// Live read: ebitenui's cursor cache is stale by design while open.
 	x, y := pollCursor()
 	pt := image.Pt(x, y)

@@ -166,10 +166,15 @@ func TestFirstFitIsTheOldMeasurement(t *testing.T) {
 	}
 }
 
-// TestColumnGripDragResizesOnlyItsColumn drives the real drag: the strip
-// owns the press (its own input layer covers the sort button), the delta
-// trades with the next column so the row keeps tiling, and no sort fires.
-func TestColumnGripDragResizesOnlyItsColumn(t *testing.T) {
+// TestColumnGripDragFollowsThePointer is the edge-tracking contract the
+// width arithmetic alone never pinned: the strip sits ON the boundary it
+// drags, and that boundary moves with the cursor — the column left of it
+// grows, the column right of it gives the width back, and no other
+// boundary moves. (The old trade partner was the least important column,
+// wherever it was: grabbing Distance's right edge moved Name's edge while
+// the grabbed line stood still. The last column's strip sat at the ⋯
+// button, made-up boundary and all.)
+func TestColumnGripDragFollowsThePointer(t *testing.T) {
 	env, _ := newTestEnv(t)
 	tbl, ui := newColumnTable(t, env, overviewCols())
 	tbl.SetRows(overviewRows("0 m/s"))
@@ -177,20 +182,25 @@ func TestColumnGripDragResizesOnlyItsColumn(t *testing.T) {
 	before := anchorsOf(tbl)
 	avail := tbl.FitWidthForTest()
 
-	// The last column's strip stops at the ⋯ button, which owns the
-	// strip's right end.
-	grip := tbl.grips[3].GetWidget().Rect
-	if grip.Empty() || !grip.In(tbl.header.GetWidget().Rect) {
-		t.Fatalf("grip 3 rect = %v, want a strip inside the header %v", grip, tbl.header.GetWidget().Rect)
+	// The table's right edge is not a column boundary: the last column
+	// keeps no strip (the fit owns that edge; there is nothing to drag).
+	if r := tbl.grips[len(tbl.cols)-1].GetWidget().Rect; !r.Empty() {
+		t.Errorf("last column's strip = %v, want none (its right edge is the table's)", r)
 	}
-	if menu := tbl.menuBtn.GetWidget().Rect; grip.Max.X > menu.Min.X {
-		t.Errorf("last grip %v runs under the column menu %v", grip, menu)
+
+	grip := tbl.grips[1].GetWidget().Rect
+	if grip.Empty() || !grip.In(tbl.header.GetWidget().Rect) {
+		t.Fatalf("grip 1 rect = %v, want a strip inside the header %v", grip, tbl.header.GetWidget().Rect)
+	}
+	// The strip ends exactly on the Distance|Kind boundary it drags.
+	if edge := tbl.hdrBtn[2].GetWidget().Rect.Min.X; grip.Max.X != edge {
+		t.Fatalf("grip 1 ends at %d, not on the Distance|Kind boundary %d", grip.Max.X, edge)
 	}
 	// The split rule: a press in the strip belongs to the grip's own
 	// (blocking) layer — the grips are added after the sort row, so theirs
 	// sits above the button tiling underneath it.
 	pt := grip.Min.Add(image.Pt(grip.Dx()/2, grip.Dy()/2))
-	gl := tbl.grips[3].GetWidget().EffectiveInputLayer()
+	gl := tbl.grips[1].GetWidget().EffectiveInputLayer()
 	if !gl.ActiveFor(pt.X, pt.Y, input.LayerEventTypeMouseButton) || !gl.BlockLower {
 		t.Fatal("the grip's input layer does not block its strip")
 	}
@@ -202,12 +212,14 @@ func TestColumnGripDragResizesOnlyItsColumn(t *testing.T) {
 	}
 
 	tbl.Step(pt, true, true)
-	if tbl.grip != 3 {
-		t.Fatalf("press on grip 3 grabbed %d", tbl.grip)
+	if tbl.grip != 1 {
+		t.Fatalf("press on grip 1 grabbed %d", tbl.grip)
 	}
-	tbl.Step(pt.Add(image.Pt(40, 0)), false, true)
-	tbl.Step(pt.Add(image.Pt(40, 0)), false, false)
+	// +20 stays inside Kind's floor slack, so the trade is unbounded by it.
+	tbl.Step(pt.Add(image.Pt(20, 0)), false, true)
+	tbl.Step(pt.Add(image.Pt(20, 0)), false, false)
 	settle(t, tbl, ui)
+	after := anchorsOf(tbl)
 
 	if tbl.grip != -1 {
 		t.Errorf("grip still grabbed after the release")
@@ -215,23 +227,56 @@ func TestColumnGripDragResizesOnlyItsColumn(t *testing.T) {
 	if tbl.sortKey != "" {
 		t.Errorf("sort key = %q after a grip drag, want none", tbl.sortKey)
 	}
-	if got, want := tbl.widths[3], before.widths[3]+40; math.Abs(got-want) > 1 {
-		t.Errorf("dragged column = %v, want %v (40 px wider)", got, want)
+	// (a) The grabbed edge follows the pointer — on screen, header and
+	// body alike, by exactly the drag distance.
+	if got, want := after.hdr[2].Min.X, before.hdr[2].Min.X+20; got != want {
+		t.Errorf("Distance|Kind boundary at %d, want %d (the grabbed edge must follow the pointer)", got, want)
 	}
-	if got := tbl.widths[0]; math.Abs(got-(before.widths[0]-40)) > 1 {
-		t.Errorf("traded column = %v, want %v (40 px narrower)", got, before.widths[0]-40)
+	if got, want := after.cells[2].Min.X, before.cells[2].Min.X+20; got != want {
+		t.Errorf("row cell boundary at %d, want %d (body must track the header)", got, want)
 	}
-	if sum := uitest.SumPrefix(tbl.widths[:len(tbl.cols)]); math.Abs(sum-avail) > 1e-6 {
-		t.Errorf("column sum = %v, want the table width %v (still tiling)", sum, avail)
+	if got, want := tbl.grips[1].GetWidget().Rect.Max.X, grip.Max.X+20; got != want {
+		t.Errorf("the grabbed strip ends at %d, want %d", got, want)
+	}
+	// (b) The column left of the edge grew, the one right of it traded the
+	// delta away.
+	if got, want := after.widths[1], before.widths[1]+20; math.Abs(got-want) > 1 {
+		t.Errorf("Distance = %v, want %v (20 px wider)", got, want)
+	}
+	if got, want := after.widths[2], before.widths[2]-20; math.Abs(got-want) > 1 {
+		t.Errorf("Kind = %v, want %v (20 px narrower, the trade partner)", got, want)
+	}
+	// (c) No other boundary moved.
+	if after.hdr[0] != before.hdr[0] {
+		t.Errorf("Name's box %v → %v after dragging Distance's edge", before.hdr[0], after.hdr[0])
+	}
+	if after.hdr[3] != before.hdr[3] {
+		t.Errorf("Velocity's box %v → %v after dragging Distance's edge", before.hdr[3], after.hdr[3])
+	}
+	if after.widths[0] != before.widths[0] || after.widths[3] != before.widths[3] {
+		t.Errorf("untouched widths %v/%v → %v/%v",
+			before.widths[0], before.widths[3], after.widths[0], after.widths[3])
+	}
+	if sum := uitest.SumPrefix(tbl.widths); math.Abs(sum-avail) > 1e-6 {
+		t.Errorf("column sum = %v, want the column area %v (still tiling)", sum, avail)
 	}
 
-	// The strip never drops below the header floor (the fit's own Min).
-	grip = tbl.grips[3].GetWidget().Rect
-	tbl.Step(grip.Min.Add(image.Pt(1, 1)), true, true)
-	tbl.Step(image.Pt(-1000, grip.Min.Y), false, true)
-	tbl.Step(image.Pt(-1000, grip.Min.Y), false, false)
-	if tbl.base[3].Width < tbl.base[3].Min {
-		t.Errorf("dragged width %v under the floor %v", tbl.base[3].Width, tbl.base[3].Min)
+	// The floor: the dragged column stops at its header measure, the
+	// partner never drops under its own, and the row keeps tiling.
+	grip = tbl.grips[1].GetWidget().Rect
+	pt = grip.Min.Add(image.Pt(1, 1))
+	tbl.Step(pt, true, true)
+	tbl.Step(image.Pt(-4000, pt.Y), false, true)
+	tbl.Step(image.Pt(-4000, pt.Y), false, false)
+	settle(t, tbl, ui)
+	if tbl.base[1].Width < tbl.base[1].Min {
+		t.Errorf("dragged width %v under the floor %v", tbl.base[1].Width, tbl.base[1].Min)
+	}
+	if tbl.base[2].Width < tbl.base[2].Min {
+		t.Errorf("partner width %v under its floor %v", tbl.base[2].Width, tbl.base[2].Min)
+	}
+	if sum := uitest.SumPrefix(tbl.widths); math.Abs(sum-tbl.FitWidthForTest()) > 1e-6 {
+		t.Errorf("column sum = %v after the floor clamp, want %v", sum, tbl.FitWidthForTest())
 	}
 }
 
@@ -251,6 +296,82 @@ func TestColumnGripClaimsTheResizeCursor(t *testing.T) {
 	ApplyCursor()
 	if shape != ebiten.CursorShapeEWResize {
 		t.Errorf("grip cursor = %v, want EW-resize", shape)
+	}
+}
+
+// TestColumnHeaderLabelStopsAtTheMenu: the ⋯ button owns the header's
+// right end and no column's header ink lands in its strip. The label is
+// ellipsized into its own column (the sort arrow survives), and the
+// columns tile the header up to the strip, so the dots are never
+// obscured — the last column's label used to run straight across them.
+func TestColumnHeaderLabelStopsAtTheMenu(t *testing.T) {
+	env, _ := newTestEnv(t)
+	tbl, ui := newColumnTable(t, env, overviewCols())
+	// The narrowest the fit allows, then the sort arrow pushes the label
+	// past the frozen floor: the label is wider than its column can show.
+	tbl.SetPrefs(map[string]ColumnPref{"Velocity": {Width: 1}})
+	tbl.SetRows(overviewRows("0 m/s"))
+	tbl.SetSort("Velocity", true)
+	settle(t, tbl, ui)
+
+	last := len(tbl.cols) - 1
+	label := tbl.hdrBtn[last].Text().Label
+	budget := tbl.widths[last] - 2*float64(theme.Px(cellPad))
+	if raw := tbl.cols[last].Title + tbl.indicator(last); tbl.headMeasure(raw) <= budget {
+		t.Fatalf("the %q label (%v) fits its %v column: the pin proves nothing",
+			raw, tbl.headMeasure(raw), tbl.widths[last])
+	}
+	if !strings.Contains(label, "…") || !strings.HasSuffix(label, tbl.indicator(last)) {
+		t.Errorf("header label = %q, want an ellipsis that keeps the sort arrow %q", label, tbl.indicator(last))
+	}
+	if got := tbl.headMeasure(label); got > budget {
+		t.Errorf("header label %q measures %v, past its %v budget", label, got, budget)
+	}
+
+	// The dots strip is the header's right end; the last column stops
+	// before it (header and body alike).
+	ui.Update()
+	menu := tbl.menuBtn.GetWidget().Rect
+	if menu.Empty() {
+		t.Fatal("no ⋯ button rect")
+	}
+	if got := tbl.hdrBtn[last].GetWidget().Rect.Max.X; got > menu.Min.X {
+		t.Errorf("the last column's header ends at %d, inside the ⋯ strip %v", got, menu)
+	}
+	if got := tbl.cellRoot(0, last).Rect.Max.X; got > menu.Min.X {
+		t.Errorf("the last column's cells end at %d, inside the ⋯ strip %v", got, menu)
+	}
+	// Ink scan (geometry: a headless process cannot read pixels back): the
+	// label's anchor box is the glyph's own extent — the same box
+	// TestHeaderCellAnchorAgreement pins — so a box clear of the strip
+	// means no label ink can land in it.
+	lbl := tbl.hdrBtn[last].Text().GetWidget().Rect
+	if lbl.Empty() {
+		t.Fatal("the header label has no box")
+	}
+	if lbl.Max.X > menu.Min.X {
+		t.Errorf("the header label's ink box %v runs into the ⋯ strip %v", lbl, menu)
+	}
+	if lbl.Max.X-lbl.Min.X > int(budget) {
+		t.Errorf("the header label's box is %d wide, past its %v budget", lbl.Dx(), budget)
+	}
+	// The grip strips stay clear too: the label is inset by cellPad, the
+	// strips are narrower than that inset (a one-line invariant).
+	for i := range tbl.cols {
+		if g := tbl.grips[i].GetWidget().Rect; !g.Empty() && tbl.hdrBtn[i].Text().GetWidget().Rect.Overlaps(g) {
+			t.Errorf("column %d's label %v runs into its grip %v",
+				i, tbl.hdrBtn[i].Text().GetWidget().Rect, g)
+		}
+	}
+	// Row cells live in the viewport below the header: no cell can reach a
+	// header control.
+	hdr := tbl.header.GetWidget().Rect
+	for r := range tbl.Rows {
+		for i := range tbl.cols {
+			if c := tbl.cellRoot(r, i).Rect; !c.Empty() && c.Min.Y < hdr.Max.Y {
+				t.Errorf("row %d column %d cell %v rises into the header %v", r, i, c, hdr)
+			}
+		}
 	}
 }
 
@@ -334,6 +455,80 @@ func TestColumnMenuTogglesVisibility(t *testing.T) {
 	e.Action()
 	if tbl.hidden[last] {
 		t.Error("the last visible column was hidden")
+	}
+}
+
+// TestColumnMenuToggleAppliesFromTheDotsClick drives the real path: the
+// ⋯ button's click opens the menu, the entry runs through the menu's own
+// gesture handling and the column is hidden by the end of that frame — no
+// window resize, no row change. The entry reopens the menu in place, so
+// the same press edge must not run an entry a second time when the frame
+// polls again (the host's MenuInput pass, then Kit.Update's): that second
+// toggle used to undo the first, which is why the menu "did nothing".
+func TestColumnMenuToggleAppliesFromTheDotsClick(t *testing.T) {
+	env, _ := newTestEnv(t)
+	tbl, ui := newColumnTable(t, env, overviewCols())
+	tbl.SetRows(overviewRows("0 m/s"))
+	settle(t, tbl, ui)
+	m := env.Menu()
+
+	// The ⋯ click, through ebitenui's deferred event (the button's own
+	// clicked handler derives the popup anchor from itself).
+	btn := tbl.menuBtn.GetWidget()
+	btn.MouseButtonClickedEvent.Fire(&widget.WidgetMouseButtonClickedEventArgs{Button: ebiten.MouseButtonLeft})
+	ui.Update()
+	if !m.IsOpen() {
+		t.Fatal("the ⋯ click opened no menu")
+	}
+	at := m.Rect().Min
+
+	const kind = 2
+	row := m.RowRect(kind)
+	if row.Empty() {
+		t.Fatalf("menu has no row %d (rows: %d)", kind, len(m.Entries()))
+	}
+	pt := row.Min.Add(image.Pt(row.Dx()/2, row.Dy()/2))
+	pressed := true
+	defer SetPollCursorForTest(func() (int, int) { return pt.X, pt.Y })()
+	defer SetPressEdgeForTest(func(ebiten.MouseButton) bool { return pressed })()
+
+	// One frame, two polls: the host's MenuInput pass and Kit.Update's
+	// fallback poll read the same press edge.
+	m.Poll()
+	m.Poll()
+	m.TakeBlocked()
+
+	if !tbl.hidden[kind] {
+		t.Fatal("clicking Kind hid nothing: the column is still shown")
+	}
+	if tbl.widths[kind] != 0 {
+		t.Errorf("hidden Kind width = %v, want the display filter's 0", tbl.widths[kind])
+	}
+	if tbl.hdrBtn[kind].GetWidget().GetVisibility() != widget.Visibility_Hide {
+		t.Error("hidden column's header button still draws")
+	}
+	if r := tbl.cellRoot(0, kind).Rect; !r.Empty() && tbl.cellRoot(0, kind).GetVisibility() != widget.Visibility_Hide {
+		t.Errorf("hidden column's cell still draws at %v", r)
+	}
+	if !m.IsOpen() || m.Rect().Min != at {
+		t.Errorf("menu did not reopen at %v (open=%v rect=%v)", at, m.IsOpen(), m.Rect())
+	}
+	if m.Entries()[kind].Checked {
+		t.Error("reopened menu still reports Kind checked")
+	}
+	if sum := uitest.SumPrefix(tbl.widths); math.Abs(sum-tbl.FitWidthForTest()) > 1e-6 {
+		t.Errorf("column sum = %v, want %v (the visible columns retile)", sum, tbl.FitWidthForTest())
+	}
+
+	// The latch is one gesture, not a freeze: the next click on the same
+	// row shows Kind again.
+	pressed = false
+	m.Poll()
+	pressed = true
+	m.Poll()
+	m.TakeBlocked()
+	if tbl.hidden[kind] {
+		t.Error("the next click did not show Kind again (menu input stuck)")
 	}
 }
 

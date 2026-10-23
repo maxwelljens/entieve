@@ -716,8 +716,7 @@ func (t *Table) Sync() {
 	t.clampScroll()
 	t.rail.Sync()
 	t.syncPlateBand()
-	avail := float64(t.root.GetWidget().Rect.Dx())
-	if avail > 0 && avail != t.fittedFor {
+	if avail := t.columnsWidth(); avail > 0 && avail != t.fittedFor {
 		t.applyWidths()
 	}
 }
@@ -1382,7 +1381,7 @@ func (t *Table) clampScroll() {
 // growing — feeds the frozen base back through the same policy, so content
 // can never move an anchor.
 func (t *Table) applyWidths() {
-	avail := float64(t.root.GetWidget().Rect.Dx())
+	avail := t.columnsWidth()
 	t.ensureFrozen(avail)
 	sub := make([]ColWidth, 0, len(t.cols))
 	prio := make([]int, 0, len(t.cols))
@@ -1406,12 +1405,20 @@ func (t *Table) applyWidths() {
 	t.layoutCells()
 }
 
+// columnsWidth is the width the columns tile: the header strip less the ⋯
+// button's own strip at its right end, so no column (and no header label)
+// ever runs under the dots.
+func (t *Table) columnsWidth() float64 {
+	return float64(t.root.GetWidget().Rect.Dx()) - float64(theme.Px(ColMenuW))
+}
+
 // ensureFrozen measures every column's natural width (the header plus the
 // widest cell of the current rows) and its floor ONCE — the first fit's
 // tiling — and freezes the result. The first fit is exactly the algorithm
-// the table always ran, so a first-open layout is unchanged; from then on
-// the fit consumes the frozen base, and later content changes (a cell
-// widening mid-warp, the sort arrow) only ever ellipsize.
+// the table always ran (over the column area, beside the ⋯ strip), so a
+// first-open layout is unchanged; from then on the fit consumes the frozen
+// base, and later content changes (a cell widening mid-warp, the sort
+// arrow) only ever ellipsize.
 func (t *Table) ensureFrozen(avail float64) {
 	if t.frozen {
 		return
@@ -1489,7 +1496,7 @@ func (t *Table) layoutCells() {
 		b := t.hdrBtn[i]
 		b.GetWidget().MinWidth = w
 		b.GetWidget().LayoutData = widget.RowLayoutData{Stretch: true, MaxWidth: w}
-		b.SetText(c.Title + t.indicator(i))
+		b.SetText(t.headerLabel(i))
 		if t.sortKey != "" && t.sortKey == c.Key {
 			b.SetImage(t.hdrOn)
 		} else {
@@ -1542,6 +1549,18 @@ func setVis(w *widget.Widget, v widget.Visibility) {
 	if w.GetVisibility() != v {
 		w.SetVisibility(v)
 	}
+}
+
+// headerLabel is the sort button's text: the title ellipsized into the
+// column's inner width (the cells' own budget), with the sort arrow kept —
+// a column squeezed after the freeze must still show which way it sorts.
+func (t *Table) headerLabel(i int) string {
+	ind := t.indicator(i)
+	avail := t.widths[i] - 2*float64(theme.Px(cellPad)) - t.headMeasure(ind)
+	if avail < 0 {
+		avail = 0
+	}
+	return Ellipsize(t.cols[i].Title, avail, t.headMeasure) + ind
 }
 
 // indicator is the active sort column's arrow suffix. IBM Plex Sans ships
