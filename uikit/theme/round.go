@@ -107,9 +107,18 @@ func roundedBox(top, bottom, edge color.NRGBA, w int, radii Radii) *eimage.NineS
 }
 
 // roundedBoxAt is roundedBox with the fill suppressed for the first fillTop
-// device px (the top slice), which is how the banded viewport keeps its
-// border ring while the artwork shows through.
+// device px, which is how the banded viewport keeps its border ring while
+// the artwork shows through. The top slice is padT rows — the corner arcs —
+// and every one of them is filled (fillTop only blanks rows the caller asked
+// for), so a box's top and bottom bands read its fill edge to edge.
 func roundedBoxAt(top, bottom, edge color.NRGBA, w int, radii Radii, fillTop int) *eimage.NineSlice {
+	img, padX, padY := roundedBoxRaster(top, bottom, edge, w, radii, fillTop)
+	return eimage.NewNineSlice(ebiten.NewImageFromImage(img), padX, padY)
+}
+
+// roundedBoxRaster rasterises the box and returns it with its nine-slice
+// cuts (columns, rows) — the seam round_test.go reads pixels through.
+func roundedBoxRaster(top, bottom, edge color.NRGBA, w int, radii Radii, fillTop int) (*image.NRGBA, [3]int, [3]int) {
 	r := scaleRadii(radii)
 	b := max(Px(w), 1)
 	padT := max(max(r.TL, r.TR), b, fillTop)
@@ -117,12 +126,8 @@ func roundedBoxAt(top, bottom, edge color.NRGBA, w int, radii Radii, fillTop int
 	padL := max(max(r.TL, r.BL), b)
 	padR := max(max(r.TR, r.BR), b)
 
-	img := roundRectImage(padL+padR+1, padT+depthRows+padB, top, bottom, edge, b, r, padT, padT)
-	return eimage.NewNineSlice(
-		ebiten.NewImageFromImage(img),
-		[3]int{padL, 1, padR},
-		[3]int{padT, depthRows, padB},
-	)
+	img := roundRectImage(padL+padR+1, padT+depthRows+padB, top, bottom, edge, b, r, padT, fillTop)
+	return img, [3]int{padL, 1, padR}, [3]int{padT, depthRows, padB}
 }
 
 // scaleRadii converts design radii to device px.
