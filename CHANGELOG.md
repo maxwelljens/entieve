@@ -187,6 +187,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Saves are
   untouched (schema 2: defs carry the limits, saves carry module ids).
 
+### Fixed
+- Rounded chrome's top band carries the panel/title fill again (the backdrop no longer shows through where the corners begin).
+
 ### Changed
 - **Chrome adopts the Cyber Terminal kit's form language** (`uikit`, `docs`) — shapes only, the amber-on-black palette is pixel-identical (its golden values and the log severity hexes pass untouched): rounded chrome on three radius tokens (14 window pieces, 8 panels/cards, 5 controls), window title bars top-rounded and bodies bottom-rounded around a square seam; three hollow 9 px ring dots at every title bar's left; a subtle top→bottom depth ramp on panel and window-body fills (ΔRGB ≤ 6, ±4 alpha around the 230 translucency token); tracked mono (Plex Mono, 0.12 em) window titles, panel heads and section heads; the starmap's 28 px lattice at 3.5 % accent; and the rack's waiting dot pulsing through eight pre-rendered phases. Kit credit (Kerem Bolek) and the new form canon: [docs/lore/AESTHETIC.md](docs/lore/AESTHETIC.md), implementation substrate in [docs/ART.md](docs/ART.md).
 - Volume in lists and aggregates (inventory rows and totals, fitting capacities, tooltip stats) floors to two decimals with trailing zeroes trimmed — a cargo sum of `0.7000000000000001 m³` reads `0.7 m³`; the Show Info window keeps full precision.
