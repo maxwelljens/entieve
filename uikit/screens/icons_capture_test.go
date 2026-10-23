@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/entieve/entieve/uikit/internal/uitest"
 	"github.com/entieve/entieve/uikit/theme"
+	"image"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -168,7 +169,23 @@ func (g *iconsCaptureGame) verify(img *ebiten.Image) {
 				continue
 			}
 			tile := cell.btn.GetWidget().Rect
-			bx, n := uitest.GlyphBounds(img, tile)
+			// The waiting badge (top-right dot) and ready marker
+			// (bottom-right shell) are designed corner ink — exclude
+			// their footprints so only the glyph moves the centroid.
+			var excl []image.Rectangle
+			if cell.ammoGfx.GetWidget().GetVisibility() == widget.Visibility_Show {
+				ox, oy := rackAmmoOrigin()
+				s := theme.Px(rackAmmoIcon)
+				excl = append(excl, image.Rect(tile.Min.X+ox, tile.Min.Y+oy,
+					tile.Min.X+ox+s, tile.Min.Y+oy+s))
+			}
+			if cell.badgeGfx.GetWidget().GetVisibility() == widget.Visibility_Show {
+				r := theme.Px(rackBadgeR)
+				cx := tile.Max.X - theme.Px(rackBadgeInset)
+				cy := tile.Min.Y + theme.Px(rackBadgeInset)
+				excl = append(excl, image.Rect(cx-r, cy-r, cx+r, cy+r))
+			}
+			bx, n := uitest.GlyphBounds(img, tile, excl...)
 			if n < 8 {
 				fail("rack tile %v has %d ink pixels for %s, want a drawn glyph",
 					tile, n, cell.icon)

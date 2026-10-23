@@ -146,7 +146,9 @@ func AbsInt(v int) int {
 // GlyphBounds returns the on-screen footprint of a rack tile's glyph: the
 // bounds of every pixel inside the tile that differs from its flat body
 // colour (sampled at an inner corner the centred glyph never reaches).
-func GlyphBounds(img *ebiten.Image, tile image.Rectangle) (image.Rectangle, int) {
+// Overlays drawn in the tile's corners (waiting badge, ready marker) are
+// designed ink and are passed as exclude so they never drag the centroid.
+func GlyphBounds(img *ebiten.Image, tile image.Rectangle, exclude ...image.Rectangle) (image.Rectangle, int) {
 	refR, refG, refB, _ := img.At(tile.Min.X+4, tile.Min.Y+4).RGBA()
 	close := func(c interface {
 		RGBA() (uint32, uint32, uint32, uint32)
@@ -157,6 +159,12 @@ func GlyphBounds(img *ebiten.Image, tile image.Rectangle) (image.Rectangle, int)
 			AbsInt(int(b>>8)-int(refB>>8)) <= 14
 	}
 	return inkBoundsFunc(img, tile.Inset(3), func(x, y int) bool {
+		p := image.Pt(x, y)
+		for _, ex := range exclude {
+			if p.In(ex) {
+				return false
+			}
+		}
 		return !close(img.At(x, y))
 	})
 }
