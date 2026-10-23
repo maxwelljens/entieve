@@ -203,21 +203,6 @@ its name — the fleet's nine hulls, drawn to be told apart by silhouette at
   in `uikit/emblems` + `tools/emblemraster`; the portraits are original
   artwork and carry the manifest's `original artwork` credit.
 
-## Palette and chrome language
-
-The theme is the **Cyber Terminal** register: mint hairlines on near-black
-panels, one accent (mint `#71f3c4`), status roles good `#80efb1` / warning
-`#ffc76b` / danger `#ff647c`, mono chrome with tracked labels, a radial mint
-wash under the interface and a 28 px grid on the starmap. Values and roles
-are canonized in [lore/AESTHETIC.md](lore/AESTHETIC.md); the code is
-`uikit/theme` (palette, tracked labels, widget theme).
-
-**Credit — derived, not shipped.** The palette and chrome language are
-derived from the **Cyber Terminal UI Kit** by **Kerem Bolek** (© 2026),
-whose license permits inclusion/adaptation in published projects. No kit
-files (CSS, JS, SVG, demo HTML) are copied into this repository: the theme
-is implemented from the kit's colour/typography tokens.
-
 ## Typeface
 
 The interface is set in **IBM Plex Sans** (the display face) with **IBM
@@ -229,18 +214,9 @@ did (`uikit.DefaultTypeScale`).
 
 | Weight | Role |
 |---|---|
-| Regular | body text: log lines, tooltip rows and values, text input, table cells (outside the mono tables below), list entries |
-| Medium | emphasis: table header sort buttons, buttons, HUD readouts, tooltip titles (`render.FaceBold` / `Env.FaceBold` — the constant name is historical) |
+| Regular | body text: log lines, labels, tooltip rows and values, text input, table cells (outside the mono tables below) |
+| Medium | emphasis: window titles, table header sort buttons, buttons, HUD readouts, tooltip titles (`render.FaceBold` / `Env.FaceBold` — the constant name is historical) |
 | Light, Bold | shipped with the family in `render/fonts/`, not used by the UI |
-
-**Chrome vs body.** The Cyber Terminal canon (docs/lore/AESTHETIC.md) splits
-the two faces by role: **chrome labels are Plex Mono with a 0.12 em letter
-tracking step**, body and row text stay Plex Sans. A chrome label is a
-window title, a panel head, a section head (tooltip and Show Info sections)
-or another stat/eyebrow head — drawn through `theme.NewChromeText` (widgets)
-or `theme.DrawTracked` (hand-painted panels), never through a plain
-`widget.Text`. Tracking is per-glyph (`text/v2`'s Face interface is closed,
-so no face wrapper can add it); the measured width includes the steps.
 
 - **License — IBM Plex Sans, SIL Open Font License 1.1**: `Copyright ©
   2017 IBM Corp. with Reserved Font Name "Plex"`. The full
@@ -263,10 +239,9 @@ entries line the columns up. Everything around the rows stays IBM Plex
 Sans: window titles, section labels, the table header sort buttons,
 buttons and the stepper readouts.
 
-- **Rule of thumb**: display font (IBM Plex Sans) for body and prose —
-  log lines, tooltip rows, list entries, buttons, table cells; mono (IBM
-  Plex Mono) for chrome labels (titles, panel and section heads, with
-  tracking) and for tabular data — numbers and listed entries in tables.
+- **Rule of thumb**: display font (IBM Plex Sans) for chrome and prose —
+  titles, labels, buttons, tooltips, logs; mono (IBM Plex Mono) for
+  tabular data — numbers and listed entries in tables.
 - **License — IBM Plex Mono, SIL Open Font License 1.1**: `Copyright ©
   2017 IBM Corp. with Reserved Font Name "Plex"`. The full
   `IBMPlexMono_LICENCE.txt` travels in `render/fonts/` beside its TTF
@@ -311,7 +286,7 @@ rack cells, the Fitting window's module rows and the Warp gate hint.
 | Title | **Bold** at the base step — the only bold line in a tooltip |
 | Sub line | Regular small, ColDim — `High slot 1 · Weapon` (slot · class) |
 | Hairline | 2 px ColAccent at low alpha (80), full content width |
-| Section label | **Mono small with 0.12 em tracking**, ColHead, stored uppercase (`DAMAGE`, `CHARGE`, `ACTIVATION`) |
+| Section label | Regular small, ColHead, stored uppercase (`DAMAGE`, `CHARGE`, `ACTIVATION`) |
 | Row | label ColDim left · value right-anchored on one shared x, ColText (or ColGood/ColDanger for a signed modifier) |
 | Hint footer | Regular tiny, ColDim — `Right-click: module menu`, `Click: activate` |
 | Surface | the existing panel treatment: opaque `BGHard` fill, 1 px Border edge at 220, 8/5 px padding |

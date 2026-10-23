@@ -129,11 +129,6 @@ func TipMeasure(s string, face *text.Face) float64 {
 	return w
 }
 
-// tipMeasureTracked measures a tracked mono chrome label (section heads).
-func tipMeasureTracked(s string, face *text.Face, size float64) float64 {
-	return theme.MeasureTracked(s, *face, size)
-}
-
 // tipLineH is a face's line box: the height every text rect in the panel
 // takes (ascent + descent rounded up, the way Table derives rowH).
 func TipLineH(face *text.Face) int {
@@ -155,7 +150,7 @@ func tipInnerWidth(t theme.Theme, m TooltipModel) int {
 		w = sub
 	}
 	for _, sec := range m.Sections {
-		if lw := tipMeasureTracked(sec.Label, t.FaceMono(theme.StepSmall), t.TS().Small); lw > w {
+		if lw := TipMeasure(sec.Label, t.Face(theme.StepSmall)); lw > w {
 			w = lw
 		}
 		for _, row := range sec.Rows {
@@ -365,12 +360,11 @@ func drawTooltip(dst *ebiten.Image, m TooltipModel, l tipLayout, t theme.Theme, 
 	}
 	for si, sec := range m.Sections {
 		sl := l.Sections[si]
-		theme.DrawTracked(dst, sec.Label, *t.FaceMono(theme.StepSmall), t.TS().Small,
-			float64(at(sl.Label).Min.X), float64(at(sl.Label).Min.Y), theme.Solid(p.Head))
+		theme.DrawCardText(dst, sec.Label, t.Face(theme.StepSmall), at(sl.Label).Min.X, at(sl.Label).Min.Y, theme.Solid(p.Head))
 		for ri, row := range sec.Rows {
 			rr := sl.Rows[ri]
 			theme.DrawCardText(dst, row.Label, t.Face(theme.StepSmall), at(rr.Label).Min.X, at(rr.Label).Min.Y, theme.Solid(p.Dim))
-			col := resolveTint(row.Tint, p)
+			col := row.Tint
 			if col == (color.RGBA{}) {
 				col = p.Text
 			}
@@ -542,24 +536,11 @@ func (v *TipView) Render(screen *ebiten.Image) {
 // Content builders
 // ---------------------------------------------------------------------------
 
-// goodTint/dangerTint are the value tints for signed modifiers: roles, not
-// literal colours — the panel resolves them against its injected palette
-// at draw time (a host palette must not inherit the defaults' hexes).
+// goodTint/dangerTint are the value tints for signed modifiers.
 var (
 	goodTint   = theme.DefaultPalette().Good
 	dangerTint = theme.DefaultPalette().Danger
 )
-
-// resolveTint maps the two semantic tints onto the palette in use.
-func resolveTint(c color.RGBA, p theme.Palette) color.RGBA {
-	switch c {
-	case goodTint:
-		return p.Good
-	case dangerTint:
-		return p.Danger
-	}
-	return c
-}
 
 // signed renders v with an explicit sign — "+60.0" / "−45.0" (U+2212, the
 // minus IBM Plex Sans ships).

@@ -108,7 +108,7 @@ func New(c *content.Content) *Renderer {
 	}
 }
 
-// SetSelected marks an entity for the mint selection highlight. The Game
+// SetSelected marks an entity for the amber selection highlight. The Game
 // syncs this from the UI each frame before Draw.
 func (r *Renderer) SetSelected(e ecs.Entity) { r.selected = e }
 
@@ -312,7 +312,7 @@ func (r *Renderer) Draw(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 	now := s.Time()
 	r.bodyPrims = 0
 
-	dst.Fill(color.RGBA{7, 11, 15, 255}) // the kit's page black (#070b0f)
+	dst.Fill(color.RGBA{2, 3, 6, 255})
 	r.drawBackdrop(dst, cam, sys)
 	r.drawNebula(dst, cam, sys)
 	r.drawStarfield(dst, cam, sys)
@@ -650,12 +650,12 @@ func (r *Renderer) drawStatic(dst *ebiten.Image, cam Camera, o gridObj) {
 			&vector.DrawPathOptions{AntiAlias: true, ColorScale: colorScale(color.RGBA{143, 164, 192, 255})})
 		vector.DrawFilledCircle(dst, float32(sx), float32(sy), float32(px*0.34),
 			color.RGBA{44, 53, 66, 255}, true)
-		// Mint running lights (the interface accent, echoed in-world).
+		// Amber running lights.
 		for i := 0; i < 4; i++ {
 			a := float64(i)/4*2*math.Pi + math.Pi/4
 			vector.DrawFilledCircle(dst,
 				float32(sx+math.Cos(a)*px*0.72), float32(sy+math.Sin(a)*px*0.72),
-				float32(math.Max(1.2, px*0.05)), color.RGBA{113, 243, 196, 255}, true)
+				float32(math.Max(1.2, px*0.05)), color.RGBA{255, 180, 84, 255}, true)
 		}
 	case sim.KindGate:
 		px := clamp(orDef(o.radius, 1500)*cam.Zoom, 16, 0.3*maxDim)

@@ -43,7 +43,7 @@ type Manufacturing struct {
 	craftLbl *widget.Text
 	jobsLbl  *widget.Text
 	stepper  *widgets.QtyStepper
-	title    *theme.ChromeText
+	title    *widget.Text
 
 	start, collect, cancel *widget.Button
 

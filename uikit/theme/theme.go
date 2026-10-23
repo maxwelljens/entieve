@@ -12,58 +12,52 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
-// Palette holds every color the kit paints with. DefaultPalette is the
-// Cyber Terminal palette (docs/lore/AESTHETIC.md): mint hairlines on
-// near-black panels, mono chrome over sans body text.
+// Palette holds every color the kit paints with. DefaultPalette mirrors the
+// legacy ui package's EVE-dark chrome colors exactly; TestThemeMatchesLegacy
+// pins the two together while ui/ still exists.
 type Palette struct {
 	BG     color.RGBA // near-black translucent panel fill
 	BGHard color.RGBA // opaque variant for layering
-	Border color.RGBA // thin panel borders (a dark mint: the hairline at the call sites' alphas)
-	Accent color.RGBA // mint accents / selection
+	Border color.RGBA // thin panel borders
+	Accent color.RGBA // amber accents / selection
 	Text   color.RGBA // primary text
 	Dim    color.RGBA // secondary text
 	Head   color.RGBA // table headers
-	Good   color.RGBA // positive / success green
+	Good   color.RGBA // positive / shield-ish green
 	Warn   color.RGBA // warnings / armor amber
 	Danger color.RGBA // hostile red
-	Info   color.RGBA // informational cyan
+	Info   color.RGBA // info blue
 	Shield color.RGBA // shield blue
 	Struct color.RGBA // structure grey
 	Cell   color.RGBA // module cell background
 	Cap    color.RGBA // capacitor green
-	Player color.RGBA // the player's own ship (ice cyan)
+	Player color.RGBA // the player's own ship
 	Hover  color.RGBA // hover tint (drawn translucent)
 	HeadBg color.RGBA // table header strip
 }
 
-// DefaultPalette returns the Cyber Terminal palette. Values are the kit's
-// own tokens where the kit has a role (accent #71f3c4, text #d9f7ef, muted
-// #6e8c87, secondary #86a59f/#b8d7cf, good #80efb1, warning #ffc76b,
-// danger #ff647c, panel #0b1116, titlebar #0a0f14, panel2 #0e161d); the
-// two roles the kit lacks (Info, Player) are cool extensions of its hue
-// space. Border is not a kit hex: the kit's hairline is mint at 16 %, so
-// the role carries the solid that lands there once the call sites'
-// alphas composite it over the panels (see TestBorderCompositesToHairline).
+// DefaultPalette returns the EVE-dark palette used by the current game UI
+// (hex values copied from ui/style.go).
 func DefaultPalette() Palette {
 	return Palette{
-		BG:     mustHex("#0b1116ee"),
-		BGHard: mustHex("#0a0f14"),
-		Border: mustHex("#1f3f3a"),
-		Accent: mustHex("#71f3c4"),
-		Text:   mustHex("#d9f7ef"),
-		Dim:    mustHex("#6e8c87"),
-		Head:   mustHex("#86a59f"),
-		Good:   mustHex("#80efb1"),
-		Warn:   mustHex("#ffc76b"),
-		Danger: mustHex("#ff647c"),
-		Info:   mustHex("#74c7d9"),
-		Shield: mustHex("#6fa8ff"), // unchanged: HUD layer identity + capture thresholds
-		Struct: mustHex("#b8d7cf"),
-		Cell:   mustHex("#0e161d"),
-		Cap:    mustHex("#80efb1"),
-		Player: mustHex("#8fe9ff"),
-		Hover:  mustHex("#71f3c4"),
-		HeadBg: mustHex("#0f181f"),
+		BG:     mustHex("#0a0e14ee"),
+		BGHard: mustHex("#0a0e14"),
+		Border: mustHex("#3a4452"),
+		Accent: mustHex("#ffb454"),
+		Text:   mustHex("#d8dee9"),
+		Dim:    mustHex("#7a8494"),
+		Head:   mustHex("#5b677a"),
+		Good:   mustHex("#5fcf80"),
+		Warn:   mustHex("#e0a33c"),
+		Danger: mustHex("#e05555"),
+		Info:   mustHex("#8fb8e0"),
+		Shield: mustHex("#6fa8ff"),
+		Struct: mustHex("#c9ced6"),
+		Cell:   mustHex("#141a24"),
+		Cap:    mustHex("#5fcf80"),
+		Player: mustHex("#7fe3ff"),
+		Hover:  mustHex("#ffb454"),
+		HeadBg: mustHex("#131926"),
 	}
 }
 
@@ -89,17 +83,17 @@ func OwnedRowTint(p Palette) color.RGBA {
 func RailGroupColor(p Palette, group string) color.RGBA {
 	switch group {
 	case "Ship":
-		return p.Player // ice cyan — your ship
+		return p.Player // cyan — your ship
 	case "Trade":
 		return p.Good // green
 	case "Industry":
-		return p.Warn // amber
+		return p.Warn // orange
 	case "Station":
-		return p.Accent // mint
+		return p.Accent // gold
 	case "World":
-		return p.Info // cyan
+		return p.Info // blue
 	case "Help & System":
-		return p.Struct // pale
+		return p.Struct // silver
 	}
 	return p.Text
 }
@@ -174,8 +168,7 @@ func Bordered(body, edge color.NRGBA, w int) *eimage.NineSlice {
 	return eimage.NewBorderedNineSliceColor(body, edge, Px(w))
 }
 
-// NewTheme builds a complete ebitenui widget theme for the Cyber Terminal
-// look.
+// NewTheme builds a complete ebitenui widget theme for the EVE-dark look.
 // Every widget theme entry is populated with nineslices generated from the
 // palette; button states visibly differ (idle = cell fill, hover = accent
 // tint, pressed = deeper accent, disabled = dimmed).
@@ -185,8 +178,8 @@ func NewTheme(p Palette, ts TypeScale) *widget.Theme {
 	buttonImage := &widget.ButtonImage{
 		Idle:         Bordered(Solid(p.Cell), NRGBA(p.Border, 220), 1),
 		Hover:        Bordered(NRGBA(p.Hover, 18), NRGBA(p.Accent, 200), 1),
-		Pressed:      Bordered(NRGBA(p.Hover, 32), NRGBA(p.Border, 220), 1),
-		PressedHover: Bordered(NRGBA(p.Hover, 32), NRGBA(p.Accent, 200), 1),
+		Pressed:      Bordered(NRGBA(p.Hover, 45), NRGBA(p.Border, 220), 1),
+		PressedHover: Bordered(NRGBA(p.Hover, 45), NRGBA(p.Accent, 200), 1),
 		Disabled:     Bordered(NRGBA(p.Cell, 140), NRGBA(p.Border, 110), 1),
 	}
 	buttonText := &widget.ButtonTextColor{
@@ -320,8 +313,8 @@ func newButtonParams(p Palette, f kitFaces) *widget.ButtonParams {
 		Image: &widget.ButtonImage{
 			Idle:         Bordered(Solid(p.Cell), NRGBA(p.Border, 220), 1),
 			Hover:        Bordered(NRGBA(p.Hover, 18), NRGBA(p.Accent, 200), 1),
-			Pressed:      Bordered(NRGBA(p.Hover, 32), NRGBA(p.Border, 220), 1),
-			PressedHover: Bordered(NRGBA(p.Hover, 32), NRGBA(p.Accent, 200), 1),
+			Pressed:      Bordered(NRGBA(p.Hover, 45), NRGBA(p.Border, 220), 1),
+			PressedHover: Bordered(NRGBA(p.Hover, 45), NRGBA(p.Accent, 200), 1),
 			Disabled:     Bordered(NRGBA(p.Cell, 140), NRGBA(p.Border, 110), 1),
 		},
 		TextColor: &widget.ButtonTextColor{
@@ -351,14 +344,14 @@ func newListParams(p Palette, f kitFaces) *widget.ListParams {
 			DisabledUnselected: NRGBA(p.Dim, 160),
 			DisabledSelected:   NRGBA(p.Dim, 160),
 
-			// Selected: accent tint behind the row.
-			SelectedBackground:        NRGBA(p.Accent, 24),
-			SelectedFocusedBackground: NRGBA(p.Accent, 44),
+			// Selected: amber accent behind the row (matches ui's overview).
+			SelectedBackground:        NRGBA(p.Accent, 36),
+			SelectedFocusedBackground: NRGBA(p.Accent, 64),
 
 			// Hover: subtle accent tint; press: a little deeper.
-			FocusedBackground:          NRGBA(p.Accent, 16),
-			SelectingBackground:        NRGBA(p.Accent, 32),
-			SelectingFocusedBackground: NRGBA(p.Accent, 48),
+			FocusedBackground:          NRGBA(p.Accent, 22),
+			SelectingBackground:        NRGBA(p.Accent, 44),
+			SelectingFocusedBackground: NRGBA(p.Accent, 64),
 			DisabledSelectedBackground: NRGBA(p.Cell, 140),
 		},
 		ScrollContainerPadding: widget.NewInsetsSimple(Px(SpSm)),
@@ -407,7 +400,7 @@ func newSliderParams(p Palette) *widget.SliderParams {
 }
 
 // newCheckboxImages builds the checkbox states: an empty bordered box, an
-// accent-filled box when checked, and a dimmed box when disabled.
+// amber-filled box when checked, and a dimmed box when disabled.
 func newCheckboxImages(p Palette) *widget.CheckboxImage {
 	unchecked := Bordered(Solid(p.Cell), NRGBA(p.Border, 255), 2)
 	checked := Bordered(Solid(p.Accent), NRGBA(p.Border, 255), 2)

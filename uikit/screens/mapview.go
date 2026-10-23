@@ -249,20 +249,6 @@ func (m *MapView) drawMap(cur content.SystemID) {
 	}
 	p := m.th.Pal()
 
-	// The kit's 28 px mint grid (3.5 % lines) under the graph: the starmap
-	// is the one technical surface that carries it (windows keep clean
-	// hairlines). Drawn right after the Clear, so it inherits the repaint
-	// rule like every other mark on this image.
-	grid := theme.NRGBA(p.Accent, 9)
-	step := float64(theme.Px(28)) * s
-	b := m.img.Bounds()
-	for x := 0.0; x < float64(b.Dx()); x += step {
-		vector.StrokeLine(m.img, float32(x), 0, float32(x), float32(b.Dy()), float32(s), grid, false)
-	}
-	for y := 0.0; y < float64(b.Dy()); y += step {
-		vector.StrokeLine(m.img, 0, float32(y), float32(b.Dx()), float32(y), float32(s), grid, false)
-	}
-
 	// The planned route, edge by edge: nil while no destination is set or
 	// the gates do not connect the two.
 	route := m.route(cur, m.dest)
@@ -275,7 +261,7 @@ func (m *MapView) drawMap(cur content.SystemID) {
 
 	// Gate edges from every system's gate celestials. The planned route
 	// wins over the current-system adjacency accent.
-	base := theme.NRGBA(p.Border, 220)
+	base := color.RGBA{90, 100, 118, 160}
 	for _, n := range nodes {
 		def, ok := m.cv.Defs().System(n.id)
 		if !ok {

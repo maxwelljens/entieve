@@ -144,16 +144,15 @@ func (g *tooltipCaptureGame) verify(img *ebiten.Image) {
 	if n := uitest.InkIn(img, title); n < 20 {
 		fail("title box %v drew %d bright pixels, want ≥ 20", title, n)
 	}
-	// --- 3. The first hairline reads the palette's Accent over the panel
-	//        fill (hue-agnostic: the tint, not a channel order).
+	// --- 3. The first hairline reads accent over the panel fill (the fill//     itself is near-black, so any real divider is far brighter).
 	if len(layout.Rules) == 0 {
 		fail("layout has no hairline")
 	} else {
 		rule := at(layout.Rules[0])
-		pal := g.c.env.Pal()
 		lit := 0
 		for x := rule.Min.X + 2; x < rule.Max.X-2; x += 8 {
-			if f, ok := tintFrac(img.At(x, (rule.Min.Y+rule.Max.Y)/2), pal.BGHard, pal.Accent); ok && f > 0.15 {
+			rr, _, _, _ := img.At(x, (rule.Min.Y+rule.Max.Y)/2).RGBA()
+			if rr>>8 > 50 {
 				lit++
 			}
 		}

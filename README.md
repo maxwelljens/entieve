@@ -141,23 +141,12 @@ rules: [docs/ART.md](docs/ART.md).
 
 ## Typeface
 
-The UI is set in **IBM Plex Sans** — Regular for body and row text, Medium
-for tooltip titles, table headers, buttons and HUD readouts — with **IBM Plex
-Mono** for the tabular cells and, letter-tracked, for every chrome label
-(window titles, panel and section heads). Both families are embedded from
+The UI is set in **IBM Plex Sans** — Regular for body text, Medium for window
+titles, table headers, buttons and HUD readouts — embedded from
 `render/fonts/` alongside its license, so `IBM Plex Sans, SIL Open Font
 License 1.1` ("Copyright 2018 The IBM Plex Sans Project Authors"
 <https://github.com/noponies/turret-road>) is included in every binary
 ([`render/fonts/OFL.txt`](render/fonts/OFL.txt), [docs/ART.md](docs/ART.md)).
-
-## Look
-
-The chrome is the **Cyber Terminal** register: mint hairlines on near-black
-panels, mono chrome with tracked labels, a mint radial wash under the
-interface and a 28 px grid on the starmap. The palette and chrome language
-are derived from the **Cyber Terminal UI Kit** by Kerem Bolek (© 2026); no
-kit files ship here, only the derived theme
-([`uikit/theme`](uikit/theme), [docs/lore/AESTHETIC.md](docs/lore/AESTHETIC.md)).
 
 ## Icons
 

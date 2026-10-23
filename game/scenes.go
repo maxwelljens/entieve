@@ -250,13 +250,14 @@ func (g *Game) titleBar(label string) *widget.Container {
 		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
-	head := theme.NewChromeText(g.env, theme.StepBase, label, p.Accent)
-	head.GetWidget().LayoutData = widget.AnchorLayoutData{
-		HorizontalPosition: widget.AnchorLayoutPositionStart,
-		VerticalPosition:   widget.AnchorLayoutPositionCenter,
-		Padding:            widget.NewInsetsSimple(theme.Px(5)),
-	}
-	title.AddChild(head)
+	title.AddChild(widget.NewText(
+		widget.TextOpts.Text(label, g.env.FaceBold(theme.StepBase), solid(p.Accent)),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionStart,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			Padding:            widget.NewInsetsSimple(theme.Px(5)),
+		})),
+	))
 	return title
 }
 

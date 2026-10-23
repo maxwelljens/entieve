@@ -8,7 +8,6 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit/theme"
 )
 
 // TestLogPushAndColors covers the line pipeline: BBCode severity colors,
@@ -21,18 +20,15 @@ func TestLogPushAndColors(t *testing.T) {
 		t.Fatalf("fresh log text = %q, want empty", l.ta.GetText())
 	}
 
-	// Severity → the palette role the panel injects (the BBCode color the
-	// text area must carry). Palette-derived, so the test survives a
-	// reskin without pinning hexes of its own.
-	pal := theme.DefaultPalette()
+	// Severity → palette hex (the BBCode color the text area must carry).
 	for _, c := range []struct {
 		sev  sim.Severity
 		want string
 	}{
-		{sim.SevInfo, hexColor(pal.Info)},
-		{sim.SevGood, hexColor(pal.Good)},
-		{sim.SevWarning, hexColor(pal.Warn)},
-		{sim.SevDanger, hexColor(pal.Danger)},
+		{sim.SevInfo, "#8fb8e0"},
+		{sim.SevGood, "#5fcf80"},
+		{sim.SevWarning, "#e0a33c"},
+		{sim.SevDanger, "#e05555"},
 	} {
 		text := "severity " + strconv.Itoa(int(c.sev))
 		l.PushLine(c.sev, text)
@@ -48,7 +44,7 @@ func TestLogPushAndColors(t *testing.T) {
 		{Kind: sim.EvLog, Severity: sim.SevDanger, Time: 7.5, Text: "structure hit"},
 	})
 	got := l.ta.GetText()
-	if !strings.Contains(got, "[color="+hexColor(pal.Dim)+"][1:05][/color] [color="+hexColor(pal.Good)+"]wrecking shot[/color]") {
+	if !strings.Contains(got, "[color=#7a8494][1:05][/color] [color=#5fcf80]wrecking shot[/color]") {
 		t.Errorf("event line missing stamp/color:\n%s", got)
 	}
 	if !strings.Contains(got, "[0:07]") || !strings.Contains(got, "structure hit") {

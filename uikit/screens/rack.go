@@ -51,16 +51,11 @@ const (
 	// TestIconsCaptureFrame pins the result to the drawn pixels.
 	rackIconPad    = 20
 	rackIconEmptyW = 10
-	// rackBadgeR / rackBadgeInset place the waiting-state marker: a
-	// pulsing dot in the tile's top-right corner, on its own overlay image
+	// rackBadgeR / rackBadgeInset place the waiting-state marker: a static
+	// palette dot in the tile's top-right corner, on its own overlay image
 	// so it shares the tile's rect without touching the glyph or the ring.
 	rackBadgeR     = 2 // dot radius (design px)
 	rackBadgeInset = 6 // dot centre inset from the tile's top-right corner
-	// The pulse: pre-rendered phase images (the kit's blinking cursor),
-	// swapped by pointer when the phase changes — never per-frame Clear,
-	// which the ring's falling-edge guard also exists to avoid.
-	rackBadgePhases = 8
-	rackBadgeTicks  = 6 // Syncs per phase (0.1 s at 60 TPS)
 	// rackAmmoIcon / rackAmmoInset place the ready marker: a small round
 	// silhouette in the tile's bottom-right corner, on its own overlay, kept
 	// clear of the waiting dot (top-right = "needs you", bottom-right =
@@ -76,7 +71,7 @@ var (
 )
 
 // Rack is the module rack (the right half of the HUD's bottom-center pair):
-// one cell per slot showing the module short name, a mint glow while
+// one cell per slot showing the module short name, an amber glow while
 // active, a cycle ring depleting clockwise over the tile while the module
 // runs or its bay loads, a small shell marker in the tile's bottom-right
 // corner once the bay is armed, and a hover tooltip with the module's key
@@ -98,9 +93,6 @@ type Rack struct {
 	as        widgets.ActionSink
 	container *widget.Container
 	cells     [rackRows][rackMaxCells]*rackCell
-	badge     []*ebiten.Image // waiting-dot pulse phases (shared by every cell)
-	badgeTick int             // Syncs since the pulse started (deterministic)
-	badgePh   int             // phase in flight
 	ammoPref  map[sim.SlotRef]content.ItemID
 	measure   func(string) float64
 	// pick, when set (game wires Kit.Selected), names the entity the player
@@ -119,31 +111,31 @@ type Rack struct {
 // over it + name line) plus its tooltip widgets. Cells are persistent, so a
 // fitting change only rewrites their name, glyph, spec (menu + tooltip data)
 // and enabled state. active mirrors ModuleRuntime.Active for the click toggle
-// (the visual rides the button's Disabled state: dim cell while off, mint
+// (the visual rides the button's Disabled state: dim cell while off, amber
 // cell while running).
 type rackCell struct {
-	slot       sim.SlotRef
-	root       *widget.Container
-	stack      *widget.Container // tile + cycle-ring overlay + waiting badge
-	btn        *widget.Button
-	ring       *ebiten.Image
-	ringGfx    *widget.Graphic
-	badgeGfx   *widget.Graphic // the waiting-state dot's overlay, shown only while waiting
-	badgePhase int             // pulse phase currently on the overlay
-	ammo       *ebiten.Image   // the ready marker (static round glyph)
-	ammoGfx    *widget.Graphic // its overlay, shown while the bay is loaded
-	name       *widget.Text
-	ringOn     bool             // ring visible at the last Sync (a cycle in flight)
-	ringFrac   float64          // ring fill at the last Sync (1 = just activated, 0 = done)
-	ringLit    bool             // ring colour: lit while repeating, greyed while cancelled
-	tip        widgets.RowTip   // structured hover tooltip (built on first fit)
-	spec       widgets.RowSpec  // declared interactions, rebuilt by syncCell
-	clip       sim.ClipState    // shell bay at the last Sync
-	hasClip    bool             // the fitted module loads rounds (sim.Clip ok)
-	waiting    bool             // empty bay, no selection, 2+ round types in cargo
-	module     content.ModuleID // module currently shown ("" = empty slot)
-	icon       string           // glyph the tile currently shows ("" = none)
-	active     bool             // runtime Active at the last Sync
+	slot     sim.SlotRef
+	root     *widget.Container
+	stack    *widget.Container // tile + cycle-ring overlay + waiting badge
+	btn      *widget.Button
+	ring     *ebiten.Image
+	ringGfx  *widget.Graphic
+	badge    *ebiten.Image   // the waiting-state corner dot (static)
+	badgeGfx *widget.Graphic // its overlay, shown only while waiting
+	ammo     *ebiten.Image   // the ready marker (static round glyph)
+	ammoGfx  *widget.Graphic // its overlay, shown while the bay is loaded
+	name     *widget.Text
+	ringOn   bool             // ring visible at the last Sync (a cycle in flight)
+	ringFrac float64          // ring fill at the last Sync (1 = just activated, 0 = done)
+	ringLit  bool             // ring colour: lit while repeating, greyed while cancelled
+	tip      widgets.RowTip   // structured hover tooltip (built on first fit)
+	spec     widgets.RowSpec  // declared interactions, rebuilt by syncCell
+	clip     sim.ClipState    // shell bay at the last Sync
+	hasClip  bool             // the fitted module loads rounds (sim.Clip ok)
+	waiting  bool             // empty bay, no selection, 2+ round types in cargo
+	module   content.ModuleID // module currently shown ("" = empty slot)
+	icon     string           // glyph the tile currently shows ("" = none)
+	active   bool             // runtime Active at the last Sync
 }
 
 // NewRack builds the module rack over the given seams. The container keeps
@@ -154,7 +146,6 @@ func NewRack(env widgets.Seams) *Rack {
 	p := env.Pal()
 	faceTiny := env.Face(theme.StepTiny)
 	r := &Rack{th: env, cv: env, as: env, ammoPref: map[sim.SlotRef]content.ItemID{}}
-	r.badge = rackBadgeImages(p)
 	r.measure = func(s string) float64 {
 		w, _ := text.Measure(s, *faceTiny, 0)
 		return w
@@ -189,12 +180,14 @@ func NewRack(env widgets.Seams) *Rack {
 		body.AddChild(rowBox)
 	}
 
-	titleText := theme.NewChromeText(env, theme.StepBase, "Modules", p.Accent)
-	titleText.GetWidget().LayoutData = widget.AnchorLayoutData{
-		HorizontalPosition: widget.AnchorLayoutPositionStart,
-		VerticalPosition:   widget.AnchorLayoutPositionCenter,
-		Padding:            widget.NewInsetsSimple(theme.Px(theme.ContentsPad)),
-	}
+	titleText := widget.NewText(
+		widget.TextOpts.Text("Modules", env.FaceBold(theme.StepBase), theme.Solid(p.Accent)),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionStart,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			Padding:            widget.NewInsetsSimple(theme.Px(theme.ContentsPad)),
+		})),
+	)
 	title := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BGHard), theme.NRGBA(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
@@ -224,25 +217,6 @@ func NewRack(env widgets.Seams) *Rack {
 func rackAmmoOrigin() (x, y int) {
 	return theme.Px(rackCellW - rackAmmoIcon - rackAmmoInset),
 		theme.Px(rackCellH - rackAmmoIcon - rackAmmoInset)
-}
-
-// rackBadgeAlphas is the pulse ladder: the kit's blinking cursor, eased
-// over eight phases so the dot breathes instead of strobe-switching.
-var rackBadgeAlphas = [rackBadgePhases]uint8{255, 215, 165, 115, 75, 115, 165, 215}
-
-// rackBadgeImages renders the waiting-dot pulse phases once, shared by every
-// cell (the dot is tile geometry, identical in each).
-func rackBadgeImages(p theme.Palette) []*ebiten.Image {
-	imgs := make([]*ebiten.Image, rackBadgePhases)
-	sc := theme.Scale()
-	for i, a := range rackBadgeAlphas {
-		img := ebiten.NewImage(theme.Px(rackCellW), theme.Px(rackCellH))
-		vector.DrawFilledCircle(img,
-			float32(float64(theme.Px(rackCellW))-rackBadgeInset*sc), float32(rackBadgeInset*sc),
-			float32(rackBadgeR*sc), theme.NRGBA(p.Info, a), false)
-		imgs[i] = img
-	}
-	return imgs
 }
 
 // newCell builds one slot cell: a 50×40 icon tile (the module's class
@@ -291,10 +265,14 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 	cell.ringGfx = widget.NewGraphic(widget.GraphicOpts.Image(cell.ring))
 	theme.ShowWidget(cell.ringGfx.GetWidget(), false)
 	// The waiting badge rides its own overlay for the same reason — and so
-	// the ring's falling-edge Clear can never wipe it: the shared pulse
-	// phases put one dot in the tile's top-right corner, hidden unless the
-	// bay waits.
-	cell.badgeGfx = widget.NewGraphic(widget.GraphicOpts.Image(r.badge[0]))
+	// the ring's falling-edge Clear can never wipe it: one static palette
+	// dot in the tile's top-right corner, hidden unless the bay waits.
+	cell.badge = ebiten.NewImage(theme.Px(rackCellW), theme.Px(rackCellH))
+	s := theme.Scale()
+	vector.DrawFilledCircle(cell.badge,
+		float32(float64(theme.Px(rackCellW))-rackBadgeInset*s), float32(rackBadgeInset*s),
+		float32(rackBadgeR*s), p.Info, false)
+	cell.badgeGfx = widget.NewGraphic(widget.GraphicOpts.Image(cell.badge))
 	theme.ShowWidget(cell.badgeGfx.GetWidget(), false)
 	// The ready marker is the second corner overlay: the same static-image
 	// trick, in the bottom-right so the two corners keep distinct meanings.
@@ -353,15 +331,15 @@ func rackGlyph(name string, tint color.RGBA) *ebiten.Image {
 	return icons.Get(name, theme.Px(theme.IconButton), tint)
 }
 
-// rackCellImages builds the cell chrome: a mint-tinted glow for active
+// rackCellImages builds the cell chrome: an amber-tinted glow for active
 // modules and a dimmed cell for inactive/empty slots (the button's Disabled
 // state picks the look, so the theme's dim label rides along).
 func rackCellImages(p theme.Palette) *widget.ButtonImage {
 	return &widget.ButtonImage{
-		Idle:         theme.Bordered(theme.NRGBA(p.Accent, 48), theme.Solid(p.Accent), 1),
-		Hover:        theme.Bordered(theme.NRGBA(p.Accent, 72), theme.Solid(p.Accent), 1),
-		Pressed:      theme.Bordered(theme.NRGBA(p.Accent, 80), theme.NRGBA(p.Accent, 220), 1),
-		PressedHover: theme.Bordered(theme.NRGBA(p.Accent, 80), theme.Solid(p.Accent), 1),
+		Idle:         theme.Bordered(theme.NRGBA(p.Accent, 60), theme.Solid(p.Accent), 1),
+		Hover:        theme.Bordered(theme.NRGBA(p.Accent, 95), theme.Solid(p.Accent), 1),
+		Pressed:      theme.Bordered(theme.NRGBA(p.Accent, 110), theme.NRGBA(p.Accent, 220), 1),
+		PressedHover: theme.Bordered(theme.NRGBA(p.Accent, 110), theme.Solid(p.Accent), 1),
 		Disabled:     theme.Bordered(theme.NRGBA(p.Cell, 140), theme.NRGBA(p.Border, 110), 1),
 	}
 }
@@ -381,11 +359,6 @@ func (r *Rack) Sync() {
 	if s == nil {
 		return
 	}
-	// The waiting dot's pulse: one shared frame counter, advanced once per
-	// Sync, so the phase is a function of the frame count (deterministic —
-	// no wall clock).
-	r.badgeTick++
-	r.badgePh = (r.badgeTick / rackBadgeTicks) % rackBadgePhases
 	player := s.Player()
 	fit, hasFit := s.Fitting(player)
 	now := s.Time()
@@ -477,12 +450,6 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 	cell.waiting = cell.hasClip && cell.clip.Rounds == 0 &&
 		cell.clip.Selection == "" && len(cell.clip.Options) >= 2
 	theme.ShowWidget(cell.badgeGfx.GetWidget(), cell.waiting)
-	if cell.waiting && cell.badgePhase != r.badgePh {
-		// Swap the pre-rendered phase by pointer: no repaint, no Clear
-		// (the ring's deferred-atlas lesson).
-		cell.badgePhase = r.badgePh
-		cell.badgeGfx.Image = r.badge[r.badgePh]
-	}
 	// The ready marker: a loaded bay with no load in flight — the gun can
 	// fire. The waiting dot is the only other corner marker and the two
 	// states exclude each other (waiting needs an empty bay).

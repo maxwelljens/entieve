@@ -2,9 +2,6 @@ package screens
 
 import (
 	"fmt"
-	"image/color"
-	"math"
-
 	"github.com/entieve/entieve/uikit/internal/uitest"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
@@ -28,7 +25,7 @@ const infoCaptureFrames = 13
 // TestInfoWindowCaptureFrame renders the two Show Info surfaces — a
 // floating details window (hull page: header, prose, section rows) and a
 // context menu open beside it (bold first entry, disabled entry grayed,
-// separator hairline, palette hover band) — through a real ebiten game
+// separator hairline, amber hover band) — through a real ebiten game
 // loop, checks the drawn pixels and screenshots the frame.
 //
 // Skipped unless ENTIEVE_CAPTURE=1 so the regular suite stays windowless.
@@ -133,8 +130,8 @@ func (g *infoCaptureGame) Draw(screen *ebiten.Image) {
 func (g *infoCaptureGame) Layout(w, h int) (int, int) { return 1280, 720 }
 
 // verify screenshots the frame and asserts the pixels: the menu popup is
-// on screen with label ink, its hover band reads the palette's hover tint
-// and its separator draws; the details window is on screen with title-bar and body ink.
+// on screen with label ink, its hover band reads amber and its separator
+// draws; the details window is on screen with title-bar and body ink.
 // Every failure is collected so one run reports all of them.
 func (g *infoCaptureGame) verify(img *ebiten.Image) {
 	var errs []string
@@ -155,30 +152,32 @@ func (g *infoCaptureGame) verify(img *ebiten.Image) {
 		if n := uitest.InkIn(img, r); n < 40 {
 			fail("menu %v drew %d ink pixels, want ≥ 40", r, n)
 		}
-		// The hovered row's right half carries only the hover band fill:
-		// the palette's Hover role over the popup's fill (hue-agnostic —
-		// whatever the injected palette says, the band must be its tint).
-		pal := g.k.Env().Pal()
+		// The hovered row's right half carries only the amber band fill.
 		hov := m.RowRect(1)
 		band := image.Rect(hov.Min.X+hov.Dx()/2, hov.Min.Y, hov.Max.X-2, hov.Max.Y-2)
-		tinted := 0
+		amber := 0
 		for y := band.Min.Y; y < band.Max.Y; y++ {
 			for x := band.Min.X; x < band.Max.X; x++ {
-				if f, ok := tintFrac(img.At(x, y), pal.BGHard, pal.Hover); ok && f > 0.02 && f < 0.5 {
-					tinted++
+				rr, gg, bb, _ := img.At(x, y).RGBA()
+				r8, g8, b8 := int(rr>>8), int(gg>>8), int(bb>>8)
+				// The 40-alpha amber band over the near-black fill: red
+				// lifted above both channels, green still over blue.
+				if r8 > 35 && r8 > g8+5 && g8 > b8 {
+					amber++
 				}
 			}
 		}
-		if tinted < 20 {
-			fail("hover band %v drew %d tinted pixels, want ≥ 20", band, tinted)
+		if amber < 20 {
+			fail("hover band %v drew %d amber pixels, want ≥ 20", band, amber)
 		}
-		// The separator hairline: the Border role over the fill, centered
-		// in its band, spanning most of the popup's inset width.
+		// The separator hairline: brighter than the fill, centered in
+		// its band, spanning most of the popup's inset width.
 		sep := m.RowRect(2)
 		y := (sep.Min.Y + sep.Max.Y) / 2
 		lit := 0
 		for x := sep.Min.X + 14; x < sep.Max.X-14; x += 4 {
-			if f, ok := tintFrac(img.At(x, y), pal.BGHard, pal.Border); ok && f > 0.3 {
+			rr, _, _, _ := img.At(x, y).RGBA()
+			if int(rr>>8) > 24 {
 				lit++
 			}
 		}
@@ -186,15 +185,14 @@ func (g *infoCaptureGame) verify(img *ebiten.Image) {
 			fail("separator row drew %d lit samples of %d, want the hairline", lit, want)
 		}
 		// Disabled entry: its label draws, but markedly fainter than
-		// the enabled first entry (the grayed look, never hidden). Ink is
-		// measured against the popup fill, not an absolute brightness.
-		enabled := inkMass(img, m.RowRect(0), pal.BGHard)
-		disabled := inkMass(img, m.RowRect(3), pal.BGHard)
-		if disabled < 20 {
-			fail("disabled entry drew %d ink mass, want its grayed label", disabled)
+		// the enabled first entry (the grayed look, never hidden).
+		enabled := uitest.InkIn(img, m.RowRect(0))
+		disabled := uitest.InkIn(img, m.RowRect(3))
+		if disabled < 3 {
+			fail("disabled entry drew %d ink pixels, want its grayed label", disabled)
 		}
-		if enabled > 0 && disabled*2 > enabled {
-			fail("disabled entry is not grayed: %d ink mass vs %d for the enabled entry", disabled, enabled)
+		if enabled > 0 && disabled*3 > enabled {
+			fail("disabled entry is not grayed: %d ink vs %d for the enabled entry", disabled, enabled)
 		}
 	}
 
@@ -237,48 +235,4 @@ func (g *infoCaptureGame) verify(img *ebiten.Image) {
 	if len(errs) > 0 {
 		g.err = fmt.Errorf("capture %s: %s", g.out, strings.Join(errs, "; "))
 	}
-}
-
-// tintFrac reports how far c has moved from base toward role (0 = base,
-// 1 = role), using only the channels where the role is a real move; ok is
-// false when the channels disagree, i.e. the pixel is not that tint.
-func tintFrac(c color.Color, base, role color.RGBA) (f float64, ok bool) {
-	cr, cg, cb, _ := c.RGBA()
-	got := [3]float64{float64(cr >> 8), float64(cg >> 8), float64(cb >> 8)}
-	from := [3]float64{float64(base.R), float64(base.G), float64(base.B)}
-	ref := [3]float64{float64(role.R) - from[0], float64(role.G) - from[1], float64(role.B) - from[2]}
-	lo, hi, n := math.Inf(1), math.Inf(-1), 0
-	for i := range got {
-		if math.Abs(ref[i]) < 12 {
-			continue // this channel barely moves: not evidence
-		}
-		r := (got[i] - from[i]) / ref[i]
-		lo, hi = math.Min(lo, r), math.Max(hi, r)
-		n++
-	}
-	if n < 2 || hi-lo > 0.2 {
-		return 0, false
-	}
-	return (lo + hi) / 2, true
-}
-
-// inkMass sums how far every pixel's brightest channel rises above the
-// popup fill — the palette-relative ink measure (InkIn hardcodes 90, which
-// the muted roles no longer clear). It weighs brightness, so a grayed
-// label reads as a fraction of the enabled one instead of a pixel count.
-func inkMass(img *ebiten.Image, box image.Rectangle, base color.RGBA) int {
-	bm := int(max(base.R, max(base.G, base.B)))
-	sum := 0
-	for y := box.Min.Y; y < box.Max.Y; y++ {
-		for x := box.Min.X; x < box.Max.X; x++ {
-			r, gc, b, a := img.At(x, y).RGBA()
-			if a == 0 {
-				continue
-			}
-			if d := int(max(r>>8, max(gc>>8, b>>8))) - bm; d > 0 {
-				sum += d
-			}
-		}
-	}
-	return sum
 }

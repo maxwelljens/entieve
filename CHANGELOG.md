@@ -7,20 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- **A reskin to the Cyber Terminal look** (`uikit`, `render`, `game`): the
-  whole interface moves from amber-on-black to mint-on-near-black. New
-  palette (mint hairlines at ~16 %, near-black panels, `#80efb1` / `#ffc76b`
-  / `#ff647c` status roles, Shield still blue), window titles, panel and
-  section heads set in letter-tracked Plex Mono over Plex Sans body text, a
-  soft mint radial wash under the interface, a 28 px grid on the starmap,
-  and a pulsing waiting-ammo dot on the rack. Selection brackets and the
-  station running lights in the world follow the mint; stars, planets, rocks,
-  nebulae and mining beams keep their physical colours. Palette and chrome
-  language are derived from the Cyber Terminal UI Kit by Kerem Bolek (©
-  2026); no kit files ship. Canon: docs/lore/AESTHETIC.md.
-
 ### Added
 
 - **Column prefs — frozen widths, drag resize, ⋯ column menu** (`uikit`,

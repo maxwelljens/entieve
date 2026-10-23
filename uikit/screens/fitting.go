@@ -80,7 +80,7 @@ type Fitting struct {
 
 	measure func(string) float64 // the StepTiny face, for tile-name ellipsis
 
-	title *theme.ChromeText // title bar: hull name and class
+	title *widget.Text // title bar: hull name and class
 
 	// Zone 1 — ship identity.
 	portrait      *ebiten.Image

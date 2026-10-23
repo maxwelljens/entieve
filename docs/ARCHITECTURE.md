@@ -767,7 +767,7 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 >
 > **UI platform (2026-10, complete):** the chrome lives in `uikit/`, built on
 > **ebitenui v0.7.3** (pinned in go.mod); the legacy hand-drawn `ui/` package
-> is retired (golden-value tests pin the Cyber Terminal palette and type scale).
+> is retired (golden-value tests pin the EVE-dark palette and type scale).
 > Two upstream gaps shape the layer: `widget.List` cannot do columns,
 > per-row styling, or scroll introspection — so data tables use
 > `widget.ScrollContainer` + per-row containers (we own the scroll
@@ -898,8 +898,7 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
   per-shot muzzle flash + travelling bolts + impact glow (never a
   muzzle→target beam), wreck icons.
 - `uikit` widgets are pure layout+input over `*sim.Sim` state; window chrome
-  Cyber Terminal (near-black panels, mint hairlines, mint tracked mono chrome
-  over Plex Sans body text).
+  EVE-dark (near-black panels, amber/white text, mono-ish gofont).
   Windows: Overview (table: icon, name, distance, velocity — sortable),
   Selected Item (actions: approach/orbit/warp/lock/dock/jump/loot), HUD
   (shield/armor/structure arcs, capacitor bar, speed, targeting list),

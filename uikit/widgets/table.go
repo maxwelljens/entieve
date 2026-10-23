@@ -30,7 +30,7 @@ const (
 	// entryPadV is the vertical padding inside a row.
 	entryPadV = 5
 	// selectionAlpha is the accent tint alpha of the selected row.
-	selectionAlpha = 40
+	selectionAlpha = 64
 	// wheelRows is how many rows one mouse-wheel notch scrolls.
 	wheelRows = 3
 )

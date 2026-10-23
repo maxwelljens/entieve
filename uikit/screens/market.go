@@ -114,7 +114,7 @@ type Market struct {
 	tbl     *widgets.Table
 	stepper *widgets.QtyStepper
 	bar     *widget.Slider // order-book scrollbar rail (mirrors ScrollTop)
-	title   *theme.ChromeText
+	title   *widget.Text
 	buy     *widget.Button
 	sell    *widget.Button
 

@@ -144,13 +144,14 @@ func (k *Kit) buildSelected() {
 		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BGHard), theme.NRGBA(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
-	head := theme.NewChromeText(k.th, theme.StepBase, "Selected Item", p.Accent)
-	head.GetWidget().LayoutData = widget.AnchorLayoutData{
-		HorizontalPosition: widget.AnchorLayoutPositionStart,
-		VerticalPosition:   widget.AnchorLayoutPositionCenter,
-		Padding:            widget.NewInsetsSimple(theme.Px(theme.ContentsPad)),
-	}
-	title.AddChild(head)
+	title.AddChild(widget.NewText(
+		widget.TextOpts.Text("Selected Item", k.th.FaceBold(theme.StepBase), theme.Solid(p.Accent)),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionStart,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			Padding:            widget.NewInsetsSimple(theme.Px(theme.ContentsPad)),
+		})),
+	))
 
 	sp.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
