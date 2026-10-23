@@ -733,7 +733,7 @@ func (t *Table) scrollImage(top int) *widget.ScrollContainerImage {
 	p := t.th.Pal()
 	idle := theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 160), 1)
 	if top > 0 {
-		idle = banded(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 160), theme.Px(1), top)
+		idle = theme.BandedBox(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 160), top)
 	}
 	return &widget.ScrollContainerImage{
 		Idle:     idle,
@@ -774,21 +774,6 @@ func plateFillTop(band, view image.Rectangle) int {
 	default:
 		return band.Max.Y - view.Min.Y
 	}
-}
-
-// banded is theme.Bordered with the body fill starting top px down: the rows
-// above that line paint no fill, so a window's artwork band reads through
-// them. Border and fill below the line are the plain Bordered ones — built
-// with the same Fill/Set calls so they stay byte-identical.
-func banded(body, edge color.NRGBA, w, top int) *eimage.NineSlice {
-	top = max(top, w) // the band never eats the top border line
-	img := ebiten.NewImage(2*w+1, top+1+w)
-	img.Fill(edge)
-	if top > w {
-		img.SubImage(image.Rect(w, w, w+1, top)).(*ebiten.Image).Clear()
-	}
-	img.Set(w, top, body)
-	return eimage.NewNineSlice(img, [3]int{w, 1, w}, [3]int{top, 1, w})
 }
 
 // headerClicked toggles the sort column/direction on a header click.

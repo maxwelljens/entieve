@@ -27,6 +27,8 @@ const (
 
 	mapHitR  = 10  // node click radius (design px)
 	mapCardW = 330 // selected-system card width (design px)
+
+	mapGridStep = 28 // the kit's lattice pitch (design px)
 )
 
 // mapNode is one system's starmap plane position (light-years) and its
@@ -84,7 +86,7 @@ func NewMapView(env interface {
 	m.gfx = widget.NewGraphic(widget.GraphicOpts.Image(m.img))
 
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.WindowBodyBox(p, theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
@@ -249,6 +251,19 @@ func (m *MapView) drawMap(cur content.SystemID) {
 	}
 	p := m.th.Pal()
 
+	// The kit's 28 px lattice under the graph: the starmap is the one
+	// technical surface that carries it (windows keep clean hairlines).
+	// Accent at 3.5 % — structure, not colour.
+	grid := theme.NRGBA(p.Accent, 9)
+	step := float64(theme.Px(mapGridStep))
+	b := m.img.Bounds()
+	for x := 0.0; x < float64(b.Dx()); x += step {
+		vector.StrokeLine(m.img, float32(x), 0, float32(x), float32(b.Dy()), float32(s), grid, false)
+	}
+	for y := 0.0; y < float64(b.Dy()); y += step {
+		vector.StrokeLine(m.img, 0, float32(y), float32(b.Dx()), float32(y), float32(s), grid, false)
+	}
+
 	// The planned route, edge by edge: nil while no destination is set or
 	// the gates do not connect the two.
 	route := m.route(cur, m.dest)
@@ -409,10 +424,7 @@ func (m *MapView) drawCard(cur content.SystemID) {
 		height += h
 	}
 	rect := image.Rect(theme.Px(12), theme.Px(10), theme.Px(12)+theme.Px(mapCardW), theme.Px(10)+height)
-	theme.FillRect(m.img, rect, theme.NRGBA(p.BGHard, 225))
-	s := float32(theme.Scale())
-	vector.StrokeRect(m.img, float32(rect.Min.X)+s/2, float32(rect.Min.Y)+s/2,
-		float32(rect.Dx())-s, float32(rect.Dy())-s, s, theme.NRGBA(p.Border, 210), true)
+	theme.DrawRoundBox(m.img, rect, theme.NRGBA(p.BGHard, 225), theme.NRGBA(p.Border, 210), 1, theme.AllRadii(theme.RadiusPanel))
 	y := rect.Min.Y + pad
 	for _, l := range lines {
 		face := m.th.Face(theme.StepSmall)

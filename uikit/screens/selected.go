@@ -129,7 +129,7 @@ func (k *Kit) buildSelected() {
 	sp.warpTips = []*widget.ToolTip{sp.warpTip}
 
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.WindowBodyBox(p, theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200))),
 		// The body's geometry comes from the pure selectedLayout below —
 		// rows stack from the top, bands tile their row with equal gaps.
 		widget.ContainerOpts.Layout(&selectedLayouter{bands: selectedBands[:]}),
@@ -141,17 +141,17 @@ func (k *Kit) buildSelected() {
 		sp.orbitRange, sp.warpRange)
 
 	title := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BGHard), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.WindowTitleBox(theme.Solid(p.BGHard), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
-	title.AddChild(widget.NewText(
-		widget.TextOpts.Text("Selected Item", k.th.FaceBold(theme.StepBase), theme.Solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(theme.Px(theme.ContentsPad)),
-		})),
-	))
+	spTitle := theme.NewChromeText(k.th, theme.StepBase, "Selected Item", p.Accent)
+	spTitle.GetWidget().LayoutData = widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		Padding:            &widget.Insets{Left: theme.Px(theme.SpMd + theme.TitleDotsW + theme.TitleDotsGap)},
+	}
+	title.AddChild(theme.TitleDotsWidget(p))
+	title.AddChild(spTitle)
 
 	sp.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),

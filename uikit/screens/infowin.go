@@ -595,7 +595,7 @@ type InfoWin struct {
 	as widgets.ActionSink
 
 	win    *widget.Window
-	title  *widget.Text
+	title  *theme.ChromeText
 	page   *widget.Container
 	scroll *widget.ScrollContainer
 	rail   *widgets.ScrollRail
@@ -649,7 +649,7 @@ func NewInfoWin(env widgets.Seams) *InfoWin {
 	w.rail = widgets.NewScrollRail(env, w.scroll, w.scroll, w.page)
 
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.WindowBodyBox(p, theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
@@ -867,9 +867,7 @@ func (w *InfoWin) render(p infoPage) {
 		))
 	}
 	for _, sec := range p.Sections {
-		w.page.AddChild(widget.NewText(
-			widget.TextOpts.Text(sec.Label, env.Face(theme.StepSmall), theme.Solid(pal.Head)),
-		))
+		w.page.AddChild(theme.NewChromeText(env, theme.StepSmall, sec.Label, pal.Head))
 		for _, row := range sec.Rows {
 			w.page.AddChild(w.rowWidget(row))
 		}

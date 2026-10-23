@@ -114,7 +114,7 @@ type Market struct {
 	tbl     *widgets.Table
 	stepper *widgets.QtyStepper
 	bar     *widget.Slider // order-book scrollbar rail (mirrors ScrollTop)
-	title   *widget.Text
+	title   *theme.ChromeText
 	buy     *widget.Button
 	sell    *widget.Button
 
@@ -784,7 +784,7 @@ func NewMarket(env widgets.Seams) *Market {
 	m.split.SetDefaultRatio(0, mktTreeShare)
 	m.split.SetDefaultRatio(1, 1-mktSideShare)
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.WindowBodyBox(p, theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),

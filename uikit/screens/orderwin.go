@@ -44,7 +44,7 @@ type OrderWin struct {
 	as widgets.ActionSink
 
 	win   *widget.Window
-	title *widget.Text
+	title *theme.ChromeText
 	body  *widget.Container
 
 	modeBtn *widget.Button
@@ -120,7 +120,7 @@ func NewOrderWin(env widgets.Seams) *OrderWin {
 	}
 
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.WindowBodyBox(p, theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),

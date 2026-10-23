@@ -544,7 +544,7 @@ func TestRackWaitingBadge(t *testing.T) {
 	if badge := gun.badgeGfx.GetWidget().Rect; !badge.In(tile) {
 		t.Errorf("badge rect %v escapes the tile %v", badge, tile)
 	}
-	if gun.badge == gun.ring {
+	if gun.badgeGfx.Image == gun.ring {
 		t.Error("badge shares the ring's image: the ring's clear would wipe it")
 	}
 	if gun.ringOn {
@@ -710,7 +710,7 @@ func TestRackReadyMarker(t *testing.T) {
 	if mr := gun.ammoGfx.GetWidget().Rect; !mr.In(tile) {
 		t.Errorf("marker rect %v escapes the tile %v", mr, tile)
 	}
-	if gun.ammo == gun.ring || gun.ammo == gun.badge {
+	if gun.ammo == gun.ring || gun.ammo == gun.badgeGfx.Image {
 		t.Error("the marker shares the ring's or the badge's image")
 	}
 	if badges := gun.badgeGfx.GetWidget().GetVisibility(); badges == widget.Visibility_Show {
@@ -1162,5 +1162,40 @@ func TestRackDoubleClickShowsInfoWithoutToggle(t *testing.T) {
 	leftClick(c, t, gun.btn)
 	if len(*cmds) != 2 {
 		t.Fatalf("click after the spent gesture queued %d commands, want 2 (toggling again)", len(*cmds))
+	}
+}
+
+// TestRackWaitingBadgePulse: the waiting dot breathes on a frame-count
+// cadence advanced in Sync (deterministic — no wall clock), swaps the
+// pre-rendered phase images by pointer, and two racks fed the same Syncs
+// land on the same phase.
+func TestRackWaitingBadgePulse(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	a, b := NewRack(env), NewRack(env)
+	for i := 0; i < 13; i++ {
+		a.Sync()
+		b.Sync()
+	}
+	if a.badgePh != b.badgePh {
+		t.Fatalf("twin racks drifted: phase %d vs %d", a.badgePh, b.badgePh)
+	}
+	if want := (13 / rackBadgeTicks) % rackBadgePhases; a.badgePh != want {
+		t.Errorf("phase after 13 syncs = %d, want %d", a.badgePh, want)
+	}
+	cell := a.cells[0][0]
+	phase, img := a.badgePh, cell.badgeGfx.Image
+	for i := 0; i < rackBadgeTicks; i++ {
+		a.Sync()
+	}
+	if a.badgePh == phase {
+		t.Error("the pulse did not advance after one phase's ticks")
+	}
+	if cell.badgePhase != a.badgePh || cell.badgeGfx.Image == img {
+		t.Error("the overlay did not follow the shared phase image")
+	}
+	// The phases are distinct images built from a ladder that really moves
+	// (pixel reads are not available outside a game loop).
+	if a.badge[0] == a.badge[rackBadgePhases/2] || rackBadgeAlphas[0] == rackBadgeAlphas[rackBadgePhases/2] {
+		t.Error("pulse phases are identical: the dot cannot breathe")
 	}
 }

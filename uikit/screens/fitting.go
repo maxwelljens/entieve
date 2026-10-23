@@ -80,7 +80,7 @@ type Fitting struct {
 
 	measure func(string) float64 // the StepTiny face, for tile-name ellipsis
 
-	title *widget.Text // title bar: hull name and class
+	title *theme.ChromeText // title bar: hull name and class
 
 	// Zone 1 — ship identity.
 	portrait      *ebiten.Image
@@ -230,7 +230,7 @@ func NewFitting(env widgets.Seams) *Fitting {
 	summary := f.newSummary()
 
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.WindowBodyBox(p, theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true, false, false}),
@@ -286,7 +286,7 @@ func (f *Fitting) newIdentity() *widget.Container {
 		),
 	)
 	frame := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BGHard), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.WindowTitleBox(theme.Solid(p.BGHard), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 		widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.MinSize(theme.Px(fitPortrait)+2, theme.Px(fitPortrait)+2),

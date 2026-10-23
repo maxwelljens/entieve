@@ -3,11 +3,11 @@ package widgets
 import (
 	"fmt"
 	"image"
-	"image/color"
 	"testing"
 
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -94,18 +94,19 @@ func TestPlateFillTop(t *testing.T) {
 	}
 }
 
-// TestBandedNineSlice pins the banded viewport's shape: the Bordered border
+// TestBandedNineSlice pins the banded viewport's shape: the control radius
 // ring with the band's height above the fill line. The pixels are pinned by
 // the header capture (ebiten readback needs a running game loop).
 func TestBandedNineSlice(t *testing.T) {
-	body := color.NRGBA{R: 10, G: 20, B: 30, A: 230}
-	edge := color.NRGBA{R: 40, G: 50, B: 60, A: 160}
+	p := theme.DefaultPalette()
+	body, edge := theme.WindowBody(p.BG), theme.NRGBA(p.Border, 160)
 	for _, c := range []struct{ top, want int }{
-		{8, 8}, {2, 2}, {1, 2}, {0, 2}, // a band thinner than the border keeps the border
+		{8, 8}, {2, 5}, {1, 5}, {0, 5}, // a band thinner than the corner cell keeps the cell
 	} {
-		mw, mh := banded(body, edge, 2, c.top).MinSize()
-		if mw != 4 || mh != c.want+2 {
-			t.Errorf("banded(top %d) min size = %d×%d, want 4×%d", c.top, mw, mh, c.want+2)
+		mw, mh := theme.BandedBox(body, edge, c.top).MinSize()
+		if mw != 2*theme.RadiusControl || mh != c.want+theme.RadiusControl {
+			t.Errorf("banded(top %d) min size = %d×%d, want %d×%d",
+				c.top, mw, mh, 2*theme.RadiusControl, c.want+theme.RadiusControl)
 		}
 	}
 }

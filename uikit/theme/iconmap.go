@@ -154,39 +154,52 @@ func (b *IconBox) Widget() *widget.Graphic { return b.g }
 // Name returns the icon currently shown ("" when hidden).
 func (b *IconBox) Name() string { return b.name }
 
-// NewTitleBar builds the standard window title bar: a leading 24 px icon
-// (icon == "" draws the bar text-only) beside the accent title. Returns the
-// bar for WindowOpts.TitleBar and the title text, which windows that retitle
-// keep a handle on.
-func NewTitleBar(d Theme, label, icon string) (*widget.Container, *widget.Text) {
+// TitleDotsWidget is the ring block as an anchor-start graphic: a hand-built
+// title bar adds it the same way the standard one does.
+func TitleDotsWidget(p Palette) *widget.Graphic {
+	g := widget.NewGraphic(widget.GraphicOpts.Image(TitleDots(p)))
+	g.GetWidget().LayoutData = widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		Padding:            &widget.Insets{Left: Px(SpMd)},
+	}
+	return g
+}
+
+// NewTitleBar builds the standard window title bar: the kit's three hollow
+// ring dots at the bar's left, then a leading 24 px icon (icon == "" draws
+// the bar text-only) beside the accent title. Returns the bar for
+// WindowOpts.TitleBar and the tracked mono title label, which windows that
+// retitle keep a handle on.
+func NewTitleBar(d Theme, label, icon string) (*widget.Container, *ChromeText) {
 	p := d.Pal()
 	title := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(Bordered(Solid(p.BGHard), NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(WindowTitleBox(Solid(p.BGHard), NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
+	title.AddChild(TitleDotsWidget(p))
 	// The icon is anchored to the bar's start and the title is padded past
-	// it, so the two can never overlap however wide the bar gets.
+	// it, so the two can never overlap however wide the bar gets. Both sit
+	// clear of the dot block.
 	// Title bars are furniture: they take the SpMd token (the panel
 	// margin ContentsPad is denser — the bar gets air the body does not).
-	titlePad := SpMd
+	titlePad := SpMd + TitleDotsW + TitleDotsGap
 	if icon != "" {
 		g := NewIcon(icon, IconTitle, p.Accent)
 		g.GetWidget().LayoutData = widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(Px(SpMd)),
+			Padding:            &widget.Insets{Left: Px(titlePad)},
 		}
 		title.AddChild(g)
-		titlePad = SpMd + IconTitle + IconGap
+		titlePad += IconTitle + IconGap
 	}
-	txt := widget.NewText(
-		widget.TextOpts.Text(label, d.FaceBold(StepBase), Solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(Px(titlePad)),
-		})),
-	)
+	txt := NewChromeText(d, StepBase, label, p.Accent)
+	txt.w.LayoutData = widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		Padding:            &widget.Insets{Left: Px(titlePad)},
+	}
 	title.AddChild(txt)
 	return title, txt
 }

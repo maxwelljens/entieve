@@ -161,11 +161,14 @@ func Solid(c color.RGBA) color.NRGBA { return NRGBA(c, c.A) }
 
 func NineSlice(c color.NRGBA) *eimage.NineSlice { return eimage.NewNineSliceColor(c) }
 
-// bordered builds a bordered nineslice with the border width scaled: a
-// 1 design-unit hairline is 1 DIP, so it must thicken with the rest of
-// the interface (at 2× it is 2 device px = 1 DIP, still a hairline).
+// Bordered builds the control chrome: a bordered nineslice with the
+// control corner radius (5 design px) and the border width scaled — a 1
+// design-unit hairline is 1 DIP, so it must thicken with the rest of the
+// interface (at 2× it is 2 device px = 1 DIP, still a hairline).
+// Panels, window pieces and square strips call Rounded/PanelBox/
+// WindowBodyBox/WindowTitleBox for their own radii (round.go).
 func Bordered(body, edge color.NRGBA, w int) *eimage.NineSlice {
-	return eimage.NewBorderedNineSliceColor(body, edge, Px(w))
+	return Rounded(body, edge, w, AllRadii(RadiusControl))
 }
 
 // NewTheme builds a complete ebitenui widget theme for the EVE-dark look.

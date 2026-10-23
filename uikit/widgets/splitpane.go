@@ -108,8 +108,10 @@ func newSplitPane(th theme.Theme, row bool, panes []widget.PreferredSizeLocateab
 	}
 	// Recessed track: a Border line around the near-black BGHard fill, so
 	// the division reads on any surface (the body is the same near-black
-	// at window translucency).
-	trackImg := theme.Bordered(theme.Solid(pal.BGHard), theme.NRGBA(pal.Border, 200), 1)
+	// at window translucency). The seam is 4 px — under the control
+	// radius — so it keeps a 1 px corner: the kit's meter-bar rule
+	// (thin chrome stays square-ish; a 5 px radius would overlap tiles).
+	trackImg := theme.Rounded(theme.Solid(pal.BGHard), theme.NRGBA(pal.Border, 200), 1, theme.AllRadii(1))
 	if n := len(panes); n > 0 {
 		for i := range s.shares {
 			s.shares[i] = 1 / float64(n)

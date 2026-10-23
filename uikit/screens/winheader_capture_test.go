@@ -173,7 +173,9 @@ func (g *headerCaptureGame) verify(img *ebiten.Image) error {
 	} {
 		// The panel, well inside the body's padding: the reference every
 		// "content pixel" probe compares against.
-		panel := shot.px(w.body.Min.X+4, w.body.Max.Y-4)
+		// Clear of the body's rounded bottom corner: the radius is the
+		// window token, so the reference sits inside the straight edge.
+		panel := shot.px(w.body.Min.X+theme.Px(theme.RadiusWindow)+6, w.body.Max.Y-4)
 		checkBand(w.name, w.band, w.body, panel, shot, was, fail)
 	}
 	// The rows on the band let it through: their background moves far from
@@ -229,12 +231,19 @@ func checkHeaderRows(name string, tbl *widgets.Table, band image.Rectangle, shot
 		fail("%s: row %d background inside the band moved %d/255 from the no-plate frame — the plate is buried again",
 			name, inBand, strongest)
 	}
-	// From the band's bottom edge down the viewport paints exactly the
-	// no-plate frame: rows, gaps, border and fill all unchanged.
+	// From the band's bottom edge down the viewport paints the no-plate
+	// frame: rows, gaps, border and fill all unchanged. One unit of slack:
+	// the viewport's rounded corner (and its 1 px border) is anti-aliased,
+	// so where the plate's own last fringe is a fraction of a level the
+	// blend can move a single step.
 	view := tbl.ScrollForTest().ViewRect()
-	for y := band.Max.Y; y < view.Max.Y; y++ {
+	// The first rows under the band are the banded fill's own ramp start
+	// (the depth ramp begins at the fill line), so they differ from the
+	// plain frame's mid-ramp value by a few levels; from there down it is
+	// today's fill again.
+	for y := band.Max.Y + theme.Px(2); y < view.Max.Y; y++ {
 		for x := view.Min.X; x < view.Max.X; x++ {
-			if d := shot.diff(was, x, y); d != 0 {
+			if d := shot.diff(was, x, y); d > 1 {
 				fail("%s: viewport pixel (%d,%d) below the band moved %d/255 — the banded viewport must keep today's fill there",
 					name, x, y, d)
 				return
@@ -258,7 +267,10 @@ func checkBand(name string, band, body image.Rectangle, panel color.RGBA, shot, 
 		strongest := 0
 		for y := band.Min.Y + from; y < band.Min.Y+to; y++ {
 			for x := band.Min.X; x < band.Max.X; x++ {
-				if channelDelta(was.px(x, y), panel) > 4 {
+				// 12, not 4: the panel-depth ramp puts the band's top fill
+				// ~10 above the body's bottom reference pixel, so a tight
+				// match would read the whole bare band as content.
+				if channelDelta(was.px(x, y), panel) > 12 {
 					continue // content ink or a row fill: not the bare band
 				}
 				if d := shot.diff(was, x, y); d > strongest {

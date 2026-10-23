@@ -195,7 +195,7 @@ func (k *Kit) buildOverview() {
 	// Body: the table fills its grid cell exactly, so the scroll
 	// viewport is bounded by the window no matter how tall the rows are.
 	contents := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(k.th.Pal().BG), theme.NRGBA(k.th.Pal().Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.WindowBodyBox(k.th.Pal(), theme.WindowBody(k.th.Pal().BG), theme.NRGBA(k.th.Pal().Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
@@ -205,17 +205,17 @@ func (k *Kit) buildOverview() {
 	contents.AddChild(tbl.Container())
 
 	title := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(k.th.Pal().BGHard), theme.NRGBA(k.th.Pal().Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.WindowTitleBox(theme.Solid(k.th.Pal().BGHard), theme.NRGBA(k.th.Pal().Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
-	title.AddChild(widget.NewText(
-		widget.TextOpts.Text("Overview", k.th.FaceBold(theme.StepBase), theme.Solid(k.th.Pal().Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(theme.Px(theme.ContentsPad)),
-		})),
-	))
+	ovTitle := theme.NewChromeText(k.th, theme.StepBase, "Overview", k.th.Pal().Accent)
+	ovTitle.GetWidget().LayoutData = widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		Padding:            &widget.Insets{Left: theme.Px(theme.SpMd + theme.TitleDotsW + theme.TitleDotsGap)},
+	}
+	title.AddChild(theme.TitleDotsWidget(k.th.Pal()))
+	title.AddChild(ovTitle)
 
 	o.win = widget.NewWindow(
 		widget.WindowOpts.Contents(contents),

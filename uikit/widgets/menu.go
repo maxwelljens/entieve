@@ -265,13 +265,7 @@ func (m *Menu) Draw(dst *ebiten.Image) {
 	}
 	m.screen = dst.Bounds()
 	p := m.th.Pal()
-	theme.FillRect(dst, m.rect, theme.Solid(p.BGHard))
-	// The popup's hairline border scales with the rest of the chrome.
-	bs := float32(theme.Scale())
-	vector.StrokeRect(dst,
-		float32(m.rect.Min.X)+bs/2, float32(m.rect.Min.Y)+bs/2,
-		float32(m.rect.Dx())-bs, float32(m.rect.Dy())-bs,
-		bs, theme.NRGBA(p.Border, 220), true)
+	theme.DrawRoundBox(dst, m.rect, theme.Solid(p.BGHard), theme.NRGBA(p.Border, 220), 1, theme.AllRadii(theme.RadiusControl))
 	for _, r := range m.rows {
 		e := m.entries[r.entry]
 		if e.Sep {
