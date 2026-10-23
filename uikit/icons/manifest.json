@@ -3,6 +3,12 @@
   "license_url": "https://creativecommons.org/licenses/by/3.0/",
   "source": "https://game-icons.net",
   "icons": {
+    "ammo": {
+      "slug": "artillery-shell",
+      "author": "Quoting",
+      "url": "https://game-icons.net/1x1/quoting/artillery-shell.html",
+      "file": "ammo.png"
+    },
     "act_approach": {
       "slug": "convergence-target",
       "author": "Delapouite",

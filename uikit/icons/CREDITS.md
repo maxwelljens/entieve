@@ -50,3 +50,4 @@ Requested attribution format: *Icons made by {author}. Available on https://game
 | `svc_market` | `coins` | Icons made by Delapouite. Available on https://game-icons.net | [coins](https://game-icons.net/1x1/delapouite/coins.html) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | `svc_refinery` | `furnace` | Icons made by Delapouite. Available on https://game-icons.net | [furnace](https://game-icons.net/1x1/delapouite/furnace.html) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | `svc_scanner` | `radar-sweep` | Icons made by Lorc. Available on https://game-icons.net | [radar-sweep](https://game-icons.net/1x1/lorc/radar-sweep.html) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| `ammo` | `artillery-shell` | Icons made by Quoting. Available on https://game-icons.net | [artillery-shell](https://game-icons.net/1x1/quoting/artillery-shell.html) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |

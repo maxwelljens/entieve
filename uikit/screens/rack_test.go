@@ -3,6 +3,7 @@ package screens
 import (
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
+
 	"image/color"
 	"strings"
 	"testing"
@@ -573,6 +574,177 @@ func TestRackWaitingBadge(t *testing.T) {
 		if cell.waiting || cell.badgeGfx.GetWidget().GetVisibility() == widget.Visibility_Show {
 			t.Errorf("bayless cell %d wears the waiting badge", idx)
 		}
+	}
+}
+
+// TestRackLoadRing pins the load cycle's ring: a bay that is loading (an idle
+// module's top-up — rounds in, selection not yet written, deadline ahead)
+// draws the ring LIT, while a genuinely cancelled cycle on a loaded bay stays
+// greyed. The two shapes read differently, and the ready marker waits for the
+// load to complete.
+func TestRackLoadRing(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	r := NewRack(env)
+	c := newChromeUI(env)
+	c.AddPanel(r.Container(), r)
+	c.Frame(t, 1280, 720)
+
+	gun := r.cells[0][0] // Small Autocannon, high slot 1: 3 s cycle, 40-round bay
+	marker := func() bool {
+		return gun.ammoGfx.GetWidget().GetVisibility() == widget.Visibility_Show
+	}
+	fit, _ := env.Sim.Fittings.Get(env.Sim.Player())
+	rt := &fit.HighRT[0]
+	now := env.Sim.Time()
+
+	// A load in flight, half a cycle out: take-at-start rounds in the bay,
+	// the selection still unwritten (that is what Loading derives from).
+	rt.Active = false
+	rt.Clip = content.CargoStack{Item: "ammo-emp-s", Qty: 40}
+	rt.Selection = ""
+	rt.CycleEnds = now + 1.5
+	r.Sync()
+	if !gun.ringOn || !gun.ringLit || gun.ringFrac != 0.5 {
+		t.Errorf("loading ring = on:%v lit:%v frac:%v, want lit on / 0.5",
+			gun.ringOn, gun.ringLit, gun.ringFrac)
+	}
+	if vis := gun.ringGfx.GetWidget().GetVisibility(); vis != widget.Visibility_Show {
+		t.Errorf("loading ring visibility = %d, want shown", vis)
+	}
+	if gun.waiting {
+		t.Error("a loading bay reads as waiting")
+	}
+	if marker() {
+		t.Error("a loading bay shows the ready marker")
+	}
+
+	// The same clock on a loaded bay with its selection written is a
+	// cancellation, not a load: the ring greys out and the marker shows.
+	rt.Selection = "ammo-emp-s"
+	r.Sync()
+	if !gun.ringOn || gun.ringLit {
+		t.Errorf("cancelled ring = on:%v lit:%v, want greyed", gun.ringOn, gun.ringLit)
+	}
+	if !marker() {
+		t.Error("a loaded cancelled bay shows no ready marker")
+	}
+
+	// Once the clock is in the past the ring goes and the bay stays armed.
+	rt.CycleEnds = now
+	r.Sync()
+	if gun.ringOn {
+		t.Error("ring after the cycle ran out, want none")
+	}
+	if !marker() {
+		t.Error("the armed idle bay shows no ready marker")
+	}
+
+	// A dry bay (empty, a type selected, nothing loading) shows no marker.
+	rt.Clip = content.CargoStack{}
+	r.Sync()
+	if marker() {
+		t.Error("a dry bay shows the ready marker")
+	}
+}
+
+// TestRackReadyMarker pins the bottom-right ammunition marker: hidden while
+// the bay waits, loads, is dry or the slot is empty; shown once the bay is
+// loaded and the load has completed. It rides its own overlay, so the cell
+// geometry, glyph and ring never move (the waiting dot's contract, in the
+// opposite corner).
+func TestRackReadyMarker(t *testing.T) {
+	env, cmds := newChromeEnv(t)
+	r := NewRack(env)
+	c := newChromeUI(env)
+	c.AddPanel(r.Container(), r)
+	c.Frame(t, 1280, 720)
+
+	gun := r.cells[0][0]
+	shown := func() bool {
+		return gun.ammoGfx.GetWidget().GetVisibility() == widget.Visibility_Show
+	}
+	if !gun.waiting {
+		t.Fatal("fixture gun is not waiting")
+	}
+	if shown() {
+		t.Error("a waiting bay shows the ready marker")
+	}
+
+	// Choosing a charge starts the bay's load: rounds in, marker still held.
+	selectCharge(env.Sim, sim.SlotRef{Class: content.SlotHigh, Index: 0})
+	env.Sim.Step()
+	c.Frame(t, 1280, 720)
+	if gun.clip.Rounds == 0 || !gun.clip.Loading {
+		t.Fatalf("clip = %+v, want a load in flight", gun.clip)
+	}
+	if shown() {
+		t.Error("a loading bay shows the ready marker")
+	}
+	tile := gun.btn.GetWidget().Rect
+	name := gun.name.GetWidget().Rect
+	root := gun.root.GetWidget().Rect
+	glyph := gun.btn.GraphicImage().Idle
+	badge := gun.badgeGfx.GetWidget().Rect
+
+	// The 3 s load completes: armed, marker shown, nothing else moved.
+	for i := 0; i < 180; i++ {
+		env.Sim.Step()
+	}
+	c.Frame(t, 1280, 720)
+	if gun.clip.Rounds == 0 || gun.clip.Loading {
+		t.Fatalf("clip = %+v, want a completed load", gun.clip)
+	}
+	if !shown() {
+		t.Fatal("an armed bay shows no ready marker")
+	}
+	if gun.btn.GetWidget().Rect != tile || gun.name.GetWidget().Rect != name ||
+		gun.root.GetWidget().Rect != root {
+		t.Error("the ready marker disturbed the cell geometry")
+	}
+	if gun.btn.GraphicImage().Idle != glyph {
+		t.Error("the ready marker replaced the tile glyph")
+	}
+	if gun.ringOn {
+		t.Error("an armed idle cell drew a cycle ring")
+	}
+	if mr := gun.ammoGfx.GetWidget().Rect; !mr.In(tile) {
+		t.Errorf("marker rect %v escapes the tile %v", mr, tile)
+	}
+	if gun.ammo == gun.ring || gun.ammo == gun.badge {
+		t.Error("the marker shares the ring's or the badge's image")
+	}
+	if badges := gun.badgeGfx.GetWidget().GetVisibility(); badges == widget.Visibility_Show {
+		t.Error("an armed cell still wears the waiting dot")
+	}
+	if gun.badgeGfx.GetWidget().Rect != badge {
+		t.Error("the waiting dot moved")
+	}
+
+	// Bottom-right, by construction: the glyph's box sits wholly in the
+	// tile's bottom-right quadrant and inside the overlay.
+	b := gun.ammo.Bounds()
+	x0, y0 := rackAmmoOrigin()
+	side := theme.Px(rackAmmoIcon)
+	if x0 <= b.Dx()/2 || y0 <= b.Dy()/2 {
+		t.Errorf("marker origin (%d,%d) is not in the bottom-right of %v", x0, y0, b)
+	}
+	if x0+side > b.Dx() || y0+side > b.Dy() {
+		t.Errorf("marker glyph %dx%d at (%d,%d) escapes the overlay %v", side, side, x0, y0, b)
+	}
+
+	// Bayless and empty slots never wear it (miner, rocket pod, empty low).
+	for _, row := range []struct{ r, i int }{{0, 1}, {0, 2}, {2, 3}} {
+		if r.cells[row.r][row.i].ammoGfx.GetWidget().GetVisibility() == widget.Visibility_Show {
+			t.Errorf("cell(%d,%d) shows a ready marker", row.r, row.i)
+		}
+	}
+
+	// The marker is paint-only: the armed cell still toggles on a click.
+	before := len(*cmds)
+	spendDouble(r)
+	leftClick(c, t, gun.btn)
+	if len(*cmds) != before+1 {
+		t.Fatalf("armed click enqueued %d commands, want the single toggle", len(*cmds)-before)
 	}
 }
 

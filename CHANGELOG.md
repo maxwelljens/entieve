@@ -34,6 +34,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New read-only seam `widgets.ContentView.Clip` over `sim.Clip`; there is
     one implementation (`view`), so no stub needed updating. Docs: GAMEPLAY
     "Bays" / "Ammo cycling", NAMING rows (proposed).
+- **Reload ring and ready marker on the rack** (`sim`, `uikit`): loads are
+  now visible as they happen, and an armed bay says so.
+  - **Every bay load runs a cycle.** An idle bay's top-up, an auto-switch or
+    a `CmdSetAmmo` now takes the same one firing cycle an active gun's reload
+    always cost at its boundary: the rounds move into the bay at the start
+    (conservation unchanged) and the gun is not ready until the deadline.
+    The `<module> loaded with <round> (N rounds)` line now fires at
+    completion. A fresh fit at boot is still pre-loaded instantly (no UI
+    exists yet). Pacing: an idle reload that used to finish in one tick now
+    costs a cycle, and an NPC's first shot after a fresh bay load shifted by
+    one cycle. Saves are untouched (schema 3; a load in flight restores into
+    the same load — `ClipState.Loading` derives from the bay and the
+    not-yet-written selection).
+  - The rack cell draws the load's **cycle ring lit** (a cancelled cycle
+    with its clock still running stays greyed), so a picked round visibly
+    cycles in, and shows a small **shell marker** in the tile's bottom-right
+    corner once the bay is loaded and not loading: armed, where the
+    top-right `Info` dot means the waiting state (`needs you`). The marker
+    is its own overlay — tile, name, hit area, glyph, ring and dot are
+    untouched. New `uikit/icons/ammo.png` (`artillery-shell` by Quoting,
+    CC BY 3.0, tinted from the palette).
 - **Window artwork headers** (`render`, `uikit`): the Refinery and
   Manufacturing windows can carry a plate of their own,
   `assets/artwork/refining_header.jpg` and `manufacturing_header.jpg`

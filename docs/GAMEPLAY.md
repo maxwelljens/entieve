@@ -340,7 +340,12 @@ hard and how often it lands. Projectile guns draw no capacitor.
 **bay** sized in m³. A **load cycle** fills it from cargo with a full bay of
 one round type and costs one firing cycle, so a reload pauses the gun for a
 beat (about every forty small autocannon rounds, or every ~120 s of
-sustained fire; twenty-five cap booster cells). With one round type in
+sustained fire; twenty-five cap booster cells). The load is visible: its
+rack cell draws the cycle ring lit while the bay loads (a cancelled cycle
+keeps its ring greyed), and once the bay is loaded and not loading a small
+shell marker appears in the tile's bottom-right corner — armed, as opposed
+to the waiting dot in the top-right, which means the bay needs a choice. With
+one round type in
 cargo the bay looks after itself: pre-loaded when fitted, topped up while
 that type lasts, and switched when it runs out and one other type is left.
 With two or more types in cargo the gun **waits for a choice**: its rack

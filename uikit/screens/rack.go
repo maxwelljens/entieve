@@ -56,6 +56,12 @@ const (
 	// so it shares the tile's rect without touching the glyph or the ring.
 	rackBadgeR     = 2 // dot radius (design px)
 	rackBadgeInset = 6 // dot centre inset from the tile's top-right corner
+	// rackAmmoIcon / rackAmmoInset place the ready marker: a small round
+	// silhouette in the tile's bottom-right corner, on its own overlay, kept
+	// clear of the waiting dot (top-right = "needs you", bottom-right =
+	// "armed") and of the cycle ring.
+	rackAmmoIcon  = 10 // marker glyph size (design px)
+	rackAmmoInset = 5  // marker inset from the tile's bottom-right corner
 )
 
 // rackClasses and rackRowLabels index the three slot rows.
@@ -67,7 +73,9 @@ var (
 // Rack is the module rack (the right half of the HUD's bottom-center pair):
 // one cell per slot showing the module short name, an amber glow while
 // active, a cycle ring depleting clockwise over the tile while the module
-// runs, and a hover tooltip with the module's key stats. Left-clicking a cell toggles
+// runs or its bay loads, a small shell marker in the tile's bottom-right
+// corner once the bay is armed, and a hover tooltip with the module's key
+// stats. Left-clicking a cell toggles
 // the module (enqueueing CmdActivate/CmdDeactivate; empty slots are inert);
 // a second click inside the double-click window shows Show Info instead of
 // toggling — the click that completes the gesture is Show Info, strictly
@@ -114,6 +122,8 @@ type rackCell struct {
 	ringGfx  *widget.Graphic
 	badge    *ebiten.Image   // the waiting-state corner dot (static)
 	badgeGfx *widget.Graphic // its overlay, shown only while waiting
+	ammo     *ebiten.Image   // the ready marker (static round glyph)
+	ammoGfx  *widget.Graphic // its overlay, shown while the bay is loaded
 	name     *widget.Text
 	ringOn   bool             // ring visible at the last Sync (a cycle in flight)
 	ringFrac float64          // ring fill at the last Sync (1 = just activated, 0 = done)
@@ -202,6 +212,13 @@ func NewRack(env widgets.Seams) *Rack {
 	return r
 }
 
+// rackAmmoOrigin is the ready marker's glyph origin inside the cell overlay:
+// the tile's bottom-right corner, inset from both edges.
+func rackAmmoOrigin() (x, y int) {
+	return theme.Px(rackCellW - rackAmmoIcon - rackAmmoInset),
+		theme.Px(rackCellH - rackAmmoIcon - rackAmmoInset)
+}
+
 // newCell builds one slot cell: a 50×40 icon tile (the module's class
 // glyph; right-click cycles a weapon's charge) with the cycle ring drawn
 // over it, and the name line under it. The cell's structured hover tooltip
@@ -257,10 +274,20 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 		float32(rackBadgeR*s), p.Info, false)
 	cell.badgeGfx = widget.NewGraphic(widget.GraphicOpts.Image(cell.badge))
 	theme.ShowWidget(cell.badgeGfx.GetWidget(), false)
+	// The ready marker is the second corner overlay: the same static-image
+	// trick, in the bottom-right so the two corners keep distinct meanings.
+	cell.ammo = ebiten.NewImage(theme.Px(rackCellW), theme.Px(rackCellH))
+	glyph := icons.Get("ammo", theme.Px(rackAmmoIcon), p.Text)
+	op := &ebiten.DrawImageOptions{}
+	x0, y0 := rackAmmoOrigin()
+	op.GeoM.Translate(float64(x0), float64(y0))
+	cell.ammo.DrawImage(glyph, op)
+	cell.ammoGfx = widget.NewGraphic(widget.GraphicOpts.Image(cell.ammo))
+	theme.ShowWidget(cell.ammoGfx.GetWidget(), false)
 	cell.stack = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewStackedLayout()),
 	)
-	cell.stack.AddChild(cell.btn, cell.ringGfx, cell.badgeGfx)
+	cell.stack.AddChild(cell.btn, cell.ringGfx, cell.badgeGfx, cell.ammoGfx)
 	cell.root = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
@@ -382,16 +409,32 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 		def, _ = r.cv.Defs().Module(id)
 	}
 	active := rt != nil && rt.Active
+	// The bay read comes first: a load in flight is a cycle of its own (the
+	// ring shows it, lit) and it withholds the ready marker.
+	cell.clip, cell.hasClip = sim.ClipState{}, false
+	if def != nil {
+		cell.clip, cell.hasClip = r.cv.Clip(cell.slot)
+	}
+	loading := cell.hasClip && cell.clip.Loading
 	// A cancelled module keeps its cycle clock (the boundary rule in the
 	// sim): while that clock is still ahead of now, a cycle is in flight
 	// and the ring must show it — greyed — so a cancelled module never
-	// reads as a plain idle one.
-	pending := !active && rt != nil && rt.CycleEnds > 0 && rt.CycleEnds > now
+	// reads as a plain idle one. A load's deadline also sits ahead of now,
+	// but a load is activity, not a cancellation: it draws lit.
+	pending := !active && !loading && rt != nil && rt.CycleEnds > 0 && rt.CycleEnds > now
 	progress := 0.0
-	if def != nil && rt != nil && rt.CycleEnds > 0 && def.ActivationTime > 0 && (active || pending) {
+	if def != nil && rt != nil && rt.CycleEnds > 0 && (active || pending || loading) {
 		// Same expression as the legacy rack: position inside the current
-		// cycle window (CycleEnds - ActivationTime .. CycleEnds).
-		progress = hudFrac01((now - (rt.CycleEnds - def.ActivationTime)) / def.ActivationTime)
+		// cycle window (CycleEnds - period .. CycleEnds). A load's window is
+		// the firing cycle it costs (the gun's ShotTime), which the shipped
+		// content keeps equal to ActivationTime.
+		period := def.ActivationTime
+		if loading && def.Weapon != nil && def.Weapon.ShotTime > 0 {
+			period = def.Weapon.ShotTime
+		}
+		if period > 0 {
+			progress = hudFrac01((now - (rt.CycleEnds - period)) / period)
+		}
 	}
 
 	// Rewriting the label every frame is cheap (Text.measure early-returns
@@ -404,13 +447,14 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 	// every round type in cargo that fits. A waiting cell (empty bay, no
 	// selection, two or more types competing — sim fillClip's ambiguous
 	// case) wears the badge and its click opens the picker.
-	cell.clip, cell.hasClip = sim.ClipState{}, false
-	if def != nil {
-		cell.clip, cell.hasClip = r.cv.Clip(cell.slot)
-	}
 	cell.waiting = cell.hasClip && cell.clip.Rounds == 0 &&
 		cell.clip.Selection == "" && len(cell.clip.Options) >= 2
 	theme.ShowWidget(cell.badgeGfx.GetWidget(), cell.waiting)
+	// The ready marker: a loaded bay with no load in flight — the gun can
+	// fire. The waiting dot is the only other corner marker and the two
+	// states exclude each other (waiting needs an empty bay).
+	theme.ShowWidget(cell.ammoGfx.GetWidget(),
+		cell.hasClip && cell.clip.Rounds > 0 && !loading)
 	// Glyph + name: the tile shows the module's class, the line under it
 	// keeps the short name (and the click seam) exactly where it was.
 	icon := ""
@@ -436,14 +480,14 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 	cell.spec = r.cellSpec(cell, def)
 	cell.tip.Set(r.th, cell.btn.GetWidget(), cell.spec.Tip.Key, cell.spec.Tip.Build)
 	cell.btn.GetWidget().Disabled = !active
-	r.syncRing(cell, active || pending, active, 1-progress)
+	r.syncRing(cell, active || pending || loading, active || loading, 1-progress)
 }
 
 // syncRing shows the cycle ring while a cycle is in flight: lit on a
-// repeating module, greyed on one whose autocycle was cancelled but whose
-// clock has not run out yet. Depleting clockwise from full at activation:
-// remaining = 1 − (now − start) / ActivationTime, the same cycle window the
-// old bar read.
+// repeating module and on a bay that is loading, greyed on one whose autocycle
+// was cancelled but whose clock has not run out yet. Depleting clockwise from
+// full at activation: remaining = 1 − (now − start) / period, the same cycle
+// window the old bar read.
 func (r *Rack) syncRing(cell *rackCell, show, lit bool, remaining float64) {
 	theme.ShowWidget(cell.ringGfx.GetWidget(), show)
 	if !show {

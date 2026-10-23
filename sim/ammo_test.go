@@ -93,22 +93,25 @@ func TestBayReloadsWhenEmpty(t *testing.T) {
 		t.Fatalf("cargo = %d, want 15 (no reload yet)", got)
 	}
 
-	stepN(s, 120) // t=10 s: the cycle reloads instead of firing
+	stepN(s, 120) // t=10 s: the cycle loads instead of firing (rounds move in)
 	evs := drain(s)
 	if got := bayRounds(s, ammoSlot()); got != 5 {
-		t.Fatalf("bay after reload = %d, want 5", got)
+		t.Fatalf("bay after reload start = %d, want 5", got)
 	}
 	if got := cargoCount(s, "ammo-emp-s"); got != 10 {
-		t.Fatalf("cargo after reload = %d, want 10", got)
+		t.Fatalf("cargo after reload start = %d, want 10", got)
 	}
 	if hasEvent(evs, EvLog, "Sloop hits") || hasEvent(evs, EvLog, "Sloop misses") {
 		t.Fatalf("a load cycle fired a shot: %v", evs)
 	}
-	if findEvent(evs, EvModule, "EMP Turret loaded with EMP Charge (5 rounds)") == nil {
-		t.Fatalf("missing reload line: %v", evs)
+	if findEvent(evs, EvModule, "loaded with") != nil {
+		t.Fatalf("the load line fired at the start, want it at completion: %v", evs)
 	}
 
-	stepN(s, 120) // t=12 s: the deferred shot fires from the new bay
+	stepN(s, 120) // t=12 s: the load completes and the deferred shot fires
+	if findEvent(drain(s), EvModule, "EMP Turret loaded with EMP Charge (5 rounds)") == nil {
+		t.Fatal("missing completion line")
+	}
 	if got := bayRounds(s, ammoSlot()); got != 4 {
 		t.Fatalf("bay after the deferred shot = %d, want 4", got)
 	}
@@ -137,9 +140,9 @@ func TestBayWaitsWithTwoTypes(t *testing.T) {
 	s.Queue(CmdActivate{Slot: ammoSlot(), Target: npc})
 	s.Step()
 	drain(s)
-	// The three AP rounds fire at t=0/2/4; at t=6 the empty bay finds two
-	// types competing.
-	stepN(s, 360)
+	// The three AP rounds fire at t=2/4/6 (the bay is loaded at t=0); at t=8
+	// the empty bay finds two types competing.
+	stepN(s, 480)
 	evs := drain(s)
 	if got := bayRounds(s, ammoSlot()); got != 0 {
 		t.Fatalf("bay = %d, want 0", got)
@@ -178,22 +181,34 @@ func TestBayAutoSwitchesToTheLastType(t *testing.T) {
 	s.Queue(CmdActivate{Slot: ammoSlot(), Target: npc})
 	s.Step()
 	drain(s)
-	// The two AP rounds fire at t=0 and t=2; at t=4 the empty bay finds
-	// fusion as the only remaining type and loads it.
-	stepN(s, 240)
-	evs := drain(s)
+	// The two AP rounds fire at t=2 and t=4; the bay runs dry at t=4 and at
+	// t=6 the empty bay finds fusion as the only remaining type: its load
+	// starts then (all five rounds move in) and completes one cycle later.
+	stepN(s, 360)   // t=6 s: the auto-switch load starts
+	evs := drain(s) // (holds the AP load's completion line from t=2)
+	if got := ammoTotal(s, "ammo-fusion-s"); got != 5 {
+		t.Fatalf("fusion = %d, want 5 (conserved at the start)", got)
+	}
+	if got := bayRounds(s, ammoSlot()); got != 5 {
+		t.Fatalf("auto-switch loaded %d rounds, want 5", got)
+	}
+	if cs, _ := s.Clip(s.player, ammoSlot()); !cs.Loading {
+		t.Fatalf("clip = %+v, want a load in flight", cs)
+	}
+	if findEvent(evs, EvModule, "Fusion Charge") != nil {
+		t.Fatalf("the load line fired at the start, want it at completion: %v", evs)
+	}
+
+	stepN(s, 120) // t=8 s: the load completes and the deferred shot fires
+	evs = drain(s)
 	if findEvent(evs, EvModule, "EMP Turret loaded with Fusion Charge (5 rounds)") == nil {
 		t.Fatalf("missing auto-switch load: %v", evs)
-	}
-	if got := ammoTotal(s, "ammo-fusion-s"); got != 5 {
-		t.Fatalf("fusion = %d, want 5 (conserved)", got)
 	}
 	if got := s.ammoPref(s.player, ammoSlot()); got != "ammo-fusion-s" {
 		t.Fatalf("selection = %q, want ammo-fusion-s", got)
 	}
-	// And the gun is loaded and firing again.
-	if got := bayRounds(s, ammoSlot()); got != 5 {
-		t.Fatalf("auto-switch loaded %d rounds, want 5", got)
+	if got := bayRounds(s, ammoSlot()); got != 4 {
+		t.Fatalf("bay after the deferred shot = %d, want 4", got)
 	}
 }
 
@@ -211,8 +226,13 @@ func TestCmdSetAmmoDumpsAndReloads(t *testing.T) {
 
 	before := ammoTotal(s, "ammo-emp-s")
 	evs := setAmmo(s, "ammo-ap-s")
-	if findEvent(evs, EvModule, "EMP Turret loaded with AP Charge (4 rounds)") == nil {
-		t.Fatalf("missing load line: %v", evs)
+	// The switch is a load like any other: the AP rounds are in at once and
+	// the bay is not ready until the load's cycle completes.
+	if findEvent(evs, EvModule, "loaded with") != nil {
+		t.Fatalf("the load line fired at the start, want it at completion: %v", evs)
+	}
+	if cs, _ := s.Clip(s.player, ammoSlot()); !cs.Loading {
+		t.Fatalf("clip = %+v, want a load in flight", cs)
 	}
 	// The five EMP rounds went back to cargo; the AP rounds loaded.
 	if got := ammoTotal(s, "ammo-emp-s"); got != before {
@@ -224,16 +244,19 @@ func TestCmdSetAmmoDumpsAndReloads(t *testing.T) {
 	if got := bayRounds(s, ammoSlot()); got != 4 {
 		t.Fatalf("bay = %d AP rounds, want 4", got)
 	}
-	if got := s.ammoPref(s.player, ammoSlot()); got != "ammo-ap-s" {
-		t.Fatalf("selection = %q", got)
-	}
 	if rt, _ := hudModule(s, ammoSlot()); !rt.Active {
 		t.Fatal("module must stay Active through the switch")
 	}
-	// The load cycle defers the next shot by one firing cycle, then it fires
-	// from the new bay.
-	if got := bayRounds(s, ammoSlot()); got != 4 {
-		t.Fatalf("bay = %d, want 4 until the deferred shot", got)
+	// The load cycle completes and the deferred shot fires from the new bay.
+	stepN(s, 120)
+	if findEvent(drain(s), EvModule, "EMP Turret loaded with AP Charge (4 rounds)") == nil {
+		t.Fatal("missing completion line")
+	}
+	if got := s.ammoPref(s.player, ammoSlot()); got != "ammo-ap-s" {
+		t.Fatalf("selection = %q", got)
+	}
+	if got := bayRounds(s, ammoSlot()); got != 3 {
+		t.Fatalf("bay = %d after the deferred shot, want 3", got)
 	}
 }
 
@@ -261,15 +284,20 @@ func TestCmdSetAmmoClearDumpsAndWaits(t *testing.T) {
 		t.Fatalf("missing clear event: %v", evs)
 	}
 
-	// One type only: clearing auto-loads it again (the bay rule).
+	// One type only: clearing auto-loads it again (the bay rule). The load
+	// takes its cycle, so the selection lands at completion.
 	s2 := newTestSim(t)
 	_, rt, _ := s2.moduleRuntime(s2.player, ammoSlot())
 	s2.dumpClip(s2.player, rt) // empty the bay first so cargo holds one type
 	setCargo(s2, content.CargoStack{Item: "ammo-ap-s", Qty: 7})
 	setAmmo(s2, "")
 	if got := bayRounds(s2, ammoSlot()); got != 5 {
-		t.Fatalf("bay = %d AP rounds, want 5 (auto after clear)", got)
+		t.Fatalf("bay = %d AP rounds, want 5 (loading after the clear)", got)
 	}
+	if cs, _ := s2.Clip(s2.player, ammoSlot()); !cs.Loading {
+		t.Fatalf("clip = %+v, want a load in flight", cs)
+	}
+	stepN(s2, 120)
 	if got := s2.ammoPref(s2.player, ammoSlot()); got != "ammo-ap-s" {
 		t.Fatalf("selection = %q, want ammo-ap-s", got)
 	}
@@ -283,6 +311,7 @@ func TestCmdSetAmmoInvalidItemWarnsAndIsIgnored(t *testing.T) {
 		s := newTestSim(t)
 		giveCargo(s, "ammo-ap-s", 5)
 		setAmmo(s, "ammo-ap-s")
+		stepN(s, 120) // let the switch's load complete: a settled bay
 		drain(s)
 		return s
 	}
@@ -376,7 +405,8 @@ func TestAmmoFamiliesDoNotCrossLoad(t *testing.T) {
 		t.Fatalf("small shells = %d, want %d (untouched by a medium gun)", got, smallBefore)
 	}
 
-	// The matching family loads and is consumed from its bay.
+	// The matching family loads and is consumed from its bay. The load takes
+	// the gun's cycle, so the one round is spent after it completes.
 	giveCargo(s, "ammo-emp-m", 1)
 	setAmmo(s, "ammo-emp-m")
 	s.Queue(CmdActivate{Slot: slot, Target: npc})
@@ -385,6 +415,10 @@ func TestAmmoFamiliesDoNotCrossLoad(t *testing.T) {
 	if got := cargoCount(s, "ammo-emp-m"); got != 0 {
 		t.Fatalf("medium shell = %d, want 0 (loaded into the bay)", got)
 	}
+	if got := bayRounds(s, slot); got != 1 {
+		t.Fatalf("medium bay = %d, want 1 (in at the load's start)", got)
+	}
+	stepN(s, 180) // the 3 s load cycle completes and the shot fires
 	if got := bayRounds(s, slot); got != 0 {
 		t.Fatalf("medium bay = %d, want 0 (one round fired)", got)
 	}
@@ -394,21 +428,27 @@ func TestAmmoFamiliesDoNotCrossLoad(t *testing.T) {
 }
 
 // TestNpcBayAutoLoads: NPC charges resolve to auto with no interaction — the
-// single granted type loads its bay and the rat fires.
+// single granted type's load starts on the spawn tick and completes one cycle
+// later, and the rat fires from it.
 func TestNpcBayAutoLoads(t *testing.T) {
 	s := newTestSim(t)
 	npc := spawnNearPlayer(t, s)
-	s.Step() // the bay pass resolves the rat's single shell type
+	s.Step() // the bay pass starts the rat's single shell type
 
 	fit, _ := s.Fittings.Get(npc)
 	if len(fit.HighRT) == 0 {
 		t.Fatal("rat has no high module")
 	}
+	// Take at start: the rounds are in, the selection lands at completion.
 	if fit.HighRT[0].Clip.Qty == 0 || fit.HighRT[0].Clip.Item == "" {
-		t.Fatalf("rat bay = %+v, want loaded", fit.HighRT[0].Clip)
+		t.Fatalf("rat bay = %+v, want rounds in at the load's start", fit.HighRT[0].Clip)
 	}
+	if cs, ok := s.Clip(npc, SlotRef{Class: content.SlotHigh, Index: 0}); !ok || !cs.Loading {
+		t.Fatalf("rat clip = %+v, want a load in flight", cs)
+	}
+	stepN(s, 130) // the 2 s load cycle
 	if got := fit.HighRT[0].Selection; got == "" {
-		t.Fatal("rat bay has no selection after auto-load")
+		t.Fatal("rat bay has no selection after its load completed")
 	}
 }
 
