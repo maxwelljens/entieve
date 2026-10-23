@@ -616,6 +616,32 @@ func TestInfoWindowShowAndRefSwap(t *testing.T) {
 	}
 }
 
+// TestInfoWindowModuleHeaderIcon: a module page leads with the module's own
+// icon (its art when the content names one) at the 24 px title box; other
+// pages keep the 20 px tooltip box.
+func TestInfoWindowModuleHeaderIcon(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	w := env.InfoWindow()
+	if w == nil {
+		t.Fatal("environment has no info window")
+	}
+	ui := newWindowUI(t, env, w.Win())
+	env.ShowInfo(widgets.ModuleRef("mod-autocannon-s"))
+	uitest.PumpWindow(t, ui, w.Sync, 1024, 700)
+
+	line, ok := w.page.Children()[0].(*widget.Container)
+	if !ok {
+		t.Fatalf("page header is %T, want a container", w.page.Children()[0])
+	}
+	g := line.Children()[0].GetWidget().Rect
+	if got := g.Dx(); got != theme.Px(theme.IconTitle) {
+		t.Errorf("module header icon box = %d, want the %d px title box", got, theme.Px(theme.IconTitle))
+	}
+	if got := line.Children()[1].GetWidget().Rect.Min.X; got < g.Max.X+theme.Px(theme.IconGap) {
+		t.Errorf("module title starts at %d, want clear of the icon %v", got, g)
+	}
+}
+
 // TestInfoWindowScrollbarGutter: the Show Info page rides a reserved
 // scrollbar gutter — the rail hides while a short page fits, the viewport
 // stays inset either way (the gutter never collapses), and an overflowing

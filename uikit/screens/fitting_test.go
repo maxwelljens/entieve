@@ -97,8 +97,8 @@ func TestFittingRowTooltips(t *testing.T) {
 	if m.Title != "Small Autocannon" || m.Sub != "High slot 1 · Weapon" {
 		t.Errorf("slot tile tooltip = %q/%q, want Small Autocannon / High slot 1 · Weapon", m.Title, m.Sub)
 	}
-	if m.Icon != "mod_weapon" {
-		t.Errorf("slot tile icon = %q, want mod_weapon", m.Icon)
+	if def, ok := env.Content.Module("mod-autocannon-s"); !ok || m.Icon != theme.ModuleIconFor(def) {
+		t.Errorf("slot tile icon = %q, want the module's own icon (mod_autocannon_s)", m.Icon)
 	}
 	if len(m.Hints) != 0 {
 		t.Errorf("slot tile carries rack hints %q — a fitting tile neither clicks nor cycles ammo", m.Hints)
@@ -193,17 +193,22 @@ func TestFittingSlotGrid(t *testing.T) {
 		}
 	}
 
-	// Filled tile: the class glyph is the button's graphic (the padding
-	// pair is the centring condition; the capture test pins the pixels).
+	// Filled tile: the module's own icon (its art) is the button's graphic
+	// (the padding pair is the centring condition; the capture test pins the
+	// pixels).
 	tile := fitTileAt(f, sim.SlotRef{Class: content.SlotHigh, Index: 0})
-	if tile.icon != "mod_weapon" {
-		t.Fatalf("high slot 1 icon = %q, want mod_weapon", tile.icon)
+	def, ok := env.Content.Module("mod-autocannon-s")
+	if !ok {
+		t.Fatal("fixture: mod-autocannon-s missing from content")
+	}
+	if tile.icon != theme.ModuleIconFor(def) {
+		t.Fatalf("high slot 1 icon = %q, want %s", tile.icon, theme.ModuleIconFor(def))
 	}
 	if g := tile.btn.GraphicImage(); g == nil || g.Idle == nil || g.Idle == fitGlyph("", color.RGBA{}) {
-		t.Error("fitted tile carries no class glyph")
+		t.Error("fitted tile carries no icon")
 	}
-	if b := tile.btn.GraphicImage().Idle.Bounds(); b.Dx() != theme.Px(theme.IconButton) || b.Dy() != theme.Px(theme.IconButton) {
-		t.Errorf("tile glyph box = %v, want the %d px class glyph", b, theme.Px(theme.IconButton))
+	if b := tile.btn.GraphicImage().Idle.Bounds(); b.Dx() != theme.Px(theme.IconTile) || b.Dy() != theme.Px(theme.IconTile) {
+		t.Errorf("tile icon box = %v, want the %d px tile icon", b, theme.Px(theme.IconTile))
 	}
 	// Free the last high slot: the placeholder tile takes the dashed
 	// chrome instead of a fitted module's accent edge.

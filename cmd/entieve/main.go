@@ -26,6 +26,7 @@ import (
 	"github.com/entieve/entieve/game"
 	"github.com/entieve/entieve/script"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/icons"
 )
 
 // version is stamped at build time via -ldflags "-X main.version=...".
@@ -137,13 +138,23 @@ func cmdValidate(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "entieve validate: load: %v\n", err)
 		return 1
 	}
-	if err := c.Validate(); err != nil {
+	if err := c.Validate(content.WithIconKeys(iconKeys())); err != nil {
 		fmt.Fprintf(stderr, "entieve validate: FAILED\n%v\n", err)
 		return 1
 	}
 	fmt.Fprintf(stdout, "content OK: %d items, %d ships, %d modules, %d npcs, %d systems, %d worlds, contracts: %d\n",
 		len(c.Items), len(c.Ships), len(c.Modules), len(c.NPCs), len(c.Systems), len(c.Worlds), len(c.Contracts))
 	return 0
+}
+
+// iconKeys is the icon manifest's semantic-name set, as a lookup for the
+// content validator (content cannot import the UI layer that owns it).
+func iconKeys() map[string]bool {
+	keys := make(map[string]bool)
+	for _, n := range icons.Names() {
+		keys[n] = true
+	}
+	return keys
 }
 
 func cmdSimulate(args []string, stdout, stderr io.Writer) int {

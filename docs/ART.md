@@ -27,6 +27,7 @@ it decorates. IDs are the same kebab-case strings the content JSON uses
 | `assets/asteroids/` | ore ID the belt's asteroids carry (`items/ores.json`) | `ore-cordite.png` | unrotated |
 | `assets/backgrounds/` | system ID (`sys-*.json`) or `default` | `default.png` | unrotated |
 | `assets/artwork/` | fixed names (no content id) | `spaceship_hangar.jpg` | unrotated, cover-fit |
+| `assets/icons/` | fixed module-render names (build-time source only) | `small_autocannon.png`, `medium_artillery.png` | n/a — the 256² embedded copies live in `uikit/icons/` |
 
 Sub-JSON lookup is exactly `<directory>/<id>.png`; other files and
 directories are ignored. `assets/artwork/` is the one kind that also accepts
@@ -157,7 +158,18 @@ window title.
   16 px inline (table rows, target cards), 20 px buttons, 24 px title bars —
   then tinted from the palette role at draw (ColText / ColDim / ColAccent /
   ColDanger / ColInfo; disabled controls 40 % alpha) and cached per
-  name+size+tint. Icons are never multicolour and never stretch.
+  name+size+tint. Glyphs are never multicolour and no icon ever stretches.
+- **Art sub-mode**: manifest entries with `"mode": "art"` are the exception —
+  full-colour renders drawn as-is (no silhouette flattening, no tint), cached
+  per name+size. The weapon modules (autocannon s/m/l, artillery s/m/l) use
+  256×256 LANCZOS downscales of the project's own renders from
+  `assets/icons/` (`art-autocannon-s.png` … `art-artillery-l.png`; the large
+  autocannon reuses the medium render, so five files cover six modules;
+  embedded copies in `uikit/icons/`). They are **CC0 1.0**
+  (`license`/`license_url` on the entry; the set-level CC BY 3.0 still covers
+  the game-icons glyphs) and draw at **32 px** in the fitting/rack tiles
+  (`theme.IconTile`) and **24 px** in the Show Info module header and module
+  tooltip (`theme.IconTitle`). Everything else on the size grid is unchanged.
 - **Optical fit**: glyphs that sit off-centre in their frame carry a
   per-icon `nudge` (fractions of the box) in `manifest.json`.
 - **Fallback**: an unknown name renders the neutral gear, so a new kind can

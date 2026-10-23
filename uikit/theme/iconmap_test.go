@@ -86,6 +86,31 @@ func TestModuleIconCoversEveryModuleKind(t *testing.T) {
 	}
 }
 
+// TestModuleIconForResolver: a module's own Icon wins when the registry
+// knows it; an unknown key or an empty one degrades to the class glyph
+// (defence in depth — bad content never renders a broken image), and nil is
+// no icon at all.
+func TestModuleIconForResolver(t *testing.T) {
+	def := &content.ModuleDef{Kind: content.KindWeapon, Icon: "mod_autocannon_s"}
+	if got := ModuleIconFor(def); got != "mod_autocannon_s" {
+		t.Errorf("module with own icon = %q, want mod_autocannon_s", got)
+	}
+	if !icons.Has("mod_autocannon_s") {
+		t.Error("mod_autocannon_s is not in the manifest")
+	}
+	def.Icon = "not-an-icon"
+	if got, want := ModuleIconFor(def), ModuleIcon(content.KindWeapon); got != want {
+		t.Errorf("unknown icon key = %q, want the class glyph %q", got, want)
+	}
+	def.Icon = ""
+	if got, want := ModuleIconFor(def), ModuleIcon(content.KindWeapon); got != want {
+		t.Errorf("no icon key = %q, want the class glyph %q", got, want)
+	}
+	if got := ModuleIconFor(nil); got != "" {
+		t.Errorf("ModuleIconFor(nil) = %q, want empty", got)
+	}
+}
+
 // TestContractIconCoversContractKinds: kill/deliver/mine get their board
 // glyphs and anything else falls back.
 func TestContractIconCoversContractKinds(t *testing.T) {

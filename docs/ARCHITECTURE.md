@@ -808,18 +808,28 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > [game-icons.net](https://game-icons.net) (**CC BY 3.0**: every icon keeps
 > its author credit, `uikit/icons/CREDITS.md`, machine-readable in
 > `manifest.json` + `uikit/icons/icons_test.go`). `icons.Get(name, size,
-> tint)` converts a PNG to a white-alpha silhouette at load, draws it into a
-> fixed square box on the 16/20/24 size grid with the manifest's optional
-> optical `nudge`, tints it from the palette role and caches per
-> name+size+tint; unknown names resolve to the neutral gear (`icons.Fallback`),
-> never a missing-image artifact. The widget surface that grew with it:
-> `TableRow.Icons`/`TableRow.IconTint` (icon box + label cells in
-> left-aligned columns — right-aligned numeric anchors are untouched),
+> tint)` converts a glyph PNG to a white-alpha silhouette at load, draws it
+> into a fixed square box on the 16/20/24 size grid with the manifest's
+> optional optical `nudge`, tints it from the palette role and caches per
+> name+size+tint; art-mode entries (`"mode":"art"`, the five module renders)
+> are drawn full-colour as-is — no flattening, no tint, cached per name+size —
+> and are CC0 (the glyph set stays CC BY 3.0); unknown names resolve to the
+> neutral gear (`icons.Fallback`), never a missing-image artifact.
+> `theme.ModuleIconFor(def)` is the module-icon rule: a `content` module's
+> `icon` key when the registry knows it, else its class glyph — every
+> module-specific surface (fitting/rack tiles, hangar rows, Show Info module
+> header, module tooltip, market module rows) goes through it, so a bad key
+> degrades to the glyph. The widget surface that grew with it:
+> `TableRow.Icons`/`TableRow.IconTint`/`TableRow.IconSize` (icon box + label
+> cells in left-aligned columns — `IconSize` 0 is the 16 px `IconInline`, the
+> market rows set 20, and the width reservation/ellipsize budget follow it;
+> right-aligned numeric anchors are untouched),
 > `uikit.NewTitleBar(env, label, icon)` (leading 24 px title-bar glyph),
 > `uikit.KindIcon` / `ModuleIcon` / `ContractIcon` (semantic name → kind),
 > `uikit.NewIcon` for shell-owned widgets (game contract rows, Undock), and
 > `uikit.IconInline/IconButton/IconTitle/IconGap/IconDisabledA` as the size
-> grid constants. Surfaces that carry icons: overview Kind column, Selected
+> grid constants (plus `uikit.IconTile` 32 px for the fitting/rack module
+> art). Surfaces that carry icons: overview Kind column, Selected
 > Item header + action buttons, HUD target cards, scanner contacts, fitting
 > slot/hangar rows, contract board rows, service title bars, module-rack
 > tiles.

@@ -74,9 +74,9 @@ func TestRackConstruction(t *testing.T) {
 			}
 			// The tile carries the module's class glyph (the same cached
 			// image the icon registry hands everyone else).
-			wantGlyph := icons.Get(theme.ModuleIcon(def.Kind), theme.IconButton, env.Pal().Text)
+			wantGlyph := icons.Get(theme.ModuleIconFor(def), theme.IconTile, env.Pal().Text)
 			if cell.btn.GraphicImage() == nil || cell.btn.GraphicImage().Idle != wantGlyph {
-				t.Errorf("cell(%d,%d) tile glyph is not %s", row, i, theme.ModuleIcon(def.Kind))
+				t.Errorf("cell(%d,%d) tile glyph is not %s", row, i, theme.ModuleIconFor(def))
 			}
 		}
 	}
@@ -99,7 +99,7 @@ func TestRackConstruction(t *testing.T) {
 	if lbl := empty.name.Label; lbl != "" {
 		t.Errorf("empty slot name = %q, want empty", lbl)
 	}
-	if g := empty.btn.GraphicImage(); g == nil || g.Idle != icons.Get(icons.Fallback, theme.IconButton, color.RGBA{}) {
+	if g := empty.btn.GraphicImage(); g == nil || g.Idle != icons.Get(icons.Fallback, theme.IconTile, color.RGBA{}) {
 		t.Error("empty slot tile should hold a transparent box, not a glyph")
 	}
 	if tips := empty.btn.GetWidget().ToolTips; len(tips) != 0 {
@@ -196,9 +196,10 @@ func TestRackTooltipStats(t *testing.T) {
 	c.Frame(t, 1280, 720)
 
 	gun := r.cells[0][0].tip.View.Model()
-	if gun.Icon != "mod_weapon" || gun.Title != "Small Autocannon" || gun.Sub != "High slot 1 · Weapon" {
-		t.Errorf("gun header = %q/%q/%q, want mod_weapon / Small Autocannon / High slot 1 · Weapon",
-			gun.Icon, gun.Title, gun.Sub)
+	if def, ok := env.Content.Module("mod-autocannon-s"); !ok || gun.Icon != theme.ModuleIconFor(def) ||
+		gun.Title != "Small Autocannon" || gun.Sub != "High slot 1 · Weapon" {
+		t.Errorf("gun header = %q/%q/%q, want %s / Small Autocannon / High slot 1 · Weapon",
+			gun.Icon, gun.Title, gun.Sub, theme.ModuleIconFor(&content.ModuleDef{Icon: "mod_autocannon_s"}))
 	}
 	// Every line the plain-text tooltip had, as rows.
 	for _, want := range []struct{ sec, label, value string }{

@@ -1,15 +1,17 @@
 // Package icons ships Entieve's icon set: the monochrome game-icons.net
 // silhouettes embedded in this directory, loaded as white-alpha bitmaps and
-// tinted per palette role at draw time.
+// tinted per palette role at draw time, plus the per-module full-colour art
+// (CC0, `"mode":"art"`) drawn as-is.
 //
-// Every icon is a 512×512 transparent PNG render fetched from
+// Every glyph is a 512×512 transparent PNG render fetched from
 // https://game-icons.net (CC BY 3.0 — authors are credited in CREDITS.md and
-// machine-readably in manifest.json, which this package also embeds).
+// machine-readably in manifest.json, which this package also embeds). The art
+// entries are 256×256 downscales of the local module renders, public domain.
 //
-// Get caches per name+size+tint, so a palette role drawn every frame costs one
-// map lookup after the first call. Unknown names never miss: they resolve to
-// the neutral gear silhouette (Fallback), so a caller can never paint a
-// missing-image artifact.
+// Get caches per name+size+tint (name+size for art, which ignores the tint),
+// so a palette role drawn every frame costs one map lookup after the first
+// call. Unknown names never miss: they resolve to the neutral gear silhouette
+// (Fallback), so a caller can never paint a missing-image artifact.
 package icons
 
 import (
@@ -19,6 +21,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	_ "image/png" // the embedded art is PNG
 	"math"
 	"sync"
@@ -54,13 +57,23 @@ type Nudge struct {
 	DY float64 `json:"dy"`
 }
 
+// ArtMode is the manifest `mode` of a full-colour render: it is drawn as-is
+// (no silhouette flattening, no tint), unlike the "" mode glyphs.
+const ArtMode = "art"
+
 // Entry is one manifest record: how to find the art and credit its author.
 type Entry struct {
 	Slug   string `json:"slug"`
 	Author string `json:"author"`
 	URL    string `json:"url"`
 	File   string `json:"file"`
-	Nudge  *Nudge `json:"nudge,omitempty"`
+	// Mode "" = a tinted white silhouette; "art" = the full-colour render.
+	Mode string `json:"mode,omitempty"`
+	// License/LicenseURL override the set-level license for one entry (the
+	// art entries are CC0 while the glyph set is CC BY 3.0).
+	License    string `json:"license,omitempty"`
+	LicenseURL string `json:"license_url,omitempty"`
+	Nudge      *Nudge `json:"nudge,omitempty"`
 }
 
 // manifest is manifest.json's shape.
@@ -73,11 +86,12 @@ type manifest struct {
 
 var (
 	loadOnce sync.Once
-	registry map[string]Entry    // semantic name -> record
-	silhou   map[string]silShape // file -> decoded silhouette (alpha only)
+	registry map[string]Entry        // semantic name -> record
+	silhou   map[string]silShape     // file -> decoded silhouette (alpha only)
+	arts     map[string]*image.NRGBA // file -> decoded full-colour art
 
 	mu    sync.Mutex
-	cache map[string]*ebiten.Image // name|size|tint -> rendered icon
+	cache map[string]*ebiten.Image // name|size|tint (name|size for art) -> rendered icon
 )
 
 // load parses the embedded manifest once. A malformed manifest is a build
@@ -96,6 +110,7 @@ func load() {
 		}
 		registry = m.Icons
 		silhou = map[string]silShape{}
+		arts = map[string]*image.NRGBA{}
 		cache = map[string]*ebiten.Image{}
 	})
 }
@@ -107,8 +122,9 @@ func Has(name string) bool {
 	return ok
 }
 
-// names returns every semantic icon name in the registry (tests only).
-func names() []string {
+// Names returns every semantic icon name in the registry (the content
+// validator's icon-key set, via the CLI).
+func Names() []string {
 	load()
 	out := make([]string, 0, len(registry))
 	for n := range registry {
@@ -121,6 +137,10 @@ func names() []string {
 // (RGB picks the color, A the opacity — 255 is fully opaque). Repeated calls
 // with equal arguments return the same image. Unknown names return the
 // Fallback icon.
+//
+// An art-mode entry ("mode":"art") is drawn full-colour as-is: the tint is
+// ignored, so its cache key drops the tint (one entry per name+size — two
+// tints share it instead of thrashing the cache).
 func Get(name string, size int, tint color.RGBA) *ebiten.Image {
 	load()
 	if size < 1 {
@@ -129,17 +149,46 @@ func Get(name string, size int, tint color.RGBA) *ebiten.Image {
 	if _, ok := registry[name]; !ok {
 		name = Fallback
 	}
-	key := fmt.Sprintf("%s|%d|%d,%d,%d,%d", name, size, tint.R, tint.G, tint.B, tint.A)
+	e := registry[name]
+	art := e.Mode == ArtMode
+	key := fmt.Sprintf("%s|%d|art", name, size)
+	if !art {
+		key = fmt.Sprintf("%s|%d|%d,%d,%d,%d", name, size, tint.R, tint.G, tint.B, tint.A)
+	}
 
 	mu.Lock()
 	defer mu.Unlock()
 	if img, ok := cache[key]; ok {
 		return img
 	}
-	e := registry[name]
-	img := ebiten.NewImageFromImage(tintBox(silhouette(e.File), size, e.Nudge, tint))
+	var img *ebiten.Image
+	if art {
+		img = ebiten.NewImageFromImage(scaleBox(artImage(e.File), size, e.Nudge))
+	} else {
+		img = ebiten.NewImageFromImage(tintBox(silhouette(e.File), size, e.Nudge, tint))
+	}
 	cache[key] = img
 	return img
+}
+
+// artImage decodes one embedded full-colour PNG into straight-alpha NRGBA
+// once (Get holds mu).
+func artImage(file string) *image.NRGBA {
+	if s, ok := arts[file]; ok {
+		return s
+	}
+	raw, err := pngFS.ReadFile(file)
+	if err != nil {
+		panic("icons: embedded " + file + ": " + err.Error())
+	}
+	src, _, err := image.Decode(bytes.NewReader(raw))
+	if err != nil {
+		panic("icons: decode " + file + ": " + err.Error())
+	}
+	dst := image.NewNRGBA(src.Bounds())
+	draw.Draw(dst, dst.Bounds(), src, src.Bounds().Min, draw.Src)
+	arts[file] = dst
+	return dst
 }
 
 // silShape is one decoded silhouette's alpha channel at its source size.

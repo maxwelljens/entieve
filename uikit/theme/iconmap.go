@@ -15,6 +15,9 @@ const (
 	IconInline = icons.Inline
 	IconButton = icons.Button
 	IconTitle  = icons.Title
+	// IconTile is the fitting/rack slot tile's art box (the 50×40 cell's
+	// module render); the type grid above stays pinned at 16/20/24.
+	IconTile = 32
 )
 
 // IconGap is the gap between an icon box and the label beside it.
@@ -77,6 +80,19 @@ func ModuleIcon(kind string) string {
 	default:
 		return "row_module"
 	}
+}
+
+// ModuleIconFor resolves one module's icon: its own content Icon when the
+// icon registry knows that key, else its class glyph (ModuleIcon). A bad
+// content key degrades to the glyph — never a broken image. nil is "".
+func ModuleIconFor(def *content.ModuleDef) string {
+	if def == nil {
+		return ""
+	}
+	if def.Icon != "" && icons.Has(def.Icon) {
+		return def.Icon
+	}
+	return ModuleIcon(def.Kind)
 }
 
 // ContractIcon maps a contract's objective kind (kill/deliver/mine) to its

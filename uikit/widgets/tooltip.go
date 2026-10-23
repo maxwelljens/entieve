@@ -84,10 +84,19 @@ type TooltipSection struct {
 type TooltipModel struct {
 	Icon     string     // semantic icon name ("" = text-only header)
 	IconTint color.RGBA // icon tint; zero = ColText
+	IconSize int        // icon box in design units (0 = TipIcon; module headers take theme.IconTitle)
 	Title    string     // bold header line — the only bold text in a tooltip
 	Sub      string     // dim class line under the title column
 	Sections []TooltipSection
 	Hints    []string // footer lines (ColDim, tiny step)
+}
+
+// iconSize is the model's icon box in design units (0 = the default tip box).
+func (m TooltipModel) iconSize() int {
+	if m.IconSize > 0 {
+		return m.IconSize
+	}
+	return TipIcon
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +151,7 @@ func tipInnerWidth(t theme.Theme, m TooltipModel) int {
 	// The title and sub lines sit in the column right of the icon.
 	indent := 0.0
 	if m.Icon != "" {
-		indent = float64(theme.Px(TipIcon) + theme.Px(tipIconGap))
+		indent = float64(theme.Px(m.iconSize()) + theme.Px(tipIconGap))
 	}
 	w := indent + TipMeasure(m.Title, t.FaceBold(theme.StepBase))
 	if sub := indent + TipMeasure(m.Sub, t.Face(theme.StepSmall)); sub > w {
@@ -184,7 +193,7 @@ func tipLayoutAt(t theme.Theme, m TooltipModel, iw int) tipLayout {
 	// Design constants × the current scale, bound once: every rect below
 	// is positioned in live px, and the draw side uses the same values.
 	padX, padY := theme.Px(TipPadX), theme.Px(tipPadY)
-	icon, iconGap := theme.Px(TipIcon), theme.Px(tipIconGap)
+	icon, iconGap := theme.Px(m.iconSize()), theme.Px(tipIconGap)
 	ruleH, ruleGap := theme.Px(TipRuleH), theme.Px(tipRuleGap)
 	secGap, rowGap, hintGap := theme.Px(tipSecGap), theme.Px(TipRowGap), theme.Px(tipHintGap)
 
@@ -343,7 +352,7 @@ func drawTooltip(dst *ebiten.Image, m TooltipModel, l tipLayout, t theme.Theme, 
 		r := at(l.Icon)
 		opts := &ebiten.DrawImageOptions{}
 		opts.GeoM.Translate(float64(r.Min.X), float64(r.Min.Y))
-		dst.DrawImage(icons.Get(m.Icon, theme.Px(TipIcon), tint), opts)
+		dst.DrawImage(icons.Get(m.Icon, theme.Px(m.iconSize()), tint), opts)
 	}
 	theme.DrawCardText(dst, m.Title, t.FaceBold(theme.StepBase), at(l.Title).Min.X, at(l.Title).Min.Y, theme.Solid(p.Text))
 	if m.Sub != "" {
@@ -699,10 +708,11 @@ func ModuleTip(def *content.ModuleDef, slotText, charge string, chargeQty int, h
 		return TooltipModel{}
 	}
 	m := TooltipModel{
-		Icon:  theme.ModuleIcon(def.Kind),
-		Title: def.Name,
-		Sub:   TipSub(slotText, def.Kind),
-		Hints: hints,
+		Icon:     theme.ModuleIconFor(def),
+		IconSize: theme.IconTitle,
+		Title:    def.Name,
+		Sub:      TipSub(slotText, def.Kind),
+		Hints:    hints,
 	}
 	m.Sections = ModuleSections(def, charge, chargeQty)
 	if def.ActivationTime > 0 || def.ActivationCost > 0 {

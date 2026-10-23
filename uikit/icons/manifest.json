@@ -296,6 +296,51 @@
       "author": "Lorc",
       "url": "https://game-icons.net/1x1/lorc/radar-sweep.html",
       "file": "radar-sweep.png"
+    },
+    "mod_autocannon_s": {
+      "slug": "small-autocannon",
+      "author": "public domain",
+      "url": "https://github.com/maxwelljens/entieve",
+      "file": "art-autocannon-s.png",
+      "mode": "art",
+      "license": "CC0 1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    "mod_autocannon_m": {
+      "slug": "medium-autocannon",
+      "author": "public domain",
+      "url": "https://github.com/maxwelljens/entieve",
+      "file": "art-autocannon-m.png",
+      "mode": "art",
+      "license": "CC0 1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    "mod_artillery_s": {
+      "slug": "small-artillery",
+      "author": "public domain",
+      "url": "https://github.com/maxwelljens/entieve",
+      "file": "art-artillery-s.png",
+      "mode": "art",
+      "license": "CC0 1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    "mod_artillery_m": {
+      "slug": "medium-artillery",
+      "author": "public domain",
+      "url": "https://github.com/maxwelljens/entieve",
+      "file": "art-artillery-m.png",
+      "mode": "art",
+      "license": "CC0 1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    "mod_artillery_l": {
+      "slug": "large-artillery",
+      "author": "public domain",
+      "url": "https://github.com/maxwelljens/entieve",
+      "file": "art-artillery-l.png",
+      "mode": "art",
+      "license": "CC0 1.0",
+      "license_url": "https://creativecommons.org/publicdomain/zero/1.0/"
     }
   }
 }
