@@ -12,18 +12,46 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// Column preferences and the header's column chrome.
+// Column layout, column preferences and the header's column chrome.
 //
-// A table measures its columns ONCE, on the first fit, and freezes the
-// result (Table.ensureFrozen): from then on a cell growing — the
-// overview's Velocity mid-warp, the sort arrow moving to another header —
-// can never move a pixel. Content that no longer fits ellipsizes instead.
-// The frozen widths are what the ⋯ menu and the drag grips change, and
-// what the layout sidecar persists.
+// ONE layout pass owns the columns: applyWidths turns the frozen bases,
+// the visible set and the table width into every visible width, and
+// layoutCells/headerLayout derive the header buttons, the grip strips and
+// the row cell rects from that result. No other site computes a column
+// width.
 //
-// Display filter: hiding a column filters layout, drawing and hit tests by
-// column index. cols and every row's Cells stay positional, so hide/show
-// never re-indexes a row (the surfaces' index pins keep holding).
+// Two policies, kept apart on purpose:
+//
+//  1. First fit (defaults). With a width and rows on the first fit, the
+//     table measures the content once and freezes the result — the old
+//     elastic fit: content widths, surplus to the lowest-Priority grow
+//     column, Priority shrink toward the header floors. Every default
+//     frame is byte-identical to the pre-freeze table. The result IS each
+//     column's base, and the bases never re-measure: a cell growing
+//     mid-warp or the sort arrow moving to another header ellipsizes
+//     instead.
+//  2. Every later layout (a table resize, a visibility change, a stored
+//     pref, a grip drag) distributes the table width over the frozen bases
+//     PROPORTIONALLY: the ratios hold — a column the player made smaller
+//     stays smaller and the freed width spreads over the others — so the
+//     rows still tile the table exactly. A table narrower than the bases
+//     gives width back in Priority order toward the floors, unchanged.
+//     The pass itself never writes back, so hiding is a pure display
+//     filter and showing the column again restores its frozen width.
+//
+// A table resize and a grip press adopt the layout they just produced as
+// the base (adoptWidths): those are the moments where the act itself IS the
+// layout, and a drag must edit the widths the player sees — otherwise the
+// fit's surplus or its priority shrink sits outside the base and a grip can
+// only move the invisible part, bottoming the column out at floor+surplus.
+//
+// Interleave rules (the rest of this file):
+//   - grips sit only on a boundary two visible columns share; the last
+//     visible column has no grip (its right edge is the table's);
+//   - the ⋯ button owns ColMenuW at the header's right end: the columns
+//     tile the width less that strip, so nothing runs under the dots;
+//   - visibility is a display filter: cols and every row's Cells stay
+//     positional, and a hidden column keeps its base width.
 
 // Column chrome metrics (design units).
 const (
@@ -35,6 +63,61 @@ const (
 	// dots (and the header labels never paint over them).
 	ColMenuW = 22
 )
+
+// layoutColumns is the one width computation: every visible column's width
+// in a table avail px wide, from the frozen bases. At or above the bases it
+// scales them proportionally (the ratios are the contract); a narrower table
+// takes width back in Priority order toward the floors. Hidden columns get
+// no width and no base of theirs takes part (the display filter). avail <= 0
+// (no table width yet) yields the bases themselves.
+func layoutColumns(bases []ColWidth, prio []int, hidden []bool, avail float64) []float64 {
+	out := make([]float64, len(bases))
+	vis := make([]int, 0, len(bases))
+	sum := 0.0
+	for i := range bases {
+		if hidden[i] {
+			continue
+		}
+		vis = append(vis, i)
+		sum += bases[i].Width
+	}
+	switch {
+	case len(vis) == 0:
+	case avail <= 0 || sum == avail:
+		for _, i := range vis {
+			out[i] = bases[i].Width
+		}
+	case sum < avail:
+		scale := avail / sum
+		for _, i := range vis {
+			out[i] = bases[i].Width * scale
+		}
+	default:
+		sub := make([]ColWidth, len(vis))
+		p := make([]int, len(vis))
+		for k, i := range vis {
+			sub[k], p[k] = bases[i], prio[i]
+		}
+		sub = fitColumns(sub, p, -1, avail) // -1: no grow column after the freeze
+		for k, i := range vis {
+			out[i] = sub[k].Width
+		}
+	}
+	return out
+}
+
+// colOffsets is the one tiling rule: column i's rounded right edge, from
+// the table's left edge. Header buttons, grip strips and row cells all
+// anchor on it, so a grip sits exactly on the boundary it drags.
+func colOffsets(widths []float64) []int {
+	out := make([]int, len(widths))
+	acc := 0.0
+	for i, w := range widths {
+		acc += w
+		out[i] = int(math.Round(acc))
+	}
+	return out
+}
 
 // ColumnPref is one table column's persisted state, in DESIGN units (the
 // sidecar convention — theme.Px scales it back): Width is the frozen
@@ -57,7 +140,10 @@ func (t *Table) PrefsID() string { return t.prefsID }
 // SetPrefs applies the stored column state. Call it after construction
 // and before the first rows: the widths overlay the frozen measurement.
 func (t *Table) SetPrefs(p map[string]ColumnPref) {
-	t.prefs = p
+	t.prefs = make(map[string]ColumnPref, len(p))
+	for k, v := range p {
+		t.prefs[k] = v
+	}
 	if t.frozen {
 		t.applyPrefs()
 		t.applyWidths()
@@ -67,6 +153,12 @@ func (t *Table) SetPrefs(p map[string]ColumnPref) {
 // Prefs reads the table's column state back for the sidecar. A table that
 // has not been fitted yet (no rows, never laid out) reports the stored set
 // unchanged — an empty list keeps its column state instead of losing it.
+//
+// The stored widths are the player's: a drag records them (storeWidths), a
+// window resize does not — a resize scales the live layout, it does not
+// rewrite what the player chose. A column with no stored width reports the
+// frozen default, so a table that was never touched still hands the sidecar
+// a full set.
 func (t *Table) Prefs() map[string]ColumnPref {
 	if t.prefsID == "" {
 		return nil
@@ -77,8 +169,9 @@ func (t *Table) Prefs() map[string]ColumnPref {
 	s := theme.Scale()
 	out := make(map[string]ColumnPref, len(t.cols))
 	for i, c := range t.cols {
-		p := ColumnPref{Off: t.hidden[i]}
-		if s > 0 {
+		p := t.prefs[c.Key]
+		p.Off = t.hidden[i]
+		if p.Width == 0 && s > 0 {
 			p.Width = t.base[i].Width / s
 		}
 		out[c.Key] = p
@@ -246,8 +339,8 @@ func colDots(c color.Color) *eimage.NineSlice {
 // headerLayout places the sort row across the strip, a grip on every
 // boundary two visible columns share, and the ⋯ button in its own strip
 // at the header's right end (the columns tile up to it, never under it).
-// It reuses layoutCells' cumulative rounding, so a grip sits exactly on
-// the boundary it drags.
+// It anchors on colOffsets, the same cumulative rounding layoutCells uses,
+// so a grip sits exactly on the boundary it drags.
 type headerLayout struct{ t *Table }
 
 // PreferredSize is the sort row's own: the chrome rides over it and never
@@ -270,20 +363,20 @@ func (h headerLayout) Layout(ws []widget.PreferredSizeLocateableWidget, rect ima
 	}
 	menu := image.Rect(rect.Max.X-theme.Px(ColMenuW), rect.Min.Y, rect.Max.X, rect.Max.Y)
 	ws[1+len(t.cols)].SetLocation(menu)
+	off := colOffsets(t.widths)
 	last := -1
 	for i := range t.cols {
 		if !t.hidden[i] {
 			last = i
 		}
 	}
-	acc, prev := 0.0, rect.Min.X
+	prev := rect.Min.X
 	for i := range t.cols {
-		if i >= len(t.widths) {
+		if i >= len(off) {
 			ws[1+i].SetLocation(image.Rectangle{})
 			continue
 		}
-		acc += t.widths[i]
-		next := rect.Min.X + int(math.Round(acc))
+		next := rect.Min.X + off[i]
 		// Only a boundary two visible columns share can be dragged: the
 		// last visible column's right edge is the table's own (the fit's),
 		// and a hidden column owns no edge at all. A column no wider than
@@ -311,6 +404,8 @@ func (t *Table) Poll() {
 
 // Step is Poll's testable core: a rising press on a grip strip grabs that
 // column's width, the held drag follows the cursor, the release drops it.
+// The press adopts the laid-out widths as the frozen base (adoptWidths), so
+// the drag edits exactly what the player sees.
 func (t *Table) Step(cursor image.Point, rising, pressed bool) {
 	if t.grip >= 0 {
 		if !pressed {
@@ -327,7 +422,48 @@ func (t *Table) Step(cursor image.Point, rising, pressed bool) {
 	}
 	t.setGripCursor()
 	if rising {
+		t.adoptWidths()
 		t.grip, t.gripX, t.gripFrom = i, cursor.X, t.base[i].Width
+	}
+}
+
+// adoptWidths makes the current layout the frozen base. It runs where the
+// act itself IS the layout: a table resize (the new width is the input, and
+// later hides and drags continue from what was on screen) and a grip press
+// (the drag must edit the widths the player sees — otherwise the fit's
+// surplus, or its priority shrink, sits outside the base and the grip can
+// only move the invisible part, bottoming the column out at floor+surplus).
+// A content change or a visibility toggle never adopts: a hidden column
+// keeps its base width, so showing it again restores it.
+func (t *Table) adoptWidths() {
+	if len(t.widths) != len(t.base) {
+		return
+	}
+	for i := range t.base {
+		if !t.hidden[i] && t.widths[i] > 0 {
+			t.base[i].Width = t.widths[i]
+		}
+	}
+}
+
+// storeWidths records the player's tiling as the stored column widths (in
+// design units), so a drag persists while a resize — which also adopts the
+// tiling — never rewrites what the player chose.
+func (t *Table) storeWidths() {
+	s := theme.Scale()
+	if t.prefsID == "" || s <= 0 {
+		return
+	}
+	if t.prefs == nil {
+		t.prefs = map[string]ColumnPref{}
+	}
+	for i, c := range t.cols {
+		if t.hidden[i] {
+			continue
+		}
+		p := t.prefs[c.Key]
+		p.Width, p.Off = t.base[i].Width/s, false
+		t.prefs[c.Key] = p
 	}
 }
 
@@ -360,6 +496,7 @@ func (t *Table) setColWidth(i int, w float64) {
 	t.base[i].Width += d
 	t.base[j].Width -= d
 	t.applyWidths()
+	t.storeWidths()
 }
 
 // nextVisible is the visible column after i (-1 when none): the column on

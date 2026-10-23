@@ -874,6 +874,35 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > of browse and the old fixed 240 px column are their opening shares of the
 > 760×560 landing rect; the pane floor is `SplitMinPane`).
 
+> **Table columns (2026-10 — frozen bases, two layout policies).** Every
+> `widgets.Table` runs ONE layout pass (`Table.applyWidths` →
+> `layoutColumns`); the header buttons, grip strips and row cells are all
+> derived from that result (`layoutCells`/`headerLayout` anchor on the same
+> `colOffsets` tiling), so no other site computes a column width. Two
+> policies are kept apart on purpose. **(1) First fit:** the first fit with a
+> width and rows measures the content once and freezes it — the pre-freeze
+> elastic fit, unchanged (content widths, surplus to the lowest-Priority grow
+> column, Priority shrink toward the header floors) — so every default frame
+> stays byte-identical and the result IS each column's base; the bases never
+> re-measure, so a cell growing mid-warp or the sort arrow moving only
+> ellipsizes. **(2) Every later layout** (table resize, visibility change,
+> stored pref): the table's width is distributed over the frozen bases
+> **proportionally** — the ratios hold, so a column the player made smaller
+> stays smaller and freed width spreads over the others, the rows still
+> tiling exactly — and a table narrower than the bases gives width back in
+> Priority order toward the floors, unchanged. A table resize adopts the new
+> tiling as the base, and a grip press does the same (`adoptWidths`): a drag
+> must edit the widths the player sees, or the surplus/shrink lives outside
+> the base and the column bottoms out at floor+surplus (the market Item bug);
+> content changes and visibility toggles never adopt, so a hidden column
+> keeps its base width and restores it when shown. Header chrome: a 6
+> design-px grip strip (`colGripW`) only on a boundary two visible columns
+> share (the last visible column has no grip — that edge is the table's), and
+> the ⋯ button owns its own 22 px strip (`ColMenuW`) at the header's right
+> end, so no column tiles or paints under it. Per-column state — the width
+> and the hidden flag — persists in the layout sidecar's `tables` map in
+> design units (`widgets.ColumnPref`).
+
 > **Market tree and search (2026-10):** the market's browse pane renders
 > `ItemDef`/`ModuleDef`/`ShipDef` `group` paths (content-validated, 1–3
 > segments) as a one-column table; a branch click scopes the catalog and the

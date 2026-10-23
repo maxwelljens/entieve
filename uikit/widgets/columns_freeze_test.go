@@ -352,7 +352,10 @@ func TestColumnHeaderLabelStopsAtTheMenu(t *testing.T) {
 	if lbl.Max.X > menu.Min.X {
 		t.Errorf("the header label's ink box %v runs into the ⋯ strip %v", lbl, menu)
 	}
-	if lbl.Max.X-lbl.Min.X > int(budget) {
+	// The ellipsize budget is a float and the widget box rounds to the
+	// nearest pixel (layoutCells' ellipsize note), so compare against the
+	// rounded budget, not its truncation.
+	if lbl.Max.X-lbl.Min.X > int(math.Round(budget)) {
 		t.Errorf("the header label's box is %d wide, past its %v budget", lbl.Dx(), budget)
 	}
 	// The grip strips stay clear too: the label is inset by cellPad, the
