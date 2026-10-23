@@ -1360,33 +1360,26 @@ func (t *Table) clampScroll() {
 	t.scroll.ScrollTop = math.Max(0, math.Min(1, t.scroll.ScrollTop))
 }
 
-// applyWidths fits the columns into the available width and pushes the
-// result into the header buttons and row cells. The natural measure runs
-// once (ensureFrozen): every later fit — a resize, a sort click, a cell
-// growing — feeds the frozen base back through the same policy, so content
-// can never move an anchor.
+// applyWidths is THE layout pass: the frozen bases in, the visible widths
+// out, and layoutCells derives the header buttons, the grip strips and the
+// cell rects from the result. Every input that can move a column comes
+// through here: the table width, a sort arrow, a visibility toggle, stored
+// prefs, a grip drag. The first fit measures and freezes (ensureFrozen);
+// every later pass scales the bases proportionally (layoutColumns). A table
+// width change adopts the new tiling as the base — the same rule as a grip
+// press (adoptWidths), so a hide or a drag continues from what is on screen.
 func (t *Table) applyWidths() {
 	avail := t.columnsWidth()
 	t.ensureFrozen(avail)
-	sub := make([]ColWidth, 0, len(t.cols))
-	prio := make([]int, 0, len(t.cols))
-	idx := make([]int, 0, len(t.cols))
-	for i := range t.cols {
-		if t.hidden[i] {
-			continue
-		}
-		sub = append(sub, t.base[i])
-		prio = append(prio, t.cols[i].Priority)
-		idx = append(idx, i)
+	prio := make([]int, len(t.cols))
+	for i, c := range t.cols {
+		prio[i] = c.Priority
 	}
-	if avail > 0 && len(sub) > 0 {
-		sub = fitColumns(sub, prio, growColumn(prio), avail)
+	t.widths = layoutColumns(t.base, prio, t.hidden, avail)
+	if t.frozen && avail > 0 && t.fittedFor != 0 && avail != t.fittedFor {
+		t.adoptWidths()
 	}
 	t.fittedFor = avail
-	t.widths = make([]float64, len(t.cols))
-	for k, i := range idx {
-		t.widths[i] = sub[k].Width
-	}
 	t.layoutCells()
 }
 
@@ -1402,8 +1395,8 @@ func (t *Table) columnsWidth() float64 {
 // tiling — and freezes the result. The first fit is exactly the algorithm
 // the table always ran (over the column area, beside the ⋯ strip), so a
 // first-open layout is unchanged; from then on the fit consumes the frozen
-// base, and later content changes (a cell widening mid-warp, the sort
-// arrow) only ever ellipsize.
+// base (layoutColumns), and later content changes (a cell widening
+// mid-warp, the sort arrow) only ever ellipsize.
 func (t *Table) ensureFrozen(avail float64) {
 	if t.frozen {
 		return
@@ -1411,7 +1404,7 @@ func (t *Table) ensureFrozen(avail float64) {
 	natural := make([]ColWidth, len(t.cols))
 	prio := make([]int, len(t.cols))
 	for i, c := range t.cols {
-		w := t.headMeasure(c.Title+t.indicator(i)) + 2*float64(theme.Px(cellPad))
+		w := t.colFloor(i, c)
 		if c.Width > w {
 			w = c.Width
 		}
@@ -1441,11 +1434,7 @@ func (t *Table) ensureFrozen(avail float64) {
 				w = m
 			}
 		}
-		min := t.headMeasure(c.Title+t.indicator(i)) + 2*float64(theme.Px(cellPad))
-		if c.MinWidth > min {
-			min = c.MinWidth
-		}
-		natural[i] = ColWidth{Label: c.Title, Width: w, Min: min}
+		natural[i] = ColWidth{Label: c.Title, Width: w, Min: t.colFloor(i, c)}
 		prio[i] = c.Priority
 	}
 	t.base = natural
@@ -1461,18 +1450,30 @@ func (t *Table) ensureFrozen(avail float64) {
 	t.applyPrefs()
 }
 
-// layoutCells applies the fitted widths: cumulative rounding gives every
-// column a fixed anchor (no jitter), the header buttons tile the strip
-// exactly, and every cell gets its width plus an ellipsized label. Hidden
-// columns are filtered out of layout and drawing by index — their cells
-// stay where they are, so showing them again restores them untouched.
+// colFloor is a column's floor: its header title (with the sort arrow) plus
+// the cell padding, or the declared MinWidth when that is wider.
+func (t *Table) colFloor(i int, c Column) float64 {
+	f := t.headMeasure(c.Title+t.indicator(i)) + 2*float64(theme.Px(cellPad))
+	if c.MinWidth > f {
+		f = c.MinWidth
+	}
+	return f
+}
+
+// layoutCells applies the fitted widths: colOffsets gives every column a
+// fixed anchor (no jitter), the header buttons tile the strip exactly, and
+// every cell gets its width plus an ellipsized label. Hidden columns are
+// filtered out of layout and drawing by index — their cells stay where
+// they are, so showing them again restores them untouched.
 func (t *Table) layoutCells() {
+	off := colOffsets(t.widths)
 	prev := 0
-	acc := 0.0
 	for i, c := range t.cols {
-		acc += t.widths[i]
-		w := int(math.Round(acc)) - prev
-		prev += w
+		w := 0
+		if i < len(off) {
+			w = off[i] - prev
+			prev = off[i]
+		}
 		vis := widget.Visibility_Show
 		if t.hidden[i] {
 			vis = widget.Visibility_Hide

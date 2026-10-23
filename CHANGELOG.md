@@ -189,6 +189,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Rounded chrome's top band carries the panel/title fill again (the backdrop no longer shows through where the corners begin).
+- **Column widths dragged in a table now stick, and hiding a column no longer
+  freezes resizing** (`uikit/widgets`): the frozen bases and the widths on
+  screen used to drift apart after the first fit — a wider table gave the
+  whole surplus to the lowest-priority "grow" column and a narrower one took
+  the shortage from the Priority order — so a grip edited a number the player
+  could not see. In the market, the Item column bottomed out at its floor plus
+  the surplus ("cannot make Item smaller than a very large size", with prices
+  and quantities stuck ellipsized); in the overview, hiding a column freed
+  width that no grip could pass on, and the columns sitting on their header
+  floors made every other boundary inert. Every layout after the freeze now
+  spreads the table width over the frozen bases **proportionally** (ratios
+  preserved, rows still tiling exactly; a short table still gives width back
+  in Priority order toward the floors), and a grip press adopts the laid-out
+  widths as the base, so a drag moves exactly the boundary on screen. Default
+  layouts are unchanged — the first fit is byte-identical — and a hidden
+  column still restores its frozen width when shown again.
 
 ### Changed
 - **Chrome adopts the Cyber Terminal kit's form language** (`uikit`, `docs`) — shapes only, the amber-on-black palette is pixel-identical (its golden values and the log severity hexes pass untouched): rounded chrome on three radius tokens (14 window pieces, 8 panels/cards, 5 controls), window title bars top-rounded and bodies bottom-rounded around a square seam; three hollow 9 px ring dots at every title bar's left; a subtle top→bottom depth ramp on panel and window-body fills (ΔRGB ≤ 6, ±4 alpha around the 230 translucency token); tracked mono (Plex Mono, 0.12 em) window titles, panel heads and section heads; the starmap's 28 px lattice at 3.5 % accent; and the rack's waiting dot pulsing through eight pre-rendered phases. Kit credit (Kerem Bolek) and the new form canon: [docs/lore/AESTHETIC.md](docs/lore/AESTHETIC.md), implementation substrate in [docs/ART.md](docs/ART.md).
