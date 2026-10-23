@@ -43,7 +43,7 @@ type Manufacturing struct {
 	craftLbl *widget.Text
 	jobsLbl  *widget.Text
 	stepper  *widgets.QtyStepper
-	title    *widget.Text
+	title    *theme.ChromeText
 
 	start, collect, cancel *widget.Button
 
@@ -167,7 +167,7 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	// The body panel is the header band's: it paints the panel, the
 	// manufacturing plate over it and then the body (docs/ART.md "Window
 	// headers").
-	panel := theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)
+	panel := theme.WindowBodyBox(p, theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200))
 
 	f.win = widget.NewWindow(
 		widget.WindowOpts.Contents(newHeaderBand(body, panel, render.ManufacturingHeader)),

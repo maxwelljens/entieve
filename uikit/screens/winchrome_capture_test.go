@@ -168,8 +168,11 @@ func (g *winChromeCaptureGame) verify(img *ebiten.Image) error {
 	}
 
 	// Endpoint 2 (uniformity) — at settle every body reads the ONE
-	// translucency token over the same backdrop.
-	want := theme.WindowBody(g.k.th.Pal().BG)
+	// translucency token over the same backdrop. The body's top rows are
+	// the panel-depth ramp's top end (PanelTop), by construction: the
+	// sample sits two px under the title seam.
+	pal := g.k.th.Pal()
+	want := theme.PanelTop(pal, theme.WindowBody(pal.BG))
 	// out = src·a + dst·(1−a) in 8-bit over the opaque white backdrop.
 	blend := func(c uint8) int {
 		return (int(c)*int(want.A) + 255*(255-int(want.A)) + 127) / 255
@@ -185,6 +188,47 @@ func (g *winChromeCaptureGame) verify(img *ebiten.Image) error {
 		if abs(r-wantR) > 2 || abs(gg-wantG) > 2 || abs(b-wantB) > 2 {
 			fail("%s body at %v = (%d,%d,%d), want the WindowBody blend (%d,%d,%d) — every window must share the one translucency token",
 				w.name, pt, r, gg, b, wantR, wantG, wantB)
+		}
+	}
+
+	// Rounded chrome: every window's bottom-left corner is cut away (the
+	// backdrop shows through) while the same row ten px in is the frame.
+	// Title bars are top-rounded only, bodies bottom-rounded only.
+	// A window whose corner another window covers is skipped for the
+	// corner probes (the info window overlaps the selected item's title
+	// bar here); the body-uniformity arm above still covers every window.
+	covered := func(pt image.Point, self *widget.Window) bool {
+		for _, o := range g.wins {
+			if o.win == nil || o.win == self {
+				continue
+			}
+			if pt.In(o.win.GetContainer().GetWidget().Rect) {
+				return true
+			}
+		}
+		return false
+	}
+	for _, w := range g.wins {
+		if w.win == nil {
+			continue
+		}
+		r := w.win.GetContainer().GetWidget().Rect
+		corner := image.Pt(r.Min.X, r.Max.Y-1)
+		if covered(corner, w.win) {
+			continue
+		}
+		if cr, cg, cb := sample(corner); cr != 255 || cg != 255 || cb != 255 {
+			fail("%s bottom-left corner %v = (%d,%d,%d), want the rounded-away backdrop (255,255,255)",
+				w.name, corner, cr, cg, cb)
+		}
+		edge := image.Pt(r.Min.X+theme.Px(theme.RadiusWindow)+2, r.Max.Y-1)
+		if cr, cg, cb := sample(edge); cr == 255 && cg == 255 && cb == 255 {
+			fail("%s bottom edge %v reads the backdrop: the body did not fill its frame", w.name, edge)
+		}
+		top := image.Pt(r.Min.X, r.Min.Y)
+		if cr, cg, cb := sample(top); cr != 255 || cg != 255 || cb != 255 {
+			fail("%s top-left corner %v = (%d,%d,%d), want the title bar's rounded-away corner",
+				w.name, top, cr, cg, cb)
 		}
 	}
 

@@ -1,6 +1,7 @@
 package theme
 
 import (
+	"image"
 	"testing"
 
 	"github.com/ebitenui/ebitenui"
@@ -107,47 +108,82 @@ func TestContractIconCoversContractKinds(t *testing.T) {
 }
 
 // TestTitleBarIconAndLabelDoNotOverlap pins the title bar's geometry: the
-// glyph is the 24 px title box at the bar's start, the label starts clear
+// glyph is the 24 px title box after the dot block, the label starts clear
 // of it, and both stay inside the bar.
 func TestTitleBarIconAndLabelDoNotOverlap(t *testing.T) {
 	env := NewSeam(DefaultPalette(), DefaultTypeScale())
 	bar, txt := NewTitleBar(env, "Market", "svc_market")
 	layoutTitleBar(t, env, bar)
-	if len(bar.Children()) != 2 {
-		t.Fatalf("title bar has %d children, want icon + label", len(bar.Children()))
+	if len(bar.Children()) != 3 {
+		t.Fatalf("title bar has %d children, want dots + icon + label", len(bar.Children()))
 	}
-	icon := bar.Children()[0].GetWidget().Rect
-	label := bar.Children()[1].GetWidget().Rect
+	dots := bar.Children()[0].GetWidget().Rect
+	icon := bar.Children()[1].GetWidget().Rect
+	label := bar.Children()[2].GetWidget().Rect
+	if dots.Dx() != TitleDotsW || dots.Dy() != TitleDot {
+		t.Errorf("dot block = %v, want %d×%d", dots, TitleDotsW, TitleDot)
+	}
+	if dots.Min.X != SpMd {
+		t.Errorf("dot block starts at x=%d, want %d (SpMd)", dots.Min.X, SpMd)
+	}
 	if icon.Dx() != IconTitle || icon.Dy() != IconTitle {
 		t.Errorf("icon box = %v, want %d×%d", icon, IconTitle, IconTitle)
 	}
-	if icon.Overlaps(label) {
-		t.Errorf("icon %v overlaps the label %v", icon, label)
+	if icon.Min.X != SpMd+TitleDotsW+TitleDotsGap {
+		t.Errorf("icon starts at x=%d, want the dot block + gap (%d)",
+			icon.Min.X, SpMd+TitleDotsW+TitleDotsGap)
 	}
-	if icon.Min.X != SpMd {
-		t.Errorf("icon starts at x=%d, want the %d px bar padding (SpMd)", icon.Min.X, SpMd)
+	if dots.Overlaps(icon) || icon.Overlaps(label) {
+		t.Errorf("dots %v / icon %v / label %v overlap", dots, icon, label)
 	}
 	if label.Min.X < icon.Max.X+IconGap {
 		t.Errorf("label starts at x=%d, want ≥ %d (icon end + gap)",
 			label.Min.X, icon.Max.X+IconGap)
 	}
-	if !icon.In(bar.GetWidget().Rect) || !label.In(bar.GetWidget().Rect) {
-		t.Errorf("icon %v / label %v escape the bar %v",
-			icon, label, bar.GetWidget().Rect)
+	if !dots.In(bar.GetWidget().Rect) || !icon.In(bar.GetWidget().Rect) || !label.In(bar.GetWidget().Rect) {
+		t.Errorf("dots %v / icon %v / label %v escape the bar %v",
+			dots, icon, label, bar.GetWidget().Rect)
 	}
 	if txt.Label != "Market" {
 		t.Errorf("title text = %q, want Market", txt.Label)
 	}
 
-	// An icon-less bar keeps the old text-only layout.
+	// An icon-less bar keeps the text-only layout, still clear of the dots.
 	plain, _ := NewTitleBar(env, "Overview", "")
 	layoutTitleBar(t, env, plain)
-	if len(plain.Children()) != 1 {
-		t.Fatalf("icon-less title bar has %d children, want 1", len(plain.Children()))
+	if len(plain.Children()) != 2 {
+		t.Fatalf("icon-less title bar has %d children, want dots + label", len(plain.Children()))
 	}
-	if plain.Children()[0].GetWidget().Rect.Min.X != SpMd {
-		t.Errorf("plain title starts at x=%d, want %d (SpMd)",
-			plain.Children()[0].GetWidget().Rect.Min.X, SpMd)
+	if plain.Children()[1].GetWidget().Rect.Min.X != SpMd+TitleDotsW+TitleDotsGap {
+		t.Errorf("plain title starts at x=%d, want %d (dots + gap)",
+			plain.Children()[1].GetWidget().Rect.Min.X, SpMd+TitleDotsW+TitleDotsGap)
+	}
+}
+
+// TestTitleDots pins the kit's signature mark: three hollow 9 px rings, a
+// 1 px border-colour ring each, nothing filled inside.
+func TestTitleDots(t *testing.T) {
+	p := DefaultPalette()
+	img := titleDotsImage(p)
+	b := img.Bounds()
+	if b.Dx() != TitleDotsW || b.Dy() != TitleDot {
+		t.Fatalf("dot image = %v, want %d×%d", b.Size(), TitleDotsW, TitleDot)
+	}
+	if TitleDot != 9 || TitleDotGap != 7 || TitleDotsW != 41 {
+		t.Errorf("dot tokens = %d/%d/%d, want 9/7/41", TitleDot, TitleDotGap, TitleDotsW)
+	}
+	centre := func(i int) image.Point {
+		return image.Pt(i*(TitleDot+TitleDotGap)+TitleDot/2, TitleDot/2)
+	}
+	for i := 0; i < 3; i++ {
+		c := centre(i)
+		rim := image.Pt(c.X, c.Y-TitleDot/2) // top of the ring
+		if a := img.NRGBAAt(rim.X, rim.Y).A; a < 90 {
+			t.Errorf("ring %d rim at %v alpha = %d, want the hairline ink", i, rim, a)
+		}
+		if a := img.NRGBAAt(c.X, c.Y).A; a > 2 {
+			t.Errorf("ring %d centre at %v alpha = %d, want hollow", i, c, a)
+		}
 	}
 }
 

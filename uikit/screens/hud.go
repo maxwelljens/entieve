@@ -325,7 +325,7 @@ func NewHud(env interface {
 	)
 
 	h.status = widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.PanelBox(p, theme.Solid(p.BG), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
 			widget.RowLayoutOpts.Spacing(theme.Px(hudStatusGap)),
@@ -361,7 +361,7 @@ func NewHud(env interface {
 		Padding:            &widget.Insets{Left: theme.Px(theme.ContentsPad)},
 	}
 	h.strip = widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.PanelBox(p, theme.Solid(p.BG), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 		widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.MinSize(0, theme.Px(hudStripH)),
@@ -542,9 +542,9 @@ func drawTargetCard(dst *ebiten.Image, c targetCard, env theme.Theme) {
 	// Hairlines scale with the card image: stroke s px centred on the
 	// s-pixel inset edge.
 	s := float32(theme.Scale())
-	dst.Fill(theme.Solid(p.BG))
-	vector.StrokeRect(dst, s/2, s/2, float32(card.Dx())-s, float32(card.Dy())-s,
-		s, theme.NRGBA(p.Border, 200), true)
+	dst.Clear()
+	theme.DrawRoundBox(dst, card, theme.Solid(p.BG), theme.NRGBA(p.Border, 200), 1,
+		theme.AllRadii(theme.RadiusPanel))
 
 	// Kind glyph leads the name line, then the name — the two rects come
 	// from the same pure geometry, so they can never overlap.

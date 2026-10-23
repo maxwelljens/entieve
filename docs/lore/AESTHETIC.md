@@ -135,6 +135,8 @@ for mechanics (sizes, fallbacks, directories); this section binds the look.
 - MUST keep trait skew soft: flavour and stat skew only.
 - MUST keep the visual canon: amber-on-black, IBM Plex Sans, monochrome
   silhouettes, drop-in sprites.
+- MUST keep chrome on the form tokens — radius 14/8/5, title-bar dot rings,
+  panel depth, tracked mono chrome labels (see Form language).
 - MUST write amounts as `1,234.56 €` / `50¢` in UI and logs, "euro(s)" /
   "cent(s)" in prose.
 - NEVER use epic, mythic, destiny or chosen-one language in any content.
@@ -142,3 +144,36 @@ for mechanics (sizes, fallbacks, directories); this section binds the look.
   text.
 - NEVER colour outside the palette roles or introduce a second typeface or
   multicolour icons.
+
+## Form language (Cyber Terminal-inspired)
+
+Chrome shapes and structure follow the **Cyber Terminal UI Kit** (kit by
+Kerem Bolek, 2026; form vocabulary only — no kit file is shipped, and no
+kit colour is used). Everything below is implemented in `uikit/theme`
+(`round.go`, `dots.go`, `tracked.go`). The palette canon above is binding
+and untouched: every fill, border and ink on these forms is a palette role.
+
+- **Rounded chrome — three radius tokens** (design px, scaled with the UI):
+  `14` window pieces, `8` panels and cards, `5` controls. Window title bars
+  are rounded on their TOP corners only and window bodies on their BOTTOM
+  corners only, so the seam between them stays square and a window reads as
+  one frame. Inner scroll viewports keep square masks (a rectangular clip)
+  — the one place the kit's rounding stops.
+- **Window dots.** Every title bar opens with the kit's signature mark:
+  three hollow 9 px rings (1 px border-role stroke, nothing filled), then the
+  window icon and the tracked title.
+- **Panel depth.** Panel and window-body fills ramp from a hair lighter at
+  the top (the body lifted 35 % toward `HeadBg`) to the body itself four
+  alpha steps more opaque at the bottom. The step is capped at ΔRGB 6 and
+  ±4 alpha around the window translucency token: depth, never a colour
+  change.
+- **Tracked mono chrome labels.** Window titles, panel heads and
+  info/tooltip section heads are set in IBM Plex Mono — the existing mono
+  contents face, not a second family — with 0.12 em tracking. Body, row and
+  list text stays IBM Plex Sans.
+- **Grid motif.** The starmap carries the kit's 28 px lattice in the accent
+  role at 3.5 % alpha: structure on the one technical surface, while
+  windows keep clean hairlines.
+- **Pulse.** The module rack's waiting dot breathes through eight
+  pre-rendered phases on a deterministic frame count (the kit's blinking
+  cursor read as a status mark).

@@ -301,3 +301,62 @@ Geometry is pinned by `TestTipLayoutTilesAtBothWidths`,
 `TestTipFits320px` and `TestTipPlacementClamp`; the drawn panel by
 `TestTipPanelDrawSmoke` and, under `ENTIEVE_CAPTURE=1`,
 `TestTooltipCaptureFrame` (→ `/tmp/opencode/tooltip_capture.png`).
+
+## Chrome and form
+
+Chrome shapes follow the **Cyber Terminal UI Kit**'s form vocabulary (kit
+by Kerem Bolek; borrowed shapes only — the palette stays the house's amber
+on black, and no kit file or colour is used). The canon is
+[AESTHETIC.md — Form language](lore/AESTHETIC.md#form-language-cyber-terminal-inspired);
+this section is the implementation substrate.
+
+**Radius tokens** (`uikit/theme/round.go`, design px, all through
+`theme.Px`):
+
+| Token | Value | Chrome |
+|---|---|---|
+| `RadiusWindow` | 14 | window pieces: title bar TOP corners, body BOTTOM corners |
+| `RadiusPanel` | 8 | in-window panels and cards, HUD boxes, starmap card, context menu* |
+| `RadiusControl` | 5 | buttons, text inputs, lists, sliders, checkbox, tooltip, menu |
+
+\* the menu and tooltip use the control radius (5): they are popups, not
+panels.
+
+**Per-corner rule.** A window is two pieces: the title bar rounds its top
+two corners only, the body rounds its bottom two only; the seam between
+them stays square (`theme.TopRadii(RadiusWindow)` /
+`theme.BottomRadii(RadiusWindow)`). Panels and controls round all four.
+A box smaller than twice its radius is out of the scale — thin chrome
+(4 px split seams, meter bars, scroll viewport masks) keeps a square or
+1 px corner. The generator pads each side by its own corner cell
+(`max(radius, border)`), so a nine-slice never leaks past its own rect.
+
+**Dots anatomy** (`uikit/theme/dots.go`). Three hollow rings, 9 px outside
+diameter, 1 px stroke, 7 px apart (41 px block), drawn in the bar's border
+role at alpha 200 — nothing filled. They sit `SpMd` from the bar's left
+edge; the icon starts after the block plus `SpMd`, the tracked title after
+the icon plus `IconGap`. Every `theme.NewTitleBar` window carries them, and
+so do the hand-built window bars (Overview, Selected Item) through
+`theme.TitleDotsWidget`. Two headers deliberately lead with their own mark
+instead: the fitting window's hull-portrait header and the HUD rack's
+"Modules" panel head.
+
+**Panel depth** (`theme.PanelTop` / `PanelBottom`). Panel and window-body
+fills ramp top→bottom: the body lifted 35 % toward `HeadBg` at the top
+(ΔRGB ≤ 6) to the body itself 4 alpha steps more opaque at the bottom
+(±4 around `WindowAlpha`, whose value stays the ramp's midpoint). Title
+bars are flat. The ramp lives in the nine-slice's centre row (256 source
+rows, stretched), so every panel inherits it at any size.
+
+**Tracked chrome labels** (`uikit/theme/tracked.go`). Window titles, panel
+heads and info/tooltip section heads draw in IBM Plex Mono (the mono
+contents face) with 0.12 em tracking, glyph by glyph: `theme.ChromeText`
+for widgets, `theme.DrawTracked` inside hand-drawn panels. Body and row
+text stays IBM Plex Sans.
+
+Pinned by `TestRadiusTokens`, `TestWindowPiecesArePerCornerRounded`,
+`TestChromeClassMinSizes`, `TestPanelDepthToken`,
+`TestDepthRampDrawsTopToBottom`, `TestTitleDots` (raster reads, no game
+loop needed) and, under `ENTIEVE_CAPTURE=1`,
+`TestWindowFadeAndTranslucencyCapture` (corner cut-away + depth top end),
+`TestMapCaptureFrame` (28 px lattice) and `TestHeaderCaptureFrame`.

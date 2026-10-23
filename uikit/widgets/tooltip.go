@@ -14,7 +14,6 @@ import (
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
-	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 // Structured hover tooltips.
@@ -150,7 +149,7 @@ func tipInnerWidth(t theme.Theme, m TooltipModel) int {
 		w = sub
 	}
 	for _, sec := range m.Sections {
-		if lw := TipMeasure(sec.Label, t.Face(theme.StepSmall)); lw > w {
+		if lw := theme.MeasureTracked(sec.Label, *t.FaceMono(theme.StepSmall), t.TS().Small); lw > w {
 			w = lw
 		}
 		for _, row := range sec.Rows {
@@ -333,13 +332,8 @@ func drawTooltip(dst *ebiten.Image, m TooltipModel, l tipLayout, t theme.Theme, 
 
 	// Surface: the current tooltip's own treatment (BGHard over a Border
 	// edge at 220), drawn by hand because the panel is this widget's rect.
-	theme.FillRect(dst, image.Rect(0, 0, size.X, size.Y).Add(origin), theme.Solid(p.BGHard))
-	// Hairline border scales with the panel.
-	bs := float32(theme.Scale())
-	vector.StrokeRect(dst,
-		float32(origin.X)+bs/2, float32(origin.Y)+bs/2,
-		float32(size.X)-bs, float32(size.Y)-bs,
-		bs, theme.NRGBA(p.Border, 220), true)
+	theme.DrawRoundBox(dst, image.Rect(0, 0, size.X, size.Y).Add(origin),
+		theme.Solid(p.BGHard), theme.NRGBA(p.Border, 220), 1, theme.AllRadii(theme.RadiusControl))
 
 	if m.Icon != "" && !l.Icon.Empty() {
 		tint := m.IconTint
@@ -360,7 +354,8 @@ func drawTooltip(dst *ebiten.Image, m TooltipModel, l tipLayout, t theme.Theme, 
 	}
 	for si, sec := range m.Sections {
 		sl := l.Sections[si]
-		theme.DrawCardText(dst, sec.Label, t.Face(theme.StepSmall), at(sl.Label).Min.X, at(sl.Label).Min.Y, theme.Solid(p.Head))
+		theme.DrawTracked(dst, sec.Label, *t.FaceMono(theme.StepSmall), t.TS().Small,
+			float64(at(sl.Label).Min.X), float64(at(sl.Label).Min.Y), theme.Solid(p.Head))
 		for ri, row := range sec.Rows {
 			rr := sl.Rows[ri]
 			theme.DrawCardText(dst, row.Label, t.Face(theme.StepSmall), at(rr.Label).Min.X, at(rr.Label).Min.Y, theme.Solid(p.Dim))
