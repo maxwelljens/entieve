@@ -307,20 +307,32 @@ func (s *Sim) DrainEvents() []Event { return s.Events() }
 // is the waiting state — the player must choose (CmdSetAmmo) before the gun
 // fires again. Loading is true from the moment a load moves its rounds into
 // the bay until its cycle completes: the rounds are in but not yet usable.
+//
+// BayM3 and CycleSeconds are the bay's spec, derived here from the same
+// privates the load runs on (clipBay, cyclePeriod) so a read side never
+// re-derives them from a ModuleDef: the bay's capacity in m³ and the load
+// cycle it costs, the 1 s floor included. Both are READ-ONLY and recomputed on
+// every Clip call — never stored in a component, never in the Save schema.
 type ClipState struct {
-	Item      content.ItemID
-	Rounds    int
-	Capacity  int
-	Selection content.ItemID
-	Options   []content.ItemID
-	Loading   bool
+	Item         content.ItemID
+	Rounds       int
+	Capacity     int
+	Selection    content.ItemID
+	Options      []content.ItemID
+	Loading      bool
+	BayM3        float64
+	CycleSeconds float64
 }
 
 // Clip reports one slot's shell bay; ok is false when the slot holds no bay
 // (no such module, a charge-free weapon, or a non-charge module).
 func (s *Sim) Clip(e ecs.Entity, slot SlotRef) (ClipState, bool) {
 	def, rt, ok := s.moduleDef(e, slot)
-	if !ok || clipBay(def) <= 0 {
+	if !ok {
+		return ClipState{}, false
+	}
+	bay := clipBay(def)
+	if bay <= 0 {
 		return ClipState{}, false
 	}
 	cargo, _ := s.Cargos.Get(e)
@@ -333,12 +345,14 @@ func (s *Sim) Clip(e ecs.Entity, slot SlotRef) (ClipState, bool) {
 		item = rt.Selection
 	}
 	return ClipState{
-		Item:      rt.Clip.Item,
-		Rounds:    rt.Clip.Qty,
-		Capacity:  s.clipRounds(def, item),
-		Selection: rt.Selection,
-		Options:   s.clipTypes(def, stacks),
-		Loading:   loadInFlight(rt),
+		Item:         rt.Clip.Item,
+		Rounds:       rt.Clip.Qty,
+		Capacity:     s.clipRounds(def, item),
+		Selection:    rt.Selection,
+		Options:      s.clipTypes(def, stacks),
+		Loading:      loadInFlight(rt),
+		BayM3:        bay,
+		CycleSeconds: cyclePeriod(def),
 	}, true
 }
 

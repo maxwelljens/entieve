@@ -40,15 +40,13 @@ const (
 	rackRingR    = 16   // cycle ring radius over the tile centre (px)
 	rackRingW    = 2    // cycle ring stroke width (px)
 	rackRowGap   = 8    // gap between slot rows
-	// rackIconSpacing is ebitenui's fixed spacing between a graphic
-	// button's text and graphic (widget/button.go hardcodes it).
-	rackIconSpacing = 10
 	// rackIconPad is the row padding that puts the glyph back in the
 	// tile's centre: the graphic row runs [empty text][spacing][glyph],
-	// so the row's far side has to pay for both the text box and the
-	// spacing (paddingRight = textWidth + rackIconSpacing). The empty
-	// text measures rackIconEmptyW in the shipped theme;
-	// TestIconsCaptureFrame pins the result to the drawn pixels.
+	// where ebitenui's spacing is a fixed 10 px (widget/button.go hardcodes
+	// it), so the row's far side has to pay for both the text box and that
+	// spacing (paddingRight = textWidth + 10). The empty text measures
+	// rackIconEmptyW in the shipped theme; TestIconsCaptureFrame pins the
+	// result to the drawn pixels.
 	rackIconPad    = 20
 	rackIconEmptyW = 10
 	// rackBadgeR / rackBadgeInset place the waiting-state marker: a pulsing
@@ -643,9 +641,10 @@ func (r *Rack) cellTip(cell *rackCell, def *content.ModuleDef) (string, func() w
 	if def.ActivationTime > 0 {
 		hints = append(hints, "Click: activate")
 	}
-	// The bay row counts rounds of the round the bay would load: its
-	// volume sets the count, so that type is part of the key. No type at
-	// all (a waiting bay) has no count to show — the row says so instead.
+	// The bay row reads the cell's ClipState (bay m³, capacity, load cycle)
+	// and names the round it would load; that reference type is part of the
+	// key, because another shell is another row. No type at all (a waiting
+	// bay) has no count to show — the row says so instead.
 	roundID := cell.clip.Item
 	if roundID == "" {
 		roundID = cell.clip.Selection
@@ -658,7 +657,7 @@ func (r *Rack) cellTip(cell *rackCell, def *content.ModuleDef) (string, func() w
 				round = d
 			}
 		}
-		return widgets.ClipTip(widgets.ModuleTip(def, widgets.SlotLabel(cell.slot), charge, qty, hints...), def, round)
+		return widgets.ClipTip(widgets.ModuleTip(def, widgets.SlotLabel(cell.slot), charge, qty, hints...), cell.clip, round)
 	}
 }
 

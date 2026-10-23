@@ -3,7 +3,6 @@ package game
 import (
 	"image"
 	"image/color"
-	"math"
 
 	eimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
@@ -141,15 +140,9 @@ func backdropAlpha(frame int) float32 {
 	return float32(frame) / stationFadeFrames
 }
 
-// coverScale is the cover fit of a sw×sh plate into a w×h window: the larger
-// axis scale, so the plate fills the frame and crops the overflow. 0 for an
-// empty plate or window (nothing drawn).
-func coverScale(sw, sh, w, h int) float64 {
-	if sw <= 0 || sh <= 0 || w <= 0 || h <= 0 {
-		return 0
-	}
-	return math.Max(float64(w)/float64(sw), float64(h)/float64(sh))
-}
+// coverScale is the cover fit of a sw×sh plate into a w×h window, delegated to
+// render's one implementation (the docked plate and the art loader agree).
+func coverScale(sw, sh, w, h int) float64 { return render.CoverScale(sw, sh, w, h) }
 
 // dockedTitle is the backdrop's caption line (NAMING.md interface strings).
 func dockedTitle(station string) string { return "Docked: " + station }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/sim"
 )
 
 // tipTestEnv is a Theme with just what the tooltip maths needs (palette
@@ -497,8 +498,11 @@ func TestModuleTipOmitsAbsentData(t *testing.T) {
 // TestClipTipBayRow pins the bay row a charge-fed module's tooltip gains:
 // the bay's m³, the whole rounds it holds of the round it would load and
 // the load cycle, the waiting wording while no round is chosen (no count),
-// and no row at all on a module without a bay. The count is the content
-// calibration's own arithmetic (ModuleDef.BayRounds), not a second copy.
+// and no row at all on a module without a bay.
+//
+// The row reads the sim's read side (ClipState.BayM3/Capacity/CycleSeconds);
+// the states here are the values that read side produces for these content
+// modules — TestClipStateCarriesTheBaySpec (sim) pins the derivation.
 func TestClipTipBayRow(t *testing.T) {
 	c := content.MustLoad()
 	gun, ok := c.Module("mod-autocannon-s")
@@ -509,12 +513,13 @@ func TestClipTipBayRow(t *testing.T) {
 	if !ok {
 		t.Fatal("content: ammo-emp-s missing")
 	}
-	m := ClipTip(ModuleTip(gun, "High slot 1", "None", 0), gun, ion)
+	gunBay := sim.ClipState{BayM3: 0.2, Capacity: 40, CycleSeconds: 3}
+	m := ClipTip(ModuleTip(gun, "High slot 1", "None", 0), gunBay, ion)
 	if got := tipValue(m, "CHARGE", "Clip"); got != "0.2 m³ · 40 rounds · 3.0 s" {
 		t.Errorf("small autocannon clip row = %q, want 0.2 m³ · 40 rounds · 3.0 s", got)
 	}
 	// No round chosen (a waiting bay): the row says so and counts nothing.
-	m = ClipTip(ModuleTip(gun, "High slot 1", "None", 0), gun, nil)
+	m = ClipTip(ModuleTip(gun, "High slot 1", "None", 0), gunBay, nil)
 	if got := tipValue(m, "CHARGE", "Clip"); got != "waiting for ammo selection" {
 		t.Errorf("waiting clip row = %q, want the waiting wording", got)
 	}
@@ -528,7 +533,8 @@ func TestClipTipBayRow(t *testing.T) {
 	if !ok {
 		t.Fatal("content: charge-cap-cell missing")
 	}
-	m = ClipTip(ModuleTip(booster, "Mid slot 1", "", 0), booster, cell)
+	m = ClipTip(ModuleTip(booster, "Mid slot 1", "", 0),
+		sim.ClipState{BayM3: 0.25, Capacity: 25, CycleSeconds: 5}, cell)
 	if got := tipValue(m, "CHARGE", "Clip"); got != "0.25 m³ · 25 rounds · 5.0 s" {
 		t.Errorf("cap booster clip row = %q, want 0.25 m³ · 25 rounds · 5.0 s", got)
 	}
@@ -539,7 +545,7 @@ func TestClipTipBayRow(t *testing.T) {
 		if !ok {
 			t.Fatalf("content: %s missing", id)
 		}
-		m = ClipTip(ModuleTip(def, "High slot 1", "", 0), def, nil)
+		m = ClipTip(ModuleTip(def, "High slot 1", "", 0), sim.ClipState{}, nil)
 		for _, sec := range m.Sections {
 			for _, row := range sec.Rows {
 				if row.Label == "Clip" {
