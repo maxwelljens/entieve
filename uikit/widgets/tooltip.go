@@ -729,19 +729,22 @@ func ModuleTip(def *content.ModuleDef, slotText, charge string, chargeQty int, h
 }
 
 // ClipTip adds the bay ("clip") row to a charge-fed module's tooltip model:
-// the bay's m³, the whole rounds it holds of the round it would load and the
-// load cycle (one firing cycle). round is that charge (nil = the bay waits
-// for a choice, so the row says so and counts nothing). A module without a
-// bay comes back unchanged — no row, no placeholder.
-func ClipTip(m TooltipModel, def *content.ModuleDef, round *content.ItemDef) TooltipModel {
-	if clipBay(def) <= 0 {
+// the bay's m³, the whole rounds it holds of its reference shell and the load
+// cycle. The numbers come off the sim's read side (sim.Clip → ClipState), so
+// the bay rule — which def field is the bay, what a load cycle costs — lives
+// once, in sim/clips.go. round is that reference shell (Clip.Item, else
+// Clip.Selection): its volume decides whether there is a count to show, nil
+// meaning the bay waits for a choice, so the row says so and counts nothing.
+// A slot without a bay comes back unchanged — no row, no placeholder.
+func ClipTip(m TooltipModel, clip sim.ClipState, round *content.ItemDef) TooltipModel {
+	if clip.BayM3 <= 0 {
 		return m
 	}
 	row := TooltipRow{Label: "Clip", Value: "waiting for ammo selection"}
 	if round != nil && round.Volume > 0 {
-		row.Value = theme.FormatVolumeShort(clipBay(def)) + " · " +
-			theme.FormatInt(int64(def.BayRounds(round.Volume))) + " rounds · " +
-			theme.GroupFloat(clipCycle(def), 1) + " s"
+		row.Value = theme.FormatVolumeShort(clip.BayM3) + " · " +
+			theme.FormatInt(int64(clip.Capacity)) + " rounds · " +
+			theme.GroupFloat(clip.CycleSeconds, 1) + " s"
 	}
 	// The bay belongs to the charge block; a model without one (the cap
 	// booster, whose charge the tooltip does not name) gets its own.
@@ -753,27 +756,4 @@ func ClipTip(m TooltipModel, def *content.ModuleDef, round *content.ItemDef) Too
 	}
 	m.Sections = append(m.Sections, TooltipSection{Label: "CHARGE", Rows: []TooltipRow{row}})
 	return m
-}
-
-// clipBay is a module's bay capacity in m³ (0 = the module loads no rounds):
-// the gun's weapon bay, or the cap booster's cell bay.
-func clipBay(def *content.ModuleDef) float64 {
-	switch {
-	case def == nil:
-		return 0
-	case def.Weapon != nil:
-		return def.Weapon.BayM3
-	case def.Boost != nil:
-		return def.Boost.BayM3
-	}
-	return 0
-}
-
-// clipCycle is the time a bay load costs: one firing cycle (the shot time),
-// the activation time for the cap booster.
-func clipCycle(def *content.ModuleDef) float64 {
-	if def.Weapon != nil && def.Weapon.ShotTime > 0 {
-		return def.Weapon.ShotTime
-	}
-	return def.ActivationTime
 }

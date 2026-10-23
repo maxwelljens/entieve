@@ -542,3 +542,25 @@ func TestNpcChargeGrantPerFamily(t *testing.T) {
 		t.Fatalf("granted families = %v", families)
 	}
 }
+
+// TestClipStateCarriesTheBaySpec pins the read-only spec fields the UI reads
+// instead of re-deriving the bay rule (the rack tooltip's bay row): the bay's
+// m³ and the load cycle are the ones the load itself runs on.
+func TestClipStateCarriesTheBaySpec(t *testing.T) {
+	s := newTestSim(t)
+	cs, ok := s.Clip(s.player, ammoSlot())
+	if !ok {
+		t.Fatal("fixture has no EMP turret bay")
+	}
+	if cs.BayM3 != 0.05 {
+		t.Errorf("BayM3 = %v, want 0.05 (the autocannon's fixture bay)", cs.BayM3)
+	}
+	if cs.CycleSeconds != 2 {
+		t.Errorf("CycleSeconds = %v, want 2 (the gun's firing cycle)", cs.CycleSeconds)
+	}
+	// Capacity is the bay in whole rounds of its reference shell: the spec
+	// and the live count agree by construction.
+	if cs.Capacity != 5 || cs.Rounds != cs.Capacity {
+		t.Errorf("capacity %d / loaded %d, want the full 5-round bay", cs.Capacity, cs.Rounds)
+	}
+}

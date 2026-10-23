@@ -35,6 +35,19 @@ const (
 // headerBand is a window body wrapper that owns the body's panel background,
 // so it can paint the plate between the panel and the content — the one draw
 // order a Container cannot express (it draws its background, then children).
+//
+// Contract:
+//   - ONE child, a stretched grid: the body is the wrapper's only child, so
+//     the wrapper adds no geometry — it supplies the draw order and tracks
+//     hover for the body (whose background image used to do that).
+//   - One plate per window: the window's constructor passes the resolver. A
+//     nil resolver (no assets/, no plate for the kind) is the no-band case —
+//     the panel paints alone, byte-identical to the plain body it replaced.
+//   - The fade counter (0..openFrames) lives here and advances in Render: it
+//     scales the plate's alpha only, never the layout.
+//   - No clip interaction: the body renders whole over the band, so rows
+//     scroll OVER the pinned plate; the viewport's own fill is what steps
+//     aside (widgets.PlateBand), never a clip.
 type headerBand struct {
 	*widget.Container
 
@@ -135,11 +148,12 @@ func headerBandOf(w *widget.Window) *headerBand {
 	if hb, ok := w.Contents.(*headerBand); ok {
 		return hb
 	}
-	if c, ok := w.Contents.(widget.Containerer); ok {
-		for _, ch := range c.Children() {
-			if hb, ok := ch.(*headerBand); ok {
-				return hb
-			}
+	if w.Contents == nil {
+		return nil
+	}
+	for _, ch := range w.Contents.Children() {
+		if hb, ok := ch.(*headerBand); ok {
+			return hb
 		}
 	}
 	return nil

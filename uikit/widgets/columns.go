@@ -52,6 +52,10 @@ import (
 //     tile the width less that strip, so nothing runs under the dots;
 //   - visibility is a display filter: cols and every row's Cells stay
 //     positional, and a hidden column keeps its base width.
+//   - PlateBand (table.go) is the neighbouring rule BEHIND the rows: a window's
+//     artwork band (screens/winheader.go) holds the viewport's fill down to
+//     its bottom edge, so no column width moves — the tiling above is
+//     unchanged, only the paint under the first rows.
 
 // Column chrome metrics (design units).
 const (

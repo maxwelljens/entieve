@@ -280,9 +280,11 @@ glyph for any of it, so nothing depends on a cmap probe.
   two 1 px strokes, accent at rest and grayed for the row that only reports
   (the last visible column). The tick gutter is reserved per menu, so every
   label in a column menu starts on one x.
-- **Frozen widths**: the columns are measured once on the first fit and then
-  never move — a wider value ellipsizes inside its column rather than
-  re-fitting the row (docs/GAMEPLAY.md, Overview).
+- **Frozen bases**: the columns are measured once on the first fit and that
+  tiling becomes each column's base — a wider value ellipsizes inside its
+  column rather than re-fitting the row (docs/GAMEPLAY.md, Overview). A later
+  table width scales the bases proportionally and a grip edits them, so what
+  the player sees is always the base (CONTEXT.md, Column prefs).
 
 ## Tooltip anatomy
 
@@ -372,3 +374,7 @@ Pinned by `TestRadiusTokens`, `TestWindowPiecesArePerCornerRounded`,
 loop needed) and, under `ENTIEVE_CAPTURE=1`,
 `TestWindowFadeAndTranslucencyCapture` (corner cut-away + depth top end),
 `TestMapCaptureFrame` (28 px lattice) and `TestHeaderCaptureFrame`.
+
+Which generator a screen asks for, and what each piece derives from, is the
+map in [ARCHITECTURE.md — UI chrome architecture](ARCHITECTURE.md#ui-chrome-architecture-map);
+this section is the visual canon.

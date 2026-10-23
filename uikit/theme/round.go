@@ -26,6 +26,27 @@ const (
 	RadiusControl = 5
 )
 
+// The generator families — a screen asks for a PIECE, never for a radius
+// (docs/ART.md, "Chrome and form", carries the visual canon; this is the
+// derivation the code guarantees):
+//
+//	window body piece   WindowBodyBox: bottom corners, panel depth. The
+//	                    colour is WindowBody(palette) — the WindowAlpha token.
+//	window title piece  WindowTitleBox: top corners, flat opaque BGHard fill.
+//	                    Body + title share the seam: square there, rounded out.
+//	panel               PanelBox: 8 px all round, PanelTop→PanelBottom depth.
+//	control             Bordered (theme.go): 5 px all round, flat. Buttons,
+//	                    inputs, lists, tooltips, the context menu.
+//	banded viewport     BandedBox: control radii with the fill starting under
+//	                    a plate band (widgets.PlateBand); flat, so the chrome
+//	                    does not change when a plate unloads.
+//	square              Rounded(…, Radii{}): view masks, meter strips, seams.
+//
+// Naming map: WindowAlpha is the one translucency token and WindowBody the
+// palette colour it applies to (chrome.go); PanelTop/PanelBottom are the depth
+// ramp's two ends derived FROM that body colour — not a second translucency
+// rule. Radii are per box, so no screen passes a token where a piece exists.
+//
 // Radii are a box's four corner radii in design px, clockwise from the top
 // left. Zero is square, which is what the window seam and the few
 // deliberately square strips (view masks, meter bars) use.
@@ -95,6 +116,10 @@ func WindowTitleBox(body, edge color.NRGBA) *eimage.NineSlice {
 // artwork band reads through a viewport's top rows. It rounds like the
 // plain box and stays flat like it too (scroll viewports carry no depth
 // ramp), so the chrome does not change when a plate unloads.
+//
+// fillTop blanks the body fill only: the border — corner arcs included —
+// always paints, so a deep band never opens the box's edge (the invariant a
+// banded viewport's border ring depends on).
 func BandedBox(body, edge color.NRGBA, fillTop int) *eimage.NineSlice {
 	return roundedBoxAt(body, body, edge, 1, AllRadii(RadiusControl), Px(fillTop))
 }
@@ -102,6 +127,15 @@ func BandedBox(body, edge color.NRGBA, fillTop int) *eimage.NineSlice {
 // roundedBox rasterises a bordered, per-corner-rounded box and wraps it as
 // a nine-slice: the corner cells hold the arcs, the centre row is the
 // depth ramp (top→bottom) and the centre column a one-px fill.
+//
+// Rasteriser contract (roundedBoxAt and below): input is device px except the
+// radii, which scale through Px; each side's pad is max(its corner radius,
+// border) so an arc never leaks out of the box; the nine-slice's centre row
+// is depthRows source rows (the ramp) stretched to the box's height, so the
+// depth is rendered without knowing the height here. Rows above fillTop lose
+// the body FILL only (the banded viewport lets a plate read through); the
+// border always paints, corner arcs included, so the box's edge never opens.
+// fillTop is device px and is folded into the top pad.
 func roundedBox(top, bottom, edge color.NRGBA, w int, radii Radii) *eimage.NineSlice {
 	return roundedBoxAt(top, bottom, edge, w, radii, 0)
 }
@@ -222,6 +256,11 @@ func DrawRoundBox(dst *ebiten.Image, r image.Rectangle, body, edge color.NRGBA, 
 	dst.DrawImage(img, op)
 }
 
+// roundKey is the cache's identity: everything that changes a pixel of the
+// drawn box — device size, both colours, border and the four device radii.
+// fillTop is deliberately absent: the cache serves DrawRoundBox only, which
+// always draws fillTop 0; the banded nine-slice path rasterises once per
+// BandedBox call and never reads this cache.
 type roundKey struct {
 	w, h           int
 	body, edge     color.NRGBA
@@ -229,6 +268,9 @@ type roundKey struct {
 	tl, tr, br, bl int
 }
 
+// roundCache bounds the HUD's per-card draws: a handful of distinct sizes per
+// frame, so 128 entries never thrash; past that the map is cleared wholesale
+// (simpler than an LRU, and the next frame re-rasterises the visible set).
 var roundCache = struct {
 	sync.Mutex
 	m map[roundKey]*ebiten.Image

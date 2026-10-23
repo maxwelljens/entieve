@@ -230,6 +230,10 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 // dismisses the popup never reaches the widgets underneath. The window
 // raise is gated the same way: a dismiss click can never re-stack what
 // lies beneath the popup.
+//
+// This is the care-taker half of the consumed-gesture latch (the contract
+// is on widgets.Menu): Menu.Poll sets it, TakeBlocked clears it — once per
+// frame, here — so the next frame's poll is live again.
 func (k *Kit) Update() error {
 	k.svc.menu.Poll()
 	menuBlocked := k.svc.menu.TakeBlocked()

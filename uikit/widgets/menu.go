@@ -67,6 +67,24 @@ type menuRow struct {
 	rect  image.Rectangle
 }
 
+// The consumed-gesture latch — ONE name for the whole same-frame double-action
+// guard, whose halves live here and in screens/kit.go:
+//
+//	set       Menu.Click / Menu.Esc, when the popup consumes a press or Esc;
+//	read      Menu.Poll's early return: "this frame already acted", so the
+//	          second poll of the same frame (the host's MenuInput pass, then
+//	          Kit.Update's fallback) never runs an entry twice — an entry's
+//	          Action may have reopened the popup, and running it again would
+//	          undo it;
+//	cleared   Menu.TakeBlocked, called once per frame by Kit.Update and the
+//	          ONLY clearer, so the next frame's poll is live again while
+//	          ui.Update stays skipped for the frame the gesture happened in.
+//
+// It lives on the Menu because the gesture is the popup's own input; Kit.Update
+// is its only care-taker. Pinned by the real click in
+// widgets.TestColumnMenuToggleAppliesFromTheDotsClick (one toggle, not two)
+// and, kit-side, screens.TestRaiseNeverFiresThroughTheMenu.
+//
 // Menu is one session's context menu: opened through the ActionSink
 // (Do(OpenMenu{…})), drawn and gated by the Kit. The zero value is a
 // closed menu; NewMenu (through NewEnv/Kit) builds one bound to a Theme.
@@ -74,7 +92,7 @@ type Menu struct {
 	th theme.Theme
 
 	open    bool
-	blocked bool // a click/Esc was consumed this frame (Kit.Update skips ui)
+	blocked bool // the consumed-gesture latch: set by Click/Esc, cleared by TakeBlocked
 
 	entries []MenuEntry
 	rect    image.Rectangle // popup rect in screen space
@@ -147,8 +165,9 @@ func (m *Menu) Hover(pt image.Point) {
 // consumes the gesture (the menu is modal), closes, and runs the pressed
 // entry's Action — after the close, so an action that opens another menu
 // wins. Disabled entries and separators only close.
-// Constraint: menu-opening actions would re-enter the second poll in the
-// same frame (Kit.Update polls again after the host's MenuInput pass).
+// It sets the consumed-gesture latch (the contract on Menu): an action may
+// reopen the popup, and Kit.Update polls again in the same frame after the
+// host's MenuInput pass, so a second run must not reach an entry.
 func (m *Menu) Click(pt image.Point) bool {
 	if !m.open {
 		return false
@@ -176,9 +195,9 @@ func (m *Menu) Esc() bool {
 	return true
 }
 
-// takeBlocked reads (and clears) the consumed-gesture latch: Kit.Update
-// skips ui.Update on the frame it reports true, so the dismiss click
-// never reaches the widgets underneath.
+// TakeBlocked reads (and clears) the consumed-gesture latch: Kit.Update skips
+// ui.Update on the frame it reports true, so the dismiss click never reaches
+// the widgets underneath. The only clearer — see the contract on Menu.
 func (m *Menu) TakeBlocked() bool {
 	b := m.blocked
 	m.blocked = false
@@ -358,8 +377,8 @@ func PollCursor() (int, int) { return pollCursor() }
 // Poll runs one frame of menu input: hover from the live cursor, then
 // Esc and the mouse buttons (any press dismisses; a press on an enabled
 // entry runs it). It reports whether a menu owned the frame. The
-// consumed-gesture latch is cleared by exactly one place —
-// Menu.TakeBlocked, in Kit.Update.
+// consumed-gesture latch is set by Click/Esc and cleared by exactly one
+// place — Menu.TakeBlocked, in Kit.Update (the contract on Menu).
 func (m *Menu) Poll() bool {
 	if m == nil || !m.open {
 		return false
@@ -367,7 +386,8 @@ func (m *Menu) Poll() bool {
 	// One gesture, one action: this frame's press already ran (an entry's
 	// Action may have reopened the popup), so a second poll in the same
 	// frame — Kit.Update's, after the host's MenuInput pass — must not run
-	// an entry again. Menu.TakeBlocked clears the latch in Kit.Update.
+	// an entry again. The consumed-gesture latch is cleared later in the
+	// same frame, by Menu.TakeBlocked in Kit.Update.
 	if m.blocked {
 		return true
 	}

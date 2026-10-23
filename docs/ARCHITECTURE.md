@@ -929,6 +929,30 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > routes the arrows/Enter/two-step Esc through `Market.SearchKey`;
 > `Ctrl+F` opens the market and focuses the field.
 
+### UI chrome architecture (map)
+
+The chrome is a set of derivations, each with **one owner**; the notes above
+are the change log, this is the index. [ART.md](ART.md) carries the visual
+canon (form language, radii table, dot/depth anatomy, tooltip anatomy) — this
+map only says where each thing derives from.
+
+| Concern | Owner | Contract |
+|---|---|---|
+| Generator families | `uikit/theme/round.go` | One rasteriser behind `Bordered` (control, 5 px, flat), `PanelBox` (panel, 8 px, depth), `WindowTitleBox` (top corners only) + `WindowBodyBox` (bottom corners only, depth) — the two window pieces — `BandedBox` (control radii, fill starts under a plate band) and `Rounded` (explicit per-corner radii; square = zero). A screen asks for a **piece**, never a radius. |
+| Radius / depth / dots / tracking tokens | `theme/round.go`, `theme/dots.go`, `theme/tracked.go` | `RadiusWindow/Panel/Control` are design px through `Px`; `depthRows` is the ramp's source resolution (the nine-slice centre row stretches it); `PanelTop`/`PanelBottom` are the ramp's ends derived from the body colour; `TitleDot*` the ring mark; `trackEm` the 0.12 em chrome tracking. One home each — no call site re-types them. |
+| Tracked chrome labels | `theme/tracked.go` | `ChromeText` (widget), `DrawTracked` (hand-drawn) and `MeasureTracked` are the only tracking path; body/row text stays untracked Sans. A tracked label measures with the same step it draws. |
+| Table columns | `widgets/columns.go` + `table.go` | One layout pass (`applyWidths` → `layoutColumns`) owns every width; header buttons, grips, the ⋯ strip (`ColMenuW`) and row cells all derive from `colOffsets`. Frozen bases + proportional later layouts (the "Table columns" note above). |
+| Plate band | `screens/winheader.go` + `widgets.PlateBand` | Two halves of one boundary: the window wrapper paints panel → plate → body (draw order), and the table's viewport drops its fill under the band (`plateFillTop`). Both are paint-only: no width, rect or scroll offset moves. |
+| Rack badge / ready marker | `screens/rack.go` | The waiting dot is one of `rackBadgePhases` pre-rendered images, swapped by pointer once per `rackBadgeTicks` (deterministic frame count, no per-frame Clear); the ready marker is a static overlay in the tile's other corner; the cycle ring is drawn under both. Both overlays are visibility-flipped, never rebuilt. |
+| Menu latch | `widgets/menu.go` + `screens/kit.go` | The **consumed-gesture latch**: `Menu.Click/Esc` set it, `Menu.Poll` reads it (one gesture, one action per frame), `Kit.Update` clears it via `Menu.TakeBlocked` and skips `ui.Update` that frame. Contract documented on `Menu`. |
+| Clip seam | `sim/api.go` (`ClipState`) | The bay as the UI reads it: loaded rounds, capacity for the reference shell, selection/options, `Loading`, plus the derived bay spec `BayM3`/`CycleSeconds` (recomputed per call from `sim/clips.go`'s privates — never persisted). The rack's waiting dot, ready marker and tooltip bay row read this one state; the cycle ring reads the module runtime. |
+
+Rules that keep it one system: a screen names a piece or a token, never a
+literal radius/alpha of its own; anything measured is measured by the same
+function that draws it; every option that changes paint only (`PlateBand`,
+`ContentsFace`) leaves geometry alone; and a value that lives in `sim` is read
+through `sim`'s read side rather than re-derived in `uikit`.
+
 - `render.Renderer` created with `(*content.Content)`; `Draw(dst *ebiten.Image,
   cam Camera, s *sim.Sim)` reads sim stores read-only. Vector art: ships as
   polygons per hull class, star glow, parallax starfield (seeded), grid dots,
