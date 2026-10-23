@@ -117,8 +117,9 @@ type ModuleRuntime struct {
 	// and defers the next firing cycle by exactly CycleEnds.
 	Clip content.CargoStack
 	// Selection is the shell type the bay tops up from ("" = none: the gun
-	// waits for a choice when 2+ types compete in cargo). Persisted with the
-	// fitting in Save (schema 3).
+	// waits for a choice when 2+ types compete in cargo; also "" while a load
+	// is in flight — it is written when the load completes). Persisted with
+	// the fitting in Save (schema 3).
 	Selection content.ItemID
 }
 

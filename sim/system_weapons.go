@@ -69,7 +69,6 @@ func (s *Sim) fireWeapon(e ecs.Entity, def *content.ModuleDef, slot SlotRef, rt 
 		switch s.fillClip(e, def, rt) {
 		case clipFilled:
 			// The load cycle replaces this cycle: the shot waits it out.
-			rt.CycleEnds = s.time + period
 			return
 		case clipAmbiguous:
 			// Two or more shell types compete and none is selected: sit dry

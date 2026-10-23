@@ -213,8 +213,10 @@ func New(c *content.Content, w *content.WorldDef, seed int64) (*Sim, error) {
 	if agentWorlds[w.ID] {
 		s.spawnAgents()
 	}
-	// Fresh fits pre-load: every bay fills from cargo before the first Step.
-	s.fillBays()
+	// Fresh fits pre-load: every bay fills from cargo before the first Step,
+	// settled at once — no UI exists yet to show a load cycle (all later loads
+	// are clocked; see preloadBays).
+	s.preloadBays()
 	return s, nil
 }
 
@@ -300,15 +302,18 @@ func (s *Sim) DrainEvents() []Event { return s.Events() }
 
 // ClipState is one charge module's shell bay as the UI reads it: the loaded
 // rounds and the bay's capacity for that shell (in whole rounds), the shell
-// type the bay tops up from, and every shell type in cargo that fits it
-// (sorted by id). An empty bay with two or more Options is the waiting state
-// — the player must choose (CmdSetAmmo) before the gun fires again.
+// type the bay tops up from, every shell type in cargo that fits it (sorted by
+// id), and whether a load is in flight. An empty bay with two or more Options
+// is the waiting state — the player must choose (CmdSetAmmo) before the gun
+// fires again. Loading is true from the moment a load moves its rounds into
+// the bay until its cycle completes: the rounds are in but not yet usable.
 type ClipState struct {
 	Item      content.ItemID
 	Rounds    int
 	Capacity  int
 	Selection content.ItemID
 	Options   []content.ItemID
+	Loading   bool
 }
 
 // Clip reports one slot's shell bay; ok is false when the slot holds no bay
@@ -333,6 +338,7 @@ func (s *Sim) Clip(e ecs.Entity, slot SlotRef) (ClipState, bool) {
 		Capacity:  s.clipRounds(def, item),
 		Selection: rt.Selection,
 		Options:   s.clipTypes(def, stacks),
+		Loading:   loadInFlight(rt),
 	}, true
 }
 

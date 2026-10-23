@@ -352,6 +352,7 @@ func TestRestoreKeepsBaysAndResetsPlayerWork(t *testing.T) {
 	giveCargo(s, "ammo-ap-s", 3)
 	s.Queue(CmdSetAmmo{Slot: slot, Item: "ammo-ap-s"})
 	s.Step()
+	stepN(s, 120) // the switch's load completes
 	drain(s)
 	if got := s.ammoPref(s.player, slot); got != "ammo-ap-s" {
 		t.Fatalf("selection=%q want ammo-ap-s", got)

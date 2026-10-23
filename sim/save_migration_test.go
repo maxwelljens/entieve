@@ -429,11 +429,16 @@ func TestRestoreMigratesV2Bays(t *testing.T) {
 	if got := bayRounds(b, slot); got != 0 {
 		t.Fatalf("migrated bay=%d want 0 before the bay rule runs", got)
 	}
-	// …and the next tick resolves the single type: the gun auto-loads.
+	// …and the next tick starts the single type's load: the rounds move in at
+	// once, the selection lands when the load completes.
 	b.Step()
 	if got := bayRounds(b, slot); got != 5 {
-		t.Fatalf("bay after migrate+step=%d want 5 (auto-resolved)", got)
+		t.Fatalf("bay after migrate+step=%d want 5 (rounds in at the start)", got)
 	}
+	if cs, _ := b.Clip(b.player, slot); !cs.Loading {
+		t.Fatalf("clip = %+v, want a load in flight", cs)
+	}
+	stepN(b, 120) // the load cycle
 	if got := b.ammoPref(b.player, slot); got != "ammo-emp-s" {
 		t.Fatalf("selection=%q want ammo-emp-s", got)
 	}

@@ -10,11 +10,12 @@ import (
 
 // Shell bays ("clips"): every charge-consuming module — a projectile gun with
 // an ammo class, or the cap booster — carries a fixed m³ bay that holds whole
-// rounds of exactly ONE shell type. Rounds move from cargo into the bay by a
-// full-bay load cycle exactly one firing cycle long (started at the cycle
-// boundary, so the load DEFERS the next shot by one cycle). Each shot draws
-// one round; the bay tops itself up from the selected type while that type
-// has cargo stock.
+// rounds of exactly ONE shell type. Every load takes one firing cycle: the
+// rounds move at the start (take-at-start conservation) and the bay is not
+// ready until the deadline, so the load DEFERS the next shot by one cycle.
+// Only the fresh-fit pre-load at boot is instant (preloadBays). Each shot
+// draws one round; the bay tops itself up from the selected type while that
+// type has cargo stock.
 //
 // Selection rule (the only automatic behaviour there is):
 //   - the bay loads the selected type while its cargo stock lasts;
@@ -104,16 +105,17 @@ func (s *Sim) clipTypes(def *content.ModuleDef, stacks []content.CargoStack) []c
 type clipState int
 
 const (
-	clipKept      clipState = iota // bay loaded (or no bay / nothing to load)
-	clipFilled                     // a full-bay load happened
+	clipKept      clipState = iota // bay loaded/loading (or no bay / nothing to load)
+	clipFilled                     // a full-bay load started
 	clipAmbiguous                  // empty bay, no selection, 2+ types in cargo: wait
 )
 
-// fillClip resolves one empty bay from cargo. A loaded bay is never touched;
-// a bay whose selection still has cargo stock takes that type, otherwise the
-// selection clears and the type count decides (1 = load it, 0 = dry, 2+ =
-// wait). A full bay's rounds move at once and the transfer is immediate, so a
-// save mid-load can neither duplicate nor lose rounds.
+// fillClip starts a load into one empty bay from cargo. A loaded or loading
+// bay is never touched; a bay whose selection still has cargo stock takes
+// that type, otherwise the selection clears and the type count decides (1 =
+// load it, 0 = dry, 2+ = wait). A full bay's rounds move at once (take at
+// start: a save mid-load can neither duplicate nor lose rounds) and the bay
+// holds the load cycle until its deadline (loadClip, finishLoad).
 func (s *Sim) fillClip(e ecs.Entity, def *content.ModuleDef, rt *ModuleRuntime) clipState {
 	bay := clipBay(def)
 	cargo, ok := s.Cargos.Get(e)
@@ -123,7 +125,6 @@ func (s *Sim) fillClip(e ecs.Entity, def *content.ModuleDef, rt *ModuleRuntime) 
 	if rt.Selection != "" {
 		if stacksCount(cargo.Stacks, rt.Selection) > 0 {
 			if n := s.loadClip(cargo, def, rt, rt.Selection); n > 0 {
-				s.logLoad(e, def, rt.Clip.Item, n)
 				return clipFilled
 			}
 		}
@@ -135,7 +136,6 @@ func (s *Sim) fillClip(e ecs.Entity, def *content.ModuleDef, rt *ModuleRuntime) 
 		return clipKept
 	case 1:
 		if n := s.loadClip(cargo, def, rt, types[0]); n > 0 {
-			s.logLoad(e, def, rt.Clip.Item, n)
 			return clipFilled
 		}
 		return clipKept
@@ -143,8 +143,11 @@ func (s *Sim) fillClip(e ecs.Entity, def *content.ModuleDef, rt *ModuleRuntime) 
 	return clipAmbiguous
 }
 
-// loadClip moves up to a full bay of item from cargo into the bay and makes
-// it the selection. It returns the rounds loaded.
+// loadClip moves up to a full bay of item from cargo into the bay and starts
+// the load: the rounds leave cargo at once, and the bay is not ready until the
+// load's deadline (CycleEnds) passes. Selection is written only when the load
+// completes, so a loaded bay with no selection is exactly a load in flight
+// (loadInFlight) — no extra save field.
 func (s *Sim) loadClip(cargo *Cargo, def *content.ModuleDef, rt *ModuleRuntime, item content.ItemID) int {
 	rounds := s.clipRounds(def, item)
 	if rounds <= 0 {
@@ -156,8 +159,52 @@ func (s *Sim) loadClip(cargo *Cargo, def *content.ModuleDef, rt *ModuleRuntime, 
 	}
 	cargo.Stacks = stacks
 	rt.Clip = content.CargoStack{Item: item, Qty: taken}
-	rt.Selection = item
+	rt.Selection = ""
+	// A load costs one firing cycle. A longer cycle already in flight (a
+	// cancelled module's clock) is kept, as CmdSetAmmo always deferred.
+	if due := s.time + cyclePeriod(def); rt.CycleEnds < due {
+		rt.CycleEnds = due
+	}
 	return taken
+}
+
+// loadInFlight reports a load whose rounds have already moved but whose
+// deadline has not passed. Both halves are persistent state (the bay and the
+// selection), so a save mid-load restores into the same load.
+func loadInFlight(rt *ModuleRuntime) bool {
+	return rt.Clip.Item != "" && rt.Clip.Qty > 0 && rt.Selection == ""
+}
+
+// finishLoad completes one bay load: the loaded type becomes the selection
+// and the one line per load fires here, at the deadline.
+func (s *Sim) finishLoad(e ecs.Entity, def *content.ModuleDef, rt *ModuleRuntime) {
+	rt.Selection = rt.Clip.Item
+	s.logLoad(e, def, rt.Clip.Item, rt.Clip.Qty)
+}
+
+// preloadBays resolves the fresh-fit pre-load at boot: fillBays starts the
+// loads and this settles them at once, leaving no clock running. No UI exists
+// before the first tick to show a load cycle; everything after boot is clocked.
+func (s *Sim) preloadBays() {
+	s.fillBays()
+	for _, e := range sortedEntities(s.Fittings) {
+		fit, ok := s.Fittings.Get(e)
+		if !ok {
+			continue
+		}
+		for _, class := range slotClasses {
+			defs, rts := fit.Defs(class), fit.Runtimes(class)
+			for i := range rts {
+				if !loadInFlight(&rts[i]) {
+					continue
+				}
+				if def, ok := s.Content.Module(defs[i]); ok {
+					s.finishLoad(e, def, &rts[i])
+				}
+				rts[i].CycleEnds = 0
+			}
+		}
+	}
 }
 
 // dumpClip returns the bay's rounds to the owner's cargo (unfit, assembly and
@@ -187,13 +234,14 @@ func (s *Sim) logLoad(e ecs.Entity, def *content.ModuleDef, item content.ItemID,
 		Text: def.Name + " loaded with " + name + " (" + itoaN(n) + " rounds)"})
 }
 
-// fillBays fills every IDLE fitted bay from cargo before the cycle systems
-// run: this is what pre-loads a fresh fit, tops up a gun that was switched off
-// while empty, and auto-switches a selection that ran out while exactly one
-// type remains. An ACTIVE module is skipped — it loads at its own cycle
-// boundary, where the load costs a firing cycle (see fireWeapon and the cap
-// booster branch of systemModules).
+// fillBays resolves every bay before the cycle systems run. It completes loads
+// whose deadline has passed — the module cycle loop skips idle modules, so an
+// idle load has to finish here — and starts a load in every IDLE empty bay.
+// An ACTIVE module starts no load here: it loads at its own cycle boundary,
+// where the load costs a firing cycle (see fireWeapon and the cap booster
+// branch of systemModules). Every load after boot holds the bay for one cycle.
 func (s *Sim) fillBays() {
+	now := s.time
 	for _, e := range sortedEntities(s.Fittings) {
 		fit, ok := s.Fittings.Get(e)
 		if !ok {
@@ -202,14 +250,21 @@ func (s *Sim) fillBays() {
 		for _, class := range slotClasses {
 			defs, rts := fit.Defs(class), fit.Runtimes(class)
 			for i := range rts {
-				if rts[i].Active {
-					continue // active modules load at their cycle boundary
-				}
+				rt := &rts[i]
 				def, ok := s.Content.Module(defs[i])
-				if !ok {
+				if !ok || clipBay(def) <= 0 {
 					continue
 				}
-				s.fillClip(e, def, &rts[i])
+				if loadInFlight(rt) {
+					if now >= rt.CycleEnds {
+						s.finishLoad(e, def, rt)
+					}
+					continue
+				}
+				if rt.Active {
+					continue // active modules load at their cycle boundary
+				}
+				s.fillClip(e, def, rt)
 			}
 		}
 	}

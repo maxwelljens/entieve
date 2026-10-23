@@ -319,16 +319,11 @@ func (s *Sim) execSetAmmo(c CmdSetAmmo) {
 	}
 	cargo, _ := s.Cargos.Get(p)
 	s.dumpClip(p, rt)
-	if n := s.loadClip(cargo, def, rt, c.Item); n > 0 {
-		s.logLoad(p, def, rt.Clip.Item, n)
-		// The switch costs one firing cycle: an active gun resumes after the
-		// load rather than firing the instant the command lands.
-		if due := s.time + cyclePeriod(def); rt.Active && rt.CycleEnds < due {
-			rt.CycleEnds = due
-		}
-	} else {
+	if s.loadClip(cargo, def, rt, c.Item) <= 0 {
 		cannot()
 	}
+	// The switch takes one firing cycle, like every load: loadClip set the
+	// deadline and the completion logs.
 }
 
 // cmdLock starts locking a target from the player's ship.

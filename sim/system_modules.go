@@ -43,10 +43,10 @@ func (s *Sim) systemModules() {
 				}
 				slot := SlotRef{Class: class, Index: i}
 				// A cap booster burns its cells from a bay like a gun its
-				// shells: an empty bay loads first and spends this cycle.
+				// shells: an empty bay loads first and the load holds this
+				// cycle (loadClip set the deadline).
 				if def.Kind == content.KindCapBooster {
 					if s.fillClip(e, def, rt) == clipFilled {
-						rt.CycleEnds = now + cyclePeriod(def)
 						continue
 					}
 				}

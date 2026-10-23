@@ -522,11 +522,23 @@ func TestCapBoosterConsumesCellAndRestores(t *testing.T) {
 	s.Queue(CmdActivate{Slot: slot, Target: 0})
 	s.Step()
 	drain(s)
-	if math.Abs(c.Current-150) > 1.25*DT+1e-12 {
-		t.Fatalf("cap=%v want ~150 (50 + CapRestore 100)", c.Current)
+	// The fresh bay's load costs the booster's first cycle: it spends its
+	// first cell when the load completes (ActivationTime 10 s), not on
+	// activation.
+	if got := bayRounds(s, slot); got != 5 {
+		t.Fatalf("bay after activation=%d want 5 (rounds in, load in flight)", got)
 	}
+	if cs, _ := s.Clip(s.player, slot); !cs.Loading {
+		t.Fatalf("clip = %+v, want a load in flight", cs)
+	}
+	stepN(s, 599) // one tick before the load's cycle ends
+	before := c.Current
+	stepN(s, 2)
 	if got := bayRounds(s, slot); got != 4 {
 		t.Fatalf("bay after boost=%d want 4 (one cell burned)", got)
+	}
+	if c.Current < before+99 {
+		t.Fatalf("cap=%v from %v, want the +100 restore", c.Current, before)
 	}
 }
 

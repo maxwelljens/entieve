@@ -158,13 +158,17 @@ the cap booster — carries a **bay** (`weapon.bay_m3` / `boost.bay_m3`) that
 holds whole rounds of exactly one round type. `sim/clips.go` owns the
 machinery:
 
-- **Load cycle.** A load moves a *full bay* from cargo and takes exactly one
-  firing cycle: the rounds transfer at the start of the load (so a save
-  mid-load can neither duplicate nor lose them) and the next firing cycle is
-  deferred by `CycleEnds = now + ShotTime`. Loading costs no capacitor.
-  A fresh fit pre-loads (and `sim.New` runs the bay pass once, before the
-  first tick); one quiet `EvModule` line per completed load
-  (`<module> loaded with <round> (N rounds)`).
+- **Load cycle.** Every load takes exactly one firing cycle, whether it
+  starts at an active gun's cycle boundary or in an idle bay that ran empty
+  (a top-up, an auto-switch, `CmdSetAmmo`). The rounds transfer at the start
+  of the load (so a save mid-load can neither duplicate nor lose them) and
+  the bay is not ready until the deadline: `CycleEnds = now + ShotTime` (a
+  longer cycle already in flight is kept). Loading costs no capacitor. The
+  module cycle loop skips idle modules, so the bay pass itself completes
+  idle loads when their deadline passes; one quiet `EvModule` line per
+  completed load fires then (`<module> loaded with <round> (N rounds)`).
+  The one exception is the fresh fit at boot: `sim.New` resolves the pre-load
+  instantly (no UI exists yet to show a cycle).
 - **Selection.** `ModuleRuntime.Selection` names the round type the bay
   tops up from. The rule is the only automatic behaviour: while the selected
   type has cargo stock the bay reloads it; when it runs out the bay switches
@@ -181,9 +185,12 @@ machinery:
   cargo; a destroyed ship's loaded rounds land in its wreck's loot; docking
   and undocking never touch a bay.
 - **Read surface for the UI.** `Sim.Clip(e, slot) (sim.ClipState, bool)`
-  reports `{Item, Rounds, Capacity, Selection, Options}` — `Options` is
-  every round type in cargo that fits the bay (2+ with `Rounds == 0` is the
-  waiting state the rack will offer a choice from).
+  reports `{Item, Rounds, Capacity, Selection, Options, Loading}` — `Options`
+  is every round type in cargo that fits the bay (2+ with `Rounds == 0` is
+  the waiting state the rack will offer a choice from), and `Loading` is true
+  from a load's start until its cycle completes (derived from the runtime's
+  bay and not-yet-written selection, so a save mid-load restores into the
+  same load — no schema field was added).
 - NPCs run the identical machinery; their single-type spawn grant resolves
   to auto-load with no interaction.
 
