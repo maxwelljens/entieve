@@ -252,6 +252,26 @@ buttons and the stepper readouts.
   `render/fonts_test.go` (`TestMonoFaceResolvesAndCovers`); the sort
   indicators stay IBM Plex Sans's ↑/↓ — only the row cells change face.
 
+## Table chrome
+
+The table header's own furniture is **drawn, not set**: there is no font
+glyph for any of it, so nothing depends on a cmap probe.
+
+- **Resize grips**: a 6 design-px strip at each column's right edge, inside
+  the 40 px header — a 1 px column boundary line at rest (palette `Border` at 160)
+  that lights accent under the pointer and while dragged, with the split
+  row's EW-resize cursor. Each strip is its own blocking input layer over the
+  sort buttons, so a press there resizes and never sorts.
+- **Column menu**: three 2 px dots, 2 px apart (the split pane's sash-grip
+  dot language) centred in a 22 px button at the header's right end, dim at
+  rest and lit on hover. Its popup marks the visible columns with a tick —
+  two 1 px strokes, accent at rest and grayed for the row that only reports
+  (the last visible column). The tick gutter is reserved per menu, so every
+  label in a column menu starts on one x.
+- **Frozen widths**: the columns are measured once on the first fit and then
+  never move — a wider value ellipsizes inside its column rather than
+  re-fitting the row (docs/GAMEPLAY.md, Overview).
+
 ## Tooltip anatomy
 
 Hover tips are structured panels, not text blobs. One content model

@@ -40,16 +40,21 @@ const (
 	menuMinW    = 150 // popup floor width
 	menuSepH    = 9   // separator band height
 	menuHoverA  = 40  // amber hover fill alpha
+	menuTickW   = 14  // the tick gutter of a checked (column) menu
 )
 
 // MenuEntry is one context-menu row. The first entry of every surface
 // menu is "Show Info", Bold. Disabled entries render grayed but stay
-// visible (never hidden); Sep draws a hairline instead of a label.
+// visible (never hidden); Sep draws a hairline instead of a label. Checked
+// is a column menu's on/off state: when a menu carries any checked row,
+// every label is inset past a tick gutter and the checked ones draw a tick
+// (a runtime polyline — the interface has no font glyph for one).
 type MenuEntry struct {
 	Label    string
 	Bold     bool
 	Disabled bool
 	Sep      bool
+	Checked  bool
 	Action   func()
 }
 
@@ -76,6 +81,7 @@ type Menu struct {
 	rows    []menuRow       // one band per entry, screen space
 	hover   int             // entry index under the pointer, -1 = none
 	screen  image.Rectangle // last drawn screen (the clamp bound)
+	tick    int             // tick gutter width in px (0 = no checked rows)
 }
 
 // NewMenu builds a closed context menu over the given environment.
@@ -202,6 +208,15 @@ func (m *Menu) layout(at image.Point) {
 		rowH = b
 	}
 	width := theme.Px(menuMinW)
+	// The tick gutter is per menu, not per row: a column menu's labels all
+	// start on one x.
+	m.tick = 0
+	for _, e := range m.entries {
+		if e.Checked {
+			m.tick = theme.Px(menuTickW)
+			break
+		}
+	}
 	for _, e := range m.entries {
 		if e.Sep || e.Label == "" {
 			continue
@@ -210,7 +225,7 @@ func (m *Menu) layout(at image.Point) {
 		if e.Bold {
 			f = bold
 		}
-		if w := int(TipMeasure(e.Label, f)) + 2*rowPadX; w > width {
+		if w := int(TipMeasure(e.Label, f)) + 2*rowPadX + m.tick; w > width {
 			width = w
 		}
 	}
@@ -275,8 +290,29 @@ func (m *Menu) Draw(dst *ebiten.Image) {
 		if e.Disabled {
 			col = theme.NRGBA(p.Dim, 150)
 		}
-		theme.DrawCardText(dst, e.Label, face, r.rect.Min.X+theme.Px(menuRowPadX), r.rect.Min.Y+theme.Px(menuRowPadY), col)
+		if m.tick > 0 {
+			m.drawTick(dst, r.rect, e, p)
+		}
+		theme.DrawCardText(dst, e.Label, face, r.rect.Min.X+theme.Px(menuRowPadX)+m.tick, r.rect.Min.Y+theme.Px(menuRowPadY), col)
 	}
+}
+
+// drawTick paints a checked entry's tick in its row's gutter: two strokes
+// (the menu's dot language, no font glyph), the accent at rest and the
+// disabled gray for a row that only reports.
+func (m *Menu) drawTick(dst *ebiten.Image, r image.Rectangle, e MenuEntry, p theme.Palette) {
+	if !e.Checked {
+		return
+	}
+	col := theme.NRGBA(p.Accent, 255)
+	if e.Disabled {
+		col = theme.NRGBA(p.Dim, 150)
+	}
+	s := float32(theme.Scale())
+	x := float32(r.Min.X + theme.Px(menuRowPadX))
+	y := float32((r.Min.Y + r.Max.Y) / 2)
+	vector.StrokeLine(dst, x, y, x+4*s, y+4*s, s, col, true)
+	vector.StrokeLine(dst, x+4*s, y+4*s, x+10*s, y-5*s, s, col, true)
 }
 
 // pressEdge reports a mouse press edge for menu dismissal/activation.

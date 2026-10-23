@@ -597,7 +597,7 @@ func NewMarket(env widgets.Seams) *Market {
 	// Contents face: the order book is names, prices and quantities —
 	// IBM Plex Mono lines the columns up (title, toolbar and buttons
 	// stay IBM Plex Sans).
-	m.tbl = widgets.NewTable(env, cols, widgets.ContentsFace(env.FaceMono(theme.StepSmall)))
+	m.tbl = widgets.NewTable(env, cols, widgets.ContentsFace(env.FaceMono(theme.StepSmall)), widgets.PrefsID("book"))
 	m.tbl.SetSort("Item", true)
 	// Sync builds rows in canonical book order (each item's parent row,
 	// then its orders when the item is open); the Item sort key keeps that
@@ -667,7 +667,7 @@ func NewMarket(env widgets.Seams) *Market {
 			Left: theme.Px(4), Right: theme.Px(4), Top: theme.Px(2), Bottom: theme.Px(2),
 		}),
 	)
-	m.tree = widgets.NewTable(env, []widgets.Column{{Key: "Tree", Title: "Browse"}})
+	m.tree = widgets.NewTable(env, []widgets.Column{{Key: "Tree", Title: "Browse"}}, widgets.PrefsID("tree"))
 	m.tree.SetSortFunc(func(string, bool, []widgets.TableRow) {})
 	m.tree.OnSelect(func(r widgets.TableRow) {
 		m.search.Focus(false)
@@ -825,6 +825,12 @@ func (m *Market) Splits() []widgets.Seam {
 		{Name: "market-tree", Split: m.split, Index: 0},
 		{Name: "market-orders", Split: m.split, Index: 1},
 	}
+}
+
+// Tables are the window's tables for the layout sidecar: the order book
+// and the browse tree are separate lists with separate column sets.
+func (m *Market) Tables() []*widgets.Table {
+	return []*widgets.Table{m.tbl, m.tree}
 }
 
 // orders returns the orders the window shows: the docked station's own

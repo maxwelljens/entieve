@@ -48,7 +48,7 @@ func NewFinances(env widgets.Seams) *Finances {
 	// The ledger is names, dates and amounts: the mono contents face lines
 	// the columns up. Chronological order is the sim's own; the window
 	// shows it newest first, so the last movement is the top row.
-	f.tbl = widgets.NewTable(env, cols, widgets.ContentsFace(env.FaceMono(theme.StepSmall)))
+	f.tbl = widgets.NewTable(env, cols, widgets.ContentsFace(env.FaceMono(theme.StepSmall)), widgets.PrefsID("ledger"))
 
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
@@ -81,6 +81,10 @@ func NewFinances(env widgets.Seams) *Finances {
 
 // Win returns the finances window for Kit.AddWindow.
 func (f *Finances) Win() *widget.Window { return f.win }
+
+// Tables are the window's table for the layout sidecar (the ledger's
+// column widths; the holdings block is a headerless PlainTable).
+func (f *Finances) Tables() []*widgets.Table { return []*widgets.Table{f.tbl} }
 
 // Sync refreshes the holdings block and the ledger rows from the
 // simulation. Call it every frame while mounted.

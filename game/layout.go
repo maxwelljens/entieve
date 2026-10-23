@@ -55,6 +55,11 @@ type winLayout struct {
 	H      int                `json:"h"`
 	Open   bool               `json:"open"`
 	Splits map[string]float64 `json:"splits,omitempty"`
+	// Tables is the window's tables' column state, table id → column key
+	// → width (design units) and hidden flag. It arrived without a format
+	// bump: an absent map is the measured default, which is exactly what a
+	// v3 file written before it means.
+	Tables map[string]map[string]widgets.ColumnPref `json:"tables,omitempty"`
 }
 
 // layoutFile is the sidecar document.
@@ -169,6 +174,7 @@ func (g *Game) writeLayout() error {
 			H:      int(math.Round(float64(h) / s)),
 			Open:   g.persistOpen(name, open),
 			Splits: g.splitRatios(name),
+			Tables: g.tablePrefs(name),
 		}
 	}
 	data, err := json.MarshalIndent(f, "", "  ")
@@ -269,6 +275,74 @@ func (g *Game) applySplits(name string, ratios map[string]float64) {
 	}
 }
 
+// tablesOf resolves a sidecar name to the window's tables, in build
+// order (nil for the windows without a table, and before the screens
+// exist). The tables carry their own sidecar id (widgets.PrefsID) — the
+// inventory's three holds share one, so one stored set reaches all three.
+func (g *Game) tablesOf(name string) []*widgets.Table {
+	switch name {
+	case "overview":
+		if g.kit != nil {
+			return []*widgets.Table{g.kit.OverviewTable()}
+		}
+	case "inventory":
+		if g.inv != nil {
+			return g.inv.Tables()
+		}
+	case "fitting":
+		if g.fitt != nil {
+			return g.fitt.Tables()
+		}
+	case "manufacturing":
+		if g.manu != nil {
+			return g.manu.Tables()
+		}
+	case "market":
+		if g.mkt != nil {
+			return g.mkt.Tables()
+		}
+	case "refinery":
+		if g.ref != nil {
+			return g.ref.Tables()
+		}
+	case "finances":
+		if g.fin != nil {
+			return g.fin.Tables()
+		}
+	}
+	return nil
+}
+
+// tablePrefs is the write side: each table id's column state, the first
+// table carrying an id speaking for it (the inventory's holds agree by
+// construction — they share one set).
+func (g *Game) tablePrefs(name string) map[string]map[string]widgets.ColumnPref {
+	var out map[string]map[string]widgets.ColumnPref
+	for _, t := range g.tablesOf(name) {
+		id, p := t.PrefsID(), t.Prefs()
+		if id == "" || len(p) == 0 {
+			continue
+		}
+		if out == nil {
+			out = map[string]map[string]widgets.ColumnPref{}
+		}
+		if _, ok := out[id]; !ok {
+			out[id] = p
+		}
+	}
+	return out
+}
+
+// applyTablePrefs is the read side: hand every table its stored column
+// set (a table the file does not name keeps the measured freeze).
+func (g *Game) applyTablePrefs(name string, prefs map[string]map[string]widgets.ColumnPref) {
+	for _, t := range g.tablesOf(name) {
+		if p, ok := prefs[t.PrefsID()]; ok {
+			t.SetPrefs(p)
+		}
+	}
+}
+
 // applyLayout restores the sidecar over the built-in defaults: geometry
 // (clamped to MinSize and the screen) for every named window present,
 // open state for the toggleable ones, and the scene stack for the help
@@ -336,6 +410,9 @@ func (g *Game) applyLayout(screenW, screenH int) {
 		// The split ratios (v3): a v2 file names none, so every seam
 		// keeps its equal-share default.
 		g.applySplits(name, e.Splits)
+		// The column state (additive, no version bump): a file without it
+		// leaves each table at its measured freeze.
+		g.applyTablePrefs(name, e.Tables)
 	}
 	// The help window only exists through its overlay scene (modal + dim
 	// backdrop): sync the stack to the restored flag. The starmap is an

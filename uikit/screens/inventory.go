@@ -53,11 +53,11 @@ func NewInventory(env widgets.Seams) *Inventory {
 	// these rows are names, quantities and volumes — IBM Plex Mono
 	// lines the columns up (section labels and buttons stay IBM Plex Sans).
 	mono := widgets.ContentsFace(env.FaceMono(theme.StepSmall))
-	inv.cargo = widgets.NewTable(env, cols, mono)
+	inv.cargo = widgets.NewTable(env, cols, mono, widgets.PrefsID("inventory"))
 	inv.cargo.OnSelect(inv.selectFrom("cargo"))
-	inv.ore = widgets.NewTable(env, cols, mono)
+	inv.ore = widgets.NewTable(env, cols, mono, widgets.PrefsID("inventory"))
 	inv.ore.OnSelect(inv.selectFrom("ore"))
-	inv.hangar = widgets.NewTable(env, cols, mono)
+	inv.hangar = widgets.NewTable(env, cols, mono, widgets.PrefsID("inventory"))
 	inv.hangar.OnSelect(inv.selectFrom("hangar"))
 	// Inventory rows carry no other action: their RowSpec declares the
 	// Show Info ref only (built in rowsOf), so double-click swaps the
@@ -148,6 +148,13 @@ func (inv *Inventory) Splits() []widgets.Seam {
 		{Name: "inventory-ore", Split: inv.split, Index: 0},
 		{Name: "inventory-hangar", Split: inv.split, Index: 1},
 	}
+}
+
+// Tables are the window's tables for the layout sidecar. The three holds
+// share one column set (they are the same three columns over the same
+// holds), so a width dragged in one of them applies to all three.
+func (inv *Inventory) Tables() []*widgets.Table {
+	return []*widgets.Table{inv.cargo, inv.ore, inv.hangar}
 }
 
 // paneStack stacks one split pane's rows in a single column: the rows

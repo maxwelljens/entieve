@@ -194,6 +194,10 @@ func (g *Game) resetLayout() {
 		for _, sm := range g.splitSeams(name) {
 			sm.Split.Reset()
 		}
+		// Column widths and hidden columns too: the tables measure again.
+		for _, t := range g.tablesOf(name) {
+			t.ResetPrefs()
+		}
 	}
 	g.placeDefaults(g.w, g.h)
 	g.clampRestored(g.w, g.h)

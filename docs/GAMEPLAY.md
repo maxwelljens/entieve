@@ -59,7 +59,8 @@ in-game help window renders.
 |---|---|
 | Left click | Select entity / press UI buttons; drag a window's title bar to move it (click also raises it to the front) |
 | Left drag | On any window **edge or corner** (≈8 px grip): resize from all four sides — the opposite edge stays fixed, the window never shrinks past its minimum |
-| Left click | On an overview column header: sort (click again flips direction) |
+| Left click | On a table column header: sort (click again flips direction); on the **⋯ button** at the header's end: the column menu (hide/show a column) |
+| Left drag | On a column's right edge in a table header (the 6 px strip): widen or narrow that column — the change trades with the next column, the header title is the floor, and the cursor is the left/right arrow |
 | `Ctrl` + left click | Lock target under cursor |
 | Left double-click | Show Info — open the item's details window directly, anywhere the item appears (rack, fitting slots and hangar modules, market, inventory, overview, contract rows); on a **hangar module** it fits that module into the first empty slot of its class; on empty space, fly straight toward that point |
 | Right click | Orbit target under cursor (2,500 m) — in the world; unchanged |
@@ -187,7 +188,8 @@ save — `<save path>.layout.json`, e.g.
 (`Ctrl+S` / menu **Save**) and again when you quit cleanly from the
 menu. The pane proportions of the split windows (inventory, fitting,
 manufacturing, market) ride along in the same file, so a dragged seam comes back
-with the rest of the arrangement. It is read back on startup and after
+with the rest of the arrangement; so do the tables' column widths and
+hidden columns. It is read back on startup and after
 loading a save, so a
 favorite arrangement survives restarts and loads. Restored windows are
 clamped to their minimum size and to the screen (always fully
@@ -241,6 +243,15 @@ over it to scroll (wheel up moves toward the top of the list; rows clip to
 the panel), click a
 row to select. Numbers are right-aligned on fixed column anchors, so digits
 changing never shift the columns.
+
+Columns are yours: **drag a column's right edge** in the header to set its
+width (the change trades with the next column, and the header title is the
+floor), and the **⋯ button** at the header's end hides or shows columns —
+the same ⋯ every list in the game carries. Widths are measured once on first
+open and then stay put: a value that grows (velocity mid-warp) ellipsizes
+rather than pushing the columns after it. Widths and hidden columns are
+saved with the window layout (see **Your layout persists**), so they come
+back on the next session.
 
 Rows tint **red for hostiles** and **blue for your own ship**; the Kind
 column names the rest (Ship, Asteroid, Wreck, Station, Gate, …).
