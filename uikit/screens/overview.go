@@ -176,7 +176,7 @@ func (k *Kit) buildOverview() {
 		{Key: "Distance", Title: "Distance", Priority: 1, AlignRight: true},
 		{Key: "Kind", Title: "Kind", Priority: 2},
 		{Key: "Velocity", Title: "Velocity", Priority: 3, AlignRight: true},
-	})
+	}, widgets.PrefsID("overview"))
 	// Typed sort: string cells would order "1.2 AU" before "42 m".
 	tbl.SetSortFunc(sortOverview)
 	tbl.SetSort("Distance", true)

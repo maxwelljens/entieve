@@ -502,6 +502,10 @@ func (k *Kit) SelectedWindow() *widget.Window { return k.sp.win }
 // first Show.
 func (k *Kit) InfoWindow() *widget.Window { return k.svc.info.Win() }
 
+// OverviewTable returns the built-in overview's table (the layout
+// sidecar's column prefs resolve it through here).
+func (k *Kit) OverviewTable() *widgets.Table { return k.ov.tbl }
+
 // InfoOpen reports whether the Show Info window is up.
 func (k *Kit) InfoOpen() bool { return k.svc.info.IsOpen() }
 

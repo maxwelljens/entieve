@@ -174,7 +174,7 @@ func NewFitting(env widgets.Seams) *Fitting {
 	f.hangar = widgets.NewTable(env, []widgets.Column{
 		{Key: "Item", Title: "Hangar", Priority: 1},
 		{Key: "Qty", Title: "Qty", Priority: 0, AlignRight: true},
-	})
+	}, widgets.PrefsID("hangar"))
 	f.hangar.OnSelect(f.selectHangar)
 	// Double-click fits a hangar module into the first empty slot of its
 	// class (the row menu's Fit-into-selected-slot stays the fallback);
@@ -265,6 +265,10 @@ func (f *Fitting) Win() *widget.Window { return f.win }
 func (f *Fitting) Splits() []widgets.Seam {
 	return []widgets.Seam{{Name: "fitting-hangar", Split: f.split, Index: 0}}
 }
+
+// Tables are the window's tables for the layout sidecar (the hangar
+// list's column widths).
+func (f *Fitting) Tables() []*widgets.Table { return []*widgets.Table{f.hangar} }
 
 // newIdentity builds zone 1: the framed hull portrait, the hull's name and
 // its class · maker line with the corporation's emblem.

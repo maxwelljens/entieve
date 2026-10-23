@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Column prefs — frozen widths, drag resize, ⋯ column menu** (`uikit`,
+  `game`): every `widgets.Table` (overview, the three inventory holds, the
+  market book and browse tree, the fitting hangar, the manufacturing
+  recipe and job lists, the refinery ore list and the finances ledger)
+  measures its columns **once** and freezes them.
+  - The measurement is today's algorithm, run on the first fit — the
+    first-open layout is byte-identical. From then on the frozen widths are
+    what the fit consumes, so a cell growing (an overview row's Velocity
+    mid-warp) or the sort arrow moving to another header **never moves an
+    anchor**: content that no longer fits ellipsizes instead.
+  - **Drag a column's right edge** (the 6 design-px strip in the header) to
+    set its width; the change trades with the next-most-important column, so
+    the row keeps tiling the table exactly. The strip has its own blocking
+    input layer, so a press there never sorts; the cursor is the split row's
+    EW-resize. Floor is the column's header title; no ceiling.
+  - A **⋯ button** at the header's right end opens a flat menu with one
+    ticked row per column: a row hides or shows that column (display filter
+    — layout, draw and hit tests only; row data and cell indices never
+    change), then reopens the menu at the same point. The entry that would
+    hide the last visible column is grayed. The ticks and dots are drawn,
+    not font glyphs.
+  - Widths and hidden columns persist in the layout sidecar next to the
+    window rects and seam ratios (`tables`, additive — no version bump):
+    design units, so one saved set restores at any UI scale. The inventory's
+    three holds share one set; the market's two lists keep their own.
+    "Reset window layout" clears them with the rest.
+
 - **Ammo selection on the rack — picker, Load entries, waiting badge, bay
   row** (`uikit`): the magazine feature's UI half.
   - A charge-fed cell whose bay **waits for a choice** (empty bay, two or

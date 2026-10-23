@@ -79,7 +79,7 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 		{Key: "Fee", Title: "Fee", Priority: 3, AlignRight: true},
 		{Key: "Inputs", Title: "Inputs", Priority: 4},
 	}
-	f.recipes = widgets.NewTable(env, recipeCols, widgets.PlateBand(func() image.Rectangle {
+	f.recipes = widgets.NewTable(env, recipeCols, widgets.PrefsID("recipes"), widgets.PlateBand(func() image.Rectangle {
 		return headerPlateBand(f.win)
 	}))
 	jobCols := []widgets.Column{
@@ -89,7 +89,7 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 		{Key: "Progress", Title: "Progress", Priority: 2, AlignRight: true},
 		{Key: "State", Title: "State", Priority: 1},
 	}
-	f.jobs = widgets.NewTable(env, jobCols)
+	f.jobs = widgets.NewTable(env, jobCols, widgets.PrefsID("jobs"))
 
 	// Canonical display order: the sim's own RecipesInOrder / job-id
 	// order (reversing on a second header click, any other header click
@@ -189,6 +189,12 @@ func (f *Manufacturing) Win() *widget.Window { return f.win }
 // job-list pane below it).
 func (f *Manufacturing) Splits() []widgets.Seam {
 	return []widgets.Seam{{Name: "manufacturing-jobs", Split: f.split, Index: 0}}
+}
+
+// Tables are the window's tables for the layout sidecar: the recipe
+// catalog and the job list are separate lists.
+func (f *Manufacturing) Tables() []*widgets.Table {
+	return []*widgets.Table{f.recipes, f.jobs}
 }
 
 // canonicalFirst is the market table's sort rule: the given key keeps the

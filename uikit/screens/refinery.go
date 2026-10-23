@@ -64,7 +64,7 @@ func NewRefinery(env widgets.Seams) *Refinery {
 		{Key: "Held", Title: "Held", Priority: 2, AlignRight: true},
 		{Key: "Yield", Title: "Yield @ qty → hangar", Priority: 1},
 	}
-	r.ores = widgets.NewTable(env, cols, widgets.PlateBand(func() image.Rectangle {
+	r.ores = widgets.NewTable(env, cols, widgets.PrefsID("ores"), widgets.PlateBand(func() image.Rectangle {
 		return headerPlateBand(r.win)
 	}))
 	r.ores.SetSort("Ore", true)
@@ -123,6 +123,10 @@ func NewRefinery(env widgets.Seams) *Refinery {
 
 // Win returns the refinery window for Kit.AddWindow.
 func (r *Refinery) Win() *widget.Window { return r.win }
+
+// Tables are the window's table for the layout sidecar (the ore list's
+// column widths).
+func (r *Refinery) Tables() []*widgets.Table { return []*widgets.Table{r.ores} }
 
 // headerPlateBand is the band a table's PlateBand knob reads: the window's
 // artwork header rect, or empty when it carries no band or the build ships no

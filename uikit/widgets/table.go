@@ -402,7 +402,10 @@ type Table struct {
 	root    *widget.Container
 	rail    *ScrollRail // the reserved-gutter scrollbar beside the viewport
 	header  *widget.Container
+	hdrRow  *widget.Container // the sort buttons, tiling the strip
 	hdrBtn  []*widget.Button
+	grips   []*widget.Button // one resize strip per column (headerLayout)
+	menuBtn *widget.Button   // the ⋯ column menu at the strip's right end
 	hdrIdle *widget.ButtonImage
 	hdrOn   *widget.ButtonImage
 	scroll  *widget.ScrollContainer
@@ -418,6 +421,14 @@ type Table struct {
 	Tips      []RowTip     // per-row tooltip slot (the spec's Tip data)
 	widths    []float64    // fitted column widths
 	fittedFor float64      // available width the fit was computed for
+	base      []ColWidth   // the frozen per-column measure (see ensureFrozen)
+	frozen    bool         // base is the first fit's tiling, mine to keep
+	hidden    []bool       // columns the display filter leaves out
+	prefs     map[string]ColumnPref
+	prefsID   string
+	grip      int     // column whose grip is dragged (-1 = none)
+	gripX     int     // cursor x at the drag's press
+	gripFrom  float64 // the grabbed column's width at the press
 	sortKey   string
 	sortAsc   bool
 	sortFn    func(key string, asc bool, rows []TableRow)
@@ -474,7 +485,9 @@ func NewTable(env Seams, cols []Column, opts ...TableOption) *Table {
 		cols:   append([]Column(nil), cols...),
 		Face:   env.Face(theme.StepSmall), // cell face: display body by default
 		selIdx: -1,
+		grip:   -1,
 	}
+	t.hidden = make([]bool, len(t.cols))
 	for _, opt := range opts {
 		opt(t)
 	}
@@ -511,15 +524,20 @@ func NewTable(env Seams, cols []Column, opts ...TableOption) *Table {
 		Disabled:     theme.Bordered(theme.NRGBA(p.Cell, 140), theme.NRGBA(p.Border, 110), 1),
 	}
 
-	// Header: one sort button per column; applyWidths pins every button
-	// to its fitted column so headers stay aligned with the row cells.
+	// Header: one sort button per column in a row that tiles the strip; the
+	// column chrome (the resize grips and the ⋯ menu) is anchored over it
+	// by headerLayout, so the sort buttons keep their exact rects.
 	t.header = widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(eimage.NewNineSliceColor(theme.Solid(p.HeadBg))),
+		widget.ContainerOpts.Layout(headerLayout{t: t}),
+	)
+	t.hdrRow = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
 			widget.RowLayoutOpts.Spacing(0),
 		)),
 	)
+	t.header.AddChild(t.hdrRow)
 	for i := range t.cols {
 		i := i
 		c := t.cols[i]
@@ -554,8 +572,9 @@ func NewTable(env Seams, cols []Column, opts ...TableOption) *Table {
 			}),
 		)
 		t.hdrBtn = append(t.hdrBtn, btn)
-		t.header.AddChild(btn)
+		t.hdrRow.AddChild(btn)
 	}
+	t.buildColumnChrome()
 
 	// Rows: one container per row inside the scroll content.
 	t.body = widget.NewContainer(
@@ -688,10 +707,12 @@ func (t *Table) SetRows(rows []TableRow) {
 }
 
 // Sync re-fits the columns when the table's width changed (window
-// resize/drag) and re-pins the scroll offset to the current overflow
-// (viewport growth can make a scrolled list fit again). Owners call it
-// once per frame; it is cheap when nothing changed.
+// resize/drag), re-pins the scroll offset to the current overflow
+// (viewport growth can make a scrolled list fit again) and steps the
+// column grip drag. Owners call it once per frame; it is cheap when
+// nothing changed.
 func (t *Table) Sync() {
+	t.Poll()
 	t.clampScroll()
 	t.rail.Sync()
 	t.syncPlateBand()
@@ -701,8 +722,9 @@ func (t *Table) Sync() {
 	}
 }
 
-// Refit re-measures and re-applies the column widths immediately (for
-// owners that resize the table outside the normal frame pump).
+// Refit re-applies the column widths immediately (for owners that resize
+// the table outside the normal frame pump). The measurement itself is
+// frozen — a refit only re-runs the fit over the frozen base.
 func (t *Table) Refit() { t.applyWidths() }
 
 // scrollImage is the viewport's background: today's bordered body fill, or —
@@ -1354,11 +1376,46 @@ func (t *Table) clampScroll() {
 	t.scroll.ScrollTop = math.Max(0, math.Min(1, t.scroll.ScrollTop))
 }
 
-// applyWidths measures the natural width of every column (header plus
-// the widest cell of the current rows), fits them into the available
-// width and pushes the result into the header buttons and row cells.
+// applyWidths fits the columns into the available width and pushes the
+// result into the header buttons and row cells. The natural measure runs
+// once (ensureFrozen): every later fit — a resize, a sort click, a cell
+// growing — feeds the frozen base back through the same policy, so content
+// can never move an anchor.
 func (t *Table) applyWidths() {
 	avail := float64(t.root.GetWidget().Rect.Dx())
+	t.ensureFrozen(avail)
+	sub := make([]ColWidth, 0, len(t.cols))
+	prio := make([]int, 0, len(t.cols))
+	idx := make([]int, 0, len(t.cols))
+	for i := range t.cols {
+		if t.hidden[i] {
+			continue
+		}
+		sub = append(sub, t.base[i])
+		prio = append(prio, t.cols[i].Priority)
+		idx = append(idx, i)
+	}
+	if avail > 0 && len(sub) > 0 {
+		sub = fitColumns(sub, prio, growColumn(prio), avail)
+	}
+	t.fittedFor = avail
+	t.widths = make([]float64, len(t.cols))
+	for k, i := range idx {
+		t.widths[i] = sub[k].Width
+	}
+	t.layoutCells()
+}
+
+// ensureFrozen measures every column's natural width (the header plus the
+// widest cell of the current rows) and its floor ONCE — the first fit's
+// tiling — and freezes the result. The first fit is exactly the algorithm
+// the table always ran, so a first-open layout is unchanged; from then on
+// the fit consumes the frozen base, and later content changes (a cell
+// widening mid-warp, the sort arrow) only ever ellipsize.
+func (t *Table) ensureFrozen(avail float64) {
+	if t.frozen {
+		return
+	}
 	natural := make([]ColWidth, len(t.cols))
 	prio := make([]int, len(t.cols))
 	for i, c := range t.cols {
@@ -1399,21 +1456,24 @@ func (t *Table) applyWidths() {
 		natural[i] = ColWidth{Label: c.Title, Width: w, Min: min}
 		prio[i] = c.Priority
 	}
-	fitted := natural
-	if avail > 0 {
-		fitted = fitColumns(natural, prio, growColumn(prio), avail)
+	t.base = natural
+	// Nothing to freeze yet: the table has no width (built before its
+	// first frame) or no rows (a list that opened empty). The natural
+	// widths are today's provisional answer; the freeze lands on the
+	// first fit that has content to measure.
+	if avail <= 0 || len(t.Rows) == 0 {
+		return
 	}
-	t.fittedFor = avail
-	t.widths = make([]float64, len(fitted))
-	for i, c := range fitted {
-		t.widths[i] = c.Width
-	}
-	t.layoutCells()
+	t.base = fitColumns(natural, prio, growColumn(prio), avail)
+	t.frozen = true
+	t.applyPrefs()
 }
 
 // layoutCells applies the fitted widths: cumulative rounding gives every
 // column a fixed anchor (no jitter), the header buttons tile the strip
-// exactly, and every cell gets its width plus an ellipsized label.
+// exactly, and every cell gets its width plus an ellipsized label. Hidden
+// columns are filtered out of layout and drawing by index — their cells
+// stay where they are, so showing them again restores them untouched.
 func (t *Table) layoutCells() {
 	prev := 0
 	acc := 0.0
@@ -1421,6 +1481,10 @@ func (t *Table) layoutCells() {
 		acc += t.widths[i]
 		w := int(math.Round(acc)) - prev
 		prev += w
+		vis := widget.Visibility_Show
+		if t.hidden[i] {
+			vis = widget.Visibility_Hide
+		}
 
 		b := t.hdrBtn[i]
 		b.GetWidget().MinWidth = w
@@ -1431,6 +1495,7 @@ func (t *Table) layoutCells() {
 		} else {
 			b.SetImage(t.hdrIdle)
 		}
+		setVis(b.GetWidget(), vis)
 
 		// Ellipsize against the float width: the int-rounded cell is up
 		// to half a pixel narrower, and rounding it down here would
@@ -1450,11 +1515,17 @@ func (t *Table) layoutCells() {
 				inner = 0
 			}
 			tx := t.Texts[r][i]
-			if tx == nil {
-				continue // a run cell draws its own segments
+			root := t.cellRoot(r, i)
+			if root != nil {
+				setVis(root, vis)
+			}
+			if tx == nil || t.hidden[i] {
+				// A run cell draws its own segments; a hidden column
+				// keeps its label as it was (it is re-ellipsized when
+				// the column comes back).
+				continue
 			}
 			tx.Label = Ellipsize(cellOf(t.Rows[r], i), inner, t.measure)
-			root := t.cellRoot(r, i)
 			root.MinWidth = w
 			root.LayoutData = widget.RowLayoutData{Stretch: true, MaxWidth: w}
 		}
@@ -1464,6 +1535,13 @@ func (t *Table) layoutCells() {
 		ctr.RequestRelayout()
 	}
 	t.body.RequestRelayout()
+}
+
+// setVis sets w's visibility without a relayout when it is already right.
+func setVis(w *widget.Widget, v widget.Visibility) {
+	if w.GetVisibility() != v {
+		w.SetVisibility(v)
+	}
 }
 
 // indicator is the active sort column's arrow suffix. IBM Plex Sans ships
