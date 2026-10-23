@@ -156,9 +156,9 @@ func (b *IconBox) Name() string { return b.name }
 
 // NewTitleBar builds the standard window title bar: a leading 24 px icon
 // (icon == "" draws the bar text-only) beside the accent title. Returns the
-// bar for WindowOpts.TitleBar and the title text, which windows that retitle
-// keep a handle on.
-func NewTitleBar(d Theme, label, icon string) (*widget.Container, *widget.Text) {
+// bar for WindowOpts.TitleBar and the title label, which windows that
+// retitle keep a handle on. The title is a tracked mono chrome label.
+func NewTitleBar(d Theme, label, icon string) (*widget.Container, *ChromeText) {
 	p := d.Pal()
 	title := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(Bordered(Solid(p.BGHard), NRGBA(p.Border, 200), 1)),
@@ -179,14 +179,12 @@ func NewTitleBar(d Theme, label, icon string) (*widget.Container, *widget.Text) 
 		title.AddChild(g)
 		titlePad = SpMd + IconTitle + IconGap
 	}
-	txt := widget.NewText(
-		widget.TextOpts.Text(label, d.FaceBold(StepBase), Solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(Px(titlePad)),
-		})),
-	)
+	txt := NewChromeText(d, StepBase, label, p.Accent)
+	txt.w.LayoutData = widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		Padding:            widget.NewInsetsSimple(Px(titlePad)),
+	}
 	title.AddChild(txt)
 	return title, txt
 }

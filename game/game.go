@@ -194,6 +194,10 @@ type Game struct {
 	space  *SpaceScene
 	w, h   int // logical screen size (Layout), in device pixels
 	sized  bool
+	// wash is the interface backdrop's radial mint glow, pre-rendered once
+	// per screen size (drawWash) and laid over the scene, under the kit.
+	wash    *ebiten.Image
+	washFor image.Point
 
 	// Resolution independence: dev is the display's device scale factor
 	// (window px → device px, see Layout) and uiScale the persisted user
@@ -986,13 +990,63 @@ func helpRows() []uikit.KeyRow {
 // Draw
 // ---------------------------------------------------------------------------
 
-// Draw renders the scene stack (world first, then overlay veils), then
-// the whole interface on top.
+// Draw renders the scene stack (world first, then overlay veils), lays the
+// interface's background wash over it, then the whole interface on top.
 func (g *Game) Draw(dst *ebiten.Image) {
 	for _, sc := range g.scenes {
 		sc.Draw(dst)
 	}
+	g.drawWash(dst)
 	g.kit.Draw(dst)
+}
+
+// washN is the wash image's resolution: a tiny gradient stretched to the
+// screen, so the cost is one DrawImage call per frame.
+const washN = 64
+
+// drawWash paints the Cyber Terminal backdrop between the scene and the
+// interface: a soft radial mint glow centred on the top edge that fades out
+// by ~42 % of the height. Windows, panels and HUD keep their own fills on
+// top of it.
+func (g *Game) drawWash(dst *ebiten.Image) {
+	b := dst.Bounds()
+	if g.wash == nil || g.washFor != b.Size() {
+		p := theme.DefaultPalette()
+		if g.env != nil {
+			p = g.env.Pal()
+		}
+		g.wash, g.washFor = washImage(b.Size(), p), b.Size()
+	}
+	op := &ebiten.DrawImageOptions{}
+	op.Filter = ebiten.FilterLinear
+	op.GeoM.Scale(float64(b.Dx())/washN, float64(b.Dy())/washN)
+	op.GeoM.Translate(float64(b.Min.X), float64(b.Min.Y))
+	dst.DrawImage(g.wash, op)
+}
+
+// washImage renders the wash gradient for a screen size: accent at a peaking
+// alpha in the top centre (the kit's #10201d over #070b0f is ~2 %), fading
+// to nothing by 42 % of the height, radially in the screen's proportions.
+func washImage(size image.Point, p theme.Palette) *ebiten.Image {
+	const peak = 20
+	img := ebiten.NewImage(washN, washN)
+	asp := 1.0
+	if size.Y > 0 {
+		asp = float64(size.X) / float64(size.Y)
+	}
+	for y := 0; y < washN; y++ {
+		for x := 0; x < washN; x++ {
+			dx := ((float64(x)+0.5)/washN - 0.5) * asp
+			dy := (float64(y) + 0.5) / washN
+			d := math.Hypot(dx, dy) / 0.42
+			if d >= 1 {
+				continue
+			}
+			t := 1 - d
+			img.Set(x, y, theme.NRGBA(p.Accent, uint8(peak*t*t)))
+		}
+	}
+	return img
 }
 
 // ---------------------------------------------------------------------------

@@ -208,14 +208,13 @@ func (k *Kit) buildOverview() {
 		widget.ContainerOpts.BackgroundImage(theme.Bordered(theme.Solid(k.th.Pal().BGHard), theme.NRGBA(k.th.Pal().Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
-	title.AddChild(widget.NewText(
-		widget.TextOpts.Text("Overview", k.th.FaceBold(theme.StepBase), theme.Solid(k.th.Pal().Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(theme.Px(theme.ContentsPad)),
-		})),
-	))
+	head := theme.NewChromeText(k.th, theme.StepBase, "Overview", k.th.Pal().Accent)
+	head.GetWidget().LayoutData = widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		Padding:            widget.NewInsetsSimple(theme.Px(theme.ContentsPad)),
+	}
+	title.AddChild(head)
 
 	o.win = widget.NewWindow(
 		widget.WindowOpts.Contents(contents),

@@ -117,10 +117,10 @@ hint); click once to open — a freshly opened window lands on top — and
 again to close it. An entry you cannot use right now is **grayed, never
 hidden** (the services view and manufacturing in space, the scanner while
 docked, fitting at a station without the fitting service); clicking a
-grayed entry does nothing. A window that is open wears the entry's amber
-glow, and the glyphs are colour-coded by section — **Ship** cyan,
-**Trade** green, **Industry** orange, **Station** gold, **World** blue,
-**Help & System** silver — so the rail reads group-first at a glance
+grayed entry does nothing. A window that is open wears the entry's mint
+glow, and the glyphs are colour-coded by section — **Ship** ice-cyan,
+**Trade** green, **Industry** amber, **Station** mint, **World** cyan,
+**Help & System** pale — so the rail reads group-first at a glance
 (a grayed entry stays dim whatever its group). The slim tab at the rail's
 top edge collapses the rail to its
 tab — a setting that persists as `rail_collapsed` in
@@ -238,7 +238,7 @@ Undocking cuts straight back to the world — the fade is entry-only.
 
 A sortable, **scrollable** table of everything you can currently perceive:
 name, distance, kind, velocity. Click a column header to sort (click again to
-flip direction; the active column tints amber and shows ↑/↓), hover the wheel
+flip direction; the active column tints mint and shows ↑/↓), hover the wheel
 over it to scroll (wheel up moves toward the top of the list; rows clip to
 the panel), click a
 row to select. Numbers are right-aligned on fixed column anchors, so digits
@@ -659,7 +659,7 @@ backdrop, draggable and stacking with the rest). Hovering a system lights
 it and its name; **click** it to open its card in the window's top-left
 corner — display name, zone, its stations and every gate destination.
 **Click the selected system again** to set it as your **destination**: the
-shortest gate route from your current system is drawn in amber, the
+shortest gate route from your current system is drawn in mint, the
 destination wears the widest ring, and the card counts the jumps. Click
 the destination once more (or set the system you are already in) to clear
 it. Destination, selection and hover are session-only view state — they
