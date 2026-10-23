@@ -265,7 +265,7 @@ func (inv *Inventory) rowsOf(stacks []content.CargoStack) []widgets.TableRow {
 			vol = def.Volume * float64(st.Qty)
 		}
 		rows = append(rows, widgets.TableRow{
-			Cells: []string{name, "×" + theme.FormatInt(int64(st.Qty)), theme.FormatVolume(vol)},
+			Cells: []string{name, "×" + theme.FormatInt(int64(st.Qty)), theme.FormatVolumeShort(vol)},
 			Data:  st.Item,
 			// The whole interaction surface: Show Info, plus the sell verb.
 			Spec: widgets.RowSpec{
@@ -286,7 +286,7 @@ func (inv *Inventory) section(title string) string {
 	if !ok {
 		return title + " · no cargo hold"
 	}
-	return title + " · " + theme.FormatVolume(used) + " / " + theme.FormatVolume(cap)
+	return title + " · " + theme.FormatVolumeShort(used) + " / " + theme.FormatVolumeShort(cap)
 }
 
 // oreSection renders the ore hold header with used/capacity totals.
@@ -295,7 +295,7 @@ func (inv *Inventory) oreSection() string {
 	if !ok {
 		return "Ore hold · not fitted"
 	}
-	return "Ore hold · " + theme.FormatVolume(used) + " / " + theme.FormatVolume(cap)
+	return "Ore hold · " + theme.FormatVolumeShort(used) + " / " + theme.FormatVolumeShort(cap)
 }
 
 // transfer moves the selected stack from its section to hold ("cargo",

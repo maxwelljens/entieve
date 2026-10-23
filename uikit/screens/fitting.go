@@ -730,8 +730,8 @@ func (f *Fitting) statValues(player ecs.Entity, ship sim.ShipState, hasShip bool
 		v["Signature"] = theme.GroupFloat(m.SigRadius, 0) + " m"
 	}
 	if cg, ok := s.Cargo(player); ok {
-		v["Cargo"] = theme.FormatVolume(cg.Capacity)
-		v["Ore hold"] = theme.FormatVolume(cg.OreCapacity)
+		v["Cargo"] = theme.FormatVolumeShort(cg.Capacity)
+		v["Ore hold"] = theme.FormatVolumeShort(cg.OreCapacity)
 	}
 	if tg, ok := s.Targeting(player); ok {
 		v["Targets"] = theme.FormatInt(int64(tg.MaxTargets))

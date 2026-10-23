@@ -25,3 +25,27 @@ func TestFormatVolumeKeepsSmallVolumes(t *testing.T) {
 		}
 	}
 }
+
+// TestFormatVolumeShortFloorsAndTrims pins the list/aggregate rule: float
+// noise snapped away, floored to two decimals, trailing zeroes trimmed —
+// a genuine third decimal floors honestly (0.669 → 0.66).
+func TestFormatVolumeShortFloorsAndTrims(t *testing.T) {
+	cases := map[float64]string{
+		0.7000000000000001: "0.7 m³", // the reported cargo-sum artifact
+		0.6999999999999999: "0.7 m³", // downward noise, epsilon-snapped
+		350.29999999999995: "350.3 m³",
+		45.999999999999993: "46 m³",
+		0.005:              "0 m³", // below two decimals: floored
+		0.06:               "0.06 m³",
+		0.104:              "0.1 m³",
+		0.669:              "0.66 m³", // genuine round-down
+		100:                "100 m³",
+		16500:              "16500 m³",
+		0:                  "0 m³",
+	}
+	for v, want := range cases {
+		if got := FormatVolumeShort(v); got != want {
+			t.Errorf("FormatVolumeShort(%v) = %q, want %q", v, got, want)
+		}
+	}
+}

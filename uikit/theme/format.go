@@ -69,10 +69,21 @@ func FormatCredits(v float64) string {
 }
 
 // formatVolume renders a volume in m³ at full precision with no trailing
-// zeroes: "0.005 m³", "123.4 m³", "400 m³" — small volumes (ammo rounds)
-// must not round away to 0.0.
+// zeroes: "0.005 m³", "123.4 m³", "400 m³" — info surfaces where perfect
+// precision is required (small ammo volumes must not round away to 0.0).
 func FormatVolume(v float64) string {
 	return strconv.FormatFloat(v, 'f', -1, 64) + " m³"
+}
+
+// FormatVolumeShort renders a volume for lists and aggregates: float noise
+// snapped away, floored to two decimals, trailing zeroes trimmed —
+// 0.7000000000000001 m³ reads "0.7 m³", a genuine 0.669 m³ reads
+// "0.66 m³" (round down). The 1e-6 epsilon is far below any genuine
+// third decimal (volumes move in 0.005 steps) but above accumulated
+// float error at cargo scales, so 350.29999999999995 → "350.3 m³".
+func FormatVolumeShort(v float64) string {
+	floor := math.Floor(v*100+1e-6) / 100
+	return strconv.FormatFloat(floor, 'f', -1, 64) + " m³"
 }
 
 // formatPct renders a fraction 0..1 as "87%".

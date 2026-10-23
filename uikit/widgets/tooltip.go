@@ -608,7 +608,7 @@ func ModuleSections(def *content.ModuleDef, charge string, chargeQty int) []Tool
 		}
 	case def.Mining != nil:
 		secs = append(secs, TooltipSection{Label: "YIELD", Rows: []TooltipRow{
-			{Label: "Per cycle", Value: theme.FormatVolume(def.Mining.VolumePerCycle)},
+			{Label: "Per cycle", Value: theme.FormatVolumeShort(def.Mining.VolumePerCycle)},
 		}})
 	}
 
@@ -734,7 +734,7 @@ func ClipTip(m TooltipModel, def *content.ModuleDef, round *content.ItemDef) Too
 	}
 	row := TooltipRow{Label: "Clip", Value: "waiting for ammo selection"}
 	if round != nil && round.Volume > 0 {
-		row.Value = theme.FormatVolume(clipBay(def)) + " · " +
+		row.Value = theme.FormatVolumeShort(clipBay(def)) + " · " +
 			theme.FormatInt(int64(def.BayRounds(round.Volume))) + " rounds · " +
 			theme.GroupFloat(clipCycle(def), 1) + " s"
 	}

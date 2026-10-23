@@ -134,6 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   untouched (schema 2: defs carry the limits, saves carry module ids).
 
 ### Changed
+- Volume in lists and aggregates (inventory rows and totals, fitting capacities, tooltip stats) floors to two decimals with trailing zeroes trimmed — a cargo sum of `0.7000000000000001 m³` reads `0.7 m³`; the Show Info window keeps full precision.
 
 - **Naval calibre rename** (`content`, `docs`): ammunition display names now
   carry calibre and payload (`40mm ion`, `57mm armour-piercing`,
