@@ -23,7 +23,7 @@ var (
 	colWreck   = color.RGBA{255, 215, 95, 255}  // wreck yellow
 	colCel     = color.RGBA{143, 184, 255, 255} // celestial blue
 	colAnomaly = color.RGBA{208, 128, 255, 255} // anomaly purple
-	colSelect  = color.RGBA{255, 180, 84, 255}  // selection amber
+	colSelect  = color.RGBA{113, 243, 196, 255} // selection mint (the palette's Accent)
 	colLock    = color.RGBA{140, 230, 255, 255} // lock cyan
 )
 
@@ -389,7 +389,7 @@ func (r *Renderer) drawOverlay(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 		}
 	}
 
-	// Selection highlight on top: bigger amber corners plus a soft ring.
+	// Selection highlight on top: bigger mint corners plus a soft ring.
 	for _, bucket := range [][]gridObj{r.bStar, r.bPlanet, r.bAnomaly, r.bStatic, r.bRock, r.bWreck, r.bShip} {
 		for _, o := range bucket {
 			if o.info.Entity != r.selected {
@@ -402,7 +402,7 @@ func (r *Renderer) drawOverlay(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 			}
 			r.bracket(dst, sx, sy, half, colSelect, 2)
 			vector.StrokeCircle(dst, float32(sx), float32(sy), float32(half+6), 1,
-				color.RGBA{255, 180, 84, 90}, true)
+				color.RGBA{113, 243, 196, 90}, true)
 		}
 	}
 }

@@ -108,15 +108,33 @@ will apply — is [NAMING.md — Money strings](NAMING.md#money-strings).
 Direction for all future art. [../ART.md](../ART.md) remains authoritative
 for mechanics (sizes, fallbacks, directories); this section binds the look.
 
-- **Palette — amber on black, EVE-dark.** Near-black surfaces (`#0a0e14`
-  panel fill), amber accent and selection (`#ffb454`), pale text on dim
-  greys, functional colours reserved for status: green good, amber warning,
-  red danger, blue info. Nothing pastel, nothing white, no colour without a
-  job. Per-system nebula palettes in `content/data/systems/*.json` stay
-  dark washes behind this chrome.
-- **Type — IBM Plex Sans** everywhere (OFL, embedded in `render/fonts/`):
-  Regular for body, Bold for emphasis. Diacritics and `€`/`¢` are covered;
-  use authentic spellings.
+**Palette — mint on near-black, the Cyber Terminal register.** The tokens
+are the Cyber Terminal UI Kit's (c) 2026 Kerem Bolek; the palette and chrome
+language are derived from that kit under its license (derived from, not
+shipped: no kit files live in this repo). Page black `#070b0f`, panel
+`#0b1116`, title bar `#0a0f14`, raised panel `#0e161d`, hairline **mint
+`#71f3c4` at ~16 %** on every border, text `#d9f7ef`, muted `#6e8c87`,
+secondary `#86a59f` / `#b8d7cf`. Chrome is a **single accent — mint**: the
+accent role is `#71f3c4` and every chrome label, hairline, selection and
+glow works from it. Status roles are kit hexes: **good `#80efb1`, warning
+`#ffc76b`, danger `#ff647c`**. Two roles the kit lacks are cool extensions
+of its hue space — **Info `#74c7d9`** (informational text, the rack's
+waiting dot) and **Player `#8fe9ff`** (your ship's identity tint) — and
+**Shield stays blue `#6fa8ff`**: the HUD layer's own identity, tuned against
+the shield-bar capture thresholds. Nothing pastel beyond these tokens, no
+colour without a job; per-system nebula palettes in
+`content/data/systems/*.json` stay dark washes behind the chrome. The
+interface sits on a soft radial mint top-wash (palette-derived, under all
+UI), and the starmap alone carries the kit's 28 px mint grid at ~3.5 %.
+
+- **Type — IBM Plex Sans body, IBM Plex Mono chrome.** Body text, table
+  rows, list entries and tooltip titles stay Plex Sans (Regular body, Bold
+  for the tooltip title). Chrome labels — window titles, panel heads,
+  section/stat heads, tooltip section labels — are **Plex Mono with a
+  0.12 em letter-tracking step** (`uikit/theme` tracked labels), drawn in
+  the mint accent or the head role. Uppercase only where the string is
+  already authored uppercase (tooltip and info sections); never re-case a
+  name. Diacritics and `€`/`¢` are covered; use authentic spellings.
 - **Icons — monochrome game-icons silhouettes** (`uikit/icons/`, CC BY 3.0,
   credited in `uikit/icons/CREDITS.md`): single white silhouettes tinted
   from palette roles at draw time. Never multicolour, never photographic.
@@ -125,7 +143,9 @@ for mechanics (sizes, fallbacks, directories); this section binds the look.
   built-in vector art. Hull sprites point right. Art is machinery with
   service lights and panel lines — freighters, cutters, drones, hazard
   markings — not sleek space-fantasy curves. Beauty comes from precision,
-  scale and wear.
+  scale and wear. In-world hues stay physical (stars, planets, rocks,
+  nebulae, bolts, mining green); only the UI-coupled accents (selection
+  brackets, the station running lights) speak the mint.
 
 **Binding rules**
 
@@ -133,12 +153,13 @@ for mechanics (sizes, fallbacks, directories); this section binds the look.
 - MUST place every new name in one layer of the naming matrix and give every
   new hull exactly one origin tag.
 - MUST keep trait skew soft: flavour and stat skew only.
-- MUST keep the visual canon: amber-on-black, IBM Plex Sans, monochrome
-  silhouettes, drop-in sprites.
+- MUST keep the visual canon: mint-on-black Cyber Terminal palette, IBM Plex
+  Sans body with tracked IBM Plex Mono chrome, monochrome silhouettes,
+  drop-in sprites.
 - MUST write amounts as `1,234.56 €` / `50¢` in UI and logs, "euro(s)" /
   "cent(s)" in prose.
 - NEVER use epic, mythic, destiny or chosen-one language in any content.
 - NEVER echo the retired placeholder names (see naming layers) in display
   text.
-- NEVER colour outside the palette roles or introduce a second typeface or
-  multicolour icons.
+- NEVER colour outside the palette roles, introduce a second typeface, or
+  give body/list text the tracked chrome treatment.

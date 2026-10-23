@@ -44,7 +44,7 @@ type OrderWin struct {
 	as widgets.ActionSink
 
 	win   *widget.Window
-	title *widget.Text
+	title *theme.ChromeText
 	body  *widget.Container
 
 	modeBtn *widget.Button

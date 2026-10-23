@@ -39,7 +39,7 @@ const (
 	menuRowPadY = 4   // vertical padding around a row's line
 	menuMinW    = 150 // popup floor width
 	menuSepH    = 9   // separator band height
-	menuHoverA  = 40  // amber hover fill alpha
+	menuHoverA  = 32  // mint hover fill alpha (the kit's subtle band)
 	menuTickW   = 14  // the tick gutter of a checked (column) menu
 )
 
@@ -256,7 +256,7 @@ func (m *Menu) layout(at image.Point) {
 }
 
 // Draw paints the popup: the tooltip's surface (opaque fill + 1 px
-// border), the amber hover band, the labels (Bold first entry, grayed
+// border), the mint hover band, the labels (Bold first entry, grayed
 // when disabled) and the separator hairlines. Kit.Draw calls it last, so
 // the menu is always on top.
 func (m *Menu) Draw(dst *ebiten.Image) {
