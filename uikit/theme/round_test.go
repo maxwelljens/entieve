@@ -118,6 +118,93 @@ func TestPanelDepthToken(t *testing.T) {
 	}
 }
 
+// TestChromeBoxFillsItsRect pins the box contract every chrome class
+// shares: the generated raster IS the piece's rect — the nine-slice cuts
+// are cell sizes, not padding bands, so the top and bottom bands read the
+// piece's fill edge to edge and only the corner cutouts are transparent.
+// A regression here shows as the backdrop through a band where the arcs
+// begin (the winchrome capture pins the drawn pixels too).
+func TestChromeBoxFillsItsRect(t *testing.T) {
+	p := DefaultPalette()
+	edge := NRGBA(p.Border, 200)
+	body := WindowBody(p.BG)
+	panelTop, panelBot := PanelTop(p, body), PanelBottom(p, body)
+	cases := []struct {
+		name        string
+		top, bottom color.NRGBA
+		radii       Radii
+		fillTop     int
+	}{
+		{"window title", Solid(p.BGHard), Solid(p.BGHard), TopRadii(RadiusWindow), 0},
+		{"window body", panelTop, panelBot, BottomRadii(RadiusWindow), 0},
+		{"panel", panelTop, panelBot, AllRadii(RadiusPanel), 0},
+		{"control", Solid(p.Cell), Solid(p.Cell), AllRadii(RadiusControl), 0},
+		{"banded viewport", body, body, AllRadii(RadiusControl), Px(21)},
+	}
+	for _, c := range cases {
+		img, padX, padY := roundedBoxRaster(c.top, c.bottom, edge, 1, c.radii, c.fillTop)
+		b := img.Bounds()
+		// The cuts tile the raster exactly: no row or column of padding
+		// sits outside the nine cells.
+		if padX[0]+padX[1]+padX[2] != b.Dx() || padY[0]+padY[1]+padY[2] != b.Dy() {
+			t.Errorf("%s cuts %v×%v do not tile the %d×%d raster", c.name, padX, padY, b.Dx(), b.Dy())
+		}
+		mid := b.Dx() / 2
+		// Corner cutouts: transparent on a rounded corner only, and the
+		// shape reaches its rect's edge just past the arc.
+		corners := []struct {
+			pt image.Point
+			r  int
+		}{
+			{image.Pt(0, 0), c.radii.TL},
+			{image.Pt(b.Dx()-1, 0), c.radii.TR},
+			{image.Pt(b.Dx()-1, b.Dy()-1), c.radii.BR},
+			{image.Pt(0, b.Dy()-1), c.radii.BL},
+		}
+		for _, k := range corners {
+			if a := img.NRGBAAt(k.pt.X, k.pt.Y).A; (k.r > 0) != (a == 0) {
+				t.Errorf("%s corner %v alpha = %d, want transparent only where rounded (r=%d)", c.name, k.pt, a, k.r)
+			}
+		}
+		if a := img.NRGBAAt(padX[0], 0).A; a == 0 {
+			t.Errorf("%s top edge at x=%d is transparent: the box does not reach its rect's top", c.name, padX[0])
+		}
+		// The centre column: filled from the first row under the hairline to
+		// the last, except the banded viewport's requested blank band.
+		floor := min(c.top.A, c.bottom.A) // the fill never dips below its ends
+		for y := Px(1); y < b.Dy()-Px(1); y++ {
+			got := img.NRGBAAt(mid, y)
+			if y < c.fillTop {
+				if got.A != 0 {
+					t.Errorf("%s band row %d alpha = %d, want 0 (artwork shows through)", c.name, y, got.A)
+				}
+				continue
+			}
+			if got.A < floor {
+				t.Errorf("%s centre column row %d alpha = %d, want the fill (≥ %d)", c.name, y, got.A, floor)
+			}
+		}
+		// The top band carries the ramp's top colour, the bottom band its
+		// bottom end (the hairline keeps the last row, so skip it).
+		if c.fillTop == 0 {
+			y := max(Px(1), padY[0]-1)
+			if got := img.NRGBAAt(mid, y); got != c.top {
+				t.Errorf("%s top band row %d = %v, want the top colour %v", c.name, y, got, c.top)
+			}
+		}
+		for y := b.Dy() - padY[2]; y < b.Dy()-Px(1); y++ {
+			if got := img.NRGBAAt(mid, y); got != c.bottom {
+				t.Errorf("%s bottom band row %d = %v, want the bottom colour %v", c.name, y, got, c.bottom)
+			}
+		}
+		if y := b.Dy() - Px(1) - 1; y >= c.fillTop {
+			if got := img.NRGBAAt(mid, y); got != c.bottom {
+				t.Errorf("%s last fill row %d = %v, want the bottom colour %v", c.name, y, got, c.bottom)
+			}
+		}
+	}
+}
+
 // TestDepthRampDrawsTopToBottom proves the nine-slice's centre row really
 // carries the ramp (not a flat fill): the raster's first body row is the
 // top end and its last is the bottom end.
@@ -125,7 +212,7 @@ func TestDepthRampDrawsTopToBottom(t *testing.T) {
 	p := DefaultPalette()
 	body := WindowBody(p.BG)
 	top, bot := PanelTop(p, body), PanelBottom(p, body)
-	img := roundRectImage(40, 300, top, bot, NRGBA(p.Border, 200), 1, scaleRadii(AllRadii(RadiusPanel)), RadiusPanel, RadiusPanel)
+	img := roundRectImage(40, 300, top, bot, NRGBA(p.Border, 200), 1, scaleRadii(AllRadii(RadiusPanel)), RadiusPanel, 0)
 	first := img.NRGBAAt(20, RadiusPanel+1)
 	last := img.NRGBAAt(20, 300-RadiusPanel-2)
 	if first.R != top.R || first.A != top.A {

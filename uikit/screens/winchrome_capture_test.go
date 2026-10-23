@@ -232,6 +232,52 @@ func (g *winChromeCaptureGame) verify(img *ebiten.Image) error {
 		}
 	}
 
+	// Box contract — the generated shape's bounding box IS the piece's
+	// rect: the top and bottom bands carry the piece's fill edge to edge
+	// (only the corner cutouts are transparent), so no backdrop band shows
+	// where the arcs begin. The title bar's band is the flat BGHard fill,
+	// the body's bottom band the depth ramp's bottom end (PanelBottom).
+	blendOver := func(c color.NRGBA) (int, int, int) {
+		f := func(v uint8) int { return (int(v)*int(c.A) + 255*(255-int(c.A)) + 127) / 255 }
+		return f(c.R), f(c.G), f(c.B)
+	}
+	titleWant := theme.Solid(pal.BGHard)
+	bodyWant := theme.PanelBottom(pal, theme.WindowBody(pal.BG))
+	for _, w := range g.wins {
+		if w.win == nil {
+			continue
+		}
+		tb := w.win.TitleBar.GetWidget().Rect
+		tx := tb.Min.X + tb.Dx()/2
+		// Rows 1 and RadiusWindow/2 sit inside the top slice (the arcs'
+		// band): the fill runs right up to the hairline, no gap above it.
+		for _, pt := range []image.Point{
+			{X: tx, Y: tb.Min.Y + theme.Px(1)},
+			{X: tx, Y: tb.Min.Y + theme.Px(theme.RadiusWindow)/2},
+		} {
+			r, gg, b := sample(pt)
+			if abs(r-int(titleWant.R)) > 1 || abs(gg-int(titleWant.G)) > 1 || abs(b-int(titleWant.B)) > 1 {
+				fail("%s title top band %v = (%d,%d,%d), want the title-bar fill (%d,%d,%d) — the box fills its rect",
+					w.name, pt, r, gg, b, titleWant.R, titleWant.G, titleWant.B)
+			}
+		}
+		// The rect's very first row is the frame hairline, never the backdrop.
+		if r, gg, b := sample(image.Pt(tx, tb.Min.Y)); r == 255 && gg == 255 && b == 255 {
+			fail("%s title top row %v reads the backdrop: the box does not reach its rect's top edge", w.name, image.Pt(tx, tb.Min.Y))
+		}
+		r := w.win.GetContainer().GetWidget().Rect
+		bx := r.Min.X + r.Dx()/2
+		wantR, wantG, wantB := blendOver(bodyWant)
+		for _, dy := range []int{1, 2} {
+			pt := image.Pt(bx, r.Max.Y-1-dy)
+			cr, cg, cb := sample(pt)
+			if abs(cr-wantR) > 2 || abs(cg-wantG) > 2 || abs(cb-wantB) > 2 {
+				fail("%s body bottom band %v = (%d,%d,%d), want the ramp's bottom end (%d,%d,%d)",
+					w.name, pt, cr, cg, cb, wantR, wantG, wantB)
+			}
+		}
+	}
+
 	// The × glyph drew inside the overview's exclusion strip (its own
 	// text ink over the near-black bar).
 	strip := closeButtonRect(g.k.OverviewWindow().TitleBar.GetWidget().Rect)
