@@ -30,8 +30,10 @@ const (
 	// colGripW is the resize strip at each column's right edge, inside the
 	// header strip.
 	colGripW = 6
-	// colMenuW is the ⋯ button at the header's right end.
-	colMenuW = 22
+	// ColMenuW is the ⋯ button's strip at the header's right end: the
+	// columns tile the table width less it, so no column runs under the
+	// dots (and the header labels never paint over them).
+	ColMenuW = 22
 )
 
 // ColumnPref is one table column's persisted state, in DESIGN units (the
@@ -230,7 +232,7 @@ func colHairline(c color.Color) *eimage.NineSlice {
 // no cmap probe for U+22EF. The image is the button's exact size, so the
 // fixed nine-slice fills it.
 func colDots(c color.Color) *eimage.NineSlice {
-	w, h := max(theme.Px(colMenuW), 3), max(theme.Px(TableHeaderH), 3)
+	w, h := max(theme.Px(ColMenuW), 3), max(theme.Px(TableHeaderH), 3)
 	dot, gap := max(theme.Px(SplitGripDot), 1), theme.Px(SplitGripGap)
 	img := ebiten.NewImage(w, h)
 	x, y := (w-(3*dot+2*gap))/2, (h-dot)/2
@@ -241,11 +243,11 @@ func colDots(c color.Color) *eimage.NineSlice {
 	return eimage.NewFixedNineSlice(img)
 }
 
-// headerLayout places the sort row across the strip, a grip at every
-// visible column's right edge (the last one stops at the ⋯ button, which
-// owns the strip's right end) and the menu button there. It reuses
-// layoutCells' cumulative rounding, so a grip sits exactly on the boundary
-// it drags.
+// headerLayout places the sort row across the strip, a grip on every
+// boundary two visible columns share, and the ⋯ button in its own strip
+// at the header's right end (the columns tile up to it, never under it).
+// It reuses layoutCells' cumulative rounding, so a grip sits exactly on
+// the boundary it drags.
 type headerLayout struct{ t *Table }
 
 // PreferredSize is the sort row's own: the chrome rides over it and never
@@ -266,7 +268,7 @@ func (h headerLayout) Layout(ws []widget.PreferredSizeLocateableWidget, rect ima
 	if len(ws) < len(t.cols)+2 {
 		return
 	}
-	menu := image.Rect(rect.Max.X-theme.Px(colMenuW), rect.Min.Y, rect.Max.X, rect.Max.Y)
+	menu := image.Rect(rect.Max.X-theme.Px(ColMenuW), rect.Min.Y, rect.Max.X, rect.Max.Y)
 	ws[1+len(t.cols)].SetLocation(menu)
 	last := -1
 	for i := range t.cols {
@@ -282,15 +284,13 @@ func (h headerLayout) Layout(ws []widget.PreferredSizeLocateableWidget, rect ima
 		}
 		acc += t.widths[i]
 		next := rect.Min.X + int(math.Round(acc))
+		// Only a boundary two visible columns share can be dragged: the
+		// last visible column's right edge is the table's own (the fit's),
+		// and a hidden column owns no edge at all. A column no wider than
+		// its grip keeps no strip (there would be nothing to drag).
 		grip := image.Rectangle{}
-		edge := next
-		if i == last {
-			edge = min(edge, menu.Min.X)
-		}
-		// A column no wider than its grip keeps no strip (there would be
-		// nothing to drag).
-		if !t.hidden[i] && edge-prev > theme.Px(colGripW) {
-			grip = image.Rect(edge-theme.Px(colGripW), rect.Min.Y, edge, rect.Max.Y)
+		if !t.hidden[i] && i != last && next-prev > theme.Px(colGripW) {
+			grip = image.Rect(next-theme.Px(colGripW), rect.Min.Y, next, rect.Max.Y)
 		}
 		ws[1+i].SetLocation(grip)
 		prev = next
@@ -331,47 +331,46 @@ func (t *Table) Step(cursor image.Point, rising, pressed bool) {
 	}
 }
 
-// dragTo sets the grabbed column's frozen width from the cursor delta: its
-// right edge follows the pointer, never below the header floor and with no
-// ceiling.
+// dragTo sets the grabbed column's frozen width from the cursor delta: the
+// boundary under the pointer follows it, never below either column's header
+// floor and with no ceiling.
 func (t *Table) dragTo(cursor image.Point) {
 	t.setColWidth(t.grip, t.gripFrom+float64(cursor.X-t.gripX))
 }
 
 // setColWidth writes one column's frozen width. The delta is traded with
-// the next-most-important visible column, so the row of columns keeps
-// tiling the table exactly and the fit has nothing to redistribute — a
-// drag is what the player sees, whichever column they grabbed.
+// the NEXT visible column — the one whose left edge is the boundary the
+// strip sits on, so the grabbed edge moves with the pointer — and both
+// sides stop at their header floor, so the row of columns keeps tiling the
+// table exactly and the fit has nothing to redistribute.
 func (t *Table) setColWidth(i int, w float64) {
 	if i < 0 || i >= len(t.base) || i >= len(t.cols) {
 		return
 	}
-	w = math.Max(w, t.base[i].Min)
+	j := t.nextVisible(i)
+	if j < 0 {
+		return // the table's right edge is the fit's, not a drag's
+	}
 	d := w - t.base[i].Width
+	d = math.Max(d, t.base[i].Min-t.base[i].Width) // the dragged column's floor
+	d = math.Min(d, t.base[j].Width-t.base[j].Min) // the partner's floor
 	if d == 0 {
 		return
 	}
-	t.base[i].Width = w
-	if j := t.otherVisible(i); j >= 0 {
-		t.base[j].Width = math.Max(t.base[j].Width-d, t.base[j].Min)
-	}
+	t.base[i].Width += d
+	t.base[j].Width -= d
 	t.applyWidths()
 }
 
-// otherVisible is the visible column a drag trades width with: the least
-// important one besides i (the fit's grow column, or the runner-up when i
-// is the grow column).
-func (t *Table) otherVisible(i int) int {
-	best := -1
-	for j := range t.cols {
-		if j == i || t.hidden[j] {
-			continue
-		}
-		if best < 0 || t.cols[j].Priority < t.cols[best].Priority {
-			best = j
+// nextVisible is the visible column after i (-1 when none): the column on
+// the far side of the boundary i's strip drags.
+func (t *Table) nextVisible(i int) int {
+	for j := i + 1; j < len(t.cols); j++ {
+		if !t.hidden[j] {
+			return j
 		}
 	}
-	return best
+	return -1
 }
 
 // gripAt is the grip strip under p, or -1. Each grip owns a blocking input

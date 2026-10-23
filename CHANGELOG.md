@@ -20,16 +20,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     mid-warp) or the sort arrow moving to another header **never moves an
     anchor**: content that no longer fits ellipsizes instead.
   - **Drag a column's right edge** (the 6 design-px strip in the header) to
-    set its width; the change trades with the next-most-important column, so
-    the row keeps tiling the table exactly. The strip has its own blocking
-    input layer, so a press there never sorts; the cursor is the split row's
-    EW-resize. Floor is the column's header title; no ceiling.
-  - A **⋯ button** at the header's right end opens a flat menu with one
-    ticked row per column: a row hides or shows that column (display filter
-    — layout, draw and hit tests only; row data and cell indices never
-    change), then reopens the menu at the same point. The entry that would
-    hide the last visible column is grayed. The ticks and dots are drawn,
-    not font glyphs.
+    set its width: the strip sits on the boundary it drags, and that
+    boundary follows the cursor — the next visible column gives the delta
+    back, so the row keeps tiling the table exactly. A column with no column
+    right of it (the last one) has no strip: the table edge is the fit's.
+    The strip has its own blocking input layer, so a press there never
+    sorts; the cursor is the split row's EW-resize. Floor is the column's
+    header title; no ceiling.
+  - A **⋯ button** in its own strip at the header's right end opens a flat
+    menu with one ticked row per column: a row hides or shows that column
+    (display filter — layout, draw and hit tests only; row data and cell
+    indices never change), then reopens the menu at the same point. The
+    entry that would hide the last visible column is grayed. The columns
+    tile the header less that strip, so no column's cells or header label
+    ever run under the dots; a header label wider than its column
+    ellipsizes, keeping the sort arrow. The ticks and dots are drawn, not
+    font glyphs.
   - Widths and hidden columns persist in the layout sidecar next to the
     window rects and seam ratios (`tables`, additive — no version bump):
     design units, so one saved set restores at any UI scale. The inventory's

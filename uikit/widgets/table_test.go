@@ -153,10 +153,11 @@ func TestTableRefitOnResize(t *testing.T) {
 	tbl.SetRows([]TableRow{{Cells: []string{"alpha", "1"}, Data: 0}})
 	tbl.Sync()
 	// The columns fit the cell MINUS the scrollbar gutter reserved at the
-	// table's right edge (ScrollRail).
-	gutter := float64(theme.Px(theme.ScrollGutter))
+	// table's right edge (ScrollRail) and the ⋯ button's own strip at the
+	// header's right end (no column runs under the dots).
+	gutter := float64(theme.Px(theme.ScrollGutter) + theme.Px(ColMenuW))
 	if want := 640 - gutter; tbl.FitWidthForTest() != want {
-		t.Fatalf("fittedFor = %v, want %v (640 − the %v px gutter)", tbl.FitWidthForTest(), want, gutter)
+		t.Fatalf("fittedFor = %v, want %v (640 − the %v px gutter + ⋯ strip)", tbl.FitWidthForTest(), want, gutter)
 	}
 	if sum := uitest.SumPrefix(tbl.widths); math.Abs(sum-(640-gutter)) > 1e-6 {
 		t.Fatalf("column sum = %v, want %v", sum, 640-gutter)
