@@ -1,6 +1,8 @@
 package screens
 
 import (
+	"fmt"
+
 	"github.com/entieve/entieve/uikit/internal/uitest"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
@@ -531,27 +533,31 @@ func TestSettingsPanelWiring(t *testing.T) {
 		master    = 100
 		music     = 70
 		shuffle   = true
-		stepDelta []int
-		volDelta  []int
+		scaleHits []float64
+		setMaster int
+		persists  int
 		resets    int
 		resetAlls int
 	)
-	s := NewSettings(env, SettingsActions{
+	act := SettingsActions{
 		UIScale:          func() float64 { return scale },
-		StepScale:        func(d int) { stepDelta = append(stepDelta, d) },
+		UIScaleLadder:    []float64{0.75, 1.0, 1.25, 1.5, 2.0, 2.5},
+		SetUIScale:       func(r float64) { scale = r; scaleHits = append(scaleHits, r) },
 		Fullscreen:       func() bool { return fs },
 		SetFullscreen:    func(on bool) { fs = on },
 		RailCollapsed:    func() bool { return rail },
 		SetRailCollapsed: func(on bool) { rail = on },
 		MasterVolume:     func() int { return master },
-		StepMasterVolume: func(d int) { volDelta = append(volDelta, d) },
+		SetMasterVolume:  func(v int) { master = v; setMaster++ },
 		MusicVolume:      func() int { return music },
-		StepMusicVolume:  func(d int) { volDelta = append(volDelta, d) },
+		SetMusicVolume:   func(v int) { music = v },
+		PersistSettings:  func() { persists++ },
 		Shuffle:          func() bool { return shuffle },
 		SetShuffle:       func(on bool) { shuffle = on },
 		ResetLayout:      func() { resets++ },
 		ResetAll:         func() { resetAlls++ },
-	})
+	}
+	s := NewSettings(env, act)
 	ui := newWindowUI(t, env, s.Win())
 	uitest.PumpWindow(t, ui, s.Sync, 1280, 720)
 
@@ -574,18 +580,83 @@ func TestSettingsPanelWiring(t *testing.T) {
 		t.Errorf("shuffle label = %q, want on state", got)
 	}
 
-	// Buttons: the scale stepper's −/+ are the row's first/last children.
-	kids := s.scaleRow.Children()
-	if len(kids) != 4 {
-		t.Fatalf("scale row children = %d, want 4 (− label value +)", len(kids))
+	// The three numeric rows are [label, slider, value].
+	for name, row := range map[string]*widget.Container{"scale": s.scaleRow, "master": s.masterRow, "music": s.musicRow} {
+		if kids := row.Children(); len(kids) != 3 {
+			t.Errorf("%s row children = %d, want 3 (label, slider, value)", name, len(kids))
+		}
 	}
-	uitest.FireButton(ui, kids[3].(*widget.Button)) // +
-	if len(stepDelta) != 1 || stepDelta[0] != 1 {
-		t.Errorf("after +: step deltas = %v, want [1]", stepDelta)
+
+	// Drive the sliders through their production input path — Poll reads
+	// the shared cursor/press/held seams — so Sync and the grab interact
+	// exactly as they do in a frame.
+	var (
+		cur   image.Point
+		press bool
+		held  bool
+	)
+	defer widgets.SetPollCursorForTest(func() (int, int) { return cur.X, cur.Y })()
+	defer widgets.SetPressEdgeForTest(func(ebiten.MouseButton) bool { return press })()
+	defer widgets.SetSliderHeldForTest(func() bool { return held })()
+	frame := func(p image.Point, down bool) {
+		cur = p
+		press = down && !held
+		held = down
+		s.Sync()
+		press = false
 	}
-	uitest.FireButton(ui, kids[0].(*widget.Button)) // −
-	if len(stepDelta) != 2 || stepDelta[1] != -1 {
-		t.Errorf("after −: step deltas = %v, want [1 -1]", stepDelta)
+
+	// The scale slider is notched: clicking a rung applies it absolutely
+	// and the readout follows it.
+	if got := len(s.scaleSlider.TickPositions()); got != 6 {
+		t.Errorf("scale ticks = %d, want the six rungs", got)
+	}
+	frame(sliderPoint(s.scaleSlider, 1.5), true)
+	frame(sliderPoint(s.scaleSlider, 1.5), false)
+	if len(scaleHits) != 1 || scaleHits[0] != 1.5 || scale != 1.5 {
+		t.Fatalf("scale slider click = %v (host %v), want one absolute 1.5", scaleHits, scale)
+	}
+	s.Sync()
+	if got := s.scaleVal.Label; got != "1.5×" {
+		t.Errorf("scale readout after click = %q, want 1.5×", got)
+	}
+
+	// A volume drag streams the live Set and writes the sidecar ONCE, on
+	// release — N changes, one persist, none mid-drag.
+	masterBefore := setMaster
+	frame(sliderPoint(s.masterSlide, 40), true)
+	for _, v := range []float64{45, 50, 55} {
+		frame(sliderPoint(s.masterSlide, v), true)
+	}
+	if got, want := s.masterVal.Label, fmt.Sprintf("%d%%", int(math.Round(s.masterSlide.Value()))); got != want {
+		t.Errorf("master readout mid-drag = %q, want %q (the handle's value)", got, want)
+	}
+	if persists != 0 {
+		t.Errorf("sidecar writes mid-drag = %d, want 0", persists)
+	}
+	if master != int(math.Round(s.masterSlide.Value())) {
+		t.Errorf("host master = %d, want the dragged handle value %v", master, s.masterSlide.Value())
+	}
+	if setMaster-masterBefore < 3 {
+		t.Errorf("live master sets = %d, want one per moved value (≥3)", setMaster-masterBefore)
+	}
+	frame(sliderPoint(s.masterSlide, 55), false)
+	if persists != 1 {
+		t.Errorf("sidecar writes after release = %d, want exactly 1", persists)
+	}
+
+	// Music is the same freeflow control on its own value.
+	frame(sliderPoint(s.musicSlide, 30), true)
+	frame(sliderPoint(s.musicSlide, 30), false)
+	if music != int(math.Round(s.musicSlide.Value())) {
+		t.Errorf("music after click = %d, want %v", music, s.musicSlide.Value())
+	}
+	s.Sync()
+	if got, want := s.musicVal.Label, fmt.Sprintf("%d%%", music); got != want {
+		t.Errorf("music readout after click = %q, want %q", got, want)
+	}
+	if persists != 2 {
+		t.Errorf("music click persists = %d, want 2 (one per grab)", persists)
 	}
 
 	// The window's second child is the body: [scale row, fullscreen,
@@ -617,21 +688,6 @@ func TestSettingsPanelWiring(t *testing.T) {
 	if got := s.railBtn.Text().Label; got != "Rail: collapsed" {
 		t.Errorf("rail label after click = %q, want collapsed state", got)
 	}
-	// Master and music steppers: −/ + route the step intents, and the
-	// readout follows the host value.
-	masterRow := bkids[3].(widget.Containerer).Children()
-	uitest.FireButton(ui, masterRow[0].(*widget.Button)) // −
-	uitest.FireButton(ui, masterRow[3].(*widget.Button)) // +
-	musicRow := bkids[4].(widget.Containerer).Children()
-	uitest.FireButton(ui, musicRow[0].(*widget.Button)) // −
-	if len(volDelta) != 3 || volDelta[0] != -1 || volDelta[1] != 1 || volDelta[2] != -1 {
-		t.Errorf("volume step deltas = %v, want [-1 1 -1]", volDelta)
-	}
-	master = 90
-	s.Sync()
-	if got := s.masterVal.Label; got != "90%" {
-		t.Errorf("master readout after change = %q, want 90%%", got)
-	}
 	uitest.FireButton(ui, bkids[5].(*widget.Button)) // shuffle toggle
 	if shuffle {
 		t.Error("shuffle button did not flip the host flag")
@@ -660,6 +716,32 @@ func TestSettingsPanelWiring(t *testing.T) {
 	if got := s.resetAll.Text().Label; got != "Reset all settings" {
 		t.Errorf("reset-all label after confirm = %q, want the idle label", got)
 	}
+	// A rebuild under a drag (the host replaces this panel on a scale
+	// change) leaves the replacement slider idle: a held pointer with no
+	// fresh press cannot fire a stale change.
+	s2 := NewSettings(env, act)
+	uitest.PumpWindow(t, ui, s2.Sync, 1280, 720)
+	if s2.scaleSlider.Grabbed() {
+		t.Fatal("a fresh slider starts grabbed")
+	}
+	before := len(scaleHits)
+	s2.Sync() // held pointer, no fresh press: the replacement slider stays idle
+	if len(scaleHits) != before {
+		t.Errorf("a held frame with no press changed the scale (%v)", scaleHits[before:])
+	}
+}
+
+// clickSlider presses and releases the slider at value v's x.
+func clickSlider(sl *widgets.Slider, v float64) {
+	p := sliderPoint(sl, v)
+	sl.Step(p, true, true)
+	sl.Step(p, false, false)
+}
+
+// sliderPoint is the band's centre at value v's x.
+func sliderPoint(sl *widgets.Slider, v float64) image.Point {
+	b := sl.HitBand()
+	return image.Pt(sl.ValueX(v), b.Min.Y+b.Dy()/2)
 }
 
 // TestSettingsRowsFitAtMinScale: at the shrunken 0.75 rung the eight rows
@@ -670,15 +752,17 @@ func TestSettingsRowsFitAtMinScale(t *testing.T) {
 	env, _ := newTestEnv(t)
 	s := NewSettings(env, SettingsActions{
 		UIScale:          func() float64 { return 1 },
-		StepScale:        func(int) {},
+		UIScaleLadder:    []float64{0.75, 1.0, 1.25, 1.5, 2.0, 2.5},
+		SetUIScale:       func(float64) {},
 		Fullscreen:       func() bool { return false },
 		SetFullscreen:    func(bool) {},
 		RailCollapsed:    func() bool { return false },
 		SetRailCollapsed: func(bool) {},
 		MasterVolume:     func() int { return 100 },
-		StepMasterVolume: func(int) {},
+		SetMasterVolume:  func(int) {},
 		MusicVolume:      func() int { return 70 },
-		StepMusicVolume:  func(int) {},
+		SetMusicVolume:   func(int) {},
+		PersistSettings:  func() {},
 		Shuffle:          func() bool { return true },
 		SetShuffle:       func(bool) {},
 		ResetLayout:      func() {},
@@ -796,5 +880,29 @@ func TestInventoryAndMarketRowsUseMonoFace(t *testing.T) {
 	m := NewMarket(env)
 	if *m.tbl.Face != *mono {
 		t.Errorf("market order book face = %v, want the mono contents face", *m.tbl.Face)
+	}
+}
+
+// staticSettingsActions is a harmless non-nil action set for construction
+// tests that only measure the window (the Settings contract requires
+// every callback).
+func staticSettingsActions() SettingsActions {
+	return SettingsActions{
+		UIScale:          func() float64 { return 1 },
+		UIScaleLadder:    []float64{0.75, 1.0, 1.25, 1.5, 2.0, 2.5},
+		SetUIScale:       func(float64) {},
+		Fullscreen:       func() bool { return false },
+		SetFullscreen:    func(bool) {},
+		RailCollapsed:    func() bool { return false },
+		SetRailCollapsed: func(bool) {},
+		MasterVolume:     func() int { return 100 },
+		SetMasterVolume:  func(int) {},
+		MusicVolume:      func() int { return 70 },
+		SetMusicVolume:   func(int) {},
+		PersistSettings:  func() {},
+		Shuffle:          func() bool { return true },
+		SetShuffle:       func(bool) {},
+		ResetLayout:      func() {},
+		ResetAll:         func() {},
 	}
 }

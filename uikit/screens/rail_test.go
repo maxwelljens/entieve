@@ -583,7 +583,7 @@ func TestDefaultWindowRectsClearTheRailGutter(t *testing.T) {
 				{"scanner", NewScanner(env).Win()},
 				{"starmap", NewMapView(env).Win()},
 				{"help", NewHelp(env, keyMapRows(8)).Win()},
-				{"settings", NewSettings(env, SettingsActions{}).Win()},
+				{"settings", NewSettings(env, staticSettingsActions()).Win()},
 			}
 			floor := theme.Px(RailInset)
 			for _, c := range cases {

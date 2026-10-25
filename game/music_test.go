@@ -76,24 +76,18 @@ func TestMusicDefaultsAndPersistence(t *testing.T) {
 		t.Errorf("effective volume = %v, want 0.7 (1 × 0.7)", fm.effective)
 	}
 
-	// The stepper math: five 10% steps down = 0.5 master; 0.5 × 0.7 = 0.35
-	// reaches the seam as the effective volume.
-	for range 5 {
-		g.stepMasterVolume(-1)
-	}
+	// The live absolute set: master 50%; 0.5 × 0.7 = 0.35 reaches the
+	// seam as the effective volume (and writes nothing yet).
+	g.setMasterVolume(50)
 	if g.masterVol != 50 || fm.effective != 0.35 {
 		t.Errorf("after -50%% master: setting %d, effective %v; want 50 and 0.35", g.masterVol, fm.effective)
 	}
 	// Clamped at both ends (no wrap, no negative volume).
-	for range 20 {
-		g.stepMusicVolume(-1)
-	}
+	g.setMusicVolume(-20)
 	if g.musicVol != 0 || fm.effective != 0 {
 		t.Errorf("music floor = %d / %v, want 0/0", g.musicVol, fm.effective)
 	}
-	for range 20 {
-		g.stepMusicVolume(+1)
-	}
+	g.setMusicVolume(120)
 	if g.musicVol != 100 {
 		t.Errorf("music ceiling = %d, want 100", g.musicVol)
 	}
@@ -175,8 +169,8 @@ func TestMusicResetAllRestoresTrio(t *testing.T) {
 	fm := &fakeMusic{}
 	g := newMusicGameAt(t, path, fm)
 	g.applySize(1280, 720)
-	g.stepMasterVolume(-4)
-	g.stepMusicVolume(-3)
+	g.setMasterVolume(60)
+	g.setMusicVolume(40)
 	g.setShuffle(false)
 	if fm.effective == 0.7 || fm.shuffle {
 		t.Fatalf("fixture: audio settings not applied (%v, shuffle %v)", fm.effective, fm.shuffle)

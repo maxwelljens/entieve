@@ -3,23 +3,28 @@ package screens
 import (
 	"fmt"
 	"image"
+	"math"
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
 )
 
 // SettingsActions is the settings window's seam to its host (the game):
 // the panel draws no state of its own, it reads and pokes these callbacks
-// every Sync. The host owns the ladder, the persistence and the live
-// apply (game.stepUIScale / setFullscreen / setVsync / setRailCollapsed /
-// stepMasterVolume / stepMusicVolume / setShuffle / resetLayout /
-// resetAllSettings); the window only renders and routes. All must be
-// non-nil.
+// every Sync. The host owns the ladders, the persistence and the live
+// apply (game.setUIScale / setFullscreen / setVsync / setRailCollapsed /
+// setMasterVolume / setMusicVolume / persistSettings / setShuffle /
+// resetLayout / resetAllSettings); the window only renders and routes.
+// All must be non-nil.
 type SettingsActions struct {
-	// UIScale returns the current user UI scale (the persisted setting).
-	UIScale func() float64
-	// StepScale moves the scale one rung along the host's ladder.
-	StepScale func(delta int)
+	// UIScale returns the current user UI scale (the persisted setting);
+	// UIScaleLadder is the six-rung ladder the notched slider rides and
+	// SetUIScale applies one rung absolutely (the host persists it and
+	// rebuilds the interface at the new scale).
+	UIScale       func() float64
+	UIScaleLadder []float64
+	SetUIScale    func(rung float64)
 	// Fullscreen reports the current window mode; SetFullscreen flips it.
 	Fullscreen    func() bool
 	SetFullscreen func(bool)
@@ -27,13 +32,16 @@ type SettingsActions struct {
 	// SetRailCollapsed flips it (the host persists it).
 	RailCollapsed    func() bool
 	SetRailCollapsed func(bool)
-	// MasterVolume and MusicVolume are whole percents (0..100); the
-	// Step callbacks move one 10% step and the host persists the pair.
-	// The host multiplies them at the music seam.
-	MasterVolume     func() int
-	StepMasterVolume func(delta int)
-	MusicVolume      func() int
-	StepMusicVolume  func(delta int)
+	// MasterVolume and MusicVolume are whole percents (0..100). The Set
+	// callbacks apply a drag's value live WITHOUT writing the sidecar;
+	// PersistSettings is the release/persist point, so one drag writes
+	// once however many values it streamed. The host multiplies the pair
+	// at the music seam.
+	MasterVolume    func() int
+	SetMasterVolume func(v int)
+	MusicVolume     func() int
+	SetMusicVolume  func(v int)
+	PersistSettings func()
 	// Shuffle reports the shuffled-pool flag; SetShuffle flips it.
 	Shuffle    func() bool
 	SetShuffle func(bool)
@@ -44,29 +52,33 @@ type SettingsActions struct {
 	ResetAll func()
 }
 
-// Settings is the settings window: UI scale stepper, fullscreen and rail
-// toggles, master/music volume steppers, a shuffle toggle and the two
-// reset buttons. It mounts like every other panel (panelDefs, sidecar
-// name "settings", key P) and rebuilds with the interface, so all of its
-// displayed state is re-read from the actions in Sync — including right
-// after a live scale change rebuilt it under itself.
+// Settings is the settings window: a notched UI-scale slider, fullscreen
+// and rail toggles, freeflow master/music volume sliders, a shuffle toggle
+// and the two reset buttons. It mounts like every other panel (panelDefs,
+// sidecar name "settings", key P) and rebuilds with the interface, so all
+// of its displayed state is re-read from the actions in Sync — including
+// right after a live scale change rebuilt it under itself (the replacement
+// slider starts idle; the drag is over, never re-fired).
 type Settings struct {
 	th  theme.Theme
 	act SettingsActions
 	win *widget.Window
 
-	scaleRow  *widget.Container // relaid when the scale value text changes
-	scaleVal  *widget.Text
-	masterRow *widget.Container
-	masterVal *widget.Text
-	musicRow  *widget.Container
-	musicVal  *widget.Text
-	fsBtn     *widget.Button
-	fsState   bool // last text written, to keep Sync a compare
-	railBtn   *widget.Button
-	railState bool
-	shufBtn   *widget.Button
-	shufState bool
+	scaleRow    *widget.Container // relaid when the value text changes
+	scaleSlider *widgets.Slider
+	scaleVal    *widget.Text
+	masterRow   *widget.Container
+	masterSlide *widgets.Slider
+	masterVal   *widget.Text
+	musicRow    *widget.Container
+	musicSlide  *widgets.Slider
+	musicVal    *widget.Text
+	fsBtn       *widget.Button
+	fsState     bool // last text written, to keep Sync a compare
+	railBtn     *widget.Button
+	railState   bool
+	shufBtn     *widget.Button
+	shufState   bool
 	// resetAll is the two-step destructive button (the save manager's
 	// Delete pattern): the first press swaps the label, the second acts.
 	resetAll   *widget.Button
@@ -79,17 +91,6 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 	p := d.Pal()
 	s := &Settings{th: d, act: act}
 
-	newBtn := func(label string, clicked func()) *widget.Button {
-		return widget.NewButton(
-			widget.ButtonOpts.TextLabel(label),
-			widget.ButtonOpts.WidgetOpts(
-				// ≥40×40 scaled hit area for every small control.
-				widget.WidgetOpts.MinSize(theme.Px(40), theme.Px(40)),
-				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-			),
-			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
-		)
-	}
 	// Full-width toggle row: the label is the state readout.
 	newToggle := func(label string, clicked func()) *widget.Button {
 		return widget.NewButton(
@@ -101,57 +102,55 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
 		)
 	}
-	// newStepper is the UI-scale row idiom for a numeric setting: − label
-	// value +, the value on the tabular contents face and relayed out by
-	// setStepperValue when it changes.
-	newStepper := func(label string, step func(int)) (*widget.Container, *widget.Text) {
-		val := widget.NewText(
-			widget.TextOpts.Text("0%", s.th.FaceMono(theme.StepSmall), theme.Solid(p.Accent)),
-			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-				Position: widget.RowLayoutPositionCenter,
+	// newValue is one row's readout: the tabular contents face (mono
+	// digits do not jitter while a handle moves) and the row relays out
+	// when the text changes (setStepperValue), so a wider value never
+	// draws under the slider.
+	newValue := func(text string) *widget.Text {
+		return widget.NewText(
+			widget.TextOpts.Text(text, s.th.FaceMono(theme.StepSmall), theme.Solid(p.Accent)),
+			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.GridLayoutData{
+				HorizontalPosition: widget.GridLayoutPositionEnd,
+				VerticalPosition:   widget.GridLayoutPositionCenter,
 			})),
 		)
+	}
+	// newSliderRow is the settings row idiom for a numeric setting:
+	// label, the slider (stretched across the row's middle column) and
+	// the value at the right. The grid is what stretches the slider: the
+	// house RowLayout only stretches on its cross axis.
+	newSliderRow := func(label string, sl *widgets.Slider, val *widget.Text) *widget.Container {
 		lbl := widget.NewText(
 			widget.TextOpts.Text(label, s.th.Face(theme.StepSmall), theme.Solid(p.Text)),
-			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-				Position: widget.RowLayoutPositionCenter,
+			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.GridLayoutData{
+				VerticalPosition: widget.GridLayoutPositionCenter,
 			})),
 		)
 		row := widget.NewContainer(
-			widget.ContainerOpts.Layout(widget.NewRowLayout(
-				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
+			widget.ContainerOpts.Layout(widget.NewGridLayout(
+				widget.GridLayoutOpts.Columns(3),
+				widget.GridLayoutOpts.Stretch([]bool{false, true, false}, []bool{false}),
+				widget.GridLayoutOpts.Spacing(theme.Px(theme.ContentsPad), 0),
 			)),
+			// Full body width: the vertical RowLayout stretches its
+			// children on the cross axis only when asked.
+			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 		)
-		row.AddChild(newBtn("-", func() { step(-1) }), lbl, val, newBtn("+", func() { step(+1) }))
-		return row, val
+		row.AddChild(lbl, sl, val)
+		return row
 	}
 
-	// Row 1: the scale stepper. The value is a dynamic number, so it
-	// carries the tabular contents face (mono digits do not jitter while
-	// stepping) and its row relays out on change (setStepperValue) —
-	// otherwise a wider value would draw under the + button.
-	s.scaleVal = widget.NewText(
-		widget.TextOpts.Text("1×", s.th.FaceMono(theme.StepSmall), theme.Solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-			Position: widget.RowLayoutPositionCenter,
-		})),
-	)
-	minus := newBtn("-", func() { act.StepScale(-1) })
-	plus := newBtn("+", func() { act.StepScale(+1) })
-	scaleLbl := widget.NewText(
-		widget.TextOpts.Text("UI scale", s.th.Face(theme.StepSmall), theme.Solid(p.Text)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-			Position: widget.RowLayoutPositionCenter,
-		})),
-	)
-	s.scaleRow = widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
-		)),
-	)
-	s.scaleRow.AddChild(minus, scaleLbl, s.scaleVal, plus)
+	// Row 1: the UI scale slider — the six-rung ladder, notched. The
+	// host applies a rung absolutely and rebuilds the interface at it;
+	// the replacement slider starts idle (the rebuild ends the drag).
+	s.scaleVal = newValue(fmt.Sprintf("%.4g×", act.UIScale()))
+	s.scaleSlider = widgets.NewSlider(d, widgets.SliderOpts{
+		Mode:     widgets.SliderNotches,
+		Notches:  append([]float64(nil), act.UIScaleLadder...),
+		Value:    act.UIScale(),
+		OnChange: act.SetUIScale,
+	})
+	s.scaleRow = newSliderRow("UI scale", s.scaleSlider, s.scaleVal)
 
 	// Rows 2–3: full-width toggles. The button's label is the state
 	// readout, so it is rewritten whenever the state changes.
@@ -167,10 +166,25 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 		func() { act.SetRailCollapsed(!act.RailCollapsed()) },
 	)
 
-	// Rows 4–6: audio. The two volume steppers share the UI-scale idiom
-	// (whole percents, 10% steps); shuffle is a toggle and defaults on.
-	s.masterRow, s.masterVal = newStepper("Master", act.StepMasterVolume)
-	s.musicRow, s.musicVal = newStepper("Music", act.StepMusicVolume)
+	// Rows 4–6: audio. The two volumes are freeflow sliders (whole
+	// percents, 1% steps): the drag applies live through Set*, the
+	// release is the one persist point. Shuffle is a toggle, default on.
+	s.masterVal = newValue(fmt.Sprintf("%d%%", act.MasterVolume()))
+	s.masterSlide = widgets.NewSlider(d, widgets.SliderOpts{
+		Mode: widgets.SliderFreeflow, Min: 0, Max: 100, Step: 1,
+		Value:     float64(act.MasterVolume()),
+		OnChange:  func(v float64) { act.SetMasterVolume(int(math.Round(v))) },
+		OnRelease: func(float64) { act.PersistSettings() },
+	})
+	s.masterRow = newSliderRow("Master", s.masterSlide, s.masterVal)
+	s.musicVal = newValue(fmt.Sprintf("%d%%", act.MusicVolume()))
+	s.musicSlide = widgets.NewSlider(d, widgets.SliderOpts{
+		Mode: widgets.SliderFreeflow, Min: 0, Max: 100, Step: 1,
+		Value:     float64(act.MusicVolume()),
+		OnChange:  func(v float64) { act.SetMusicVolume(int(math.Round(v))) },
+		OnRelease: func(float64) { act.PersistSettings() },
+	})
+	s.musicRow = newSliderRow("Music", s.musicSlide, s.musicVal)
 	s.shufBtn = newToggle(
 		// Default state is shuffle on, the fresh-install default.
 		"Shuffle: on",
@@ -210,11 +224,13 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
 		// Content floor: title + eight 40 px rows + the hint line (the
-		// frame does not auto-grow, so the fallback is exactly this tall).
-		widget.WindowOpts.MinSize(theme.Px(300), theme.Px(460)),
+		// frame does not auto-grow, so the fallback is exactly this tall),
+		// and wide enough for a slider's full travel beside its label and
+		// readout (the three-way grid leaves the middle column the rest).
+		widget.WindowOpts.MinSize(theme.Px(380), theme.Px(460)),
 		// Fallback only: centred at the 1280×720 design size (the game
 		// re-centers it from placeDefaults like the other overlays).
-		widget.WindowOpts.Location(image.Rect(theme.Px(490), theme.Px(130), theme.Px(790), theme.Px(590))),
+		widget.WindowOpts.Location(image.Rect(theme.Px(450), theme.Px(130), theme.Px(830), theme.Px(590))),
 	)
 	return s
 }
@@ -222,10 +238,30 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 // Win returns the settings window for Kit.AddWindow.
 func (s *Settings) Win() *widget.Window { return s.win }
 
-// Sync refreshes the scale value and the toggle labels from the host.
-// Call it every frame while mounted.
+// Sync polls the three sliders, mirrors the host's values into idle
+// handles and refreshes the readouts and toggle labels. Call it every
+// frame while mounted.
+//
+// The sliders own their value while grabbed (the mirror is skipped), so a
+// volume drag cannot be snapped back under the pointer between the live
+// Set and the host's next read. A notched scale change rebuilds the whole
+// interface inside Poll: the object running this Sync is the one being
+// replaced, and the fresh panel starts with idle sliders — the old drag
+// never fires another change.
 func (s *Settings) Sync() {
-	setStepperValue(s.scaleRow, s.scaleVal, fmt.Sprintf("%.4g×", s.act.UIScale()))
+	s.scaleSlider.Poll()
+	s.masterSlide.Poll()
+	s.musicSlide.Poll()
+	if !s.scaleSlider.Grabbed() {
+		s.scaleSlider.SetValue(s.act.UIScale())
+	}
+	if !s.masterSlide.Grabbed() {
+		s.masterSlide.SetValue(float64(s.act.MasterVolume()))
+	}
+	if !s.musicSlide.Grabbed() {
+		s.musicSlide.SetValue(float64(s.act.MusicVolume()))
+	}
+	setStepperValue(s.scaleRow, s.scaleVal, fmt.Sprintf("%.4g×", s.scaleSlider.Value()))
 	if on := s.act.Fullscreen(); on != s.fsState {
 		s.fsState = on
 		if on {
@@ -242,8 +278,8 @@ func (s *Settings) Sync() {
 			s.railBtn.SetText("Rail: expanded")
 		}
 	}
-	setStepperValue(s.masterRow, s.masterVal, fmt.Sprintf("%d%%", s.act.MasterVolume()))
-	setStepperValue(s.musicRow, s.musicVal, fmt.Sprintf("%d%%", s.act.MusicVolume()))
+	setStepperValue(s.masterRow, s.masterVal, fmt.Sprintf("%d%%", int(math.Round(s.masterSlide.Value()))))
+	setStepperValue(s.musicRow, s.musicVal, fmt.Sprintf("%d%%", int(math.Round(s.musicSlide.Value()))))
 	if on := s.act.Shuffle(); on != s.shufState {
 		s.shufState = on
 		if on {
@@ -253,3 +289,10 @@ func (s *Settings) Sync() {
 		}
 	}
 }
+
+// ScaleSliderForTest, MasterSliderForTest and MusicSliderForTest expose
+// the three controls (geometry, value and Step) to surface tests — the
+// Table.RowWidgetForTest precedent, never called by production code.
+func (s *Settings) ScaleSliderForTest() *widgets.Slider  { return s.scaleSlider }
+func (s *Settings) MasterSliderForTest() *widgets.Slider { return s.masterSlide }
+func (s *Settings) MusicSliderForTest() *widgets.Slider  { return s.musicSlide }

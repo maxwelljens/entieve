@@ -165,11 +165,12 @@ type Game struct {
 	masterVol, musicVol int
 	shuffle             bool
 
-	// The settings window (uikit/screens/settings.go): UI scale stepper,
-	// fullscreen/vsync/rail toggles and the two resets. Like every panel
+	// The settings window (uikit/screens/settings.go): notched UI-scale
+	// slider, freeflow volume sliders, fullscreen/vsync/rail toggles and
+	// the two resets. Like every panel
 	// it is rebuilt by buildKit, so its live state is re-read from g in
 	// Sync. The action bundle rides a field (filled by buildKit) instead
-	// of being spelled inside the Screen row: naming stepUIScale/applyScale
+	// of being spelled inside the Screen row: naming setUIScale/applyScale
 	// there would make the spec table depend on the rebuild path that
 	// reads it — an initialization cycle, see uikit.go.
 	sett        *uikit.Settings
@@ -879,15 +880,17 @@ func (g *Game) buildKit() error {
 	// reaches them through a field.
 	g.settActions = uikit.SettingsActions{
 		UIScale:          func() float64 { return g.uiScale },
-		StepScale:        func(delta int) { g.stepUIScale(delta) },
+		UIScaleLadder:    uiScaleSteps[:],
+		SetUIScale:       func(rung float64) { g.setUIScale(rung) },
 		Fullscreen:       func() bool { return g.fullscreen },
 		SetFullscreen:    func(on bool) { g.setFullscreen(on) },
 		RailCollapsed:    func() bool { return g.railCollapsed },
 		SetRailCollapsed: func(on bool) { g.setRailCollapsed(on) },
 		MasterVolume:     func() int { return g.masterVol },
-		StepMasterVolume: func(delta int) { g.stepMasterVolume(delta) },
+		SetMasterVolume:  func(v int) { g.setMasterVolume(v) },
 		MusicVolume:      func() int { return g.musicVol },
-		StepMusicVolume:  func(delta int) { g.stepMusicVolume(delta) },
+		SetMusicVolume:   func(v int) { g.setMusicVolume(v) },
+		PersistSettings:  func() { g.persistSettings() },
 		Shuffle:          func() bool { return g.shuffle },
 		SetShuffle:       func(on bool) { g.setShuffle(on) },
 		ResetLayout:      func() { g.resetLayout() },

@@ -3,6 +3,8 @@ package game
 import (
 	"bytes"
 	"encoding/json"
+	"image"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -401,25 +403,38 @@ func TestTitleSettingsAndCredits(t *testing.T) {
 		t.Errorf("title rail toggle sidecar = %v, want rail_collapsed: true", raw)
 	}
 	before := g.uiScale
-	g.settActions.StepScale(1)
+	g.settActions.SetUIScale(1.25)
 	if g.uiScale == before {
-		t.Fatal("StepScale did not move the UI scale")
-	}
-	// The audio rows reach the same host state from the title mount.
-	g.settActions.StepMasterVolume(-1)
-	g.settActions.StepMusicVolume(-1)
-	g.settActions.SetShuffle(false)
-	if g.masterVol != 90 || g.musicVol != 60 || g.shuffle {
-		t.Errorf("title audio rows = (%d, %d, shuffle %v), want (90, 60, false)", g.masterVol, g.musicVol, g.shuffle)
-	}
-	if raw := readSettingsMap(t, g.settingsPath()); raw["master_volume"] != float64(90) || raw["shuffle_off"] != true {
-		t.Errorf("title audio sidecar = %v, want master 90 and shuffle_off true", raw)
+		t.Fatal("SetUIScale did not move the UI scale")
 	}
 	if err := g.Update(); err != nil { // rebuild + remount after the scale change
 		t.Fatalf("Update after scale change: %v", err)
 	}
 	if g.titleUI.sett == nil || g.titleUI.settRemove == nil {
-		t.Error("settings window lost across the scale rebuild")
+		t.Fatal("settings window lost across the scale rebuild")
+	}
+	// The audio rows reach the same host state from the title mount: a
+	// slider drag applies live and its release is the sidecar write.
+	ms := g.titleUI.sett.MasterSliderForTest()
+	if ms == nil {
+		t.Fatal("the title settings window has no master slider")
+	}
+	band := ms.HitBand()
+	at := image.Pt(ms.ValueX(45), band.Min.Y+band.Dy()/2)
+	ms.Step(at, true, true)
+	ms.Step(at, false, false)
+	if want := int(math.Round(ms.Value())); g.masterVol != want {
+		t.Errorf("title master slider = %d, want %d", g.masterVol, want)
+	}
+	g.settActions.SetMusicVolume(60)
+	g.settActions.SetShuffle(false)
+	if g.musicVol != 60 || g.shuffle {
+		t.Errorf("title audio actions = (%d, shuffle %v), want (60, false)", g.musicVol, g.shuffle)
+	}
+	g.settActions.PersistSettings()
+	raw := readSettingsMap(t, g.settingsPath())
+	if raw["master_volume"] != float64(g.masterVol) || raw["music_volume"] != float64(60) || raw["shuffle_off"] != true {
+		t.Errorf("title audio sidecar = %v, want master %d, music 60, shuffle_off true", raw, g.masterVol)
 	}
 
 	g.titleUI.open("credits")

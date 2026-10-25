@@ -634,7 +634,7 @@ func TestResetAllSettings(t *testing.T) {
 	g.setFullscreen(true)
 	g.setVsync(false)
 	g.setRailCollapsed(true)
-	g.stepMasterVolume(-1)
+	g.setMasterVolume(90)
 	g.setShuffle(false)
 	g.applyUIScale(1.5)
 	g.flushSize = true // an armed quit write: the size is on disk now
@@ -670,5 +670,52 @@ func TestResetAllSettings(t *testing.T) {
 	if len(raw) != 4 || raw["ui_scale"] != float64(1) || raw["fullscreen"] != false ||
 		raw["master_volume"] != float64(100) || raw["music_volume"] != float64(70) {
 		t.Errorf("sidecar after reset = %v, want exactly ui_scale 1, fullscreen false, master 100, music 70", raw)
+	}
+}
+
+// TestScaleSliderRebuildsAndDropsTheDrag: the notched UI-scale slider
+// applies a rung live, which rebuilds the whole interface under the
+// slider mid-grab. The replacement panel's slider is idle, so the held
+// pointer cannot re-fire the old drag; the scale stays on the rung the
+// press chose.
+func TestScaleSliderRebuildsAndDropsTheDrag(t *testing.T) {
+	resetScale(t)
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	g.open[pSettings] = true
+	g.syncMounts()
+	pump(t, g, 1280, 720)
+
+	old := g.sett
+	if old == nil {
+		t.Fatal("settings panel not mounted")
+	}
+	sl := old.ScaleSliderForTest()
+	band := sl.HitBand()
+	at := image.Pt(sl.ValueX(1.25), band.Min.Y+band.Dy()/2)
+	sl.Step(at, true, true)
+	if g.sett == old {
+		t.Fatal("a scale rung did not rebuild the interface")
+	}
+	if g.uiScale != 1.25 || theme.Scale() != 1.25 {
+		t.Fatalf("scale after the slider press = %v (global %v), want 1.25", g.uiScale, theme.Scale())
+	}
+
+	pump(t, g, 1280, 720) // lay the rebuilt panel out
+	fresh := g.sett.ScaleSliderForTest()
+	if fresh == nil || fresh == sl {
+		t.Fatal("the rebuilt panel did not carry a fresh slider")
+	}
+	if fresh.Grabbed() {
+		t.Error("the replacement slider starts grabbed (stale drag state)")
+	}
+	// A held frame with no fresh press is not a drag: the handle must not
+	// jump (and the old drag must not fire through the replaced panel).
+	fresh.Step(image.Pt(fresh.ValueX(2.5), fresh.HitBand().Min.Y+1), false, true)
+	if g.uiScale != 1.25 {
+		t.Errorf("a stale held frame moved the scale to %v, want 1.25", g.uiScale)
+	}
+	if fresh.Value() != 1.25 {
+		t.Errorf("fresh slider value = %v, want the applied rung 1.25", fresh.Value())
 	}
 }
