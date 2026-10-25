@@ -3,6 +3,7 @@ package game
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -14,11 +15,11 @@ import (
 
 // TestTitleCaptureFrame is the gated title capture (ENTIEVE_CAPTURE=1,
 // one ebiten loop per process). It pins the phase's pixels: the tracked
-// amber wordmark and the menu are drawn over a dimmed static world, and
-// the gameplay chrome (rail column, HUD band, Overview corner, log
-// pocket) is ABSENT — those sample points are pixel-identical to a
-// world+dim-only frame. A second frame opens the save manager and writes
-// it beside the title frame.
+// amber wordmark and the menu are drawn over the embedded artwork backdrop
+// (title_background.jpg, cover-fit under the light veil), and the gameplay
+// chrome (rail column, HUD band, Overview corner, log pocket) is ABSENT —
+// those sample points are pixel-identical to a backdrop-only frame. A
+// second frame opens the save manager and writes it beside the title frame.
 //
 // Output: $ENTIEVE_CAPTURE_DIR (default /tmp/opencode)/title_capture.png
 // and title_manager_capture.png.
@@ -49,8 +50,8 @@ func TestTitleCaptureFrame(t *testing.T) {
 	if !cg.titleSaved || !cg.managerSaved {
 		t.Fatal("capture never rendered")
 	}
-	t.Logf("title capture %s (wordmark pixels %d accent %d, chrome diffs %d, world pixels %d) and %s",
-		cg.out, cg.wordPixels, cg.accent, cg.chromeDiffs, cg.worldPixels, cg.managerOut)
+	t.Logf("title capture %s (wordmark pixels %d accent %d, chrome diffs %d, artwork pixels %d/%d distinct %d) and %s",
+		cg.out, cg.wordPixels, cg.accent, cg.chromeDiffs, cg.artPixels, cg.artDiff, cg.distinct, cg.managerOut)
 }
 
 type titleCaptureGame struct {
@@ -64,11 +65,15 @@ type titleCaptureGame struct {
 	done         bool
 	err          error
 
-	wordPixels  int
-	accent      int
-	chromeDiffs int
-	worldPixels int
-	managerPx   int
+	wordPixels    int
+	accent        int
+	chromeDiffs   int
+	artPixels     int // backdrop samples that carry art colour
+	artDiff       int // backdrop samples that differ from the world+dim frame
+	distinct      int // distinct backdrop sample colours (not a flat fill)
+	fallbackDiffs int
+	againDiffs    int
+	managerPx     int
 }
 
 func (cg *titleCaptureGame) Update() error {
@@ -100,12 +105,11 @@ func (cg *titleCaptureGame) Draw(screen *ebiten.Image) {
 }
 
 // captureTitle samples the settled title frame against the same frame
-// minus the title chrome.
+// minus the title chrome (the backdrop layer alone).
 func (cg *titleCaptureGame) captureTitle(img *ebiten.Image) {
 	g := cg.g
 	base := ebiten.NewImage(1280, 720)
-	g.space.Draw(base)
-	dimScreen(base, 1280, 720, titleDim)
+	g.drawTitleBackdrop(base)
 
 	// The wordmark: amber tracked text over the backdrop.
 	wr := g.titleUI.wordmark.GetWidget().Rect
@@ -144,12 +148,48 @@ func (cg *titleCaptureGame) captureTitle(img *ebiten.Image) {
 		}
 	}
 
-	// The world backdrop is really there (not a flat black frame).
+	// The backdrop is the user's artwork, not the old starfield: nearly
+	// every sample carries art colour, differs from the world+dim frame,
+	// and the samples are not a flat fill.
+	world := ebiten.NewImage(1280, 720)
+	g.space.Draw(world)
+	dimScreen(world, 1280, 720, titleDim)
+	seen := map[color.RGBA]bool{}
 	for y := 4; y < 720; y += 16 {
 		for x := 4; x < 1280; x += 16 {
+			if base.At(x, y) != world.At(x, y) {
+				cg.artDiff++
+			}
 			r, gg, b, _ := base.At(x, y).RGBA()
 			if r>>8 > 8 || gg>>8 > 8 || b>>8 > 8 {
-				cg.worldPixels++
+				cg.artPixels++
+			}
+			seen[color.RGBAModel.Convert(base.At(x, y)).(color.RGBA)] = true
+		}
+	}
+	cg.distinct = len(seen)
+
+	// The fallback branch is still exactly today's world+dim backdrop.
+	plate := titleArtwork
+	titleArtwork = func() *ebiten.Image { return nil }
+	fb := ebiten.NewImage(1280, 720)
+	g.drawTitleBackdrop(fb)
+	titleArtwork = plate
+	for y := 4; y < 720; y += 16 {
+		for x := 4; x < 1280; x += 16 {
+			if fb.At(x, y) != world.At(x, y) {
+				cg.fallbackDiffs++
+			}
+		}
+	}
+
+	// Drawing the backdrop twice gives the same pixels (determinism).
+	again := ebiten.NewImage(1280, 720)
+	g.drawTitleBackdrop(again)
+	for y := 0; y < 720; y += 8 {
+		for x := 0; x < 1280; x += 8 {
+			if again.At(x, y) != base.At(x, y) {
+				cg.againDiffs++
 			}
 		}
 	}
@@ -157,9 +197,14 @@ func (cg *titleCaptureGame) captureTitle(img *ebiten.Image) {
 	if cg.wordPixels < 50 || cg.accent < 30 {
 		cg.err = fmt.Errorf("wordmark missing: %d changed pixels, %d accent pixels", cg.wordPixels, cg.accent)
 	} else if cg.chromeDiffs != 0 {
-		cg.err = fmt.Errorf("gameplay chrome painted at the title: %d probe points differ from the world+dim frame", cg.chromeDiffs)
-	} else if cg.worldPixels < 100 {
-		cg.err = fmt.Errorf("world backdrop missing: only %d non-black samples", cg.worldPixels)
+		cg.err = fmt.Errorf("gameplay chrome painted at the title: %d probe points differ from the backdrop frame", cg.chromeDiffs)
+	} else if cg.artPixels < 400 || cg.artDiff < 400 || cg.distinct < 30 {
+		cg.err = fmt.Errorf("artwork backdrop missing: %d lit samples, %d differing from the world, %d distinct colours",
+			cg.artPixels, cg.artDiff, cg.distinct)
+	} else if cg.fallbackDiffs != 0 {
+		cg.err = fmt.Errorf("world fallback drifted: %d samples differ from world+dim", cg.fallbackDiffs)
+	} else if cg.againDiffs != 0 {
+		cg.err = fmt.Errorf("artwork backdrop is not deterministic: %d samples differ on the second draw", cg.againDiffs)
 	}
 	cg.write(img, cg.out)
 }
@@ -173,8 +218,7 @@ func (cg *titleCaptureGame) captureManager(img *ebiten.Image) {
 		return
 	}
 	base := ebiten.NewImage(1280, 720)
-	cg.g.space.Draw(base)
-	dimScreen(base, 1280, 720, titleDim)
+	cg.g.drawTitleBackdrop(base)
 	for y := wr.Min.Y; y < wr.Max.Y; y += 2 {
 		for x := wr.Min.X; x < wr.Max.X; x += 2 {
 			if img.At(x, y) != base.At(x, y) {

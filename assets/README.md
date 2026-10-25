@@ -11,6 +11,7 @@ assets/
 ├── asteroids/<ore-id>.png         e.g. ore-cordite.png       (unrotated)
 ├── backgrounds/<system-id>.png    e.g. default.png          (unrotated, tiles; default.png serves all systems)
 ├── artwork/spaceship_hangar.jpg   the docked-station backdrop (JPEG, cover-fit)
+├── artwork/title_background.jpg    the title screen's backdrop (JPEG, cover-fit, embedded via artwork.go)
 └── audio/*.ogg                    the six music tracks (embedded, not walked by the art loader)
 ```
 

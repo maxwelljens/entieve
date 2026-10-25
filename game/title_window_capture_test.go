@@ -16,7 +16,8 @@ import (
 
 // The two title-window captures (ENTIEVE_CAPTURE=1, one ebiten loop per
 // process): the redesigned Keybindings and Credits windows as a player
-// sees them over the dimmed title. Both settle the open fade before the
+// sees them over the artwork title backdrop. Both settle the open fade
+// before the
 // capture — the fade is 12 frames, the first window frame lands at 4, so
 // frame 24 is fully settled (the known fade-phase flake).
 //
@@ -101,7 +102,7 @@ func (cg *titleWindowCapture) Draw(screen *ebiten.Image) {
 	cg.capture(img)
 }
 
-// capture pins the window: it paints over the world+dim frame, its
+// capture pins the window: it paints over the title backdrop frame, its
 // tracked headers are there, and (keybindings) its sections are the three
 // the action tables derive.
 func (cg *titleWindowCapture) capture(img *ebiten.Image) {
@@ -131,8 +132,7 @@ func (cg *titleWindowCapture) capture(img *ebiten.Image) {
 		return
 	}
 	base := ebiten.NewImage(1280, 720)
-	g.space.Draw(base)
-	dimScreen(base, 1280, 720, titleDim)
+	g.drawTitleBackdrop(base)
 	for y := r.Min.Y; y < r.Max.Y; y += 2 {
 		for x := r.Min.X; x < r.Max.X; x += 2 {
 			if img.At(x, y) != base.At(x, y) {

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Title screen backdrop is the artwork** (`game`, `assets/artwork`):
+  the boot title now draws `assets/artwork/title_background.jpg` (2736×1536,
+  embedded through an `assets/artwork/artwork.go` shim so releases show it
+  without shipping `assets/`), cover-fit to the window under a lighter veil
+  tuned to the plate — the menu, wordmark and windows sit on the artwork
+  instead of the static starfield. Decoded once on the first title frame;
+  with no plate (or a corrupt one) the phase keeps today's static world
+  render under the old dim, and the simulation still never steps.
+
 ## [0.9.0] - 2026-10-25
 
 ### Added

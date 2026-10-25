@@ -910,14 +910,13 @@ func helpRows() []uikit.KeyRow { return helpRowsFor(nil) }
 // ---------------------------------------------------------------------------
 
 // Draw renders the scene stack (world first, then overlay veils), then
-// the whole interface on top. At the title the world is the whole scene
-// stack (drawn statically — Update never steps it) under the title dim,
-// and the kit draws only the title's own widgets: gameplay chrome is
-// unmounted for the phase.
+// the whole interface on top. At the title the phase's own backdrop — the
+// embedded artwork plate, or the static world when there is none — sits
+// under the title chrome, and the kit draws only the title's own widgets:
+// gameplay chrome is unmounted for the phase.
 func (g *Game) Draw(dst *ebiten.Image) {
 	if g.title {
-		g.space.Draw(dst)
-		dimScreen(dst, g.w, g.h, titleDim)
+		g.drawTitleBackdrop(dst)
 		g.kit.Draw(dst)
 		return
 	}
