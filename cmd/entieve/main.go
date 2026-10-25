@@ -93,11 +93,13 @@ func cmdRun(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	opts := game.Options{
-		Content:  c,
-		World:    wd,
-		Title:    "Entieve — " + wd.Name,
-		SavePath: *save,
-		Seed:     *seed,
+		Content:      c,
+		World:        wd,
+		Title:        "Entieve — " + wd.Name,
+		SavePath:     *save,
+		Seed:         *seed,
+		StartInTitle: startInTitle(*load),
+		Version:      version,
 	}
 	if *load != "" {
 		save, err := readSave(*load)
@@ -406,6 +408,10 @@ func defaultSavePath() string {
 	}
 	return filepath.Join(dir, "entieve", "save.json")
 }
+
+// startInTitle decides whether `run` boots into the title screen: yes,
+// unless --load was given (a CLI load bypasses the title).
+func startInTitle(load string) bool { return load == "" }
 
 // newFlagSet builds a flag set with a compact, predictable error style.
 func newFlagSet(name string, stderr io.Writer) *flag.FlagSet {

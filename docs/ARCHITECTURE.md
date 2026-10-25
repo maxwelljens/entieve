@@ -946,6 +946,7 @@ map only says where each thing derives from.
 | Rack badge / ready marker | `screens/rack.go` | The waiting dot is one of `rackBadgePhases` pre-rendered images, swapped by pointer once per `rackBadgeTicks` (deterministic frame count, no per-frame Clear); the ready marker is a static overlay in the tile's other corner; the cycle ring is drawn under both. Both overlays are visibility-flipped, never rebuilt. |
 | Menu latch | `widgets/menu.go` + `screens/kit.go` | The **consumed-gesture latch**: `Menu.Click/Esc` set it, `Menu.Poll` reads it (one gesture, one action per frame), `Kit.Update` clears it via `Menu.TakeBlocked` and skips `ui.Update` that frame. Contract documented on `Menu`. |
 | Clip seam | `sim/api.go` (`ClipState`) | The bay as the UI reads it: loaded rounds, capacity for the reference shell, selection/options, `Loading`, plus the derived bay spec `BayM3`/`CycleSeconds` (recomputed per call from `sim/clips.go`'s privates — never persisted). The rack's waiting dot, ready marker and tooltip bay row read this one state; the cycle ring reads the module runtime. |
+| Title phase | `game/title.go` + `Options.StartInTitle` | The boot menu (wordmark, New game / Continue / Save manager / Settings / Credits / Quit) and its three scene-owned modal windows; the phase freezes the sim, suppresses `kit.Draw`'s gameplay chrome (rail via `Kit.SetTopsVisible`, HUD/rack/core via their show seams, panels unmounted) and leaves through one reconcile (`leaveTitle`). Save plumbing (`SaveAs`, the save list, the active save path) lives here; the sim format is untouched. |
 
 Rules that keep it one system: a screen names a piece or a token, never a
 literal radius/alpha of its own; anything measured is measured by the same
@@ -974,7 +975,13 @@ through `sim`'s read side rather than re-derived in `uikit`.
   ore→mineral yield preview at a `refine` station), Station services (repair/market/refine/
   fitting tabs), Starmap (system graph, current system highlighted —
   click selects, gates are used in-system), Log (event feed).
-- `game`: scene stack. Space scene is the hub. The keyboard map is
+- `game`: scene stack. Space scene is the hub. `Options.StartInTitle`
+  (set by `entieve run` when `--load` is absent) opens a **title phase**
+  before the normal loop: the space scene renders statically as the
+  backdrop, the sim does not step, gameplay chrome stays unmounted, and
+  the title's own menu/windows (`game/title.go`) take the input; leaving
+  the title (New game, Continue, a manager load) runs one normal boot
+  reconcile. The keyboard map is
   `game.KeyMap` (`game/input.go`, the single source shared with the
   in-game help overlay `H`) and is documented in `docs/GAMEPLAY.md`.
 - Save/load: `game` writes `Save` JSON to

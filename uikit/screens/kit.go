@@ -125,6 +125,11 @@ type Kit struct {
 	// the kit, so a rebuild (load, scale change) starts open.
 	coreClosed map[string]bool
 	coreShown  bool
+
+	// topsHidden suppresses the top chrome entirely (the title screen
+	// draws no gameplay chrome): drawTops parks the rail instead of
+	// re-showing it every frame.
+	topsHidden bool
 }
 
 // NewKit builds the interface layer over loaded content and a live
@@ -376,6 +381,12 @@ func (k *Kit) modalUp() bool {
 // priority with input priority. Skipped while a modal window is up: the
 // modal's fullscreen layer keeps gating the chrome exactly as before.
 func (k *Kit) drawTops(screen *ebiten.Image) {
+	if k.topsHidden {
+		for _, t := range k.tops {
+			t.SetWindowPass(false) // parked: never painted below the windows
+		}
+		return
+	}
 	// The deferred-setup executor ebitenui uses internally, wired to run
 	// immediately: the subtree's layers must be added right here, in
 	// place, not back on ui's queue (which has already drained).
@@ -493,6 +504,11 @@ func (k *Kit) AddTopContainer(t TopChrome, layoutData any) {
 	k.root.AddChild(t.Container())
 	k.tops = append(k.tops, t)
 }
+
+// SetTopsVisible shows or hides the top chrome wholesale. It exists for
+// the title phase, which draws no gameplay chrome: drawTops re-shows the
+// rail every frame otherwise.
+func (k *Kit) SetTopsVisible(on bool) { k.topsHidden = !on }
 
 // OverviewWindow returns the built-in Overview window for hit-testing,
 // repositioning and visibility control.

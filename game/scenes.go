@@ -3,6 +3,7 @@ package game
 import (
 	"image"
 	"image/color"
+	"path/filepath"
 
 	eimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
@@ -212,7 +213,7 @@ func (sc *HelpScene) Draw(dst *ebiten.Image) {
 // ---------------------------------------------------------------------------
 
 // menuItems are the Esc menu buttons, in draw order.
-var menuItems = []string{"Resume", "Save", "Load", "Quit"}
+var menuItems = []string{"Resume", "Save", "Save as…", "Load", "Quit"}
 
 // MenuScene is the Esc menu: a small modal uikit window with Resume /
 // Save / Load / Quit. Scene and window toggle together.
@@ -283,19 +284,23 @@ func (g *Game) buildMenuWindow() *widget.Window {
 	actions := map[string]func(){
 		"Resume": func() { g.Do(widgets.Toggle{Screen: "Menu"}) },
 		"Save":   func() { g.Do(widgets.Save{}) },
-		"Load":   func() { g.Do(widgets.Load{}) },
-		"Quit":   func() { g.Do(widgets.Quit{}) },
+		"Save as…": func() {
+			err := g.SaveAs()
+			g.report(err, "Saved as "+filepath.Base(g.activeSavePath()))
+		},
+		"Load": func() { g.Do(widgets.Load{}) },
+		"Quit": func() { g.Do(widgets.Quit{}) },
 	}
 	for _, item := range menuItems {
 		item := item
 		body.AddChild(g.newBtn(item, menuBtnW, menuBtnH, actions[item]))
 	}
+	locH := theme.Px(len(menuItems)*int(menuBtnH) + (len(menuItems)-1)*10 + 20 + winTitleH)
 	return widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(g.titleBar("Menu"), theme.Px(winTitleH)),
 		widget.WindowOpts.Modal(),
-		widget.WindowOpts.Location(image.Rect(0, 0,
-			theme.Px(int(menuBtnW)+20), theme.Px(int(4*menuBtnH+3*10+20)+winTitleH))),
+		widget.WindowOpts.Location(image.Rect(0, 0, theme.Px(int(menuBtnW)+20), locH)),
 	)
 }
 
