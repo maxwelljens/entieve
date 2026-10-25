@@ -782,7 +782,7 @@ func (g *Game) buildKit() error {
 		// kit's chrome stays hidden until the title is left.
 		if g.titleUI != nil {
 			g.titleUI.detach()
-			g.titleUI.host.Rebind(kit, g.gameServices())
+			g.titleUI.host.Rebind(kit, g.titleServices())
 		}
 	}
 	return nil
@@ -812,9 +812,10 @@ func (g *Game) gameServices() screenServices {
 			ResetAll:         func() { g.resetAllSettings() },
 		},
 		Keys: uikit.KeybindActions{
-			Rows:  func() []uikit.KeybindRow { return g.keybindRows() },
-			Begin: func(action string) { g.beginCapture(action) },
-			Reset: func() { g.resetKeys() },
+			Rows:     func() []uikit.KeybindRow { return g.keybindRows() },
+			Begin:    func(action string) { g.beginCapture(action) },
+			ResetRow: func(action string) { g.resetKey(action) },
+			Reset:    func() { g.resetKeys() },
 		},
 		HelpRows: func() []uikit.KeyRow { return helpRowsFor(g) },
 		Menu:     func() widgets.WindowPanel { return winPanel{win: g.buildMenuWindow()} },

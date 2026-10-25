@@ -44,12 +44,27 @@ type binding struct {
 }
 
 // keyAction is one rebindable action: its stable id (the Screen spec's
-// action or a worldKeyMap id), the window label and its default binding.
+// action or a worldKeyMap id), the window label, its default binding and
+// the keybindings window's section (derived from which table declared it:
+// worldKeyMap or the Screen spec).
 type keyAction struct {
 	ID    string
 	Label string
+	Group string
 	Def   binding
+	// Keys is the fixed layer's display text (its key set); empty for a
+	// rebindable action, whose chip reads the live binding instead.
+	Keys string
 }
+
+// The keybindings window's section names, in draw order: the world
+// commands, the Screen spec's toggles, then the fixed, never-rebindable
+// chord layer.
+const (
+	groupShip  = "Ship controls"
+	groupWin   = "Windows"
+	groupFixed = "Fixed shortcuts"
+)
 
 // fixedActions are the global chord layer's action ids: documented in
 // KeyMap but never overridable (the window skips them).
@@ -69,7 +84,7 @@ var defaultBinds map[string]binding
 
 func init() {
 	seen := map[string]bool{}
-	add := func(b Binding) {
+	add := func(b Binding, group string) {
 		if fixedActions[b.Action] || seen[b.Action] {
 			return
 		}
@@ -77,19 +92,61 @@ func init() {
 		keyActions = append(keyActions, keyAction{
 			ID:    b.Action,
 			Label: actionLabel(b.Desc),
+			Group: group,
 			Def:   binding{Key: b.Key, Shift: b.Shift},
 		})
 	}
 	for _, b := range worldKeyMap {
-		add(b)
+		add(b, groupShip)
 	}
 	for _, b := range screenBindings(screens) {
-		add(b)
+		add(b, groupWin)
 	}
 	defaultBinds = make(map[string]binding, len(keyActions))
 	for _, a := range keyActions {
 		defaultBinds[a.ID] = a.Def
 	}
+}
+
+// fixedRows is the fixed chord layer as the window's informational
+// section: one row per fixed ACTION in KeyMap order, its keys joined
+// ("[ / -"). Derived from KeyMap (which screens.go's init assigns after
+// this file's), never a second hand-written list.
+var fixedRows []keyAction
+
+// fixedKeyRows builds fixedRows on first use — the window's Rows closure
+// is the only caller, and the action table is static per build.
+func fixedKeyRows() []keyAction {
+	if fixedRows != nil {
+		return fixedRows
+	}
+	fixedRows = []keyAction{}
+	at := map[string]int{}
+	for _, b := range KeyMap {
+		if !fixedActions[b.Action] {
+			continue
+		}
+		if i, ok := at[b.Action]; ok {
+			fixedRows[i].Keys += " · " + chordText(b.Desc)
+			continue
+		}
+		at[b.Action] = len(fixedRows)
+		fixedRows = append(fixedRows, keyAction{
+			ID:    b.Action,
+			Label: actionLabel(b.Desc),
+			Group: groupFixed,
+			Keys:  chordText(b.Desc),
+		})
+	}
+	return fixedRows
+}
+
+// chordText is a KeyMap row's key text: the part before the em dash, which
+// is how the chord is documented ("Ctrl+S", "[", "Esc") — the fixed layer
+// shows it verbatim, modifiers included.
+func chordText(desc string) string {
+	key, _, _ := strings.Cut(desc, " — ")
+	return key
 }
 
 // actionLabel turns a KeyMap description into a row label: the text after
@@ -230,8 +287,39 @@ func (g *Game) beginCapture(action string) {
 // cancelCapture disarms the pending row.
 func (g *Game) cancelCapture() { g.captureAction, g.keyNotice = "", "" }
 
+// unbindAction leaves one action unbound (the sidecar's explicit null):
+// the action triggers nothing until it is rebound, and replace policy has
+// already done the same to a key's previous holder.
+func (g *Game) unbindAction(action string) {
+	if _, ok := defaultBinds[action]; !ok {
+		return
+	}
+	delete(g.binds, action)
+	g.cancelCapture()
+	if err := g.writeKeys(); err != nil {
+		g.report(err, "")
+	}
+	g.refreshHelp()
+}
+
+// resetKey restores one action's default binding (the row's Reset), which
+// steals it back from a holder exactly like any rebind.
+func (g *Game) resetKey(action string) {
+	def, ok := defaultBinds[action]
+	if !ok {
+		return
+	}
+	g.assign(action, def)
+	g.cancelCapture()
+	if err := g.writeKeys(); err != nil {
+		g.report(err, "")
+	}
+	g.refreshHelp()
+}
+
 // captureKey feeds one just-pressed key to the armed row and reports
-// whether the capture layer consumed the key. Esc cancels; a modifier key
+// whether the capture layer consumed the key. Esc cancels; Backspace or
+// Delete clears the binding (the action is then unbound); a modifier key
 // keeps waiting; a fixed chord shows the notice and keeps waiting;
 // anything else assigns (replace policy).
 func (g *Game) captureKey(k ebiten.Key, ctrl, shift bool) bool {
@@ -248,10 +336,12 @@ func (g *Game) captureKey(k ebiten.Key, ctrl, shift bool) bool {
 	}
 	action := g.captureAction
 	switch {
+	case k == ebiten.KeyBackspace || k == ebiten.KeyDelete:
+		g.unbindAction(action)
 	case ctrl:
-		g.keyNotice = "Ctrl chords are fixed — press another key"
+		g.keyNotice = "Ctrl chords are fixed — try another key"
 	case reservedKey(k):
-		g.keyNotice = keyText(k) + " is a fixed shortcut — press another key"
+		g.keyNotice = keyText(k) + " is a fixed shortcut"
 	default:
 		g.assign(action, binding{Key: k, Shift: shift})
 		g.cancelCapture()
@@ -286,19 +376,26 @@ func (g *Game) actionHeld(in Input, action string) bool {
 	return !b.Shift || held(in.KeysDown, ebiten.KeyShift)
 }
 
-// keybindRows renders the live table for the keybindings window.
+// keybindRows renders the live table for the keybindings window: the
+// rebindable actions in declaration order, then the fixed chord layer.
 func (g *Game) keybindRows() []uikit.KeybindRow {
-	rows := make([]uikit.KeybindRow, 0, len(keyActions))
+	rows := make([]uikit.KeybindRow, 0, len(keyActions)+len(fixedKeyRows()))
 	for _, a := range keyActions {
-		row := uikit.KeybindRow{Action: a.ID, Label: a.Label}
+		row := uikit.KeybindRow{Action: a.ID, Label: a.Label, Group: a.Group}
 		if b, ok := g.binds[a.ID]; ok {
 			row.Key = bindText(b)
+			row.Rebound = b != a.Def
 		}
 		if g.captureAction == a.ID {
 			row.Armed = true
 			row.Notice = g.keyNotice
 		}
 		rows = append(rows, row)
+	}
+	for _, a := range fixedKeyRows() {
+		rows = append(rows, uikit.KeybindRow{
+			Action: a.ID, Label: a.Label, Group: a.Group, Key: a.Keys, Fixed: true,
+		})
 	}
 	return rows
 }

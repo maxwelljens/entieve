@@ -318,7 +318,7 @@ var screens = []Screen{
 		// rebinds). O: the remaining free letter near the UI cluster.
 		ID: idKeybindings, Title: "Keybindings", Icon: "svc_help",
 		Key: ebiten.KeyO, Action: "keybindings", Desc: "O — toggle keybindings (rebind screen and world keys)",
-		DefaultRect: image.Rect(0, 0, 480, 650),
+		DefaultRect: image.Rect(0, 0, 480, 640), // uikit.NewKeybindings' content floor
 		DockPolicy:  DockFloating, InTitle: true,
 		Group: "Help & System",
 		Build: func(h *ScreenHost) widgets.WindowPanel {
