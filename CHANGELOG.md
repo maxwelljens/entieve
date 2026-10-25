@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Expanded settings window** (`game`, `uikit/screens`): the `P` window
+  now also carries a **vsync** toggle (default on — an absent key in an
+  existing `settings.json` keeps today's behaviour), a **rail** collapse
+  toggle wired to the same persisted state as the rail's edge tab, and a
+  two-step **Reset all settings** that restores 1× windowed, vsync on, the
+  rail expanded and no saved window size. The window grows from three rows
+  to five (300×320 default rect); **Reset window layout** is unchanged.
+  - The last **windowed size** is written to `<save>.settings.json` on a
+    clean quit and restored when booting windowed (clamped to 1024×700;
+    fullscreen is unaffected). `vsync_off` is the inverted sidecar key, so
+    files from before the setting read as vsync on.
+
 - **Title screen with save manager, settings and credits** (`game`,
   `cmd/entieve`): `entieve run` now boots into a title screen over a static
   world backdrop — tracked amber wordmark, version line, and New game /

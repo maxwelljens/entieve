@@ -144,13 +144,22 @@ type Game struct {
 	rail          *uikit.Rail
 	railCollapsed bool
 
+	// The persisted vsync flag and the last windowed size (window
+	// pixels). vsyncApply is the ebiten seam (nil = the real call) so
+	// headless tests can pin the apply path; flushSize gates the size
+	// keys — only a clean quit writes them.
+	vsync      bool
+	vsyncApply func(bool)
+	winW, winH int
+	flushSize  bool
+
 	// The settings window (uikit/screens/settings.go): UI scale stepper,
-	// fullscreen toggle, reset-layout. Like every panel it is rebuilt by
-	// buildKit, so its live state is re-read from g in Sync. The action
-	// bundle rides a field (filled by buildKit) instead of being spelled
-	// inside the Screen row: naming stepUIScale/applyScale there would
-	// make the spec table depend on the rebuild path that reads it — an
-	// initialization cycle, see uikit.go.
+	// fullscreen/vsync/rail toggles and the two resets. Like every panel
+	// it is rebuilt by buildKit, so its live state is re-read from g in
+	// Sync. The action bundle rides a field (filled by buildKit) instead
+	// of being spelled inside the Screen row: naming stepUIScale/applyScale
+	// there would make the spec table depend on the rebuild path that
+	// reads it — an initialization cycle, see uikit.go.
 	sett        *uikit.Settings
 	settActions uikit.SettingsActions
 
@@ -322,9 +331,9 @@ func (g *Game) Run() error {
 	ebiten.SetWindowTitle(title)
 	// Window chrome is in WINDOW pixels: never multiply this by the UI or
 	// device scale (Layout converts the outside size separately).
-	ebiten.SetWindowSize(defaultW, defaultH)
+	ebiten.SetWindowSize(g.windowSize())
 	ebiten.SetWindowResizable(true)
-	ebiten.SetVsyncEnabled(true)
+	g.applyVsync(g.vsync) // persisted flag; absent in old files = on
 	ebiten.SetFullscreen(g.fullscreen)
 	return ebiten.RunGame(g)
 }
@@ -377,6 +386,11 @@ func (g *Game) applySize(w, h int) {
 	}
 	first := !g.sized
 	g.sized, g.w, g.h = true, w, h
+	// The last WINDOWED size is the outside size, not these device
+	// pixels: divide back through the device factor (quitPersist writes
+	// it, so the transient boot size is never persisted).
+	g.winW = int(math.Round(float64(w) / g.deviceScale()))
+	g.winH = int(math.Round(float64(h) / g.deviceScale()))
 	g.placeDefaults(w, h)
 	if first {
 		g.applyLayout(w, h) // startup: read the sidecar once the screen is known
@@ -446,13 +460,19 @@ func (g *Game) Update() error {
 		g.report(g.LoadGame(), "Game loaded")
 	}
 	if g.quit {
-		// Clean quit: persist the window layout so it survives the
-		// restart even without a manual save (best-effort — the loop is
-		// ending and there is nowhere left to report an error).
-		g.writeLayout()
+		g.quitPersist()
 		return ebiten.Termination
 	}
 	return nil
+}
+
+// quitPersist is the clean-quit flush: the layout sidecar plus the
+// settings sidecar carrying the last windowed size (best-effort — the
+// loop is ending and there is nowhere left to report an error).
+func (g *Game) quitPersist() {
+	g.writeLayout()
+	g.flushSize = true
+	g.writeSettings()
 }
 
 // handleKeys maps the global keyboard bindings: the KeyMap semantics the
@@ -833,11 +853,14 @@ func (g *Game) buildKit() error {
 	// actions are assembled here — see Game.settActions for why the row
 	// reaches them through a field.
 	g.settActions = uikit.SettingsActions{
-		UIScale:       func() float64 { return g.uiScale },
-		StepScale:     func(delta int) { g.stepUIScale(delta) },
-		Fullscreen:    func() bool { return g.fullscreen },
-		SetFullscreen: func(on bool) { g.setFullscreen(on) },
-		ResetLayout:   func() { g.resetLayout() },
+		UIScale:          func() float64 { return g.uiScale },
+		StepScale:        func(delta int) { g.stepUIScale(delta) },
+		Fullscreen:       func() bool { return g.fullscreen },
+		SetFullscreen:    func(on bool) { g.setFullscreen(on) },
+		RailCollapsed:    func() bool { return g.railCollapsed },
+		SetRailCollapsed: func(on bool) { g.setRailCollapsed(on) },
+		ResetLayout:      func() { g.resetLayout() },
+		ResetAll:         func() { g.resetAllSettings() },
 	}
 	g.screenWin = [numPanels]*widget.Window{}
 	for _, s := range screens {

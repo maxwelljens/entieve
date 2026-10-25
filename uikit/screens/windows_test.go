@@ -519,23 +519,28 @@ func TestTableSelectVsActivate(t *testing.T) {
 }
 
 // TestSettingsPanelWiring pins the panel's seam: Sync renders the host's
-// state (scale value, fullscreen label) and the controls call back with
-// the right intents — nothing is stored panel-side, which is what lets a
-// live scale change rebuild the window under itself.
+// state (scale value, fullscreen and rail labels) and the controls call
+// back with the right intents — nothing is stored panel-side, which is
+// what lets a live scale change rebuild the window under itself.
 func TestSettingsPanelWiring(t *testing.T) {
 	env, _ := newTestEnv(t)
 	var (
 		scale     = 1.0
 		fs        = false
+		rail      = false
 		stepDelta []int
 		resets    int
+		resetAlls int
 	)
 	s := NewSettings(env, SettingsActions{
-		UIScale:       func() float64 { return scale },
-		StepScale:     func(d int) { stepDelta = append(stepDelta, d) },
-		Fullscreen:    func() bool { return fs },
-		SetFullscreen: func(on bool) { fs = on },
-		ResetLayout:   func() { resets++ },
+		UIScale:          func() float64 { return scale },
+		StepScale:        func(d int) { stepDelta = append(stepDelta, d) },
+		Fullscreen:       func() bool { return fs },
+		SetFullscreen:    func(on bool) { fs = on },
+		RailCollapsed:    func() bool { return rail },
+		SetRailCollapsed: func(on bool) { rail = on },
+		ResetLayout:      func() { resets++ },
+		ResetAll:         func() { resetAlls++ },
 	})
 	ui := newWindowUI(t, env, s.Win())
 	uitest.PumpWindow(t, ui, s.Sync, 1280, 720)
@@ -545,6 +550,9 @@ func TestSettingsPanelWiring(t *testing.T) {
 	}
 	if got := s.fsBtn.Text().Label; got != "Fullscreen: off" {
 		t.Errorf("fullscreen label = %q, want off state", got)
+	}
+	if got := s.railBtn.Text().Label; got != "Rail: expanded" {
+		t.Errorf("rail label = %q, want expanded state", got)
 	}
 
 	// Buttons: the scale stepper's −/+ are the row's first/last children.
@@ -562,14 +570,14 @@ func TestSettingsPanelWiring(t *testing.T) {
 	}
 
 	// The window's second child is the body: [scale row, fullscreen,
-	// reset, hint].
+	// rail, reset layout, reset all, hint].
 	body, ok := s.win.GetContainer().Children()[1].(widget.Containerer)
 	if !ok {
 		t.Fatal("settings body is not a container")
 	}
 	bkids := body.Children()
-	if len(bkids) < 4 {
-		t.Fatalf("settings body children = %d, want ≥ 4", len(bkids))
+	if len(bkids) < 6 {
+		t.Fatalf("settings body children = %d, want ≥ 6", len(bkids))
 	}
 	uitest.FireButton(ui, bkids[1].(*widget.Button)) // fullscreen toggle (host currently off)
 	fs = false
@@ -582,9 +590,73 @@ func TestSettingsPanelWiring(t *testing.T) {
 	if got := s.fsBtn.Text().Label; got != "Fullscreen: on" {
 		t.Errorf("fullscreen label after click = %q, want on state", got)
 	}
-	uitest.FireButton(ui, bkids[2].(*widget.Button)) // reset layout
+	uitest.FireButton(ui, bkids[2].(*widget.Button)) // rail toggle
+	if !rail {
+		t.Error("rail button did not flip the host flag")
+	}
+	s.Sync()
+	if got := s.railBtn.Text().Label; got != "Rail: collapsed" {
+		t.Errorf("rail label after click = %q, want collapsed state", got)
+	}
+	uitest.FireButton(ui, bkids[3].(*widget.Button)) // reset layout
 	if resets != 1 {
 		t.Errorf("reset calls = %d, want 1", resets)
+	}
+	// Reset all is two-step: the first press only arms (label swap), the
+	// second fires exactly once and restores the label.
+	uitest.FireButton(ui, bkids[4].(*widget.Button))
+	if resetAlls != 0 {
+		t.Fatalf("armed reset-all fired on the first press")
+	}
+	if got := s.resetAll.Text().Label; got != "Confirm reset all" {
+		t.Errorf("armed reset-all label = %q, want the confirm state", got)
+	}
+	uitest.FireButton(ui, bkids[4].(*widget.Button))
+	if resetAlls != 1 {
+		t.Errorf("reset-all calls = %d, want 1", resetAlls)
+	}
+	if got := s.resetAll.Text().Label; got != "Reset all settings" {
+		t.Errorf("reset-all label after confirm = %q, want the idle label", got)
+	}
+}
+
+// TestSettingsRowsFitAtMinScale: at the shrunken 0.75 rung the five rows
+// and the hint still stack inside the window without overlap — the window
+// grows with its content, and every row keeps its scaled 30 px floor.
+func TestSettingsRowsFitAtMinScale(t *testing.T) {
+	uitest.UseScale(t, 0.75)
+	env, _ := newTestEnv(t)
+	s := NewSettings(env, SettingsActions{
+		UIScale:          func() float64 { return 1 },
+		StepScale:        func(int) {},
+		Fullscreen:       func() bool { return false },
+		SetFullscreen:    func(bool) {},
+		RailCollapsed:    func() bool { return false },
+		SetRailCollapsed: func(bool) {},
+		ResetLayout:      func() {},
+		ResetAll:         func() {},
+	})
+	ui := newWindowUI(t, env, s.Win())
+	uitest.PumpWindow(t, ui, s.Sync, 1280, 720)
+
+	body := s.win.Contents.(widget.Containerer)
+	kids := body.Children()
+	if len(kids) != 6 {
+		t.Fatalf("settings body children = %d, want 6 (stepper, fullscreen, rail, reset, reset all, hint)", len(kids))
+	}
+	prev := image.Rectangle{}
+	for i, k := range kids {
+		r := k.GetWidget().Rect
+		if r.Dy() <= 0 {
+			t.Fatalf("row %d has no height: %v", i, r)
+		}
+		if i > 0 && r.Min.Y < prev.Max.Y {
+			t.Errorf("row %d overlaps the one above: %v vs %v", i, r, prev)
+		}
+		prev = r
+	}
+	if body := body.GetWidget().Rect; prev.Max.Y > body.Max.Y || prev.Max.X > body.Max.X {
+		t.Errorf("settings body %v clips its last row at %v", body, prev)
 	}
 }
 

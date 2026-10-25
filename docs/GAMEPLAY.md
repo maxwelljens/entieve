@@ -10,9 +10,10 @@ Run it with:
 entieve run [--world world-default] [--seed N] [--save save.json] [--load save.json]
 ```
 
-The window opens at 1280×720 (resizable, vsync, minimum 1024×700 — smaller
-windows clamp up rather than breaking the HUD layout). Everything in the
-keyboard table below is also available in-game via the help window (`H`).
+The window opens at its last windowed size (1280×720 on a fresh install),
+resizable, vsync on by default, minimum 1024×700 — smaller windows clamp up
+rather than breaking the HUD layout. Everything in the keyboard table below
+is also available in-game via the help window (`H`).
 
 ## Controls
 
@@ -43,7 +44,7 @@ in-game help window renders.
 | `B` | Toggle manufacturing window (manufacture while docked) |
 | `N` | Toggle starmap |
 | `H` | Toggle help window |
-| `P` | Toggle settings (UI scale, fullscreen, window layout) |
+| `P` | Toggle settings (UI scale, display, rail, layout) |
 | `K` | Toggle finances window (holdings and transactions) |
 | `Esc` | Menu: Resume / Save / Save as… / Load / Quit |
 | `[` or `-` | Time acceleration down (8 → 4 → 2 → 1×) |
@@ -131,9 +132,12 @@ the Esc menu keeps its own key — the rail is not its launcher.
 The **Settings**
 window (`P`) holds the **UI scale** stepper (0.75× – 2.5×, applied live —
 every window, control and font rescales and keeps its arrangement), a
-**fullscreen** toggle and **Reset window layout**; the scale, the
-fullscreen flag and the rail's collapse state persist next to the save
-in `<save>.settings.json`, and
+**fullscreen** toggle, a **rail** collapse toggle, **Reset window layout**
+and **Reset all settings** (a second click on **Confirm reset all**
+restores 1× windowed with vsync on, the rail expanded and no saved window
+size); the scale, the fullscreen and vsync flags, the rail's collapse
+state and the last windowed size (written on clean quit) persist next to
+the save in `<save>.settings.json`, and
 the window arrangement itself persists in design units, so one saved
 layout works at every scale. Icons (from
 [game-icons.net](https://game-icons.net), credited per-icon in
