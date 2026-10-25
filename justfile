@@ -19,7 +19,7 @@ default:
 
 # Play the game (flags pass through: --world, --seed, --load, --save).
 run *ARGS:
-    go run ./cmd/entieve run {{ARGS}}
+    go run ./cmd/entieve run {{ ARGS }}
 
 # ---- verify ---------------------------------------------------------------
 
@@ -76,19 +76,19 @@ validate:
 
 # Run the simulation headlessly (flags pass through: --world, --ticks, --script).
 simulate *ARGS:
-    go run ./cmd/entieve simulate {{ARGS}}
+    go run ./cmd/entieve simulate {{ ARGS }}
 
 # Print one content definition as JSON: just describe mod-emp-turret
 describe id:
-    go run ./cmd/entieve describe {{id}}
+    go run ./cmd/entieve describe {{ id }}
 
 # ---- build ---------------------------------------------------------------
 
 # Build the game for this machine → bin/entieve, version-stamped.
 build:
     mkdir -p bin
-    go build -trimpath -ldflags "-s -w -X main.version={{version}}" -o bin/entieve ./cmd/entieve
-    @echo "bin/entieve ({{version}})"
+    go build -trimpath -ldflags "-s -w -X main.version={{ version }}" -o bin/entieve ./cmd/entieve
+    @echo "bin/entieve ({{ version }})"
 
 # Build every release target locally → dist/ (same config the release uses).
 dist:
@@ -98,23 +98,23 @@ dist:
 release-notes ver output="dist/release-notes.md":
     #!/usr/bin/env bash
     set -euo pipefail
-    mkdir -p "$(dirname "{{output}}")"
-    awk -v ver="{{ver}}" '
+    mkdir -p "$(dirname "{{ output }}")"
+    awk -v ver="{{ ver }}" '
         index($0, "## [" ver "]") == 1 { grab = 1; next }
         grab && /^## \[/ { exit }
         grab { print }
-    ' CHANGELOG.md | sed -e '/./,$!d' > "{{output}}"
-    if ! grep -q . "{{output}}"; then
-        echo "just release-notes: no section '## [{{ver}}]' in CHANGELOG.md" >&2
+    ' CHANGELOG.md | sed -e '/./,$!d' > "{{ output }}"
+    if ! grep -q . "{{ output }}"; then
+        echo "just release-notes: no section '## [{{ ver }}]' in CHANGELOG.md" >&2
         exit 1
     fi
-    echo "{{output}}"
+    echo "{{ output }}"
 
 # Cut a release: check → changelog → tag → push → publish GitHub release.
 release ver:
     #!/usr/bin/env bash
     set -euo pipefail
-    version="{{ver}}"
+    version="{{ ver }}"
     case "$version" in
         v*) echo "just release: version without the v prefix (got $version)" >&2; exit 2 ;;
     esac
@@ -163,6 +163,16 @@ release ver:
     notes=$(mktemp "${TMPDIR:-/tmp}/entieve-release-notes.XXXXXX.md")
     just release-notes "$version" "$notes"
     GH_TOKEN=$(gh auth token) goreleaser release --clean --release-notes "$notes"
+
+    # Belt-and-braces: goreleaser has silently dropped --release-notes before
+    # (changelog.disable short-circuits the reader pipe — v0.5.0..v0.9.0 all
+    # published empty bodies). Verify what landed and repair from the folded
+    # notes if the body came out empty.
+    body_len=$(gh release view "$tag" --repo maxwelljens/entieve --json body -q '.body|length' 2>/dev/null | tr -cd '0-9' || true)
+    if [ "${body_len:-0}" -le 1 ]; then
+        echo "just release: published body is empty; repairing from $notes" >&2
+        gh release edit "$tag" --repo maxwelljens/entieve --notes-file "$notes"
+    fi
 
 # Remove build artifacts.
 clean:
