@@ -12,8 +12,9 @@ import (
 // the panel draws no state of its own, it reads and pokes these callbacks
 // every Sync. The host owns the ladder, the persistence and the live
 // apply (game.stepUIScale / setFullscreen / setVsync / setRailCollapsed /
-// resetLayout / resetAllSettings); the window only renders and routes.
-// All must be non-nil.
+// stepMasterVolume / stepMusicVolume / setShuffle / resetLayout /
+// resetAllSettings); the window only renders and routes. All must be
+// non-nil.
 type SettingsActions struct {
 	// UIScale returns the current user UI scale (the persisted setting).
 	UIScale func() float64
@@ -26,6 +27,16 @@ type SettingsActions struct {
 	// SetRailCollapsed flips it (the host persists it).
 	RailCollapsed    func() bool
 	SetRailCollapsed func(bool)
+	// MasterVolume and MusicVolume are whole percents (0..100); the
+	// Step callbacks move one 10% step and the host persists the pair.
+	// The host multiplies them at the music seam.
+	MasterVolume     func() int
+	StepMasterVolume func(delta int)
+	MusicVolume      func() int
+	StepMusicVolume  func(delta int)
+	// Shuffle reports the shuffled-pool flag; SetShuffle flips it.
+	Shuffle    func() bool
+	SetShuffle func(bool)
 	// ResetLayout clears the persisted window arrangement (sidecar) and
 	// recomposes the built-in defaults.
 	ResetLayout func()
@@ -34,11 +45,11 @@ type SettingsActions struct {
 }
 
 // Settings is the settings window: UI scale stepper, fullscreen and rail
-// toggles and the two reset buttons. It mounts like every other panel
-// (panelDefs, sidecar name "settings", key P) and rebuilds with the
-// interface, so all of its displayed state is re-read from the actions in
-// Sync — including right after a live scale change rebuilt it under
-// itself.
+// toggles, master/music volume steppers, a shuffle toggle and the two
+// reset buttons. It mounts like every other panel (panelDefs, sidecar
+// name "settings", key P) and rebuilds with the interface, so all of its
+// displayed state is re-read from the actions in Sync — including right
+// after a live scale change rebuilt it under itself.
 type Settings struct {
 	th  theme.Theme
 	act SettingsActions
@@ -46,10 +57,16 @@ type Settings struct {
 
 	scaleRow  *widget.Container // relaid when the scale value text changes
 	scaleVal  *widget.Text
+	masterRow *widget.Container
+	masterVal *widget.Text
+	musicRow  *widget.Container
+	musicVal  *widget.Text
 	fsBtn     *widget.Button
 	fsState   bool // last text written, to keep Sync a compare
 	railBtn   *widget.Button
 	railState bool
+	shufBtn   *widget.Button
+	shufState bool
 	// resetAll is the two-step destructive button (the save manager's
 	// Delete pattern): the first press swaps the label, the second acts.
 	resetAll   *widget.Button
@@ -83,6 +100,31 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 			),
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
 		)
+	}
+	// newStepper is the UI-scale row idiom for a numeric setting: − label
+	// value +, the value on the tabular contents face and relayed out by
+	// setStepperValue when it changes.
+	newStepper := func(label string, step func(int)) (*widget.Container, *widget.Text) {
+		val := widget.NewText(
+			widget.TextOpts.Text("0%", s.th.FaceMono(theme.StepSmall), theme.Solid(p.Accent)),
+			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+				Position: widget.RowLayoutPositionCenter,
+			})),
+		)
+		lbl := widget.NewText(
+			widget.TextOpts.Text(label, s.th.Face(theme.StepSmall), theme.Solid(p.Text)),
+			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+				Position: widget.RowLayoutPositionCenter,
+			})),
+		)
+		row := widget.NewContainer(
+			widget.ContainerOpts.Layout(widget.NewRowLayout(
+				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+				widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
+			)),
+		)
+		row.AddChild(newBtn("-", func() { step(-1) }), lbl, val, newBtn("+", func() { step(+1) }))
+		return row, val
 	}
 
 	// Row 1: the scale stepper. The value is a dynamic number, so it
@@ -125,7 +167,17 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 		func() { act.SetRailCollapsed(!act.RailCollapsed()) },
 	)
 
-	// Rows 4–5: the two resets. Reset all is destructive, so it arms on
+	// Rows 4–6: audio. The two volume steppers share the UI-scale idiom
+	// (whole percents, 10% steps); shuffle is a toggle and defaults on.
+	s.masterRow, s.masterVal = newStepper("Master", act.StepMasterVolume)
+	s.musicRow, s.musicVal = newStepper("Music", act.StepMusicVolume)
+	s.shufBtn = newToggle(
+		// Default state is shuffle on, the fresh-install default.
+		"Shuffle: on",
+		func() { act.SetShuffle(!act.Shuffle()) },
+	)
+
+	// Rows 7–8: the two resets. Reset all is destructive, so it arms on
 	// the first press and fires on the second.
 	resetBtn := newToggle("Reset window layout", func() { act.ResetLayout() })
 	s.resetAll = newToggle("Reset all settings", func() {
@@ -150,19 +202,19 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	body.AddChild(s.scaleRow, s.fsBtn, s.railBtn, resetBtn, s.resetAll, hint)
+	body.AddChild(s.scaleRow, s.fsBtn, s.railBtn, s.masterRow, s.musicRow, s.shufBtn, resetBtn, s.resetAll, hint)
 
 	title, _ := theme.NewTitleBar(d, "Settings", "")
 
 	s.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
-		// Content floor: title + five 40 px rows + the hint line (the
+		// Content floor: title + eight 40 px rows + the hint line (the
 		// frame does not auto-grow, so the fallback is exactly this tall).
-		widget.WindowOpts.MinSize(theme.Px(300), theme.Px(320)),
+		widget.WindowOpts.MinSize(theme.Px(300), theme.Px(460)),
 		// Fallback only: centred at the 1280×720 design size (the game
 		// re-centers it from placeDefaults like the other overlays).
-		widget.WindowOpts.Location(image.Rect(theme.Px(490), theme.Px(200), theme.Px(790), theme.Px(520))),
+		widget.WindowOpts.Location(image.Rect(theme.Px(490), theme.Px(130), theme.Px(790), theme.Px(590))),
 	)
 	return s
 }
@@ -188,6 +240,16 @@ func (s *Settings) Sync() {
 			s.railBtn.SetText("Rail: collapsed")
 		} else {
 			s.railBtn.SetText("Rail: expanded")
+		}
+	}
+	setStepperValue(s.masterRow, s.masterVal, fmt.Sprintf("%d%%", s.act.MasterVolume()))
+	setStepperValue(s.musicRow, s.musicVal, fmt.Sprintf("%d%%", s.act.MusicVolume()))
+	if on := s.act.Shuffle(); on != s.shufState {
+		s.shufState = on
+		if on {
+			s.shufBtn.SetText("Shuffle: on")
+		} else {
+			s.shufBtn.SetText("Shuffle: off")
 		}
 	}
 }

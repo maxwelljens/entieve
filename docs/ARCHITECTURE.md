@@ -764,6 +764,35 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > while rebuilding the whole interface against the new scale. World zoom
 > (`zoomBase`) carries the device factor only — scaling the UI never
 > zooms the world.
+
+> **Music seam (2026-10).** The soundtrack is a `game.Music` interface
+> (`game/music.go`) with exactly two implementations: the silent
+> `nopMusic` that `game.New` installs when `Options.Music` is nil (every
+> test, `simulate` and `validate` path) and `realMusic`, built only by
+> `cmdRun` (`game.NewMusic`). The six `.ogg` files stay under
+> `assets/audio/` byte-for-byte and are embedded by the shim beside them
+> (`assets/audio/audio.go`, `//go:embed *.ogg`) — `go:embed` cannot reach
+> a parent directory, and releases carry no `assets/` folder.
+> `realMusic` decodes one embedded track at a time with
+> `ebiten/v2/audio/vorbis` (`oggvorbis` is already an ebiten dependency;
+> `hajimehoshi/go-vorbis` is cgo and is never used), creates one
+> `NewPlayerF32` per track and polls `IsPlaying()` in `Tick` to advance —
+> there is no end-of-stream callback. `Game.Update` ticks the seam on the
+> mainline **before** the title branch, so the title, space and a docked
+> station share one shuffled pool; `Current()`, the volumes and the
+> shuffle flag are state only and never enter the event log or the save.
+> The volume applied to the player is `master × music` (whole percents
+> from the settings sidecar, 100/70 fresh), re-applied on every change
+> and on every track start. **Structural invariant:** `audio.NewContext`
+> may exist at most once per process (a second call panics) and its
+> device only opens in ebiten's before-update hook on the first game-loop
+> update, so it is created exactly once in `cmdRun`'s construction path
+> (`sync.Once` inside the seam for belt and braces); no test may reach
+> it, which is why `game.New` never constructs `realMusic`.
+> Ordering is the pure `trackQueue` (injectable seed; tests pin
+> permutations and no-immediate-repeat), and decode failures skip the
+> track and surface through the `warn` callback (`cmdRun` prints them to
+> stderr) — all six failing leaves the game silent, never broken.
 >
 > **UI platform (2026-10, complete):** the chrome lives in `uikit/`, built on
 > **ebitenui v0.7.3** (pinned in go.mod); the legacy hand-drawn `ui/` package
