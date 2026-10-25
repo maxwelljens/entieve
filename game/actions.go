@@ -6,54 +6,51 @@ import (
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
-	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// worldKey maps the in-space keyboard bindings to sim commands. It runs
-// only while the space or station scene is on top and Ctrl is not held
-// (Ctrl combos belong to the game layer). Semantics mirror the legacy
-// ui.Update key switch.
-func (g *Game) worldKey(k ebiten.Key, shift bool) {
-	switch k {
-	case ebiten.KeyTab:
-		if shift {
-			g.lockSelected()
-		} else {
-			g.cycleLock()
-		}
-	case ebiten.KeyF1:
+// worldKey runs the in-space command a live key table resolved to. It
+// runs only while the space or station scene is on top and Ctrl is not
+// held (Ctrl combos belong to the game layer). Semantics mirror the
+// legacy ui.Update key switch; the action ids are worldKeyMap's.
+func (g *Game) worldKey(action string) {
+	switch action {
+	case "lock-nearest":
+		g.cycleLock()
+	case "lock-selected":
+		g.lockSelected()
+	case "high-1":
 		g.toggleModule(content.SlotHigh, 0)
-	case ebiten.KeyF2:
+	case "high-2":
 		g.toggleModule(content.SlotHigh, 1)
-	case ebiten.KeyF3:
+	case "high-3":
 		g.toggleModule(content.SlotHigh, 2)
-	case ebiten.KeyF4:
+	case "high-4":
 		g.toggleModule(content.SlotHigh, 3)
-	case ebiten.KeyF5:
+	case "high-5":
 		g.toggleModule(content.SlotHigh, 4)
-	case ebiten.KeyF6:
+	case "high-6":
 		g.toggleModule(content.SlotHigh, 5)
-	case ebiten.KeyF7:
+	case "high-7":
 		g.toggleModule(content.SlotHigh, 6)
-	case ebiten.KeyF8:
+	case "high-8":
 		g.toggleModule(content.SlotHigh, 7)
-	case ebiten.KeyA:
+	case "approach":
 		g.doApproach()
-	case ebiten.KeyQ:
+	case "orbit":
 		g.doOrbit()
-	case ebiten.KeyS:
+	case "stop":
 		g.s.Queue(sim.CmdStop{})
-	case ebiten.KeyW:
+	case "align":
 		g.doAlign()
-	case ebiten.KeyZ:
+	case "warp":
 		g.doWarp()
-	case ebiten.KeyD:
+	case "dock":
 		g.dockNearest()
-	case ebiten.KeyJ:
+	case "jump":
 		g.jumpNearest()
-	case ebiten.KeyL:
+	case "loot":
 		g.lootNearest()
-	case ebiten.KeyM:
+	case "mine":
 		g.mineSelected()
 	}
 }

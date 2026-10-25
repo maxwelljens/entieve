@@ -18,7 +18,9 @@ is also available in-game via the help window (`H`).
 ## Controls
 
 The key map below is generated from `game.KeyMap` — the same source the
-in-game help window renders.
+in-game help window renders. Screen toggles and world commands are
+rebindable (see **Keybindings** below); the global chords (`Esc`, `Ctrl+S`,
+`Ctrl+F`, `F9`, `[` `]` `-` `=`) are fixed.
 
 ### Keyboard
 
@@ -46,6 +48,7 @@ in-game help window renders.
 | `H` | Toggle help window |
 | `P` | Toggle settings (UI scale, display, rail, layout) |
 | `K` | Toggle finances window (holdings and transactions) |
+| `O` | Toggle keybindings (rebind screen and world keys) |
 | `Esc` | Menu: Resume / Save / Save as… / Load / Quit |
 | `[` or `-` | Time acceleration down (8 → 4 → 2 → 1×) |
 | `]` or `=` | Time acceleration up (1 → 2 → 4 → 8×) |
@@ -80,6 +83,20 @@ window or the HUD chrome never reaches the world behind it.
 - Lock-under-cursor uses **`Ctrl`+click** so `L` stays free for looting.
 - `C` is **scanner** (a new window; no legacy binding to displace).
 
+**Rebinding (Keybindings, `O`)**: every screen toggle in the table and every
+world command (`Tab` locks, `A/Q/S/W/Z/D/J/L/M`, `F1–F8`, the arrows) can be
+rebound from the **Keybindings** window — the rail's *Help & System* entry,
+the title menu's **Keybindings** row, or `O`. Click a row, then press the key
+you want: the row shows *press a key…* while it waits, and `Esc` cancels.
+Binding a key another action already holds **replaces** it — the old holder
+becomes unbound (shown `—`) and can be rebound again; one key is one action,
+and the window always shows the current bindings so a theft is visible.
+`Reset all bindings` (two clicks: *Confirm reset all*) restores every default.
+The global chords are fixed and refuse capture with a notice: `Esc`, `Ctrl+S`,
+`Ctrl+F`, `F9` and `[` `]` `-` `=` (a `Ctrl` chord cannot be captured at all).
+Bindings persist immediately to `<save>.keys.json` beside the save; a missing
+or damaged file means the defaults.
+
 ### Windows
 
 The interface is a stack of **draggable, resizable windows** with title
@@ -108,12 +125,12 @@ without those plates (every release ships no `assets/`) draws the plain panel,
 exactly as before.
 
 Toggle keys open and close their window (`I`, `F`, `G`, `B`, `C`, `N`, `H`,
-`P`, `K`, `Shift+L`) — windows have no separate close button. The same
+`P`, `K`, `O`, `Shift+L`) — windows have no separate close button. The same
 toggles live on the **left navigation rail**: one glyph per window in
 six sections — **Ship** (Overview, Selected Item, Fitting), **Trade**
 (Market, Inventory, Finances), **Industry** (Manufacturing, Refinery), **Station** (Station
 Services), **World** (Scanner, Starmap, Log) and **Help & System**
-(Help, Settings). Hover an entry for its tooltip (icon, name and hotkey
+(Help, Settings, Keybindings). Hover an entry for its tooltip (icon, name and hotkey
 hint); click once to open — a freshly opened window lands on top — and
 again to close it. An entry you cannot use right now is **grayed, never
 hidden** (the services view and manufacturing in space, the scanner while
@@ -210,7 +227,8 @@ while the untouched ones re-place on their defaults.
 
 **Your layout persists.** Every named window's position, size and
 open/closed state (overview, selected item, log, market, inventory,
-fitting, manufacturing, refinery, scanner, map, help) is saved to a sidecar file next to the
+fitting, manufacturing, refinery, scanner, map, help, keybindings) is
+saved to a sidecar file next to the
 save — `<save path>.layout.json`, e.g.
 `os.UserConfigDir()/entieve/save.json.layout.json` — whenever you save
 (`Ctrl+S` / menu **Save**) and again when you quit cleanly from the

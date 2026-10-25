@@ -5,8 +5,10 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// Binding documents one keyboard binding. KeyMap is the single source of
-// truth for the in-game help overlay (H) and docs/GAMEPLAY.md.
+// Binding documents one keyboard binding. KeyMap is the default table the
+// live key layer (game/keys.go) overlays the player's overrides onto; the
+// help overlay and docs/GAMEPLAY.md read these rows (the help overlay
+// substitutes the live key when the player rebound an action).
 //
 // Conflict resolutions (documented): F1–F8 are high-slot module toggles, so
 // the classic "F5 save" moved to Ctrl+S (F9 load kept: no conflict). "M" is

@@ -44,6 +44,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The audio engine is constructed only on the `run` path; tests inject
     a silent fake, so no headless path creates the one audio context.
 
+- **Rebindable keys** (`game`, `uikit/screens`): screen toggles and world
+  commands can be rebound in a new **Keybindings** window (`O`, the rail's
+  *Help & System* entry, or the title menu between Settings and Credits).
+  Click a row and press a key; `Esc` cancels; **replace policy** means a key
+  belongs to one action and stealing it leaves the old holder unbound
+  (`—`). The window shows every current binding and offers a two-step
+  **Reset all bindings**. Overrides persist immediately to a new
+  `<save>.keys.json` sidecar (excluded from the save manager), holding only
+  the player's deviations; a missing or damaged file means the defaults. The
+  global chords (`Esc`, `Ctrl+S`, `Ctrl+F`, `F9`, `[` `]` `-` `=`) are a
+  fixed layer and refuse capture with a notice; `Esc` stays reserved as a
+  plain binding. The help overlay follows the live bindings.
+
 - **Expanded settings window** (`game`, `uikit/screens`): the `P` window
   now also carries a **vsync** toggle (default on — an absent key in an
   existing `settings.json` keeps today's behaviour), a **rail** collapse
