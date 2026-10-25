@@ -62,6 +62,10 @@ type Options struct {
 	// in Run). Tests pin it explicitly so the baseline suite runs hermetically
 	// at 1.0 no matter what display the suite runs on.
 	DeviceScale float64
+	// Music is the audio seam. Nil installs the silent nop — every
+	// headless path (tests, simulate) and the documented default; the
+	// real engine is built only in cmdRun (see Music).
+	Music Music
 }
 
 // panelID identifies one toggleable interface window. The always-on
@@ -152,6 +156,14 @@ type Game struct {
 	vsyncApply func(bool)
 	winW, winH int
 	flushSize  bool
+
+	// The music seam and the three audio settings behind it (percent
+	// 0..100 for the volumes; the engine multiplies them). music is
+	// never nil after New: nil Options.Music installs nopMusic, so the
+	// real audio context can only be reached from cmdRun.
+	music               Music
+	masterVol, musicVol int
+	shuffle             bool
 
 	// The settings window (uikit/screens/settings.go): UI scale stepper,
 	// fullscreen/vsync/rail toggles and the two resets. Like every panel
@@ -274,6 +286,14 @@ func New(opts Options) (*Game, error) {
 		g.dev = 1
 	}
 	g.loadSettings() // <SavePath>.settings.json: ui_scale, fullscreen
+	// The audio seam is installed before anything can read it: nil (tests,
+	// simulate) is the silent nop, so no test can reach audio.NewContext.
+	g.music = opts.Music
+	if g.music == nil {
+		g.music = nopMusic{}
+	}
+	g.applyMusicSettings()
+	g.music.Start() // a real engine's Play is pending until the device opens
 	theme.SetScale(g.uiScale * g.dev)
 	g.w = int(math.Round(float64(defaultW) * g.dev))
 	g.h = int(math.Round(float64(defaultH) * g.dev))
@@ -418,6 +438,10 @@ func (g *Game) Update() error {
 
 	in := g.buildInput()
 
+	// Music advances identically at the title and in-game: the tick is on
+	// the mainline, before the title-phase branch.
+	g.music.Tick()
+
 	if g.title {
 		return g.updateTitle(in)
 	}
@@ -470,6 +494,7 @@ func (g *Game) Update() error {
 // settings sidecar carrying the last windowed size (best-effort — the
 // loop is ending and there is nowhere left to report an error).
 func (g *Game) quitPersist() {
+	g.music.Stop()
 	g.writeLayout()
 	g.flushSize = true
 	g.writeSettings()
@@ -859,6 +884,12 @@ func (g *Game) buildKit() error {
 		SetFullscreen:    func(on bool) { g.setFullscreen(on) },
 		RailCollapsed:    func() bool { return g.railCollapsed },
 		SetRailCollapsed: func(on bool) { g.setRailCollapsed(on) },
+		MasterVolume:     func() int { return g.masterVol },
+		StepMasterVolume: func(delta int) { g.stepMasterVolume(delta) },
+		MusicVolume:      func() int { return g.musicVol },
+		StepMusicVolume:  func(delta int) { g.stepMusicVolume(delta) },
+		Shuffle:          func() bool { return g.shuffle },
+		SetShuffle:       func(on bool) { g.setShuffle(on) },
 		ResetLayout:      func() { g.resetLayout() },
 		ResetAll:         func() { g.resetAllSettings() },
 	}

@@ -385,12 +385,12 @@ func TestTitleSettingsAndCredits(t *testing.T) {
 	if g.titleUI.sett == nil || g.titleUI.settRemove == nil {
 		t.Fatal("settings window did not mount from the title")
 	}
-	// The title mounts the same grown settings window: five rows + hint
+	// The title mounts the same grown settings window: eight rows + hint
 	// (the kit wraps a plain body in its clip container, so unwrap once).
 	clip := g.titleUI.sett.Win().Contents.(widget.Containerer)
 	body := clip.Children()[0].(widget.Containerer)
-	if n := len(body.Children()); n != 6 {
-		t.Errorf("title settings body rows = %d, want 6 (stepper, fullscreen, rail, reset, reset all, hint)", n)
+	if n := len(body.Children()); n != 9 {
+		t.Errorf("title settings body rows = %d, want 9 (stepper, fullscreen, rail, master, music, shuffle, reset, reset all, hint)", n)
 	}
 	// The new rail row is wired from the title too (same action bundle).
 	g.settActions.SetRailCollapsed(true)
@@ -404,6 +404,16 @@ func TestTitleSettingsAndCredits(t *testing.T) {
 	g.settActions.StepScale(1)
 	if g.uiScale == before {
 		t.Fatal("StepScale did not move the UI scale")
+	}
+	// The audio rows reach the same host state from the title mount.
+	g.settActions.StepMasterVolume(-1)
+	g.settActions.StepMusicVolume(-1)
+	g.settActions.SetShuffle(false)
+	if g.masterVol != 90 || g.musicVol != 60 || g.shuffle {
+		t.Errorf("title audio rows = (%d, %d, shuffle %v), want (90, 60, false)", g.masterVol, g.musicVol, g.shuffle)
+	}
+	if raw := readSettingsMap(t, g.settingsPath()); raw["master_volume"] != float64(90) || raw["shuffle_off"] != true {
+		t.Errorf("title audio sidecar = %v, want master 90 and shuffle_off true", raw)
 	}
 	if err := g.Update(); err != nil { // rebuild + remount after the scale change
 		t.Fatalf("Update after scale change: %v", err)

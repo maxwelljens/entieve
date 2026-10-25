@@ -244,11 +244,11 @@ var screens = []Screen{
 	},
 	{
 		// Like every panel it is rebuilt by buildKit, so its live state
-		// (scale ladder, fullscreen, vsync, rail, resets) is re-read
-		// from g in Sync.
+		// (scale ladder, fullscreen, vsync, rail, audio volumes, shuffle,
+		// resets) is re-read from g in Sync.
 		ID: pSettings, Title: "Settings", Icon: "kind_unknown",
 		Key: ebiten.KeyP, Action: "settings", Desc: "P — toggle settings (UI scale, display, layout)",
-		DefaultRect: image.Rect(490, 200, 790, 520), // uikit.NewSettings' landing rect
+		DefaultRect: image.Rect(490, 130, 790, 590), // uikit.NewSettings' landing rect
 		DockPolicy:  DockFloating, SidecarName: "settings",
 		Group: "Help & System",
 		Sync:  func(g *Game) { g.sett.Sync() },

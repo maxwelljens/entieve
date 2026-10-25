@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Music with master/music volume and shuffle** (`game`, `cmd/entieve`,
+  `uikit/screens`, `assets/audio`): the game now plays the six space
+  tracks as one shuffled pool everywhere — title, space and a docked
+  station — advancing to the next track when the current one ends. The
+  `P` Settings window grows two volume steppers (**Master**, **Music**;
+  10% steps, defaults 100% and 70%) and a **Shuffle** toggle (default on)
+  ahead of the reset buttons; the engine's output volume is
+  master × music, re-applied live and on every track change. Reset all
+  restores 100/70/shuffle-on, and `master_volume`, `music_volume` and the
+  inverted `shuffle_off` persist in `<save>.settings.json` (absent keys
+  read as the fresh-install defaults).
+  - The six `.ogg` files are embedded into the binary from
+    `assets/audio/` (they stay where they are; a shim beside them carries
+    the `//go:embed`), so releases need no `assets/` folder and the
+    binary grows by the ~14.5 MB of audio. Playback is cgo-free on every
+    release target via Ebitengine's `audio`/`vorbis` packages.
+  - The audio engine is constructed only on the `run` path; tests inject
+    a silent fake, so no headless path creates the one audio context.
+
 - **Expanded settings window** (`game`, `uikit/screens`): the `P` window
   now also carries a **vsync** toggle (default on — an absent key in an
   existing `settings.json` keeps today's behaviour), a **rail** collapse

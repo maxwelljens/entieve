@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/game"
@@ -100,6 +101,13 @@ func cmdRun(args []string, stdout, stderr io.Writer) int {
 		Seed:         *seed,
 		StartInTitle: startInTitle(*load),
 		Version:      version,
+		// The only site that reaches ebiten.RunGame builds the real music
+		// engine (audio.NewContext may exist once per process, never in a
+		// test): a shuffled pool seeded from the clock, decode failures
+		// reported here rather than fatal.
+		Music: game.NewMusic(time.Now().UnixNano(), func(err error) {
+			fmt.Fprintf(stderr, "entieve: music: %v\n", err)
+		}),
 	}
 	if *load != "" {
 		save, err := readSave(*load)

@@ -132,18 +132,30 @@ the Esc menu keeps its own key — the rail is not its launcher.
 The **Settings**
 window (`P`) holds the **UI scale** stepper (0.75× – 2.5×, applied live —
 every window, control and font rescales and keeps its arrangement), a
-**fullscreen** toggle, a **rail** collapse toggle, **Reset window layout**
-and **Reset all settings** (a second click on **Confirm reset all**
-restores 1× windowed with vsync on, the rail expanded and no saved window
-size); the scale, the fullscreen and vsync flags, the rail's collapse
-state and the last windowed size (written on clean quit) persist next to
+**fullscreen** toggle, a **rail** collapse toggle, **Master** and
+**Music** volume steppers (10% steps, 0–100%; a fresh install plays at
+100% × 70%), a **Shuffle** toggle (the six tracks in a shuffled pool,
+on by default), **Reset window layout** and **Reset all settings** (a
+second click on **Confirm reset all** restores 1× windowed with vsync on,
+the rail expanded, master 100% / music 70% / shuffle on and no saved
+window size); the scale, the fullscreen and vsync flags, the rail's
+collapse state, the two volumes, the shuffle flag and the last windowed
+size (written on clean quit) persist next to
 the save in `<save>.settings.json`, and
 the window arrangement itself persists in design units, so one saved
 layout works at every scale. Icons (from
 [game-icons.net](https://game-icons.net), credited per-icon in
 `uikit/icons/CREDITS.md`) mark service titles, action buttons, overview
 kinds and contract types — monochrome glyphs tinted to the theme, and
-every icon keeps its text label. Two panels are
+every icon keeps its text label.
+
+**Music** plays everywhere — the title, space and a docked station — from
+the six embedded tracks (`assets/audio/`): one shuffled pool, the next
+track starting when the current one ends, with no gap and no per-screen
+switch. The engine's output volume is the product of the two steppers,
+applied live and again on every track change; turning either to 0% (or
+shuffle aside) never stops play. Tracks are embedded in the binary, so a
+release needs no `assets/` folder next to it. Two panels are
 **always-on chrome** and cannot be closed or moved: the **ship status**
 panel (bottom center left half: the hull portrait, then a readout
 column — shield / armor / structure bars with their current/max values
@@ -166,6 +178,14 @@ selectors — **Orbit range** (2.5k–50k m) and **Warp to within** (0/10/50 km)
 — are pure state: clicking one only cycles its value and never issues a
 command. Warp, Orbit, `Z` and `Q` all act at the range their selector
 currently shows.
+
+**Music** plays everywhere — the title, space and a docked station — from
+the six embedded tracks (`assets/audio/`): one shuffled pool, the next
+track starting when the current one ends, with no gap and no per-screen
+switch. The engine's output volume is the product of the two steppers,
+applied live and again on every track change; turning either to 0% (or
+shuffle aside) never stops play. Tracks are embedded in the binary, so a
+release needs no `assets/` folder next to it.
 
 Default positions: overview top-right, selected item top-left, scanner
 in the center column under the top row, log bottom-left, the HUD pair
