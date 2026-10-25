@@ -183,9 +183,9 @@ func TestMarketTreeForgetsFoldsOnClose(t *testing.T) {
 	m.expanded["Modules"] = true
 	m.search.Insert("turret")
 
-	// What the kit's close does (winanim.startClose): the window goes
-	// hidden; the panel syncs once more while it fades.
-	theme.ShowWidget(m.Win().GetContainer().GetWidget(), false)
+	// What a committed × close does: the host's Dismissed hook runs once
+	// while the close fades, then the panel syncs once more.
+	m.Dismissed()
 	m.Sync()
 	if len(m.open) != 0 {
 		t.Fatalf("folds = %v after the window closed, want none", m.open)

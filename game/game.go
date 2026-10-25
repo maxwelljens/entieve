@@ -68,32 +68,6 @@ type Options struct {
 	Music Music
 }
 
-// panelID identifies one toggleable interface window. The always-on
-// chrome (Overview, Selected Item, HUD, rack) and the navigation rail
-// are managed separately. The enum is the compile-time half of the
-// Screen spec: rows are declared in this order (game/screens.go), and
-// TestScreenSpecMatchesRegistries pins the two together — the ids, their
-// count (numPanels) and the table order.
-type panelID int
-
-const (
-	pInventory panelID = iota
-	pFitting
-	pMarket
-	pManufacturing
-	pScanner
-	pMap
-	pHelp
-	pLog
-	pSettings
-	pServices
-	pRefinery
-	pFinances
-	pKeybindings
-	pMenu
-	numPanels
-)
-
 // Game implements ebiten.Game and hosts the uikit interface.
 type Game struct {
 	opts  Options
@@ -119,19 +93,11 @@ type Game struct {
 	hud  *uikit.Hud
 	rack *uikit.Rack
 
-	// Window panels (the log joined them: pLog below).
-	logP *uikit.LogPanel
-	inv  *uikit.Inventory
-	fitt *uikit.Fitting
-	mkt  *uikit.Market
-	manu *uikit.Manufacturing
-	ref  *uikit.Refinery
-	scan *uikit.Scanner
-	mp   *uikit.MapView
-	help *uikit.HelpPanel
-	fin  *uikit.Finances
-
-	menuWin *widget.Window
+	// host owns the Screen table's live state: open flags, mounts, the
+	// committed-close handshake and the placement tracker. The concrete
+	// panels are reached through bodyOf when the game calls into them
+	// (the log's feed, the market's search field).
+	host *ScreenHost
 
 	// The station services view (the one window docking opens): its
 	// window rides the panel registry like every Screen row, and svcUI
@@ -166,26 +132,12 @@ type Game struct {
 	masterVol, musicVol int
 	shuffle             bool
 
-	// The settings window (uikit/screens/settings.go): notched UI-scale
-	// slider, freeflow volume sliders, fullscreen/vsync/rail toggles and
-	// the two resets. Like every panel
-	// it is rebuilt by buildKit, so its live state is re-read from g in
-	// Sync. The action bundle rides a field (filled by buildKit) instead
-	// of being spelled inside the Screen row: naming setUIScale/applyScale
-	// there would make the spec table depend on the rebuild path that
-	// reads it — an initialization cycle, see uikit.go.
-	sett        *uikit.Settings
-	settActions uikit.SettingsActions
-
 	// Keybindings (game/keys.go): the live overrides, the armed row and
-	// its refusal notice, the window's action seam (the title screen and
-	// the in-game Screen row each build their own panel over it) and the
-	// built in-game panel.
+	// its refusal notice. The window's action seam rides the host's
+	// screenServices (Settings and Keys actions are assembled there).
 	binds         map[string]binding
 	captureAction string
 	keyNotice     string
-	keyActions    uikit.KeybindActions
-	keyUI         *uikit.Keybindings
 
 	// The station window's contract board (contracts.go): the body, the
 	// two row sections, the signature of the last rebuild and the
@@ -197,28 +149,13 @@ type Game struct {
 	stAvailRows []stationRow
 	stActRows   []stationRow
 
-	// open is the player-visible state of each toggleable window;
-	// mounted is its current AddWindow handle (nil = unmounted).
-	open    [numPanels]bool
-	mounted [numPanels]widget.RemoveWindowFunc
-
 	// mktSearchFocus opens the market for Ctrl+F and focuses its search
 	// field once the panel exists (the mount happens after the key pass).
 	mktSearchFocus bool
 
-	// screenWin is every Screen row's built window (Build's return
-	// value), refreshed with the kit — panelDefs resolves ids through it.
-	screenWin [numPanels]*widget.Window
-
 	// Selection lives in the kit: world clicks, the Tab cycle-lock and
-	// the overview all feed Kit.Select, the game reads Kit.Selected.
-	// placed is the last rect this session composed for each window,
-	// restored the windows positioned from the layout sidecar. A window
-	// is virgin — safe to (re)place when the viewport changes — while it
-	// carries no restored flag and still sits exactly where we last put
-	// it; anything else is the player's arrangement and is never stomped.
-	placed   map[*widget.Window]image.Rectangle
-	restored map[*widget.Window]bool
+	// the overview all feed Kit.Select, the game reads Kit.Selected. The
+	// placement tracker (placed/restored) lives on the host.
 
 	pendingLoad bool
 	quit        bool
@@ -307,18 +244,9 @@ func New(opts Options) (*Game, error) {
 	g.applyMusicSettings()
 	g.music.Start() // a real engine's Play is pending until the device opens
 	g.loadKeys()    // <SavePath>.keys.json: the keybinding overrides
-	g.keyActions = uikit.KeybindActions{
-		Rows:  func() []uikit.KeybindRow { return g.keybindRows() },
-		Begin: func(action string) { g.beginCapture(action) },
-		Reset: func() { g.resetKeys() },
-	}
 	theme.SetScale(g.uiScale * g.dev)
 	g.w = int(math.Round(float64(defaultW) * g.dev))
 	g.h = int(math.Round(float64(defaultH) * g.dev))
-	// The log is open by default (it used to be non-closable chrome);
-	// the saved layout may override this once the first screen size
-	// lands (see applyLayout).
-	g.open[pLog] = true
 	if err := g.buildKit(); err != nil {
 		return nil, err
 	}
@@ -413,9 +341,9 @@ func (g *Game) Layout(width, height int) (int, int) {
 // (re)places the movable default windows for the new viewport, then
 // restores the saved layout over them on the first real size
 // (user-dragged positions and sidecar entries survive later resizes:
-// placeDefaults only touches virgin windows, see placeIfVirgin). The
+// placeDefaults only touches virgin windows, see ScreenHost.Place). The
 // restored windows are re-clamped to the new screen on every size change
-// (see clampRestored) so a sidecar written at a larger resolution can
+// (see ScreenHost.ClampRestored) so a sidecar written at a larger resolution can
 // never strand a window off-screen. The root-overlay chrome anchors
 // itself, so a resize needs no refit from the game.
 func (g *Game) applySize(w, h int) {
@@ -433,7 +361,7 @@ func (g *Game) applySize(w, h int) {
 	if first {
 		g.applyLayout(w, h) // startup: read the sidecar once the screen is known
 	}
-	g.clampRestored(w, h)
+	g.host.ClampRestored(w, h)
 }
 
 // ---------------------------------------------------------------------------
@@ -480,14 +408,16 @@ func (g *Game) Update() error {
 
 	if evs := g.s.Events(); len(evs) > 0 {
 		g.onEvents(evs)
-		g.logP.Push(evs)
+		bodyOf[*uikit.LogPanel](g.host, idLog).Push(evs)
 	}
 
 	g.syncScenes()
 	g.syncPanels()
 	g.syncMounts()
-	if g.mktSearchFocus && g.mkt != nil {
-		g.mkt.FocusSearch()
+	if g.mktSearchFocus {
+		if mkt := bodyOf[*uikit.Market](g.host, idMarket); mkt != nil {
+			mkt.FocusSearch()
+		}
 		g.mktSearchFocus = false
 	}
 
@@ -553,8 +483,8 @@ func (g *Game) handleKeys(in Input) error {
 		// world hotkey yields. Esc with text clears the query first; Esc
 		// on an empty field blurs (SearchKey's false) and falls through
 		// to the normal Esc handling below.
-		if g.mkt != nil && g.mkt.SearchFocused() {
-			consumed := g.mkt.SearchKey(k)
+		if mkt := bodyOf[*uikit.Market](g.host, idMarket); mkt != nil && mkt.SearchFocused() {
+			consumed := mkt.SearchKey(k)
 			if consumed || k != ebiten.KeyEscape {
 				continue
 			}
@@ -573,7 +503,7 @@ func (g *Game) handleKeys(in Input) error {
 		case ctrl && k == ebiten.KeyF:
 			// Ctrl+F opens the market (if closed) and focuses its search
 			// field; the focus lands after the mount, below.
-			g.open[pMarket] = true
+			g.host.SetOpen(idMarket, true)
 			g.mktSearchFocus = true
 		case ctrl && k == ebiten.KeyS:
 			g.report(g.SaveGame(), "Game saved")
@@ -652,11 +582,7 @@ func (g *Game) syncPanels() {
 	g.hud.Sync()
 	g.rack.Sync()
 	g.syncRail()
-	for p := panelID(0); p < numPanels; p++ {
-		if g.mounted[p] != nil {
-			g.syncPanel(p)
-		}
-	}
+	g.host.Sync()
 }
 
 // syncRail refreshes the navigation rail (context gating and the
@@ -675,113 +601,46 @@ func (g *Game) syncRail() {
 	}
 }
 
-// syncPanel runs one panel's registered Sync (nil = nothing to sync).
-func (g *Game) syncPanel(p panelID) {
-	if s := panelDefs[p].sync; s != nil {
-		s(g)
-	}
-}
-
-// syncMounts reconciles the mounted window set with the desired state:
-// toggle intent, docked-only visibility and the chrome/core visibility.
-// The per-panel rule lives in panelDefs[p].want (one table), iterated in
-// enum order so the mount order — and the draw order it produces — is
-// stable.
+// syncMounts is the frame's composition: the room decides the mounts, one
+// chrome rule decides visibility, then the dock-only jobs run. Mount order
+// follows the spec (the host's slot order), so the draw stack does too.
 func (g *Game) syncMounts() {
-	if g.title {
-		return // the title phase mounts no gameplay chrome
-	}
 	docked := g.s.Docked.Has(g.s.Player())
-
-	for p := panelID(0); p < numPanels; p++ {
-		g.setPanel(p, panelDefs[p].want(g, docked))
-	}
-
-	// The ship HUD and module rack are space chrome: hidden on the root
-	// overlay while docked (legacy parity), and the kit's core windows
-	// (Overview / Selected Item) follow the same rule.
-	g.setChromeVisible(!docked)
-	g.kit.SetCoreVisible(!docked)
+	g.host.Reconcile(Room{Title: g.title, Docked: docked})
+	// Space chrome (HUD, rack, the kit's core windows) follows the room;
+	// top chrome (the rail) follows gameplay — the title shows neither.
+	g.applyChrome(!docked && !g.title, !g.title)
 
 	// The services view is an ordinary panel now (the station scene
-	// opens it, syncMounts mounts it); only the contract board keeps a
+	// opens it, the host mounts it); only the contract board keeps a
 	// docked-only refresh — it follows the docked station and the live
 	// mission state while the scene is up.
-	if docked {
+	if docked && !g.title {
 		g.syncStationBoard()
 	}
 
 	// The order mini-window is transient and docked-only: a player who
 	// leaves the station has no book to post to, so it closes with the
 	// dock (undock and jump — a jump implies undocked — both land here).
-	if !docked {
+	if !docked && !g.title {
 		g.kit.CloseOrder()
 	}
 }
 
-// setChromeVisible shows or hides the space chrome (HUD + module rack) on
-// the root overlay. Hidden widgets keep their last rect, so every hit-test
-// must check visibility first (see overUI).
-func (g *Game) setChromeVisible(show bool) {
-	setVisibility(g.hud.Container().GetWidget(), show)
-	setVisibility(g.rack.Container().GetWidget(), show)
+// applyChrome is the one visibility rule: the space chrome (HUD, rack,
+// kit core windows) follows space; the top chrome (rail) follows gameplay.
+func (g *Game) applyChrome(space, gameplay bool) {
+	theme.ShowWidget(g.hud.Container().GetWidget(), space)
+	theme.ShowWidget(g.rack.Container().GetWidget(), space)
+	g.kit.SetCoreVisible(space)
+	g.kit.SetTopsVisible(gameplay)
 }
 
-// setVisibility flips a widget's visibility (no-op when already there).
-func setVisibility(w *widget.Widget, show bool) {
-	vis := widget.Visibility_Show
-	if !show {
-		vis = widget.Visibility_Hide
-	}
-	if w.GetVisibility() != vis {
-		w.SetVisibility(vis)
-	}
-}
-
-// setPanel mounts or unmounts one toggleable window. A mount runs the
-// panel's Sync immediately: syncPanels (which runs before syncMounts)
-// skipped it while unmounted, so this is what puts current data on the
-// window before this frame's draw.
-//
-// Note (upstream): every Kit.AddWindow leaks a little on ebitenui's side
-// — the four event handlers AddWindowQuietly never removes plus a
-// Container.Validate button rebuild, ≈5.3 KB per mount cycle (measured;
-// see docs/ARCHITECTURE.md, "upstream window-remount leak"). Unmounting
-// is still the right semantics: a hidden window would keep gating world
-// input and change the mount-order draw stack, so this is documented,
-// not "fixed" by hiding panels instead.
-func (g *Game) setPanel(p panelID, want bool) {
-	have := g.mounted[p] != nil
-	if want == have {
-		return
-	}
-	if !want && p == pKeybindings {
-		g.cancelCapture() // a closed capture row must not eat keys
-	}
-	if want {
-		g.mounted[p] = g.kit.AddWindow(g.panelWindow(p))
-		g.syncPanel(p)
-		return
-	}
-	g.mounted[p]()
-	g.mounted[p] = nil
-}
-
-// panelWindow returns the window backing a panel id (nil for an id
-// outside the enum).
-func (g *Game) panelWindow(p panelID) *widget.Window {
-	if p < 0 || p >= numPanels {
-		return nil
-	}
-	return g.screenWin[p]
-}
-
-// overUI reports whether the pointer sits on any interface panel: the
-// exact rects of every measurable panel (the kit's core windows, the
-// root-overlay chrome (HUD, rack, rail), the menu, all mounted toggle
-// windows — the log among them while it is open) plus ebitenui's own
-// hover flag, which covers what the game cannot measure (rack tooltips,
-// ephemeral windows). The hover flag only
+// overUI reports whether the pointer sits on interface panel chrome: the
+// kit's own exact rects (the core windows, every mounted window — the log
+// among them while it is open — and the rail), the root-overlay chrome
+// (HUD, rack) and ebitenui's hover flag, which covers what the game cannot
+// measure (rack tooltips, ephemeral windows). The hover flag only
 // refreshes in Draw, so it lags a frame behind the pointer — the exact
 // rects are the honest gate, the flag is a backstop.
 // ebitenui does not gate raw ebiten input, so world mouse handling must
@@ -802,23 +661,7 @@ func (g *Game) overUI(x, y float64) bool {
 	if g.menuModal {
 		return true
 	}
-	if hitWidget(pt, g.kit.OverviewWindow().GetContainer().GetWidget()) {
-		return true
-	}
-	if hitWidget(pt, g.kit.SelectedWindow().GetContainer().GetWidget()) {
-		return true
-	}
-	// The Show Info window is a normal (non-modal) window, but only while
-	// it is up: closed it is unmounted AND hidden, and a hidden widget
-	// keeps its last rect (hitWidget checks visibility).
-	if hitWidget(pt, g.kit.InfoWindow().GetContainer().GetWidget()) {
-		return true
-	}
-	// The order mini-window is a normal (non-modal) window too: it gates
-	// the world while it is up (closed it is unmounted and hidden).
-	if ow := g.kit.OrderWindow(); ow != nil && hitWidget(pt, ow.GetContainer().GetWidget()) {
-		return true
-	}
+	// The HUD's children are anchored root-overlay chrome, not windows.
 	if g.hud != nil && isVisible(g.hud.Container().GetWidget()) {
 		for _, ch := range g.hud.Container().Children() {
 			if hitWidget(pt, ch.GetWidget()) {
@@ -829,20 +672,7 @@ func (g *Game) overUI(x, y float64) bool {
 	if g.rack != nil && hitWidget(pt, g.rack.Container().GetWidget()) {
 		return true
 	}
-	// The log is a mounted window like the rest: when it is closed the
-	// loop below skips it, so a closed log never gates the world.
-	for p := panelID(0); p < numPanels; p++ {
-		if g.mounted[p] == nil {
-			continue
-		}
-		if hitWidget(pt, g.panelWindow(p).GetContainer().GetWidget()) {
-			return true
-		}
-	}
-	if g.rail != nil && hitWidget(pt, g.rail.Container().GetWidget()) {
-		return true
-	}
-	return false
+	return g.kit.Over(pt)
 }
 
 // hitWidget reports whether pt sits on w: visible (a hidden widget keeps
@@ -861,7 +691,7 @@ func (g *Game) report(err error, okMsg string) {
 	if err != nil {
 		sev, msg = sim.SevDanger, "Failed: "+err.Error()
 	}
-	g.logP.PushLine(sev, msg)
+	bodyOf[*uikit.LogPanel](g.host, idLog).PushLine(sev, msg)
 }
 
 // ---------------------------------------------------------------------------
@@ -871,9 +701,9 @@ func (g *Game) report(err error, okMsg string) {
 // buildKit constructs the kit, every panel and the root-overlay chrome
 // against the current sim. LoadGame re-runs it: panels hold sim
 // references, so a restore rebuilds the whole interface (selection
-// resets; the toggle intent in g.open survives, LoadGame carries the
-// log history across, and LoadGame re-applies the saved window layout
-// after this returns).
+// resets; the host's open flags survive, LoadGame carries the log history
+// across, and LoadGame re-applies the saved window layout after this
+// returns).
 func (g *Game) buildKit() error {
 	kit, err := uikit.NewKit(g.opts.Content, g.s, func(cmd sim.Command) { g.enqueue(cmd) })
 	if err != nil {
@@ -897,45 +727,6 @@ func (g *Game) buildKit() error {
 	// same source the F-key module toggles use — before falling back to
 	// the first suitable lock.
 	g.rack.SetTargetPicker(func() ecs.Entity { return kit.Selected() })
-
-	// One pass over the Screen spec: each row builds its window (and the
-	// panel handle it lives in) and carries its modal flag. The settings
-	// actions are assembled here — see Game.settActions for why the row
-	// reaches them through a field.
-	g.settActions = uikit.SettingsActions{
-		UIScale:          func() float64 { return g.uiScale },
-		UIScaleLadder:    uiScaleSteps[:],
-		SetUIScale:       func(rung float64) { g.setUIScale(rung) },
-		Fullscreen:       func() bool { return g.fullscreen },
-		SetFullscreen:    func(on bool) { g.setFullscreen(on) },
-		RailCollapsed:    func() bool { return g.railCollapsed },
-		SetRailCollapsed: func(on bool) { g.setRailCollapsed(on) },
-		MasterVolume:     func() int { return g.masterVol },
-		SetMasterVolume:  func(v int) { g.setMasterVolume(v) },
-		MusicVolume:      func() int { return g.musicVol },
-		SetMusicVolume:   func(v int) { g.setMusicVolume(v) },
-		PersistSettings:  func() { g.persistSettings() },
-		Shuffle:          func() bool { return g.shuffle },
-		SetShuffle:       func(on bool) { g.setShuffle(on) },
-		ResetLayout:      func() { g.resetLayout() },
-		ResetAll:         func() { g.resetAllSettings() },
-	}
-	g.screenWin = [numPanels]*widget.Window{}
-	for _, s := range screens {
-		win := s.Build(g)
-		g.screenWin[s.ID] = win
-		if s.Modal {
-			win.Modal = true
-		}
-		// The title-bar × for every row: wired through the row's OWN
-		// close semantics — the same toggle its key and rail entry
-		// perform (non-modal rows flip the open flag, modal rows pop
-		// their scene), so reopen behavior is untouched. Rows without a
-		// title bar (the station services view) register harmlessly: the
-		// kit attaches no button for them.
-		s := s
-		kit.SetWindowClose(win, func() { g.toggleScreen(s.Title) })
-	}
 
 	// Always-on chrome mounts straight onto the kit's root overlay — no
 	// full-screen wrapper windows: the HUD stretches across the root and
@@ -968,39 +759,72 @@ func (g *Game) buildKit() error {
 	g.rack.Container().GetWidget().TrackHover = true
 	g.rail.Container().GetWidget().TrackHover = true
 
-	// Panels are fresh: no mounts, no selection (documented). The
-	// placement records belong to the old windows — drop them with the
-	// kit (a load rebuild re-composes the defaults, then applyLayout
-	// brings the player's saved arrangement back over them).
-	g.mounted = [numPanels]widget.RemoveWindowFunc{}
-	g.placed = map[*widget.Window]image.Rectangle{}
-	g.restored = map[*widget.Window]bool{}
+	// The Screen host: one row per window, built and ×-registered in
+	// spec order before the first mount. A rebuild drops the old panels
+	// (the old kit owns them) but keeps the player's open flags.
+	svc := g.gameServices()
+	if g.host == nil {
+		g.host = newScreenHost(screens, gameScope, kit, svc)
+		// The log is open by default (it used to be non-closable
+		// chrome); a saved layout may override this once applyLayout
+		// runs.
+		g.host.SetOpen(idLog, true)
+	} else {
+		g.host.Rebind(kit, svc)
+	}
+	g.host.Warm()
 
 	g.placeDefaults(g.w, g.h)
 	g.syncMounts()
 	if g.title {
 		// A rebuild (load, scale change) during the title phase: the old
 		// title widgets belonged to the kit just dropped, and the fresh
-		// kit's chrome must stay hidden until the title is left.
+		// kit's chrome stays hidden until the title is left.
 		if g.titleUI != nil {
 			g.titleUI.detach()
+			g.titleUI.host.Rebind(kit, g.gameServices())
 		}
-		g.hideGameplayChrome()
 	}
 	return nil
 }
 
-// hideGameplayChrome unmounts every gameplay window and hides the
-// always-on chrome (HUD, rack, rail, core windows) without touching the
-// player's open flags — leaving the title re-mounts them from those flags
-// exactly as a normal boot would.
-func (g *Game) hideGameplayChrome() {
-	for p := panelID(0); p < numPanels; p++ {
-		g.setPanel(p, false)
+// gameServices assembles the game-backed bundle a Screen row's Build may
+// reach through the host.
+func (g *Game) gameServices() screenServices {
+	return screenServices{
+		Env: g.env,
+		Settings: uikit.SettingsActions{
+			UIScale:          func() float64 { return g.uiScale },
+			UIScaleLadder:    uiScaleSteps[:],
+			SetUIScale:       func(rung float64) { g.setUIScale(rung) },
+			Fullscreen:       func() bool { return g.fullscreen },
+			SetFullscreen:    func(on bool) { g.setFullscreen(on) },
+			RailCollapsed:    func() bool { return g.railCollapsed },
+			SetRailCollapsed: func(on bool) { g.setRailCollapsed(on) },
+			MasterVolume:     func() int { return g.masterVol },
+			SetMasterVolume:  func(v int) { g.setMasterVolume(v) },
+			MusicVolume:      func() int { return g.musicVol },
+			SetMusicVolume:   func(v int) { g.setMusicVolume(v) },
+			PersistSettings:  func() { g.persistSettings() },
+			Shuffle:          func() bool { return g.shuffle },
+			SetShuffle:       func(on bool) { g.setShuffle(on) },
+			ResetLayout:      func() { g.resetLayout() },
+			ResetAll:         func() { g.resetAllSettings() },
+		},
+		Keys: uikit.KeybindActions{
+			Rows:  func() []uikit.KeybindRow { return g.keybindRows() },
+			Begin: func(action string) { g.beginCapture(action) },
+			Reset: func() { g.resetKeys() },
+		},
+		HelpRows: func() []uikit.KeyRow { return helpRowsFor(g) },
+		Menu:     func() widgets.WindowPanel { return winPanel{win: g.buildMenuWindow()} },
+		Station: func() widgets.WindowPanel {
+			win := g.buildServicesWindow()
+			return winPanel{win: win, sync: func() { g.svcUI.Sync() }}
+		},
+		Close:  g.toggleScreenID,
+		Cancel: g.cancelCapture,
 	}
-	g.setChromeVisible(false)
-	g.kit.SetCoreVisible(false)
-	g.kit.SetTopsVisible(false)
 }
 
 // placeDefaults (re)places every movable default window for the current
@@ -1018,12 +842,12 @@ func (g *Game) hideGameplayChrome() {
 // content height by contracts.go). Nothing is composed specially for the
 // docked state.
 //
-// Every placement goes through placeIfVirgin: a window the player
+// Every placement goes through ScreenHost.Place: a window the player
 // dragged, or one restored from the layout sidecar, keeps its
 // position — so recomposing on a viewport change never stomps an
 // arrangement.
 func (g *Game) placeDefaults(w, h int) {
-	place := g.placeIfVirgin
+	place := g.host.Place
 	// The rail column fits the viewport: cap it to the room under its
 	// top inset (plus the bottom margin every window keeps), so the
 	// entry column clips + wheel-scrolls inside the screen instead of
@@ -1057,47 +881,22 @@ func (g *Game) placeDefaults(w, h int) {
 	// 1024×700 minimum, so that one overlap is inherent (see
 	// TestVirginPlacementTable); every other row clears the rail gutter
 	// and stays on screen.
-	for _, s := range screens {
-		win := g.screenWin[s.ID]
-		r := win.GetContainer().GetWidget().Rect
-		if r.Dx() <= 0 || r.Dy() <= 0 {
-			continue // never laid out: there is nothing to position
-		}
-		place(win, anchorRect(s.DefaultRect, s.Anchor, r.Dx(), r.Dy(), w, h))
-	}
+	g.host.PlaceDefaults(w, h)
 	// The Show Info window floats: centered like the other on-demand
 	// overlays (its sidecar rect wins once the player has one, and it is
 	// hidden until the first Show anyway). It is a geometry-only sidecar
-	// special, not a Screen row — see layoutTarget.
+	// special, not a Screen row — see layoutEntry.
 	if r := g.kit.InfoWindow().GetContainer().GetWidget().Rect; r.Dx() > 0 && r.Dy() > 0 {
 		place(g.kit.InfoWindow(), centerRect(r.Dx(), r.Dy(), w, h))
 	}
 	// The order mini-window floats too: centred on first use. It is a
 	// transient dialog with no sidecar rect (never persisted), and
-	// placeIfVirgin still refuses to stomp a dragged position.
+	// ScreenHost.Place still refuses to stomp a dragged position.
 	if ow := g.kit.OrderWindow(); ow != nil {
 		if r := ow.GetContainer().GetWidget().Rect; r.Dx() > 0 && r.Dy() > 0 {
 			place(ow, centerRect(r.Dx(), r.Dy(), w, h))
 		}
 	}
-}
-
-// placeIfVirgin moves win to rect unless the player owns its position:
-// a window restored from the layout sidecar, or one that no longer sits
-// on the last rect we composed (only a drag/resize moves a window off
-// it — hidden and unmounted windows keep their rect).
-func (g *Game) placeIfVirgin(win *widget.Window, rect image.Rectangle) {
-	if g.restored[win] {
-		return
-	}
-	if prev, ok := g.placed[win]; ok && win.GetContainer().GetWidget().Rect != prev {
-		return // player-moved: never stomp it again
-	}
-	win.SetLocation(rect)
-	// Read back what SetLocation actually applied: it grows a rect below
-	// MinSize, and the tracker must hold the real rect or the window
-	// would read as player-moved from here on.
-	g.placed[win] = win.GetContainer().GetWidget().Rect
 }
 
 // helpRows converts KeyMap into the help panel's row shape (the shared
@@ -1328,14 +1127,15 @@ func (g *Game) LoadGame() error {
 	}
 	// The log is not part of the save: capture it before the rebuild and
 	// restore it into the fresh panel afterwards.
-	lines := g.logP.Lines()
+	logPanel := bodyOf[*uikit.LogPanel](g.host, idLog)
+	lines := logPanel.Lines()
 	if err := g.s.Restore(&save); err != nil {
 		return err
 	}
 	if err := g.buildKit(); err != nil {
 		return err
 	}
-	g.logP.SetLines(lines)
+	bodyOf[*uikit.LogPanel](g.host, idLog).SetLines(lines)
 	g.applyLayout(g.w, g.h) // AFTER the rebuild: fresh windows, fresh mounts
 	if g.space != nil {
 		g.space.ResetView()

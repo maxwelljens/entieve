@@ -148,6 +148,15 @@ func (k *Kit) SetWindowClose(w *widget.Window, close func()) {
 	k.closeBtns[w] = btn
 }
 
+// Closing reports whether w has a committed close fade running — the ×
+// was pressed and the fade has not settled yet. Hosts read it before their
+// mount reconciliation clears the mount, so a chrome close can run its
+// one-shot dismiss hook while a hotkey unmount never does.
+func (k *Kit) Closing(w *widget.Window) bool {
+	a, ok := k.anims[w]
+	return ok && !a.open
+}
+
 // CloseButtonOf returns win's × button (nil when the window is not
 // closable or has no title bar) — the handle tests press.
 func (k *Kit) CloseButtonOf(w *widget.Window) *widget.Button { return k.closeBtns[w] }

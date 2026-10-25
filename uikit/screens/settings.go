@@ -54,8 +54,8 @@ type SettingsActions struct {
 
 // Settings is the settings window: a notched UI-scale slider, fullscreen
 // and rail toggles, freeflow master/music volume sliders, a shuffle toggle
-// and the two reset buttons. It mounts like every other panel (panelDefs,
-// sidecar name "settings", key P) and rebuilds with the interface, so all
+// and the two reset buttons. It mounts like every other panel (Screen id
+// "settings" — its sidecar key — key P) and rebuilds with the interface, so all
 // of its displayed state is re-read from the actions in Sync — including
 // right after a live scale change rebuilt it under itself (the replacement
 // slider starts idle; the drag is over, never re-fired).

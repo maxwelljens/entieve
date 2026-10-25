@@ -12,6 +12,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -160,9 +161,9 @@ func mountedRects(g *Game) []struct {
 	}
 	add("overview", g.kit.OverviewWindow().GetContainer().GetWidget())
 	add("selected", g.kit.SelectedWindow().GetContainer().GetWidget())
-	for p := panelID(0); p < numPanels; p++ {
-		if g.mounted[p] != nil {
-			add(panelNames[p], g.panelWindow(p).GetContainer().GetWidget())
+	for _, p := range g.host.IDs() {
+		if g.host.Mounted(p) {
+			add(panelNames[p], g.host.Window(p).GetContainer().GetWidget())
 		}
 	}
 	// Root-overlay chrome: the HUD's visible children (the target-box row
@@ -189,8 +190,8 @@ func chromeShown(g *Game) bool {
 // panelNames labels the panel ids for test output — derived from the
 // Screen spec (the sidecar key, or the lowercased title for the screen
 // that is not persisted).
-var panelNames = func() map[panelID]string {
-	m := make(map[panelID]string, len(screens))
+var panelNames = func() map[ScreenID]string {
+	m := make(map[ScreenID]string, len(screens))
 	for _, s := range screens {
 		m[s.ID] = screenLabel(s)
 	}
@@ -277,7 +278,7 @@ func TestSceneDrawSmoke(t *testing.T) {
 
 		// Starmap: an ordinary window now, so it stacks over the help
 		// overlay without a modal scene or a dim backdrop.
-		g.open[pMap] = true
+		g.host.SetOpen(idMap, true)
 		g.syncMounts()
 		pump(t, g, size[0], size[1])
 		g.Draw(img)
@@ -289,7 +290,7 @@ func TestSceneDrawSmoke(t *testing.T) {
 		g.Draw(img)
 		g.pop()
 		g.pop()
-		g.open[pMap] = false
+		g.host.SetOpen(idMap, false)
 		g.syncMounts()
 
 		// Station view: docked chrome + the services view.
@@ -307,10 +308,10 @@ func TestSceneDrawSmoke(t *testing.T) {
 // blurb) sizes itself inside the minimum window.
 func TestHelpWindowFits(t *testing.T) {
 	g := newSmokeGame(t)
-	g.open[pHelp] = true
+	g.host.SetOpen(idHelp, true)
 	g.syncMounts()
 	pump(t, g, 1024, 700)
-	r := g.help.Win().GetContainer().GetWidget().Rect
+	r := bodyOf[*uikit.HelpPanel](g.host, idHelp).Win().GetContainer().GetWidget().Rect
 	if r.Dx() == 0 || r.Dy() == 0 {
 		t.Fatal("help window never laid out")
 	}
@@ -355,24 +356,25 @@ func TestFrameReconcilesMounts(t *testing.T) {
 	check := func(stage string) {
 		t.Helper()
 		docked := g.s.Docked.Has(g.s.Player())
-		for p := panelID(0); p < numPanels; p++ {
-			want := panelDefs[p].want(g, docked)
-			if got := g.mounted[p] != nil; got != want {
+		for _, p := range g.host.IDs() {
+			want := g.host.Want(p, Room{Docked: docked})
+			if got := g.host.Mounted(p); got != want {
 				t.Errorf("%s: %s mounted=%v, want %v (open=%v docked=%v)",
-					stage, panelNames[p], got, want, *panelDefs[p].open(g), docked)
+					stage, panelNames[p], got, want, g.host.IsOpen(p), docked)
 			}
 		}
 	}
 
 	// Space with mixed intent: one frame mounts inventory and log,
 	// leaves market closed, keeps the space-only scanner up.
-	g.open[pInventory], g.open[pMarket] = true, false
-	g.open[pScanner] = true
+	g.host.SetOpen(idInventory, true)
+	g.host.SetOpen(idMarket, false)
+	g.host.SetOpen(idScanner, true)
 	if err := g.Update(); err != nil {
 		t.Fatalf("space frame: %v", err)
 	}
 	check("space")
-	if g.mounted[pInventory] == nil || g.mounted[pMarket] != nil || g.mounted[pScanner] == nil {
+	if !g.host.Mounted(idInventory) || g.host.Mounted(idMarket) || !g.host.Mounted(idScanner) {
 		t.Error("space mounts do not follow the intent the frame was given")
 	}
 
@@ -384,14 +386,14 @@ func TestFrameReconcilesMounts(t *testing.T) {
 		t.Fatalf("dock frame: %v", err)
 	}
 	check("docked")
-	if g.mounted[pScanner] != nil {
+	if g.host.Mounted(idScanner) {
 		t.Error("scanner still mounted while docked")
 	}
-	if !g.open[pServices] || g.mounted[pServices] == nil {
+	if !g.host.IsOpen(idServices) || !g.host.Mounted(idServices) {
 		t.Error("services view not opened by the dock frame")
 	}
-	for _, p := range []panelID{pMarket, pFitting, pManufacturing} {
-		if g.open[p] || g.mounted[p] != nil {
+	for _, p := range []ScreenID{idMarket, idFitting, idManufacturing} {
+		if g.host.IsOpen(p) || g.host.Mounted(p) {
 			t.Errorf("docking opened %s as well — only the services view auto-opens", panelNames[p])
 		}
 	}
@@ -404,13 +406,13 @@ func TestFrameReconcilesMounts(t *testing.T) {
 		t.Fatalf("undock frame: %v", err)
 	}
 	check("undocked")
-	if g.open[pServices] || g.mounted[pServices] != nil {
+	if g.host.IsOpen(idServices) || g.host.Mounted(idServices) {
 		t.Error("services view still open after the undock frame")
 	}
-	if g.mounted[pScanner] == nil {
+	if !g.host.Mounted(idScanner) {
 		t.Error("scanner not restored by the undock frame")
 	}
-	if g.mounted[pInventory] == nil {
+	if !g.host.Mounted(idInventory) {
 		t.Error("player-opened inventory closed by the undock frame")
 	}
 }
@@ -423,7 +425,7 @@ func TestFrameDrainsSimEventSameFrame(t *testing.T) {
 	if n := len(g.s.Missions()); n != 0 {
 		t.Fatalf("fixture: %d missions already accepted", n)
 	}
-	before := len(g.logP.Lines())
+	before := len(bodyOf[*uikit.LogPanel](g.host, idLog).Lines())
 	g.s.Queue(sim.CmdAcceptMission{ID: "contract-solace-cleanup-1"})
 
 	// Whichever frame's sim step runs the queued command must also drain
@@ -437,7 +439,7 @@ func TestFrameDrainsSimEventSameFrame(t *testing.T) {
 			continue // the frame's step has not run the command yet
 		}
 		stepped = true
-		lines := g.logP.Lines()
+		lines := bodyOf[*uikit.LogPanel](g.host, idLog).Lines()
 		if len(lines) <= before {
 			t.Fatalf("mission accepted but its event never reached the log in that frame (%d → %d lines)",
 				before, len(lines))
@@ -467,7 +469,7 @@ func TestPendingLoadSwapsKitAfterPump(t *testing.T) {
 
 	g.push(&MenuScene{g: g})
 	g.syncMounts()
-	if g.mounted[pMenu] == nil {
+	if !g.host.Mounted(idMenu) {
 		t.Fatal("menu window not mounted")
 	}
 	load := menuButton(t, g, "Load")
@@ -490,7 +492,7 @@ func TestPendingLoadSwapsKitAfterPump(t *testing.T) {
 	if g.kit == oldKit {
 		t.Fatal("staged load did not rebuild the kit after the pump")
 	}
-	if g.mounted[pMenu] == nil {
+	if !g.host.Mounted(idMenu) {
 		t.Error("menu not remounted by the rebuild")
 	}
 }
@@ -516,9 +518,9 @@ func menuButton(t *testing.T, g *Game, label string) *widget.Button {
 			}
 		}
 	}
-	ctr, ok := g.menuWin.GetContainer().(widget.Containerer)
+	ctr, ok := g.host.Window(idMenu).GetContainer().(widget.Containerer)
 	if !ok {
-		t.Fatalf("menu container is %T", g.menuWin.GetContainer())
+		t.Fatalf("menu container is %T", g.host.Window(idMenu).GetContainer())
 	}
 	walk(ctr)
 	if found == nil {

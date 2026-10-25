@@ -48,7 +48,7 @@ func TestPlacedDefaultRectsClearTheRailGutter(t *testing.T) {
 					cases = append(cases, struct {
 						name string
 						win  *widget.Window
-					}{s.Title, g.screenWin[s.ID]})
+					}{s.Title, g.host.Window(s.ID)})
 				}
 
 				floor := theme.Px(uikit.RailInset)
@@ -135,13 +135,13 @@ func TestVirginPlacementTable(t *testing.T) {
 				check("show info", g.kit.InfoWindow().GetContainer().GetWidget().Rect)
 				check("station services", g.svcWin.GetContainer().GetWidget().Rect)
 				for _, s := range screens {
-					check(s.Title, g.screenWin[s.ID].GetContainer().GetWidget().Rect)
+					check(s.Title, g.host.Window(s.ID).GetContainer().GetWidget().Rect)
 				}
 
 				// The boot set is pairwise disjoint…
 				ov := g.kit.OverviewWindow().GetContainer().GetWidget().Rect
 				sp := g.kit.SelectedWindow().GetContainer().GetWidget().Rect
-				lg := g.logP.Win().GetContainer().GetWidget().Rect
+				lg := bodyOf[*uikit.LogPanel](g.host, idLog).Win().GetContainer().GetWidget().Rect
 				for _, p := range []struct {
 					a, b   string
 					ra, rb image.Rectangle

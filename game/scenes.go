@@ -68,14 +68,14 @@ type StationScene struct {
 // its fade-in from the world.
 func (sc *StationScene) OnEnter() {
 	sc.fade = 0
-	sc.g.open[pServices] = true
+	sc.g.host.SetOpen(idServices, true)
 }
 
 // OnLeave implements Scene: undocking closes the services view and
 // leaves every player-opened window exactly as it was. The frame is
 // removed with it, so the artwork cuts straight back to the world — the
 // fade is entry-only by design.
-func (sc *StationScene) OnLeave() { sc.g.open[pServices] = false }
+func (sc *StationScene) OnLeave() { sc.g.host.SetOpen(idServices, false) }
 
 // Update advances the backdrop's fade-in and nothing else: world input
 // stays off because this scene is on top. The counter settles at full and
@@ -195,10 +195,10 @@ func (sc *StationScene) drawDockedTitle(dst *ebiten.Image, a float32) {
 type HelpScene struct{ g *Game }
 
 // OnEnter implements Scene.
-func (sc *HelpScene) OnEnter() { sc.g.open[pHelp] = true }
+func (sc *HelpScene) OnEnter() { sc.g.host.SetOpen(idHelp, true) }
 
 // OnLeave implements Scene.
-func (sc *HelpScene) OnLeave() { sc.g.open[pHelp] = false }
+func (sc *HelpScene) OnLeave() { sc.g.host.SetOpen(idHelp, false) }
 
 // Update is a no-op: H / Esc close the scene.
 func (sc *HelpScene) Update(in Input) error { return nil }
@@ -220,10 +220,10 @@ var menuItems = []string{"Resume", "Save", "Save as…", "Load", "Quit"}
 type MenuScene struct{ g *Game }
 
 // OnEnter implements Scene: mounts the menu window.
-func (sc *MenuScene) OnEnter() { sc.g.open[pMenu] = true }
+func (sc *MenuScene) OnEnter() { sc.g.host.SetOpen(idMenu, true) }
 
 // OnLeave implements Scene: unmounts the menu window.
-func (sc *MenuScene) OnLeave() { sc.g.open[pMenu] = false }
+func (sc *MenuScene) OnLeave() { sc.g.host.SetOpen(idMenu, false) }
 
 // Update is a no-op: the buttons run inside Kit.Update.
 func (sc *MenuScene) Update(in Input) error { return nil }

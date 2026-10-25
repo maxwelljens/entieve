@@ -126,16 +126,16 @@ func TestRailClicksToggleWindows(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
-	if g.open[pMarket] || g.mounted[pMarket] != nil {
+	if g.host.IsOpen(idMarket) || g.host.Mounted(idMarket) {
 		t.Fatal("fixture: market already open in space")
 	}
 
 	click(t, g, g.rail.Button("Market"))
-	if !g.open[pMarket] {
+	if !g.host.IsOpen(idMarket) {
 		t.Fatal("rail click did not open the market")
 	}
 	g.syncMounts()
-	if g.mounted[pMarket] == nil {
+	if !g.host.Mounted(idMarket) {
 		t.Fatal("opened market did not mount (a mount is the raise to the top)")
 	}
 	// The entry's open-state closure tracks the window (the accent glow
@@ -146,11 +146,11 @@ func TestRailClicksToggleWindows(t *testing.T) {
 	}
 
 	click(t, g, g.rail.Button("Market"))
-	if g.open[pMarket] {
+	if g.host.IsOpen(idMarket) {
 		t.Fatal("second rail click did not close the market")
 	}
 	g.syncMounts()
-	if g.mounted[pMarket] != nil {
+	if g.host.Mounted(idMarket) {
 		t.Fatal("closed market stayed mounted")
 	}
 
@@ -183,20 +183,20 @@ func TestRailGrayedClicksDoNothing(t *testing.T) {
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
 
-	if g.open[pServices] {
+	if g.host.IsOpen(idServices) {
 		t.Fatal("fixture: services view open in space")
 	}
 	click(t, g, g.rail.Button("Station Services"))
-	if g.open[pServices] {
+	if g.host.IsOpen(idServices) {
 		t.Error("grayed services entry toggled its window in space")
 	}
 
 	g = dockedShowcaseGame(t, 1280, 720)
-	if g.open[pScanner] {
+	if g.host.IsOpen(idScanner) {
 		t.Fatal("fixture: scanner open while docked")
 	}
 	click(t, g, g.rail.Button("Scanner"))
-	if g.open[pScanner] {
+	if g.host.IsOpen(idScanner) {
 		t.Error("grayed scanner entry toggled its window while docked")
 	}
 	if g.rail.Button("Station Services").GetWidget().Disabled {
@@ -222,34 +222,34 @@ func TestDockOpensExactlyTheServicesView(t *testing.T) {
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
 
-	before := g.open
+	before := g.host.OpenFlags()
 	dockAt(t, g)
 	pump(t, g, 1280, 720)
 
-	if !g.open[pServices] || g.mounted[pServices] == nil {
+	if !g.host.IsOpen(idServices) || !g.host.Mounted(idServices) {
 		t.Fatal("services view did not open on dock")
 	}
-	for p := panelID(0); p < numPanels; p++ {
-		if p == pServices {
+	for _, p := range g.host.IDs() {
+		if p == idServices {
 			continue
 		}
-		if g.open[p] != before[p] {
+		if g.host.IsOpen(p) != before[p] {
 			t.Errorf("docking flipped %s (%v → %v) — only the services view may open",
-				panelNames[p], before[p], g.open[p])
+				panelNames[p], before[p], g.host.IsOpen(p))
 		}
-		if g.mounted[p] != nil && !before[p] && p != pServices {
+		if g.host.Mounted(p) && !before[p] && p != idServices {
 			t.Errorf("docking mounted %s without the player opening it", panelNames[p])
 		}
 	}
 
 	g.s.Docked.Remove(g.s.Player())
 	pump(t, g, 1280, 720)
-	if g.open[pServices] || g.mounted[pServices] != nil {
+	if g.host.IsOpen(idServices) || g.host.Mounted(idServices) {
 		t.Error("undocking did not close the services view")
 	}
-	for p := panelID(0); p < numPanels; p++ {
-		if g.open[p] != before[p] {
-			t.Errorf("undocking left %s at %v, want its pre-dock state %v", panelNames[p], g.open[p], before[p])
+	for _, p := range g.host.IDs() {
+		if g.host.IsOpen(p) != before[p] {
+			t.Errorf("undocking left %s at %v, want its pre-dock state %v", panelNames[p], g.host.IsOpen(p), before[p])
 		}
 	}
 }
@@ -265,11 +265,11 @@ func TestRailPlacesOpenedWindowsWhileDocked(t *testing.T) {
 	}
 
 	wins := map[string]*widget.Window{
-		"Market": g.mkt.Win(), "Inventory": g.inv.Win(), "Fitting": g.fitt.Win(),
+		"Market": bodyOf[*uikit.Market](g.host, idMarket).Win(), "Inventory": bodyOf[*uikit.Inventory](g.host, idInventory).Win(), "Fitting": bodyOf[*uikit.Fitting](g.host, idFitting).Win(),
 	}
 	defaults := map[string]image.Rectangle{
-		"Market": serviceDefaults[pMarket], "Inventory": serviceDefaults[pInventory],
-		"Fitting": serviceDefaults[pFitting],
+		"Market": serviceDefaults[idMarket], "Inventory": serviceDefaults[idInventory],
+		"Fitting": serviceDefaults[idFitting],
 	}
 	for _, title := range []string{"Market", "Inventory", "Fitting"} {
 		click(t, g, g.rail.Button(title))
@@ -303,16 +303,16 @@ func TestServicesViewButtonsOnTheRealStations(t *testing.T) {
 	// Cargo toggles the inventory window.
 	click(t, g, g.svcUI.Button("cargo"))
 	g.syncMounts()
-	if !g.open[pInventory] || g.mounted[pInventory] == nil {
+	if !g.host.IsOpen(idInventory) || !g.host.Mounted(idInventory) {
 		t.Error("Cargo did not toggle the inventory window")
 	}
 	click(t, g, g.svcUI.Button("cargo"))
 	g.syncMounts()
 
 	// Every service button toggles a real spec row (Toggle carries the
-	// spec's own Title, so screenByTitle resolves it).
+	// spec's own Title, so the host title index resolves it).
 	for _, title := range []string{"Market", "Fitting", "Manufacturing", "Inventory"} {
-		if _, ok := screenByTitle[strings.ToLower(title)]; !ok {
+		if _, ok := g.host.ByTitle(strings.ToLower(title)); !ok {
 			t.Errorf("spec lost the row %q the services view toggles", title)
 		}
 	}
@@ -408,7 +408,7 @@ func TestRailClicksWinOverAWindowUnderneath(t *testing.T) {
 	if cell.Dx() <= 0 || !cell.In(ovRect) {
 		t.Fatalf("fixture: Inventory cell %v not under the dragged overview %v", cell, ovRect)
 	}
-	if g.open[pInventory] {
+	if g.host.IsOpen(idInventory) {
 		t.Fatal("fixture: inventory already open")
 	}
 	before := g.kit.Selected()
@@ -422,9 +422,9 @@ func TestRailClicksWinOverAWindowUnderneath(t *testing.T) {
 	frame()
 
 	g.syncMounts()
-	if !g.open[pInventory] || g.mounted[pInventory] == nil {
+	if !g.host.IsOpen(idInventory) || !g.host.Mounted(idInventory) {
 		t.Errorf("rail cell under a window did not toggle the inventory (open=%v mounted=%v) — "+
-			"the window underneath won the click", g.open[pInventory], g.mounted[pInventory] != nil)
+			"the window underneath won the click", g.host.IsOpen(idInventory), g.host.Mounted(idInventory))
 	}
 	if got := g.kit.Selected(); got != before {
 		t.Errorf("the buried overview received the click (selection %v → %v) — "+

@@ -12,6 +12,7 @@ import (
 
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -203,7 +204,7 @@ func TestApplyUIScaleLiveRelayout(t *testing.T) {
 		t.Fatal("overview has no rect before the scale change")
 	}
 	faceBefore, _ := text.Measure("Entieve", *g.env.FaceBold(theme.StepBase), 0)
-	g.logP.PushLine(sim.SevInfo, "kept across the rebuild")
+	bodyOf[*uikit.LogPanel](g.host, idLog).PushLine(sim.SevInfo, "kept across the rebuild")
 
 	g.applyUIScale(1.5)
 
@@ -229,7 +230,7 @@ func TestApplyUIScaleLiveRelayout(t *testing.T) {
 		t.Errorf("face measure after change = %v, want ≈%v (1.5× ±3%%)", faceAfter, 1.5*faceBefore)
 	}
 	// Metrics rebuilt: the inventory window's floor is now 1.5× design.
-	if got := panelDefs[pInventory].window(g).MinSize; got == nil || got.X != 450 || got.Y != 630 {
+	if got := g.host.Window(idInventory).MinSize; got == nil || got.X != 450 || got.Y != 630 {
 		t.Errorf("inventory MinSize after change = %v, want (450,630) (1.5× 300×420)", got)
 	}
 	// Design-unit placement preserved: each coordinate is the old one
@@ -249,13 +250,13 @@ func TestApplyUIScaleLiveRelayout(t *testing.T) {
 	}
 	// The log survived the rebuild.
 	found := false
-	for _, l := range g.logP.Lines() {
+	for _, l := range bodyOf[*uikit.LogPanel](g.host, idLog).Lines() {
 		if strings.Contains(l, "kept across the rebuild") {
 			found = true
 		}
 	}
 	if !found {
-		t.Errorf("log line lost across the scale rebuild: %v", g.logP.Lines())
+		t.Errorf("log line lost across the scale rebuild: %v", bodyOf[*uikit.LogPanel](g.host, idLog).Lines())
 	}
 	// And back: the sidecar now holds the clamped design rect (the
 	// right-anchored Overview cannot keep its corner in an unchanged
@@ -388,11 +389,11 @@ func TestSettingsPanelMounts(t *testing.T) {
 	if err := g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyP}}); err != nil {
 		t.Fatalf("handleKeys: %v", err)
 	}
-	if !g.open[pSettings] {
+	if !g.host.IsOpen(idSettings) {
 		t.Fatal("P did not open the settings panel")
 	}
 	g.syncMounts()
-	if g.sett == nil || g.mounted[pSettings] == nil {
+	if bodyOf[*uikit.Settings](g.host, idSettings) == nil || !g.host.Mounted(idSettings) {
 		t.Fatal("settings window not mounted after P")
 	}
 	// It is a named sidecar window.
@@ -601,17 +602,17 @@ func TestRailSettingsToggle(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "save.json")
 	g := newShowcaseGameAt(t, path)
 	g.applySize(1280, 720)
-	if g.settActions.RailCollapsed() {
+	if g.host.services.Settings.RailCollapsed() {
 		t.Fatal("fresh rail starts expanded")
 	}
-	g.settActions.SetRailCollapsed(true)
+	g.host.services.Settings.SetRailCollapsed(true)
 	if !g.rail.Collapsed() || !g.railCollapsed {
 		t.Fatal("the settings toggle did not park the rail")
 	}
 	if raw := readSettingsMap(t, g.settingsPath()); raw["rail_collapsed"] != true {
 		t.Errorf("collapsed sidecar = %v, want rail_collapsed: true", raw)
 	}
-	g.settActions.SetRailCollapsed(false)
+	g.host.services.Settings.SetRailCollapsed(false)
 	if g.rail.Collapsed() || g.railCollapsed {
 		t.Fatal("the settings toggle did not expand the rail")
 	}
@@ -682,11 +683,11 @@ func TestScaleSliderRebuildsAndDropsTheDrag(t *testing.T) {
 	resetScale(t)
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
-	g.open[pSettings] = true
+	g.host.SetOpen(idSettings, true)
 	g.syncMounts()
 	pump(t, g, 1280, 720)
 
-	old := g.sett
+	old := bodyOf[*uikit.Settings](g.host, idSettings)
 	if old == nil {
 		t.Fatal("settings panel not mounted")
 	}
@@ -694,7 +695,7 @@ func TestScaleSliderRebuildsAndDropsTheDrag(t *testing.T) {
 	band := sl.HitBand()
 	at := image.Pt(sl.ValueX(1.25), band.Min.Y+band.Dy()/2)
 	sl.Step(at, true, true)
-	if g.sett == old {
+	if bodyOf[*uikit.Settings](g.host, idSettings) == old {
 		t.Fatal("a scale rung did not rebuild the interface")
 	}
 	if g.uiScale != 1.25 || theme.Scale() != 1.25 {
@@ -702,7 +703,7 @@ func TestScaleSliderRebuildsAndDropsTheDrag(t *testing.T) {
 	}
 
 	pump(t, g, 1280, 720) // lay the rebuilt panel out
-	fresh := g.sett.ScaleSliderForTest()
+	fresh := bodyOf[*uikit.Settings](g.host, idSettings).ScaleSliderForTest()
 	if fresh == nil || fresh == sl {
 		t.Fatal("the rebuilt panel did not carry a fresh slider")
 	}

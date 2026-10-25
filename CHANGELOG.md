@@ -100,6 +100,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     minerals, ore, hulls) — through the new `TableRow.IconSize`; browse-tree
     branch rows stay text-only.
 
+### Changed
+
+- Internal window-host restructuring: every Screen row now builds a
+  `widgets.WindowPanel` and a single Game-free **Screen host** mounts,
+  syncs, dismisses and places it (the title's Settings/Keybindings ride a
+  second host instance). The layout sidecar format and bytes are
+  unchanged; a committed × close still clears the market's folds while a
+  hotkey close keeps them. No player-visible change.
+
 ## [0.8.0] - 2026-10-23
 
 ### Added

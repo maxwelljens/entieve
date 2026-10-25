@@ -14,24 +14,24 @@ import (
 //
 // rowScene returns the scene a modal row's window is owned by (nil for a
 // non-modal row — the starmap is one of those now).
-func rowScene(g *Game, id panelID) Scene {
+func rowScene(g *Game, id ScreenID) Scene {
 	switch id {
-	case pHelp:
+	case idHelp:
 		return &HelpScene{g: g}
-	case pMenu:
+	case idMenu:
 		return &MenuScene{g: g}
 	}
 	return nil
 }
 
 // sceneUp reports whether that scene type is on the stack.
-func sceneUp(g *Game, id panelID) bool {
+func sceneUp(g *Game, id ScreenID) bool {
 	return g.findScene(func(sc Scene) bool {
 		switch id {
-		case pHelp:
+		case idHelp:
 			_, ok := sc.(*HelpScene)
 			return ok
-		case pMenu:
+		case idMenu:
 			_, ok := sc.(*MenuScene)
 			return ok
 		}
@@ -42,7 +42,7 @@ func sceneUp(g *Game, id panelID) bool {
 func TestSpecCloseButtonsFollowTheirRow(t *testing.T) {
 	// Two sessions cover the whole table: rows mount in space by
 	// default, DockedOnly rows need the station (the gating is the same
-	// panelDefs.want rule the key and rail ride).
+	// host want rule the key and rail ride).
 	space := newShowcaseGame(t)
 	space.applySize(1280, 720)
 	docked := dockedShowcaseGame(t, 1280, 720)
@@ -55,10 +55,10 @@ func TestSpecCloseButtonsFollowTheirRow(t *testing.T) {
 				g = docked
 			}
 
-			if s.ID == pServices {
+			if s.ID == idServices {
 				// The one row with no title bar: no × to attach, and the
 				// window keeps its service-row header instead of a bar.
-				win := g.screenWin[s.ID]
+				win := g.host.Window(s.ID)
 				if win.TitleBar != nil {
 					t.Fatalf("services window grew a title bar (%v)", win.GetContainer().GetWidget().Rect)
 				}
@@ -76,15 +76,15 @@ func TestSpecCloseButtonsFollowTheirRow(t *testing.T) {
 				}
 				g.push(sc)
 			} else {
-				g.open[s.ID] = true
+				g.host.SetOpen(s.ID, true)
 			}
 			pump(t, g, 1280, 720)
 			pump(t, g, 1280, 720)
-			if g.mounted[s.ID] == nil {
-				t.Fatalf("fixture: row did not mount (open=%v docked=%v)", g.open[s.ID], g.s.Docked.Has(g.s.Player()))
+			if !g.host.Mounted(s.ID) {
+				t.Fatalf("fixture: row did not mount (open=%v docked=%v)", g.host.IsOpen(s.ID), g.s.Docked.Has(g.s.Player()))
 			}
 
-			win := g.screenWin[s.ID]
+			win := g.host.Window(s.ID)
 			btn := g.kit.CloseButtonOf(win)
 			if btn == nil {
 				t.Fatalf("row mounted with no × button")
@@ -98,13 +98,13 @@ func TestSpecCloseButtonsFollowTheirRow(t *testing.T) {
 			// through it), exactly like the key and the rail entry.
 			click(t, g, btn)
 			pump(t, g, 1280, 720) // the next reconciliation unmounts
-			if g.open[s.ID] {
+			if g.host.IsOpen(s.ID) {
 				t.Errorf("× left the row open — close did not run the row's toggle")
 			}
 			if s.Modal && sceneUp(g, s.ID) {
 				t.Error("× did not pop the row's scene")
 			}
-			if g.mounted[s.ID] != nil {
+			if g.host.Mounted(s.ID) {
 				t.Error("row still mounted after its close")
 			}
 			if win.GetContainer().GetWidget().IsVisible() {
@@ -118,13 +118,13 @@ func TestSpecCloseButtonsFollowTheirRow(t *testing.T) {
 			// kit-side, this asserts the row semantics survive it.
 			g.toggleScreen(s.Title)
 			pump(t, g, 1280, 720)
-			if !g.open[s.ID] {
+			if !g.host.IsOpen(s.ID) {
 				t.Error("reopen toggle left the row closed")
 			}
 			if s.Modal != sceneUp(g, s.ID) {
 				t.Errorf("reopen: scene on stack = %v, want modal=%v", sceneUp(g, s.ID), s.Modal)
 			}
-			if g.mounted[s.ID] == nil {
+			if !g.host.Mounted(s.ID) {
 				t.Error("reopened row did not remount")
 			}
 

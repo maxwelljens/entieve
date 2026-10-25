@@ -323,8 +323,8 @@ func (g *Game) liveKeyLabel(action string) string {
 
 // refreshHelp re-renders an already-built help overlay with the live keys.
 func (g *Game) refreshHelp() {
-	if g.help != nil {
-		g.help.SetRows(helpRowsFor(g))
+	if help := bodyOf[*uikit.HelpPanel](g.host, idHelp); help != nil {
+		help.SetRows(helpRowsFor(g))
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -18,15 +18,28 @@ import (
 // demonstration (a fixture row derives an enum slot, a KeyMap binding, a
 // sidecar name and a default placement with no other edit).
 
+// screenIndex / screenByID resolve the spec rows by their frozen ids for
+// tests that used to index the old enum.
+func screenIndex(id ScreenID) int {
+	for i, s := range screens {
+		if s.ID == id {
+			return i
+		}
+	}
+	return -1
+}
+
+func screenByID(id ScreenID) Screen { return screens[screenIndex(id)] }
+
 // withFixture appends one well-formed fixture row to a copy of the spec —
 // the "new window" the scalability demonstration adds.
 func withFixture() []Screen {
 	fixture := Screen{
-		ID: panelID(len(screens)), Title: "Fixture", Icon: "svc_inventory",
+		ID: "fixture", Title: "Fixture", Icon: "svc_inventory",
 		Key: ebiten.KeyV, Action: "fixture", Desc: "V — toggle fixture",
 		DefaultRect: image.Rect(0, 0, defaultW, defaultH),
-		DockPolicy:  DockFloating, SidecarName: "fixture", Group: "Trade",
-		Build: func(*Game) *widget.Window { return nil },
+		DockPolicy:  DockFloating, Group: "Trade",
+		Build: func(*ScreenHost) widgets.WindowPanel { return nil },
 	}
 	return append(slices.Clone(screens), fixture)
 }
@@ -55,8 +68,9 @@ func TestScreenSpecRejectsMalformedRows(t *testing.T) {
 		want   string
 	}{
 		{"missing builder", func(r []Screen) { r[0].Build = nil }, "missing builder"},
-		{"duplicate id", func(r []Screen) { r[1].ID = pInventory }, "already used by"},
-		{"ids out of enum order", func(r []Screen) { r[0], r[1] = r[1], r[0] }, "out of order"},
+		{"duplicate id", func(r []Screen) { r[1].ID = idInventory }, "already used by"},
+		{"zero id", func(r []Screen) { r[0].ID = "" }, "zero id"},
+		{"upper-case id", func(r []Screen) { r[0].ID = "Inventory" }, "lowercase sidecar key"},
 		{"duplicate key", func(r []Screen) { r[1].Key = ebiten.KeyI }, "already bound by"},
 		{"zero title", func(r []Screen) { r[0].Title = "" }, "zero title"},
 		{"unknown icon", func(r []Screen) { r[0].Icon = "svc_nope" }, "unknown icon"},
@@ -64,16 +78,15 @@ func TestScreenSpecRejectsMalformedRows(t *testing.T) {
 		{"duplicate action id", func(r []Screen) { r[1].Action = "inventory" }, "already used by"},
 		{"help text without a key", func(r []Screen) { r[0].Key = keyNone }, "help text without a key binding"},
 		{"desc without the em dash", func(r []Screen) { r[0].Desc = "toggle inventory" }, "must read"},
-		{"transient screen with a name", func(r []Screen) { r[pMenu].SidecarName = "menu" }, "transient screen must not carry"},
-		{"persisted screen without a name", func(r []Screen) { r[0].SidecarName = "" }, "needs a sidecar name"},
-		{"duplicate sidecar name", func(r []Screen) { r[1].SidecarName = "inventory" }, `sidecar name "inventory" already used`},
 		{"missing rail group", func(r []Screen) { r[0].Group = "" }, "missing rail group"},
 		{"unknown rail group", func(r []Screen) { r[0].Group = "Cargo Bay" }, "unknown rail group"},
-		{"transient row claiming a group", func(r []Screen) { r[pMenu].Group = "Ship" }, "transient screen must not carry"},
+		{"transient row claiming a group", func(r []Screen) { r[screenIndex(idMenu)].Group = "Ship" }, "transient screen must not carry"},
 		{"unknown station service", func(r []Screen) { r[1].Service = "banking" }, "unknown station service"},
 		{"row without a rail icon", func(r []Screen) { r[0].Icon = "" }, "missing icon"},
-		{"space-only and docked-only at once", func(r []Screen) { r[pManufacturing].SpaceOnly = true }, "never mounts"},
+		{"space-only and docked-only at once", func(r []Screen) { r[screenIndex(idManufacturing)].SpaceOnly = true }, "never mounts"},
 		{"unknown anchor", func(r []Screen) { r[0].Anchor = Anchor(99) }, "unknown anchor"},
+		{"duplicate title", func(r []Screen) { r[1].Title = "Inventory" }, "title already used by"},
+		{"unknown dock policy", func(r []Screen) { r[0].DockPolicy = DockPolicy(99) }, "unknown dock policy"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -99,49 +112,38 @@ func TestScreenSpecRejectsMalformedRows(t *testing.T) {
 func TestScreenSpecMatchesRegistries(t *testing.T) {
 	g := newShowcaseGame(t)
 	for _, s := range screens {
-		d := panelDefs[s.ID]
-		if d.name != s.SidecarName {
-			t.Errorf("%s: panelDef name = %q, want %q", screenLabel(s), d.name, s.SidecarName)
+		if w := g.host.Window(s.ID); w == nil {
+			t.Errorf("%s: host has no built window", screenLabel(s))
 		}
-		if w := d.window(g); w == nil || w != g.screenWin[s.ID] {
-			t.Errorf("%s: panelDef window = %v, want the built %v", screenLabel(s), w, g.screenWin[s.ID])
-		}
-		if o := d.open(g); o != &g.open[s.ID] {
-			t.Errorf("%s: panelDef open flag is not the row's", screenLabel(s))
-		}
-		if (d.sync == nil) != (s.Sync == nil) {
-			t.Errorf("%s: panelDef sync presence (%v) differs from the row's (%v)",
-				screenLabel(s), d.sync != nil, s.Sync != nil)
-		}
-		if d.sync != nil {
-			d.sync(g) // the row's refresh runs against a live session
+		if p := g.host.Panel(s.ID); p == nil || p.Win() != g.host.Window(s.ID) {
+			t.Errorf("%s: host panel window disagrees with Window()", screenLabel(s))
 		}
 		// Mount rule in both views, read back as behaviour: a SpaceOnly
 		// screen never mounts docked, a DockedOnly screen never mounts in
 		// space, everything else follows its flag.
-		g.open[s.ID] = true
+		g.host.SetOpen(s.ID, true)
 		switch {
 		case s.SpaceOnly:
-			if !d.want(g, false) || d.want(g, true) {
+			if !g.host.Want(s.ID, Room{}) || g.host.Want(s.ID, Room{Docked: true}) {
 				t.Errorf("%s: SpaceOnly want(space, docked) = (%v, %v), want (true, false)",
-					screenLabel(s), d.want(g, false), d.want(g, true))
+					screenLabel(s), g.host.Want(s.ID, Room{}), g.host.Want(s.ID, Room{Docked: true}))
 			}
 		case s.DockedOnly:
-			if d.want(g, false) || !d.want(g, true) {
+			if g.host.Want(s.ID, Room{}) || !g.host.Want(s.ID, Room{Docked: true}) {
 				t.Errorf("%s: DockedOnly want(space, docked) = (%v, %v), want (false, true)",
-					screenLabel(s), d.want(g, false), d.want(g, true))
+					screenLabel(s), g.host.Want(s.ID, Room{}), g.host.Want(s.ID, Room{Docked: true}))
 			}
 		default:
-			if !d.want(g, false) || !d.want(g, true) {
+			if !g.host.Want(s.ID, Room{}) || !g.host.Want(s.ID, Room{Docked: true}) {
 				t.Errorf("%s: want(space, docked) = (%v, %v), want (true, true)",
-					screenLabel(s), d.want(g, false), d.want(g, true))
+					screenLabel(s), g.host.Want(s.ID, Room{}), g.host.Want(s.ID, Room{Docked: true}))
 			}
 		}
-		g.open[s.ID] = false
+		g.host.SetOpen(s.ID, false)
 	}
 
-	// Sidecar: the core windows plus every named row, in spec order.
-	wantNames := append([]string{"overview", "selected", "infowin"}, sidecarNames(screens)...)
+	// Sidecar: the core windows plus every persisted row, in spec order.
+	wantNames := append(coreLayoutNames(), sidecarNames(screens)...)
 	if !slices.Equal(layoutNames, wantNames) {
 		t.Errorf("layoutNames = %v, want %v", layoutNames, wantNames)
 	}
@@ -152,7 +154,7 @@ func TestScreenSpecMatchesRegistries(t *testing.T) {
 	}
 	for _, s := range screens {
 		if got := panelNames[s.ID]; got != screenLabel(s) {
-			t.Errorf("panelNames[%d] = %q, want %q", s.ID, got, screenLabel(s))
+			t.Errorf("panelNames[%q] = %q, want %q", s.ID, got, screenLabel(s))
 		}
 	}
 }
@@ -169,7 +171,7 @@ func TestScreenPlacementDerivesFromSpec(t *testing.T) {
 		g.applySize(w, h)
 
 		for _, s := range screens {
-			r := g.screenWin[s.ID].GetContainer().GetWidget().Rect
+			r := g.host.Window(s.ID).GetContainer().GetWidget().Rect
 			want := anchorRect(s.DefaultRect, s.Anchor, r.Dx(), r.Dy(), w, h)
 			if r != want {
 				t.Errorf("%dx%d: %s = %v, want the derived %v", w, h, screenLabel(s), r, want)
@@ -179,25 +181,25 @@ func TestScreenPlacementDerivesFromSpec(t *testing.T) {
 		// Anchor semantics, stated as behaviour (the pre-spec contract).
 		// The log's pocket starts clear of the rail's gutter (97 = 10 +
 		// uikit.RailInset) and keeps its 264 px width and bottom inset.
-		if r := g.screenWin[pLog].GetContainer().GetWidget().Rect; r != image.Rect(97, h-10-240, 97+264, h-10) {
+		if r := g.host.Window(idLog).GetContainer().GetWidget().Rect; r != image.Rect(97, h-10-240, 97+264, h-10) {
 			t.Errorf("%dx%d: log = %v, want the bottom-left pocket (97, %d)-(361, %d)",
 				w, h, r, h-10-240, h-10)
 		}
 		// The scanner sits in the centre column, 87 px right of the
 		// pre-rail design position (396 + uikit.RailInset).
-		if r := g.screenWin[pScanner].GetContainer().GetWidget().Rect; r.Min != image.Pt(483, 276) {
+		if r := g.host.Window(idScanner).GetContainer().GetWidget().Rect; r.Min != image.Pt(483, 276) {
 			t.Errorf("%dx%d: scanner at %v, want the fixed design position (483,276)", w, h, r.Min)
 		}
 		// The help window centres on top (24 px inset) with its left
 		// edge floored clear of the rail gutter: centred lands inside
 		// the 87 px rail at the 1024 minimum, so the floor (10+RailInset
 		// = 97) wins there.
-		if r := g.screenWin[pHelp].GetContainer().GetWidget().Rect; r.Min.Y != 24 || r.Min.X != max(railClearX(), (w-r.Dx())/2) {
+		if r := g.host.Window(idHelp).GetContainer().GetWidget().Rect; r.Min.Y != 24 || r.Min.X != max(railClearX(), (w-r.Dx())/2) {
 			t.Errorf("%dx%d: help at %v, want top inset 24 and x = max(%d, centred %d)",
 				w, h, r.Min, railClearX(), (w-r.Dx())/2)
 		}
-		for _, p := range []panelID{pMap, pMenu, pManufacturing, pSettings} {
-			r := g.screenWin[p].GetContainer().GetWidget().Rect
+		for _, p := range []ScreenID{idMap, idMenu, idManufacturing, idSettings} {
+			r := g.host.Window(p).GetContainer().GetWidget().Rect
 			if want := centerRect(r.Dx(), r.Dy(), w, h); r.Min != want.Min {
 				t.Errorf("%dx%d: %s at %v, want centred at %v", w, h, panelNames[p], r.Min, want.Min)
 			}
@@ -219,18 +221,18 @@ func TestScreenKeysToggleTheirPanels(t *testing.T) {
 		if s.Shift {
 			press.KeysDown = []ebiten.Key{ebiten.KeyShift}
 		}
-		before := g.open[s.ID]
+		before := g.host.IsOpen(s.ID)
 		if err := g.handleKeys(press); err != nil {
 			t.Fatalf("%s: handleKeys: %v", screenLabel(s), err)
 		}
-		if g.open[s.ID] == before {
+		if g.host.IsOpen(s.ID) == before {
 			t.Errorf("%s: %v did not toggle the flag (still %v)", screenLabel(s), s.Key, before)
 		}
 		if err := g.handleKeys(press); err != nil {
 			t.Fatalf("%s: handleKeys (release): %v", screenLabel(s), err)
 		}
-		if g.open[s.ID] != before {
-			t.Errorf("%s: second press did not toggle back (now %v)", screenLabel(s), g.open[s.ID])
+		if g.host.IsOpen(s.ID) != before {
+			t.Errorf("%s: second press did not toggle back (now %v)", screenLabel(s), g.host.IsOpen(s.ID))
 		}
 	}
 }
@@ -246,25 +248,6 @@ func TestScreenKeysToggleTheirPanels(t *testing.T) {
 func TestOneScreenRowDerivesEveryRegistry(t *testing.T) {
 	rows := withFixture()
 	fixture := rows[len(rows)-1]
-
-	// Enum: the row slots in after the last id, still in order.
-	if int(fixture.ID) != len(rows)-1 {
-		t.Errorf("fixture id = %d, want %d (contiguous after the enum)", fixture.ID, len(rows)-1)
-	}
-	for i, s := range rows {
-		if s.ID != panelID(i) {
-			t.Fatalf("rows[%d].ID = %d, want %d", i, s.ID, i)
-		}
-	}
-
-	// panelDefs: the new row registers (name, window and flag accessors).
-	defs := derivePanelDefs(rows)
-	if len(defs) != len(rows) {
-		t.Fatalf("derivePanelDefs = %d rows, want %d", len(defs), len(rows))
-	}
-	if d := defs[fixture.ID]; d.name != "fixture" || d.window == nil || d.open == nil || d.want == nil {
-		t.Errorf("fixture panelDef = %+v, want a complete row named fixture", d)
-	}
 
 	// KeyMap: the row's binding derives, and still never collides.
 	binding := Binding{Key: fixture.Key, Action: fixture.Action, Desc: fixture.Desc}
@@ -289,7 +272,7 @@ func TestOneScreenRowDerivesEveryRegistry(t *testing.T) {
 	if want := centerRect(300, 200, 1280, 720); r != want {
 		t.Errorf("fixture placement = %v, want centred %v", r, want)
 	}
-	// Test labels follow the sidecar key.
+	// Test labels follow the row id.
 	if label := screenLabel(fixture); label != "fixture" {
 		t.Errorf("fixture label = %q, want fixture", label)
 	}

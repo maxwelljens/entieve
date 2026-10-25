@@ -47,11 +47,11 @@ func TestKeybindDefaults(t *testing.T) {
 	}
 	// The new window's default key opens and closes it like any row.
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyO}})
-	if !g.open[pKeybindings] {
+	if !g.host.IsOpen(idKeybindings) {
 		t.Fatal("O did not open the keybindings window")
 	}
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyO}})
-	if g.open[pKeybindings] {
+	if g.host.IsOpen(idKeybindings) {
 		t.Fatal("O did not close the keybindings window")
 	}
 }
@@ -64,7 +64,7 @@ func TestKeybindReplaceRoundTrip(t *testing.T) {
 	g := newShowcaseGameAt(t, path)
 
 	// Inventory takes F from Fitting (which loses its key).
-	g.keyActions.Begin("inventory")
+	g.host.services.Keys.Begin("inventory")
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyF}})
 	if k, _ := liveKey(g, "inventory"); k != ebiten.KeyF {
 		t.Fatalf("inventory = %v, want F", k)
@@ -73,10 +73,10 @@ func TestKeybindReplaceRoundTrip(t *testing.T) {
 		t.Fatal("fitting kept F after inventory stole it")
 	}
 	// Fitting takes I (free now).
-	g.keyActions.Begin("fitting")
+	g.host.services.Keys.Begin("fitting")
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyI}})
 	// Warp takes S from stop.
-	g.keyActions.Begin("warp")
+	g.host.services.Keys.Begin("warp")
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyS}})
 	if _, ok := g.binds["stop"]; ok {
 		t.Fatal("stop kept S after warp stole it")
@@ -120,17 +120,17 @@ func TestKeybindReplaceRoundTrip(t *testing.T) {
 
 	// Both directions through the real key pass.
 	g2.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyF}})
-	if !g2.open[pInventory] {
+	if !g2.host.IsOpen(idInventory) {
 		t.Error("F did not toggle inventory")
 	}
-	if g2.open[pFitting] {
+	if g2.host.IsOpen(idFitting) {
 		t.Error("F also toggled fitting (the old holder)")
 	}
 	g2.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyI}})
-	if !g2.open[pFitting] {
+	if !g2.host.IsOpen(idFitting) {
 		t.Error("I did not toggle fitting")
 	}
-	if !g2.open[pInventory] {
+	if !g2.host.IsOpen(idInventory) {
 		t.Error("I toggled inventory back (the old holder)")
 	}
 
@@ -159,7 +159,7 @@ func TestKeybindReplaceRoundTrip(t *testing.T) {
 func TestKeybindReservedAndCancel(t *testing.T) {
 	g := newShowcaseGameAt(t, filepath.Join(t.TempDir(), "save.json"))
 
-	g.keyActions.Begin("inventory")
+	g.host.services.Keys.Begin("inventory")
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyEscape}})
 	if g.captureAction != "" || g.keyNotice != "" {
 		t.Errorf("Esc left capture armed (action=%q notice=%q)", g.captureAction, g.keyNotice)
@@ -171,7 +171,7 @@ func TestKeybindReservedAndCancel(t *testing.T) {
 		t.Error("Esc opened the menu while capture was armed")
 	}
 
-	g.keyActions.Begin("inventory")
+	g.host.services.Keys.Begin("inventory")
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyF9}})
 	if g.captureAction != "inventory" {
 		t.Fatal("a fixed chord cancelled the capture instead of refusing it")
@@ -182,7 +182,7 @@ func TestKeybindReservedAndCancel(t *testing.T) {
 	if k, _ := liveKey(g, "inventory"); k != ebiten.KeyI {
 		t.Errorf("F9 assigned inventory = %v, want I", k)
 	}
-	if rows := g.keyActions.Rows(); func() bool {
+	if rows := g.host.services.Keys.Rows(); func() bool {
 		for _, r := range rows {
 			if r.Action == "inventory" {
 				return r.Armed && strings.Contains(r.Notice, "fixed")
@@ -238,12 +238,12 @@ func TestKeybindSidecarDropsInvalid(t *testing.T) {
 func TestKeybindResetClearsFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "save.json")
 	g := newShowcaseGameAt(t, path)
-	g.keyActions.Begin("inventory")
+	g.host.services.Keys.Begin("inventory")
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyV}})
 	if _, err := os.Stat(g.keysPath()); err != nil {
 		t.Fatalf("sidecar not written: %v", err)
 	}
-	g.keyActions.Reset()
+	g.host.services.Keys.Reset()
 	if _, err := os.Stat(g.keysPath()); !os.IsNotExist(err) {
 		t.Errorf("reset left the sidecar: %v", err)
 	}
@@ -251,11 +251,11 @@ func TestKeybindResetClearsFile(t *testing.T) {
 		t.Errorf("reset left inventory = %v, want I", k)
 	}
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyV}})
-	if g.open[pInventory] {
+	if g.host.IsOpen(idInventory) {
 		t.Error("V still toggled inventory after the reset")
 	}
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyI}})
-	if !g.open[pInventory] {
+	if !g.host.IsOpen(idInventory) {
 		t.Error("I did not toggle inventory after the reset")
 	}
 }
@@ -265,7 +265,7 @@ func TestKeybindResetClearsFile(t *testing.T) {
 func TestKeybindCaptureRows(t *testing.T) {
 	g := newShowcaseGameAt(t, filepath.Join(t.TempDir(), "save.json"))
 	row := func() (key string, armed, found bool) {
-		for _, r := range g.keyActions.Rows() {
+		for _, r := range g.host.services.Keys.Rows() {
 			if r.Action == "inventory" {
 				return r.Key, r.Armed, true
 			}
@@ -275,7 +275,7 @@ func TestKeybindCaptureRows(t *testing.T) {
 	if key, armed, ok := row(); !ok || key != "I" || armed {
 		t.Fatalf("idle inventory row = %q armed=%v (ok=%v), want key I", key, armed, ok)
 	}
-	g.keyActions.Begin("inventory")
+	g.host.services.Keys.Begin("inventory")
 	if _, armed, ok := row(); !ok || !armed {
 		t.Fatalf("armed inventory row armed=%v (ok=%v)", armed, ok)
 	}
@@ -283,7 +283,7 @@ func TestKeybindCaptureRows(t *testing.T) {
 	if key, armed, ok := row(); !ok || armed || key != "I" {
 		t.Fatalf("cancelled row = %q armed=%v (ok=%v), want the idle I row", key, armed, ok)
 	}
-	g.keyActions.Begin("inventory")
+	g.host.services.Keys.Begin("inventory")
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyV}})
 	if key, armed, ok := row(); !ok || armed || key != "V" {
 		t.Fatalf("assigned row = %q armed=%v (ok=%v), want key V", key, armed, ok)
@@ -323,14 +323,14 @@ func TestTitleKeybindings(t *testing.T) {
 	if err := g.Update(); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
-	if g.titleUI.kb == nil || g.titleUI.kbRem == nil {
+	if !g.titleUI.host.Mounted(idKeybindings) {
 		t.Fatal("keybindings window did not mount from the title")
 	}
 	g.Draw(ebiten.NewImage(1280, 720)) // lay the window out once
-	if r := g.titleUI.kb.Win().GetContainer().GetWidget().Rect; r.Dx() <= 0 || r.Dy() <= 0 || r.Max.X > 1280 || r.Max.Y > 720 {
+	if r := g.titleUI.host.Window(idKeybindings).GetContainer().GetWidget().Rect; r.Dx() <= 0 || r.Dy() <= 0 || r.Max.X > 1280 || r.Max.Y > 720 {
 		t.Errorf("keybindings window rect = %v, want an on-screen size", r)
 	}
-	g.keyActions.Begin("inventory")
+	g.host.services.Keys.Begin("inventory")
 	if err := g.updateTitle(Input{JustPressed: []ebiten.Key{ebiten.KeyV}}); err != nil {
 		t.Fatalf("updateTitle capture: %v", err)
 	}
@@ -341,7 +341,7 @@ func TestTitleKeybindings(t *testing.T) {
 	if err := g.Update(); err != nil {
 		t.Fatalf("Update after close: %v", err)
 	}
-	if g.titleUI.kb != nil {
+	if g.titleUI.host.Mounted(idKeybindings) {
 		t.Error("the keybindings window survived its close")
 	}
 	if !g.title {

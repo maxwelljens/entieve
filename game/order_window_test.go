@@ -32,7 +32,7 @@ func TestOrderWindowKeyboardGate(t *testing.T) {
 		t.Fatalf("focused 's' moved the intent: %+v (was %+v)", after, before)
 	}
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyN}})
-	if g.open[pMap] {
+	if g.host.IsOpen(idMap) {
 		t.Fatal("focused 'n' opened the map")
 	}
 
@@ -52,7 +52,7 @@ func TestOrderWindowKeyboardGate(t *testing.T) {
 		t.Fatalf("unfocused 's' did not fire the world stop: %+v (ok=%v)", it, ok)
 	}
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyN}})
-	if !g.open[pMap] {
+	if !g.host.IsOpen(idMap) {
 		t.Fatal("unfocused 'n' did not open the map")
 	}
 }

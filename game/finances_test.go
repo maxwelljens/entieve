@@ -3,6 +3,7 @@ package game
 import (
 	"testing"
 
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -12,12 +13,17 @@ import (
 // handleKeys, the rail lists it, and mounting it lays it out on screen at
 // both design sizes.
 func TestFinancesWiring(t *testing.T) {
-	row := screens[pFinances]
+	var row Screen
+	for _, s := range screens {
+		if s.ID == idFinances {
+			row = s
+		}
+	}
 	if row.Title != "Finances" {
 		t.Errorf("title = %q, want Finances", row.Title)
 	}
-	if row.SidecarName != "finances" || row.Group != "Trade" {
-		t.Errorf("sidecar/group = %q/%q, want finances/Trade", row.SidecarName, row.Group)
+	if row.ID != idFinances || row.Group != "Trade" {
+		t.Errorf("id/group = %q/%q, want finances/Trade", row.ID, row.Group)
 	}
 	if row.Key == keyNone || row.Action == "" {
 		t.Errorf("row %+v is unkeyed", row)
@@ -43,21 +49,21 @@ func TestFinancesWiring(t *testing.T) {
 
 	// The key toggles the panel and back (the spec's own path).
 	press := Input{JustPressed: []ebiten.Key{row.Key}}
-	before := g.open[pFinances]
+	before := g.host.IsOpen(idFinances)
 	if err := g.handleKeys(press); err != nil {
 		t.Fatalf("handleKeys: %v", err)
 	}
-	if g.open[pFinances] == before {
+	if g.host.IsOpen(idFinances) == before {
 		t.Fatalf("%v did not toggle the panel", row.Key)
 	}
 
 	// Mounted, synced and in bounds at both design sizes.
 	for _, size := range [][2]int{{1280, 720}, {1024, 700}} {
 		g.applySize(size[0], size[1])
-		g.open[pFinances] = true
+		g.host.SetOpen(idFinances, true)
 		g.syncMounts()
 		pump(t, g, size[0], size[1])
-		if g.fin == nil || g.panelWindow(pFinances) != g.fin.Win() {
+		if bodyOf[*uikit.Finances](g.host, idFinances) == nil || g.host.Window(idFinances) != bodyOf[*uikit.Finances](g.host, idFinances).Win() {
 			t.Fatalf("%dx%d: the row did not build the window", size[0], size[1])
 		}
 		assertInBounds(t, g, size[0], size[1])

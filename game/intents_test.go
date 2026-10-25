@@ -23,33 +23,33 @@ func TestDoHandlesHostIntents(t *testing.T) {
 	// Toggle: docking opened ONLY the services view (nothing force-
 	// opens any more), so the market starts closed and the intent flips
 	// exactly what the screen's key flips.
-	if g.open[pMarket] {
+	if g.host.IsOpen(idMarket) {
 		t.Fatal("fixture: market opened by docking (only the services view opens)")
 	}
 	g.Do(widgets.Toggle{Screen: "Market"})
-	if !g.open[pMarket] {
+	if !g.host.IsOpen(idMarket) {
 		t.Error("Toggle did not open the Market screen")
 	}
 	g.syncMounts()
-	if g.mounted[pMarket] == nil {
+	if !g.host.Mounted(idMarket) {
 		t.Error("opened Market screen did not mount")
 	}
 	g.Do(widgets.Toggle{Screen: "market"}) // the title matches case-insensitively
-	if g.open[pMarket] {
+	if g.host.IsOpen(idMarket) {
 		t.Error("second Toggle did not close the Market screen")
 	}
 	g.syncMounts()
-	if g.mounted[pMarket] != nil {
+	if g.host.Mounted(idMarket) {
 		t.Error("closed Market screen stayed mounted (setPanel handler not reached)")
 	}
 
 	// A non-modal row flips its open flag, the way its key does.
 	g.Do(widgets.Toggle{Screen: "Starmap"})
-	if !g.open[pMap] {
+	if !g.host.IsOpen(idMap) {
 		t.Error("Starmap toggle did not open the window")
 	}
 	g.Do(widgets.Toggle{Screen: "Starmap"})
-	if g.open[pMap] {
+	if g.host.IsOpen(idMap) {
 		t.Error("second Starmap toggle did not close the window")
 	}
 

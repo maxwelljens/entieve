@@ -1,6 +1,7 @@
 package game
 
 import (
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"image"
 	"os"
 	"path/filepath"
@@ -25,10 +26,10 @@ const stationBoardWorstCaseH = 426
 // log pocket at the minimum — the big trade window wins that strip), the
 // inventory rect and the fitting window's 644×682 column at the screen's
 // top-right (the EVE fitting shape needs the room).
-var serviceDefaults = map[panelID]image.Rectangle{
-	pMarket:    image.Rect(97, 8, 857, 568),
-	pInventory: image.Rect(396, 256, 701, 690),
-	pFitting:   image.Rect(370, 8, 1014, 690),
+var serviceDefaults = map[ScreenID]image.Rectangle{
+	idMarket:    image.Rect(97, 8, 857, 568),
+	idInventory: image.Rect(396, 256, 701, 690),
+	idFitting:   image.Rect(370, 8, 1014, 690),
 }
 
 // TestServiceDefaultsAreDeclared pins the spec rows themselves: each
@@ -36,7 +37,7 @@ var serviceDefaults = map[panelID]image.Rectangle{
 // change to a row's geometry must be deliberate.
 func TestServiceDefaultsAreDeclared(t *testing.T) {
 	for id, want := range serviceDefaults {
-		row := screens[id]
+		row := screenByID(id)
 		if row.DefaultRect != want {
 			t.Errorf("%s DefaultRect = %v, want %v", row.Title, row.DefaultRect, want)
 		}
@@ -44,7 +45,7 @@ func TestServiceDefaultsAreDeclared(t *testing.T) {
 			t.Errorf("%s Anchor = %v, want AnchorFixed", row.Title, row.Anchor)
 		}
 	}
-	if mkt := serviceDefaults[pMarket]; mkt.Dx() != 760 || mkt.Dy() != 560 {
+	if mkt := serviceDefaults[idMarket]; mkt.Dx() != 760 || mkt.Dy() != 560 {
 		t.Errorf("market default %v is not the three-pane 760×560", mkt)
 	}
 }
@@ -61,15 +62,17 @@ func TestServiceWindowsOpenAtTheirDefaults(t *testing.T) {
 		g.applySize(w, h)
 		dockAt(t, g)
 		g.syncScenes()
-		g.open[pMarket], g.open[pInventory], g.open[pFitting] = true, true, true
+		g.host.SetOpen(idMarket, true)
+		g.host.SetOpen(idInventory, true)
+		g.host.SetOpen(idFitting, true)
 		g.syncMounts()
 		pump(t, g, w, h)
 
 		screen := image.Rect(0, 0, w, h)
-		log := g.logP.Win().GetContainer().GetWidget().Rect
+		log := bodyOf[*uikit.LogPanel](g.host, idLog).Win().GetContainer().GetWidget().Rect
 		floor := railClearX()
-		for _, id := range []panelID{pMarket, pInventory, pFitting} {
-			win := g.screenWin[id]
+		for _, id := range []ScreenID{idMarket, idInventory, idFitting} {
+			win := g.host.Window(id)
 			r := win.GetContainer().GetWidget().Rect
 			if want := serviceDefaults[id]; r != want {
 				t.Errorf("%dx%d: %s at %v, want its per-type default %v",
@@ -84,7 +87,7 @@ func TestServiceWindowsOpenAtTheirDefaults(t *testing.T) {
 			// The market is the one window allowed over the log pocket:
 			// its three panes need the width, and the log raises back on
 			// a click (windows are a stack).
-			if id != pMarket && r.Overlaps(log) {
+			if id != idMarket && r.Overlaps(log) {
 				t.Errorf("%dx%d: %s %v overlaps the log pocket %v", w, h, panelNames[id], r, log)
 			}
 			if min := win.MinSize; min != nil && (r.Dx() < min.X || r.Dy() < min.Y) {
@@ -155,23 +158,23 @@ func TestStationLayoutSavedWins(t *testing.T) {
 	pump(t, g, 1280, 720)
 
 	saved := image.Rect(400, 380, 760, 680)
-	if got := g.mkt.Win().GetContainer().GetWidget().Rect; got != saved {
+	if got := bodyOf[*uikit.Market](g.host, idMarket).Win().GetContainer().GetWidget().Rect; got != saved {
 		t.Fatalf("startup: market = %v, want the saved %v", got, saved)
 	}
 	// The sidecar says nothing about the inventory: it lands on its own
 	// per-type default.
-	if got := g.inv.Win().GetContainer().GetWidget().Rect; got != serviceDefaults[pInventory] {
-		t.Errorf("startup: virgin inventory = %v, want %v", got, serviceDefaults[pInventory])
+	if got := bodyOf[*uikit.Inventory](g.host, idInventory).Win().GetContainer().GetWidget().Rect; got != serviceDefaults[idInventory] {
+		t.Errorf("startup: virgin inventory = %v, want %v", got, serviceDefaults[idInventory])
 	}
 
 	// Resize: the saved market stays put, the virgin windows re-place.
 	g.applySize(1024, 700)
 	pump(t, g, 1024, 700)
-	if got := g.mkt.Win().GetContainer().GetWidget().Rect; got != saved {
+	if got := bodyOf[*uikit.Market](g.host, idMarket).Win().GetContainer().GetWidget().Rect; got != saved {
 		t.Errorf("after resize: market = %v, want the saved %v (sidecar wins)", got, saved)
 	}
-	if got := g.fitt.Win().GetContainer().GetWidget().Rect; got != serviceDefaults[pFitting] {
-		t.Errorf("after resize: virgin fitting = %v, want %v", got, serviceDefaults[pFitting])
+	if got := bodyOf[*uikit.Fitting](g.host, idFitting).Win().GetContainer().GetWidget().Rect; got != serviceDefaults[idFitting] {
+		t.Errorf("after resize: virgin fitting = %v, want %v", got, serviceDefaults[idFitting])
 	}
 }
 
@@ -188,8 +191,8 @@ func TestPlaceDefaultsKeepsUserMoves(t *testing.T) {
 	movedOverview := image.Rect(120, 60, 500, 360) // 380×300 ≥ MinSize
 	movedLog := image.Rect(640, 300, 1000, 540)    // 360×240 ≥ MinSize, on screen at 1024
 	g.kit.OverviewWindow().SetLocation(movedOverview)
-	g.logP.Win().SetLocation(movedLog)
-	helpBefore := g.help.Win().GetContainer().GetWidget().Rect
+	bodyOf[*uikit.LogPanel](g.host, idLog).Win().SetLocation(movedLog)
+	helpBefore := bodyOf[*uikit.HelpPanel](g.host, idHelp).Win().GetContainer().GetWidget().Rect
 
 	g.applySize(1024, 700)
 	pump(t, g, 1024, 700)
@@ -197,15 +200,15 @@ func TestPlaceDefaultsKeepsUserMoves(t *testing.T) {
 	if got := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; got != movedOverview {
 		t.Errorf("user-moved overview = %v, want %v (resize stomped it)", got, movedOverview)
 	}
-	if got := g.logP.Win().GetContainer().GetWidget().Rect; got != movedLog {
+	if got := bodyOf[*uikit.LogPanel](g.host, idLog).Win().GetContainer().GetWidget().Rect; got != movedLog {
 		t.Errorf("user-moved log = %v, want %v (resize stomped it)", got, movedLog)
 	}
 
 	// Virgin windows re-place on their per-type defaults.
-	if got := g.mkt.Win().GetContainer().GetWidget().Rect; got != serviceDefaults[pMarket] {
-		t.Errorf("virgin market = %v, want its per-type default %v", got, serviceDefaults[pMarket])
+	if got := bodyOf[*uikit.Market](g.host, idMarket).Win().GetContainer().GetWidget().Rect; got != serviceDefaults[idMarket] {
+		t.Errorf("virgin market = %v, want its per-type default %v", got, serviceDefaults[idMarket])
 	}
-	help := g.help.Win().GetContainer().GetWidget().Rect
+	help := bodyOf[*uikit.HelpPanel](g.host, idHelp).Win().GetContainer().GetWidget().Rect
 	if want := max(railClearX(), (1024-help.Dx())/2); help.Min.X != want {
 		t.Errorf("virgin help x = %d, want %d (re-centred for 1024, floored past the rail gutter)", help.Min.X, want)
 	}
@@ -219,11 +222,11 @@ func TestPlaceDefaultsKeepsUserMoves(t *testing.T) {
 	if got := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; got != movedOverview {
 		t.Errorf("user-moved overview = %v after the second resize, want %v", got, movedOverview)
 	}
-	if got := g.logP.Win().GetContainer().GetWidget().Rect; got != movedLog {
+	if got := bodyOf[*uikit.LogPanel](g.host, idLog).Win().GetContainer().GetWidget().Rect; got != movedLog {
 		t.Errorf("user-moved log = %v after the second resize, want %v", got, movedLog)
 	}
-	if got := g.inv.Win().GetContainer().GetWidget().Rect; got != serviceDefaults[pInventory] {
-		t.Errorf("virgin inventory = %v, want its per-type default %v", got, serviceDefaults[pInventory])
+	if got := bodyOf[*uikit.Inventory](g.host, idInventory).Win().GetContainer().GetWidget().Rect; got != serviceDefaults[idInventory] {
+		t.Errorf("virgin inventory = %v, want its per-type default %v", got, serviceDefaults[idInventory])
 	}
 }
 
@@ -246,8 +249,8 @@ func TestSavedServiceOverlapHonored(t *testing.T) {
 	pump(t, g, 1280, 720)
 
 	overlap := image.Rect(400, 200, 760, 620)
-	for _, id := range []panelID{pMarket, pInventory} {
-		if got := g.screenWin[id].GetContainer().GetWidget().Rect; got != overlap {
+	for _, id := range []ScreenID{idMarket, idInventory} {
+		if got := g.host.Window(id).GetContainer().GetWidget().Rect; got != overlap {
 			t.Errorf("%s = %v, want the saved overlapping rect %v (saved wins)",
 				panelNames[id], got, overlap)
 		}

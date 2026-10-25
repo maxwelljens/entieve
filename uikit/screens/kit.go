@@ -319,10 +319,8 @@ func (k *Kit) raisePressed() {
 	}
 	x, y := widgets.PollCursor()
 	pt := image.Pt(x, y)
-	for _, t := range k.tops {
-		if w := t.Container().GetWidget(); w.IsVisible() && pt.In(w.Rect) {
-			return // top chrome (the rail) owns this point — no raise
-		}
+	if k.overTop(pt) {
+		return // top chrome (the rail) owns this point — no raise
 	}
 	for i := len(k.stack) - 1; i >= 0; i-- {
 		w := k.stack[i].win.GetContainer().GetWidget()
@@ -340,6 +338,32 @@ func (k *Kit) raisePressed() {
 			return // a modal above the candidate owns every gesture
 		}
 	}
+}
+
+// overTop reports whether pt sits on visible top chrome (the rail).
+func (k *Kit) overTop(pt image.Point) bool {
+	for _, t := range k.tops {
+		if w := t.Container().GetWidget(); w.IsVisible() && pt.In(w.Rect) {
+			return true
+		}
+	}
+	return false
+}
+
+// Over reports whether pt sits on interface chrome the kit owns: visible
+// top chrome or a visible mounted window. Hidden windows keep their last
+// rect but claim nothing, and an unmounted window is not in the stack at
+// all — the world-input gate's exact-conjunct rule.
+func (k *Kit) Over(pt image.Point) bool {
+	if k.overTop(pt) {
+		return true
+	}
+	for _, m := range k.stack {
+		if w := m.win.GetContainer().GetWidget(); w.IsVisible() && pt.In(w.Rect) {
+			return true
+		}
+	}
+	return false
 }
 
 // raise re-tops win: the kit's own remove closure (chrome, stack entry,
