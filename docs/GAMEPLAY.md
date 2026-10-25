@@ -45,7 +45,7 @@ in-game help window renders.
 | `H` | Toggle help window |
 | `P` | Toggle settings (UI scale, fullscreen, window layout) |
 | `K` | Toggle finances window (holdings and transactions) |
-| `Esc` | Menu: Resume / Save / Load / Quit |
+| `Esc` | Menu: Resume / Save / Save as… / Load / Quit |
 | `[` or `-` | Time acceleration down (8 → 4 → 2 → 1×) |
 | `]` or `=` | Time acceleration up (1 → 2 → 4 → 8×) |
 | `Ctrl+S` | Save game |
@@ -736,19 +736,36 @@ replays are unaffected.
 
 ## Save / load
 
-- **`Ctrl+S`** writes a full JSON snapshot (`sim.Snapshot()`) to
-  `os.UserConfigDir()/entieve/save.json` (override with `--save`) and
-  the window layout alongside it (`save.json.layout.json`).
+- The game boots into a **title screen**: **New game**, **Continue** (the
+  most recently modified save), **Save manager**, **Settings**,
+  **Credits** and **Quit**. The world behind it is a still frame — the
+  simulation does not step until you enter the game. The settings window
+  opens and closes with `P` there too, exactly as in-game.
+- **`Ctrl+S`** writes a full JSON snapshot (`sim.Snapshot()`) to the
+  active save path — `os.UserConfigDir()/entieve/save.json` (override
+  with `--save`) until a load or a save-as makes another file active —
+  and the window layout alongside the *configured* path
+  (`save.json.layout.json`).
 - **`F9`** restores that snapshot mid-run and rebuilds the interface
   against the restored world, then re-applies the saved window layout.
-- `--load <file>` restores a save at startup.
-- The `Esc` menu offers the same Save / Load plus Resume and Quit.
-  Quitting from the menu also writes the layout, so your window
+- **`--load <file>`** restores a save at startup and skips the title.
+- **Save as…** (Esc menu) writes the next free auto-numbered file in the
+  saves directory: `save.json` while it is free, else the smallest free
+  `save-N.json` (N ≥ 2). It becomes the active save, so Save / `Ctrl+S`
+  keep writing it.
+- The **Save manager** lists the saves directory's `*.json` save files
+  (layout/settings sidecars excluded), newest first, marks the active
+  one, and offers **Load** and **Delete** (a second click on
+  **Confirm?** removes the file). Deleting the last save leaves the
+  empty state.
+- The `Esc` menu offers the same Save / Load, **Save as…**, Resume and
+  Quit. Quitting from the menu also writes the layout, so your window
   arrangement survives a restart even without saving the game.
 
 Saving is the only way progress persists: quitting from the menu does not
 autosave. (The window layout is the exception — it is written on every
-clean quit as well.)
+clean quit as well.) The layout and settings sidecars are global to the
+configured save path: UI preferences never follow the active save.
 
 **Restoring mid-run rebuilds the interface**: the selection clears and
 window positions return to the layout saved with the game (their

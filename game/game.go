@@ -52,6 +52,12 @@ type Options struct {
 	Save     *sim.Save         // optional: restore on boot (--load)
 	Title    string            // window title (default "Entieve")
 	SavePath string            // F5/F9 path (default: user config dir)
+	// StartInTitle boots into the title screen (cmd-only; never together
+	// with Save — --load bypasses the title). Tests and `simulate` leave it
+	// false and see the unchanged boot.
+	StartInTitle bool
+	// Version is the title screen's version line ("" = omit it).
+	Version string
 	// DeviceScale is the display's DPI factor (0 = read the real monitor
 	// in Run). Tests pin it explicitly so the baseline suite runs hermetically
 	// at 1.0 no matter what display the suite runs on.
@@ -184,6 +190,18 @@ type Game struct {
 	pendingLoad bool
 	quit        bool
 
+	// activeSave is where Save writes ("" = Options.SavePath): set by a
+	// load or a save-as. Layout and settings sidecars stay keyed to the
+	// configured SavePath (UI prefs are global).
+	activeSave string
+
+	// title is the boot phase: the world renders statically behind the
+	// title UI, the sim never steps and gameplay chrome stays unmounted.
+	title             bool
+	titleUI           *titleScreen
+	pendingTitleEnter bool
+	pendingTitleLoad  string
+
 	// menuModal latches the frame's context-menu state: Game.Update
 	// samples it (Kit.MenuInput) before any scene or key handling, so a
 	// menu that is up — or that consumed this frame's click/Esc — gates
@@ -233,9 +251,10 @@ func New(opts Options) (*Game, error) {
 		}
 	}
 	g := &Game{
-		opts: opts,
-		s:    s,
-		ren:  render.New(opts.Content),
+		opts:  opts,
+		s:     s,
+		ren:   render.New(opts.Content),
+		title: opts.StartInTitle,
 	}
 	g.enqueue = s.Queue
 	// Scale before anything is built: the device factor (pinned by tests,
@@ -259,6 +278,9 @@ func New(opts Options) (*Game, error) {
 	g.space = &SpaceScene{g: g, zoom: 1}
 	g.scenes = []Scene{g.space}
 	g.space.OnEnter()
+	if g.title {
+		g.ensureTitleUI()
+	}
 	return g, nil
 }
 
@@ -381,6 +403,10 @@ func (g *Game) Update() error {
 	g.menuModal = g.kit.MenuInput()
 
 	in := g.buildInput()
+
+	if g.title {
+		return g.updateTitle(in)
+	}
 
 	if err := g.handleKeys(in); err != nil {
 		return err
@@ -595,6 +621,9 @@ func (g *Game) syncPanel(p panelID) {
 // enum order so the mount order — and the draw order it produces — is
 // stable.
 func (g *Game) syncMounts() {
+	if g.title {
+		return // the title phase mounts no gameplay chrome
+	}
 	docked := g.s.Docked.Has(g.s.Player())
 
 	for p := panelID(0); p < numPanels; p++ {
@@ -868,7 +897,29 @@ func (g *Game) buildKit() error {
 
 	g.placeDefaults(g.w, g.h)
 	g.syncMounts()
+	if g.title {
+		// A rebuild (load, scale change) during the title phase: the old
+		// title widgets belonged to the kit just dropped, and the fresh
+		// kit's chrome must stay hidden until the title is left.
+		if g.titleUI != nil {
+			g.titleUI.detach()
+		}
+		g.hideGameplayChrome()
+	}
 	return nil
+}
+
+// hideGameplayChrome unmounts every gameplay window and hides the
+// always-on chrome (HUD, rack, rail, core windows) without touching the
+// player's open flags — leaving the title re-mounts them from those flags
+// exactly as a normal boot would.
+func (g *Game) hideGameplayChrome() {
+	for p := panelID(0); p < numPanels; p++ {
+		g.setPanel(p, false)
+	}
+	g.setChromeVisible(false)
+	g.kit.SetCoreVisible(false)
+	g.kit.SetTopsVisible(false)
 }
 
 // placeDefaults (re)places every movable default window for the current
@@ -987,8 +1038,17 @@ func helpRows() []uikit.KeyRow {
 // ---------------------------------------------------------------------------
 
 // Draw renders the scene stack (world first, then overlay veils), then
-// the whole interface on top.
+// the whole interface on top. At the title the world is the whole scene
+// stack (drawn statically — Update never steps it) under the title dim,
+// and the kit draws only the title's own widgets: gameplay chrome is
+// unmounted for the phase.
 func (g *Game) Draw(dst *ebiten.Image) {
+	if g.title {
+		g.space.Draw(dst)
+		dimScreen(dst, g.w, g.h, titleDim)
+		g.kit.Draw(dst)
+		return
+	}
 	for _, sc := range g.scenes {
 		sc.Draw(dst)
 	}
@@ -1129,10 +1189,19 @@ func (g *Game) SavePath() string {
 	return filepath.Join(dir, "entieve", "save.json")
 }
 
-// SaveGame snapshots the sim to SavePath (default
+// activeSavePath is where Save writes and Load reads: the configured
+// path until a load or a save-as makes another file active.
+func (g *Game) activeSavePath() string {
+	if g.activeSave != "" {
+		return g.activeSave
+	}
+	return g.SavePath()
+}
+
+// SaveGame snapshots the sim to the active save path (default
 // os.UserConfigDir()/entieve/save.json) and writes the window-layout
-// sidecar next to it, so a restart keeps the layout even without a
-// second save.
+// sidecar next to the configured path, so a restart keeps the layout even
+// without a second save.
 func (g *Game) SaveGame() error {
 	save, err := g.s.Snapshot()
 	if err != nil {
@@ -1142,7 +1211,7 @@ func (g *Game) SaveGame() error {
 	if err != nil {
 		return err
 	}
-	path := g.SavePath()
+	path := g.activeSavePath()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -1152,12 +1221,42 @@ func (g *Game) SaveGame() error {
 	return g.writeLayout()
 }
 
-// LoadGame restores the sim from SavePath mid-run and rebuilds the
-// interface against the restored sim (selection resets; open windows
+// SaveAs writes the next free auto-numbered save file in the saves
+// directory and makes it the active save. No dialog: save.json while it
+// is free, else the smallest save-N.json (N ≥ 2) that does not exist.
+func (g *Game) SaveAs() error {
+	prev := g.activeSave
+	g.activeSave = g.nextSavePath()
+	if err := g.SaveGame(); err != nil {
+		g.activeSave = prev
+		return err
+	}
+	return nil
+}
+
+// nextSavePath is the save-as rule: save.json, else save-2.json,
+// save-3.json, … in the configured save's directory.
+func (g *Game) nextSavePath() string {
+	dir := filepath.Dir(g.SavePath())
+	for i := 1; ; i++ {
+		name := "save.json"
+		if i > 1 {
+			name = fmt.Sprintf("save-%d.json", i)
+		}
+		p := filepath.Join(dir, name)
+		if _, err := os.Stat(p); err != nil {
+			return p
+		}
+	}
+}
+
+// LoadGame restores the sim from the active save path mid-run and rebuilds
+// the interface against the restored sim (selection resets; open windows
 // stay open; the log history is carried across the rebuild). The saved
 // window layout is restored after the rebuild, over the fresh defaults.
 func (g *Game) LoadGame() error {
-	data, err := os.ReadFile(g.SavePath())
+	path := g.activeSavePath()
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}

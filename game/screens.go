@@ -305,7 +305,7 @@ var screens = []Screen{
 		// menu keeps its key and its function.
 		ID: pMenu, Title: "Menu",
 		Key: ebiten.KeyEscape, Action: "menu", Desc: "Esc — menu (Resume / Save / Load / Quit)",
-		DefaultRect: image.Rect(0, 0, 240, 254), // buildMenuWindow's landing rect
+		DefaultRect: image.Rect(0, 0, 240, 304), // buildMenuWindow's landing rect (5 rows)
 		DockPolicy:  DockTransient, Modal: true, SidecarName: "",
 		Sync:  nil,
 		Build: func(g *Game) *widget.Window { g.menuWin = g.buildMenuWindow(); return g.menuWin },

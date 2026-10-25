@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Title screen with save manager, settings and credits** (`game`,
+  `cmd/entieve`): `entieve run` now boots into a title screen over a static
+  world backdrop — tracked amber wordmark, version line, and New game /
+  Continue / Save manager / Settings / Credits / Quit. The simulation is
+  frozen and gameplay chrome stays hidden until you enter; `--load`
+  bypasses the title.
+  - **Save manager**: the saves directory (`*.json`, sidecars excluded),
+    newest first with the active save marked; Load and a two-click Delete.
+  - **Save as…** in the Esc menu writes the next free auto-numbered file
+    (`save.json`, else `save-N.json`, N ≥ 2) and makes it the active save;
+    Save / Ctrl+S follow it. Layout and settings sidecars stay global.
+  - Credits window authored from the in-repo licences (icons, module
+    renders, hull/emblem art, form language, typefaces, dependencies), with
+    the key strings pinned against their source files.
+
 - **Per-module weapon art** (`uikit/icons`, `content`, `uikit`): the five
   autocannon/artillery modules show their own full-colour render instead of
   the shared class glyph.

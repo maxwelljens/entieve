@@ -52,6 +52,9 @@ names the *modules and seams* we build that vocabulary into.
 | Term | Meaning |
 |---|---|
 | **Screen** | a window the player can open: declared as one **Screen spec** row (id, title, icon, key, default rect, dock policy, sync, build) from which the registries derive |
+| **Title screen** | the boot phase (`Options.StartInTitle`, set by the `run` command only and never with `--load`): the already-built world renders as a static backdrop under the title menu, the simulation does not step, and gameplay chrome (rail, HUD, rack, core windows, log) stays unmounted; leaving it runs one normal boot reconcile |
+| **Save manager** | the title screen's window over the saves directory (`filepath.Dir` of the configured save path): `*.json` save files only (layout/settings sidecars excluded), newest first, with **Load** and a two-click **Delete** |
+| **Active save path** | where **Save** writes (Esc-menu Save / Ctrl+S): the configured save path until a load or a **Save as…** makes another file active; layout and settings sidecars stay keyed to the configured path |
 | **DockPolicy** | where a Screen's window lives: `floating` (placed by `placeDefaults` from its declared rect — every window, the docked services view included) or `transient` (scene-owned, never persisted — the Esc menu) |
 | **Anchor** | which edges of the viewport a floating Screen hangs its design-unit default rect on: centred, a fixed design coordinate, bottom-left insets, or top-centred |
 | **Row** | one listed entry in a table; its interactions derive from its **RowSpec** |
