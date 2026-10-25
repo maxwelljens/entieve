@@ -385,6 +385,21 @@ func TestTitleSettingsAndCredits(t *testing.T) {
 	if g.titleUI.sett == nil || g.titleUI.settRemove == nil {
 		t.Fatal("settings window did not mount from the title")
 	}
+	// The title mounts the same grown settings window: five rows + hint
+	// (the kit wraps a plain body in its clip container, so unwrap once).
+	clip := g.titleUI.sett.Win().Contents.(widget.Containerer)
+	body := clip.Children()[0].(widget.Containerer)
+	if n := len(body.Children()); n != 6 {
+		t.Errorf("title settings body rows = %d, want 6 (stepper, fullscreen, rail, reset, reset all, hint)", n)
+	}
+	// The new rail row is wired from the title too (same action bundle).
+	g.settActions.SetRailCollapsed(true)
+	if !g.railCollapsed || !g.rail.Collapsed() {
+		t.Fatal("the title's settings rail row did not park the rail")
+	}
+	if raw := readSettingsMap(t, g.settingsPath()); raw["rail_collapsed"] != true {
+		t.Errorf("title rail toggle sidecar = %v, want rail_collapsed: true", raw)
+	}
 	before := g.uiScale
 	g.settActions.StepScale(1)
 	if g.uiScale == before {

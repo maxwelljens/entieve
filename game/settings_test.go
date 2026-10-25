@@ -2,6 +2,7 @@ package game
 
 import (
 	"encoding/json"
+	"errors"
 	"image"
 	"math"
 	"os"
@@ -67,10 +68,14 @@ func TestSettingsPersistence(t *testing.T) {
 	g := newShowcaseGame(t)
 
 	// Absent → defaults.
-	g.uiScale, g.fullscreen = 7.0, true // poisoned before the read
+	g.uiScale, g.fullscreen, g.vsync = 7.0, true, false // poisoned before the read
+	g.winW, g.winH = 111, 222
 	g.loadSettings()
-	if g.uiScale != 1.0 || g.fullscreen {
-		t.Errorf("absent file → (%v, %v), want (1, false)", g.uiScale, g.fullscreen)
+	if g.uiScale != 1.0 || g.fullscreen || !g.vsync {
+		t.Errorf("absent file → (%v, %v, vsync %v), want (1, false, true)", g.uiScale, g.fullscreen, g.vsync)
+	}
+	if w, h := g.windowSize(); w != defaultW || h != defaultH {
+		t.Errorf("absent file → window %d×%d, want the %d×%d default", w, h, defaultW, defaultH)
 	}
 
 	// Round trip.
@@ -78,13 +83,14 @@ func TestSettingsPersistence(t *testing.T) {
 	if err := g.writeSettings(); err != nil {
 		t.Fatalf("writeSettings: %v", err)
 	}
-	g.uiScale, g.fullscreen = 0, false
+	g.uiScale, g.fullscreen, g.vsync = 0, false, false
 	g.loadSettings()
-	if g.uiScale != 1.5 || !g.fullscreen {
-		t.Errorf("round trip → (%v, %v), want (1.5, true)", g.uiScale, g.fullscreen)
+	if g.uiScale != 1.5 || !g.fullscreen || !g.vsync {
+		t.Errorf("round trip → (%v, %v, vsync %v), want (1.5, true, true)", g.uiScale, g.fullscreen, g.vsync)
 	}
 
-	// Documented shape: {"ui_scale": 1.5, "fullscreen": true}.
+	// Documented default shape: {"ui_scale": 1.5, "fullscreen": true} —
+	// vsync on and no windowed size means no extra keys.
 	data, err := os.ReadFile(g.settingsPath())
 	if err != nil {
 		t.Fatalf("read settings: %v", err)
@@ -103,14 +109,39 @@ func TestSettingsPersistence(t *testing.T) {
 		t.Errorf("fullscreen = %v, want true", raw["fullscreen"])
 	}
 
+	// Vsync off is the inverted key; the rest of the shape is unchanged.
+	g.vsync = false
+	if err := g.writeSettings(); err != nil {
+		t.Fatalf("writeSettings: %v", err)
+	}
+	raw = readSettingsMap(t, g.settingsPath())
+	if len(raw) != 3 || raw["vsync_off"] != true {
+		t.Errorf("vsync-off settings keys = %v, want the default two plus vsync_off: true", raw)
+	}
+	g.vsync = true
+	g.loadSettings()
+	if g.vsync {
+		t.Error("vsync_off round trip read back on, want the inverted key honoured")
+	}
+
+	// A file from the pre-vsync version (no key) boots vsync ON.
+	if err := os.WriteFile(g.settingsPath(), []byte(`{"ui_scale":1,"fullscreen":false}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g.vsync = false
+	g.loadSettings()
+	if !g.vsync {
+		t.Error("a file without vsync_off read vsync off, want on (today's hardcoded boot)")
+	}
+
 	// Corrupt → defaults (never an error, never a crash).
 	if err := os.WriteFile(g.settingsPath(), []byte("{not json"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	g.uiScale, g.fullscreen = 1.5, true
+	g.uiScale, g.fullscreen, g.vsync = 1.5, true, false
 	g.loadSettings()
-	if g.uiScale != 1.0 || g.fullscreen {
-		t.Errorf("corrupt file → (%v, %v), want (1, false)", g.uiScale, g.fullscreen)
+	if g.uiScale != 1.0 || g.fullscreen || !g.vsync {
+		t.Errorf("corrupt file → (%v, %v, vsync %v), want (1, false, true)", g.uiScale, g.fullscreen, g.vsync)
 	}
 
 	// Off-ladder scale → 1.0, but the flag still reads.
@@ -463,4 +494,161 @@ func readSettingsMap(t *testing.T, path string) map[string]any {
 		t.Fatalf("settings JSON: %v", err)
 	}
 	return raw
+}
+
+// TestVsyncRoundTripAndLiveApply: vsync defaults ON (the old hardcoded
+// boot), a file without the key keeps it on, and the toggle reaches the
+// ebiten seam live, persists inverted and survives a restart.
+func TestVsyncRoundTripAndLiveApply(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	g := newShowcaseGameAt(t, path)
+	if !g.vsync {
+		t.Fatal("a fresh session must boot vsync on (today's behaviour)")
+	}
+
+	// Pre-vsync file: no key, still on.
+	if err := os.WriteFile(g.settingsPath(), []byte(`{"ui_scale":1,"fullscreen":false}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g.vsync = false
+	g.loadSettings()
+	if !g.vsync {
+		t.Error("a file without vsync_off loaded vsync off, want on")
+	}
+
+	// Live off: the seam sees false and the sidecar records the inverted key.
+	var calls []bool
+	g.vsyncApply = func(on bool) { calls = append(calls, on) }
+	g.setVsync(false)
+	if g.vsync || len(calls) != 1 || calls[0] {
+		t.Errorf("setVsync(false) → vsync %v, seam calls %v; want off and one false call", g.vsync, calls)
+	}
+	if raw := readSettingsMap(t, g.settingsPath()); raw["vsync_off"] != true {
+		t.Errorf("vsync-off sidecar = %v, want vsync_off: true", raw)
+	}
+
+	// Restart: still off (default-true only applies when the key is absent).
+	g2 := newShowcaseGameAt(t, path)
+	if g2.vsync {
+		t.Error("vsync off did not survive the restart")
+	}
+
+	// Live on again: seam true, and the key drops back to the default shape.
+	var on []bool
+	g2.vsyncApply = func(v bool) { on = append(on, v) }
+	g2.setVsync(true)
+	if !g2.vsync || len(on) != 1 || !on[0] {
+		t.Errorf("setVsync(true) → vsync %v, seam calls %v; want on and one true call", g2.vsync, on)
+	}
+	if raw := readSettingsMap(t, g2.settingsPath()); raw["vsync_off"] != nil {
+		t.Errorf("vsync-on sidecar = %v, want the key gone", raw)
+	}
+}
+
+// TestWindowSizePersistsOnQuit: applySize captures the WINDOW size (not
+// device pixels), the clean quit writes it to the settings sidecar, a
+// restart restores it in windowSize (what Run opens with), and a size
+// below the supported minimum clamps instead of booting too small.
+func TestWindowSizePersistsOnQuit(t *testing.T) {
+	resetScale(t)
+	path := filepath.Join(t.TempDir(), "save.json")
+	g := newScaleGameAt(t, path, 1.5)
+	g.Layout(1100, 800) // device 1650×1200: winW/H must stay window px
+	if g.winW != 1100 || g.winH != 800 {
+		t.Fatalf("captured window size = %d×%d, want 1100×800 (not device px)", g.winW, g.winH)
+	}
+
+	g.quit = true
+	if err := g.Update(); !errors.Is(err, ebiten.Termination) {
+		t.Fatalf("quit Update error = %v, want ebiten.Termination", err)
+	}
+	raw := readSettingsMap(t, g.settingsPath())
+	if raw["window_w"] != float64(1100) || raw["window_h"] != float64(800) {
+		t.Errorf("quit sidecar = %v, want window 1100×800", raw)
+	}
+
+	g2 := newScaleGameAt(t, path, 1.5)
+	if w, h := g2.windowSize(); w != 1100 || h != 800 {
+		t.Errorf("restored windowSize = %d×%d, want 1100×800", w, h)
+	}
+
+	// Below the supported minimum → clamp to 1024×700.
+	if err := os.WriteFile(g2.settingsPath(),
+		[]byte(`{"ui_scale":1,"fullscreen":false,"window_w":640,"window_h":480}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g2.loadSettings()
+	if w, h := g2.windowSize(); w != minW || h != minH {
+		t.Errorf("clamped windowSize = %d×%d, want %d×%d", w, h, minW, minH)
+	}
+}
+
+// TestRailSettingsToggle: the settings window's rail row drives the same
+// persisted state as the edge tab, live and across a restart.
+func TestRailSettingsToggle(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	g := newShowcaseGameAt(t, path)
+	g.applySize(1280, 720)
+	if g.settActions.RailCollapsed() {
+		t.Fatal("fresh rail starts expanded")
+	}
+	g.settActions.SetRailCollapsed(true)
+	if !g.rail.Collapsed() || !g.railCollapsed {
+		t.Fatal("the settings toggle did not park the rail")
+	}
+	if raw := readSettingsMap(t, g.settingsPath()); raw["rail_collapsed"] != true {
+		t.Errorf("collapsed sidecar = %v, want rail_collapsed: true", raw)
+	}
+	g.settActions.SetRailCollapsed(false)
+	if g.rail.Collapsed() || g.railCollapsed {
+		t.Fatal("the settings toggle did not expand the rail")
+	}
+	if raw := readSettingsMap(t, g.settingsPath()); raw["rail_collapsed"] != nil {
+		t.Errorf("expanded sidecar = %v, want the key gone", raw)
+	}
+}
+
+// TestResetAllSettings: one action restores every default — scale 1×,
+// windowed, vsync on, rail expanded, no stored windowed size — re-applies
+// them live and leaves exactly the default sidecar shape.
+func TestResetAllSettings(t *testing.T) {
+	resetScale(t)
+	path := filepath.Join(t.TempDir(), "save.json")
+	g := newShowcaseGameAt(t, path)
+	g.Layout(1100, 800)
+
+	var vsync []bool
+	g.vsyncApply = func(on bool) { vsync = append(vsync, on) }
+	g.setFullscreen(true)
+	g.setVsync(false)
+	g.setRailCollapsed(true)
+	g.applyUIScale(1.5)
+	g.flushSize = true // an armed quit write: the size is on disk now
+	if err := g.writeSettings(); err != nil {
+		t.Fatalf("pre-reset writeSettings: %v", err)
+	}
+	if raw := readSettingsMap(t, g.settingsPath()); raw["window_w"] == nil || raw["vsync_off"] == nil || raw["rail_collapsed"] == nil {
+		t.Fatalf("fixture: non-default settings not persisted: %v", raw)
+	}
+
+	g.resetAllSettings()
+
+	if g.uiScale != 1.0 || theme.Scale() != 1.0 {
+		t.Errorf("scale after reset = %v (global %v), want 1", g.uiScale, theme.Scale())
+	}
+	if g.fullscreen || !g.vsync || g.railCollapsed || g.rail.Collapsed() {
+		t.Errorf("after reset: fullscreen %v, vsync %v, rail %v/%v; want off/on/expanded",
+			g.fullscreen, g.vsync, g.railCollapsed, g.rail.Collapsed())
+	}
+	if len(vsync) == 0 || !vsync[len(vsync)-1] {
+		t.Errorf("vsync seam after reset = %v, want a final true call", vsync)
+	}
+	if w, h := g.windowSize(); w != defaultW || h != defaultH {
+		t.Errorf("windowed size after reset = %d×%d, want the %d×%d default", w, h, defaultW, defaultH)
+	}
+	// The one flush left the default document: no rail/vsync/size keys.
+	raw := readSettingsMap(t, g.settingsPath())
+	if len(raw) != 2 || raw["ui_scale"] != float64(1) || raw["fullscreen"] != false {
+		t.Errorf("sidecar after reset = %v, want exactly ui_scale 1 + fullscreen false", raw)
+	}
 }

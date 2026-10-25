@@ -14,22 +14,27 @@ import (
 
 // Player settings persistence: a JSON sidecar next to the save file,
 // <Options.SavePath>.settings.json, holding the UI scale, the fullscreen
-// flag and the navigation rail's collapse state:
+// and vsync flags, the navigation rail's collapse state and the last
+// windowed size:
 //
 //	{"ui_scale": 1.5, "fullscreen": false}
-//	{"ui_scale": 1, "fullscreen": false, "rail_collapsed": true}
+//	{"ui_scale": 1, "fullscreen": false, "rail_collapsed": true, "vsync_off": true}
+//	{"ui_scale": 1, "fullscreen": false, "window_w": 1100, "window_h": 800}
 //
-// rail_collapsed is omitempty: the documented DEFAULT shape above stays
-// exactly two keys (an absent key reads as expanded — the rail's boot
-// state), and a collapsed rail writes the third.
+// Every key past the first two is omitempty, so a file with default
+// settings stays the documented two-key shape. rail_collapsed true means
+// collapsed; vsync_off is INVERTED (absent/false = vsync on, today's
+// hardcoded boot) so a file written before the key existed keeps vsync
+// on. The windowed size is written only on a clean quit (see
+// quitPersist) — never mid-session — and read back in Run.
 //
 // Like the layout sidecar the contract is robustness over fidelity: a
 // missing, corrupt or out-of-ladder file degrades to the defaults (UI
-// scale 1.0, windowed) and never errors or crashes; unknown keys are
-// ignored. It loads in New, BEFORE the interface is built and before the
-// first Layout, so the very first frame is already laid out at the saved
-// scale; every change writes it back immediately (best-effort errors are
-// reported to the log).
+// scale 1.0, windowed, vsync on, expanded rail, 1280×720) and never
+// errors or crashes; unknown keys are ignored. It loads in New, BEFORE
+// the interface is built and before the first Layout, so the very first
+// frame is already laid out at the saved scale; every change writes it
+// back immediately (best-effort errors are reported to the log).
 //
 // ui_scale is the USER half of the global scale: the installed UI scale
 // is uiScale × the display's device factor (see Game.Run / theme.SetScale).
@@ -50,6 +55,13 @@ type settingsFile struct {
 	// RailCollapsed parks the left navigation rail to its edge tab;
 	// absent = expanded (the boot default).
 	RailCollapsed bool `json:"rail_collapsed,omitempty"`
+	// VsyncOff is the inverted vsync flag: absent = on, which is what
+	// every build before this key did unconditionally.
+	VsyncOff bool `json:"vsync_off,omitempty"`
+	// WindowW/H are the last WINDOWED size (window pixels), written on
+	// clean quit only; absent = the 1280×720 boot default.
+	WindowW int `json:"window_w,omitempty"`
+	WindowH int `json:"window_h,omitempty"`
 }
 
 // settingsPath is the sidecar location: the resolved save path plus
@@ -60,8 +72,8 @@ func (g *Game) settingsPath() string { return g.SavePath() + ".settings.json" }
 // missing file, bad JSON, a scale off the ladder — leaves the defaults
 // in place (never an error; called from New before anything is built).
 func (g *Game) loadSettings() {
-	g.uiScale, g.fullscreen = defaultUIScale, false
-	g.railCollapsed = false
+	g.uiScale, g.fullscreen, g.vsync, g.railCollapsed = defaultUIScale, false, true, false
+	g.winW, g.winH = 0, 0
 	data, err := os.ReadFile(g.settingsPath())
 	if err != nil {
 		return
@@ -74,12 +86,26 @@ func (g *Game) loadSettings() {
 		g.uiScale = s
 	}
 	g.fullscreen = f.Fullscreen
+	g.vsync = !f.VsyncOff
 	g.railCollapsed = f.RailCollapsed
+	if f.WindowW > 0 && f.WindowH > 0 {
+		g.winW, g.winH = f.WindowW, f.WindowH
+	}
 }
 
-// writeSettings persists g's settings (called on every change).
+// writeSettings persists g's settings (called on every change, and on
+// quit with the windowed size). flushSize gates the size keys: they are
+// only meaningful for a real window and are written by quitPersist.
 func (g *Game) writeSettings() error {
-	f := settingsFile{UIScale: g.uiScale, Fullscreen: g.fullscreen, RailCollapsed: g.railCollapsed}
+	f := settingsFile{
+		UIScale:       g.uiScale,
+		Fullscreen:    g.fullscreen,
+		RailCollapsed: g.railCollapsed,
+		VsyncOff:      !g.vsync,
+	}
+	if g.flushSize {
+		f.WindowW, f.WindowH = g.windowSize()
+	}
 	data, err := json.MarshalIndent(f, "", "  ")
 	if err != nil {
 		return err
@@ -89,6 +115,18 @@ func (g *Game) writeSettings() error {
 		return err
 	}
 	return os.WriteFile(path, data, 0o644)
+}
+
+// windowSize is the size Run opens the window at: the last windowed size
+// read from the sidecar, clamped to the supported minimum, else the
+// 1280×720 default. Fullscreen is unaffected — the size is the windowed
+// restore size.
+func (g *Game) windowSize() (int, int) {
+	w, h := g.winW, g.winH
+	if w <= 0 || h <= 0 {
+		return defaultW, defaultH
+	}
+	return max(w, minW), max(h, minH)
 }
 
 // scaleOnLadder reports whether s is (numerically) a step of the ladder.
@@ -175,6 +213,64 @@ func (g *Game) setFullscreen(on bool) {
 	if err := g.writeSettings(); err != nil {
 		g.report(err, "")
 	}
+}
+
+// applyVsync is the ebiten seam for the vsync flag: nil means the real
+// display call, tests swap it for a recorder (the flag is unreadable).
+func (g *Game) applyVsync(on bool) {
+	if g.vsyncApply != nil {
+		g.vsyncApply(on)
+		return
+	}
+	ebiten.SetVsyncEnabled(on)
+}
+
+// setVsync flips vsync live and persists it. Run applies the saved flag
+// at boot through the same seam.
+func (g *Game) setVsync(on bool) {
+	if on == g.vsync {
+		return
+	}
+	g.vsync = on
+	g.applyVsync(on)
+	if err := g.writeSettings(); err != nil {
+		g.report(err, "")
+	}
+}
+
+// setRailCollapsed parks or expands the navigation rail from the
+// settings window (the edge tab goes through the same state via
+// syncRail) and persists it.
+func (g *Game) setRailCollapsed(on bool) {
+	if on == g.railCollapsed {
+		return
+	}
+	g.railCollapsed = on
+	g.rail.SetCollapsed(on)
+	if err := g.writeSettings(); err != nil {
+		g.report(err, "")
+	}
+}
+
+// resetAllSettings restores every setting to its default — scale 1×,
+// windowed, vsync on, rail expanded, no persisted windowed size — then
+// rebuilds the interface at 1× (the live-apply path) and flushes the
+// sidecar once.
+func (g *Game) resetAllSettings() {
+	g.uiScale = defaultUIScale
+	g.fullscreen = false
+	g.vsync = true
+	g.railCollapsed = false
+	g.winW, g.winH = 0, 0
+	g.flushSize = false
+	ebiten.SetFullscreen(false)
+	g.applyVsync(true)
+	g.applyScale(true)
+	g.rail.SetCollapsed(false) // also when applyScale short-circuits
+	if err := g.writeSettings(); err != nil {
+		g.report(err, "")
+	}
+	g.report(nil, "Settings reset")
 }
 
 // resetLayout clears the persisted window arrangement and recomposes the

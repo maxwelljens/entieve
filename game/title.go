@@ -125,7 +125,7 @@ func (g *Game) updateTitle(in Input) error {
 		g.leaveTitle()
 	}
 	if g.quit {
-		g.writeLayout()
+		g.quitPersist()
 		return ebiten.Termination
 	}
 	return nil
