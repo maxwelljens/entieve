@@ -9,14 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Slider widget family** (`uikit/widgets`, `uikit/screens`): a reusable
+  house slider in two modes — **freeflow** (a continuous range quantised
+  only by its own step: the settings volume sliders) and **notched** (an
+  explicit ladder the handle snaps to, with one dim tick per rung and the
+  handle resting exactly on them: the UI-scale slider over its six rungs).
+  Both share one track (thin rounded border, accent fill to the handle), a
+  24 design-px grab band, click-to-position and absolute pointer drag with
+  release ending the grab; `OnChange` streams the live value and
+  `OnRelease` fires once per drag (the persistence point). The `P`
+  Settings window's **UI scale** control is now the notched slider
+  (replacing the −/+ stepper) and its window widens to 380×460 to give the
+  sliders their travel; settings actions take absolute values
+  (`SetUIScale(rung)`, `SetMasterVolume/MusicVolume`, `PersistSettings`).
+
 - **Music with master/music volume and shuffle** (`game`, `cmd/entieve`,
   `uikit/screens`, `assets/audio`): the game now plays the six space
   tracks as one shuffled pool everywhere — title, space and a docked
   station — advancing to the next track when the current one ends. The
-  `P` Settings window grows two volume steppers (**Master**, **Music**;
-  10% steps, defaults 100% and 70%) and a **Shuffle** toggle (default on)
-  ahead of the reset buttons; the engine's output volume is
-  master × music, re-applied live and on every track change. Reset all
+  `P` Settings window grows two freeflow volume sliders (**Master**,
+  **Music**; 0–100% in 1% steps, defaults 100% and 70%) and a **Shuffle**
+  toggle (default on) ahead of the reset buttons; dragging applies the
+  volume live and the sidecar is written once on release, and the engine's
+  output volume is master × music, re-applied live and on every track
+  change. Reset all
   restores 100/70/shuffle-on, and `master_volume`, `music_volume` and the
   inverted `shuffle_off` persist in `<save>.settings.json` (absent keys
   read as the fresh-install defaults).

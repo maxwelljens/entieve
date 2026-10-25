@@ -248,7 +248,7 @@ var screens = []Screen{
 		// resets) is re-read from g in Sync.
 		ID: pSettings, Title: "Settings", Icon: "kind_unknown",
 		Key: ebiten.KeyP, Action: "settings", Desc: "P — toggle settings (UI scale, display, layout)",
-		DefaultRect: image.Rect(490, 130, 790, 590), // uikit.NewSettings' landing rect
+		DefaultRect: image.Rect(450, 130, 830, 590), // uikit.NewSettings' landing rect
 		DockPolicy:  DockFloating, SidecarName: "settings",
 		Group: "Help & System",
 		Sync:  func(g *Game) { g.sett.Sync() },

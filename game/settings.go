@@ -52,14 +52,13 @@ var uiScaleSteps = [...]float64{0.75, 1.0, 1.25, 1.5, 2.0, 2.5}
 // defaultUIScale is the scale with no (or invalid) settings present.
 const defaultUIScale = 1.0
 
-// Audio defaults and the stepper step. The volumes are whole percents
-// (0..100) persisted as percents; the engine multiplies them at the seam,
-// so a fresh install plays at 1.00 × 0.70.
+// Audio defaults. The volumes are whole percents (0..100) persisted as
+// percents; the engine multiplies them at the seam, so a fresh install
+// plays at 1.00 × 0.70.
 const (
 	defaultMasterVolume = 100
 	defaultMusicVolume  = 70
 	defaultShuffle      = true
-	volumeStep          = 10
 )
 
 // settingsFile is the settings sidecar document.
@@ -172,18 +171,13 @@ func scaleOnLadder(s float64) (float64, bool) {
 	return 0, false
 }
 
-// stepUIScale moves the user setting one rung along the ladder (the
-// settings stepper's − / +) and applies it live.
-func (g *Game) stepUIScale(delta int) {
-	idx := 0
-	for i, step := range uiScaleSteps {
-		if step == g.uiScale {
-			idx = i
-			break
-		}
+// setUIScale applies one rung of the ladder absolutely (the settings
+// slider's handle, which snaps to these values). A rung off the ladder is
+// ignored — the sidecar reader's rule; the slider can only produce rungs.
+func (g *Game) setUIScale(v float64) {
+	if s, ok := scaleOnLadder(v); ok {
+		g.applyUIScale(s)
 	}
-	idx = clampInt(idx+delta, 0, len(uiScaleSteps)-1)
-	g.applyUIScale(uiScaleSteps[idx])
 }
 
 // applyUIScale switches the UI to a new user scale, LIVE: settings are
@@ -294,29 +288,31 @@ func (g *Game) applyMusicSettings() {
 	g.music.SetShuffle(g.shuffle)
 }
 
-// stepMasterVolume moves the master volume one 10% step (0..100), applies
-// it live and persists it.
-func (g *Game) stepMasterVolume(delta int) {
-	v := clampInt(g.masterVol+delta*volumeStep, 0, 100)
+// setMasterVolume applies a whole percent (0..100) live at the music
+// seam WITHOUT writing the sidecar: the settings slider streams these
+// while the pointer moves, and PersistSettings is the drag's one write.
+func (g *Game) setMasterVolume(v int) {
+	v = clampInt(v, 0, 100)
 	if v == g.masterVol {
 		return
 	}
 	g.masterVol = v
 	g.applyMusicSettings()
-	if err := g.writeSettings(); err != nil {
-		g.report(err, "")
-	}
 }
 
-// stepMusicVolume moves the music volume one 10% step (0..100), applies
-// it live and persists it.
-func (g *Game) stepMusicVolume(delta int) {
-	v := clampInt(g.musicVol+delta*volumeStep, 0, 100)
+// setMusicVolume is the music half of setMasterVolume's contract.
+func (g *Game) setMusicVolume(v int) {
+	v = clampInt(v, 0, 100)
 	if v == g.musicVol {
 		return
 	}
 	g.musicVol = v
 	g.applyMusicSettings()
+}
+
+// persistSettings is the settings slider's release point: one sidecar
+// write per drag, however many values the drag streamed.
+func (g *Game) persistSettings() {
 	if err := g.writeSettings(); err != nil {
 		g.report(err, "")
 	}

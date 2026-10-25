@@ -1,0 +1,152 @@
+package screens
+
+import (
+	"fmt"
+	"image"
+	"image/color"
+	"image/png"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/entieve/entieve/uikit/internal/uitest"
+	"github.com/hajimehoshi/ebiten/v2"
+)
+
+// settingsCaptureFrames is how many draws settle before the sample (the
+// window fades in over 12 frames).
+const settingsCaptureFrames = 13
+
+// TestSettingsCaptureFrame draws the settings window through a real
+// ebiten loop and pins the slider family's pixels the headless suite
+// cannot read back: the accent fill reaches the master volume's 100%
+// handle, the notched scale slider carries one dim tick per rung at the
+// handle's own resting positions, and every handle is on its track.
+// Skipped unless ENTIEVE_CAPTURE=1; the PNG lands in $ENTIEVE_CAPTURE_DIR
+// (default /tmp/opencode).
+func TestSettingsCaptureFrame(t *testing.T) {
+	if os.Getenv("ENTIEVE_CAPTURE") == "" {
+		t.Skip("set ENTIEVE_CAPTURE=1 to render a capture frame")
+	}
+	uitest.SkipIfLoopRan(t)
+	outDir := os.Getenv("ENTIEVE_CAPTURE_DIR")
+	if outDir == "" {
+		outDir = "/tmp/opencode"
+	}
+
+	env, _ := newTestEnv(t)
+	act := staticSettingsActions()
+	s := NewSettings(env, act)
+	ui := newWindowUI(t, env, s.Win())
+	s.Win().SetLocation(image.Rect(490, 130, 790, 590))
+
+	g := &settingsCaptureGame{ui: ui, s: s, out: filepath.Join(outDir, "settings_capture.png")}
+	uitest.RunCaptureLoop(t, "Entieve settings capture", g)
+	if g.err != nil {
+		t.Fatal(g.err)
+	}
+	if !g.saved {
+		t.Fatal("capture never rendered")
+	}
+	t.Logf("capture written to %s", g.out)
+}
+
+// settingsCaptureGame drives the panel and verifies the settled frame.
+type settingsCaptureGame struct {
+	ui interface {
+		Update()
+		Draw(*ebiten.Image)
+	}
+	s   *Settings
+	out string
+
+	frames int
+	last   *ebiten.Image
+	saved  bool
+	err    error
+}
+
+func (g *settingsCaptureGame) Update() error {
+	if g.saved || g.err != nil {
+		return ebiten.Termination
+	}
+	g.s.Sync()
+	g.ui.Update()
+	if g.frames > settingsCaptureFrames && g.last != nil {
+		if err := g.verify(); err != nil {
+			g.err = err
+		} else if err := g.save(); err != nil {
+			g.err = err
+		} else {
+			g.saved = true
+		}
+		return ebiten.Termination
+	}
+	return nil
+}
+
+func (g *settingsCaptureGame) Draw(screen *ebiten.Image) {
+	img := ebiten.NewImage(1280, 720)
+	img.Fill(color.White)
+	g.ui.Draw(img)
+	g.last = img
+	g.frames++
+	screen.DrawImage(img, nil)
+}
+
+func (g *settingsCaptureGame) Layout(w, h int) (int, int) { return 1280, 720 }
+
+// verify samples the sliders on the settled frame.
+func (g *settingsCaptureGame) verify() error {
+	p := g.s.th.Pal()
+	if v := g.s.masterSlide.Value(); v != 100 {
+		return fmt.Errorf("master slider = %v, want the 100%% default", v)
+	}
+	// The 100% handle sits at the track's right end, so the fill spans
+	// the whole track: its centre is accent.
+	mr := g.s.masterSlide.GetWidget().Rect
+	mcy := mr.Min.Y + mr.Dy()/2
+	if got := pixel(g.last, mr.Min.X+mr.Dx()/2, mcy); got != p.Accent {
+		return fmt.Errorf("master track centre = %v, want the accent fill %v", got, p.Accent)
+	}
+	if got := pixel(g.last, g.s.masterSlide.ValueX(100), mcy); got != p.Text {
+		return fmt.Errorf("master handle = %v, want the handle body %v", got, p.Text)
+	}
+
+	// One dim tick per rung, at the handle's resting x; only the rung the
+	// handle sits on is covered by the handle itself.
+	sr := g.s.scaleSlider.GetWidget().Rect
+	scy := sr.Min.Y + sr.Dy()/2
+	hx := g.s.scaleSlider.ValueX(g.s.scaleSlider.Value())
+	ticks := g.s.scaleSlider.TickPositions()
+	if len(ticks) != 6 {
+		return fmt.Errorf("scale ticks = %d, want 6", len(ticks))
+	}
+	for _, x := range ticks {
+		if x == hx {
+			continue // the resting handle paints over its own tick
+		}
+		if got := pixel(g.last, x, scy); got != p.Dim {
+			return fmt.Errorf("scale tick at x=%d = %v, want the dim mark %v", x, got, p.Dim)
+		}
+	}
+	if got := pixel(g.last, hx, scy); got != p.Text {
+		return fmt.Errorf("scale handle = %v, want the handle body %v", got, p.Text)
+	}
+	return nil
+}
+
+// pixel is the image's colour at (x, y) as the palette's own type.
+func pixel(img *ebiten.Image, x, y int) color.RGBA {
+	return color.RGBAModel.Convert(img.At(x, y)).(color.RGBA)
+}
+
+// save writes the settled frame as PNG.
+func (g *settingsCaptureGame) save() error {
+	f, err := os.Create(g.out)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return png.Encode(f, g.last)
+}

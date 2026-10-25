@@ -130,12 +130,13 @@ and the module rack are permanent ship chrome and have no rail entries, and
 the Esc menu keeps its own key — the rail is not its launcher.
 
 The **Settings**
-window (`P`) holds the **UI scale** stepper (0.75× – 2.5×, applied live —
-every window, control and font rescales and keeps its arrangement), a
+window (`P`) holds the **UI scale** slider — a notched track over the six
+rungs 0.75× – 2.5× whose handle snaps to a rung and applies it live (every
+window, control and font rescales and keeps its arrangement) — a
 **fullscreen** toggle, a **rail** collapse toggle, **Master** and
-**Music** volume steppers (10% steps, 0–100%; a fresh install plays at
-100% × 70%), a **Shuffle** toggle (the six tracks in a shuffled pool,
-on by default), **Reset window layout** and **Reset all settings** (a
+**Music** volume sliders (freeflow, 0–100% in 1% steps; a fresh install
+plays at 100% × 70%), a **Shuffle** toggle (the six tracks in a shuffled
+pool, on by default), **Reset window layout** and **Reset all settings** (a
 second click on **Confirm reset all** restores 1× windowed with vsync on,
 the rail expanded, master 100% / music 70% / shuffle on and no saved
 window size); the scale, the fullscreen and vsync flags, the rail's
@@ -143,7 +144,10 @@ collapse state, the two volumes, the shuffle flag and the last windowed
 size (written on clean quit) persist next to
 the save in `<save>.settings.json`, and
 the window arrangement itself persists in design units, so one saved
-layout works at every scale. Icons (from
+layout works at every scale. Dragging a volume slider is live — the music
+follows the handle — but the sidecar is written once, when the drag is
+released; the notched scale slider applies its rung as the handle snaps
+to it. Icons (from
 [game-icons.net](https://game-icons.net), credited per-icon in
 `uikit/icons/CREDITS.md`) mark service titles, action buttons, overview
 kinds and contract types — monochrome glyphs tinted to the theme, and
