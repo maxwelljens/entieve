@@ -29,10 +29,11 @@ func TestServiceTableAgreesWithScreens(t *testing.T) {
 		if b == nil {
 			t.Fatalf("%s: the services row has no %q button", svc.ID, svc.ID)
 		}
-		row, ok := screenByTitle[strings.ToLower(svc.Window)]
+		id, ok := g.host.ByTitle(strings.ToLower(svc.Window))
 		if !ok {
 			t.Fatalf("%s: window %q names no Screen row", svc.ID, svc.Window)
 		}
+		row := screenByID(id)
 		if row.Title != svc.Window {
 			t.Errorf("%s: window %q resolves to row %q", svc.ID, svc.Window, row.Title)
 		}

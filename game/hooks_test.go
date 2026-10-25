@@ -1,6 +1,7 @@
 package game
 
 import (
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"image"
 	"testing"
 
@@ -104,14 +105,14 @@ func TestChromeOnRootOverlay(t *testing.T) {
 		t.Errorf("rack %v is not inside the HUD container %v",
 			g.rack.Container().GetWidget().Rect, g.hud.Container().GetWidget().Rect)
 	}
-	if mounted[g.logP.Container()] {
+	if mounted[bodyOf[*uikit.LogPanel](g.host, idLog).Container()] {
 		t.Error("log still rides the root overlay (it is a window now)")
 	}
 
 	// The rack tracks hover so input.UIHovered covers its padding; the
 	// HUD container must not: it spans the whole screen. The log window
 	// container tracks hover through the window chrome itself.
-	if !g.rack.Container().GetWidget().TrackHover || !g.logP.Container().GetWidget().TrackHover ||
+	if !g.rack.Container().GetWidget().TrackHover || !bodyOf[*uikit.LogPanel](g.host, idLog).Container().GetWidget().TrackHover ||
 		!g.rail.Container().GetWidget().TrackHover {
 		t.Error("rack/log/rail containers do not track hover")
 	}
@@ -140,7 +141,7 @@ func TestChromeOnRootOverlay(t *testing.T) {
 		rect image.Rectangle
 	}{
 		{"rack", g.rack.Container().GetWidget().Rect},
-		{"log", g.logP.Container().GetWidget().Rect},
+		{"log", bodyOf[*uikit.LogPanel](g.host, idLog).Container().GetWidget().Rect},
 		{"rail", g.rail.Container().GetWidget().Rect},
 	} {
 		x, y := centerOf(t, p.rect)
@@ -221,23 +222,23 @@ func TestLogHistorySurvivesLoad(t *testing.T) {
 	for i := 0; i < 30; i++ {
 		g.s.Step()
 	}
-	g.logP.PushLine(sim.SevInfo, "before the load")
-	g.logP.PushLine(sim.SevGood, "second line")
-	before := g.logP.Lines()
+	bodyOf[*uikit.LogPanel](g.host, idLog).PushLine(sim.SevInfo, "before the load")
+	bodyOf[*uikit.LogPanel](g.host, idLog).PushLine(sim.SevGood, "second line")
+	before := bodyOf[*uikit.LogPanel](g.host, idLog).Lines()
 	if len(before) < 2 {
 		t.Fatalf("log lines = %d, want the pushed lines", len(before))
 	}
-	oldLog := g.logP
+	oldLog := bodyOf[*uikit.LogPanel](g.host, idLog)
 	if err := g.SaveGame(); err != nil {
 		t.Fatalf("SaveGame: %v", err)
 	}
 	if err := g.LoadGame(); err != nil {
 		t.Fatalf("LoadGame: %v", err)
 	}
-	if g.logP == oldLog {
+	if bodyOf[*uikit.LogPanel](g.host, idLog) == oldLog {
 		t.Fatal("log panel was not rebuilt against the restored sim")
 	}
-	after := g.logP.Lines()
+	after := bodyOf[*uikit.LogPanel](g.host, idLog).Lines()
 	if len(after) != len(before) {
 		t.Fatalf("log lines after load = %d, want %d", len(after), len(before))
 	}

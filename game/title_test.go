@@ -12,6 +12,7 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -120,7 +121,7 @@ func TestTitleSuppressesGameplayChrome(t *testing.T) {
 	if g.rail.Container().GetWidget().IsVisible() {
 		t.Error("navigation rail visible at the title")
 	}
-	if g.mounted[pLog] != nil {
+	if g.host.Mounted(idLog) {
 		t.Error("log window mounted at the title")
 	}
 	if g.titleUI == nil || g.titleUI.menu == nil || !g.titleUI.menu.GetWidget().IsVisible() {
@@ -178,7 +179,7 @@ func TestTitleNewGameEnters(t *testing.T) {
 	if !g.hud.Container().GetWidget().IsVisible() {
 		t.Error("HUD still hidden after entering the game")
 	}
-	if g.mounted[pLog] == nil {
+	if !g.host.Mounted(idLog) {
 		t.Error("log not mounted after entering the game")
 	}
 	h0 := g.s.Hash()
@@ -384,18 +385,18 @@ func TestTitleSettingsAndCredits(t *testing.T) {
 	if err := g.Update(); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
-	if g.titleUI.sett == nil || g.titleUI.settRemove == nil {
+	if !g.titleUI.host.Mounted(idSettings) {
 		t.Fatal("settings window did not mount from the title")
 	}
 	// The title mounts the same grown settings window: eight rows + hint
 	// (the kit wraps a plain body in its clip container, so unwrap once).
-	clip := g.titleUI.sett.Win().Contents.(widget.Containerer)
+	clip := g.titleUI.host.Window(idSettings).Contents.(widget.Containerer)
 	body := clip.Children()[0].(widget.Containerer)
 	if n := len(body.Children()); n != 9 {
 		t.Errorf("title settings body rows = %d, want 9 (stepper, fullscreen, rail, master, music, shuffle, reset, reset all, hint)", n)
 	}
 	// The new rail row is wired from the title too (same action bundle).
-	g.settActions.SetRailCollapsed(true)
+	g.host.services.Settings.SetRailCollapsed(true)
 	if !g.railCollapsed || !g.rail.Collapsed() {
 		t.Fatal("the title's settings rail row did not park the rail")
 	}
@@ -403,19 +404,19 @@ func TestTitleSettingsAndCredits(t *testing.T) {
 		t.Errorf("title rail toggle sidecar = %v, want rail_collapsed: true", raw)
 	}
 	before := g.uiScale
-	g.settActions.SetUIScale(1.25)
+	g.host.services.Settings.SetUIScale(1.25)
 	if g.uiScale == before {
 		t.Fatal("SetUIScale did not move the UI scale")
 	}
 	if err := g.Update(); err != nil { // rebuild + remount after the scale change
 		t.Fatalf("Update after scale change: %v", err)
 	}
-	if g.titleUI.sett == nil || g.titleUI.settRemove == nil {
+	if !g.titleUI.host.Mounted(idSettings) {
 		t.Fatal("settings window lost across the scale rebuild")
 	}
 	// The audio rows reach the same host state from the title mount: a
 	// slider drag applies live and its release is the sidecar write.
-	ms := g.titleUI.sett.MasterSliderForTest()
+	ms := bodyOf[*uikit.Settings](g.titleUI.host, idSettings).MasterSliderForTest()
 	if ms == nil {
 		t.Fatal("the title settings window has no master slider")
 	}
@@ -426,12 +427,12 @@ func TestTitleSettingsAndCredits(t *testing.T) {
 	if want := int(math.Round(ms.Value())); g.masterVol != want {
 		t.Errorf("title master slider = %d, want %d", g.masterVol, want)
 	}
-	g.settActions.SetMusicVolume(60)
-	g.settActions.SetShuffle(false)
+	g.host.services.Settings.SetMusicVolume(60)
+	g.host.services.Settings.SetShuffle(false)
 	if g.musicVol != 60 || g.shuffle {
 		t.Errorf("title audio actions = (%d, shuffle %v), want (60, false)", g.musicVol, g.shuffle)
 	}
-	g.settActions.PersistSettings()
+	g.host.services.Settings.PersistSettings()
 	raw := readSettingsMap(t, g.settingsPath())
 	if raw["master_volume"] != float64(g.masterVol) || raw["music_volume"] != float64(60) || raw["shuffle_off"] != true {
 		t.Errorf("title audio sidecar = %v, want master %d, music 60, shuffle_off true", raw, g.masterVol)
@@ -448,7 +449,7 @@ func TestTitleSettingsAndCredits(t *testing.T) {
 	if r := g.titleUI.credits.GetContainer().GetWidget().Rect; r.Dx() <= 0 || r.Dy() <= 0 {
 		t.Errorf("credits window never laid out (%v)", r)
 	}
-	if g.titleUI.settRemove != nil {
+	if g.titleUI.host.Mounted(idSettings) {
 		t.Error("opening credits left the settings window mounted")
 	}
 	g.titleUI.closeTop()
@@ -474,13 +475,13 @@ func TestTitlePSettingsToggle(t *testing.T) {
 	if err := g.updateTitle(Input{JustPressed: []ebiten.Key{ebiten.KeyP}}); err != nil {
 		t.Fatalf("P open: %v", err)
 	}
-	if !g.titleUI.settOpen || g.titleUI.sett == nil || g.titleUI.settRemove == nil {
+	if !g.titleUI.host.IsOpen(idSettings) || !g.titleUI.host.Mounted(idSettings) {
 		t.Fatal("P did not open the title's settings window")
 	}
 	if err := g.updateTitle(Input{JustPressed: []ebiten.Key{ebiten.KeyP}}); err != nil {
 		t.Fatalf("P close: %v", err)
 	}
-	if g.titleUI.settOpen || g.titleUI.sett != nil {
+	if g.titleUI.host.IsOpen(idSettings) || g.titleUI.host.Mounted(idSettings) {
 		t.Error("P did not close the title's settings window (the hint's claim)")
 	}
 	if !g.title {
@@ -508,7 +509,7 @@ func TestEscMenuSaveAsButton(t *testing.T) {
 		t.Fatalf("Update: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(filepath.Dir(g.SavePath()), "save.json")); err != nil {
-		t.Errorf("Save as… wrote no save.json: %v (active %q, log %v)", err, g.activeSavePath(), g.logP.Lines())
+		t.Errorf("Save as… wrote no save.json: %v (active %q, log %v)", err, g.activeSavePath(), bodyOf[*uikit.LogPanel](g.host, idLog).Lines())
 	}
 	if filepath.Base(g.activeSavePath()) != "save.json" {
 		t.Errorf("active save after Save as… = %q", g.activeSavePath())

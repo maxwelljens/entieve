@@ -6,21 +6,21 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/uikit/icons"
 	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // The Screen spec: one table declaring every window the player can open,
 // and the single source the window registries derive from. Adding a
-// window is one row here plus its Build; the panel enum order, panelDefs
-// (the frame/mount/persistence table), the KeyMap toggle rows and their
+// window is one row here plus its Build; the KeyMap toggle rows and their
 // help-overlay text, the layout sidecar's name list, placeDefaults and the
 // test label map all follow from the rows — each derivation below names
-// what it feeds.
+// what it feeds. The Screen host (game/screenhost.go) mounts, syncs and
+// dismisses the built panels from the same rows.
 //
 // The rows are declarative. Behaviour that belongs to a scene (the help
 // and Esc overlays) stays where it is; a row reaches it through Modal
@@ -73,12 +73,36 @@ const (
 // zero value is ebiten.KeyA.
 const keyNone ebiten.Key = -1
 
-// Screen is one window the player can open — the spec row every registry
-// derives from.
+// ScreenID is a Screen row's frozen identity: its layout-sidecar key and
+// its stable name in logs and tests. The value is exactly the key a
+// sidecar file carries on disk; renaming one needs a migration
+// (migrateLayoutNames).
+type ScreenID string
+
+const (
+	idInventory     ScreenID = "inventory"
+	idFitting       ScreenID = "fitting"
+	idMarket        ScreenID = "market"
+	idManufacturing ScreenID = "manufacturing"
+	idScanner       ScreenID = "scanner"
+	idMap           ScreenID = "map"
+	idHelp          ScreenID = "help"
+	idLog           ScreenID = "log"
+	idSettings      ScreenID = "settings"
+	idServices      ScreenID = "services"
+	idRefinery      ScreenID = "refinery"
+	idFinances      ScreenID = "finances"
+	idKeybindings   ScreenID = "keybindings"
+	idMenu          ScreenID = "menu"
+)
+
+// Screen is one window the player can open — the spec row the host and
+// the registries derive from.
 //
-//	ID            panel id (the enum slot); rows are declared in enum
-//	              order, which fixes the mount — and therefore the draw —
-//	              order (the log lands before the Esc menu)
+//	ID            the frozen sidecar key, also the row's label; rows are
+//	              declared in mount order (which fixes the draw order —
+//	              the log lands before the Esc menu). A transient row has
+//	              an id but no sidecar entry (DockPolicy)
 //	Title         the window's canonical name (its title bar, the test
 //	              labels; must be non-empty and unique)
 //	Icon          the title-bar glyph AND the navigation rail's entry
@@ -99,7 +123,8 @@ const keyNone ebiten.Key = -1
 //	              H → help), so Modal rows are never flag-toggled here
 //	DefaultRect   default geometry in design units (see Anchor for which
 //	              parts the composition reads)
-//	DockPolicy    floating / transient (not in the sidecar)
+//	DockPolicy    floating (persisted under its ID) / transient (scene-owned,
+//	              never persisted)
 //	Modal         the window is modal while up (help, menu)
 //	SpaceOnly     mounts only in space (the scanner's docked counterpart
 //	              rule); DockedOnly mounts only while docked (the manufacturing
@@ -111,12 +136,13 @@ const keyNone ebiten.Key = -1
 //	              station lacking it the rail entry grays, clicking it
 //	              does nothing ("" = no dependency; in space the window
 //	              opens exactly as its key always did)
-//	SidecarName   the layout-sidecar key; "" = not persisted (transient)
-//	Sync          refresh the panel from the sim (nil = static content);
-//	              runs every frame while mounted and once when it mounts
-//	Build         constructs the window on the session, once per buildKit
+//	InTitle       the row also lives on the title screen: its host mounts
+//	              it lazily and exclusively there (Settings, Keybindings)
+//	Build         constructs the panel (window + Sync) on the host, once
+//	              per Warm and freshly per title mount; the window is the
+//	              Build's return value — there is no side-channel registry
 type Screen struct {
-	ID    panelID
+	ID    ScreenID
 	Title string
 	Icon  string
 
@@ -128,39 +154,36 @@ type Screen struct {
 	DefaultRect image.Rectangle
 	Anchor      Anchor
 
-	DockPolicy  DockPolicy
-	Modal       bool
-	SpaceOnly   bool
-	DockedOnly  bool
-	Group       string
-	Service     string
-	SidecarName string
+	DockPolicy DockPolicy
+	Modal      bool
+	SpaceOnly  bool
+	DockedOnly bool
+	Group      string
+	Service    string
+	InTitle    bool
 
-	Sync  func(*Game)
-	Build func(*Game) *widget.Window
+	Build func(*ScreenHost) widgets.WindowPanel
 }
 
-// screens is THE table. Enum order, one row per panel id.
+// screens is THE table, in mount order (the log lands before the menu).
 var screens = []Screen{
 	{
 		// An ordinary floating window, docked or in space: it opens at its
 		// own declared default (uikit.NewInventory's landing rect), not in
 		// a composed docked band.
-		ID: pInventory, Title: "Inventory", Icon: "svc_inventory",
+		ID: idInventory, Title: "Inventory", Icon: "svc_inventory",
 		Key: ebiten.KeyI, Action: "inventory", Desc: "I — toggle inventory",
 		DefaultRect: image.Rect(396, 256, 701, 690), Anchor: AnchorFixed,
-		DockPolicy: DockFloating, SidecarName: "inventory", Group: "Trade",
-		Sync:  func(g *Game) { g.inv.Sync() },
-		Build: func(g *Game) *widget.Window { g.inv = uikit.NewInventory(g.env); return g.inv.Win() },
+		DockPolicy: DockFloating, Group: "Trade",
+		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewInventory(h.services.Env) },
 	},
 	{
-		ID: pFitting, Title: "Fitting", Icon: "svc_fitting",
+		ID: idFitting, Title: "Fitting", Icon: "svc_fitting",
 		Key: ebiten.KeyF, Action: "fitting", Desc: "F — toggle fitting",
 		DefaultRect: image.Rect(370, 8, 1014, 690), Anchor: AnchorFixed,
-		DockPolicy: DockFloating, SidecarName: "fitting",
-		Group: "Ship", Service: "fitting",
-		Sync:  func(g *Game) { g.fitt.Sync() },
-		Build: func(g *Game) *widget.Window { g.fitt = uikit.NewFitting(g.env); return g.fitt.Win() },
+		DockPolicy: DockFloating,
+		Group:      "Ship", Service: "fitting",
+		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewFitting(h.services.Env) },
 	},
 	{
 		// The market's per-type default is its landing rect
@@ -168,25 +191,23 @@ var screens = []Screen{
 		// the rail gutter's clear line and stays inside the 1024×700
 		// minimum. Docked or in space it opens here; the old docked band
 		// stretched it across the viewport.
-		ID: pMarket, Title: "Market", Icon: "svc_market",
+		ID: idMarket, Title: "Market", Icon: "svc_market",
 		Key: ebiten.KeyG, Action: "market", Desc: "G — toggle market window (trade while docked)",
 		DefaultRect: image.Rect(97, 8, 857, 568), Anchor: AnchorFixed,
-		DockPolicy: DockFloating, SidecarName: "market",
-		Group: "Trade", Service: "market",
-		Sync:  func(g *Game) { g.mkt.Sync() },
-		Build: func(g *Game) *widget.Window { g.mkt = uikit.NewMarket(g.env); return g.mkt.Win() },
+		DockPolicy: DockFloating,
+		Group:      "Trade", Service: "market",
+		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewMarket(h.services.Env) },
 	},
 	{
 		// A station service that floats: it mounts only while docked and
 		// centres like the overlays on first open (its Screen row carries
 		// no Anchor, so the centred fallback applies).
-		ID: pManufacturing, Title: "Manufacturing", Icon: "svc_manufacturing",
+		ID: idManufacturing, Title: "Manufacturing", Icon: "svc_manufacturing",
 		Key: ebiten.KeyB, Action: "manufacturing", Desc: "B — toggle manufacturing window (manufacture while docked)",
 		DefaultRect: image.Rect(312, 120, 792, 600),
-		DockPolicy:  DockFloating, DockedOnly: true, SidecarName: "manufacturing",
+		DockPolicy:  DockFloating, DockedOnly: true,
 		Group: "Industry", Service: "industry",
-		Sync:  func(g *Game) { g.manu.Sync() },
-		Build: func(g *Game) *widget.Window { g.manu = uikit.NewManufacturing(g.env); return g.manu.Win() },
+		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewManufacturing(h.services.Env) },
 	},
 	{
 		// Space chrome: hidden while docked (legacy parity). Fixed in the
@@ -194,39 +215,36 @@ var screens = []Screen{
 		// constructor default is 10+RailInset,251 (above the bottom-left
 		// log). The x carries the rail inset: the left column (rail,
 		// overview, log, station) all start clear of uikit.RailInset.
-		ID: pScanner, Title: "Scanner", Icon: "svc_scanner",
+		ID: idScanner, Title: "Scanner", Icon: "svc_scanner",
 		Key: ebiten.KeyC, Action: "scanner", Desc: "C — toggle scanner (off-grid sweep)",
 		DefaultRect: image.Rect(396+uikit.RailInset, 276, 696+uikit.RailInset, 524), // 300×248 (uikit scanW × titleBarH+scanBodyH)
 		Anchor:      AnchorFixed,
-		DockPolicy:  DockFloating, SpaceOnly: true, SidecarName: "scanner",
+		DockPolicy:  DockFloating, SpaceOnly: true,
 		Group: "World",
-		Sync:  func(g *Game) { g.scan.Sync() },
-		Build: func(g *Game) *widget.Window { g.scan = uikit.NewScanner(g.env); return g.scan.Win() },
+		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewScanner(h.services.Env) },
 	},
 	{
 		// An ordinary floating window: N flips its flag like every other
 		// keyed row, and the graph's own hover/select/destination live in
 		// the view (uikit/screens/mapview.go).
-		ID: pMap, Title: "Starmap", Icon: "svc_map",
+		ID: idMap, Title: "Starmap", Icon: "svc_map",
 		Key: ebiten.KeyN, Action: "starmap", Desc: "N — toggle starmap",
 		DefaultRect: image.Rect(160, 80, 870, 634), // uikit.NewMapView's landing rect
-		DockPolicy:  DockFloating, SidecarName: "map",
-		Group: "World",
-		Sync:  func(g *Game) { g.mp.Sync() },
-		Build: func(g *Game) *widget.Window { g.mp = uikit.NewMapView(g.env); return g.mp.Win() },
+		DockPolicy:  DockFloating,
+		Group:       "World",
+		Build:       func(h *ScreenHost) widgets.WindowPanel { return uikit.NewMapView(h.services.Env) },
 	},
 	{
 		// Modal overlay driven by HelpScene; the window sizes itself from
 		// its rows (uikit.NewHelp), so the rect declares the top inset
 		// and the design viewport edges only.
-		ID: pHelp, Title: "Help", Icon: "svc_help",
+		ID: idHelp, Title: "Help", Icon: "svc_help",
 		Key: ebiten.KeyH, Action: "help", Desc: "H — toggle help",
 		DefaultRect: image.Rect(0, 24, defaultW, defaultH),
 		Anchor:      AnchorTopCenter,
-		DockPolicy:  DockFloating, Modal: true, SidecarName: "help",
+		DockPolicy:  DockFloating, Modal: true,
 		Group: "Help & System",
-		Sync:  func(g *Game) { g.help.Sync() },
-		Build: func(g *Game) *widget.Window { g.help = uikit.NewHelp(g.env, helpRowsFor(g)); return g.help.Win() },
+		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewHelp(h.services.Env, h.services.HelpRows()) },
 	},
 	{
 		// Bottom-left pocket beside the HUD pair: left/bottom insets of 10
@@ -235,29 +253,24 @@ var screens = []Screen{
 		// 361 right edge, so the log narrows by the rail inset to its
 		// content floor (its overlap with the HUD pair at the 1024×700
 		// minimum is inherent — see TestVirginPlacementTable).
-		ID: pLog, Title: "Log", Icon: "svc_log",
+		ID: idLog, Title: "Log", Icon: "svc_log",
 		Key: ebiten.KeyL, Shift: true, Action: "log", Desc: "Shift+L — toggle log window",
 		DefaultRect: image.Rect(10+uikit.RailInset, defaultH-10-240, 10+264, defaultH-10),
 		Anchor:      AnchorBottomLeft,
-		DockPolicy:  DockFloating, SidecarName: "log",
-		Group: "World",
-		Sync:  func(g *Game) { g.logP.Sync() },
-		Build: func(g *Game) *widget.Window { g.logP = uikit.NewLog(g.env); return g.logP.Win() },
+		DockPolicy:  DockFloating,
+		Group:       "World",
+		Build:       func(h *ScreenHost) widgets.WindowPanel { return uikit.NewLog(h.services.Env) },
 	},
 	{
-		// Like every panel it is rebuilt by buildKit, so its live state
-		// (scale ladder, fullscreen, vsync, rail, audio volumes, shuffle,
-		// resets) is re-read from g in Sync.
-		ID: pSettings, Title: "Settings", Icon: "kind_unknown",
+		// Like every panel it is rebuilt by the host's Warm, so its live
+		// state (scale ladder, fullscreen, vsync, rail, audio volumes,
+		// shuffle, resets) is re-read from the action bundle in Sync.
+		ID: idSettings, Title: "Settings", Icon: "kind_unknown",
 		Key: ebiten.KeyP, Action: "settings", Desc: "P — toggle settings (UI scale, display, layout)",
 		DefaultRect: image.Rect(450, 130, 830, 590), // uikit.NewSettings' landing rect
-		DockPolicy:  DockFloating, SidecarName: "settings",
+		DockPolicy:  DockFloating, InTitle: true,
 		Group: "Help & System",
-		Sync:  func(g *Game) { g.sett.Sync() },
-		Build: func(g *Game) *widget.Window {
-			g.sett = uikit.NewSettings(g.env, g.settActions)
-			return g.sett.Win()
-		},
+		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewSettings(h.services.Env, h.services.Settings) },
 	},
 	{
 		// The station services view: the ONE window docking opens, the
@@ -268,53 +281,48 @@ var screens = []Screen{
 		// (stationRect). Unkeyed by design — docking opens it, the rail
 		// reopens it, and there is nothing to press in space where it
 		// cannot mount.
-		ID: pServices, Title: "Station Services", Icon: "kind_station",
+		ID: idServices, Title: "Station Services", Icon: "kind_station",
 		Key:         keyNone, // docking opens it; the rail reopens it
 		DefaultRect: image.Rect(stationX, stationY, stationX+stationWinW, stationY+stationMinH),
 		Anchor:      AnchorFixed,
-		DockPolicy:  DockFloating, DockedOnly: true, SidecarName: "services",
+		DockPolicy:  DockFloating, DockedOnly: true,
 		Group: "Station",
-		Sync:  func(g *Game) { g.svcUI.Sync() },
-		Build: func(g *Game) *widget.Window { return g.buildServicesWindow() },
+		Build: func(h *ScreenHost) widgets.WindowPanel { return h.services.Station() },
 	},
 	{
 		// The refinery: an ore→mineral service window, docked-only like the
 		// manufacturing panel, centred on first open. Its own key would
 		// crowd the bindings; the rail and the services row open it.
-		ID: pRefinery, Title: "Refinery", Icon: "svc_refinery",
+		ID: idRefinery, Title: "Refinery", Icon: "svc_refinery",
 		Key:         keyNone,
 		DefaultRect: image.Rect(430, 160, 850, 560),
-		DockPolicy:  DockFloating, DockedOnly: true, SidecarName: "refinery",
+		DockPolicy:  DockFloating, DockedOnly: true,
 		Group: "Industry", Service: "refine",
-		Sync:  func(g *Game) { g.ref.Sync() },
-		Build: func(g *Game) *widget.Window { g.ref = uikit.NewRefinery(g.env); return g.ref.Win() },
+		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewRefinery(h.services.Env) },
 	},
 	{
 		// The wallet window: a floating read-only ledger, so it opens in
 		// space and docked alike (nothing in it needs a station service).
 		// K: F and G already belong to fitting and market.
-		ID: pFinances, Title: "Finances", Icon: "svc_finances",
+		ID: idFinances, Title: "Finances", Icon: "svc_finances",
 		Key: ebiten.KeyK, Action: "finances", Desc: "K — toggle finances window (holdings and transactions)",
 		DefaultRect: image.Rect(312, 170, 712, 530),
-		DockPolicy:  DockFloating, SidecarName: "finances",
-		Group: "Trade",
-		Sync:  func(g *Game) { g.fin.Sync() },
-		Build: func(g *Game) *widget.Window { g.fin = uikit.NewFinances(g.env); return g.fin.Win() },
+		DockPolicy:  DockFloating,
+		Group:       "Trade",
+		Build:       func(h *ScreenHost) widgets.WindowPanel { return uikit.NewFinances(h.services.Env) },
 	},
 	{
 		// The rebinding window: one row per rebindable action (the screen
 		// toggles and the world commands), a click arms capture and the
 		// next key assigns. The fixed chord layer is not listed (it never
 		// rebinds). O: the remaining free letter near the UI cluster.
-		ID: pKeybindings, Title: "Keybindings", Icon: "svc_help",
+		ID: idKeybindings, Title: "Keybindings", Icon: "svc_help",
 		Key: ebiten.KeyO, Action: "keybindings", Desc: "O — toggle keybindings (rebind screen and world keys)",
 		DefaultRect: image.Rect(0, 0, 480, 650),
-		DockPolicy:  DockFloating, SidecarName: "keybindings",
+		DockPolicy:  DockFloating, InTitle: true,
 		Group: "Help & System",
-		Sync:  func(g *Game) { g.keyUI.Sync() },
-		Build: func(g *Game) *widget.Window {
-			g.keyUI = uikit.NewKeybindings(g.env, g.keyActions)
-			return g.keyUI.Win()
+		Build: func(h *ScreenHost) widgets.WindowPanel {
+			return keybindPanel{Keybindings: uikit.NewKeybindings(h.services.Env, h.services.Keys), cancel: h.services.Cancel}
 		},
 	},
 	{
@@ -322,101 +330,30 @@ var screens = []Screen{
 		// static buttons — no Sync — and never persisted, so a restart
 		// cannot reopen it. It is deliberately NOT in the rail: the pause
 		// menu keeps its key and its function.
-		ID: pMenu, Title: "Menu",
+		ID: idMenu, Title: "Menu",
 		Key: ebiten.KeyEscape, Action: "menu", Desc: "Esc — menu (Resume / Save / Load / Quit)",
 		DefaultRect: image.Rect(0, 0, 240, 304), // buildMenuWindow's landing rect (5 rows)
-		DockPolicy:  DockTransient, Modal: true, SidecarName: "",
-		Sync:  nil,
-		Build: func(g *Game) *widget.Window { g.menuWin = g.buildMenuWindow(); return g.menuWin },
+		DockPolicy:  DockTransient, Modal: true,
+		Build: func(h *ScreenHost) widgets.WindowPanel { return h.services.Menu() },
 	},
 }
 
-// panelDef is one toggleable panel's whole registration: the single
-// place a panel has to appear in for the frame, mount and persistence
-// paths to agree. It is DERIVED from the Screen row (derivePanelDefs) —
-// the row is what a new window declares.
-//
-//	name   sidecar key ("" = not persisted — the Esc menu is scene-owned
-//	       and must not reopen on the next boot)
-//	window the window backing the id (the Build's return value)
-//	open   the player's toggle flag (scene-driven for map/help/menu)
-//	want   the desired mount for this frame: (game, docked), derived from
-//	       SpaceOnly / DockedOnly
-//	sync   refresh the panel's widgets from the sim (nil = static
-//	       content); run every frame while mounted and once when the
-//	       window mounts, so a freshly mounted panel draws current data
-type panelDef struct {
-	name   string
-	window func(*Game) *widget.Window
-	open   func(*Game) *bool
-	want   func(*Game, bool) bool
-	sync   func(*Game)
-}
-
-// panelDefs is indexed by panelID in enum order — syncMounts iterates
-// it, so the mount order follows the enum (the log lands before the Esc
-// menu, which keeps the top of the draw order). Rows are declared in
-// enum order, so position == id; screenSpecErrors enforces that.
-//
-// Assigned in init: the rows' Build closures reach session code that
-// reads these same registries (the menu's Save button → writeLayout →
-// layoutNames, the help rows → KeyMap), so deriving them in package-level
-// initializers would be a circular initialization. init runs after every
-// variable exists and before any session is built.
-var panelDefs []panelDef
-
-// screenByTitle keys every row by its lowercased Title for
-// Toggle{Screen} (game/intents.go). Like panelDefs it is assigned in
-// init: the rows' Build closures reach session code that resolves
-// titles through it, so a package-level initializer would be a circular
-// initialization.
-var screenByTitle map[string]Screen
-
+// init derives the two package-level registries from the spec: the
+// KeyMap toggle rows and the sidecar name list. The rows' Build closures
+// run later (on a host), so nothing here reaches session code.
 func init() {
-	panelDefs = derivePanelDefs(screens)
-	screenByTitle = titleIndex(screens)
 	KeyMap = slices.Concat(worldKeyMap, screenBindings(screens))
-	layoutNames = append([]string{"overview", "selected", "infowin"}, sidecarNames(screens)...)
+	layoutNames = append(coreLayoutNames(), sidecarNames(screens)...)
 }
 
-// titleIndex keys rows by lowercased title — Toggle{Screen}'s lookup
-// (titles compare case-insensitively, as the intent documents).
-func titleIndex(rows []Screen) map[string]Screen {
-	m := make(map[string]Screen, len(rows))
-	for _, s := range rows {
-		m[strings.ToLower(s.Title)] = s
-	}
-	return m
-}
-
-// derivePanelDefs builds panelDefs from any Screen table (the tests run
-// it over a fixture row too).
-func derivePanelDefs(rows []Screen) []panelDef {
-	defs := make([]panelDef, len(rows))
-	for i, s := range rows {
-		defs[i] = panelDef{
-			name:   s.SidecarName,
-			window: func(g *Game) *widget.Window { return g.screenWin[s.ID] },
-			open:   func(g *Game) *bool { return &g.open[s.ID] },
-			want: func(g *Game, docked bool) bool {
-				return g.open[s.ID] &&
-					(!s.SpaceOnly || !docked) &&
-					(!s.DockedOnly || docked)
-			},
-			sync: s.Sync,
-		}
-	}
-	return defs
-}
-
-// sidecarNames returns the persisted windows' sidecar keys in spec order;
-// layout.go prefixes them with the two core windows and the Show Info
-// window. A transient screen (the Esc menu) is not among them.
+// sidecarNames returns the persisted windows' keys in spec order;
+// layout.go prefixes them with the core windows. A transient screen (the
+// Esc menu) is not among them.
 func sidecarNames(rows []Screen) []string {
 	names := make([]string, 0, len(rows))
 	for _, s := range rows {
-		if s.SidecarName != "" {
-			names = append(names, s.SidecarName)
+		if s.DockPolicy != DockTransient {
+			names = append(names, string(s.ID))
 		}
 	}
 	return names
@@ -436,37 +373,21 @@ func screenBindings(rows []Screen) []Binding {
 	return out
 }
 
-// screenLabel is a screen's registry label: its sidecar key, or the
-// lowercased title when it is not persisted (the Esc menu — draw_test's
-// panelNames map is built from it, and screenSpecErrors uses it to keep
-// the labels unique).
-func screenLabel(s Screen) string {
-	if s.SidecarName != "" {
-		return s.SidecarName
-	}
-	return strings.ToLower(s.Title)
-}
+// screenLabel is a screen's registry label: its frozen id (the sidecar
+// key for persisted rows; the Esc menu's id is not persisted).
+func screenLabel(s Screen) string { return string(s.ID) }
 
 // pressScreen performs the toggle a rebindable screen action names: the
 // modal help scene, or the flag of the keyed non-modal row (the Screen
 // spec is the table; the live key for the action is resolved by the
 // caller through Game.actionFor). Reports whether a row claimed it.
 func (g *Game) pressScreen(action string) bool {
-	for _, s := range screens {
-		if s.Action != action {
-			continue
-		}
-		if s.Modal {
-			if s.ID == pHelp {
-				g.toggleHelp()
-				return true
-			}
-			return false
-		}
-		g.open[s.ID] = !g.open[s.ID]
-		return true
+	id, ok := g.host.ByAction(action)
+	if !ok {
+		return false
 	}
-	return false
+	g.toggleScreenID(id)
+	return true
 }
 
 // anchorRect composes a screen's default rect for a w×h viewport: the
@@ -522,23 +443,28 @@ func screenSpecErrors(rows []Screen) []string {
 		k     ebiten.Key
 		shift bool
 	}
-	ids := map[panelID]string{}
-	names := map[string]string{}
-	labels := map[string]string{}
+	ids := map[ScreenID]string{}
+	titles := map[string]string{}
 	keys := map[keyCombo]string{}
 	actions := map[string]string{}
 
 	for i, s := range rows {
-		if int(s.ID) != i {
-			add("row %d (%s): id %d is out of order — rows are declared in enum order", i, s.Title, s.ID)
+		if s.ID == "" {
+			add("row %d: zero id", i)
+		} else if string(s.ID) != strings.ToLower(string(s.ID)) || strings.ContainsAny(string(s.ID), " \t") {
+			add("row %d (%s): id %q must be a lowercase sidecar key", i, s.Title, s.ID)
 		}
 		if prev, dup := ids[s.ID]; dup {
-			add("row %d (%s): id %d already used by %q", i, s.Title, s.ID, prev)
+			add("row %d (%s): id %q already used by %q", i, s.Title, s.ID, prev)
 		}
 		ids[s.ID] = s.Title
 
 		if s.Title == "" {
-			add("row %d (id %d): zero title", i, s.ID)
+			add("row %d (id %s): zero title", i, s.ID)
+		} else if prev, dup := titles[strings.ToLower(s.Title)]; dup {
+			add("row %d (%s): title already used by %q", i, s.Title, prev)
+		} else {
+			titles[strings.ToLower(s.Title)] = s.Title
 		}
 		if s.Icon == "" {
 			// The rail renders one glyph per openable entry, so every
@@ -585,25 +511,9 @@ func screenSpecErrors(rows []Screen) []string {
 			keys[combo] = s.Title
 		}
 
-		// Sidecar: transient screens stay out of the file, every other
-		// screen persists under a unique key and label.
-		switch {
-		case s.DockPolicy == DockTransient && s.SidecarName != "":
-			add("row %d (%s): transient screen must not carry sidecar name %q", i, s.Title, s.SidecarName)
-		case s.DockPolicy != DockTransient && s.SidecarName == "":
-			add("row %d (%s): persisted screen needs a sidecar name", i, s.Title)
-		case s.SidecarName != "":
-			if prev, dup := names[s.SidecarName]; dup {
-				add("row %d (%s): sidecar name %q already used by %q", i, s.Title, s.SidecarName, prev)
-			}
-			names[s.SidecarName] = s.Title
-		}
-		label := screenLabel(s)
-		if prev, dup := labels[label]; dup {
-			add("row %d (%s): label %q already used by %q", i, s.Title, label, prev)
-		}
-		labels[label] = s.Title
-
+		// Persistence: the id IS the sidecar key, so id uniqueness above
+		// keeps the sidecar's windows unique; DockPolicy decides whether
+		// the row appears in the file at all.
 		// Rail grouping and the station service the window needs:
 		// transients never enter the rail and must not claim a section,
 		// every other row must name a known group, and a service must be

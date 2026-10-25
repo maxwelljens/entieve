@@ -314,7 +314,7 @@ func TestDragFrameCost(t *testing.T) {
 
 	// ---- heavy fixture: docked showcase + market seeded to ~300 rows ----
 	g := dockedShowcaseGame(t, 1280, 720)
-	g.open[pMarket] = true
+	g.host.SetOpen(idMarket, true)
 	g.syncMounts()
 	pump(t, g, 1280, 720)
 	seedBook(t, g, g.s.DockedMarket(), 300)
@@ -327,7 +327,7 @@ func TestDragFrameCost(t *testing.T) {
 	orders := len(g.s.BookOrders(g.s.DockedMarket()))
 	t.Logf("heavy fixture: market order book = %d resting orders (rows)", orders)
 
-	mk := g.panelWindow(pMarket)
+	mk := g.host.Window(idMarket)
 	idleTick := func(i int) {
 		c := titlePoint(mk)
 		mm.moveTo(c.X, c.Y)
@@ -393,7 +393,7 @@ func TestDragFrameCost(t *testing.T) {
 	pressEdge2 := installSeams(t, mm2)
 	img2 := ebiten.NewImage(1280, 720)
 
-	lg := g2.panelWindow(pLog)
+	lg := g2.host.Window(idLog)
 	lIdleTick := func(i int) {
 		c := titlePoint(lg)
 		mm2.moveTo(c.X, c.Y)
@@ -472,7 +472,7 @@ func TestDragCPUProfile(t *testing.T) {
 	seed := envInt("ENTIEVE_SEED_ORDERS", 300)
 
 	g := dockedShowcaseGame(t, 1280, 720)
-	g.open[pMarket] = true
+	g.host.SetOpen(idMarket, true)
 	g.syncMounts()
 	pump(t, g, 1280, 720)
 	seedBook(t, g, g.s.DockedMarket(), seed)
@@ -482,7 +482,7 @@ func TestDragCPUProfile(t *testing.T) {
 	mm := useLoopMouse(t)
 	pressEdge := installSeams(t, mm)
 	img := ebiten.NewImage(1280, 720)
-	mk := g.panelWindow(pMarket)
+	mk := g.host.Window(idMarket)
 	idleTick := func(i int) {
 		c := titlePoint(mk)
 		mm.moveTo(c.X, c.Y)

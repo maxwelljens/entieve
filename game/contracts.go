@@ -255,9 +255,9 @@ func (g *Game) rebuildStationBoard(m stationBoardModel) {
 	// of truth as placeDefaults — so the board's content hug and the
 	// default placement can never disagree — and it goes through the
 	// placement tracker like every other placed rect: a direct SetLocation
-	// here would leave g.placed stale and the window would read as
+	// here would leave the tracker stale and the window would read as
 	// player-moved (never recomposed again).
-	g.placeIfVirgin(g.svcWin, stationRect(h))
+	g.host.Place(g.svcWin, stationRect(h))
 }
 
 // buildContractRow renders one board row as a rich row of the table

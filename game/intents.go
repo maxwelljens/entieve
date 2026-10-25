@@ -2,7 +2,6 @@ package game
 
 import (
 	"github.com/entieve/entieve/uikit/widgets"
-	"strings"
 )
 
 // The write seam (CONTEXT.md: ActionSink): every screen expresses "do
@@ -32,16 +31,11 @@ func (g *Game) Do(i widgets.Intent) {
 	}
 }
 
-// toggleScreen flips the Screen spec row titled name (case-insensitive).
-// The non-modal rows flip their open flag exactly like their key does
-// (pressScreen — syncMounts mounts/unmounts from it); the modal rows are
-// scene-owned, so they push/pop the scene their key drives.
+// toggleScreen flips the Screen row titled name (case-insensitive). The
+// non-modal rows flip their host flag exactly like their key does; the
+// modal rows are scene-owned, so they push/pop the scene their key drives.
 func (g *Game) toggleScreen(name string) {
-	// The title index, not the screens table: the Esc menu's Build
-	// reaches Do, and reading the table back through Do would make the
-	// screens initializer depend on itself (Go's init cycle).
-	// screenByTitle is populated in init, with the other registries.
-	s, ok := screenByTitle[strings.ToLower(name)]
+	id, ok := g.host.ByTitle(name)
 	if !ok {
 		// Not a Screen row: the two core windows (the rail's Overview /
 		// Selected Item entries) toggle through the kit; anything else
@@ -49,18 +43,21 @@ func (g *Game) toggleScreen(name string) {
 		g.kit.ToggleCore(name)
 		return
 	}
-	if s.Modal {
-		switch s.ID {
-		case pHelp:
-			g.toggleHelp()
-		case pMenu:
-			if _, top := g.top().(*MenuScene); top {
-				g.pop()
-			} else {
-				g.push(&MenuScene{g: g})
-			}
+	g.toggleScreenID(id)
+}
+
+// toggleScreenID is the close semantics one row's title/rail key/× runs.
+func (g *Game) toggleScreenID(id ScreenID) {
+	switch id {
+	case idHelp:
+		g.toggleHelp()
+	case idMenu:
+		if _, top := g.top().(*MenuScene); top {
+			g.pop()
+		} else {
+			g.push(&MenuScene{g: g})
 		}
-		return
+	default:
+		g.host.Toggle(id)
 	}
-	g.open[s.ID] = !g.open[s.ID]
 }

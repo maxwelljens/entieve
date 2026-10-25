@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/ebitenui/ebitenui/widget"
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 )
@@ -24,7 +25,7 @@ import (
 // restored rect is clamped to the window's MinSize and to the screen,
 // and its left edge to the rail gutter (applyLayout) — at restore time;
 // later viewport changes re-clamp to MinSize and the screen
-// (clampRestored), so shrinking the window after a restore can never
+// (ScreenHost.ClampRestored), so shrinking the window after a restore can never
 // strand a restored window off-screen.
 
 // layoutVersion tags the sidecar format. Version 2 (rects + open flags
@@ -68,70 +69,84 @@ type layoutFile struct {
 	Windows map[string]winLayout `json:"windows"`
 }
 
+// layoutEntry is one persisted window as the sidecar sees it: geometry
+// always, an open value for the rows that have one, panes and tables only
+// when the panel implements the facet. A row with panes or tables thus
+// persists BECAUSE it implements the optional interface — the silent
+// no-op bug class cannot come back through a forgotten name switch.
+type layoutEntry interface {
+	Win() *widget.Window
+	PersistOpen() bool
+	RestoreOpen(bool)
+	Splits() []widgets.Seam
+	Tables() []*widgets.Table
+}
+
+// coreLayoutEntry is the three kit-owned windows' sidecar row: the two
+// always-on core windows (geometry + open=true) and Show Info (geometry
+// only — it appears on demand, never at boot).
+type coreLayoutEntry struct {
+	name   string
+	win    func(*uikit.Kit) *widget.Window
+	tables func(*uikit.Kit) []*widgets.Table
+	open   bool
+}
+
+var coreLayout = []coreLayoutEntry{
+	{
+		name: "overview", win: (*uikit.Kit).OverviewWindow, open: true,
+		tables: func(k *uikit.Kit) []*widgets.Table { return []*widgets.Table{k.OverviewTable()} },
+	},
+	{name: "selected", win: (*uikit.Kit).SelectedWindow, open: true},
+	{name: "infowin", win: (*uikit.Kit).InfoWindow, open: false},
+}
+
+// coreEntry adapts a core row to the layoutEntry interface.
+type coreEntry struct {
+	kit *uikit.Kit
+	e   coreLayoutEntry
+}
+
+func (c coreEntry) Win() *widget.Window    { return c.e.win(c.kit) }
+func (c coreEntry) PersistOpen() bool      { return c.e.open }
+func (c coreEntry) RestoreOpen(bool)       {}
+func (c coreEntry) Splits() []widgets.Seam { return nil }
+func (c coreEntry) Tables() []*widgets.Table {
+	if c.e.tables == nil {
+		return nil
+	}
+	return c.e.tables(c.kit)
+}
+
+func coreLayoutNames() []string {
+	names := make([]string, len(coreLayout))
+	for i, e := range coreLayout {
+		names[i] = e.name
+	}
+	return names
+}
+
 // layoutNames are the persisted windows, in a stable write order: the
-// two always-on core windows plus the Show Info window (geometry only —
-// see layoutTarget) plus every Screen row that carries a sidecar name
-// (the Esc menu is scene-owned and stays out). Menu, station and the
-// HUD/rack chrome are not user layout state.
-//
-// Assigned in init from the spec (uikit.go), like panelDefs.
+// three core windows plus every Screen row that is not transient (the Esc
+// menu is scene-owned and stays out). Assigned in init from the spec.
 var layoutNames []string
 
 // layoutPath is the sidecar location: the resolved save path plus
 // .layout.json (e.g. …/entieve/save.json.layout.json).
 func (g *Game) layoutPath() string { return g.SavePath() + ".layout.json" }
 
-// panelByName resolves a sidecar name to its panel id (ok=false for the
-// core windows, the menu's empty key and unknown names).
-func panelByName(name string) (panelID, bool) {
-	if name == "" {
-		return 0, false
-	}
-	for p := panelID(0); p < numPanels; p++ {
-		if panelDefs[p].name == name {
-			return p, true
+// layoutEntry resolves a persisted name to its window: the core windows,
+// then a host row by its id (which is the sidecar key).
+func (g *Game) layoutEntry(name string) layoutEntry {
+	for _, e := range coreLayout {
+		if e.name == name {
+			return coreEntry{kit: g.kit, e: e}
 		}
 	}
-	return 0, false
-}
-
-// layoutTarget resolves a persisted name to its window and — for the
-// toggleable windows — its open flag. overview/selected are always-on
-// core chrome (hidden while docked, never closed) and infowin is the Show
-// Info window (geometry only, see persistOpen): nil flag, geometry on
-// read. Every other name comes from panelDefs; unknown names (and the
-// menu's empty key) resolve to nil and are skipped by both sides.
-func (g *Game) layoutTarget(name string) (*widget.Window, *bool) {
-	switch name {
-	case "overview":
-		return g.kit.OverviewWindow(), nil
-	case "selected":
-		return g.kit.SelectedWindow(), nil
-	case "infowin":
-		return g.kit.InfoWindow(), nil
+	if s := g.host.Slot(name); s != nil {
+		return s
 	}
-	if p, ok := panelByName(name); ok {
-		return panelDefs[p].window(g), panelDefs[p].open(g)
-	}
-	return nil, nil
-}
-
-// persistOpen picks the open flag writeLayout records for a named
-// window: the core windows always write open, a toggleable one writes
-// its LIVE flag, and the Show Info window is geometry-only (always
-// closed, never restored — it appears on demand, never at boot). No
-// docked special case remains: nothing is force-opened on dock any
-// more, so the sidecar holds exactly the state the player last saw (the
-// services view's flag is the station scene's, which is open exactly
-// while docked).
-func (g *Game) persistOpen(name string, open *bool) bool {
-	if name == "infowin" {
-		return false
-	}
-	if open == nil {
-		return true
-	}
-	return *open
+	return nil
 }
 
 // writeLayout persists every named window's geometry, open state and
@@ -143,7 +158,11 @@ func (g *Game) writeLayout() error {
 	f := layoutFile{Version: layoutVersion, Windows: map[string]winLayout{}}
 	s := theme.Scale()
 	for _, name := range layoutNames {
-		win, open := g.layoutTarget(name)
+		e := g.layoutEntry(name)
+		if e == nil {
+			continue
+		}
+		win := e.Win()
 		if win == nil {
 			continue
 		}
@@ -172,9 +191,9 @@ func (g *Game) writeLayout() error {
 			Y:      int(math.Round(float64(r.Min.Y) / s)),
 			W:      int(math.Round(float64(w) / s)),
 			H:      int(math.Round(float64(h) / s)),
-			Open:   g.persistOpen(name, open),
-			Splits: g.splitRatios(name),
-			Tables: g.tablePrefs(name),
+			Open:   e.PersistOpen(),
+			Splits: splitRatios(e),
+			Tables: tablePrefs(e),
 		}
 	}
 	data, err := json.MarshalIndent(f, "", "  ")
@@ -224,36 +243,10 @@ func migrateLayoutNames(w map[string]winLayout) map[string]winLayout {
 	return w
 }
 
-// splitSeams resolves a sidecar name to its panel's named split seams
-// (nil for the windows without panes, and before the kit is built).
-// The names live with each panel's SplitPane wiring, not in the Screen
-// spec: a window with panes is the exception, not the rule.
-func (g *Game) splitSeams(name string) []widgets.Seam {
-	switch name {
-	case "inventory":
-		if g.inv != nil {
-			return g.inv.Splits()
-		}
-	case "fitting":
-		if g.fitt != nil {
-			return g.fitt.Splits()
-		}
-	case "manufacturing":
-		if g.manu != nil {
-			return g.manu.Splits()
-		}
-	case "market":
-		if g.mkt != nil {
-			return g.mkt.Splits()
-		}
-	}
-	return nil
-}
-
 // splitRatios is the write side: each named seam's current ratio, nil
 // when the window has no panes.
-func (g *Game) splitRatios(name string) map[string]float64 {
-	seams := g.splitSeams(name)
+func splitRatios(e layoutEntry) map[string]float64 {
+	seams := e.Splits()
 	if len(seams) == 0 {
 		return nil
 	}
@@ -267,58 +260,20 @@ func (g *Game) splitRatios(name string) map[string]float64 {
 // applySplits is the read side: restore the stored ratios (the split
 // clamps anything out of range); a seam the file does not name keeps its
 // equal-share default.
-func (g *Game) applySplits(name string, ratios map[string]float64) {
-	for _, sm := range g.splitSeams(name) {
+func applySplits(e layoutEntry, ratios map[string]float64) {
+	for _, sm := range e.Splits() {
 		if f, ok := ratios[sm.Name]; ok {
 			sm.Split.SetRatio(sm.Index, f)
 		}
 	}
 }
 
-// tablesOf resolves a sidecar name to the window's tables, in build
-// order (nil for the windows without a table, and before the screens
-// exist). The tables carry their own sidecar id (widgets.PrefsID) — the
-// inventory's three holds share one, so one stored set reaches all three.
-func (g *Game) tablesOf(name string) []*widgets.Table {
-	switch name {
-	case "overview":
-		if g.kit != nil {
-			return []*widgets.Table{g.kit.OverviewTable()}
-		}
-	case "inventory":
-		if g.inv != nil {
-			return g.inv.Tables()
-		}
-	case "fitting":
-		if g.fitt != nil {
-			return g.fitt.Tables()
-		}
-	case "manufacturing":
-		if g.manu != nil {
-			return g.manu.Tables()
-		}
-	case "market":
-		if g.mkt != nil {
-			return g.mkt.Tables()
-		}
-	case "refinery":
-		if g.ref != nil {
-			return g.ref.Tables()
-		}
-	case "finances":
-		if g.fin != nil {
-			return g.fin.Tables()
-		}
-	}
-	return nil
-}
-
 // tablePrefs is the write side: each table id's column state, the first
 // table carrying an id speaking for it (the inventory's holds agree by
 // construction — they share one set).
-func (g *Game) tablePrefs(name string) map[string]map[string]widgets.ColumnPref {
+func tablePrefs(e layoutEntry) map[string]map[string]widgets.ColumnPref {
 	var out map[string]map[string]widgets.ColumnPref
-	for _, t := range g.tablesOf(name) {
+	for _, t := range e.Tables() {
 		id, p := t.PrefsID(), t.Prefs()
 		if id == "" || len(p) == 0 {
 			continue
@@ -335,8 +290,8 @@ func (g *Game) tablePrefs(name string) map[string]map[string]widgets.ColumnPref 
 
 // applyTablePrefs is the read side: hand every table its stored column
 // set (a table the file does not name keeps the measured freeze).
-func (g *Game) applyTablePrefs(name string, prefs map[string]map[string]widgets.ColumnPref) {
-	for _, t := range g.tablesOf(name) {
+func applyTablePrefs(e layoutEntry, prefs map[string]map[string]widgets.ColumnPref) {
+	for _, t := range e.Tables() {
 		if p, ok := prefs[t.PrefsID()]; ok {
 			t.SetPrefs(p)
 		}
@@ -351,7 +306,7 @@ func (g *Game) applyTablePrefs(name string, prefs map[string]map[string]widgets.
 // startup (first applySize) and after LoadGame's rebuild. A partial
 // sidecar only restores the windows it holds, and each restored window
 // is flagged as the player's arrangement so the composed defaults never
-// overwrite it on a later resize (see placeIfVirgin).
+// overwrite it on a later resize (see ScreenHost.Place).
 //
 // Restored flags are plain player state now (nothing docks-open the
 // service windows): a docked boot reads the services view's flag from
@@ -362,19 +317,17 @@ func (g *Game) applyLayout(screenW, screenH int) {
 	if len(wins) == 0 {
 		return
 	}
-	if g.restored == nil {
-		g.restored = map[*widget.Window]bool{}
-	}
-	if g.placed == nil {
-		g.placed = map[*widget.Window]image.Rectangle{}
-	}
 	screen := image.Rect(0, 0, screenW, screenH)
 	for _, name := range layoutNames {
-		e, ok := wins[name]
+		saved, ok := wins[name]
 		if !ok {
 			continue
 		}
-		win, open := g.layoutTarget(name)
+		entry := g.layoutEntry(name)
+		if entry == nil {
+			continue
+		}
+		win := entry.Win()
 		if win == nil {
 			continue
 		}
@@ -384,9 +337,9 @@ func (g *Game) applyLayout(screenW, screenH int) {
 		}
 		// Sidecar rects are DESIGN units: × current scale back into live
 		// px (at scale 1 this is the exact historical pixel rect).
-		x, y := theme.Px(e.X), theme.Px(e.Y)
-		saved := image.Rect(x, y, x+theme.Px(e.W), y+theme.Px(e.H))
-		r := clampLayoutRect(saved, minSize, screen)
+		x, y := theme.Px(saved.X), theme.Px(saved.Y)
+		rect := image.Rect(x, y, x+theme.Px(saved.W), y+theme.Px(saved.H))
+		r := clampLayoutRect(rect, minSize, screen)
 		// The rail is top chrome painting over every window, so a sidecar
 		// written before it widened can park a title bar under the gutter,
 		// out of reach. Floor the left edge only, keeping the saved size
@@ -398,21 +351,15 @@ func (g *Game) applyLayout(screenW, screenH int) {
 		win.SetLocation(r)
 		// Track the rect actually applied (SetLocation may grow it), so
 		// the placement tracker never reports a restored window as
-		// player-moved — see placeIfVirgin and TestPlacementTracker.
-		g.placed[win] = win.GetContainer().GetWidget().Rect
-		// Saved wins from here on: the window is the player's
-		// arrangement, so placeIfVirgin leaves it alone on every later
-		// viewport change (loading must never smash a moved layout).
-		g.restored[win] = true
-		if open != nil {
-			*open = e.Open
-		}
+		// player-moved — see ScreenHost.Place and TestPlacementTracker.
+		g.host.MarkRestored(win)
+		entry.RestoreOpen(saved.Open)
 		// The split ratios (v3): a v2 file names none, so every seam
 		// keeps its equal-share default.
-		g.applySplits(name, e.Splits)
+		applySplits(entry, saved.Splits)
 		// The column state (additive, no version bump): a file without it
 		// leaves each table at its measured freeze.
-		g.applyTablePrefs(name, e.Tables)
+		applyTablePrefs(entry, saved.Tables)
 	}
 	// The help window only exists through its overlay scene (modal + dim
 	// backdrop): sync the stack to the restored flag. The starmap is an
@@ -427,38 +374,12 @@ func (g *Game) applyLayout(screenW, screenH int) {
 			g.pop() // OnLeave re-asserts open=false
 		}
 	}
-	syncOverlay(g.open[pHelp],
+	syncOverlay(g.host.IsOpen(idHelp),
 		func(s Scene) bool { _, ok := s.(*HelpScene); return ok },
 		func() Scene { return &HelpScene{g: g} })
 	// Apply restored open flags immediately (LoadGame rebuilt the mounts
 	// before this ran).
 	g.syncMounts()
-}
-
-// clampRestored re-establishes the on-screen guarantee for the windows
-// restored from the sidecar whenever the viewport changes: their rects
-// are clamped to the new screen (and to MinSize) exactly like at restore
-// time, while the restored flag stays set — the player's relative
-// arrangement survives (only what no longer fits slides back in), and
-// placeDefaults still never stomps it. Call it from applySize after the
-// defaults composed. Restored windows are tracked, so the placement
-// tracker keeps reading true afterwards.
-func (g *Game) clampRestored(w, h int) {
-	screen := image.Rect(0, 0, w, h)
-	for win, restored := range g.restored {
-		if !restored {
-			continue
-		}
-		minSize := image.Point{X: 1, Y: 1}
-		if win.MinSize != nil {
-			minSize = *win.MinSize
-		}
-		r := win.GetContainer().GetWidget().Rect
-		if c := clampLayoutRect(r, minSize, screen); c != r {
-			win.SetLocation(c)
-		}
-		g.placed[win] = win.GetContainer().GetWidget().Rect
-	}
 }
 
 // clampLayoutRect fits a restored rect onto the screen at min size:

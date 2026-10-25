@@ -10,6 +10,7 @@ import (
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -22,10 +23,10 @@ func TestPanelMountAndSync(t *testing.T) {
 
 		// Every panel must be constructed by New.
 		for name, v := range map[string]any{
-			"hud": g.hud, "rack": g.rack, "log": g.logP, "inventory": g.inv,
-			"fitting": g.fitt, "market": g.mkt, "manufacturing": g.manu,
-			"refinery": g.ref,
-			"scanner":  g.scan, "map": g.mp, "help": g.help, "menu": g.menuWin,
+			"hud": g.hud, "rack": g.rack, "log": bodyOf[*uikit.LogPanel](g.host, idLog), "inventory": bodyOf[*uikit.Inventory](g.host, idInventory),
+			"fitting": bodyOf[*uikit.Fitting](g.host, idFitting), "market": bodyOf[*uikit.Market](g.host, idMarket), "manufacturing": bodyOf[*uikit.Manufacturing](g.host, idManufacturing),
+			"refinery": bodyOf[*uikit.Refinery](g.host, idRefinery),
+			"scanner":  bodyOf[*uikit.Scanner](g.host, idScanner), "map": bodyOf[*uikit.MapView](g.host, idMap), "help": bodyOf[*uikit.HelpPanel](g.host, idHelp), "menu": g.host.Window(idMenu),
 			"station": g.svcWin, "kit": g.kit, "infowin": g.kit.InfoWindow(),
 		} {
 			if v == nil {
@@ -35,10 +36,14 @@ func TestPanelMountAndSync(t *testing.T) {
 
 		// Mount everything: every toggle window, the overlays and the
 		// docked station services.
-		g.open[pInventory], g.open[pFitting], g.open[pMarket] = true, true, true
-		g.open[pManufacturing] = true
-		g.open[pRefinery] = true
-		g.open[pScanner], g.open[pMap], g.open[pHelp] = true, true, true
+		g.host.SetOpen(idInventory, true)
+		g.host.SetOpen(idFitting, true)
+		g.host.SetOpen(idMarket, true)
+		g.host.SetOpen(idManufacturing, true)
+		g.host.SetOpen(idRefinery, true)
+		g.host.SetOpen(idScanner, true)
+		g.host.SetOpen(idMap, true)
+		g.host.SetOpen(idHelp, true)
 		g.push(&MenuScene{g: g})
 		dockAt(t, g)
 		g.syncScenes()
@@ -48,8 +53,8 @@ func TestPanelMountAndSync(t *testing.T) {
 		pump(t, g, size[0], size[1])
 
 		// The log seam accepts pushes without panicking.
-		g.logP.PushLine(sim.SevInfo, "mount smoke")
-		g.logP.Sync()
+		bodyOf[*uikit.LogPanel](g.host, idLog).PushLine(sim.SevInfo, "mount smoke")
+		bodyOf[*uikit.LogPanel](g.host, idLog).Sync()
 
 		assertInBounds(t, g, size[0], size[1])
 	}
@@ -93,40 +98,34 @@ func TestPanelDefsCoverEnum(t *testing.T) {
 		}
 		t.FailNow() // the first frame would panic on a missing builder
 	}
-	if panelID(len(screens)) != numPanels {
-		t.Fatalf("%d Screen rows for %d panel ids", len(screens), numPanels)
-	}
-	for i, s := range screens {
-		if s.ID != panelID(i) {
-			t.Fatalf("screens[%d].ID = %d, want %d (the enum is the spec's order)", i, s.ID, i)
+	seen := map[ScreenID]bool{}
+	for _, s := range screens {
+		if s.ID == "" || seen[s.ID] {
+			t.Fatalf("screens: empty or duplicate id %q", s.ID)
 		}
-	}
-	if panelID(len(panelDefs)) != numPanels {
-		t.Fatalf("panelDefs has %d rows, want %d (one per id)", len(panelDefs), numPanels)
+		seen[s.ID] = true
 	}
 
 	// Pass 2: the rows against a live session — every id resolves a real
-	// window and flag, and its mount rule computes in both views.
+	// built panel/window, and its mount rule computes in both views.
 	g := newShowcaseGame(t)
-	for p := panelID(0); p < numPanels; p++ {
-		d := panelDefs[p]
-		if w := d.window(g); w == nil {
-			t.Errorf("panel %s: window() returned nil", panelNames[p])
+	for _, s := range screens {
+		if g.host.Window(s.ID) == nil {
+			t.Errorf("panel %s: Window() returned nil", s.ID)
 		}
-		if d.open(g) == nil {
-			t.Errorf("panel %s: open() returned nil", panelNames[p])
+		if g.host.Panel(s.ID) == nil {
+			t.Errorf("panel %s: Panel() returned nil", s.ID)
 		}
-		_ = d.want(g, false)
-		_ = d.want(g, true)
+		_ = g.host.Want(s.ID, Room{})
+		_ = g.host.Want(s.ID, Room{Docked: true})
 	}
 
-	// layoutNames = the two core windows + the Show Info window + every
-	// named panel, in enum order — the sidecar and the table cannot
-	// drift apart.
-	want := []string{"overview", "selected", "infowin"}
-	for p := panelID(0); p < numPanels; p++ {
-		if panelDefs[p].name != "" {
-			want = append(want, panelDefs[p].name)
+	// layoutNames = the core windows + every non-transient row, in spec
+	// order — the sidecar and the table cannot drift apart.
+	want := coreLayoutNames()
+	for _, s := range screens {
+		if s.DockPolicy != DockTransient {
+			want = append(want, string(s.ID))
 		}
 	}
 	if len(layoutNames) != len(want) {
@@ -137,20 +136,19 @@ func TestPanelDefsCoverEnum(t *testing.T) {
 			t.Errorf("layoutNames[%d] = %q, want %q", i, name, want[i])
 		}
 	}
-	// Every named panel resolves to a window; the two core windows and
-	// the Show Info window are geometry-only (no open flag — infowin is
-	// written closed and never restores open).
+	// Every named entry resolves to a window; rows keep a live open flag,
+	// the core windows do not (infowin is written closed, never restored).
 	for _, name := range layoutNames {
-		win, open := g.layoutTarget(name)
-		if win == nil {
-			t.Errorf("layoutTarget(%q) resolved no window", name)
+		e := g.layoutEntry(name)
+		if e == nil || e.Win() == nil {
+			t.Errorf("layoutEntry(%q) resolved no window", name)
 		}
-		if name != "overview" && name != "selected" && name != "infowin" && open == nil {
-			t.Errorf("layoutTarget(%q) resolved no open flag", name)
+		if g.host.Slot(name) == nil && name != "overview" && name != "selected" && name != "infowin" {
+			t.Errorf("layoutEntry(%q) is neither core nor a row", name)
 		}
 	}
-	if win, open := g.layoutTarget("no-such-panel"); win != nil || open != nil {
-		t.Errorf("layoutTarget(unknown) = (%v, %v), want (nil, nil)", win, open)
+	if g.layoutEntry("no-such-panel") != nil {
+		t.Error("layoutEntry(unknown) resolved an entry")
 	}
 }
 
@@ -162,28 +160,28 @@ func TestToggleKeys(t *testing.T) {
 
 	toggles := []struct {
 		key ebiten.Key
-		p   panelID
+		p   ScreenID
 	}{
-		{ebiten.KeyI, pInventory},
-		{ebiten.KeyF, pFitting},
-		{ebiten.KeyC, pScanner},
-		{ebiten.KeyG, pMarket},
+		{ebiten.KeyI, idInventory},
+		{ebiten.KeyF, idFitting},
+		{ebiten.KeyC, idScanner},
+		{ebiten.KeyG, idMarket},
 	}
 	for _, tc := range toggles {
 		g.handleKeys(Input{JustPressed: []ebiten.Key{tc.key}})
-		if !g.open[tc.p] {
+		if !g.host.IsOpen(tc.p) {
 			t.Fatalf("%v: panel %s did not open", tc.key, panelNames[tc.p])
 		}
 		g.syncMounts()
-		if g.mounted[tc.p] == nil {
+		if !g.host.Mounted(tc.p) {
 			t.Fatalf("%v: panel %s not mounted after open", tc.key, panelNames[tc.p])
 		}
 		g.handleKeys(Input{JustPressed: []ebiten.Key{tc.key}})
-		if g.open[tc.p] {
+		if g.host.IsOpen(tc.p) {
 			t.Fatalf("%v: panel %s did not close", tc.key, panelNames[tc.p])
 		}
 		g.syncMounts()
-		if g.mounted[tc.p] != nil {
+		if g.host.Mounted(tc.p) {
 			t.Fatalf("%v: panel %s still mounted after close", tc.key, panelNames[tc.p])
 		}
 	}
@@ -191,49 +189,49 @@ func TestToggleKeys(t *testing.T) {
 	// Shift+L toggles the log window (open by default); plain L keeps
 	// its loot binding and must not touch the log.
 	shiftL := Input{JustPressed: []ebiten.Key{ebiten.KeyL}, KeysDown: []ebiten.Key{ebiten.KeyShift}}
-	if !g.open[pLog] {
+	if !g.host.IsOpen(idLog) {
 		t.Fatal("log window must start open")
 	}
 	g.handleKeys(shiftL)
-	if g.open[pLog] {
+	if g.host.IsOpen(idLog) {
 		t.Fatal("Shift+L did not close the log")
 	}
 	g.syncMounts()
-	if g.mounted[pLog] != nil {
+	if g.host.Mounted(idLog) {
 		t.Fatal("log window still mounted after close")
 	}
 	g.handleKeys(shiftL)
 	g.syncMounts()
-	if !g.open[pLog] || g.mounted[pLog] == nil {
+	if !g.host.IsOpen(idLog) || !g.host.Mounted(idLog) {
 		t.Fatal("Shift+L did not re-open the log window")
 	}
-	beforeLog := g.open[pLog]
+	beforeLog := g.host.IsOpen(idLog)
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyL}})
-	if g.open[pLog] != beforeLog {
+	if g.host.IsOpen(idLog) != beforeLog {
 		t.Error("plain L toggled the log (loot binding broken)")
 	}
 
 	// N toggles the Starmap window (a plain window: no scene).
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyN}})
-	if !g.open[pMap] {
+	if !g.host.IsOpen(idMap) {
 		t.Fatal("N did not open the starmap window")
 	}
 	g.syncMounts()
-	if g.mounted[pMap] == nil {
+	if !g.host.Mounted(idMap) {
 		t.Fatal("map window not mounted")
 	}
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyN}})
-	if g.open[pMap] {
+	if g.host.IsOpen(idMap) {
 		t.Fatal("N did not close the starmap window")
 	}
 	g.syncMounts()
-	if g.mounted[pMap] != nil {
+	if g.host.Mounted(idMap) {
 		t.Fatal("map window still mounted after close")
 	}
 
 	// H toggles the Help scene + window.
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyH}})
-	if _, ok := g.top().(*HelpScene); !ok || !g.open[pHelp] {
+	if _, ok := g.top().(*HelpScene); !ok || !g.host.IsOpen(idHelp) {
 		t.Fatal("H did not open the help scene")
 	}
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyH}})
@@ -243,24 +241,24 @@ func TestToggleKeys(t *testing.T) {
 
 	// Esc opens the modal menu; while it is open no other key toggles.
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyEscape}})
-	if _, ok := g.top().(*MenuScene); !ok || !g.open[pMenu] {
+	if _, ok := g.top().(*MenuScene); !ok || !g.host.IsOpen(idMenu) {
 		t.Fatal("Esc did not open the menu")
 	}
 	g.syncMounts()
-	if g.mounted[pMenu] == nil {
+	if !g.host.Mounted(idMenu) {
 		t.Fatal("menu window not mounted")
 	}
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyI, ebiten.KeyN}})
-	if g.open[pInventory] || g.open[pMap] {
+	if g.host.IsOpen(idInventory) || g.host.IsOpen(idMap) {
 		t.Fatal("toggle keys fired while the Esc menu is open")
 	}
 	// Esc again closes everything menu-related.
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyEscape}})
-	if _, ok := g.top().(*MenuScene); ok || g.open[pMenu] {
+	if _, ok := g.top().(*MenuScene); ok || g.host.IsOpen(idMenu) {
 		t.Fatal("Esc did not close the menu")
 	}
 	g.syncMounts()
-	if g.mounted[pMenu] != nil {
+	if g.host.Mounted(idMenu) {
 		t.Fatal("menu window still mounted after Esc")
 	}
 }
@@ -287,7 +285,7 @@ func TestWorldInputGating(t *testing.T) {
 		rect image.Rectangle
 	}{
 		{"rack", g.rack.Container().GetWidget().Rect},
-		{"log", g.logP.Container().GetWidget().Rect},
+		{"log", bodyOf[*uikit.LogPanel](g.host, idLog).Container().GetWidget().Rect},
 	} {
 		x, y := centerOf(t, p.rect)
 		mustHit = append(mustHit, point{p.name, x, y})
@@ -348,10 +346,10 @@ func TestWorldInputGating(t *testing.T) {
 	}
 
 	// A mounted toggle window gates just like the chrome strips.
-	g.open[pInventory] = true
+	g.host.SetOpen(idInventory, true)
 	g.syncMounts()
 	pump(t, g, 1280, 720)
-	ix, iy := centerOf(t, g.inv.Win().GetContainer().GetWidget().Rect)
+	ix, iy := centerOf(t, bodyOf[*uikit.Inventory](g.host, idInventory).Win().GetContainer().GetWidget().Rect)
 	if !g.overUI(ix, iy) {
 		t.Errorf("inventory window not gated: overUI(%v, %v) = false", ix, iy)
 	}
@@ -368,7 +366,7 @@ func TestSaveRebuildLoad(t *testing.T) {
 			g.s.Step()
 		}
 
-		g.open[pInventory] = true
+		g.host.SetOpen(idInventory, true)
 		g.syncMounts()
 		if err := g.SaveGame(); err != nil {
 			t.Fatalf("SaveGame: %v", err)
@@ -397,10 +395,10 @@ func TestSaveRebuildLoad(t *testing.T) {
 		if g.kit.Selected() != 0 {
 			t.Errorf("selection not reset (selected=%v)", g.kit.Selected())
 		}
-		if !g.open[pInventory] || g.mounted[pInventory] == nil {
+		if !g.host.IsOpen(idInventory) || !g.host.Mounted(idInventory) {
 			t.Error("toggle state not preserved across the rebuild")
 		}
-		if g.hud == nil || g.rack == nil || g.logP == nil {
+		if g.hud == nil || g.rack == nil || bodyOf[*uikit.LogPanel](g.host, idLog) == nil {
 			t.Fatal("panels missing after rebuild")
 		}
 		// Re-bound: every panel reads the live sim.
@@ -426,9 +424,9 @@ func TestSceneTransitionsDock(t *testing.T) {
 	g.applySize(1280, 720)
 
 	// Pre-dock: space chrome up, scanner open, fitting closed.
-	g.open[pScanner] = true
+	g.host.SetOpen(idScanner, true)
 	g.syncMounts()
-	if g.mounted[pScanner] == nil {
+	if !g.host.Mounted(idScanner) {
 		t.Fatal("scanner not mounted in space")
 	}
 	if !chromeShown(g) {
@@ -443,15 +441,15 @@ func TestSceneTransitionsDock(t *testing.T) {
 		t.Fatal("station scene not pushed on dock")
 	}
 	g.syncMounts()
-	if !g.open[pServices] || g.mounted[pServices] == nil {
+	if !g.host.IsOpen(idServices) || !g.host.Mounted(idServices) {
 		t.Error("services view not surfaced on dock")
 	}
-	for _, p := range []panelID{pInventory, pFitting, pMarket} {
-		if g.open[p] || g.mounted[p] != nil {
+	for _, p := range []ScreenID{idInventory, idFitting, idMarket} {
+		if g.host.IsOpen(p) || g.host.Mounted(p) {
 			t.Errorf("docking opened %s too — only the services view auto-opens", panelNames[p])
 		}
 	}
-	if g.mounted[pScanner] != nil {
+	if g.host.Mounted(idScanner) {
 		t.Error("scanner still mounted while docked")
 	}
 	if chromeShown(g) {
@@ -467,10 +465,10 @@ func TestSceneTransitionsDock(t *testing.T) {
 		t.Fatal("station scene not popped on undock")
 	}
 	g.syncMounts()
-	if g.open[pServices] || g.mounted[pServices] != nil {
+	if g.host.IsOpen(idServices) || g.host.Mounted(idServices) {
 		t.Error("services view still open after undock")
 	}
-	if g.mounted[pScanner] == nil {
+	if !g.host.Mounted(idScanner) {
 		t.Error("scanner not restored after undock")
 	}
 	if !chromeShown(g) {
@@ -485,7 +483,7 @@ func TestSceneTransitionsDock(t *testing.T) {
 func TestStationPriorState(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
-	g.open[pFitting] = true
+	g.host.SetOpen(idFitting, true)
 	g.syncMounts()
 
 	dockAt(t, g)
@@ -495,7 +493,7 @@ func TestStationPriorState(t *testing.T) {
 	g.s.Docked.Remove(g.s.Player())
 	g.syncScenes()
 	g.syncMounts()
-	if !g.open[pFitting] || g.mounted[pFitting] == nil {
+	if !g.host.IsOpen(idFitting) || !g.host.Mounted(idFitting) {
 		t.Error("pre-open fitting window was closed by the undock")
 	}
 }

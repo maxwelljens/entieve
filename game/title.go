@@ -3,10 +3,10 @@ package game
 // The title phase: a flag-gated boot state (Options.StartInTitle, set by
 // cmd run only when --load is absent) in which the already-built space
 // scene renders statically behind a dim veil while the sim stays frozen
-// and gameplay chrome stays unmounted. The title owns its own widgets —
-// a menu mounted on the kit's root overlay plus three scene-owned modal
-// windows (save manager, settings, credits) — so no Screen row, panel
-// flag or KeyMap binding changes for it.
+// and gameplay chrome stays unmounted. The title owns a menu on the kit's
+// root overlay, a save manager and credits window, and a second Screen
+// host for the title-scoped rows (Settings, Keybindings) — mounted
+// lazily, exclusively and freshly on every reopen, never persisted.
 
 import (
 	"image"
@@ -18,7 +18,6 @@ import (
 	"unicode"
 
 	"github.com/ebitenui/ebitenui/widget"
-	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -64,28 +63,40 @@ type titleScreen struct {
 	items      []titleItem
 	errMsg     string
 
-	settOpen    bool
 	creditsOpen bool
 	managerOpen bool
-	kbOpen      bool
 
-	sett        *uikit.Settings
-	settRemove  widget.RemoveWindowFunc
+	// The title's Screen host: the title-scoped rows (Settings,
+	// Keybindings), mounted lazily and exclusively. Its rows are the same
+	// Screen spec rows the game host mounts.
+	rows []Screen
+	host *ScreenHost
+
 	credits     *widget.Window
 	creditsRem  widget.RemoveWindowFunc
 	manager     *widget.Window
 	managerPage *widget.Container
 	managerRem  widget.RemoveWindowFunc
-	kb          *uikit.Keybindings
-	kbRem       widget.RemoveWindowFunc
 	saves       []saveEntry
 	pendingDel  string
 }
 
 func newTitleScreen(g *Game) *titleScreen {
-	t := &titleScreen{g: g}
+	t := &titleScreen{g: g, rows: titleRows()}
+	t.host = newScreenHost(t.rows, titleScope, g.kit, g.gameServices())
 	t.buildMenu()
 	return t
+}
+
+// titleRows are the Screen rows that also live on the title screen.
+func titleRows() []Screen {
+	var out []Screen
+	for _, s := range screens {
+		if s.InTitle {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // ensureTitleUI returns the title's UI, building it on first use.
@@ -159,7 +170,6 @@ func (g *Game) leaveTitle() {
 	}
 	g.titleUI = nil
 	g.title = false
-	g.kit.SetTopsVisible(true)
 	g.syncScenes()
 	g.syncPanels()
 	g.syncMounts()
@@ -231,7 +241,11 @@ func (t *titleScreen) labels() []string {
 	if len(t.g.listSaves()) > 0 {
 		out = append(out, "Continue")
 	}
-	return append(out, "Save manager", "Settings", "Keybindings", "Credits", "Quit")
+	out = append(out, "Save manager")
+	for _, s := range t.rows {
+		out = append(out, s.Title)
+	}
+	return append(out, "Credits", "Quit")
 }
 
 // action resolves one menu label to its click.
@@ -244,14 +258,16 @@ func (t *titleScreen) action(label string) func() {
 		return func() { t.continueMostRecent() }
 	case "Save manager":
 		return func() { t.open("manager") }
-	case "Settings":
-		return func() { t.open("settings") }
-	case "Keybindings":
-		return func() { t.open("keybindings") }
 	case "Credits":
 		return func() { t.open("credits") }
 	case "Quit":
 		return func() { g.quit = true }
+	}
+	for _, s := range t.rows {
+		if s.Title == label {
+			id := s.ID
+			return func() { t.open(string(id)) }
+		}
 	}
 	return func() {}
 }
@@ -277,17 +293,17 @@ func versionLine(v string) string {
 // ---------------------------------------------------------------------------
 
 func (t *titleScreen) windowOpen() bool {
-	return t.settOpen || t.creditsOpen || t.managerOpen || t.kbOpen
+	return t.host.AnyOpen() || t.creditsOpen || t.managerOpen
 }
 
 // open shows one title window (they are modal: at most one at a time).
 func (t *titleScreen) open(which string) {
-	t.settOpen = which == "settings"
 	t.creditsOpen = which == "credits"
 	t.managerOpen = which == "manager"
-	t.kbOpen = which == "keybindings"
 	t.pendingDel = ""
 	t.g.cancelCapture()
+	t.host.CloseAll()
+	t.host.SetOpen(ScreenID(which), true)
 	if t.managerOpen {
 		t.saves = t.g.listSaves()
 	}
@@ -295,7 +311,8 @@ func (t *titleScreen) open(which string) {
 
 // closeTop closes the open title window (Esc / the title-bar ×).
 func (t *titleScreen) closeTop() {
-	t.settOpen, t.creditsOpen, t.managerOpen, t.kbOpen = false, false, false, false
+	t.host.CloseAll()
+	t.creditsOpen, t.managerOpen = false, false
 	t.pendingDel = ""
 	t.g.cancelCapture()
 }
@@ -304,11 +321,11 @@ func (t *titleScreen) closeTop() {
 // window, so P closes it when open and opens it (over any other title
 // window) otherwise — the same toggle the Screen spec's settings row has.
 func (t *titleScreen) toggleSettings() {
-	if t.settOpen {
+	if t.host.IsOpen(idSettings) {
 		t.closeTop()
 		return
 	}
-	t.open("settings")
+	t.open(string(idSettings))
 }
 
 // flash reports a failed action on the menu.
@@ -325,16 +342,8 @@ func (t *titleScreen) sync() {
 	if t.menu == nil {
 		t.buildMenu()
 	}
-	if t.settOpen {
-		if t.sett == nil {
-			t.mountSettings()
-		}
-		if t.sett != nil {
-			t.sett.Sync()
-		}
-	} else {
-		t.unmountSettings()
-	}
+	t.host.Sync()
+	t.host.Reconcile(Room{Title: true})
 	if t.creditsOpen {
 		if t.creditsRem == nil {
 			t.mountCredits()
@@ -349,16 +358,6 @@ func (t *titleScreen) sync() {
 	} else {
 		t.unmountManager()
 	}
-	if t.kbOpen {
-		if t.kbRem == nil {
-			t.mountKeybindings()
-		}
-		if t.kb != nil {
-			t.kb.Sync()
-		}
-	} else {
-		t.unmountKeybindings()
-	}
 	if t.menu != nil {
 		theme.ShowWidget(t.menu.GetWidget(), !t.windowOpen())
 	}
@@ -372,10 +371,8 @@ func (t *titleScreen) detach() {
 	t.detachMenu = nil
 	t.wordmark, t.version, t.errLine = nil, nil, nil
 	t.items = nil
-	t.sett, t.settRemove = nil, nil
 	t.credits, t.creditsRem = nil, nil
 	t.manager, t.managerPage, t.managerRem = nil, nil, nil
-	t.kb, t.kbRem = nil, nil
 }
 
 // close removes every title widget and drops the state.
@@ -384,25 +381,11 @@ func (t *titleScreen) close() {
 		t.detachMenu()
 	}
 	t.detachMenu = nil
-	t.unmountSettings()
+	t.host.CloseAll()
+	t.host.Reconcile(Room{Title: true})
 	t.unmountCredits()
 	t.unmountManager()
-	t.unmountKeybindings()
 	t.detach()
-}
-
-func (t *titleScreen) mountSettings() {
-	g := t.g
-	t.sett = uikit.NewSettings(g.env, g.settActions)
-	g.kit.SetWindowClose(t.sett.Win(), t.closeTop)
-	t.settRemove = g.kit.AddWindow(t.sett.Win())
-}
-
-func (t *titleScreen) unmountSettings() {
-	if t.settRemove != nil {
-		t.settRemove()
-	}
-	t.sett, t.settRemove = nil, nil
 }
 
 func (t *titleScreen) mountCredits() {
@@ -462,20 +445,6 @@ func (t *titleScreen) unmountManager() {
 	}
 	t.manager, t.managerPage, t.managerRem = nil, nil, nil
 	t.pendingDel = ""
-}
-
-func (t *titleScreen) mountKeybindings() {
-	g := t.g
-	t.kb = uikit.NewKeybindings(g.env, g.keyActions)
-	g.kit.SetWindowClose(t.kb.Win(), t.closeTop)
-	t.kbRem = g.kit.AddWindow(t.kb.Win())
-}
-
-func (t *titleScreen) unmountKeybindings() {
-	if t.kbRem != nil {
-		t.kbRem()
-	}
-	t.kb, t.kbRem = nil, nil
 }
 
 // window wraps a scrollable page in the house window chrome (InfoWin's

@@ -898,29 +898,30 @@ func marketCatalog(cv widgets.ContentView) []content.ItemID {
 	return out
 }
 
+// Dismissed is the committed-chrome-close hook (the ×): the folds, the
+// expanded branches, the tree selection and the query are session-only,
+// so a window closed by its title bar forgets them and reopens on All
+// with everything collapsed. The host runs it once per mount cycle before
+// Sync; a hotkey unmount never reports a committed close, so that path
+// keeps the folds.
+func (m *Market) Dismissed() {
+	clear(m.open)
+	clear(m.expanded)
+	m.expanded[""] = true
+	m.branch, m.treeSel = "", ""
+	m.search.Focus(false)
+	if m.search.GetText() != "" {
+		m.search.SelectAll()
+		m.search.DeleteSelectedText()
+	}
+}
+
 // Sync refreshes the rows, the tree, the wallet readout and the docked
 // gating from the simulation. Call it every frame before Kit.Update.
 func (m *Market) Sync() {
 	m.split.Poll()
 	orders := m.orders()
 	sortBookOrders(orders)
-	// Folds and branch expansion are session-only: a window that closed
-	// (the kit hides it, see winanim.startClose) forgets what was open and
-	// reopens on All with everything collapsed and the query cleared.
-	// shortcut: a hotkey close unmounts without hiding, so that path keeps
-	// the folds until the next × close; add a close hook to the Screen seam
-	// if a reopened window must always start collapsed.
-	if !m.win.GetContainer().GetWidget().IsVisible() {
-		clear(m.open)
-		clear(m.expanded)
-		m.expanded[""] = true
-		m.branch, m.treeSel = "", ""
-		m.search.Focus(false)
-		if m.search.GetText() != "" {
-			m.search.SelectAll()
-			m.search.DeleteSelectedText()
-		}
-	}
 	// Trades only happen docked at a station — the same gate feeds the
 	// buttons below and every row's declared Buy/Sell actions.
 	gated := !m.docked()

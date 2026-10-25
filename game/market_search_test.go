@@ -3,6 +3,7 @@ package game
 import (
 	"testing"
 
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -19,7 +20,7 @@ func TestMarketSearchKeyboardGate(t *testing.T) {
 	// Ctrl+F opens the market and focuses its search field (the focus is
 	// applied in the frame pass after the mount).
 	g.handleKeys(Input{KeysDown: []ebiten.Key{ebiten.KeyControl}, JustPressed: []ebiten.Key{ebiten.KeyF}})
-	if !g.open[pMarket] {
+	if !g.host.IsOpen(idMarket) {
 		t.Fatal("Ctrl+F did not open the market")
 	}
 	g.applySize(1280, 720)
@@ -28,7 +29,7 @@ func TestMarketSearchKeyboardGate(t *testing.T) {
 		t.Fatal("Ctrl+F did not queue the search focus")
 	}
 	g.Update() // consumes the pending focus
-	if g.mkt == nil || !g.mkt.SearchFocused() {
+	if bodyOf[*uikit.Market](g.host, idMarket) == nil || !bodyOf[*uikit.Market](g.host, idMarket).SearchFocused() {
 		t.Fatal("Ctrl+F did not focus the search field")
 	}
 	g.s.Step()
@@ -41,14 +42,14 @@ func TestMarketSearchKeyboardGate(t *testing.T) {
 		t.Fatalf("focused 's' moved the intent: %+v (was %+v)", after, before)
 	}
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyN}})
-	if g.open[pMap] {
+	if g.host.IsOpen(idMap) {
 		t.Fatal("focused 'n' opened the map")
 	}
 
 	// Esc on the empty field: the field blurs and the normal Esc handling
 	// follows (the Esc menu).
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyEscape}})
-	if g.mkt.SearchFocused() {
+	if bodyOf[*uikit.Market](g.host, idMarket).SearchFocused() {
 		t.Fatal("Esc did not blur the empty search field")
 	}
 	if _, ok := g.top().(*MenuScene); !ok {

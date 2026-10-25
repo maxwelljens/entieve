@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -93,7 +94,7 @@ func TestQuitWhileDockedPersistsLiveState(t *testing.T) {
 	pump(t, g, 1280, 720)
 
 	// Player intent: fitting open, market/inventory closed.
-	g.open[pFitting] = true
+	g.host.SetOpen(idFitting, true)
 	g.syncMounts()
 
 	// Dock: exactly the services view opens.
@@ -101,11 +102,11 @@ func TestQuitWhileDockedPersistsLiveState(t *testing.T) {
 	g.syncScenes()
 	g.syncMounts()
 	pump(t, g, 1280, 720)
-	if !g.open[pServices] {
+	if !g.host.IsOpen(idServices) {
 		t.Fatal("services view not open while docked")
 	}
-	for _, p := range []panelID{pMarket, pInventory} {
-		if g.open[p] {
+	for _, p := range []ScreenID{idMarket, idInventory} {
+		if g.host.IsOpen(p) {
 			t.Fatalf("station panel %s auto-opened on dock — only the services view opens", panelNames[p])
 		}
 	}
@@ -136,13 +137,13 @@ func TestQuitWhileDockedPersistsLiveState(t *testing.T) {
 	if !g2.s.Docked.Has(g2.s.Player()) {
 		t.Fatal("fixture: the save did not carry the dock")
 	}
-	if g2.mounted[pServices] == nil {
+	if !g2.host.Mounted(idServices) {
 		t.Error("services view not surfaced on the docked restore")
 	}
-	if !g2.open[pFitting] || g2.mounted[pFitting] == nil {
+	if !g2.host.IsOpen(idFitting) || !g2.host.Mounted(idFitting) {
 		t.Error("player-open fitting closed by the restore")
 	}
-	if g2.open[pMarket] || g2.mounted[pMarket] != nil {
+	if g2.host.IsOpen(idMarket) || g2.host.Mounted(idMarket) {
 		t.Error("market reopened by the docked restore")
 	}
 
@@ -151,10 +152,10 @@ func TestQuitWhileDockedPersistsLiveState(t *testing.T) {
 	g2.syncScenes()
 	g2.syncMounts()
 	pump(t, g2, 1280, 720)
-	if g2.open[pServices] || g2.mounted[pServices] != nil {
+	if g2.host.IsOpen(idServices) || g2.host.Mounted(idServices) {
 		t.Error("services view still open in space")
 	}
-	if !g2.open[pFitting] || g2.mounted[pFitting] == nil {
+	if !g2.host.IsOpen(idFitting) || !g2.host.Mounted(idFitting) {
 		t.Error("player-open fitting lost by the dock round-trip")
 	}
 }
@@ -190,10 +191,10 @@ func TestRestoredWindowsReclampOnResize(t *testing.T) {
 	if got, want := ov.GetContainer().GetWidget().Rect, image.Rect(624, 400, 1024, 700); got != want {
 		t.Errorf("overview after the shrink = %v, want the clamped %v", got, want)
 	}
-	if !g.restored[ov] {
+	if !g.host.restored[ov] {
 		t.Error("re-clamp dropped the restored flag (the arrangement would recompose)")
 	}
-	if got := g.placed[ov]; got != ov.GetContainer().GetWidget().Rect {
+	if got := g.host.placed[ov]; got != ov.GetContainer().GetWidget().Rect {
 		t.Errorf("tracker after re-clamp = %v, want the actual %v",
 			got, ov.GetContainer().GetWidget().Rect)
 	}
@@ -201,11 +202,11 @@ func TestRestoredWindowsReclampOnResize(t *testing.T) {
 	// Every persisted window: on-screen and at/above its MinSize.
 	screen := image.Rect(0, 0, 1024, 700)
 	for _, name := range layoutNames {
-		win, _ := g.layoutTarget(name)
-		if win == nil {
+		entry := g.layoutEntry(name)
+		if entry == nil || entry.Win() == nil {
 			t.Fatalf("layout window %q does not resolve", name)
 		}
-		r := win.GetContainer().GetWidget().Rect
+		r := entry.Win().GetContainer().GetWidget().Rect
 		if r.Dx() == 0 && r.Dy() == 0 {
 			t.Errorf("%s: never laid out", name)
 			continue
@@ -213,7 +214,7 @@ func TestRestoredWindowsReclampOnResize(t *testing.T) {
 		if !r.In(screen) {
 			t.Errorf("%s: %v out of bounds at 1024×700", name, r)
 		}
-		if min := win.MinSize; min != nil && (r.Dx() < min.X || r.Dy() < min.Y) {
+		if min := entry.Win().MinSize; min != nil && (r.Dx() < min.X || r.Dy() < min.Y) {
 			t.Errorf("%s: %v below MinSize %v", name, r, min)
 		}
 	}
@@ -238,7 +239,7 @@ func TestRestoredWindowsReclampOnResize(t *testing.T) {
 }
 
 // TestPlacementTrackerMatchesActualRects: after any compose or restore
-// g.placed holds each tracked window's REAL rect. A stale entry
+// g.host.placed holds each tracked window's REAL rect. A stale entry
 // misclassifies the window as player-moved and freezes its composition
 // forever — which is what the station board's content hug did when it
 // called SetLocation directly.
@@ -247,10 +248,10 @@ func TestPlacementTrackerMatchesActualRects(t *testing.T) {
 	g := newShowcaseGameAt(t, path)
 	assertTracked := func(stage string) {
 		t.Helper()
-		if len(g.placed) == 0 {
+		if len(g.host.placed) == 0 {
 			t.Fatalf("%s: nothing is tracked", stage)
 		}
-		for win, r := range g.placed {
+		for win, r := range g.host.placed {
 			if actual := win.GetContainer().GetWidget().Rect; actual != r {
 				t.Errorf("%s: tracked %v, actual %v — this window now reads as player-moved",
 					stage, r, actual)
@@ -273,8 +274,8 @@ func TestPlacementTrackerMatchesActualRects(t *testing.T) {
 	if want := stationRect(station.Dy()); station != want {
 		t.Errorf("station = %v, want the station column %v", station, want)
 	}
-	if g.placed[g.svcWin] != station {
-		t.Errorf("station tracker = %v, want the actual %v", g.placed[g.svcWin], station)
+	if g.host.placed[g.svcWin] != station {
+		t.Errorf("station tracker = %v, want the actual %v", g.host.placed[g.svcWin], station)
 	}
 
 	// Restore path: a fresh session over this session's sidecar tracks
@@ -285,13 +286,13 @@ func TestPlacementTrackerMatchesActualRects(t *testing.T) {
 	g2 := newShowcaseGameAt(t, path)
 	g2.applySize(1280, 720)
 	pump(t, g2, 1280, 720)
-	if len(g2.restored) == 0 {
+	if len(g2.host.restored) == 0 {
 		t.Fatal("fixture: nothing was restored from the sidecar")
 	}
-	if len(g2.placed) == 0 {
+	if len(g2.host.placed) == 0 {
 		t.Fatal("restore left the placement tracker empty")
 	}
-	for win, r := range g2.placed {
+	for win, r := range g2.host.placed {
 		if actual := win.GetContainer().GetWidget().Rect; actual != r {
 			t.Errorf("restore: tracked %v, actual %v", r, actual)
 		}
@@ -361,10 +362,10 @@ func TestLayoutRoundTripAcrossRestart(t *testing.T) {
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
 
-	g.kit.OverviewWindow().SetLocation(image.Rect(40, 60, 440, 360)) // 400×300
-	g.logP.Win().SetLocation(image.Rect(700, 300, 1060, 540))        // 360×240, off a 1024 screen
-	g.open[pInventory] = true
-	g.open[pLog] = false
+	g.kit.OverviewWindow().SetLocation(image.Rect(40, 60, 440, 360))                          // 400×300
+	bodyOf[*uikit.LogPanel](g.host, idLog).Win().SetLocation(image.Rect(700, 300, 1060, 540)) // 360×240, off a 1024 screen
+	g.host.SetOpen(idInventory, true)
+	g.host.SetOpen(idLog, false)
 	g.syncMounts()
 	if err := g.writeLayout(); err != nil {
 		t.Fatalf("writeLayout: %v", err)
@@ -382,14 +383,14 @@ func TestLayoutRoundTripAcrossRestart(t *testing.T) {
 		t.Errorf("overview restored to %v, want %v (floored clear of the rail)", ov, want)
 	}
 	// The saved log rect overflows 1024 px: size kept, slid fully in.
-	lr := g2.logP.Win().GetContainer().GetWidget().Rect
+	lr := bodyOf[*uikit.LogPanel](g2.host, idLog).Win().GetContainer().GetWidget().Rect
 	if lr != image.Rect(664, 300, 1024, 540) {
 		t.Errorf("log restored to %v, want (664,300)-(1024,540)", lr)
 	}
-	if !g2.open[pInventory] || g2.mounted[pInventory] == nil {
+	if !g2.host.IsOpen(idInventory) || !g2.host.Mounted(idInventory) {
 		t.Error("inventory open state not restored (flag or mount)")
 	}
-	if g2.open[pLog] || g2.mounted[pLog] != nil {
+	if g2.host.IsOpen(idLog) || g2.host.Mounted(idLog) {
 		t.Error("closed log re-opened on restart")
 	}
 	// Bounds only: a player-arranged layout is allowed to overlap (the
@@ -423,7 +424,7 @@ func TestRestoredRectsClearTheRailGutter(t *testing.T) {
 				return g.kit.OverviewWindow().GetContainer().GetWidget().Rect
 			}, `"overview":{"x":8,"y":60,"w":400,"h":300,"open":true}`, 400},
 			{"log", func(g *Game) image.Rectangle {
-				return g.logP.Win().GetContainer().GetWidget().Rect
+				return bodyOf[*uikit.LogPanel](g.host, idLog).Win().GetContainer().GetWidget().Rect
 			}, `"log":{"x":95,"y":300,"w":360,"h":240,"open":true}`, 360},
 		} {
 			path := filepath.Join(t.TempDir(), "save.json")
@@ -489,7 +490,7 @@ func TestRestoredRectsClearTheRailGutter(t *testing.T) {
 		write(t, path, `"market":{"x":400,"y":200,"w":618,"h":240,"open":true}`)
 		g := newShowcaseGameAt(t, path)
 		g.applySize(1280, 720)
-		if r := g.mkt.Win().GetContainer().GetWidget().Rect; r != image.Rect(400, 200, 1018, 440) {
+		if r := bodyOf[*uikit.Market](g.host, idMarket).Win().GetContainer().GetWidget().Rect; r != image.Rect(400, 200, 1018, 440) {
 			t.Errorf("market restored to %v, want the saved 618×240 rect at (400,200)", r)
 		}
 	})
@@ -534,17 +535,17 @@ func TestLayoutCorruptAndPartialDegrade(t *testing.T) {
 		t.Fatal(err)
 	}
 	g.applyLayout(1280, 720)
-	lr := g.logP.Win().GetContainer().GetWidget().Rect
+	lr := bodyOf[*uikit.LogPanel](g.host, idLog).Win().GetContainer().GetWidget().Rect
 	if lr != image.Rect(500, 100, 800, 300) {
 		t.Errorf("log restored to %v, want (500,100)-(800,300)", lr)
 	}
-	if g.open[pLog] {
+	if g.host.IsOpen(idLog) {
 		t.Error("log open flag not restored from the partial sidecar")
 	}
 	if r := g.kit.OverviewWindow().GetContainer().GetWidget().Rect; r != defaultOverviewRect(1280) {
 		t.Errorf("absent overview entry moved the window to %v", r)
 	}
-	if r := g.scan.Win().GetContainer().GetWidget().Rect; r.Dx() == 0 {
+	if r := bodyOf[*uikit.Scanner](g.host, idScanner).Win().GetContainer().GetWidget().Rect; r.Dx() == 0 {
 		t.Error("absent scanner entry broke its geometry")
 	}
 	assertInBounds(t, g, 1280, 720)
@@ -587,7 +588,7 @@ func TestLayoutRestoredOnLoad(t *testing.T) {
 	pump(t, g, 1280, 720)
 
 	g.kit.OverviewWindow().SetLocation(image.Rect(40, 60, 440, 360))
-	g.open[pInventory] = true
+	g.host.SetOpen(idInventory, true)
 	g.syncMounts()
 	if err := g.SaveGame(); err != nil {
 		t.Fatalf("SaveGame: %v", err)
@@ -595,7 +596,7 @@ func TestLayoutRestoredOnLoad(t *testing.T) {
 
 	// Rearrange after the save: loading must rewind the layout too.
 	g.kit.OverviewWindow().SetLocation(image.Rect(500, 300, 900, 600))
-	g.open[pInventory] = false
+	g.host.SetOpen(idInventory, false)
 	g.syncMounts()
 	if err := g.LoadGame(); err != nil {
 		t.Fatalf("LoadGame: %v", err)
@@ -604,7 +605,7 @@ func TestLayoutRestoredOnLoad(t *testing.T) {
 	if want := image.Rect(railClearX(), 60, railClearX()+400, 360); r != want {
 		t.Errorf("overview after load = %v, want %v (floored clear of the rail)", r, want)
 	}
-	if !g.open[pInventory] || g.mounted[pInventory] == nil {
+	if !g.host.IsOpen(idInventory) || !g.host.Mounted(idInventory) {
 		t.Error("inventory open state not restored by the load")
 	}
 	pump(t, g, 1280, 720)
@@ -643,7 +644,7 @@ func TestLogWindowGating(t *testing.T) {
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
 
-	r := g.logP.Win().GetContainer().GetWidget().Rect
+	r := bodyOf[*uikit.LogPanel](g.host, idLog).Win().GetContainer().GetWidget().Rect
 	if r.Dx() == 0 {
 		t.Fatal("log window never laid out")
 	}
@@ -652,10 +653,10 @@ func TestLogWindowGating(t *testing.T) {
 		t.Errorf("open log not gated: overUI(%v, %v) = false", x, y)
 	}
 
-	g.open[pLog] = false
+	g.host.SetOpen(idLog, false)
 	g.syncMounts()
 	pump(t, g, 1280, 720)
-	if g.mounted[pLog] != nil {
+	if g.host.Mounted(idLog) {
 		t.Fatal("log still mounted after close")
 	}
 	if g.overUI(x, y) {
@@ -673,7 +674,7 @@ func TestWriteLayoutNeverPersistsDegenerateRects(t *testing.T) {
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
 
-	g.help.Win().GetContainer().GetWidget().Rect = image.Rectangle{}
+	bodyOf[*uikit.HelpPanel](g.host, idHelp).Win().GetContainer().GetWidget().Rect = image.Rectangle{}
 	if err := g.writeLayout(); err != nil {
 		t.Fatalf("writeLayout: %v", err)
 	}
@@ -681,7 +682,7 @@ func TestWriteLayoutNeverPersistsDegenerateRects(t *testing.T) {
 	if e.W <= 0 || e.H <= 0 {
 		t.Errorf("help persisted as %+v: degenerate %d×%d geometry", e, e.W, e.H)
 	}
-	if min := g.help.Win().MinSize; min != nil && (e.W < min.X || e.H < min.Y) {
+	if min := bodyOf[*uikit.HelpPanel](g.host, idHelp).Win().MinSize; min != nil && (e.W < min.X || e.H < min.Y) {
 		t.Errorf("help persisted as %+v, below MinSize %v", e, min)
 	}
 }
@@ -707,7 +708,7 @@ func TestStaleLayoutVersionIgnored(t *testing.T) {
 		t.Errorf("version-1 sidecar was applied: overview = %v, want the default %v", r, defaultOverviewRect(1280))
 	}
 	for id, want := range serviceDefaults {
-		if got := g.screenWin[id].GetContainer().GetWidget().Rect; got != want {
+		if got := g.host.Window(id).GetContainer().GetWidget().Rect; got != want {
 			t.Errorf("version-1 sidecar was applied: %s = %v, want the default %v",
 				panelNames[id], got, want)
 		}
@@ -754,9 +755,9 @@ func TestSplitRatiosPersistAcrossRestart(t *testing.T) {
 
 	// Drag inventory's first seam and fitting's only one (through the same
 	// panels the windows expose to the sidecar).
-	inv := g.splitSeams("inventory")
+	inv := g.host.Splits(idInventory)
 	inv[0].Split.SetRatio(inv[0].Index, 0.42)
-	fit := g.splitSeams("fitting")
+	fit := g.host.Splits(idFitting)
 	fit[0].Split.SetRatio(fit[0].Index, 0.7)
 
 	if err := g.SaveGame(); err != nil {
@@ -785,22 +786,23 @@ func TestSplitRatiosPersistAcrossRestart(t *testing.T) {
 	g2.applySize(1280, 720)
 	// Mount the two windows whose splits are checked (both closed in the
 	// sidecar: a drag persists ratios, never the open flag).
-	g2.open[pInventory], g2.open[pFitting] = true, true
+	g2.host.SetOpen(idInventory, true)
+	g2.host.SetOpen(idFitting, true)
 	g2.syncMounts()
 	pump(t, g2, 1280, 720)
-	if got := seamRatio("inventory-ore", g2.splitSeams("inventory")); got != 0.42 {
+	if got := seamRatio("inventory-ore", g2.host.Splits(idInventory)); got != 0.42 {
 		t.Errorf("restored inventory-ore = %v, want 0.42", got)
 	}
-	if got := seamRatio("inventory-hangar", g2.splitSeams("inventory")); got != float64(2)/3 {
+	if got := seamRatio("inventory-hangar", g2.host.Splits(idInventory)); got != float64(2)/3 {
 		t.Errorf("restored inventory-hangar = %v, want the equal share", got)
 	}
-	if got := seamRatio("fitting-hangar", g2.splitSeams("fitting")); got != 0.7 {
+	if got := seamRatio("fitting-hangar", g2.host.Splits(idFitting)); got != 0.7 {
 		t.Errorf("restored fitting-hangar = %v, want 0.7", got)
 	}
 	g2.applySize(1024, 700)
 	pump(t, g2, 1024, 700)
-	assertSplitTiled(t, "inventory", g2.splitSeams("inventory")[0].Split)
-	assertSplitTiled(t, "fitting", g2.splitSeams("fitting")[0].Split)
+	assertSplitTiled(t, "inventory", g2.host.Splits(idInventory)[0].Split)
+	assertSplitTiled(t, "fitting", g2.host.Splits(idFitting)[0].Split)
 }
 
 // TestSidecarV2MigratesToSplits: a hand-written version-2 sidecar (the
@@ -820,26 +822,26 @@ func TestSidecarV2MigratesToSplits(t *testing.T) {
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
 
-	if got, want := g.inv.Win().GetContainer().GetWidget().Rect, image.Rect(120, 140, 440, 580); got != want {
+	if got, want := bodyOf[*uikit.Inventory](g.host, idInventory).Win().GetContainer().GetWidget().Rect, image.Rect(120, 140, 440, 580); got != want {
 		t.Errorf("v2 inventory rect = %v, want the saved %v", got, want)
 	}
-	if !g.open[pInventory] {
+	if !g.host.IsOpen(idInventory) {
 		t.Error("v2 inventory open flag not restored")
 	}
 	// The rename migration still applies to v2 files (the saved 500×400
 	// grows to the window's 420×440 content floor).
-	if got, want := g.manu.Win().GetContainer().GetWidget().Rect, image.Rect(300, 200, 800, 640); got != want {
+	if got, want := bodyOf[*uikit.Manufacturing](g.host, idManufacturing).Win().GetContainer().GetWidget().Rect, image.Rect(300, 200, 800, 640); got != want {
 		t.Errorf("v2 factory rect migrated to %v, want %v", got, want)
 	}
-	if g.open[pManufacturing] {
+	if g.host.IsOpen(idManufacturing) {
 		t.Error("v2 manufacturing open flag not restored (want closed)")
 	}
-	for _, sm := range g.splitSeams("inventory") {
+	for _, sm := range g.host.Splits(idInventory) {
 		if got, want := sm.Split.Ratio(sm.Index), float64(sm.Index+1)/3; got != want {
 			t.Errorf("v2 %s = %v, want the equal-share default %v", sm.Name, got, want)
 		}
 	}
-	if got := seamRatio("fitting-hangar", g.splitSeams("fitting")); got != 0.5 {
+	if got := seamRatio("fitting-hangar", g.host.Splits(idFitting)); got != 0.5 {
 		t.Errorf("v2 fitting-hangar = %v, want the 0.5 default", got)
 	}
 
@@ -879,15 +881,15 @@ func TestSplitRatioOutOfRangeClamps(t *testing.T) {
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
 
-	if got := seamRatio("fitting-hangar", g.splitSeams("fitting")); got != widgets.SplitMaxRatio {
+	if got := seamRatio("fitting-hangar", g.host.Splits(idFitting)); got != widgets.SplitMaxRatio {
 		t.Errorf("fitting-hangar = %v, want the clamped max %v", got, widgets.SplitMaxRatio)
 	}
-	if got := seamRatio("manufacturing-jobs", g.splitSeams("manufacturing")); got != widgets.SplitMinRatio {
+	if got := seamRatio("manufacturing-jobs", g.host.Splits(idManufacturing)); got != widgets.SplitMinRatio {
 		t.Errorf("manufacturing-jobs = %v, want the clamped min %v", got, widgets.SplitMinRatio)
 	}
 	// Fitting restores open, so its split is laid out; manufacturing is
 	// docked-only and closed here, so only its stored ratio is checked.
-	assertSplitTiled(t, "fitting", g.splitSeams("fitting")[0].Split)
+	assertSplitTiled(t, "fitting", g.host.Splits(idFitting)[0].Split)
 }
 
 // assertSplitRowTiled: a row split's panes and hairlines fill its rect
@@ -925,7 +927,7 @@ func TestMarketSplitRatioPersists(t *testing.T) {
 	// at the 760 px landing rect (760 − 2·ContentsPad − both 4 px seams).
 	const treeOpening = 176.0 / 736
 	const ordersOpening = (176.0 + 320) / 736
-	seams := g.splitSeams("market")
+	seams := g.host.Splits(idMarket)
 	if len(seams) != 2 || seams[0].Name != "market-tree" || seams[1].Name != "market-orders" {
 		t.Fatalf("market seams = %+v, want market-tree then market-orders", seams)
 	}
@@ -956,24 +958,24 @@ func TestMarketSplitRatioPersists(t *testing.T) {
 	// still tiles the row.
 	g2 := newShowcaseGameAt(t, path)
 	g2.applySize(1280, 720)
-	g2.open[pMarket] = true
+	g2.host.SetOpen(idMarket, true)
 	g2.syncMounts()
 	pump(t, g2, 1280, 720)
-	if got := seamRatio("market-tree", g2.splitSeams("market")); math.Abs(got-0.32) > 1e-9 {
+	if got := seamRatio("market-tree", g2.host.Splits(idMarket)); math.Abs(got-0.32) > 1e-9 {
 		t.Errorf("restored market-tree = %v, want 0.32", got)
 	}
-	if got := seamRatio("market-orders", g2.splitSeams("market")); math.Abs(got-0.71) > 1e-9 {
+	if got := seamRatio("market-orders", g2.host.Splits(idMarket)); math.Abs(got-0.71) > 1e-9 {
 		t.Errorf("restored market-orders = %v, want 0.71", got)
 	}
-	assertSplitRowTiled(t, "market", g2.splitSeams("market")[0].Split)
+	assertSplitRowTiled(t, "market", g2.host.Splits(idMarket)[0].Split)
 	g2.applySize(1024, 700)
 	pump(t, g2, 1024, 700)
-	assertSplitRowTiled(t, "market", g2.splitSeams("market")[0].Split)
+	assertSplitRowTiled(t, "market", g2.host.Splits(idMarket)[0].Split)
 
 	// Reset window layout: back to the market's opening shares (176 px of
 	// browse, the old 240 px column), not the widget's equal thirds.
 	g2.resetLayout()
-	seams = g2.splitSeams("market")
+	seams = g2.host.Splits(idMarket)
 	if got := seamRatio("market-tree", seams); math.Abs(got-treeOpening) > 1e-9 {
 		t.Errorf("after reset market-tree = %v, want the opening share %v", got, treeOpening)
 	}
@@ -996,7 +998,7 @@ func TestMarketSplitV2Default(t *testing.T) {
 	g := newShowcaseGameAt(t, path)
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
-	if got := seamRatio("market-orders", g.splitSeams("market")); math.Abs(got-opening) > 1e-9 {
+	if got := seamRatio("market-orders", g.host.Splits(idMarket)); math.Abs(got-opening) > 1e-9 {
 		t.Errorf("v2 market-orders = %v, want the opening share %v", got, opening)
 	}
 	if err := g.writeLayout(); err != nil {

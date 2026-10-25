@@ -8,6 +8,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -249,7 +250,7 @@ func TestStationWindowGeometry(t *testing.T) {
 		pump(t, g, size[0], size[1])
 
 		station := g.svcWin.GetContainer().GetWidget().Rect
-		log := g.logP.Win().GetContainer().GetWidget().Rect
+		log := bodyOf[*uikit.LogPanel](g.host, idLog).Win().GetContainer().GetWidget().Rect
 
 		if station.Min.X < 0 || station.Max.X > size[0] || station.Max.Y > size[1] {
 			t.Errorf("%dx%d: station window %v out of bounds", size[0], size[1], station)
@@ -558,7 +559,7 @@ func TestStationWindowGripStopsAtContentMin(t *testing.T) {
 	// Close the log: it sits directly below the board, and growing the
 	// board's bottom edge into its pocket would put the shrink press on
 	// the log instead of the board.
-	g.open[pLog] = false
+	g.host.SetOpen(idLog, false)
 	g.syncMounts()
 	pump(t, g, 1280, 720)
 

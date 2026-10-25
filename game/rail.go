@@ -61,7 +61,7 @@ func railEntries(g *Game) []uikit.RailEntry {
 				DockedOnly: row.DockedOnly,
 				Service:    row.Service,
 
-				Open: func() bool { return g.open[row.ID] },
+				Open: func() bool { return g.host.IsOpen(row.ID) },
 			})
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"image"
 	"testing"
 
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -21,19 +22,19 @@ func TestCursorShapePresentsOnEveryDraw(t *testing.T) {
 		seat func(t *testing.T, g *Game) image.Point
 		want ebiten.CursorShapeType
 	}{
-		{"inventory vertical seam", func(g *Game) { g.open[pInventory] = true },
+		{"inventory vertical seam", func(g *Game) { g.host.SetOpen(idInventory, true) },
 			func(t *testing.T, g *Game) image.Point {
-				r := g.splitSeams("inventory")[0].Split.Container().Children()[1].GetWidget().Rect
+				r := g.host.Splits(idInventory)[0].Split.Container().Children()[1].GetWidget().Rect
 				return image.Pt(r.Min.X+2, r.Min.Y)
 			}, ebiten.CursorShapeNSResize},
-		{"market horizontal seam", func(g *Game) { g.open[pMarket] = true },
+		{"market horizontal seam", func(g *Game) { g.host.SetOpen(idMarket, true) },
 			func(t *testing.T, g *Game) image.Point {
-				r := g.splitSeams("market")[0].Split.Container().Children()[1].GetWidget().Rect
+				r := g.host.Splits(idMarket)[0].Split.Container().Children()[1].GetWidget().Rect
 				return image.Pt(r.Min.X, r.Min.Y+r.Dy()/2)
 			}, ebiten.CursorShapeEWResize},
-		{"window edge grip", func(g *Game) { g.open[pInventory] = true },
+		{"window edge grip", func(g *Game) { g.host.SetOpen(idInventory, true) },
 			func(t *testing.T, g *Game) image.Point {
-				r := g.inv.Win().GetContainer().GetWidget().Rect
+				r := bodyOf[*uikit.Inventory](g.host, idInventory).Win().GetContainer().GetWidget().Rect
 				return image.Pt(r.Min.X+2, (r.Min.Y+r.Max.Y)/2)
 			}, ebiten.CursorShapeEWResize},
 	}

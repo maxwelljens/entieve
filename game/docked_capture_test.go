@@ -50,7 +50,7 @@ func TestDockedBackdropCapture(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
 	dockAt(t, g)
-	g.open[pLog] = true
+	g.host.SetOpen(idLog, true)
 	g.syncScenes()
 	g.syncMounts()
 	// Settle layout and the fade through the production frame path.
@@ -63,7 +63,7 @@ func TestDockedBackdropCapture(t *testing.T) {
 	if !ok || info.Name == "" {
 		t.Fatalf("fixture: not docked (%+v, %v)", info, ok)
 	}
-	logRect := g.logP.Win().GetContainer().GetWidget().Rect
+	logRect := bodyOf[*uikit.LogPanel](g.host, idLog).Win().GetContainer().GetWidget().Rect
 	if dirs := logRect.Dx(); dirs <= 0 {
 		t.Fatalf("fixture: log window never laid out (%v)", logRect)
 	}

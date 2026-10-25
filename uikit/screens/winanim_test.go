@@ -222,3 +222,18 @@ func TestCloseFadeDefersUnmountAndStaysInert(t *testing.T) {
 		t.Errorf("close count at settle = %d, want 1", closes)
 	}
 }
+
+// TestKitClosingReadsCommittedFade: the host's Dismissed handshake reads
+// this fact — a committed close (the ×/startClose) reports Closing until
+// the fade settles; a settled window does not.
+func TestKitClosing(t *testing.T) {
+	k, _ := newTestKit(t)
+	w := k.OverviewWindow()
+	if k.Closing(w) {
+		t.Fatal("settled window reports a closing fade")
+	}
+	k.startClose(w)
+	if !k.Closing(w) {
+		t.Fatal("committed close not reported")
+	}
+}

@@ -2,6 +2,7 @@ package game
 
 import (
 	"encoding/json"
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"os"
 	"path/filepath"
 	"testing"
@@ -37,18 +38,19 @@ func readColumnDoc(t *testing.T, path string) columnDoc {
 func TestColumnPrefsPersistAcrossRestart(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "save.json")
 	g := newShowcaseGameAt(t, path)
-	g.open[pInventory], g.open[pMarket] = true, true
+	g.host.SetOpen(idInventory, true)
+	g.host.SetOpen(idMarket, true)
 	pump(t, g, 1280, 720)
 
-	inv := g.inv.Tables()[0]
+	inv := bodyOf[*uikit.Inventory](g.host, idInventory).Tables()[0]
 	if id := inv.PrefsID(); id != "inventory" {
 		t.Fatalf("inventory table id = %q, want the shared %q", id, "inventory")
 	}
 	inv.SetPrefs(map[string]widgets.ColumnPref{"Item": {Width: 180}, "Vol": {Off: true}})
-	if ids := []string{g.mkt.Tables()[0].PrefsID(), g.mkt.Tables()[1].PrefsID()}; ids[0] != "book" || ids[1] != "tree" {
+	if ids := []string{bodyOf[*uikit.Market](g.host, idMarket).Tables()[0].PrefsID(), bodyOf[*uikit.Market](g.host, idMarket).Tables()[1].PrefsID()}; ids[0] != "book" || ids[1] != "tree" {
 		t.Fatalf("market table ids = %v, want book/tree", ids)
 	}
-	g.mkt.Tables()[1].SetPrefs(map[string]widgets.ColumnPref{"Tree": {Width: 160}})
+	bodyOf[*uikit.Market](g.host, idMarket).Tables()[1].SetPrefs(map[string]widgets.ColumnPref{"Tree": {Width: 160}})
 	pump(t, g, 1280, 720)
 
 	if got := inv.Prefs()["Item"].Width; got != 180 {
@@ -81,9 +83,9 @@ func TestColumnPrefsPersistAcrossRestart(t *testing.T) {
 	// Next session: every hold table gets the stored set (the three share
 	// it), and the hidden column is filtered, not removed from the rows.
 	g2 := newShowcaseGameAt(t, path)
-	g2.open[pInventory] = true
+	g2.host.SetOpen(idInventory, true)
 	pump(t, g2, 1280, 720)
-	for i, tbl := range g2.inv.Tables() {
+	for i, tbl := range bodyOf[*uikit.Inventory](g2.host, idInventory).Tables() {
 		p := tbl.Prefs()
 		if got := p["Item"].Width; got != 180 {
 			t.Errorf("restored hold %d Item width = %v, want 180", i, got)
@@ -92,7 +94,7 @@ func TestColumnPrefsPersistAcrossRestart(t *testing.T) {
 			t.Errorf("restored hold %d lost the hidden m³ column", i)
 		}
 	}
-	cargo := g2.inv.Tables()[0]
+	cargo := bodyOf[*uikit.Inventory](g2.host, idInventory).Tables()[0]
 	rows := cargo.RowsForTest()
 	if len(rows) == 0 || len(rows[0].Cells) != 3 {
 		t.Fatalf("restored rows = %d, want positional three-cell rows", len(rows))

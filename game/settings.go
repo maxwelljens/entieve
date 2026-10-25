@@ -2,12 +2,11 @@ package game
 
 import (
 	"encoding/json"
-	"image"
 	"math"
 	"os"
 	"path/filepath"
 
-	"github.com/ebitenui/ebitenui/widget"
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -210,7 +209,7 @@ func (g *Game) applyScale(preserveLayout bool) {
 	if s == theme.Scale() {
 		return // nothing changed (a fresh Game installs its scale in New)
 	}
-	lines := g.logP.Lines()
+	lines := bodyOf[*uikit.LogPanel](g.host, idLog).Lines()
 	if preserveLayout {
 		// Write BEFORE the scale changes: design units = px ÷ old scale.
 		if err := g.writeLayout(); err != nil {
@@ -222,7 +221,7 @@ func (g *Game) applyScale(preserveLayout bool) {
 		g.report(err, "")
 		return
 	}
-	g.logP.SetLines(lines)
+	bodyOf[*uikit.LogPanel](g.host, idLog).SetLines(lines)
 	if preserveLayout {
 		g.applyLayout(g.w, g.h) // design rects × the new scale
 	}
@@ -356,7 +355,7 @@ func (g *Game) resetAllSettings() {
 
 // resetLayout clears the persisted window arrangement and recomposes the
 // built-in defaults: the sidecar file is deleted and the placement
-// trackers dropped, so placeIfVirgin treats every window as virgin again
+// trackers dropped, so ScreenHost.Place treats every window as virgin again
 // and placeDefaults re-slots them for the current screen. Open/closed
 // flags of this session are untouched — only geometry resets.
 func (g *Game) resetLayout() {
@@ -364,19 +363,22 @@ func (g *Game) resetLayout() {
 		g.report(err, "")
 		return // a failed clear must not half-apply
 	}
-	g.restored = map[*widget.Window]bool{}
-	g.placed = map[*widget.Window]image.Rectangle{}
+	g.host.ResetPlacement()
 	// The pane proportions are layout state too: back to equal shares.
 	for _, name := range layoutNames {
-		for _, sm := range g.splitSeams(name) {
+		e := g.layoutEntry(name)
+		if e == nil {
+			continue
+		}
+		for _, sm := range e.Splits() {
 			sm.Split.Reset()
 		}
 		// Column widths and hidden columns too: the tables measure again.
-		for _, t := range g.tablesOf(name) {
+		for _, t := range e.Tables() {
 			t.ResetPrefs()
 		}
 	}
 	g.placeDefaults(g.w, g.h)
-	g.clampRestored(g.w, g.h)
+	g.host.ClampRestored(g.w, g.h)
 	g.report(nil, "Window layout reset")
 }

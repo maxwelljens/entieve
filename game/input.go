@@ -27,14 +27,14 @@ type Binding struct {
 // overlay renders these same strings. No (Key, Shift, Ctrl) combination
 // appears twice (tested); several keys may share an action.
 //
-// It is assigned in init (uikit.go) from the spec: the rows' Build
+// It is assigned in init (screens.go) from the spec: the rows' Build
 // closures reach session code that reads this very map, so a package-level
 // initializer would be circular.
 var KeyMap []Binding
 
 // worldKeyMap is the hand-written half of KeyMap: bindings that belong to
 // the world and the session, not to a window. The screen toggles
-// (uikit.go) follow it in KeyMap.
+// (screens.go) follow it in KeyMap.
 var worldKeyMap = []Binding{
 	{Key: ebiten.KeyTab, Action: "lock-nearest", Desc: "Tab — cycle-lock nearest target"},
 	{Key: ebiten.KeyTab, Shift: true, Action: "lock-selected", Desc: "Shift+Tab — lock selected target"},

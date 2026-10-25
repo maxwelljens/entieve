@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/entieve/entieve/content"
+	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -20,17 +21,17 @@ import (
 func TestManufacturingPanelMount(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
-	if g.manu == nil {
+	if bodyOf[*uikit.Manufacturing](g.host, idManufacturing) == nil {
 		t.Fatal("manufacturing panel not constructed by New")
 	}
 
 	// In space: intent only, no mount.
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyB}})
-	if !g.open[pManufacturing] {
+	if !g.host.IsOpen(idManufacturing) {
 		t.Fatal("B did not toggle the manufacturing flag")
 	}
 	g.syncMounts()
-	if g.mounted[pManufacturing] != nil {
+	if g.host.Mounted(idManufacturing) {
 		t.Fatal("manufacturing mounted while undocked")
 	}
 
@@ -38,11 +39,11 @@ func TestManufacturingPanelMount(t *testing.T) {
 	dockAt(t, g)
 	g.syncScenes()
 	g.syncMounts()
-	if g.mounted[pManufacturing] == nil {
+	if !g.host.Mounted(idManufacturing) {
 		t.Fatal("manufacturing not mounted while docked with the flag set")
 	}
 	pump(t, g, 1280, 720)
-	r := g.manu.Win().GetContainer().GetWidget().Rect
+	r := bodyOf[*uikit.Manufacturing](g.host, idManufacturing).Win().GetContainer().GetWidget().Rect
 	if r.Dx() == 0 || r.Dy() == 0 {
 		t.Fatal("manufacturing window never laid out")
 	}
@@ -53,16 +54,16 @@ func TestManufacturingPanelMount(t *testing.T) {
 	// B again closes it while docked.
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyB}})
 	g.syncMounts()
-	if g.open[pManufacturing] || g.mounted[pManufacturing] != nil {
+	if g.host.IsOpen(idManufacturing) || g.host.Mounted(idManufacturing) {
 		t.Fatal("B did not close the manufacturing window")
 	}
 
 	// Undock: whatever the flag says, the station service unmounts.
-	g.open[pManufacturing] = true
+	g.host.SetOpen(idManufacturing, true)
 	g.s.Docked.Remove(g.s.Player())
 	g.syncScenes()
 	g.syncMounts()
-	if g.mounted[pManufacturing] != nil {
+	if g.host.Mounted(idManufacturing) {
 		t.Fatal("manufacturing still mounted after undock")
 	}
 }
@@ -101,24 +102,24 @@ func TestManufacturingSurfacesAtIndustryStation(t *testing.T) {
 	dockAt(t, g)
 	g.syncScenes()
 	g.syncMounts()
-	if g.open[pManufacturing] || g.mounted[pManufacturing] != nil {
+	if g.host.IsOpen(idManufacturing) || g.host.Mounted(idManufacturing) {
 		t.Fatal("manufacturing auto-opened on dock — only the services view opens")
 	}
-	if !g.open[pServices] || g.mounted[pServices] == nil {
+	if !g.host.IsOpen(idServices) || !g.host.Mounted(idServices) {
 		t.Fatal("services view not open at the industry station")
 	}
 	// The player opens it (B — what the services view's Industry button
 	// emits too).
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyB}})
 	g.syncMounts()
-	if !g.open[pManufacturing] {
+	if !g.host.IsOpen(idManufacturing) {
 		t.Fatal("manufacturing did not open at an industry station")
 	}
-	if g.mounted[pManufacturing] == nil {
+	if !g.host.Mounted(idManufacturing) {
 		t.Fatal("manufacturing not mounted after the dock frame")
 	}
 	pump(t, g, 1280, 720)
-	r := g.manu.Win().GetContainer().GetWidget().Rect
+	r := bodyOf[*uikit.Manufacturing](g.host, idManufacturing).Win().GetContainer().GetWidget().Rect
 	if r.Dx() == 0 || r.Dy() == 0 || r.Max.X > 1280 || r.Max.Y > 720 {
 		t.Fatalf("manufacturing window %v not laid out in bounds", r)
 	}
@@ -126,7 +127,7 @@ func TestManufacturingSurfacesAtIndustryStation(t *testing.T) {
 	// Closing it sticks (the panel is toggleable, B again).
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyB}})
 	g.syncMounts()
-	if g.open[pManufacturing] || g.mounted[pManufacturing] != nil {
+	if g.host.IsOpen(idManufacturing) || g.host.Mounted(idManufacturing) {
 		t.Fatal("B did not close the surfaced manufacturing")
 	}
 }
@@ -161,25 +162,18 @@ func TestManufacturingKeyDocumented(t *testing.T) {
 // the table; this pins the manufacturing's own wiring).
 func TestManufacturingWindowIsAFullPanel(t *testing.T) {
 	g := newShowcaseGame(t)
-	d := panelDefs[pManufacturing]
-	if d.name != "manufacturing" {
-		t.Errorf("sidecar name = %q, want manufacturing", d.name)
+	if g.host.Panel(idManufacturing) == nil {
+		t.Fatal("incomplete manufacturing panel")
 	}
-	if d.window(g) == nil || d.open(g) == nil {
-		t.Fatal("incomplete manufacturing panelDef")
-	}
-	if d.sync == nil {
-		t.Fatal("manufacturing panel has no sync rule")
-	}
-	if d.want(g, false) {
+	if g.host.Want(idManufacturing, Room{}) {
 		t.Error("manufacturing wants to mount while undocked")
 	}
-	g.open[pManufacturing] = true
-	if !d.want(g, true) {
+	g.host.SetOpen(idManufacturing, true)
+	if !g.host.Want(idManufacturing, Room{Docked: true}) {
 		t.Error("manufacturing does not mount while docked with the flag set")
 	}
 	// The window carries a content floor like the other services.
-	if w := d.window(g); w == nil || w.MinSize == nil {
+	if w := g.host.Window(idManufacturing); w == nil || w.MinSize == nil {
 		t.Fatal("manufacturing window has no MinSize")
 	}
 }
@@ -211,12 +205,12 @@ func TestLayoutMigratesFactoryToManufacturing(t *testing.T) {
 	}
 
 	g.applyLayout(1280, 720)
-	r := g.manu.Win().GetContainer().GetWidget().Rect
+	r := bodyOf[*uikit.Manufacturing](g.host, idManufacturing).Win().GetContainer().GetWidget().Rect
 	if r.Min != image.Pt(theme.Px(140), theme.Px(120)) ||
 		r.Dx() != theme.Px(420) || r.Dy() != theme.Px(440) {
 		t.Fatalf("restored manufacturing rect = %v, want the saved 140,120 420×440", r)
 	}
-	if !g.open[pManufacturing] {
+	if !g.host.IsOpen(idManufacturing) {
 		t.Fatal("saved open flag not restored under the new key")
 	}
 }
