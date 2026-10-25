@@ -67,6 +67,7 @@ type titleScreen struct {
 	settOpen    bool
 	creditsOpen bool
 	managerOpen bool
+	kbOpen      bool
 
 	sett        *uikit.Settings
 	settRemove  widget.RemoveWindowFunc
@@ -75,6 +76,8 @@ type titleScreen struct {
 	manager     *widget.Window
 	managerPage *widget.Container
 	managerRem  widget.RemoveWindowFunc
+	kb          *uikit.Keybindings
+	kbRem       widget.RemoveWindowFunc
 	saves       []saveEntry
 	pendingDel  string
 }
@@ -99,7 +102,12 @@ func (g *Game) ensureTitleUI() *titleScreen {
 // the interface).
 func (g *Game) updateTitle(in Input) error {
 	t := g.ensureTitleUI()
+	ctrl := held(in.KeysDown, ebiten.KeyControl)
+	shift := held(in.KeysDown, ebiten.KeyShift)
 	for _, k := range in.JustPressed {
+		if g.captureKey(k, ctrl, shift) {
+			continue
+		}
 		switch k {
 		case ebiten.KeyEscape:
 			t.closeTop()
@@ -223,7 +231,7 @@ func (t *titleScreen) labels() []string {
 	if len(t.g.listSaves()) > 0 {
 		out = append(out, "Continue")
 	}
-	return append(out, "Save manager", "Settings", "Credits", "Quit")
+	return append(out, "Save manager", "Settings", "Keybindings", "Credits", "Quit")
 }
 
 // action resolves one menu label to its click.
@@ -238,6 +246,8 @@ func (t *titleScreen) action(label string) func() {
 		return func() { t.open("manager") }
 	case "Settings":
 		return func() { t.open("settings") }
+	case "Keybindings":
+		return func() { t.open("keybindings") }
 	case "Credits":
 		return func() { t.open("credits") }
 	case "Quit":
@@ -267,7 +277,7 @@ func versionLine(v string) string {
 // ---------------------------------------------------------------------------
 
 func (t *titleScreen) windowOpen() bool {
-	return t.settOpen || t.creditsOpen || t.managerOpen
+	return t.settOpen || t.creditsOpen || t.managerOpen || t.kbOpen
 }
 
 // open shows one title window (they are modal: at most one at a time).
@@ -275,7 +285,9 @@ func (t *titleScreen) open(which string) {
 	t.settOpen = which == "settings"
 	t.creditsOpen = which == "credits"
 	t.managerOpen = which == "manager"
+	t.kbOpen = which == "keybindings"
 	t.pendingDel = ""
+	t.g.cancelCapture()
 	if t.managerOpen {
 		t.saves = t.g.listSaves()
 	}
@@ -283,8 +295,9 @@ func (t *titleScreen) open(which string) {
 
 // closeTop closes the open title window (Esc / the title-bar ×).
 func (t *titleScreen) closeTop() {
-	t.settOpen, t.creditsOpen, t.managerOpen = false, false, false
+	t.settOpen, t.creditsOpen, t.managerOpen, t.kbOpen = false, false, false, false
 	t.pendingDel = ""
+	t.g.cancelCapture()
 }
 
 // toggleSettings mirrors the in-game P row: the title owns its settings
@@ -336,6 +349,16 @@ func (t *titleScreen) sync() {
 	} else {
 		t.unmountManager()
 	}
+	if t.kbOpen {
+		if t.kbRem == nil {
+			t.mountKeybindings()
+		}
+		if t.kb != nil {
+			t.kb.Sync()
+		}
+	} else {
+		t.unmountKeybindings()
+	}
 	if t.menu != nil {
 		theme.ShowWidget(t.menu.GetWidget(), !t.windowOpen())
 	}
@@ -352,6 +375,7 @@ func (t *titleScreen) detach() {
 	t.sett, t.settRemove = nil, nil
 	t.credits, t.creditsRem = nil, nil
 	t.manager, t.managerPage, t.managerRem = nil, nil, nil
+	t.kb, t.kbRem = nil, nil
 }
 
 // close removes every title widget and drops the state.
@@ -363,6 +387,7 @@ func (t *titleScreen) close() {
 	t.unmountSettings()
 	t.unmountCredits()
 	t.unmountManager()
+	t.unmountKeybindings()
 	t.detach()
 }
 
@@ -437,6 +462,20 @@ func (t *titleScreen) unmountManager() {
 	}
 	t.manager, t.managerPage, t.managerRem = nil, nil, nil
 	t.pendingDel = ""
+}
+
+func (t *titleScreen) mountKeybindings() {
+	g := t.g
+	t.kb = uikit.NewKeybindings(g.env, g.keyActions)
+	g.kit.SetWindowClose(t.kb.Win(), t.closeTop)
+	t.kbRem = g.kit.AddWindow(t.kb.Win())
+}
+
+func (t *titleScreen) unmountKeybindings() {
+	if t.kbRem != nil {
+		t.kbRem()
+	}
+	t.kb, t.kbRem = nil, nil
 }
 
 // window wraps a scrollable page in the house window chrome (InfoWin's
@@ -555,7 +594,7 @@ func (t *titleScreen) deleteSave(path string) {
 // Saves directory
 // ---------------------------------------------------------------------------
 
-// listSaves reads dir's save files — *.json minus the layout/settings
+// listSaves reads dir's save files — *.json minus the layout/settings/keys
 // sidecars — newest first (name breaks mtime ties).
 func listSaves(dir string) []saveEntry {
 	ents, err := os.ReadDir(dir)
@@ -568,7 +607,8 @@ func listSaves(dir string) []saveEntry {
 		if e.IsDir() || !strings.HasSuffix(name, ".json") {
 			continue
 		}
-		if strings.HasSuffix(name, ".layout.json") || strings.HasSuffix(name, ".settings.json") {
+		if strings.HasSuffix(name, ".layout.json") || strings.HasSuffix(name, ".settings.json") ||
+			strings.HasSuffix(name, ".keys.json") {
 			continue
 		}
 		info, err := e.Info()

@@ -983,7 +983,13 @@ through `sim`'s read side rather than re-derived in `uikit`.
   the title (New game, Continue, a manager load) runs one normal boot
   reconcile. The keyboard map is
   `game.KeyMap` (`game/input.go`, the single source shared with the
-  in-game help overlay `H`) and is documented in `docs/GAMEPLAY.md`.
+  in-game help overlay `H`) and is documented in `docs/GAMEPLAY.md`. The
+  input seam has two layers: the **fixed chord layer** (Esc menu, `Ctrl+S`,
+  `Ctrl+F`, `F9`, `[` `]` `-` `=`) is matched literally in
+  `handleKeys`, and the **data layer** — the Screen rows' toggles and the
+  world commands — resolves `(key, shift)` through the session's live
+  bindings (`Game.actionFor`, `game/keys.go`: defaults overlaid with the
+  `<save>.keys.json` overrides, replace policy).
 - Save/load: `game` writes `Save` JSON to
   `os.UserConfigDir()/entieve/save.json` on `Ctrl+S` and loads on `F9` (also
   `--load` CLI flag).

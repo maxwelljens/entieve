@@ -28,11 +28,15 @@ type KeyRow struct {
 }
 
 // HelpPanel is the key-map window: the rows render as a two-column table
-// above a short "Sensors and visibility" blurb.
+// above a short "Sensors and visibility" blurb. SetRows rewrites the
+// table in place when the host's live bindings change.
 type HelpPanel struct {
 	th    theme.Theme
 	win   *widget.Window
 	blurb *widget.Text
+	left  *widget.Container
+	right *widget.Container
+	row   func(KeyRow) *widget.Container
 }
 
 // NewHelp builds the help window over the given environment and key map.
@@ -72,6 +76,7 @@ func NewHelp(d theme.Theme, rows []KeyRow) *HelpPanel {
 
 	perCol := (len(rows) + 1) / 2
 	left, right := newColumn(), newColumn()
+	h.left, h.right, h.row = left, right, newRow
 	for i, k := range rows {
 		if i < perCol {
 			left.AddChild(newRow(k))
@@ -143,6 +148,21 @@ func NewHelp(d theme.Theme, rows []KeyRow) *HelpPanel {
 
 // Win returns the help window for the interface to add.
 func (h *HelpPanel) Win() *widget.Window { return h.win }
+
+// SetRows replaces the key table's rows in place (the host calls it when
+// a binding changes, so an open help window never shows a stale key).
+func (h *HelpPanel) SetRows(rows []KeyRow) {
+	h.left.RemoveChildren()
+	h.right.RemoveChildren()
+	perCol := (len(rows) + 1) / 2
+	for i, k := range rows {
+		if i < perCol {
+			h.left.AddChild(h.row(k))
+		} else {
+			h.right.AddChild(h.row(k))
+		}
+	}
+}
 
 // Sync is a no-op: the key map and blurb are fixed at construction.
 func (h *HelpPanel) Sync() {}

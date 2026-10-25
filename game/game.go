@@ -85,6 +85,7 @@ const (
 	pServices
 	pRefinery
 	pFinances
+	pKeybindings
 	pMenu
 	numPanels
 )
@@ -162,6 +163,16 @@ type Game struct {
 	// reads it — an initialization cycle, see uikit.go.
 	sett        *uikit.Settings
 	settActions uikit.SettingsActions
+
+	// Keybindings (game/keys.go): the live overrides, the armed row and
+	// its refusal notice, the window's action seam (the title screen and
+	// the in-game Screen row each build their own panel over it) and the
+	// built in-game panel.
+	binds         map[string]binding
+	captureAction string
+	keyNotice     string
+	keyActions    uikit.KeybindActions
+	keyUI         *uikit.Keybindings
 
 	// The station window's contract board (contracts.go): the body, the
 	// two row sections, the signature of the last rebuild and the
@@ -274,6 +285,12 @@ func New(opts Options) (*Game, error) {
 		g.dev = 1
 	}
 	g.loadSettings() // <SavePath>.settings.json: ui_scale, fullscreen
+	g.loadKeys()     // <SavePath>.keys.json: the keybinding overrides
+	g.keyActions = uikit.KeybindActions{
+		Rows:  func() []uikit.KeybindRow { return g.keybindRows() },
+		Begin: func(action string) { g.beginCapture(action) },
+		Reset: func() { g.resetKeys() },
+	}
 	theme.SetScale(g.uiScale * g.dev)
 	g.w = int(math.Round(float64(defaultW) * g.dev))
 	g.h = int(math.Round(float64(defaultH) * g.dev))
@@ -475,15 +492,15 @@ func (g *Game) quitPersist() {
 	g.writeSettings()
 }
 
-// handleKeys maps the global keyboard bindings: the KeyMap semantics the
-// legacy shell had (Esc menu, Ctrl+S / F9, time acceleration), the help
-// scene overlay (H — its row is Modal, i.e. scene-owned), the panel
-// toggles the Screen spec declares (the starmap's N among them) and, while
-// no overlay scene is on top, the world action keys.
+// handleKeys maps the global keyboard bindings: the fixed chord layer
+// (Esc menu, Ctrl+S / F9, Ctrl+F, time acceleration) stays literal; the
+// rebindable layer resolves a press through the live key table (the
+// Screen spec's toggles, the help scene and the world commands).
 //
 // While the order mini-window has a focused price/qty field, the keys are
 // the field's: every hotkey yields so typing into it never fires a world
-// action (Esc clears the focus first — closing needs Cancel / the ×).
+// action (Esc clears the focus first — closing needs Cancel / the ×). An
+// armed keybindings row owns every key press until it cancels or assigns.
 func (g *Game) handleKeys(in Input) error {
 	ctrl := held(in.KeysDown, ebiten.KeyControl)
 	shift := held(in.KeysDown, ebiten.KeyShift)
@@ -496,6 +513,9 @@ func (g *Game) handleKeys(in Input) error {
 	typing := g.kit.OrderTyping()
 
 	for _, k := range in.JustPressed {
+		if g.captureKey(k, ctrl, shift) {
+			continue
+		}
 		if typing {
 			if k == ebiten.KeyEscape {
 				g.kit.BlurOrder()
@@ -550,15 +570,16 @@ func (g *Game) handleKeys(in Input) error {
 			case g.menuModal:
 				// So is a context menu: it owns this frame's keys until
 				// the click or Esc that dismisses it has been spent.
-			case k == ebiten.KeyH:
-				g.toggleHelp()
 			default:
-				// Every other keyed Screen flips its own flag from the
-				// spec (the starmap included — it is a plain window now;
-				// a Modal row is scene-owned and never reaches
-				// pressScreen); an unclaimed key belongs to the world.
-				if !g.pressScreen(k, shift) && world {
-					g.worldKey(k, shift)
+				// The data layer: the live key table decides whether this
+				// is a screen toggle (help included), a world command, or
+				// nothing (an unbound or fixed-layer key).
+				action, ok := g.actionFor(k, shift)
+				if !ok {
+					continue
+				}
+				if !g.pressScreen(action) && world {
+					g.worldKey(action)
 				}
 			}
 		}
@@ -707,6 +728,9 @@ func (g *Game) setPanel(p panelID, want bool) {
 	have := g.mounted[p] != nil
 	if want == have {
 		return
+	}
+	if !want && p == pKeybindings {
+		g.cancelCapture() // a closed capture row must not eat keys
 	}
 	if want {
 		g.mounted[p] = g.kit.AddWindow(g.panelWindow(p))
@@ -1043,18 +1067,9 @@ func (g *Game) placeIfVirgin(win *widget.Window, rect image.Rectangle) {
 }
 
 // helpRows converts KeyMap into the help panel's row shape (the shared
-// "key — description" strings split on the em dash).
-func helpRows() []uikit.KeyRow {
-	rows := make([]uikit.KeyRow, 0, len(KeyMap))
-	for _, b := range KeyMap {
-		key, desc := b.Desc, ""
-		if i := strings.Index(b.Desc, " — "); i >= 0 {
-			key, desc = b.Desc[:i], b.Desc[i+len(" — "):]
-		}
-		rows = append(rows, uikit.KeyRow{Key: key, Desc: desc})
-	}
-	return rows
-}
+// "key — description" strings split on the em dash). The session variant
+// (helpRowsFor) overlays the player's overrides.
+func helpRows() []uikit.KeyRow { return helpRowsFor(nil) }
 
 // ---------------------------------------------------------------------------
 // Draw
@@ -1143,12 +1158,6 @@ func (g *Game) toggleHelp() {
 // Input snapshot
 // ---------------------------------------------------------------------------
 
-// modifierKeys are polled into Input.KeysDown for modifier-aware handling.
-var modifierKeys = []ebiten.Key{
-	ebiten.KeyShift, ebiten.KeyControl, ebiten.KeyAlt,
-	ebiten.KeyArrowUp, ebiten.KeyArrowDown, ebiten.KeyArrowLeft, ebiten.KeyArrowRight,
-}
-
 // frameSec returns the real seconds of one frame (for the fixed-timestep
 // clock), guarded against a stalled or unknown TPS.
 func frameSec() float64 {
@@ -1166,6 +1175,7 @@ func (g *Game) buildInput() Input {
 		MouseX:      float64(cx),
 		MouseY:      float64(cy),
 		JustPressed: inpututil.AppendJustPressedKeys(nil),
+		KeysDown:    inpututil.AppendPressedKeys(nil),
 		MouseButton: [3]bool{
 			ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft),
 			ebiten.IsMouseButtonPressed(ebiten.MouseButtonRight),
@@ -1175,11 +1185,6 @@ func (g *Game) buildInput() Input {
 			inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft),
 			inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight),
 		},
-	}
-	for _, k := range modifierKeys {
-		if ebiten.IsKeyPressed(k) {
-			in.KeysDown = append(in.KeysDown, k)
-		}
 	}
 	_, wheelY := ebiten.Wheel()
 	in.Scroll = wheelY

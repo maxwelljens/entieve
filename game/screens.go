@@ -89,12 +89,14 @@ const keyNone ebiten.Key = -1
 //	              constructors draw their own bars — the starmap appends
 //	              its region — so the spec declares the identity, it does
 //	              not re-render it
-//	Key, Shift    the toggle binding (keyNone = none); Action + Desc are
-//	              the KeyMap row that derives from it, which is also what
-//	              the help overlay renders and what the rail's tooltip
-//	              quotes as its hint. A MODAL screen's key is wired to its
-//	              scene instead (Esc → onEscape, H → help), so Modal rows
-//	              are never flag-toggled here
+//	Key, Shift    the toggle binding's DEFAULT (keyNone = none); Action +
+//	              Desc are the KeyMap row that derives from it, which is
+//	              also what the help overlay renders and what the rail's
+//	              tooltip quotes as its hint. The live binding is the
+//	              default overlaid with the player's overrides
+//	              (game/keys.go) — pressScreen resolves by Action. A MODAL
+//	              screen's key is wired to its scene instead (Esc → onEscape,
+//	              H → help), so Modal rows are never flag-toggled here
 //	DefaultRect   default geometry in design units (see Anchor for which
 //	              parts the composition reads)
 //	DockPolicy    floating / transient (not in the sidecar)
@@ -224,7 +226,7 @@ var screens = []Screen{
 		DockPolicy:  DockFloating, Modal: true, SidecarName: "help",
 		Group: "Help & System",
 		Sync:  func(g *Game) { g.help.Sync() },
-		Build: func(g *Game) *widget.Window { g.help = uikit.NewHelp(g.env, helpRows()); return g.help.Win() },
+		Build: func(g *Game) *widget.Window { g.help = uikit.NewHelp(g.env, helpRowsFor(g)); return g.help.Win() },
 	},
 	{
 		// Bottom-left pocket beside the HUD pair: left/bottom insets of 10
@@ -298,6 +300,22 @@ var screens = []Screen{
 		Group: "Trade",
 		Sync:  func(g *Game) { g.fin.Sync() },
 		Build: func(g *Game) *widget.Window { g.fin = uikit.NewFinances(g.env); return g.fin.Win() },
+	},
+	{
+		// The rebinding window: one row per rebindable action (the screen
+		// toggles and the world commands), a click arms capture and the
+		// next key assigns. The fixed chord layer is not listed (it never
+		// rebinds). O: the remaining free letter near the UI cluster.
+		ID: pKeybindings, Title: "Keybindings", Icon: "svc_help",
+		Key: ebiten.KeyO, Action: "keybindings", Desc: "O — toggle keybindings (rebind screen and world keys)",
+		DefaultRect: image.Rect(0, 0, 480, 650),
+		DockPolicy:  DockFloating, SidecarName: "keybindings",
+		Group: "Help & System",
+		Sync:  func(g *Game) { g.keyUI.Sync() },
+		Build: func(g *Game) *widget.Window {
+			g.keyUI = uikit.NewKeybindings(g.env, g.keyActions)
+			return g.keyUI.Win()
+		},
 	},
 	{
 		// The Esc menu: scene-owned (MenuScene flips the flag), modal,
@@ -429,14 +447,21 @@ func screenLabel(s Screen) string {
 	return strings.ToLower(s.Title)
 }
 
-// pressScreen toggles the flag of the keyed, non-modal screen bound to
-// (k, shift) and reports whether one claimed the key. The modal screens
-// (help, menu) are scene-owned: their keys push/pop the scene in
-// handleKeys instead of flipping a flag, so they are skipped here.
-func (g *Game) pressScreen(k ebiten.Key, shift bool) bool {
+// pressScreen performs the toggle a rebindable screen action names: the
+// modal help scene, or the flag of the keyed non-modal row (the Screen
+// spec is the table; the live key for the action is resolved by the
+// caller through Game.actionFor). Reports whether a row claimed it.
+func (g *Game) pressScreen(action string) bool {
 	for _, s := range screens {
-		if s.Modal || s.Key == keyNone || s.Key != k || s.Shift != shift {
+		if s.Action != action {
 			continue
+		}
+		if s.Modal {
+			if s.ID == pHelp {
+				g.toggleHelp()
+				return true
+			}
+			return false
 		}
 		g.open[s.ID] = !g.open[s.ID]
 		return true

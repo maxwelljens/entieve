@@ -19,7 +19,7 @@ import (
 type Input struct {
 	MouseX, MouseY float64
 	JustPressed    []ebiten.Key
-	KeysDown       []ebiten.Key // held keys, for Shift/Ctrl modifiers
+	KeysDown       []ebiten.Key // every held key (modifiers, held actions, pan)
 	MouseButton    [3]bool      // held: [0] left, [1] right, [2] middle
 	JustClicked    [2]bool      // press edges: [0] left, [1] right
 	Scroll         float64
@@ -123,18 +123,19 @@ func (sc *SpaceScene) panBy(dxPx, dyPx float64) {
 func (sc *SpaceScene) Update(in Input) error {
 	g := sc.g
 
-	// Arrow-key panning (screen space).
+	// Arrow-key panning (screen space; the four pan commands are
+	// rebindable world actions).
 	step := panSpeed / (zoomBase * sc.zoom)
-	if held(in.KeysDown, ebiten.KeyArrowUp) {
+	if g.actionHeld(in, "pan-up") {
 		sc.pan.Y -= step
 	}
-	if held(in.KeysDown, ebiten.KeyArrowDown) {
+	if g.actionHeld(in, "pan-down") {
 		sc.pan.Y += step
 	}
-	if held(in.KeysDown, ebiten.KeyArrowLeft) {
+	if g.actionHeld(in, "pan-left") {
 		sc.pan.X -= step
 	}
-	if held(in.KeysDown, ebiten.KeyArrowRight) {
+	if g.actionHeld(in, "pan-right") {
 		sc.pan.X += step
 	}
 
