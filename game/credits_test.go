@@ -12,7 +12,11 @@ func TestCreditsPinSources(t *testing.T) {
 	section := func(title string) []string {
 		for _, s := range creditSections {
 			if s.Title == title {
-				return append([]string{s.Title}, s.Lines...)
+				out := []string{s.Title}
+				for _, r := range s.Rows {
+					out = append(out, r.Role, r.Text)
+				}
+				return out
 			}
 		}
 		t.Fatalf("no %q credits section", title)
@@ -29,7 +33,10 @@ func TestCreditsPinSources(t *testing.T) {
 	}
 
 	license := read("../LICENSE")
-	entieve := joined("Entieve")
+	// The project block is the Development section (it holds Entieve and
+	// its licence line; the old single-purpose "Entieve" section folded
+	// into it).
+	entieve := joined("Development")
 	for _, want := range []string{"MIT License", "2026 The Entieve Authors"} {
 		if !strings.Contains(license, want) {
 			t.Fatalf("LICENSE lost %q", want)
@@ -40,7 +47,7 @@ func TestCreditsPinSources(t *testing.T) {
 	}
 
 	icons := read("../uikit/icons/CREDITS.md")
-	iconLine := joined("Icons")
+	iconLine := joined("Iconography")
 	if !strings.Contains(icons, "Available on https://game-icons.net") || !strings.Contains(iconLine, "Available on https://game-icons.net") {
 		t.Error("the game-icons.net attribution sentence drifted")
 	}

@@ -135,9 +135,9 @@ const layoutBytesGolden = `{
     },
     "keybindings": {
       "x": 400,
-      "y": 35,
+      "y": 40,
       "w": 480,
-      "h": 650,
+      "h": 640,
       "open": false
     },
     "log": {

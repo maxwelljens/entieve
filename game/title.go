@@ -30,8 +30,8 @@ const (
 	titleMenuH   = 36  // menu button height
 	titleWinW    = 560 // save manager window
 	titleWinH    = 400
-	creditWinW   = 520 // credits window
-	creditWinH   = 440
+	creditWinW   = 400 // credits window
+	creditWinH   = 520
 	titleTitleH  = winTitleH
 	titleScrollH = 3 * 20 // wheel step (design px) for the title windows
 )
@@ -72,20 +72,31 @@ type titleScreen struct {
 	rows []Screen
 	host *ScreenHost
 
-	credits     *widget.Window
-	creditsRem  widget.RemoveWindowFunc
-	manager     *widget.Window
-	managerPage *widget.Container
-	managerRem  widget.RemoveWindowFunc
-	saves       []saveEntry
-	pendingDel  string
+	credits      *widget.Window
+	creditsRem   widget.RemoveWindowFunc
+	creditScroll *widget.ScrollContainer // the credits page's viewport (pins)
+	manager      *widget.Window
+	managerPage  *widget.Container
+	managerRem   widget.RemoveWindowFunc
+	saves        []saveEntry
+	pendingDel   string
 }
 
 func newTitleScreen(g *Game) *titleScreen {
 	t := &titleScreen{g: g, rows: titleRows()}
-	t.host = newScreenHost(t.rows, titleScope, g.kit, g.gameServices())
+	t.host = newScreenHost(t.rows, titleScope, g.kit, g.titleServices())
 	t.buildMenu()
 	return t
+}
+
+// titleServices is the game bundle without the owner's close hook: the
+// title host owns its rows' open flags, so a row's × is a plain toggle on
+// THIS host (with the game's hook it toggled the game host's flag and the
+// title window never closed).
+func (g *Game) titleServices() screenServices {
+	svc := g.gameServices()
+	svc.Close = nil
+	return svc
 }
 
 // titleRows are the Screen rows that also live on the title screen.
@@ -371,7 +382,7 @@ func (t *titleScreen) detach() {
 	t.detachMenu = nil
 	t.wordmark, t.version, t.errLine = nil, nil, nil
 	t.items = nil
-	t.credits, t.creditsRem = nil, nil
+	t.credits, t.creditsRem, t.creditScroll = nil, nil, nil
 	t.manager, t.managerPage, t.managerRem = nil, nil, nil
 }
 
@@ -390,28 +401,86 @@ func (t *titleScreen) close() {
 
 func (t *titleScreen) mountCredits() {
 	g := t.g
+	p := g.env.Pal()
+	roleW := theme.Px(84)
+	textW := theme.Px(creditWinW-2*theme.ContentsPad-theme.ScrollGutter-2*theme.ContentsPad) - roleW - theme.Px(theme.SpMd)
+
 	page := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(theme.Px(6)),
+			widget.RowLayoutOpts.Spacing(theme.Px(theme.SpSm)),
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	p := g.env.Pal()
-	inner := float64(theme.Px(creditWinW - 2*theme.ContentsPad - theme.ScrollGutter))
-	for _, sec := range creditSections {
-		page.AddChild(widget.NewText(widget.TextOpts.Text(sec.Title, g.env.Face(theme.StepSmall), theme.Solid(p.Accent))))
-		for _, line := range sec.Lines {
-			page.AddChild(widget.NewText(
-				widget.TextOpts.Text(line, g.env.Face(theme.StepTiny), theme.Solid(p.Text)),
-				widget.TextOpts.MaxWidth(inner),
-			))
+	// The header block: the tracked wordmark (the title screen's own
+	// treatment, text only) over the "Credits" subtitle, ruled off from
+	// the sections.
+	wordmark := theme.NewChromeText(g.env, theme.StepLarge, "ENTIEVE", p.Accent)
+	wordmark.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+	subtitle := theme.NewChromeText(g.env, theme.StepSmall, "CREDITS", p.Dim)
+	subtitle.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+	page.AddChild(wordmark, subtitle, creditRule(p))
+
+	for i, sec := range creditSections {
+		if i > 0 { // the sections' air: a real gap, not another line
+			page.AddChild(widget.NewContainer(widget.ContainerOpts.WidgetOpts(
+				widget.WidgetOpts.MinSize(0, theme.Px(theme.SpLg)))))
+		}
+		page.AddChild(theme.NewChromeText(g.env, theme.StepSmall, strings.ToUpper(sec.Title), p.Head))
+		page.AddChild(creditRule(p))
+		for _, row := range sec.Rows {
+			role := widget.NewText(
+				widget.TextOpts.Text(row.Role, g.env.Face(theme.StepTiny), theme.Solid(p.Dim)),
+				widget.TextOpts.MaxWidth(float64(roleW)),
+				widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(roleW, 0)),
+			)
+			text := widget.NewText(
+				widget.TextOpts.Text(row.Text, g.env.Face(theme.StepTiny), theme.Solid(p.Text)),
+				widget.TextOpts.MaxWidth(float64(textW)),
+			)
+			line := widget.NewContainer(
+				widget.ContainerOpts.Layout(widget.NewGridLayout(
+					widget.GridLayoutOpts.Columns(2),
+					widget.GridLayoutOpts.Stretch([]bool{false, true}, []bool{false}),
+					widget.GridLayoutOpts.Spacing(theme.Px(theme.SpMd), 0),
+				)),
+				widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+			)
+			line.AddChild(role, text)
+			page.AddChild(line)
 		}
 	}
-	win := t.window("Credits", page, creditWinW, creditWinH, image.Rect(380, 100, 380+creditWinW, 100+creditWinH))
+
+	// The footer: the licence note that closes the screen.
+	page.AddChild(widget.NewContainer(widget.ContainerOpts.WidgetOpts(
+		widget.WidgetOpts.MinSize(0, theme.Px(theme.SpMd)))))
+	page.AddChild(creditRule(p))
+	page.AddChild(widget.NewText(
+		widget.TextOpts.Text("MIT License — © 2026 The Entieve Authors. Distributed without warranty; see LICENSE.",
+			g.env.Face(theme.StepTiny), theme.Solid(p.Dim)),
+		widget.TextOpts.MaxWidth(float64(roleW+theme.Px(theme.SpMd)+textW)),
+	))
+
+	// The house title bar (dots, tracked title) — the panels' chrome, so
+	// the credits screen opens like every other window.
+	bar, _ := theme.NewTitleBar(g.env, "Credits", "")
+	win, scroll := t.window(bar, page, creditWinW, creditWinH, image.Rect(380, 100, 380+creditWinW, 100+creditWinH))
+	t.creditScroll = scroll
 	t.credits = win
 	g.kit.SetWindowClose(win, t.closeTop)
 	t.creditsRem = g.kit.AddWindow(win)
+}
+
+// creditRule is the hairline under the credits header block and each
+// section header (the InfoWin section-rule idiom).
+func creditRule(p theme.Palette) *widget.Container {
+	return widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(theme.NineSlice(theme.NRGBA(p.Accent, widgets.TipRuleA))),
+		widget.ContainerOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(0, theme.Px(widgets.TipRuleH)),
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+		),
+	)
 }
 
 func (t *titleScreen) unmountCredits() {
@@ -433,7 +502,7 @@ func (t *titleScreen) mountManager() {
 	)
 	t.managerPage = page
 	t.refreshManager()
-	win := t.window("Save manager", page, titleWinW, titleWinH, image.Rect(360, 140, 360+titleWinW, 140+titleWinH))
+	win, _ := t.window(g.titleBar("Save manager"), page, titleWinW, titleWinH, image.Rect(360, 140, 360+titleWinW, 140+titleWinH))
 	t.manager = win
 	g.kit.SetWindowClose(win, t.closeTop)
 	t.managerRem = g.kit.AddWindow(win)
@@ -449,7 +518,7 @@ func (t *titleScreen) unmountManager() {
 
 // window wraps a scrollable page in the house window chrome (InfoWin's
 // pattern: fixed rect, grid-stretched viewport beside the house rail).
-func (t *titleScreen) window(label string, page *widget.Container, w, h int, at image.Rectangle) *widget.Window {
+func (t *titleScreen) window(bar *widget.Container, page *widget.Container, w, h int, at image.Rectangle) (*widget.Window, *widget.ScrollContainer) {
 	g := t.g
 	p := g.env.Pal()
 	scroll := widget.NewScrollContainer(
@@ -484,14 +553,15 @@ func (t *titleScreen) window(label string, page *widget.Container, w, h int, at 
 		)),
 	)
 	body.AddChild(rail.Container())
-	return widget.NewWindow(
+	win := widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.TitleBar(g.titleBar(label), theme.Px(titleTitleH)),
+		widget.WindowOpts.TitleBar(bar, theme.Px(titleTitleH)),
 		widget.WindowOpts.Modal(),
 		widget.WindowOpts.MinSize(theme.Px(w), theme.Px(h)),
 		widget.WindowOpts.Location(image.Rect(
 			theme.Px(at.Min.X), theme.Px(at.Min.Y), theme.Px(at.Max.X), theme.Px(at.Max.Y))),
 	)
+	return win, scroll
 }
 
 // refreshManager rebuilds the save rows from t.saves (and shows the empty

@@ -86,16 +86,26 @@ window or the HUD chrome never reaches the world behind it.
 **Rebinding (Keybindings, `O`)**: every screen toggle in the table and every
 world command (`Tab` locks, `A/Q/S/W/Z/D/J/L/M`, `F1–F8`, the arrows) can be
 rebound from the **Keybindings** window — the rail's *Help & System* entry,
-the title menu's **Keybindings** row, or `O`. Click a row, then press the key
-you want: the row shows *press a key…* while it waits, and `Esc` cancels.
-Binding a key another action already holds **replaces** it — the old holder
-becomes unbound (shown `—`) and can be rebound again; one key is one action,
-and the window always shows the current bindings so a theft is visible.
-`Reset all bindings` (two clicks: *Confirm reset all*) restores every default.
-The global chords are fixed and refuse capture with a notice: `Esc`, `Ctrl+S`,
-`Ctrl+F`, `F9` and `[` `]` `-` `=` (a `Ctrl` chord cannot be captured at all).
-Bindings persist immediately to `<save>.keys.json` beside the save; a missing
-or damaged file means the defaults.
+the title menu's **Keybindings** row, or `O`. The window is the controls
+screen: **Ship controls** (the world commands) and **Windows** (the screen
+toggles) list each action against its live key, and a dim **Fixed
+shortcuts** block lists the chords that never rebind. Click a row, then
+press the key you want: its key chip shows *press a key…* while it waits,
+and `Esc` cancels. Binding a key another action already holds **replaces**
+it — the old holder becomes unbound (its chip shows `—`) and can be
+rebound again; one key is one action, and the window always shows the
+current bindings so a theft is visible. A rebound action's chip turns
+accent and the row offers **Reset**, which restores that one default (and
+takes the key back from its current holder); **Reset all bindings** (two
+clicks: *Confirm reset all*) restores every default.
+
+`Backspace` or `Delete` while a row waits leaves that action **unbound**:
+it triggers nothing until you bind it again, and the sidecar records the
+explicit `null` (so a reload keeps it unbound). The global chords are fixed
+and refuse capture with a notice in the window's status bar: `Esc`,
+`Ctrl+S`, `Ctrl+F`, `F9` and `[` `]` `-` `=` (a `Ctrl` chord cannot be
+captured at all). Bindings persist immediately to `<save>.keys.json` beside
+the save; a missing or damaged file means the defaults.
 
 ### Windows
 
@@ -784,9 +794,15 @@ replays are unaffected.
 
 - The game boots into a **title screen**: **New game**, **Continue** (the
   most recently modified save), **Save manager**, **Settings**,
-  **Credits** and **Quit**. The world behind it is a still frame — the
-  simulation does not step until you enter the game. The settings window
-  opens and closes with `P` there too, exactly as in-game.
+  **Keybindings**, **Credits** and **Quit**. The world behind it is a still
+  frame — the simulation does not step until you enter the game. The
+  settings window opens and closes with `P` there too, exactly as in-game,
+  and every title window's **×** (and `Esc`) closes it back to the menu.
+  **Credits** lists the project's provenance by section — Development,
+  Iconography (game-icons.net, CC BY 3.0), Module renders (CC0),
+  Hull & emblem artwork, Interface form (Cyber Terminal UI Kit), Typefaces
+  (IBM Plex, OFL) and Built with — in a scrollable role/credit block under
+  the tracked **ENTIEVE** wordmark.
 - **`Ctrl+S`** writes a full JSON snapshot (`sim.Snapshot()`) to the
   active save path — `os.UserConfigDir()/entieve/save.json` (override
   with `--save`) until a load or a save-as makes another file active —

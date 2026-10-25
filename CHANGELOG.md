@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Unbind and per-row Reset in Keybindings** (`game`, `uikit/screens`):
+  pressing `Backspace`/`Delete` while a row waits for its key clears that
+  action's binding — it triggers nothing until rebound, and the sidecar
+  stores the existing explicit `null` (no schema change). A rebound row
+  offers its own **Reset**, which restores that action's default (taking
+  the key back from whoever holds it); the two-step **Reset all bindings**
+  stays. Documented in `docs/GAMEPLAY.md`.
+
 - **Slider widget family** (`uikit/widgets`, `uikit/screens`): a reusable
   house slider in two modes — **freeflow** (a continuous range quantised
   only by its own step: the settings volume sliders) and **notched** (an
@@ -108,6 +116,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   second host instance). The layout sidecar format and bytes are
   unchanged; a committed × close still clears the market's folds while a
   hotkey close keeps them. No player-visible change.
+
+- **Keybindings window redesigned as a controls screen** (`uikit/screens`,
+  `game`): the flat list is now sectioned — **Ship controls** (the world
+  commands), **Windows** (the Screen toggles) and the dim, informational
+  **Fixed shortcuts** layer — with tracked section headers, hairline rules
+  and a reserved scroll gutter. Each row is the action label left and a
+  fixed-width key chip right, so the keys line up down the page: a neutral
+  chip for the default, an accent chip with a per-row **Reset** when the
+  action was rebound, an accent *press a key…* while it waits, `—` when it
+  is unbound and the disabled look for the fixed layer. The refusal notice
+  now reads in a bottom status bar beside the two-step **Reset all
+  bindings**; rows are 28 px and the window 480×640, scrolling through the
+  whole list at every UI scale.
+
+- **Credits window rebuilt as a proper credits screen** (`game`): a tracked
+  **ENTIEVE** wordmark and a *Credits* subtitle head seven ruled sections —
+  Development, Iconography, Module renders, Hull & emblem artwork,
+  Interface form, Typefaces, Built with — each as a role/credit
+  two-column block with generous air, closed by a licence footer. The
+  window is 400×520 with the house scrollbar and title-bar chrome; every
+  provenance sentence is unchanged, and `TestCreditsPinSources` still
+  reads them against `LICENSE`, `uikit/icons/CREDITS.md`,
+  `docs/lore/AESTHETIC.md` and `go.mod`.
+
+### Fixed
+
+- **The × on a title-screen window now closes it and returns to the menu**
+  (`game`): the title host was handed the game's close hook, so the
+  Keybindings/Settings × ran the *game* host's toggle — the title window
+  stayed up, the menu stayed hidden, and the row was silently left open in
+  the game host for when the player entered. The title host now gets the
+  action bundle without that hook (`Game.titleServices`), so its × is the
+  plain toggle its contract documents. Pinned by
+  `TestTitleCloseButtonReturnsToMenu` (both title rows) and
+  `TestTitleOwnWindowsCloseButtons` (Credits, Save manager).
 
 ## [0.8.0] - 2026-10-23
 
