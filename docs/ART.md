@@ -26,12 +26,15 @@ it decorates. IDs are the same kebab-case strings the content JSON uses
 | `assets/stations/` | celestial ID (`CelestialDef.id` in `content/data/systems/*.json`) — stations, gates, belts, other structures | `cel-haven-rest.png`, `cel-gate-penumbra.png` | unrotated |
 | `assets/asteroids/` | ore ID the belt's asteroids carry (`items/ores.json`) | `ore-cordite.png` | unrotated |
 | `assets/backgrounds/` | system ID (`sys-*.json`) or `default` | `default.png` | unrotated |
-| `assets/artwork/` | fixed names (no content id) | `spaceship_hangar.jpg` | unrotated, cover-fit |
+| `assets/artwork/` | fixed names (no content id) | `spaceship_hangar.jpg`, `title_background.jpg` | unrotated, cover-fit |
 | `assets/icons/` | fixed module-render names (build-time source only) | `small_autocannon.png`, `medium_artillery.png` | n/a — the 256² embedded copies live in `uikit/icons/` |
 
 Sub-JSON lookup is exactly `<directory>/<id>.png`; other files and
 directories are ignored. `assets/artwork/` is the one kind that also accepts
 JPEG (the docked-station plate ships as a `.jpg`); sprites stay PNG-only.
+One file there is embedded rather than walked: `title_background.jpg` ships
+inside the binary through the `assets/artwork/artwork.go` shim (see
+[Title background](#title-background)).
 
 ## Docked backdrop
 
@@ -44,6 +47,19 @@ file). No `assets/` directory (released binaries don't ship one) or no
 `artwork/` plate: the station view keeps its plain black veil, exactly as
 before. The caption's format string is registered in
 [lore/NAMING.md](lore/NAMING.md#interface-strings).
+
+## Title background
+
+`assets/artwork/title_background.jpg` (2736×1536, 16:9) is the boot title
+screen's backdrop: the phase draws it *cover-fit* over the whole window under
+a light black veil (96/255 — enough to keep the wordmark's dim captions
+legible over the bright parts of the plate, the artwork still reads), with the
+wordmark and menu over it. Unlike every other file here it is **embedded**:
+`assets/artwork/artwork.go` carries it (`//go:embed title_background.jpg`), so
+released binaries show the artwork without shipping `assets/` next to them.
+It is decoded once on the first title frame; a plate that fails to decode
+falls back to the static world render under the old, heavier dim. The sim
+never steps either way.
 
 ## Window headers
 

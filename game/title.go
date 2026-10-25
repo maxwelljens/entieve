@@ -1,23 +1,29 @@
 package game
 
 // The title phase: a flag-gated boot state (Options.StartInTitle, set by
-// cmd run only when --load is absent) in which the already-built space
-// scene renders statically behind a dim veil while the sim stays frozen
-// and gameplay chrome stays unmounted. The title owns a menu on the kit's
+// cmd run only when --load is absent). The scene behind it is the embedded
+// artwork plate, cover-fit under a light veil (the already-built space
+// scene's static render is the fallback), while the sim stays frozen and
+// gameplay chrome stays unmounted. The title owns a menu on the kit's
 // root overlay, a save manager and credits window, and a second Screen
 // host for the title-scoped rows (Settings, Keybindings) — mounted
 // lazily, exclusively and freshly on every reopen, never persisted.
 
 import (
+	"bytes"
 	"image"
+	"image/jpeg"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/assets/artwork"
+	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -25,7 +31,8 @@ import (
 
 // Title chrome metrics, in design units through the Px funnel.
 const (
-	titleDim     = 150 // black veil over the static world
+	titleDim     = 150 // black veil over the static world (the fallback)
+	titleArtVeil = 96  // black veil over the artwork plate: 3:1 under the captions
 	titleMenuW   = 240 // menu button width
 	titleMenuH   = 36  // menu button height
 	titleWinW    = 560 // save manager window
@@ -35,6 +42,45 @@ const (
 	titleTitleH  = winTitleH
 	titleScrollH = 3 * 20 // wheel step (design px) for the title windows
 )
+
+// titleArtwork is the title phase's backdrop plate, decoded once on the
+// first title frame. nil = no plate, and the phase keeps the static world
+// under titleDim — the contract render's runtime artwork has. A var (not a
+// plain func) so tests can force the fallback branch.
+var titleArtwork = sync.OnceValue(func() *ebiten.Image {
+	img, err := jpeg.Decode(bytes.NewReader(artwork.Title))
+	if err != nil || img.Bounds().Empty() {
+		return nil
+	}
+	return ebiten.NewImageFromImage(img)
+})
+
+// drawTitleBackdrop paints the layer under the title menu: the embedded
+// artwork cover-fit (aspect kept, centred, overflow cropped) under the light
+// veil that keeps the wordmark's captions legible, or — with no plate — the
+// static world under today's heavier dim, exactly as before. It returns the
+// plate it painted (nil = the world fallback), which is how a test sees the
+// branch without reading pixels.
+func (g *Game) drawTitleBackdrop(dst *ebiten.Image) *ebiten.Image {
+	art := titleArtwork()
+	if art == nil {
+		g.space.Draw(dst)
+		dimScreen(dst, g.w, g.h, titleDim)
+		return nil
+	}
+	b := art.Bounds()
+	s := render.CoverScale(b.Dx(), b.Dy(), g.w, g.h)
+	if s <= 0 {
+		return art
+	}
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(-float64(b.Dx())/2, -float64(b.Dy())/2)
+	op.GeoM.Scale(s, s)
+	op.GeoM.Translate(float64(g.w)/2, float64(g.h)/2)
+	dst.DrawImage(art, op)
+	dimScreen(dst, g.w, g.h, titleArtVeil)
+	return art
+}
 
 // saveEntry is one file in the saves directory.
 type saveEntry struct {

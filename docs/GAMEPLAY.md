@@ -794,8 +794,10 @@ replays are unaffected.
 
 - The game boots into a **title screen**: **New game**, **Continue** (the
   most recently modified save), **Save manager**, **Settings**,
-  **Keybindings**, **Credits** and **Quit**. The world behind it is a still
-  frame — the simulation does not step until you enter the game. The
+  **Keybindings**, **Credits** and **Quit**. The backdrop is the embedded
+  `assets/artwork/title_background.jpg`, cover-fit under a light veil (the
+  static world render is the fallback), and the simulation does not step
+  until you enter the game. The
   settings window opens and closes with `P` there too, exactly as in-game,
   and every title window's **×** (and `Esc`) closes it back to the menu.
   **Credits** lists the project's provenance by section — Development,

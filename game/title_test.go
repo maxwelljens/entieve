@@ -78,7 +78,7 @@ func titleItemByLabel(g *Game, label string) *titleItem {
 }
 
 // TestTitleFreezesSim: the title phase never steps the simulation — the
-// world behind the menu is a still frame.
+// backdrop (artwork, or the world when the plate is missing) is a still.
 func TestTitleFreezesSim(t *testing.T) {
 	g := newTitleGameAt(t, filepath.Join(t.TempDir(), "save.json"))
 	g.applySize(1280, 720)
