@@ -11,8 +11,11 @@ import (
 )
 
 // Inventory is the storage window: Cargo / Ore hold / Station hangar as
-// Item/Qty/m³ tables with per-section totals, a quantity stepper and
-// transfer/sell actions (CmdTransfer / CmdSell).
+// Item/Qty/m³ tables with per-section totals and one toolbar of
+// transfer/sell actions (CmdTransfer / CmdSell). Each action opens the
+// quantity picker (CONTEXT.md "Quantity picker") with its destination
+// pre-set, so one selected stack serves all four verbs; Confirm emits the
+// transfer or sale at the picked quantity.
 type Inventory struct {
 	th  theme.Theme
 	cv  widgets.ContentView
@@ -25,7 +28,6 @@ type Inventory struct {
 	cargoLbl *widget.Text
 	oreLbl   *widget.Text
 	hangLbl  *widget.Text
-	stepper  *widgets.QtyStepper
 
 	toCargo  *widget.Button
 	toOre    *widget.Button
@@ -73,8 +75,6 @@ func NewInventory(env widgets.Seams) *Inventory {
 	inv.oreLbl = newLabel("Ore hold")
 	inv.hangLbl = newLabel("Station hangar")
 
-	inv.stepper = widgets.NewQtyStepper(env, qtySteps[:])
-
 	newBtn := func(label string, clicked func()) *widget.Button {
 		return widget.NewButton(
 			widget.ButtonOpts.TextLabel(label),
@@ -90,37 +90,32 @@ func NewInventory(env widgets.Seams) *Inventory {
 	inv.toHangar = newBtn("To Hangar", func() { inv.transfer("hangar") })
 	inv.sell = newBtn("Sell", inv.sellClicked)
 
-	toolbar := func(children ...widget.PreferredSizeLocateableWidget) *widget.Container {
-		c := widget.NewContainer(
-			widget.ContainerOpts.Layout(widget.NewRowLayout(
-				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
-			)),
-		)
-		c.AddChild(children...)
-		return c
-	}
-	inv.stepper.Row().AddChild(inv.sell)
-	xferBar := toolbar(inv.toCargo, inv.toOre, inv.toHangar)
+	// One toolbar: every verb acts on the selected stack and asks for its
+	// quantity in the picker.
+	toolbar := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
+		widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+		widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
+	)))
+	toolbar.AddChild(inv.toCargo, inv.toOre, inv.toHangar, inv.sell)
+	body := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(theme.WindowBodyBox(p, theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200))),
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(1),
+			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true, false}),
+			widget.GridLayoutOpts.Spacing(0, theme.Px(4)),
+			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
+		)),
+	)
 
-	// Body: the three label/table panes over the two button rows. The
-	// panes split the leftover height by seam ratio (equal thirds by
-	// default — a drag persists in the layout sidecar).
+	// Body: the three label/table panes over the button row. The panes
+	// split the leftover height by seam ratio (equal thirds by default — a
+	// drag persists in the layout sidecar).
 	inv.split = widgets.NewSplitPane(env,
 		paneStack([]bool{false, true}, inv.cargoLbl, inv.cargo.Container()),
 		paneStack([]bool{false, true}, inv.oreLbl, inv.ore.Container()),
 		paneStack([]bool{false, true}, inv.hangLbl, inv.hangar.Container()),
 	)
-	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.WindowBodyBox(p, theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200))),
-		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Columns(1),
-			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true, false, false}),
-			widget.GridLayoutOpts.Spacing(0, theme.Px(4)),
-			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
-		)),
-	)
-	body.AddChild(inv.split.Container(), inv.stepper.Row(), xferBar)
+	body.AddChild(inv.split.Container(), toolbar)
 
 	title, _ := theme.NewTitleBar(env, "Inventory", "svc_inventory")
 
@@ -128,12 +123,14 @@ func NewInventory(env widgets.Seams) *Inventory {
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
 		// Content floor: every fixed row plus a full row of each hold
-		// section (the sections scroll below that).
-		widget.WindowOpts.MinSize(theme.Px(300), theme.Px(420)),
+		// section (the sections scroll below that). The width is the
+		// four-verb toolbar's: Cargo/Ore/Hangar/Sell need 320 design px on
+		// one row (three rows of 40 px would not fit at 300).
+		widget.WindowOpts.MinSize(theme.Px(320), theme.Px(420)),
 		// The game's Inventory Screen row declares the same rect as its
 		// per-type default (game/screens.go), so it opens here on first
 		// use, docked and in space alike.
-		widget.WindowOpts.Location(image.Rect(theme.Px(396), theme.Px(256), theme.Px(701), theme.Px(690))),
+		widget.WindowOpts.Location(image.Rect(theme.Px(396), theme.Px(256), theme.Px(716), theme.Px(690))),
 	)
 	return inv
 }
@@ -305,8 +302,8 @@ func (inv *Inventory) oreSection() string {
 	return "Ore hold · " + theme.FormatVolumeShort(used) + " / " + theme.FormatVolumeShort(cap)
 }
 
-// transfer moves the selected stack from its section to hold ("cargo",
-// "ore" or "hangar") with the stepper quantity.
+// transfer opens the quantity picker on the selected stack moving to hold
+// ("cargo", "ore" or "hangar"); Confirm emits the transfer.
 func (inv *Inventory) transfer(to string) {
 	if !inv.hasSel || inv.src == to {
 		return
@@ -321,18 +318,19 @@ func (inv *Inventory) transfer(to string) {
 			return
 		}
 	}
-	inv.as.Do(widgets.Transfer{
+	inv.as.Do(widgets.QtyPick{
+		Mode: widgets.QtyTransfer,
 		Item: inv.sel,
-		Qty:  inv.stepper.Value(),
 		From: inv.src,
 		To:   to,
 	})
 }
 
-// sellClicked emits Sell for the selected stack (docked only).
+// sellClicked opens the quantity picker on the selected stack's sale
+// (docked only); Confirm emits the sell.
 func (inv *Inventory) sellClicked() {
 	if !inv.hasSel || !inv.cv.PlayerDocked() {
 		return
 	}
-	inv.as.Do(widgets.Sell{Item: inv.sel, Qty: inv.stepper.Value()})
+	inv.as.Do(widgets.QtyPick{Mode: widgets.QtySell, Item: inv.sel})
 }

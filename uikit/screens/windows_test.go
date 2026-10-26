@@ -32,13 +32,14 @@ func equalInts(a, b []int) bool {
 }
 
 // TestMarketGatingAndEnqueue: market buttons are disabled while
-// undocked, and Buy/Sell enqueue the selected order at the stepper
-// quantity once docked.
+// undocked, and Buy/Sell open the quantity picker on the selected order —
+// Confirm there enqueues the trade at the picked quantity.
 func TestMarketGatingAndEnqueue(t *testing.T) {
 	env, cmds := newTestEnv(t)
 	m := NewMarket(env)
-	ui := newWindowUI(t, env, m.Win())
-	frame := func() { uitest.PumpWindow(t, ui, m.Sync, 1024, 700) }
+	ui := newQtyUI(t, env, m.Win())
+	q := env.QtyWindow()
+	frame := func() { pumpQty(t, ui, env, m.Sync, 1024, 700) }
 	frame()
 	frame()
 
@@ -50,8 +51,8 @@ func TestMarketGatingAndEnqueue(t *testing.T) {
 	}
 	m.buyClicked() // guarded even when called directly
 	m.sellClicked()
-	if len(*cmds) != 0 {
-		t.Fatalf("undocked trade enqueued %d commands, want 0", len(*cmds))
+	if len(*cmds) != 0 || q.IsOpen() {
+		t.Fatalf("undocked trade enqueued %d commands / opened the picker (%v), want 0 / false", len(*cmds), q.IsOpen())
 	}
 
 	// Docked: Sell unlocks; Buy needs a row whose local book holds an ask
@@ -81,17 +82,25 @@ func TestMarketGatingAndEnqueue(t *testing.T) {
 		t.Fatal("fixture: the docked book holds no ask")
 	}
 
-	// Select that item, step the quantity to 10 and trade.
+	// Select that item, pick 10 on the picker's slider and confirm.
 	clickRow(ui, m.tbl, pick)
 	frame()
 	if m.buy.GetWidget().Disabled {
 		t.Fatal("Buy still disabled on a row with a local ask")
 	}
-	uitest.FireButton(ui, m.stepper.Plus())
-	if m.stepper.Value() != 10 {
-		t.Fatalf("qty = %d, want 10", m.stepper.Value())
-	}
 	uitest.FireButton(ui, m.buy)
+	frame()
+	if !q.IsOpen() {
+		t.Fatal("Buy opened no picker")
+	}
+	if got, want := q.TitleText(), env.TradeableName(m.sel)+" — Buy"; got != want {
+		t.Errorf("picker title = %q, want %q", got, want)
+	}
+	qtyClick(t, ui, env, m.Sync, qtyMax)
+	if q.Value() != qtyMax {
+		t.Fatalf("qty = %d, want the slider's top %d", q.Value(), qtyMax)
+	}
+	uitest.FireButton(ui, q.Confirm())
 	if len(*cmds) != 1 {
 		t.Fatalf("buy enqueued %d commands, want 1", len(*cmds))
 	}
@@ -102,28 +111,39 @@ func TestMarketGatingAndEnqueue(t *testing.T) {
 	// The table sorts by name, so the selected row — not the sim's
 	// canonical stock order — is the trade target.
 	wantItem := m.tbl.Rows[pick].Data.(mktItemRow).Item
-	if buy.Item != wantItem || buy.Qty != 10 {
-		t.Errorf("CmdBuy = %+v, want {%s 10}", buy, wantItem)
+	if buy.Item != wantItem || buy.Qty != qtyMax {
+		t.Errorf("CmdBuy = %+v, want {%s %d}", buy, wantItem, qtyMax)
 	}
 
+	// Sell through the same picker (its own remembered quantity: 1 so far).
 	uitest.FireButton(ui, m.sell)
+	frame()
+	if !q.IsOpen() {
+		t.Fatal("Sell opened no picker")
+	}
+	if got := q.Value(); got != 1 {
+		t.Errorf("sell picker opened at %d, want its unseeded 1", got)
+	}
+	uitest.FireButton(ui, q.Confirm())
 	if len(*cmds) != 2 {
 		t.Fatalf("sell enqueued %d commands total, want 2", len(*cmds))
 	}
 	sell, ok := (*cmds)[1].(sim.CmdSell)
-	if !ok || sell.Item != wantItem || sell.Qty != 10 {
-		t.Errorf("cmd = %#v, want CmdSell{%s 10}", (*cmds)[1], wantItem)
+	if !ok || sell.Item != wantItem || sell.Qty != 1 {
+		t.Errorf("cmd = %#v, want CmdSell{%s 1}", (*cmds)[1], wantItem)
 	}
 }
 
-// TestInventoryTransferAndSell: section selection drives CmdTransfer
-// between holds and CmdSell, both gated by the hold's own rules (cargo
-// present, ore hold fitted, hangar side and selling docked).
+// TestInventoryTransferAndSell: section selection drives the transfer and
+// sell verbs, each opening the quantity picker with its destination
+// pre-set (both gated by the hold's own rules: cargo present, ore hold
+// fitted, hangar side and selling docked).
 func TestInventoryTransferAndSell(t *testing.T) {
 	env, cmds := newTestEnv(t)
 	inv := NewInventory(env)
-	ui := newWindowUI(t, env, inv.Win())
-	frame := func() { uitest.PumpWindow(t, ui, inv.Sync, 1024, 700) }
+	ui := newQtyUI(t, env, inv.Win())
+	q := env.QtyWindow()
+	frame := func() { pumpQty(t, ui, env, inv.Sync, 1024, 700) }
 	frame()
 	frame()
 
@@ -140,8 +160,8 @@ func TestInventoryTransferAndSell(t *testing.T) {
 	}
 	inv.transfer("hangar")
 	inv.sellClicked()
-	if len(*cmds) != 0 {
-		t.Fatalf("gated actions enqueued %d commands, want 0", len(*cmds))
+	if len(*cmds) != 0 || q.IsOpen() {
+		t.Fatalf("gated actions enqueued %d commands / opened the picker, want none", len(*cmds))
 	}
 
 	// Select a cargo row: its own hold is never a destination.
@@ -162,6 +182,17 @@ func TestInventoryTransferAndSell(t *testing.T) {
 	}
 
 	uitest.FireButton(ui, inv.toHangar)
+	frame()
+	if !q.IsOpen() {
+		t.Fatal("To Hangar opened no picker")
+	}
+	if got, want := q.TitleText(), env.TradeableName(inv.sel)+" — To Hangar"; got != want {
+		t.Errorf("picker title = %q, want %q", got, want)
+	}
+	if q.Confirm().GetWidget().Disabled {
+		t.Fatal("Confirm grayed on a live transfer")
+	}
+	uitest.FireButton(ui, q.Confirm())
 	if len(*cmds) != 1 {
 		t.Fatalf("transfer enqueued %d commands, want 1", len(*cmds))
 	}
@@ -174,6 +205,11 @@ func TestInventoryTransferAndSell(t *testing.T) {
 	}
 
 	uitest.FireButton(ui, inv.sell)
+	frame()
+	if !q.IsOpen() {
+		t.Fatal("Sell opened no picker")
+	}
+	uitest.FireButton(ui, q.Confirm())
 	if len(*cmds) != 2 {
 		t.Fatalf("sell enqueued %d commands total, want 2", len(*cmds))
 	}
@@ -825,7 +861,7 @@ func TestScaleDoublesConstructionMetrics(t *testing.T) {
 	// Pump once: the buttons carry no images of their own and validate
 	// against the window's theme (an unthemed PreferredSize panics).
 	uitest.PumpWindow(t, newWindowUI(t, env1, inv1.Win()), nil, 1280, 720)
-	bar1W, _ := inv1.stepper.Row().PreferredSize()
+	bar1W := inv1.sell.GetWidget().Rect.Dx()
 
 	uitest.UseScale(t, 2)
 	env, _ := newTestEnv(t)
@@ -841,14 +877,14 @@ func TestScaleDoublesConstructionMetrics(t *testing.T) {
 	}
 
 	inv := NewInventory(env)
-	if inv.win.MinSize == nil || inv.win.MinSize.X != 600 || inv.win.MinSize.Y != 840 {
-		t.Fatalf("inventory MinSize at 2 = %v, want (600,840) (2× the design 300×420)", inv.win.MinSize)
+	if inv.win.MinSize == nil || inv.win.MinSize.X != 640 || inv.win.MinSize.Y != 840 {
+		t.Fatalf("inventory MinSize at 2 = %v, want (640,840) (2× the design 320×420)", inv.win.MinSize)
 	}
-	if loc := inv.Win().GetContainer().GetWidget().Rect; loc != image.Rect(theme.Px(396), theme.Px(256), theme.Px(701), theme.Px(690)) {
-		t.Errorf("fallback Location at 2 = %v, want %v", loc, image.Rect(theme.Px(396), theme.Px(256), theme.Px(701), theme.Px(690)))
+	if loc := inv.Win().GetContainer().GetWidget().Rect; loc != image.Rect(theme.Px(396), theme.Px(256), theme.Px(716), theme.Px(690)) {
+		t.Errorf("fallback Location at 2 = %v, want %v", loc, image.Rect(theme.Px(396), theme.Px(256), theme.Px(716), theme.Px(690)))
 	}
-	if w := inv.stepper.Plus().GetWidget().MinWidth; w != 80 || inv.stepper.Plus().GetWidget().MinHeight != 80 {
-		t.Errorf("stepper + MinSize at 2 = %d×%d, want 80×80 (40 design hit box)", w, inv.stepper.Plus().GetWidget().MinHeight)
+	if w := inv.sell.GetWidget().MinWidth; w != 80 || inv.sell.GetWidget().MinHeight != 80 {
+		t.Errorf("toolbar button MinSize at 2 = %d×%d, want 80×80 (40 design hit box)", w, inv.sell.GetWidget().MinHeight)
 	}
 
 	// Title bar: pump the window — the title child is exactly Px(44).
@@ -869,12 +905,12 @@ func TestScaleDoublesConstructionMetrics(t *testing.T) {
 		t.Errorf("header MinHeight at 2 = %d, want 80 (Px(design 40))", h)
 	}
 
-	// PreferredSize doubles: the stepper row's preferred width is all
+	// PreferredSize doubles: the toolbar row's preferred width is all
 	// scaled pieces (40 px floors, gaps, measured labels). Glyph
 	// advances quantize per size, so "2×" holds to a couple of percent.
-	bar2W, _ := inv.stepper.Row().PreferredSize()
+	bar2W := inv.sell.GetWidget().Rect.Dx()
 	if math.Abs(float64(bar2W)-2*float64(bar1W)) > 0.05*float64(bar2W) {
-		t.Errorf("stepper row preferred width 1×=%d 2×=%d, want ≈2× (±5%%)", bar1W, bar2W)
+		t.Errorf("toolbar button width 1×=%d 2×=%d, want ≈2× (±5%%)", bar1W, bar2W)
 	}
 }
 

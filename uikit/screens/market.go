@@ -18,9 +18,6 @@ import (
 	"github.com/sahilm/fuzzy"
 )
 
-// qtySteps are the trade quantity stepper's steps (1 / 10 / 100).
-var qtySteps = [...]int{1, 10, 100}
-
 const (
 	// mktBarSteps is the order-book rail's resolution: the table's ScrollTop
 	// is a 0..1 fraction of the overflow, the slider an integer over it. The
@@ -60,12 +57,11 @@ const (
 	mineWheelRows = 3
 )
 
-// setStepperValue writes a stepper readout that is NOT a quantity stepper
-// (the settings scale row) and re-lays its row out. widget.Text.Label
-// changes do NOT invalidate layout, so without the relayout the readout
-// keeps the box measured for its previous value and a wider number draws
-// under the + button. The label carries the tabular contents face, so
-// digit widths stay stable while the value steps.
+// setStepperValue writes a readout label and re-lays its row out.
+// widget.Text.Label changes do NOT invalidate layout, so without the
+// relayout the box keeps the width measured for its previous value and a
+// wider number draws over its neighbour. The label carries the tabular
+// contents face, so digit widths stay stable while the value moves.
 func setStepperValue(bar *widget.Container, lbl *widget.Text, s string) {
 	if lbl.Label == s {
 		return
@@ -81,10 +77,11 @@ func setStepperValue(bar *widget.Container, lbl *widget.Text, s string) {
 // parent row per item of the tradeable catalog (canonical order), its
 // resting orders folded out beneath it on a click: asks (price ascending)
 // above bids (price descending), each order in the book's own [price, qty,
-// side] form. Over it sit the quantity stepper and the Buy/Sell actions,
-// which execute as market orders against the book. The title carries the
-// selected item's displayed price (last trade, best ask, best bid, base)
-// and the fee schedule.
+// side] form. Over it sit the Buy/Sell actions, which execute as market
+// orders against the book: each opens the quantity picker (CONTEXT.md
+// "Quantity picker") on the selected item and Confirm emits Buy/Sell. The
+// title carries the selected item's displayed price (last trade, best ask,
+// best bid, base) and the fee schedule.
 //
 // The browse tree scopes the catalog to a branch (All is the whole
 // catalog) and the search field filters that branch live, ranked by fuzzy
@@ -111,12 +108,11 @@ type Market struct {
 	as  widgets.ActionSink
 	win *widget.Window
 
-	tbl     *widgets.Table
-	stepper *widgets.QtyStepper
-	bar     *widget.Slider // order-book scrollbar rail (mirrors ScrollTop)
-	title   *theme.ChromeText
-	buy     *widget.Button
-	sell    *widget.Button
+	tbl   *widgets.Table
+	bar   *widget.Slider // order-book scrollbar rail (mirrors ScrollTop)
+	title *theme.ChromeText
+	buy   *widget.Button
+	sell  *widget.Button
 
 	// split is the browse | catalog | My-orders row: two seams (tree and
 	// orders) trade width with the middle pane (the old fixed 240 px
@@ -709,8 +705,6 @@ func NewMarket(env widgets.Seams) *Market {
 		}
 	})
 
-	m.stepper = widgets.NewQtyStepper(env, qtySteps[:])
-
 	newBtn := func(label string, clicked func()) *widget.Button {
 		return widget.NewButton(
 			widget.ButtonOpts.TextLabel(label),
@@ -723,13 +717,19 @@ func NewMarket(env widgets.Seams) *Market {
 	}
 	m.buy = newBtn("Buy", m.buyClicked)
 	m.sell = newBtn("Sell", m.sellClicked)
-	m.stepper.Row().AddChild(m.buy, m.sell)
+	tradeBar := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
+		)),
+	)
+	tradeBar.AddChild(m.buy, m.sell)
 
 	// The book row: the order table — widgets.Table owns its scroll
 	// viewport, its wheel wiring AND the scrollbar rail beside it (the
 	// reserved-gutter chrome, ScrollGutter design px: the handle can never
 	// overhang a row, and the rail hides while the book fits). The title
-	// line and the stepper row above stay exactly as they are.
+	// line and the Buy/Sell row above stay exactly as they are.
 	m.bar = m.tbl.Rail()
 	book := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
 	m.tbl.Container().GetWidget().LayoutData = widget.AnchorLayoutData{
@@ -792,7 +792,7 @@ func NewMarket(env widgets.Seams) *Market {
 			widget.GridLayoutOpts.Spacing(0, theme.Px(4)),
 		)),
 	)
-	left.AddChild(m.stepper.Row(), book)
+	left.AddChild(tradeBar, book)
 
 	// The browse pane: the search field over the tree, both full height.
 	browse := widget.NewContainer(
@@ -1174,18 +1174,18 @@ func (m *Market) bookRow(o sim.MarketStock, gated bool) widgets.TableRow {
 }
 
 // rowSpec is every market row's declared interactions — an item row and
-// its order rows offer the same verbs on the same item (Buy/Sell trade
-// the book, the two order-window launches post to it); only the payload
-// tells the row kinds apart. The menu's actions carry the row's own item,
-// so Buy/Sell always trade the row they were opened on — no click-time
-// selection side effects. buyOff grays Buy while the local book holds no
-// ask to lift (Request on Market stays live).
+// its order rows offer the same verbs on the same item (Buy/Sell open the
+// quantity picker on it, the two order-window launches post to its book);
+// only the payload tells the row kinds apart. The menu's actions carry the
+// row's own item, so Buy/Sell always trade the row they were opened on —
+// no click-time selection side effects. buyOff grays Buy while the local
+// book holds no ask to lift (Request on Market stays live).
 func (m *Market) rowSpec(item content.ItemID, gated, buyOff bool) widgets.RowSpec {
 	return widgets.RowSpec{
 		Ref: widgets.RowRef(m.cv, item),
 		Actions: []widgets.RowAction{
-			{Label: "Buy", Disabled: gated || buyOff, Intent: widgets.Buy{Item: item, Qty: m.stepper.Value()}},
-			{Label: "Sell", Disabled: gated, Intent: widgets.Sell{Item: item, Qty: m.stepper.Value()}},
+			{Label: "Buy", Disabled: gated || buyOff, Intent: widgets.QtyPick{Mode: widgets.QtyBuy, Item: item}},
+			{Label: "Sell", Disabled: gated, Intent: widgets.QtyPick{Mode: widgets.QtySell, Item: item}},
 			{Label: "Sell on Market", Disabled: gated,
 				Intent: widgets.OpenOrder{Item: item, Side: sim.OrderSell, Qty: m.cv.PlayerStock(item)}},
 			{Label: "Request on Market", Disabled: gated,
@@ -1199,23 +1199,23 @@ func (m *Market) docked() bool {
 	return m.cv.PlayerDocked()
 }
 
-// buyClicked emits Buy for the selected order and quantity (the
+// buyClicked opens the quantity picker on the selected item's Buy (the
 // toolbar's own button acts on the left-click selection). The row menu's
-// trade verbs ride each row's RowSpec intents — same gate, same payload,
-// on the row they were opened on.
+// trade verbs ride each row's RowSpec intent — same picker, same gate, on
+// the row they were opened on.
 func (m *Market) buyClicked() {
 	if !m.docked() || !m.hasSel {
 		return
 	}
-	m.as.Do(widgets.Buy{Item: m.sel, Qty: m.stepper.Value()})
+	m.as.Do(widgets.QtyPick{Mode: widgets.QtyBuy, Item: m.sel})
 }
 
-// sellClicked emits Sell for the selected order and quantity.
+// sellClicked opens the quantity picker on the selected item's Sell.
 func (m *Market) sellClicked() {
 	if !m.docked() || !m.hasSel {
 		return
 	}
-	m.as.Do(widgets.Sell{Item: m.sel, Qty: m.stepper.Value()})
+	m.as.Do(widgets.QtyPick{Mode: widgets.QtySell, Item: m.sel})
 }
 
 // mineOrders returns the player's resting orders at the docked station —

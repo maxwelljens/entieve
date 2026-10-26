@@ -112,7 +112,7 @@ const layoutBytesGolden = `{
     "inventory": {
       "x": 396,
       "y": 256,
-      "w": 305,
+      "w": 320,
       "h": 434,
       "open": true,
       "splits": {
@@ -122,7 +122,7 @@ const layoutBytesGolden = `{
       "tables": {
         "inventory": {
           "Item": {
-            "width": 165.96875
+            "width": 180.96875
           },
           "Qty": {
             "width": 41.4375

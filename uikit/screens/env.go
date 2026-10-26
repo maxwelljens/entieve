@@ -14,19 +14,25 @@ import (
 // panels never mutate sim state — every action starts as an Intent.
 type EnqueueFunc func(sim.Command)
 
-// services is the session's shared interaction state: the context menu
-// and the Show Info window (and, when a Kit hosts them, how to mount and
-// raise the window). Every Session copied from one source points at the
-// same *services, so all panels of a session open the same menu and swap
-// the same window.
+// services is the session's shared interaction state: the context menu,
+// the Show Info window and the quantity picker (and, when a Kit hosts
+// them, how to mount and raise the windows). Every Session copied from one
+// source points at the same *services, so all panels of a session open the
+// same menu, swap the same window and share the one picker.
 type services struct {
 	menu *widgets.Menu
 	info *InfoWin
+	// qty is the quantity picker every ± ticker was replaced by: one
+	// instance, re-targeted on every open (its per-mode memory lives in it).
+	qty *QtyWin
 	// show/close are the Kit-hosted Show Info lifecycle (mount + raise /
 	// unmount). A bare NewEnv leaves them nil and Show falls back to the
 	// window's own show/hide — a test harness mounts it by hand.
 	show  func(widgets.InfoRef)
 	close func()
+	// qtyShow is the picker's Kit-hosted open (mount + centre + raise); a
+	// bare NewEnv leaves it nil and the picker only shows.
+	qtyShow func(widgets.QtyPick)
 }
 
 // Session is one host's environment: the three seams plus the services a
@@ -41,6 +47,17 @@ type Session interface {
 
 	// InfoWindow is the session's Show Info window panel.
 	InfoWindow() *InfoWin
+
+	// QtyWindow is the session's one quantity picker (CONTEXT.md "Quantity
+	// picker"). Panels never open it directly: they emit QtyPick through
+	// the sink, which lands here. A host mounts the window (a Kit does it
+	// on first open).
+	QtyWindow() *QtyWin
+
+	// OpenQty opens (or re-targets) the session's quantity picker on req —
+	// exactly what Do(QtyPick{…}) executes. With a Kit hosting the window
+	// this mounts it; in a bare session it only fills and reveals it.
+	OpenQty(req widgets.QtyPick)
 
 	// ShowInfo opens (or swaps) the session's Show Info window on ref —
 	// exactly what Do(ShowInfo{ref}) executes. With a Kit hosting the
@@ -77,6 +94,26 @@ func (s *session) InfoWindow() *InfoWin {
 		return nil
 	}
 	return s.svc.info
+}
+
+func (s *session) QtyWindow() *QtyWin {
+	if s.svc == nil {
+		return nil
+	}
+	return s.svc.qty
+}
+
+// OpenQty runs the picker's open: the Kit-hosted mount when there is one
+// (it centres and raises the window), else the window's own show.
+func (s *session) OpenQty(req widgets.QtyPick) {
+	if s.svc == nil || s.svc.qty == nil {
+		return
+	}
+	if s.svc.qtyShow != nil {
+		s.svc.qtyShow(req)
+		return
+	}
+	s.svc.qty.Show(req)
 }
 
 func (s *session) ShowInfo(ref widgets.InfoRef) {
@@ -117,10 +154,19 @@ func NewEnv(c *content.Content, s *sim.Sim, enqueue EnqueueFunc) Session {
 	sess.Seams = widgets.NewSeams(
 		theme.NewSeam(theme.DefaultPalette(), theme.ScaleTypeScale(theme.DefaultTypeScale())),
 		widgets.NewView(c, s),
-		exec,
+		// The picker's open is a session intent the built-in executor does
+		// not know: the sink intercepts it here, everything else rides exec.
+		widgets.SinkFunc(func(i widgets.Intent) {
+			if req, ok := i.(widgets.QtyPick); ok {
+				sess.OpenQty(req)
+				return
+			}
+			exec.Do(i)
+		}),
 	)
 	sess.svc = &services{}
 	sess.svc.menu = widgets.NewMenu(sess)
 	sess.svc.info = NewInfoWin(sess)
+	sess.svc.qty = NewQtyWin(sess)
 	return sess
 }

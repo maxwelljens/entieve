@@ -359,8 +359,8 @@ out of view. The menus per
 surface: rack cells — Show Info (module) / Show Info — `<charge>` / ─ /
 **Load** `<round>` (one per round type in cargo) / **Cycle charge**; fitting slot tiles and hangar rows — Show Info / Fit /
 Unequip; market rows —
-Show Info / Buy / Sell (grayed while undocked); inventory rows — Show
-Info; overview rows — Show Info / Warp to / Orbit / Approach / Lock target
+Show Info / Buy / Sell (grayed while undocked, both opening the quantity
+picker); inventory rows — Show Info; overview rows — Show Info / Warp to / Orbit / Approach / Lock target
 (the entity's hull or caste info plus the usual commands); contract board
 rows — Accept / Abandon (grayed when gated); contract objective labels —
 Show Info.
@@ -588,6 +588,32 @@ system's first station otherwise — instead of being shipped back to
 Starogród. Death is paperwork; the log line `Respawned at <station> in a
 <hull>` is the insurer's replacement notice arriving.
 
+## Setting a quantity
+
+Every −/+ ticker is gone: whatever needs an amount now asks for it in one
+small popup — the **quantity picker**. It opens from the gesture that
+already names the action and shows the picked item, a **slider**, the
+current amount and a live preview of what the amount buys or costs, then
+**Confirm** (the verb: Refine, Start, Buy, Sell, To Hangar…) and
+**Cancel**. The window is modal and transient: it never persists a rect,
+and it remembers the amount you last **confirmed** for that action, so a
+second refine or a second trade opens where the first one left off (a
+rebuilt interface starts at 1 again). `Esc` cancels it *before* anything
+else — no window closes behind it and the Esc menu never opens — and a
+cancelled picker commits nothing.
+
+What opens it is the action, not the amount: in the **Refinery** and
+**Manufacturing** windows selecting the row *is* the action (an ore, a
+recipe), so the picker appears on the click; the **Market** and
+**Inventory** windows have several verbs over one selection, so their
+toolbar buttons (Buy, Sell / To Cargo, To Ore, To Hangar) and the rows'
+right-click verbs each open it with their own verb pre-set. The refinery's
+slider is **notched** to whole 100-ore batches (a stock under one batch
+opens it with an empty ladder and Confirm grayed); every other surface is a
+free 1–100 in single steps. Nothing new is clamped: the simulation still
+refuses an unaffordable, oversold or unfittable amount with its own log
+line, exactly as it did behind the ticker.
+
 ## Manufacturing
 
 Manufacturing is a station service like any other. Press **`B`** for the
@@ -597,11 +623,13 @@ like the other service windows (Przystań, Huta at Młynów, Doki at
 Kamieniec), and it only ever mounts while docked.
 
 The window turns **minerals into products**: pick a recipe — a hull, a
-module or a batch of charges — set the number of **runs**, and press start.
-The materials for every run are committed up front from your stock (the
-have/need column shows exactly what you hold against what the job eats),
-and the job pays a **fee of 3% of the recipe's mineral value** when it
-starts. All stations share **three job slots**, so a yard running a hull
+module or a batch of charges — and the quantity picker opens on its
+**runs** (1–100, starting at the run count you last started); Confirm
+starts the job. The materials for every run are committed up front from
+your stock (the have/need column shows exactly what you hold against what
+one run eats, and the picker's preview re-prices it at the picked run
+count), and the job pays a **fee of 3% of the recipe's mineral value** when
+it starts. All stations share **three job slots**, so a yard running a hull
 still leaves room elsewhere. The job list shows every job you own, grouped
 by station; you can collect or cancel only the jobs at the station you are
 docked at. Cancelling a running job returns its materials to the hangar
@@ -614,12 +642,13 @@ first — the two-tier chain.
 The **Refinery** window (its button on the services view, or the rail's
 Industry section) lists every ore stack in your cargo and ore hold and
 previews exactly what **Refine** would yield — `floor(refine_yield × qty)`
-per mineral. Refining runs in whole **100-ore batches**: the stepper offers
-100, 200, 300, … capped at the selected ore's stock, so 250 ore refines as
-two batches and 50 ore cannot be refined at all (the window says a batch
-needs 100 ore). Refined minerals always land in the station hangar — never
-in your ship's hold — and the hangar is unlimited, so a full hold never
-blocks a refine; the yield preview and status say `→ hangar`. **Huta**
+per mineral. Selecting an ore opens the **quantity picker** with a notched
+ladder of whole **100-ore batches** — 100, 200, 300, … capped at that
+ore's stock — so 250 ore offers two batches and 50 ore offers none (the
+picker's preview says a batch needs 100 ore and Confirm stays grayed).
+Refined minerals always land in the station hangar — never in your ship's
+hold — and the hangar is unlimited, so a full hold never blocks a refine;
+the picker's preview names the destination (`→ station hangar`). **Huta**
 at Młynów and **Jernborg** run refineries.
 
 Stations get better at their own work: every completed run raises that
@@ -663,7 +692,9 @@ whether the run is worth it.
 
 Every station's market is an **order book**: your Buy and Sell are market
 orders that take the best resting prices at that station and fill only
-what the book actually holds — nothing is conjured for you. A **broker
+what the book actually holds — nothing is conjured for you. Both go
+through the quantity picker: select the item (or use its row menu) and
+press **Buy** or **Sell**, pick the amount in the popup, confirm. A **broker
 fee** (3 % of the value) rides every buy, a **sales tax** (2.5 %) rides
 every sell; the market window shows the fill and the fee line by line.
 Prices are displayed on a ladder — last

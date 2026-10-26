@@ -130,8 +130,8 @@ func TestMarketRunsOnStubView(t *testing.T) {
 	if len(rec.got) != 1 {
 		t.Fatalf("Buy emitted %#v, want the single intent", rec.got)
 	}
-	if b, ok := rec.got[0].(widgets.Buy); !ok || b.Item != "item-stub-ore" || b.Qty != 1 {
-		t.Fatalf("intent = %#v, want Buy{item-stub-ore 1}", rec.got[0])
+	if b, ok := rec.got[0].(widgets.QtyPick); !ok || b.Mode != widgets.QtyBuy || b.Item != "item-stub-ore" {
+		t.Fatalf("intent = %#v, want QtyPick{buy item-stub-ore} (the picker asks for the quantity)", rec.got[0])
 	}
 
 	// Gated (undocked): the row's verbs gray out and pressing them —
