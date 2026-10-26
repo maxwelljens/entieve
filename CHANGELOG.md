@@ -12,7 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **UI sounds** (`game`, `assets/sfx`): five short cues from a local SFX
   pack (click, open, close, confirm, refuse), embedded through an
   `assets/sfx/sfx.go` shim and played by a new `game.UISound` seam. A mouse
-  press that lands on interface chrome clicks; a window mounting or
+  press that lands on an interactive control clicks (a button, a text
+  field, a slider's grab band, a table row, a context-menu entry — window
+  bodies, title bars and dead space stay silent); a window mounting or
   unmounting (Esc menu, station services, every floating window, the
   title's Settings/Keybindings) opens/closes; the quantity verbs (Refine,
   Start Job, Buy, Sell, Transfer), save-as, a keybinding assignment, a
@@ -25,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stays uncredited (source path documented in `assets/README.md`).
 
 ### Changed
+
+- **The click cue speaks for controls, not for windows** (`game`,
+  `uikit`): `Game.uiClick` now asks `Kit.PressTarget` instead of `overUI` —
+  the widget tree is walked from the deepest widget under the press, and
+  only a button, a text input, a slider band, a table row (host tables are
+  asked directly: their rows sit inside a scroll viewport the walk cannot
+  descend into) or the context-menu popup is loud. Pressing a title bar,
+  body, background or dead space is silent again, and so is a disabled
+  button.
 
 - **Every −/+ quantity ticker replaced by a slider picker** (`uikit`,
   `game`): the Refinery, Manufacturing, Market and Inventory windows no
@@ -51,6 +62,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of the static starfield. Decoded once on the first title frame;
   with no plate (or a corrupt one) the phase keeps today's static world
   render under the old dim, and the simulation still never steps.
+
+### Fixed
+
+- **UI cues are audible and quiet where they should be** (`game`,
+  `assets/sfx`, `game/screenhost.go`): the two Air FX cues the pack ships
+  open/close from peaked at −44 dBFS, ~30 dB under the click, so they
+  fired but could not be heard — both are gain-normalised to −14 dBFS
+  (pinned by `TestUISoundCueLevels`). Mount cues stay silent for the boot
+  composition and for the remount a rebuild (scale change, load) performs:
+  those windows were already open.
 
 ## [0.9.0] - 2026-10-25
 

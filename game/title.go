@@ -132,6 +132,7 @@ func newTitleScreen(g *Game) *titleScreen {
 	t := &titleScreen{g: g, rows: titleRows()}
 	t.host = newScreenHost(t.rows, titleScope, g.kit, g.titleServices())
 	g.wireUISounds(t.host)
+	t.host.Reconcile(Room{Title: true}) // the boot pass: quiet, nothing open
 	t.buildMenu()
 	return t
 }

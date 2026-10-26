@@ -2,9 +2,11 @@ package game
 
 import (
 	"bytes"
+	"image"
 	"io"
 	"strings"
 
+	"github.com/ebitenui/ebitenui/widget"
 	sfxassets "github.com/entieve/entieve/assets/sfx"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/audio/wav"
@@ -120,11 +122,18 @@ func (s *realUISound) SetVolume(master, ui float64) {
 func (s *realUISound) effective() float64 { return s.master * s.uiVol }
 
 // uiClick fires the click cue for a mouse press edge (either button) that
-// landed on the interface (the same overUI gate world input asks); world
-// presses and drag frames are silent. Split out of Update so a test can
-// drive one synthetic press without an ebiten input backend.
+// landed on an interactive control — a button, a text input, a slider's
+// band, a table row or a context-menu entry (Kit.PressTarget walks the
+// widget tree; the host answers for the rows). Window bodies, title bars,
+// labels and dead space are silent, and so is every world press. Split out
+// of Update so a test can drive one synthetic press without an ebiten
+// input backend.
 func (g *Game) uiClick(in Input) {
-	if (in.JustClicked[0] || in.JustClicked[1]) && g.overUI(in.MouseX, in.MouseY) {
+	if !(in.JustClicked[0] || in.JustClicked[1]) {
+		return
+	}
+	pt := image.Pt(int(in.MouseX), int(in.MouseY))
+	if g.kit.PressTarget(pt, func(win *widget.Window) bool { return g.host.TablesHit(win, pt) }) {
 		g.ui.Play(sfxClick)
 	}
 }

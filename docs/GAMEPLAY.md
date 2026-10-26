@@ -192,8 +192,11 @@ release needs no `assets/` folder next to it.
 
 **UI sounds** are five short cues from a local SFX pack, embedded the same
 way (`assets/sfx/`, see [assets/README](../assets/README.md) for
-provenance): a **click** on every mouse press over interface chrome (never
-on a world press, never per drag frame), an **open** and a **close** when a
+provenance): a **click** on a press that lands on a control — a button, a
+text field, a slider's grab band, a table row or a context-menu entry —
+and silence on window bodies, title bars, backgrounds, slider rows outside
+their band, disabled buttons, dead space and every world press (never per
+drag frame either). An **open** and a **close** sound when a
 window mounts or unmounts (the Esc menu, the station services view and
 every floating window — including the title's Settings and Keybindings),
 a **confirm** when a verb lands (Refine, Start Job, Buy, Sell, Transfer,
