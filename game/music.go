@@ -61,15 +61,31 @@ var (
 	musicContext     *audio.Context
 )
 
-// NewMusic builds the real engine over the embedded tracks: shuffled
+// audioCtx is the one context both audio channels share: music and the UI
+// cues come from the same factory (NewAudio) precisely so a second
+// NewContext — which panics — can never be reached.
+func audioCtx() *audio.Context {
+	musicContextOnce.Do(func() { musicContext = audio.NewContext(musicSampleRate) })
+	return musicContext
+}
+
+// NewAudio builds both real audio channels on ONE context (audio.NewContext
+// may exist once per process): the music engine over the embedded tracks
+// and the UI cue players. cmdRun is the only caller — every headless path
+// leaves Options.Music/Options.UISound nil and gets the nops.
+func NewAudio(seed int64, warn func(error)) (Music, UISound) {
+	if warn == nil {
+		warn = func(error) {}
+	}
+	return newMusic(seed, warn), newUISounds(warn)
+}
+
+// newMusic builds the real engine over the embedded tracks: shuffled
 // pool, one player at a time, seeded by seed (cmdRun passes the clock;
 // tests that pin the ordering drive trackQueue directly). warn receives
 // decode failures (cmdRun prints them to stderr); a failing track is
 // skipped, and all six failing leaves the game silent, never panicked.
-func NewMusic(seed int64, warn func(error)) Music {
-	if warn == nil {
-		warn = func(error) {}
-	}
+func newMusic(seed int64, warn func(error)) Music {
 	m := &realMusic{warn: warn, master: 1, musicVol: 1}
 	entries, err := audioassets.FS.ReadDir(".")
 	if err != nil {
@@ -83,8 +99,7 @@ func NewMusic(seed int64, warn func(error)) Music {
 		}
 	}
 	m.queue = newTrackQueue(len(m.tracks), true, seed)
-	musicContextOnce.Do(func() { musicContext = audio.NewContext(musicSampleRate) })
-	m.ctx = musicContext
+	m.ctx = audioCtx()
 	return m
 }
 

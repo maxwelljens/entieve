@@ -388,12 +388,12 @@ func TestTitleSettingsAndCredits(t *testing.T) {
 	if !g.titleUI.host.Mounted(idSettings) {
 		t.Fatal("settings window did not mount from the title")
 	}
-	// The title mounts the same grown settings window: eight rows + hint
+	// The title mounts the same grown settings window: nine rows + hint
 	// (the kit wraps a plain body in its clip container, so unwrap once).
 	clip := g.titleUI.host.Window(idSettings).Contents.(widget.Containerer)
 	body := clip.Children()[0].(widget.Containerer)
-	if n := len(body.Children()); n != 9 {
-		t.Errorf("title settings body rows = %d, want 9 (stepper, fullscreen, rail, master, music, shuffle, reset, reset all, hint)", n)
+	if n := len(body.Children()); n != 10 {
+		t.Errorf("title settings body rows = %d, want 10 (stepper, fullscreen, rail, master, music, UI, shuffle, reset, reset all, hint)", n)
 	}
 	// The new rail row is wired from the title too (same action bundle).
 	g.host.services.Settings.SetRailCollapsed(true)

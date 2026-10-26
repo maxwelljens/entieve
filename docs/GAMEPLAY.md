@@ -160,20 +160,22 @@ The **Settings**
 window (`P`) holds the **UI scale** slider — a notched track over the six
 rungs 0.75× – 2.5× whose handle snaps to a rung and applies it live (every
 window, control and font rescales and keeps its arrangement) — a
-**fullscreen** toggle, a **rail** collapse toggle, **Master** and
-**Music** volume sliders (freeflow, 0–100% in 1% steps; a fresh install
-plays at 100% × 70%), a **Shuffle** toggle (the six tracks in a shuffled
-pool, on by default), **Reset window layout** and **Reset all settings** (a
+**fullscreen** toggle, a **rail** collapse toggle, **Master**, **Music**
+and **UI** volume sliders (freeflow, 0–100% in 1% steps; a fresh install
+plays music at 100% × 70% and UI cues at 100% × 80%), a **Shuffle** toggle
+(the six tracks in a shuffled pool, on by default), **Reset window layout**
+and **Reset all settings** (a
 second click on **Confirm reset all** restores 1× windowed with vsync on,
-the rail expanded, master 100% / music 70% / shuffle on and no saved
-window size); the scale, the fullscreen and vsync flags, the rail's
-collapse state, the two volumes, the shuffle flag and the last windowed
+the rail expanded, master 100% / music 70% / UI 80% / shuffle on and no
+saved window size); the scale, the fullscreen and vsync flags, the rail's
+collapse state, the three volumes, the shuffle flag and the last windowed
 size (written on clean quit) persist next to
 the save in `<save>.settings.json`, and
 the window arrangement itself persists in design units, so one saved
 layout works at every scale. Dragging a volume slider is live — the music
-follows the handle — but the sidecar is written once, when the drag is
-released; the notched scale slider applies its rung as the handle snaps
+(and the UI cues, on their own slider) follow the handle — but the sidecar
+is written once, when the drag is released; the notched scale slider
+applies its rung as the handle snaps
 to it. Icons (from
 [game-icons.net](https://game-icons.net), credited per-icon in
 `uikit/icons/CREDITS.md`) mark service titles, action buttons, overview
@@ -186,7 +188,19 @@ track starting when the current one ends, with no gap and no per-screen
 switch. The engine's output volume is the product of the two steppers,
 applied live and again on every track change; turning either to 0% (or
 shuffle aside) never stops play. Tracks are embedded in the binary, so a
-release needs no `assets/` folder next to it. Two panels are
+release needs no `assets/` folder next to it.
+
+**UI sounds** are five short cues from a local SFX pack, embedded the same
+way (`assets/sfx/`, see [assets/README](../assets/README.md) for
+provenance): a **click** on every mouse press over interface chrome (never
+on a world press, never per drag frame), an **open** and a **close** when a
+window mounts or unmounts (the Esc menu, the station services view and
+every floating window — including the title's Settings and Keybindings),
+a **confirm** when a verb lands (Refine, Start Job, Buy, Sell, Transfer,
+save-as, a keybinding assignment, a save-manager load or delete, and the
+two resets) and a **refuse** when the keybindings window rejects a chord
+(a fixed shortcut or a Ctrl chord). They are mixed at `master × UI` and
+play at 80% on a fresh install. Two panels are
 **always-on chrome** and cannot be closed or moved: the **ship status**
 panel (bottom center left half: the hull portrait, then a readout
 column — shield / armor / structure bars with their current/max values

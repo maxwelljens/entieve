@@ -273,6 +273,7 @@ func (g *Game) resetKeys() {
 	}
 	g.refreshHelp()
 	g.report(nil, "Keybindings reset")
+	g.ui.Play(sfxConfirm)
 }
 
 // beginCapture arms one action's row: the next key press assigns it.
@@ -340,10 +341,13 @@ func (g *Game) captureKey(k ebiten.Key, ctrl, shift bool) bool {
 		g.unbindAction(action)
 	case ctrl:
 		g.keyNotice = "Ctrl chords are fixed — try another key"
+		g.ui.Play(sfxRefuse)
 	case reservedKey(k):
 		g.keyNotice = keyText(k) + " is a fixed shortcut"
+		g.ui.Play(sfxRefuse)
 	default:
 		g.assign(action, binding{Key: k, Shift: shift})
+		g.ui.Play(sfxConfirm)
 		g.cancelCapture()
 		if err := g.writeKeys(); err != nil {
 			g.report(err, "")

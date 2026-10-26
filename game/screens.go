@@ -267,7 +267,7 @@ var screens = []Screen{
 		// shuffle, resets) is re-read from the action bundle in Sync.
 		ID: idSettings, Title: "Settings", Icon: "kind_unknown",
 		Key: ebiten.KeyP, Action: "settings", Desc: "P — toggle settings (UI scale, display, layout)",
-		DefaultRect: image.Rect(450, 130, 830, 590), // uikit.NewSettings' landing rect
+		DefaultRect: image.Rect(450, 106, 830, 614), // uikit.NewSettings' landing rect
 		DockPolicy:  DockFloating, InTitle: true,
 		Group: "Help & System",
 		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewSettings(h.services.Env, h.services.Settings) },

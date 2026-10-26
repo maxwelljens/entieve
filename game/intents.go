@@ -26,6 +26,11 @@ func (g *Game) Do(i widgets.Intent) {
 		g.pendingLoad = true
 	case widgets.Quit:
 		g.quit = true
+	case widgets.Buy, widgets.Sell, widgets.Transfer, widgets.StartJob, widgets.Refine:
+		// The quantity verbs: routed exactly as before, with the confirm
+		// cue on the press that lands them.
+		g.ui.Play(sfxConfirm)
+		g.kit.RunIntent(v)
 	default:
 		g.kit.RunIntent(i)
 	}

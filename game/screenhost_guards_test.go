@@ -249,9 +249,9 @@ const layoutBytesGolden = `{
     },
     "settings": {
       "x": 450,
-      "y": 130,
+      "y": 106,
       "w": 380,
-      "h": 460,
+      "h": 508,
       "open": false
     }
   }

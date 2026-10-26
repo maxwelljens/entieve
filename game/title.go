@@ -131,6 +131,7 @@ type titleScreen struct {
 func newTitleScreen(g *Game) *titleScreen {
 	t := &titleScreen{g: g, rows: titleRows()}
 	t.host = newScreenHost(t.rows, titleScope, g.kit, g.titleServices())
+	g.wireUISounds(t.host)
 	t.buildMenu()
 	return t
 }
@@ -216,6 +217,7 @@ func (g *Game) titleLoad(path string) error {
 		return err
 	}
 	g.leaveTitle()
+	g.ui.Play(sfxConfirm)
 	return nil
 }
 
@@ -673,6 +675,7 @@ func (t *titleScreen) deleteSave(path string) {
 	t.saves = t.g.listSaves()
 	t.refreshManager()
 	t.buildMenu() // Continue follows the save count
+	t.g.ui.Play(sfxConfirm)
 }
 
 // ---------------------------------------------------------------------------

@@ -83,6 +83,10 @@ type ScreenHost struct {
 	// last put it.
 	placed   map[*widget.Window]image.Rectangle
 	restored map[*widget.Window]bool
+
+	// onMount/onUnmount are the game's UI-sound hooks (nil = silent):
+	// they fire on a row's mount and unmount edges only, never per frame.
+	onMount, onUnmount func(ScreenID)
 }
 
 // newScreenHost builds the host over a row table. scope title keeps
@@ -187,6 +191,9 @@ func (h *ScreenHost) setMounted(s *screenSlot, want bool) {
 		s.mount = h.sink.AddWindow(s.panel.Win())
 		s.dismissed = false
 		s.panel.Sync()
+		if h.onMount != nil {
+			h.onMount(s.row.ID)
+		}
 		return
 	}
 	if u, ok := s.panel.(interface{ Unmounted() }); ok {
@@ -194,6 +201,9 @@ func (h *ScreenHost) setMounted(s *screenSlot, want bool) {
 	}
 	s.mount()
 	s.mount, s.dismissed = nil, false
+	if h.onUnmount != nil {
+		h.onUnmount(s.row.ID)
+	}
 	if h.scope == titleScope {
 		s.panel = nil
 	}

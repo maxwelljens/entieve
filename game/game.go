@@ -66,6 +66,10 @@ type Options struct {
 	// headless path (tests, simulate) and the documented default; the
 	// real engine is built only in cmdRun (see Music).
 	Music Music
+	// UISound is the UI cue seam, installed the same way: nil is the
+	// silent nop, and cmdRun builds the real one beside the music
+	// (NewAudio, one shared context).
+	UISound UISound
 }
 
 // Game implements ebiten.Game and hosts the uikit interface.
@@ -127,9 +131,13 @@ type Game struct {
 	// The music seam and the three audio settings behind it (percent
 	// 0..100 for the volumes; the engine multiplies them). music is
 	// never nil after New: nil Options.Music installs nopMusic, so the
-	// real audio context can only be reached from cmdRun.
+	// real audio context can only be reached from cmdRun. ui is the UI
+	// cue seam beside it (the UI volume rides the same master), nop
+	// unless cmdRun injected the real one.
 	music               Music
+	ui                  UISound
 	masterVol, musicVol int
+	uiVol               int
 	shuffle             bool
 
 	// Keybindings (game/keys.go): the live overrides, the armed row and
@@ -235,13 +243,18 @@ func New(opts Options) (*Game, error) {
 		g.dev = 1
 	}
 	g.loadSettings() // <SavePath>.settings.json: ui_scale, fullscreen
-	// The audio seam is installed before anything can read it: nil (tests,
-	// simulate) is the silent nop, so no test can reach audio.NewContext.
+	// The audio seams are installed before anything can read them: nil
+	// (tests, simulate) is the silent nop, so no test can reach
+	// audio.NewContext.
 	g.music = opts.Music
 	if g.music == nil {
 		g.music = nopMusic{}
 	}
-	g.applyMusicSettings()
+	g.ui = opts.UISound
+	if g.ui == nil {
+		g.ui = nopUISound{}
+	}
+	g.applyAudioSettings()
 	g.music.Start() // a real engine's Play is pending until the device opens
 	g.loadKeys()    // <SavePath>.keys.json: the keybinding overrides
 	theme.SetScale(g.uiScale * g.dev)
@@ -383,6 +396,11 @@ func (g *Game) Update() error {
 	g.menuModal = g.kit.MenuInput()
 
 	in := g.buildInput()
+
+	// UI sounds ride the frame's own input: one click cue per press edge
+	// that lands on the interface (title or game — the kit's windows are
+	// the same), silent for world presses and drag frames.
+	g.uiClick(in)
 
 	// Music advances identically at the title and in-game: the tick is on
 	// the mainline, before the title-phase branch.
@@ -772,6 +790,7 @@ func (g *Game) buildKit() error {
 	} else {
 		g.host.Rebind(kit, svc)
 	}
+	g.wireUISounds(g.host)
 	g.host.Warm()
 
 	g.placeDefaults(g.w, g.h)
@@ -786,6 +805,16 @@ func (g *Game) buildKit() error {
 		}
 	}
 	return nil
+}
+
+// wireUISounds hooks a Screen host's mount and unmount edges to the UI
+// cue seam: every window mounted through the host (the Esc menu, the
+// docked services view, the overlays and the title's own rows) opens and
+// closes with its cue. Kit-level one-offs that never mount through the
+// host — the order mini-window and the Show Info window — stay silent.
+func (g *Game) wireUISounds(h *ScreenHost) {
+	h.onMount = func(ScreenID) { g.ui.Play(sfxOpen) }
+	h.onUnmount = func(ScreenID) { g.ui.Play(sfxClose) }
 }
 
 // gameServices assembles the game-backed bundle a Screen row's Build may
@@ -805,6 +834,8 @@ func (g *Game) gameServices() screenServices {
 			SetMasterVolume:  func(v int) { g.setMasterVolume(v) },
 			MusicVolume:      func() int { return g.musicVol },
 			SetMusicVolume:   func(v int) { g.setMusicVolume(v) },
+			UIVolume:         func() int { return g.uiVol },
+			SetUIVolume:      func(v int) { g.setUIVolume(v) },
 			PersistSettings:  func() { g.persistSettings() },
 			Shuffle:          func() bool { return g.shuffle },
 			SetShuffle:       func(on bool) { g.setShuffle(on) },
@@ -1092,6 +1123,7 @@ func (g *Game) SaveAs() error {
 		g.activeSave = prev
 		return err
 	}
+	g.ui.Play(sfxConfirm)
 	return nil
 }
 

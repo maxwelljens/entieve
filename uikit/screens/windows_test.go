@@ -532,6 +532,7 @@ func TestSettingsPanelWiring(t *testing.T) {
 		rail      = false
 		master    = 100
 		music     = 70
+		uiVol     = 80
 		shuffle   = true
 		scaleHits []float64
 		setMaster int
@@ -551,6 +552,8 @@ func TestSettingsPanelWiring(t *testing.T) {
 		SetMasterVolume:  func(v int) { master = v; setMaster++ },
 		MusicVolume:      func() int { return music },
 		SetMusicVolume:   func(v int) { music = v },
+		UIVolume:         func() int { return uiVol },
+		SetUIVolume:      func(v int) { uiVol = v },
 		PersistSettings:  func() { persists++ },
 		Shuffle:          func() bool { return shuffle },
 		SetShuffle:       func(on bool) { shuffle = on },
@@ -659,15 +662,30 @@ func TestSettingsPanelWiring(t *testing.T) {
 		t.Errorf("music click persists = %d, want 2 (one per grab)", persists)
 	}
 
+	// UI is the third volume: the same freeflow control on the UI cue
+	// channel (master × UI is the host's math; the row only routes).
+	frame(sliderPoint(s.uiSlide, 35), true)
+	frame(sliderPoint(s.uiSlide, 35), false)
+	if uiVol != int(math.Round(s.uiSlide.Value())) {
+		t.Errorf("UI volume after click = %d, want %v", uiVol, s.uiSlide.Value())
+	}
+	s.Sync()
+	if got, want := s.uiVal.Label, fmt.Sprintf("%d%%", uiVol); got != want {
+		t.Errorf("UI readout after click = %q, want %q", got, want)
+	}
+	if persists != 3 {
+		t.Errorf("UI click persists = %d, want 3 (one per grab)", persists)
+	}
+
 	// The window's second child is the body: [scale row, fullscreen,
-	// rail, master, music, shuffle, reset layout, reset all, hint].
+	// rail, master, music, UI, shuffle, reset layout, reset all, hint].
 	body, ok := s.win.GetContainer().Children()[1].(widget.Containerer)
 	if !ok {
 		t.Fatal("settings body is not a container")
 	}
 	bkids := body.Children()
-	if len(bkids) != 9 {
-		t.Fatalf("settings body children = %d, want 9 (scale, fullscreen, rail, master, music, shuffle, reset, reset all, hint)", len(bkids))
+	if len(bkids) != 10 {
+		t.Fatalf("settings body children = %d, want 10 (scale, fullscreen, rail, master, music, UI, shuffle, reset, reset all, hint)", len(bkids))
 	}
 	uitest.FireButton(ui, bkids[1].(*widget.Button)) // fullscreen toggle (host currently off)
 	fs = false
@@ -688,7 +706,7 @@ func TestSettingsPanelWiring(t *testing.T) {
 	if got := s.railBtn.Text().Label; got != "Rail: collapsed" {
 		t.Errorf("rail label after click = %q, want collapsed state", got)
 	}
-	uitest.FireButton(ui, bkids[5].(*widget.Button)) // shuffle toggle
+	uitest.FireButton(ui, bkids[6].(*widget.Button)) // shuffle toggle (row 6 since the UI volume row landed at 5)
 	if shuffle {
 		t.Error("shuffle button did not flip the host flag")
 	}
@@ -696,20 +714,20 @@ func TestSettingsPanelWiring(t *testing.T) {
 	if got := s.shufBtn.Text().Label; got != "Shuffle: off" {
 		t.Errorf("shuffle label after click = %q, want off state", got)
 	}
-	uitest.FireButton(ui, bkids[6].(*widget.Button)) // reset layout
+	uitest.FireButton(ui, bkids[7].(*widget.Button)) // reset layout (row 7: the UI row shifted the resets down)
 	if resets != 1 {
 		t.Errorf("reset calls = %d, want 1", resets)
 	}
 	// Reset all is two-step: the first press only arms (label swap), the
 	// second fires exactly once and restores the label.
-	uitest.FireButton(ui, bkids[7].(*widget.Button))
+	uitest.FireButton(ui, bkids[8].(*widget.Button))
 	if resetAlls != 0 {
 		t.Fatalf("armed reset-all fired on the first press")
 	}
 	if got := s.resetAll.Text().Label; got != "Confirm reset all" {
 		t.Errorf("armed reset-all label = %q, want the confirm state", got)
 	}
-	uitest.FireButton(ui, bkids[7].(*widget.Button))
+	uitest.FireButton(ui, bkids[8].(*widget.Button))
 	if resetAlls != 1 {
 		t.Errorf("reset-all calls = %d, want 1", resetAlls)
 	}
@@ -744,7 +762,7 @@ func sliderPoint(sl *widgets.Slider, v float64) image.Point {
 	return image.Pt(sl.ValueX(v), b.Min.Y+b.Dy()/2)
 }
 
-// TestSettingsRowsFitAtMinScale: at the shrunken 0.75 rung the eight rows
+// TestSettingsRowsFitAtMinScale: at the shrunken 0.75 rung the nine rows
 // and the hint still stack inside the window without overlap — the window
 // grows with its content, and every row keeps its scaled 30 px floor.
 func TestSettingsRowsFitAtMinScale(t *testing.T) {
@@ -762,6 +780,8 @@ func TestSettingsRowsFitAtMinScale(t *testing.T) {
 		SetMasterVolume:  func(int) {},
 		MusicVolume:      func() int { return 70 },
 		SetMusicVolume:   func(int) {},
+		UIVolume:         func() int { return 80 },
+		SetUIVolume:      func(int) {},
 		PersistSettings:  func() {},
 		Shuffle:          func() bool { return true },
 		SetShuffle:       func(bool) {},
@@ -773,8 +793,8 @@ func TestSettingsRowsFitAtMinScale(t *testing.T) {
 
 	body := s.win.Contents.(widget.Containerer)
 	kids := body.Children()
-	if len(kids) != 9 {
-		t.Fatalf("settings body children = %d, want 9 (stepper, fullscreen, rail, master, music, shuffle, reset, reset all, hint)", len(kids))
+	if len(kids) != 10 {
+		t.Fatalf("settings body children = %d, want 10 (stepper, fullscreen, rail, master, music, UI, shuffle, reset, reset all, hint)", len(kids))
 	}
 	prev := image.Rectangle{}
 	for i, k := range kids {
@@ -899,6 +919,8 @@ func staticSettingsActions() SettingsActions {
 		SetMasterVolume:  func(int) {},
 		MusicVolume:      func() int { return 70 },
 		SetMusicVolume:   func(int) {},
+		UIVolume:         func() int { return 80 },
+		SetUIVolume:      func(int) {},
 		PersistSettings:  func() {},
 		Shuffle:          func() bool { return true },
 		SetShuffle:       func(bool) {},
