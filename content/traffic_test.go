@@ -18,7 +18,7 @@ import (
 func TestEmbeddedTrafficValid(t *testing.T) {
 	c := MustLoad()
 	if len(c.Traffic) != 7 {
-		t.Fatalf("traffic defs = %d, want 7 (solace, penumbra, gloam + the Kresy ring: rudnik, mlynow, kamieniec, glusza)", len(c.Traffic))
+		t.Fatalf("traffic defs = %d, want 7 (solace, penumbra, gloam + the the Wild Fields ring: rudnik, mlynow, kamieniec, glusza)", len(c.Traffic))
 	}
 	for _, sys := range keys(c.Traffic) {
 		td := c.Traffic[sys]
@@ -402,7 +402,7 @@ func TestConvoyTimeToKillPinned(t *testing.T) {
 				tc.raider, tc.raiders, got, tc.wantDPS)
 		}
 	}
-	// Pinned headline: one Kuźbor marauder needs ~178 s of continuous fire
+	// Pinned headline: one Kvonice marauder needs ~178 s of continuous fire
 	// to kill a convoy hauler; three raiders ~59 s. The escape and patrol
 	// windows (20 s flee, 15 s response) are measured against these.
 	ttk := ehp / (dps("npc-rat-marauder", "ship-npc-hauler"))

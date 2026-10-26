@@ -553,7 +553,7 @@ shows two sections.
 
 **Available contracts** — the docked station's board. Each row shows the
 title, the objective (`Destroy 1× Scuttler`,
-`Deliver 2 m³ 40mm ion to Havstov`, `Mine 400 m³ Kerngrit Ore` — every
+`Deliver 2 m³ 40mm ion to Hauvnok`, `Mine 400 m³ Kerngrit Ore` — every
 objective label right-clicks to **Show Info** on the item it names) and
 the reward (`40,000.00 € · +0.10 standing`). Press **Accept** to take it; a
 contract above your standing shows its requirement
@@ -587,11 +587,11 @@ contract raises it (`+0.10` on today's level-1 boards, `+0.15` on
 level-2), and level-2 boards require **0.20** standing — two level-1
 completions — before they hand out their orders.
 
-Note that Kuźbor now has a station, **Havstov**, so the insurer can hand
-over the replacement hull locally: a pilot destroyed over Kuźbor has their
-escape pod picked up at Havstov — their last in-system docking, or the
+Note that Kvonice now has a station, **Hauvnok**, so the insurer can hand
+over the replacement hull locally: a pilot destroyed over Kvonice has their
+escape pod picked up at Hauvnok — their last in-system docking, or the
 system's first station otherwise — instead of being shipped back to
-Sterhov. Death is paperwork; the log line `Respawned at <station> in a
+Struvok. Death is paperwork; the log line `Respawned at <station> in a
 <hull>` is the insurer's replacement notice arriving.
 
 ## Setting a quantity
@@ -625,8 +625,8 @@ line, exactly as it did behind the ticker.
 Manufacturing is a station service like any other. Press **`B`** for the
 **Manufacturing** window (or its Manufacturing button on the services
 view) — docked at a station with the **industry** service it opens there
-like the other service windows (Havstov, Hutov at Młyndal, Dokhavn at
-Kamenvik), and it only ever mounts while docked.
+like the other service windows (Hauvnok, Hovžan at Młondan, Dukšan at
+Kamžal), and it only ever mounts while docked.
 
 The window turns **minerals into products**: pick a recipe — a hull, a
 module or a batch of charges — and the quantity picker opens on its
@@ -654,8 +654,8 @@ ore's stock — so 250 ore offers two batches and 50 ore offers none (the
 picker's preview says a batch needs 100 ore and Confirm stays grayed).
 Refined minerals always land in the station hangar — never in your ship's
 hold — and the hangar is unlimited, so a full hold never blocks a refine;
-the picker's preview names the destination (`→ station hangar`). **Hutov**
-at Młyndal and **Jernvold** run refineries.
+the picker's preview names the destination (`→ station hangar`). **Hovžan**
+at Młondan and **Jalvrek** run refineries.
 
 Stations get better at their own work: every completed run raises that
 station's **craft** in the recipe's family (hulls, modules, charges), up
@@ -733,31 +733,32 @@ Authority's patrols, courts and insurers actually work: **Charter space**,
 **the Fringe** and **Unincorporated**, the lanes an EVE pilot would call
 high-sec, low-sec and null-sec.
 
-The playable map is one constellation, **Kresy** ("the borderlands") — the
-Kresy ring: seven systems out from Sterhov.
+The playable map is **the Wild Fields** — region and constellation carry
+one name — on the ring of stargates: seven systems out from Struvok.
 
-**Charter space.** You start in **Sterhov** (constellation *Kresy*): the
-first-wave heartland, safe lanes and working paperwork. *Jernvold* station
+**Charter space.** You start in **Struvok** (the Wild Fields): the
+first-wave heartland, safe lanes and working paperwork. *Jalvrek* station
 (market, inventory and fitting) is the oldest town's berth, an asteroid
-belt sits close, and gates run on to Kuźbor and Rudnek. **Rudnek** is the
-ring's ore country — Polish *rudnik* "ore-works", drifted — anchored by its mining
-outpost **Malmhalda** (market and repairs), with gates back to Sterhov and
-on to Młyndal.
+belt sits close, and gates run on to Kvonice and Rydnok. **Rydnok** is the
+ring's ore country — from Polish *rudnik* "ore-works", weathered past the word —
+anchored by its mining
+outpost **Halžek** (market and repairs), with gates back to Struvok and
+on to Młondan.
 
-**The Fringe.** **Kuźbor** is the junction of the rush — four gates, NPCs
+**The Fringe.** **Kvonice** is the junction of the rush — four gates, NPCs
 aggressive, the belt holding richer ore (kerngrit, lucidite), and the
-anomaly **Gniazvor** hiding Marauders plus a Hierarch boss with the best
-loot. Its station, **Havstov**, is a freeport: it runs the level-2 board,
+anomaly **Gnazvor** hiding Marauders plus a Hierarch boss with the best
+loot. Its station, **Hauvnok**, is a freeport: it runs the level-2 board,
 doubles as the local insurance point (see Contracts & standing) and builds
-things (see Manufacturing). **Młyndal** is the refinery step of the chain —
-its platform **Hutov** refines and manufactures (market, refine, industry).
-**Kamenvik** is the shipyard country: **Dokhavn**, its depot (market,
-fitting, industry), and the lane on to Głusholm.
+things (see Manufacturing). **Młondan** is the refinery step of the chain —
+its platform **Hovžan** refines and manufactures (market, refine, industry).
+**Kamžal** is the shipyard country: **Dukšan**, its depot (market,
+fitting, industry), and the lane on to Glůšan.
 
-**Unincorporated.** **Pustheim** is the dead-end frontier — Old Works
+**Unincorporated.** **Pušťov** is the dead-end frontier — Old Works
 country, deliberately dangerous: borealite belt ore and heavy spawns
-including Hierarchs, with no patrols and no station at all. **Głusholm** is
-quiet in the wrong way; its Unincorporated freeport **Kantov** runs a
+including Hierarchs, with no patrols and no station at all. **Glůšan** is
+quiet in the wrong way; its Unincorporated freeport **Kanšev** runs a
 market and little else. Travel system-to-system by flying to a stargate
 and pressing `J` — the starmap (`N`) shows the gate graph with every
 system under its own name and your current system highlighted.
@@ -779,7 +780,7 @@ The systems keep moving while you do something else. Overlapping systems
 run underneath the economy:
 
 **NPC convoys haul cargo on the lanes.** Each system runs freighters
-(along the trade routes — they appear in the overview as **Taborek**) on
+(along the trade routes — they appear in the overview as **Tobřek**) on
 its own schedule: they spawn at the route's origin, warp the leg exactly
 like a player ship — align, tunnel, land — and deliver their cargo at the
 station endpoint, or leave the system at a gate. They are ordinary ships:
@@ -788,10 +789,10 @@ lock one, shoot it, or just watch it work.
 **Guard patrols respond to incidents, never the player.** Patrols are
 friendly: they do not fire on you no matter how close you fly — they only
 defend themselves if you attack them first. Charter patrols (overview name
-**Custor**) circle their anchor station and warp to a convoy ambush when
+**Kuštor**) circle their anchor station and warp to a convoy ambush when
 one breaks out, scaled by zone: a three-ship wing lands on the spot in
 Charter space, a single responder arrives after about 15 seconds in the
-Fringe, and Unincorporated Pustheim has no patrols at all. In Charter
+Fringe, and Unincorporated Pušťov has no patrols at all. In Charter
 space they also work the belts: a static guard takes on the pirate rats
 anchored at its own celestial, and a patrol sweeps an occupied belt once a
 beat, hunts the rats down and flies home only once the belt is empty. Free
@@ -801,8 +802,8 @@ sweep takes it too. A rat they kill leaves the same lootable wreck as any
 other kill; the bounty is paid only when the kill is yours.
 
 **Rats ambush convoys in the Fringe and Unincorporated.** Every convoy
-transit in Kuźbor has roughly a 1-in-6 chance of being jumped, Pustheim
-about 1 in 3, Sterhov never. On a hit, one to three raiders of that
+transit in Kvonice has roughly a 1-in-6 chance of being jumped, Pušťov
+about 1 in 3, Struvok never. On a hit, one to three raiders of that
 system's own rat class drop in mid-leg — renamed for the job, so a
 Marauder hitting a haul becomes a **Marauder Ambusher** in your overview.
 The hauler is dragged out of warp and burns for 20 seconds before

@@ -39,15 +39,15 @@ func TestEmbeddedContractsValid(t *testing.T) {
 	}
 }
 
-// TestStationBoardsResolve pins board resolution: Jernvold carries one
-// contract of each kind (the showcase world's board), Havstov carries
+// TestStationBoardsResolve pins board resolution: Jalvrek carries one
+// contract of each kind (the showcase world's board), Hauvnok carries
 // the standing-gated level-2 board, unknown stations have empty boards.
 func TestStationBoardsResolve(t *testing.T) {
 	c := MustLoad()
 
 	haven := c.Board("cel-haven-rest")
 	if len(haven) != 3 {
-		t.Fatalf("Jernvold board = %d contracts, want 3", len(haven))
+		t.Fatalf("Jalvrek board = %d contracts, want 3", len(haven))
 	}
 	kinds := map[string]int{}
 	for _, ct := range haven {
@@ -55,7 +55,7 @@ func TestStationBoardsResolve(t *testing.T) {
 	}
 	for _, want := range []string{ContractKill, ContractDeliver, ContractMine} {
 		if kinds[want] != 1 {
-			t.Errorf("Jernvold board kinds = %v, want one %s", kinds, want)
+			t.Errorf("Jalvrek board kinds = %v, want one %s", kinds, want)
 		}
 	}
 	for _, ct := range haven {
@@ -66,7 +66,7 @@ func TestStationBoardsResolve(t *testing.T) {
 
 	port := c.Board("cel-penumbra-port")
 	if len(port) != 2 {
-		t.Fatalf("Havstov board = %d contracts, want 2", len(port))
+		t.Fatalf("Hauvnok board = %d contracts, want 2", len(port))
 	}
 	for _, ct := range port {
 		if ct.Level != 2 || ct.MinStanding < 0.2 {

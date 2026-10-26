@@ -8,7 +8,7 @@ import (
 // TestMarketStationsSeedBothMaterialSides pins the raw-material liquidity
 // the market tree is built for: EVERY station offering the market service
 // seeds both sides of every ore and mineral — a hold can always be sold and
-// materials always bought back, at every port (Havstov included; its
+// materials always bought back, at every port (Hauvnok included; its
 // founding book carries materials and nothing else). The seeds are finite
 // endowments: no restock lives in content.
 func TestMarketStationsSeedBothMaterialSides(t *testing.T) {
@@ -56,7 +56,7 @@ func TestMarketStationsSeedBothMaterialSides(t *testing.T) {
 }
 
 // TestStarterSystemOffersIndustry: the starter system's station runs the
-// manufacturing service — the player's first factory is in Sterhov.
+// manufacturing service — the player's first factory is in Struvok.
 func TestStarterSystemOffersIndustry(t *testing.T) {
 	c := MustLoad()
 	solace, ok := c.Systems["sys-solace"]

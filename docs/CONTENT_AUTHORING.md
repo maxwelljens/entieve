@@ -210,15 +210,15 @@ content package stays free of the UI layer).
 ## Recipe 1: add a star system
 
 **1. Create `content/data/systems/<shortname>.json`** (full example — a
-complete, valid two-celestial system with a gate back to Sterhov):
+complete, valid two-celestial system with a gate back to Struvok):
 
 ```json
 {
   "id": "sys-cinder",
   "name": "Cinder",
   "security": "low",
-  "constellation": "Kresy",
-  "region": "Far Moravia",
+  "constellation": "the Wild Fields",
+  "region": "the Wild Fields",
   "position": { "X": 4.0, "Y": 2.5 },
   "palette": {
     "nebula1": "#1a0c0c",
@@ -253,7 +253,7 @@ complete, valid two-celestial system with a gate back to Sterhov):
     },
     {
       "id": "cel-gate-solace",
-      "name": "Gate (Sterhov)",
+      "name": "Gate (Struvok)",
       "kind": "gate",
       "position": { "X": 3200000000000, "Y": -2240000000000 },
       "radius": 2500,
@@ -590,7 +590,7 @@ a mined hold must be sellable and materials must be buyable at every port.
   (sideron 25,000 bid / 12,000 ask), thousands for ore and the dear
   minerals, hundreds for the rarest. Asks are modest stock; bids are the
   local industry's standing demand.
-- Havstov (`cel-penumbra-port`) had no `market` block at all before this
+- Hauvnok (`cel-penumbra-port`) had no `market` block at all before this
   pass: its freeport now carries the same materials set plus the rounds its
   own raiders need (`TestRespawnAmmoIsOnTheLocalBook`).
 - The materials rows live at the end of each station's `market` array in
@@ -607,7 +607,7 @@ a mined hold must be sellable and materials must be buyable at every port.
 {
   "id": "world-speedrun",
   "name": "Speedrun",
-  "description": "A compact challenge world: kill the Gniazvor, dock, repeat.",
+  "description": "A compact challenge world: kill the Gnazvor, dock, repeat.",
   "start": {
     "system": "sys-penumbra",
     "position": { "X": 530000000000, "Y": -300000000000 },
@@ -654,7 +654,7 @@ station's board (`station` = the offering station) and is loaded from
   "station": "cel-haven-rest",
   "objective": { "target": "npc-rat-scuttler", "count": 1 },
   "reward": { "credits": 40000, "item": null, "standing_gain": 0.1 },
-  "description": "The Old Works are shadowing the ore haulers out of the Sterhov belt. Cull the Scuttler and dock at Jernvold to collect the bounty office's fee."
+  "description": "The Old Works are shadowing the ore haulers out of the Struvok belt. Cull the Scuttler and dock at Jalvrek to collect the bounty office's fee."
 }
 ```
 
@@ -796,9 +796,9 @@ reschedules anything.
 
 | security | p | shipped example |
 |----------|---|-----------------|
-| high | 0 | Sterhov convoys are never ambushed |
-| low  | 1/6 ≈ 16.7 % | Kuźbor: ≈1 ambush per 6 legs |
-| null | 1/3 ≈ 33.3 % | Pustheim: 1 ambush per 3 legs |
+| high | 0 | Struvok convoys are never ambushed |
+| low  | 1/6 ≈ 16.7 % | Kvonice: ≈1 ambush per 6 legs |
+| null | 1/3 ≈ 33.3 % | Pušťov: 1 ambush per 3 legs |
 
 Raiders: `1 + Intn(3)` ships of the def's `raider` class, spawned within
 3 km of the ambushed hauler. Flee math: the hauler burns 20 s before its
@@ -919,8 +919,8 @@ words from `docs/lore/NAMING.md`, and never a retired placeholder name.
 
 Manufacturing runs at stations offering the `industry` service (the closed
 set lives in `content/validate.go`: `repair | market | refine | fitting |
-industry`). Shipped, Havstov (`cel-penumbra-port`, the Kuźbor freeport),
-Hutov (`cel-huta`, Młyndal) and Dokhavn (`cel-doki`, Kamenvik) carry it.
+industry`). Shipped, Hauvnok (`cel-penumbra-port`, the Kvonice freeport),
+Hovžan (`cel-huta`, Młondan) and Dukšan (`cel-doki`, Kamžal) carry it.
 
 Every job commits its minerals up front and costs a fee of **3 % of the
 recipe's mineral value at base prices**, per run, debited from the wallet

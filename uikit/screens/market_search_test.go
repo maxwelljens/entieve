@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -460,9 +461,12 @@ func TestMarketAvailabilitySuffix(t *testing.T) {
 // TestMarketSearchFoldsDiacritics: the query matches through the canon
 // diacritics in BOTH directions. The fixtures are derived, not hardcoded —
 // every maker that carries a diacritic (folded first word = what a plain
-// keyboard types, raw first word = the typed-diacritic direction) gets both
-// queries checked against its exact item set, so the pin survives any
-// future rename of the houses.
+// keyboard types, raw first word = the typed-diacritic direction) is
+// queried both ways. The contract is recall plus symmetry, not an exact
+// item set: sahilm/fuzzy is a SUBSEQUENCE matcher, so a maker word also
+// spells through unrelated rows (a longer word hits more of them), and a
+// pin on the exact set would break on any rename — which is how this test
+// caught its own fixture the first time the houses drifted.
 func TestMarketSearchFoldsDiacritics(t *testing.T) {
 	m, env, _, frame := mktSearchEnv(t)
 
@@ -529,11 +533,14 @@ func TestMarketSearchFoldsDiacritics(t *testing.T) {
 	}
 
 	for word, s := range sets {
-		if got := query(word); !sameSet(got, s.items) {
-			t.Errorf("ASCII %q matched %v, want the %d %q items %v", word, got, len(s.items), s.raw, s.items)
+		folded, typed := query(word), query(s.raw)
+		for _, item := range s.items {
+			if !slices.Contains(folded, item) {
+				t.Errorf("ASCII %q missed one of its own %q items: %v", word, s.raw, folded)
+			}
 		}
-		if got := query(s.raw); !sameSet(got, s.items) {
-			t.Errorf("typed %q matched %v, want the same %q set %v", s.raw, got, s.raw, s.items)
+		if !sameSet(folded, typed) {
+			t.Errorf("%q and %q disagree: %v vs %v", word, s.raw, folded, typed)
 		}
 	}
 }

@@ -8,18 +8,18 @@
     "station": "cel-haven-rest",
     "objective": { "target": "npc-rat-scuttler", "count": 1 },
     "reward": { "credits": 40000, "item": null, "standing_gain": 0.1 },
-    "description": "An Old Works Scuttler is shadowing the ore haulers out of the Sterhov belt. Cull it, dock at Jernvold, and the bounty office settles the fee."
+    "description": "An Old Works Scuttler is shadowing the ore haulers out of the Struvok belt. Cull it, dock at Jalvrek, and the bounty office settles the fee."
   },
   {
     "id": "contract-solace-supply-run-1",
-    "title": "Supply run to Havstov",
+    "title": "Supply run to Hauvnok",
     "kind": "deliver",
     "level": 1,
     "min_standing": 0.0,
     "station": "cel-haven-rest",
     "objective": { "item": "ammo-emp-s", "count": 1, "destination": "cel-penumbra-port" },
     "reward": { "credits": 86000, "item": null, "standing_gain": 0.1 },
-    "description": "Havstov is short on ion rounds. Buy 200 rounds (1 m³) on the Jernvold market and carry them to the Havstov hangar — one gate jump into the Fringe. The cargo is the delivery: do not spend it on the way."
+    "description": "Hauvnok is short on ion rounds. Buy 200 rounds (1 m³) on the Jalvrek market and carry them to the Hauvnok hangar — one gate jump into the Fringe. The cargo is the delivery: do not spend it on the way."
   },
   {
     "id": "contract-solace-cordite-1",
@@ -30,6 +30,6 @@
     "station": "cel-haven-rest",
     "objective": { "item": "ore-cordite", "count": 400 },
     "reward": { "credits": 38400, "item": null, "standing_gain": 0.1 },
-    "description": "Jernvold's refinery needs 400 m³ of raw Kerngrit. Fill the ore hold at the Sterhov belt and dock to turn the order in."
+    "description": "Jalvrek's refinery needs 400 m³ of raw Kerngrit. Fill the ore hold at the Struvok belt and dock to turn the order in."
   }
 ]

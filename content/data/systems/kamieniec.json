@@ -1,9 +1,9 @@
 {
   "id": "sys-kamieniec",
-  "name": "Kamenvik",
+  "name": "Kamžal",
   "security": "low",
-  "constellation": "Kresy",
-  "region": "Far Moravia",
+  "constellation": "the Wild Fields",
+  "region": "the Wild Fields",
   "position": { "X": 8.6, "Y": 2.4 },
   "palette": {
     "nebula1": "#0c1220",
@@ -14,7 +14,7 @@
   "celestials": [
     {
       "id": "cel-kamieniec-star",
-      "name": "Kamenvik",
+      "name": "Kamžal",
       "kind": "star",
       "position": { "X": 0, "Y": 0 },
       "radius": 560000000,
@@ -22,7 +22,7 @@
     },
     {
       "id": "cel-kamieniec-prime",
-      "name": "Kamenvik Prime",
+      "name": "Kamžal Prime",
       "kind": "planet",
       "position": { "X": -172416500386, "Y": -64656187645 },
       "radius": 6371000,
@@ -30,7 +30,7 @@
     },
     {
       "id": "cel-doki",
-      "name": "Dokhavn",
+      "name": "Dukšan",
       "kind": "station",
       "position": { "X": 394813455714, "Y": 460615698333 },
       "radius": 850,
@@ -100,7 +100,7 @@
     },
     {
       "id": "cel-gate-penumbra",
-      "name": "Gate (Kuźbor)",
+      "name": "Gate (Kvonice)",
       "kind": "gate",
       "position": { "X": 3117105713934, "Y": -1934755270718 },
       "radius": 2500,
@@ -112,7 +112,7 @@
     },
     {
       "id": "cel-gate-glusza",
-      "name": "Gate (Głusholm)",
+      "name": "Gate (Glůšan)",
       "kind": "gate",
       "position": { "X": 4098724975052, "Y": 2884287945407 },
       "radius": 2500,

@@ -1,4 +1,4 @@
-# Far Moravia
+# The Wild Fields
 
 The binding lore rulebook for Entieve's setting. Everything under
 `docs/lore/` applies to all content — hand-written or AI-authored — and
@@ -7,29 +7,29 @@ here), [AESTHETIC.md](AESTHETIC.md) (how everything sounds and looks),
 [NAMING.md](NAMING.md) (every entity's name). Mechanics stay in
 [../GAMEPLAY.md](../GAMEPLAY.md); this file is setting only.
 
-## Far Moravia
+## The Wild Fields
 
-Far Moravia is the region Entieve is set in: a frontier gold-rush district —
-small, industrial, and a long way from anywhere that matters. The playable
-map is one constellation of it, **Kresy** ("the borderlands"): seven
-systems on the ring of stargates:
+**The Wild Fields** is the region Entieve is set in, and the name of its
+constellation too — one frontier gold-rush district: small, industrial, and a
+long way from anywhere that matters. The playable map is one district of it,
+seven systems on the ring of stargates:
 
 | System | Zone | What it is |
 |---|---|---|
-| **Sterhov** | Charter space | the first-wave heartland; the safe lanes |
-| **Rudnek** | Charter space | the ore-works country; the ring's mining anchor |
-| **Kuźbor** | the Fringe | the junction of the rush: yards, richer ore, a freeport |
-| **Młyndal** | the Fringe | the refinery step of the chain |
-| **Kamenvik** | the Fringe | shipyard country; the depot at the ring's edge |
-| **Pustheim** | Unincorporated | the dead-end frontier — Old Works country |
-| **Głusholm** | Unincorporated | the hush: one freeport and not much else |
+| **Struvok** | Charter space | the first-wave heartland; the safe lanes |
+| **Rydnok** | Charter space | the ore-works country; the ring's mining anchor |
+| **Kvonice** | the Fringe | the junction of the rush: yards, richer ore, a freeport |
+| **Młondan** | the Fringe | the refinery step of the chain |
+| **Kamžal** | the Fringe | shipyard country; the depot at the ring's edge |
+| **Pušťov** | Unincorporated | the dead-end frontier — Old Works country |
+| **Glůšan** | Unincorporated | the hush: one freeport and not much else |
 
-Everything else in Far Moravia is off the map: other districts, other
+Everything else in the Wild Fields is off the map: other districts, other
 constellations, other rushes. Mention them if you must; name nothing.
 
 **Binding rules**
 
-- MUST keep Far Moravia a working frontier district — mines, refineries,
+- MUST keep the Wild Fields a working frontier district — mines, refineries,
   freeports, hazard tape, invoices.
 - MUST keep every named system, constellation and region registered in
   [NAMING.md](NAMING.md); unregistered geography does not exist.
@@ -38,7 +38,7 @@ constellations, other rushes. Mention them if you must; name nothing.
 
 ## The rush and the ore
 
-The rush is about ore. Far Moravia's belts carry exotic ores that turned out
+The rush is about ore. The Wild Fields' belts carry exotic ores that turned out
 to be the feedstock for a manufacturing breakthrough in the old worlds — and
 that was enough. Capital, contractors and pilots arrived to cut rock, and
 they have not stopped arriving.
@@ -54,7 +54,7 @@ The feedstock pays. That is the entire economic argument.
 
 **Binding rules**
 
-- MUST treat the ores as the reason everyone in Far Moravia is here.
+- MUST treat the ores as the reason everyone in the Wild Fields is here.
 - MUST keep the economy quotidian: bounties, contracts, market stock,
   refinery yields, insurance premiums.
 - NEVER name the manufacturing breakthrough or its product. It is a demand
@@ -63,7 +63,7 @@ The feedstock pays. That is the entire economic argument.
 
 ## The settlement waves
 
-Two waves of people live in Far Moravia, one on top of the other.
+Two waves of people live in the Wild Fields, one on top of the other.
 
 **The first wave** arrived generations ago: European settlers of Moravian,
 Polish and Nordic heritage, in numbers large enough to found towns. Those
@@ -99,7 +99,7 @@ not flags. The manufacturers take their names from these heritages (see
 [FACTIONS.md — Corporate members](FACTIONS.md#corporate-members)) — the
 heritage shapes the house, never the other way round.
 
-Nobody in Far Moravia sends mail home and gets an answer.
+Nobody in the Wild Fields sends mail home and gets an answer.
 
 **Binding rules**
 
@@ -111,7 +111,7 @@ Nobody in Far Moravia sends mail home and gets an answer.
 ## Zones: charter reach
 
 Security status is **charter reach** — how far the colonial authority's
-patrols, courts and insurers actually function. Far Moravia speaks of three
+patrols, courts and insurers actually function. The Wild Fields speaks of three
 zones:
 
 | Zone | Code value | What it means |
@@ -122,13 +122,13 @@ zones:
 
 | System | Zone |
 |---|---|
-| Sterhov | Charter space |
-| Rudnek | Charter space |
-| Kuźbor | the Fringe |
-| Młyndal | the Fringe |
-| Kamenvik | the Fringe |
-| Pustheim | Unincorporated |
-| Głusholm | Unincorporated |
+| Struvok | Charter space |
+| Rydnok | Charter space |
+| Kvonice | the Fringe |
+| Młondan | the Fringe |
+| Kamžal | the Fringe |
+| Pušťov | Unincorporated |
+| Glůšan | Unincorporated |
 
 UI copy uses the zone words with a complementary status label — "Charter ·
 secure", "Fringe · contested", "Unincorporated · no charter". The values
@@ -149,7 +149,7 @@ world-facing words.
 
 Life runs on paperwork and throughput. Dock crews, refinery shifts, convoy
 schedules, contract boards, berthing fees. Charter space is orderly and slow.
-The Fringe is loud and priced accordingly. Pustheim is quiet in the wrong
+The Fringe is loud and priced accordingly. Pušťov is quiet in the wrong
 way.
 
 The player is an **ordinary pilot**: skilled, mortal, insured. Licensed work —
@@ -165,7 +165,7 @@ anyone who pays the fee.
 - MUST ground day-to-day texture in work: shifts, holds, cycles, invoices,
   schedules.
 - NEVER frame the player as chosen, destined, prophesied or secretly
-  important. Nobody in Far Moravia is waiting for anyone.
+  important. Nobody in the Wild Fields is waiting for anyone.
 
 ## Death and insurance
 

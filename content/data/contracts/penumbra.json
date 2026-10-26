@@ -1,14 +1,14 @@
 [
   {
     "id": "contract-penumbra-den-hunt-1",
-    "title": "Gniazvor hunt",
+    "title": "Gnazvor hunt",
     "kind": "kill",
     "level": 2,
     "min_standing": 0.2,
     "station": "cel-penumbra-port",
     "objective": { "target": "npc-rat-marauder", "count": 1 },
     "reward": { "credits": 240000, "item": null, "standing_gain": 0.15 },
-    "description": "A Marauder holds station in the Gniazvor and raids Havstov's shipping lanes. Prove yourself to the Havstov office (standing 0.20) and put it down."
+    "description": "A Marauder holds station in the Gnazvor and raids Hauvnok's shipping lanes. Prove yourself to the Hauvnok office (standing 0.20) and put it down."
   },
   {
     "id": "contract-penumbra-lucidite-1",
@@ -19,6 +19,6 @@
     "station": "cel-penumbra-port",
     "objective": { "item": "ore-lucidite", "count": 500 },
     "reward": { "credits": 85000, "item": null, "standing_gain": 0.15 },
-    "description": "Havstov pays a premium on 500 m³ of lucidite out of the Kuźbor belt. Standing 0.20 required before they hand out the order."
+    "description": "Hauvnok pays a premium on 500 m³ of lucidite out of the Kvonice belt. Standing 0.20 required before they hand out the order."
   }
 ]

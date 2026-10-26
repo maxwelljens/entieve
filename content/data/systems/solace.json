@@ -1,9 +1,9 @@
 {
   "id": "sys-solace",
-  "name": "Sterhov",
+  "name": "Struvok",
   "security": "high",
-  "constellation": "Kresy",
-  "region": "Far Moravia",
+  "constellation": "the Wild Fields",
+  "region": "the Wild Fields",
   "position": { "X": 0, "Y": 0 },
   "palette": {
     "nebula1": "#0a1024",
@@ -14,7 +14,7 @@
   "celestials": [
     {
       "id": "cel-solace-star",
-      "name": "Sterhov",
+      "name": "Struvok",
       "kind": "star",
       "position": { "X": 0, "Y": 0 },
       "radius": 696000000,
@@ -22,7 +22,7 @@
     },
     {
       "id": "cel-solace-prime",
-      "name": "Sterhov Prime",
+      "name": "Struvok Prime",
       "kind": "planet",
       "position": { "X": 106112365472, "Y": -45476728060 },
       "radius": 6371000,
@@ -30,7 +30,7 @@
     },
     {
       "id": "cel-haven-rest",
-      "name": "Jernvold",
+      "name": "Jalvrek",
       "kind": "station",
       "position": { "X": 842987620248, "Y": 502550312071 },
       "radius": 800,
@@ -113,7 +113,7 @@
     },
     {
       "id": "cel-gate-penumbra",
-      "name": "Gate (Kuźbor)",
+      "name": "Gate (Kvonice)",
       "kind": "gate",
       "position": { "X": 2945076955526, "Y": -2086096176831 },
       "radius": 2500,
@@ -125,7 +125,7 @@
     },
     {
       "id": "cel-gate-rudnik",
-      "name": "Gate (Rudnek)",
+      "name": "Gate (Rydnok)",
       "kind": "gate",
       "position": { "X": -4561869113906, "Y": 1710700917715 },
       "radius": 2500,

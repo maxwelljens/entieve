@@ -26,10 +26,10 @@ func TestInfoPageMakerShipped(t *testing.T) {
 		sub       string
 		makerName string
 	}{
-		{"hull", widgets.ShipRef("ship-sloop"), "Frigate · Boreall", "Boreall"},
-		{"module", widgets.ModuleRef("mod-autocannon-s"), "Weapon · Nordvakten", "Nordvakten"},
-		{"charge", widgets.ItemRef("ammo-emp-s"), "Ammo · Zakłady Burza", "Zakłady Burza"},
-		{"charge-cap-cell", widgets.ItemRef("charge-cap-cell"), "Charge · Iskeld", "Iskeld"},
+		{"hull", widgets.ShipRef("ship-sloop"), "Frigate · Bůral", "Bůral"},
+		{"module", widgets.ModuleRef("mod-autocannon-s"), "Weapon · Noldvar Guard", "Noldvar Guard"},
+		{"charge", widgets.ItemRef("ammo-emp-s"), "Ammo · Bríždan Factory", "Bríždan Factory"},
+		{"charge-cap-cell", widgets.ItemRef("charge-cap-cell"), "Charge · Iškoven", "Iškoven"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

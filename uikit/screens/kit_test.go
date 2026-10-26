@@ -177,7 +177,7 @@ func TestOverviewRowClickSelectsThenShowsInfo(t *testing.T) {
 		t.Fatalf("fixture: %v (%s) resolves to no definition", target.Entity, target.Kind)
 	}
 	page, _ := infoPageFor(k.Env(), ref)
-	if page.Title == "" || !strings.Contains(page.Title, "Vaktr") {
+	if page.Title == "" || !strings.Contains(page.Title, "Vaštrek") {
 		t.Errorf("page head = %q, want the entity name (the title no longer carries it)", page.Title)
 	}
 	if got := k.svc.info.TitleText(); got != "Info" {

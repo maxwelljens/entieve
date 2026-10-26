@@ -163,32 +163,32 @@ and stragglers are chased off the anchor.
 
 **Systems** (`content/data/systems/*.json`, one file per system; display
 names are registered in `docs/lore/NAMING.md` — the ids below are frozen):
-- `sys-solace` — **Sterhov**, starting system (constellation Kresy,
+- `sys-solace` — **Struvok**, starting system (the Wild Fields,
   Charter space). Star `cel-solace-star`, planet `cel-solace-prime`,
-  station `cel-haven-rest` (Jernvold; services: repair, market, refine,
+  station `cel-haven-rest` (Jalvrek; services: repair, market, refine,
   fitting), belt `cel-solace-belt` (ore-sterngrit, ore-cordite), gates
   `cel-gate-penumbra` → `sys-penumbra` and `cel-gate-rudnik` → `sys-rudnik`,
   rat spawns (scuttler), founding market orders on `cel-haven-rest`'s book
   (all player ships + core modules + charges).
-- `sys-rudnik` — **Rudnek**, Charter space, the ring's ore anchor. Station
-  `cel-halda` (Malmhalda, mining outpost: market, repair), belt
+- `sys-rudnik` — **Rydnok**, Charter space, the ring's ore anchor. Station
+  `cel-halda` (Halžek, mining outpost: market, repair), belt
   `cel-rudnik-belt`, gates → `sys-solace` and `sys-mlynow`.
-- `sys-penumbra` — **Kuźbor**, the Fringe junction (NPCs aggressive).
+- `sys-penumbra` — **Kvonice**, the Fringe junction (NPCs aggressive).
   Belt `cel-penumbra-belt` (ore-cordite, ore-lucidite), anomaly
-  `cel-penumbra-den` (Gniazvor: marauders + boss hierarch, best loot),
-  station `cel-penumbra-port` (Havstov, freeport: repair, market, refine,
+  `cel-penumbra-den` (Gnazvor: marauders + boss hierarch, best loot),
+  station `cel-penumbra-port` (Hauvnok, freeport: repair, market, refine,
   fitting, industry; hosts the level-2 contract board), gates → `sys-solace`,
   `sys-gloam`, `sys-mlynow`, `sys-kamieniec`.
-- `sys-mlynow` — **Młyndal**, the Fringe. Station `cel-huta` (Hutov, refinery
+- `sys-mlynow` — **Młondan**, the Fringe. Station `cel-huta` (Hovžan, refinery
   platform: market, refine, industry), belt `cel-mlynow-belt`, gates →
   `sys-rudnik` and `sys-penumbra`.
-- `sys-kamieniec` — **Kamenvik**, the Fringe. Station `cel-doki` (Dokhavn,
+- `sys-kamieniec` — **Kamžal**, the Fringe. Station `cel-doki` (Dukšan,
   shipyard & depot: market, fitting, industry), belt `cel-kamieniec-belt`,
   gates → `sys-penumbra` and `sys-glusza`.
-- `sys-gloam` — **Pustheim**, Unincorporated dead-end frontier, dangerous.
+- `sys-gloam` — **Pušťov**, Unincorporated dead-end frontier, dangerous.
   Belt `cel-gloam-belt` (ore-glacierite), heavy spawns incl.
   `npc-rat-hierarch`; no station; gates → `sys-penumbra` and `sys-glusza`.
-- `sys-glusza` — **Głusholm**, Unincorporated. Station `cel-kantor` (Kantov,
+- `sys-glusza` — **Glůšan**, Unincorporated. Station `cel-kantor` (Kanšev,
   freeport: market), belt `cel-glusza-belt`, gates → `sys-kamieniec` and
   `sys-gloam`.
 
@@ -567,7 +567,7 @@ economy sits on top of:
   player pipeline with an explicit activation target (`npcActivate(e, ai,
   target)`); only the *aggro* state machine remains player-centric.
 - **Sporadic attacks** — every convoy tunnel entry in the Fringe or
-  Unincorporated rolls `p = (1-σ)/3` (1-in-6 Kuźbor, 1-in-3 Pustheim, 0
+  Unincorporated rolls `p = (1-σ)/3` (1-in-6 Kvonice, 1-in-3 Pušťov, 0
   in Charter space); on a
   hit, 1–3 raiders of the system's `raider` rat class drop in mid-leg
   (renamed `<Name> Ambusher` so name-addressed scripts stay
@@ -692,7 +692,7 @@ market buy/sell, refine, ship assembly/swap, module fit/unfit, respawn
 timers, save/restore round-trip, determinism (Hash equality of twin runs),
 contract accept → objective progress → auto-claim payout + standing,
 NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
-(Kuźbor legs, showcase seed), security patrol response + convoy escape.
+(Kvonice legs, showcase seed), security patrol response + convoy escape.
 
 > **Sim hardening registry (2026-10, `fix/sim-hardening`).** Append-only
 > entries for the contract changes made by the fragility review:

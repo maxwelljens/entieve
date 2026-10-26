@@ -22,7 +22,7 @@ names the *modules and seams* we build that vocabulary into.
 | **Bay** (clip) | a charge-consuming module's fixed m³ ammunition space (`weapon.bay_m3`, `boost.bay_m3` for the cap booster): whole rounds of exactly one round type, sized so sustained fire reloads about every 120 s |
 | **Load cycle** | filling a bay from cargo: a full bay's rounds, taking exactly one firing cycle (no capacitor cost), so the next shot is deferred by it. The rounds move in at the start; the bay is ready when the cycle completes (the rack draws the ring lit meanwhile and a shell marker once armed). Also what `CmdSetAmmo` starts when it switches a round type; only the fresh fit at boot is pre-loaded instantly |
 | **Waiting state** | a bay sitting empty while two or more round types compete in cargo and none is selected: the gun logs one `<module> waiting for ammo selection` line, deactivates quietly, and fires only once `CmdSetAmmo` picks a type. Distinct from truly dry (empty bay, no matching cargo rounds = the `no charges` warning) |
-| **Caste** | an Old Works machine archetype (`npc-*`: Scuttler, Marauder, Hierarch) + the Charter patrol (Custor) |
+| **Caste** | an Old Works machine archetype (`npc-*`: Scuttler, Marauder, Hierarch) + the Charter patrol (Kuštor) |
 | **Station** | a market/service node (a celestial); stations hold the order books |
 | **Service** | a station's offered capability, owned by one table (`content.Services`): the id content files spell, its display label and icon, and the Screen window its services-row button toggles (`repair` opens none) |
 | **Order book** | per-station continuous double auction: asks + bids, never-crossed |

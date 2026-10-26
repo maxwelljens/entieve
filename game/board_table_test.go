@@ -129,7 +129,7 @@ func TestBoardOnTableRowRects(t *testing.T) {
 	}
 	g.kit.Menu().Close()
 
-	// --- The gated board (Havstov): the standing requirement rides
+	// --- The gated board (Hauvnok): the standing requirement rides
 	// line 2 beside the summary, at the row's full content width.
 	g = dockedShowcaseGame(t, 1280, 720)
 	g.s.Docked.Set(g.s.Player(), sim.Docked{At: "cel-penumbra-port"})

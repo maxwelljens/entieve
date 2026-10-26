@@ -35,6 +35,8 @@ func foldRune(r rune) rune {
 		return 'd'
 	case 'ě':
 		return 'e'
+	case 'í':
+		return 'i'
 	case 'ň':
 		return 'n'
 	case 'ř':
@@ -71,6 +73,8 @@ func foldRune(r rune) rune {
 		return 'D'
 	case 'Ě':
 		return 'E'
+	case 'Í':
+		return 'I'
 	case 'Ň':
 		return 'N'
 	case 'Ř':

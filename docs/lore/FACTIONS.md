@@ -1,4 +1,4 @@
-# Factions of Far Moravia
+# Factions of the Wild Fields
 
 Who lives in [UNIVERSE.md](UNIVERSE.md)'s region and what they want. Binding
 for all content. Names are settled here and registered in
@@ -6,7 +6,7 @@ for all content. Names are settled here and registered in
 
 ## The charter authority
 
-**Far Moravia Charter Authority** — "the Charter Authority" in documents,
+**The Wild Fields Charter Authority** — "the Charter Authority" in documents,
 "the Charter" on the lanes — is the colonial authority that makes Charter
 space Charter space. It holds the founding grant for the region and is the
 only institution with a reach worth arguing with.
@@ -48,23 +48,25 @@ no warships, and they stay independent of each other and of the Charter.
 
 | House | Origin | Trade | Notes |
 |---|---|---|---|
-| **Boreall** | Nordic | sensors, avionics, electronic warfare | aurora-chasing sensor engineers; the region's eyes, sold by subscription |
-| **Nordvakten** | Nordic | ordnance, turrets, guidance | founded by artillery officers; still believes every problem has a caliber |
-| **Iskeld** | Nordic | energy systems, capacitors, cells | cold-weather power systems; the grid nobody notices until it fails |
-| **Kombinat Ferrum** | Polish | heavy hulls, armor, structures | the iron combine: heavy hulls, heavier contracts |
-| **Družin** | Moravian | extraction, refining, barging | a miners' cooperative that outgrew its own pit |
-| **Zakłady Burza** | Polish/Moravian | munitions, energetic materials | Storm Works: propellants, warheads, and very good insurance |
-| **Celerita** | Latinate | propulsion, express logistics, recovery | if it must arrive yesterday — for a price, it does |
-| **Praetor** | Latinate | security services, patrol craft, protective systems | security is a service; the Custor hull is the receipt |
-| **Aldemar Group** | indistinct European | instrumentation, field repair, components | components for everyone; a boardroom for no one |
+| **Bůral** | Nordic | sensors, avionics, electronic warfare | aurora-chasing sensor engineers; the region's eyes, sold by subscription |
+| **Noldvar Guard** | Nordic | ordnance, turrets, guidance | founded by artillery officers; still believes every problem has a caliber |
+| **Iškoven** | Nordic | energy systems, capacitors, cells | cold-weather power systems; the grid nobody notices until it fails |
+| **Kumbřan Steelworks** | Polish | heavy hulls, armor, structures | the iron combine: heavy hulls, heavier contracts |
+| **Dvužek** | Moravian | extraction, refining, barging | a miners' cooperative that outgrew its own pit |
+| **Bríždan Factory** | Polish/Moravian | munitions, energetic materials | Storm Works: propellants, warheads, and very good insurance |
+| **Cylvar** | Latinate | propulsion, express logistics, recovery | if it must arrive yesterday — for a price, it does |
+| **Preštor** | Latinate | security services, patrol craft, protective systems | security is a service; the Kuštor hull is the receipt |
+| **Alďmar** | indistinct European | instrumentation, field repair, components | components for everyone; a boardroom for no one |
 | **Vantera** | indistinct European | industrial automation, shielding, station systems | station infrastructure, shielding, and quiet shareholdings |
 
-Three houses carry their founding-charter name through two drift steps:
-**Borealis Systems → Borealis → Boreall**, **Družstvo Concordia → Družstvo
-→ Družin** and **Celeritas Courier → Celeritas → Celerita** (each dropped
-its Latinate form-word, then drifted); **Kombinat Ferrum** keeps its name —
-a charter-era fossil. The full registry is
-[NAMING.md — Corporations](NAMING.md#corporations--manufacturers).
+Every house but one has been weathered twice, and three still show the whole
+chain: **Borealis Systems → Borealis → Boreall → Bůral**, **Družstvo
+Concordia → Družstvo → Družin → Dvužek** and **Celeritas Courier →
+Celeritas → Celerita → Cylvar**. Kombinat Ferrum was a charter-era fossil
+until the second depth broke it too (**Kombinat Ferrum → Kumbřan
+Steelworks**), and Zakłady Burza became **Bríždan Factory**. Only
+**Vantera** keeps its name: it was coined, not inherited. The full registry
+is [NAMING.md — Corporations](NAMING.md#corporations--manufacturers).
 
 Corps buy ore, sell hulls and modules, post contracts on the boards, and
 occasionally sue each other. They do not patrol and they do not fight the
@@ -84,7 +86,7 @@ Old Works — they write the losses down and raise the risk premium.
 ## Freeports and independents
 
 Freeports are stations no charter owns: berthing fee, market, refinery, no
-questions. **Havstov** in Kuźbor is the working example — the Fringe's
+questions. **Hauvnok** in Kvonice is the working example — the Fringe's
 living room, where the contract board pays well and the neighbours are
 whoever docked last.
 
@@ -100,7 +102,7 @@ matters, and welcome everywhere a berth is paid for.
 
 ## The Old Works
 
-The hostile power of Far Moravia is not people. It is the **Old Works** —
+The hostile power of the Wild Fields is not people. It is the **Old Works** —
 unshackled self-replicating industrial and terraforming machine swarms left
 over from the settlement era, when the first wave's building programme was
 called simply "the Works". The crews stopped coming; the Works did not stop
@@ -118,9 +120,9 @@ heavy plant that never clocked out.
 | **Marauder** | assault — jumps convoys, pins targets |
 | **Hierarch** | overseer / command — coordinates the swarm, fights to the last |
 
-**Territory:** Unincorporated space in practice (Pustheim) and the deep
+**Territory:** Unincorporated space in practice (Pušťov) and the deep
 Fringe. They nest in anomalies and derelict works — a machine den is a
-**Gniazvor** (*gniazdo* "nest", grafted with Latin *vor-* "devour") on pilot
+**Gnazvor** (*gniazdo* "nest", grafted with Latin *vor-* "devour") on pilot
 slang — and raid outward.
 
 **Binding rules**
@@ -133,7 +135,7 @@ slang — and raid outward.
 
 ## Smugglers and fences
 
-Human pirates in Far Moravia are not an army; they are a black market.
+Human pirates in the Wild Fields are not an army; they are a black market.
 Smugglers, fences and opportunists move cargo around charter paperwork,
 resell what the Old Works leave behind, and price risk like everyone else.
 
@@ -154,7 +156,7 @@ names in warnings. They are not a combat roster.
 
 |  | Charter Authority | Corporate houses | Freeports & independents | The Old Works | The Amber Run |
 |---|---|---|---|---|---|
-| **Charter Authority** | — | licensed, taxed, occasionally sued | regulated at arm's length; Havstov pays berths, not taxes | attrition; no negotiation | warrants, not wars |
+| **Charter Authority** | — | licensed, taxed, occasionally sued | regulated at arm's length; Hauvnok pays berths, not taxes | attrition; no negotiation | warrants, not wars |
 | **Corporate houses** | | — | buy their ore, sell them hulls | written off as losses; premiums raised | buy deniable cargo |
 | **Freeports & independents** | | | — | survive or don't | customers and competition |
 | **The Old Works** | | | | — | eat their ships too |
@@ -162,7 +164,7 @@ names in warnings. They are not a combat roster.
 
 **Binding rules**
 
-- MUST keep relations commercial. Nothing in Far Moravia is at war; things
+- MUST keep relations commercial. Nothing in the Wild Fields is at war; things
   are uninsured.
 - MUST keep the asymmetry: the Old Works are a hazard, not a rival
   government.

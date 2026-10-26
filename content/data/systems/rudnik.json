@@ -1,9 +1,9 @@
 {
   "id": "sys-rudnik",
-  "name": "Rudnek",
+  "name": "Rydnok",
   "security": "high",
-  "constellation": "Kresy",
-  "region": "Far Moravia",
+  "constellation": "the Wild Fields",
+  "region": "the Wild Fields",
   "position": { "X": -3.8, "Y": 1.6 },
   "palette": {
     "nebula1": "#0a1424",
@@ -14,7 +14,7 @@
   "celestials": [
     {
       "id": "cel-rudnik-star",
-      "name": "Rudnek",
+      "name": "Rydnok",
       "kind": "star",
       "position": { "X": 0, "Y": 0 },
       "radius": 640000000,
@@ -22,7 +22,7 @@
     },
     {
       "id": "cel-rudnik-prime",
-      "name": "Rudnek Prime",
+      "name": "Rydnok Prime",
       "kind": "planet",
       "position": { "X": 192734907622, "Y": -89942956890 },
       "radius": 6371000,
@@ -30,7 +30,7 @@
     },
     {
       "id": "cel-halda",
-      "name": "Malmhalda",
+      "name": "Halžek",
       "kind": "station",
       "position": { "X": 1069460519460, "Y": 741722618335 },
       "radius": 800,
@@ -92,7 +92,7 @@
     },
     {
       "id": "cel-gate-solace",
-      "name": "Gate (Sterhov)",
+      "name": "Gate (Struvok)",
       "kind": "gate",
       "position": { "X": -3492472586259, "Y": -1940262547922 },
       "radius": 2500,
@@ -104,7 +104,7 @@
     },
     {
       "id": "cel-gate-mlynow",
-      "name": "Gate (Młyndal)",
+      "name": "Gate (Młondan)",
       "kind": "gate",
       "position": { "X": 4025289688051, "Y": 2631920180649 },
       "radius": 2500,

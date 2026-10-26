@@ -1,9 +1,9 @@
 {
   "id": "sys-glusza",
-  "name": "Głusholm",
+  "name": "Glůšan",
   "security": "null",
-  "constellation": "Kresy",
-  "region": "Far Moravia",
+  "constellation": "the Wild Fields",
+  "region": "the Wild Fields",
   "position": { "X": 12.4, "Y": 1.2 },
   "palette": {
     "nebula1": "#050810",
@@ -14,7 +14,7 @@
   "celestials": [
     {
       "id": "cel-glusza-star",
-      "name": "Głusholm",
+      "name": "Glůšan",
       "kind": "star",
       "position": { "X": 0, "Y": 0 },
       "radius": 410000000,
@@ -22,7 +22,7 @@
     },
     {
       "id": "cel-glusza-prime",
-      "name": "Głusholm Prime",
+      "name": "Glůšan Prime",
       "kind": "planet",
       "position": { "X": 188689321815, "Y": -113213593089 },
       "radius": 6371000,
@@ -30,7 +30,7 @@
     },
     {
       "id": "cel-kantor",
-      "name": "Kantov",
+      "name": "Kanšev",
       "kind": "station",
       "position": { "X": -733780939157, "Y": 1048258484510 },
       "radius": 700,
@@ -98,7 +98,7 @@
     },
     {
       "id": "cel-gate-kamieniec",
-      "name": "Gate (Kamenvik)",
+      "name": "Gate (Kamžal)",
       "kind": "gate",
       "position": { "X": 2706209756564, "Y": -1769444840830 },
       "radius": 2500,
@@ -110,7 +110,7 @@
     },
     {
       "id": "cel-gate-gloam",
-      "name": "Gate (Pustheim)",
+      "name": "Gate (Pušťov)",
       "kind": "gate",
       "position": { "X": 4467521572858, "Y": 3722934644049 },
       "radius": 2500,

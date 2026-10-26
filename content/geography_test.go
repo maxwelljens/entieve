@@ -6,15 +6,15 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Geography sanity: the Kresy ring shipped in content/data/systems/*.json.
+// Geography sanity: the the Wild Fields ring shipped in content/data/systems/*.json.
 // Validate cross-checks every reference; these tests pin the shipped shape —
 // the canon gate topology, station services/books, founding-seed ordering
 // and the zone strings every system file repeats.
 // ---------------------------------------------------------------------------
 
 // gateEdges is the canon gate topology: one entry per edge, system ids
-// sorted inside the key. The ring runs Sterhov — Rudnek — Młyndal —
-// Kuźbor — Kamenvik — Głusholm — Pustheim, with Rudnek the Charter anchor.
+// sorted inside the key. The ring runs Struvok — Rydnok — Młondan —
+// Kvonice — Kamžal — Glůšan — Pušťov, with Rydnok the Charter anchor.
 var gateEdges = []string{
 	"sys-gloam|sys-glusza",
 	"sys-gloam|sys-penumbra",
@@ -112,7 +112,7 @@ func TestCelestialNamesFollowConventions(t *testing.T) {
 // TestShippedStationsServeAndStock: every station carries at least one
 // service from the allowed set and the market service; the four new
 // stations ship a founding market block (their endowment is the only
-// initial liquidity the world gets — Jernvold already carries one).
+// initial liquidity the world gets — Jalvrek already carries one).
 func TestShippedStationsServeAndStock(t *testing.T) {
 	c := MustLoad()
 	newSystems := map[SystemID]bool{
@@ -188,7 +188,7 @@ func TestFoundingBooksOpenNeverCrossed(t *testing.T) {
 		}
 	}
 	if books < 5 {
-		t.Errorf("founding books = %d, want at least 5 (Jernvold + the four new stations)", books)
+		t.Errorf("founding books = %d, want at least 5 (Jalvrek + the four new stations)", books)
 	}
 }
 

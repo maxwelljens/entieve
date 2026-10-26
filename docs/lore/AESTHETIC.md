@@ -28,20 +28,20 @@ matches the game's amber-on-black look.
 
 ### In voice
 
-1. "Jernvold's dock crew tapes over everything that moves, and half of what
+1. "Jalvrek's dock crew tapes over everything that moves, and half of what
    doesn't."
 2. "Everyone prices in euro because converting on the frontier is worse."
-3. "Pustheim has no patrols, no courts, and no insurance adjusters."
+3. "Pušťov has no patrols, no courts, and no insurance adjusters."
 4. "A Hierarch's crest buys a hauler. It does not buy you somewhere to spend
    it."
-5. "Charter patrols answer in three minutes in Sterhov. In the Fringe,
+5. "Charter patrols answer in three minutes in Struvok. In the Fringe,
    bring friends."
 
 ### Not in voice
 
 1. "Ancient and terrible, the Old Works stir from their long slumber to
    claim the stars." — mythic. Machines here cut rock; they do not slumber.
-2. "You are the chosen pilot, the last hope of Far Moravia." — destiny. The
+2. "You are the chosen pilot, the last hope of the Wild Fields." — destiny. The
    player is an insured working pilot ([UNIVERSE.md — Daily
    life](UNIVERSE.md#daily-life-and-the-pilots-place)).
 3. "A glorious odyssey awaits among the constellations!" — travel-brochure
@@ -55,9 +55,9 @@ registry come from this matrix; the layers follow the settlement history in
 
 | Layer | Rule | Examples |
 |---|---|---|
-| Places: regions, constellations, systems, stations, celestials | **Slavic/Nordic blend, time-drifted** — Slavic stems with evolved suffixes, Nordic ones grafted on (and back), no live dictionary word | Far Moravia, Kresy, Sterhov, Kuźbor, Pustheim, Jernvold, Havstov, Gniazvor |
-| Institutions: authorities, corporations | **fossilized Latinate register** — charter-era names hold their archaic form and do not drift; one heritage form-word or root may carry the origin flavour | Far Moravia Charter Authority; the ten manufacturing houses: Boreall, Nordvakten, Iskeld, Kombinat Ferrum, Družin, Zakłady Burza, Celerita, Praetor, Aldemar Group, Vantera |
-| Ship hulls | **drifted heritage trade nouns** — origin-tagged, **one origin per hull**, the name must read as that origin's trade | Havřek (Moravian), Kosar, Furmek, Taborek (Polish), Vaktr (Nordic), Custor (Latinate) |
+| Places: regions, constellations, systems, stations, celestials | **Slavic/Nordic blend, weathered to the second depth** — the live stem is erased, only the family shape survives | the Wild Fields, Struvok, Kvonice, Pušťov, Jalvrek, Hauvnok, Gnazvor |
+| Institutions: authorities, corporations | **weathered root, optionally + an English form-word** — Latinate houses keep the classical shape, never the Latin word | Wild Fields Charter Authority; the ten manufacturing houses: Bůral, Noldvar Guard, Iškoven, Kumbřan Steelworks, Dvužek, Bríždan Factory, Cylvar, Preštor, Alďmar, Vantera |
+| Ship hulls | **drifted heritage trade nouns** — origin-tagged, **one origin per hull**, live stem erased, the name must read as that origin's trade | Hušnek (Moravian), Ždanek, Furdžan, Tobřek (Polish), Vaštrek (Nordic), Kuštor (Latinate) |
 | Machine names | the caste names are canon and untouchable | Scuttler, Marauder, Hierarch |
 | Products: modules, charges, minerals, ores, loot | plain trade nouns of the lingua franca, mechanics-aligned; a mineral or ore may be coined from a real root when no trade word survives | Small Autocannon, 40mm ion, Sideron, Sterngrit, Alloy Scrap |
 
@@ -71,12 +71,19 @@ Supporting rules:
   time-depth drift retired (Starogród, Rudnik, Kuźnica, Młynów, Kamieniec,
   Pustkowie, Głusza, Jernborg, Przystań, Gniazdo, Halda, Huta, Doki, Kantor,
   Väktare, Kosa, Havíř, Furman, Tabor, Custos, Borealis, Nordvakt, Iskald,
-  Družstvo, Celeritas) — must not survive as names, slang or secondary names.
-- **Real roots.** Prefer words with lexical roots; note the root in
-  [NAMING.md](NAMING.md).
+  Družstvo, Celeritas), nor the names the second depth retired (Sterhov,
+  Rudnek, Kuźbor, Młyndal, Kamenvik, Pustheim, Głusholm, Jernvold, Havstov,
+  Gniazvor, Malmhalda, Hutov, Dokhavn, Kantov, Vaktr, Kosar, Havřek, Furmek,
+  Taborek, Custor, Boreall, Nordvakten, Iskeld, Kombinat Ferrum, Družin,
+  Zakłady Burza, Celerita, Praetor, Aldemar Group, Far Moravia, Kresy) —
+  must not survive as names, slang or secondary names.
+- **Real roots, erased.** Prefer words with lexical roots; note the root in
+  [NAMING.md](NAMING.md), and weather it past recognition in the name itself
+  ([Time-depth drift](NAMING.md#time-depth-drift)).
 - **Diacritics are correct, not risky.** The game font renders all Polish
-  and Czech diacritics (ą ć ę ł ń ó ś ź ż č ď ě ň ř š ť ů ž, upper and
-  lower) plus `€` and `¢`. Keep names sayable by an English reader.
+  and Czech diacritics (ą ć ę ł ń ó ś ź ż č ď ě ň ř š ť ů ž, plus the Czech
+  long í; upper and lower) plus `€` and `¢`. Keep names sayable by an English
+  reader.
 
 ## Origins and traits
 

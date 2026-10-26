@@ -22,15 +22,15 @@ type Corp struct {
 
 // AllCorps is the ten-firm manufacturer roster — the maker vocabulary.
 var AllCorps = []Corp{
-	{ID: "corp-borealis", Name: "Boreall", Heritage: "nordic"},
-	{ID: "corp-nordvakt", Name: "Nordvakten", Heritage: "nordic"},
-	{ID: "corp-iskald", Name: "Iskeld", Heritage: "nordic"},
-	{ID: "corp-ferrum", Name: "Kombinat Ferrum", Heritage: "polish"},
-	{ID: "corp-druzstvo", Name: "Družin", Heritage: "moravian"},
-	{ID: "corp-burza", Name: "Zakłady Burza", Heritage: "polish-moravian"},
-	{ID: "corp-celeritas", Name: "Celerita", Heritage: "latinate"},
-	{ID: "corp-praetor", Name: "Praetor", Heritage: "latinate"},
-	{ID: "corp-aldemar", Name: "Aldemar Group", Heritage: "indistinct-european"},
+	{ID: "corp-borealis", Name: "Bůral", Heritage: "nordic"},
+	{ID: "corp-nordvakt", Name: "Noldvar Guard", Heritage: "nordic"},
+	{ID: "corp-iskald", Name: "Iškoven", Heritage: "nordic"},
+	{ID: "corp-ferrum", Name: "Kumbřan Steelworks", Heritage: "polish"},
+	{ID: "corp-druzstvo", Name: "Dvužek", Heritage: "moravian"},
+	{ID: "corp-burza", Name: "Bríždan Factory", Heritage: "polish-moravian"},
+	{ID: "corp-celeritas", Name: "Cylvar", Heritage: "latinate"},
+	{ID: "corp-praetor", Name: "Preštor", Heritage: "latinate"},
+	{ID: "corp-aldemar", Name: "Alďmar", Heritage: "indistinct-european"},
 	{ID: "corp-vantera", Name: "Vantera", Heritage: "indistinct-european"},
 }
 

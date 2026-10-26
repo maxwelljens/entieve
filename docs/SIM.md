@@ -531,12 +531,12 @@ sub-light travel between landmarks is scenery, not transport.
 
 The placement is per-system, never cloned: each body keeps its authored
 direction from the star (the authored vector is rescaled, so gate
-directions still read as the Kresy ring across systems), and its distance
+directions still read as the Wild Fields ring across systems), and its distance
 comes from a band split into one radial slot per body with a seeded
 jitter, driven by a SplitMix64 stream keyed on the FNV-1a hash of the
 system id. Slots violating a separation floor are re-drawn from their
 whole band on the same stream (95% of the band after twelve tries). World
-starts (`content/data/worlds/*.json`) ride their anchor body — Jernvold,
+starts (`content/data/worlds/*.json`) ride their anchor body — Jalvrek,
 the Asteroid Belt I — keeping their authored offset.
 
 Consequences the layout deliberately accepts: warp speeds are already
