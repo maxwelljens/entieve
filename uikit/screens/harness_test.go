@@ -8,6 +8,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/internal/uitest"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -137,6 +138,42 @@ func newWindowUI(t *testing.T, env widgets.Seams, wins ...*widget.Window) *ebite
 	}
 	ui.Update()
 	return ui
+}
+
+// newQtyUI mounts a panel's windows PLUS the session's quantity picker: a
+// bare session only shows the picker (the Kit mounts it through
+// Kit.OpenQty), so the tests mount it by hand and treat it as always
+// mounted, invisible until an open.
+func newQtyUI(t *testing.T, env Session, wins ...*widget.Window) *ebitenui.UI {
+	t.Helper()
+	return newWindowUI(t, env, append(wins, env.QtyWindow().Win())...)
+}
+
+// pumpQty runs one frame with the session's picker synced too — the kit
+// does that from Kit.Sync in the game, a bare session's host must.
+func pumpQty(t *testing.T, ui *ebitenui.UI, env Session, sync func(), w, h int) {
+	t.Helper()
+	env.QtyWindow().Sync()
+	uitest.PumpWindow(t, ui, sync, w, h)
+}
+
+// qtyClick presses the picker's slider at value v through the production
+// input path (the shared cursor/press/held seams): a press-and-release
+// gesture inside the widget, then a frame each side of it. The slider's
+// unit is a pixel of its track, so aim at the ends (min/max land exactly)
+// or set mid values with Slider.SetValue.
+func qtyClick(t *testing.T, ui *ebitenui.UI, env Session, sync func(), v float64) {
+	t.Helper()
+	pt := sliderPoint(env.QtyWindow().Slider(), v)
+	var press, held bool
+	cursor := pt
+	defer widgets.SetPollCursorForTest(func() (int, int) { return cursor.X, cursor.Y })()
+	defer widgets.SetPressEdgeForTest(func(ebiten.MouseButton) bool { return press })()
+	defer widgets.SetSliderHeldForTest(func() bool { return held })()
+	press, held = true, true
+	pumpQty(t, ui, env, sync, 1024, 700) // rising press: grab + jump to v
+	press, held = false, false
+	pumpQty(t, ui, env, sync, 1024, 700) // release: the grab ends
 }
 
 // newTestKit builds a Kit over the embedded content and world-showcase,

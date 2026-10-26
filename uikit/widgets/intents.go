@@ -47,6 +47,19 @@ type (
 		Qty  int
 	}
 
+	// QtyPick asks the host to open its quantity picker for one action: the
+	// item (or recipe) it is for, the holds a transfer moves between, and
+	// the mode that names its slider model and its verb. Host-owned like
+	// OpenOrder — the picker's Confirm is what emits Refine / StartJob /
+	// Buy / Sell / Transfer, so this carries no command.
+	QtyPick struct {
+		Mode   QtyMode
+		Item   content.ItemID
+		Recipe content.RecipeID
+		From   string
+		To     string
+	}
+
 	// Buy/Sell trade at the docked station's market.
 	Buy struct {
 		Item content.ItemID
@@ -142,7 +155,21 @@ type (
 	Quit   struct{}
 )
 
+// QtyMode names what a quantity picker will confirm: its slider model (the
+// refinery's whole-batch ladder is the one notched surface), its verb and
+// the intent its Confirm emits.
+type QtyMode int
+
+const (
+	QtyRefine   QtyMode = iota // ore → minerals, whole 100-ore batches
+	QtyStart                   // manufacturing runs
+	QtyBuy                     // market buy
+	QtySell                    // market / inventory sell
+	QtyTransfer                // hold transfer
+)
+
 func (ShowInfo) isIntent()    {}
+func (QtyPick) isIntent()     {}
 func (OpenMenu) isIntent()    {}
 func (OpenOrder) isIntent()   {}
 func (Buy) isIntent()         {}
@@ -182,10 +209,10 @@ func (Quit) isIntent()        {}
 // the game's. warpRange/orbitRange are the Selected Item selectors'
 // current values, read at press (0 where there is no selector, e.g. a
 // kit-less session). ok is false for the intents a host handles itself:
-// ShowInfo, OpenMenu, OpenOrder, Toggle, Save, Load, Quit.
+// ShowInfo, OpenMenu, OpenOrder, QtyPick, Toggle, Save, Load, Quit.
 func commandFor(i Intent, warpRange, orbitRange float64) (sim.Command, bool) {
 	switch v := i.(type) {
-	case ShowInfo, OpenMenu, OpenOrder, Toggle, Save, Load, Quit:
+	case ShowInfo, OpenMenu, OpenOrder, QtyPick, Toggle, Save, Load, Quit:
 		return nil, false
 	case Buy:
 		return sim.CmdBuy{Item: v.Item, Qty: v.Qty}, true

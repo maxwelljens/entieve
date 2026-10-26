@@ -24,11 +24,12 @@ const stationBoardWorstCaseH = 426
 // Screen rows), in design units == px at the identity scale: the market's
 // three-pane 760×560 rect on the rail gutter's clear line (it overlaps the
 // log pocket at the minimum — the big trade window wins that strip), the
-// inventory rect and the fitting window's 644×682 column at the screen's
-// top-right (the EVE fitting shape needs the room).
+// inventory rect (330 design px wide: its four-verb toolbar must fit on one
+// row) and the fitting window's 644×682 column at the screen's top-right
+// (the EVE fitting shape needs the room).
 var serviceDefaults = map[ScreenID]image.Rectangle{
 	idMarket:    image.Rect(97, 8, 857, 568),
-	idInventory: image.Rect(396, 256, 701, 690),
+	idInventory: image.Rect(396, 256, 716, 690),
 	idFitting:   image.Rect(370, 8, 1014, 690),
 }
 

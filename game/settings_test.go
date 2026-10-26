@@ -230,8 +230,8 @@ func TestApplyUIScaleLiveRelayout(t *testing.T) {
 		t.Errorf("face measure after change = %v, want ≈%v (1.5× ±3%%)", faceAfter, 1.5*faceBefore)
 	}
 	// Metrics rebuilt: the inventory window's floor is now 1.5× design.
-	if got := g.host.Window(idInventory).MinSize; got == nil || got.X != 450 || got.Y != 630 {
-		t.Errorf("inventory MinSize after change = %v, want (450,630) (1.5× 300×420)", got)
+	if got := g.host.Window(idInventory).MinSize; got == nil || got.X != 480 || got.Y != 630 {
+		t.Errorf("inventory MinSize after change = %v, want (480,630) (1.5× 320×420)", got)
 	}
 	// Design-unit placement preserved: each coordinate is the old one
 	// moved to 1.5× through the sidecar (round to the nearest device px).

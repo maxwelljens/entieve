@@ -173,7 +173,7 @@ var screens = []Screen{
 		// a composed docked band.
 		ID: idInventory, Title: "Inventory", Icon: "svc_inventory",
 		Key: ebiten.KeyI, Action: "inventory", Desc: "I — toggle inventory",
-		DefaultRect: image.Rect(396, 256, 701, 690), Anchor: AnchorFixed,
+		DefaultRect: image.Rect(396, 256, 716, 690), Anchor: AnchorFixed,
 		DockPolicy: DockFloating, Group: "Trade",
 		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewInventory(h.services.Env) },
 	},

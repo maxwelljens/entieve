@@ -226,8 +226,7 @@ func TestMarketOrderBookRows(t *testing.T) {
 // ScrollContainer with real overflow at the window's own size, a wheel
 // notch moves the offset and the rows with it, and the scrollbar rail
 // beside the viewport mirrors the offset — and writes drags back — while
-// the title line and the stepper/button row keep their place above the
-// book.
+// the title line and the Buy/Sell row keep their place above the book.
 func TestMarketOrderBookScrolls(t *testing.T) {
 	env, _ := newTestEnv(t)
 	m := NewMarket(env)
@@ -289,18 +288,21 @@ func TestMarketOrderBookScrolls(t *testing.T) {
 		t.Errorf("rail position = %d, want 500 (mirror of ScrollTop 0.5)", m.bar.Current)
 	}
 
-	// The window's own rows are untouched: title line, stepper row
-	// (minus/readout/plus/buy/sell), then the book under them.
+	// The window's own rows are untouched: title line, the Buy/Sell row,
+	// then the book under them.
 	title := m.title.GetWidget().Rect
-	stepper := m.stepper.Row().GetWidget().Rect
+	trade := m.buy.GetWidget().Rect.Union(m.sell.GetWidget().Rect)
 	table := m.tbl.Container().GetWidget().Rect
-	if !(title.Max.Y <= stepper.Min.Y && stepper.Max.Y <= table.Min.Y) {
-		t.Errorf("stacking changed: title %v, stepper %v, book %v (want stacked top to bottom)",
-			title, stepper, table)
+	if !(title.Max.Y <= trade.Min.Y && trade.Max.Y <= table.Min.Y) {
+		t.Errorf("stacking changed: title %v, trade row %v, book %v (want stacked top to bottom)",
+			title, trade, table)
 	}
-	for name, b := range map[string]*widget.Button{"-": m.stepper.Minus(), "+": m.stepper.Plus(), "Buy": m.buy, "Sell": m.sell} {
-		if r := b.GetWidget().Rect; !r.In(stepper) {
-			t.Errorf("%s button %v outside the stepper row %v", name, r, stepper)
+	for name, b := range map[string]*widget.Button{"Buy": m.buy, "Sell": m.sell} {
+		if r := b.GetWidget().Rect; !r.In(trade) {
+			t.Errorf("%s button %v outside the trade row %v", name, r, trade)
+		}
+		if r := b.GetWidget().Rect; r.Max.Y > table.Min.Y {
+			t.Errorf("%s button %v overlaps the book %v", name, r, table)
 		}
 	}
 }
@@ -384,28 +386,26 @@ func TestMarketTitleShowsPriceAndFee(t *testing.T) {
 	}
 }
 
-// TestStepperReadoutFitsItsValue (Defect B regression): the qty readout
-// resizes to its current value as the stepper steps — "Qty 1" grows to
-// "Qty 100" and never reaches the + button, at scale 1 and 1.5. (The
-// million-digit case lives beside the widget: widgets
-// TestQtyStepperReadoutGrows.)
-func TestStepperReadoutFitsItsValue(t *testing.T) {
+// TestPickerReadoutFitsItsValue (Defect B regression, carried over from the
+// retired ± ticker): the picker's readout resizes with its value — the box
+// always measures at least the text — and never reaches into the slider,
+// at scale 1 and 1.5.
+func TestPickerReadoutFitsItsValue(t *testing.T) {
 	defer theme.SetScale(1)
 	for _, sc := range []float64{1, 1.5} {
 		theme.SetScale(sc)
 		env, _ := newTestEnv(t)
 		inv := NewInventory(env)
-		ui := newWindowUI(t, env, inv.Win())
-		inv.Sync()
-		uitest.PumpWindow(t, ui, inv.Sync, 1280, 720)
+		ui := newQtyUI(t, env, inv.Win())
+		q := env.QtyWindow()
+		pumpQty(t, ui, env, inv.Sync, 1280, 720)
 
 		check := func(want string) {
 			t.Helper()
-			uitest.PumpWindow(t, ui, inv.Sync, 1280, 720)
-			lbl := inv.stepper.Label().GetWidget().Rect
-			plus := inv.stepper.Plus().GetWidget().Rect
-			minus := inv.stepper.Minus().GetWidget().Rect
-			if got := inv.stepper.Label().Label; got != want {
+			pumpQty(t, ui, env, inv.Sync, 1280, 720)
+			lbl := q.read.GetWidget().Rect
+			slide := q.Slider().GetWidget().Rect
+			if got := q.read.Label; got != want {
 				t.Errorf("scale %v: readout = %q, want %q", sc, got, want)
 			}
 			// The box measures the value itself (same face, no h-padding).
@@ -414,18 +414,24 @@ func TestStepperReadoutFitsItsValue(t *testing.T) {
 				t.Errorf("scale %v: readout box %d wide, need ≥ %v for %q",
 					sc, lbl.Dx(), need, want)
 			}
-			if lbl.Max.X > plus.Min.X {
-				t.Errorf("scale %v: readout (%v) overlaps + button (%v)", sc, lbl, plus)
-			}
-			if lbl.Min.X < minus.Max.X {
-				t.Errorf("scale %v: readout (%v) overlaps − button (%v)", sc, lbl, minus)
+			if lbl.Min.X < slide.Max.X {
+				t.Errorf("scale %v: readout (%v) overlaps the slider (%v)", sc, lbl, slide)
 			}
 		}
 
-		check("Qty 1")
-		inv.stepper.Step(2) // the ladder's top, 100
-		check("Qty 100")
-		inv.stepper.Step(-2)
-		check("Qty 1")
+		// Open the picker on the cargo stack and walk its value.
+		env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+		clickRow(ui, inv.cargo, 0)
+		pumpQty(t, ui, env, inv.Sync, 1280, 720)
+		inv.sellClicked()
+		pumpQty(t, ui, env, inv.Sync, 1280, 720)
+		if !q.IsOpen() {
+			t.Fatalf("scale %v: no picker up", sc)
+		}
+		check("1")
+		q.Slider().SetValue(qtyMax)
+		pumpQty(t, ui, env, inv.Sync, 1280, 720)
+		check(theme.FormatInt(qtyMax))
+		q.Close()
 	}
 }

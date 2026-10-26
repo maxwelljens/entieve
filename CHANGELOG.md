@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Every −/+ quantity ticker replaced by a slider picker** (`uikit`,
+  `game`): the Refinery, Manufacturing, Market and Inventory windows no
+  longer carry a `[-] Qty N [+]` row. A quantity is now asked for in one
+  small, modal popup — the **quantity picker** — with the item line, a
+  slider, the live amount, a live preview (refinery yield, run time/fee/
+  inputs, trade total) and Confirm/Cancel. The Refinery and Manufacturing
+  windows open it on the row you select (an ore, a recipe); Market and
+  Inventory open it per verb (Buy/Sell, To Cargo/To Ore/To Hangar/Sell),
+  and every row's right-click quantity action routes through the same
+  picker. The refinery keeps its notched whole-100-ore ladder (sub-batch
+  stock opens an empty slider with Confirm grayed and the old wording);
+  everything else is freeflow 1–100. The picker re-opens at the last
+  confirmed value per action, `Esc` cancels it before any window close,
+  and Confirm emits exactly the intents the tickers did — no simulation
+  change. Documented in `docs/GAMEPLAY.md` ("Setting a quantity"),
+  `CONTEXT.md` ("Quantity picker") and `docs/ARCHITECTURE.md`.
+
 - **Title screen backdrop is the artwork** (`game`, `assets/artwork`):
   the boot title now draws `assets/artwork/title_background.jpg` (2736×1536,
   embedded through an `assets/artwork/artwork.go` shim so releases show it

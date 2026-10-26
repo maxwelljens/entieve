@@ -118,6 +118,13 @@ type Kit struct {
 	orderWin    *OrderWin
 	orderRemove widget.RemoveWindowFunc
 
+	// qtyWin is the session's one quantity picker (services.qty — the
+	// replacement for every retired ± ticker) and qtyRemove its mount
+	// handle (nil = closed). Also deliberately out of the layout sidecar:
+	// a transient dialog, never restored.
+	qtyWin    *QtyWin
+	qtyRemove widget.RemoveWindowFunc
+
 	// core visibility (hidden e.g. while docked in a station) and the
 	// player's own close of a core window (the rail's Overview /
 	// Selected Item entries): a window shows when the host shows the
@@ -200,6 +207,15 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	k.orderWin.onClose = k.CloseOrder
 	k.SetWindowClose(k.orderWin.Win(), k.CloseOrder)
 
+	// The quantity picker: one instance on the session's services, opened
+	// by the panels' QtyPick intent (RunIntent), closed by its × / Cancel
+	// / Esc and by Confirm.
+	k.qtyWin = NewQtyWin(k.seams())
+	k.svc.qty = k.qtyWin
+	k.qtyWin.onClose = k.CloseQty
+	k.svc.qtyShow = k.OpenQty
+	k.SetWindowClose(k.qtyWin.Win(), k.CloseQty)
+
 	// Root container: transparent overlay over the world render; windows
 	// float above it. The theme rides the widget parent chain.
 	root := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
@@ -242,6 +258,7 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 func (k *Kit) Update() error {
 	k.svc.menu.Poll()
 	menuBlocked := k.svc.menu.TakeBlocked()
+	k.pickPoll() // the picker's own Esc (hosts that skip MenuInput still cancel)
 	if !k.svc.menu.IsOpen() && !menuBlocked {
 		k.raisePressed()
 		k.ui.Update()
@@ -440,6 +457,7 @@ func (k *Kit) Sync() {
 	k.ov.sync(k)
 	k.syncSelected()
 	k.svc.info.Sync()
+	k.svc.qty.Sync() // the picker's slider input + live preview
 }
 
 // seams packages the kit's three seams for the panels it builds: the
@@ -460,13 +478,17 @@ func (k *Kit) SetSink(s widgets.ActionSink) {
 }
 
 // RunIntent executes one intent on the kit's own behalf: session intents
-// (Show Info, the context menu, the order mini-window) run on the kit's
-// services, every other intent maps onto the sim command it dispatches to
-// (commandFor) and rides the enqueue tail. Game.Do delegates here for
-// whatever it does not handle itself.
+// (Show Info, the context menu, the order mini-window, the quantity
+// picker) run on the kit's services, every other intent maps onto the sim
+// command it dispatches to (commandFor) and rides the enqueue tail.
+// Game.Do delegates here for whatever it does not handle itself.
 func (k *Kit) RunIntent(i widgets.Intent) {
-	if o, ok := i.(widgets.OpenOrder); ok {
-		k.OpenOrder(o.Item, o.Side, o.Qty)
+	switch v := i.(type) {
+	case widgets.OpenOrder:
+		k.OpenOrder(v.Item, v.Side, v.Qty)
+		return
+	case widgets.QtyPick:
+		k.OpenQty(v)
 		return
 	}
 	k.exec.Do(i)
@@ -647,6 +669,67 @@ func (k *Kit) OrderWindow() *widget.Window {
 // reach its fields through it).
 func (k *Kit) OrderWin() *OrderWin { return k.orderWin }
 
+// OpenQty opens (or re-targets) the quantity picker on req: Show-Info
+// style, one instance — a second launch swaps the target in place and
+// raises the window, a first open fades it in. It is centred on the
+// viewport each time (a transient dialog with no persisted rect).
+func (k *Kit) OpenQty(req widgets.QtyPick) {
+	if k.qtyWin == nil || !k.qtyWin.Show(req) {
+		return
+	}
+	k.centerQty()
+	raised := k.qtyRemove != nil
+	if raised {
+		k.qtyRemove()
+		k.qtyRemove = nil
+	}
+	k.qtyRemove = k.addWindow(k.qtyWin.Win(), !raised)
+}
+
+// CloseQty closes the quantity picker: unmount and hide (its rect is
+// transient and never persisted). Idempotent — Cancel, Esc and Confirm all
+// land here, and a Cancel/× writes nothing anywhere.
+func (k *Kit) CloseQty() {
+	if k.qtyWin == nil {
+		return
+	}
+	if k.qtyRemove != nil {
+		k.qtyRemove()
+		k.qtyRemove = nil
+	}
+	k.qtyWin.hide()
+}
+
+// QtyOpen reports whether the quantity picker is up.
+func (k *Kit) QtyOpen() bool { return k.qtyWin != nil && k.qtyWin.IsOpen() }
+
+// QtyWindow returns the quantity picker's window (the world-input gate
+// hit-tests it, like InfoWindow).
+func (k *Kit) QtyWindow() *widget.Window {
+	if k.qtyWin == nil {
+		return nil
+	}
+	return k.qtyWin.Win()
+}
+
+// QtyWin returns the quantity picker panel (tests reach its slider and
+// Confirm through it).
+func (k *Kit) QtyWin() *QtyWin { return k.qtyWin }
+
+// centerQty puts the picker in the middle of the viewport: the root
+// overlay is laid out to it, so its rect is the screen. The construction
+// rect is the fallback before the first frame.
+func (k *Kit) centerQty() {
+	root := k.root.GetWidget().Rect
+	w := k.qtyWin.Win().GetContainer().GetWidget().Rect
+	if root.Empty() || w.Empty() {
+		return
+	}
+	x := root.Min.X + (root.Dx()-w.Dx())/2
+	y := root.Min.Y + (root.Dy()-w.Dy())/2
+	k.qtyWin.Win().SetLocation(image.Rect(x, y, x+w.Dx(), y+w.Dy()))
+}
+
 // SetCoreVisible shows or hides the always-mounted chrome (Overview and
 // Selected Item), e.g. hide while docked in a station scene. The host's
 // rule composes with the player's own close (ToggleCore): the docked
@@ -714,13 +797,33 @@ func (k *Kit) applyCore() {
 	}
 }
 
-// MenuInput polls the host's pointer and Esc key for the context menu.
-// It must run BEFORE scene and key handling (Game.Update calls it first):
-// it returns whether a menu owned this frame's input, which the host
-// latches to gate world input and its own key switches. Kit.Update polls
-// the same seam afterwards, so a host that never calls it still gets
-// dismissal — just a frame later and without the same-frame gate.
-func (k *Kit) MenuInput() bool { return k.svc.menu.Poll() }
+// MenuInput polls the host's pointer and Esc key for the context menu and,
+// if it is up, the quantity picker. It must run BEFORE scene and key
+// handling (Game.Update calls it first): it returns whether one of them
+// owned this frame's input, which the host latches to gate world input and
+// its own key switches. Kit.Update polls the same seam afterwards, so a
+// host that never calls it still gets dismissal — just a frame later and
+// without the same-frame gate.
+func (k *Kit) MenuInput() bool {
+	if k.svc.menu.Poll() {
+		return true
+	}
+	return k.pickPoll()
+}
+
+// pickPoll runs the quantity picker's modal frame: Esc cancels it — before
+// any window close or the Esc menu, because this runs first and latches the
+// host's gate — and while it is up the picker owns the frame (its modal
+// layer owns the clicks; the keys go to the picker).
+func (k *Kit) pickPoll() bool {
+	if k.qtyWin == nil || !k.qtyWin.IsOpen() {
+		return false
+	}
+	if qtyEsc() {
+		k.CloseQty()
+	}
+	return true
+}
 
 // MenuRect exposes the active popup rect (zero when closed) for the
 // host's world-input gate.

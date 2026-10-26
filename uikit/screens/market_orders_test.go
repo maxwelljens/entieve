@@ -61,14 +61,15 @@ func TestMarketStandingOrderPanel(t *testing.T) {
 		t.Fatalf("cancel emitted %#v, want CancelOrder{ID:7}", rec.got)
 	}
 
-	// The book row declares the two order-window launch verbs: Sell on
-	// Market carries the player's holdings as the window's sell default,
+	// The book row declares the two trade verbs (both opening the quantity
+	// picker on the row's item) and the two order-window launch verbs: Sell
+	// on Market carries the player's holdings as the window's sell default,
 	// Request on Market defaults to 1. Pressing each through a real Menu
-	// routes OpenOrder into the sink.
+	// routes its intent into the sink.
 	spec := m.tbl.Rows[0].Spec
 	wantActions := []widgets.RowAction{
-		{Label: "Buy", Intent: widgets.Buy{Item: "item-stub-ore", Qty: 1}},
-		{Label: "Sell", Intent: widgets.Sell{Item: "item-stub-ore", Qty: 1}},
+		{Label: "Buy", Intent: widgets.QtyPick{Mode: widgets.QtyBuy, Item: "item-stub-ore"}},
+		{Label: "Sell", Intent: widgets.QtyPick{Mode: widgets.QtySell, Item: "item-stub-ore"}},
 		{Label: "Sell on Market", Intent: widgets.OpenOrder{Item: "item-stub-ore", Side: sim.OrderSell, Qty: 5}},
 		{Label: "Request on Market", Intent: widgets.OpenOrder{Item: "item-stub-ore", Side: sim.OrderBuy, Qty: 1}},
 	}

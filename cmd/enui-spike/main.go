@@ -50,6 +50,7 @@ type spike struct {
 	sim   *sim.Sim
 	ren   *render.Renderer
 	kit   *screens.Kit
+	env   screens.Session // the session the station panels are built from
 	zoom  float64
 	accel int
 	acc   float64 // fixed-timestep accumulator (seconds)
@@ -90,6 +91,7 @@ func main() {
 		sim:       s,
 		ren:       render.New(c),
 		kit:       kit,
+		env:       env,
 		zoom:      zoomStart,
 		market:    screens.NewMarket(env),
 		inventory: screens.NewInventory(env),
@@ -98,6 +100,9 @@ func main() {
 	g.mkRemove = kit.AddWindow(g.market.Win())
 	g.invRemove = kit.AddWindow(g.inventory.Win())
 	g.fitRemove = kit.AddWindow(g.fitting.Win())
+	// The session's quantity picker: mounted here (hidden) because this
+	// host builds its panels from a bare session, which only shows it.
+	kit.AddWindow(env.QtyWindow().Win())
 	g.mkShown, g.invShown, g.fitShown = true, true, true
 
 	ebiten.SetWindowTitle(titleBase)
@@ -149,6 +154,7 @@ func (g *spike) Update() error {
 	g.market.Sync()
 	g.inventory.Sync()
 	g.fitting.Sync()
+	g.env.QtyWindow().Sync()
 	if err := g.kit.Update(); err != nil {
 		return err
 	}

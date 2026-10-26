@@ -81,14 +81,16 @@ func recipeRowFor(f *Manufacturing, product content.ItemID) int {
 }
 
 // TestManufacturingPanelGatingAndEnqueue walks the panel like the market tests
-// walk theirs: rows from the sim, visible-but-grayed Start while undocked
-// / unstocked / over the slot cap, the stepper's have/need readout, and
-// the two enqueued commands.
+// walk theirs: rows from the sim, one run's have/need readout on the board,
+// the selection gesture opening the quantity picker whose Confirm is gated
+// by the sim's own start gate (undocked / unstocked / over the slot cap),
+// and the two enqueued commands.
 func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 	env, cmds := factoryEnv(t)
 	f := NewManufacturing(env)
-	ui := newWindowUI(t, env, f.Win())
-	frame := func() { uitest.PumpWindow(t, ui, f.Sync, 1024, 700) }
+	ui := newQtyUI(t, env, f.Win())
+	q := env.QtyWindow()
+	frame := func() { pumpQty(t, ui, env, f.Sync, 1024, 700) }
 	frame()
 	frame()
 
@@ -115,7 +117,8 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 			t.Errorf("row %d time = %q, want a per-run figure", i, r.Cells[2])
 		}
 	}
-	// The charge row's inputs read have/need at the stepper quantity.
+	// The charge row's inputs read have/need for one run (the run count is
+	// the picker's business).
 	chargeRow := recipeRowFor(f, "ammo-emp-s")
 	if chargeRow < 0 {
 		t.Fatal("no ammo-emp-s recipe row")
@@ -124,18 +127,23 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 		t.Errorf("inputs cell = %q, want the have/need readout", f.recipes.Rows[chargeRow].Cells[4])
 	}
 
-	// Undocked: Start is visible but grayed, and a direct press enqueues
-	// nothing (the market buttons' rule).
-	if !f.start.GetWidget().Disabled {
-		t.Fatal("Start enabled while undocked")
+	// Undocked: the row's Start verb is grayed and the selection gesture
+	// opens nothing (no industry service).
+	if act := f.recipes.Rows[chargeRow].Spec.Actions[0]; !act.Disabled {
+		t.Fatal("Start verb enabled while undocked")
 	}
-	f.startClicked()
+	clickRow(ui, f.recipes, chargeRow)
+	frame()
+	if q.IsOpen() {
+		t.Fatal("picker opened away from an industry station")
+	}
 	if len(*cmds) != 0 {
 		t.Fatalf("undocked start enqueued %d commands, want 0", len(*cmds))
 	}
 
-	// Docked at the (patched) industry station: still grayed — no
-	// materials — but the craft line and slot readout light up.
+	// Docked at the (patched) industry station: the craft line and slot
+	// readout light up; the picker opens on the recipe but Confirm stays
+	// grayed — no materials yet.
 	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: factoryStation})
 	frame()
 	if !strings.Contains(f.craftLbl.Label, "charges L1") ||
@@ -145,11 +153,20 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 	if f.jobsLbl.Label != "Jobs — 0/3 slots" {
 		t.Errorf("jobs line = %q, want the 0/3 slot readout", f.jobsLbl.Label)
 	}
-	if !f.start.GetWidget().Disabled {
-		t.Fatal("Start enabled with an empty hold")
+	clickRow(ui, f.recipes, chargeRow)
+	frame()
+	if !q.IsOpen() {
+		t.Fatal("selecting a recipe opened no picker")
+	}
+	if got, want := q.TitleText(), env.TradeableName("ammo-emp-s")+" — Start"; got != want {
+		t.Errorf("picker title = %q, want %q", got, want)
+	}
+	if !q.Confirm().GetWidget().Disabled {
+		t.Fatal("Confirm enabled with an empty hold")
 	}
 
-	// Stock the charge recipe and select its row: Start arms.
+	// Stock the charge recipe and pick the row again: Confirm arms and
+	// emits CmdStartJob at the picked runs.
 	rec := env.Content.Recipes["rec-ammo-emp-s"]
 	if rec == nil {
 		t.Fatal("fixture: rec-ammo-emp-s missing")
@@ -166,10 +183,13 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 	if !f.hasSel || f.sel.recipe != rec.ID {
 		t.Fatalf("selection = %+v (hasSel=%v), want the charge recipe", f.sel, f.hasSel)
 	}
-	if f.start.GetWidget().Disabled {
-		t.Fatal("Start still grayed with materials in the hold")
+	if q.Confirm().GetWidget().Disabled {
+		t.Fatal("Confirm still grayed with materials in the hold")
 	}
-	uitest.FireButton(ui, f.start)
+	if got := q.Value(); got != 1 {
+		t.Errorf("picker opens at %d runs, want 1", got)
+	}
+	uitest.FireButton(ui, q.Confirm())
 	if len(*cmds) != 1 {
 		t.Fatalf("start enqueued %d commands, want 1", len(*cmds))
 	}
@@ -178,24 +198,29 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 		t.Fatalf("cmd = %#v, want CmdStartJob{%s 1}", (*cmds)[0], rec.ID)
 	}
 
-	// Stepping to 10 runs re-prices the need: the same cell now quotes the
-	// ten-run commit and Start grays out again (materials for 10 missing).
-	uitest.FireButton(ui, f.stepper.Plus())
+	// Picking 10 runs re-prices the preview and disarms Confirm again: the
+	// hold covers one run, not ten.
+	clickRow(ui, f.recipes, chargeRow)
 	frame()
-	if f.stepper.Value() != 10 {
-		t.Fatalf("qty = %d, want 10", f.stepper.Value())
+	q.Slider().SetValue(10) // the runs the player picks on the slider
+	frame()
+	if got := q.Value(); got != 10 {
+		t.Fatalf("runs = %d, want 10", got)
 	}
-	cell := f.recipes.Rows[chargeRow].Cells[4]
-	if !strings.Contains(cell, "/7,200") {
-		t.Errorf("inputs cell at qty 10 = %q, want /7,200", cell)
+	if got := q.NoteText(); !strings.Contains(got, "/7,200") {
+		t.Errorf("preview inputs at 10 runs = %q, want the ten-run need (/7,200)", got)
 	}
-	if !f.start.GetWidget().Disabled {
-		t.Fatal("Start enabled over the material budget")
+	if got := q.DetailText(); !strings.Contains(got, "10 runs") {
+		t.Errorf("preview at 10 runs = %q, want the ten-run time and fee", got)
 	}
-	f.startClicked()
+	if !q.Confirm().GetWidget().Disabled {
+		t.Fatal("Confirm enabled over the material budget")
+	}
+	uitest.FireButton(ui, q.Confirm())
 	if len(*cmds) != 1 {
-		t.Fatalf("grayed start enqueued a command (%d total)", len(*cmds))
+		t.Fatalf("grayed Confirm enqueued a command (%d total)", len(*cmds))
 	}
+	q.Close()
 
 	// A real job (the agent seam): the job row appears, Collect stays
 	// grayed until the clock runs it down, then it enqueues CmdCollectJob.

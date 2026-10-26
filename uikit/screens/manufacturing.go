@@ -17,11 +17,12 @@ import (
 
 // Manufacturing is the station manufacturing window: the recipe board
 // (product name + icon, family, per-run time at the docked station's
-// current craft level, job fee, inputs with have/need counts) over the
-// quantity stepper and the Start action, plus the GLOBAL job list (every
-// station, grouped by station) with per-job progress and the Collect /
-// Cancel actions — in the market panel's shape (two tables, toolbars,
-// rows wired for Show Info).
+// current craft level, per-run fee, one run's inputs with have/need) over
+// the GLOBAL job list (every station, grouped by station) with per-job
+// progress and the Collect / Cancel actions — in the market panel's shape
+// (two tables, toolbars, rows wired for Show Info). Selecting a recipe
+// opens the quantity picker on its runs (CONTEXT.md "Quantity picker");
+// Confirm emits StartJob.
 //
 // Gating follows the game's menu convention: controls stay VISIBLE and
 // gray out (widget Disabled) when the player is undocked, the station
@@ -42,10 +43,9 @@ type Manufacturing struct {
 
 	craftLbl *widget.Text
 	jobsLbl  *widget.Text
-	stepper  *widgets.QtyStepper
 	title    *theme.ChromeText
 
-	start, collect, cancel *widget.Button
+	collect, cancel *widget.Button
 
 	sel    manufacturingRow
 	hasSel bool
@@ -99,15 +99,20 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	f.jobs.SetSort("Product", true)
 	f.jobs.SetSortFunc(canonicalFirst("Product", jobCols))
 
-	attachSelect := func(t *widgets.Table) {
+	attachSelect := func(t *widgets.Table, recipe bool) {
 		t.OnSelect(func(r widgets.TableRow) {
-			if row, ok := r.Data.(manufacturingRow); ok {
-				f.sel, f.hasSel = row, true
+			row, ok := r.Data.(manufacturingRow)
+			if !ok {
+				return
+			}
+			f.sel, f.hasSel = row, true
+			if recipe {
+				f.openPicker(row)
 			}
 		})
 	}
-	attachSelect(f.recipes)
-	attachSelect(f.jobs)
+	attachSelect(f.recipes, true)
+	attachSelect(f.jobs, false)
 	// Show Info, double-click and the Start/Collect action derive from
 	// the rows' RowSpec (rowSpec), built in Sync — no hand wiring.
 
@@ -117,7 +122,6 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	f.jobsLbl = widget.NewText(
 		widget.TextOpts.Text("Jobs", env.Face(theme.StepTiny), theme.Solid(p.Accent)),
 	)
-	f.stepper = widgets.NewQtyStepper(env, qtySteps[:])
 
 	newBtn := func(label string, clicked func()) *widget.Button {
 		return widget.NewButton(
@@ -129,12 +133,9 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
 		)
 	}
-	f.start = newBtn("Start", f.startClicked)
 	f.collect = newBtn("Collect", f.collectClicked)
 	f.cancel = newBtn("Cancel", f.cancelClicked)
 
-	startBar := f.stepper.Row()
-	startBar.AddChild(f.start)
 	collectBar := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
@@ -143,12 +144,12 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	)
 	collectBar.AddChild(f.collect, f.cancel)
 
-	// Body: the craft readout over two panes — the recipe board with its
-	// Start toolbar, the job list with Collect/Cancel — split by a
-	// draggable seam (equal halves by default; a drag persists in the
-	// layout sidecar).
+	// Body: the craft readout over two panes — the recipe board (its rows
+	// open the quantity picker, so it needs no toolbar), the job list with
+	// Collect/Cancel — split by a draggable seam (equal halves by default;
+	// a drag persists in the layout sidecar).
 	f.split = widgets.NewSplitPane(env,
-		paneStack([]bool{true, false}, f.recipes.Container(), startBar),
+		paneStack([]bool{true}, f.recipes.Container()),
 		paneStack([]bool{false, true, false}, f.jobsLbl, f.jobs.Container(), collectBar),
 	)
 	body := widget.NewContainer(
@@ -172,8 +173,8 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	f.win = widget.NewWindow(
 		widget.WindowOpts.Contents(newHeaderBand(body, panel, render.ManufacturingHeader)),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
-		// Content floor: the craft line, a few rows of each table and
-		// both toolbars.
+		// Content floor: the craft line, a few rows of each table and the
+		// job toolbar.
 		widget.WindowOpts.MinSize(theme.Px(420), theme.Px(440)),
 		// Construction landing rect: the game centers the window on first
 		// open (placeDefaults, AnchorCenter).
@@ -234,7 +235,10 @@ func (f *Manufacturing) Sync() {
 	f.split.Poll()
 	s := f.cv
 	station := s.DockedIndustry()
-	runs := f.stepper.Value()
+	// The board quotes one run: the chosen run count lives in the quantity
+	// picker (its preview re-prices at the picked value), so the columns stay
+	// a stable per-run reference.
+	runs := 1
 
 	// Recipe board: the content's canonical order, one row per recipe.
 	recRows := make([]widgets.TableRow, 0, len(f.cv.Defs().Recipes))
@@ -247,7 +251,7 @@ func (f *Manufacturing) Sync() {
 				rec.Family,
 				theme.GroupFloat(s.JobDuration(station, rec.ID, 1), 1) + " s",
 				theme.FormatCredits(s.JobFee(rec.ID, runs)),
-				f.inputsCell(mats),
+				inputsText(f.cv, mats),
 			},
 			Icons: []string{productIcon(f.cv, rec.Product), "", "", "", ""},
 			Data:  row,
@@ -322,7 +326,6 @@ func (f *Manufacturing) Sync() {
 	slotsUsed := len(all)
 	f.jobsLbl.Label = "Jobs — " + theme.FormatInt(int64(slotsUsed)) + "/" + theme.FormatInt(int64(slots)) + " slots"
 
-	f.start.GetWidget().Disabled = !f.startReadyFor(f.sel)
 	f.collect.GetWidget().Disabled = !f.collectReadyFor(f.sel)
 	f.cancel.GetWidget().Disabled = !f.cancelReadyFor(f.sel)
 
@@ -340,9 +343,10 @@ func (f *Manufacturing) Sync() {
 	f.title.Label = "Manufacturing — " + slotsLbl
 }
 
-// inputsCell renders the have/need line of a job's materials: one
+// inputsText renders the have/need line of a job's materials: one
 // "Name have/need" pair per input, joined by the table's ellipsis rules.
-func (f *Manufacturing) inputsCell(mats []content.CargoStack) string {
+// The board and the picker's preview share it.
+func inputsText(cv widgets.ContentView, mats []content.CargoStack) string {
 	if len(mats) == 0 {
 		return "—"
 	}
@@ -352,10 +356,10 @@ func (f *Manufacturing) inputsCell(mats []content.CargoStack) string {
 			out += " · "
 		}
 		name := string(m.Item)
-		if def, ok := f.cv.Defs().Item(m.Item); ok {
+		if def, ok := cv.Defs().Item(m.Item); ok {
 			name = def.Name
 		}
-		out += name + " " + theme.FormatInt(int64(f.cv.PlayerStock(m.Item))) +
+		out += name + " " + theme.FormatInt(int64(cv.PlayerStock(m.Item))) +
 			"/" + theme.FormatInt(int64(m.Qty))
 	}
 	return out
@@ -420,13 +424,13 @@ func productIcon(cv widgets.ContentView, product content.ItemID) string {
 }
 
 // startReadyFor is the Start gate for one recipe row: the sim would accept
-// it right now at the stepper quantity (CanStartJob covers the industry
-// service, the slots and the materials).
+// it right now at one run (CanStartJob covers the industry service, the
+// slots and the materials) — the picker re-checks its own run count.
 func (f *Manufacturing) startReadyFor(row manufacturingRow) bool {
 	if row.recipe == "" {
 		return false
 	}
-	return f.cv.CanStartJob(f.cv.DockedIndustry(), row.recipe, f.stepper.Value())
+	return f.cv.CanStartJob(f.cv.DockedIndustry(), row.recipe, 1)
 }
 
 // collectReadyFor is the Collect gate for one job row: the docked
@@ -469,12 +473,13 @@ func (f *Manufacturing) rowSpec(row manufacturingRow) widgets.RowSpec {
 
 // rowActions is a row's context-menu action entry (Start for a recipe,
 // Collect for a done job, Cancel for a running one) with the same gate as
-// the toolbar button.
+// the selection path: Start opens the quantity picker, never a fixed run
+// count.
 func (f *Manufacturing) rowActions(row manufacturingRow) []widgets.RowAction {
 	switch {
 	case row.recipe != "":
 		return []widgets.RowAction{{Label: "Start", Disabled: !f.startReadyFor(row),
-			Intent: widgets.StartJob{Recipe: row.recipe, Runs: f.stepper.Value()}}}
+			Intent: widgets.QtyPick{Mode: widgets.QtyStart, Item: f.recipeProduct(row.recipe), Recipe: row.recipe}}}
 	case row.job != 0:
 		if f.collectReadyFor(row) {
 			return []widgets.RowAction{{Label: "Collect",
@@ -486,16 +491,22 @@ func (f *Manufacturing) rowActions(row manufacturingRow) []widgets.RowAction {
 	return []widgets.RowAction{{Label: "Start", Disabled: true}}
 }
 
-// startClicked emits StartJob for the selected recipe and quantity.
-func (f *Manufacturing) startClicked() { f.startWith(f.sel) }
+// recipeProduct is a recipe's product id ("" when the recipe no longer
+// loads) — the picker's title and item line.
+func (f *Manufacturing) recipeProduct(rec content.RecipeID) content.ItemID {
+	if def, ok := f.cv.Defs().Recipes[rec]; ok {
+		return def.Product
+	}
+	return ""
+}
 
-// startWith emits StartJob for one recipe row (gated even when called
-// directly, the market buttons' rule).
-func (f *Manufacturing) startWith(row manufacturingRow) {
-	if !f.startReadyFor(row) {
+// openPicker opens the quantity picker on a recipe's runs — the selection
+// gesture. Nothing opens away from an industry station.
+func (f *Manufacturing) openPicker(row manufacturingRow) {
+	if row.recipe == "" || f.cv.DockedIndustry() == "" {
 		return
 	}
-	f.as.Do(widgets.StartJob{Recipe: row.recipe, Runs: f.stepper.Value()})
+	f.as.Do(widgets.QtyPick{Mode: widgets.QtyStart, Item: f.recipeProduct(row.recipe), Recipe: row.recipe})
 }
 
 // collectClicked emits CollectJob for the selected job.

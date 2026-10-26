@@ -172,10 +172,11 @@ type Game struct {
 	pendingTitleEnter bool
 	pendingTitleLoad  string
 
-	// menuModal latches the frame's context-menu state: Game.Update
-	// samples it (Kit.MenuInput) before any scene or key handling, so a
-	// menu that is up — or that consumed this frame's click/Esc — gates
-	// world input (overUI) and the key switches for the whole frame.
+	// menuModal latches the frame's popup state (the context menu and the
+	// quantity picker): Game.Update samples it (Kit.MenuInput) before any
+	// scene or key handling, so a popup that is up — or that consumed this
+	// frame's click/Esc — gates world input (overUI) and the key switches
+	// for the whole frame.
 	menuModal bool
 
 	scenes []Scene
@@ -650,11 +651,13 @@ func (g *Game) overUI(x, y float64) bool {
 		return true
 	}
 	pt := image.Point{X: int(x), Y: int(y)}
-	// The context menu gates in two deterministic parts: its popup rect,
-	// which uikit exposes (an ebitenui-drawn popup would be invisible to
-	// this rect test), and the frame latch — a menu that was up when the
-	// frame's input was sampled owns every gesture on it, so the click
-	// that dismisses the popup cannot also act in the world.
+	// The popups gate in two deterministic parts: the context menu's popup
+	// rect — uikit exposes it because an ebitenui-drawn popup would be
+	// invisible to this rect test — and the frame latch, which is the
+	// quantity picker's only gate (its window is in the kit's stack, so
+	// kit.Over covers the rect below): a popup that was up when the frame's
+	// input was sampled owns every gesture on it, so a click outside it
+	// never reaches the world.
 	if r, open := g.kit.MenuRect(); open && pt.In(r) {
 		return true
 	}

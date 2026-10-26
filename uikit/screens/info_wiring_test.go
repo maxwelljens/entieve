@@ -13,15 +13,16 @@ import (
 
 // TestMarketRowMenu: a market row's RowSpec declares Show Info plus the
 // row-targeted Buy/Sell (grayed while undocked, armed once docked), and
-// right-clicking opens exactly that menu — pressing Buy enqueues CmdBuy
-// for the clicked row at the stepper quantity — and a double-click opens
-// Show Info on the row's item (right-click itself moves no selection: the
-// actions carry the row's payload).
+// right-clicking opens exactly that menu — pressing Buy opens the quantity
+// picker on the clicked row and its Confirm enqueues CmdBuy for it — and a
+// double-click opens Show Info on the row's item (right-click itself moves
+// no selection: the actions carry the row's payload).
 func TestMarketRowMenu(t *testing.T) {
 	env, cmds := newTestEnv(t)
 	m := NewMarket(env)
-	ui := newWindowUI(t, env, m.Win())
-	frame := func() { uitest.PumpWindow(t, ui, m.Sync, 1024, 700) }
+	ui := newQtyUI(t, env, m.Win())
+	q := env.QtyWindow()
+	frame := func() { pumpQty(t, ui, env, m.Sync, 1024, 700) }
 	frame()
 	frame()
 	if len(m.tbl.Rows) == 0 {
@@ -42,8 +43,8 @@ func TestMarketRowMenu(t *testing.T) {
 		}
 	}
 	clickMenuEntry(t, env, "Buy") // disabled: closes, enqueues nothing
-	if len(*cmds) != 0 {
-		t.Fatalf("undocked menu Buy enqueued %d commands, want 0", len(*cmds))
+	if len(*cmds) != 0 || q.IsOpen() {
+		t.Fatalf("undocked menu Buy enqueued %d commands / opened the picker, want neither", len(*cmds))
 	}
 
 	// The declared data behind that menu: the row's RowSpec carries
@@ -55,20 +56,23 @@ func TestMarketRowMenu(t *testing.T) {
 		t.Fatalf("row Ref = %v (%v), want the row item's ref for %s", spec.Ref, ok, wantItem)
 	}
 	wantLabels := []string{"Buy", "Sell", "Sell on Market", "Request on Market"}
+	wantIntents := []widgets.Intent{
+		widgets.QtyPick{Mode: widgets.QtyBuy, Item: wantItem},
+		widgets.QtyPick{Mode: widgets.QtySell, Item: wantItem},
+		widgets.OpenOrder{Item: wantItem, Side: sim.OrderSell, Qty: env.Sim.PlayerStock(wantItem)},
+		widgets.OpenOrder{Item: wantItem, Side: sim.OrderBuy, Qty: 1},
+	}
 	if len(spec.Actions) != len(wantLabels) {
 		t.Fatalf("row actions = %+v, want %v", spec.Actions, wantLabels)
 	}
 	for i, want := range wantLabels {
-		if got := spec.Actions[i]; got.Label != want || !got.Disabled {
+		got := spec.Actions[i]
+		if got.Label != want || !got.Disabled {
 			t.Errorf("action %d = %+v, want %s grayed while undocked", i, got, want)
 		}
-	}
-	// The two launches carry the row item and the right side.
-	if a := spec.Actions[2]; a.Intent != (widgets.OpenOrder{Item: wantItem, Side: sim.OrderSell, Qty: env.Sim.PlayerStock(wantItem)}) {
-		t.Errorf("Sell on Market intent = %#v, want OpenOrder{sell %s}", a.Intent, wantItem)
-	}
-	if a := spec.Actions[3]; a.Intent != (widgets.OpenOrder{Item: wantItem, Side: sim.OrderBuy, Qty: 1}) {
-		t.Errorf("Request on Market intent = %#v, want OpenOrder{buy %s qty 1}", a.Intent, wantItem)
+		if got.Intent != wantIntents[i] {
+			t.Errorf("action %d (%s) intent = %#v, want %#v", i, want, got.Intent, wantIntents[i])
+		}
 	}
 
 	// Docked: the same menu, now armed — data and entries agree.
@@ -90,8 +94,18 @@ func TestMarketRowMenu(t *testing.T) {
 	if env.Menu().IsOpen() {
 		t.Fatal("menu did not close after Buy")
 	}
+	frame()
+	if !q.IsOpen() {
+		t.Fatal("the row menu's Buy opened no picker")
+	}
+	if got := q.Value(); got != 1 {
+		t.Errorf("picker opened at %d, want 1", got)
+	}
+	uitest.FireButton(ui, q.Confirm())
 	rightClickRow(t, ui, m.tbl, 0)
 	pressMenuEntry(t, env, "Sell")
+	frame()
+	uitest.FireButton(ui, q.Confirm())
 
 	if len(*cmds) != 2 {
 		t.Fatalf("menu trade enqueued %d commands, want 2", len(*cmds))
