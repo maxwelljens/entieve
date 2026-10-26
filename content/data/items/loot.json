@@ -30,7 +30,7 @@
     "id": "loot-hierarch-crest",
     "group": "Loot",
     "name": "Hierarch's Crest",
-    "description": "Salvage from a Pustheim hierarch: a polished identification crest worth a fortune.",
+    "description": "Salvage from a Pušťov hierarch: a polished identification crest worth a fortune.",
     "category": "loot",
     "volume": 0.5,
     "base_price": 450000

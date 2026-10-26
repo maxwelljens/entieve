@@ -374,8 +374,8 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 		t.Errorf("USED IN ref = %v, want item/ammo-emp-s", emp.Ref)
 	}
 	// The hull recipe consuming the same mineral is listed too (the
-	// shipped barge hull is named Havřek).
-	if r := rowIn(t, ui, "Havřek"); r.Ref == nil || *r.Ref != widgets.ShipRef("ship-barge") {
+	// shipped barge hull is named Hušnek).
+	if r := rowIn(t, ui, "Hušnek"); r.Ref == nil || *r.Ref != widgets.ShipRef("ship-barge") {
 		t.Errorf("USED IN hull row = %+v, want a ship-barge link", r)
 	}
 
@@ -564,7 +564,7 @@ func TestManufacturingAllStationJobs(t *testing.T) {
 	frame := func() { uitest.PumpWindow(t, ui, f.Sync, 1024, 700) }
 	frame()
 
-	// Stock and start a job at ANOTHER industry station (Hutov).
+	// Stock and start a job at ANOTHER industry station (Hovžan).
 	rec := env.Content.Recipes["rec-ammo-emp-s"]
 	for _, m := range env.Sim.JobMaterials("cel-huta", rec.ID, 1) {
 		giveItem(env.Sim, m.Item, m.Qty)

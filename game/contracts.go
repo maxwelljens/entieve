@@ -427,7 +427,7 @@ func (g *Game) objectiveRef(id content.ContractID) (widgets.InfoRef, bool) {
 }
 
 // objectiveSummary renders the contract's kind + objective, e.g.
-// "Destroy 1× Scuttler", "Deliver 2 m³ 40mm ion to Havstov",
+// "Destroy 1× Scuttler", "Deliver 2 m³ 40mm ion to Hauvnok",
 // "Mine 400 m³ Kerngrit Ore".
 func objectiveSummary(cv widgets.ContentView, def *content.ContractDef) string {
 	c := cv.Defs()

@@ -1,9 +1,9 @@
 {
   "id": "sys-penumbra",
-  "name": "Kuźbor",
+  "name": "Kvonice",
   "security": "low",
-  "constellation": "Kresy",
-  "region": "Far Moravia",
+  "constellation": "the Wild Fields",
+  "region": "the Wild Fields",
   "position": {
     "X": 6.2,
     "Y": -1.8
@@ -17,7 +17,7 @@
   "celestials": [
     {
       "id": "cel-penumbra-star",
-      "name": "Kuźbor",
+      "name": "Kvonice",
       "kind": "star",
       "position": {
         "X": 0,
@@ -64,7 +64,7 @@
     },
     {
       "id": "cel-penumbra-den",
-      "name": "Gniazvor",
+      "name": "Gnazvor",
       "kind": "anomaly",
       "position": {
         "X": 814255444390,
@@ -92,7 +92,7 @@
     },
     {
       "id": "cel-gate-solace",
-      "name": "Gate (Sterhov)",
+      "name": "Gate (Struvok)",
       "kind": "gate",
       "position": {
         "X": -3110398816844,
@@ -109,7 +109,7 @@
     },
     {
       "id": "cel-gate-gloam",
-      "name": "Gate (Pustheim)",
+      "name": "Gate (Pušťov)",
       "kind": "gate",
       "position": {
         "X": 3316068789411,
@@ -126,7 +126,7 @@
     },
     {
       "id": "cel-penumbra-port",
-      "name": "Havstov",
+      "name": "Hauvnok",
       "kind": "station",
       "position": {
         "X": 882221736153,
@@ -169,7 +169,7 @@
     },
     {
       "id": "cel-gate-mlynow",
-      "name": "Gate (Młyndal)",
+      "name": "Gate (Młondan)",
       "kind": "gate",
       "position": {
         "X": -3327077444731,
@@ -186,7 +186,7 @@
     },
     {
       "id": "cel-gate-kamieniec",
-      "name": "Gate (Kamenvik)",
+      "name": "Gate (Kamžal)",
       "kind": "gate",
       "position": {
         "X": 1807211319445,

@@ -18,13 +18,13 @@ func TestFoldString(t *testing.T) {
 		want string
 		orig []int
 	}{
-		{"Zakłady", "Zaklady", []int{0, 1, 2, 3, 5, 6, 7}},
-		{"Havřek", "Havrek", []int{0, 1, 2, 3, 5, 6}},
-		{"Młyndal", "Mlyndal", []int{0, 1, 3, 4, 5, 6, 7}},
-		{"Kuźbor", "Kuzbor", []int{0, 1, 2, 4, 5, 6}},
-		{"Głusholm", "Glusholm", []int{0, 1, 3, 4, 5, 6, 7, 8}},
+		{"Bríždan", "Brizdan", []int{0, 1, 2, 4, 6, 7, 8}},
+		{"Hušnek", "Husnek", []int{0, 1, 2, 4, 5, 6}},
+		{"Młondan", "Mlondan", []int{0, 1, 3, 4, 5, 6, 7}},
+		{"Pušťov", "Pustov", []int{0, 1, 2, 4, 6, 7}},
+		{"Glůšan", "Glusan", []int{0, 1, 2, 4, 6, 7}},
 		{"ŠŤŮ", "STU", []int{0, 2, 4}},
-		{"Družin", "Druzin", []int{0, 1, 2, 3, 5, 6}},
+		{"Kumbřan", "Kumbran", []int{0, 1, 2, 3, 4, 6, 7}},
 		{"Shield Booster", "Shield Booster", nil},
 		{"40mm ion", "40mm ion", nil},
 		{"é", "é", nil}, // outside the canon set: untouched
@@ -45,12 +45,12 @@ func TestFoldString(t *testing.T) {
 // rune starts, and the highlight consumer then tints the whole accented
 // letter — an offset can never land mid-rune.
 func TestFoldMatchRemapsToRuneStarts(t *testing.T) {
-	name := "Havřek"
+	name := "Kumbřan"
 	folded, mp := foldString(name)
 
-	matches := fuzzy.Find("rek", []string{folded})
+	matches := fuzzy.Find("ran", []string{folded})
 	if len(matches) != 1 {
-		t.Fatalf("fixture: %d matches for \"rek\" in %q", len(matches), folded)
+		t.Fatalf("fixture: %d matches for \"ran\" in %q", len(matches), folded)
 	}
 	var match []int
 	for _, i := range matches[0].MatchedIndexes {
@@ -58,8 +58,8 @@ func TestFoldMatchRemapsToRuneStarts(t *testing.T) {
 			match = append(match, mp[i])
 		}
 	}
-	// Folded r sits at byte 3, which is the rune start of ř in the name.
-	if want := []int{3, 5, 6}; !reflect.DeepEqual(match, want) {
+	// Folded r sits at byte 4, which is the rune start of ř in the name.
+	if want := []int{4, 6, 7}; !reflect.DeepEqual(match, want) {
 		t.Fatalf("remapped indexes = %v, want %v (rune starts)", match, want)
 	}
 
@@ -72,7 +72,7 @@ func TestFoldMatchRemapsToRuneStarts(t *testing.T) {
 			hits = append(hits, s.Text)
 		}
 	}
-	if !reflect.DeepEqual(hits, []string{"řek"}) {
-		t.Errorf("accent runs = %q, want the whole letter in one run (\"řek\")", hits)
+	if !reflect.DeepEqual(hits, []string{"řan"}) {
+		t.Errorf("accent runs = %q, want the whole letter in one run (\"řan\")", hits)
 	}
 }

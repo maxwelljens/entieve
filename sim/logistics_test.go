@@ -620,7 +620,7 @@ func sortedTrafficSystems(c *content.Content) []content.SystemID {
 }
 
 // TestLogisticsNextHopRouting pins the gate-path walk over the shipped
-// Kresy ring: the first hop of every cross-system leg (shortest path,
+// the Wild Fields ring: the first hop of every cross-system leg (shortest path,
 // ties broken on celestial definition order — deterministic).
 func TestLogisticsNextHopRouting(t *testing.T) {
 	c, err := content.Load(content.FS())
@@ -656,7 +656,7 @@ func TestLogisticsNextHopRouting(t *testing.T) {
 
 // ringContent extends the cross fixture with a THIRD system hanging off
 // sys-b, so a route from sys-a must hop twice (a → b → c) — the shape of
-// the shipped ring lanes (e.g. Młyndal → Kamenvik via Kuźbor).
+// the shipped ring lanes (e.g. Młondan → Kamžal via Kvonice).
 func ringContent() *content.Content {
 	c := crossContent()
 	sysB := c.Systems["sys-b"]
@@ -773,7 +773,7 @@ func TestLogisticsMultiHopJourney(t *testing.T) {
 }
 
 // TestLogisticsRingTwinRuns is the determinism gate for the SHIPPED ring
-// lanes: two sims activate Kamenvik (three new cross-system routes,
+// lanes: two sims activate Kamžal (three new cross-system routes,
 // spawn-time stock sourcing, gate hops parking journeys, low-sec ambush
 // rolls) and stay in lockstep — hashes at checkpoints and event sequences —
 // with the new lanes observably active.
@@ -827,7 +827,7 @@ func TestLogisticsRingTwinRuns(t *testing.T) {
 			t.Fatalf("event %d differs:\n%+v\n%+v", i, a, b)
 		}
 	}
-	// The new lanes are observably active: departures from Kamenvik and
+	// The new lanes are observably active: departures from Kamžal and
 	// at least one gate hop (the shipment parked for its neighbour).
 	departed, hops := 0, 0
 	for i := range evA {

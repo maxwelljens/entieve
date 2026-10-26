@@ -13,21 +13,26 @@ entities here in the same format before their content lands.
 
 | Layer | Rule | Origin tags |
 |---|---|---|
-| Places | Slavic/Nordic blend, time-drifted | `place`, `Nordic` |
-| Institutions / corporations | fossilized Latinate register; one heritage form-word allowed | `Latinate` |
-| Ship hulls | drifted heritage trade nouns, **one origin per hull** | `Moravian`, `Polish`, `Nordic`, `Latinate` |
+| Places | Slavic/Nordic blend, time-drifted to the second depth — roots weathered past recognition | `place`, `Nordic` |
+| Institutions / corporations | weathered root, optionally + an English form-word; Latinate houses keep the classical shape, never the Latin word | `Latinate` |
+| Ship hulls | drifted heritage trade nouns, **one origin per hull**, live stem erased | `Moravian`, `Polish`, `Nordic`, `Latinate` |
 | Machine names | caste names are canon: Scuttler, Marauder, Hierarch | `Old Works` |
 | Products (modules, charges, minerals, ores, loot) | plain trade nouns of the lingua franca, mechanics-aligned | `trade` |
 
 - Retired names that must not survive in display text: **Solace, Penumbra,
   Gloam, Haven Rest, Thevek Reach, Loomfall, Loomfall Security, Mire
-  Corsairs, Gloam Hierarchy**, plus every name the time-depth drift retired
+  Corsairs, Gloam Hierarchy**; everything the first drift retired
   (**Starogród, Rudnik, Kuźnica, Młynów, Kamieniec, Pustkowie, Głusza,
   Jernborg, Przystań, Gniazdo, Halda, Huta, Doki, Kantor, Väktare, Kosa,
   Havíř, Furman, Tabor, Custos, Borealis, Nordvakt, Iskald, Družstvo,
-  Celeritas**) and their fragments. A retired name is matched whole-word:
-  several current names carry one as a prefix (Kosar/Kosa,
-  Malmhalda/Halda, Taborek/Tabor, Nordvakten/Nordvakt).
+  Celeritas**); and everything the second depth retired (**Sterhov, Rudnek,
+  Kuźbor, Młyndal, Kamenvik, Pustheim, Głusholm, Jernvold, Havstov,
+  Gniazvor, Malmhalda, Hutov, Dokhavn, Kantov, Vaktr, Kosar, Havřek, Furmek,
+  Taborek, Custor, Boreall, Nordvakten, Iskeld, Kombinat Ferrum, Družin,
+  Zakłady Burza, Celerita, Praetor, Aldemar Group, Far Moravia, Kresy**) —
+  names and fragments alike. A retired name is matched whole-word: retired
+  forms have lived on as prefixes (Kosar/Kosa, Malmhalda/Halda,
+  Taborek/Tabor).
 - Authentic diacritics are correct, not risky: the game font (IBM Plex Sans)
   renders all Polish/Czech diacritics plus `€` and `¢`. Keep names sayable
   for English readers; note the lexical root in `notes`.
@@ -47,51 +52,51 @@ non-dictionary blend (see [Time-depth drift](#time-depth-drift)).
 
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
-| `sys-solace` | Starogród | **Sterhov** | place | *stary* "old" + *gród* "fortified town" → *Sterhov* "old town"; first-wave heartland, Charter space |
-| `sys-penumbra` | Kuźnica | **Kuźbor** | place | *kuźnia* "forge" + *-bor* → "forge + fort"; the Fringe junction |
-| `sys-gloam` | Pustkowie | **Pustheim** | place | *pustka* "waste, void" + Norse *-heim* "home" → "wasteland + home", ironic on purpose; Unincorporated dead-end |
-| `sys-rudnik` | Rudnik | **Rudnek** | place | *ruda* "ore" → "ore-works"; the Charter-space anchor of the ring |
-| `sys-mlynow` | Młynów | **Młyndal** | place | *młyn* "mill" + Norse *-dal* "valley" → "mill + valley"; the Fringe |
-| `sys-kamieniec` | Kamieniec | **Kamenvik** | place | *kamień* "stone" + Norse *-vik* "bay" → "stone + bay"; the Fringe |
-| `sys-glusza` | Głusza | **Głusholm** | place | *głusza* "remote wilderness, the hush" + Norse *-holm* "islet" → "hush + islet"; Unincorporated |
+| `sys-solace` | Sterhov | **Struvok** | place | old town, weathered past *stary*/*gród* — no live stem survives; first-wave heartland, Charter space |
+| `sys-penumbra` | Kuźbor | **Kvonice** | place | forge + fort, weathered past *kuźnia*; the Fringe junction |
+| `sys-gloam` | Pustheim | **Pušťov** | place | wasteland + home, weathered past *pustka* (ironic on purpose); Unincorporated dead-end |
+| `sys-rudnik` | Rudnek | **Rydnok** | place | ore-works, weathered past *ruda*; the Charter-space anchor of the ring |
+| `sys-mlynow` | Młyndal | **Młondan** | place | mill + valley, weathered past *młyn*/*dal*; the Fringe |
+| `sys-kamieniec` | Kamenvik | **Kamžal** | place | stone + bay, weathered past *kamień*/*vik*; the Fringe |
+| `sys-glusza` | Głusholm | **Glůšan** | place | hush + islet, weathered past *głusza*/*holm*; Unincorporated |
 
 ### Celestials
 
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
-| `cel-solace-star` | Starogród | Sterhov | place | star carries its system's name (existing convention) |
-| `cel-solace-prime` | Starogród Prime | Sterhov Prime | place | "<system> Prime" convention |
+| `cel-solace-star` | Sterhov | **Struvok** | place | star carries its system's name (existing convention) |
+| `cel-solace-prime` | Sterhov Prime | **Struvok Prime** | place | "<system> Prime" convention |
 | `cel-solace-belt` | Solace Belt | Asteroid Belt I | place | "Asteroid Belt <Roman numeral>" convention: numbered per system in celestial order (first belt = I) |
-| `cel-haven-rest` | Jernborg | **Jernvold** | Nordic | Norse *jern* "iron" + *-vold* "rule, keep"; oldest town, Nordic trace |
-| `cel-gate-penumbra` | Penumbra Gate | Gate (Kuźbor) | place | "Gate (<destination display name>)" convention; four instances share this id (`sys-solace`, `sys-gloam`, `sys-mlynow`, `sys-kamieniec`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory) |
-| `cel-penumbra-star` | Kuźnica | Kuźbor | place | |
+| `cel-haven-rest` | Jernvold | **Jalvrek** | Nordic | iron + rule/keep, weathered past *jern*/*vold*; oldest town, Nordic trace |
+| `cel-gate-penumbra` | Gate (Kuźbor) | Gate (Kvonice) | place | "Gate (<destination display name>)" convention; four instances share this id (`sys-solace`, `sys-gloam`, `sys-mlynow`, `sys-kamieniec`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory) |
+| `cel-penumbra-star` | Kuźbor | **Kvonice** | place | |
 | `cel-penumbra-belt` | Penumbra Belt | Asteroid Belt I | place | "Asteroid Belt <Roman numeral>" convention: numbered per system in celestial order (first belt = I) |
-| `cel-penumbra-den` | Gniazdo | **Gniazvor** | place | *gniazdo* "nest" + Latin *vor-* "devour" (Old Works flavour); the anomaly in the system |
-| `cel-gate-solace` | Solace Gate | Gate (Sterhov) | place | "Gate (<destination display name>)" convention |
-| `cel-gate-gloam` | Gloam Gate | Gate (Pustheim) | place | "Gate (<destination display name>)" convention |
-| `cel-penumbra-port` | Przystań | **Havstov** | place | Norse *hav* "sea" + Slavic *-stav* "pier" → "sea + pier"; the freeport |
-| `cel-gloam-star` | Pustkowie | Pustheim | place | |
+| `cel-penumbra-den` | Gniazvor | **Gnazvor** | place | nest + devour, weathered past *gniazdo*/*vor-* (Old Works flavour); the anomaly in the system |
+| `cel-gate-solace` | Gate (Sterhov) | Gate (Struvok) | place | "Gate (<destination display name>)" convention |
+| `cel-gate-gloam` | Gate (Pustheim) | Gate (Pušťov) | place | "Gate (<destination display name>)" convention |
+| `cel-penumbra-port` | Havstov | **Hauvnok** | place | sea + pier, weathered past *hav*/*stav*; the freeport |
+| `cel-gloam-star` | Pustheim | **Pušťov** | place | |
 | `cel-gloam-belt` | Gloam Belt | Asteroid Belt I | place | "Asteroid Belt <Roman numeral>" convention: numbered per system in celestial order (first belt = I) |
-| `cel-rudnik-star` | Rudnik | Rudnek | place | star carries its system's name (existing convention) |
-| `cel-rudnik-prime` | Rudnik Prime | Rudnek Prime | place | "<system> Prime" convention |
-| `cel-halda` | Halda | **Malmhalda** | place | Norse *malm* "ore" + *halda* "slag heap" → "ore slag heap"; Rudnek's mining outpost |
+| `cel-rudnik-star` | Rudnek | **Rydnok** | place | star carries its system's name (existing convention) |
+| `cel-rudnik-prime` | Rudnek Prime | **Rydnok Prime** | place | "<system> Prime" convention |
+| `cel-halda` | Malmhalda | **Halžek** | place | ore + slag heap, weathered past *malm*/*hałda*; Rydnok's mining outpost |
 | `cel-rudnik-belt` | Asteroid Belt I | Asteroid Belt I | place | "Asteroid Belt <Roman numeral>" convention: numbered per system in celestial order (first belt = I) |
-| `cel-gate-rudnik` | Gate (Rudnik) | Gate (Rudnek) | place | "Gate (<destination display name>)" convention; two instances (`sys-solace`, `sys-mlynow`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory) |
-| `cel-mlynow-star` | Młynów | Młyndal | place | star carries its system's name (existing convention) |
-| `cel-mlynow-prime` | Młynów Prime | Młyndal Prime | place | "<system> Prime" convention |
-| `cel-huta` | Huta | **Hutov** | place | *hut-* "smelter" (← German *Hütte*) + *-ov*; Młyndal's refinery platform |
+| `cel-gate-rudnik` | Gate (Rudnek) | Gate (Rydnok) | place | "Gate (<destination display name>)" convention; two instances (`sys-solace`, `sys-mlynow`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory) |
+| `cel-mlynow-star` | Młyndal | **Młondan** | place | star carries its system's name (existing convention) |
+| `cel-mlynow-prime` | Młyndal Prime | **Młondan Prime** | place | "<system> Prime" convention |
+| `cel-huta` | Hutov | **Hovžan** | place | smelter, weathered past *hut-* (← German *Hütte*); Młondan's refinery platform |
 | `cel-mlynow-belt` | Asteroid Belt I | Asteroid Belt I | place | "Asteroid Belt <Roman numeral>" convention: numbered per system in celestial order (first belt = I) |
-| `cel-gate-mlynow` | Gate (Młynów) | Gate (Młyndal) | place | "Gate (<destination display name>)" convention; two instances (`sys-rudnik`, `sys-penumbra`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory) |
-| `cel-kamieniec-star` | Kamieniec | Kamenvik | place | star carries its system's name (existing convention) |
-| `cel-kamieniec-prime` | Kamieniec Prime | Kamenvik Prime | place | "<system> Prime" convention |
-| `cel-doki` | Doki | **Dokhavn** | place | *dok* "dock" + Norse *havn* "harbour" → "dock + harbour"; Kamenvik's shipyard & depot |
+| `cel-gate-mlynow` | Gate (Młyndal) | Gate (Młondan) | place | "Gate (<destination display name>)" convention; two instances (`sys-rudnik`, `sys-penumbra`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory) |
+| `cel-kamieniec-star` | Kamenvik | **Kamžal** | place | star carries its system's name (existing convention) |
+| `cel-kamieniec-prime` | Kamenvik Prime | **Kamžal Prime** | place | "<system> Prime" convention |
+| `cel-doki` | Dokhavn | **Dukšan** | place | dock + harbour, weathered past *dok*/*havn*; Kamžal's shipyard & depot |
 | `cel-kamieniec-belt` | Asteroid Belt I | Asteroid Belt I | place | "Asteroid Belt <Roman numeral>" convention: numbered per system in celestial order (first belt = I) |
-| `cel-gate-kamieniec` | Gate (Kamieniec) | Gate (Kamenvik) | place | "Gate (<destination display name>)" convention; two instances (`sys-penumbra`, `sys-glusza`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory) |
-| `cel-glusza-star` | Głusza | Głusholm | place | star carries its system's name (existing convention) |
-| `cel-glusza-prime` | Głusza Prime | Głusholm Prime | place | "<system> Prime" convention |
-| `cel-kantor` | Kantor | **Kantov** | place | *kantor* "trading post, exchange" (← German *Kontor*) + *-ov*; Głusholm's Unincorporated freeport |
+| `cel-gate-kamieniec` | Gate (Kamenvik) | Gate (Kamžal) | place | "Gate (<destination display name>)" convention; two instances (`sys-penumbra`, `sys-glusza`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory) |
+| `cel-glusza-star` | Głusholm | **Glůšan** | place | star carries its system's name (existing convention) |
+| `cel-glusza-prime` | Głusholm Prime | **Glůšan Prime** | place | "<system> Prime" convention |
+| `cel-kantor` | Kantov | **Kanšev** | place | trading post, weathered past *kantor* (← German *Kontor*); Glůšan's Unincorporated freeport |
 | `cel-glusza-belt` | Asteroid Belt I | Asteroid Belt I | place | "Asteroid Belt <Roman numeral>" convention: numbered per system in celestial order (first belt = I) |
-| `cel-gate-glusza` | Gate (Głusza) | Gate (Głusholm) | place | "Gate (<destination display name>)" convention; two instances (`sys-kamieniec`, `sys-gloam`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory) |
+| `cel-gate-glusza` | Gate (Głusholm) | Gate (Glůšan) | place | "Gate (<destination display name>)" convention; two instances (`sys-kamieniec`, `sys-gloam`) per [../CONTENT_AUTHORING.md](../CONTENT_AUTHORING.md#id-naming-rules-mandatory) |
 
 ### Corporations — manufacturers
 
@@ -105,27 +110,27 @@ Rat hulls, ores, minerals and loot stay unattributed.
 
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
-| `corp-borealis` | Borealis | **Boreall** | Nordic | Latin *borealis* "northern", vernacular clipping (Borealis Systems → Borealis → Boreall); sensors, avionics, electronic warfare |
-| `corp-nordvakt` | Nordvakt | **Nordvakten** | Nordic | Norwegian *nord* "north" + *vakt* "watch, guard", Norse definite *-en* "the north-watch"; ordnance, turrets, guidance |
-| `corp-iskald` | Iskald | **Iskeld** | Nordic | Danish/Norwegian *is* "ice" + *kald* "cold", vowel drift; energy systems, capacitors, cells |
-| `corp-ferrum` | Kombinat Ferrum | **Kombinat Ferrum** | Polish | Polish *kombinat* "combine" + Latin *ferrum* "iron"; keeps its name — charter-era fossil; heavy hulls, armor, structures |
-| `corp-druzstvo` | Družstvo | **Družin** | Moravian | Old Slavic *druzina* "retinue" (Družstvo Concordia → Družstvo → Družin); extraction, refining, barging |
-| `corp-burza` | — | **Zakłady Burza** | Polish/Moravian | Polish *zakłady* "works, plant" + *burza* "storm"; munitions, energetic materials |
-| `corp-celeritas` | Celeritas | **Celerita** | Latinate | Latin *celeritas* "swiftness", vernacular shift (Celeritas Courier → Celeritas → Celerita); propulsion, express logistics, recovery |
-| `corp-praetor` | — | **Praetor** | Latinate | Latin *praetor* "one who goes before; commander"; security services, patrol craft, protective systems |
-| `corp-aldemar` | — | **Aldemar Group** | indistinct European | Continental personal-name stock, Germanic *ald-* "old" + *-mar* "renowned"; instrumentation, field repair, components |
-| `corp-vantera` | — | **Vantera** | indistinct European | coined from Latin *vānus* "hollow, empty" (*vantera* "the hollowing"); industrial automation, shielding, station systems |
+| `corp-borealis` | Boreall | **Bůral** | Nordic | northern, weathered past Latin *borealis* (classical *-al* shape kept); sensors, avionics, electronic warfare |
+| `corp-nordvakt` | Nordvakten | **Noldvar Guard** | Nordic | north-watch, weathered past *nord*/*vakt* plus the English form-word; ordnance, turrets, guidance |
+| `corp-iskald` | Iskeld | **Iškoven** | Nordic | ice-cold, weathered past *is*/*kald*; energy systems, capacitors, cells |
+| `corp-ferrum` | Kombinat Ferrum | **Kumbřan Steelworks** | Polish | iron-combine, weathered past *kombinat*/*ferrum* plus the English form-word; heavy hulls, armor, structures |
+| `corp-druzstvo` | Družin | **Dvužek** | Moravian | retinue, weathered past Old Slavic *druzina* (Družstvo Concordia → Družstvo → Družin → Dvužek); extraction, refining, barging |
+| `corp-burza` | Zakłady Burza | **Bríždan Factory** | Polish/Moravian | storm-works, weathered past *zakłady*/*burza* plus the English form-word; munitions, energetic materials |
+| `corp-celeritas` | Celerita | **Cylvar** | Latinate | swiftness, weathered past Latin *celeritas* (classical *-ar* shape kept); propulsion, express logistics, recovery |
+| `corp-praetor` | Praetor | **Preštor** | Latinate | commander, weathered past Latin *praetor* (classical *-or* shape kept); security services, patrol craft, protective systems |
+| `corp-aldemar` | Aldemar Group | **Alďmar** | indistinct European | old + renowned, weathered past *ald-*/*-mar*; instrumentation, field repair, components |
+| `corp-vantera` | Vantera | **Vantera** | indistinct European | kept — already coined, so it needs no weathering; industrial automation, shielding, station systems |
 
 ### Ship hulls
 
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
-| `ship-sloop` | Väktare | **Vaktr** | Nordic | Swedish *väktare* "watchman", clipped to the definite stem; precise electronics-heavy frigate |
-| `ship-cutlass` | Kosa | **Kosar** | Polish | *kosa* "scythe" → *kosar* "scythe-worker"; close-in yard-built brawler |
-| `ship-barge` | Havíř | **Havřek** | Moravian | Czech *havíř* "miner", diminutive drift; the mining barge |
-| `ship-hauler` | Furman | **Furmek** | Polish | *furman* "carter", diminutive drift; the workhorse hauler |
-| `ship-npc-hauler` | Tabor | **Taborek** | Polish | *tabor* "wagon train", diminutive drift; civilian convoy freighter. Overview role labels documented in [../GAMEPLAY.md](../GAMEPLAY.md) ride along in the content pass |
-| `ship-npc-patrol` | Custos | **Custor** | Latinate | Latin *custos* "guardian", vernacular shift; charter patrol cutter. Same caveat as `ship-npc-hauler` |
+| `ship-sloop` | Vaktr | **Vaštrek** | Nordic | watchman, weathered past Swedish *väktare*; precise electronics-heavy frigate |
+| `ship-cutlass` | Kosar | **Ždanek** | Polish | scythe-worker, weathered past *kosa*; close-in yard-built brawler |
+| `ship-barge` | Havřek | **Hušnek** | Moravian | miner, weathered past Czech *havíř*; the mining barge |
+| `ship-hauler` | Furmek | **Furdžan** | Polish | carter, weathered past *furman*; the workhorse hauler |
+| `ship-npc-hauler` | Taborek | **Tobřek** | Polish | wagon train, weathered past *tabor*; civilian convoy freighter. Overview role labels documented in [../GAMEPLAY.md](../GAMEPLAY.md) ride along in the content pass |
+| `ship-npc-patrol` | Custor | **Kuštor** | Latinate | guardian, weathered past Latin *custos* (classical *-or* shape kept); charter patrol cutter. Same caveat as `ship-npc-hauler` |
 | `ship-rat-scuttler` | Scuttler | Scuttler | Old Works | caste name retained (canon); description says "corsair skiff" — machine framing in the content pass |
 | `ship-rat-marauder` | Marauder | Marauder | Old Works | caste name retained (canon); description says "corsair gunship" — same pass |
 | `ship-rat-hierarch` | Hierarch | Hierarch | Old Works | caste name retained (canon); description implies a human "crew" — same pass |
@@ -225,27 +230,27 @@ Rat hulls, ores, minerals and loot stay unattributed.
 
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
-| `contract-solace-cleanup-1` | Belt cleanup | keep | trade | description: "the Old Works", "Sterhov belt", "Jernvold" |
-| `contract-solace-supply-run-1` | Supply run to Przystań | **Supply run to Havstov** | place | description: "Havstov", "the Jernvold market", "the Fringe" |
-| `contract-solace-cordite-1` | Cordite order | **Kerngrit order** | trade | renamed 2026-10-22 with the ore; description: "Jernvold's refinery", "Sterhov belt" |
-| `contract-penumbra-den-hunt-1` | Gniazdo hunt | **Gniazvor hunt** | place | description: "the Gniazvor", "the Havstov office" |
-| `contract-penumbra-lucidite-1` | Lucidite contract | keep | trade | description: "Havstov", "the Kuźbor belt" |
-| `contract-manufacturing-shield-1` | — | **Shield booster order** | trade | durable manufactured goods (Shield Booster, a non-weapon module); offering Dokhavn, delivery Havstov |
-| `contract-manufacturing-web-1` | — | **Web units for the yard** | trade | durable manufactured goods (Stasis Web, a non-weapon module); offering Hutov, delivery Dokhavn |
+| `contract-solace-cleanup-1` | Belt cleanup | keep | trade | description: "the Old Works", "Struvok belt", "Jalvrek" |
+| `contract-solace-supply-run-1` | Supply run to Havstov | **Supply run to Hauvnok** | place | description: "Hauvnok", "the Jalvrek market", "the Fringe" |
+| `contract-solace-cordite-1` | Cordite order | **Kerngrit order** | trade | renamed 2026-10-22 with the ore; description: "Jalvrek's refinery", "Struvok belt" |
+| `contract-penumbra-den-hunt-1` | Gniazvor hunt | **Gnazvor hunt** | place | description: "the Gnazvor", "the Hauvnok office" |
+| `contract-penumbra-lucidite-1` | Lucidite contract | keep | trade | description: "Hauvnok", "the Kvonice belt" |
+| `contract-manufacturing-shield-1` | — | **Shield booster order** | trade | durable manufactured goods (Shield Booster, a non-weapon module); offering Dukšan, delivery Hauvnok |
+| `contract-manufacturing-web-1` | — | **Web units for the yard** | trade | durable manufactured goods (Stasis Web, a non-weapon module); offering Hovžan, delivery Dukšan |
 
 ### Worlds
 
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
-| `world-default` | New Pilot | keep | trade | out-of-universe scenario name; description still names the pre-drift "Jernborg" and "Starogród" — the world file is lead-owned, so that edit is pending its owner |
-| `world-showcase` | Showcase | keep | trade | test world; scenario details still name the pre-drift "Starogród"/"Kuźnica"/"Väktare" — lead-owned, pending (tests pin ids, not names) |
+| `world-default` | New Pilot | keep | trade | out-of-universe scenario name; description names "Jalvrek" and "Struvok" and is swept with the rest (lead-approved 2026-10-26) |
+| `world-showcase` | Showcase | keep | trade | test world; scenario details name the current places and hulls, and are swept too (tests pin ids, not names) |
 
 ### Strings without ids
 
 | field | current value | proposed value | origin | notes |
 |---|---|---|---|---|
-| `universe.json` `region` | Thevek Reach | **Far Moravia** | place | settled canon |
-| `universe.json` `constellation` | Loomfall | **Kresy** | place | Polish *kresy* "borderlands" |
+| `universe.json` `region` | Far Moravia | **the Wild Fields** | place | one weathering serves both levels; the article is part of the value, like "the Fringe" |
+| `universe.json` `constellation` | Kresy | **the Wild Fields** | place | same value as the region — the map is one district of one wild country |
 | `npcs/guards.json` `faction` | Loomfall Security | **Charter Authority** | Latinate | full form "Far Moravia Charter Authority" ([FACTIONS.md](FACTIONS.md#the-charter-authority)) |
 | `npcs/rats.json` `faction` (Scuttler, Marauder) | Mire Corsairs | **Old Works** | Old Works | two placeholder strings collapse into one faction |
 | `npcs/rats.json` `faction` (Hierarch) | Gloam Hierarchy | **Old Works** | Old Works | same |
@@ -271,7 +276,7 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | Market tree header (`uikit/screens/market.go`) | — | **Browse** | trade | the browse pane's fixed column header (it sorts nothing; the branch order is the content tree's). Proposed 2026-10-22, awaiting user approval |
 | Market search field (`uikit/screens/market.go`) | — | placeholder **Search** | trade | the field above the tree: filters the selected branch live by name, group path and maker; `Ctrl+F` focuses it. Plain imperative noun, no legend. Proposed 2026-10-22, awaiting user approval |
 | Market search empty state (`uikit/screens/market.go`) | — | **No matches** | trade | the one dim row a query with no hits renders (never an empty table); the clearing rule is the field's own. Proposed 2026-10-22, awaiting user approval |
-| Market cross-station availability (`uikit/screens/market.go`) | — | Qty suffix **&lt;n&gt; · &lt;m&gt; more** · title detail **· cheapest &lt;station&gt; &lt;price&gt;** | trade | the Qty cell's dim suffix counts the OTHER market stations whose books hold an ask for the item; the selected row's title names the cheapest such station and ask (e.g. `· cheapest Dokhavn 112 €`). Local columns stay local; the suffix is a lead, not a merged book. Proposed 2026-10-22, awaiting user approval |
+| Market cross-station availability (`uikit/screens/market.go`) | — | Qty suffix **&lt;n&gt; · &lt;m&gt; more** · title detail **· cheapest &lt;station&gt; &lt;price&gt;** | trade | the Qty cell's dim suffix counts the OTHER market stations whose books hold an ask for the item; the selected row's title names the cheapest such station and ask (e.g. `· cheapest Dukšan 112 €`). Local columns stay local; the suffix is a lead, not a merged book. Proposed 2026-10-22, awaiting user approval |
 | Fitting summary capacitor verdict (`uikit/screens/fitting.go`) | — | **Cap stable** / **Cap unstable (~<n> s)** | ship | the fitting window's projected capacitor verdict under the fit's running modules: stable while their summed GJ/s stays under the recharge curve's peak rate, else the seconds the charge lasts, with a drain-vs-recharge bar under it. The three summary row labels are **Total DPS** · **Cap drain** · **Cap recharge**. Proposed 2026-10-21, awaiting user approval |
 | Station service labels (`content/services.go`) | — | **Repair** · **Market** · **Fitting** · **Manufacturing** · **Refinery** | trade | the `content.Services` table's display names: the services row's button tooltips and, for the four with a window, the window titles already registered above (Market/Fitting/Manufacturing/Refinery). `repair` has no window — the sim repairs on `CmdRepair` — so it draws no button. Approved 2026-10-21 |
 | Bay load log (`sim/clips.go`) | — | **&lt;module&gt; loaded with &lt;round name&gt; (&lt;n&gt; rounds)** | trade | the one quiet line per completed bay load, `EvModule`, player modules only — the same line confirms a `CmdSetAmmo` choice (`<module> loaded with <round> (<n> rounds)`, the words the ammo-selection proof reads). Proposed 2026-10-22, awaiting user approval |
@@ -293,26 +298,42 @@ Rat hulls, ores, minerals and loot stay unattributed.
 
 The world names are not contemporary words pushed through a dictionary; they
 are what those words became over generations. Approved 2026-10-26 for the
-place, hull and corporation layers.
+place, hull, corporation and region layers, in two depths: the first drift
+blended Slavic and Nordic forms; the second — **morpheme erasure** —
+weathered them past recognition, because a name that still holds a live stem
+(*jern* in Jernvold, *młyn* in Młyndal) reads as a translation, not as a
+history.
 
-- **Recipe.** A Slavic stem keeps its meaning and takes an evolved suffix:
-  `-ov` / `-ek` / `-its`, a final `-a` drifting to `-e`, a stem clipped where
-  speech would clip it (Väktare → Vaktr, Družstvo → Družin).
-- **The blend signal.** Nordic suffixes graft onto Slavic stems and Slavic
-  suffixes onto Nordic ones: `-vik` (bay), `-holm` (islet), `-hald`/`-halda`
-  (slag heap), `-dal` (valley), `-heim` (home), `-vold` (rule, keep),
-  `-borg` (fort), `-havn` (harbour), and the Norse definite `-en`/`-an`. A
-  chain that reads *source obvious, word dead* is the target: Kamenvik is
-  visibly *kamień*, and is a word in no living language.
-- **Institutional fossilization.** Charter-era names hold their archaic form
-  instead of drifting: Kombinat Ferrum, Praetor, Aldemar Group, Vantera, the
-  Charter Authority, Far Moravia, Kresy. Their names are fossils, so they
-  read older than the places they administer.
+- **Morpheme erasure.** No segment of a name may survive as a live dictionary
+  word in Polish, Czech, Swedish, Norwegian, Latin or English. Vowel rotation
+  and consonant weathering carry the root away (*jern* → *jal-*, *młyn* →
+  *młon-*, *kamień* → *kamž-*, *hav* → *hauv-*, *dok* → *duk-*), and
+  compound seams fuse instead of stacking (Havstov → Hauvnok, Malmhalda →
+  Halžek). What may survive is the shape of the family, not the word: the
+  glue suffixes still trace who settled where, the way EVE's Minmatar names
+  do. The first drift was too light — it kept its stems — and is retired.
+- **The blend signal.** Slavic and Nordic weathering trade places: `-vok`,
+  `-nok`, `-vice`, `-dan`, `-žal`, `-šan`, `-vrek`, `-šek`, `-žan`, `-šev`,
+  `-řek`, `-džan`. A chain that reads *family recognisable, word dead* is the
+  target: the Kamžal line is plainly stone-country and holds no word any
+  dictionary knows.
+- **Houses** take a weathered root, optionally plus an English form-word:
+  Noldvar Guard, Kumbřan Steelworks and Bríždan Factory are canon as given;
+  the bare roots stand alone (Bůral, Iškoven, Dvužek, Cylvar, Preštor,
+  Alďmar). Vantera is already coined and keeps its name.
+- **The Latinate rule.** Latinate-class names keep their classical *shape*
+  while the Latin itself is unrecognisable: Bůral holds `-al`, Cylvar `-ar`,
+  Kuštor and Preštor `-or` — but *borealis*, *celeritas*, *custos* and
+  *praetor* are dead as segments.
+- **Regions and constellations** weather like places: Far Moravia and Kresy
+  are one country now, **the Wild Fields** — article included, like "the
+  Fringe" — in both `universe.json` fields and every system file.
 - **Diacritics stay inside the font-verified set** (Polish + Czech: ą ć ę ł ń
-  ó ś ź ż č ď ě ň ř š ť ů ž). No new glyph gets smuggled in with a name.
-- **Every new world name must be checkably not a live dictionary word** in
-  Polish, Czech, Swedish, Norwegian, Latin or English. If a dictionary knows
-  it, it has not drifted far enough.
+  ó ś ź ż č ď ě ň ř š ť ů ž, plus í for the Czech long i). No new glyph gets
+  smuggled in with a name.
+- **Every new name must be checkably not a live dictionary word** in Polish,
+  Czech, Swedish, Norwegian, Latin or English. If a dictionary knows it, it
+  has not weathered far enough.
 - **Sayable for an English reader**, and the root is noted in the registry row
   like any other invented name.
 
@@ -349,17 +370,18 @@ For future (human or AI) authors adding content:
    origin's trade noun — a Polish hauler, a Nordic ewar frigate and a
    charter cutter must not sound alike. Caste names (Scuttler, Marauder,
    Hierarch) are reserved for the Old Works.
-3. **Drift a real root, then note it** in `notes` (language + gloss, e.g.
-   `*hav* "sea" (Norse) + *-stav* "pier"`). Coin words only from real
-   morphemes, and run the drift recipe in [Time-depth
-   drift](#time-depth-drift) — a name that is still a dictionary entry has not
-   drifted.
+3. **Weather a real root past recognition, then note it** in `notes`
+   (language + gloss, e.g. `*hav* "sea" (Norse) + *-stav* "pier"`). Coin words
+   only from real morphemes, and run [Time-depth drift](#time-depth-drift):
+   the root may be traceable in `notes`, never in a segment of the shipped
+   name — a name that still holds a dictionary word has not weathered.
 4. **Write the name with authentic diacritics** and check it is sayable by
    an English reader. Diacritics render; they are not a risk.
 5. **Never mint a name that echoes a retired one** (list above), including
-   as a nickname or a joke — and remember a retired name is guarded
-   whole-word, so a current name may legitimately carry one as a prefix
-   (Kosar/Kosa, Taborek/Tabor).
+   as a nickname or a joke. A retired name is guarded whole-word, so a
+   current name may carry one as a prefix — but a *live stem* is what the
+   second depth retired, so do not reintroduce one (no *-młyn-*, *-jern-*,
+   *-hav-*).
 6. **Never rename an id.** Add a row here; leave the slug alone.
 7. **Register the entity here** in the exact table format: one row per id,
    `proposed name` as a draft, `origin` from the tag vocabulary.
@@ -377,14 +399,16 @@ For future (human or AI) authors adding content:
   the vocabulary above; every hull gets exactly one heritage origin.
 - MUST keep names display-only: **ids are frozen** and never renamed, even
   when a slug embeds a retired name.
-- MUST note the lexical root of every invented name in `notes`.
+- MUST note the lexical root of every invented name in `notes`, and MUST
+  weather that root past recognition in the shipped name itself (no live
+  dictionary segment; see [Time-depth drift](#time-depth-drift)).
 - MUST use the `€` / `¢` string conventions here in all UI and log text, and
   Charter space / the Fringe / Unincorporated for zones.
 - NEVER leave a retired name — Solace, Penumbra, Gloam, Haven Rest, Thevek
   Reach, Loomfall, Loomfall Security, Mire Corsairs, Gloam Hierarchy, or any
-  name the time-depth drift retired (Starogród … Celeritas, list in the quick
-  reference) — in display text: names, titles, descriptions, UI strings, log
-  lines. Guarded by `content/origin_desc_test.go`; a new retired name extends
-  that list.
+  name either time-depth pass retired (Starogród … Kresy, full list in the
+  quick reference) — in display text: names, titles, descriptions, UI
+  strings, log lines. Guarded by `content/origin_desc_test.go`; a new retired
+  name extends that list.
 - NEVER reserve the caste names Scuttler, Marauder and Hierarch for anything
   but the Old Works.

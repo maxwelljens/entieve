@@ -28,26 +28,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **World names time-drifted into the Slavic+Nordic blend** (`content/data`,
-  `content/corps.go`): the place layer moved generations past its live
-  Polish/Czech/Swedish dictionary words — systems **Sterhov · Rudnek ·
-  Kuźbor · Młyndal · Kamenvik · Pustheim · Głusholm**, stations **Jernvold ·
-  Havstov · Gniazvor · Malmhalda · Hutov · Dokhavn · Kantov**, hulls
-  **Vaktr · Kosar · Havřek · Furmek · Taborek · Custor** and five worker
-  houses (**Boreall · Nordvakten · Iskeld · Družin · Celerita**) — with the
-  registry rules codified in `docs/lore/NAMING.md` (Time-depth drift;
-  retired-name list extended, guarded by a whole-word sweep test). Ids and
-  slugs are unchanged, so saves, worlds and the tour still load — a save's
-  stored ship name is a string snapshot and keeps its old form until the
-  traffic respawns. The keep list holds: Far Moravia, Kresy,
-  the Charter Authority, the zones, the euro, Kombinat Ferrum, Praetor,
-  Aldemar Group, Vantera, the Old Works castes and every product noun.
+- **World names weathered to the second depth** (`content/data`,
+  `content/corps.go`): the place layer is now past the live Polish/Czech/
+  Swedish/Latin stem it grew from — no dictionary segment survives, only the
+  family shape — systems **Struvok · Rydnok · Kvonice · Młondan · Kamžal ·
+  Pušťov · Glůšan**, stations **Jalvrek · Hauvnok · Gnazvor · Halžek ·
+  Hovžan · Dukšan · Kanšev**, hulls **Vaštrek · Ždanek · Hušnek · Furdžan ·
+  Tobřek · Kuštor**, and the ten houses (**Bůral · Noldvar Guard · Iškoven ·
+  Kumbřan Steelworks · Dvužek · Bríždan Factory · Cylvar · Preštor ·
+  Alďmar**; Vantera was already coined and keeps its name). Region and
+  constellation both become **the Wild Fields**, in `universe.json`, every
+  system file and the prose. The registry rules are codified in
+  `docs/lore/NAMING.md` (Time-depth drift: morpheme erasure, the house
+  form-word, the Latinate shape rule; retired-name list extended, guarded by
+  a whole-word sweep test). Ids and slugs are unchanged, so saves, worlds and
+  the tour still load — a save's stored ship name is a string snapshot and
+  keeps its old form until the traffic respawns. The keep list holds: the
+  Charter Authority, the zones, the euro, Vantera, the Old Works castes and
+  every product noun.
 - **Market search folds diacritics** (`uikit/screens`): the query and the
   catalog match through the canon name alphabet in both directions — an
-  ASCII keyboard finds accented names ("zaklady" → Zakłady Burza,
-  "havrek" → Havřek) and a diacritic-typed query still matches; the
-  match highlight remaps to whole letters. The fold table is the game
-  font's verified diacritic set.
+  ASCII keyboard finds accented names ("brizdan" → Bríždan, "husnek" →
+  Hušnek) and a diacritic-typed query still matches; the match highlight
+  remaps to whole letters. The fold table is the game font's verified
+  diacritic set (now including the Czech long í).
 
 - **The click cue speaks for controls, not for windows** (`game`,
   `uikit`): `Game.uiClick` now asks `Kit.PressTarget` instead of `overUI` —

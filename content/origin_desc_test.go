@@ -53,11 +53,11 @@ func TestShippedNpcsCarryDescription(t *testing.T) {
 	}
 }
 
-// retiredNames are the placeholder names (and their fragments) that must
-// never survive in display text — docs/lore/NAMING.md binding rules. Matched
-// case-insensitively, whole word only: several current names carry a retired
-// one as a prefix (Kosa/Kosar, Halda/Malmhalda, Tabor/Taborek,
-// Nordvakt/Nordvakten), and Doki/Huta/Kantor are ordinary enough to need it.
+// retiredNames are the names (and their fragments) that must never survive in
+// display text — docs/lore/NAMING.md binding rules. Matched case-insensitively,
+// whole word only: retired forms have lived on as prefixes of live ones
+// (Kosa/Kosar, Halda/Malmhalda, Tabor/Taborek), and Doki/Huta/Kantor are
+// ordinary enough words to need it.
 var retiredNames = []string{
 	"solace", "penumbra", "gloam", "haven rest", "thevek", "loomfall", "corsair",
 	// Time-depth drift, 2026-10-26 (NAMING.md).
@@ -65,6 +65,14 @@ var retiredNames = []string{
 	"jernborg", "przystań", "gniazdo", "halda", "huta", "doki", "kantor",
 	"väktare", "kosa", "havíř", "furman", "tabor", "custos",
 	"borealis", "nordvakt", "iskald", "družstvo", "celeritas",
+	// Second-depth drift, 2026-10-26: the drift-1 names themselves retire as
+	// their live stems erode (morpheme erasure).
+	"sterhov", "rudnek", "kuźbor", "młyndal", "kamenvik", "pustheim", "głusholm",
+	"jernvold", "havstov", "gniazvor", "malmhalda", "hutov", "dokhavn", "kantov",
+	"vaktr", "kosar", "havřek", "furmek", "taborek", "custor",
+	"boreall", "nordvakten", "iskeld", "kombinat ferrum", "družin",
+	"zakłady burza", "celerita", "praetor", "aldemar group",
+	"far moravia", "kresy",
 }
 
 // containsWord reports whether hay holds needle as a whole word (letters on
@@ -104,6 +112,11 @@ func TestShippedTextAvoidsRetiredNames(t *testing.T) {
 		{"the Gniazvor", "gniazdo", false},
 		{"the Havstov office", "przystań", false},
 		{"Pustheim", "pustkowie", false},
+		{"Kumbřan Steelworks", "kombinat ferrum", false},
+		{"the Wild Fields", "far moravia", false},
+		{"Wild Fields", "kresy", false},
+		{"Bríždan Factory", "zakłady burza", false},
+		{"Noldvar Guard", "nordvakten", false},
 	}
 	for _, b := range boundary {
 		if got := containsWord(strings.ToLower(b.text), b.needle); got != b.hit {
@@ -112,6 +125,9 @@ func TestShippedTextAvoidsRetiredNames(t *testing.T) {
 	}
 
 	c := MustLoad()
+	if c.Universe == nil {
+		t.Fatal("universe missing")
+	}
 	idToken := regexp.MustCompile(`[a-z][a-z0-9]*(?:-[a-z0-9]+)+`)
 	// The id mask drops frozen slugs (their slugs may embed retired
 	// words) while space-separated real names survive it.
@@ -130,10 +146,12 @@ func TestShippedTextAvoidsRetiredNames(t *testing.T) {
 		hay := strings.ToLower(idToken.ReplaceAllString(text, " "))
 		for _, needle := range retiredNames {
 			if containsWord(hay, needle) {
-				t.Errorf("%s: echoes retired placeholder name %q", ctx, needle)
+				t.Errorf("%s: echoes retired name %q", ctx, needle)
 			}
 		}
 	}
+	check("universe/region", c.Universe.Region)
+	check("universe/constellation", c.Universe.Constellation)
 	for _, id := range keys(c.Systems) {
 		s := c.Systems[id]
 		check("systems/"+string(id), s.Name)

@@ -35,7 +35,7 @@ const (
 // display identity.
 type mapNode struct {
 	id       content.SystemID
-	name     string // display name (Sterhov, Kuźbor, …), never the id
+	name     string // display name (Struvok, Kvonice, …), never the id
 	x, y     float64
 	security string
 }

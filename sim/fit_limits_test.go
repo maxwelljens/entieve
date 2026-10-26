@@ -14,7 +14,7 @@ import (
 // ---------------------------------------------------------------------------
 
 // realFittingSim loads the shipped content and docks the default world's
-// frigate at Jernvold (the fitting service).
+// frigate at Jalvrek (the fitting service).
 func realFittingSim(t *testing.T) *Sim {
 	t.Helper()
 	c, err := content.Load(content.FS())
@@ -25,14 +25,14 @@ func realFittingSim(t *testing.T) *Sim {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	st := entityByName(s, "Jernvold")
+	st := entityByName(s, "Jalvrek")
 	if st.IsZero() {
-		t.Fatal("no Jernvold station")
+		t.Fatal("no Jalvrek station")
 	}
 	if tr, ok := s.Transforms.Get(st); ok {
 		setPlayerPos(s, tr.Pos)
 	}
-	dockAtStation(t, s, "Jernvold")
+	dockAtStation(t, s, "Jalvrek")
 	return s
 }
 

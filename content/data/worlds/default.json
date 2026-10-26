@@ -1,7 +1,7 @@
 {
   "id": "world-default",
   "name": "New Pilot",
-  "description": "The normal game start: a Vaktr with a modest fit parked outside Jernvold station in Sterhov.",
+  "description": "The normal game start: a Vaštrek with a modest fit parked outside Jalvrek station in Struvok.",
   "start": {
     "system": "sys-solace",
     "position": { "X": 843007620248, "Y": 502580312071 },

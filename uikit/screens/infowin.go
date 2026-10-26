@@ -81,7 +81,7 @@ type infoPage struct {
 }
 
 // makerSub joins a def's lead label (class/kind/category) with its maker's
-// display name — "Frigate · Kombinat Ferrum". A maker-less def keeps its
+// display name — "Frigate · Kumbřan Steelworks". A maker-less def keeps its
 // lead label alone ("" maker and "" lead → "").
 func makerSub(lead, maker string) string {
 	name := content.CorpName(maker)
