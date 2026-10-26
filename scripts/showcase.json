@@ -14,24 +14,24 @@
   {
     "at_tick": 2400,
     "action": "warp",
-    "target": "Jernborg"
+    "target": "Jernvold"
   },
   {
     "at_tick": 6300,
     "action": "approach",
-    "target": "Jernborg",
+    "target": "Jernvold",
     "note": "closes the gap after a possible clone respawn"
   },
   {
     "at_tick": 7200,
     "action": "dock",
-    "target": "Jernborg"
+    "target": "Jernvold"
   },
   {
     "at_tick": 7230,
     "action": "accept-mission",
     "mission": "contract-solace-cleanup-1",
-    "note": "contract leg: take the kill contract off the Jernborg board; the belt fight counts progress, the tick-51060 dock auto-claims it"
+    "note": "contract leg: take the kill contract off the Jernvold board; the belt fight counts progress, the tick-51060 dock auto-claims it"
   },
   {
     "at_tick": 7260,
@@ -229,14 +229,14 @@
   {
     "at_tick": 42060,
     "action": "warp",
-    "target": "Jernborg",
+    "target": "Jernvold",
     "range": 50000,
     "note": "warp to within 50 km: the approach step closes the last gap"
   },
   {
     "at_tick": 42300,
     "action": "approach",
-    "target": "Jernborg"
+    "target": "Jernvold"
   },
   {
     "at_tick": 50060,
@@ -248,7 +248,7 @@
   {
     "at_tick": 51060,
     "action": "dock",
-    "target": "Jernborg",
+    "target": "Jernvold",
     "note": "station session 2: services, stash, fit swap, hull swap"
   },
   {
@@ -351,17 +351,17 @@
   {
     "at_tick": 53060,
     "action": "warp",
-    "target": "Gate (Kuźnica)"
+    "target": "Gate (Kuźbor)"
   },
   {
     "at_tick": 59060,
     "action": "jump",
-    "target": "Gate (Kuźnica)"
+    "target": "Gate (Kuźbor)"
   },
   {
     "at_tick": 59120,
     "action": "warp",
-    "target": "Gniazdo"
+    "target": "Gniazvor"
   },
   {
     "at_tick": 60180,

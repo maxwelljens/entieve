@@ -1,6 +1,6 @@
 {
   "id": "sys-gloam",
-  "name": "Pustkowie",
+  "name": "Pustheim",
   "security": "null",
   "constellation": "Kresy",
   "region": "Far Moravia",
@@ -14,7 +14,7 @@
   "celestials": [
     {
       "id": "cel-gloam-star",
-      "name": "Pustkowie",
+      "name": "Pustheim",
       "kind": "star",
       "position": { "X": 0, "Y": 0 },
       "radius": 390000000,
@@ -40,7 +40,7 @@
     },
     {
       "id": "cel-gate-penumbra",
-      "name": "Gate (Kuźnica)",
+      "name": "Gate (Kuźbor)",
       "kind": "gate",
       "position": { "X": 2788672514437, "Y": 1892313491939 },
       "radius": 2500,
@@ -52,7 +52,7 @@
     },
     {
       "id": "cel-gate-glusza",
-      "name": "Gate (Głusza)",
+      "name": "Gate (Głusholm)",
       "kind": "gate",
       "position": { "X": -4064181929557, "Y": 2763643712099 },
       "radius": 2500,

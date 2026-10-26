@@ -133,7 +133,7 @@ func TestFaceWeightsParseAndDiffer(t *testing.T) {
 // draws), is a different source than the display face, and covers every
 // glyph the inventory and market rows draw: row punctuation, the €/¢
 // currency marks, and the Polish/Czech diacritics the system and item
-// names carry (Młynów, Kuźnica…).
+// names carry (Młyndal, Kuźbor…).
 //
 // The sort indicators (↑/↓) are deliberately absent from the probe:
 // they live in the header buttons, which keep the display face.
@@ -165,7 +165,7 @@ func TestMonoFaceResolvesAndCovers(t *testing.T) {
 		t.Errorf("digit advances not uniform: %q=%v %q=%v %q=%v — not a monospace default instance",
 			"1", d1, "1111", d4, "0000", d0)
 	}
-	if w, _ := text.Measure("Młynów 12,345.67 €", f, 0); w <= d4 {
+	if w, _ := text.Measure("Młyndal 12,345.67 €", f, 0); w <= d4 {
 		t.Errorf("diacritic name measures %v, want more than %q (%v)", w, "1111", d4)
 	}
 

@@ -56,7 +56,7 @@ func TestTableContentsFace(t *testing.T) {
 
 	// The built cell widget itself: its preferred width is the mono
 	// measure of the label, not the display one.
-	const label = "Młynów 1,234.56 €"
+	const label = "Młyndal 1,234.56 €"
 	tbl.SetRows([]TableRow{{Cells: []string{label}, Data: 0}})
 	plain.SetRows([]TableRow{{Cells: []string{label}, Data: 0}})
 	gotMono, _ := tbl.Texts[0][0].PreferredSize()

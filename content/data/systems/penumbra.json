@@ -1,6 +1,6 @@
 {
   "id": "sys-penumbra",
-  "name": "Kuźnica",
+  "name": "Kuźbor",
   "security": "low",
   "constellation": "Kresy",
   "region": "Far Moravia",
@@ -17,7 +17,7 @@
   "celestials": [
     {
       "id": "cel-penumbra-star",
-      "name": "Kuźnica",
+      "name": "Kuźbor",
       "kind": "star",
       "position": {
         "X": 0,
@@ -64,7 +64,7 @@
     },
     {
       "id": "cel-penumbra-den",
-      "name": "Gniazdo",
+      "name": "Gniazvor",
       "kind": "anomaly",
       "position": {
         "X": 814255444390,
@@ -92,7 +92,7 @@
     },
     {
       "id": "cel-gate-solace",
-      "name": "Gate (Starogród)",
+      "name": "Gate (Sterhov)",
       "kind": "gate",
       "position": {
         "X": -3110398816844,
@@ -109,7 +109,7 @@
     },
     {
       "id": "cel-gate-gloam",
-      "name": "Gate (Pustkowie)",
+      "name": "Gate (Pustheim)",
       "kind": "gate",
       "position": {
         "X": 3316068789411,
@@ -126,7 +126,7 @@
     },
     {
       "id": "cel-penumbra-port",
-      "name": "Przystań",
+      "name": "Havstov",
       "kind": "station",
       "position": {
         "X": 882221736153,
@@ -169,7 +169,7 @@
     },
     {
       "id": "cel-gate-mlynow",
-      "name": "Gate (Młynów)",
+      "name": "Gate (Młyndal)",
       "kind": "gate",
       "position": {
         "X": -3327077444731,
@@ -186,7 +186,7 @@
     },
     {
       "id": "cel-gate-kamieniec",
-      "name": "Gate (Kamieniec)",
+      "name": "Gate (Kamenvik)",
       "kind": "gate",
       "position": {
         "X": 1807211319445,

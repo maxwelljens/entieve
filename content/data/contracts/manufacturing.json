@@ -8,7 +8,7 @@
     "station": "cel-doki",
     "objective": { "item": "mod-shield-boost", "count": 4, "destination": "cel-penumbra-port" },
     "reward": { "credits": 1430000, "item": null, "standing_gain": 0.15 },
-    "description": "Doki's yard has four shield boosters on backorder and Przystań's fitters will take them. Manufacture or buy four units of Shield Booster, load them in the hold, and dock at Przystań — standing 0.10 with the Doki office first."
+    "description": "Dokhavn's yard has four shield boosters on backorder and Havstov's fitters will take them. Manufacture or buy four units of Shield Booster, load them in the hold, and dock at Havstov — standing 0.10 with the Dokhavn office first."
   },
   {
     "id": "contract-manufacturing-web-1",
@@ -19,6 +19,6 @@
     "station": "cel-huta",
     "objective": { "item": "mod-stasis-web", "count": 3, "destination": "cel-doki" },
     "reward": { "credits": 685000, "item": null, "standing_gain": 0.12 },
-    "description": "Huta's platform runs its ore lines with Stasis Web units from Doki, and the last shipment never arrived. Bring three units of Stasis Web to Doki's hangar — the order is open to pilots at standing 0.05."
+    "description": "Hutov's platform runs its ore lines with Stasis Web units from Dokhavn, and the last shipment never arrived. Bring three units of Stasis Web to Dokhavn's hangar — the order is open to pilots at standing 0.05."
   }
 ]

@@ -2,7 +2,7 @@
   "id": "ship-hauler",
   "group": "Ships/Industrials",
   "base_price": 480000,
-  "name": "Furman",
+  "name": "Furmek",
   "class": "industrial",
   "description": "A fat industrial hauler. One high slot, one big hold: it runs, it does not fight.",
   "maker": "corp-ferrum",

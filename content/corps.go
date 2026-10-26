@@ -22,13 +22,13 @@ type Corp struct {
 
 // AllCorps is the ten-firm manufacturer roster — the maker vocabulary.
 var AllCorps = []Corp{
-	{ID: "corp-borealis", Name: "Borealis", Heritage: "nordic"},
-	{ID: "corp-nordvakt", Name: "Nordvakt", Heritage: "nordic"},
-	{ID: "corp-iskald", Name: "Iskald", Heritage: "nordic"},
+	{ID: "corp-borealis", Name: "Boreall", Heritage: "nordic"},
+	{ID: "corp-nordvakt", Name: "Nordvakten", Heritage: "nordic"},
+	{ID: "corp-iskald", Name: "Iskeld", Heritage: "nordic"},
 	{ID: "corp-ferrum", Name: "Kombinat Ferrum", Heritage: "polish"},
-	{ID: "corp-druzstvo", Name: "Družstvo", Heritage: "moravian"},
+	{ID: "corp-druzstvo", Name: "Družin", Heritage: "moravian"},
 	{ID: "corp-burza", Name: "Zakłady Burza", Heritage: "polish-moravian"},
-	{ID: "corp-celeritas", Name: "Celeritas", Heritage: "latinate"},
+	{ID: "corp-celeritas", Name: "Celerita", Heritage: "latinate"},
 	{ID: "corp-praetor", Name: "Praetor", Heritage: "latinate"},
 	{ID: "corp-aldemar", Name: "Aldemar Group", Heritage: "indistinct-european"},
 	{ID: "corp-vantera", Name: "Vantera", Heritage: "indistinct-european"},

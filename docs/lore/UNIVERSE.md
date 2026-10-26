@@ -16,13 +16,13 @@ systems on the ring of stargates:
 
 | System | Zone | What it is |
 |---|---|---|
-| **Starogród** | Charter space | the first-wave heartland; the safe lanes |
-| **Rudnik** | Charter space | the ore-works country; the ring's mining anchor |
-| **Kuźnica** | the Fringe | the junction of the rush: yards, richer ore, a freeport |
-| **Młynów** | the Fringe | the refinery step of the chain |
-| **Kamieniec** | the Fringe | shipyard country; the depot at the ring's edge |
-| **Pustkowie** | Unincorporated | the dead-end frontier — Old Works country |
-| **Głusza** | Unincorporated | the hush: one freeport and not much else |
+| **Sterhov** | Charter space | the first-wave heartland; the safe lanes |
+| **Rudnek** | Charter space | the ore-works country; the ring's mining anchor |
+| **Kuźbor** | the Fringe | the junction of the rush: yards, richer ore, a freeport |
+| **Młyndal** | the Fringe | the refinery step of the chain |
+| **Kamenvik** | the Fringe | shipyard country; the depot at the ring's edge |
+| **Pustheim** | Unincorporated | the dead-end frontier — Old Works country |
+| **Głusholm** | Unincorporated | the hush: one freeport and not much else |
 
 Everything else in Far Moravia is off the map: other districts, other
 constellations, other rushes. Mention them if you must; name nothing.
@@ -122,13 +122,13 @@ zones:
 
 | System | Zone |
 |---|---|
-| Starogród | Charter space |
-| Rudnik | Charter space |
-| Kuźnica | the Fringe |
-| Młynów | the Fringe |
-| Kamieniec | the Fringe |
-| Pustkowie | Unincorporated |
-| Głusza | Unincorporated |
+| Sterhov | Charter space |
+| Rudnek | Charter space |
+| Kuźbor | the Fringe |
+| Młyndal | the Fringe |
+| Kamenvik | the Fringe |
+| Pustheim | Unincorporated |
+| Głusholm | Unincorporated |
 
 UI copy uses the zone words with a complementary status label — "Charter ·
 secure", "Fringe · contested", "Unincorporated · no charter". The values
@@ -149,7 +149,7 @@ world-facing words.
 
 Life runs on paperwork and throughput. Dock crews, refinery shifts, convoy
 schedules, contract boards, berthing fees. Charter space is orderly and slow.
-The Fringe is loud and priced accordingly. Pustkowie is quiet in the wrong
+The Fringe is loud and priced accordingly. Pustheim is quiet in the wrong
 way.
 
 The player is an **ordinary pilot**: skilled, mortal, insured. Licensed work —

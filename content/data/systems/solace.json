@@ -1,6 +1,6 @@
 {
   "id": "sys-solace",
-  "name": "Starogród",
+  "name": "Sterhov",
   "security": "high",
   "constellation": "Kresy",
   "region": "Far Moravia",
@@ -14,7 +14,7 @@
   "celestials": [
     {
       "id": "cel-solace-star",
-      "name": "Starogród",
+      "name": "Sterhov",
       "kind": "star",
       "position": { "X": 0, "Y": 0 },
       "radius": 696000000,
@@ -22,7 +22,7 @@
     },
     {
       "id": "cel-solace-prime",
-      "name": "Starogród Prime",
+      "name": "Sterhov Prime",
       "kind": "planet",
       "position": { "X": 106112365472, "Y": -45476728060 },
       "radius": 6371000,
@@ -30,7 +30,7 @@
     },
     {
       "id": "cel-haven-rest",
-      "name": "Jernborg",
+      "name": "Jernvold",
       "kind": "station",
       "position": { "X": 842987620248, "Y": 502550312071 },
       "radius": 800,
@@ -113,7 +113,7 @@
     },
     {
       "id": "cel-gate-penumbra",
-      "name": "Gate (Kuźnica)",
+      "name": "Gate (Kuźbor)",
       "kind": "gate",
       "position": { "X": 2945076955526, "Y": -2086096176831 },
       "radius": 2500,
@@ -125,7 +125,7 @@
     },
     {
       "id": "cel-gate-rudnik",
-      "name": "Gate (Rudnik)",
+      "name": "Gate (Rudnek)",
       "kind": "gate",
       "position": { "X": -4561869113906, "Y": 1710700917715 },
       "radius": 2500,

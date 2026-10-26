@@ -249,7 +249,7 @@ func TestMarketMyOrdersAfterOrderDialog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewKit: %v", err)
 	}
-	// Jernborg is sys-solace's market station: the order dialog and the
+	// Jernvold is sys-solace's market station: the order dialog and the
 	// market column both read the docked book.
 	s.Docked.Set(s.Player(), sim.Docked{At: "cel-haven-rest"})
 

@@ -154,10 +154,11 @@ hull, when it shows up. NOT stat recitation (the UI shows stats
 separately), NOT human corsairs: machine castes are framed as equipment,
 per AESTHETIC's voice rules, with no epic language and no retired
 placeholder names (Solace, Penumbra, Gloam, Haven Rest, Thevek Reach,
-Loomfall, Mire Corsairs, Gloam Hierarchy). One or two sentences, same
-shape as a ship/module `description`. Shipped NPCs must all have one
-(`TestShippedNpcsCarryDescription`, enforced the same way as the contract
-title/description rule).
+Loomfall, Mire Corsairs, Gloam Hierarchy — nor any name the time-depth drift
+retired, see [NAMING.md](lore/NAMING.md#time-depth-drift)). One or two
+sentences, same shape as a ship/module `description`. Shipped NPCs must all
+have one (`TestShippedNpcsCarryDescription`, enforced the same way as the
+contract title/description rule).
 
 ## Market orders: the ship-order convention
 
@@ -209,7 +210,7 @@ content package stays free of the UI layer).
 ## Recipe 1: add a star system
 
 **1. Create `content/data/systems/<shortname>.json`** (full example — a
-complete, valid two-celestial system with a gate back to Starogród):
+complete, valid two-celestial system with a gate back to Sterhov):
 
 ```json
 {
@@ -252,7 +253,7 @@ complete, valid two-celestial system with a gate back to Starogród):
     },
     {
       "id": "cel-gate-solace",
-      "name": "Gate (Starogród)",
+      "name": "Gate (Sterhov)",
       "kind": "gate",
       "position": { "X": 3200000000000, "Y": -2240000000000 },
       "radius": 2500,
@@ -589,7 +590,7 @@ a mined hold must be sellable and materials must be buyable at every port.
   (sideron 25,000 bid / 12,000 ask), thousands for ore and the dear
   minerals, hundreds for the rarest. Asks are modest stock; bids are the
   local industry's standing demand.
-- Przystań (`cel-penumbra-port`) had no `market` block at all before this
+- Havstov (`cel-penumbra-port`) had no `market` block at all before this
   pass: its freeport now carries the same materials set plus the rounds its
   own raiders need (`TestRespawnAmmoIsOnTheLocalBook`).
 - The materials rows live at the end of each station's `market` array in
@@ -606,7 +607,7 @@ a mined hold must be sellable and materials must be buyable at every port.
 {
   "id": "world-speedrun",
   "name": "Speedrun",
-  "description": "A compact challenge world: kill the Gniazdo, dock, repeat.",
+  "description": "A compact challenge world: kill the Gniazvor, dock, repeat.",
   "start": {
     "system": "sys-penumbra",
     "position": { "X": 530000000000, "Y": -300000000000 },
@@ -653,7 +654,7 @@ station's board (`station` = the offering station) and is loaded from
   "station": "cel-haven-rest",
   "objective": { "target": "npc-rat-scuttler", "count": 1 },
   "reward": { "credits": 40000, "item": null, "standing_gain": 0.1 },
-  "description": "The Old Works are shadowing the ore haulers out of the Starogród belt. Cull the Scuttler and dock at Jernborg to collect the bounty office's fee."
+  "description": "The Old Works are shadowing the ore haulers out of the Sterhov belt. Cull the Scuttler and dock at Jernvold to collect the bounty office's fee."
 }
 ```
 
@@ -795,9 +796,9 @@ reschedules anything.
 
 | security | p | shipped example |
 |----------|---|-----------------|
-| high | 0 | Starogród convoys are never ambushed |
-| low  | 1/6 ≈ 16.7 % | Kuźnica: ≈1 ambush per 6 legs |
-| null | 1/3 ≈ 33.3 % | Pustkowie: 1 ambush per 3 legs |
+| high | 0 | Sterhov convoys are never ambushed |
+| low  | 1/6 ≈ 16.7 % | Kuźbor: ≈1 ambush per 6 legs |
+| null | 1/3 ≈ 33.3 % | Pustheim: 1 ambush per 3 legs |
 
 Raiders: `1 + Intn(3)` ships of the def's `raider` class, spawned within
 3 km of the ambushed hauler. Flee math: the hauler burns 20 s before its
@@ -918,8 +919,8 @@ words from `docs/lore/NAMING.md`, and never a retired placeholder name.
 
 Manufacturing runs at stations offering the `industry` service (the closed
 set lives in `content/validate.go`: `repair | market | refine | fitting |
-industry`). Shipped, Przystań (`cel-penumbra-port`, the Kuźnica freeport),
-Huta (`cel-huta`, Młynów) and Doki (`cel-doki`, Kamieniec) carry it.
+industry`). Shipped, Havstov (`cel-penumbra-port`, the Kuźbor freeport),
+Hutov (`cel-huta`, Młyndal) and Dokhavn (`cel-doki`, Kamenvik) carry it.
 
 Every job commits its minerals up front and costs a fee of **3 % of the
 recipe's mineral value at base prices**, per run, debited from the wallet

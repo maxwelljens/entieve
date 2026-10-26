@@ -13,9 +13,9 @@ go test ./...                   # the whole test suite (headless, no GPU needed)
 
 ## Flying
 
-![Väktare next to Jernborg station, with the overview, log and ship HUD open](screenshots/1.png)
+![Vaktr next to Jernvold station, with the overview, log and ship HUD open](screenshots/1.png)
 
-*Undocked at Jernborg in the Starogród system. The overview lists everything
+*Undocked at Jernvold in the Sterhov system. The overview lists everything
 on grid, the Selected Item panel acts on the highlighted object, and the HUD
 holds shield/armor/structure, speed, wallet and capacitor.*
 
@@ -44,7 +44,7 @@ chrome with no entries.
 
 ![Station interior with contracts, market, inventory and fitting windows open](screenshots/2.png)
 
-*Docked at Jernborg. Contracts on the left, the market with stock and prices
+*Docked at Jernvold. Contracts on the left, the market with stock and prices
 at the top, cargo and ore hold in the middle, the fitting window on the right.*
 
 Docking opens exactly one window: the **station services view**, with
@@ -68,14 +68,14 @@ Fitting is slot-based: high slots take turrets and mining lasers, mid slots
 take propulsion and electronic warfare, low slots take tank and repair. The
 fitting window shows what each change does to the hull — shield/armor/structure,
 capacitor and recharge, speed, alignment, signature, cargo, and resists per
-damage type. There are four player hulls (Väktare, Kosa, Havíř, Furman), and
+damage type. There are four player hulls (Vaktr, Kosar, Havřek, Furmek), and
 the market is where the parts come from.
 
 ## Combat and mining
 
-![Fight at the Kuźnica belt with a Scutter locked, asteroids in the overview and the EMP turret stats open](screenshots/3.png)
+![Fight at the Kuźbor belt with a Scutter locked, asteroids in the overview and the EMP turret stats open](screenshots/3.png)
 
-*A fight at the Kuźnica belt. The locked target gets its own readout at the
+*A fight at the Kuźbor belt. The locked target gets its own readout at the
 top; the module panel on the right shows the turret's damage profile, optimal
 range, falloff, tracking and capacitor use; the log records every shot.*
 
@@ -92,7 +92,7 @@ Rats patrol the belts and defend them against miners and shooters, and they
 behave differently across the cluster: skittish in Charter space, fighting to
 the death out in the Unincorporated systems. Combat anomalies hide the boss
 rats and the best loot. Lose your ship and you are not finished — your pod is
-recovered and the insurer issues a fresh Väktare.
+recovered and the insurer issues a fresh Vaktr.
 
 Controls and concepts: [docs/GAMEPLAY.md](docs/GAMEPLAY.md).
 
@@ -116,9 +116,9 @@ Controls and concepts: [docs/GAMEPLAY.md](docs/GAMEPLAY.md).
   recipes turn minerals into hulls, modules and charges — run as timed jobs
   at industry stations (factory window, `B`), with station craft that grows
   with every completed run.
-- **Seven systems** in the Far Moravia frontier — the Kresy ring: Starogród
-  and Rudnik (Charter space), Kuźnica, Młynów and Kamieniec (the Fringe),
-  Pustkowie and Głusza (Unincorporated) — with escalating danger, stargates
+- **Seven systems** in the Far Moravia frontier — the Kresy ring: Sterhov
+  and Rudnek (Charter space), Kuźbor, Młyndal and Kamenvik (the Fringe),
+  Pustheim and Głusholm (Unincorporated) — with escalating danger, stargates
   between them, and combat anomalies with boss rats. Rat temperament
   follows charter reach: Charter space rats are skittish, Unincorporated
   rats fight to the death.
@@ -207,7 +207,7 @@ content without touching engine code is the intended workflow:
 
 ## Worlds
 
-- `world-default` — the normal game start at Starogród.
+- `world-default` — the normal game start at Sterhov.
 - `world-showcase` — the test world: exercises **every** feature in the game
   (see its `scenario` checklist) and powers the integration suite in
   [`tests/`](tests).

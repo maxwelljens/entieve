@@ -1,6 +1,6 @@
 {
   "id": "sys-rudnik",
-  "name": "Rudnik",
+  "name": "Rudnek",
   "security": "high",
   "constellation": "Kresy",
   "region": "Far Moravia",
@@ -14,7 +14,7 @@
   "celestials": [
     {
       "id": "cel-rudnik-star",
-      "name": "Rudnik",
+      "name": "Rudnek",
       "kind": "star",
       "position": { "X": 0, "Y": 0 },
       "radius": 640000000,
@@ -22,7 +22,7 @@
     },
     {
       "id": "cel-rudnik-prime",
-      "name": "Rudnik Prime",
+      "name": "Rudnek Prime",
       "kind": "planet",
       "position": { "X": 192734907622, "Y": -89942956890 },
       "radius": 6371000,
@@ -30,7 +30,7 @@
     },
     {
       "id": "cel-halda",
-      "name": "Halda",
+      "name": "Malmhalda",
       "kind": "station",
       "position": { "X": 1069460519460, "Y": 741722618335 },
       "radius": 800,
@@ -92,7 +92,7 @@
     },
     {
       "id": "cel-gate-solace",
-      "name": "Gate (Starogród)",
+      "name": "Gate (Sterhov)",
       "kind": "gate",
       "position": { "X": -3492472586259, "Y": -1940262547922 },
       "radius": 2500,
@@ -104,7 +104,7 @@
     },
     {
       "id": "cel-gate-mlynow",
-      "name": "Gate (Młynów)",
+      "name": "Gate (Młyndal)",
       "kind": "gate",
       "position": { "X": 4025289688051, "Y": 2631920180649 },
       "radius": 2500,
