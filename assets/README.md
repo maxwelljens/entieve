@@ -49,7 +49,11 @@ seam's cue names:
 
 The pack's originals are 24-bit/48 kHz PCM; ebiten's wav decoder reads only
 8- and 16-bit PCM, so each copy is transcoded to 16-bit/44.1 kHz stereo
-(the audio context's rate) — a byte-identical copy would not decode. They
+(the audio context's rate) — a byte-identical copy would not decode. The
+two Air FX files also ship ~30 dB under the rest of the pack (they peak at
+−44 dBFS against the click's −14), which made them inaudible at any sane
+volume: `open.wav` and `close.wav` carry +30 and +27.6 dB of gain so every
+cue peaks at about −14 dBFS (`game.TestUISoundCueLevels` pins the floor). They
 are embedded by `sfx.go` beside them (`//go:embed *.wav`) and played by
 `game.UISound`; `game.NewAudio` builds the players only on the `run` path,
 so tests never decode a cue. The pack is **uncredited**: its licence is

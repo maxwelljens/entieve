@@ -2,14 +2,18 @@ package game
 
 import (
 	"bytes"
+	"encoding/binary"
 	"image"
 	"io"
+	"math"
 	"os"
 	"sort"
 	"testing"
 
+	"github.com/ebitenui/ebitenui/widget"
 	sfxassets "github.com/entieve/entieve/assets/sfx"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio/wav"
@@ -64,58 +68,156 @@ func TestDefaultUISoundIsNop(t *testing.T) {
 	g.ui.SetVolume(0.5, 0.5)
 }
 
-// TestUISoundTriggers pins every approved trigger against the fake seam:
-// a UI press edge clicks (once per press), a world press is silent, host
-// mounts/unmounts open and close, the quantity intents confirm, and the
-// keybind refusals refuse.
-func TestUISoundTriggers(t *testing.T) {
-	path := t.TempDir() + "/save.json"
-	f := &fakeUISound{}
-	g := newUISoundGame(t, path, f)
-	pump(t, g, 1280, 720)
-	f.plays = nil // ignore the boot mounts (the log opens by default)
+// pressAt feeds one synthetic press edge at pt through the production
+// click gate and reports what the seam received for it.
+func pressAt(g *Game, f *fakeUISound, pt image.Point) []string {
+	before := len(f.plays)
+	g.uiClick(Input{MouseX: float64(pt.X), MouseY: float64(pt.Y), JustClicked: [2]bool{true, false}})
+	return f.plays[before:]
+}
 
-	// Every press edge over interface chrome clicks; a drag frame (no
-	// edge) does not, and a world press never does.
-	log := g.host.Window(idLog).GetContainer().GetWidget().Rect
-	at := image.Pt(log.Min.X+log.Dx()/2, log.Min.Y+log.Dy()/2)
-	g.uiClick(Input{MouseX: float64(at.X), MouseY: float64(at.Y), JustClicked: [2]bool{true, false}})
-	if len(f.plays) != 1 || f.plays[0] != sfxClick {
-		t.Fatalf("press over the log = %v, want one click", f.plays)
+// TestUIClickLandsOnControlsOnly is the click-cue classification: a press
+// speaks only for an interactive control — a button, a text input, a
+// slider's grab band, a table row, a context-menu entry. Window bodies,
+// title bars, plain labels, a slider's row outside its band, disabled
+// buttons, dead space and the world stay silent (the user's "clicking
+// anywhere on a window ticks").
+func TestUIClickLandsOnControlsOnly(t *testing.T) {
+	f := &fakeUISound{}
+	g := newUISoundGame(t, t.TempDir()+"/save.json", f)
+	pump(t, g, 1280, 720)
+	f.plays = nil
+
+	// A fixture window on top of the stack carrying one of each control,
+	// laid out by the real layout pass.
+	env := g.env
+	btn := widget.NewButton(widget.ButtonOpts.TextLabel("Go"))
+	off := widget.NewButton(widget.ButtonOpts.TextLabel("Off"))
+	off.GetWidget().Disabled = true
+	input := widget.NewTextInput(widget.TextInputOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(120), theme.Px(30))))
+	sl := widgets.NewSlider(env, widgets.SliderOpts{Mode: widgets.SliderFreeflow, Min: 0, Max: 100, Step: 1, Value: 50})
+	row := widget.NewContainer(widget.ContainerOpts.WidgetOpts(
+		widget.WidgetOpts.MinSize(0, theme.Px(30)),
+		widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+	))
+	body := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Spacing(theme.Px(8)),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
+		)),
+	)
+	body.AddChild(btn, off, input, sl, row)
+	title, _ := theme.NewTitleBar(env, "Fixture", "")
+	win := widget.NewWindow(
+		widget.WindowOpts.Contents(body),
+		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
+		widget.WindowOpts.MinSize(theme.Px(320), theme.Px(320)),
+		widget.WindowOpts.Location(image.Rect(theme.Px(140), theme.Px(120), theme.Px(460), theme.Px(440))),
+	)
+	g.kit.SetWindowClose(win, func() {}) // attaches the × the fixture presses
+	g.kit.AddWindow(win)
+	pump(t, g, 1280, 720)
+	f.plays = nil
+
+	centre := func(r image.Rectangle) image.Point {
+		return image.Pt(r.Min.X+r.Dx()/2, r.Min.Y+r.Dy()/2)
 	}
-	// A right press on chrome is a press too (the context menu's edge).
-	g.uiClick(Input{MouseX: float64(at.X), MouseY: float64(at.Y), JustClicked: [2]bool{false, true}})
-	if len(f.plays) != 2 || f.plays[1] != sfxClick {
-		t.Fatalf("right press over the log = %v, want a second click", f.plays)
+	// Loud: the controls.
+	for name, pt := range map[string]image.Point{
+		"button":       centre(btn.GetWidget().Rect),
+		"text input":   centre(input.GetWidget().Rect),
+		"slider band":  centre(sl.HitBand()),
+		"window close": centre(g.kit.CloseButtonOf(win).GetWidget().Rect),
+	} {
+		if got := pressAt(g, f, pt); len(got) != 1 || got[0] != sfxClick {
+			t.Errorf("press on the %s = %v, want one click", name, got)
+		}
 	}
-	f.plays = f.plays[:1]
-	g.uiClick(Input{MouseX: float64(at.X), MouseY: float64(at.Y)}) // held, no edge
-	if len(f.plays) != 1 {
-		t.Errorf("a held press clicked again: %v", f.plays)
+	// Silent: everything that is furniture (a bare container is not a row;
+	// the real table row below is).
+	bodyTop := body.GetWidget().Rect
+	band := sl.HitBand()
+	silent := map[string]image.Point{
+		"window body":  image.Pt(bodyTop.Min.X+2, bodyTop.Max.Y-2),
+		"title bar":    image.Pt(title.GetWidget().Rect.Min.X+theme.Px(40), centre(title.GetWidget().Rect).Y),
+		"disabled":     centre(off.GetWidget().Rect),
+		"slider row":   image.Pt(centre(sl.HitBand()).X, sl.GetWidget().Rect.Max.Y-1),
+		"title corner": image.Pt(bodyTop.Max.X-1, bodyTop.Min.Y+1),
 	}
+	for name, pt := range silent {
+		if pt.In(band) {
+			t.Fatalf("fixture: %s point %v sits in the slider band", name, pt)
+		}
+		if got := pressAt(g, f, pt); len(got) != 0 {
+			t.Errorf("press on the %s = %v, want silence", name, got)
+		}
+	}
+	// A drag frame (no press edge) never speaks.
+	before := len(f.plays)
+	g.uiClick(Input{MouseX: float64(centre(btn.GetWidget().Rect).X), MouseY: float64(centre(btn.GetWidget().Rect).Y)})
+	if len(f.plays) != before {
+		t.Errorf("a held press clicked again: %v", f.plays[before:])
+	}
+	// The world is silent.
 	if world, ok := freePoint(g); ok {
-		g.uiClick(Input{MouseX: float64(world.X), MouseY: float64(world.Y), JustClicked: [2]bool{true, false}})
-		if len(f.plays) != 1 {
-			t.Errorf("a world press played %v, want silence", f.plays[1:])
+		if got := pressAt(g, f, world); len(got) != 0 {
+			t.Errorf("a world press played %v, want silence", got)
 		}
 	} else {
 		t.Error("no point off the interface: cannot prove a world press is silent")
+	}
+	// A real table row is a control (the row tag, not a fixture).
+	if tbl := g.kit.OverviewTable(); tbl != nil && len(tbl.RowsForTest()) > 0 {
+		r := tbl.RowWidgetForTest(0).Rect
+		if r.Dx() > 0 && r.Dy() > 0 {
+			if got := pressAt(g, f, centre(r)); len(got) != 1 || got[0] != sfxClick {
+				t.Errorf("press on an overview row = %v, want one click", got)
+			}
+		}
+	} else {
+		t.Error("the overview table has no rows to press")
+	}
+	// A context-menu entry is a control (the popup is drawn, not a widget).
+	g.Do(widgets.OpenMenu{
+		At:      image.Pt(theme.Px(600), theme.Px(300)),
+		Entries: []widgets.MenuEntry{{Label: "Show Info", Action: func() {}}},
+	})
+	pump(t, g, 1280, 720)
+	if r, open := g.kit.MenuRect(); open {
+		if got := pressAt(g, f, image.Pt(r.Min.X+r.Dx()/2, r.Min.Y+6)); len(got) != 1 || got[0] != sfxClick {
+			t.Errorf("press on a menu entry = %v, want one click", got)
+		}
+	} else {
+		t.Error("the context menu did not open")
+	}
+}
+
+// TestUISoundTriggers pins the non-click triggers against the fake seam:
+// host mounts/unmounts open and close, the quantity intents confirm, and
+// the keybind refusals refuse.
+func TestUISoundTriggers(t *testing.T) {
+	g := newUISoundGame(t, t.TempDir()+"/save.json", &fakeUISound{})
+	f := g.ui.(*fakeUISound)
+	pump(t, g, 1280, 720)
+	if len(f.plays) != 0 {
+		t.Fatalf("the boot composition played %v, want silence", f.plays)
 	}
 
 	// Mount and unmount edges through the host (Reconcile owns them).
 	g.host.SetOpen(idScanner, true)
 	g.syncMounts()
-	if len(f.plays) != 2 || f.plays[1] != sfxOpen {
-		t.Fatalf("mount = %v, want a following open", f.plays)
+	if len(f.plays) != 1 || f.plays[0] != sfxOpen {
+		t.Fatalf("mount = %v, want one open", f.plays)
 	}
 	g.host.SetOpen(idScanner, false)
 	g.syncMounts()
-	if len(f.plays) != 3 || f.plays[2] != sfxClose {
+	if len(f.plays) != 2 || f.plays[1] != sfxClose {
 		t.Fatalf("unmount = %v, want a following close", f.plays)
 	}
 	// A frame with no edge in either direction stays silent.
 	g.syncMounts()
-	if len(f.plays) != 3 {
+	if len(f.plays) != 2 {
 		t.Errorf("an unchanged room replayed cues: %v", f.plays)
 	}
 
@@ -267,4 +369,41 @@ func freePoint(g *Game) (image.Point, bool) {
 		}
 	}
 	return image.Point{}, false
+}
+
+// cueMinPeakDB is the floor a cue's own peak must clear: the seam plays at
+// master × UI (0.8 fresh), so a file ~30 dB under its siblings is silent in
+// practice however correctly it fires.
+const cueMinPeakDB = -24.0
+
+// TestUISoundCueLevels pins that every embedded cue is actually audible.
+// It is the pin for the reported "the open/close sounds do not play": the
+// triggers fired, but the two Air FX files peaked at -44 / -41.6 dBFS —
+// ~30 dB below the click — so nothing could be heard.
+func TestUISoundCueLevels(t *testing.T) {
+	for _, name := range []string{"click", "open", "close", "confirm", "refuse"} {
+		data, err := sfxassets.FS.ReadFile(name + ".wav")
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		stream, err := wav.DecodeF32(bytes.NewReader(data))
+		if err != nil {
+			t.Fatalf("%s decode: %v", name, err)
+		}
+		pcm, err := io.ReadAll(stream)
+		if err != nil {
+			t.Fatalf("%s pcm: %v", name, err)
+		}
+		var peak float64
+		for i := 0; i+3 < len(pcm); i += 4 {
+			v := math.Abs(float64(math.Float32frombits(binary.LittleEndian.Uint32(pcm[i:]))))
+			peak = max(peak, v)
+		}
+		if peak == 0 {
+			t.Fatalf("%s is digital silence", name)
+		}
+		if db := 20 * math.Log10(peak); db < cueMinPeakDB {
+			t.Errorf("%s peaks at %.1f dBFS, want ≥ %.0f (inaudible at the seam's volume)", name, db, cueMinPeakDB)
+		}
+	}
 }

@@ -87,6 +87,11 @@ type ScreenHost struct {
 	// onMount/onUnmount are the game's UI-sound hooks (nil = silent):
 	// they fire on a row's mount and unmount edges only, never per frame.
 	onMount, onUnmount func(ScreenID)
+
+	// quiet silences the next reconcile pass: the boot composition and the
+	// remount after Rebind (a rebuilt kit brings back the windows the
+	// player already had) are not opens, so they must not speak.
+	quiet bool
 }
 
 // newScreenHost builds the host over a row table. scope title keeps
@@ -101,6 +106,7 @@ func newScreenHost(rows []Screen, scope hostScope, sink hostSink, services scree
 		services: services,
 		placed:   map[*widget.Window]image.Rectangle{},
 		restored: map[*widget.Window]bool{},
+		quiet:    true, // the boot composition is not an open
 	}
 	for _, row := range rows {
 		s := &screenSlot{row: row}
@@ -125,6 +131,7 @@ func (h *ScreenHost) Rebind(sink hostSink, services screenServices) {
 	}
 	h.placed = map[*widget.Window]image.Rectangle{}
 	h.restored = map[*widget.Window]bool{}
+	h.quiet = true // the rebuilt kit remounts what was already open
 }
 
 // Warm builds every panel and registers its ×, in row order, before the
@@ -172,17 +179,21 @@ func (h *ScreenHost) want(s *screenSlot, room Room) bool {
 		(!s.row.DockedOnly || room.Docked)
 }
 
-// Reconcile mounts and unmounts the rows to match the room.
+// Reconcile mounts and unmounts the rows to match the room. The pass after
+// a Rebind (and the boot one) is quiet: those mounts are windows coming
+// back, not the player opening them.
 func (h *ScreenHost) Reconcile(room Room) {
+	quiet := h.quiet
+	h.quiet = false
 	for _, s := range h.slots {
-		h.setMounted(s, h.want(s, room))
+		h.setMounted(s, h.want(s, room), quiet)
 	}
 }
 
 // setMounted is the mount lifecycle: a mount builds on demand (title),
 // mounts and runs Sync in the same frame; an unmount runs the panel's
 // Unmounted hook, then removes.
-func (h *ScreenHost) setMounted(s *screenSlot, want bool) {
+func (h *ScreenHost) setMounted(s *screenSlot, want, quiet bool) {
 	if want == (s.mount != nil) {
 		return
 	}
@@ -191,7 +202,7 @@ func (h *ScreenHost) setMounted(s *screenSlot, want bool) {
 		s.mount = h.sink.AddWindow(s.panel.Win())
 		s.dismissed = false
 		s.panel.Sync()
-		if h.onMount != nil {
+		if h.onMount != nil && !quiet {
 			h.onMount(s.row.ID)
 		}
 		return
@@ -201,7 +212,7 @@ func (h *ScreenHost) setMounted(s *screenSlot, want bool) {
 	}
 	s.mount()
 	s.mount, s.dismissed = nil, false
-	if h.onUnmount != nil {
+	if h.onUnmount != nil && !quiet {
 		h.onUnmount(s.row.ID)
 	}
 	if h.scope == titleScope {
@@ -372,6 +383,23 @@ func (h *ScreenHost) Tables(id ScreenID) []*widgets.Table {
 	return nil
 }
 
+// TablesHit reports whether pt lands on one of win's table rows: the click
+// cue's row test, asked per window so the kit's press gate honours the
+// stack (only the topmost window under the pointer is consulted).
+func (h *ScreenHost) TablesHit(win *widget.Window, pt image.Point) bool {
+	for _, s := range h.slots {
+		if s.panel == nil || s.panel.Win() != win {
+			continue
+		}
+		for _, t := range h.Tables(s.row.ID) {
+			if t.RowAt(pt) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // PersistedOpen is the open value the sidecar records for a persisted row.
 func (h *ScreenHost) PersistedOpen(id ScreenID) bool {
 	return h.IsOpen(id)
@@ -437,6 +465,7 @@ func (h *ScreenHost) MarkRestored(win *widget.Window) {
 func (h *ScreenHost) ResetPlacement() {
 	h.placed = map[*widget.Window]image.Rectangle{}
 	h.restored = map[*widget.Window]bool{}
+	h.quiet = true // the rebuilt kit remounts what was already open
 }
 
 // PlaceDefaults re-places every row's window from its declared rect +

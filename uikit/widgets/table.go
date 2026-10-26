@@ -1666,6 +1666,24 @@ func fitColumns(cols []ColWidth, prio []int, grow int, avail float64) []ColWidth
 // can fire a real click at it (the suite's row-click helpers).
 func (t *Table) RowWidgetForTest(i int) *widget.Widget { return t.RowCts[i].GetWidget() }
 
+// RowAt reports whether pt sits on a row's clickable strip: inside the
+// table's viewport (a scrolled-out row's rect is clipped away and must not
+// claim the point) and on one of the row containers that carry the click
+// handler. Rows live inside the table's scroll viewport, which the kit's
+// widget walk cannot descend into (a ScrollContainer hides its content),
+// so the press gate asks the table itself.
+func (t *Table) RowAt(pt image.Point) bool {
+	if !pt.In(t.scroll.ViewRect()) {
+		return false
+	}
+	for _, c := range t.RowCts {
+		if w := c.GetWidget(); w.IsVisible() && pt.In(w.Rect) {
+			return true
+		}
+	}
+	return false
+}
+
 // RowClickedForTest runs row i's click handling directly (no event
 // pump): the double-click/show-info tests drive it as the handler does.
 func (t *Table) RowClickedForTest(i int) { t.rowClicked(i) }
