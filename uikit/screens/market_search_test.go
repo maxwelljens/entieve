@@ -458,24 +458,44 @@ func TestMarketAvailabilitySuffix(t *testing.T) {
 }
 
 // TestMarketSearchFoldsDiacritics: the query matches through the canon
-// diacritics in BOTH directions — ASCII "zaklady" finds the items whose
-// maker is "Zakłady Burza", a diacritic-typed "zakłady" finds the same
-// set, and "druzstvo" finds Družstvo's. (RED: the raw byte matcher in
-// searchHits misses every one of them.)
+// diacritics in BOTH directions. The fixtures are derived, not hardcoded —
+// every maker that carries a diacritic (folded first word = what a plain
+// keyboard types, raw first word = the typed-diacritic direction) gets both
+// queries checked against its exact item set, so the pin survives any
+// future rename of the houses.
 func TestMarketSearchFoldsDiacritics(t *testing.T) {
 	m, env, _, frame := mktSearchEnv(t)
 
-	burza, dru := []content.ItemID{}, []content.ItemID{}
+	type mset struct {
+		raw   string // the maker, diacritics intact
+		items []content.ItemID
+	}
+	sets := map[string]*mset{}
 	for _, item := range marketCatalog(env) {
-		switch m.maker[item] {
-		case "Zakłady Burza":
-			burza = append(burza, item)
-		case "Družstvo":
-			dru = append(dru, item)
+		mk := m.maker[item]
+		folded, _ := foldString(mk)
+		if folded == mk {
+			continue
+		}
+		word := strings.SplitN(folded, " ", 2)[0]
+		s := sets[word]
+		if s == nil {
+			s = &mset{raw: strings.SplitN(mk, " ", 2)[0]}
+			sets[word] = s
+		}
+		s.items = append(s.items, item)
+	}
+	if len(sets) < 2 {
+		t.Fatalf("fixture: %d diacritic-carrying makers, need at least 2", len(sets))
+	}
+	big := false
+	for _, s := range sets {
+		if len(s.items) >= 2 {
+			big = true
 		}
 	}
-	if len(burza) < 2 || len(dru) < 1 {
-		t.Fatalf("fixture: %d burza items, %d Družstvo items — need both", len(burza), len(dru))
+	if !big {
+		t.Fatal("fixture: every diacritic maker is a singleton — need one with a set")
 	}
 
 	m.FocusSearch()
@@ -483,7 +503,7 @@ func TestMarketSearchFoldsDiacritics(t *testing.T) {
 		t.Helper()
 		// SetText, not SelectAll+DeleteSelectedText: the widget's
 		// selection delete miscounts bytes on multi-byte runes and
-		// leaves trailing bytes behind (observed: "zakłady" -> "y").
+		// leaves trailing bytes behind (observed: "zak\u0142ady" -> "y").
 		m.search.SetText(q)
 		frame()
 		out := []content.ItemID{}
@@ -508,13 +528,12 @@ func TestMarketSearchFoldsDiacritics(t *testing.T) {
 		return true
 	}
 
-	if got := query("zaklady"); !sameSet(got, burza) {
-		t.Errorf("\"zaklady\" matched %v, want the %d Zakłady Burza items %v", got, len(burza), burza)
-	}
-	if got := query("zakłady"); !sameSet(got, burza) {
-		t.Errorf("typed \"zakłady\" matched %v, want the same Zakłady Burza set %v", got, burza)
-	}
-	if got := query("druzstvo"); !sameSet(got, dru) {
-		t.Errorf("\"druzstvo\" matched %v, want the Družstvo items %v", got, dru)
+	for word, s := range sets {
+		if got := query(word); !sameSet(got, s.items) {
+			t.Errorf("ASCII %q matched %v, want the %d %q items %v", word, got, len(s.items), s.raw, s.items)
+		}
+		if got := query(s.raw); !sameSet(got, s.items) {
+			t.Errorf("typed %q matched %v, want the same %q set %v", s.raw, got, s.raw, s.items)
+		}
 	}
 }
