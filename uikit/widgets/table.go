@@ -1698,6 +1698,10 @@ func (t *Table) WidthsForTest() []float64 { return t.widths }
 // refit and construction-metric tests).
 func (t *Table) HdrBtnForTest() []*widget.Button { return t.hdrBtn }
 
+// MenuBtnForTest is the header's ⋯ button (the column menu's open path —
+// a host test clicks it at its own rect).
+func (t *Table) MenuBtnForTest() *widget.Button { return t.menuBtn }
+
 // ScrollForTest is the scroll viewport (overflow assertions).
 func (t *Table) ScrollForTest() *widget.ScrollContainer { return t.scroll }
 

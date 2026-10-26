@@ -126,8 +126,9 @@ Controls and concepts: [docs/GAMEPLAY.md](docs/GAMEPLAY.md).
   for anonymous long-range contacts; warp-to-within (0/10/50 km) shapes
   landings.
 - **Show Info.** Right-click any item where it appears for a flat EVE-style
-  context menu (bold **Show Info** first) and one floating `<Name> — Info`
-  window — description prose, stats, charges, market data, loot.
+  context menu (bold **Show Info** first) and one floating **Info** window
+  (its body is headed with the entity's name) — description prose, stats,
+  charges, market data, loot.
 - **Time acceleration** (1×–8×).
 
 ## Custom art

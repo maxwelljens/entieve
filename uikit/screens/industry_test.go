@@ -158,8 +158,8 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 	if !q.IsOpen() {
 		t.Fatal("selecting a recipe opened no picker")
 	}
-	if got, want := q.TitleText(), env.TradeableName("ammo-emp-s")+" — Start"; got != want {
-		t.Errorf("picker title = %q, want %q", got, want)
+	if got := q.TitleText(); got != "Quantity" {
+		t.Errorf("picker title = %q, want the base name Quantity", got)
 	}
 	if !q.Confirm().GetWidget().Disabled {
 		t.Fatal("Confirm enabled with an empty hold")

@@ -659,8 +659,9 @@ func NewInfoWin(env widgets.Seams) *InfoWin {
 	)
 	body.AddChild(w.rail.Container())
 
-	// Title bar: name + "— Info". The close affordance (the ×) is not
-	// built here: Kit.SetWindowClose attaches it through the kit-wide
+	// Title bar: the base display name only (window titles are furniture;
+	// the page leads with its own <Name> head inside the body). The close
+	// affordance (the ×) is not built here: Kit.SetWindowClose attaches it through the kit-wide
 	// close seam, so every closable title bar carries the same button.
 	bar, title := theme.NewTitleBar(env, "Info", "")
 	w.title = title
@@ -699,7 +700,7 @@ func (w *InfoWin) IsOpen() bool {
 // Ref is what the window currently shows (ok = a page was ever built).
 func (w *InfoWin) Ref() (widgets.InfoRef, bool) { return w.ref, w.hasRef }
 
-// TitleText is the title-bar label (tests pin "<Name> — Info").
+// TitleText is the title-bar label (the base display name).
 func (w *InfoWin) TitleText() string {
 	if w.title == nil {
 		return ""
@@ -726,7 +727,9 @@ func (w *InfoWin) Show(ref widgets.InfoRef) bool {
 	}
 	w.ref, w.hasRef = ref, true
 	w.render(page)
-	w.title.Label = page.Title + " — Info"
+	// The title is the base display name only (a window title is
+	// furniture): the page leads with its own head inside the body.
+	w.title.Label = "Info"
 	w.scroll.ScrollTop = 0
 	theme.ShowWidget(w.win.GetContainer().GetWidget(), true)
 	return true

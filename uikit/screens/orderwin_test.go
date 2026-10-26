@@ -92,8 +92,8 @@ func TestOrderWindowDefaults(t *testing.T) {
 		t.Fatal("Show refused a docked launch")
 	}
 	frame()
-	if got, want := w.TitleText(), "Stub Ore — Order"; got != want {
-		t.Errorf("title = %q, want %q", got, want)
+	if got := w.TitleText(); got != "Order" {
+		t.Errorf("title = %q, want the base name Order", got)
 	}
 	if got, want := w.price.GetText(), "91"; got != want { // best bid 90 + 1
 		t.Errorf("sell price = %q, want %q", got, want)
@@ -240,8 +240,8 @@ func TestOrderWindowSingleInstance(t *testing.T) {
 	if !k.OrderOpen() {
 		t.Fatal("OpenOrder did not open the window")
 	}
-	if got, want := k.OrderWin().TitleText(), k.Env().TradeableName(a)+" — Order"; got != want {
-		t.Errorf("title = %q, want %q", got, want)
+	if got := k.OrderWin().TitleText(); got != "Order" {
+		t.Errorf("title = %q, want the base name Order", got)
 	}
 	if got, want := k.OrderWin().qty.GetText(), "4"; got != want {
 		t.Errorf("sell qty = %q, want %q", got, want)
@@ -259,8 +259,8 @@ func TestOrderWindowSingleInstance(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("order window mounted %d times, want the single instance", count)
 	}
-	if got, want := k.OrderWin().TitleText(), k.Env().TradeableName(b)+" — Order"; got != want {
-		t.Errorf("retargeted title = %q, want %q", got, want)
+	if got := k.OrderWin().TitleText(); got != "Order" {
+		t.Errorf("retargeted title = %q, want the base name Order (a re-target never retitles)", got)
 	}
 	if got, want := k.OrderWin().modeBtn.Text().Label, "Request"; got != want {
 		t.Errorf("retargeted mode = %q, want %q", got, want)

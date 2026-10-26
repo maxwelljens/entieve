@@ -6,6 +6,7 @@ import (
 	"github.com/entieve/entieve/uikit/widgets"
 	"image"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
@@ -176,8 +177,11 @@ func TestOverviewRowClickSelectsThenShowsInfo(t *testing.T) {
 		t.Fatalf("fixture: %v (%s) resolves to no definition", target.Entity, target.Kind)
 	}
 	page, _ := infoPageFor(k.Env(), ref)
-	if got, want := k.svc.info.TitleText(), page.Title+" — Info"; got != want {
-		t.Errorf("info title = %q, want %q", got, want)
+	if page.Title == "" || !strings.Contains(page.Title, "Väktare") {
+		t.Errorf("page head = %q, want the entity name (the title no longer carries it)", page.Title)
+	}
+	if got := k.svc.info.TitleText(); got != "Info" {
+		t.Errorf("info title = %q, want the base name Info", got)
 	}
 	if r := k.InfoWindow().GetContainer().GetWidget().Rect; r.Dx() == 0 {
 		t.Error("info window never laid out")

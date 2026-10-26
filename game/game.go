@@ -187,6 +187,14 @@ type Game struct {
 	// for the whole frame.
 	menuModal bool
 
+	// menuWasOpen is the previous frame's popup state: the popup's open
+	// EDGE is its appearance cue. The menu is kit-level (never a mounted
+	// window), so no window-mount edge speaks for it; a reopen inside one
+	// frame (a column toggle re-opens the popup) is not a new appearance.
+	// Dismissal stays silent — the press that closes the popup is the same
+	// gesture whose landing the click cue already reports.
+	menuWasOpen bool
+
 	scenes []Scene
 	space  *SpaceScene
 	w, h   int // logical screen size (Layout), in device pixels
@@ -391,6 +399,14 @@ func (g *Game) Update() error {
 	// Draw without an Update, and ApplyCursor then repeats this pass's
 	// decision instead of clearing it.
 	widgets.BeginCursorFrame()
+	// The context menu appearing is its own cue: the popup is kit-level
+	// (no mount edge speaks for it), so the closed→open edge is read here —
+	// before this frame's poll, which may dismiss it.
+	_, menuUp := g.kit.MenuRect()
+	if menuUp && !g.menuWasOpen {
+		g.ui.Play(sfxOpen)
+	}
+	g.menuWasOpen = menuUp
 	// The context menu owns its frame: sample it before anything reads
 	// input (it may consume this frame's Esc or click), then gate the
 	// scene and key switches on the latch.

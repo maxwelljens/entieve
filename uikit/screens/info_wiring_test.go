@@ -126,8 +126,11 @@ func TestMarketRowMenu(t *testing.T) {
 	if !env.InfoWindow().IsOpen() {
 		t.Fatal("double-click on a market row did not open Show Info")
 	}
-	if got, want := env.InfoWindow().TitleText(), env.TradeableName(wantItem)+" — Info"; got != want {
-		t.Errorf("info title = %q, want %q", got, want)
+	if got := env.InfoWindow().TitleText(); got != "Info" {
+		t.Errorf("info title = %q, want the base name Info", got)
+	}
+	if ref, ok := env.InfoWindow().Ref(); !ok || ref.ID != string(wantItem) {
+		t.Errorf("info ref = %v/%v, want the row's item %s", ref, ok, wantItem)
 	}
 }
 

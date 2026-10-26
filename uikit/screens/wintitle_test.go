@@ -2,6 +2,7 @@ package screens
 
 import (
 	"image"
+	"strings"
 	"testing"
 
 	"github.com/ebitenui/ebitenui/event"
@@ -287,5 +288,130 @@ func TestTitleDragSkipsRelayout(t *testing.T) {
 	}
 	if res.n != 0 {
 		t.Errorf("ResizeEvent count = %d, want 0", res.n)
+	}
+}
+
+// TestTitleNeverOverflowsItsBar is the reported title-bar bug: a long title
+// must be ellipsized into the bar's safe width (past the dots and icon, clear
+// of the × strip) instead of running under the × and out of the window.
+func TestTitleNeverOverflowsItsBar(t *testing.T) {
+	k, _ := newTestKit(t)
+	env := k.Env()
+	long := "Market — Cordite Ore 12.34 € · fee 3%+1% · cheapest Kern Place 11.00 €"
+	bar, txt := theme.NewTitleBar(env, long, "svc_market")
+	body := widget.NewContainer(widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(200), theme.Px(120))))
+	win := widget.NewWindow(
+		widget.WindowOpts.Contents(body),
+		widget.WindowOpts.TitleBar(bar, theme.Px(theme.TitleBarH)),
+		widget.WindowOpts.MinSize(theme.Px(200), theme.Px(160)),
+		widget.WindowOpts.Location(image.Rect(theme.Px(20), theme.Px(20), theme.Px(20+260), theme.Px(20+180))),
+	)
+	k.SetWindowClose(win, func() {}) // attaches the × the title must clear
+	k.AddWindow(win)
+	pumpKit(t, k, 1024, 700)
+	pumpKit(t, k, 1024, 700)
+
+	closeBtn := k.CloseButtonOf(win).GetWidget().Rect
+	label := txt.GetWidget().Rect
+	if closeBtn.Empty() || label.Empty() {
+		t.Fatalf("fixture: × %v / label %v never laid out", closeBtn, label)
+	}
+	face, size := *env.FaceMono(theme.StepBase), env.TS().Base
+	avail := float64(closeBtn.Min.X-theme.Px(theme.SpSm)) - float64(label.Min.X)
+	if got := theme.MeasureTracked(long, face, size); got <= avail {
+		t.Fatalf("fixture: the title measures %v in %v of room — it cannot overflow", got, avail)
+	}
+	shown := txt.Shown()
+	if got := theme.MeasureTracked(shown, face, size); got > avail {
+		t.Errorf("the title draws %v wide in %v of room: it runs %v px under the × strip %v",
+			got, avail, got-avail, closeBtn)
+	}
+	if shown == long || !strings.HasSuffix(shown, "…") {
+		t.Errorf("the drawn title = %q, want the ellipsized form of %q", shown, long)
+	}
+
+	// A title that fits is drawn verbatim (no stray ellipsis on the windows
+	// whose base names are short).
+	bar2, short := theme.NewTitleBar(env, "Market", "svc_market")
+	win2 := widget.NewWindow(
+		widget.WindowOpts.Contents(widget.NewContainer(widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(240), theme.Px(120))))),
+		widget.WindowOpts.TitleBar(bar2, theme.Px(theme.TitleBarH)),
+		widget.WindowOpts.MinSize(theme.Px(320), theme.Px(160)),
+		widget.WindowOpts.Location(image.Rect(theme.Px(300), theme.Px(20), theme.Px(620), theme.Px(200))),
+	)
+	k.SetWindowClose(win2, func() {})
+	k.AddWindow(win2)
+	pumpKit(t, k, 1024, 700)
+	pumpKit(t, k, 1024, 700)
+	if short.GetWidget().Rect.Empty() {
+		t.Fatal("fixture: the short-titled bar never laid out")
+	}
+	if got := short.Shown(); got != "Market" {
+		t.Errorf("a fitting title draws %q, want Market", got)
+	}
+}
+
+// TestTitleBarStillRetitles pins the retitle capability the static titles
+// keep (the user's "preserve the underlying functionality"): production
+// passes base names, but setting the label still reaches the drawn title —
+// verbatim while it fits.
+func TestTitleBarStillRetitles(t *testing.T) {
+	k, _ := newTestKit(t)
+	env := k.Env()
+	bar, txt := theme.NewTitleBar(env, "Market", "")
+	win := widget.NewWindow(
+		widget.WindowOpts.Contents(widget.NewContainer(widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(240), theme.Px(120))))),
+		widget.WindowOpts.TitleBar(bar, theme.Px(theme.TitleBarH)),
+		widget.WindowOpts.MinSize(theme.Px(320), theme.Px(160)),
+		widget.WindowOpts.Location(image.Rect(theme.Px(20), theme.Px(20), theme.Px(340), theme.Px(200))),
+	)
+	k.SetWindowClose(win, func() {})
+	k.AddWindow(win)
+	pumpKit(t, k, 1024, 700)
+	pumpKit(t, k, 1024, 700)
+
+	txt.Label = "Market — Ore"
+	pumpKit(t, k, 1024, 700)
+	if got := txt.Shown(); got != "Market — Ore" {
+		t.Errorf("the drawn title = %q, want the retitled %q", got, txt.Label)
+	}
+}
+
+// TestTitleBarSliverDrawsTheBareEllipsis: a bar narrower than the dots +
+// icon lead-in leaves the label no room at all — it draws the bare "…", never
+// the full title over the ×.
+func TestTitleBarSliverDrawsTheBareEllipsis(t *testing.T) {
+	k, _ := newTestKit(t)
+	env := k.Env()
+	long := "Market — Cordite Ore 12.34 € · fee 3%+1% · cheapest Kern Place 11.00 €"
+	bar, txt := theme.NewTitleBar(env, long, "svc_market")
+	win := widget.NewWindow(
+		widget.WindowOpts.Contents(widget.NewContainer(widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(60), theme.Px(60))))),
+		widget.WindowOpts.TitleBar(bar, theme.Px(theme.TitleBarH)),
+		widget.WindowOpts.MinSize(theme.Px(100), theme.Px(100)),
+		widget.WindowOpts.Location(image.Rect(theme.Px(20), theme.Px(20), theme.Px(120), theme.Px(140))),
+	)
+	k.SetWindowClose(win, func() {})
+	k.AddWindow(win)
+	pumpKit(t, k, 1024, 700)
+	pumpKit(t, k, 1024, 700)
+
+	closeBtn := k.CloseButtonOf(win).GetWidget().Rect
+	label := txt.GetWidget().Rect
+	if closeBtn.Empty() || label.Empty() {
+		t.Fatalf("fixture: × %v / label %v never laid out", closeBtn, label)
+	}
+	face, size := *env.FaceMono(theme.StepBase), env.TS().Base
+	room := float64(closeBtn.Min.X-theme.Px(theme.SpSm)) - float64(label.Min.X)
+	if room >= theme.MeasureTracked("M", face, size) {
+		t.Fatalf("fixture: %v px of room still fits a glyph — the sliver case is untested", room)
+	}
+	// No room for a glyph: the bare "…" when even that fits, nothing when it
+	// does not — never the full title over the ×.
+	if got := txt.Shown(); got != "…" && got != "" {
+		t.Errorf("a title with %v px of room draws %q, want the bare ellipsis or nothing", room, got)
+	}
+	if got := theme.MeasureTracked(txt.Shown(), face, size); got > max(room, 0) {
+		t.Errorf("the drawn title measures %v in %v of room", got, room)
 	}
 }

@@ -62,8 +62,8 @@ func TestRefineryWindow(t *testing.T) {
 	if !q.IsOpen() {
 		t.Fatal("selecting an ore opened no picker")
 	}
-	if got, want := q.TitleText(), "Kerngrit Ore — Refine"; got != want {
-		t.Errorf("picker title = %q, want %q", got, want)
+	if got := q.TitleText(); got != "Quantity" {
+		t.Errorf("picker title = %q, want the base name Quantity", got)
 	}
 	if got := q.Value(); got != 100 {
 		t.Errorf("picker opens at %d, want the first whole batch 100", got)

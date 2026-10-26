@@ -502,7 +502,8 @@ func TestInfoRefResolution(t *testing.T) {
 }
 
 // TestInfoWindowShowAndRefSwap drives the window itself: Show reveals it
-// with the "<Name> — Info" title and a built page (header, prose, ref
+// with the base "Info" title (the page's own head names the entity) and a
+// built page (header, prose, ref
 // rows), a ref row's right-click opens the one-entry Show Info menu and
 // its double-click swaps the window's content in place, an unknown ref
 // changes nothing, and Close hides it again.
@@ -531,8 +532,8 @@ func TestInfoWindowShowAndRefSwap(t *testing.T) {
 	if !w.IsOpen() {
 		t.Fatal("window did not reveal")
 	}
-	if got, want := w.TitleText(), "Fixture Module — Info"; got != want {
-		t.Errorf("title = %q, want %q", got, want)
+	if got := w.TitleText(); got != "Info" {
+		t.Errorf("title = %q, want the base name Info", got)
 	}
 	if w.prose != nil {
 		t.Error("a def without a description rendered a prose block")
@@ -568,8 +569,7 @@ func TestInfoWindowShowAndRefSwap(t *testing.T) {
 
 	// Pressing Show Info swaps the window onto the linked charge.
 	target := first.Ref
-	targetDef, ok := env.Content.Item(content.ItemID(target.ID))
-	if !ok {
+	if _, ok := env.Content.Item(content.ItemID(target.ID)); !ok {
 		t.Fatalf("fixture: linked charge %s not in content", target.ID)
 	}
 	pressMenuEntry(t, env, "Show Info")
@@ -579,8 +579,8 @@ func TestInfoWindowShowAndRefSwap(t *testing.T) {
 	if ref, _ := w.Ref(); ref != target {
 		t.Errorf("window ref = %v, want the linked %v", ref, target)
 	}
-	if got, want := w.TitleText(), targetDef.Name+" — Info"; got != want {
-		t.Errorf("swapped title = %q, want %q", got, want)
+	if got := w.TitleText(); got != "Info" {
+		t.Errorf("swapped title = %q, want the base name Info", got)
 	}
 
 	// Double-click on a link row swaps the same way (a single click is
