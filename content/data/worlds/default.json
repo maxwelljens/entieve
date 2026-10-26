@@ -1,7 +1,7 @@
 {
   "id": "world-default",
   "name": "New Pilot",
-  "description": "The normal game start: a Väktare with a modest fit parked outside Jernborg station in Starogród.",
+  "description": "The normal game start: a Vaktr with a modest fit parked outside Jernvold station in Sterhov.",
   "start": {
     "system": "sys-solace",
     "position": { "X": 843007620248, "Y": 502580312071 },

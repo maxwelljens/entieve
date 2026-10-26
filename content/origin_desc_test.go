@@ -1,6 +1,8 @@
 package content
 
 import (
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode"
@@ -84,7 +86,7 @@ func containsWord(hay, needle string) bool {
 
 // TestShippedTextAvoidsRetiredNames guards the no-placeholder-echo rule across
 // every display name and prose field the content ships: names, titles and
-// descriptions. Worlds are lead-owned and reported separately.
+// descriptions — including the lead-owned worlds' player-visible text.
 func TestShippedTextAvoidsRetiredNames(t *testing.T) {
 	// The whole-word rule has to bite on the retired name and stay quiet on
 	// the current one that carries it as a prefix.
@@ -110,8 +112,22 @@ func TestShippedTextAvoidsRetiredNames(t *testing.T) {
 	}
 
 	c := MustLoad()
+	idToken := regexp.MustCompile(`[a-z][a-z0-9]*(?:-[a-z0-9]+)+`)
+	// The id mask drops frozen slugs (their slugs may embed retired
+	// words) while space-separated real names survive it.
+	if strings.Contains(strings.ToLower(idToken.ReplaceAllString("see contract-solace-cleanup-1 at Jernborg", " ")), "solace") {
+		t.Error("the id mask left a frozen slug in the scan")
+	}
+	if !strings.Contains(strings.ToLower(idToken.ReplaceAllString("the Solace market", " ")), "solace") {
+		t.Error("the id mask ate a real retired name")
+	}
 	check := func(ctx string, text string) {
-		hay := strings.ToLower(text)
+		// Frozen ids may embed retired slugs by canon ("ids are frozen
+		// implementation artifacts, including when they embed retired
+		// slugs"); scenario prose documents them as ids, so id-shaped
+		// tokens are masked before the word scan. Space-separated real
+		// names are never masked.
+		hay := strings.ToLower(idToken.ReplaceAllString(text, " "))
 		for _, needle := range retiredNames {
 			if containsWord(hay, needle) {
 				t.Errorf("%s: echoes retired placeholder name %q", ctx, needle)
@@ -152,5 +168,19 @@ func TestShippedTextAvoidsRetiredNames(t *testing.T) {
 	}
 	for _, corp := range AllCorps {
 		check("corps/"+corp.ID, corp.Name)
+	}
+	// Worlds sweep too: their display text was retargeted in the drift's
+	// follow-up (lead-approved), and the rule covers what the world select
+	// and the tour show from here on.
+	for _, id := range keys(c.Worlds) {
+		w := c.Worlds[id]
+		check("worlds/"+string(id), w.Name)
+		check("worlds/"+string(id), w.Description)
+		for i, cp := range w.Scenario {
+			ctx := "worlds/" + string(id) + "/scenario[" + strconv.Itoa(i) + "]"
+			check(ctx, cp.Name)
+			check(ctx, cp.Feature)
+			check(ctx, cp.Detail)
+		}
 	}
 }

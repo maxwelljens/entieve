@@ -21,10 +21,10 @@ func TestFoldString(t *testing.T) {
 		{"Zakłady", "Zaklady", []int{0, 1, 2, 3, 5, 6, 7}},
 		{"Havřek", "Havrek", []int{0, 1, 2, 3, 5, 6}},
 		{"Młyndal", "Mlyndal", []int{0, 1, 3, 4, 5, 6, 7}},
-		{"Kuźnica", "Kuznica", []int{0, 1, 2, 4, 5, 6, 7}},
+		{"Kuźbor", "Kuzbor", []int{0, 1, 2, 4, 5, 6}},
 		{"Głusholm", "Glusholm", []int{0, 1, 3, 4, 5, 6, 7, 8}},
 		{"ŠŤŮ", "STU", []int{0, 2, 4}},
-		{"Družstvo", "Druzstvo", []int{0, 1, 2, 3, 5, 6, 7, 8}},
+		{"Družin", "Druzin", []int{0, 1, 2, 3, 5, 6}},
 		{"Shield Booster", "Shield Booster", nil},
 		{"40mm ion", "40mm ion", nil},
 		{"é", "é", nil}, // outside the canon set: untouched
