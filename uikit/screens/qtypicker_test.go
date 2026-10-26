@@ -44,8 +44,8 @@ func TestQtyPickerFreeflowClamps(t *testing.T) {
 	if !q.IsOpen() {
 		t.Fatal("Sell opened no picker")
 	}
-	if got, want := q.TitleText(), env.TradeableName(inv.sel)+" — Sell"; got != want {
-		t.Errorf("title = %q, want %q", got, want)
+	if got := q.TitleText(); got != "Quantity" {
+		t.Errorf("title = %q, want the base name Quantity", got)
 	}
 
 	// Slider drags: the ends are exact, and the readout follows.
@@ -209,10 +209,10 @@ func TestQtyPickerRefineLadder(t *testing.T) {
 	}
 }
 
-// TestQtyPickerVerbPerSurface: the picker's Confirm carries the surface's
-// own verb, so the popup says what it will do (and the transfer names its
-// destination hold).
-func TestQtyPickerVerbPerSurface(t *testing.T) {
+// TestQtyPickerTitleIsStatic: the picker's title is the base display name
+// whatever the surface opened it — the popup is retargeted in place, and a
+// retitle is not how it says what it will do.
+func TestQtyPickerTitleIsStatic(t *testing.T) {
 	env, _ := newTestEnv(t)
 	inv := NewInventory(env)
 	ui := newQtyUI(t, env, inv.Win())
@@ -221,18 +221,14 @@ func TestQtyPickerVerbPerSurface(t *testing.T) {
 	pumpQty(t, ui, env, inv.Sync, 1024, 700)
 	clickRow(ui, inv.cargo, 0)
 	pumpQty(t, ui, env, inv.Sync, 1024, 700)
-	name := env.TradeableName(inv.sel)
-	for _, c := range []struct {
-		open func()
-		want string
-	}{
-		{func() { inv.transfer("hangar") }, name + " — To Hangar"},
-		{func() { inv.sellClicked() }, name + " — Sell"},
+	for _, open := range []func(){
+		func() { inv.transfer("hangar") },
+		inv.sellClicked,
 	} {
-		c.open()
+		open()
 		pumpQty(t, ui, env, inv.Sync, 1024, 700)
-		if got := q.TitleText(); got != c.want {
-			t.Errorf("title = %q, want %q", got, c.want)
+		if got := q.TitleText(); got != "Quantity" {
+			t.Errorf("title = %q, want the base name Quantity", got)
 		}
 		q.Close()
 	}

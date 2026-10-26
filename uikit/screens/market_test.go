@@ -353,10 +353,11 @@ func TestMarketBookWheelSettles(t *testing.T) {
 	}
 }
 
-// TestMarketTitleShowsPriceAndFee: unselected, the title carries the
-// wallet; selected, it switches to the item's displayed price (the price
-// ladder) and the fee schedule — the view's last-price + fee display.
-func TestMarketTitleShowsPriceAndFee(t *testing.T) {
+// TestMarketTitleIsTheBaseName: the title bar is furniture — the window's
+// base display name, before and after a selection, whatever the wallet or
+// the selected item's ladder quote. The figures live in the body's own
+// readouts, never in the bar.
+func TestMarketTitleIsTheBaseName(t *testing.T) {
 	env, _ := newTestEnv(t)
 	m := NewMarket(env)
 	ui := newWindowUI(t, env, m.Win())
@@ -364,8 +365,8 @@ func TestMarketTitleShowsPriceAndFee(t *testing.T) {
 	frame()
 	frame()
 
-	if want := "Market — " + theme.FormatCredits(env.Sim.Wallet()); m.title.Label != want {
-		t.Fatalf("title = %q, want %q", m.title.Label, want)
+	if got := m.title.Label; got != "Market" {
+		t.Fatalf("title = %q, want the base name Market", got)
 	}
 
 	clickRow(ui, m.tbl, 0)
@@ -373,16 +374,8 @@ func TestMarketTitleShowsPriceAndFee(t *testing.T) {
 	if !m.hasSel {
 		t.Fatal("selection did not take")
 	}
-	// The title quotes the shown book: the selected row's own price for the
-	// item, plus the fee schedule.
-	want := "Market — " + env.TradeableName(m.sel) + " " + m.tbl.Rows[0].Cells[1] +
-		" · fee " + feePct(sim.MarketBrokerFee) + "+" + feePct(sim.MarketSalesTax)
-	if m.title.Label != want {
-		t.Fatalf("title = %q, want %q", m.title.Label, want)
-	}
-	if !strings.Contains(m.title.Label, feePct(sim.MarketBrokerFee)) ||
-		!strings.Contains(m.title.Label, feePct(sim.MarketSalesTax)) {
-		t.Fatalf("title %q does not quote both fees", m.title.Label)
+	if got := m.title.Label; got != "Market" {
+		t.Fatalf("title after selecting %s = %q, want the base name Market", m.sel, got)
 	}
 }
 

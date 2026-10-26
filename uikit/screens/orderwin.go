@@ -130,8 +130,8 @@ func NewOrderWin(env widgets.Seams) *OrderWin {
 	body.AddChild(o.modeBtn, row(label("Price"), o.price), o.preview, row(label("Qty"), o.qty), row(o.accept, o.cancel))
 	o.body = body
 
-	// The title bar carries the target ("<ItemName> — Order"); the × close
-	// is attached by the kit's close seam (SetWindowClose), like Show Info.
+	// The title bar carries the base display name; the × close is attached
+	// by the kit's close seam (SetWindowClose), like Show Info.
 	bar, title := theme.NewTitleBar(env, "Order", "")
 	o.title = title
 
@@ -165,7 +165,9 @@ func (o *OrderWin) Show(item content.ItemID, side sim.OrderSide, qty int) bool {
 		qty = 1
 	}
 	o.sellQty = qty
-	o.title.Label = o.cv.TradeableName(item) + " — Order"
+	// The title is the base display name only (a window title is
+	// furniture); the item is not repeated there.
+	o.title.Label = "Order"
 	o.setMode(side)
 	// Open unfocused: the player clicks a field to type, and until then the
 	// world hotkeys stay live (the game gates on OrderTyping).
@@ -196,7 +198,7 @@ func (o *OrderWin) IsOpen() bool {
 	return o.win != nil && o.win.GetContainer().GetWidget().IsVisible()
 }
 
-// TitleText is the title-bar label (tests pin "<Name> — Order").
+// TitleText is the title-bar label (the base display name).
 func (o *OrderWin) TitleText() string {
 	if o.title == nil {
 		return ""

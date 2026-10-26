@@ -106,8 +106,8 @@ func TestMarketRunsOnStubView(t *testing.T) {
 	if got := m.tbl.Rows[0].Cells[0]; got != "Stub Ore" {
 		t.Errorf("item cell = %q, want the stub def's name", got)
 	}
-	if want := "Market — " + theme.FormatCredits(1234.5); m.title.Label != want {
-		t.Errorf("title = %q, want %q (the stub wallet)", m.title.Label, want)
+	if got := m.title.Label; got != "Market" {
+		t.Errorf("title = %q, want the base name Market", got)
 	}
 
 	// The row's menu presses through a REAL Menu: the derived entries

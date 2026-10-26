@@ -80,7 +80,7 @@ type Fitting struct {
 
 	measure func(string) float64 // the StepTiny face, for tile-name ellipsis
 
-	title *theme.ChromeText // title bar: hull name and class
+	title *theme.ChromeText // the static title bar label
 
 	// Zone 1 — ship identity.
 	portrait      *ebiten.Image
@@ -681,19 +681,18 @@ func (f *Fitting) Sync() {
 // change only) and the class · maker line with the maker's emblem.
 func (f *Fitting) syncIdentity(ship sim.ShipState, hasShip bool) {
 	hull, maker := content.ShipID(""), ""
-	name, class, sub := "No ship", "", ""
+	name, sub := "No ship", ""
 	if hasShip {
 		hull = ship.Hull
 		if def, ok := f.cv.Defs().Ship(hull); ok {
-			name, class = def.Name, def.Class
+			name = def.Name
 			maker = def.Maker
 			sub = makerSub(def.Class, def.Maker)
 		}
 	}
-	f.title.Label = "Fitting — " + name
-	if class != "" {
-		f.title.Label += " (" + class + ")"
-	}
+	// The title is the base display name only (a window title is
+	// furniture): the hull name and class are the body's own heads.
+	f.title.Label = "Fitting"
 	f.name.Label = name
 	f.idText.Label = sub
 

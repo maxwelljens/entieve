@@ -887,11 +887,27 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > slot/hangar rows, contract board rows, service title bars, module-rack
 > tiles.
 
+> **Window titles (2026-10):** a title bar carries no live state — every
+> window passes its base display name (`Market`, `Manufacturing`,
+> `Quantity`, `Order`, `Info`, `Fitting`) and never composes a runtime
+> suffix. The figures the old suffixes repeated live in the bodies (the
+> order book's columns, the picker's preview, the body heads); the one
+> deliberate loss is the market's fee schedule, which had no other surface
+> and is documented in GAMEPLAY instead. `theme.NewTitleBar` binds its
+> `theme.ChromeText` to the bar, and `ChromeText.Shown` ellipsizes the
+> drawn form against the bar's safe width — from the label's own start
+> (clear of the dots and leading icon) to the end-anchored chrome, i.e. the
+> `×` — so even a long or retitled label can never paint under the close
+> button or out of the window; the fit case draws verbatim, and
+> `theme.Ellipsize` is the one implementation (`widgets.Ellipsize`
+> delegates). The retitle mechanism stays: setting `Label` still asks for
+> a relayout and redraws (`TestTitleBarStillRetitles`).
+
 > **Show Info (2026-10):** `uikit/menu.go` is the flat EVE-style popup
 > context-menu primitive (first entry "Show Info", bold; the other entries
 > are the surface's context actions, grayed-but-visible when currently
 > impossible) and `uikit/infowin.go` is the one reusable floating details
-> window (`<Name> — Info`) with per-kind content builders (hull / module /
+> window (titled `Info`, body headed with the name) with per-kind content builders (hull / module /
 > item / machine caste); item references inside the window are themselves
 > right-clickable (Show Info swaps the window's content). Content schema
 > gains `NpcDef.Description` (dossier prose — the window is its first UI

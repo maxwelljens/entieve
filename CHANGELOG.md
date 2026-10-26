@@ -54,6 +54,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   change. Documented in `docs/GAMEPLAY.md` ("Setting a quantity"),
   `CONTEXT.md` ("Quantity picker") and `docs/ARCHITECTURE.md`.
 
+- **Window titles are static base names** (`uikit/screens`, `uikit/theme`):
+  every window's title bar now reads its own name — `Market`,
+  `Manufacturing`, `Quantity`, `Order`, `Info`, `Fitting` — instead of the
+  live suffix it composed (the market's wallet / price-ladder / fee
+  schedule / cheapest-elsewhere quote, the manufacturing product ·
+  duration · fee · level · slots blob, the picker's `<Item> — <Verb>`, the
+  order window's `<Item> — Order`, Show Info's `<Page> — Info`, the
+  fitting hull name and class). The figures those suffixes repeated live in
+  the window bodies (board columns, the picker's preview, the book's own
+  columns, the body heads). The retitle mechanism is untouched: a setter
+  still re-lays and redraws the tracked label (`theme.ChromeText.Label`),
+  production just passes constants.
+
 - **Title screen backdrop is the artwork** (`game`, `assets/artwork`):
   the boot title now draws `assets/artwork/title_background.jpg` (2736×1536,
   embedded through an `assets/artwork/artwork.go` shim so releases show it
@@ -64,6 +77,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   render under the old dim, and the simulation still never steps.
 
 ### Fixed
+
+- **A long window title no longer overflows its bar** (`uikit/theme`): the
+  tracked title label is now ellipsized to the bar's safe width — from its
+  own start (clear of the ring dots and the leading icon) to the title
+  bar's end-anchored chrome, i.e. the `×` strip — so a title can never
+  paint under the close button or out of the window. A title that fits is
+  drawn verbatim; `theme.ChromeText.Shown` is the drawn form (the one
+  `Ellipsize` implementation now lives in `theme`, with `widgets.Ellipsize`
+  delegating to it).
+
+- **The context menu's appearance has a cue** (`game`): the ⋯ column menu
+  and every row context menu now play the `open` cue when the popup
+  appears. Dismissal stays silent on purpose — the press that dismisses the
+  popup is the same gesture whose landing the click cue already reports.
+  Pinned by `TestUISoundMenuOpen` through a real frame loop.
 
 - **UI cues are audible and quiet where they should be** (`game`,
   `assets/sfx`, `game/screenhost.go`): the two Air FX cues the pack ships

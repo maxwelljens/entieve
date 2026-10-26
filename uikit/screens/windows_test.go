@@ -93,8 +93,8 @@ func TestMarketGatingAndEnqueue(t *testing.T) {
 	if !q.IsOpen() {
 		t.Fatal("Buy opened no picker")
 	}
-	if got, want := q.TitleText(), env.TradeableName(m.sel)+" — Buy"; got != want {
-		t.Errorf("picker title = %q, want %q", got, want)
+	if got := q.TitleText(); got != "Quantity" {
+		t.Errorf("picker title = %q, want the base name Quantity", got)
 	}
 	qtyClick(t, ui, env, m.Sync, qtyMax)
 	if q.Value() != qtyMax {
@@ -186,8 +186,8 @@ func TestInventoryTransferAndSell(t *testing.T) {
 	if !q.IsOpen() {
 		t.Fatal("To Hangar opened no picker")
 	}
-	if got, want := q.TitleText(), env.TradeableName(inv.sel)+" — To Hangar"; got != want {
-		t.Errorf("picker title = %q, want %q", got, want)
+	if got := q.TitleText(); got != "Quantity" {
+		t.Errorf("picker title = %q, want the base name Quantity", got)
 	}
 	if q.Confirm().GetWidget().Disabled {
 		t.Fatal("Confirm grayed on a live transfer")

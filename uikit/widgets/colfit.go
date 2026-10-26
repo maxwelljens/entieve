@@ -1,5 +1,7 @@
 package widgets
 
+import "github.com/entieve/entieve/uikit/theme"
+
 // ---------------------------------------------------------------------------
 // Column fitting — FitColumns is the legacy elastic fit the overview
 // shipped with (surplus to Name, shrink order Name-last); Table uses the
@@ -40,27 +42,8 @@ func nameColumn(cols []ColWidth) int {
 
 // Ellipsize shortens s with a trailing "…" so the result measures at most
 // w, using measure (which must be monotonic in string length). An empty
-// string is returned when even the ellipsis does not fit.
+// string is returned when even the ellipsis does not fit. The body lives in
+// theme (theme <- widgets), which needs it for the title bar's own overflow.
 func Ellipsize(s string, w float64, measure func(string) float64) string {
-	if measure(s) <= w {
-		return s
-	}
-	const dots = "…"
-	if measure(dots) > w {
-		return ""
-	}
-	runes := []rune(s)
-	lo, hi := 0, len(runes)
-	for lo < hi {
-		mid := (lo + hi + 1) / 2
-		if measure(string(runes[:mid])+dots) <= w {
-			lo = mid
-		} else {
-			hi = mid - 1
-		}
-	}
-	if lo == 0 {
-		return dots
-	}
-	return string(runes[:lo]) + dots
+	return theme.Ellipsize(s, w, measure)
 }

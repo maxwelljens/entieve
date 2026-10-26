@@ -148,7 +148,7 @@ func NewQtyWin(env widgets.Seams) *QtyWin {
 	)
 	body.AddChild(o.info, o.sliderRow, o.detail, o.note, row(o.confirm, o.cancel))
 
-	// The title bar carries "<Item> — <Verb>"; the × close is attached by the
+	// The title bar carries the base display name; the × close is attached by the
 	// kit's close seam (SetWindowClose), like Show Info and the order window.
 	bar, title := theme.NewTitleBar(env, "Quantity", "")
 	o.title = title
@@ -179,7 +179,10 @@ func (o *QtyWin) Show(req widgets.QtyPick) bool {
 		return false
 	}
 	o.req = req
-	o.title.Label = o.cv.TradeableName(req.Item) + " — " + o.verb()
+	// The title is the base display name only (a window title is
+	// furniture): the picker's own lines carry the amount and the preview,
+	// and the item where the mode names one.
+	o.title.Label = "Quantity"
 	o.qtyLbl.Label = "Qty"
 	if req.Mode == widgets.QtyStart {
 		o.qtyLbl.Label = "Runs"
@@ -209,7 +212,7 @@ func (o *QtyWin) IsOpen() bool {
 	return o.win != nil && o.win.GetContainer().GetWidget().IsVisible()
 }
 
-// TitleText is the title-bar label (tests pin "<Name> — <Verb>").
+// TitleText is the title-bar label (the base display name).
 func (o *QtyWin) TitleText() string {
 	if o.title == nil {
 		return ""
@@ -427,22 +430,6 @@ func (o *QtyWin) submit() {
 		o.as.Do(widgets.Transfer{Item: o.req.Item, Qty: q, From: o.req.From, To: o.req.To})
 	}
 	o.Close()
-}
-
-// verb is the Confirm label (and the title's tail) for the mode.
-func (o *QtyWin) verb() string {
-	switch o.req.Mode {
-	case widgets.QtyRefine:
-		return "Refine"
-	case widgets.QtyStart:
-		return "Start"
-	case widgets.QtyBuy:
-		return "Buy"
-	case widgets.QtySell:
-		return "Sell"
-	default:
-		return "To " + holdName(o.req.To)
-	}
 }
 
 // qtyBatches is the refinery's notched ladder for an ore holding stock

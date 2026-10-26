@@ -186,7 +186,9 @@ func TitleDotsWidget(p Palette) *widget.Graphic {
 // ring dots at the bar's left, then a leading 24 px icon (icon == "" draws
 // the bar text-only) beside the accent title. Returns the bar for
 // WindowOpts.TitleBar and the tracked mono title label, which windows that
-// retitle keep a handle on.
+// retitle keep a handle on; the label is bound to the bar (ChromeText.Shown
+// ellipsizes it clear of the ×), so a title longer than the window cannot
+// overflow the bar.
 func NewTitleBar(d Theme, label, icon string) (*widget.Container, *ChromeText) {
 	p := d.Pal()
 	title := widget.NewContainer(
@@ -211,6 +213,7 @@ func NewTitleBar(d Theme, label, icon string) (*widget.Container, *ChromeText) {
 		titlePad += IconTitle + IconGap
 	}
 	txt := NewChromeText(d, StepBase, label, p.Accent)
+	txt.bar = title
 	txt.w.LayoutData = widget.AnchorLayoutData{
 		HorizontalPosition: widget.AnchorLayoutPositionStart,
 		VerticalPosition:   widget.AnchorLayoutPositionCenter,

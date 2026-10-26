@@ -199,6 +199,9 @@ their band, disabled buttons, dead space and every world press (never per
 drag frame either). An **open** and a **close** sound when a
 window mounts or unmounts (the Esc menu, the station services view and
 every floating window — including the title's Settings and Keybindings),
+an **open** when the right-click context menu appears (its **dismissal is
+deliberately silent** — the press that closes it is already the click the
+cue reports),
 a **confirm** when a verb lands (Refine, Start Job, Buy, Sell, Transfer,
 save-as, a keybinding assignment, a save-manager load or delete, and the
 two resets) and a **refuse** when the keybindings window rejects a chord
@@ -340,9 +343,9 @@ hidden. **Double-click** the item to skip the menu and go straight to the
 details window. There is no keyboard key for this: inspecting is
 mouse-only.
 
-One reusable floating window, titled `<Name> — Info`, holds the details —
-dragable, resizable, closeable, non-modal. Show Info swaps its content
-instead of stacking windows, and the item references inside it (charges,
+One reusable floating window, titled **Info** (its body is headed with the
+entity's name), holds the details — dragable, resizable, closeable,
+non-modal. Show Info swaps its content instead of stacking windows, and the item references inside it (charges,
 ores, hulls) are themselves right-clickable. Its position and size
 persist in the layout sidecar, but it never opens on its own.
 
@@ -595,10 +598,10 @@ Starogród. Death is paperwork; the log line `Respawned at <station> in a
 
 Every −/+ ticker is gone: whatever needs an amount now asks for it in one
 small popup — the **quantity picker**. It opens from the gesture that
-already names the action and shows the picked item, a **slider**, the
-current amount and a live preview of what the amount buys or costs, then
-**Confirm** (the verb: Refine, Start, Buy, Sell, To Hangar…) and
-**Cancel**. The window is modal and transient: it never persists a rect,
+already names the action and shows what it is working on, a **slider**,
+the current amount and a live preview of what the amount buys or costs,
+then **Confirm** (the action you came from: Refine, Start, Buy, Sell, To
+Hangar…) and **Cancel**. The window is modal and transient: it never persists a rect,
 and it remembers the amount you last **confirmed** for that action, so a
 second refine or a second trade opens where the first one left off (a
 rebuilt interface starts at 1 again). `Esc` cancels it *before* anything
@@ -689,9 +692,8 @@ the field and then the window handles the key normally.
 **Cross-station availability.** The columns stay local (this station's
 ladder, this station's resting quantity), but when another station's book
 stocks the item the Qty cell carries a dim `· N more` suffix (how many
-other books ask for it), and selecting it adds the cheapest such ask to the
-title line — `· cheapest Doki 112 €` — so a trader can see at a glance
-whether the run is worth it.
+other books ask for it) — the window title stays the plain **Market**, so
+the exact cheapest ask on the other book is read at that station.
 
 Every station's market is an **order book**: your Buy and Sell are market
 orders that take the best resting prices at that station and fill only
@@ -699,7 +701,7 @@ what the book actually holds — nothing is conjured for you. Both go
 through the quantity picker: select the item (or use its row menu) and
 press **Buy** or **Sell**, pick the amount in the popup, confirm. A **broker
 fee** (3 % of the value) rides every buy, a **sales tax** (2.5 %) rides
-every sell; the market window shows the fill and the fee line by line.
+every sell; the Finances ledger books each fill with its fee.
 Prices are displayed on a ladder — last
 trade, best ask, best bid, then the item's base price — and they move
 only when real goods trade hands.

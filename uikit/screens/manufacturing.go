@@ -329,18 +329,10 @@ func (f *Manufacturing) Sync() {
 	f.collect.GetWidget().Disabled = !f.collectReadyFor(f.sel)
 	f.cancel.GetWidget().Disabled = !f.cancelReadyFor(f.sel)
 
-	slotsLbl := theme.FormatInt(int64(slotsUsed)) + "/" + theme.FormatInt(int64(slots)) + " jobs"
-	if f.hasSel && f.sel.recipe != "" {
-		if rec, ok := f.cv.Defs().Recipes[f.sel.recipe]; ok {
-			level := s.CraftLevel(station, rec.Family)
-			f.title.Label = "Manufacturing — " + f.cv.TradeableName(rec.Product) + " · " +
-				theme.GroupFloat(s.JobDuration(station, rec.ID, runs), 1) + " s · fee " +
-				theme.FormatCredits(s.JobFee(rec.ID, runs)) + " · L" +
-				theme.FormatInt(int64(level)) + " · " + slotsLbl
-			return
-		}
-	}
-	f.title.Label = "Manufacturing — " + slotsLbl
+	// The title is the base display name only (a window title is
+	// furniture): the selected recipe, its duration, fee, craft level and
+	// the job slots are the body's own readouts.
+	f.title.Label = "Manufacturing"
 }
 
 // inputsText renders the have/need line of a job's materials: one

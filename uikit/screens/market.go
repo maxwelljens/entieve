@@ -80,8 +80,8 @@ func setStepperValue(bar *widget.Container, lbl *widget.Text, s string) {
 // side] form. Over it sit the Buy/Sell actions, which execute as market
 // orders against the book: each opens the quantity picker (CONTEXT.md
 // "Quantity picker") on the selected item and Confirm emits Buy/Sell. The
-// title carries the selected item's displayed price (last trade, best ask,
-// best bid, base) and the fee schedule.
+// title bar stays the base display name (window titles are furniture); the
+// book's own columns carry the price voice.
 //
 // The browse tree scopes the catalog to a branch (All is the whole
 // catalog) and the search field filters that branch live, ranked by fuzzy
@@ -94,8 +94,7 @@ func setStepperValue(bar *widget.Container, lbl *widget.Text, s string) {
 // placing the first order is how a market wakes up (Request on Market
 // works from an empty book). Placing a hull ask is refused by the sim, so
 // hull rows trade the way they always did. Other stations' books are read
-// read-only for the availability suffix and the title's cheapest-elsewhere
-// detail; the columns stay local.
+// read-only for the availability suffix; the columns stay local.
 //
 // Beside the catalog sits the standing-order column: My orders — only
 // THIS station's player orders, each with a Cancel button. It acts on the
@@ -146,7 +145,7 @@ type Market struct {
 	hit     int
 
 	// Availability: every other market station's asks per item (the Qty
-	// suffix and the title's cheapest-elsewhere detail), rebuilt each
+	// suffix), rebuilt each
 	// Sync while docked. stations is the universe's market roster.
 	stations []sim.StationID
 	avail    map[content.ItemID]mktAvail
@@ -532,11 +531,6 @@ func mktItemOf(data any) (content.ItemID, bool) {
 	return "", false
 }
 
-// feePct renders a fee rate as a percentage ("3%", "2.5%").
-func feePct(rate float64) string {
-	return strconv.FormatFloat(rate*100, 'g', -1, 64) + "%"
-}
-
 // sortBookOrders puts mixed orders into canonical display order: item
 // ascending, asks before bids, asks by price ascending, bids by price
 // descending. Stable, so equal prices keep arrival (price-time) order.
@@ -659,7 +653,7 @@ func NewMarket(env widgets.Seams) *Market {
 		}
 		mktJoin(rows, blocks)
 	})
-	// A click selects the row's item (the title quotes it, Buy/Sell trade
+	// A click selects the row's item (the toolbar reads it, Buy/Sell trade
 	// it) and, on an item row, folds its orders out or away. The row's
 	// declared RowSpec already carries its own item, so the menu never
 	// depends on this selection; a double-click still opens Show Info.
@@ -916,8 +910,8 @@ func (m *Market) Dismissed() {
 	}
 }
 
-// Sync refreshes the rows, the tree, the wallet readout and the docked
-// gating from the simulation. Call it every frame before Kit.Update.
+// Sync refreshes the rows, the tree and the docked gating from the
+// simulation. Call it every frame before Kit.Update.
 func (m *Market) Sync() {
 	m.split.Poll()
 	orders := m.orders()
@@ -934,7 +928,7 @@ func (m *Market) Sync() {
 		by[o.Item] = append(by[o.Item], o)
 	}
 	// The other stations' books (dock the availability read): the Qty
-	// suffix counts them, the title names the cheapest.
+	// suffix counts them.
 	m.avail = m.crossAvail(docked)
 	ask := func(item content.ItemID) bool {
 		for _, o := range by[item] {
@@ -1025,20 +1019,10 @@ func (m *Market) Sync() {
 
 	sys := m.cv.System()
 	if sys != nil {
-		label := "Market — " + theme.FormatCredits(m.cv.Wallet())
-		if m.hasSel {
-			// Selected: the book's price voice for this item (last trade,
-			// best ask, best bid, then base), the fee schedule and, when
-			// another station stocks it, the cheapest such ask.
-			label = "Market — " + m.cv.TradeableName(m.sel) + " " +
-				theme.FormatCredits(m.cv.PriceLadder(docked, m.sel)) +
-				" · fee " + feePct(sim.MarketBrokerFee) + "+" + feePct(sim.MarketSalesTax)
-			if a, ok := m.avail[m.sel]; ok && a.Stations > 0 {
-				label += " · cheapest " + m.cv.StationName(a.Station) + " " +
-					theme.FormatCredits(a.Cheapest)
-			}
-		}
-		m.title.Label = label
+		// The title is the base display name only (a window title is
+		// furniture): the price ladder is the book's own columns and the
+		// wallet is the HUD readout, never the bar.
+		m.title.Label = "Market"
 	}
 	// Trades only happen docked at a station (the gate declared above);
 	// Buy additionally needs a local ask to lift — an item no one sells

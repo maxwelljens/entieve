@@ -393,34 +393,25 @@ func TestMarketBuyGreysWithoutLocalAsk(t *testing.T) {
 	}
 }
 
-// TestMarketAvailabilitySuffixAndTitle: the Qty cell carries the dim
-// "· N more" suffix for the OTHER stations stocking the item, and the
-// selected row's title names the cheapest such station.
-func TestMarketAvailabilitySuffixAndTitle(t *testing.T) {
+// TestMarketAvailabilitySuffix: the Qty cell carries the dim "· N more"
+// suffix for the OTHER stations stocking the item.
+func TestMarketAvailabilitySuffix(t *testing.T) {
 	m, env, _, frame := mktSearchEnv(t)
 	local := env.Sim.BookOrders("cel-haven-rest")
 
-	// The count and cheapest read the same books the seam reads: pick an
-	// item stocked both locally and elsewhere.
+	// The count reads the same books the seam reads: pick an item stocked
+	// both locally and elsewhere.
 	var want content.ItemID
-	var cheapest float64
-	var station sim.StationID
 	var count int
 	stations := marketStations(env.Defs())
 	asks := map[content.ItemID]int{}
-	best := map[content.ItemID]float64{}
-	where := map[content.ItemID]sim.StationID{}
 	for _, st := range stations {
 		if st == "cel-haven-rest" {
 			continue
 		}
 		for _, o := range env.Sim.BookOrders(st) {
-			if o.Side != sim.OrderSell {
-				continue
-			}
-			asks[o.Item]++
-			if p, ok := best[o.Item]; !ok || o.Price < p {
-				best[o.Item], where[o.Item] = o.Price, st
+			if o.Side == sim.OrderSell {
+				asks[o.Item]++
 			}
 		}
 	}
@@ -432,7 +423,7 @@ func TestMarketAvailabilitySuffixAndTitle(t *testing.T) {
 	}
 	for _, item := range marketCatalog(env) {
 		if local0[item] && asks[item] >= 1 {
-			want, count, cheapest, station = item, asks[item], best[item], where[item]
+			want, count = item, asks[item]
 			break
 		}
 	}
@@ -457,10 +448,11 @@ func TestMarketAvailabilitySuffixAndTitle(t *testing.T) {
 		t.Errorf("qty suffix tint = %#v, want the palette's Dim", suffix.Tint)
 	}
 
+	// The title stays the base name; the availability detail is the
+	// column's suffix alone (the title bar carries no state).
 	m.selectItem(want)
 	frame()
-	wantLabel := " · cheapest " + env.Sim.StationName(station) + " " + theme.FormatCredits(cheapest)
-	if !strings.Contains(m.title.Label, wantLabel) {
-		t.Errorf("title = %q, want %q", m.title.Label, wantLabel)
+	if got := m.title.Label; got != "Market" {
+		t.Errorf("title = %q, want the base name Market", got)
 	}
 }

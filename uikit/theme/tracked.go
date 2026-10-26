@@ -60,6 +60,12 @@ func DrawTracked(dst *ebiten.Image, s string, face text.Face, size float64, x, y
 // ChromeText is a tracked mono label widget (the chrome register). It
 // mirrors widget.Text's Label field so retitling call sites keep working;
 // a changed Label asks for a relayout on the next Update.
+//
+// Dynamic window titles are deliberately unused as of the static-title
+// change — every window passes its base display name — but the mechanism
+// stays: a caller may still set Label and the label follows. The drawn
+// label is ellipsized to the title bar's safe width (Shown), so a long title
+// can never run under the × or out of the bar.
 type ChromeText struct {
 	Label string
 
@@ -68,6 +74,10 @@ type ChromeText struct {
 	size float64
 	col  color.RGBA
 	laid string // the label the parent laid out last
+
+	// bar is the title bar this label sits in (nil for a panel head): the
+	// bound Shown ellipsizes against.
+	bar *widget.Container
 }
 
 // NewChromeText builds a tracked chrome label. step names a type-scale step
@@ -84,6 +94,69 @@ func NewChromeText(d Theme, step, label string, col color.RGBA) *ChromeText {
 	}
 	t.w = widget.NewWidget()
 	return t
+}
+
+// Ellipsize shortens s with a trailing "…" so the result measures at most
+// w, using measure (which must be monotonic in string length). An empty
+// string is returned when even the ellipsis does not fit. The one
+// implementation: widgets.Ellipsize delegates here (theme <- widgets).
+func Ellipsize(s string, w float64, measure func(string) float64) string {
+	if measure(s) <= w {
+		return s
+	}
+	const dots = "…"
+	if measure(dots) > w {
+		return ""
+	}
+	runes := []rune(s)
+	lo, hi := 0, len(runes)
+	for lo < hi {
+		mid := (lo + hi + 1) / 2
+		if measure(string(runes[:mid])+dots) <= w {
+			lo = mid
+		} else {
+			hi = mid - 1
+		}
+	}
+	if lo == 0 {
+		return dots
+	}
+	return string(runes[:lo]) + dots
+}
+
+// Shown is the label as drawn: the whole Label while it fits, its ellipsized
+// form when the title bar is too narrow (a dynamic title must never overflow
+// the bar or run under the ×).
+func (t *ChromeText) Shown() string {
+	w, bound := t.room()
+	if !bound {
+		return t.Label
+	}
+	return Ellipsize(t.Label, max(w, 0), func(s string) float64 { return MeasureTracked(s, t.face, t.size) })
+}
+
+// room is the width the label may use, from its own left edge: the bar's
+// right edge, or the left edge of the bar's end-anchored chrome (the ×)
+// when that comes first, less one hairline gap. bound is false when there is
+// nothing to bound against (a panel head outside a title bar, or a bar that
+// has not been laid out yet); the width itself may be negative when the bar
+// is narrower than the label's own lead-in, which draws the bare ellipsis.
+func (t *ChromeText) room() (float64, bool) {
+	if t.bar == nil || t.w.Rect.Empty() || t.bar.GetWidget().Rect.Empty() {
+		return 0, false
+	}
+	right := t.bar.GetWidget().Rect.Max.X
+	for _, ch := range t.bar.Children() {
+		cw := ch.GetWidget()
+		if cw.Rect.Empty() {
+			continue
+		}
+		if a, ok := cw.LayoutData.(widget.AnchorLayoutData); ok &&
+			a.HorizontalPosition == widget.AnchorLayoutPositionEnd {
+			right = min(right, cw.Rect.Min.X)
+		}
+	}
+	return float64(right - t.w.Rect.Min.X - Px(SpSm)), true
 }
 
 // SetColor recolours the label.
@@ -105,7 +178,7 @@ func (t *ChromeText) Render(dst *ebiten.Image) {
 	if !t.w.IsVisible() {
 		return
 	}
-	DrawTracked(dst, t.Label, t.face, t.size,
+	DrawTracked(dst, t.Shown(), t.face, t.size,
 		float64(t.w.Rect.Min.X), float64(t.w.Rect.Min.Y), t.col)
 }
 
