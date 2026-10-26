@@ -95,8 +95,8 @@ func NewMapView(env interface {
 	body.AddChild(m.gfx)
 
 	title := "Starmap"
-	if u := env.Defs().Universe; u != nil && (u.Region != "" || u.Constellation != "") {
-		title = "Starmap — " + u.Region + " / " + u.Constellation
+	if u := env.Defs().Universe; u != nil {
+		title = starmapTitle(u.Region, u.Constellation)
 	}
 	titleBar, _ := theme.NewTitleBar(env, title, "svc_map")
 
@@ -557,5 +557,22 @@ func (m *MapView) mapSecurity(sec string) color.RGBA {
 		return m.th.Pal().Danger
 	default:
 		return m.th.Pal().Dim
+	}
+}
+
+// starmapTitle composes the window title from the universe's region and
+// constellation. They usually carry one name (the Wild Fields serves both
+// levels), so the pair never doubles; an empty half renders as its lone
+// name rather than a dangling separator.
+func starmapTitle(region, constellation string) string {
+	switch {
+	case region == "" && constellation == "":
+		return "Starmap"
+	case region == "":
+		return "Starmap — " + constellation
+	case constellation == "" || region == constellation:
+		return "Starmap — " + region
+	default:
+		return "Starmap — " + region + " / " + constellation
 	}
 }

@@ -115,6 +115,9 @@ func TestFaceWeightsParseAndDiffer(t *testing.T) {
 	for _, r := range []rune("·»×³≈—–…↑↓“”") { // label punctuation the UI draws
 		runes = append(runes, r)
 	}
+	for _, r := range []rune("ąćęłńóśźżĄĆĘŁŃÓŚŹŻčďěňřšťůžČĎĚŇŘŠŤŮŽíÍ") { // the canon name alphabet: captions and tooltips draw names too
+		runes = append(runes, r)
+	}
 	for _, r := range runes {
 		k, err := f.GlyphIndex(&buf, r)
 		if err != nil {
@@ -189,7 +192,7 @@ func TestMonoFaceResolvesAndCovers(t *testing.T) {
 		runes = append(runes, r)
 	}
 	// Polish and Czech diacritics in the names rows list, both cases.
-	for _, r := range []rune("ąćęłńóśźżĄĆĘŁŃÓŚŹŻčďěňřšťůžČĎĚŇŘŠŤŮŽ") {
+	for _, r := range []rune("ąćęłńóśźżĄĆĘŁŃÓŚŹŻčďěňřšťůžČĎĚŇŘŠŤŮŽíÍ") {
 		runes = append(runes, r)
 	}
 	for _, r := range runes {
