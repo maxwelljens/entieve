@@ -2,7 +2,7 @@
   "id": "ship-cutlass",
   "group": "Ships/Destroyers",
   "base_price": 1250000,
-  "name": "Kosa",
+  "name": "Kosar",
   "class": "destroyer",
   "description": "A yard-built close-range brawler: extra guns and thick plating for pilots who like to brawl on top of their target.",
   "maker": "corp-ferrum",

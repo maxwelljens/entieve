@@ -2,7 +2,7 @@
   "id": "ship-npc-patrol",
   "group": "Ships/Frigates",
   "base_price": 420000,
-  "name": "Custos",
+  "name": "Custor",
   "class": "frigate",
   "description": "Charter patrol cutter: fast, well-gunned, and never far from the trade lanes.",
   "maker": "corp-praetor",

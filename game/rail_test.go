@@ -284,7 +284,7 @@ func TestRailPlacesOpenedWindowsWhileDocked(t *testing.T) {
 }
 
 // TestServicesViewButtonsOnTheRealStations: at the start station
-// (Jernborg: repair, market, refine, fitting, industry) the view offers
+// (Jernvold: repair, market, refine, fitting, industry) the view offers
 // market, fitting and industry; a repair-only service set hides them. Cargo toggles the
 // inventory window, every service button's Toggle names a Screen spec
 // row the host resolves, and Undock queues the sim's undock command.

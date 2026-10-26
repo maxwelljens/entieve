@@ -112,8 +112,8 @@ func TestStationBackdropArtworkLoaded(t *testing.T) {
 // TestDockedTitleTextAndPosition pins the caption string (NAMING.md
 // interface strings) and its lower-centre anchor.
 func TestDockedTitleTextAndPosition(t *testing.T) {
-	if got := dockedTitle("Huta"); got != "Docked: Huta" {
-		t.Errorf("title = %q, want %q", got, "Docked: Huta")
+	if got := dockedTitle("Hutov"); got != "Docked: Hutov" {
+		t.Errorf("title = %q, want %q", got, "Docked: Hutov")
 	}
 	if y := dockedTitleY(720); y != 630 {
 		t.Errorf("title y at 720 = %v, want 630 (7/8 down)", y)

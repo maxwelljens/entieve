@@ -22,7 +22,7 @@ func newServicesView(t *testing.T, inner int, services []string) (*Services, *re
 	th := theme.NewSeam(theme.DefaultPalette(), theme.DefaultTypeScale())
 	cv := &stubView{
 		docked:  true,
-		station: widgets.StationInfo{Name: "Jernborg", System: "Genesis", Services: services},
+		station: widgets.StationInfo{Name: "Jernvold", System: "Genesis", Services: services},
 	}
 	sink := &recordingSink{}
 	env := widgets.NewSeams(th, cv, sink)
@@ -167,7 +167,7 @@ func TestServicesIdentityAndFit(t *testing.T) {
 		const inner = 346
 		// Every service → five buttons: the widest the row gets.
 		s, _, _ := newServicesView(t, inner, []string{"market", "fitting", "industry", "repair", "refine"})
-		const want = "Jernborg · Genesis"
+		const want = "Jernvold · Genesis"
 		if s.Identity() != want {
 			t.Errorf("identity = %q, want %q (station name · system)", s.Identity(), want)
 		}

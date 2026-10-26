@@ -16,13 +16,13 @@ import (
 // 2026-10-18 approval. The registry conformance test below also reads it
 // out of docs/lore/NAMING.md.
 var makerRoster = []struct{ id, name string }{
-	{"corp-borealis", "Borealis"},
-	{"corp-nordvakt", "Nordvakt"},
-	{"corp-iskald", "Iskald"},
+	{"corp-borealis", "Boreall"},
+	{"corp-nordvakt", "Nordvakten"},
+	{"corp-iskald", "Iskeld"},
 	{"corp-ferrum", "Kombinat Ferrum"},
-	{"corp-druzstvo", "Družstvo"},
+	{"corp-druzstvo", "Družin"},
 	{"corp-burza", "Zakłady Burza"},
-	{"corp-celeritas", "Celeritas"},
+	{"corp-celeritas", "Celerita"},
 	{"corp-praetor", "Praetor"},
 	{"corp-aldemar", "Aldemar Group"},
 	{"corp-vantera", "Vantera"},
@@ -139,12 +139,12 @@ func TestNamingRegistryListsCorps(t *testing.T) {
 			t.Errorf("%s: registry heritage %q, AllCorps %q", corp.ID, heritage, corp.Heritage)
 		}
 	}
-	// The four absorbed houses record their pre-corp names in the
-	// "current name" column (col 2); Kombinat Ferrum keeps its name.
+	// The four drifted houses record the name the time-depth pass retired in
+	// the "current name" column (col 2); Kombinat Ferrum keeps its name.
 	for slug, old := range map[string]string{
-		"corp-borealis":  "Borealis Systems",
-		"corp-druzstvo":  "Družstvo Concordia",
-		"corp-celeritas": "Celeritas Courier",
+		"corp-borealis":  "Borealis",
+		"corp-druzstvo":  "Družstvo",
+		"corp-celeritas": "Celeritas",
 		"corp-ferrum":    "Kombinat Ferrum",
 	} {
 		if got := strings.TrimSpace(rows[slug][2]); got != old {

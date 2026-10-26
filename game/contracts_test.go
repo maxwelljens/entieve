@@ -296,7 +296,7 @@ func TestStationWindowGeometry(t *testing.T) {
 
 // TestStationBoardRendersShippedContent pins the rendered row text of the
 // shipped contracts: full objective/reward strings (no ellipsis — the row
-// columns are wide enough) and the gated requirement on the Przystań board.
+// columns are wide enough) and the gated requirement on the Havstov board.
 func TestStationBoardRendersShippedContent(t *testing.T) {
 	g := dockedShowcaseGame(t, 1024, 700)
 
@@ -307,7 +307,7 @@ func TestStationBoardRendersShippedContent(t *testing.T) {
 		t.Errorf("cleanup reward = %q, want %q", got, want)
 	}
 	if got, want := availLine(t, g, "contract-solace-supply-run-1", 1),
-		"Deliver 1 m³ 40mm ion to Przystań"; got != want {
+		"Deliver 1 m³ 40mm ion to Havstov"; got != want {
 		t.Errorf("supply summary = %q, want %q", got, want)
 	}
 	if got, want := availLine(t, g, "contract-solace-cordite-1", 1), "Mine 400 m³ Kerngrit Ore"; got != want {
@@ -335,17 +335,17 @@ func TestStationBoardRendersShippedContent(t *testing.T) {
 	setMissions(t, g, sim.MissionState{ID: "contract-solace-supply-run-1"})
 	g.syncMounts()
 	pump(t, g, 1024, 700)
-	if got, want := activeTitle(t, g, 0), "Supply run to Przystań — …"; got != want {
+	if got, want := activeTitle(t, g, 0), "Supply run to Havstov — …"; got != want {
 		t.Errorf("supply active line = %q, want %q", got, want)
 	}
 
-	// Gated board: dock at Przystań (standing 0 < 0.20).
+	// Gated board: dock at Havstov (standing 0 < 0.20).
 	g.s.Docked.Set(g.s.Player(), sim.Docked{At: "cel-penumbra-port"})
 	g.syncScenes()
 	g.syncMounts()
 	pump(t, g, 1024, 700)
 	if len(g.stAvailRows) != 2 {
-		t.Fatalf("Przystań board rows = %d, want 2", len(g.stAvailRows))
+		t.Fatalf("Havstov board rows = %d, want 2", len(g.stAvailRows))
 	}
 	for _, r := range g.stAvailRows {
 		if !r.btn.GetWidget().Disabled {
@@ -417,7 +417,7 @@ func TestStationAcceptEmitsCommand(t *testing.T) {
 		t.Fatalf("missions = %+v, want the accepted one", ms)
 	}
 
-	// Gated rows (Przystań, standing 0): disabled and silent.
+	// Gated rows (Havstov, standing 0): disabled and silent.
 	g.s.Docked.Set(g.s.Player(), sim.Docked{At: "cel-penumbra-port"})
 	g.syncScenes()
 	g.syncMounts()

@@ -2,7 +2,7 @@
   "id": "ship-npc-hauler",
   "group": "Ships/Industrials",
   "base_price": 520000,
-  "name": "Tabor",
+  "name": "Taborek",
   "class": "industrial",
   "description": "A civilian freighter flying the trade lanes under convoy contract: fat hold, thick industrial tank, no guns. It runs, it does not fight.",
   "maker": "corp-ferrum",

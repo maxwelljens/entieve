@@ -1,6 +1,6 @@
 {
   "id": "sys-kamieniec",
-  "name": "Kamieniec",
+  "name": "Kamenvik",
   "security": "low",
   "constellation": "Kresy",
   "region": "Far Moravia",
@@ -14,7 +14,7 @@
   "celestials": [
     {
       "id": "cel-kamieniec-star",
-      "name": "Kamieniec",
+      "name": "Kamenvik",
       "kind": "star",
       "position": { "X": 0, "Y": 0 },
       "radius": 560000000,
@@ -22,7 +22,7 @@
     },
     {
       "id": "cel-kamieniec-prime",
-      "name": "Kamieniec Prime",
+      "name": "Kamenvik Prime",
       "kind": "planet",
       "position": { "X": -172416500386, "Y": -64656187645 },
       "radius": 6371000,
@@ -30,7 +30,7 @@
     },
     {
       "id": "cel-doki",
-      "name": "Doki",
+      "name": "Dokhavn",
       "kind": "station",
       "position": { "X": 394813455714, "Y": 460615698333 },
       "radius": 850,
@@ -100,7 +100,7 @@
     },
     {
       "id": "cel-gate-penumbra",
-      "name": "Gate (Kuźnica)",
+      "name": "Gate (Kuźbor)",
       "kind": "gate",
       "position": { "X": 3117105713934, "Y": -1934755270718 },
       "radius": 2500,
@@ -112,7 +112,7 @@
     },
     {
       "id": "cel-gate-glusza",
-      "name": "Gate (Głusza)",
+      "name": "Gate (Głusholm)",
       "kind": "gate",
       "position": { "X": 4098724975052, "Y": 2884287945407 },
       "radius": 2500,

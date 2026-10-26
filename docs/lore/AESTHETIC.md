@@ -28,13 +28,13 @@ matches the game's amber-on-black look.
 
 ### In voice
 
-1. "Jernborg's dock crew tapes over everything that moves, and half of what
+1. "Jernvold's dock crew tapes over everything that moves, and half of what
    doesn't."
 2. "Everyone prices in euro because converting on the frontier is worse."
-3. "Pustkowie has no patrols, no courts, and no insurance adjusters."
+3. "Pustheim has no patrols, no courts, and no insurance adjusters."
 4. "A Hierarch's crest buys a hauler. It does not buy you somewhere to spend
    it."
-5. "Charter patrols answer in three minutes in Starogród. In the Fringe,
+5. "Charter patrols answer in three minutes in Sterhov. In the Fringe,
    bring friends."
 
 ### Not in voice
@@ -55,9 +55,9 @@ registry come from this matrix; the layers follow the settlement history in
 
 | Layer | Rule | Examples |
 |---|---|---|
-| Places: regions, constellations, systems, stations, celestials | Polish / Old Slavic, **Nordic traces in the oldest towns** | Far Moravia, Kresy, Starogród, Kuźnica, Pustkowie, Jernborg, Przystań, Gniazdo |
-| Institutions: authorities, corporations | Latinate register; one heritage form-word or root may carry the origin flavour | Far Moravia Charter Authority; the ten manufacturing houses: Borealis, Nordvakt, Iskald, Kombinat Ferrum, Družstvo, Zakłady Burza, Celeritas, Praetor, Aldemar Group, Vantera |
-| Ship hulls | origin-tagged trade nouns — **one origin per hull**, the name must read as that origin's trade | Havíř (Moravian), Kosa, Furman, Tabor (Polish), Väktare (Nordic), Custos (Latinate) |
+| Places: regions, constellations, systems, stations, celestials | **Slavic/Nordic blend, time-drifted** — Slavic stems with evolved suffixes, Nordic ones grafted on (and back), no live dictionary word | Far Moravia, Kresy, Sterhov, Kuźbor, Pustheim, Jernvold, Havstov, Gniazvor |
+| Institutions: authorities, corporations | **fossilized Latinate register** — charter-era names hold their archaic form and do not drift; one heritage form-word or root may carry the origin flavour | Far Moravia Charter Authority; the ten manufacturing houses: Boreall, Nordvakten, Iskeld, Kombinat Ferrum, Družin, Zakłady Burza, Celerita, Praetor, Aldemar Group, Vantera |
+| Ship hulls | **drifted heritage trade nouns** — origin-tagged, **one origin per hull**, the name must read as that origin's trade | Havřek (Moravian), Kosar, Furmek, Taborek (Polish), Vaktr (Nordic), Custor (Latinate) |
 | Machine names | the caste names are canon and untouchable | Scuttler, Marauder, Hierarch |
 | Products: modules, charges, minerals, ores, loot | plain trade nouns of the lingua franca, mechanics-aligned; a mineral or ore may be coined from a real root when no trade word survives | Small Autocannon, 40mm ion, Sideron, Sterngrit, Alloy Scrap |
 
@@ -67,8 +67,11 @@ Supporting rules:
   Ids (`sys-*`, `cel-*`, `ship-*`, `mod-*`, `ore-*`, …) are frozen
   implementation artifacts, including when they embed retired slugs.
 - **No placeholder echoes.** Solace, Penumbra, Gloam, Haven Rest, Thevek
-  Reach, Loomfall, Mire Corsairs and their fragments must not survive as
-  names, slang or secondary names.
+  Reach, Loomfall, Mire Corsairs and their fragments — nor any name the
+  time-depth drift retired (Starogród, Rudnik, Kuźnica, Młynów, Kamieniec,
+  Pustkowie, Głusza, Jernborg, Przystań, Gniazdo, Halda, Huta, Doki, Kantor,
+  Väktare, Kosa, Havíř, Furman, Tabor, Custos, Borealis, Nordvakt, Iskald,
+  Družstvo, Celeritas) — must not survive as names, slang or secondary names.
 - **Real roots.** Prefer words with lexical roots; note the root in
   [NAMING.md](NAMING.md).
 - **Diacritics are correct, not risky.** The game font renders all Polish

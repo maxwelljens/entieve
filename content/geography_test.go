@@ -13,8 +13,8 @@ import (
 // ---------------------------------------------------------------------------
 
 // gateEdges is the canon gate topology: one entry per edge, system ids
-// sorted inside the key. The ring runs Starogród — Rudnik — Młynów —
-// Kuźnica — Kamieniec — Głusza — Pustkowie, with Rudnik the Charter anchor.
+// sorted inside the key. The ring runs Sterhov — Rudnek — Młyndal —
+// Kuźbor — Kamenvik — Głusholm — Pustheim, with Rudnek the Charter anchor.
 var gateEdges = []string{
 	"sys-gloam|sys-glusza",
 	"sys-gloam|sys-penumbra",
@@ -112,7 +112,7 @@ func TestCelestialNamesFollowConventions(t *testing.T) {
 // TestShippedStationsServeAndStock: every station carries at least one
 // service from the allowed set and the market service; the four new
 // stations ship a founding market block (their endowment is the only
-// initial liquidity the world gets — Jernborg already carries one).
+// initial liquidity the world gets — Jernvold already carries one).
 func TestShippedStationsServeAndStock(t *testing.T) {
 	c := MustLoad()
 	newSystems := map[SystemID]bool{
@@ -188,7 +188,7 @@ func TestFoundingBooksOpenNeverCrossed(t *testing.T) {
 		}
 	}
 	if books < 5 {
-		t.Errorf("founding books = %d, want at least 5 (Jernborg + the four new stations)", books)
+		t.Errorf("founding books = %d, want at least 5 (Jernvold + the four new stations)", books)
 	}
 }
 

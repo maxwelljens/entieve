@@ -2,7 +2,7 @@
   "id": "ship-barge",
   "group": "Ships/Barges",
   "base_price": 900000,
-  "name": "Havíř",
+  "name": "Havřek",
   "class": "barge",
   "description": "A slow, sturdy mining barge with a huge ore hold. Strip belts, warp home, repeat.",
   "maker": "corp-druzstvo",

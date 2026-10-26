@@ -1,6 +1,6 @@
 {
   "id": "sys-mlynow",
-  "name": "Młynów",
+  "name": "Młyndal",
   "security": "low",
   "constellation": "Kresy",
   "region": "Far Moravia",
@@ -14,7 +14,7 @@
   "celestials": [
     {
       "id": "cel-mlynow-star",
-      "name": "Młynów",
+      "name": "Młyndal",
       "kind": "star",
       "position": { "X": 0, "Y": 0 },
       "radius": 480000000,
@@ -22,7 +22,7 @@
     },
     {
       "id": "cel-mlynow-prime",
-      "name": "Młynów Prime",
+      "name": "Młyndal Prime",
       "kind": "planet",
       "position": { "X": 174131788010, "Y": 81944370828 },
       "radius": 6371000,
@@ -30,7 +30,7 @@
     },
     {
       "id": "cel-huta",
-      "name": "Huta",
+      "name": "Hutov",
       "kind": "station",
       "position": { "X": 274857800180, "Y": -159128200104 },
       "radius": 900,
@@ -96,7 +96,7 @@
     },
     {
       "id": "cel-gate-rudnik",
-      "name": "Gate (Rudnik)",
+      "name": "Gate (Rudnek)",
       "kind": "gate",
       "position": { "X": 2853755567647, "Y": 2283004454117 },
       "radius": 2500,
@@ -108,7 +108,7 @@
     },
     {
       "id": "cel-gate-penumbra",
-      "name": "Gate (Kuźnica)",
+      "name": "Gate (Kuźbor)",
       "kind": "gate",
       "position": { "X": -4913469412868, "Y": 1052886302757 },
       "radius": 2500,

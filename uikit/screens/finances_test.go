@@ -36,9 +36,9 @@ func TestFinancesRendersHoldingsAndLedger(t *testing.T) {
 	cv := &finView{
 		cash: 1234.5, deployed: 90, receivables: 30000,
 		entries: []sim.LedgerEntry{
-			{Tick: 60, What: "Repairs — 250.0 HP", Where: "Jernborg", Amount: -1234.5},
-			{Tick: 120, What: "Market buy — 10 x EMP Charge", Where: "Jernborg", Amount: -51.5, Fee: 1.5},
-			{Tick: 223380, What: "Contract — Belt cleanup", Where: "Jernborg", Amount: 30000},
+			{Tick: 60, What: "Repairs — 250.0 HP", Where: "Jernvold", Amount: -1234.5},
+			{Tick: 120, What: "Market buy — 10 x EMP Charge", Where: "Jernvold", Amount: -51.5, Fee: 1.5},
+			{Tick: 223380, What: "Contract — Belt cleanup", Where: "Jernvold", Amount: 30000},
 		},
 	}
 	f := NewFinances(widgets.NewSeams(th, cv, &recordingSink{}))
@@ -68,7 +68,7 @@ func TestFinancesRendersHoldingsAndLedger(t *testing.T) {
 	if got := f.tbl.Rows[1].Cells[3]; got != "-51.50 €" {
 		t.Errorf("trade net = %q, want the net amount", got)
 	}
-	if got := f.tbl.Rows[1].Cells[2]; got != "Jernborg" {
+	if got := f.tbl.Rows[1].Cells[2]; got != "Jernvold" {
 		t.Errorf("where cell = %q, want the station", got)
 	}
 

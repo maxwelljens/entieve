@@ -12,8 +12,8 @@ import (
 // The high-sec belt response: security forces clear pirate rats.
 //
 // OLD behaviour (the reported bug): guards never initiated on anything but
-// player-sourced damage, so rats parked on a high-sec belt — Rudnik's
-// static guards, Starogród's patrols — sat there forever.
+// player-sourced damage, so rats parked on a high-sec belt — Rudnek's
+// static guards, Sterhov's patrols — sat there forever.
 //
 // NEW behaviour, two forces:
 //
@@ -58,7 +58,7 @@ func newBeltSim(t *testing.T, c *content.Content, seed int64) *Sim {
 }
 
 // spawnStaticGuard places a guard anchored at home that is NOT in the
-// Patrols store — the Rudnik static belt guard.
+// Patrols store — the Rudnek static belt guard.
 func spawnStaticGuard(t *testing.T, s *Sim, home core.Vec2) ecs.Entity {
 	t.Helper()
 	e := s.spawnNpc("npc-guard-test", home, 0)
