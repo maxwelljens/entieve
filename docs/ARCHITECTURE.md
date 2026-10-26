@@ -769,7 +769,7 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > (`game/music.go`) with exactly two implementations: the silent
 > `nopMusic` that `game.New` installs when `Options.Music` is nil (every
 > test, `simulate` and `validate` path) and `realMusic`, built only by
-> `cmdRun` (`game.NewMusic`). The six `.ogg` files stay under
+> `cmdRun` (`game.NewAudio`). The six `.ogg` files stay under
 > `assets/audio/` byte-for-byte and are embedded by the shim beside them
 > (`assets/audio/audio.go`, `//go:embed *.ogg`) — `go:embed` cannot reach
 > a parent directory, and releases carry no `assets/` folder.
@@ -788,11 +788,35 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > device only opens in ebiten's before-update hook on the first game-loop
 > update, so it is created exactly once in `cmdRun`'s construction path
 > (`sync.Once` inside the seam for belt and braces); no test may reach
-> it, which is why `game.New` never constructs `realMusic`.
+> it, which is why `game.New` never constructs `realMusic` or
+> the real cue players.
 > Ordering is the pure `trackQueue` (injectable seed; tests pin
 > permutations and no-immediate-repeat), and decode failures skip the
 > track and surface through the `warn` callback (`cmdRun` prints them to
 > stderr) — all six failing leaves the game silent, never broken.
+>
+> **UI sounds (2026-10).** The five interaction cues are a `game.UISound`
+> interface (`game/uisound.go`) with the same two-implementation rule: a
+> silent `nopUISound` (every test, `simulate`, `validate`) and
+> `realUISound`, built only on the run path. Both real channels come from
+> **one factory**, `game.NewAudio(seed, warn)` in `cmdRun`: it returns the
+> music engine and the cue players over the *same* `audioCtx()`
+> (`sync.Once`) context — two independent factories would risk the
+> once-per-process `NewContext` panic the music seam already guards.
+> `realUISound` decodes each `assets/sfx/*.wav` to PCM bytes once
+> (`ebiten/v2/audio/wav`, 16-bit; a differing rate is resampled to the
+> context's 44100) and keeps one `NewPlayerF32FromBytes` player per cue,
+> re-triggered by `Rewind`+`Play`, so a cue cuts its own tail while
+> distinct cues overlap. The volume is `master × ui`, re-applied on every
+> change and again on every fire (the music seam's idiom). `Game.Update`
+> fires `click` on a press edge that lands on `overUI` (one helper,
+> `Game.uiClick`), the `ScreenHost` fires `open`/`close` from its mount
+> and unmount edges (`onMount`/`onUnmount`, set by `Game.wireUISounds` on
+> both hosts — the game's and the title's), and `Game.Do`'s quantity
+> intents plus the verbs that land (save-as, a keybind assignment, the
+> save-manager load/delete, the two resets) fire `confirm`; the
+> keybindings refusals fire `refuse`. Kit-level one-offs that never mount
+> through the host (the order mini-window, Show Info) stay silent.
 >
 > **UI platform (2026-10, complete):** the chrome lives in `uikit/`, built on
 > **ebitenui v0.7.3** (pinned in go.mod); the legacy hand-drawn `ui/` package

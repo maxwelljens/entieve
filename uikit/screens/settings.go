@@ -14,9 +14,9 @@ import (
 // the panel draws no state of its own, it reads and pokes these callbacks
 // every Sync. The host owns the ladders, the persistence and the live
 // apply (game.setUIScale / setFullscreen / setVsync / setRailCollapsed /
-// setMasterVolume / setMusicVolume / persistSettings / setShuffle /
-// resetLayout / resetAllSettings); the window only renders and routes.
-// All must be non-nil.
+// setMasterVolume / setMusicVolume / setUIVolume / persistSettings /
+// setShuffle / resetLayout / resetAllSettings); the window only renders
+// and routes. All must be non-nil.
 type SettingsActions struct {
 	// UIScale returns the current user UI scale (the persisted setting);
 	// UIScaleLadder is the six-rung ladder the notched slider rides and
@@ -32,15 +32,17 @@ type SettingsActions struct {
 	// SetRailCollapsed flips it (the host persists it).
 	RailCollapsed    func() bool
 	SetRailCollapsed func(bool)
-	// MasterVolume and MusicVolume are whole percents (0..100). The Set
-	// callbacks apply a drag's value live WITHOUT writing the sidecar;
-	// PersistSettings is the release/persist point, so one drag writes
-	// once however many values it streamed. The host multiplies the pair
-	// at the music seam.
+	// MasterVolume, MusicVolume and UIVolume are whole percents (0..100).
+	// The Set callbacks apply a drag's value live WITHOUT writing the
+	// sidecar; PersistSettings is the release/persist point, so one drag
+	// writes once however many values it streamed. The host multiplies
+	// master with each channel's own volume at the audio seams.
 	MasterVolume    func() int
 	SetMasterVolume func(v int)
 	MusicVolume     func() int
 	SetMusicVolume  func(v int)
+	UIVolume        func() int
+	SetUIVolume     func(v int)
 	PersistSettings func()
 	// Shuffle reports the shuffled-pool flag; SetShuffle flips it.
 	Shuffle    func() bool
@@ -53,8 +55,8 @@ type SettingsActions struct {
 }
 
 // Settings is the settings window: a notched UI-scale slider, fullscreen
-// and rail toggles, freeflow master/music volume sliders, a shuffle toggle
-// and the two reset buttons. It mounts like every other panel (Screen id
+// and rail toggles, freeflow master/music/UI volume sliders, a shuffle
+// toggle and the two reset buttons. It mounts like every other panel (Screen id
 // "settings" — its sidecar key — key P) and rebuilds with the interface, so all
 // of its displayed state is re-read from the actions in Sync — including
 // right after a live scale change rebuilt it under itself (the replacement
@@ -73,6 +75,9 @@ type Settings struct {
 	musicRow    *widget.Container
 	musicSlide  *widgets.Slider
 	musicVal    *widget.Text
+	uiRow       *widget.Container
+	uiSlide     *widgets.Slider
+	uiVal       *widget.Text
 	fsBtn       *widget.Button
 	fsState     bool // last text written, to keep Sync a compare
 	railBtn     *widget.Button
@@ -166,9 +171,9 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 		func() { act.SetRailCollapsed(!act.RailCollapsed()) },
 	)
 
-	// Rows 4–6: audio. The two volumes are freeflow sliders (whole
-	// percents, 1% steps): the drag applies live through Set*, the
-	// release is the one persist point. Shuffle is a toggle, default on.
+	// Rows 4–6: audio. The three volumes are freeflow sliders (whole
+	// percents, 1% steps): the drag applies live through Set*, the release
+	// is the one persist point. Shuffle is a toggle, default on.
 	s.masterVal = newValue(fmt.Sprintf("%d%%", act.MasterVolume()))
 	s.masterSlide = widgets.NewSlider(d, widgets.SliderOpts{
 		Mode: widgets.SliderFreeflow, Min: 0, Max: 100, Step: 1,
@@ -185,13 +190,21 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 		OnRelease: func(float64) { act.PersistSettings() },
 	})
 	s.musicRow = newSliderRow("Music", s.musicSlide, s.musicVal)
+	s.uiVal = newValue(fmt.Sprintf("%d%%", act.UIVolume()))
+	s.uiSlide = widgets.NewSlider(d, widgets.SliderOpts{
+		Mode: widgets.SliderFreeflow, Min: 0, Max: 100, Step: 1,
+		Value:     float64(act.UIVolume()),
+		OnChange:  func(v float64) { act.SetUIVolume(int(math.Round(v))) },
+		OnRelease: func(float64) { act.PersistSettings() },
+	})
+	s.uiRow = newSliderRow("UI", s.uiSlide, s.uiVal)
 	s.shufBtn = newToggle(
 		// Default state is shuffle on, the fresh-install default.
 		"Shuffle: on",
 		func() { act.SetShuffle(!act.Shuffle()) },
 	)
 
-	// Rows 7–8: the two resets. Reset all is destructive, so it arms on
+	// Rows 8–9: the two resets. Reset all is destructive, so it arms on
 	// the first press and fires on the second.
 	resetBtn := newToggle("Reset window layout", func() { act.ResetLayout() })
 	s.resetAll = newToggle("Reset all settings", func() {
@@ -216,21 +229,21 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	body.AddChild(s.scaleRow, s.fsBtn, s.railBtn, s.masterRow, s.musicRow, s.shufBtn, resetBtn, s.resetAll, hint)
+	body.AddChild(s.scaleRow, s.fsBtn, s.railBtn, s.masterRow, s.musicRow, s.uiRow, s.shufBtn, resetBtn, s.resetAll, hint)
 
 	title, _ := theme.NewTitleBar(d, "Settings", "")
 
 	s.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
-		// Content floor: title + eight 40 px rows + the hint line (the
+		// Content floor: title + nine 40 px rows + the hint line (the
 		// frame does not auto-grow, so the fallback is exactly this tall),
 		// and wide enough for a slider's full travel beside its label and
 		// readout (the three-way grid leaves the middle column the rest).
-		widget.WindowOpts.MinSize(theme.Px(380), theme.Px(460)),
+		widget.WindowOpts.MinSize(theme.Px(380), theme.Px(508)),
 		// Fallback only: centred at the 1280×720 design size (the game
 		// re-centers it from placeDefaults like the other overlays).
-		widget.WindowOpts.Location(image.Rect(theme.Px(450), theme.Px(130), theme.Px(830), theme.Px(590))),
+		widget.WindowOpts.Location(image.Rect(theme.Px(450), theme.Px(106), theme.Px(830), theme.Px(614))),
 	)
 	return s
 }
@@ -238,7 +251,7 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 // Win returns the settings window for Kit.AddWindow.
 func (s *Settings) Win() *widget.Window { return s.win }
 
-// Sync polls the three sliders, mirrors the host's values into idle
+// Sync polls the sliders, mirrors the host's values into idle
 // handles and refreshes the readouts and toggle labels. Call it every
 // frame while mounted.
 //
@@ -252,6 +265,7 @@ func (s *Settings) Sync() {
 	s.scaleSlider.Poll()
 	s.masterSlide.Poll()
 	s.musicSlide.Poll()
+	s.uiSlide.Poll()
 	if !s.scaleSlider.Grabbed() {
 		s.scaleSlider.SetValue(s.act.UIScale())
 	}
@@ -260,6 +274,9 @@ func (s *Settings) Sync() {
 	}
 	if !s.musicSlide.Grabbed() {
 		s.musicSlide.SetValue(float64(s.act.MusicVolume()))
+	}
+	if !s.uiSlide.Grabbed() {
+		s.uiSlide.SetValue(float64(s.act.UIVolume()))
 	}
 	setStepperValue(s.scaleRow, s.scaleVal, fmt.Sprintf("%.4g×", s.scaleSlider.Value()))
 	if on := s.act.Fullscreen(); on != s.fsState {
@@ -280,6 +297,7 @@ func (s *Settings) Sync() {
 	}
 	setStepperValue(s.masterRow, s.masterVal, fmt.Sprintf("%d%%", int(math.Round(s.masterSlide.Value()))))
 	setStepperValue(s.musicRow, s.musicVal, fmt.Sprintf("%d%%", int(math.Round(s.musicSlide.Value()))))
+	setStepperValue(s.uiRow, s.uiVal, fmt.Sprintf("%d%%", int(math.Round(s.uiSlide.Value()))))
 	if on := s.act.Shuffle(); on != s.shufState {
 		s.shufState = on
 		if on {
@@ -290,9 +308,11 @@ func (s *Settings) Sync() {
 	}
 }
 
-// ScaleSliderForTest, MasterSliderForTest and MusicSliderForTest expose
-// the three controls (geometry, value and Step) to surface tests — the
-// Table.RowWidgetForTest precedent, never called by production code.
+// ScaleSliderForTest, MasterSliderForTest, MusicSliderForTest and
+// UISliderForTest expose the four controls (geometry, value and Step) to
+// surface tests — the Table.RowWidgetForTest precedent, never called by
+// production code.
 func (s *Settings) ScaleSliderForTest() *widgets.Slider  { return s.scaleSlider }
 func (s *Settings) MasterSliderForTest() *widgets.Slider { return s.masterSlide }
 func (s *Settings) MusicSliderForTest() *widgets.Slider  { return s.musicSlide }
+func (s *Settings) UISliderForTest() *widgets.Slider     { return s.uiSlide }

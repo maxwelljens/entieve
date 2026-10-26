@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **UI sounds** (`game`, `assets/sfx`): five short cues from a local SFX
+  pack (click, open, close, confirm, refuse), embedded through an
+  `assets/sfx/sfx.go` shim and played by a new `game.UISound` seam. A mouse
+  press that lands on interface chrome clicks; a window mounting or
+  unmounting (Esc menu, station services, every floating window, the
+  title's Settings/Keybindings) opens/closes; the quantity verbs (Refine,
+  Start Job, Buy, Sell, Transfer), save-as, a keybinding assignment, a
+  save-manager load or delete and the two resets confirm; a rejected
+  keybind chord refuses. The settings window gains a **UI** volume slider
+  (0–100%, 80% fresh install, `ui_volume` in `<save>.settings.json`) mixed
+  at `master × UI`; the real players are built beside the music on the
+  same one audio context (`game.NewAudio`), and every headless path gets a
+  silent nop — no test decodes or plays a cue. Pack licence unknown, so it
+  stays uncredited (source path documented in `assets/README.md`).
+
 ### Changed
 
 - **Title screen backdrop is the artwork** (`game`, `assets/artwork`):

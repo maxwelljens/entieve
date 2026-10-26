@@ -101,13 +101,13 @@ func TestSettingsPersistence(t *testing.T) {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		t.Fatalf("settings JSON: %v", err)
 	}
-	for _, k := range []string{"ui_scale", "fullscreen", "master_volume", "music_volume"} {
+	for _, k := range []string{"ui_scale", "fullscreen", "master_volume", "music_volume", "ui_volume"} {
 		if _, ok := raw[k]; !ok {
 			t.Errorf("settings keys = %v, want %s present", raw, k)
 		}
 	}
-	if len(raw) != 4 {
-		t.Errorf("settings keys = %v, want exactly ui_scale, fullscreen, master_volume, music_volume", raw)
+	if len(raw) != 5 {
+		t.Errorf("settings keys = %v, want exactly ui_scale, fullscreen, master_volume, music_volume, ui_volume", raw)
 	}
 	if v, ok := raw["ui_scale"].(float64); !ok || v != 1.5 {
 		t.Errorf("ui_scale = %v, want 1.5", raw["ui_scale"])
@@ -121,6 +121,9 @@ func TestSettingsPersistence(t *testing.T) {
 	if v, ok := raw["music_volume"].(float64); !ok || v != 70 {
 		t.Errorf("music_volume = %v, want 70", raw["music_volume"])
 	}
+	if v, ok := raw["ui_volume"].(float64); !ok || v != 80 {
+		t.Errorf("ui_volume = %v, want the 80 default", raw["ui_volume"])
+	}
 
 	// Vsync off is the inverted key; the rest of the shape is unchanged.
 	g.vsync = false
@@ -128,8 +131,8 @@ func TestSettingsPersistence(t *testing.T) {
 		t.Fatalf("writeSettings: %v", err)
 	}
 	raw = readSettingsMap(t, g.settingsPath())
-	if len(raw) != 5 || raw["vsync_off"] != true {
-		t.Errorf("vsync-off settings keys = %v, want the default four plus vsync_off: true", raw)
+	if len(raw) != 6 || raw["vsync_off"] != true {
+		t.Errorf("vsync-off settings keys = %v, want the default five plus vsync_off: true", raw)
 	}
 	g.vsync = true
 	g.loadSettings()
@@ -472,8 +475,8 @@ func TestRailCollapsePersists(t *testing.T) {
 		t.Fatal("collapsed state did not reach the host (syncRail)")
 	}
 	raw := readSettingsMap(t, g.settingsPath())
-	if len(raw) != 5 || raw["rail_collapsed"] != true {
-		t.Errorf("collapsed settings keys = %v, want the default four plus rail_collapsed: true", raw)
+	if len(raw) != 6 || raw["rail_collapsed"] != true {
+		t.Errorf("collapsed settings keys = %v, want the default five plus rail_collapsed: true", raw)
 	}
 
 	// A new session on the same path boots collapsed.
@@ -486,8 +489,8 @@ func TestRailCollapsePersists(t *testing.T) {
 	click(t, g, g.rail.Tab())
 	pump(t, g, 1280, 720)
 	raw = readSettingsMap(t, g.settingsPath())
-	if _, ok := raw["rail_collapsed"]; ok || len(raw) != 4 {
-		t.Errorf("expanded settings keys = %v, want exactly ui_scale, fullscreen, master_volume, music_volume", raw)
+	if _, ok := raw["rail_collapsed"]; ok || len(raw) != 5 {
+		t.Errorf("expanded settings keys = %v, want exactly ui_scale, fullscreen, master_volume, music_volume, ui_volume", raw)
 	}
 	g3 := newShowcaseGameAt(t, path)
 	if g3.rail.Collapsed() {
@@ -655,9 +658,9 @@ func TestResetAllSettings(t *testing.T) {
 		t.Errorf("after reset: fullscreen %v, vsync %v, rail %v/%v; want off/on/expanded",
 			g.fullscreen, g.vsync, g.railCollapsed, g.rail.Collapsed())
 	}
-	if g.masterVol != 100 || g.musicVol != 70 || !g.shuffle {
-		t.Errorf("audio after reset = (%d, %d, shuffle %v), want (100, 70, true)",
-			g.masterVol, g.musicVol, g.shuffle)
+	if g.masterVol != 100 || g.musicVol != 70 || g.uiVol != 80 || !g.shuffle {
+		t.Errorf("audio after reset = (%d, %d, UI %d, shuffle %v), want (100, 70, 80, true)",
+			g.masterVol, g.musicVol, g.uiVol, g.shuffle)
 	}
 	if len(vsync) == 0 || !vsync[len(vsync)-1] {
 		t.Errorf("vsync seam after reset = %v, want a final true call", vsync)
@@ -666,11 +669,12 @@ func TestResetAllSettings(t *testing.T) {
 		t.Errorf("windowed size after reset = %d×%d, want the %d×%d default", w, h, defaultW, defaultH)
 	}
 	// The one flush left the default document: no rail/vsync/size/shuffle
-	// keys, and the audio percents back at 100/70.
+	// keys, and the audio percents back at 100/70/80.
 	raw := readSettingsMap(t, g.settingsPath())
-	if len(raw) != 4 || raw["ui_scale"] != float64(1) || raw["fullscreen"] != false ||
-		raw["master_volume"] != float64(100) || raw["music_volume"] != float64(70) {
-		t.Errorf("sidecar after reset = %v, want exactly ui_scale 1, fullscreen false, master 100, music 70", raw)
+	if len(raw) != 5 || raw["ui_scale"] != float64(1) || raw["fullscreen"] != false ||
+		raw["master_volume"] != float64(100) || raw["music_volume"] != float64(70) ||
+		raw["ui_volume"] != float64(80) {
+		t.Errorf("sidecar after reset = %v, want exactly ui_scale 1, fullscreen false, master 100, music 70, UI 80", raw)
 	}
 }
 

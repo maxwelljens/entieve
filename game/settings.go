@@ -13,18 +13,19 @@ import (
 
 // Player settings persistence: a JSON sidecar next to the save file,
 // <Options.SavePath>.settings.json, holding the UI scale, the fullscreen
-// and vsync flags, the navigation rail's collapse state, the two audio
+// and vsync flags, the navigation rail's collapse state, the three audio
 // volume percents, the shuffle flag and the last windowed size:
 //
 //	{"ui_scale": 1.5, "fullscreen": false}
 //	{"ui_scale": 1, "fullscreen": false, "rail_collapsed": true, "vsync_off": true}
 //	{"ui_scale": 1, "fullscreen": false, "window_w": 1100, "window_h": 800}
-//	{"ui_scale": 1, "fullscreen": false, "master_volume": 60, "music_volume": 30, "shuffle_off": true}
+//	{"ui_scale": 1, "fullscreen": false, "master_volume": 60, "music_volume": 30,
+//	 "ui_volume": 80, "shuffle_off": true}
 //
 // Every key past the first two is omitempty by default, so a file with
-// default settings stays close to the documented two-key shape; the two
+// default settings stays close to the documented two-key shape; the three
 // volume percents are written as pointers so an explicit 0 is not the
-// absent-key default (100 / 70). rail_collapsed true means collapsed;
+// absent-key default (100 / 70 / 80). rail_collapsed true means collapsed;
 // vsync_off and shuffle_off are INVERTED (absent/false = on, today's
 // hardcoded boot) so a file written before the key existed keeps the
 // behaviour it had. The windowed size is written only on a clean quit
@@ -53,10 +54,11 @@ const defaultUIScale = 1.0
 
 // Audio defaults. The volumes are whole percents (0..100) persisted as
 // percents; the engine multiplies them at the seam, so a fresh install
-// plays at 1.00 × 0.70.
+// plays music at 1.00 × 0.70 and UI cues at 1.00 × 0.80.
 const (
 	defaultMasterVolume = 100
 	defaultMusicVolume  = 70
+	defaultUIVolume     = 80
 	defaultShuffle      = true
 )
 
@@ -70,10 +72,12 @@ type settingsFile struct {
 	// VsyncOff is the inverted vsync flag: absent = on, which is what
 	// every build before this key did unconditionally.
 	VsyncOff bool `json:"vsync_off,omitempty"`
-	// MasterVolume/MusicVolume are whole percents; absent = 100 / 70.
-	// Pointers keep an explicit 0 distinct from "key not written".
+	// MasterVolume/MusicVolume/UIVolume are whole percents; absent =
+	// 100 / 70 / 80. Pointers keep an explicit 0 distinct from "key not
+	// written".
 	MasterVolume *int `json:"master_volume,omitempty"`
 	MusicVolume  *int `json:"music_volume,omitempty"`
+	UIVolume     *int `json:"ui_volume,omitempty"`
 	// ShuffleOff is the inverted shuffle flag (the vsync_off precedent):
 	// absent = on, the fresh-install default.
 	ShuffleOff bool `json:"shuffle_off,omitempty"`
@@ -92,7 +96,7 @@ func (g *Game) settingsPath() string { return g.SavePath() + ".settings.json" }
 // in place (never an error; called from New before anything is built).
 func (g *Game) loadSettings() {
 	g.uiScale, g.fullscreen, g.vsync, g.railCollapsed = defaultUIScale, false, true, false
-	g.masterVol, g.musicVol, g.shuffle = defaultMasterVolume, defaultMusicVolume, defaultShuffle
+	g.masterVol, g.musicVol, g.uiVol, g.shuffle = defaultMasterVolume, defaultMusicVolume, defaultUIVolume, defaultShuffle
 	g.winW, g.winH = 0, 0
 	data, err := os.ReadFile(g.settingsPath())
 	if err != nil {
@@ -114,6 +118,9 @@ func (g *Game) loadSettings() {
 	if f.MusicVolume != nil {
 		g.musicVol = clampInt(*f.MusicVolume, 0, 100)
 	}
+	if f.UIVolume != nil {
+		g.uiVol = clampInt(*f.UIVolume, 0, 100)
+	}
 	g.shuffle = !f.ShuffleOff
 	if f.WindowW > 0 && f.WindowH > 0 {
 		g.winW, g.winH = f.WindowW, f.WindowH
@@ -124,7 +131,7 @@ func (g *Game) loadSettings() {
 // quit with the windowed size). flushSize gates the size keys: they are
 // only meaningful for a real window and are written by quitPersist.
 func (g *Game) writeSettings() error {
-	master, musicVol := g.masterVol, g.musicVol
+	master, musicVol, uiVol := g.masterVol, g.musicVol, g.uiVol
 	f := settingsFile{
 		UIScale:       g.uiScale,
 		Fullscreen:    g.fullscreen,
@@ -132,6 +139,7 @@ func (g *Game) writeSettings() error {
 		VsyncOff:      !g.vsync,
 		MasterVolume:  &master,
 		MusicVolume:   &musicVol,
+		UIVolume:      &uiVol,
 		ShuffleOff:    !g.shuffle,
 	}
 	if g.flushSize {
@@ -278,17 +286,18 @@ func (g *Game) setRailCollapsed(on bool) {
 	}
 }
 
-// applyMusicSettings pushes the two volume percents and the shuffle flag
-// into the seam. Called after load and on every audio setting change; the
-// engine applies master × music to the current track and keeps the pair
-// for the next one.
-func (g *Game) applyMusicSettings() {
+// applyAudioSettings pushes the volume percents and the shuffle flag into
+// the two seams. Called after load and on every audio setting change; each
+// engine applies master × its own channel (music / UI) to what it plays
+// and keeps the pair for the next fire.
+func (g *Game) applyAudioSettings() {
 	g.music.SetVolume(float64(g.masterVol)/100, float64(g.musicVol)/100)
 	g.music.SetShuffle(g.shuffle)
+	g.ui.SetVolume(float64(g.masterVol)/100, float64(g.uiVol)/100)
 }
 
-// setMasterVolume applies a whole percent (0..100) live at the music
-// seam WITHOUT writing the sidecar: the settings slider streams these
+// setMasterVolume applies a whole percent (0..100) live at the audio
+// seams WITHOUT writing the sidecar: the settings slider streams these
 // while the pointer moves, and PersistSettings is the drag's one write.
 func (g *Game) setMasterVolume(v int) {
 	v = clampInt(v, 0, 100)
@@ -296,7 +305,7 @@ func (g *Game) setMasterVolume(v int) {
 		return
 	}
 	g.masterVol = v
-	g.applyMusicSettings()
+	g.applyAudioSettings()
 }
 
 // setMusicVolume is the music half of setMasterVolume's contract.
@@ -306,7 +315,17 @@ func (g *Game) setMusicVolume(v int) {
 		return
 	}
 	g.musicVol = v
-	g.applyMusicSettings()
+	g.applyAudioSettings()
+}
+
+// setUIVolume is the UI-cue half of setMasterVolume's contract.
+func (g *Game) setUIVolume(v int) {
+	v = clampInt(v, 0, 100)
+	if v == g.uiVol {
+		return
+	}
+	g.uiVol = v
+	g.applyAudioSettings()
 }
 
 // persistSettings is the settings slider's release point: one sidecar
@@ -324,32 +343,33 @@ func (g *Game) setShuffle(on bool) {
 		return
 	}
 	g.shuffle = on
-	g.applyMusicSettings()
+	g.applyAudioSettings()
 	if err := g.writeSettings(); err != nil {
 		g.report(err, "")
 	}
 }
 
 // resetAllSettings restores every setting to its default — scale 1×,
-// windowed, vsync on, rail expanded, master 100% / music 70% / shuffle on,
-// no persisted windowed size — then rebuilds the interface at 1× (the
-// live-apply path) and flushes the sidecar once.
+// windowed, vsync on, rail expanded, master 100% / music 70% / UI 80% /
+// shuffle on, no persisted windowed size — then rebuilds the interface at
+// 1× (the live-apply path) and flushes the sidecar once.
 func (g *Game) resetAllSettings() {
 	g.uiScale = defaultUIScale
 	g.fullscreen = false
 	g.vsync = true
 	g.railCollapsed = false
-	g.masterVol, g.musicVol, g.shuffle = defaultMasterVolume, defaultMusicVolume, defaultShuffle
+	g.masterVol, g.musicVol, g.uiVol, g.shuffle = defaultMasterVolume, defaultMusicVolume, defaultUIVolume, defaultShuffle
 	g.winW, g.winH = 0, 0
 	g.flushSize = false
 	ebiten.SetFullscreen(false)
 	g.applyVsync(true)
 	g.applyScale(true)
 	g.rail.SetCollapsed(false) // also when applyScale short-circuits
-	g.applyMusicSettings()
+	g.applyAudioSettings()
 	if err := g.writeSettings(); err != nil {
 		g.report(err, "")
 	}
+	g.ui.Play(sfxConfirm)
 	g.report(nil, "Settings reset")
 }
 

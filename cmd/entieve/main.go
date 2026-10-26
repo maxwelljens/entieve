@@ -93,6 +93,14 @@ func cmdRun(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "entieve: unknown world %q (see worlds/ in content data)\n", *world)
 		return 1
 	}
+	// The only site that reaches ebiten.RunGame builds the real audio:
+	// one factory, one shared context (audio.NewContext may exist once per
+	// process, never in a test) — the shuffled music pool seeded from the
+	// clock and the five UI cues. Decode failures are reported here rather
+	// than fatal.
+	musicSeam, uiSeam := game.NewAudio(time.Now().UnixNano(), func(err error) {
+		fmt.Fprintf(stderr, "entieve: audio: %v\n", err)
+	})
 	opts := game.Options{
 		Content:      c,
 		World:        wd,
@@ -101,13 +109,8 @@ func cmdRun(args []string, stdout, stderr io.Writer) int {
 		Seed:         *seed,
 		StartInTitle: startInTitle(*load),
 		Version:      version,
-		// The only site that reaches ebiten.RunGame builds the real music
-		// engine (audio.NewContext may exist once per process, never in a
-		// test): a shuffled pool seeded from the clock, decode failures
-		// reported here rather than fatal.
-		Music: game.NewMusic(time.Now().UnixNano(), func(err error) {
-			fmt.Fprintf(stderr, "entieve: music: %v\n", err)
-		}),
+		Music:        musicSeam,
+		UISound:      uiSeam,
 	}
 	if *load != "" {
 		save, err := readSave(*load)
