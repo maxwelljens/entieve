@@ -679,7 +679,9 @@ whose **Buy** is grayed until some local order offers it (**Request on
 Market** stays live, and placing the first order is how a market wakes up).
 
 **Search.** The field above the tree filters the selected branch live as
-you type (name, group path and maker all match, case-insensitive). Results
+you type (name, group path and maker all match, case-insensitive and
+diacritic-folded — "zaklady" finds Zakłady, and a typed "zakłady" still
+matches). Results
 are flat and ranked by fuzzy score — best match first, the header sort
 yielding while the query is up — with the matched letters highlighted;
 clearing the query restores the branch view and its sort. The query

@@ -456,3 +456,65 @@ func TestMarketAvailabilitySuffix(t *testing.T) {
 		t.Errorf("title = %q, want the base name Market", got)
 	}
 }
+
+// TestMarketSearchFoldsDiacritics: the query matches through the canon
+// diacritics in BOTH directions — ASCII "zaklady" finds the items whose
+// maker is "Zakłady Burza", a diacritic-typed "zakłady" finds the same
+// set, and "druzstvo" finds Družstvo's. (RED: the raw byte matcher in
+// searchHits misses every one of them.)
+func TestMarketSearchFoldsDiacritics(t *testing.T) {
+	m, env, _, frame := mktSearchEnv(t)
+
+	burza, dru := []content.ItemID{}, []content.ItemID{}
+	for _, item := range marketCatalog(env) {
+		switch m.maker[item] {
+		case "Zakłady Burza":
+			burza = append(burza, item)
+		case "Družstvo":
+			dru = append(dru, item)
+		}
+	}
+	if len(burza) < 2 || len(dru) < 1 {
+		t.Fatalf("fixture: %d burza items, %d Družstvo items — need both", len(burza), len(dru))
+	}
+
+	m.FocusSearch()
+	query := func(q string) []content.ItemID {
+		t.Helper()
+		// SetText, not SelectAll+DeleteSelectedText: the widget's
+		// selection delete miscounts bytes on multi-byte runes and
+		// leaves trailing bytes behind (observed: "zakłady" -> "y").
+		m.search.SetText(q)
+		frame()
+		out := []content.ItemID{}
+		for _, h := range m.results {
+			out = append(out, h.Item)
+		}
+		return out
+	}
+	sameSet := func(got, want []content.ItemID) bool {
+		if len(got) != len(want) {
+			return false
+		}
+		set := map[content.ItemID]bool{}
+		for _, item := range want {
+			set[item] = true
+		}
+		for _, item := range got {
+			if !set[item] {
+				return false
+			}
+		}
+		return true
+	}
+
+	if got := query("zaklady"); !sameSet(got, burza) {
+		t.Errorf("\"zaklady\" matched %v, want the %d Zakłady Burza items %v", got, len(burza), burza)
+	}
+	if got := query("zakłady"); !sameSet(got, burza) {
+		t.Errorf("typed \"zakłady\" matched %v, want the same Zakłady Burza set %v", got, burza)
+	}
+	if got := query("druzstvo"); !sameSet(got, dru) {
+		t.Errorf("\"druzstvo\" matched %v, want the Družstvo items %v", got, dru)
+	}
+}
