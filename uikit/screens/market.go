@@ -397,19 +397,32 @@ func (m *Market) scopeItems() []content.ItemID {
 
 // searchHits ranks the branch's items by fuzzy score over the display
 // name, the full group path and the maker — sahilm/fuzzy's Find, so the
-// ranking is the library's (descending score, stable for ties).
+// ranking is the library's (descending score, stable for ties). Both the
+// query and the haystack are diacritic-folded first (fold.go), so an
+// ASCII keyboard matches accented names and a typed diacritic matches
+// back; the library's byte offsets are remapped to the original's rune
+// starts so the highlight tints the whole letter.
 func (m *Market) searchHits(q string, scope []content.ItemID) []mktHit {
+	fq, _ := foldString(q)
+	fnames := make([]string, len(scope))
+	folds := make([][]int, len(scope))
 	hay := make([]string, len(scope))
 	for i, item := range scope {
-		hay[i] = m.cv.TradeableName(item) + " " + m.group[item] + " " + m.maker[item]
+		fname, nmap := foldString(m.cv.TradeableName(item))
+		fnames[i], folds[i] = fname, nmap
+		fg, _ := foldString(m.group[item])
+		fm, _ := foldString(m.maker[item])
+		hay[i] = fname + " " + fg + " " + fm
 	}
 	var out []mktHit
-	for _, mt := range fuzzy.Find(q, hay) {
+	for _, mt := range fuzzy.Find(fq, hay) {
 		item := scope[mt.Index]
-		name := m.cv.TradeableName(item)
 		match := make([]int, 0, len(mt.MatchedIndexes))
 		for _, i := range mt.MatchedIndexes {
-			if i < len(name) {
+			if i < len(fnames[mt.Index]) {
+				if folds[mt.Index] != nil {
+					i = folds[mt.Index][i]
+				}
 				match = append(match, i)
 			}
 		}

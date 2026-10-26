@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Market search folds diacritics** (`uikit/screens`): the query and the
+  catalog match through the canon name alphabet in both directions — an
+  ASCII keyboard finds accented names ("zaklady" → Zakłady Burza,
+  "druzstvo" → Družstvo) and a diacritic-typed query still matches; the
+  match highlight remaps to whole letters. The fold table is the game
+  font's verified diacritic set.
+
 - **The click cue speaks for controls, not for windows** (`game`,
   `uikit`): `Game.uiClick` now asks `Kit.PressTarget` instead of `overUI` —
   the widget tree is walked from the deepest widget under the press, and
