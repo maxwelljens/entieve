@@ -123,6 +123,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A context-menu entry no longer clicks what is behind it** (`uikit`,
+  `game`): the press that lands (or dismisses) the popup now belongs to the
+  popup for every consumer. `Kit.Update` still skips the widget pass while a
+  popup owns the frame, but it advances ebitenui's cached input, so the
+  unspent press edge can no longer fire on the row underneath — ebitenui
+  computes its "just pressed" edge on the next `ui.Update`, which used to be
+  the frame after the popup had already closed. `Menu.Click`/`Esc` also claim
+  `widgets.PressEdge` until `Menu.TakeBlocked`, which silences the kit's raw
+  pollers — the starmap's nodes, slider bands, split panes and column grips —
+  for the same frame. Pinned by `TestMenuEntryClickDoesNotReachTheRowBehind`,
+  `TestColumnMenuDismissPressDoesNotReachTheTableRows`,
+  `TestMapViewIgnoresThePopupsPress` and `TestMenuSpendsTheFramesPressEdge`.
+
 - **A long window title no longer overflows its bar** (`uikit/theme`): the
   tracked title label is now ellipsized to the bar's safe width — from its
   own start (clear of the ring dots and the leading icon) to the title

@@ -250,7 +250,11 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 // drive it) and ui.Update is skipped, so the click or Esc that
 // dismisses the popup never reaches the widgets underneath. The window
 // raise is gated the same way: a dismiss click can never re-stack what
-// lies beneath the popup.
+// lies beneath the popup. Skipping ui.Update also skips its input pass,
+// so that pass runs by hand in the else branch: ebitenui computes its
+// press edge from that cache, and an unspent edge would fire on the
+// widget under the popup the next time ui.Update runs — the row behind
+// the entry would click too.
 //
 // This is the care-taker half of the consumed-gesture latch (the contract
 // is on widgets.Menu): Menu.Poll sets it, TakeBlocked clears it — once per
@@ -262,6 +266,14 @@ func (k *Kit) Update() error {
 	if !k.svc.menu.IsOpen() && !menuBlocked {
 		k.raisePressed()
 		k.ui.Update()
+	} else {
+		// The popup owns the frame, so no widget pass runs — but ebitenui's
+		// cached input must still advance (ui.Update's own first step): an
+		// unspent press edge would otherwise sit in the handler and fire on
+		// whatever widget lies under the popup the next time ui.Update runs,
+		// i.e. the row behind the entry would click too.
+		input.Update()
+		input.AfterUpdate()
 	}
 	k.stepChromes()
 	return nil
