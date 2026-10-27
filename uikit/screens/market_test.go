@@ -35,8 +35,8 @@ func parseCredits(t *testing.T, s string) float64 {
 
 // TestMarketRowIcons pins the market's row glyphs: every item row (catalog
 // parent, expanded order, search hit) carries a 20 px icon — a module's own
-// art, else its group's glyph — while the browse-tree branch rows stay
-// text-only.
+// icon, else the item's icon (drop-in art, else its category silhouette) —
+// while the browse-tree branch rows stay text-only.
 func TestMarketRowIcons(t *testing.T) {
 	env, _ := newTestEnv(t)
 	m := NewMarket(env)
@@ -57,7 +57,7 @@ func TestMarketRowIcons(t *testing.T) {
 		}
 		seen[r.Icons[0]] = true
 	}
-	for _, want := range []string{"mod_autocannon_s", "ammo", "act_loot", "kind_belt", "kind_asteroid", "row_hull"} {
+	for _, want := range []string{"mod-autocannon-s", "ammo", "loot-navdata", "min-ferrite", "ore-sterngrit", "row_hull"} {
 		if !seen[want] {
 			t.Errorf("no catalog row carries %q (saw %v)", want, seen)
 		}

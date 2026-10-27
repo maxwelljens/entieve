@@ -18,6 +18,12 @@ const (
 	// IconTile is the fitting/rack slot tile's art box (the 50×40 cell's
 	// module render); the type grid above stays pinned at 16/20/24.
 	IconTile = 32
+	// IconHero is the Show Info body's hero icon — the one big render of the
+	// entity, deliberately off the type grid. IconCorp is the corporation
+	// logo beside it, and IconHero must stay strictly bigger: the entity
+	// leads, its maker is an attribution (TestHeroOutgrowsCorpLogo).
+	IconHero = 64
+	IconCorp = 40
 )
 
 // IconGap is the gap between an icon box and the label beside it.
@@ -82,17 +88,56 @@ func ModuleIcon(kind string) string {
 	}
 }
 
-// ModuleIconFor resolves one module's icon: its own content Icon when the
-// icon registry knows that key, else its class glyph (ModuleIcon). A bad
-// content key degrades to the glyph — never a broken image. nil is "".
+// ModuleIconFor resolves one module's icon: the player's drop-in art for its
+// content id first (assets/icons — the id is a registered art key), else its
+// own content Icon when the icon registry knows that key, else its class
+// glyph (ModuleIcon). A bad content key degrades to the glyph — never a
+// broken image. nil is "".
 func ModuleIconFor(def *content.ModuleDef) string {
 	if def == nil {
 		return ""
+	}
+	if id := string(def.ID); id != "" && icons.Has(id) {
+		return id
 	}
 	if def.Icon != "" && icons.Has(def.Icon) {
 		return def.Icon
 	}
 	return ModuleIcon(def.Kind)
+}
+
+// ItemIconFor resolves one item's icon: the player's drop-in art for its
+// content id first, else its category's silhouette (ammo, loot, mineral,
+// ore), else the neutral gear. nil is "".
+func ItemIconFor(def *content.ItemDef) string {
+	if def == nil {
+		return ""
+	}
+	if id := string(def.ID); id != "" && icons.Has(id) {
+		return id
+	}
+	switch def.Category {
+	case content.CatAmmo, content.CatCharge:
+		return "ammo"
+	case content.CatLoot:
+		return "act_loot"
+	case content.CatMineral:
+		return "kind_belt"
+	case content.CatOre:
+		return "kind_asteroid"
+	}
+	return icons.Fallback
+}
+
+// CorpIconFor resolves one corporation's logo: the player's drop-in art for
+// its corp-* slug, else "" — the caller then keeps the vector emblem
+// (uikit/emblems). Only the Show Info hero draws the logo; every other slot
+// stays an emblem.
+func CorpIconFor(slug string) string {
+	if slug != "" && icons.Has(slug) {
+		return slug
+	}
+	return ""
 }
 
 // ContractIcon maps a contract's objective kind (kill/deliver/mine) to its

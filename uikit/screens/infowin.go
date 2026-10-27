@@ -71,8 +71,7 @@ type infoSection struct {
 
 // infoPage is one windowful of content: header, prose and sections.
 type infoPage struct {
-	Icon     string
-	IconSize int // header icon box in design units (0 = the 20 px tooltip box)
+	Hero     string // the body hero icon, drawn at theme.IconHero
 	Title    string
 	Sub      string // category/maker line under the title
 	Prose    string // wrapped description ("" = no prose block at all)
@@ -270,7 +269,7 @@ func infoPageFor(cv widgets.ContentView, ref widgets.InfoRef) (infoPage, bool) {
 // for the unattributed rat hulls), slots, the survival block with resists,
 // capacitor, propulsion, sensors and cargo.
 func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
-	p := infoPage{Icon: "row_hull", Title: def.Name, Prose: def.Description, Emblem: def.Maker}
+	p := infoPage{Hero: "row_hull", Title: def.Name, Prose: def.Description, Emblem: def.Maker}
 	if def.Class != "" {
 		p.Sub = spacedKind(def.Class)
 	}
@@ -389,7 +388,7 @@ func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
 // kind, cycle, capacitor draw), then the shared moduleTip stat sections,
 // the compatible charges as links and the market price.
 func modulePage(cv widgets.ContentView, def *content.ModuleDef) infoPage {
-	p := infoPage{Icon: theme.ModuleIconFor(def), IconSize: theme.IconTitle, Title: def.Name, Prose: def.Description, Emblem: def.Maker}
+	p := infoPage{Hero: theme.ModuleIconFor(def), Title: def.Name, Prose: def.Description, Emblem: def.Maker}
 	if def.Kind != "" {
 		p.Sub = spacedKind(def.Kind)
 	}
@@ -452,7 +451,7 @@ func ammoItems(cv widgets.ContentView, class string) []content.ItemID {
 // itemPage renders an item: properties, market price, the refine yields
 // as links and the ammo damage profile when it has one.
 func itemPage(cv widgets.ContentView, def *content.ItemDef) infoPage {
-	p := infoPage{Title: def.Name, Prose: def.Description, Emblem: def.Maker}
+	p := infoPage{Hero: theme.ItemIconFor(def), Title: def.Name, Prose: def.Description, Emblem: def.Maker}
 	if def.Category != "" {
 		p.Sub = spacedKind(def.Category)
 	}
@@ -516,7 +515,7 @@ func itemPage(cv widgets.ContentView, def *content.ItemDef) infoPage {
 // stream gave it one — never placeholder text), the dossier block with
 // its hull as a link, behavior ranges and the loot table as links.
 func npcPage(cv widgets.ContentView, def *content.NpcDef) infoPage {
-	p := infoPage{Icon: "kind_ship", Title: def.Name, Prose: def.Description}
+	p := infoPage{Hero: "kind_ship", Title: def.Name, Prose: def.Description}
 	hull, hasHull := cv.Defs().Ship(def.Ship)
 	if hasHull && hull.Class != "" {
 		p.Sub = spacedKind(hull.Class)
@@ -601,7 +600,9 @@ type InfoWin struct {
 	scroll *widget.ScrollContainer
 	rail   *widgets.ScrollRail
 	prose  *widget.Text
-	emblem *widget.Graphic // header maker emblem (nil when the def has none)
+	emblem *widget.Graphic // Sub line maker emblem (nil when the def has none)
+	hero   *widget.Graphic // body hero icon (nil when the page has none)
+	logo   *widget.Graphic // body corporation logo (nil when the def has no maker)
 
 	proseW  float64 // inner width the prose is wrapped to
 	refRows []InfoRefRow
@@ -716,6 +717,15 @@ func (w *InfoWin) RefRows() []InfoRefRow { return w.refRows }
 // mark beside the Sub line — or nil when the def has no maker.
 func (w *InfoWin) Emblem() *widget.Graphic { return w.emblem }
 
+// Hero is the body's big icon graphic of the current page (theme.IconHero),
+// or nil when the page has no hero.
+func (w *InfoWin) Hero() *widget.Graphic { return w.hero }
+
+// CorpLogo is the corporation logo beside the hero — the maker's dropped
+// corp art, or its vector emblem when none is dropped — or nil when the def
+// has no maker.
+func (w *InfoWin) CorpLogo() *widget.Graphic { return w.logo }
+
 // Show swaps the window's whole page to ref's details and reveals the
 // window. It reports whether the ref resolved: unknown ids open nothing.
 // Mounting (and the raise-to-top remount) is the host's job — see
@@ -793,33 +803,46 @@ func (w *InfoWin) render(p infoPage) {
 	w.refRows = nil
 	w.prose = nil
 	w.emblem = nil
+	w.hero = nil
+	w.logo = nil
 
-	// Header: the class glyph and the bold title share one line, the
-	// category/origin line hangs under the title column (tooltip anatomy).
-	iconW := 0
-	line := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(theme.IconGap)),
-		)),
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
-	)
-	if p.Icon != "" {
-		size := widgets.TipIcon
-		if p.IconSize > 0 {
-			size = p.IconSize
+	// Hero: the entity's big render at the top of the body, with the maker's
+	// corporation logo beside it (the dropped corp art; the vector emblem
+	// when none is dropped). theme.IconHero is strictly bigger than
+	// theme.IconCorp — the entity leads, its maker is an attribution.
+	if p.Hero != "" || p.Emblem != "" {
+		hero := widget.NewContainer(
+			widget.ContainerOpts.Layout(widget.NewRowLayout(
+				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+				widget.RowLayoutOpts.Spacing(theme.Px(theme.SpMd)),
+			)),
+			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+		)
+		if p.Hero != "" {
+			g := theme.NewIcon(p.Hero, theme.IconHero, pal.Text)
+			g.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+			hero.AddChild(g)
+			w.hero = g
 		}
-		g := theme.NewIcon(p.Icon, size, pal.Text)
-		g.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
-		line.AddChild(g)
-		// Scaled ONCE here (it mirrors the drawn icon box + row gap);
-		// the spacer's MinSize below reads it already in live px.
-		iconW = theme.Px(size) + theme.Px(theme.IconGap)
+		if p.Emblem != "" {
+			var g *widget.Graphic
+			if logo := theme.CorpIconFor(p.Emblem); logo != "" {
+				g = theme.NewIcon(logo, theme.IconCorp, pal.Text)
+			} else {
+				g = widget.NewGraphic(widget.GraphicOpts.Image(emblems.Get(p.Emblem, theme.Px(theme.IconCorp))))
+			}
+			g.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+			hero.AddChild(g)
+			w.logo = g
+		}
+		w.page.AddChild(hero)
 	}
-	line.AddChild(widget.NewText(
+
+	// The title row is text alone (the header icon moved into the hero).
+	w.page.AddChild(widget.NewText(
 		widget.TextOpts.Text(p.Title, env.FaceBold(theme.StepBase), theme.Solid(pal.Text)),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	))
-	w.page.AddChild(line)
 	if p.Sub != "" || p.Emblem != "" {
 		sub := widget.NewContainer(
 			widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -828,12 +851,6 @@ func (w *InfoWin) render(p infoPage) {
 			)),
 			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 		)
-		if iconW > 0 {
-			sub.AddChild(widget.NewText(
-				widget.TextOpts.Text("", env.Face(theme.StepSmall), theme.Solid(pal.Dim)),
-				widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(iconW, 0)),
-			))
-		}
 		// The maker's emblem leads the Sub line (the corporation mark on
 		// manufactured goods; nothing on rat hulls and unattributed items).
 		if p.Emblem != "" {

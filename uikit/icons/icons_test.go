@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	dropin "github.com/entieve/entieve/assets/icons"
 )
 
 // readManifest loads manifest.json from disk (the same bytes Get embeds).
@@ -364,6 +366,34 @@ func TestArtModeIsFullColourAndTintFree(t *testing.T) {
 	}
 	if checked == 0 {
 		t.Fatal("no art-mode entries to check")
+	}
+}
+
+// TestDropinArtIsRegisteredAsArt pins the player's drop-in set on the same
+// draw path as the manifest art: every embedded content id answers Has, draws
+// full-colour (two tints share one image — the tint is ignored) and stays out
+// of the manifest registry.
+func TestDropinArtIsRegisteredAsArt(t *testing.T) {
+	ids := dropin.IDs()
+	if len(ids) == 0 {
+		t.Fatal("no drop-in icons registered")
+	}
+	red := color.RGBA{R: 255, A: 255}
+	blue := color.RGBA{B: 255, A: 255}
+	for _, id := range ids {
+		if !Has(id) {
+			t.Errorf("%s: Has = false for a registered drop-in", id)
+		}
+		if _, in := registry[id]; in {
+			t.Errorf("%s: drop-in id shadows a manifest entry", id)
+		}
+		if Get(id, Title, red) != Get(id, Title, blue) {
+			t.Errorf("%s: two tints rendered different drop-in images (tint must be ignored)", id)
+		}
+		img, ok := dropin.Load(id)
+		if !ok || !nrgbaInk(scaleBox(straightAlpha(img), Title, nil)) {
+			t.Errorf("%s: drop-in art rendered no ink", id)
+		}
 	}
 }
 

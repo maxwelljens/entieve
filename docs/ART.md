@@ -27,14 +27,17 @@ it decorates. IDs are the same kebab-case strings the content JSON uses
 | `assets/asteroids/` | ore ID the belt's asteroids carry (`items/ores.json`) | `ore-cordite.png` | unrotated |
 | `assets/backgrounds/` | system ID (`sys-*.json`) or `default` | `default.png` | unrotated |
 | `assets/artwork/` | fixed names (no content id) | `spaceship_hangar.jpg`, `title_background.jpg` | unrotated, cover-fit |
-| `assets/icons/` | fixed module-render names (build-time source only) | `small_autocannon.png`, `medium_artillery.png` | n/a — the 256² embedded copies live in `uikit/icons/` |
+| `assets/icons/` | the content ID (module, `corp-*`, ore, mineral, loot) | `mod-autocannon-s.png`, `corp-burza.png` | n/a — UI icons, drawn in a square box |
 
 Sub-JSON lookup is exactly `<directory>/<id>.png`; other files and
 directories are ignored. `assets/artwork/` is the one kind that also accepts
 JPEG (the docked-station plate ships as a `.jpg`); sprites stay PNG-only.
 One file there is embedded rather than walked: `title_background.jpg` ships
 inside the binary through the `assets/artwork/artwork.go` shim (see
-[Title background](#title-background)).
+[Title background](#title-background)). `assets/icons/` is embedded the same
+way (`assets/icons/icons.go`, `//go:embed *.png`) and registers itself as
+full-colour art in the icon registry — the walk skips it, so those renders
+never enter the world sprite cache.
 
 ## Docked backdrop
 
@@ -184,8 +187,15 @@ window title.
   embedded copies in `uikit/icons/`). They are **CC0 1.0**
   (`license`/`license_url` on the entry; the set-level CC BY 3.0 still covers
   the game-icons glyphs) and draw at **32 px** in the fitting/rack tiles
-  (`theme.IconTile`) and **24 px** in the Show Info module header and module
+  (`theme.IconTile`) and **24 px** in the Show Info module hero and module
   tooltip (`theme.IconTitle`). Everything else on the size grid is unchanged.
+- **Drop-in art**: the player's own icons live in `assets/icons/`, one PNG per
+  content id (modules, `corp-*`, ores, minerals, loot) — see
+  [`assets/README.md`](../assets/README.md#drop-in-icons-icons). The set
+  embeds through `assets/icons/icons.go` and registers itself as full-colour
+  art under the content id, so a dropped file wins every icon slot for that id
+  (module tiles, rack, market rows, tooltips, the Show Info hero) with no
+  manifest edit; content without a file falls back exactly as before.
 - **Optical fit**: glyphs that sit off-centre in their frame carry a
   per-icon `nudge` (fractions of the box) in `manifest.json`.
 - **Fallback**: an unknown name renders the neutral gear, so a new kind can
@@ -312,7 +322,7 @@ rack cells, the Fitting window's module rows and the Warp gate hint.
 
 | Piece | Treatment |
 |---|---|
-| Icon | 20 px (`icons.Button`), the class glyph, manifest `nudge` applied, tinted ColText |
+| Icon | 20 px (`icons.Button`) — the module's own icon (drop-in art, else the class glyph), manifest `nudge` applied, tinted ColText |
 | Title | **Bold** at the base step — the only bold line in a tooltip |
 | Sub line | Regular small, ColDim — `High slot 1 · Weapon` (slot · class) |
 | Hairline | 2 px ColAccent at low alpha (80), full content width |

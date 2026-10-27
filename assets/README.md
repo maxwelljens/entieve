@@ -9,6 +9,7 @@ assets/
 ├── hulls/<hull-id>.png            e.g. ship-sloop.png        (rotated to heading)
 ├── stations/<celestial-id>.png    e.g. cel-haven-rest.png    (unrotated)
 ├── asteroids/<ore-id>.png         e.g. ore-cordite.png       (unrotated)
+├── icons/<content-id>.png         e.g. mod-autocannon-s.png  (UI icon, square box)
 ├── backgrounds/<system-id>.png    e.g. default.png          (unrotated, tiles; default.png serves all systems)
 ├── artwork/spaceship_hangar.jpg   the docked-station backdrop (JPEG, cover-fit)
 ├── artwork/title_background.jpg    the title screen's backdrop (JPEG, cover-fit, embedded via artwork.go)
@@ -19,6 +20,32 @@ assets/
 The file name is exactly the content ID used by the game's JSON data.
 PNG with alpha, any pixel size (drawn at ≥2× its on-screen size for
 crispness); hull sprites point right (+X), the nose direction.
+
+## Drop-in icons (`icons/`)
+
+The player's own icon art, one PNG per content ID, flat in this directory.
+The file name is **exactly** the content ID (`assets/README.md`'s one rule),
+so a name that is a display string ("kerngrit.png") is embedded and never
+drawn; `assets/icons/icons_test.go` fails the build until it parses as a real
+ID. The set embeds through `icons.go` (`//go:embed *.png`) and registers
+itself in the icon registry (`uikit/icons`) as **art-mode** art keyed by the
+content ID — full-colour, drawn as-is, never tinted — so the drop-in wins
+every slot that content ID reaches:
+
+| Family | IDs | Slots the art reaches |
+|---|---|---|
+| modules | `mod-autocannon-s/-m`, `mod-artillery-s/-m/-l`, `mod-shield-boost`, `mod-shield-extender`, `mod-armor-rep`, `mod-armor-plate`, `mod-cap-recharger`, `mod-afterburner`, `mod-mining-laser`, `mod-stasis-web`, `mod-warp-scram` | fitting tiles, module rack, market rows, manufacturing/refining rows, module tooltip, Show Info hero |
+| corporations | `corp-aldemar`, `corp-burza`, `corp-borealis`, `corp-celeritas`, `corp-druzstvo`, `corp-iskald`, `corp-ferrum`, `corp-nordvakt`, `corp-praetor`, `corp-vantera` | the Show Info hero's corporation logo (40 px) — the small emblems on the Sub line and the hull decals stay vector |
+| minerals | `min-ferrite`, `min-nickel`, `min-cobalt`, `min-silex`, `min-glacite`, `min-argon` | market rows, manufacturing/refining rows, Show Info hero |
+| ores | `ore-sterngrit`, `ore-cordite`, `ore-lucidite`, `ore-glacierite` | same |
+| loot | `loot-alloy-scrap`, `loot-iced-core`, `loot-navdata`, `loot-hierarch-crest` | same |
+
+Anything without a file falls back exactly as before (a module's class glyph,
+an item's category silhouette, the corporation's vector emblem). `_alt/`
+holds three alternate renders the owner set aside: **ignored by decision** —
+`go:embed` only reaches `*.png` in this directory, so nothing under `_alt/`
+is embedded or drawn. A dropped PNG is 720²/512² RGBA and may be any size;
+the registry scales it into the square icon box.
 
 ## Music (`audio/`)
 

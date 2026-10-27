@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Drop-in icon art wired everywhere** (`assets/icons`, `uikit/icons`,
+  `theme`): the owner's 38 hand-drawn icons — 14 modules, 10 corporations, 6
+  minerals, 4 ores, 4 loot types — live in `assets/icons/` one PNG per content
+  ID (the file name *is* the ID; a scheme-guard test rejects display names),
+  embed through a flat `icons.go` shim, and register themselves in the icon
+  registry as full-colour art keyed by that ID (no `manifest.json` entry, no
+  tint). `theme.ModuleIconFor`, the new `theme.ItemIconFor` and
+  `theme.CorpIconFor` put them first, so the art reaches the fitting tiles,
+  the module rack, market rows, manufacturing/refining rows, module tooltips
+  and contract-free item rows; content without a file keeps its old class
+  glyph / category silhouette / vector emblem. The world sprite walk skips
+  `assets/icons/` — the set is UI art and never enters the sprite cache.
+  `assets/icons/_alt/` holds three alternates set aside: ignored, not embedded.
+- **Show Info body hero** (`uikit/screens`): the window's page body now opens
+  with a hero block — the entity's icon at 64 design px, with the corporation
+  logo at 40 px beside it when the def names a maker (the dropped corp art,
+  else the vector emblem). The header icon is gone: the title row is the
+  title text alone, and the Sub line keeps its emblem and `Class · Maker`
+  text untouched.
+
 - **UI sounds** (`game`, `assets/sfx`): five short cues from a local SFX
   pack (click, open, close, confirm, refuse), embedded through an
   `assets/sfx/sfx.go` shim and played by a new `game.UISound` seam. A mouse

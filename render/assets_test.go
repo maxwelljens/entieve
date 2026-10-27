@@ -69,6 +69,26 @@ func TestLoadAssetsLoadsPNGByConvention(t *testing.T) {
 	}
 }
 
+// TestDropinIconsStayOutOfTheSpriteCache pins the one walk exclusion: the
+// player's UI icon set (assets/icons/*.png) is UI art with no convention key,
+// so the sprite walk never holds its renders.
+func TestDropinIconsStayOutOfTheSpriteCache(t *testing.T) {
+	dir := t.TempDir()
+	writePNG(t, filepath.Join(dir, "icons", "mod-autocannon-s.png"), 720, 720)
+	writePNG(t, filepath.Join(dir, "hulls", "ship-sloop.png"), 64, 32)
+	stashAssets(t, dir)
+
+	if sp := spriteFor("icons/mod-autocannon-s"); sp != nil {
+		t.Error("the drop-in icon set landed in the world sprite cache")
+	}
+	if spriteFor("hulls/ship-sloop") == nil {
+		t.Error("the exclusion swallowed the world sprites too")
+	}
+	if _, indexed := platePaths["icons/mod-autocannon-s"]; indexed {
+		t.Error("the drop-in icon set landed in the plate index")
+	}
+}
+
 // writeJPEG drops a w×h opaque JPEG at path, creating the parent directories.
 func writeJPEG(t *testing.T, path string, w, h int) {
 	t.Helper()
