@@ -138,6 +138,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Capture tests no longer show a window on the desktop** (`uikit`,
+  `game`, `render`): every gated capture loop calls
+  `ebiten.SetWindowVisible(false)` before `RunGame` — ebiten's own
+  contract ("calling it before RunGame runs the game without showing
+  the window"), pinned by `TestCaptureLoopStaysHidden` and proven
+  pixel-neutral (visible and hidden runs of the same code are
+  byte-identical). The regular suite was always windowless — captures
+  were the only windows. `TestAlphaCompositeGroundTruth` now drives
+  its own hidden loop: under `ENTIEVE_CAPTURE=1` it used to *panic*
+  (`ReadPixels cannot be called before the game starts`), so it had
+  never actually verified anything — it passes for real now.
+
 - **A context-menu entry no longer clicks what is behind it** (`uikit`,
   `game`): the press that lands (or dismisses) the popup now belongs to the
   popup for every consumer. `Kit.Update` still skips the widget pass while a
