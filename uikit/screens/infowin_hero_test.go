@@ -54,8 +54,8 @@ func TestInfoWindowHeroBlock(t *testing.T) {
 	if h == nil {
 		t.Fatal("module page has no hero graphic")
 	}
-	if b := h.Image.Bounds(); b.Dx() != theme.Px(theme.IconHero) {
-		t.Errorf("hero box = %v, want %d px", b, theme.Px(theme.IconHero))
+	if b := h.Image.Bounds(); b.Dx() != 128 {
+		t.Errorf("hero box = %v, want the 128 px info hero", b)
 	}
 	hero, ok := w.page.Children()[0].(*widget.Container)
 	if !ok {
@@ -78,8 +78,9 @@ func TestInfoWindowHeroBlock(t *testing.T) {
 }
 
 // TestInfoWindowMakerLineCarriesCorpArt pins the Sub line's mark: the dropped
-// corporation art (theme.CorpIconFor) at the corp token, not the vector
-// emblem — the corp icons replace the emblems on the info maker line.
+// corporation art (theme.CorpIconFor) at the info corp token (80 px — twice
+// the fitting window's block), not the vector emblem — the corp icons replace
+// the emblems on the info maker line.
 func TestInfoWindowMakerLineCarriesCorpArt(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	w := env.InfoWindow()
@@ -100,10 +101,13 @@ func TestInfoWindowMakerLineCarriesCorpArt(t *testing.T) {
 	if wantID == "" {
 		t.Fatalf("%s has no drop-in corp art", page.Emblem)
 	}
-	if b := g.Image.Bounds(); b.Dx() != theme.Px(theme.IconCorp) {
-		t.Errorf("maker-line mark box = %v, want %d px", b, theme.Px(theme.IconCorp))
+	if b := g.Image.Bounds(); b.Dx() != 80 {
+		t.Errorf("maker-line mark box = %v, want the 80 px info corp mark", b)
 	}
-	if g.Image != icons.Get(wantID, theme.Px(theme.IconCorp), env.Pal().Text) {
+	if b := g.Image.Bounds(); b.Dx() != theme.Px(theme.IconCorpInfo) {
+		t.Errorf("maker-line mark box = %v, want %d px (theme.IconCorpInfo)", b, theme.Px(theme.IconCorpInfo))
+	}
+	if g.Image != icons.Get(wantID, theme.Px(theme.IconCorpInfo), env.Pal().Text) {
 		t.Errorf("maker-line mark is not the drop-in corp art %q", wantID)
 	}
 }

@@ -50,6 +50,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Icon sizes raised for readability** (`theme`, `uikit/screens`): the slot
+  tile glyph grows +75%, 32 → **56 px** (`theme.IconTile`), in **62×62**
+  cells (the icon plus a 3 px ring) in both the fitting window and the HUD
+  rack. Both tile grids are capped by frozen budgets: the rack trades its
+  High/Mid/Low label column and its panel title bar for the bigger cells
+  (the 1280 bottom pair must still clear the log pocket), and the fitting
+  window's slots pane opens at **0.60** of its split (the equal half no
+  longer holds three tile rows). No window rect changes. Inside Show Info the
+  panel's own graphics double: the body hero 64 → **128 px**
+  (`theme.IconHero`) and the maker-line corporation mark 40 → **80 px**
+  (`theme.IconCorpInfo`, info-scoped — the fitting window's maker block stays
+  40 px, `theme.IconCorp`). The inline/button/title grid (16/20/24) is
+  unchanged.
 - **World names weathered to the second depth** (`content/data`,
   `content/corps.go`): the place layer is now past the live Polish/Czech/
   Swedish/Latin stem it grew from — no dictionary segment survives, only the

@@ -107,6 +107,20 @@ func TestRackConstruction(t *testing.T) {
 	}
 }
 
+// TestRackCellHoldsTheTileIcon pins the cell geometry to the art box: the
+// 56 px tile icon keeps a 3 px ring on every side (the 1280 log pocket caps
+// the HUD pair, so the rack draws one ring tighter than the fitting grid),
+// and the glyph can never clip at an edge or run into the name line under it.
+func TestRackCellHoldsTheTileIcon(t *testing.T) {
+	if rackCellW != theme.IconTile+6 || rackCellH != theme.IconTile+6 {
+		t.Errorf("rack cell = %d×%d, want the %d px tile icon + 6 (3 px ring)",
+			rackCellW, rackCellH, theme.IconTile)
+	}
+	if rackRingR*2 > rackCellH {
+		t.Errorf("cycle ring diameter %d exceeds the cell %d", rackRingR*2, rackCellH)
+	}
+}
+
 // TestRackActiveAndCycle covers the runtime states: idle modules wear the
 // disabled look and no ring, active ones light up with a cycle ring read
 // from ModuleRuntime.Active/CycleEnds against Sim.Time(), and a CANCELLED

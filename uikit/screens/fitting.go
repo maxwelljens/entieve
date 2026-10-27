@@ -24,24 +24,28 @@ import (
 // slot grid over the hangar's split on the right, and the derived fitting
 // summary (DPS, capacitor verdict) as a strip under both. The left column
 // runs 300 px, wide enough for the two-column stat rows; the tiles are the
-// HUD rack's 50×40 cells (a local copy — the rack's own metrics are its
+// HUD rack's 62×62 cells (a local copy — the rack's own metrics are its
 // business) with a StepTiny name line under each.
 const (
 	fitColW       = 300 // identity + stats column (design px)
 	fitPortrait   = 120 // hull portrait box, hudPortrait's twin
-	fitTileW      = 50  // slot tile width (rackCellW's twin)
-	fitTileH      = 40  // slot tile height (the 40 px hit-area floor)
+	fitTileW      = 62  // slot tile width (rackCellW's twin: IconTile + 6)
+	fitTileH      = 62  // slot tile height (theme.IconTile + 6)
 	fitTileNameH  = 19  // name line under a filled tile (StepTiny line box)
 	fitTileLabelW = 30  // "High"/"Mid"/"Low" label column
 	fitTileGap    = 4   // gap between tiles
 	fitMaxCells   = 4   // widest slot row across the hull roster
-	fitRowGap     = 8   // gap between the class rows
+	fitRowGap     = 4   // gap between the class rows (the frozen window height)
 	// fitIconPad centres a tile glyph: ebitenui lays a graphic button out
 	// as [empty text][10 px spacing][glyph], so paddingRight =
 	// paddingLeft + spacing is the centring condition (rackIconPad's twin).
 	fitIconPad = 20
-	fitBarW    = 160 // capacitor verdict bar width
-	fitBarH    = 8   // capacitor verdict bar height
+	// fitSlotShare is the slots pane's opening share of the split: the
+	// 62 px tile rows do not fit the equal half at the window's frozen
+	// height (682 px), and the grid would draw over the hangar's header.
+	fitSlotShare = 0.6
+	fitBarW      = 160 // capacitor verdict bar width
+	fitBarH      = 8   // capacitor verdict bar height
 	// capacitor endurance integration: the mirror of the sim's recharge
 	// curve, stepped at a fixed second; past the horizon an unstable cap
 	// reads as the horizon (a fit that lasts an hour is stable in play).
@@ -130,7 +134,7 @@ type fitRow struct {
 	value *widget.Text
 }
 
-// fitTile is one slot tile: a 50×40 tile carrying the module's class glyph
+// fitTile is one slot tile: a 62×62 tile carrying the module's class glyph
 // (a dashed placeholder while empty) with the short name under it, its
 // declared interactions (RowSpec) and its structured tooltip slot.
 type fitTile struct {
@@ -189,6 +193,7 @@ func NewFitting(env widgets.Seams) *Fitting {
 		paneStack([]bool{false, false}, label("Slots"), grid),
 		paneStack([]bool{false, true}, label("Hangar"), f.hangar.Container()),
 	)
+	f.split.SetDefaultRatio(0, fitSlotShare)
 	// The body's main row: the fixed identity/stat column beside the split
 	// (the grid layout gives the left column its width and the split the
 	// rest — a RowLayout stretches only across its axis).
@@ -521,9 +526,9 @@ func (f *Fitting) newTile(class string, idx int) *fitTile {
 		widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionCenter),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, theme.Px(fitTileNameH))),
 	)
-	// The 32 px tile icon makes the button's inner row wider than the cell;
-	// the cap keeps the 50×40 tile geometry (the icon overflows only its
-	// transparent padding, never the tile).
+	// The tile icon makes the button's inner row wider than the cell; the
+	// cap keeps the cell geometry (the row's transparent padding overflows,
+	// the glyph stays centred inside the tile).
 	t.btn.GetWidget().LayoutData = widget.RowLayoutData{MaxWidth: theme.Px(fitTileW)}
 	t.root = widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
 		widget.RowLayoutOpts.Direction(widget.DirectionVertical),
@@ -702,7 +707,7 @@ func (f *Fitting) syncIdentity(ship sim.ShipState, hasShip bool) {
 		f.emblemSlug = maker
 		f.idRow.RemoveChildren()
 		if maker != "" {
-			if g := corpMark(maker, f.th.Pal().Text); g != nil {
+			if g := corpMark(maker, theme.IconCorp, f.th.Pal().Text); g != nil {
 				g.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
 				f.idRow.AddChild(g)
 			}

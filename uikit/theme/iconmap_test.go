@@ -166,19 +166,21 @@ func TestDropinArtWinsEveryIconSlot(t *testing.T) {
 	}
 }
 
-// TestHeroOutgrowsCorpLogo pins the Show Info hero geometry: the entity's
-// own icon is strictly bigger than the corporation mark below it on the
-// maker line — the entity leads, the attribution never does (the fitting
-// window's maker block draws the same corp token).
+// TestHeroOutgrowsCorpLogo pins the icon ladder the panels draw at: the
+// Show Info hero is the biggest box (128 px), twice the info maker-line mark
+// (80 px), which is twice the fitting window's corporation block (40 px);
+// the tile icons (56 px) sit between. The entity leads, the attribution
+// never does.
 func TestHeroOutgrowsCorpLogo(t *testing.T) {
-	if IconHero <= IconCorp {
-		t.Errorf("hero %d px is not bigger than the corp logo %d px", IconHero, IconCorp)
+	if IconHero != 128 || IconCorpInfo != 80 || IconCorp != 40 || IconTile != 56 {
+		t.Errorf("hero/corp-info/corp/tile = %d/%d/%d/%d, want 128/80/40/56",
+			IconHero, IconCorpInfo, IconCorp, IconTile)
 	}
-	if IconCorp != 40 || IconHero != 64 {
-		t.Errorf("hero/logo = %d/%d, want 64/40", IconHero, IconCorp)
+	if IconHero <= IconCorpInfo || IconCorpInfo <= IconCorp {
+		t.Error("the hero must outgrow the info maker mark, and it the fitting block")
 	}
-	if IconHero <= IconTitle || IconCorp <= IconTile {
-		t.Error("the hero and logo must outgrow the header/tile boxes they replace")
+	if IconHero <= IconTile || IconCorpInfo <= IconTile || IconHero <= IconTitle {
+		t.Error("the hero and the info maker mark must outgrow the tile/header boxes")
 	}
 }
 

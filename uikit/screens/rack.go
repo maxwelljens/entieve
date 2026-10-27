@@ -27,17 +27,20 @@ func iconColor(c color.RGBA, a uint8) color.RGBA {
 
 // Rack geometry: three slot rows of cells sized so the widest row (high 4
 // slots is the widest in the hull roster) fits the 1024×700 minimum window
-// beside the centered HUD. Every cell is at least the 40 px minimum hit
-// area in both axes.
+// beside the centered HUD. A cell is the tile icon plus a 3 px ring
+// (theme.IconTile + 6), the fitting window's grid's twin. The HUD pair is
+// centered as a whole, so the 1280 log pocket (the pair may not pass 558 px)
+// caps the cell width and the game's virgin placement table caps its height:
+// the rows carry no High/Mid/Low label column and the panel no title bar.
+// The row order is the fitting window's; the cell tooltips name the module.
 const (
 	rackRows     = 3    // high / mid / low
 	rackMaxCells = 4    // widest slot row across every hull
-	rackCellW    = 50   // cell width
-	rackCellH    = 40   // cell height (minimum hit area)
+	rackCellW    = 62   // cell width (theme.IconTile + 6)
+	rackCellH    = 62   // cell height (theme.IconTile + 6)
 	rackNameH    = 19   // name line under a tile (fits StepTiny line box)
-	rackLabelW   = 30   // "High"/"Mid"/"Low" label column
 	rackCycleMax = 1000 // cycle-ring resolution (0.1 % steps)
-	rackRingR    = 16   // cycle ring radius over the tile centre (px)
+	rackRingR    = 28   // cycle ring radius over the tile centre (IconTile/2)
 	rackRingW    = 2    // cycle ring stroke width (px)
 	rackRowGap   = 8    // gap between slot rows
 	// rackIconPad is the row padding that puts the glyph back in the
@@ -63,17 +66,14 @@ const (
 	// silhouette in the tile's bottom-right corner, on its own overlay, kept
 	// clear of the waiting dot (top-right = "needs you", bottom-right =
 	// "armed") and of the cycle ring. The inset is 3 (not 5) because the
-	// 32 px tile icon's ink reaches x=37/y=30 of the 50×40 cell, where a
-	// 5 px-inset marker would sit on it.
+	// 56 px tile icon's box leaves only its 3 px ring, where a 5 px-inset
+	// marker would sit deeper on the art.
 	rackAmmoIcon  = 10 // marker glyph size (design px)
 	rackAmmoInset = 3  // marker inset from the tile's bottom-right corner
 )
 
-// rackClasses and rackRowLabels index the three slot rows.
-var (
-	rackClasses   = [rackRows]string{content.SlotHigh, content.SlotMid, content.SlotLow}
-	rackRowLabels = [rackRows]string{"High", "Mid", "Low"}
-)
+// rackClasses indexes the three slot rows (high, mid, low).
+var rackClasses = [rackRows]string{content.SlotHigh, content.SlotMid, content.SlotLow}
 
 // Rack is the module rack (the right half of the HUD's bottom-center pair):
 // one cell per slot showing the module short name, an amber glow while
@@ -165,22 +165,20 @@ func NewRack(env widgets.Seams) *Rack {
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Spacing(theme.Px(rackRowGap)),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
+			// The body's side margin is SpSm (not ContentsPad): the panel
+			// sits in the HUD pair, whose 1280 budget the tile growth
+			// already spends (the label column is gone too).
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.SpSm))),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
 	for row := 0; row < rackRows; row++ {
-		label := widget.NewText(
-			widget.TextOpts.Text(rackRowLabels[row], faceTiny, theme.Solid(p.Head)),
-			widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(rackLabelW), 0)),
-		)
 		rowBox := widget.NewContainer(
 			widget.ContainerOpts.Layout(widget.NewRowLayout(
 				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
+				widget.RowLayoutOpts.Spacing(theme.Px(theme.SpSm)),
 			)),
 		)
-		rowBox.AddChild(label)
 		for idx := 0; idx < rackMaxCells; idx++ {
 			cell := r.newCell(row, idx)
 			r.cells[row][idx] = cell
@@ -188,22 +186,6 @@ func NewRack(env widgets.Seams) *Rack {
 		}
 		body.AddChild(rowBox)
 	}
-
-	titleText := theme.NewChromeText(env, theme.StepBase, "Modules", p.Accent)
-	titleText.GetWidget().LayoutData = widget.AnchorLayoutData{
-		HorizontalPosition: widget.AnchorLayoutPositionStart,
-		VerticalPosition:   widget.AnchorLayoutPositionCenter,
-		Padding:            widget.NewInsetsSimple(theme.Px(theme.ContentsPad)),
-	}
-	title := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.Rounded(theme.Solid(p.BGHard), theme.NRGBA(p.Border, 200), 1, theme.TopRadii(theme.RadiusPanel))),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(0, theme.Px(theme.TitleBarH)),
-			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-		),
-	)
-	title.AddChild(titleText)
 
 	r.container = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -215,7 +197,10 @@ func NewRack(env widgets.Seams) *Rack {
 			Padding:            &widget.Insets{Right: theme.Px(10), Bottom: theme.Px(10)},
 		})),
 	)
-	r.container.AddChild(title, body)
+	// No panel title bar: the pair's height is frozen by the game's virgin
+	// placement table (the overview's default must clear it at 1024×700), and
+	// the tile growth spends exactly that budget.
+	r.container.AddChild(body)
 	return r
 }
 
@@ -245,7 +230,7 @@ func rackBadgeImages(p theme.Palette) []*ebiten.Image {
 	return imgs
 }
 
-// newCell builds one slot cell: a 50×40 icon tile (the module's class
+// newCell builds one slot cell: a 62×62 icon tile (the module's class
 // glyph; right-click cycles a weapon's charge) with the cycle ring drawn
 // over it, and the name line under it. The cell's structured hover tooltip
 // is built on its first fit (see rowTip). The glyph lives in the tile and
@@ -309,9 +294,9 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 	cell.stack = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewStackedLayout()),
 	)
-	// The 32 px tile icon makes the button's inner row wider than the cell;
-	// the cap keeps the 50×40 tile geometry (the icon overflows only its
-	// transparent padding, never the tile).
+	// The tile icon makes the button's inner row wider than the cell; the
+	// cap keeps the cell geometry (the row's transparent padding overflows,
+	// the glyph stays centred inside the tile).
 	cell.stack.GetWidget().LayoutData = widget.RowLayoutData{MaxWidth: theme.Px(rackCellW)}
 	cell.stack.AddChild(cell.btn, cell.ringGfx, cell.badgeGfx, cell.ammoGfx)
 	cell.root = widget.NewContainer(

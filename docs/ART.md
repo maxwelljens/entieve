@@ -186,9 +186,15 @@ window title.
   autocannon reuses the medium render, so five files cover six modules;
   embedded copies in `uikit/icons/`). They are **CC0 1.0**
   (`license`/`license_url` on the entry; the set-level CC BY 3.0 still covers
-  the game-icons glyphs) and draw at **32 px** in the fitting/rack tiles
-  (`theme.IconTile`) and **24 px** in the Show Info module hero and module
-  tooltip (`theme.IconTitle`). Everything else on the size grid is unchanged.
+  the game-icons glyphs) and draw at **56 px** in the fitting window's slot
+  tiles and the HUD rack's cells (both **62×62**: the icon plus a 3 px ring,
+  the HUD pair's and the window's frozen budgets) — `theme.IconTile` — and
+  **24 px** in module tooltips (`theme.IconTitle`). Inside Show Info the
+  panel doubles its own graphics
+  instead: the body hero at **128 px** (`theme.IconHero`) and the maker-line
+  corporation mark at **80 px** (`theme.IconCorpInfo`; the fitting window's
+  maker block keeps 40 px, `theme.IconCorp`). Inline/button/title glyphs
+  (16/20/24) are unchanged.
 - **Drop-in art**: the player's own icons live in `assets/icons/`, one PNG per
   content id (modules, `corp-*`, ores, minerals, loot) — see
   [`assets/README.md`](../assets/README.md#drop-in-icons-icons). The set

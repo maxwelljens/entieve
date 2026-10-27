@@ -151,7 +151,7 @@ func (g *fitCaptureGame) verify(img *ebiten.Image) error {
 		fail("maker mark box %v has %d non-body pixels, want the corp art", kids[0].GetWidget().Rect, got)
 	}
 
-	// A fitted tile's module icon sits centred in the 50×40 cell (±4 px,
+	// A fitted tile's module icon sits centred in the 62×62 cell (±4 px,
 	// the rack's discipline); an empty placeholder is dashed (border ink
 	// with gaps) and hollow.
 	fitted, empty := 0, 0

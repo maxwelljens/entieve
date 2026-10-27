@@ -223,8 +223,8 @@ func (g *infoCaptureGame) verify(img *ebiten.Image) {
 		// token (the corp icons replace the vector emblems here).
 		if e := g.k.svc.info.Emblem(); e == nil || e.Image == nil {
 			fail("maker line has no corporation mark")
-		} else if b := e.Image.Bounds(); b.Dx() != theme.Px(theme.IconCorp) {
-			fail("maker mark box = %v, want %d px", b, theme.Px(theme.IconCorp))
+		} else if b := e.Image.Bounds(); b.Dx() != theme.Px(theme.IconCorpInfo) {
+			fail("maker mark box = %v, want %d px", b, theme.Px(theme.IconCorpInfo))
 		} else {
 			box := e.GetWidget().Rect
 			br, bg, bb, _ := img.At(box.Min.X-3, box.Min.Y+box.Dy()/2).RGBA()

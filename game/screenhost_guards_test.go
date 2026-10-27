@@ -92,7 +92,7 @@ const layoutBytesGolden = `{
       "h": 682,
       "open": false,
       "splits": {
-        "fitting-hangar": 0.5
+        "fitting-hangar": 0.6
       }
     },
     "help": {
