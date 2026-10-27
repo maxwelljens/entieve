@@ -128,6 +128,40 @@ func TestMenuBuildAndDispatch(t *testing.T) {
 	}
 }
 
+// TestMenuSpendsTheFramesPressEdge pins the popup's claim on the raw press
+// edge: the gesture that dismisses the popup (or lands an entry) belongs to
+// the popup, so widgets.PressEdge — what every non-menu poller reads (the
+// starmap's nodes, the slider bands, the split panes, the column grips) —
+// reports nothing for that frame. Menu.TakeBlocked, the once-per-frame
+// clearer in Kit.Update, hands the seam back.
+func TestMenuSpendsTheFramesPressEdge(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	m := env.Menu()
+	var hits []string
+	defer SetPressEdgeForTest(func(ebiten.MouseButton) bool { return true })()
+	defer SetPollCursorForTest(func() (int, int) { return 10, 10 })()
+
+	if !PressEdge(ebiten.MouseButtonLeft) {
+		t.Fatal("fixture: the free press edge is already spent")
+	}
+	m.Open(menuTestEntries(&hits), image.Pt(10, 10))
+	if !m.Poll() {
+		t.Fatal("the popup did not take the frame's press")
+	}
+	if PressEdge(ebiten.MouseButtonLeft) || PressEdge(ebiten.MouseButtonRight) {
+		t.Error("the popup's own press reached the raw seam too")
+	}
+	if !m.TakeBlocked() {
+		t.Fatal("the press set no consumed-gesture latch")
+	}
+	if !PressEdge(ebiten.MouseButtonLeft) {
+		t.Error("TakeBlocked left the press spent: the next frame is silent")
+	}
+	if len(hits) != 0 {
+		t.Errorf("a dismiss outside every band ran %v, want nothing", hits)
+	}
+}
+
 // TestMenuDrawsAndClamps: Draw records the screen (the clamp bound), so
 // a popup opened past an edge slides back inside it, and the drawn frame
 // carries the labels — bold first entry, grayed disabled — plus the

@@ -916,7 +916,12 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > the window is never restored open. The popup is custom rather than
 > ebitenui's own context-menu windows because those bypass the
 > deterministic world-input gate: the menu rect joins `Game.overUI`'s
-> exact-rect list, so a click over the popup can never reach world input.
+> exact-rect list, so a click over the popup can never reach world input,
+> and the press itself is spent on the popup for the rest of the pass —
+> `Kit.Update` still advances ebitenui's cached input while it skips
+> `ui.Update`, and `Menu.Click`/`Esc` claim `widgets.PressEdge` until
+> `Menu.TakeBlocked` — so no widget, table row, starmap node or slider
+> under the popup sees the gesture either.
 
 > **Split panes (2026-10):** a multi-pane window divides its leftover
 > height — or width — by **ratio**, not ebitenui's equal `GridLayout`

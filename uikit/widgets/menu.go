@@ -78,7 +78,11 @@ type menuRow struct {
 //	          undo it;
 //	cleared   Menu.TakeBlocked, called once per frame by Kit.Update and the
 //	          ONLY clearer, so the next frame's poll is live again while
-//	          ui.Update stays skipped for the frame the gesture happened in.
+//	          ui.Update stays skipped for the frame the gesture happened in;
+//	spent     widgets.PressEdge, the raw seam every other poller in the kit
+//	          reads (the starmap's nodes, the slider bands, the split panes,
+//	          the column grips): Click/Esc claim the frame's press so the
+//	          gesture is spent on the popup, TakeBlocked hands it back.
 //
 // It lives on the Menu because the gesture is the popup's own input; Kit.Update
 // is its only care-taker. Pinned by the real click in
@@ -173,6 +177,7 @@ func (m *Menu) Click(pt image.Point) bool {
 		return false
 	}
 	m.blocked = true
+	pressClaim = true
 	i, hit := m.at(pt)
 	var entry MenuEntry
 	if hit {
@@ -191,6 +196,7 @@ func (m *Menu) Esc() bool {
 		return false
 	}
 	m.blocked = true
+	pressClaim = true
 	m.Close()
 	return true
 }
@@ -201,6 +207,7 @@ func (m *Menu) Esc() bool {
 func (m *Menu) TakeBlocked() bool {
 	b := m.blocked
 	m.blocked = false
+	pressClaim = false
 	return b
 }
 
@@ -339,17 +346,22 @@ var pressEdge = func(b ebiten.MouseButton) bool {
 // SetPressEdgeForTest overrides the raw press-edge poll for a headless
 // test and returns a restore func. Test-only seam: never call it from
 // production code. Cursor position has its own seam, SetPollCursorForTest.
+// Swapping the edge source starts a fresh gesture timeline, so the popup's
+// claim on the previous frame's press is dropped with it (production clears
+// it once per frame through Menu.TakeBlocked).
 func SetPressEdgeForTest(f func(ebiten.MouseButton) bool) func() {
 	prev := pressEdge
 	pressEdge = f
+	pressClaim = false
 	return func() { pressEdge = prev }
 }
 
 // PressEdge reports this frame's raw press edge for b through the seam
 // above — the same edge Menu.Poll dispatches on, so one scripted click
 // drives the popup and the kit's window raise alike (production: raw
-// ebiten inpututil, never ebitenui's cached input).
-func PressEdge(b ebiten.MouseButton) bool { return pressEdge(b) }
+// ebiten inpututil, never ebitenui's cached input). While the popup has
+// claimed the frame's press (pressClaim), no other poller sees it.
+func PressEdge(b ebiten.MouseButton) bool { return !pressClaim && pressEdge(b) }
 
 // pollCursor is the menu's cursor read: live off ebiten, NOT ebitenui's
 // input.CursorPosition() — that one is a cache refreshed only inside
@@ -373,6 +385,13 @@ func SetPollCursorForTest(f func() (int, int)) func() {
 // raw ebiten.CursorPosition — the same position Menu.Poll and the kit's
 // window raise must agree on; ebitenui's cache is stale by design).
 func PollCursor() (int, int) { return pollCursor() }
+
+// pressClaim is the popup's claim on the frame's press edge — the other half
+// of the consumed-gesture latch (see the contract above): Click/Esc set it,
+// TakeBlocked clears it. Every non-menu raw press poller reads PressEdge
+// (the starmap's nodes, the slider bands, the split panes, the column
+// grips); Menu.Poll reads the raw seam instead, so the popup still acts.
+var pressClaim bool
 
 // Poll runs one frame of menu input: hover from the live cursor, then
 // Esc and the mouse buttons (any press dismisses; a press on an enabled
