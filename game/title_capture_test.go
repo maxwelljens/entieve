@@ -41,6 +41,8 @@ func TestTitleCaptureFrame(t *testing.T) {
 	}
 	ebiten.SetWindowTitle("Entieve title capture")
 	ebiten.SetWindowSize(1280, 720)
+	// Capture contract: the loop never shows a window on the desktop.
+	ebiten.SetWindowVisible(false)
 	if err := ebiten.RunGame(cg); err != nil {
 		t.Skipf("cannot run capture game loop: %v", err)
 	}

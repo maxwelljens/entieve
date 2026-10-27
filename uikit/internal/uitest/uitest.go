@@ -35,6 +35,9 @@ func RunCaptureLoop(t *testing.T, title string, g ebiten.Game) {
 	t.Helper()
 	ebiten.SetWindowTitle(title)
 	ebiten.SetWindowSize(1280, 720)
+	// Run the loop without showing the window: captures render offscreen
+	// (SetWindowVisible before RunGame — the desktop stays clear).
+	ebiten.SetWindowVisible(false)
 	err := ebiten.RunGame(g)
 	ebitenLoopRan = true
 	if err != nil {

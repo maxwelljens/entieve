@@ -47,6 +47,8 @@ func runTitleWindowCapture(t *testing.T, which, name string) {
 	cg := &titleWindowCapture{t: t, g: g, which: which, out: filepath.Join(outDir, name)}
 	ebiten.SetWindowTitle("Entieve " + which + " capture")
 	ebiten.SetWindowSize(1280, 720)
+	// Capture contract: the loop never shows a window on the desktop.
+	ebiten.SetWindowVisible(false)
 	if err := ebiten.RunGame(cg); err != nil {
 		t.Skipf("cannot run capture game loop: %v", err)
 	}
