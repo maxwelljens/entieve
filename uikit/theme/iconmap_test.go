@@ -167,8 +167,9 @@ func TestDropinArtWinsEveryIconSlot(t *testing.T) {
 }
 
 // TestHeroOutgrowsCorpLogo pins the Show Info hero geometry: the entity's
-// icon is strictly bigger than the corporation logo beside it, and the logo
-// stays the Sub line's emblem box so the attribution never leads.
+// own icon is strictly bigger than the corporation mark below it on the
+// maker line — the entity leads, the attribution never does (the fitting
+// window's maker block draws the same corp token).
 func TestHeroOutgrowsCorpLogo(t *testing.T) {
 	if IconHero <= IconCorp {
 		t.Errorf("hero %d px is not bigger than the corp logo %d px", IconHero, IconCorp)

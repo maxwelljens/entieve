@@ -17,17 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   registry as full-colour art keyed by that ID (no `manifest.json` entry, no
   tint). `theme.ModuleIconFor`, the new `theme.ItemIconFor` and
   `theme.CorpIconFor` put them first, so the art reaches the fitting tiles,
-  the module rack, market rows, manufacturing/refining rows, module tooltips
-  and contract-free item rows; content without a file keeps its old class
+  the module rack, market rows, manufacturing/refining rows, module tooltips,
+  contract-free item rows and the corporation marks on the Show Info maker
+  line and the fitting maker block; content without a file keeps its old class
   glyph / category silhouette / vector emblem. The world sprite walk skips
   `assets/icons/` — the set is UI art and never enters the sprite cache.
   `assets/icons/_alt/` holds three alternates set aside: ignored, not embedded.
 - **Show Info body hero** (`uikit/screens`): the window's page body now opens
-  with a hero block — the entity's icon at 64 design px, with the corporation
-  logo at 40 px beside it when the def names a maker (the dropped corp art,
-  else the vector emblem). The header icon is gone: the title row is the
-  title text alone, and the Sub line keeps its emblem and `Class · Maker`
-  text untouched.
+  with a hero block — the entity's icon at 64 design px, alone. The header
+  icon is gone: the title row is the title text alone. The corporation mark
+  rides the Sub (maker) line at 40 px, and the fitting window's maker block
+  draws the same mark: both are the dropped corp art where one exists, the
+  vector emblem otherwise — the corp icons replace the SVG emblems there, and
+  a panel never shows the mark twice.
 
 - **UI sounds** (`game`, `assets/sfx`): five short cues from a local SFX
   pack (click, open, close, confirm, refuse), embedded through an

@@ -38,13 +38,12 @@ import (
 // Window geometry: a floating page, wide enough for label/value rows at
 // the small step and tall enough to show several sections at once.
 const (
-	infoW       = 420 // default width
-	infoH       = 460 // default height
-	infoMinW    = 300 // content floor: header + prose + two rows
-	infoMinH    = 340
-	infoGap     = 6  // vertical gap between page blocks
-	infoWheelN  = 3  // wheel notches per scroll step (rows), like the tables
-	emblemBlock = 40 // header emblem box, design px (readable at 32–48)
+	infoW      = 420 // default width
+	infoH      = 460 // default height
+	infoMinW   = 300 // content floor: header + prose + two rows
+	infoMinH   = 340
+	infoGap    = 6 // vertical gap between page blocks
+	infoWheelN = 3 // wheel notches per scroll step (rows), like the tables
 )
 
 // ---------------------------------------------------------------------------
@@ -600,9 +599,8 @@ type InfoWin struct {
 	scroll *widget.ScrollContainer
 	rail   *widgets.ScrollRail
 	prose  *widget.Text
-	emblem *widget.Graphic // Sub line maker emblem (nil when the def has none)
+	emblem *widget.Graphic // Sub line corporation mark (nil when the def has none)
 	hero   *widget.Graphic // body hero icon (nil when the page has none)
-	logo   *widget.Graphic // body corporation logo (nil when the def has no maker)
 
 	proseW  float64 // inner width the prose is wrapped to
 	refRows []InfoRefRow
@@ -713,18 +711,14 @@ func (w *InfoWin) TitleText() string {
 // click / double-click handlers live on).
 func (w *InfoWin) RefRows() []InfoRefRow { return w.refRows }
 
-// Emblem is the header emblem graphic of the current page — the maker's
-// mark beside the Sub line — or nil when the def has no maker.
+// Emblem is the corporation mark on the current page's Sub line — the
+// maker's dropped art, or its vector emblem when none is dropped — or nil
+// when the def has no maker.
 func (w *InfoWin) Emblem() *widget.Graphic { return w.emblem }
 
 // Hero is the body's big icon graphic of the current page (theme.IconHero),
 // or nil when the page has no hero.
 func (w *InfoWin) Hero() *widget.Graphic { return w.hero }
-
-// CorpLogo is the corporation logo beside the hero — the maker's dropped
-// corp art, or its vector emblem when none is dropped — or nil when the def
-// has no maker.
-func (w *InfoWin) CorpLogo() *widget.Graphic { return w.logo }
 
 // Show swaps the window's whole page to ref's details and reveals the
 // window. It reports whether the ref resolved: unknown ids open nothing.
@@ -795,6 +789,20 @@ func (w *InfoWin) rewrap() {
 	}
 }
 
+// corpMark builds the corporation graphic a panel shows: the player's
+// dropped corp art (theme.CorpIconFor) first, else the vector emblem in the
+// same box — a corp with no drop-in yet keeps its emblem. nil when the slug
+// is known to neither.
+func corpMark(slug string, tint color.RGBA) *widget.Graphic {
+	if id := theme.CorpIconFor(slug); id != "" {
+		return theme.NewIcon(id, theme.IconCorp, tint)
+	}
+	if img := emblems.Get(slug, theme.Px(theme.IconCorp)); img != nil {
+		return widget.NewGraphic(widget.GraphicOpts.Image(img))
+	}
+	return nil
+}
+
 // render rebuilds the page container from a model: header, prose and the
 // section rows (link rows get their click seam).
 func (w *InfoWin) render(p infoPage) {
@@ -804,13 +812,12 @@ func (w *InfoWin) render(p infoPage) {
 	w.prose = nil
 	w.emblem = nil
 	w.hero = nil
-	w.logo = nil
 
-	// Hero: the entity's big render at the top of the body, with the maker's
-	// corporation logo beside it (the dropped corp art; the vector emblem
-	// when none is dropped). theme.IconHero is strictly bigger than
-	// theme.IconCorp — the entity leads, its maker is an attribution.
-	if p.Hero != "" || p.Emblem != "" {
+	// Hero: the entity's big render alone at the top of the body. The
+	// corporation mark is attribution, so it rides the Sub line below —
+	// theme.IconHero stays strictly bigger than theme.IconCorp
+	// (TestHeroOutgrowsCorpLogo), and a panel never shows the mark twice.
+	if p.Hero != "" {
 		hero := widget.NewContainer(
 			widget.ContainerOpts.Layout(widget.NewRowLayout(
 				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
@@ -818,23 +825,10 @@ func (w *InfoWin) render(p infoPage) {
 			)),
 			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 		)
-		if p.Hero != "" {
-			g := theme.NewIcon(p.Hero, theme.IconHero, pal.Text)
-			g.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
-			hero.AddChild(g)
-			w.hero = g
-		}
-		if p.Emblem != "" {
-			var g *widget.Graphic
-			if logo := theme.CorpIconFor(p.Emblem); logo != "" {
-				g = theme.NewIcon(logo, theme.IconCorp, pal.Text)
-			} else {
-				g = widget.NewGraphic(widget.GraphicOpts.Image(emblems.Get(p.Emblem, theme.Px(theme.IconCorp))))
-			}
-			g.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
-			hero.AddChild(g)
-			w.logo = g
-		}
+		g := theme.NewIcon(p.Hero, theme.IconHero, pal.Text)
+		g.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+		hero.AddChild(g)
+		w.hero = g
 		w.page.AddChild(hero)
 	}
 
@@ -851,17 +845,15 @@ func (w *InfoWin) render(p infoPage) {
 			)),
 			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 		)
-		// The maker's emblem leads the Sub line (the corporation mark on
-		// manufactured goods; nothing on rat hulls and unattributed items).
+		// The maker's corporation mark leads the Sub line (the dropped corp
+		// art, else the vector emblem — nothing on rat hulls and
+		// unattributed items).
 		if p.Emblem != "" {
-			g := widget.NewGraphic(
-				widget.GraphicOpts.Image(emblems.Get(p.Emblem, theme.Px(emblemBlock))),
-				widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-					Position: widget.RowLayoutPositionCenter,
-				})),
-			)
-			sub.AddChild(g)
-			w.emblem = g
+			if g := corpMark(p.Emblem, pal.Text); g != nil {
+				g.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+				sub.AddChild(g)
+				w.emblem = g
+			}
 		}
 		if p.Sub != "" {
 			sub.AddChild(widget.NewText(

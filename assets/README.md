@@ -35,7 +35,7 @@ every slot that content ID reaches:
 | Family | IDs | Slots the art reaches |
 |---|---|---|
 | modules | `mod-autocannon-s/-m`, `mod-artillery-s/-m/-l`, `mod-shield-boost`, `mod-shield-extender`, `mod-armor-rep`, `mod-armor-plate`, `mod-cap-recharger`, `mod-afterburner`, `mod-mining-laser`, `mod-stasis-web`, `mod-warp-scram` | fitting tiles, module rack, market rows, manufacturing/refining rows, module tooltip, Show Info hero |
-| corporations | `corp-aldemar`, `corp-burza`, `corp-borealis`, `corp-celeritas`, `corp-druzstvo`, `corp-iskald`, `corp-ferrum`, `corp-nordvakt`, `corp-praetor`, `corp-vantera` | the Show Info hero's corporation logo (40 px) — the small emblems on the Sub line and the hull decals stay vector |
+| corporations | `corp-aldemar`, `corp-burza`, `corp-borealis`, `corp-celeritas`, `corp-druzstvo`, `corp-iskald`, `corp-ferrum`, `corp-nordvakt`, `corp-praetor`, `corp-vantera` | the corporation mark on the Show Info maker (Sub) line and the fitting window's maker block (40 px) — the hull decals stay vector |
 | minerals | `min-ferrite`, `min-nickel`, `min-cobalt`, `min-silex`, `min-glacite`, `min-argon` | market rows, manufacturing/refining rows, Show Info hero |
 | ores | `ore-sterngrit`, `ore-cordite`, `ore-lucidite`, `ore-glacierite` | same |
 | loot | `loot-alloy-scrap`, `loot-iced-core`, `loot-navdata`, `loot-hierarch-crest` | same |

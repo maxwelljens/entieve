@@ -10,6 +10,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/internal/uitest"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
@@ -523,6 +524,40 @@ func TestFittingIdentityBlock(t *testing.T) {
 	}
 	if len(f.idRow.Children()) != 1 {
 		t.Errorf("no-ship identity row keeps %d children, want the bare line", len(f.idRow.Children()))
+	}
+}
+
+// TestFittingMakerLogoIsCorpArt pins the identity row's maker mark: the
+// dropped corporation art (theme.CorpIconFor) at the corp token, not the
+// vector emblem — the corp icons replace the emblems on the fitting maker
+// block too.
+func TestFittingMakerLogoIsCorpArt(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	f := NewFitting(env)
+	ui := newWindowUI(t, env, f.Win())
+	uitest.PumpWindow(t, ui, f.Sync, 1024, 700)
+
+	shell, ok := env.Content.Ship("ship-sloop")
+	if !ok {
+		t.Fatal("fixture: ship-sloop missing")
+	}
+	kids := f.idRow.Children()
+	if len(kids) != 2 {
+		t.Fatalf("identity row children = %d, want the maker mark + the line", len(kids))
+	}
+	g, ok := kids[0].(*widget.Graphic)
+	if !ok || g.Image == nil {
+		t.Fatalf("maker mark is %T, want a graphic with the corp art", kids[0])
+	}
+	wantID := theme.CorpIconFor(shell.Maker)
+	if wantID == "" {
+		t.Fatalf("%s has no drop-in corp art", shell.Maker)
+	}
+	if b := g.Image.Bounds(); b.Dx() != theme.Px(theme.IconCorp) {
+		t.Errorf("maker mark box = %v, want %d px", b, theme.Px(theme.IconCorp))
+	}
+	if g.Image != icons.Get(wantID, theme.Px(theme.IconCorp), env.Pal().Text) {
+		t.Errorf("maker mark is not the drop-in corp art %q", wantID)
 	}
 }
 

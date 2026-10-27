@@ -142,12 +142,13 @@ func (g *fitCaptureGame) verify(img *ebiten.Image) error {
 		fail("portrait %v has %d non-body pixels, want the hull art", frame, got)
 	}
 
-	// The maker emblem leads the class · maker line.
+	// The maker's corporation mark leads the class · maker line (the dropped
+	// corp art replaced the vector emblem here).
 	kids := g.fit.idRow.Children()
 	if len(kids) != 2 {
-		fail("identity row has %d children, want the emblem + the maker line", len(kids))
+		fail("identity row has %d children, want the mark + the maker line", len(kids))
 	} else if got := differing(kids[0].GetWidget().Rect.Inset(2)); got < 20 {
-		fail("emblem box %v has %d non-body pixels, want the maker mark", kids[0].GetWidget().Rect, got)
+		fail("maker mark box %v has %d non-body pixels, want the corp art", kids[0].GetWidget().Rect, got)
 	}
 
 	// A fitted tile's module icon sits centred in the 50×40 cell (±4 px,

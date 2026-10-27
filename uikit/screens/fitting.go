@@ -11,7 +11,6 @@ import (
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit/emblems"
 	"github.com/entieve/entieve/uikit/hulls"
 	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
@@ -30,7 +29,6 @@ import (
 const (
 	fitColW       = 300 // identity + stats column (design px)
 	fitPortrait   = 120 // hull portrait box, hudPortrait's twin
-	fitEmblem     = 40  // maker emblem box, infowin's emblemBlock
 	fitTileW      = 50  // slot tile width (rackCellW's twin)
 	fitTileH      = 40  // slot tile height (the 40 px hit-area floor)
 	fitTileNameH  = 19  // name line under a filled tile (StepTiny line box)
@@ -678,7 +676,7 @@ func (f *Fitting) Sync() {
 }
 
 // syncIdentity refreshes the title, the portrait (repainted on a hull
-// change only) and the class · maker line with the maker's emblem.
+// change only) and the class · maker line with the maker's corporation mark.
 func (f *Fitting) syncIdentity(ship sim.ShipState, hasShip bool) {
 	hull, maker := content.ShipID(""), ""
 	name, sub := "No ship", ""
@@ -703,13 +701,11 @@ func (f *Fitting) syncIdentity(ship sim.ShipState, hasShip bool) {
 	if maker != f.emblemSlug {
 		f.emblemSlug = maker
 		f.idRow.RemoveChildren()
-		if img := emblems.Get(maker, theme.Px(fitEmblem)); img != nil {
-			f.idRow.AddChild(widget.NewGraphic(
-				widget.GraphicOpts.Image(img),
-				widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-					Position: widget.RowLayoutPositionCenter,
-				})),
-			))
+		if maker != "" {
+			if g := corpMark(maker, f.th.Pal().Text); g != nil {
+				g.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+				f.idRow.AddChild(g)
+			}
 		}
 		f.idRow.AddChild(f.idText)
 	}
