@@ -194,7 +194,8 @@ window title.
   [`assets/README.md`](../assets/README.md#drop-in-icons-icons). The set
   embeds through `assets/icons/icons.go` and registers itself as full-colour
   art under the content id, so a dropped file wins every icon slot for that id
-  (module tiles, rack, market rows, tooltips, the Show Info hero) with no
+  (module tiles, rack, market rows, tooltips, the Show Info hero, and the
+  corporation mark on the info maker line and the fitting maker block) with no
   manifest edit; content without a file falls back exactly as before.
 - **Optical fit**: glyphs that sit off-centre in their frame carry a
   per-icon `nudge` (fractions of the box) in `manifest.json`.

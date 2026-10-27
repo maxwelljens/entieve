@@ -49,6 +49,7 @@ func TestInfoWindowCaptureFrame(t *testing.T) {
 	fixtureShip(t, env, "ship-capture-hull", &content.ShipDef{
 		Name:        "Kestrel Prime",
 		Class:       "frigate",
+		Maker:       "corp-borealis",
 		Origin:      "moravian",
 		Description: "A heritage frigate restored from the old works: light, fast and stubbornly analogue where it counts.",
 		Slots:       content.Slots{High: 4, Mid: 4, Low: 2},
@@ -217,6 +218,30 @@ func (g *infoCaptureGame) verify(img *ebiten.Image) {
 		head := image.Rect(r.Min.X+8, r.Min.Y+theme.TitleBarH+6, r.Max.X-8, r.Min.Y+theme.TitleBarH+34)
 		if n := uitest.InkIn(img, head); n < 40 {
 			fail("header line %v drew %d ink pixels, want the hull name", n, n)
+		}
+		// The maker line leads with the dropped corporation art at the corp
+		// token (the corp icons replace the vector emblems here).
+		if e := g.k.svc.info.Emblem(); e == nil || e.Image == nil {
+			fail("maker line has no corporation mark")
+		} else if b := e.Image.Bounds(); b.Dx() != theme.Px(theme.IconCorp) {
+			fail("maker mark box = %v, want %d px", b, theme.Px(theme.IconCorp))
+		} else {
+			box := e.GetWidget().Rect
+			br, bg, bb, _ := img.At(box.Min.X-3, box.Min.Y+box.Dy()/2).RGBA()
+			diff := 0
+			for y := box.Min.Y; y < box.Max.Y; y++ {
+				for x := box.Min.X; x < box.Max.X; x++ {
+					pr, pg, pb, _ := img.At(x, y).RGBA()
+					if uitest.AbsInt(int(pr>>8)-int(br>>8)) > 6 ||
+						uitest.AbsInt(int(pg>>8)-int(bg>>8)) > 6 ||
+						uitest.AbsInt(int(pb>>8)-int(bb>>8)) > 6 {
+						diff++
+					}
+				}
+			}
+			if diff < 20 {
+				fail("maker mark %v drew %d non-body pixels, want the corp art", box, diff)
+			}
 		}
 	}
 

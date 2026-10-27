@@ -20,8 +20,9 @@ const (
 	IconTile = 32
 	// IconHero is the Show Info body's hero icon — the one big render of the
 	// entity, deliberately off the type grid. IconCorp is the corporation
-	// logo beside it, and IconHero must stay strictly bigger: the entity
-	// leads, its maker is an attribution (TestHeroOutgrowsCorpLogo).
+	// mark on the maker line (the fitting window's maker block too), and
+	// IconHero must stay strictly bigger: the entity leads, its maker is an
+	// attribution (TestHeroOutgrowsCorpLogo).
 	IconHero = 64
 	IconCorp = 40
 )
@@ -131,8 +132,8 @@ func ItemIconFor(def *content.ItemDef) string {
 
 // CorpIconFor resolves one corporation's logo: the player's drop-in art for
 // its corp-* slug, else "" — the caller then keeps the vector emblem
-// (uikit/emblems). Only the Show Info hero draws the logo; every other slot
-// stays an emblem.
+// (uikit/emblems). The panels that draw a corporation mark (Show Info's
+// maker line, the fitting window's maker block) go through here first.
 func CorpIconFor(slug string) string {
 	if slug != "" && icons.Has(slug) {
 		return slug
