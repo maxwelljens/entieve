@@ -10,7 +10,6 @@ import (
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 )
@@ -400,8 +399,8 @@ func jobStateLabel(state sim.JobState) string {
 	return "Running"
 }
 
-// productIcon picks a recipe/job row's product glyph: hulls, module
-// classes, and the neutral gear for plain items (charges, minerals).
+// productIcon picks a recipe/job row's product glyph: hulls, a module's own
+// icon, an item's icon (drop-in art, else its category silhouette).
 func productIcon(cv widgets.ContentView, product content.ItemID) string {
 	if _, ok := cv.Defs().Ship(content.ShipID(product)); ok {
 		return "row_hull"
@@ -409,8 +408,8 @@ func productIcon(cv widgets.ContentView, product content.ItemID) string {
 	if def, ok := cv.Defs().Module(content.ModuleID(product)); ok {
 		return theme.ModuleIconFor(def)
 	}
-	if _, ok := cv.Defs().Item(product); ok {
-		return icons.Fallback
+	if def, ok := cv.Defs().Item(product); ok {
+		return theme.ItemIconFor(def)
 	}
 	return ""
 }

@@ -12,6 +12,10 @@
 // so a palette role drawn every frame costs one map lookup after the first
 // call. Unknown names never miss: they resolve to the neutral gear silhouette
 // (Fallback), so a caller can never paint a missing-image artifact.
+//
+// The player's drop-in icon set (assets/icons, one file per content id)
+// registers itself here as full-colour art keyed by the content id, so a
+// module or item id draws its dropped art through the very same Get.
 package icons
 
 import (
@@ -26,6 +30,7 @@ import (
 	"math"
 	"sync"
 
+	dropin "github.com/entieve/entieve/assets/icons"
 	"github.com/hajimehoshi/ebiten/v2"
 	xdraw "golang.org/x/image/draw"
 )
@@ -86,9 +91,10 @@ type manifest struct {
 
 var (
 	loadOnce sync.Once
-	registry map[string]Entry        // semantic name -> record
-	silhou   map[string]silShape     // file -> decoded silhouette (alpha only)
-	arts     map[string]*image.NRGBA // file -> decoded full-colour art
+	registry map[string]Entry              // semantic name -> record
+	silhou   map[string]silShape           // file -> decoded silhouette (alpha only)
+	arts     map[string]*image.NRGBA       // file -> decoded full-colour art
+	dropins  map[string]func() image.Image // content id -> lazy drop-in art
 
 	mu    sync.Mutex
 	cache map[string]*ebiten.Image // name|size|tint (name|size for art) -> rendered icon
@@ -111,14 +117,43 @@ func load() {
 		registry = m.Icons
 		silhou = map[string]silShape{}
 		arts = map[string]*image.NRGBA{}
+		dropins = map[string]func() image.Image{}
 		cache = map[string]*ebiten.Image{}
+		// The player's drop-in set: one art entry per embedded file, decoded
+		// on its first draw (a 720² render is never decoded unseen).
+		for _, id := range dropin.IDs() {
+			dropins[id] = func() image.Image {
+				img, _ := dropin.Load(id)
+				return img
+			}
+		}
 	})
 }
 
-// Has reports whether name is a known semantic icon name.
+// RegisterArt adds a runtime full-colour art entry under id, drawn exactly
+// like a manifest "art" entry (as-is, no tint) — the drop-in icon path, for
+// art that is not in manifest.json. It replaces any earlier entry for id.
+func RegisterArt(id string, img image.Image) {
+	load()
+	registerArt(id, func() image.Image { return img })
+}
+
+// registerArt fills the drop-in map (Get and RegisterArt hold mu; load fills
+// it before anything can read it).
+func registerArt(id string, dec func() image.Image) {
+	mu.Lock()
+	defer mu.Unlock()
+	dropins[id] = dec
+}
+
+// Has reports whether name is a known semantic icon name — a manifest glyph
+// or a registered drop-in art id.
 func Has(name string) bool {
 	load()
-	_, ok := registry[name]
+	if _, ok := registry[name]; ok {
+		return true
+	}
+	_, ok := dropins[name]
 	return ok
 }
 
@@ -138,19 +173,22 @@ func Names() []string {
 // with equal arguments return the same image. Unknown names return the
 // Fallback icon.
 //
-// An art-mode entry ("mode":"art") is drawn full-colour as-is: the tint is
-// ignored, so its cache key drops the tint (one entry per name+size — two
-// tints share it instead of thrashing the cache).
+// An art-mode entry ("mode":"art" or a drop-in content id) is drawn
+// full-colour as-is: the tint is ignored, so its cache key drops the tint
+// (one entry per name+size — two tints share it instead of thrashing the
+// cache).
 func Get(name string, size int, tint color.RGBA) *ebiten.Image {
 	load()
 	if size < 1 {
 		size = 1
 	}
-	if _, ok := registry[name]; !ok {
+	e, known := registry[name]
+	dropinArt, dropped := dropins[name]
+	if !known && !dropped {
 		name = Fallback
+		e = registry[Fallback]
 	}
-	e := registry[name]
-	art := e.Mode == ArtMode
+	art := dropped || e.Mode == ArtMode
 	key := fmt.Sprintf("%s|%d|art", name, size)
 	if !art {
 		key = fmt.Sprintf("%s|%d|%d,%d,%d,%d", name, size, tint.R, tint.G, tint.B, tint.A)
@@ -162,13 +200,27 @@ func Get(name string, size int, tint color.RGBA) *ebiten.Image {
 		return img
 	}
 	var img *ebiten.Image
-	if art {
+	switch {
+	case dropped:
+		img = ebiten.NewImageFromImage(scaleBox(straightAlpha(dropinArt()), size, nil))
+	case art:
 		img = ebiten.NewImageFromImage(scaleBox(artImage(e.File), size, e.Nudge))
-	} else {
+	default:
 		img = ebiten.NewImageFromImage(tintBox(silhouette(e.File), size, e.Nudge, tint))
 	}
 	cache[key] = img
 	return img
+}
+
+// straightAlpha converts a decoded image to the straight-alpha NRGBA form
+// scaleBox scales (drop-in art decodes as RGBA or paletted, not NRGBA).
+func straightAlpha(src image.Image) *image.NRGBA {
+	if s, ok := src.(*image.NRGBA); ok {
+		return s
+	}
+	dst := image.NewNRGBA(src.Bounds())
+	draw.Draw(dst, dst.Bounds(), src, src.Bounds().Min, draw.Src)
+	return dst
 }
 
 // artImage decodes one embedded full-colour PNG into straight-alpha NRGBA

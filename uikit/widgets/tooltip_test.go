@@ -408,8 +408,10 @@ func TestModuleTipCarriesModuleDef(t *testing.T) {
 		},
 	}
 	m := ModuleTip(weapon, "High slot 1", "Fusion L", 600, "Right-click: cycle ammo", "Click: activate")
-	if m.Icon != "mod_weapon" || m.Title != "EMP Turret" || m.Sub != "High slot 1 · Weapon" {
-		t.Errorf("header = %q/%q/%q, want mod_weapon / EMP Turret / High slot 1 · Weapon",
+	// The header icon is the module's own icon: the drop-in art keyed by the
+	// content id wins over the class glyph (theme.ModuleIconFor).
+	if m.Icon != "mod-autocannon-s" || m.Title != "EMP Turret" || m.Sub != "High slot 1 · Weapon" {
+		t.Errorf("header = %q/%q/%q, want mod-autocannon-s / EMP Turret / High slot 1 · Weapon",
 			m.Icon, m.Title, m.Sub)
 	}
 	checkSections(t, "weapon", m.Sections, []TooltipSection{

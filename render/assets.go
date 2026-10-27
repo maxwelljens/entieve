@@ -61,6 +61,11 @@ func LoadAssets(dir string) {
 		}
 		key := strings.TrimSuffix(filepath.ToSlash(rel), ext)
 		switch {
+		// The drop-in icon set is UI art, not a world sprite: it embeds
+		// itself (assets/icons) and has no convention key, so the walk must
+		// not hold 38 × 720² renders in the sprite cache.
+		case strings.HasPrefix(key, dropinIconsRoot):
+			return nil
 		case strings.EqualFold(ext, ".png"):
 			if strings.HasPrefix(key, "backgrounds/") {
 				platePaths[key] = path // indexed, decoded on demand per system
@@ -92,6 +97,11 @@ func spriteFor(key string) *ebiten.Image {
 
 // artworkRoot is the full-window plate kind: assets/artwork/<name>.(png|jpg).
 const artworkRoot = "artwork/"
+
+// dropinIconsRoot is the UI icon set (assets/icons/<content-id>.png): the
+// walk skips it — the set embeds itself in the assets/icons package and never
+// becomes a world sprite.
+const dropinIconsRoot = "icons/"
 
 // artworkDocked is the docked-station backdrop's convention key
 // (assets/artwork/spaceship_hangar.jpg). The plate is one per session: it

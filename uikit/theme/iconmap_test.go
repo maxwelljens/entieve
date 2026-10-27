@@ -111,6 +111,76 @@ func TestModuleIconForResolver(t *testing.T) {
 	}
 }
 
+// TestDropinArtWinsEveryIconSlot pins the drop-in precedence: a module's own
+// dropped art (keyed by its content id) beats the manifest art entry content
+// assigns it, an item's dropped art beats its category silhouette, and a
+// corporation's dropped logo beats the emblem — while an unwired def still
+// resolves exactly as before.
+func TestDropinArtWinsEveryIconSlot(t *testing.T) {
+	// mod-autocannon-s ships art both ways: the old manifest entry
+	// (mod_autocannon_s) and the player's drop-in. The drop-in is the id.
+	def := &content.ModuleDef{ID: "mod-autocannon-s", Kind: content.KindWeapon, Icon: "mod_autocannon_s"}
+	if got := ModuleIconFor(def); got != "mod-autocannon-s" {
+		t.Errorf("ModuleIconFor = %q, want the drop-in id mod-autocannon-s", got)
+	}
+	// The five manifest art entries are the ones the drop-in overrides.
+	for _, id := range []string{"mod-artillery-s", "mod-artillery-m", "mod-artillery-l", "mod-autocannon-m"} {
+		d := &content.ModuleDef{ID: content.ModuleID(id), Kind: content.KindWeapon, Icon: "mod_autocannon_s"}
+		if got := ModuleIconFor(d); got != id {
+			t.Errorf("%s: ModuleIconFor = %q, want the drop-in id", id, got)
+		}
+	}
+	// Uncovered modules fall back exactly as today: the class glyph.
+	if got, want := ModuleIconFor(&content.ModuleDef{ID: "mod-rocket-pod", Kind: content.KindWeapon}), "mod_weapon"; got != want {
+		t.Errorf("unwired module = %q, want the class glyph %q", got, want)
+	}
+
+	// Items: dropped art first, then the category silhouette.
+	for id, cat := range map[content.ItemID]string{
+		"min-ferrite": "mineral", "ore-cordite": "ore", "loot-navdata": "loot",
+	} {
+		if got := ItemIconFor(&content.ItemDef{ID: id, Category: cat}); got != string(id) {
+			t.Errorf("ItemIconFor(%s) = %q, want the drop-in id", id, got)
+		}
+	}
+	for cat, want := range map[string]string{
+		"ammo": "ammo", "charge": "ammo", "loot": "act_loot",
+		"mineral": "kind_belt", "ore": "kind_asteroid", "": icons.Fallback,
+	} {
+		if got := ItemIconFor(&content.ItemDef{ID: "unwired-item", Category: cat}); got != want {
+			t.Errorf("ItemIconFor(category %q) = %q, want %q", cat, got, want)
+		}
+	}
+	if got := ItemIconFor(nil); got != "" {
+		t.Errorf("ItemIconFor(nil) = %q, want empty", got)
+	}
+
+	// Corporations: the dropped logo, else "" (the caller keeps the emblem).
+	for _, corp := range content.AllCorps {
+		if got := CorpIconFor(corp.ID); got != corp.ID {
+			t.Errorf("CorpIconFor(%s) = %q, want the logo id", corp.ID, got)
+		}
+	}
+	if got := CorpIconFor("corp-nowhere"); got != "" {
+		t.Errorf("CorpIconFor(unknown) = %q, want empty (emblem fallback)", got)
+	}
+}
+
+// TestHeroOutgrowsCorpLogo pins the Show Info hero geometry: the entity's
+// icon is strictly bigger than the corporation logo beside it, and the logo
+// stays the Sub line's emblem box so the attribution never leads.
+func TestHeroOutgrowsCorpLogo(t *testing.T) {
+	if IconHero <= IconCorp {
+		t.Errorf("hero %d px is not bigger than the corp logo %d px", IconHero, IconCorp)
+	}
+	if IconCorp != 40 || IconHero != 64 {
+		t.Errorf("hero/logo = %d/%d, want 64/40", IconHero, IconCorp)
+	}
+	if IconHero <= IconTitle || IconCorp <= IconTile {
+		t.Error("the hero and logo must outgrow the header/tile boxes they replace")
+	}
+}
+
 // TestContractIconCoversContractKinds: kill/deliver/mine get their board
 // glyphs and anything else falls back.
 func TestContractIconCoversContractKinds(t *testing.T) {

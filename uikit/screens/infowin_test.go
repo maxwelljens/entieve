@@ -143,8 +143,8 @@ func TestInfoPageHull(t *testing.T) {
 	if !ok {
 		t.Fatal("full hull did not resolve")
 	}
-	if page.Title != full.Name || page.Icon != "row_hull" {
-		t.Errorf("header = %q/%q, want %q/row_hull", page.Title, page.Icon, full.Name)
+	if page.Title != full.Name || page.Hero != "row_hull" {
+		t.Errorf("header = %q/%q, want %q/row_hull", page.Title, page.Hero, full.Name)
 	}
 	if page.Prose != full.Description {
 		t.Errorf("prose = %q, want the description", page.Prose)
@@ -337,8 +337,10 @@ func TestInfoPageItem(t *testing.T) {
 	if !ok {
 		t.Fatal("ore did not resolve")
 	}
-	if page.Icon != "" {
-		t.Errorf("item icon = %q, want text-only header (no item glyph in the set)", page.Icon)
+	// The item's hero: no drop-in art for the fixture id, so its category's
+	// silhouette (an ore reads as the asteroid glyph).
+	if page.Hero != theme.KindIcon(sim.KindAsteroid) {
+		t.Errorf("item hero = %q, want the ore silhouette %q", page.Hero, theme.KindIcon(sim.KindAsteroid))
 	}
 	if r := mustRow(t, page, "PROPERTIES", "Category"); r.Value != "Ore" {
 		t.Errorf("category = %+v, want Ore", r)
@@ -616,10 +618,10 @@ func TestInfoWindowShowAndRefSwap(t *testing.T) {
 	}
 }
 
-// TestInfoWindowModuleHeaderIcon: a module page leads with the module's own
-// icon (its art when the content names one) at the 24 px title box; other
-// pages keep the 20 px tooltip box.
-func TestInfoWindowModuleHeaderIcon(t *testing.T) {
+// TestInfoWindowModuleHeroIcon: a module page's hero is the module's own icon
+// (its drop-in art, keyed by the content id) at the hero box, and the title
+// sits at the content column's left edge — no header icon offsets it.
+func TestInfoWindowModuleHeroIcon(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	w := env.InfoWindow()
 	if w == nil {
@@ -629,16 +631,23 @@ func TestInfoWindowModuleHeaderIcon(t *testing.T) {
 	env.ShowInfo(widgets.ModuleRef("mod-autocannon-s"))
 	uitest.PumpWindow(t, ui, w.Sync, 1024, 700)
 
-	line, ok := w.page.Children()[0].(*widget.Container)
+	def, ok := env.Content.Module("mod-autocannon-s")
 	if !ok {
-		t.Fatalf("page header is %T, want a container", w.page.Children()[0])
+		t.Fatal("mod-autocannon-s is not in the content stream")
 	}
-	g := line.Children()[0].GetWidget().Rect
-	if got := g.Dx(); got != theme.Px(theme.IconTitle) {
-		t.Errorf("module header icon box = %d, want the %d px title box", got, theme.Px(theme.IconTitle))
+	if got, want := theme.ModuleIconFor(def), "mod-autocannon-s"; got != want {
+		t.Errorf("module icon = %q, want the drop-in id %q", got, want)
 	}
-	if got := line.Children()[1].GetWidget().Rect.Min.X; got < g.Max.X+theme.Px(theme.IconGap) {
-		t.Errorf("module title starts at %d, want clear of the icon %v", got, g)
+	h := w.Hero()
+	if h == nil {
+		t.Fatal("module page has no hero")
+	}
+	if got, want := h.GetWidget().Rect.Dx(), theme.Px(theme.IconHero); got != want {
+		t.Errorf("hero box = %d, want the %d px hero token", got, want)
+	}
+	title := w.page.Children()[1].GetWidget().Rect
+	if hero := w.page.Children()[0].GetWidget().Rect; title.Min.X != hero.Min.X {
+		t.Errorf("title starts at %d, want the content column's edge %d", title.Min.X, hero.Min.X)
 	}
 }
 
