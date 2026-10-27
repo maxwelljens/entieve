@@ -789,15 +789,16 @@ func (w *InfoWin) rewrap() {
 	}
 }
 
-// corpMark builds the corporation graphic a panel shows: the player's
-// dropped corp art (theme.CorpIconFor) first, else the vector emblem in the
-// same box — a corp with no drop-in yet keeps its emblem. nil when the slug
-// is known to neither.
-func corpMark(slug string, tint color.RGBA) *widget.Graphic {
+// corpMark builds the corporation graphic a panel shows at the given token
+// (IconCorpInfo on the info maker line, IconCorp in the fitting window): the
+// player's dropped corp art (theme.CorpIconFor) first, else the vector
+// emblem in the same box — a corp with no drop-in yet keeps its emblem. nil
+// when the slug is known to neither.
+func corpMark(slug string, size int, tint color.RGBA) *widget.Graphic {
 	if id := theme.CorpIconFor(slug); id != "" {
-		return theme.NewIcon(id, theme.IconCorp, tint)
+		return theme.NewIcon(id, size, tint)
 	}
-	if img := emblems.Get(slug, theme.Px(theme.IconCorp)); img != nil {
+	if img := emblems.Get(slug, theme.Px(size)); img != nil {
 		return widget.NewGraphic(widget.GraphicOpts.Image(img))
 	}
 	return nil
@@ -849,7 +850,7 @@ func (w *InfoWin) render(p infoPage) {
 		// art, else the vector emblem — nothing on rat hulls and
 		// unattributed items).
 		if p.Emblem != "" {
-			if g := corpMark(p.Emblem, pal.Text); g != nil {
+			if g := corpMark(p.Emblem, theme.IconCorpInfo, pal.Text); g != nil {
 				g.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
 				sub.AddChild(g)
 				w.emblem = g

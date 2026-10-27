@@ -15,16 +15,19 @@ const (
 	IconInline = icons.Inline
 	IconButton = icons.Button
 	IconTitle  = icons.Title
-	// IconTile is the fitting/rack slot tile's art box (the 50×40 cell's
-	// module render); the type grid above stays pinned at 16/20/24.
-	IconTile = 32
+	// IconTile is the fitting/rack slot tile's art box (the 64×64 cell's
+	// module render: the icon plus a 4 px padding ring); the type grid above
+	// stays pinned at 16/20/24.
+	IconTile = 56
 	// IconHero is the Show Info body's hero icon — the one big render of the
-	// entity, deliberately off the type grid. IconCorp is the corporation
-	// mark on the maker line (the fitting window's maker block too), and
-	// IconHero must stay strictly bigger: the entity leads, its maker is an
-	// attribution (TestHeroOutgrowsCorpLogo).
-	IconHero = 64
-	IconCorp = 40
+	// entity, deliberately off the type grid. IconCorpInfo is the
+	// corporation mark below it on the info maker line, IconCorp the fitting
+	// window's maker block: the panel draws both its graphics at twice the
+	// window's, and IconHero must stay strictly the biggest — the entity
+	// leads, its maker is an attribution (TestHeroOutgrowsCorpLogo).
+	IconHero     = 128
+	IconCorpInfo = 80
+	IconCorp     = 40
 )
 
 // IconGap is the gap between an icon box and the label beside it.

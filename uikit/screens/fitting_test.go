@@ -157,7 +157,7 @@ func TestFittingRowTooltips(t *testing.T) {
 
 // TestFittingSlotGrid pins the grid to the hull: one tile per hull slot
 // (empty ones dashed, so the grid shows the hull's shape), filled tiles
-// carrying the module glyph centred in the 50×40 cell.
+// carrying the module glyph centred in the 62×62 cell.
 func TestFittingSlotGrid(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	f := NewFitting(env)
@@ -208,8 +208,8 @@ func TestFittingSlotGrid(t *testing.T) {
 	if g := tile.btn.GraphicImage(); g == nil || g.Idle == nil || g.Idle == fitGlyph("", color.RGBA{}) {
 		t.Error("fitted tile carries no icon")
 	}
-	if b := tile.btn.GraphicImage().Idle.Bounds(); b.Dx() != theme.Px(theme.IconTile) || b.Dy() != theme.Px(theme.IconTile) {
-		t.Errorf("tile icon box = %v, want the %d px tile icon", b, theme.Px(theme.IconTile))
+	if b := tile.btn.GraphicImage().Idle.Bounds(); b.Dx() != 56 || b.Dy() != 56 {
+		t.Errorf("tile icon box = %v, want the 56 px tile icon", b)
 	}
 	// Free the last high slot: the placeholder tile takes the dashed
 	// chrome instead of a fitted module's accent edge.
@@ -225,13 +225,49 @@ func TestFittingSlotGrid(t *testing.T) {
 	}
 }
 
+// TestFittingGridClearsTheHangar pins the slots grid inside its split pane:
+// the 64 px tiles need the taller default share, or the last row draws over
+// the seam and the hangar's header.
+func TestFittingGridClearsTheHangar(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	f := NewFitting(env)
+	ui := newWindowUI(t, env, f.Win())
+	uitest.PumpWindow(t, ui, f.Sync, 1280, 720)
+
+	last := 0
+	for row := 0; row < 3; row++ {
+		for idx := 0; idx < fitMaxCells; idx++ {
+			tr := f.tiles[row][idx]
+			if !fitTileShown(tr) {
+				continue
+			}
+			// The name line under a filled tile is the grid's lowest ink.
+			if b := tr.name.GetWidget().Rect.Max.Y; b > last {
+				last = b
+			}
+		}
+	}
+	if last == 0 {
+		t.Fatal("no slot tile laid out")
+	}
+	// The slots pane is the split's first pane (the hangar's header, not
+	// just its table, is what a stray row would cover).
+	if pane := f.split.Container().Children()[0].GetWidget().Rect; last > pane.Max.Y {
+		t.Errorf("slots grid bottom = %d, want inside the slots pane (%d)", last, pane.Max.Y)
+	}
+}
+
 // TestFitDashTile: the placeholder raster is the tile's box (the pixels —
 // dashes, gaps, hollow centre — are pinned by the capture frame, which is
 // the only place ebiten allows a readback).
 func TestFitDashTile(t *testing.T) {
+	if fitTileW != theme.IconTile+6 || fitTileH != theme.IconTile+6 {
+		t.Errorf("fitting tile = %d×%d, want the %d px tile icon + 6 (3 px ring)",
+			fitTileW, fitTileH, theme.IconTile)
+	}
 	p := theme.DefaultPalette()
-	if b := fitDashImage(p).Bounds(); b.Dx() != theme.Px(fitTileW) || b.Dy() != theme.Px(fitTileH) {
-		t.Errorf("dash tile raster = %v, want the %d×%d tile box", b, theme.Px(fitTileW), theme.Px(fitTileH))
+	if b := fitDashImage(p).Bounds(); b.Dx() != 62 || b.Dy() != 62 {
+		t.Errorf("dash tile raster = %v, want the 62×62 tile box", b)
 	}
 }
 
@@ -553,15 +589,19 @@ func TestFittingMakerLogoIsCorpArt(t *testing.T) {
 	if wantID == "" {
 		t.Fatalf("%s has no drop-in corp art", shell.Maker)
 	}
-	if b := g.Image.Bounds(); b.Dx() != theme.Px(theme.IconCorp) {
-		t.Errorf("maker mark box = %v, want %d px", b, theme.Px(theme.IconCorp))
+	// The fitting block keeps the 40 px token: the info panel's 80 px mark
+	// is info-scoped (theme.IconCorpInfo), the asymmetry is deliberate.
+	if b := g.Image.Bounds(); b.Dx() != 40 {
+		t.Errorf("maker mark box = %v, want the 40 px fitting corp token", b)
 	}
 	if g.Image != icons.Get(wantID, theme.Px(theme.IconCorp), env.Pal().Text) {
 		t.Errorf("maker mark is not the drop-in corp art %q", wantID)
 	}
 }
 
-// TestFittingSeamKept: the hangar seam is the window's one sidecar seam.
+// TestFittingSeamKept: the hangar seam is the window's one sidecar seam,
+// opened at the slots-pane share the tile grid needs (not the equal share
+// every other split opens on).
 func TestFittingSeamKept(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	f := NewFitting(env)
@@ -571,7 +611,7 @@ func TestFittingSeamKept(t *testing.T) {
 	if len(seams) != 1 || seams[0].Name != "fitting-hangar" || seams[0].Index != 0 {
 		t.Fatalf("Splits() = %+v, want the fitting-hangar seam", seams)
 	}
-	if got := seams[0].Split.Ratio(seams[0].Index); math.Abs(got-0.5) > 1e-9 {
-		t.Errorf("default seam ratio = %v, want the equal share 0.5", got)
+	if got := seams[0].Split.Ratio(seams[0].Index); math.Abs(got-fitSlotShare) > 1e-9 {
+		t.Errorf("default seam ratio = %v, want the slots share %v", got, fitSlotShare)
 	}
 }

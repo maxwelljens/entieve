@@ -27,10 +27,11 @@ func splitSeam(s *widgets.SplitPane, i int) image.Rectangle {
 	return s.Container().Children()[2*i+1].GetWidget().Rect
 }
 
-// TestWindowSplitsEqualByDefault pins the three multi-pane windows to
-// the equal-share default with nothing stored: Inventory thirds,
-// Fitting and Manufacturing halves, and every split tiling its body
-// exactly (no gap, no overflow).
+// TestWindowSplitsEqualByDefault pins the multi-pane windows' opening
+// shares with nothing stored: Inventory thirds, Manufacturing halves, and
+// every split tiling its body exactly (no gap, no overflow). Fitting is the
+// one exception — its tile grid needs the taller slots pane at the window's
+// frozen height, so it opens at fitSlotShare.
 func TestWindowSplitsEqualByDefault(t *testing.T) {
 	env, _ := newTestEnv(t)
 
@@ -38,34 +39,39 @@ func TestWindowSplitsEqualByDefault(t *testing.T) {
 		name  string
 		build func() (*widget.Window, *widgets.SplitPane)
 		panes int
+		share float64 // seam 0's opening share; 0 = the equal-share default
 	}{
 		{"inventory", func() (*widget.Window, *widgets.SplitPane) {
 			p := NewInventory(env)
 			return p.Win(), p.split
-		}, 3},
+		}, 3, 0},
 		{"fitting", func() (*widget.Window, *widgets.SplitPane) {
 			p := NewFitting(env)
 			return p.Win(), p.split
-		}, 2},
+		}, 2, fitSlotShare},
 		{"manufacturing", func() (*widget.Window, *widgets.SplitPane) {
 			p := NewManufacturing(env)
 			return p.Win(), p.split
-		}, 2},
+		}, 2, 0},
 	}
 	for _, c := range cases {
 		win, split := c.build()
 		uitest.PumpWindow(t, newWindowUI(t, env, win), nil, 1280, 720)
 
 		for i := 0; i < c.panes-1; i++ {
-			if got, want := split.Ratio(i), float64(i+1)/float64(c.panes); got != want {
-				t.Errorf("%s: seam %d ratio = %v, want the equal share %v", c.name, i, got, want)
+			want := float64(i+1) / float64(c.panes)
+			if i == 0 && c.share != 0 {
+				want = c.share
+			}
+			if got := split.Ratio(i); got != want {
+				t.Errorf("%s: seam %d ratio = %v, want %v", c.name, i, got, want)
 			}
 		}
 		panes := splitPanes(split)
 		if len(panes) != c.panes {
 			t.Fatalf("%s: %d panes, want %d", c.name, len(panes), c.panes)
 		}
-		for i := 1; i < len(panes); i++ {
+		for i := 1; i < len(panes) && c.share == 0; i++ {
 			if d := panes[i].Dy() - panes[i-1].Dy(); d < -1 || d > 1 {
 				t.Errorf("%s: pane heights %v, want equal shares", c.name, panes)
 			}

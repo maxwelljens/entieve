@@ -841,8 +841,10 @@ func TestSidecarV2MigratesToSplits(t *testing.T) {
 			t.Errorf("v2 %s = %v, want the equal-share default %v", sm.Name, got, want)
 		}
 	}
-	if got := seamRatio("fitting-hangar", g.host.Splits(idFitting)); got != 0.5 {
-		t.Errorf("v2 fitting-hangar = %v, want the 0.5 default", got)
+	// The fitting split opens at 0.6: its tile grid needs the taller slots
+	// pane at the window's frozen height (see screens.NewFitting).
+	if got := seamRatio("fitting-hangar", g.host.Splits(idFitting)); got != 0.6 {
+		t.Errorf("v2 fitting-hangar = %v, want the 0.6 slots share", got)
 	}
 
 	// The next write is version 3, rects and flags unchanged.
@@ -859,8 +861,8 @@ func TestSidecarV2MigratesToSplits(t *testing.T) {
 	if got := doc.Windows["inventory"].Splits["inventory-ore"]; got != float64(1)/3 {
 		t.Errorf("rewritten inventory-ore = %v, want the default %v", got, float64(1)/3)
 	}
-	if got := doc.Windows["fitting"].Splits["fitting-hangar"]; got != 0.5 {
-		t.Errorf("rewritten fitting-hangar = %v, want the default 0.5", got)
+	if got := doc.Windows["fitting"].Splits["fitting-hangar"]; got != 0.6 {
+		t.Errorf("rewritten fitting-hangar = %v, want the 0.6 slots share", got)
 	}
 }
 
