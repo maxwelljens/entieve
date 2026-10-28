@@ -12,15 +12,13 @@ import (
 const (
 	// beltDepletedEpsilon: a rock at or below this volume is destroyed
 	// (mining and requisition draws), never respawned on reload and never
-	// a draw source again until regrowth lifts it back above.
+	// a draw source again until the next cycle refill lifts it back above.
 	beltDepletedEpsilon = 1e-9
-	// beltGrowTicks is one belt regrowth window (600 ticks = 10 sim
-	// seconds at 60 tps).
-	beltGrowTicks = 600
-	// beltGrowFraction is the belt regrowth rate: +1% of the rock's
-	// definition volume per window, capped at that volume — the approved
-	// "belts deplete + slow regrow" plan. Pure math, zero RNG.
-	beltGrowFraction = 0.01
+	// beltCycleTicks is one full belt cycle (216,000 ticks = 60 sim
+	// minutes at 60 tps): at every boundary the whole belt refills to its
+	// definition volume — the approved "fields refill on a fixed cycle"
+	// rule. Pure math, zero RNG.
+	beltCycleTicks = int64(216_000)
 )
 
 // systemMining runs completed cycles of active mining lasers.
@@ -32,9 +30,9 @@ const (
 // rounding. A hold with no room for even one whole unit emits EvtCargoFull
 // and deactivates the laser; a depleted asteroid is destroyed with a log.
 //
-// The belt regrowth pass runs first: every belt state (all systems) grows
-// one window per 600 ticks (see systemBelts), so mining decrements and
-// regrowth increments stay in step with the live asteroid entities.
+// The belt refill pass runs first: every belt state (all systems) refills
+// at its 60-minute cycle boundary (see systemBelts), so mining decrements
+// and the refill reset stay in step with the live asteroid entities.
 func (s *Sim) systemMining() {
 	s.systemBelts()
 	now := s.time
@@ -56,6 +54,11 @@ func (s *Sim) systemMining() {
 				}
 				slot := SlotRef{Class: class, Index: i}
 				if reason, ok := s.checkCycle(e, def, slot); !ok {
+					// NPC miners go quiet: the reason line is player-only
+					// noise (the EvModule deactivation still fires).
+					if e != s.player {
+						reason = ""
+					}
 					s.deactivate(e, slot, reason, SevWarning)
 					continue
 				}
@@ -90,6 +93,9 @@ func (s *Sim) mineCycle(e ecs.Entity, def *content.ModuleDef, slot SlotRef) {
 		return
 	}
 	m := def.Mining
+	// NPC miners run the same cycle machinery but keep the player's log
+	// clean: no per-cycle line, no hold-full warning, no depletion line.
+	quiet := e != s.player
 
 	container, capM3 := oreContainer(cargo)
 	space := capM3 - s.stacksVolume(*container)
@@ -101,15 +107,25 @@ func (s *Sim) mineCycle(e ecs.Entity, def *content.ModuleDef, slot SlotRef) {
 		if cargo.OreCapacity > 0 {
 			hold = "Ore hold"
 		}
-		s.emit(Event{Kind: EvCargoFull, Severity: SevWarning, Actor: e, Target: tgt,
-			Text: hold + " full: cannot store " + s.oreName(ast.Ore)})
-		s.deactivate(e, slot, "hold full", SevWarning)
+		if !quiet {
+			s.emit(Event{Kind: EvCargoFull, Severity: SevWarning, Actor: e, Target: tgt,
+				Text: hold + " full: cannot store " + s.oreName(ast.Ore)})
+		}
+		reason := "hold full"
+		if quiet {
+			reason = ""
+		}
+		s.deactivate(e, slot, reason, SevWarning)
 		return
 	}
 
 	volWant := math.Min(m.VolumePerCycle, ast.Remaining)
 	if volWant <= 0 {
-		s.deactivate(e, slot, "asteroid depleted", SevWarning)
+		reason := "asteroid depleted"
+		if quiet {
+			reason = ""
+		}
+		s.deactivate(e, slot, reason, SevWarning)
 		return
 	}
 	unitsNat := math.Floor((cargo.Remainder + volWant) / iv)
@@ -143,16 +159,17 @@ func (s *Sim) mineCycle(e ecs.Entity, def *content.ModuleDef, slot SlotRef) {
 		if vol > 0 {
 			s.pendingOre = append(s.pendingOre, pendingOreYield{item: ast.Ore, vol: vol})
 		}
+		s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: e, Target: tgt,
+			Text:  "Mined " + formatM3(vol) + " m³ " + s.oreName(ast.Ore),
+			Value: vol, Item: ast.Ore})
 	}
-
-	s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: e, Target: tgt,
-		Text:  "Mined " + formatM3(vol) + " m³ " + s.oreName(ast.Ore),
-		Value: vol, Item: ast.Ore})
 
 	// Depletion.
 	if ast.Remaining <= beltDepletedEpsilon {
-		s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: e, Target: tgt,
-			Text: s.nameOf(tgt) + " depleted", Item: ast.Ore})
+		if !quiet {
+			s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: e, Target: tgt,
+				Text: s.nameOf(tgt) + " depleted", Item: ast.Ore})
+		}
 		s.destroy(tgt)
 	}
 }
@@ -183,12 +200,12 @@ func formatM3(v float64) string {
 }
 
 // ---------------------------------------------------------------------------
-// Persistent belt state — depletion, regrowth, requisition draws
+// Persistent belt state — depletion, cycle refill, requisition draws
 // ---------------------------------------------------------------------------
 
 // beltKeys returns every belt-state key in canonical order (system id
 // ascending, then celestial id ascending) — the iteration order for
-// regrowth and the save serialization (map order never reaches state).
+// cycle refill and the save serialization (map order never reaches state).
 func (s *Sim) beltKeys() []beltKey {
 	keys := make([]beltKey, 0, len(s.belts))
 	for k := range s.belts {
@@ -203,36 +220,52 @@ func (s *Sim) beltKeys() []beltKey {
 	return keys
 }
 
-// systemBelts advances the persistent belt state: every rock regrows +1% of
-// its definition volume per elapsed 600-tick window, capped at that volume.
-// Pure math (no RNG), applied to every system's state so belts keep growing
-// while the player is elsewhere. A live rock grows with its entity (the
-// entity is authoritative on the grid and the state mirrors it); a depleted
-// rock exists only in the state and re-enters the grid on the next system
-// load.
+// systemBelts refills every belt at its 60-minute cycle boundary: each rock
+// resets to its definition volume, in state and on the grid. Pure math plus
+// spawnAsteroid's existing master-stream scatter (no new RNG role), applied
+// to every system's state so belts keep refilling while the player is
+// elsewhere.
+//
+// The cycle is derived from the tick count alone: n := (ticks - GrownAt) /
+// beltCycleTicks; GrownAt is the anchor of the last boundary (the persisted
+// field, unchanged on the wire). A live rock tops up IN PLACE — the entity
+// is kept, so the player's mining target survives the boundary — and a
+// destroyed rock re-enters the grid through spawnAsteroid, which always
+// rolls its two scatter values first (see its MASTER-STREAM note), so a
+// refill can never shift the stream: the scatter is simply fresh. Off-system
+// belts refill state-only; their rocks get their fresh scatter on the next
+// system load, as before.
 func (s *Sim) systemBelts() {
+	sys := s.System()
 	for _, k := range s.beltKeys() {
 		st := s.belts[k]
-		n := (s.ticks - st.GrownAt) / beltGrowTicks
+		n := (s.ticks - st.GrownAt) / beltCycleTicks
 		if n <= 0 {
-			continue
+			continue // epoch check first: nothing to do inside the cycle
 		}
-		st.GrownAt += n * beltGrowTicks
-		add := float64(n) * beltGrowFraction
+		st.GrownAt += n * beltCycleTicks
+		// The loaded belt's def, for putting destroyed rocks back on the
+		// grid. Off-system belts refill state-only (nil here).
+		var cel *content.CelestialDef
+		if k.System == s.systemID && sys != nil {
+			if c := sysCelestial(sys, st.Cel); c != nil && c.Belt != nil {
+				cel = c
+			}
+		}
 		for i := range st.Rocks {
 			rock := &st.Rocks[i]
-			if rock.Volume <= 0 {
-				continue
+			rock.Remaining = rock.Volume
+			if cel == nil {
+				continue // state-only: the grid rebuild scatters it
 			}
-			grow := rock.Volume * add
 			if e := s.beltRockEntity(st, i); !e.IsZero() {
 				if ast, ok := s.Asteroids.Get(e); ok {
-					ast.Remaining = math.Min(rock.Volume, ast.Remaining+grow)
-					rock.Remaining = ast.Remaining
-					continue
+					ast.Remaining = rock.Volume // top up in place, entity kept
 				}
+				continue
 			}
-			rock.Remaining = math.Min(rock.Volume, rock.Remaining+grow)
+			// Destroyed rock: back on the grid at a fresh scatter.
+			s.spawnAsteroid(cel, *rock, i)
 		}
 	}
 }

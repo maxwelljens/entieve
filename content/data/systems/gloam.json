@@ -25,11 +25,11 @@
       "name": "Asteroid Belt I",
       "kind": "belt",
       "position": { "X": -492723823375, "Y": -766459280806 },
-      "radius": 300000,
+      "radius": 900000,
       "colors": ["#9db8d0"],
       "belt": {
         "asteroids": [
-          { "ore": "ore-glacierite", "count": 14, "volume": 8000 }
+          { "ore": "ore-glacierite", "count": 42, "volume": 24000 }
         ]
       },
       "spawns": [

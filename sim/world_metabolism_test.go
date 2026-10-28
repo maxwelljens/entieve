@@ -9,7 +9,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// World metabolism tests: persistent belts (deplete + regrow), wreck
+// World metabolism tests: persistent belts (deplete + cycle refill), wreck
 // reprocessing, and market-funded NPC replacement (nothing spawns from
 // nowhere).
 // ---------------------------------------------------------------------------
@@ -131,11 +131,20 @@ func TestBeltDepletionPersistsAcrossSaveRestoreAndReload(t *testing.T) {
 	}
 }
 
-// TestBeltRegrowRateCapAndRecovery pins the regrowth math: +1% of the
-// definition volume per 600 ticks per rock, capped at the definition
-// volume, live rocks grow with their entity, and a depleted rock re-enters
-// the grid on the next reload at its regrown volume.
-func TestBeltRegrowRateCapAndRecovery(t *testing.T) {
+// jumpTo sets the sim clock to tick t (Sim.time is derived from ticks, so a
+// test that skips ahead must move both). The belt cycle is pure tick math, so
+// a test can jump a whole cycle instead of stepping 216,000 times.
+func jumpTo(s *Sim, t int64) {
+	s.ticks = t
+	s.time = float64(t) * DT
+}
+
+// TestBeltCycleRefillAndRecovery pins the fixed-cycle refill that replaced the
+// old +1 % trickle: nothing happens inside the 60-minute window, at the
+// boundary every rock resets to its definition volume — the live one in
+// place (same entity, the player's mining target survives) — and a destroyed
+// rock re-enters the grid with the refilled state.
+func TestBeltCycleRefillAndRecovery(t *testing.T) {
 	s := newTestSim(t)
 	const celID = content.CelID("cel-belt-a")
 	st := beltState(s, "sys-a", celID)
@@ -143,50 +152,130 @@ func TestBeltRegrowRateCapAndRecovery(t *testing.T) {
 		t.Fatalf("belt state = %+v, want 2 rocks", st)
 	}
 
-	// Rock 0: depleted off-grid (state-only). Rock 1: live but below its
-	// definition volume (entity authoritative).
+	// Rock 0: depleted off-grid (state-only). Rock 1: live but mined down.
 	s.destroy(rockByIndex(t, s, celID, 0))
 	st.Rocks[0].Remaining = 0
 	st.GrownAt = s.ticks
 	e1 := rockByIndex(t, s, celID, 1)
 	ast1, _ := s.Asteroids.Get(e1)
-	ast1.Remaining = 99.5
-	st.Rocks[1].Remaining = 99.5
+	ast1.Remaining = 40
+	st.Rocks[1].Remaining = 40
 
-	stepN(s, 600) // systems read the pre-step tick count: no window yet
+	// Inside the window nothing refills: no trickle exists any more.
+	jumpTo(s, st.GrownAt+beltCycleTicks-1)
+	stepN(s, 1)
 	if st.Rocks[0].Remaining != 0 {
-		t.Fatalf("regrew before 600 ticks: %v", st.Rocks[0].Remaining)
+		t.Fatalf("refilled inside the cycle: %v", st.Rocks[0].Remaining)
 	}
-	stepN(s, 1) // window 1 (ticks = 600): +1% of 100
-	if st.Rocks[0].Remaining != 1.0 {
-		t.Fatalf("depleted rock = %v, want 1.0 (1%% of def volume per 600 ticks)", st.Rocks[0].Remaining)
-	}
-	if ast1.Remaining != 100.0 {
-		t.Fatalf("live rock = %v, want 100.0 (capped at def volume)", ast1.Remaining)
-	}
-	if st.Rocks[1].Remaining != 100.0 {
-		t.Fatalf("live rock state = %v, want 100.0", st.Rocks[1].Remaining)
-	}
-	stepN(s, 601) // window 2 (ticks = 1200)
-	if st.Rocks[0].Remaining != 2.0 {
-		t.Fatalf("depleted rock = %v, want 2.0", st.Rocks[0].Remaining)
-	}
-	if ast1.Remaining != 100.0 {
-		t.Fatalf("capped rock grew past its definition volume: %v", ast1.Remaining)
-	}
-	stepN(s, 601) // window 3 (ticks = 1800)
-	if st.Rocks[0].Remaining != 3.0 {
-		t.Fatalf("depleted rock = %v, want 3.0", st.Rocks[0].Remaining)
+	if ast1.Remaining != 40 {
+		t.Fatalf("live rock grew inside the cycle: %v", ast1.Remaining)
 	}
 
-	// Recovery: on re-entry the depleted rock comes back at its regrown
-	// volume (3 windows × 1% of 100 m³).
-	if err := s.LoadSystem("sys-a", ""); err != nil {
-		t.Fatalf("reload: %v", err)
+	// Boundary: state AND grid reset to the definition volume.
+	stepN(s, 1)
+	if st.Rocks[0].Remaining != st.Rocks[0].Volume || st.Rocks[0].Remaining != 100 {
+		t.Fatalf("depleted rock state = %v, want the def volume 100", st.Rocks[0].Remaining)
 	}
+	if ast1.Remaining != 100 {
+		t.Fatalf("live rock = %v, want the def volume 100", ast1.Remaining)
+	}
+	if st.Rocks[1].Remaining != 100 {
+		t.Fatalf("live rock state = %v, want 100", st.Rocks[1].Remaining)
+	}
+	if got := rockByIndex(t, s, celID, 1); got != e1 {
+		t.Fatalf("live rock entity changed across the boundary: %v -> %v", e1, got)
+	}
+	if st.GrownAt != beltCycleTicks {
+		t.Fatalf("GrownAt = %d, want the boundary anchor %d", st.GrownAt, beltCycleTicks)
+	}
+
+	// The destroyed rock is back on the grid, at full volume, from the state.
 	a, _ := s.Asteroids.Get(rockByIndex(t, s, celID, 0))
-	if a.Remaining != 3.0 {
-		t.Fatalf("recovered rock = %v, want 3.0", a.Remaining)
+	if a.Remaining != 100 {
+		t.Fatalf("recovered rock = %v, want 100", a.Remaining)
+	}
+
+	// A later boundary refills again, from the new anchor.
+	jumpTo(s, beltCycleTicks+beltCycleTicks)
+	stepN(s, 1)
+	if st.GrownAt != 2*beltCycleTicks {
+		t.Fatalf("GrownAt = %d after the second boundary, want %d", st.GrownAt, 2*beltCycleTicks)
+	}
+}
+
+// TestBeltCycleRespawnsDestroyedRockAtNewScatter pins the other half of the
+// boundary rule: a rock destroyed inside the cycle comes back through
+// spawnAsteroid, so its scatter is fresh — a new entity at a new position,
+// never the old rock resurrected.
+func TestBeltCycleRespawnsDestroyedRockAtNewScatter(t *testing.T) {
+	s := newTestSim(t)
+	const celID = content.CelID("cel-belt-a")
+	st := beltState(s, "sys-a", celID)
+	st.GrownAt = s.ticks
+	rock := rockByIndex(t, s, celID, 0)
+	oldPos := mustPos(s, rock)
+	s.destroy(rock)
+	st.Rocks[0].Remaining = 0
+
+	jumpTo(s, s.ticks+beltCycleTicks)
+	stepN(s, 1)
+
+	fresh := rockByIndex(t, s, celID, 0)
+	if fresh == rock {
+		t.Fatal("destroyed rock resurrected at the same handle")
+	}
+	if p := mustPos(s, fresh); p == oldPos {
+		t.Fatalf("fresh rock at the old position %v, want a new scatter", p)
+	}
+	a, _ := s.Asteroids.Get(fresh)
+	if a.Remaining != 100 {
+		t.Fatalf("fresh rock = %v, want the def volume 100", a.Remaining)
+	}
+}
+
+// TestBeltCycleSurvivesSaveRestore pins that the cycle is pure tick-derived
+// state: twin sims crossing the boundary with the same snapshot/restore
+// round-trip stay bit-identical, and a restored save does not refill early.
+func TestBeltCycleSurvivesSaveRestore(t *testing.T) {
+	newRun := func() *Sim { return newTestSim(t) }
+	a, b := newRun(), newRun()
+	for _, s := range []*Sim{a, b} {
+		st := beltState(s, "sys-a", "cel-belt-a")
+		st.GrownAt = s.ticks
+		st.Rocks[0].Remaining = 0
+		s.destroy(rockByIndex(t, s, "cel-belt-a", 0))
+		jumpTo(s, beltCycleTicks-1)
+	}
+	stepN(a, 1)
+	stepN(b, 1)
+	if a.Hash() != b.Hash() {
+		t.Fatalf("twin hashes differ before the boundary: %x != %x", a.Hash(), b.Hash())
+	}
+
+	save, err := b.Snapshot()
+	if err != nil {
+		t.Fatalf("snapshot: %v", err)
+	}
+	c, err := New(testContent(), testWorld(), testSeed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Restore(save); err != nil {
+		t.Fatalf("restore: %v", err)
+	}
+	if c.Hash() != b.Hash() {
+		t.Fatalf("restored hash=%016x want %016x", c.Hash(), b.Hash())
+	}
+	// The restored save is inside the window: no early refill.
+	if got := beltState(c, "sys-a", "cel-belt-a").Rocks[0].Remaining; got != 0 {
+		t.Fatalf("restored belt refilled inside the cycle: %v", got)
+	}
+
+	for _, s := range []*Sim{a, b, c} {
+		stepN(s, 1) // both cross the boundary
+	}
+	if a.Hash() != b.Hash() || b.Hash() != c.Hash() {
+		t.Fatalf("boundary refill diverged: a=%016x b=%016x c=%016x", a.Hash(), b.Hash(), c.Hash())
 	}
 }
 
@@ -394,7 +483,8 @@ func oreAskContent() *content.Content {
 	return c
 }
 
-// emptyBelt drains a belt's state and freezes its regrowth (test helper).
+// emptyBelt drains a belt's state and freezes the cycle (test helper): the
+// anchor sits a million ticks ahead, so no boundary falls inside a test.
 func emptyBelt(t *testing.T, s *Sim) *BeltState {
 	t.Helper()
 	st := beltState(s, s.systemID, "cel-belt-a")
@@ -404,7 +494,7 @@ func emptyBelt(t *testing.T, s *Sim) *BeltState {
 	for i := range st.Rocks {
 		st.Rocks[i].Remaining = 0
 	}
-	st.GrownAt = s.ticks + 1_000_000 // no regrowth window during the test
+	st.GrownAt = s.ticks + 1_000_000 // no cycle boundary during the test
 	return st
 }
 
@@ -684,9 +774,9 @@ func mustNpc(t *testing.T, s *Sim, id content.NpcID) *content.NpcDef {
 // ---------------------------------------------------------------------------
 
 // TestWorldMetabolismTwinRunsIdenticalHash drives mining (state sync),
-// a real respawn requisition (ore draw + charge buy) and several regrowth
-// windows through twin sims and requires identical hashes at every
-// checkpoint — including after a snapshot/restore round-trip mid-window.
+// a real respawn requisition (ore draw + charge buy) through twin sims and
+// requires identical hashes at every checkpoint — including after a
+// snapshot/restore round-trip mid-run.
 func TestWorldMetabolismTwinRunsIdenticalHash(t *testing.T) {
 	drive := func(s *Sim, out map[int]uint64) {
 		rock := firstAsteroid(t, s)
@@ -715,8 +805,8 @@ func TestWorldMetabolismTwinRunsIdenticalHash(t *testing.T) {
 		}
 	}
 
-	// Restore both from the same snapshot and keep stepping across regrowth
-	// windows: belt state and ledger must round-trip into identical futures.
+	// Restore both from the same snapshot and keep stepping: belt state and
+	// ledger must round-trip into identical futures.
 	save, err := a.Snapshot()
 	if err != nil {
 		t.Fatal(err)

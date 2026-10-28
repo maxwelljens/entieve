@@ -282,17 +282,25 @@
   {
     "at_tick": 51310,
     "action": "transfer",
+    "item": "ammo-emp-s",
+    "qty": 1,
+    "from": "cargo",
+    "to": "hangar",
+    "note": "stash every leftover shell (the bay was dumped at 50060): the 3x belts and the belt miners shifted the fight streams, so the leftover counts were recalibrated to 1 EMP / 3 fusion / 3 plutonium / 7 AP. EMP and fusion leave together, then plutonium and AP leave on the same tick, so the idle gun never sees a single type it would auto-load — and with no matching round in cargo the fight-3 cycle is truly dry"
+  },
+  {
+    "at_tick": 51310,
+    "action": "transfer",
     "item": "ammo-fusion-s",
     "qty": 3,
     "from": "cargo",
-    "to": "hangar",
-    "note": "stash every leftover shell (the bay was dumped at 50060); the last two types leave on the same tick so the idle gun never sees a single type it would auto-load, and with no matching round in cargo the fight-3 cycle is truly dry"
+    "to": "hangar"
   },
   {
     "at_tick": 51320,
     "action": "transfer",
     "item": "ammo-plutonium-s",
-    "qty": 4,
+    "qty": 3,
     "from": "cargo",
     "to": "hangar"
   },
@@ -300,7 +308,7 @@
     "at_tick": 51320,
     "action": "transfer",
     "item": "ammo-ap-s",
-    "qty": 11,
+    "qty": 7,
     "from": "cargo",
     "to": "hangar"
   },

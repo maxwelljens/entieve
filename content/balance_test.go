@@ -184,6 +184,7 @@ var hullReferencePrices = map[ShipID]float64{
 	"ship-npc-patrol":   400000,
 	"ship-rat-marauder": 520000,
 	"ship-npc-hauler":   600000,
+	"ship-npc-miner":    380000,
 	"ship-rat-hierarch": 900000,
 }
 
@@ -289,7 +290,7 @@ func TestHullRecipesCostMoreThanModules(t *testing.T) {
 func TestHullRecipeMaterialLadder(t *testing.T) {
 	c := MustLoad()
 	ladder := []ShipID{
-		"ship-rat-scuttler", "ship-sloop", "ship-npc-patrol", "ship-cutlass",
+		"ship-rat-scuttler", "ship-sloop", "ship-npc-miner", "ship-npc-patrol", "ship-cutlass",
 		"ship-rat-marauder", "ship-npc-hauler", "ship-hauler", "ship-barge",
 		"ship-rat-hierarch",
 	}

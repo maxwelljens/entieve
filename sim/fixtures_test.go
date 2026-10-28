@@ -151,6 +151,11 @@ func testContent() *content.Content {
 	}
 
 	npcs := map[content.NpcID]*content.NpcDef{
+		"npc-miner-test": {
+			ID: "npc-miner-test", Name: "Fixture Miner", Faction: "Test Co-op",
+			Ship: "ship-barge", Fit: []content.ModuleID{"mod-mining-laser"},
+			AggroRange: 0, OrbitRange: 1500, FleeThreshold: 0,
+		},
 		"npc-rat-scuttler": {
 			ID: "npc-rat-scuttler", Name: "Rat Scuttler", Faction: "Mire Corsairs",
 			Ship:          "ship-rat",

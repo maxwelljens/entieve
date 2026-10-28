@@ -373,7 +373,7 @@ func TestAgentMinerDepletesBeltAndSells(t *testing.T) {
 			p, ask.Price, s.marketBasePrice("ore-sterngrit"))
 	}
 	// The belt keeps depleting across acts (stock effect), even with
-	// regrowth windows in play.
+	// cycle boundary in play.
 	stepAgentActs(s, "ag-mine", 3)
 	if v := s.BeltOreVolume("sys-a"); v >= after {
 		t.Fatalf("belt volume %v after three more passes, want < %v", v, after)
@@ -385,7 +385,7 @@ func TestAgentMinerDepletesBeltAndSells(t *testing.T) {
 // dry-belt rule) — here nothing is left to buy, so the bid rests.
 func TestAgentMinerDryBeltBids(t *testing.T) {
 	s := newTestSim(t)
-	emptyBelt(t, s) // drained + regrowth frozen
+	emptyBelt(t, s) // drained + cycle frozen
 	addTestAgent(s, "ag-dry", RoleMiner, "cel-station-a", 100_000)
 	a := agentOf(s, "ag-dry")
 

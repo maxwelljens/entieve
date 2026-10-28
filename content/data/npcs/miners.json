@@ -1,0 +1,15 @@
+[
+  {
+    "id": "npc-miner-barge",
+    "name": "Kutřek",
+    "description": "A Dvužek cooperative barge working a claim: it cuts a rock, fills its hold, and runs the load to the nearest market. It carries no guns and takes no notice of who is flying past it.",
+    "faction": "Dvužek",
+    "ship": "ship-npc-miner",
+    "fit": ["mod-mining-laser"],
+    "aggro_range": 0,
+    "orbit_range": 2000,
+    "flee_threshold": 0,
+    "bounty": 0,
+    "loot": []
+  }
+]

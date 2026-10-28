@@ -225,7 +225,7 @@ func (s *Sim) spawnCelestial(cel *content.CelestialDef, pending map[string]int) 
 	}
 	if cel.Belt != nil {
 		// Rocks come from the persistent belt state: seeded from the def on
-		// first generation, afterwards the saved (depleted/regrown) volumes.
+		// first generation, afterwards the saved (depleted/refilled) volumes.
 		st := s.ensureBeltState(cel)
 		for i, rock := range st.Rocks {
 			s.spawnAsteroid(cel, rock, i)
@@ -276,7 +276,7 @@ func (s *Sim) ensureBeltState(cel *content.CelestialDef) *BeltState {
 
 // ensureBeltStateAt is ensureBeltState for an arbitrary system: the ledger
 // agents' miner leaning seeds belt state for systems the player has never
-// visited, so extraction there depletes (and regrows) persistent state
+// visited, so extraction there depletes (and refills) persistent state
 // exactly like the loaded grid's.
 func (s *Sim) ensureBeltStateAt(sys content.SystemID, cel *content.CelestialDef) *BeltState {
 	if s.belts == nil {
@@ -310,7 +310,7 @@ func (s *Sim) spawnAsteroid(cel *content.CelestialDef, rock BeltRock, index int)
 	angle := s.RNG.Range(0, 2*math.Pi)
 	r := s.RNG.Range(0, spread)
 	if rock.Remaining <= beltDepletedEpsilon {
-		return // depleted: state-only until regrowth brings it back
+		return // depleted: state-only until the cycle brings it back
 	}
 	pos := cel.Position.Add(core.Vec2{X: math.Cos(angle) * r, Y: math.Sin(angle) * r})
 

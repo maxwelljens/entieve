@@ -15,6 +15,7 @@ var marketGroups = map[string]string{
 	"ship-cutlass":      "Ships/Destroyers",
 	"ship-hauler":       "Ships/Industrials",
 	"ship-npc-hauler":   "Ships/Industrials",
+	"ship-npc-miner":    "Ships/Industrials",
 	"ship-npc-patrol":   "Ships/Frigates",
 	"ship-rat-hierarch": "Ships/Rat hulls",
 	"ship-rat-marauder": "Ships/Rat hulls",

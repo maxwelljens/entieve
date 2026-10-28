@@ -2,6 +2,7 @@ package sim
 
 import (
 	"math"
+	"sort"
 	"strings"
 
 	"github.com/entieve/entieve/content"
@@ -85,6 +86,11 @@ const npcPatrolMaxRadius = 2500
 // passive. The threat triggers exist so pirate rats are not passive, and
 // apply to every non-guard NPC exactly as before.
 //
+// Civilian miners are the second exception (npc-miner-*, NpcDef.IsMiner):
+// they never enter this machine at all — npcMiner runs their extraction loop
+// and they stay passive through it (no trigger, no flee). Their own def is
+// what makes them passive; nothing here is weakened for rats.
+//
 // The pursuit leash is leash = npcLeashFactor * effAggro measured from the
 // NPC's Home: an engaged NPC chases/engages while the player stays inside
 // it and breaks off to return when it is crossed; a returning NPC only
@@ -135,6 +141,13 @@ func (s *Sim) systemNpc() {
 		}
 		def, hasDef := s.Content.Npc(ai.Npc)
 		if !hasDef {
+			continue
+		}
+		// Civilian miners run their own extraction loop and never enter the
+		// threat machine below: passive by definition, never aggroed by the
+		// player and never fleeing.
+		if def.IsMiner() {
+			s.npcMiner(e, ai, tr, def)
 			continue
 		}
 
@@ -339,6 +352,194 @@ func (s *Sim) npcPatrol(e ecs.Entity, ai *NpcAI, tr *Transform, def *content.Npc
 	s.Intents.Set(e, Intent{Kind: IntentManual, Dir: dir.Norm(), SpeedFrac: npcPatrolSpeedFrac})
 }
 
+// npcMinerWarpRange is the distance (m) past which a miner warps to its
+// work: frontier belts scatter wider than the sensor grid, and sublight
+// would never cross them.
+const npcMinerWarpRange = 100_000
+
+// npcMiner runs the civilian extraction loop of npc-miner-* (NpcDef.IsMiner):
+//
+//	mine — cut the nearest rock with volume left, moving on when it
+//	       depletes; when the hold is full switch to haul
+//	haul — warp to the NEAREST STATION of the same system, and on arrival
+//	       post the hold's ore on that station's market as system supply,
+//	       then despawn (recordRespawn re-arms the spawn group's timer)
+//
+// The player is never a target and never an aggro trigger: miners skip the
+// player-centric threat machine entirely (no lock, no flee). They are
+// otherwise normal ships — lockable, damageable, and death runs the ordinary
+// wreck path.
+func (s *Sim) npcMiner(e ecs.Entity, ai *NpcAI, tr *Transform, def *content.NpcDef) {
+	switch ai.State {
+	case NpcHaul:
+		s.minerHaul(e, ai, tr)
+	default:
+		ai.State = NpcMine
+		s.minerMine(e, ai, tr, def)
+	}
+}
+
+// minerMine cuts the nearest rock with volume left. The mining laser needs no
+// lock (targetRock, see checkCycle): the miner binds it straight to the rock.
+func (s *Sim) minerMine(e ecs.Entity, ai *NpcAI, tr *Transform, def *content.NpcDef) {
+	if s.minerHoldFull(e) {
+		st := s.nearestStation(tr.Pos)
+		if st.IsZero() {
+			return // no market in this system: the hold stays put
+		}
+		ai.State = NpcHaul
+		ai.Target = st
+		s.stopAllModules(e) // nothing cycles while the hold is full
+		return
+	}
+	rock := s.nearestBeltRock(tr.Pos)
+	if rock.IsZero() {
+		s.npcPatrol(e, ai, tr, def) // empty belt: keep drifting, no RNG
+		return
+	}
+	ai.Target = rock
+	rp, ok := s.posOf(rock)
+	if !ok {
+		return
+	}
+	dist := tr.Pos.Dist(rp)
+	if dist > npcMinerWarpRange {
+		if !s.Warps.Has(e) {
+			s.warpToPoint(e, rp)
+		}
+		return
+	}
+	if dist > def.OrbitRange {
+		s.Intents.Set(e, Intent{Kind: IntentApproach, Target: rock})
+		return
+	}
+	s.Intents.Set(e, Intent{Kind: IntentStop})
+	s.npcActivate(e, ai, rock)
+}
+
+// minerHaul carries a full hold to the station picked when the hold filled.
+func (s *Sim) minerHaul(e ecs.Entity, ai *NpcAI, tr *Transform) {
+	sp, ok := s.posOf(ai.Target)
+	if ai.Target.IsZero() || !ok {
+		ai.State = NpcMine
+		ai.Target = 0
+		return
+	}
+	if tr.Pos.Dist(sp) > warpLandRange {
+		if !s.Warps.Has(e) {
+			s.warpToPoint(e, sp)
+		}
+		return
+	}
+	if !s.minerDeliver(e, ai.Target) {
+		ai.State = NpcMine // an unsellable load stays aboard: back to cutting
+		return
+	}
+	s.recordRespawn(e, ai)
+	s.destroy(e)
+}
+
+// minerDeliver posts a miner's whole ore hold on the station's book as
+// system-owned asks, one tick under the station's own best ask — the convoy
+// delivery rule (see the traffic delivery in system_traffic.go), which is
+// also why a delivery mints no money: settle() only moves currency for
+// player-owned orders, so the system-side ask simply adds supply at a real
+// price. Deterministic: items are posted in sorted order, one order each.
+// Reports whether the hold came out empty (an ore with no tradable price
+// stays aboard, so nothing is destroyed by a bad quote).
+func (s *Sim) minerDeliver(e ecs.Entity, station ecs.Entity) bool {
+	c, ok := s.Cargos.Get(e)
+	cel, celOK := s.Celestials.Get(station)
+	if !ok || !celOK || len(c.Ore) == 0 {
+		return true
+	}
+	items := make([]content.ItemID, 0, len(c.Ore))
+	for _, st := range c.Ore {
+		items = append(items, st.Item)
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i] < items[j] })
+	book := s.market[cel.Cel]
+	var left []content.CargoStack // stacks with no tradable price stay aboard
+	for _, item := range items {
+		qty := stacksCount(c.Ore, item)
+		price := s.marketBasePrice(item)
+		if book != nil {
+			if ask, ok := book.bestAsk(item); ok && ask.Price < price {
+				price = ask.Price
+			}
+		}
+		post := tickDown(price)
+		if qty <= 0 || post <= 0 {
+			left = addStacks(left, item, qty) // never lose a unit to a bad price
+			continue
+		}
+		s.PlaceOrder(cel.Cel, OrderSell, item, qty, post, OwnerSystem)
+		s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: e, System: s.systemID, Item: item,
+			Value: float64(qty),
+			Text: s.nameOf(e) + " delivered " + formatM3(s.itemVolume(item)*float64(qty)) +
+				" m³ " + s.itemName(item) + " to " + s.nameOf(station)})
+	}
+	c.Ore = left
+	s.Cargos.Set(e, *c)
+	return len(left) == 0
+}
+
+// minerHoldFull reports whether a miner's ore container has less than one m³
+// left.
+// shortcut: full = under one m³ free (every shipped ore is 1 m³ per unit);
+// split the check per ore if sub-m³ ores ever ship.
+func (s *Sim) minerHoldFull(e ecs.Entity) bool {
+	c, ok := s.Cargos.Get(e)
+	if !ok {
+		return true
+	}
+	container, capM3 := oreContainer(c)
+	return capM3 <= 0 || capM3-s.stacksVolume(*container) < 1
+}
+
+// nearestBeltRock returns the nearest live asteroid with volume left (zero
+// when the grid holds none) — a miner's next cut. Canonical handle order and
+// a strict comparison make ties deterministic.
+func (s *Sim) nearestBeltRock(pos core.Vec2) ecs.Entity {
+	var best ecs.Entity
+	bestD := math.MaxFloat64
+	for _, e := range sortedEntities(s.Asteroids) {
+		a, ok := s.Asteroids.Get(e)
+		if !ok || a.Remaining <= beltDepletedEpsilon {
+			continue
+		}
+		p, ok := s.posOf(e)
+		if !ok {
+			continue
+		}
+		if d := pos.Dist(p); d < bestD {
+			bestD, best = d, e
+		}
+	}
+	return best
+}
+
+// nearestStation returns the nearest station celestial on the grid (zero when
+// the system has none).
+func (s *Sim) nearestStation(pos core.Vec2) ecs.Entity {
+	var best ecs.Entity
+	bestD := math.MaxFloat64
+	for _, e := range sortedEntities(s.Celestials) {
+		c, ok := s.Celestials.Get(e)
+		if !ok || c.Kind != content.CelStation {
+			continue
+		}
+		p, ok := s.posOf(e)
+		if !ok {
+			continue
+		}
+		if d := pos.Dist(p); d < bestD {
+			bestD, best = d, e
+		}
+	}
+	return best
+}
+
 // ratTargetAt returns the rat (npc-rat-*) anchored at home the security
 // forces should engage next, in canonical handle order — the target a
 // high-sec guard clears, and the belt occupancy a patrol sweep looks for.
@@ -498,7 +699,8 @@ func (s *Sim) npcEnsureLock(e, target ecs.Entity) {
 
 // npcActivate runs the NPC's per-tick module activation policy against an
 // explicit target: weapons and ewar once the target is locked and in range,
-// tank when damaged, cap booster when low, afterburner while fleeing.
+// mining lasers on a rock (no lock needed), tank when damaged, cap booster
+// when low, afterburner while fleeing.
 // Failures are silent (quiet). systemNpc passes the player; the traffic
 // system passes the ambushed hauler or an attacking patrol, which is what
 // makes NPC-vs-NPC combat run through the normal lock/activate/turret/
@@ -527,6 +729,8 @@ func (s *Sim) npcActivate(e ecs.Entity, ai *NpcAI, target ecs.Entity) {
 			slot := SlotRef{Class: class, Index: i}
 			switch def.Kind {
 			case content.KindWeapon:
+				s.activate(e, slot, target, true)
+			case content.KindMiningLaser:
 				s.activate(e, slot, target, true)
 			case content.KindStasisWeb, content.KindWarpScram:
 				s.activate(e, slot, target, true)
