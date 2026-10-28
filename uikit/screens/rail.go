@@ -69,10 +69,11 @@ const (
 // RailEntry is one window the rail offers. The host fills it from its
 // window table; the rail owns rendering, context gating and emission.
 //
-//	Icon, Title, Key, Desc  identity exactly as the host's table
-//	                        declares it — Key the display key, Desc the
-//	                        "I — toggle inventory" tooltip hint ("" =
-//	                        unkeyed)
+//	Icon, Title             identity exactly as the host's table declares it
+//	Hint                    the tooltip's hotkey line ("I — toggle
+//	                        inventory"), read LIVE when the tip is shown so
+//	                        a rebind shows without a rebuild (nil or "" =
+//	                        no hint: an unkeyed window)
 //	Group                   section name; a hairline separates group
 //	                        changes as the entries run down
 //	SpaceOnly/DockedOnly    context gating: unavailable while docked /
@@ -85,8 +86,7 @@ const (
 type RailEntry struct {
 	Icon  string
 	Title string
-	Key   string
-	Desc  string
+	Hint  func() string
 
 	Group      string
 	SpaceOnly  bool
@@ -94,6 +94,14 @@ type RailEntry struct {
 	Service    string
 
 	Open func() bool
+}
+
+// hint is the entry's live tooltip line ("" when the host gave none).
+func (e RailEntry) hint() string {
+	if e.Hint == nil {
+		return ""
+	}
+	return e.Hint()
 }
 
 // Rail is the left icon rail: Theme + ContentView + ActionSink, like
@@ -517,21 +525,24 @@ func entryEnabled(e RailEntry, docked bool, services []string) bool {
 }
 
 // entryTipKey is the tooltip change key: the model depends on the title,
-// the hint and whether the entry is available here — never on the glow.
+// the live hint and whether the entry is available here — never on the
+// glow. The hint is in it or an open tip would keep the chord it was
+// built with across a rebind.
 func entryTipKey(e RailEntry, enabled bool) string {
-	return e.Title + "|" + e.Desc + "|" + strconv.FormatBool(enabled)
+	return e.Title + "|" + e.hint() + "|" + strconv.FormatBool(enabled)
 }
 
-// entryTip is the rail tooltip: icon + title + the hotkey hint (the
-// host's Desc, which reads "I — toggle inventory"), plus the grayed
-// explanation when the entry is unavailable in this context.
+// entryTip is the rail tooltip: icon + title + the live hotkey hint (the
+// host's Hint, "I — toggle inventory"), plus the grayed explanation when
+// the entry is unavailable in this context.
 func entryTip(e RailEntry, enabled bool) widgets.TooltipModel {
 	m := widgets.TooltipModel{Icon: e.Icon, Title: e.Title}
+	hint := e.hint()
 	switch {
 	case !enabled:
 		m.Hints = []string{"Unavailable here"}
-	case e.Desc != "":
-		m.Hints = []string{e.Desc}
+	case hint != "":
+		m.Hints = []string{hint}
 	}
 	return m
 }

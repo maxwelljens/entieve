@@ -72,6 +72,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Key hints follow a rebind everywhere** (`game`, `uikit/screens`): the
+  chord is no longer baked into the text each surface prints. The Screen
+  spec's `Desc` and the world binding table hold the description only
+  ("toggle inventory"), and `keyMapRow` composes `game.KeyMap`'s
+  "chord — description" rows with one `chordOf` formatter ("Ctrl+S",
+  "Shift+L", "Esc", "F1", "["), so the existing help overlay, keybindings
+  chips and rail tooltips render byte-identical defaults. A new
+  `game/keyhints.go` answers `Chord` / `Desc` / `Hint` from the live binding
+  table (the fixed chord layer from its own literals, never from a bind),
+  and the rail tooltip and the settings footer read it through two new
+  seams (`RailEntry.Hint`, `SettingsActions.CloseHint`): rebinding a screen
+  key now moves the help row, the rail tooltip, the keybindings chip and the
+  settings window's "… closes" line in the same frame — previously the last
+  two kept the chord the window was built with. An action left unbound (its
+  key stolen by replace policy, or cleared with Backspace) shows `—` in the
+  chip and "· unbound" in the rail tip, and the settings footer drops its
+  close clause instead of printing a dash. `screenSpecErrors` now rejects a
+  `Desc` that carries a chord, so a baked key cannot come back
+  (`TestRebindRefreshesEveryHint` pins all four surfaces).
+
 - **One dialog lifecycle for the on-demand windows** (`uikit/screens`): Show
   Info, the order mini-window and the quantity picker now share one
   Kit-internal `dialog` (`kitdialog.go`) instead of three copies of the

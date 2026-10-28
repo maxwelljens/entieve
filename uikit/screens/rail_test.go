@@ -21,10 +21,10 @@ import (
 // Trade (station-dependent), World (space-only).
 func railEntries3(open *bool) []RailEntry {
 	return []RailEntry{
-		{Icon: "kind_ship", Title: "Overview", Key: "", Desc: "", Group: "Ship", Open: func() bool { return *open }},
-		{Icon: "svc_fitting", Title: "Fitting", Key: "F", Desc: "F — toggle fitting", Group: "Ship"},
-		{Icon: "svc_market", Title: "Market", Key: "G", Desc: "G — toggle market", Group: "Trade", Service: "market"},
-		{Icon: "svc_scanner", Title: "Scanner", Key: "C", Desc: "C — toggle scanner", Group: "World", SpaceOnly: true},
+		{Icon: "kind_ship", Title: "Overview", Group: "Ship", Open: func() bool { return *open }},
+		{Icon: "svc_fitting", Title: "Fitting", Hint: func() string { return "F — toggle fitting" }, Group: "Ship"},
+		{Icon: "svc_market", Title: "Market", Hint: func() string { return "G — toggle market" }, Group: "Trade", Service: "market"},
+		{Icon: "svc_scanner", Title: "Scanner", Hint: func() string { return "C — toggle scanner" }, Group: "World", SpaceOnly: true},
 	}
 }
 
@@ -388,17 +388,32 @@ func TestRailGatingAndToggle(t *testing.T) {
 	}
 }
 
-// TestRailTooltips: the hover model is icon + title + the host's hint,
-// swapped for the "unavailable" line when the entry is grayed here.
+// TestRailTooltips: the hover model is icon + title + the host's live hint,
+// swapped for the "unavailable" line when the entry is grayed here, and the
+// tooltip's change key follows the hint — an open tip must not keep the
+// chord it was built with across a rebind.
 func TestRailTooltips(t *testing.T) {
-	e := RailEntry{Icon: "svc_market", Title: "Market", Desc: "G — toggle market"}
+	hint := "G — toggle market"
+	e := RailEntry{Icon: "svc_market", Title: "Market", Hint: func() string { return hint }}
 	m := entryTip(e, true)
-	if m.Icon != "svc_market" || m.Title != "Market" || len(m.Hints) != 1 || m.Hints[0] != e.Desc {
-		t.Errorf("tip = %+v, want the icon, title and %q", m, e.Desc)
+	if m.Icon != "svc_market" || m.Title != "Market" || len(m.Hints) != 1 || m.Hints[0] != hint {
+		t.Errorf("tip = %+v, want the icon, title and %q", m, hint)
+	}
+	key := entryTipKey(e, true)
+	hint = "U — toggle market"
+	if entryTipKey(e, true) == key {
+		t.Error("the tooltip change key ignores the hint (an open tip keeps a stale chord)")
+	}
+	if m = entryTip(e, true); len(m.Hints) != 1 || m.Hints[0] != hint {
+		t.Errorf("rebuilt tip = %+v, want the live %q", m, hint)
 	}
 	m = entryTip(e, false)
 	if len(m.Hints) != 1 || m.Hints[0] != "Unavailable here" {
 		t.Errorf("grayed tip = %+v, want the unavailable line", m)
+	}
+	// An entry the host gave no hint for draws none.
+	if m = entryTip(RailEntry{Title: "Overview"}, true); len(m.Hints) != 0 {
+		t.Errorf("hintless tip = %+v, want no hint line", m)
 	}
 }
 

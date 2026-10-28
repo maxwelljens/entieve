@@ -26,7 +26,8 @@ var railGroups = [...]string{"Ship", "Trade", "Industry", "Station", "World", "H
 //
 // The Open closures read the live state: the panel flags for spec rows
 // (the modal scenes drive the same flags), the kit's own close state for
-// the core windows.
+// the core windows. The Hint closures read the live binding table the same
+// way (game/keyhints.go).
 func railEntries(g *Game) []uikit.RailEntry {
 	core := []uikit.RailEntry{
 		{
@@ -53,8 +54,9 @@ func railEntries(g *Game) []uikit.RailEntry {
 			entries = append(entries, uikit.RailEntry{
 				Icon:  row.Icon,
 				Title: row.Title,
-				Key:   keyLabel(row),
-				Desc:  row.Desc,
+				// Live, local: the tooltip asks the binding table when it
+				// is shown, so a rebind needs no invalidation here.
+				Hint: func() string { return g.hints.Hint(row.Action) },
 
 				Group:      row.Group,
 				SpaceOnly:  row.SpaceOnly,
@@ -66,14 +68,4 @@ func railEntries(g *Game) []uikit.RailEntry {
 		}
 	}
 	return entries
-}
-
-// keyLabel is a row's display key for the rail tooltip ("" = unkeyed;
-// the tooltip's hint line is the row's Desc, which already reads
-// "Shift+L — toggle log window").
-func keyLabel(s Screen) string {
-	if s.Key == keyNone {
-		return ""
-	}
-	return s.Key.String()
 }
