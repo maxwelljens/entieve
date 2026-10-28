@@ -119,6 +119,12 @@ func (s *Sim) stationAccess(svc string) (ecs.Entity, bool) {
 		s.log(SevWarning, s.player, "This station does not offer "+svc)
 		return 0, false
 	}
+	// A remnant still runs market, repair and refinery; its charter services
+	// (industry, fitting) are dark until the system is reclaimed.
+	if !s.stationOffers(s.dockedStationID(), svc) {
+		s.log(SevWarning, s.player, "This station is a remnant — no "+svc+" here")
+		return 0, false
+	}
 	return st, true
 }
 
@@ -229,6 +235,11 @@ func (s *Sim) settle(book *MarketBook, ms []match) (int, float64) {
 	// Last traded unit: price-time priority's final (worst) fill.
 	book.Lasts[ms[0].order.Item] = ms[len(ms)-1].order.Price
 	for _, m := range ms {
+		// A war bid pays for what it takes: the treasury funds the fill (the
+		// war mints nothing) and the value feeds the nearest front.
+		if m.order.Owner == OwnerWar {
+			s.warFill(m.order.Station, m.order.Price*float64(m.qty))
+		}
 		if m.order.Owner != OwnerPlayer {
 			continue
 		}
@@ -242,6 +253,7 @@ func (s *Sim) settle(book *MarketBook, ms []match) (int, float64) {
 		}
 		v := m.order.Price * float64(m.qty)
 		tax := MarketSalesTax * v
+		s.routeFee(tax)
 		received := v - tax
 		s.wallet += received
 		s.recordLedger(LedgerEntry{
@@ -370,6 +382,7 @@ func (s *Sim) execBuy(c CmdBuy) {
 	}
 	before := s.marketPrice(book, c.Item)
 	s.wallet -= cost + fee
+	s.routeFee(fee)
 	s.recordLedger(LedgerEntry{
 		What:   "Market buy — " + itoaN(qty) + " x " + s.itemName(c.Item),
 		Where:  s.stationName(station),
@@ -427,6 +440,20 @@ func (s *Sim) execSell(c CmdSell) {
 	// plus the sales tax on execution (both come out of the proceeds).
 	fee := MarketBrokerFee * proceeds
 	tax := MarketSalesTax * proceeds
+	s.routeFee(fee + tax)
+	// Selling into a standing war bid is the player's own delivery to the
+	// front: the treasury paid, the goods are consumed, the meter will move.
+	if s.war != nil {
+		for _, m := range ms {
+			if m.order.Owner != OwnerWar {
+				continue
+			}
+			s.emit(Event{Kind: EvWar, Phase: WarSupply, Severity: SevGood, Actor: s.player,
+				Item: m.order.Item, System: s.systemID,
+				Value: m.order.Price * float64(m.qty),
+				Text:  "The war takes " + itoaN(m.qty) + " x " + s.itemName(m.order.Item)})
+		}
+	}
 	received := proceeds - tax - fee
 	s.wallet += received
 	s.recordLedger(LedgerEntry{
@@ -597,6 +624,7 @@ func (s *Sim) PlaceOrder(station StationID, side OrderSide, item content.ItemID,
 				return OrderResult{}, false
 			}
 			s.wallet -= escrow + fee
+			s.routeFee(fee)
 			res.Fee = fee
 			// Escrow covered every fill (at or below the limit) and the
 			// resting remainder: only the price improvement is surplus.
@@ -624,6 +652,7 @@ func (s *Sim) PlaceOrder(station StationID, side OrderSide, item content.ItemID,
 			// Broker fee rides on the placed value (EVE charges it at
 			// placement, both sides, and keeps it on cancel).
 			s.wallet -= fee
+			s.routeFee(fee)
 			res.Fee = fee
 		}
 	}
@@ -644,6 +673,7 @@ func (s *Sim) PlaceOrder(station StationID, side OrderSide, item content.ItemID,
 				received := value - tax
 				s.wallet += received
 				fillTax, fillNet = tax, received
+				s.routeFee(tax)
 				s.emit(Event{Kind: EvMarket, Severity: SevGood, Actor: s.player, Item: item,
 					Text: "Sold " + itoaN(qtyFilled) + " x " + s.itemName(item) + " for " +
 						euro(received) + " (" + euro(tax) + " sales tax)",

@@ -499,8 +499,9 @@ func upkeepContent() *content.Content {
 	return c
 }
 
-// moneySupply sums every ledger the sim calls money: the player wallet,
-// all agent capital, the station upkeep ledgers and the faction ledger.
+// moneySupply sums every ledger the sim calls money: the player wallet, all
+// agent capital, the station upkeep ledgers, the faction ledgers and the war
+// treasury.
 func moneySupply(s *Sim) float64 {
 	total := s.wallet
 	for i := range s.agents {
@@ -512,6 +513,7 @@ func moneySupply(s *Sim) float64 {
 	for _, v := range s.factionLedger {
 		total += v
 	}
+	total += s.WarTreasury()
 	return total
 }
 

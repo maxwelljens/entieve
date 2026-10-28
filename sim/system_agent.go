@@ -86,6 +86,7 @@ func (s *Sim) agentSettleFill(a *Agent, o AgentOrder, qty int) {
 		addInv(a, o.Item, qty)
 	case OrderSell:
 		a.Capital += o.Price * float64(qty) * (1 - MarketSalesTax)
+		s.routeFee(MarketSalesTax * o.Price * float64(qty))
 		takeInv(a, o.Item, qty)
 	}
 }

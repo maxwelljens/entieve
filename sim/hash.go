@@ -37,7 +37,8 @@ func (hh *hasher) bytes(bs []byte) {
 // free-slot mirror, the respawn anchor, active module target bindings, the
 // manufacturing jobs, the per-station craft counters, the ledger agents
 // (roster, capital, inventory, beliefs, margins and haul wishes) and the
-// per-station upkeep ledgers.
+// per-station upkeep ledgers, and the war (control, the front's meters and the
+// bloc treasury).
 // Pending events and queued commands are intentionally excluded (Save does
 // not carry them).
 //

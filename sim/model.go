@@ -211,6 +211,10 @@ type NpcAI struct {
 	// never a same-faction ally). Persisted with the rest of the NPC state
 	// (SavedNpcAI).
 	LastHitBy ecs.Entity
+	// Faction overrides the NPC def's faction for this hull ("" = the def's
+	// own colours): the Corporate Fleets fly machine hulls content has not
+	// named yet, so the fleet's colours ride the entity.
+	Faction string
 }
 
 // Asteroid is a minable rock.
@@ -659,6 +663,9 @@ const (
 	EvAnomalyCleared EventKind = "anomaly_cleared"
 	EvMission        EventKind = "mission"
 	EvTraffic        EventKind = "traffic"
+	// EvWar is war news (see the EvWar phases below): flips, front movement,
+	// fleet skirmishes and the player's own kills/deliveries at the front.
+	EvWar EventKind = "war"
 )
 
 // EvTraffic phases: "departed" | "jumped" | "delivered" | "attacked" |
@@ -691,6 +698,17 @@ const (
 	MissionCompleted = "completed"
 	MissionAbandoned = "abandoned"
 	MissionRefused   = "refused"
+)
+
+// EvWar phases: "flip" (always) | "contest" (a meter moved newsThreshold) |
+// "supply" (the player delivered to the war) | "kill" (a player kill fed a
+// front) | "skirmish" (a Corporate Fleets action witnessed on the grid).
+const (
+	WarFlip     = "flip"
+	WarContest  = "contest"
+	WarSupply   = "supply"
+	WarKill     = "kill"
+	WarSkirmish = "skirmish"
 )
 
 // Severity classifies log importance for the UI.
@@ -807,6 +825,9 @@ const (
 const (
 	OwnerPlayer = "player"
 	OwnerSystem = "system"
+	// OwnerWar is a war bid: the Corporate Fleets' standing demand, funded
+	// from the war treasury (a fill debits it — the war mints nothing).
+	OwnerWar = "war"
 )
 
 // MarketStock is one resting order on a station's book. Qty keeps its old
@@ -1019,6 +1040,9 @@ type SavedNpcAI struct {
 	// LastHitBy is NpcAI.LastHitBy as a handle (omitempty: a never-hit NPC
 	// serializes exactly as before the field existed).
 	LastHitBy uint64 `json:"last_hit_by,omitempty"`
+	// Faction is NpcAI.Faction (omitempty: an ordinary NPC keeps its def's
+	// colours and serializes exactly as before the field existed).
+	Faction string `json:"faction,omitempty"`
 }
 
 // SavedModTarget is an active-module target binding.
@@ -1163,4 +1187,12 @@ type Save struct {
 	// movements, oldest first (see ledger.go) — empty and omitted on saves
 	// written before the field existed.
 	Ledger []LedgerEntry `json:"ledger,omitempty"`
+
+	// ---- the war (the Long Attrition) ----
+	// War is the war's persistent state: control per system, the front's
+	// contest meters and the Corporate Fleets' bloc treasury. Nil in a world
+	// that carries no war (the showcase tour and test fixtures), so those
+	// economies cannot drift; a save written before the war existed restores
+	// into the tick-0 map derived from authored security.
+	War *WarState `json:"war,omitempty"`
 }

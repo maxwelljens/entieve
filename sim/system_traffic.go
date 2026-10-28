@@ -292,7 +292,7 @@ func (s *Sim) systemTraffic() {
 	if t, ok := s.Content.TrafficFor(sys.ID); ok {
 		td = t
 	}
-	sec := sys.Security
+	sec := s.EffectiveSecurity(sys.ID)
 	if td != nil {
 		s.trafficSpawnHaulers(sys, td, sec)
 		s.trafficSpawnPatrol(sys, td, sec)

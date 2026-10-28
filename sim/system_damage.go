@@ -152,6 +152,9 @@ func (s *Sim) handleDeath(e, src ecs.Entity) {
 	var def *content.NpcDef
 	if hasAI {
 		def, _ = s.Content.Npc(ai.Npc)
+		// The war watches its own: a Works hull killed at a front is charter
+		// attrition, a Corporate Fleets action is front news.
+		s.warObserveKill(e, src, def)
 	}
 
 	// Loot roll from the dying NPC's own RNG stream.
@@ -343,7 +346,7 @@ func (s *Sim) checkAnomalyCleared(ai *NpcAI) {
 // is not a cleared belt.
 func (s *Sim) checkBeltCleared(ai *NpcAI) {
 	sys := s.System()
-	if sys == nil || sys.Security != "high" {
+	if sys == nil || s.EffectiveSecurity(sys.ID) != "high" {
 		return
 	}
 	if def, ok := s.Content.Npc(ai.Npc); !ok || !isRatNpc(def) {

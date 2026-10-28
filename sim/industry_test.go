@@ -708,10 +708,10 @@ func TestIndustryNoRNGDraws(t *testing.T) {
 	}
 }
 
-// TestIndustrySystemOrderPinned: industry runs as system 17 and the
-// ledger agents as system 18, appended at the END of Step — the
-// documented system order is a contract, so the sequence itself is what
-// this test reads out of api.go.
+// TestIndustrySystemOrderPinned: industry runs as system 17, the ledger
+// agents as system 18 and the war as system 19, appended at the END of
+// Step — the documented system order is a contract, so the sequence itself is
+// what this test reads out of api.go.
 func TestIndustrySystemOrderPinned(t *testing.T) {
 	src, err := os.ReadFile("api.go")
 	if err != nil {
@@ -727,7 +727,7 @@ func TestIndustrySystemOrderPinned(t *testing.T) {
 		"systemWeapons", "systemDamage", "systemCap", "systemMining",
 		"systemNpc", "systemLoot", "systemEconomy", "systemTravel",
 		"systemMission", "systemRespawn", "systemTraffic", "systemIndustry",
-		"systemAgent",
+		"systemAgent", "systemWar",
 	}
 	if strings.Join(order, ",") != strings.Join(want, ",") {
 		t.Fatalf("system order = %v, want %v", order, want)
