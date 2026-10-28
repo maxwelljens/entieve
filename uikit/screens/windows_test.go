@@ -575,6 +575,7 @@ func TestSettingsPanelWiring(t *testing.T) {
 		persists  int
 		resets    int
 		resetAlls int
+		keybinds  int
 	)
 	act := SettingsActions{
 		UIScale:          func() float64 { return scale },
@@ -585,6 +586,7 @@ func TestSettingsPanelWiring(t *testing.T) {
 		RailCollapsed:    func() bool { return rail },
 		SetRailCollapsed: func(on bool) { rail = on },
 		CloseHint:        func() string { return "P" },
+		OpenKeybindings:  func() { keybinds++ },
 		MasterVolume:     func() int { return master },
 		SetMasterVolume:  func(v int) { master = v; setMaster++ },
 		MusicVolume:      func() int { return music },
@@ -618,6 +620,9 @@ func TestSettingsPanelWiring(t *testing.T) {
 	}
 	if got := s.shufBtn.Text().Label; got != "Shuffle: on" {
 		t.Errorf("shuffle label = %q, want on state", got)
+	}
+	if got := s.keybinds.Text().Label; got != "Keybindings…" {
+		t.Errorf("keybindings row label = %q, want the window's name", got)
 	}
 
 	// The three numeric rows are [label, slider, value].
@@ -708,14 +713,15 @@ func TestSettingsPanelWiring(t *testing.T) {
 	}
 
 	// The window's second child is the body: [scale row, fullscreen,
-	// rail, master, music, UI, shuffle, reset layout, reset all, hint].
+	// rail, keybindings, master, music, UI, shuffle, reset layout, reset
+	// all, hint].
 	body, ok := s.win.GetContainer().Children()[1].(widget.Containerer)
 	if !ok {
 		t.Fatal("settings body is not a container")
 	}
 	bkids := body.Children()
-	if len(bkids) != 10 {
-		t.Fatalf("settings body children = %d, want 10 (scale, fullscreen, rail, master, music, UI, shuffle, reset, reset all, hint)", len(bkids))
+	if len(bkids) != 11 {
+		t.Fatalf("settings body children = %d, want 11 (scale, fullscreen, rail, keybindings, master, music, UI, shuffle, reset, reset all, hint)", len(bkids))
 	}
 	uitest.FireButton(ui, bkids[1].(*widget.Button)) // fullscreen toggle (host currently off)
 	fs = false
@@ -736,7 +742,11 @@ func TestSettingsPanelWiring(t *testing.T) {
 	if got := s.railBtn.Text().Label; got != "Rail: collapsed" {
 		t.Errorf("rail label after click = %q, want collapsed state", got)
 	}
-	uitest.FireButton(ui, bkids[6].(*widget.Button)) // shuffle toggle (row 6 since the UI volume row landed at 5)
+	uitest.FireButton(ui, bkids[3].(*widget.Button)) // the Keybindings door
+	if keybinds != 1 {
+		t.Errorf("keybindings opens = %d, want 1", keybinds)
+	}
+	uitest.FireButton(ui, bkids[7].(*widget.Button)) // shuffle toggle (row 7 since the UI volume row landed at 5)
 	if shuffle {
 		t.Error("shuffle button did not flip the host flag")
 	}
@@ -744,20 +754,20 @@ func TestSettingsPanelWiring(t *testing.T) {
 	if got := s.shufBtn.Text().Label; got != "Shuffle: off" {
 		t.Errorf("shuffle label after click = %q, want off state", got)
 	}
-	uitest.FireButton(ui, bkids[7].(*widget.Button)) // reset layout (row 7: the UI row shifted the resets down)
+	uitest.FireButton(ui, bkids[8].(*widget.Button)) // reset layout (row 8: the UI row and the keybindings row shifted the resets down)
 	if resets != 1 {
 		t.Errorf("reset calls = %d, want 1", resets)
 	}
 	// Reset all is two-step: the first press only arms (label swap), the
 	// second fires exactly once and restores the label.
-	uitest.FireButton(ui, bkids[8].(*widget.Button))
+	uitest.FireButton(ui, bkids[9].(*widget.Button))
 	if resetAlls != 0 {
 		t.Fatalf("armed reset-all fired on the first press")
 	}
 	if got := s.resetAll.Text().Label; got != "Confirm reset all" {
 		t.Errorf("armed reset-all label = %q, want the confirm state", got)
 	}
-	uitest.FireButton(ui, bkids[8].(*widget.Button))
+	uitest.FireButton(ui, bkids[9].(*widget.Button))
 	if resetAlls != 1 {
 		t.Errorf("reset-all calls = %d, want 1", resetAlls)
 	}
@@ -792,7 +802,7 @@ func sliderPoint(sl *widgets.Slider, v float64) image.Point {
 	return image.Pt(sl.ValueX(v), b.Min.Y+b.Dy()/2)
 }
 
-// TestSettingsRowsFitAtMinScale: at the shrunken 0.75 rung the nine rows
+// TestSettingsRowsFitAtMinScale: at the shrunken 0.75 rung the ten rows
 // and the hint still stack inside the window without overlap — the window
 // grows with its content, and every row keeps its scaled 30 px floor.
 func TestSettingsRowsFitAtMinScale(t *testing.T) {
@@ -807,6 +817,7 @@ func TestSettingsRowsFitAtMinScale(t *testing.T) {
 		RailCollapsed:    func() bool { return false },
 		SetRailCollapsed: func(bool) {},
 		CloseHint:        func() string { return "P" },
+		OpenKeybindings:  func() {},
 		MasterVolume:     func() int { return 100 },
 		SetMasterVolume:  func(int) {},
 		MusicVolume:      func() int { return 70 },
@@ -824,8 +835,8 @@ func TestSettingsRowsFitAtMinScale(t *testing.T) {
 
 	body := s.win.Contents.(widget.Containerer)
 	kids := body.Children()
-	if len(kids) != 10 {
-		t.Fatalf("settings body children = %d, want 10 (stepper, fullscreen, rail, master, music, UI, shuffle, reset, reset all, hint)", len(kids))
+	if len(kids) != 11 {
+		t.Fatalf("settings body children = %d, want 11 (stepper, fullscreen, rail, keybindings, master, music, UI, shuffle, reset, reset all, hint)", len(kids))
 	}
 	prev := image.Rectangle{}
 	for i, k := range kids {
@@ -947,6 +958,7 @@ func staticSettingsActions() SettingsActions {
 		RailCollapsed:    func() bool { return false },
 		SetRailCollapsed: func(bool) {},
 		CloseHint:        func() string { return "P" },
+		OpenKeybindings:  func() {},
 		MasterVolume:     func() int { return 100 },
 		SetMasterVolume:  func(int) {},
 		MusicVolume:      func() int { return 70 },

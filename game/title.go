@@ -9,7 +9,8 @@ package game
 // windows — the save manager, the game table's InTitle rows (Settings,
 // Keybindings) and the credits — mounted lazily, exclusively and freshly
 // on every reopen, never persisted. The menu, the keys and every × drive
-// the same open flags.
+// the same open flags; a row's Unlisted flag keeps it out of the menu
+// labels (Keybindings opens from the Settings window's button).
 
 import (
 	"bytes"
@@ -139,10 +140,11 @@ func (g *Game) titleServices() screenServices {
 	return svc
 }
 
-// titleRows is the title host's one table, in menu order: the title's own
+// titleRows is the title host's one table, in mount order: the title's own
 // save manager, the game table's InTitle rows (Settings, Keybindings) and
-// the credits. The title-only rows never enter the game table, the KeyMap,
-// the layout sidecar or the rail.
+// the credits. The menu lists them by title minus the Unlisted ones
+// (Keybindings is opened from the Settings window). The title-only rows
+// never enter the game table, the KeyMap, the layout sidecar or the rail.
 func titleRows(t *titleScreen) []Screen {
 	rows := []Screen{t.saveManagerRow()}
 	rows = append(rows, inTitleRows()...)
@@ -328,13 +330,18 @@ func (t *titleScreen) buildMenu() {
 }
 
 // labels are the menu rows, in draw order: the game's three verbs around
-// the title's own window rows.
+// the title's own window rows. An Unlisted row keeps its host slot (and
+// its ×) but gets no label — Keybindings is reached from the Settings
+// window's button, not from the menu.
 func (t *titleScreen) labels() []string {
 	out := []string{"New game"}
 	if len(t.g.listSaves()) > 0 {
 		out = append(out, "Continue")
 	}
 	for _, s := range t.rows {
+		if s.Unlisted {
+			continue
+		}
 		out = append(out, s.Title)
 	}
 	return append(out, "Quit")

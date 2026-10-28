@@ -22,7 +22,10 @@ var railGroups = [...]string{"Ship", "Trade", "Industry", "Station", "World", "H
 // railEntries derives the rail's table from the spec plus the two core
 // windows: for each section in railGroups, the core entries that belong
 // to it (in declaration order), then every Screen row of that section in
-// spec order. Transient rows (the Esc menu) never enter the rail.
+// spec order. Transient rows (the Esc menu) never enter the rail, and
+// neither do the two rows flagged NoRail / Unlisted (Settings and
+// Keybindings): the rail is the navigation, the Settings window is their
+// door.
 //
 // The Open closures read the live state: the panel flags for spec rows
 // (the modal scenes drive the same flags), the kit's own close state for
@@ -47,7 +50,7 @@ func railEntries(g *Game) []uikit.RailEntry {
 			}
 		}
 		for _, s := range screens {
-			if s.DockPolicy == DockTransient || s.Group != group {
+			if s.DockPolicy == DockTransient || s.NoRail || s.Unlisted || s.Group != group {
 				continue
 			}
 			row := s

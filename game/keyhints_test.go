@@ -68,11 +68,13 @@ func helpRowKey(g *Game, action string) string {
 }
 
 // TestRebindRefreshesEveryHint is the four-surface pin: the help overlay,
-// the rail's tooltip hint, the keybindings chip and the settings footer all
+// the keybindings chip, the settings footer and the rail's tooltip hint all
 // answer from the live binding table, so one rebind shows on all of them in
 // the same frame and one unbind leaves the chip on "—" and drops the
 // footer's close clause. Before the seams existed (RailEntry.Hint,
 // SettingsActions.CloseHint) the last three were frozen at their defaults.
+// (The tip is read on Market: Settings lost its rail entry with the
+// Settings/Keybindings navigation pass.)
 func TestRebindRefreshesEveryHint(t *testing.T) {
 	g := newShowcaseGameAt(t, filepath.Join(t.TempDir(), "save.json"))
 	g.applySize(1280, 720)
@@ -89,12 +91,6 @@ func TestRebindRefreshesEveryHint(t *testing.T) {
 		{
 			"help row key", func() string { return helpRowKey(g, "settings") },
 			"P", "U", "—",
-		},
-		{
-			"rail tooltip hint", func() string { return entryByTitle(t, g, "Settings").Hint() },
-			"P — toggle settings (UI scale, display, layout)",
-			"U — toggle settings (UI scale, display, layout)",
-			"toggle settings (UI scale, display, layout) · unbound",
 		},
 		{
 			"keybindings chip", func() string {
@@ -124,8 +120,8 @@ func TestRebindRefreshesEveryHint(t *testing.T) {
 		}
 	}
 
-	// Unbind: "—" where a key belongs, words on the rail tip, and no
-	// "— closes" clause in the footer.
+	// Unbind: "—" where a key belongs and no "— closes" clause in the
+	// footer.
 	g.host.services.Keys.Begin("settings")
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyBackspace}})
 	pump(t, g, 1280, 720)
@@ -133,5 +129,15 @@ func TestRebindRefreshesEveryHint(t *testing.T) {
 		if got := s.read(); got != s.unbound {
 			t.Errorf("%s unbound = %q, want %q", s.name, got, s.unbound)
 		}
+	}
+
+	// The rail's tooltip reads live too, on a row the rail still lists
+	// (Settings is not a rail entry any more, so its own tip is gone with
+	// it): the same rebind moves Market's tip.
+	g.host.services.Keys.Begin("market")
+	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyU}})
+	pump(t, g, 1280, 720)
+	if got, want := entryByTitle(t, g, "Market").Hint(), "U — toggle market window (trade while docked)"; got != want {
+		t.Errorf("rail tooltip hint after G→U = %q, want %q", got, want)
 	}
 }

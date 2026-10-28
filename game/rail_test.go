@@ -2,6 +2,7 @@ package game
 
 import (
 	"image"
+	"slices"
 	"strings"
 	"testing"
 
@@ -20,21 +21,22 @@ import (
 // pipeline, the grayed entries' silence, the one window docking opens
 // and the composition that places what the player opens while docked.
 
-// TestRailDerivesFromScreenSpec: every non-transient spec row is
+// TestRailDerivesFromScreenSpec: every non-transient, listed spec row is
 // exactly one rail entry — its icon, live hint and group — in section
 // order, next to the two core windows; the Esc menu, the HUD and the
-// rack have no entries (the pause menu keeps its key, the ship chrome
-// has no window to open), and every entry names a manifest icon.
+// rack have no entries (the pause menu keeps its key, the ship chrome has
+// no window to open), the two secondary windows (Settings, Keybindings)
+// are not launchers, and every entry names a manifest icon.
 func TestRailDerivesFromScreenSpec(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
 	entries := g.rail.Entries()
 
-	// One entry per openable spec row + the two core windows.
+	// One entry per openable, listed spec row + the two core windows.
 	wantRows := 0
 	for _, s := range screens {
-		if s.DockPolicy != DockTransient {
+		if s.DockPolicy != DockTransient && !s.NoRail && !s.Unlisted {
 			wantRows++
 		}
 	}
@@ -53,6 +55,12 @@ func TestRailDerivesFromScreenSpec(t *testing.T) {
 		if s.DockPolicy == DockTransient {
 			if byTitle[s.Title] != 0 {
 				t.Errorf("transient %q is in the rail (the Esc menu is not a launcher)", s.Title)
+			}
+			continue
+		}
+		if s.NoRail || s.Unlisted {
+			if byTitle[s.Title] != 0 {
+				t.Errorf("secondary %q is a rail launcher (it is opened from the Settings window)", s.Title)
 			}
 			continue
 		}
@@ -116,6 +124,44 @@ func TestRailDerivesFromScreenSpec(t *testing.T) {
 		if byTitle[title] != 0 {
 			t.Errorf("%q has a rail entry (permanent chrome / pause menu)", title)
 		}
+	}
+}
+
+// TestRailHasNoSettingsOrKeybindingsEntries: the Settings and Keybindings
+// windows left the navigation (they are opened from the Settings window's
+// Keybindings button and from Settings' own key / title-menu row). The
+// windows themselves are unchanged: both rows stay in the host, Keybindings
+// keeps its sidecar rect, and the rail's Help & System section now holds
+// exactly Help.
+func TestRailHasNoSettingsOrKeybindingsEntries(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+
+	for _, title := range []string{"Settings", "Keybindings"} {
+		if g.rail.Button(title) != nil {
+			t.Errorf("%q still has a rail entry", title)
+		}
+	}
+	var helpSystem []string
+	for _, e := range g.rail.Entries() {
+		if e.Group == "Help & System" {
+			helpSystem = append(helpSystem, e.Title)
+		}
+	}
+	if !slices.Equal(helpSystem, []string{"Help"}) {
+		t.Errorf("Help & System = %v, want just Help", helpSystem)
+	}
+
+	// B1: only the listings went. Both rows still mount through the host
+	// and Keybindings still persists its rect.
+	for _, id := range []ScreenID{idSettings, idKeybindings} {
+		if g.host.Window(id) == nil {
+			t.Errorf("%s: the window is gone, only its listings should be", id)
+		}
+	}
+	if !slices.Contains(sidecarNames(screens), string(idKeybindings)) {
+		t.Error("keybindings left the layout sidecar")
 	}
 }
 

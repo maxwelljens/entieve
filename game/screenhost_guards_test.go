@@ -99,7 +99,7 @@ const layoutBytesGolden = `{
       "x": 190,
       "y": 24,
       "w": 900,
-      "h": 613,
+      "h": 595,
       "open": false
     },
     "infowin": {
@@ -249,9 +249,9 @@ const layoutBytesGolden = `{
     },
     "settings": {
       "x": 450,
-      "y": 106,
+      "y": 82,
       "w": 380,
-      "h": 508,
+      "h": 556,
       "open": false
     }
   }

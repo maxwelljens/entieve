@@ -48,7 +48,6 @@ rebindable (see **Keybindings** below); the global chords (`Esc`, `Ctrl+S`,
 | `H` | Toggle help window |
 | `P` | Toggle settings (UI scale, display, rail, layout) |
 | `K` | Toggle finances window (holdings and transactions) |
-| `O` | Toggle keybindings (rebind screen and world keys) |
 | `Esc` | Menu: Resume / Save / Save as… / Load / Quit |
 | `[` or `-` | Time acceleration down (8 → 4 → 2 → 1×) |
 | `]` or `=` | Time acceleration up (1 → 2 → 4 → 8×) |
@@ -83,10 +82,14 @@ window or the HUD chrome never reaches the world behind it.
 - Lock-under-cursor uses **`Ctrl`+click** so `L` stays free for looting.
 - `C` is **scanner** (a new window; no legacy binding to displace).
 
-**Rebinding (Keybindings, `O`)**: every screen toggle in the table and every
-world command (`Tab` locks, `A/Q/S/W/Z/D/J/L/M`, `F1–F8`, the arrows) can be
-rebound from the **Keybindings** window — the rail's *Help & System* entry,
-the title menu's **Keybindings** row, or `O`. The window is the controls
+**Rebinding (Keybindings, from Settings)**: every screen toggle in the table
+and every world command (`Tab` locks, `A/Q/S/W/Z/D/J/L/M`, `F1–F8`, the
+arrows) can be rebound from the **Keybindings** window. That window has no
+key, no rail entry and no title-menu row of its own: its only door is the
+**Keybindings…** button in the **Settings** window (`P`, or the title
+menu's *Settings* row) — in the game it toggles the window like the rail
+entry it used to be, and at the title it replaces Settings on screen. The
+window is the controls
 screen: **Ship controls** (the world commands) and **Windows** (the screen
 toggles) list each action against its live key, and a dim **Fixed
 shortcuts** block lists the chords that never rebind. Click a row, then
@@ -135,12 +138,12 @@ without those plates (every release ships no `assets/`) draws the plain panel,
 exactly as before.
 
 Toggle keys open and close their window (`I`, `F`, `G`, `B`, `C`, `N`, `H`,
-`P`, `K`, `O`, `Shift+L`) — windows have no separate close button. The same
+`P`, `K`, `Shift+L`) — windows have no separate close button. The same
 toggles live on the **left navigation rail**: one glyph per window in
 six sections — **Ship** (Overview, Selected Item, Fitting), **Trade**
 (Market, Inventory, Finances), **Industry** (Manufacturing, Refinery), **Station** (Station
 Services), **World** (Scanner, Starmap, Log) and **Help & System**
-(Help, Settings, Keybindings). Hover an entry for its tooltip (icon, name and hotkey
+(Help). Hover an entry for its tooltip (icon, name and hotkey
 hint); click once to open — a freshly opened window lands on top — and
 again to close it. An entry you cannot use right now is **grayed, never
 hidden** (the services view and manufacturing in space, the scanner while
@@ -154,13 +157,17 @@ top edge collapses the rail to its
 tab — a setting that persists as `rail_collapsed` in
 `<save>.settings.json` (a missing key means expanded). The ship status
 and the module rack are permanent ship chrome and have no rail entries, and
-the Esc menu keeps its own key — the rail is not its launcher.
+the Esc menu keeps its own key — the rail is not its launcher. **Settings**
+and **Keybindings** are not rail launchers either: Settings keeps its key
+(`P`) and its title-menu row, and Keybindings is opened from the Settings
+window's **Keybindings…** button only.
 
 The **Settings**
 window (`P`) holds the **UI scale** slider — a notched track over the six
 rungs 0.75× – 2.5× whose handle snaps to a rung and applies it live (every
 window, control and font rescales and keeps its arrangement) — a
-**fullscreen** toggle, a **rail** collapse toggle, **Master**, **Music**
+**fullscreen** toggle, a **rail** collapse toggle, the **Keybindings…**
+button (the rebinding window's only door), **Master**, **Music**
 and **UI** volume sliders (freeflow, 0–100% in 1% steps; a fresh install
 plays music at 100% × 70% and UI cues at 100% × 80%), a **Shuffle** toggle
 (the six tracks in a shuffled pool, on by default), **Reset window layout**
@@ -862,12 +869,14 @@ replays are unaffected.
 
 - The game boots into a **title screen**: **New game**, **Continue** (the
   most recently modified save), **Save manager**, **Settings**,
-  **Keybindings**, **Credits** and **Quit**. The backdrop is the embedded
+  **Credits** and **Quit**. The backdrop is the embedded
   `assets/artwork/title_background.jpg`, cover-fit under a light veil (the
   static world render is the fallback), and the simulation does not step
   until you enter the game. The
   settings window opens and closes with `P` there too, exactly as in-game,
-  and every title window's **×** (and `Esc`) closes it back to the menu.
+  its **Keybindings…** button swaps it for the keybindings window (one
+  title window is up at a time), and every title window's **×** (and `Esc`)
+  closes it back to the menu.
   **Credits** lists the project's provenance by section — Development,
   Iconography (game-icons.net, CC BY 3.0), Module renders (CC0),
   Hull & emblem artwork, Interface form (Cyber Terminal UI Kit), Typefaces

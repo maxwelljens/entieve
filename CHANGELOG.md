@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Settings and Keybindings left the navigation** (`game`, `uikit/screens`):
+  the left rail no longer lists either window (its *Help & System* section is
+  Help alone), and the title menu no longer has a **Keybindings** row. The
+  **Keybindings** window is now opened only from the **Keybindings…** button
+  in the Settings window (in-game it toggles the window; at the title it
+  replaces Settings), so it keeps its layout sidecar entry and its window —
+  only its listings and its own `O` binding are gone. Settings is unchanged
+  otherwise: `P` still toggles it, and the title menu still lists it. A
+  rebound chord can no longer open Keybindings (it has no action of its own).
+
 ## [0.10.0] - 2026-10-28
 
 ### Added

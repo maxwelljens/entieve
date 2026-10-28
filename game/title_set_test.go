@@ -14,10 +14,12 @@ import (
 // rows — so the menu, the live key bindings and every × drive the same
 // open flags, and no title window ever reaches the game host.
 
-// TestTitleWindowsAreOneSet: P opens Settings; O closes it and opens
-// Keybindings; the menu's Credits row closes Keybindings and mounts
-// Credits; Esc closes it; a rebind to U moves the title's key (P is dead);
-// and the whole story touches exactly one title flag and no game-host row.
+// TestTitleWindowsAreOneSet: P opens Settings; the Settings window's
+// Keybindings button closes it and opens Keybindings (the window has no
+// key of its own, so O does nothing); the menu's Credits row closes
+// Keybindings and mounts Credits; Esc closes it; a rebind to U moves the
+// title's key (P is dead); and the whole story touches exactly one title
+// flag and no game-host row.
 func TestTitleWindowsAreOneSet(t *testing.T) {
 	resetScale(t)
 	g := newTitleGameAt(t, filepath.Join(t.TempDir(), "save.json"))
@@ -36,13 +38,21 @@ func TestTitleWindowsAreOneSet(t *testing.T) {
 		t.Fatal("P did not open the title's settings window")
 	}
 
-	// One open window, ever: opening Keybindings closes Settings.
+	// One open window, ever: the Settings button closes Settings and
+	// opens Keybindings. Keybindings has no key, so O is dead.
 	press(ebiten.KeyO)
+	if !g.titleUI.host.IsOpen(idSettings) || g.titleUI.host.IsOpen(idKeybindings) {
+		t.Fatal("O must drive nothing: keybindings has no key")
+	}
+	click(t, g, settingsPanel(t, g.titleUI.host).KeybindingsButtonForTest())
+	if err := g.Update(); err != nil {
+		t.Fatalf("Update after the Keybindings button: %v", err)
+	}
 	if g.titleUI.host.IsOpen(idSettings) || g.titleUI.host.Mounted(idSettings) {
-		t.Error("O left the settings window open beside keybindings")
+		t.Error("the button left the settings window open beside keybindings")
 	}
 	if !g.titleUI.host.IsOpen(idKeybindings) || !g.titleUI.host.Mounted(idKeybindings) {
-		t.Fatal("O did not open the title's keybindings window")
+		t.Fatal("the Settings button did not open the title's keybindings window")
 	}
 
 	// The menu's Credits label routes through the same lifecycle.
