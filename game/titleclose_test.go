@@ -17,7 +17,7 @@ func TestTitleCloseButtonReturnsToMenu(t *testing.T) {
 			g.applySize(1280, 720)
 			pump(t, g, 1280, 720)
 
-			g.titleUI.open(string(id))
+			g.titleUI.openID(id)
 			pump(t, g, 1280, 720)
 			if !g.titleUI.host.Mounted(id) {
 				t.Fatalf("fixture: %s did not mount at the title", id)
@@ -61,40 +61,38 @@ func TestTitleCloseButtonReturnsToMenu(t *testing.T) {
 }
 
 // TestTitleOwnWindowsCloseButtons: the title's own windows (Credits, the
-// save manager) keep their × → closeTop path — the window unmounts, the
-// menu returns and the phase stays the title.
+// save manager) are host rows too, so their × runs the SAME liveness as
+// the title-scoped rows — the window unmounts, the menu returns and the
+// phase stays the title.
 func TestTitleOwnWindowsCloseButtons(t *testing.T) {
-	for _, which := range []string{"credits", "manager"} {
-		which := which
-		t.Run(which, func(t *testing.T) {
+	for _, id := range []ScreenID{idCredits, idManager} {
+		id := id
+		t.Run(string(id), func(t *testing.T) {
 			g := newTitleGameAt(t, filepath.Join(t.TempDir(), "save.json"))
 			g.applySize(1280, 720)
 			pump(t, g, 1280, 720)
-			g.titleUI.open(which)
+			g.titleUI.openID(id)
 			pump(t, g, 1280, 720)
 
-			win := g.titleUI.credits
-			if which == "manager" {
-				win = g.titleUI.manager
-			}
+			win := g.titleUI.host.Window(id)
 			if win == nil {
-				t.Fatalf("fixture: %s did not mount", which)
+				t.Fatalf("fixture: %s did not mount", id)
 			}
 			btn := g.kit.CloseButtonOf(win)
 			if btn == nil {
-				t.Fatalf("%s has no × button", which)
+				t.Fatalf("%s has no × button", id)
 			}
 			click(t, g, btn)
 			pump(t, g, 1280, 720)
 
-			if g.titleUI.windowOpen() {
-				t.Errorf("%s × left a title window open", which)
+			if g.titleUI.host.AnyOpen() {
+				t.Errorf("%s × left a title window open", id)
 			}
 			if !g.titleUI.menu.GetWidget().IsVisible() {
-				t.Errorf("%s × did not bring the title menu back", which)
+				t.Errorf("%s × did not bring the title menu back", id)
 			}
 			if !g.title {
-				t.Errorf("%s × left the title phase", which)
+				t.Errorf("%s × left the title phase", id)
 			}
 		})
 	}

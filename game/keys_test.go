@@ -319,7 +319,7 @@ func TestTitleKeybindings(t *testing.T) {
 		t.Fatalf("menu = %v, want Settings < Keybindings < Credits", labels)
 	}
 
-	g.titleUI.open("keybindings")
+	g.titleUI.openID(idKeybindings)
 	if err := g.Update(); err != nil {
 		t.Fatalf("Update: %v", err)
 	}

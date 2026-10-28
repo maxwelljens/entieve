@@ -96,10 +96,10 @@ func (cg *titleCaptureGame) Draw(screen *ebiten.Image) {
 	if !cg.titleSaved {
 		cg.captureTitle(img)
 		cg.titleSaved = true
-		cg.g.titleUI.open("manager") // next frame renders it
+		cg.g.titleUI.openID(idManager) // next frame renders it
 		return
 	}
-	if !cg.managerSaved && cg.g.titleUI.manager != nil && cg.frames >= 20 {
+	if !cg.managerSaved && cg.g.titleUI.host.Mounted(idManager) && cg.frames >= 20 {
 		cg.captureManager(img)
 		cg.managerSaved = true
 		cg.done = true
@@ -213,7 +213,13 @@ func (cg *titleCaptureGame) captureTitle(img *ebiten.Image) {
 
 // captureManager pins the save manager window over the title.
 func (cg *titleCaptureGame) captureManager(img *ebiten.Image) {
-	wr := cg.g.titleUI.manager.GetContainer().GetWidget().Rect
+	win := cg.g.titleUI.host.Window(idManager)
+	if win == nil {
+		cg.err = fmt.Errorf("manager window did not mount")
+		cg.write(img, cg.managerOut)
+		return
+	}
+	wr := win.GetContainer().GetWidget().Rect
 	if wr.Dx() <= 0 || wr.Dy() <= 0 {
 		cg.err = fmt.Errorf("manager window never laid out (%v)", wr)
 		cg.write(img, cg.managerOut)
@@ -230,7 +236,7 @@ func (cg *titleCaptureGame) captureManager(img *ebiten.Image) {
 	}
 	if cg.managerPx < 100 {
 		cg.err = fmt.Errorf("manager window not painted: %d changed pixels (rect %v visible %v mounted %v)",
-			cg.managerPx, wr, cg.g.titleUI.manager.GetContainer().GetWidget().IsVisible(), cg.g.titleUI.managerRem != nil)
+			cg.managerPx, wr, win.GetContainer().GetWidget().IsVisible(), cg.g.titleUI.host.Mounted(idManager))
 	}
 	cg.write(img, cg.managerOut)
 }

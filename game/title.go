@@ -5,9 +5,11 @@ package game
 // artwork plate, cover-fit under a light veil (the already-built space
 // scene's static render is the fallback), while the sim stays frozen and
 // gameplay chrome stays unmounted. The title owns a menu on the kit's
-// root overlay, a save manager and credits window, and a second Screen
-// host for the title-scoped rows (Settings, Keybindings) — mounted
-// lazily, exclusively and freshly on every reopen, never persisted.
+// root overlay and ONE Screen host: its table (titleRows) is the menu's
+// windows — the save manager, the game table's InTitle rows (Settings,
+// Keybindings) and the credits — mounted lazily, exclusively and freshly
+// on every reopen, never persisted. The menu, the keys and every × drive
+// the same open flags.
 
 import (
 	"bytes"
@@ -97,7 +99,8 @@ type titleItem struct {
 }
 
 // titleScreen is the title phase's own UI. It is rebuilt from scratch
-// when the kit is rebuilt (a scale change), keeping only the open flags.
+// when the kit is rebuilt (a scale change), keeping only the open flags
+// (the host's).
 type titleScreen struct {
 	g *Game
 
@@ -109,27 +112,16 @@ type titleScreen struct {
 	items      []titleItem
 	errMsg     string
 
-	creditsOpen bool
-	managerOpen bool
-
-	// The title's Screen host: the title-scoped rows (Settings,
-	// Keybindings), mounted lazily and exclusively. Its rows are the same
-	// Screen spec rows the game host mounts.
+	// The title's Screen host: ONE table (titleRows) and one open flag per
+	// window — the menu rows, the keys and every × all drive these flags,
+	// mounted lazily and exclusively.
 	rows []Screen
 	host *ScreenHost
-
-	credits      *widget.Window
-	creditsRem   widget.RemoveWindowFunc
-	creditScroll *widget.ScrollContainer // the credits page's viewport (pins)
-	manager      *widget.Window
-	managerPage  *widget.Container
-	managerRem   widget.RemoveWindowFunc
-	saves        []saveEntry
-	pendingDel   string
 }
 
 func newTitleScreen(g *Game) *titleScreen {
-	t := &titleScreen{g: g, rows: titleRows()}
+	t := &titleScreen{g: g}
+	t.rows = titleRows(t)
 	t.host = newScreenHost(t.rows, titleScope, g.kit, g.titleServices())
 	g.wireUISounds(t.host)
 	t.host.Reconcile(Room{Title: true}) // the boot pass: quiet, nothing open
@@ -147,8 +139,19 @@ func (g *Game) titleServices() screenServices {
 	return svc
 }
 
-// titleRows are the Screen rows that also live on the title screen.
-func titleRows() []Screen {
+// titleRows is the title host's one table, in menu order: the title's own
+// save manager, the game table's InTitle rows (Settings, Keybindings) and
+// the credits. The title-only rows never enter the game table, the KeyMap,
+// the layout sidecar or the rail.
+func titleRows(t *titleScreen) []Screen {
+	rows := []Screen{t.saveManagerRow()}
+	rows = append(rows, inTitleRows()...)
+	return append(rows, t.creditsRow())
+}
+
+// inTitleRows are the game table's rows that also live on the title, in
+// table order — the InTitle marker is the authority.
+func inTitleRows() []Screen {
 	var out []Screen
 	for _, s := range screens {
 		if s.InTitle {
@@ -156,6 +159,32 @@ func titleRows() []Screen {
 		}
 	}
 	return out
+}
+
+// The title's own windows' frozen ids: no sidecar key (they are
+// transients), but stable names in logs and tests.
+const (
+	idManager ScreenID = "manager"
+	idCredits ScreenID = "credits"
+)
+
+// saveManagerRow is the title's save manager: transient (never persisted),
+// modal and unkeyed — the menu row is its only way in.
+func (t *titleScreen) saveManagerRow() Screen {
+	return Screen{
+		ID: idManager, Title: "Save manager", Key: keyNone,
+		DockPolicy: DockTransient, Modal: true,
+		Build: func(*ScreenHost) widgets.WindowPanel { return t.newSaveManager() },
+	}
+}
+
+// creditsRow is the title's credits window, same policy.
+func (t *titleScreen) creditsRow() Screen {
+	return Screen{
+		ID: idCredits, Title: "Credits", Key: keyNone,
+		DockPolicy: DockTransient, Modal: true,
+		Build: func(*ScreenHost) widgets.WindowPanel { return t.newCredits() },
+	}
 }
 
 // ensureTitleUI returns the title's UI, building it on first use.
@@ -178,14 +207,17 @@ func (g *Game) updateTitle(in Input) error {
 		if g.captureKey(k, ctrl, shift) {
 			continue
 		}
-		switch k {
-		case ebiten.KeyEscape:
+		if k == ebiten.KeyEscape {
 			t.closeTop()
-		case ebiten.KeyP:
-			// The settings window's hint ("P closes") stays true at the
-			// title: P runs the same toggle it does in-game (its row is
-			// the title's settings window here).
-			t.toggleSettings()
+			continue
+		}
+		if ctrl {
+			continue // UI-layer keys are dead while Ctrl is held (legacy parity)
+		}
+		// The same live binding table the game reads: a rebind moves a
+		// title window's key with it (actionFor reads the overrides).
+		if action, ok := g.actionFor(k, shift); ok {
+			t.press(action)
 		}
 	}
 	if err := g.kit.Update(); err != nil {
@@ -292,23 +324,24 @@ func (t *titleScreen) buildMenu() {
 		return
 	}
 	t.detachMenu = root.AddChild(menu)
-	theme.ShowWidget(menu.GetWidget(), !t.windowOpen())
+	theme.ShowWidget(menu.GetWidget(), t.menuVisible())
 }
 
-// labels are the menu rows, in draw order.
+// labels are the menu rows, in draw order: the game's three verbs around
+// the title's own window rows.
 func (t *titleScreen) labels() []string {
 	out := []string{"New game"}
 	if len(t.g.listSaves()) > 0 {
 		out = append(out, "Continue")
 	}
-	out = append(out, "Save manager")
 	for _, s := range t.rows {
 		out = append(out, s.Title)
 	}
-	return append(out, "Credits", "Quit")
+	return append(out, "Quit")
 }
 
-// action resolves one menu label to its click.
+// action resolves one menu label to its click: the same t.press the keys
+// run, so a menu row and its key cannot drift.
 func (t *titleScreen) action(label string) func() {
 	g := t.g
 	switch label {
@@ -316,18 +349,19 @@ func (t *titleScreen) action(label string) func() {
 		return func() { g.pendingTitleEnter = true }
 	case "Continue":
 		return func() { t.continueMostRecent() }
-	case "Save manager":
-		return func() { t.open("manager") }
-	case "Credits":
-		return func() { t.open("credits") }
 	case "Quit":
 		return func() { g.quit = true }
 	}
 	for _, s := range t.rows {
-		if s.Title == label {
-			id := s.ID
-			return func() { t.open(string(id)) }
+		if s.Title != label {
+			continue
 		}
+		if s.Action != "" {
+			action := s.Action
+			return func() { t.press(action) }
+		}
+		id := s.ID
+		return func() { t.openID(id) }
 	}
 	return func() {}
 }
@@ -352,40 +386,35 @@ func versionLine(v string) string {
 // Title windows
 // ---------------------------------------------------------------------------
 
-func (t *titleScreen) windowOpen() bool {
-	return t.host.AnyOpen() || t.creditsOpen || t.managerOpen
-}
+// menuVisible reports whether the title menu is the front layer.
+func (t *titleScreen) menuVisible() bool { return !t.host.AnyOpen() }
 
-// open shows one title window (they are modal: at most one at a time).
-func (t *titleScreen) open(which string) {
-	t.creditsOpen = which == "credits"
-	t.managerOpen = which == "manager"
-	t.pendingDel = ""
-	t.g.cancelCapture()
-	t.host.CloseAll()
-	t.host.SetOpen(ScreenID(which), true)
-	if t.managerOpen {
-		t.saves = t.g.listSaves()
+// press runs one of the title's actions: the row's exclusive toggle (the
+// title windows are modal, so opening one closes the others).
+func (t *titleScreen) press(action string) {
+	id, ok := t.host.ByAction(action)
+	if !ok {
+		return
 	}
-}
-
-// closeTop closes the open title window (Esc / the title-bar ×).
-func (t *titleScreen) closeTop() {
-	t.host.CloseAll()
-	t.creditsOpen, t.managerOpen = false, false
-	t.pendingDel = ""
-	t.g.cancelCapture()
-}
-
-// toggleSettings mirrors the in-game P row: the title owns its settings
-// window, so P closes it when open and opens it (over any other title
-// window) otherwise — the same toggle the Screen spec's settings row has.
-func (t *titleScreen) toggleSettings() {
-	if t.host.IsOpen(idSettings) {
+	if t.host.IsOpen(id) {
 		t.closeTop()
 		return
 	}
-	t.open(string(idSettings))
+	t.openID(id)
+}
+
+// openID shows one title window over the menu (never a toggle: SetOpen in
+// the title scope already closes the others).
+func (t *titleScreen) openID(id ScreenID) {
+	t.g.cancelCapture()
+	t.host.CloseAll()
+	t.host.SetOpen(id, true)
+}
+
+// closeTop closes the open title window (Esc / its ×).
+func (t *titleScreen) closeTop() {
+	t.host.CloseAll()
+	t.g.cancelCapture()
 }
 
 // flash reports a failed action on the menu.
@@ -395,44 +424,27 @@ func (t *titleScreen) flash(msg string) {
 	t.buildMenu()
 }
 
-// sync mounts/unmounts the open title windows and refreshes the settings
-// readout. It runs after the kit pump, so the handlers can only flip the
-// flags.
+// sync mounts/unmounts the open title windows (the host owns every flag
+// and every panel) and shows the menu while nothing is open. It runs after
+// the kit pump, so the handlers can only flip the flags.
 func (t *titleScreen) sync() {
 	if t.menu == nil {
 		t.buildMenu()
 	}
 	t.host.Sync()
 	t.host.Reconcile(Room{Title: true})
-	if t.creditsOpen {
-		if t.creditsRem == nil {
-			t.mountCredits()
-		}
-	} else {
-		t.unmountCredits()
-	}
-	if t.managerOpen {
-		if t.managerRem == nil {
-			t.mountManager()
-		}
-	} else {
-		t.unmountManager()
-	}
 	if t.menu != nil {
-		theme.ShowWidget(t.menu.GetWidget(), !t.windowOpen())
+		theme.ShowWidget(t.menu.GetWidget(), t.menuVisible())
 	}
 }
 
-// detach drops the widget references of the previous kit (a rebuild); the
-// open flags and the save list stay, so the next sync remounts the same
-// windows on the fresh kit.
+// detach drops the menu widget references of the previous kit (a rebuild);
+// the host keeps the open flags and rebuilds the windows on the fresh kit.
 func (t *titleScreen) detach() {
 	t.menu = nil
 	t.detachMenu = nil
 	t.wordmark, t.version, t.errLine = nil, nil, nil
 	t.items = nil
-	t.credits, t.creditsRem, t.creditScroll = nil, nil, nil
-	t.manager, t.managerPage, t.managerRem = nil, nil, nil
 }
 
 // close removes every title widget and drops the state.
@@ -443,12 +455,17 @@ func (t *titleScreen) close() {
 	t.detachMenu = nil
 	t.host.CloseAll()
 	t.host.Reconcile(Room{Title: true})
-	t.unmountCredits()
-	t.unmountManager()
 	t.detach()
 }
 
-func (t *titleScreen) mountCredits() {
+// creditPanel is the credits window plus its scroll viewport (the layout
+// and capture pins drive the page through it).
+type creditPanel struct {
+	winPanel
+	scroll *widget.ScrollContainer
+}
+
+func (t *titleScreen) newCredits() creditPanel {
 	g := t.g
 	p := g.env.Pal()
 	roleW := theme.Px(84)
@@ -514,10 +531,7 @@ func (t *titleScreen) mountCredits() {
 	// the credits screen opens like every other window.
 	bar, _ := theme.NewTitleBar(g.env, "Credits", "")
 	win, scroll := t.window(bar, page, creditWinW, creditWinH, image.Rect(380, 100, 380+creditWinW, 100+creditWinH))
-	t.creditScroll = scroll
-	t.credits = win
-	g.kit.SetWindowClose(win, t.closeTop)
-	t.creditsRem = g.kit.AddWindow(win)
+	return creditPanel{winPanel: winPanel{win: win}, scroll: scroll}
 }
 
 // creditRule is the hairline under the credits header block and each
@@ -532,16 +546,20 @@ func creditRule(p theme.Palette) *widget.Container {
 	)
 }
 
-func (t *titleScreen) unmountCredits() {
-	if t.creditsRem != nil {
-		t.creditsRem()
-	}
-	t.credits, t.creditsRem = nil, nil
+// managerPanel is the save manager window: its rows are rebuilt by the
+// panel's own buttons (a delete, the arm of one), never per frame — so its
+// Sync is the winPanel no-op and the page is made once per open.
+type managerPanel struct {
+	winPanel
+	t       *titleScreen
+	page    *widget.Container
+	saves   []saveEntry
+	pending string
 }
 
-func (t *titleScreen) mountManager() {
+func (t *titleScreen) newSaveManager() *managerPanel {
 	g := t.g
-	t.saves = g.listSaves()
+	m := &managerPanel{t: t, saves: g.listSaves()}
 	page := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
@@ -549,20 +567,11 @@ func (t *titleScreen) mountManager() {
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	t.managerPage = page
-	t.refreshManager()
+	m.page = page
+	m.refresh()
 	win, _ := t.window(g.titleBar("Save manager"), page, titleWinW, titleWinH, image.Rect(360, 140, 360+titleWinW, 140+titleWinH))
-	t.manager = win
-	g.kit.SetWindowClose(win, t.closeTop)
-	t.managerRem = g.kit.AddWindow(win)
-}
-
-func (t *titleScreen) unmountManager() {
-	if t.managerRem != nil {
-		t.managerRem()
-	}
-	t.manager, t.managerPage, t.managerRem = nil, nil, nil
-	t.pendingDel = ""
+	m.winPanel = winPanel{win: win}
+	return m
 }
 
 // window wraps a scrollable page in the house window chrome (InfoWin's
@@ -613,21 +622,18 @@ func (t *titleScreen) window(bar *widget.Container, page *widget.Container, w, h
 	return win, scroll
 }
 
-// refreshManager rebuilds the save rows from t.saves (and shows the empty
-// state when the directory holds none).
-func (t *titleScreen) refreshManager() {
-	if t.managerPage == nil {
-		return
-	}
-	g := t.g
+// refresh rebuilds the save rows from the panel's list (and shows the
+// empty state when the directory holds none).
+func (m *managerPanel) refresh() {
+	g := m.t.g
 	p := g.env.Pal()
-	page := t.managerPage
+	page := m.page
 	page.RemoveChildren()
-	if len(t.saves) == 0 {
+	if len(m.saves) == 0 {
 		page.AddChild(widget.NewText(widget.TextOpts.Text("No saves yet.", g.env.Face(theme.StepSmall), theme.Solid(p.Dim))))
 		return
 	}
-	for _, e := range t.saves {
+	for _, e := range m.saves {
 		e := e
 		row := widget.NewContainer(
 			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, theme.Px(30))),
@@ -648,11 +654,11 @@ func (t *titleScreen) refreshManager() {
 				widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}))),
 		)
 		del := "Delete"
-		if t.pendingDel == e.Path {
+		if m.pending == e.Path {
 			del = "Confirm?"
 		}
 		loadBtn := g.newBtn("Load", 70, 30, func() { g.pendingTitleLoad = e.Path })
-		delBtn := g.newBtn(del, 90, 30, func() { t.deleteSave(e.Path) })
+		delBtn := g.newBtn(del, 90, 30, func() { m.delete(e.Path) })
 		loadBtn.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionEnd}
 		delBtn.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionEnd}
 		row.AddChild(loadBtn, delBtn)
@@ -660,23 +666,23 @@ func (t *titleScreen) refreshManager() {
 	}
 }
 
-// deleteSave is the two-click delete: the first click arms the row, the
-// second removes exactly that file.
-func (t *titleScreen) deleteSave(path string) {
-	if t.pendingDel != path {
-		t.pendingDel = path
-		t.refreshManager()
+// delete is the two-click delete: the first click arms the row, the second
+// removes exactly that file.
+func (m *managerPanel) delete(path string) {
+	if m.pending != path {
+		m.pending = path
+		m.refresh()
 		return
 	}
-	t.pendingDel = ""
+	m.pending = ""
 	if err := os.Remove(path); err != nil {
-		t.flash("Delete failed: " + err.Error())
+		m.t.flash("Delete failed: " + err.Error())
 		return
 	}
-	t.saves = t.g.listSaves()
-	t.refreshManager()
-	t.buildMenu() // Continue follows the save count
-	t.g.ui.Play(sfxConfirm)
+	m.saves = m.t.g.listSaves()
+	m.refresh()
+	m.t.buildMenu() // Continue follows the save count
+	m.t.g.ui.Play(sfxConfirm)
 }
 
 // ---------------------------------------------------------------------------

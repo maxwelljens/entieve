@@ -72,6 +72,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One title-owned window set** (`game`): the title screen's windows — the
+  save manager, Settings, Keybindings and the credits — are now rows of ONE
+  Screen table (`titleRows`) mounted by the title's one Screen host, instead
+  of two open-flag pairs, a mount/unmount pair and a label switch beside
+  it. The menu rows, the keys and every `×` drive the same flags, the menu
+  iterates the table (no magic "credits"/"manager" strings), and the keys
+  come from the live binding table through `actionFor` — so rebinding a
+  screen key now moves it at the title too (previously `P` was hardcoded
+  there: after moving Settings to `U`, `U` did nothing at the title and `P`
+  still opened it). The two title-only rows (Save manager, Credits) stay
+  scene-owned transients — never in the game table, the KeyMap, the layout
+  sidecar or the rail — pinned by `TestTitleRowsStaySceneOwned`, and
+  `TestTitleWindowsAreOneSet` walks the menu/key/× lifecycle including the
+  rebind.
+
 - **Key hints follow a rebind everywhere** (`game`, `uikit/screens`): the
   chord is no longer baked into the text each surface prints. The Screen
   spec's `Desc` and the world binding table hold the description only
