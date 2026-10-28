@@ -1,13 +1,11 @@
 package game
 
 import (
-	"encoding/json"
 	"image"
 	"math"
-	"os"
-	"path/filepath"
 
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/docstore"
 	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
@@ -44,6 +42,10 @@ import (
 // arrangement works at 0.75× and at 2.5×, and a session that changes
 // scale mid-run round-trips through the same convention (applyScale).
 const layoutVersion = 3
+
+// layoutReadFrom is the oldest sidecar version readLayout accepts (see
+// layoutVersion for why version 1 is dropped).
+const layoutReadFrom = 2
 
 // winLayout is one persisted window: top-left corner, size and — for
 // the toggleable windows — whether it was open, plus the split panes'
@@ -196,15 +198,7 @@ func (g *Game) writeLayout() error {
 			Tables: tablePrefs(e),
 		}
 	}
-	data, err := json.MarshalIndent(f, "", "  ")
-	if err != nil {
-		return err
-	}
-	path := g.layoutPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o644)
+	return docstore.Versioned(g.layoutPath(), layoutVersion, layoutReadFrom).Save(f)
 }
 
 // readLayout loads the sidecar (rects in DESIGN units — see
@@ -213,19 +207,12 @@ func (g *Game) writeLayout() error {
 // service-trio reclaim) or newer than the current one (an unknown
 // format) — returns nil: defaults win and nothing crashes.
 func (g *Game) readLayout() map[string]winLayout {
-	data, err := os.ReadFile(g.layoutPath())
-	if err != nil {
-		return nil
-	}
 	var f layoutFile
-	if err := json.Unmarshal(data, &f); err != nil {
+	if err := docstore.Versioned(g.layoutPath(), layoutVersion, layoutReadFrom).Load(&f); err != nil {
 		return nil
 	}
-	// Version 2 is read as-is: it simply carries no split ratios, so
-	// every seam keeps its equal-share default and the next write is v3.
-	if f.Version < 2 || f.Version > layoutVersion {
-		return nil
-	}
+	// A version-2 file simply carries no split ratios, so every seam keeps
+	// its equal-share default and the next write is v3.
 	return migrateLayoutNames(f.Windows)
 }
 

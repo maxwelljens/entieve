@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Document store** (`docstore`, `game`): every JSON document beside a save
+  — the save itself, the layout, settings and keybindings sidecars — now
+  reads through one tolerant contract (missing / corrupt / out-of-range
+  version leaves the defaults and reports `ErrMissing` / `ErrFormat` /
+  `ErrVersion`; sidecars ignore it, `Save`/`Load` report it) and writes
+  through one atomic one: the same `MarshalIndent` bytes into a dot-hidden
+  `.<doc>.<random>.tmp` in the same directory, chmod 0644, fsync, rename —
+  an interrupted save can no longer truncate the previous one, and the
+  in-flight temp never shows up in the save manager. On-disk formats are
+  byte-identical (layout v3 / v2 accepted, settings unversioned, keys v1, sim
+  save schema 3 still the sim's own).
 - **One tradeable resolver** (`uikit/widgets`): `ResolveTradeable` resolves
   any marketable id — item, then module, then hull, the sim's `itemName`
   order — to `{Kind, Name, Icon, Found}` plus `Ref()`, with
@@ -70,6 +81,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   close, and one `×` registration site instead of three. Behaviour is
   unchanged: only the picker re-centres on show, and Show Info's rect still
   survives its close.
+- **Save writes are crash-safe** (`game`): `Save`, `Save as…`, the clean
+  quit and every sidecar write go through the document store's atomic
+  write instead of a truncating `os.WriteFile` — a crash, a full disk or a
+  permission failure mid-write leaves the previous document byte-identical,
+  and the leftover temp is removed. The written bytes are unchanged.
+
 - **Show Info header on one row** (`uikit/screens`, `uikit/theme`): the
   entity icon no longer stacks above the title — it sits on a dark plate
   (opaque `BGHard` fill, 10 design px of padding, panel radius, `Border`
