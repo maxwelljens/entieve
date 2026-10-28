@@ -57,8 +57,10 @@ names the *modules and seams* we build that vocabulary into.
 | **War treasury** | the Corporate Fleets' ledger, seeded like a faction ledger and refilled by the **fee cut** — a share of broker fees and sales tax rerouted instead of burned. Its balance is war health; the war mints nothing, and starve the economy and the charter loses |
 | **Remnant** | a station after its system falls: market and repair stay live (lawless), charter services (contracts, industry, fitting) go dark, guards leave, and the Works take the belts — never the docking ring. Reclaim restores the authored set |
 | **Corporate Fleets** | the bloc faction behind the commissioned fleets: hostile to the Old Works only, neutral to everyone else unless provoked. One row now; per-corp rows may grow later when a corp needs its name on screen |
-| **The Svaz** | the weak confederation binding the corporations — a league of the corps (treaty, dues, the Commission), institutional only: no territory, no office, no answers from home. "The empire" in prose |
+| **The Svaz** | the weak confederation binding the cantons and the corporations — heart in the old worlds, a dues line and a warrant at the rim: treaty, dues, the Commission. Institutional only: no office, no officer and no answer in the Wild Fields. "The empire" in prose |
 | **The Commission** | the Svaz's war commission: the mandate under which corps raise and crew fleets. The Charter stays army-less — its law is insurance, not war |
+| **Predecessors** | the civilisation before the settlement waves: it built the Old Works and lost the oversight, and why is not preserved. Known through oral tradition, a scholarly fringe and the machines themselves — never a witness, an archive or a name of its own |
+| **the Kanžar Inspectorate** | the Svaz's ban on machine minds and autonomous self-replicating systems, in institutional form: a name on a form. Offstage by canon — no office, no officer, no hull, no sim state, never a screen |
 | **Legacy id** | a content id a rename retired, mapped onto its replacement in `content.LegacyIDs` (the keys are `content.RetiredIDs`): validation rejects them in shipped content, and restore remaps them in place — `sim.walkContentIDs` finds every id a save carries by reflection, so a new id-bearing field needs no second list |
 
 ## Architecture (the UI tranche)

@@ -4,7 +4,7 @@
   "base_price": 900000,
   "name": "Hušnek",
   "class": "barge",
-  "description": "A slow, sturdy mining barge with a huge ore hold. Strip belts, warp home, repeat.",
+  "description": "A slow, sturdy mining barge with a huge ore hold. Strip belts, warp home, repeat. It turns like a loaded skip and stops like one; the ore does not.",
   "maker": "corp-druzstvo",
   "origin": "moravian",
   "slots": {

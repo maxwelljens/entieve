@@ -36,7 +36,7 @@
     "group": "Modules/Low/Armor",
     "maker": "corp-aldemar",
     "name": "Armor Repairer",
-    "description": "Active armor rep: welds plating back together every cycle while the capacitor holds.",
+    "description": "Active armor rep: welds plating back together every cycle while the capacitor holds. The weld is ugly and it holds; the yard charges extra to cut it off again.",
     "slot": "low",
     "kind": "armor_rep",
     "grid_class": "ii",

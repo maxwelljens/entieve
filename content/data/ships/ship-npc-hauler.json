@@ -4,7 +4,7 @@
   "base_price": 520000,
   "name": "Tobřek",
   "class": "industrial",
-  "description": "A civilian freighter flying the trade lanes under convoy contract: fat hold, thick industrial tank, no guns. It runs, it does not fight.",
+  "description": "A civilian freighter flying the trade lanes under convoy contract: fat hold, thick industrial tank, no guns. It runs, it does not fight. Convoy work pays by the cycle, which is the whole reason the tank is that thick.",
   "maker": "corp-ferrum",
   "origin": "polish",
   "slots": {

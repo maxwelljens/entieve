@@ -4,7 +4,7 @@
   "base_price": 2200000,
   "name": "Clastor",
   "class": "destroyer",
-  "description": "A commissioned line cutter: Preštor yards, three medium mounts, a web and the Commission's warrant behind it. It holds the front and it is not for sale.",
+  "description": "A commissioned line cutter: Preštor yards, three medium mounts, a web and the Commission's warrant behind it. It holds the front and it is not for sale. Preštor builds them to a warrant instead of a price list: the yard is paid whether the front holds or not, and the crews fly like they have read the invoice.",
   "maker": "corp-praetor",
   "origin": "latinate",
   "slots": {

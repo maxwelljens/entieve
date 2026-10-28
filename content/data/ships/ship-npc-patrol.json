@@ -4,7 +4,7 @@
   "base_price": 420000,
   "name": "Kuštor",
   "class": "frigate",
-  "description": "Charter patrol cutter: fast, well-gunned, and never far from the trade lanes.",
+  "description": "Charter patrol cutter: fast, well-gunned, and never far from the trade lanes. It answers in three minutes inside Charter space, and files the report either way.",
   "maker": "corp-praetor",
   "origin": "latinate",
   "slots": {

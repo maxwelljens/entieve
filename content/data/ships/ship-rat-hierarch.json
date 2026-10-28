@@ -4,7 +4,7 @@
   "base_price": 1600000,
   "name": "Hierarch",
   "class": "rat",
-  "description": "The Old Works overseer: heavy tank, four turrets, and nothing that can call it off - it fights to the last.",
+  "description": "The Old Works overseer: heavy tank, four turrets, and nothing that can call it off - it fights to the last. It carries the repeater that keeps a nest's frames on the same job; break it and the nest flies the pattern from memory.",
   "origin": "old-works",
   "slots": {
     "high": 4,
