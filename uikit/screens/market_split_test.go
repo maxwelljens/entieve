@@ -5,7 +5,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/entieve/entieve/uikit/internal/uitest"
+	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"

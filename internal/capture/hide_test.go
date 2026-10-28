@@ -1,4 +1,4 @@
-package uitest
+package capture
 
 import (
 	"os"

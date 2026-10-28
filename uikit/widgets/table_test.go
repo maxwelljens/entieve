@@ -2,7 +2,7 @@ package widgets
 
 import (
 	"fmt"
-	"github.com/entieve/entieve/uikit/internal/uitest"
+	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/uikit/theme"
 	"image"
 	"image/color"

@@ -3,9 +3,9 @@ package render
 import (
 	"image/color"
 	"math"
-	"os"
 	"testing"
 
+	"github.com/entieve/entieve/internal/capture"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
@@ -55,40 +55,31 @@ func TestColorScalePremultiplies(t *testing.T) {
 // opaque red — the exact "dimming does nothing" bug.
 //
 // Pixel readback requires a running ebiten loop, so this is gated behind
-// ENTIEVE_CAPTURE=1 like the uikit frame captures (needs a display).
+// ENTIEVE_CAPTURE=1 like the frame captures (needs a display).
 func TestAlphaCompositeGroundTruth(t *testing.T) {
-	if os.Getenv("ENTIEVE_CAPTURE") == "" {
-		t.Skip("pixel readback needs a running ebiten loop; set ENTIEVE_CAPTURE=1")
-	}
-	// Pixel readback needs a running loop; the capture contract drives it
-	// hidden — SetWindowVisible(false) before RunGame, so no window ever
-	// shows on the desktop (and the probe can read pixels at all: reading
-	// before the game starts panics).
 	got := color.RGBA{}
-	probe := &alphaProbe{run: func() {
-		dst := ebiten.NewImage(40, 40)
-		dst.Fill(color.RGBA{0, 0, 255, 255})
+	(&capture.Capture{
+		Name:   "Entieve alpha composite probe",
+		Frames: 1,
+		Draw: func(_ int, _ *ebiten.Image) error {
+			dst := ebiten.NewImage(40, 40)
+			dst.Fill(color.RGBA{0, 0, 255, 255})
 
-		var path vector.Path
-		path.MoveTo(10, 10)
-		path.LineTo(30, 10)
-		path.LineTo(30, 30)
-		path.LineTo(10, 30)
-		path.Close()
-		vector.FillPath(dst, &path, nil, &vector.DrawPathOptions{
-			AntiAlias:  true,
-			ColorScale: colorScale(color.RGBA{255, 0, 0, 55}),
-		})
+			var path vector.Path
+			path.MoveTo(10, 10)
+			path.LineTo(30, 10)
+			path.LineTo(30, 30)
+			path.LineTo(10, 30)
+			path.Close()
+			vector.FillPath(dst, &path, nil, &vector.DrawPathOptions{
+				AntiAlias:  true,
+				ColorScale: colorScale(color.RGBA{255, 0, 0, 55}),
+			})
 
-		got = dst.At(20, 20).(color.RGBA)
-	}}
-	ebiten.SetWindowVisible(false)
-	if err := ebiten.RunGame(probe); err != nil {
-		t.Skipf("cannot run capture game loop: %v", err)
-	}
-	if !probe.ran {
-		t.Fatal("the probe never framed")
-	}
+			got = dst.At(20, 20).(color.RGBA)
+			return nil
+		},
+	}).Run(t)
 	a := 55.0 / 255.0
 	want := color.RGBA{
 		R: uint8(math.Round(255*a + 0*(1-a))),
@@ -99,32 +90,6 @@ func TestAlphaCompositeGroundTruth(t *testing.T) {
 	if !near(got, want, 2) {
 		t.Fatalf("composite = %v, want %v (out = src·a + dst·(1−a), a=55/255)", got, want)
 	}
-}
-
-// alphaProbe draws the ground truth once inside the running loop — the
-// only place pixel readback is legal — then terminates.
-type alphaProbe struct {
-	ran  bool
-	done bool
-	run  func()
-}
-
-func (p *alphaProbe) Layout(ow, oh int) (int, int) { return ow, oh }
-
-func (p *alphaProbe) Update() error {
-	if p.done {
-		return ebiten.Termination
-	}
-	return nil
-}
-
-func (p *alphaProbe) Draw(*ebiten.Image) {
-	if p.done {
-		return
-	}
-	p.ran = true
-	p.run()
-	p.done = true
 }
 
 // unorm maps a 0..1 component back to 8-bit.

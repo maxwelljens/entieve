@@ -13,6 +13,7 @@ Everything runs through the [justfile](justfile) — `just` lists the recipes.
 | `just run` | play the game (Ebitengine window; flags pass through) |
 | `just check` | the gate: fmt-check, lint (go vet), test, content validate |
 | `just test` | the whole test suite (headless, no GPU needed) |
+| `just capture [name]` | render the gated capture PNGs (one ebiten loop per process) |
 | `just validate` | lint and cross-check all game content |
 | `just simulate …` | headless sim + state report (tick-scheduled `--script` steps) |
 | `just describe <id>` | any content id as JSON (near-miss suggestions on typos) |

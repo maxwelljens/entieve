@@ -85,6 +85,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One capture driver, `just capture`** (`internal/capture`, every gated
+  capture test): the 21 `ENTIEVE_CAPTURE` captures no longer re-implement the
+  envelope — a `capture.Capture{Name, Frames, Size, Update, Draw, Verify, Out}`
+  owns the `ENTIEVE_CAPTURE` skip, the `$ENTIEVE_CAPTURE_DIR` fallback, the
+  `SetWindowVisible(false)` loop, the PNG save and the failure report, and the
+  one-loop-per-process guard now covers the `game` and `render` captures too
+  (they used to call `ebiten.RunGame` bare, so two in one process aborted).
+  The driver is the leaf package `internal/capture` (the uikit test support
+  moved to `internal/uitest`, since `uikit/theme` imports `render`); `just
+  capture [name]` runs each capture in its own process. Pixel output and every
+  assertion are unchanged.
 - **Panel gating and the Tab cycle follow the verb table** (`uikit/screens`):
   the Selected Item panel's `syncSelected` is one loop of `VerbReady` (the
   Warp `tooClose` case is the row's `Ready` reason; `canLock` and
