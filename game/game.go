@@ -897,11 +897,6 @@ func (g *Game) placeDefaults(w, h int) {
 	}
 }
 
-// helpRows converts KeyMap into the help panel's row shape (the shared
-// "key — description" rows, description-only tables composed). The
-// session variant (helpRowsFor) uses the live keys.
-func helpRows() []uikit.KeyRow { return helpRowsFor(nil) }
-
 // ---------------------------------------------------------------------------
 // Draw
 // ---------------------------------------------------------------------------

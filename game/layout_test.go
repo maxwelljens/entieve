@@ -756,9 +756,9 @@ func TestSplitRatiosPersistAcrossRestart(t *testing.T) {
 
 	// Drag inventory's first seam and fitting's only one (through the same
 	// panels the windows expose to the sidecar).
-	inv := g.host.Splits(idInventory)
+	inv := g.host.Slot(string(idInventory)).Splits()
 	inv[0].Split.SetRatio(inv[0].Index, 0.42)
-	fit := g.host.Splits(idFitting)
+	fit := g.host.Slot(string(idFitting)).Splits()
 	fit[0].Split.SetRatio(fit[0].Index, 0.7)
 
 	if err := g.SaveGame(); err != nil {
@@ -791,19 +791,19 @@ func TestSplitRatiosPersistAcrossRestart(t *testing.T) {
 	g2.host.SetOpen(idFitting, true)
 	g2.syncMounts()
 	pump(t, g2, 1280, 720)
-	if got := seamRatio("inventory-ore", g2.host.Splits(idInventory)); got != 0.42 {
+	if got := seamRatio("inventory-ore", g2.host.Slot(string(idInventory)).Splits()); got != 0.42 {
 		t.Errorf("restored inventory-ore = %v, want 0.42", got)
 	}
-	if got := seamRatio("inventory-hangar", g2.host.Splits(idInventory)); got != float64(2)/3 {
+	if got := seamRatio("inventory-hangar", g2.host.Slot(string(idInventory)).Splits()); got != float64(2)/3 {
 		t.Errorf("restored inventory-hangar = %v, want the equal share", got)
 	}
-	if got := seamRatio("fitting-hangar", g2.host.Splits(idFitting)); got != 0.7 {
+	if got := seamRatio("fitting-hangar", g2.host.Slot(string(idFitting)).Splits()); got != 0.7 {
 		t.Errorf("restored fitting-hangar = %v, want 0.7", got)
 	}
 	g2.applySize(1024, 700)
 	pump(t, g2, 1024, 700)
-	assertSplitTiled(t, "inventory", g2.host.Splits(idInventory)[0].Split)
-	assertSplitTiled(t, "fitting", g2.host.Splits(idFitting)[0].Split)
+	assertSplitTiled(t, "inventory", g2.host.Slot(string(idInventory)).Splits()[0].Split)
+	assertSplitTiled(t, "fitting", g2.host.Slot(string(idFitting)).Splits()[0].Split)
 }
 
 // TestSidecarV2MigratesToSplits: a hand-written version-2 sidecar (the
@@ -837,14 +837,14 @@ func TestSidecarV2MigratesToSplits(t *testing.T) {
 	if g.host.IsOpen(idManufacturing) {
 		t.Error("v2 manufacturing open flag not restored (want closed)")
 	}
-	for _, sm := range g.host.Splits(idInventory) {
+	for _, sm := range g.host.Slot(string(idInventory)).Splits() {
 		if got, want := sm.Split.Ratio(sm.Index), float64(sm.Index+1)/3; got != want {
 			t.Errorf("v2 %s = %v, want the equal-share default %v", sm.Name, got, want)
 		}
 	}
 	// The fitting split opens at 0.6: its tile grid needs the taller slots
 	// pane at the window's frozen height (see screens.NewFitting).
-	if got := seamRatio("fitting-hangar", g.host.Splits(idFitting)); got != 0.6 {
+	if got := seamRatio("fitting-hangar", g.host.Slot(string(idFitting)).Splits()); got != 0.6 {
 		t.Errorf("v2 fitting-hangar = %v, want the 0.6 slots share", got)
 	}
 
@@ -884,15 +884,15 @@ func TestSplitRatioOutOfRangeClamps(t *testing.T) {
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
 
-	if got := seamRatio("fitting-hangar", g.host.Splits(idFitting)); got != widgets.SplitMaxRatio {
+	if got := seamRatio("fitting-hangar", g.host.Slot(string(idFitting)).Splits()); got != widgets.SplitMaxRatio {
 		t.Errorf("fitting-hangar = %v, want the clamped max %v", got, widgets.SplitMaxRatio)
 	}
-	if got := seamRatio("manufacturing-jobs", g.host.Splits(idManufacturing)); got != widgets.SplitMinRatio {
+	if got := seamRatio("manufacturing-jobs", g.host.Slot(string(idManufacturing)).Splits()); got != widgets.SplitMinRatio {
 		t.Errorf("manufacturing-jobs = %v, want the clamped min %v", got, widgets.SplitMinRatio)
 	}
 	// Fitting restores open, so its split is laid out; manufacturing is
 	// docked-only and closed here, so only its stored ratio is checked.
-	assertSplitTiled(t, "fitting", g.host.Splits(idFitting)[0].Split)
+	assertSplitTiled(t, "fitting", g.host.Slot(string(idFitting)).Splits()[0].Split)
 }
 
 // assertSplitRowTiled: a row split's panes and hairlines fill its rect
@@ -930,7 +930,7 @@ func TestMarketSplitRatioPersists(t *testing.T) {
 	// at the 760 px landing rect (760 − 2·ContentsPad − both 4 px seams).
 	const treeOpening = 176.0 / 736
 	const ordersOpening = (176.0 + 320) / 736
-	seams := g.host.Splits(idMarket)
+	seams := g.host.Slot(string(idMarket)).Splits()
 	if len(seams) != 2 || seams[0].Name != "market-tree" || seams[1].Name != "market-orders" {
 		t.Fatalf("market seams = %+v, want market-tree then market-orders", seams)
 	}
@@ -964,21 +964,21 @@ func TestMarketSplitRatioPersists(t *testing.T) {
 	g2.host.SetOpen(idMarket, true)
 	g2.syncMounts()
 	pump(t, g2, 1280, 720)
-	if got := seamRatio("market-tree", g2.host.Splits(idMarket)); math.Abs(got-0.32) > 1e-9 {
+	if got := seamRatio("market-tree", g2.host.Slot(string(idMarket)).Splits()); math.Abs(got-0.32) > 1e-9 {
 		t.Errorf("restored market-tree = %v, want 0.32", got)
 	}
-	if got := seamRatio("market-orders", g2.host.Splits(idMarket)); math.Abs(got-0.71) > 1e-9 {
+	if got := seamRatio("market-orders", g2.host.Slot(string(idMarket)).Splits()); math.Abs(got-0.71) > 1e-9 {
 		t.Errorf("restored market-orders = %v, want 0.71", got)
 	}
-	assertSplitRowTiled(t, "market", g2.host.Splits(idMarket)[0].Split)
+	assertSplitRowTiled(t, "market", g2.host.Slot(string(idMarket)).Splits()[0].Split)
 	g2.applySize(1024, 700)
 	pump(t, g2, 1024, 700)
-	assertSplitRowTiled(t, "market", g2.host.Splits(idMarket)[0].Split)
+	assertSplitRowTiled(t, "market", g2.host.Slot(string(idMarket)).Splits()[0].Split)
 
 	// Reset window layout: back to the market's opening shares (176 px of
 	// browse, the old 240 px column), not the widget's equal thirds.
 	g2.resetLayout()
-	seams = g2.host.Splits(idMarket)
+	seams = g2.host.Slot(string(idMarket)).Splits()
 	if got := seamRatio("market-tree", seams); math.Abs(got-treeOpening) > 1e-9 {
 		t.Errorf("after reset market-tree = %v, want the opening share %v", got, treeOpening)
 	}
@@ -1001,7 +1001,7 @@ func TestMarketSplitV2Default(t *testing.T) {
 	g := newShowcaseGameAt(t, path)
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
-	if got := seamRatio("market-orders", g.host.Splits(idMarket)); math.Abs(got-opening) > 1e-9 {
+	if got := seamRatio("market-orders", g.host.Slot(string(idMarket)).Splits()); math.Abs(got-opening) > 1e-9 {
 		t.Errorf("v2 market-orders = %v, want the opening share %v", got, opening)
 	}
 	if err := g.writeLayout(); err != nil {

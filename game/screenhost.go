@@ -235,7 +235,7 @@ func (h *ScreenHost) setMounted(s *screenSlot, want, quiet bool) {
 		// The window's table rows are its hit-test row surface: one live
 		// closure per mount, over the row's tables, so a table swapped
 		// inside the panel is seen.
-		h.sink.SetWindowRows(win, h.rowSurface(s.row.ID))
+		h.sink.SetWindowRows(win, h.rowSurface(s))
 		s.dismissed = false
 		s.panel.Sync()
 		h.fit(s)
@@ -396,37 +396,11 @@ func (h *ScreenHost) Want(id ScreenID, room Room) bool {
 // Slot resolves a sidecar name (== row id) for the layout sidecar.
 func (h *ScreenHost) Slot(name string) *screenSlot { return h.byID[ScreenID(name)] }
 
-// Splits returns a row's named seams (nil when the panel has no panes or
-// is not built).
-func (h *ScreenHost) Splits(id ScreenID) []widgets.Seam {
-	s := h.byID[id]
-	if s == nil || s.panel == nil {
-		return nil
-	}
-	if p, ok := s.panel.(interface{ Splits() []widgets.Seam }); ok {
-		return p.Splits()
-	}
-	return nil
-}
-
-// Tables returns a row's tables (nil when the panel has none or is not
-// built).
-func (h *ScreenHost) Tables(id ScreenID) []*widgets.Table {
-	s := h.byID[id]
-	if s == nil || s.panel == nil {
-		return nil
-	}
-	if p, ok := s.panel.(interface{ Tables() []*widgets.Table }); ok {
-		return p.Tables()
-	}
-	return nil
-}
-
 // rowSurface is a row's table-row surface for the kit's hit test: its
-// tables, resolved live through Tables(id) — a panel may swap them.
-func (h *ScreenHost) rowSurface(id ScreenID) func(image.Point) bool {
+// tables, resolved live through the slot — a panel may swap them.
+func (h *ScreenHost) rowSurface(s *screenSlot) func(image.Point) bool {
 	return func(pt image.Point) bool {
-		for _, t := range h.Tables(id) {
+		for _, t := range s.Tables() {
 			if t.RowAt(pt) {
 				return true
 			}

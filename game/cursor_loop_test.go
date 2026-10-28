@@ -23,12 +23,12 @@ func TestCursorShapePresentsOnEveryDraw(t *testing.T) {
 	}{
 		{"inventory vertical seam", func(g *Game) { g.host.SetOpen(idInventory, true) },
 			func(t *testing.T, g *Game) image.Point {
-				r := g.host.Splits(idInventory)[0].Split.Container().Children()[1].GetWidget().Rect
+				r := g.host.Slot(string(idInventory)).Splits()[0].Split.Container().Children()[1].GetWidget().Rect
 				return image.Pt(r.Min.X+2, r.Min.Y)
 			}, ebiten.CursorShapeNSResize},
 		{"market horizontal seam", func(g *Game) { g.host.SetOpen(idMarket, true) },
 			func(t *testing.T, g *Game) image.Point {
-				r := g.host.Splits(idMarket)[0].Split.Container().Children()[1].GetWidget().Rect
+				r := g.host.Slot(string(idMarket)).Splits()[0].Split.Container().Children()[1].GetWidget().Rect
 				return image.Pt(r.Min.X, r.Min.Y+r.Dy()/2)
 			}, ebiten.CursorShapeEWResize},
 		{"window edge grip", func(g *Game) { g.host.SetOpen(idInventory, true) },

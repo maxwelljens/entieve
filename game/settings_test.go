@@ -420,9 +420,9 @@ func TestSettingsPanelMounts(t *testing.T) {
 	if _, ok := f.Windows["settings"]; !ok {
 		t.Errorf("settings window missing from the sidecar: %v", keysOf(f.Windows))
 	}
-	// The help overlay documents the key (KeyMap → helpRows).
+	// The help overlay documents the key (KeyMap → helpRowsFor).
 	have := false
-	for _, r := range helpRows() {
+	for _, r := range helpRowsFor(nil) {
 		if r.Key == "P" {
 			have = true
 		}

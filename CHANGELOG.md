@@ -85,6 +85,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Test-only forwarders removed** (`uikit/screens`, `uikit/widgets`, `game`):
+  `Session.OpenRowMenu`, `ScreenHost.Splits`/`Tables`, `widgets.FitColumns`
+  and `helpRows` had no production caller — every panel calls
+  `widgets.OpenRowMenu`, the layout sidecar reads the slot — so tests now
+  drive the live functions and the widgets test harness lost its uncalled
+  chrome half. No behavior change.
 - **Panel gating and the Tab cycle follow the verb table** (`uikit/screens`):
   the Selected Item panel's `syncSelected` is one loop of `VerbReady` (the
   Warp `tooClose` case is the row's `Ready` reason; `canLock` and

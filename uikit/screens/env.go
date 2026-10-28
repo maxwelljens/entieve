@@ -69,10 +69,6 @@ type Session interface {
 	// click position in screen space). It replaces any menu already up.
 	// Exactly what Do(OpenMenu{…}) executes.
 	OpenMenu(entries []widgets.MenuEntry, at image.Point)
-
-	// OpenRowMenu derives a row's context menu from its RowSpec and
-	// opens it at at — through the sink (Do(OpenMenu{…})).
-	OpenRowMenu(spec widgets.RowSpec, at image.Point)
 }
 
 // session is the Session implementation NewEnv and Kit.Env return: the
@@ -131,10 +127,6 @@ func (s *session) OpenMenu(entries []widgets.MenuEntry, at image.Point) {
 	if m := s.Menu(); m != nil {
 		m.Open(entries, at)
 	}
-}
-
-func (s *session) OpenRowMenu(spec widgets.RowSpec, at image.Point) {
-	widgets.OpenRowMenu(s, s, spec, at)
 }
 
 // NewEnv builds a standalone session — the default EVE-dark Theme over
