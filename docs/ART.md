@@ -203,7 +203,9 @@ window title.
   art under the content id, so a dropped file wins every icon slot for that id
   (module tiles, rack, market rows, tooltips, the Show Info hero, and the
   corporation mark on the info maker line and the fitting maker block) with no
-  manifest edit; content without a file falls back exactly as before.
+  manifest edit; a dropped hull icon wins through `theme.HullIconFor`, else
+  the `row_hull` silhouette; content without a file falls back exactly as
+  before.
 - **Optical fit**: glyphs that sit off-centre in their frame carry a
   per-icon `nudge` (fractions of the box) in `manifest.json`.
 - **Fallback**: an unknown name renders the neutral gear, so a new kind can

@@ -191,12 +191,12 @@ func manufacturedRows(cv widgets.ContentView, id string) []infoRow {
 			infoRow{Label: "Base time", Value: theme.GroupFloat(r.Time, 1) + " s"})
 	}
 	for _, in := range r.Inputs {
-		name := widgets.ChainName(cv, in.Item)
-		if ref, ok := widgets.RefOfID(cv, string(in.Item)); ok {
-			rows = append(rows, refRow(name, ref, chainVal(in.Qty)))
+		t := widgets.ResolveTradeable(cv.Defs(), in.Item)
+		if ref, ok := t.Ref(); ok {
+			rows = append(rows, refRow(t.Name, ref, chainVal(in.Qty)))
 			continue
 		}
-		rows = append(rows, infoRow{Label: name, Value: chainVal(in.Qty)})
+		rows = append(rows, infoRow{Label: t.Name, Value: chainVal(in.Qty)})
 	}
 	return rows
 }
@@ -208,12 +208,12 @@ func manufacturedRows(cv widgets.ContentView, id string) []infoRow {
 func usedInRows(cv widgets.ContentView, id string) []infoRow {
 	var rows []infoRow
 	for _, r := range recipesUsing(cv, id) {
-		name := widgets.ChainName(cv, r.Product)
-		if ref, ok := widgets.RefOfID(cv, string(r.Product)); ok {
-			rows = append(rows, refRow(name, ref, chainVal(float64(r.Qty))))
+		t := widgets.ResolveTradeable(cv.Defs(), r.Product)
+		if ref, ok := t.Ref(); ok {
+			rows = append(rows, refRow(t.Name, ref, chainVal(float64(r.Qty))))
 			continue
 		}
-		rows = append(rows, infoRow{Label: name, Value: chainVal(float64(r.Qty))})
+		rows = append(rows, infoRow{Label: t.Name, Value: chainVal(float64(r.Qty))})
 	}
 	return rows
 }
@@ -271,7 +271,7 @@ func infoPageFor(cv widgets.ContentView, ref widgets.InfoRef) (infoPage, bool) {
 // for the unattributed rat hulls), slots, the survival block with resists,
 // capacitor, propulsion, sensors and cargo.
 func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
-	p := infoPage{Hero: "row_hull", Title: def.Name, Prose: def.Description, Emblem: def.Maker}
+	p := infoPage{Hero: theme.HullIconFor(def), Title: def.Name, Prose: def.Description, Emblem: def.Maker}
 	if def.Class != "" {
 		p.Sub = spacedKind(def.Class)
 	}
@@ -484,15 +484,12 @@ func itemPage(cv widgets.ContentView, def *content.ItemDef) infoPage {
 		sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 		var rows []infoRow
 		for _, id := range ids {
-			name := string(id)
-			if d, ok := cv.Defs().Item(id); ok {
-				name = d.Name
-			}
-			if ref, ok := widgets.RefOfID(cv, string(id)); ok {
-				rows = append(rows, refRow(name, ref, theme.FormatPct(def.RefineYield[id])))
+			t := widgets.ResolveTradeable(cv.Defs(), id)
+			if ref, ok := t.Ref(); ok {
+				rows = append(rows, refRow(t.Name, ref, theme.FormatPct(def.RefineYield[id])))
 				continue
 			}
-			rows = append(rows, infoRow{Label: name, Value: theme.FormatPct(def.RefineYield[id])})
+			rows = append(rows, infoRow{Label: t.Name, Value: theme.FormatPct(def.RefineYield[id])})
 		}
 		addSection(&p, "REFINES TO", rows)
 	}
@@ -557,10 +554,7 @@ func npcPage(cv widgets.ContentView, def *content.NpcDef) infoPage {
 
 	var loot []infoRow
 	for _, d := range def.Loot {
-		name := string(d.Item)
-		if it, ok := cv.Defs().Item(d.Item); ok {
-			name = it.Name
-		}
+		t := widgets.ResolveTradeable(cv.Defs(), d.Item)
 		value := theme.PctLabel(d.Chance)
 		switch {
 		case d.MinQty > 0 && d.MinQty != d.MaxQty:
@@ -568,11 +562,11 @@ func npcPage(cv widgets.ContentView, def *content.NpcDef) infoPage {
 		case d.MaxQty > 0:
 			value += " · ×" + theme.FormatInt(int64(d.MaxQty))
 		}
-		if ref, ok := widgets.RefOfID(cv, string(d.Item)); ok {
-			loot = append(loot, refRow(name, ref, value))
+		if ref, ok := t.Ref(); ok {
+			loot = append(loot, refRow(t.Name, ref, value))
 			continue
 		}
-		loot = append(loot, infoRow{Label: name, Value: value})
+		loot = append(loot, infoRow{Label: t.Name, Value: value})
 	}
 	addSection(&p, "LOOT", loot)
 	return p

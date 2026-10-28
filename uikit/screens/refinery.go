@@ -201,7 +201,7 @@ func (r *Refinery) Sync() {
 	ores := r.oreStacks()
 	rows := make([]widgets.TableRow, 0, len(ores))
 	for _, st := range ores {
-		ref, _ := widgets.RefOfID(r.cv, string(st.Item))
+		ref, _ := widgets.ResolveTradeable(r.cv.Defs(), st.Item).Ref()
 		row := refineryRow{ore: st.Item, ref: ref}
 		def, _ := r.cv.Defs().Item(st.Item)
 		rows = append(rows, widgets.TableRow{
@@ -210,7 +210,7 @@ func (r *Refinery) Sync() {
 				theme.FormatInt(int64(st.Qty)),
 				outputsText(r.cv, refineOutputs(r.cv, def, sim.RefineBatch)),
 			},
-			Icons: []string{productIcon(r.cv, st.Item), "", ""},
+			Icons: []string{widgets.TradeableIcon(r.cv.Defs(), st.Item), "", ""},
 			Data:  row,
 			Spec: widgets.RowSpec{Ref: &row.ref, Actions: []widgets.RowAction{{
 				Label: "Refine", Disabled: !r.refineReadyFor(row),

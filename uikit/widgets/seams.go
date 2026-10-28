@@ -415,16 +415,7 @@ func (v *view) PriceLadder(station sim.StationID, item content.ItemID) float64 {
 // TradeableName mirrors the sim's own itemName (items, modules, hulls) so
 // the UI names an id exactly as the log lines do.
 func (v *view) TradeableName(id content.ItemID) string {
-	if d, ok := v.c.Item(id); ok {
-		return d.Name
-	}
-	if d, ok := v.c.Module(content.ModuleID(id)); ok {
-		return d.Name
-	}
-	if d, ok := v.c.Ship(content.ShipID(id)); ok {
-		return d.Name
-	}
-	return string(id)
+	return TradeableName(v.c, id)
 }
 
 func (v *view) DockedIndustry() sim.StationID { return v.s.DockedIndustry() }

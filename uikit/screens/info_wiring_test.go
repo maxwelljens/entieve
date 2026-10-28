@@ -344,7 +344,7 @@ func TestRowSpecMenuShape(t *testing.T) {
 	if ents[0].Label != "Show Info" || !ents[0].Bold || ents[0].Disabled {
 		t.Errorf("entry 0 = %+v, want a bold, enabled Show Info", ents[0])
 	}
-	wantSecond := "Show Info — " + widgets.ChainName(env, "ammo-fusion-s")
+	wantSecond := "Show Info — " + widgets.TradeableName(env.Defs(), "ammo-fusion-s")
 	if ents[1].Label != wantSecond || ents[1].Bold {
 		t.Errorf("entry 1 = %+v, want the non-bold secondary %q", ents[1], wantSecond)
 	}

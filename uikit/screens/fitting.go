@@ -1071,13 +1071,14 @@ func (f *Fitting) hangarRows() []widgets.TableRow {
 		})
 	}
 	for _, ss := range f.cv.HangarShips() {
-		name := string(ss.Hull)
-		if def, ok := f.cv.Defs().Ship(ss.Hull); ok {
-			name = def.Name
+		def, ok := f.cv.Defs().Ship(ss.Hull)
+		name, icon := string(ss.Hull), theme.HullIcon
+		if ok {
+			name, icon = def.Name, theme.HullIconFor(def)
 		}
 		rows = append(rows, widgets.TableRow{
 			Cells: []string{name, "×1"},
-			Icons: []string{"row_hull", ""},
+			Icons: []string{icon, ""},
 			Data:  ss.Hull,
 			Spec:  f.hangarSpec(ss.Hull),
 		})

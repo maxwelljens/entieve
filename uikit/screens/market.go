@@ -244,25 +244,17 @@ func marketInfo(d *content.Content, items []content.ItemID) (group, maker map[co
 	return group, maker
 }
 
-// itemIcon picks one tradeable's row glyph: a module's own icon (its art,
-// else its class glyph), an item's icon (drop-in art, else its category
-// silhouette), else the market group's glyph for the entries that are not
-// item defs (hulls). Branch/parent rows stay text-only; an unknown group
-// returns "".
+// itemIcon picks one tradeable's row glyph through the one resolver (a
+// module's own icon, an item's icon, a hull's drop-in art or silhouette).
+// A stale hull id — one whose def is gone but whose market group still says
+// Ships/ — keeps the hull silhouette; branch/parent rows stay text-only and
+// any other unknown group returns "".
 func (m *Market) itemIcon(item content.ItemID) string {
-	if d := m.cv.Defs(); d != nil {
-		if def := d.Modules[content.ModuleID(item)]; def != nil {
-			return theme.ModuleIconFor(def)
-		}
-		if def, ok := d.Item(item); ok {
-			return theme.ItemIconFor(def)
-		}
+	t := widgets.ResolveTradeable(m.cv.Defs(), item)
+	if !t.Found && strings.HasPrefix(m.group[item], "Ships/") {
+		return theme.HullIcon
 	}
-	switch g := m.group[item]; {
-	case strings.HasPrefix(g, "Ships/"):
-		return "row_hull"
-	}
-	return ""
+	return t.Icon
 }
 
 // mktRowIcon is every market item row's icon box: 20 px (30 px of content in

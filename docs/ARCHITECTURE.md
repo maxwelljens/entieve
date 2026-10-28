@@ -872,7 +872,13 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > `icon` key when the registry knows it, else its class glyph — every
 > module-specific surface (fitting/rack tiles, hangar rows, Show Info module
 > header, module tooltip, market module rows) goes through it, so a bad key
-> degrades to the glyph. The widget surface that grew with it:
+> degrades to the glyph. `theme.HullIconFor(def)` is the hull-icon rule: the
+> player's drop-in art for the hull id, else the `row_hull` silhouette
+> (`theme.HullIcon`). One resolver names and draws every tradeable id:
+> `widgets.ResolveTradeable` (item → module → hull, the sim's `itemName`
+> order) yields `{Kind, Name, Icon, Found}` and a `Ref()`; market,
+> manufacturing, refinery, the Show Info link rows and its hull hero all read
+> it, so one id cannot resolve two ways. The widget surface that grew with it:
 > `TableRow.Icons`/`TableRow.IconTint`/`TableRow.IconSize` (icon box + label
 > cells in left-aligned columns — `IconSize` 0 is the 16 px `IconInline`, the
 > market rows set 20, and the width reservation/ellipsize budget follow it;

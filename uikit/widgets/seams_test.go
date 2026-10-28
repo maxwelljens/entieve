@@ -47,6 +47,9 @@ func TestViewTradeableName(t *testing.T) {
 		if got := cv.TradeableName(content.ItemID(tc.id)); got != tc.want {
 			t.Errorf("TradeableName(%q) = %q, want %q", tc.id, got, tc.want)
 		}
+		if got := ResolveTradeable(c, content.ItemID(tc.id)).Name; got != tc.want {
+			t.Errorf("ResolveTradeable(%q).Name = %q, want %q", tc.id, got, tc.want)
+		}
 	}
 }
 

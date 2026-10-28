@@ -166,6 +166,22 @@ func TestDropinArtWinsEveryIconSlot(t *testing.T) {
 	}
 }
 
+// TestHullIconFor: a hull without drop-in art draws the row_hull silhouette;
+// the player's drop-in art (assets/icons, keyed by the content id) wins every
+// hull slot — rows, market tree and the Show Info hero.
+func TestHullIconFor(t *testing.T) {
+	if got := HullIconFor(&content.ShipDef{ID: "ship-nowhere"}); got != HullIcon {
+		t.Errorf("HullIconFor(no drop-in) = %q, want %q", got, HullIcon)
+	}
+	icons.RegisterArt("ship-test-dropin", image.NewNRGBA(image.Rect(0, 0, 1, 1)))
+	if got, want := HullIconFor(&content.ShipDef{ID: "ship-test-dropin"}), "ship-test-dropin"; got != want {
+		t.Errorf("HullIconFor(drop-in) = %q, want the drop-in id %q", got, want)
+	}
+	if got := HullIconFor(nil); got != "" {
+		t.Errorf("HullIconFor(nil) = %q, want empty", got)
+	}
+}
+
 // TestHeroOutgrowsCorpLogo pins the icon ladder the panels draw at: the
 // Show Info hero is the biggest box (128 px), twice the info maker-line mark
 // (80 px), which is twice the fitting window's corporation block (40 px);
