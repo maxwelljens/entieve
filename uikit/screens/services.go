@@ -115,7 +115,8 @@ func NewServices(env widgets.Seams, innerWidth int) *Services {
 	for i := range s.btns {
 		b := &s.btns[i]
 		b.btn = widget.NewButton(
-			widget.ButtonOpts.Image(svcCellImages(p)),
+			// The strip's quiet cell: the theme's cell chrome, unlit.
+			widget.ButtonOpts.Image(theme.CellImage(p, false)),
 			widget.ButtonOpts.WidgetOpts(
 				widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 					StretchHorizontal: true,
@@ -264,16 +265,4 @@ func hintFor(b *svcButton) string {
 		return "Click: undock from the station"
 	}
 	return "Click: toggle " + b.label
-}
-
-// svcCellImages is the service button chrome — the strip's quiet
-// bordered cells with the house hover/press states.
-func svcCellImages(p theme.Palette) *widget.ButtonImage {
-	return &widget.ButtonImage{
-		Idle:         theme.Bordered(theme.NRGBA(p.BG, 210), theme.NRGBA(p.Border, 200), 1),
-		Hover:        theme.Bordered(theme.NRGBA(p.Accent, 95), theme.Solid(p.Accent), 1),
-		Pressed:      theme.Bordered(theme.NRGBA(p.Accent, 110), theme.NRGBA(p.Accent, 220), 1),
-		PressedHover: theme.Bordered(theme.NRGBA(p.Accent, 110), theme.Solid(p.Accent), 1),
-		Disabled:     theme.Bordered(theme.NRGBA(p.Cell, 140), theme.NRGBA(p.Border, 110), 1),
-	}
 }
