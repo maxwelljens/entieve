@@ -57,7 +57,7 @@ func TestMarketRowIcons(t *testing.T) {
 		}
 		seen[r.Icons[0]] = true
 	}
-	for _, want := range []string{"mod-autocannon-s", "ammo", "loot-navdata", "min-ferrite", "ore-sterngrit", "row_hull"} {
+	for _, want := range []string{"mod-autocannon-s", "ammo", "loot-navdata", "min-ferrite", "ore-sterngrit", theme.HullIcon} {
 		if !seen[want] {
 			t.Errorf("no catalog row carries %q (saw %v)", want, seen)
 		}

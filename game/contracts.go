@@ -419,7 +419,7 @@ func (g *Game) objectiveRef(id content.ContractID) (widgets.InfoRef, bool) {
 	case def.Objective.Target != "":
 		ref = widgets.NpcRef(def.Objective.Target)
 	case def.Objective.Item != "":
-		ref, _ = widgets.RefOfID(g.env, string(def.Objective.Item))
+		ref, _ = widgets.ResolveTradeable(g.env.Defs(), def.Objective.Item).Ref()
 	default:
 		return widgets.InfoRef{}, false
 	}

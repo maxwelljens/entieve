@@ -125,7 +125,7 @@ func RowMenuEntries(cv ContentView, as ActionSink, spec RowSpec) []MenuEntry {
 func showInfoEntry(cv ContentView, as ActionSink, ref InfoRef, primary bool) MenuEntry {
 	label := "Show Info"
 	if !primary {
-		label += " — " + ChainName(cv, content.ItemID(ref.ID))
+		label += " — " + TradeableName(cv.Defs(), content.ItemID(ref.ID))
 	}
 	ok := InfoRefExists(cv, ref)
 	return MenuEntry{Label: label, Bold: primary, Disabled: !ok, Action: func() {

@@ -96,9 +96,9 @@ func InfoRefFor(cv ContentView, entity ecs.Entity) (InfoRef, bool) {
 }
 
 // InfoRefOf resolves a row payload to a Show Info ref. The table surfaces
-// hand it whatever their TableRow.Data carries (see market.itemLabel for
-// the same multi-kind resolution); false means the row has nothing to
-// show and its Show Info entry stays disabled.
+// hand it whatever their TableRow.Data carries (the tradeable resolver names
+// the same multi-kind ids); false means the row has nothing to show and its
+// Show Info entry stays disabled.
 func InfoRefOf(cv ContentView, data any) (InfoRef, bool) {
 	switch v := data.(type) {
 	case InfoRef:
@@ -106,31 +106,13 @@ func InfoRefOf(cv ContentView, data any) (InfoRef, bool) {
 	case infoRefPayload: // screen row payloads answer for themselves
 		return v.InfoRefOf(cv)
 	case content.ItemID:
-		return RefOfID(cv, string(v))
+		return ResolveTradeable(cv.Defs(), v).Ref()
 	case content.ModuleID:
-		return RefOfID(cv, string(v))
+		return ResolveTradeable(cv.Defs(), content.ItemID(v)).Ref()
 	case content.ShipID:
-		return RefOfID(cv, string(v))
+		return ResolveTradeable(cv.Defs(), content.ItemID(v)).Ref()
 	case ecs.Entity:
 		return InfoRefFor(cv, v)
-	}
-	return InfoRef{}, false
-}
-
-// refOfID resolves a raw id the way itemLabel does: item, then module,
-// then ship (holds can store any of them under one id type).
-func RefOfID(cv ContentView, id string) (InfoRef, bool) {
-	if cv.Defs() == nil || id == "" {
-		return InfoRef{}, false
-	}
-	if _, ok := cv.Defs().Item(content.ItemID(id)); ok {
-		return ItemRef(content.ItemID(id)), true
-	}
-	if _, ok := cv.Defs().Module(content.ModuleID(id)); ok {
-		return ModuleRef(content.ModuleID(id)), true
-	}
-	if _, ok := cv.Defs().Ship(content.ShipID(id)); ok {
-		return ShipRef(content.ShipID(id)), true
 	}
 	return InfoRef{}, false
 }
@@ -157,20 +139,6 @@ func InfoRefExists(cv ContentView, ref InfoRef) bool {
 	return false
 }
 
-// chainName resolves a raw def id (item, module or ship) for display.
-func ChainName(cv ContentView, id content.ItemID) string {
-	if d, ok := cv.Defs().Item(id); ok {
-		return d.Name
-	}
-	if d, ok := cv.Defs().Module(content.ModuleID(id)); ok {
-		return d.Name
-	}
-	if d, ok := cv.Defs().Ship(content.ShipID(id)); ok {
-		return d.Name
-	}
-	return string(id)
-}
-
 // SlotPick is the fitting slot table's row payload: the slot reference
 // plus the fitted module ID ("" = the slot is empty).
 type SlotPick struct {
@@ -184,5 +152,5 @@ func (s SlotPick) InfoRefOf(cv ContentView) (InfoRef, bool) {
 	if s.Mod == "" {
 		return InfoRef{}, false
 	}
-	return RefOfID(cv, string(s.Mod))
+	return ResolveTradeable(cv.Defs(), content.ItemID(s.Mod)).Ref()
 }

@@ -133,6 +133,23 @@ func ItemIconFor(def *content.ItemDef) string {
 	return icons.Fallback
 }
 
+// HullIcon is a hull's fallback glyph: the ship silhouette every hull row,
+// market tree entry and Show Info hero draws when the hull has no drop-in art.
+const HullIcon = "row_hull"
+
+// HullIconFor resolves one hull's icon: the player's drop-in art for its
+// content id first (assets/icons — the same precedence as ModuleIconFor), else
+// the HullIcon silhouette. nil is "".
+func HullIconFor(def *content.ShipDef) string {
+	if def == nil {
+		return ""
+	}
+	if id := string(def.ID); id != "" && icons.Has(id) {
+		return id
+	}
+	return HullIcon
+}
+
 // CorpIconFor resolves one corporation's logo: the player's drop-in art for
 // its corp-* slug, else "" — the caller then keeps the vector emblem
 // (uikit/emblems). The panels that draw a corporation mark (Show Info's

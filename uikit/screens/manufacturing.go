@@ -252,7 +252,7 @@ func (f *Manufacturing) Sync() {
 				theme.FormatCredits(s.JobFee(rec.ID, runs)),
 				inputsText(f.cv, mats),
 			},
-			Icons: []string{productIcon(f.cv, rec.Product), "", "", "", ""},
+			Icons: []string{widgets.TradeableIcon(f.cv.Defs(), rec.Product), "", "", "", ""},
 			Data:  row,
 			Spec:  f.rowSpec(row),
 		})
@@ -287,7 +287,7 @@ func (f *Manufacturing) Sync() {
 				f.progressOf(j),
 				jobStateLabel(j.State),
 			},
-			Icons: []string{productIcon(f.cv, f.productOfJob(j)), "", "", "", ""},
+			Icons: []string{widgets.TradeableIcon(f.cv.Defs(), f.productOfJob(j)), "", "", "", ""},
 			Data:  row,
 			Spec:  f.rowSpec(row),
 		})
@@ -358,7 +358,7 @@ func inputsText(cv widgets.ContentView, mats []content.CargoStack) string {
 
 // productRef resolves a recipe's product for the row's Show Info entry.
 func (f *Manufacturing) productRef(product content.ItemID) widgets.InfoRef {
-	ref, _ := widgets.RefOfID(f.cv, string(product))
+	ref, _ := widgets.ResolveTradeable(f.cv.Defs(), product).Ref()
 	return ref
 }
 
@@ -397,21 +397,6 @@ func jobStateLabel(state sim.JobState) string {
 		return "Ready"
 	}
 	return "Running"
-}
-
-// productIcon picks a recipe/job row's product glyph: hulls, a module's own
-// icon, an item's icon (drop-in art, else its category silhouette).
-func productIcon(cv widgets.ContentView, product content.ItemID) string {
-	if _, ok := cv.Defs().Ship(content.ShipID(product)); ok {
-		return "row_hull"
-	}
-	if def, ok := cv.Defs().Module(content.ModuleID(product)); ok {
-		return theme.ModuleIconFor(def)
-	}
-	if def, ok := cv.Defs().Item(product); ok {
-		return theme.ItemIconFor(def)
-	}
-	return ""
 }
 
 // startReadyFor is the Start gate for one recipe row: the sim would accept

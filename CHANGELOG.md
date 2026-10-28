@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **One tradeable resolver** (`uikit/widgets`): `ResolveTradeable` resolves
+  any marketable id — item, then module, then hull, the sim's `itemName`
+  order — to `{Kind, Name, Icon, Found}` plus `Ref()`, with
+  `TradeableName`/`TradeableIcon` forwarders. The market rows, manufacturing
+  and refinery rows, Show Info link rows and its hull hero now all read it;
+  `theme.HullIconFor` (drop-in `ship-*` art wins, else the `row_hull`
+  silhouette) replaces the literal glyph, so a dropped hull icon reaches every
+  hull slot including the Show Info hero. Fixes a drift where the market
+  checked module before item; ids are unique per kind, so only colliding or
+  stale data ever saw it.
+
 - **Drop-in icon art wired everywhere** (`assets/icons`, `uikit/icons`,
   `theme`): the owner's 38 hand-drawn icons — 14 modules, 10 corporations, 6
   minerals, 4 ores, 4 loot types — live in `assets/icons/` one PNG per content

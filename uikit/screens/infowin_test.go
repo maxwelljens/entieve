@@ -143,8 +143,8 @@ func TestInfoPageHull(t *testing.T) {
 	if !ok {
 		t.Fatal("full hull did not resolve")
 	}
-	if page.Title != full.Name || page.Hero != "row_hull" {
-		t.Errorf("header = %q/%q, want %q/row_hull", page.Title, page.Hero, full.Name)
+	if want := theme.HullIconFor(full); page.Title != full.Name || page.Hero != want {
+		t.Errorf("header = %q/%q, want %q/%q", page.Title, page.Hero, full.Name, want)
 	}
 	if page.Prose != full.Description {
 		t.Errorf("prose = %q, want the description", page.Prose)
