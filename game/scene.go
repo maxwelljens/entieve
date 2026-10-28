@@ -9,6 +9,7 @@ import (
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	uikit "github.com/entieve/entieve/uikit/screens"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
@@ -174,11 +175,11 @@ func (sc *SpaceScene) Update(in Input) error {
 		switch {
 		case ctrl && picked:
 			g.setSelected(inf.Entity)
-			g.s.Queue(sim.CmdLock{Target: inf.Entity})
+			g.Do(widgets.Lock{Entity: inf.Entity})
 		case picked:
 			g.setSelected(inf.Entity)
 			if sc.doubleClick(in.MouseX, in.MouseY) {
-				g.s.Queue(sim.CmdApproach{Target: inf.Entity})
+				g.Do(widgets.Approach{Entity: inf.Entity})
 			}
 		default:
 			if sc.doubleClick(in.MouseX, in.MouseY) {
@@ -192,7 +193,11 @@ func (sc *SpaceScene) Update(in Input) error {
 	if in.JustClicked[1] {
 		if inf, picked := sc.pick(cam, in.MouseX, in.MouseY); picked {
 			g.setSelected(inf.Entity)
-			g.s.Queue(sim.CmdOrbit{Target: inf.Entity, Range: orbitDefaultRange})
+			// The right-click orbit flies at orbitDefaultRange even when
+			// the Selected Item selector shows another value: the range
+			// rides the intent explicitly (0 would mean "the selector at
+			// dispatch").
+			g.Do(widgets.Orbit{Entity: inf.Entity, Range: orbitDefaultRange})
 		}
 	}
 	return nil

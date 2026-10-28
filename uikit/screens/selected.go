@@ -6,8 +6,6 @@ import (
 	"math"
 
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/content"
-	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
@@ -47,7 +45,6 @@ type selectedPanel struct {
 	warpTip     *widget.ToolTip
 	warpTips    []*widget.ToolTip
 	warpTipView *widgets.TipView // structured "Warp unavailable" panel
-	warpTipKey  string           // reason the panel was built from ("" = none)
 
 	orbitIdx, warpRangeIdx int // cycle positions of the two selectors
 }
@@ -103,18 +100,20 @@ func (k *Kit) buildSelected() {
 	}
 	// Core movement actions (kept from the spike). Warp and Orbit are
 	// the action half of the warp/orbit pair: they enqueue at the range
-	// their selector shows, never a range of their own.
-	sp.approach = newBtn("Approach", "act_approach", func(*widget.ButtonClickedEventArgs) { k.approachSelected() })
-	sp.warp = newBtn("Warp", "act_warp", func(*widget.ButtonClickedEventArgs) { k.warpSelected() })
-	sp.orbit = newBtn("Orbit", "act_orbit", func(*widget.ButtonClickedEventArgs) { k.orbitSelected() })
-	sp.stop = newBtn("Stop", "act_stop", func(*widget.ButtonClickedEventArgs) { k.stopSelected() })
-	// Context actions, gated by the selection's sim.Info flags in
-	// syncSelected (disabled buttons take the theme's disabled look).
-	sp.lock = newBtn("Lock", "act_lock", func(*widget.ButtonClickedEventArgs) { k.lockSelected() })
-	sp.dock = newBtn("Dock", "act_dock", func(*widget.ButtonClickedEventArgs) { k.dockSelected() })
-	sp.jump = newBtn("Jump", "act_jump", func(*widget.ButtonClickedEventArgs) { k.jumpSelected() })
-	sp.loot = newBtn("Loot", "act_loot", func(*widget.ButtonClickedEventArgs) { k.lootSelected() })
-	sp.mine = newBtn("Mine", "act_mine", func(*widget.ButtonClickedEventArgs) { k.mineSelected() })
+	// their selector shows, never a range of their own. Every handler is
+	// the one verb table's row (worldverbs.go) — the key path and the
+	// overview rows resolve through the same rows.
+	sp.approach = newBtn("Approach", "act_approach", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("approach") })
+	sp.warp = newBtn("Warp", "act_warp", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("warp") })
+	sp.orbit = newBtn("Orbit", "act_orbit", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("orbit") })
+	sp.stop = newBtn("Stop", "act_stop", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("stop") })
+	// Context actions, gated by syncSelected from the same rows' VerbReady
+	// (disabled buttons take the theme's disabled look).
+	sp.lock = newBtn("Lock", "act_lock", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("lock-selected") })
+	sp.dock = newBtn("Dock", "act_dock", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("dock") })
+	sp.jump = newBtn("Jump", "act_jump", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("jump") })
+	sp.loot = newBtn("Loot", "act_loot", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("loot") })
+	sp.mine = newBtn("Mine", "act_mine", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("mine") })
 	// Pure selectors: always enabled, they only cycle their own value —
 	// they never enqueue. The Warp/Orbit actions and the Z/Q keys read
 	// that value back through Kit.WarpRange / Kit.OrbitRange.
@@ -344,12 +343,11 @@ func (l *selectedLayouter) Layout(children []widget.PreferredSizeLocateableWidge
 // ---------------------------------------------------------------------------
 
 // syncSelected refreshes the labels and button enablement from the
-// current selection: every action button is disabled while nothing is
-// selected, and the context actions additionally require their
-// sim.Info flag (dock/jump/loot/mine/warp), mirroring ui.ActionsFor.
-// Warp additionally refuses targets inside sim.WarpMinRange (with the
-// hover hint saying so). The two range selectors stay enabled — they
-// are state, they never enqueue.
+// current selection. Every action button's disabled state is the one verb
+// table's VerbReady answer (worldverbs.go), so the panel can never gate
+// differently from the key path or the overview rows; Warp is the only
+// row with a reason, and that reason is its hover hint. The two range
+// selectors stay enabled — they are state, they never enqueue.
 func (k *Kit) syncSelected() {
 	sp := k.sp
 	info, ok := k.cv.Info(k.selected)
@@ -368,44 +366,38 @@ func (k *Kit) syncSelected() {
 		// over the first button row) and draws on top of the buttons.
 		sp.body.RequestRelayout()
 	}
-	noSel := !ok
-	// Too close to warp: the drive cannot engage inside WarpMinRange, so
-	// the action is gated off and the tooltip names the reason.
-	tooClose := ok && info.CanWarp && info.Distance < sim.WarpMinRange
-	sp.approach.GetWidget().Disabled = noSel
-	sp.stop.GetWidget().Disabled = noSel
-	sp.orbit.GetWidget().Disabled = noSel
-	sp.warp.GetWidget().Disabled = noSel || !info.CanWarp || tooClose
-	sp.lock.GetWidget().Disabled = noSel || !canLock(info.Kind)
-	sp.dock.GetWidget().Disabled = noSel || !info.CanDock
-	sp.jump.GetWidget().Disabled = noSel || !info.CanJump
-	sp.loot.GetWidget().Disabled = noSel || !info.CanLoot
-	sp.mine.GetWidget().Disabled = noSel || !info.CanMine
-	if tooClose {
-		reason := "Target within warp minimum range (" + sim.KmLabel(sim.WarpMinRange) + ")"
-		if sp.warpTipKey != reason {
-			sp.warpTipKey = reason
-			sp.warpTipView.SetModel(widgets.TooltipModel{
-				Icon:  "act_warp",
-				Title: "Warp unavailable",
-				Sub:   reason,
-			})
+	for _, row := range []struct {
+		action string
+		btn    *widget.Button
+	}{
+		{"approach", sp.approach}, {"warp", sp.warp}, {"orbit", sp.orbit},
+		{"stop", sp.stop}, {"lock-selected", sp.lock}, {"dock", sp.dock},
+		{"jump", sp.jump}, {"loot", sp.loot}, {"mine", sp.mine},
+	} {
+		ready, why := k.VerbReady(row.action)
+		row.btn.GetWidget().Disabled = !ready
+		if row.action == "warp" {
+			k.setWarpHint(why)
 		}
-		sp.warp.GetWidget().ToolTips = sp.warpTips
-	} else {
-		sp.warpTipKey = ""
-		sp.warp.GetWidget().ToolTips = nil
 	}
 }
 
-// canLock mirrors ui.canLock: the entity kinds that can be targeted.
-func canLock(kind string) bool {
-	switch kind {
-	case sim.KindShip, sim.KindAsteroid, sim.KindWreck:
-		return true
-	default:
-		return false
+// setWarpHint attaches the Warp button's hover hint while the verb's why
+// text exists (the target inside sim.WarpMinRange) and detaches it
+// otherwise. The model is cheap state: the panel lays out on hover, not
+// here.
+func (k *Kit) setWarpHint(reason string) {
+	sp := k.sp
+	if reason == "" {
+		sp.warp.GetWidget().ToolTips = nil
+		return
 	}
+	sp.warpTipView.SetModel(widgets.TooltipModel{
+		Icon:  "act_warp",
+		Title: "Warp unavailable",
+		Sub:   reason,
+	})
+	sp.warp.GetWidget().ToolTips = sp.warpTips
 }
 
 // ---------------------------------------------------------------------------
@@ -450,106 +442,5 @@ func (k *Kit) cycleWarpRange() {
 }
 
 // ---------------------------------------------------------------------------
-// Action seam
+// Range controls
 // ---------------------------------------------------------------------------
-
-// approachSelected emits Approach for the selected entity.
-func (k *Kit) approachSelected() {
-	if k.selected.IsZero() {
-		return
-	}
-	k.sink.Do(widgets.Approach{Entity: k.selected})
-}
-
-// warpSelected emits WarpTo for the selected entity; the executor reads
-// the landing range from the warp selector at press (Kit.WarpRange — the
-// same value Z uses). The button is disabled without a valid, warpable,
-// distant enough target; this guard keeps the seam safe when driven
-// directly.
-func (k *Kit) warpSelected() {
-	if k.selected.IsZero() {
-		return
-	}
-	k.sink.Do(widgets.WarpTo{Entity: k.selected})
-}
-
-// orbitSelected emits Orbit for the selected entity; the executor reads
-// the range from the orbit selector at press (Kit.OrbitRange — the same
-// value Q uses).
-func (k *Kit) orbitSelected() {
-	if k.selected.IsZero() {
-		return
-	}
-	k.sink.Do(widgets.Orbit{Entity: k.selected})
-}
-
-// stopSelected emits Stop (cancels movement intent).
-func (k *Kit) stopSelected() {
-	k.sink.Do(widgets.Stop{})
-}
-
-// lockSelected emits Lock for the selected entity.
-func (k *Kit) lockSelected() {
-	if k.selected.IsZero() {
-		return
-	}
-	k.sink.Do(widgets.Lock{Entity: k.selected})
-}
-
-// dockSelected emits Dock at the selected station.
-func (k *Kit) dockSelected() {
-	if k.selected.IsZero() {
-		return
-	}
-	k.sink.Do(widgets.Dock{Entity: k.selected})
-}
-
-// jumpSelected emits Jump through the selected gate.
-func (k *Kit) jumpSelected() {
-	if k.selected.IsZero() {
-		return
-	}
-	k.sink.Do(widgets.Jump{Entity: k.selected})
-}
-
-// lootSelected emits Loot (empty item = everything) at the wreck.
-func (k *Kit) lootSelected() {
-	if k.selected.IsZero() {
-		return
-	}
-	k.sink.Do(widgets.Loot{Entity: k.selected})
-}
-
-// mineSelected fires the first fitted mining laser at the selected
-// asteroid (mirrors ui.UI.mineSelected): the slot resolves at press and
-// rides the intent.
-func (k *Kit) mineSelected() {
-	if k.selected.IsZero() {
-		return
-	}
-	info, ok := k.cv.Info(k.selected)
-	if !ok || info.Kind != sim.KindAsteroid {
-		return
-	}
-	slot, ok := k.firstMiningSlot()
-	if !ok {
-		return
-	}
-	k.sink.Do(widgets.Mine{Entity: k.selected, Slot: slot})
-}
-
-// firstMiningSlot finds the first fitted mining laser.
-func (k *Kit) firstMiningSlot() (sim.SlotRef, bool) {
-	fit, ok := k.cv.Fitting(k.cv.Player())
-	if !ok {
-		return sim.SlotRef{}, false
-	}
-	for _, class := range []string{content.SlotHigh, content.SlotMid} {
-		for i, id := range fit.Defs(class) {
-			if def, ok := k.cv.Defs().Module(id); ok && def.Kind == content.KindMiningLaser {
-				return sim.SlotRef{Class: class, Index: i}, true
-			}
-		}
-	}
-	return sim.SlotRef{}, false
-}

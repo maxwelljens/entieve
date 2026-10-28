@@ -237,28 +237,27 @@ func (k *Kit) buildOverview() {
 // overviewSpec is one overview row's declared interactions: Show Info on
 // what the entity IS (declared even when it resolves to nothing — the
 // entry shows grayed, first and bold), then the Selected Item window's
-// own verbs as row actions — every entry queues the sim command its
-// button queues (CmdWarpTo/CmdOrbit/CmdApproach/CmdLock), at the row's
-// entity and at the range selectors' current value (read at press).
-// Entries the sim would refuse (self-targeting, unwarpageable,
-// unlockable kinds) show grayed. The installer turns this data into the
-// menu; a right-click never moves the selection.
+// own verbs as row actions — every entry emits the same intent the panel
+// button does, at the row's entity. Enablement is the one verb table's
+// answer for that entity (VerbReady), never a second gating rule; the
+// self-check stays because a row never offers to fly to itself. The
+// installer turns this data into the menu; a right-click never moves the
+// selection.
 func (k *Kit) overviewSpec(row *ovRow) widgets.RowSpec {
 	e := row.info.Entity
 	spec := widgets.RowSpec{Ref: widgets.RowRef(k.cv, row)}
-	info, hasInfo := k.cv.Info(e)
-	if hasInfo {
+	if _, hasInfo := k.cv.Info(e); hasInfo {
 		self := e == k.cv.Player()
-		tooClose := info.Distance < sim.WarpMinRange
-		// The verbs are intents: the executor reads the warp/orbit range
-		// from the Selected Item selectors when they fire.
+		warp, _ := k.verbReadyFor("warp", e)
+		orbit, _ := k.verbReadyFor("orbit", e)
+		approach, _ := k.verbReadyFor("approach", e)
+		lock, _ := k.verbReadyFor("lock-selected", e)
 		spec.Actions = []widgets.RowAction{
-			{Label: "Warp to", Disabled: self || !info.CanWarp || tooClose,
+			{Label: "Warp to", Disabled: self || !warp,
 				Intent: widgets.WarpTo{Entity: e}},
-			{Label: "Orbit", Disabled: self, Intent: widgets.Orbit{Entity: e}},
-			{Label: "Approach", Disabled: self, Intent: widgets.Approach{Entity: e}},
-			{Label: "Lock target", Disabled: self || !canLock(info.Kind),
-				Intent: widgets.Lock{Entity: e}},
+			{Label: "Orbit", Disabled: self || !orbit, Intent: widgets.Orbit{Entity: e}},
+			{Label: "Approach", Disabled: self || !approach, Intent: widgets.Approach{Entity: e}},
+			{Label: "Lock target", Disabled: !lock, Intent: widgets.Lock{Entity: e}},
 		}
 	}
 	return spec

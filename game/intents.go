@@ -15,7 +15,9 @@ import (
 // the context menu) and the sim commands — runs on the kit's own
 // executor (Kit.RunIntent), which maps intents onto commands through the
 // single shared table (uikit's commandFor) and queues them on the
-// game's enqueue tail.
+// game's enqueue tail. The world verbs (uikit/screens/worldverbs.go)
+// emit these same intents, so the key path, the Selected Item buttons
+// and the world clicks share this one dispatch.
 func (g *Game) Do(i widgets.Intent) {
 	switch v := i.(type) {
 	case widgets.Toggle:
