@@ -7,6 +7,7 @@ import (
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/ecs"
+	"github.com/entieve/entieve/format"
 	"github.com/entieve/entieve/sim"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -355,7 +356,7 @@ func (r *Renderer) drawOverlay(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 				w := Measure(o.info.Name, LabelSize)
 				nameY := sy + half + 5*FontScale
 				Text(dst, o.info.Name, sx-w/2, nameY, LabelSize, nameCol)
-				dist := fmtDist(o.info.Distance)
+				dist := format.Dist(o.info.Distance)
 				wd := Measure(dist, LabelSizeSmall)
 				Text(dst, dist, sx-wd/2, nameY+labelLinePitch(LabelSize),
 					LabelSizeSmall, color.RGBA{135, 146, 163, 255})

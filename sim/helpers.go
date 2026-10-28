@@ -5,11 +5,11 @@ import (
 	"math"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/ecs"
+	"github.com/entieve/entieve/format"
 )
 
 // maxEvents is the pending-event cap; the oldest events are dropped beyond it.
@@ -152,41 +152,10 @@ func (s *Sim) nounOf(e ecs.Entity) string {
 	return s.nameOf(e)
 }
 
-// euro formats an amount per docs/lore/NAMING.md (Money strings): thousands
-// separators, two decimals and the € suffix — 15000 -> "15,000.00 €"; any
-// amount under one euro renders as bare cents — 0.5 -> "50¢"; zero stays
-// "0.00 €". Same rounding as before (FormatFloat, 2 decimals) — only the
-// unit presentation is euro.
-func euro(v float64) string {
-	neg := v < 0
-	if neg {
-		v = -v
-	}
-	s := strconv.FormatFloat(v, 'f', 2, 64)
-	i := strings.IndexByte(s, '.')
-	intPart, frac := s[:i], s[i:]
-	if intPart == "0" && frac != ".00" { // under one euro: bare cents, no decimals
-		cents := strings.TrimLeft(frac[1:], "0")
-		if neg {
-			return "-" + cents + "¢"
-		}
-		return cents + "¢"
-	}
-	if i > 3 {
-		var b strings.Builder
-		for i, c := range intPart {
-			if i > 0 && (len(intPart)-i)%3 == 0 {
-				b.WriteByte(',')
-			}
-			b.WriteRune(c)
-		}
-		intPart = b.String()
-	}
-	if neg {
-		return "-" + intPart + frac + " €"
-	}
-	return intPart + frac + " €"
-}
+// euro formats an amount per docs/lore/NAMING.md (Money strings) — euros with
+// thousands separators and two decimals ("15,000.00 €"), bare cents under one
+// euro ("50¢"), zero "0.00 €". The one implementation is format.Credits.
+func euro(v float64) string { return format.Credits(v) }
 
 // num formats a float for event text.
 func num(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) }

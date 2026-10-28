@@ -4,8 +4,6 @@ import (
 	"image"
 	"image/color"
 	"math"
-	"strconv"
-	"strings"
 
 	"github.com/entieve/entieve/core"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -259,60 +257,4 @@ func TextCentered(dst *ebiten.Image, s string, x, y, size float64, col color.Col
 func Measure(s string, size float64) float64 {
 	w, _ := text.Measure(s, Face(size), 0)
 	return w
-}
-
-// fmtDist formats a distance in meters for world labels. Keep in sync with
-// theme.FormatDistance (render must not import uikit, so the logic is
-// duplicated).
-func fmtDist(m float64) string {
-	switch {
-	case m < 2e3:
-		return groupInt(int64(math.Round(m))) + " m"
-	case m <= 9.9999e7:
-		return commaFloat(m/1000) + " km"
-	case m < 1.496e9:
-		return "<0.01 AU"
-	default:
-		return commaFloat2(m/1.496e11) + " AU"
-	}
-}
-
-// commaFloat2 formats v with two decimals and commas in the integer part.
-func commaFloat2(v float64) string {
-	return addCommas(strconv.FormatFloat(v, 'f', 2, 64))
-}
-
-// commaFloat formats v with one decimal and commas in the integer part.
-func commaFloat(v float64) string {
-	return addCommas(strconv.FormatFloat(v, 'f', 1, 64))
-}
-
-// groupInt formats n with thousands separators.
-func groupInt(n int64) string {
-	return addCommas(strconv.FormatInt(n, 10))
-}
-
-// addCommas inserts thousands separators into the integer part of a decimal
-// string like "12345.6" or "-12345".
-func addCommas(s string) string {
-	head, tail, found := strings.Cut(s, ".")
-	neg := strings.HasPrefix(head, "-")
-	if neg {
-		head = head[1:]
-	}
-	var b strings.Builder
-	for i, c := range head {
-		if i > 0 && (len(head)-i)%3 == 0 {
-			b.WriteByte(',')
-		}
-		b.WriteRune(c)
-	}
-	out := b.String()
-	if neg {
-		out = "-" + out
-	}
-	if found {
-		out += "." + tail
-	}
-	return out
 }
