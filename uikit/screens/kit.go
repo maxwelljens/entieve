@@ -106,24 +106,24 @@ type Kit struct {
 	// kit's Env reaches: the context menu and the Show Info window.
 	svc *services
 
-	// infoRemove unmounts the Show Info window (nil = closed). Show
-	// remounts it, which is also what raises it to the top of the stack.
-	infoRemove widget.RemoveWindowFunc
+	// The three dialogs (kitdialog.go): Show Info, the order mini-window
+	// and the quantity picker. Each is one instance, re-targeted and
+	// raised on every launch, mounted on first open and unmounted by its
+	// close — one lifecycle, one × registration site.
+	info  *dialog
+	order *dialog
+	qty   *dialog
 
-	// orderWin is the player market-order mini-window (Show-Info-style:
-	// one instance, re-targeted and raised on every launch) and
-	// orderRemove its mount handle (nil = closed). It is deliberately NOT
-	// in the layout sidecar: a transient dialog, never restored. The task
-	// queue gates the game's world hotkeys on its OrderTyping.
-	orderWin    *OrderWin
-	orderRemove widget.RemoveWindowFunc
+	// orderWin is the player market-order mini-window's panel. It is
+	// deliberately NOT in the layout sidecar: a transient dialog, never
+	// restored. The task queue gates the game's world hotkeys on its
+	// OrderTyping.
+	orderWin *OrderWin
 
-	// qtyWin is the session's one quantity picker (services.qty — the
-	// replacement for every retired ± ticker) and qtyRemove its mount
-	// handle (nil = closed). Also deliberately out of the layout sidecar:
-	// a transient dialog, never restored.
-	qtyWin    *QtyWin
-	qtyRemove widget.RemoveWindowFunc
+	// qtyWin is the quantity picker's panel (services.qty — the
+	// replacement for every retired ± ticker), also deliberately out of
+	// the layout sidecar: a transient dialog, never restored.
+	qtyWin *QtyWin
 
 	// core visibility (hidden e.g. while docked in a station) and the
 	// player's own close of a core window (the rail's Overview /
@@ -199,22 +199,23 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	// Show Info's × registers the same close it always ran (CloseInfo:
 	// unmount, rect survives for the sidecar, never auto-opens) — now
 	// through the one kit-wide close seam, which adds the fade.
-	k.SetWindowClose(k.svc.info.Win(), k.CloseInfo)
+	k.info = k.newDialog(k.svc.info.Win(), k.svc.info.hide, k.svc.info.IsOpen, nil, k.CloseInfo)
 
 	// The order mini-window: one instance, launched from item menus
 	// (OpenOrder), closed by its × / Cancel and by the host on undock.
 	k.orderWin = NewOrderWin(k.seams())
 	k.orderWin.onClose = k.CloseOrder
-	k.SetWindowClose(k.orderWin.Win(), k.CloseOrder)
+	k.order = k.newDialog(k.orderWin.Win(), k.orderWin.hide, k.orderWin.IsOpen, nil, k.CloseOrder)
 
 	// The quantity picker: one instance on the session's services, opened
 	// by the panels' QtyPick intent (RunIntent), closed by its × / Cancel
-	// / Esc and by Confirm.
+	// / Esc and by Confirm. It is the one dialog that re-places on every
+	// show (centred on the viewport).
 	k.qtyWin = NewQtyWin(k.seams())
 	k.svc.qty = k.qtyWin
 	k.qtyWin.onClose = k.CloseQty
 	k.svc.qtyShow = k.OpenQty
-	k.SetWindowClose(k.qtyWin.Win(), k.CloseQty)
+	k.qty = k.newDialog(k.qtyWin.Win(), k.qtyWin.hide, k.qtyWin.IsOpen, k.centerQty, k.CloseQty)
 
 	// Root container: transparent overlay over the world render; windows
 	// float above it. The theme rides the widget parent chain.
@@ -340,7 +341,7 @@ func (k *Kit) Draw(screen *ebiten.Image) {
 // a modal window between the top and the candidate owns every gesture
 // (its ebitenui layer is fullscreen — input below it is gated, so
 // nothing below it may rise either). A window already at the top of the
-// stack is a no-op: the remount leak (documented in ShowInfo and
+// stack is a no-op: the remount leak (documented in showDialog and
 // game.setPanel) is paid only when the stacking actually changes.
 func (k *Kit) raisePressed() {
 	if !widgets.PressEdge(ebiten.MouseButtonLeft) && !widgets.PressEdge(ebiten.MouseButtonRight) {
@@ -585,41 +586,20 @@ func (k *Kit) InfoWindow() *widget.Window { return k.svc.info.Win() }
 func (k *Kit) OverviewTable() *widgets.Table { return k.ov.tbl }
 
 // InfoOpen reports whether the Show Info window is up.
-func (k *Kit) InfoOpen() bool { return k.svc.info.IsOpen() }
+func (k *Kit) InfoOpen() bool { return k.info.isOpen() }
 
 // ShowInfo fills the Show Info window with ref's details and raises it:
 // the previous mount (if any) is removed and the window re-added, which
 // puts it on top of the window stack. Unresolvable refs change nothing —
 // the window keeps whatever it already showed rather than going hollow.
-// The remount rides the documented ebitenui window-remount leak (a few
-// KB per raise) — the price of a deterministic top-of-stack without
-// ebitenui's own relayering.
+// See showDialog for the raise/reopen rules (and the remount leak).
 func (k *Kit) ShowInfo(ref widgets.InfoRef) {
-	if !k.svc.info.Show(ref) {
-		return
-	}
-	raised := k.infoRemove != nil
-	if raised {
-		k.infoRemove()
-		k.infoRemove = nil
-	}
-	// First open fades in; a re-raise of the already-open window is a
-	// raise, not an open (addWindow with animate=false); a Show landing
-	// while the × close is still fading re-opens it — addWindow drops
-	// that pending close (its unmount is no longer owed) and the window
-	// fades back in from zero.
-	k.infoRemove = k.addWindow(k.svc.info.Win(), !raised)
+	k.showDialog(k.info, func() bool { return k.svc.info.Show(ref) })
 }
 
 // CloseInfo closes the Show Info window: unmount (its rect survives for
 // the sidecar) and hide.
-func (k *Kit) CloseInfo() {
-	if k.infoRemove != nil {
-		k.infoRemove()
-		k.infoRemove = nil
-	}
-	k.svc.info.hide()
-}
+func (k *Kit) CloseInfo() { k.closeDialog(k.info) }
 
 // OpenOrder opens (or re-targets) the player market-order mini-window on
 // item: Show-Info-style, one instance — a second launch swaps the target
@@ -627,33 +607,16 @@ func (k *Kit) CloseInfo() {
 // never persisted). The item's side and its sell default quantity come
 // from the clicked row; an undocked player opens nothing.
 func (k *Kit) OpenOrder(item content.ItemID, side sim.OrderSide, qty int) {
-	if k.orderWin == nil || !k.orderWin.Show(item, side, qty) {
-		return
-	}
-	raised := k.orderRemove != nil
-	if raised {
-		k.orderRemove()
-		k.orderRemove = nil
-	}
-	k.orderRemove = k.addWindow(k.orderWin.Win(), !raised)
+	k.showDialog(k.order, func() bool { return k.orderWin.Show(item, side, qty) })
 }
 
 // CloseOrder closes the order mini-window: unmount and hide (its rect is
 // transient and never persisted). Idempotent — safe to call every frame,
 // e.g. while the player is undocked.
-func (k *Kit) CloseOrder() {
-	if k.orderWin == nil {
-		return
-	}
-	if k.orderRemove != nil {
-		k.orderRemove()
-		k.orderRemove = nil
-	}
-	k.orderWin.hide()
-}
+func (k *Kit) CloseOrder() { k.closeDialog(k.order) }
 
 // OrderOpen reports whether the order mini-window is up.
-func (k *Kit) OrderOpen() bool { return k.orderWin != nil && k.orderWin.IsOpen() }
+func (k *Kit) OrderOpen() bool { return k.order.isOpen() }
 
 // OrderTyping reports whether a price/qty field of the order window holds
 // focus — the game gates its world hotkeys on this so typing into a field
@@ -671,10 +634,10 @@ func (k *Kit) BlurOrder() {
 // OrderWindow returns the order mini-window (the world-input gate
 // hit-tests it, like InfoWindow). nil only before NewKit finishes.
 func (k *Kit) OrderWindow() *widget.Window {
-	if k.orderWin == nil {
+	if k.order == nil {
 		return nil
 	}
-	return k.orderWin.Win()
+	return k.order.win
 }
 
 // OrderWin returns the order mini-window panel (the host's key-gate tests
@@ -686,42 +649,24 @@ func (k *Kit) OrderWin() *OrderWin { return k.orderWin }
 // raises the window, a first open fades it in. It is centred on the
 // viewport each time (a transient dialog with no persisted rect).
 func (k *Kit) OpenQty(req widgets.QtyPick) {
-	if k.qtyWin == nil || !k.qtyWin.Show(req) {
-		return
-	}
-	k.centerQty()
-	raised := k.qtyRemove != nil
-	if raised {
-		k.qtyRemove()
-		k.qtyRemove = nil
-	}
-	k.qtyRemove = k.addWindow(k.qtyWin.Win(), !raised)
+	k.showDialog(k.qty, func() bool { return k.qtyWin.Show(req) })
 }
 
 // CloseQty closes the quantity picker: unmount and hide (its rect is
 // transient and never persisted). Idempotent — Cancel, Esc and Confirm all
 // land here, and a Cancel/× writes nothing anywhere.
-func (k *Kit) CloseQty() {
-	if k.qtyWin == nil {
-		return
-	}
-	if k.qtyRemove != nil {
-		k.qtyRemove()
-		k.qtyRemove = nil
-	}
-	k.qtyWin.hide()
-}
+func (k *Kit) CloseQty() { k.closeDialog(k.qty) }
 
 // QtyOpen reports whether the quantity picker is up.
-func (k *Kit) QtyOpen() bool { return k.qtyWin != nil && k.qtyWin.IsOpen() }
+func (k *Kit) QtyOpen() bool { return k.qty.isOpen() }
 
 // QtyWindow returns the quantity picker's window (the world-input gate
 // hit-tests it, like InfoWindow).
 func (k *Kit) QtyWindow() *widget.Window {
-	if k.qtyWin == nil {
+	if k.qty == nil {
 		return nil
 	}
-	return k.qtyWin.Win()
+	return k.qty.win
 }
 
 // QtyWin returns the quantity picker panel (tests reach its slider and
@@ -730,16 +675,17 @@ func (k *Kit) QtyWin() *QtyWin { return k.qtyWin }
 
 // centerQty puts the picker in the middle of the viewport: the root
 // overlay is laid out to it, so its rect is the screen. The construction
-// rect is the fallback before the first frame.
-func (k *Kit) centerQty() {
+// rect is the fallback before the first frame. It is the picker dialog's
+// place hook — the other dialogs are never re-placed on show.
+func (k *Kit) centerQty(win *widget.Window) {
 	root := k.root.GetWidget().Rect
-	w := k.qtyWin.Win().GetContainer().GetWidget().Rect
+	w := win.GetContainer().GetWidget().Rect
 	if root.Empty() || w.Empty() {
 		return
 	}
 	x := root.Min.X + (root.Dx()-w.Dx())/2
 	y := root.Min.Y + (root.Dy()-w.Dy())/2
-	k.qtyWin.Win().SetLocation(image.Rect(x, y, x+w.Dx(), y+w.Dy()))
+	win.SetLocation(image.Rect(x, y, x+w.Dx(), y+w.Dy()))
 }
 
 // SetCoreVisible shows or hides the always-mounted chrome (Overview and

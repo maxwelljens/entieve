@@ -61,6 +61,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One dialog lifecycle for the on-demand windows** (`uikit/screens`): Show
+  Info, the order mini-window and the quantity picker now share one
+  Kit-internal `dialog` (`kitdialog.go`) instead of three copies of the
+  mount/raise/close bookkeeping — re-target, optional place, then remove +
+  re-add on top (`animate=false`, so a raise never restarts the fade; a
+  launch during a close fade drops the pending unmount), an idempotent
+  close, and one `×` registration site instead of three. Behaviour is
+  unchanged: only the picker re-centres on show, and Show Info's rect still
+  survives its close.
 - **Show Info header on one row** (`uikit/screens`, `uikit/theme`): the
   entity icon no longer stacks above the title — it sits on a dark plate
   (opaque `BGHard` fill, 10 design px of padding, panel radius, `Border`
