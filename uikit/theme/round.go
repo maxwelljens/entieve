@@ -40,6 +40,8 @@ const (
 //	banded viewport     BandedBox: control radii with the fill starting under
 //	                    a plate band (widgets.PlateBand); flat, so the chrome
 //	                    does not change when a plate unloads.
+//	well                WellBox: panel radii, the opaque BGHard fill and a
+//	                    hairline edge — a dark plate laid on the body.
 //	square              Rounded(…, Radii{}): view masks, meter strips, seams.
 //
 // Naming map: WindowAlpha is the one translucency token and WindowBody the
@@ -97,6 +99,18 @@ func Rounded(body, edge color.NRGBA, w int, radii Radii) *eimage.NineSlice {
 // deepening from PanelTop to PanelBottom.
 func PanelBox(p Palette, body, edge color.NRGBA) *eimage.NineSlice {
 	return roundedBox(PanelTop(p, body), PanelBottom(p, body), edge, 1, AllRadii(RadiusPanel))
+}
+
+// WellFill is the fill of a dark recessed plate laid ON a window body (the
+// Show Info icon well): the opaque BGHard role — the palette's solid dark,
+// the surface title bars and tab backs layer with — never the translucent
+// body it has to stay apart from.
+func WellFill(p Palette) color.NRGBA { return Solid(p.BGHard) }
+
+// WellBox is that plate: WellFill, panel radius, hairline edge. Flat (no
+// depth ramp): its job is to separate one thing from the panel around it.
+func WellBox(p Palette, edge color.NRGBA) *eimage.NineSlice {
+	return roundedBox(WellFill(p), WellFill(p), edge, 1, AllRadii(RadiusPanel))
 }
 
 // WindowBodyBox is a window's body under the title bar: bottom corners

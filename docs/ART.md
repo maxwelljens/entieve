@@ -191,9 +191,10 @@ window title.
   the HUD pair's and the window's frozen budgets) — `theme.IconTile` — and
   **24 px** in module tooltips (`theme.IconTitle`). Inside Show Info the
   panel doubles its own graphics
-  instead: the body hero at **128 px** (`theme.IconHero`) and the maker-line
-  corporation mark at **80 px** (`theme.IconCorpInfo`; the fitting window's
-  maker block keeps 40 px, `theme.IconCorp`). Inline/button/title glyphs
+  instead: the body hero at **128 px** (`theme.IconHero`) on its own dark
+  plate in the header row, and the maker-line corporation mark at **80 px**
+  (`theme.IconCorpInfo`; the fitting window's maker block keeps 40 px,
+  `theme.IconCorp`) in the name column beside it. Inline/button/title glyphs
   (16/20/24) are unchanged.
 - **Drop-in art**: the player's own icons live in `assets/icons/`, one PNG per
   content id (modules, `corp-*`, ores, minerals, loot) — see

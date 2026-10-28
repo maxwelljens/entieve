@@ -50,6 +50,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Show Info header on one row** (`uikit/screens`, `uikit/theme`): the
+  entity icon no longer stacks above the title — it sits on a dark plate
+  (opaque `BGHard` fill, 10 design px of padding, panel radius, `Border`
+  hairline; `theme.WellBox`/`theme.WellFill`) at the start of a single header
+  row, with the title and the corp-mark Sub line in the column beside it.
+  Icon sizes stay the ones the icon pass set (128 hero, 80 info corp mark);
+  unattributed pages keep the row without a mark, and the title/Sub text
+  wraps to the column so long names stay inside the window.
 - **Icon sizes raised for readability** (`theme`, `uikit/screens`): the slot
   tile glyph grows +75%, 32 → **56 px** (`theme.IconTile`), in **62×62**
   cells (the icon plus a 3 px ring) in both the fitting window and the HUD

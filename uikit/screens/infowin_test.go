@@ -619,8 +619,9 @@ func TestInfoWindowShowAndRefSwap(t *testing.T) {
 }
 
 // TestInfoWindowModuleHeroIcon: a module page's hero is the module's own icon
-// (its drop-in art, keyed by the content id) at the hero box, and the title
-// sits at the content column's left edge — no header icon offsets it.
+// (its drop-in art, keyed by the content id) at the hero box on the header
+// plate, and the title starts in the column beside that plate — no header
+// icon offsets the text.
 func TestInfoWindowModuleHeroIcon(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	w := env.InfoWindow()
@@ -645,9 +646,10 @@ func TestInfoWindowModuleHeroIcon(t *testing.T) {
 	if got, want := h.GetWidget().Rect.Dx(), theme.Px(theme.IconHero); got != want {
 		t.Errorf("hero box = %d, want the %d px hero token", got, want)
 	}
-	title := w.page.Children()[1].GetWidget().Rect
-	if hero := w.page.Children()[0].GetWidget().Rect; title.Min.X != hero.Min.X {
-		t.Errorf("title starts at %d, want the content column's edge %d", title.Min.X, hero.Min.X)
+	_, col := headerRow(t, w)
+	title := col.GetWidget().Rect
+	if plate := w.HeroPlate().GetWidget().Rect; title.Min.X <= plate.Max.X {
+		t.Errorf("title starts at %d, want it in the column right of the plate edge %d", title.Min.X, plate.Max.X)
 	}
 }
 

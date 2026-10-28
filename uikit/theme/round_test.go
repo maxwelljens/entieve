@@ -69,6 +69,31 @@ func TestWindowPiecesArePerCornerRounded(t *testing.T) {
 	}
 }
 
+// TestWellBoxIsTheDarkPlate pins the recessed plate (the Show Info icon
+// well): the opaque BGHard fill — distinct from the translucent window body
+// it is laid on — flat (no depth ramp) at the panel radius.
+func TestWellBoxIsTheDarkPlate(t *testing.T) {
+	p := DefaultPalette()
+	fill, body := WellFill(p), WindowBody(p.BG)
+	if fill != Solid(p.BGHard) {
+		t.Errorf("WellFill = %v, want the opaque BGHard role %v", fill, Solid(p.BGHard))
+	}
+	if fill == body {
+		t.Errorf("WellFill %v is the window-body fill: the plate would not read apart", fill)
+	}
+	if fill.A != 255 {
+		t.Errorf("WellFill alpha = %d, want the opaque role", fill.A)
+	}
+	edge := NRGBA(p.Border, 200)
+	if w, h := WellBox(p, edge).MinSize(); w != 2*RadiusPanel || h != 2*RadiusPanel {
+		t.Errorf("well box min size = %d×%d, want the panel radius box %d×%d", w, h, 2*RadiusPanel, 2*RadiusPanel)
+	}
+	img := boxRaster(80, 80, fill, edge, AllRadii(RadiusPanel))
+	if c := img.NRGBAAt(40, 40); c != fill {
+		t.Errorf("well centre fill = %v, want the flat %v (no depth ramp)", c, fill)
+	}
+}
+
 // TestChromeClassMinSizes pins the padding each class reserves: the
 // nine-slice's corner cells (2·radius) and the 1 px window seam strip.
 func TestChromeClassMinSizes(t *testing.T) {
