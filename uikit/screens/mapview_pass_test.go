@@ -6,14 +6,13 @@ import (
 	"testing"
 
 	"github.com/entieve/entieve/uikit/widgets"
-	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // TestMapViewIgnoresThePopupsPress pins the starmap's half of the popup
-// rule: the node poll reads the raw press edge (widgets.PressEdge, the
+// rule: the node poll reads the frame's press (Pointer.Press, the
 // SplitPane idiom), so the press that lands a context-menu entry — or
-// dismisses the menu — must be spent on the popup, never on the node under
-// it, or the map re-selects a system behind the popup.
+// dismisses the menu — is spent on the popup, never on the node under it,
+// or the map re-selects a system behind the popup.
 func TestMapViewIgnoresThePopupsPress(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	m := NewMapView(env)
@@ -34,8 +33,9 @@ func TestMapViewIgnoresThePopupsPress(t *testing.T) {
 		t.Fatal("fixture: no starmap node is hit-testable")
 	}
 
-	defer widgets.SetPressEdgeForTest(func(b ebiten.MouseButton) bool { return b == ebiten.MouseButtonLeft })()
-	defer widgets.SetPollCursorForTest(func() (int, int) { return pt.X, pt.Y })()
+	env.in.x, env.in.y = pt.X, pt.Y
+	env.in.edge = [3]bool{true, false, false}
+	env.Pointer().Begin()
 
 	menu := env.Menu()
 	menu.Open([]widgets.MenuEntry{{Label: "Show Info"}}, pt)
@@ -61,8 +61,9 @@ func TestMapViewPollsWhenNoPopupClaimedThePress(t *testing.T) {
 	if _, ok := m.nodeAt(pt); !ok {
 		t.Skip("fixture: node 0 is not hit-testable at this scale")
 	}
-	defer widgets.SetPressEdgeForTest(func(b ebiten.MouseButton) bool { return b == ebiten.MouseButtonLeft })()
-	defer widgets.SetPollCursorForTest(func() (int, int) { return pt.X, pt.Y })()
+	env.in.x, env.in.y = pt.X, pt.Y
+	env.in.edge = [3]bool{true, false, false}
+	env.Pointer().Begin()
 
 	m.Sync()
 

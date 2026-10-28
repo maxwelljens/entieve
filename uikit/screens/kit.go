@@ -59,6 +59,11 @@ type Kit struct {
 	exec *widgets.Exec // uikit's built-in executor (RunIntent)
 	sess Session
 
+	// pointer is this kit's pointer frame — the host's (Game.opts.Pointer,
+	// so it survives a kit rebuild) or a fresh OS one. Begin is the host's
+	// (first line of Update); Draw applies the frame's one cursor write.
+	pointer *widgets.Pointer
+
 	enqueue func(sim.Command)
 
 	selected ecs.Entity
@@ -139,10 +144,20 @@ type Kit struct {
 	topsHidden bool
 }
 
+// KitOption adjusts a Kit at construction (the host's pointer frame).
+type KitOption func(*Kit)
+
+// WithPointer gives the kit the host's pointer frame instead of a fresh
+// OS one — the game passes the frame it Begins every Update, so the world
+// and the interface share one sample.
+func WithPointer(p *widgets.Pointer) KitOption {
+	return func(k *Kit) { k.pointer = p }
+}
+
 // NewKit builds the interface layer over loaded content and a live
 // simulation. enqueue receives every command the player issues (pass
 // sim.Queue directly in the game).
-func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, error) {
+func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command), opts ...KitOption) (*Kit, error) {
 	if c == nil {
 		return nil, errors.New("uikit: nil content")
 	}
@@ -161,11 +176,17 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 		enqueue: enqueue,
 		th:      theme.NewSeam(theme.DefaultPalette(), theme.ScaleTypeScale(theme.DefaultTypeScale())),
 	}
-	// The kit is the app's only cursor writer (widgets.ClaimCursor /
-	// ApplyCursor — one OS write per frame, after all input). ebitenui's
-	// own AfterDraw reset would be a second writer alternating the shape
-	// every frame; nothing in the app uses its cursor names or images, so
-	// its management is switched off.
+	for _, opt := range opts {
+		opt(k)
+	}
+	if k.pointer == nil {
+		k.pointer = widgets.NewPointer(nil)
+	}
+	// The kit is the app's only cursor writer (the pointer frame's Apply —
+	// one OS write per frame, after all input). ebitenui's own AfterDraw
+	// reset would be a second writer alternating the shape every frame;
+	// nothing in the app uses its cursor names or images, so its
+	// management is switched off.
 	input.CursorManagementEnabled = false
 	k.cv = widgets.NewView(c, s)
 	// The built-in executor: session intents on the kit's own services,
@@ -192,7 +213,7 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command)) (*Kit, er
 	// lifecycle (mount/raise on Show, unmount on Close).
 	k.svc = &services{}
 	k.sess = &session{Seams: k.seams(), svc: k.svc}
-	k.svc.menu = widgets.NewMenu(k.sess)
+	k.svc.menu = widgets.NewMenu(k.sess, k.sess.Pointer())
 	k.svc.info = NewInfoWin(k.sess)
 	k.svc.show = k.ShowInfo
 	k.svc.info.onClose = k.CloseInfo
@@ -315,8 +336,8 @@ func (k *Kit) Draw(screen *ebiten.Image) {
 	// polls and both chrome passes). ebitenui's own cursor management is
 	// off (NewKit), so nothing resets the shape afterwards: exactly one
 	// write reaches the OS per frame and a stationary pointer presents
-	// the same shape every frame.
-	widgets.ApplyCursor()
+	// the same shape every frame (Apply repeats, never re-samples).
+	k.pointer.Apply()
 }
 
 // ---------------------------------------------------------------------------
@@ -329,9 +350,8 @@ func (k *Kit) Draw(screen *ebiten.Image) {
 // window body: the body's scroll viewport elevates its input layer over
 // the window container, so only title-bar presses ever fired it (and it
 // is switched off for kit windows anyway — see AddWindow). So the raise
-// polls the raw press edge and cursor (widgets' shared seams — the same
-// ones Menu.Poll reads) and re-tops through the Show-Info seam: remove
-// + re-mount. It runs inside Kit.Update's menu gate, before ui.Update,
+// reads the frame's gated press and pointer (the same frame Menu.Poll
+// reads) and re-tops through the Show-Info seam: remove + re-mount. It runs inside Kit.Update's menu gate, before ui.Update,
 // so a modal menu's dismiss click can never re-stack what lies beneath
 // the popup.
 //
@@ -344,11 +364,11 @@ func (k *Kit) Draw(screen *ebiten.Image) {
 // stack is a no-op: the remount leak (documented in showDialog and
 // game.setPanel) is paid only when the stacking actually changes.
 func (k *Kit) raisePressed() {
-	if !widgets.PressEdge(ebiten.MouseButtonLeft) && !widgets.PressEdge(ebiten.MouseButtonRight) {
+	p := k.pointer
+	if !p.Press(widgets.Left) && !p.Press(widgets.Right) {
 		return
 	}
-	x, y := widgets.PollCursor()
-	pt := image.Pt(x, y)
+	pt := p.At()
 	if k.overTop(pt) {
 		return // top chrome (the rail) owns this point — no raise
 	}
@@ -479,7 +499,7 @@ func (k *Kit) Sync() {
 func (k *Kit) seams() widgets.Seams {
 	return widgets.NewSeams(k.th, k.cv, widgets.SinkFunc(func(i widgets.Intent) {
 		k.sink.Do(i)
-	}))
+	}), k.pointer)
 }
 
 // SetSink installs the host's ActionSink — the game hands itself over so
@@ -795,3 +815,8 @@ func (k *Kit) MenuRect() (image.Rectangle, bool) {
 
 // Menu returns the kit's context menu (nil in a bare environment).
 func (k *Kit) Menu() *widgets.Menu { return k.svc.menu }
+
+// Pointer returns the kit's pointer frame. The host Begins it once per
+// Update (before MenuInput — the popup's first read) and the kit's Draw
+// ends with its Apply.
+func (k *Kit) Pointer() *widgets.Pointer { return k.pointer }

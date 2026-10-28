@@ -27,17 +27,16 @@ import (
 //     anchor. That frozen-cache dynamic is what the production bug rode
 //     on; the test keeps reproducing it faithfully for the widgets.
 //
-//   - Menu.poll's cursor read is NOT that cache: production reads the
-//     cursor live (ebiten.CursorPosition), so the same scripted raw
-//     position feeds uikit.SetPollCursorForTest. loopMouse's raw x,y is
-//     that position — one scripted "OS", two reads, as in production.
+//   - Menu.poll's cursor read is NOT that cache: it reads the host's
+//     pointer frame, whose Source is this same loopMouse (loopMouse.pointer
+//     is handed to the game's Options.Pointer). loopMouse's raw x,y is that
+//     position — one scripted "OS", two reads, as in production.
 //
-//   - The press EDGE that Menu.poll dispatches on comes from raw
-//     ebiten inpututil (no injection path exists headless), so it is
-//     delivered through the test-only setter uikit.SetPressEdgeForTest.
-//     The edge is non-consuming per tick, like inpututil's: it stays
-//     set for the whole click frame, covering both the Game.Update and
-//     the Kit.Update poll passes.
+//   - The press EDGE Menu.poll dispatches on is the frame's RawPress,
+//     sampled by Begin from the same script (its own edge snapshot, not
+//     ebitenui's cache). One press therefore feeds both the Game.Update and
+//     the Kit.Update poll passes of the frame, exactly like inpututil's
+//     edge.
 //
 // loopMouse is ebitenui's CursorUpdater seam with the DEFAULT internal
 // handler's caching semantics: raw scripted state becomes visible only
@@ -56,6 +55,53 @@ type loopMouse struct {
 	leftPrev, rightPrev bool
 	leftJust, rightJust bool
 	leftRel, rightRel   bool
+
+	// pointer (the game's frame) — the RAW script with the frame's own
+	// edge snapshot: Begin runs before ebitenui's Update refreshed the
+	// cache, so the frame cannot read the cache's just-state.
+	ptr               *widgets.Pointer
+	srcLeft, srcRight bool
+	prvLeft, prvRight bool
+	shape             ebiten.CursorShapeType
+}
+
+// loopMouse is also the game's pointer Source: one script drives both
+// ebitenui's widgets (the CursorUpdater seam) and the kit's frame.
+func (m *loopMouse) Cursor() (int, int) {
+	m.prvLeft, m.prvRight = m.srcLeft, m.srcRight
+	m.srcLeft, m.srcRight = m.left, m.right
+	return m.x, m.y
+}
+
+func (m *loopMouse) Down(b widgets.Button) bool {
+	switch b {
+	case widgets.Left:
+		return m.left
+	case widgets.Right:
+		return m.right
+	}
+	return false
+}
+
+func (m *loopMouse) JustPressed(b widgets.Button) bool {
+	switch b {
+	case widgets.Left:
+		return m.srcLeft && !m.prvLeft
+	case widgets.Right:
+		return m.srcRight && !m.prvRight
+	}
+	return false
+}
+
+// shape is the last cursor the game's frame presented (its one OS write).
+func (m *loopMouse) SetShape(s ebiten.CursorShapeType) { m.shape = s }
+
+// pointer is the frame a game built over this mouse samples.
+func (m *loopMouse) pointer() *widgets.Pointer {
+	if m.ptr == nil {
+		m.ptr = widgets.NewPointer(m)
+	}
+	return m.ptr
 }
 
 func (m *loopMouse) Update() {
@@ -109,8 +155,9 @@ func (m *loopMouse) GetCursorImage(string) *ebiten.Image { return nil }
 func (m *loopMouse) GetCursorOffset(string) image.Point  { return image.Point{} }
 
 // moveTo scripts the cursor (raw); the ebitenui cache picks it up on the
-// next UI.Update — i.e. never while a menu is up — while Menu.poll's
-// live seam (SetPollCursorForTest) sees it immediately, as in production.
+// next UI.Update — i.e. never while a menu is up — while the game's
+// pointer frame (a Source over this mouse) sees it at the next Begin, as
+// in production.
 func (m *loopMouse) moveTo(x, y int) { m.x, m.y = x, y }
 
 // useLoopMouse installs the scripted mouse for the test's duration.
@@ -139,19 +186,9 @@ func useLoopMouse(t *testing.T) *loopMouse {
 // delivered on the entry's row rect through the production poll, and the
 // action still does not run.
 func TestMenuClickDispatchesThroughUpdateLoop(t *testing.T) {
-	g := dockedShowcaseGame(t, 1280, 720)
 	mm := useLoopMouse(t)
+	g := dockedShowcaseGame(t, 1280, 720, mm.pointer())
 	img := ebiten.NewImage(1280, 720)
-
-	// The press-edge seam: armed only for the click frame below.
-	clickEdge := false
-	defer widgets.SetPressEdgeForTest(func(b ebiten.MouseButton) bool {
-		return b == ebiten.MouseButtonLeft && clickEdge
-	})()
-
-	// The menu's live-cursor seam: Menu.poll reads the scripted raw
-	// position, exactly as production reads ebiten's cursor.
-	defer widgets.SetPollCursorForTest(func() (int, int) { return mm.x, mm.y })()
 
 	frame := func() {
 		t.Helper()
@@ -206,9 +243,9 @@ func TestMenuClickDispatchesThroughUpdateLoop(t *testing.T) {
 	}
 
 	// The click: one left-press edge on entry 0's row rect.
-	clickEdge = true
+	mm.left = true
 	frame()
-	clickEdge = false
+	mm.left = false
 	frame()
 
 	// 4. The entry's action must have run.

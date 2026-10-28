@@ -94,7 +94,7 @@ func TestMarketRunsOnStubView(t *testing.T) {
 		wallet: 1234.5,
 	}
 	rec := &recordingSink{}
-	m := NewMarket(widgets.NewSeams(th, cv, rec))
+	m := NewMarket(widgets.NewSeams(th, cv, rec, nil))
 	m.Sync() // reads the stub everywhere; a sim in the path would panic
 
 	if len(m.tbl.Rows) != 1 {
@@ -110,7 +110,7 @@ func TestMarketRunsOnStubView(t *testing.T) {
 	// The row's menu presses through a REAL Menu: the derived entries
 	// route their intents into the sink, never a sim.
 	entries := widgets.RowMenuEntries(cv, rec, m.tbl.Rows[0].Spec)
-	menu := widgets.NewMenu(th)
+	menu := widgets.NewMenu(th, nil)
 	pressEntry := func(label string) {
 		t.Helper()
 		menu.Open(entries, image.Pt(10, 10))
@@ -160,7 +160,7 @@ func TestMarketRunsOnStubView(t *testing.T) {
 func TestThemeOnlyWidgetsTakeNoView(t *testing.T) {
 	th := theme.NewSeam(theme.DefaultPalette(), theme.DefaultTypeScale())
 
-	m := widgets.NewMenu(th)
+	m := widgets.NewMenu(th, nil)
 	if m.IsOpen() {
 		t.Error("a fresh menu is open")
 	}

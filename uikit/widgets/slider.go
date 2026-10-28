@@ -146,11 +146,10 @@ func (s *Slider) Grabbed() bool { return s.grab }
 // untouched. Sync uses it to mirror the host's setting into the handle.
 func (s *Slider) SetValue(v float64) { s.value = s.quantize(v) }
 
-// Poll advances one frame of slider input from the live cursor and the
-// left button. The panel calls it from Sync, before Kit.Update.
-func (s *Slider) Poll() {
-	x, y := PollCursor()
-	s.Step(image.Pt(x, y), PressEdge(ebiten.MouseButtonLeft), sliderHeld())
+// Poll advances one frame of slider input from the frame's pointer and
+// the left button. The panel calls it from Sync, before Kit.Update.
+func (s *Slider) Poll(p *Pointer) {
+	s.Step(p.At(), p.Press(Left), p.Down(Left))
 }
 
 // Step is Poll's testable core: a rising press inside the hit band grabs
@@ -191,8 +190,7 @@ func (s *Slider) hit(p image.Point) bool {
 	if p.Y < band.Min.Y || p.Y >= band.Max.Y {
 		return false
 	}
-	l := w.EffectiveInputLayer()
-	return l != &input.DefaultLayer && l.ActiveFor(p.X, p.Y, input.LayerEventTypeMouseButton)
+	return OwnsAt(w, p, input.LayerEventTypeMouseButton)
 }
 
 // HitBand is the widget's 24 design px grab strip, centred on the track.
@@ -303,17 +301,4 @@ func (s *Slider) Render(screen *ebiten.Image) {
 	handle := image.Rect(hx-hw/2, cy-hh/2, hx-hw/2+hw, cy-hh/2+hh)
 	theme.DrawRoundBox(screen, handle,
 		theme.Solid(p.Text), theme.Solid(p.Accent), theme.Px(1), theme.AllRadii(theme.RadiusControl))
-}
-
-// sliderHeld reads the left button for the grab. The indirection is the
-// test seam (the splitSeam/splitHeld precedent); production reads ebiten.
-var sliderHeld = func() bool { return ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) }
-
-// SetSliderHeldForTest overrides the slider's button read for a headless
-// test and returns a restore func. Test-only seam: never call it from
-// production code.
-func SetSliderHeldForTest(f func() bool) func() {
-	prev := sliderHeld
-	sliderHeld = f
-	return func() { sliderHeld = prev }
 }

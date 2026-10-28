@@ -927,11 +927,11 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > custom rather than ebitenui's own context-menu windows because those bypass the
 > deterministic world-input gate: the menu rect joins `Game.overUI`'s
 > exact-rect list, so a click over the popup can never reach world input,
-> and the press itself is spent on the popup for the rest of the pass —
+> and the press itself is spent on the popup for the rest of the frame —
 > `Kit.Update` still advances ebitenui's cached input while it skips
-> `ui.Update`, and `Menu.Click`/`Esc` claim `widgets.PressEdge` until
-> `Menu.TakeBlocked` — so no widget, table row, starmap node or slider
-> under the popup sees the gesture either.
+> `ui.Update`, and `Menu.Click`/`Esc` spend the pointer frame's press
+> (`Pointer.Spend`) until the next `Begin` — so no widget, table row,
+> starmap node or slider under the popup sees the gesture either.
 
 > **Split panes (2026-10):** a multi-pane window divides its leftover
 > height — or width — by **ratio**, not ebitenui's equal `GridLayout`
@@ -945,15 +945,16 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > test, so a seam under another window is inert), an NS-resize cursor over
 > a stack and EW over a row, and a 72 design-px pane floor. The cursor has
 > one writer: ebitenui's cursor management is off (`Kit`), seams and the
-> window grips only claim a shape (`widgets.ClaimCursor` — chrome steps
-> last, so a grip outranks a seam; the chrome also re-claims inside Draw)
-> and the kit's `widgets.ApplyCursor` at the end of Draw makes the frame's
-> single OS write. A claim belongs to the input pass, not the draw:
-> `widgets.BeginCursorFrame` on the first line of `Game.Update` starts the
-> pass, so a draw-only frame (ebiten draws every display frame, updates
+> window grips only claim a shape on the frame (`Pointer.ClaimShape` —
+> chrome steps last, so a grip outranks a seam; the chrome also re-claims
+> inside Draw) and `Pointer.Apply` at the end of `Kit.Draw` makes the
+> frame's single OS write. A claim belongs to the frame, not the draw: the
+> host's `Begin` on the first line of `Game.Update` takes the frame's one
+> sample, so a draw-only frame (ebiten draws every display frame, updates
 > only ~60/s — on a fast display half the draws have no tick) repeats the
-> pass's decision instead of falling back to the arrow. A host that never
-> announces a pass (the `uitest` pump) keeps the last claim. Two writers per frame
+> frame's decision instead of falling back to the arrow. A host that never
+> begins a frame (the `uitest` pump) reads no press and repeats the last
+> claim. Two writers per frame
 > (ebitenui's AfterDraw arrow plus ours) alternated the shape and flickered. Each panel
 > names its seams (`Inventory.Splits`, `Fitting.Splits`,
 > `Manufacturing.Splits`, `Market.Splits` → `widgets.Seam`) and the layout
@@ -1027,7 +1028,7 @@ map only says where each thing derives from.
 | Tracked chrome labels | `theme/tracked.go` | `ChromeText` (widget), `DrawTracked` (hand-drawn) and `MeasureTracked` are the only tracking path; body/row text stays untracked Sans. A tracked label measures with the same step it draws. |
 | Table columns | `widgets/columns.go` + `table.go` | One layout pass (`applyWidths` → `layoutColumns`) owns every width; header buttons, grips, the ⋯ strip (`ColMenuW`) and row cells all derive from `colOffsets`. Frozen bases + proportional later layouts (the "Table columns" note above). |
 | Plate band | `screens/winheader.go` + `widgets.PlateBand` | Two halves of one boundary: the window wrapper paints panel → plate → body (draw order), and the table's viewport drops its fill under the band (`plateFillTop`). Both are paint-only: no width, rect or scroll offset moves. |
-| Slider family | `widgets/slider.go` | One widget, two value models: **freeflow** (a min/max range quantised only by its Step — the settings Master/Music volumes, 1% steps) and **notched** (a snap-to ladder with one dim tick per rung and the handle resting exactly on them — the six-rung UI scale). The widget is a `PreferredSizeLocateableWidget` painted with palette roles and theme tokens (rounded track with accent fill, dim ticks, handle), so it needs no ebitenui theme images. Input is the pane-seam discipline: the panel's `Sync` calls `Poll`, which reads the shared raw cursor/press seams; a press grabs only inside the 24 design-px hit band on the widget's own active input layer (a covered slider is inert), a held grab follows the absolute cursor x with a 24 px band even where the track is thinner, and release drops it. `OnChange` streams the live value (the settings volumes apply it at the music seam; the scale host applies a rung and rebuilds the interface, after which the replacement slider starts idle); `OnRelease` is the single persist point. |
+| Slider family | `widgets/slider.go` | One widget, two value models: **freeflow** (a min/max range quantised only by its Step — the settings Master/Music volumes, 1% steps) and **notched** (a snap-to ladder with one dim tick per rung and the handle resting exactly on them — the six-rung UI scale). The widget is a `PreferredSizeLocateableWidget` painted with palette roles and theme tokens (rounded track with accent fill, dim ticks, handle), so it needs no ebitenui theme images. Input is the pane-seam discipline: the panel's `Sync` calls `Poll(p)`, which reads the host's pointer frame; a press grabs only inside the 24 design-px hit band on the widget's own active input layer (a covered slider is inert), a held grab follows the absolute cursor x with a 24 px band even where the track is thinner, and release drops it. `OnChange` streams the live value (the settings volumes apply it at the music seam; the scale host applies a rung and rebuilds the interface, after which the replacement slider starts idle); `OnRelease` is the single persist point. |
 
 | Rack badge / ready marker | `screens/rack.go` | The waiting dot is one of `rackBadgePhases` pre-rendered images, swapped by pointer once per `rackBadgeTicks` (deterministic frame count, no per-frame Clear); the ready marker is a static overlay in the tile's other corner; the cycle ring is drawn under both. Both overlays are visibility-flipped, never rebuilt. |
 | Quantity picker | `screens/qtypicker.go` + `screens/env.go` + `screens/kit.go` | The one replacement for every −/+ ticker. The popup is a session **service** (like the menu and Show Info), so a bare `NewEnv` and a `Kit` share one instance and one per-mode memory of the last confirmed value; panels never hold it — they emit the host-owned `widgets.QtyPick{Mode, Item, Recipe, From, To}` intent through the sink, which the Kit's `RunIntent` (or a bare session's wrapped sink) turns into `Session.OpenQty`. `Kit.OpenQty` mounts the window on first open, centres it on the root overlay and raises it; `Kit.CloseQty` unmounts and hides, so Cancel, Esc, `×` and Confirm all end in the same idempotent place. That is the kit's one **dialog** lifecycle (`screens/kitdialog.go`, Kit-internal): Show Info, the order mini-window and the picker all go through `newDialog` (the single `×` registration) + `showDialog` (re-target, optional `place`, then remove + re-add on top with `animate=false` — a launch on the open window never restarts the fade, and a launch during a close fade drops the pending unmount) + `closeDialog` (idempotent unmount + hide). Only the picker sets `place` (it centres on every show); a re-target of Show Info or the order window never moves it. The window is **modal** (ebitenui's fullscreen input layer: a click outside cannot reach the window beneath) and its slider is the house `widgets.Slider` polled from `Kit.Sync` — the refinery's notched whole-batch ladder, everything else freeflow 1..100. Esc is the one key it consumes, read in `Kit.MenuInput`/`Kit.Update` (`pickPoll`) ahead of any window close, so the host's Esc-menu latch already owns that frame. Confirm emits the surface's existing intent (`Refine`, `StartJob`, `Buy`, `Sell`, `Transfer`) — no new sim command, no new payload |

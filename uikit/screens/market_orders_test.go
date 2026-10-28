@@ -33,7 +33,7 @@ func TestMarketStandingOrderPanel(t *testing.T) {
 		wallet: 1234.5,
 	}
 	rec := &recordingSink{}
-	env := widgets.NewSeams(th, cv, rec)
+	env := widgets.NewSeams(th, cv, rec, nil)
 	m := NewMarket(env)
 	ui := newWindowUI(t, env, m.Win())
 	frame := func() { uitest.PumpWindow(t, ui, m.Sync, 1024, 700) }
@@ -83,7 +83,7 @@ func TestMarketStandingOrderPanel(t *testing.T) {
 	}
 
 	entries := widgets.RowMenuEntries(cv, rec, spec)
-	menu := widgets.NewMenu(th)
+	menu := widgets.NewMenu(th, nil)
 	press := func(label string) {
 		t.Helper()
 		menu.Open(entries, image.Pt(10, 10))
@@ -134,7 +134,7 @@ func TestMarketMyOrdersListsEveryOrder(t *testing.T) {
 		wallet: 1,
 	}
 	rec := &recordingSink{}
-	env := widgets.NewSeams(th, cv, rec)
+	env := widgets.NewSeams(th, cv, rec, nil)
 	m := NewMarket(env)
 	ui := newWindowUI(t, env, m.Win())
 	frame := func() { uitest.PumpWindow(t, ui, m.Sync, 1024, 700) }

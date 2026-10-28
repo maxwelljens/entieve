@@ -27,6 +27,7 @@ type testEnv struct {
 	Sim     *sim.Sim
 	Content *content.Content
 	menu    *Menu
+	in      *scriptInput // the frame's source: a test moves the pointer here
 }
 
 // Menu returns the env's context menu (the session-shaped accessor the
@@ -56,7 +57,9 @@ func newTestEnv(t *testing.T) (*testEnv, *[]sim.Command) {
 	}
 	var cmds []sim.Command
 	th := theme.NewSeam(theme.DefaultPalette(), theme.DefaultTypeScale())
-	m := NewMenu(th)
+	in := &scriptInput{}
+	frame := NewPointer(in)
+	m := NewMenu(th, frame)
 	// The built-in executor with no Show Info host: session intents land
 	// on the env's own menu, command intents tail onto enqueue.
 	exec := NewExec(
@@ -66,10 +69,11 @@ func newTestEnv(t *testing.T) (*testEnv, *[]sim.Command) {
 		nil,
 	)
 	env := &testEnv{
-		Seams:   NewSeams(th, NewView(c, s), exec),
+		Seams:   NewSeams(th, NewView(c, s), exec, frame),
 		Sim:     s,
 		Content: c,
 		menu:    m,
+		in:      in,
 	}
 	return env, &cmds
 }

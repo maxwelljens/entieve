@@ -402,6 +402,7 @@ type Table struct {
 	th          theme.Theme
 	cv          ContentView
 	as          ActionSink
+	ptr         *Pointer
 	cols        []Column
 	Face        *text.Face
 	measure     func(string) float64 // cell width, contents face
@@ -495,6 +496,7 @@ func NewTable(env Seams, cols []Column, opts ...TableOption) *Table {
 		Face:   env.Face(theme.StepSmall), // cell face: display body by default
 		selIdx: -1,
 		grip:   -1,
+		ptr:    env.Pointer(),
 	}
 	t.hidden = make([]bool, len(t.cols))
 	for _, opt := range opts {
@@ -1158,7 +1160,7 @@ func (t *Table) newRow(i int) *widget.Container {
 // row's spec), right opens the row's declared menu. The lines themselves
 // are wired by the builder.
 func (t *Table) newStackRow(i int) *widget.Container {
-	sr := NewStackRow(NewSeams(t.th, t.cv, t.as), t.Rows[i], t.Face)
+	sr := NewStackRow(NewSeams(t.th, t.cv, t.as, t.ptr), t.Rows[i], t.Face)
 	click := t.rowHandler(i)
 	sr.Root.GetWidget().LayoutData = widget.RowLayoutData{Stretch: true}
 	sr.Root.GetWidget().MouseButtonClickedEvent.AddHandler(func(args any) {
@@ -1658,8 +1660,8 @@ func fitColumns(cols []ColWidth, prio []int, grow int, avail float64) []ColWidth
 
 // ---------------------------------------------------------------------------
 // Test hooks — the internals a surface test asserts geometry/state on
-// from another package (kit_test, scale_test). Test-only seams, the
-// SetPollCursorForTest precedent; production code never calls them.
+// from another package (kit_test, scale_test). Test-only seams;
+// production code never calls them.
 // ---------------------------------------------------------------------------
 
 // RowWidgetForTest exposes row i's container widget so a surface test

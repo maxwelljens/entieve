@@ -628,22 +628,15 @@ func TestSettingsPanelWiring(t *testing.T) {
 	}
 
 	// Drive the sliders through their production input path — Poll reads
-	// the shared cursor/press/held seams — so Sync and the grab interact
-	// exactly as they do in a frame.
-	var (
-		cur   image.Point
-		press bool
-		held  bool
-	)
-	defer widgets.SetPollCursorForTest(func() (int, int) { return cur.X, cur.Y })()
-	defer widgets.SetPressEdgeForTest(func(ebiten.MouseButton) bool { return press })()
-	defer widgets.SetSliderHeldForTest(func() bool { return held })()
+	// the session's pointer frame — so Sync and the grab interact exactly
+	// as they do in a frame.
 	frame := func(p image.Point, down bool) {
-		cur = p
-		press = down && !held
-		held = down
+		env.in.x, env.in.y = p.X, p.Y
+		env.in.edge = [3]bool{down && !env.in.down[0], false, false}
+		env.in.down[0] = down
+		env.Pointer().Begin()
 		s.Sync()
-		press = false
+		env.in.edge = [3]bool{}
 	}
 
 	// The scale slider is notched: clicking a rung applies it absolutely

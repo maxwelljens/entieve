@@ -67,6 +67,7 @@ type SettingsActions struct {
 // slider starts idle; the drag is over, never re-fired).
 type Settings struct {
 	th  theme.Theme
+	ptr *widgets.Pointer
 	act SettingsActions
 	win *widget.Window
 
@@ -100,9 +101,12 @@ type Settings struct {
 
 // NewSettings builds the Settings window over the shared environment.
 // Mount it on a Kit with Kit.AddWindow and call Sync every frame.
-func NewSettings(d theme.Theme, act SettingsActions) *Settings {
+func NewSettings(d interface {
+	theme.Theme
+	Pointer() *widgets.Pointer
+}, act SettingsActions) *Settings {
 	p := d.Pal()
-	s := &Settings{th: d, act: act}
+	s := &Settings{th: d, ptr: d.Pointer(), act: act}
 
 	// Full-width toggle row: the label is the state readout.
 	newToggle := func(label string, clicked func()) *widget.Button {
@@ -271,10 +275,10 @@ func (s *Settings) Win() *widget.Window { return s.win }
 // replaced, and the fresh panel starts with idle sliders — the old drag
 // never fires another change.
 func (s *Settings) Sync() {
-	s.scaleSlider.Poll()
-	s.masterSlide.Poll()
-	s.musicSlide.Poll()
-	s.uiSlide.Poll()
+	s.scaleSlider.Poll(s.ptr)
+	s.masterSlide.Poll(s.ptr)
+	s.musicSlide.Poll(s.ptr)
+	s.uiSlide.Poll(s.ptr)
 	if !s.scaleSlider.Grabbed() {
 		s.scaleSlider.SetValue(s.act.UIScale())
 	}

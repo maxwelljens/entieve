@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/entieve/entieve/uikit/theme"
-	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -18,16 +17,11 @@ import (
 // The open cue lands one frame after the popup appears (the menu's state is
 // read at the frame's start, the same edge the host's gate reads).
 func TestUISoundMenuOpen(t *testing.T) {
-	g := newUISoundGame(t, t.TempDir()+"/save.json", &fakeUISound{})
+	mm := useLoopMouse(t)
+	g := newUISoundGame(t, t.TempDir()+"/save.json", &fakeUISound{}, mm.pointer())
 	f := g.ui.(*fakeUISound)
 	pump(t, g, 1280, 720)
-	mm := useLoopMouse(t)
 	img := ebiten.NewImage(1280, 720)
-	clickEdge := false
-	defer widgets.SetPressEdgeForTest(func(b ebiten.MouseButton) bool {
-		return clickEdge && b == ebiten.MouseButtonLeft
-	})()
-	defer widgets.SetPollCursorForTest(func() (int, int) { return mm.x, mm.y })()
 
 	frame := func() {
 		t.Helper()
@@ -40,9 +34,9 @@ func TestUISoundMenuOpen(t *testing.T) {
 	// frame the popup's open edge rides.
 	press := func(pt image.Point) {
 		mm.moveTo(pt.X, pt.Y)
-		mm.left, clickEdge = true, true
+		mm.left = true
 		frame()
-		mm.left, clickEdge = false, false
+		mm.left = false
 		frame()
 		frame()
 	}
@@ -58,8 +52,10 @@ func TestUISoundMenuOpen(t *testing.T) {
 	if !g.kit.Menu().IsOpen() {
 		t.Fatalf("the ⋯ press did not open the menu (dots %v)", dots)
 	}
-	if len(f.plays) != 1 || f.plays[0] != sfxOpen {
-		t.Fatalf("the ⋯ menu appearing = %v, want one %q", f.plays, sfxOpen)
+	// The press itself lands on the ⋯ control, so it is also the ordinary
+	// click cue — then the popup's own open edge on the next frame.
+	if len(f.plays) != 2 || f.plays[0] != sfxClick || f.plays[1] != sfxOpen {
+		t.Fatalf("the ⋯ menu appearing = %v, want %q then %q", f.plays, sfxClick, sfxOpen)
 	}
 
 	// 2. Dismissal without a selection is silent: no close cue (the press
@@ -77,8 +73,8 @@ func TestUISoundMenuOpen(t *testing.T) {
 	//    its entry is the existing click (never a second open).
 	f.plays = nil
 	press(dots)
-	if len(f.plays) != 1 || f.plays[0] != sfxOpen {
-		t.Fatalf("a second menu = %v, want one %q", f.plays, sfxOpen)
+	if len(f.plays) != 2 || f.plays[0] != sfxClick || f.plays[1] != sfxOpen {
+		t.Fatalf("a second menu = %v, want %q then %q", f.plays, sfxClick, sfxOpen)
 	}
 	entry := g.kit.Menu().RowRect(0)
 	if entry.Empty() {

@@ -78,6 +78,7 @@ type Fitting struct {
 	th  theme.Theme
 	cv  widgets.ContentView
 	as  widgets.ActionSink
+	ptr *widgets.Pointer
 	win *widget.Window
 
 	measure func(string) float64 // the StepTiny face, for tile-name ellipsis
@@ -152,7 +153,7 @@ type fitTile struct {
 // NewFitting builds the Fitting window over the shared environment.
 // Mount it on a Kit with Kit.AddWindow and call Sync every frame.
 func NewFitting(env widgets.Seams) *Fitting {
-	f := &Fitting{th: env, cv: env, as: env}
+	f := &Fitting{th: env, cv: env, as: env, ptr: env.Pointer()}
 	p := env.Pal()
 	faceTiny := env.Face(theme.StepTiny)
 	f.measure = func(s string) float64 {
@@ -659,7 +660,7 @@ func (f *Fitting) newSummary() *widget.Container {
 // tiles, the fitting summary, the hangar rows and the action gating. Call
 // it every frame before Kit.Update.
 func (f *Fitting) Sync() {
-	f.split.Poll()
+	f.split.Poll(f.ptr)
 	s := f.cv
 	player := s.Player()
 

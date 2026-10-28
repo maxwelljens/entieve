@@ -72,7 +72,7 @@ func orderStub(orders []sim.MarketStock) (*stubView, *recordingSink, widgets.Sea
 		wallet: 1000,
 	}
 	rec := &recordingSink{}
-	return cv, rec, widgets.NewSeams(th, cv, rec)
+	return cv, rec, widgets.NewSeams(th, cv, rec, nil)
 }
 
 // TestOrderWindowDefaults pins the mode defaults: Sell = best bid + 1 €,

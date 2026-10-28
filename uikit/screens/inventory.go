@@ -20,6 +20,7 @@ type Inventory struct {
 	th  theme.Theme
 	cv  widgets.ContentView
 	as  widgets.ActionSink
+	ptr *widgets.Pointer
 	win *widget.Window
 
 	cargo, ore, hangar *widgets.Table
@@ -42,7 +43,7 @@ type Inventory struct {
 // NewInventory builds the Inventory window over the shared environment.
 // Mount it on a Kit with Kit.AddWindow and call Sync every frame.
 func NewInventory(env widgets.Seams) *Inventory {
-	inv := &Inventory{th: env, cv: env, as: env}
+	inv := &Inventory{th: env, cv: env, as: env, ptr: env.Pointer()}
 	p := env.Pal()
 
 	cols := []widgets.Column{
@@ -194,7 +195,7 @@ func (inv *Inventory) tableFor(src string) *widgets.Table {
 // Sync refreshes the three sections, their totals and the action
 // gating. Call it every frame before Kit.Update.
 func (inv *Inventory) Sync() {
-	inv.split.Poll()
+	inv.split.Poll(inv.ptr)
 	s := inv.cv
 	player := s.Player()
 

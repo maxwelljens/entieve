@@ -398,12 +398,11 @@ func (h headerLayout) Layout(ws []widget.PreferredSizeLocateableWidget, rect ima
 // Grip dragging
 // ---------------------------------------------------------------------------
 
-// Poll advances one frame of column dragging from the live cursor and the
-// left button (the split seam's pattern — Table.Sync calls it, so a drag
-// costs one cursor read per frame).
+// Poll advances one frame of column dragging from the table's frame and
+// the left button (the split seam's pattern — Table.Sync calls it, so a
+// drag costs one sample per frame).
 func (t *Table) Poll() {
-	x, y := PollCursor()
-	t.Step(image.Pt(x, y), PressEdge(ebiten.MouseButtonLeft), splitHeld())
+	t.Step(t.ptr.At(), t.ptr.Press(Left), t.ptr.Down(Left))
 }
 
 // Step is Poll's testable core: a rising press on a grip strip grabs that
@@ -515,15 +514,15 @@ func (t *Table) nextVisible(i int) int {
 }
 
 // gripAt is the grip strip under p, or -1. Each grip owns a blocking input
-// layer, and ActiveFor walks the stack: a strip under another window (or
-// under the modal menu) is inert — the split seam's idiom.
+// layer, and OwnsAt walks the stack: a strip under another window (or under
+// the modal menu) is inert — the split seam's idiom.
 func (t *Table) gripAt(p image.Point) int {
 	for i, g := range t.grips {
 		w := g.GetWidget()
 		if w.Rect.Empty() || !p.In(w.Rect) {
 			continue
 		}
-		if !w.EffectiveInputLayer().ActiveFor(p.X, p.Y, input.LayerEventTypeMouseButton) {
+		if !OwnsAt(w, p, input.LayerEventTypeMouseButton) {
 			continue
 		}
 		return i
@@ -533,4 +532,4 @@ func (t *Table) gripAt(p image.Point) int {
 
 // setGripCursor claims the resize cursor (the split row's EW shape) while a
 // grip is under the pointer or dragged.
-func (t *Table) setGripCursor() { ClaimCursor(ebiten.CursorShapeEWResize) }
+func (t *Table) setGripCursor() { t.ptr.ClaimShape(ebiten.CursorShapeEWResize) }

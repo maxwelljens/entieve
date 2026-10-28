@@ -75,37 +75,31 @@ func TestMarketSplitDragTradesWidths(t *testing.T) {
 	m := NewMarket(env)
 	ui := newWindowUI(t, env, m.Win())
 	// A bare ebitenui.UI has no Kit.Draw, so the frame's seam-cursor apply
-	// (the kit's one per-frame write) is explicit in this frame model.
+	// (the kit's one per-frame write) is explicit in this frame model —
+	// after a fresh sample, as the host's Update does.
 	pump := func() {
+		env.Pointer().Begin()
 		uitest.PumpWindow(t, ui, m.Sync, 1024, 700)
-		widgets.ApplyCursor()
+		env.Pointer().Apply()
 	}
 	pump()
 
-	var shape ebiten.CursorShapeType
-	defer widgets.SetCursorShapeForTest(func(c ebiten.CursorShapeType) { shape = c })()
 	before := splitPanes(m.split)
 	seam := splitSeam(m.split, 0)
 	cur := image.Pt(seam.Min.X, (seam.Min.Y+seam.Max.Y)/2)
-
-	var down, held bool
-	defer widgets.SetPollCursorForTest(func() (int, int) { return cur.X, cur.Y })()
-	defer widgets.SetPressEdgeForTest(func(ebiten.MouseButton) bool {
-		d := down
-		down = false
-		return d
-	})()
-	defer widgets.SetSplitHeldForTest(func() bool { return held })()
+	env.in.x, env.in.y = cur.X, cur.Y
 
 	pump() // hover the band
-	if shape != ebiten.CursorShapeEWResize {
-		t.Errorf("seam cursor = %v, want EW-resize", shape)
+	if env.in.shape != ebiten.CursorShapeEWResize {
+		t.Errorf("seam cursor = %v, want EW-resize", env.in.shape)
 	}
-	down, held = true, true
+	env.in.edge, env.in.down = [3]bool{true, false, false}, [3]bool{true, false, false}
 	pump() // arm the grab
 	cur.X += 20
+	env.in.x = cur.X
+	env.in.edge = [3]bool{}
 	pump() // drag right
-	held = false
+	env.in.down = [3]bool{}
 	pump() // release
 
 	after := splitPanes(m.split)
@@ -127,11 +121,14 @@ func TestMarketSplitDragTradesWidths(t *testing.T) {
 	moved := splitPanes(m.split)
 	seam = splitSeam(m.split, 1)
 	cur = image.Pt(seam.Min.X, (seam.Min.Y+seam.Max.Y)/2)
-	down, held = true, true
+	env.in.x, env.in.y = cur.X, cur.Y
+	env.in.edge, env.in.down = [3]bool{true, false, false}, [3]bool{true, false, false}
 	pump()
 	cur.X -= 20
+	env.in.x = cur.X
+	env.in.edge = [3]bool{}
 	pump()
-	held = false
+	env.in.down = [3]bool{}
 	pump()
 	end := splitPanes(m.split)
 	if d := end[1].Dx() - (moved[1].Dx() - 20); d < -1 || d > 1 {

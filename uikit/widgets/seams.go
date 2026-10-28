@@ -553,10 +553,18 @@ func (f SinkFunc) Do(i Intent) {
 // screen that draws, reads state AND acts (a market table, the Show Info
 // window, the module rack). Screens that need less declare less: a
 // Theme-only widget takes Theme, a reader takes Theme+ContentView.
+//
+// It also carries the host's pointer frame (CONTEXT.md "Pointer frame"):
+// one per host, created by the game and shared by every panel, so a frame
+// has exactly one sample and one cursor shape whoever polls it.
 type Seams interface {
 	theme.Theme
 	ContentView
 	ActionSink
+
+	// Pointer is the host's pointer frame. Widgets built from these seams
+	// read their input from it instead of the OS.
+	Pointer() *Pointer
 }
 
 // seams carries the three seams as one assignable value (struct
@@ -565,13 +573,20 @@ type seams struct {
 	theme.Theme
 	ContentView
 	ActionSink
+	ptr *Pointer
 }
+
+// Pointer is the host's pointer frame (see Seams).
+func (s seams) Pointer() *Pointer { return s.ptr }
 
 // NewSeams packages the three seams as one assignable value — what
 // hosts outside widgets (the session builder, the kit) construct the
 // union through.
-func NewSeams(t theme.Theme, cv ContentView, s ActionSink) Seams {
-	return seams{Theme: t, ContentView: cv, ActionSink: s}
+func NewSeams(t theme.Theme, cv ContentView, s ActionSink, p *Pointer) Seams {
+	if p == nil {
+		p = NewPointer(nil)
+	}
+	return seams{Theme: t, ContentView: cv, ActionSink: s, ptr: p}
 }
 
 // Env is the deprecated name for Seams: the god-context reduced to the

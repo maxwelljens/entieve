@@ -281,22 +281,68 @@ func TestColumnGripDragFollowsThePointer(t *testing.T) {
 }
 
 // TestColumnGripClaimsTheResizeCursor: hovering a strip advertises the
-// split row's EW shape (one ClaimCursor; the kit writes it once per frame).
+// split row's EW shape through the frame (one claim per frame; the host's
+// Apply writes it once).
 func TestColumnGripClaimsTheResizeCursor(t *testing.T) {
 	env, _ := newTestEnv(t)
 	tbl, ui := newColumnTable(t, env, overviewCols())
 	tbl.SetRows(overviewRows("0 m/s"))
 	settle(t, tbl, ui)
 
-	var shape ebiten.CursorShapeType
-	defer SetCursorShapeForTest(func(c ebiten.CursorShapeType) { shape = c })()
-	defer ApplyCursor()
 	grip := tbl.grips[1].GetWidget().Rect
-	tbl.Step(grip.Min.Add(image.Pt(1, 1)), false, false)
-	ApplyCursor()
-	if shape != ebiten.CursorShapeEWResize {
-		t.Errorf("grip cursor = %v, want EW-resize", shape)
+	env.in.x, env.in.y = grip.Min.X+1, grip.Min.Y+1
+	env.Pointer().Begin()
+	tbl.Poll() // idle hover: the grip claims the frame
+	env.Pointer().Apply()
+	if env.in.shape != ebiten.CursorShapeEWResize {
+		t.Errorf("grip cursor = %v, want EW-resize", env.in.shape)
 	}
+}
+
+// TestColumnGripIgnoresLayersItDoesNotOwn pins the owner test the columns
+// copy was missing: a widget whose layer is gone falls back to ebitenui's
+// DefaultLayer, which is active ANYWHERE, so without the guard a press on
+// any pixel would grab a column. OwnsAt rejects that fallback, so a stale
+// strip is inert — and so is a strip under a covering layer.
+func TestColumnGripIgnoresLayersItDoesNotOwn(t *testing.T) {
+	env, _ := newTestEnv(t)
+	tbl, ui := newColumnTable(t, env, overviewCols())
+	tbl.SetRows(overviewRows("0 m/s"))
+	settle(t, tbl, ui)
+	pt := tbl.grips[1].GetWidget().Rect.Min.Add(image.Pt(1, 1))
+	if i := tbl.gripAt(pt); i != 1 {
+		t.Fatalf("fixture: grip at %v = %d, want 1", pt, i)
+	}
+
+	// The frame's layers are gone (a widget pumped by a frame that no
+	// longer exists): DefaultLayer passes anywhere, so only the guard can
+	// keep the strip inert.
+	input.SetupInputLayersWithDeferred(nil)
+	if i := tbl.gripAt(pt); i != -1 {
+		t.Errorf("a grip with no layer of its own owned %v (grip %d)", pt, i)
+	}
+	tbl.Step(pt, true, true)
+	if tbl.grip != -1 {
+		t.Errorf("a press on a stale grip grabbed column %d", tbl.grip)
+	}
+
+	// A covering layer in front of it (another window, the modal menu):
+	// the strip is buried, so the press belongs to whatever covers it.
+	settle(t, tbl, ui) // this frame's layers
+	cover := widget.NewContainer().GetWidget()
+	cover.ElevateToNewInputLayer(&input.Layer{
+		EventTypes: input.LayerEventTypeAll,
+		FullScreen: true,
+		BlockLower: true,
+		RectFunc:   func() image.Rectangle { return image.Rect(0, 0, 640, 480) },
+	})
+	tbl.Step(pt, true, true)
+	if tbl.grip != -1 {
+		t.Errorf("a press on a covered grip grabbed column %d", tbl.grip)
+	}
+
+	// Leave no layer behind for the next test's frame.
+	input.SetupInputLayersWithDeferred(nil)
 }
 
 // TestColumnHeaderLabelStopsAtTheMenu: the ⋯ button owns the header's
@@ -491,9 +537,8 @@ func TestColumnMenuToggleAppliesFromTheDotsClick(t *testing.T) {
 		t.Fatalf("menu has no row %d (rows: %d)", kind, len(m.Entries()))
 	}
 	pt := row.Min.Add(image.Pt(row.Dx()/2, row.Dy()/2))
-	pressed := true
-	defer SetPollCursorForTest(func() (int, int) { return pt.X, pt.Y })()
-	defer SetPressEdgeForTest(func(ebiten.MouseButton) bool { return pressed })()
+	env.in.x, env.in.y, env.in.edge = pt.X, pt.Y, [3]bool{true, false, false}
+	env.Pointer().Begin()
 
 	// One frame, two polls: the host's MenuInput pass and Kit.Update's
 	// fallback poll read the same press edge.
@@ -525,9 +570,11 @@ func TestColumnMenuToggleAppliesFromTheDotsClick(t *testing.T) {
 
 	// The latch is one gesture, not a freeze: the next click on the same
 	// row shows Kind again.
-	pressed = false
+	env.in.edge = [3]bool{}
+	env.Pointer().Begin()
 	m.Poll()
-	pressed = true
+	env.in.edge = [3]bool{true, false, false}
+	env.Pointer().Begin()
 	m.Poll()
 	m.TakeBlocked()
 	if tbl.hidden[kind] {

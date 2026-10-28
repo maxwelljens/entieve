@@ -68,7 +68,8 @@ func TestHelpGripStopsAtContentMin(t *testing.T) {
 	for _, scale := range []float64{1, 1.5} {
 		t.Run(fmt.Sprintf("scale%.1f", scale), func(t *testing.T) {
 			uitest.UseScale(t, scale)
-			k, _ := newTestKit(t)
+			fm := useFakeMouse(t)
+			k, _ := newTestKitWith(t, widgets.NewPointer(fm))
 			h := NewHelp(k.Env(), keyMapRows(37))
 			win := h.Win()
 			k.AddWindow(win)
@@ -83,7 +84,6 @@ func TestHelpGripStopsAtContentMin(t *testing.T) {
 				t.Fatalf("content floor height = %d, not above the old 200 literal", content.Y)
 			}
 
-			fm := useFakeMouse(t)
 			frame := func() { pumpKit(t, k, 1600, 1200) }
 
 			// Grow: drag the bottom-right corner outward.

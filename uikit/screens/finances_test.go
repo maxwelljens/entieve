@@ -41,7 +41,7 @@ func TestFinancesRendersHoldingsAndLedger(t *testing.T) {
 			{Tick: 223380, What: "Contract — Belt cleanup", Where: "Jalvrek", Amount: 30000},
 		},
 	}
-	f := NewFinances(widgets.NewSeams(th, cv, &recordingSink{}))
+	f := NewFinances(widgets.NewSeams(th, cv, &recordingSink{}, nil))
 	f.Sync()
 
 	if len(f.tbl.Rows) != 3 {

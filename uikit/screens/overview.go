@@ -79,7 +79,7 @@ func (k *Kit) addWindow(w *widget.Window, animate bool) widget.RemoveWindowFunc 
 	k.cancelClose(w)
 	_, ok := k.chromes[w]
 	if !ok {
-		k.chromes[w] = &winChrome{win: w, closable: k.closes[w] != nil}
+		k.chromes[w] = &winChrome{win: w, ptr: k.pointer, closable: k.closes[w] != nil}
 		// Drag-arming settles the open fade: the fade's park flips would
 		// relayout the subtree the drag translates (CONTEXT.md "Settle").
 		k.chromes[w].settle = func() { k.settleOpen(w) }

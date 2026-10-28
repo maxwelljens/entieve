@@ -328,7 +328,7 @@ func TestRailGatingAndToggle(t *testing.T) {
 	// way a real frame registers them.
 	cv := &stubView{}
 	sink := &recordingSink{}
-	env := widgets.NewSeams(th, cv, sink)
+	env := widgets.NewSeams(th, cv, sink, nil)
 	c := newChromeUI(env)
 	r := NewRail(env, entries)
 	c.AddPanel(r.Container(), r)

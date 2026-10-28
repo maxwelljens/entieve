@@ -33,7 +33,7 @@ func mktTreeEnv(t *testing.T) (*Market, *stubView, *recordingSink, func(), func(
 		wallet: 1000,
 	}
 	rec := &recordingSink{}
-	env := widgets.NewSeams(th, cv, rec)
+	env := widgets.NewSeams(th, cv, rec, nil)
 	m := NewMarket(env)
 	ui := newWindowUI(t, env, m.Win())
 	frame := func() { uitest.PumpWindow(t, ui, m.Sync, 1024, 700) }
@@ -248,7 +248,7 @@ func TestMarketTreeRequestFromGrayedRow(t *testing.T) {
 	}
 
 	entries := widgets.RowMenuEntries(cv, rec, row.Spec)
-	menu := widgets.NewMenu(m.th)
+	menu := widgets.NewMenu(m.th, nil)
 	menu.Open(entries, image.Pt(10, 10))
 	found := false
 	for i, e := range menu.Entries() {

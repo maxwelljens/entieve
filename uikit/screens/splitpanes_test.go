@@ -7,7 +7,6 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/uikit/internal/uitest"
 	"github.com/entieve/entieve/uikit/widgets"
-	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // splitPanes is a split's pane rects, top to bottom (the children are
@@ -92,29 +91,25 @@ func TestInventorySplitDragTradesTwoPanes(t *testing.T) {
 	env, _ := newTestEnv(t)
 	inv := NewInventory(env)
 	ui := newWindowUI(t, env, inv.Win())
-	pump := func() { uitest.PumpWindow(t, ui, inv.Sync, 1280, 720) }
+	pump := func() {
+		env.Pointer().Begin() // the host's sample for this frame
+		uitest.PumpWindow(t, ui, inv.Sync, 1280, 720)
+	}
 	pump()
 
 	before := splitPanes(inv.split)
 	cargoBefore := inv.cargo.Container().GetWidget().Rect.Dy()
 	seam := splitSeam(inv.split, 0)
 	cur := image.Pt(seam.Min.X+5, seam.Min.Y)
-
-	var down, held bool
-	defer widgets.SetPollCursorForTest(func() (int, int) { return cur.X, cur.Y })()
-	defer widgets.SetPressEdgeForTest(func(ebiten.MouseButton) bool {
-		d := down
-		down = false
-		return d
-	})()
-	defer widgets.SetSplitHeldForTest(func() bool { return held })()
+	env.in.x, env.in.y = cur.X, cur.Y
 
 	pump() // hover the band
-	down, held = true, true
+	env.in.edge, env.in.down = [3]bool{true, false, false}, [3]bool{true, false, false}
 	pump() // arm the grab
 	cur.Y += 15
+	env.in.y, env.in.edge = cur.Y, [3]bool{}
 	pump() // drag
-	held = false
+	env.in.down = [3]bool{}
 	pump() // release
 
 	after := splitPanes(inv.split)

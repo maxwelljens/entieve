@@ -207,8 +207,8 @@ func TestCloseButtonPressNeverStartsADrag(t *testing.T) {
 // closes. Releasing on the corner without moving is a click on the ×
 // and closes: the strip is the button's, the drag is the grip's.
 func TestCloseButtonGripKeepsCornerPrecedence(t *testing.T) {
-	k, _ := newTestKit(t)
 	fm := useFakeMouse(t)
+	k, _ := newTestKitWith(t, widgets.NewPointer(fm))
 	log := NewLog(k.Env())
 	closes := 0
 	k.AddWindow(log.Win())

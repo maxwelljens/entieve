@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	uikit "github.com/entieve/entieve/uikit/screens"
-	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -43,7 +42,7 @@ func TestCursorShapePresentsOnEveryDraw(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			m := useLoopMouse(t)
-			g := newShowcaseGame(t)
+			g := newShowcaseGame(t, m.pointer())
 			g.applySize(1280, 720)
 			tc.open(g)
 			g.syncMounts()
@@ -52,14 +51,15 @@ func TestCursorShapePresentsOnEveryDraw(t *testing.T) {
 
 			at := tc.seat(t, g)
 			m.moveTo(at.X, at.Y)
-			t.Cleanup(widgets.SetPollCursorForTest(func() (int, int) { return at.X, at.Y }))
-			t.Cleanup(widgets.SetSplitHeldForTest(func() bool { return false }))
+			m.left = false
 
 			// Every draw must present want, including the draws ebiten runs
-			// with zero Update ticks between them.
+			// with zero Update ticks between them (the frame's apply
+			// repeats the last decision instead of re-sampling).
 			draw := func(label string) {
+				m.shape = ebiten.CursorShapeDefault
 				g.Draw(img)
-				if got := ebiten.CursorShape(); got != tc.want {
+				if got := m.shape; got != tc.want {
 					t.Errorf("%s: presented %v, want %v (a draw without an Update tick dropped the claim)",
 						label, got, tc.want)
 				}

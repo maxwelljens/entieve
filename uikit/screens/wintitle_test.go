@@ -34,8 +34,8 @@ func countMoves(win *widget.Window) *moveCounter {
 // done, and returns the overview (the window under drag).
 func titleTestEnv(t *testing.T) (*Kit, *fakeMouse, *widget.Window) {
 	t.Helper()
-	k, _ := newTestKit(t)
 	fm := useFakeMouse(t)
+	k, _ := newTestKitWith(t, widgets.NewPointer(fm))
 	// Park the Selected Item window clear of the overview so the title
 	// press below is the topmost input layer at its own pixel (the same
 	// park TestOverviewLogEdgeGripsResize relies on for grips).
