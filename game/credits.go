@@ -23,7 +23,7 @@ var creditSections = []creditSection{
 		Title: "Development",
 		Rows: []creditRow{
 			{Role: "Project", Text: "Entieve"},
-			{Role: "Licence", Text: "MIT License, © 2026 The Entieve Authors."},
+			{Role: "Licence", Text: "European Union Public Licence 1.2, © 2026 The Entieve Authors."},
 		},
 	},
 	{

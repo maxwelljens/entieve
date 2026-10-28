@@ -59,9 +59,9 @@ func TestCreditsWindowLayout(t *testing.T) {
 					joined += r.Text
 				}
 			}
-			if !strings.Contains(joined, "MIT License") || len(creditSections) != 7 {
+			if !strings.Contains(joined, "European Union Public Licence 1.2") || len(creditSections) != 7 {
 				t.Errorf("credits sections = %d, texts carry the licence: %v",
-					len(creditSections), strings.Contains(joined, "MIT License"))
+					len(creditSections), strings.Contains(joined, "European Union Public Licence 1.2"))
 			}
 
 			scroll := creditsScrollOf(g)

@@ -522,7 +522,7 @@ func (t *titleScreen) newCredits() creditPanel {
 		widget.WidgetOpts.MinSize(0, theme.Px(theme.SpMd)))))
 	page.AddChild(creditRule(p))
 	page.AddChild(widget.NewText(
-		widget.TextOpts.Text("MIT License — © 2026 The Entieve Authors. Distributed without warranty; see LICENSE.",
+		widget.TextOpts.Text("EUPL 1.2 — © 2026 The Entieve Authors. Distributed without warranty; see LICENSE.",
 			g.env.Face(theme.StepTiny), theme.Solid(p.Dim)),
 		widget.TextOpts.MaxWidth(float64(roleW+theme.Px(theme.SpMd)+textW)),
 	))

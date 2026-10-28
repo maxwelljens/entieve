@@ -37,7 +37,7 @@ func TestCreditsPinSources(t *testing.T) {
 	// its licence line; the old single-purpose "Entieve" section folded
 	// into it).
 	entieve := joined("Development")
-	for _, want := range []string{"MIT License", "2026 The Entieve Authors"} {
+	for _, want := range []string{"European Union Public Licence 1.2", "2026 The Entieve Authors"} {
 		if !strings.Contains(license, want) {
 			t.Fatalf("LICENSE lost %q", want)
 		}
