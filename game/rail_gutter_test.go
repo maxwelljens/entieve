@@ -42,7 +42,7 @@ func TestPlacedDefaultRectsClearTheRailGutter(t *testing.T) {
 					{"overview", g.kit.OverviewWindow()},
 					{"selected item", g.kit.SelectedWindow()},
 					{"show info", g.kit.InfoWindow()},
-					{"station services", g.svcWin},
+					{"station services", g.host.Window(idServices)},
 				}
 				for _, s := range screens {
 					cases = append(cases, struct {
@@ -133,7 +133,7 @@ func TestVirginPlacementTable(t *testing.T) {
 				check("overview", g.kit.OverviewWindow().GetContainer().GetWidget().Rect)
 				check("selected item", g.kit.SelectedWindow().GetContainer().GetWidget().Rect)
 				check("show info", g.kit.InfoWindow().GetContainer().GetWidget().Rect)
-				check("station services", g.svcWin.GetContainer().GetWidget().Rect)
+				check("station services", g.host.Window(idServices).GetContainer().GetWidget().Rect)
 				for _, s := range screens {
 					check(s.Title, g.host.Window(s.ID).GetContainer().GetWidget().Rect)
 				}

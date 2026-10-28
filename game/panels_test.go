@@ -27,7 +27,7 @@ func TestPanelMountAndSync(t *testing.T) {
 			"fitting": bodyOf[*uikit.Fitting](g.host, idFitting), "market": bodyOf[*uikit.Market](g.host, idMarket), "manufacturing": bodyOf[*uikit.Manufacturing](g.host, idManufacturing),
 			"refinery": bodyOf[*uikit.Refinery](g.host, idRefinery),
 			"scanner":  bodyOf[*uikit.Scanner](g.host, idScanner), "map": bodyOf[*uikit.MapView](g.host, idMap), "help": bodyOf[*uikit.HelpPanel](g.host, idHelp), "menu": g.host.Window(idMenu),
-			"station": g.svcWin, "kit": g.kit, "infowin": g.kit.InfoWindow(),
+			"station": g.host.Window(idServices), "kit": g.kit, "infowin": g.kit.InfoWindow(),
 		} {
 			if v == nil {
 				t.Fatalf("%dx%d: panel %s is nil", size[0], size[1], name)

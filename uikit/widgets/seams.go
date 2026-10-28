@@ -140,6 +140,12 @@ type ContentView interface {
 	// minimum (the sim's contract-accept gate, epsilon included).
 	MeetsStanding(float64) bool
 
+	// Contracts is the docked station's contract board: the docked-at
+	// celestial, the player's standing, the station's offerings in
+	// canonical order and every accepted contract. The zero value means
+	// undocked (the board panel renders its empty read).
+	Contracts() Contracts
+
 	// Show Info reference resolution (the info catalog seam).
 	InfoRefFor(ecs.Entity) (InfoRef, bool)
 	InfoRefOf(any) (InfoRef, bool)
@@ -160,6 +166,18 @@ type StationInfo struct {
 	Name     string
 	System   string
 	Services []string
+}
+
+// Contracts is the docked station's contract board as one read (CONTEXT.md
+// "Station board"): where the player is docked, the standing that gates
+// the offerings, the station's board in canonical order and every accepted
+// contract with its live progress. The zero value means undocked; a panel
+// built on it renders the empty board.
+type Contracts struct {
+	Station  content.CelID
+	Standing float64
+	Board    []*content.ContractDef // canonical order (content.Board)
+	Active   []sim.MissionState
 }
 
 // view is the production ContentView: loaded content plus the live sim,
@@ -500,6 +518,22 @@ func (v *view) DeliverProgress(def *content.ContractDef) float64 {
 }
 
 func (v *view) MeetsStanding(min float64) bool { return v.s.Standing()+1e-9 >= min }
+
+// Contracts is the board read once: the docked celestial, the standing
+// (the sim's own epsilon gate is MeetsStanding's), the station's offerings
+// and the accepted missions. Undocked → the zero value.
+func (v *view) Contracts() Contracts {
+	at, ok := v.s.Docked.Get(v.s.Player())
+	if !ok {
+		return Contracts{}
+	}
+	return Contracts{
+		Station:  at.At,
+		Standing: v.s.Standing(),
+		Board:    v.c.Board(at.At),
+		Active:   v.s.Missions(),
+	}
+}
 
 func (v *view) JobMaterials(st sim.StationID, rec content.RecipeID, runs int) []content.CargoStack {
 	return v.s.JobMaterials(st, rec, runs)

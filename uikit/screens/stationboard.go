@@ -1,36 +1,47 @@
-package game
+package screens
 
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"math"
 	"slices"
 	"sort"
 
+	eimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
-	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
-// Station contract-board geometry (docs/GAMEPLAY.md, "Contracts &
-// standing"). The station services window owns the left column while
-// docked: x ∈ [stationX, stationX+stationWinW) starts clear of the
-// navigation rail's gutter and keeps its right edge at 404. The
-// content-driven height (row caps included) keeps the bottom above the
-// log, whose top sits at screen-height-250 — i.e. y=450 at the 1024×700
-// minimum. Both are pinned by tests at 1280×720, 1024×700 and at the
-// window minimum.
+// The station board — the contract column under the service row — is a
+// Screen panel of its own (CONTEXT.md "Station board"): the window, the
+// service row and the two contract sections, rebuilt from one comparable
+// model and fitted to its content.
+//
+// It is the ONE window docking opens. The host asks it for its content
+// floor (FitSize, DESIGN units) and mirrors that onto the window's
+// MinSize and the declared column through the placement tracker — the
+// panel never places or resizes itself, so a player-moved window keeps its
+// position and a grip drag stops at the board's own height.
+//
+// Geometry (docs/GAMEPLAY.md, "Contracts & standing"): the station
+// services window owns the left column while docked: x ∈ [StationX,
+// StationX+StationWinW) starts clear of the navigation rail's gutter and
+// keeps its right edge at 404. The content-driven height (row caps
+// included) keeps the bottom above the log, whose top sits at
+// screen-height-250 — i.e. y=450 at the 1024×700 minimum. Both are pinned
+// by tests at 1280×720, 1024×700 and at the window minimum.
 const (
-	stationX     = 10 + uikit.RailInset // window left edge: rail gutter first
-	stationY     = 8
-	stationWinW  = 394 - uikit.RailInset // window width; right edge still 404
-	stationMinW  = 394 - uikit.RailInset // window MinSize — the "minimum window" row-rect pin
-	stationMinH  = 200
+	StationX     = 10 + RailInset // window left edge: rail gutter first
+	StationY     = 8
+	StationWinW  = 394 - RailInset // window width; right edge still 404
+	StationMinW  = 394 - RailInset // window MinSize — the "minimum window" pin
+	StationMinH  = 200
 	boardPad     = 6 // body padding
 	boardSpacing = 5 // vertical gap between body children
 	boardRowGap  = 4 // gap between two board rows
@@ -45,23 +56,140 @@ const (
 	availMaxRows = 3                // visible available rows ("+N more" beyond)
 	actMaxRows   = 2                // visible active rows ("+N more" beyond)
 
-	boardInnerW   = stationWinW - 2*boardPad                // body inner width: 382
+	boardInnerW   = StationWinW - 2*boardPad                // body inner width: 382
 	boardContentW = boardInnerW - 2*boardRowPad             // row content width: 376
 	boardTextW    = boardContentW - boardBtnW - boardBtnGap // text column width: 278
 )
+
+// StationRect is the station board's window rect in live px: the left
+// column, clear of the navigation rail's gutter, at the board's content
+// height (never below StationMinH). The game's Screen row declares the
+// same column (its DefaultRect) and the host's FitSize path composes it
+// from this height, so the declared rect and the fitted one can never
+// disagree.
+func StationRect(stationH int) image.Rectangle {
+	return image.Rect(theme.Px(StationX), theme.Px(StationY),
+		theme.Px(StationX+StationWinW), theme.Px(StationY)+max(stationH, theme.Px(StationMinH)))
+}
+
+// boardBox is the board's chrome: the square 1 px bordered strip the board
+// rows and body have always worn (not theme.Bordered's 5 px control
+// radius) — panel chrome is a deliberate piece, pinned by the docked
+// capture.
+func boardBox(body, edge color.NRGBA, w int) *eimage.NineSlice {
+	return eimage.NewBorderedNineSliceColor(body, edge, w)
+}
+
+// StationBoard is the docked station's contract board panel: the service
+// row (identity / Undock / Cargo / this station's services), the available
+// contracts and the active ones. Sync re-reads the board every mounted
+// frame and rebuilds the rows only when the model moves.
+type StationBoard struct {
+	env widgets.Seams
+	cv  widgets.ContentView
+
+	win    *widget.Window
+	svc    *Services
+	body   *widget.Container
+	avail  *widget.Container
+	active *widget.Container
+
+	model     stationBoardModel
+	availRows []BoardRow
+	actRows   []BoardRow
+
+	// fit is the content floor in DESIGN units, cached at the last
+	// rebuild (FitSize's answer — never a per-frame PreferredSize).
+	fit int
+}
+
+// NewStationBoard builds the board over the given seams. The window is
+// constructed empty at the declared column with the static floor; the host
+// mounts it, runs Sync and then applies FitSize.
+func NewStationBoard(env widgets.Seams) *StationBoard {
+	p := env.Pal()
+	b := &StationBoard{env: env, cv: env, fit: StationMinH}
+	b.svc = NewServices(env, boardInnerW)
+	b.avail = newBoardSection()
+	b.active = newBoardSection()
+
+	availHead := widget.NewText(
+		widget.TextOpts.Text("Available contracts", env.Face(theme.StepSmall), theme.Solid(p.Accent)),
+	)
+	actHead := widget.NewText(
+		widget.TextOpts.Text("Active contracts", env.Face(theme.StepSmall), theme.Solid(p.Accent)),
+	)
+
+	body := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(boardBox(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Spacing(theme.Px(boardSpacing)),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(boardPad))),
+		)),
+	)
+	body.AddChild(b.svc.Container(), availHead, b.avail, actHead, b.active)
+
+	b.body = body
+	b.win = widget.NewWindow(
+		widget.WindowOpts.Contents(body),
+		widget.WindowOpts.MinSize(theme.Px(StationMinW), theme.Px(StationMinH)),
+		widget.WindowOpts.Location(image.Rect(
+			theme.Px(StationX), theme.Px(StationY),
+			theme.Px(StationX+StationWinW), theme.Px(StationY+StationMinH))),
+	)
+	return b
+}
+
+// Win returns the panel's window for the host's mount and the layout
+// sidecar.
+func (b *StationBoard) Win() *widget.Window { return b.win }
+
+// Services returns the service row above the board (the panel's identity
+// line and per-service buttons).
+func (b *StationBoard) Services() *Services { return b.svc }
+
+// FitSize is the board's content floor in DESIGN units: the column's fixed
+// width and the height the last rebuild measured (never below StationMinH).
+// The host mirrors it onto the window's MinSize and composes the declared
+// column from it.
+func (b *StationBoard) FitSize() (w, h int) { return StationWinW, b.fit }
+
+// Sync refreshes the service row every frame and rebuilds the board when
+// its model moves — the one refresh path (the host syncs mounted panels).
+func (b *StationBoard) Sync() {
+	if b.cv == nil {
+		return
+	}
+	b.svc.Sync()
+	m := b.build()
+	if !m.same(b.model) {
+		b.model = m
+		b.rebuild(m)
+	}
+}
+
+// newBoardSection builds one contract-row section: a bare container whose
+// rows are tiled by the table module's row stack — equal heights,
+// boardRowGap apart, the pure pin of which is boardRowRects.
+func newBoardSection() *widget.Container {
+	return widget.NewContainer(
+		widget.ContainerOpts.Layout(widgets.StackLayout{Gap: theme.Px(boardRowGap)}),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+	)
+}
 
 // boardRowRects tiles up to n contract rows inside inner: equal heights,
 // equal boardRowGap gaps, first row flush with inner's top — every rect
 // pairwise disjoint and fully inside inner. n <= 0 (or an inner too small
 // to hold even one pixel-high row) returns no rects.
 //
-// The tiling itself is the table module's row stack (widgets.StackRects
-// at the board's gap — the layout newBoardSection installs); this
-// wrapper is the pure pin the geometry tests assert against, in the
-// board's own units. The station board sections size themselves to their
-// rows, so the runtime rects come out at exactly the natural row height;
-// the fill semantics keep the invariants for any inner rect the tests
-// throw at it (design sizes, window minimum, degenerate n).
+// The tiling itself is the table module's row stack (widgets.StackRects at
+// the board's gap — the layout newBoardSection installs); this wrapper is
+// the pure pin the geometry tests assert against, in the board's own
+// units. The sections size themselves to their rows, so the runtime rects
+// come out at exactly the natural row height; the fill semantics keep the
+// invariants for any inner rect the tests throw at it.
 func boardRowRects(inner image.Rectangle, n int) []image.Rectangle {
 	return widgets.StackRects(inner, n, theme.Px(boardRowGap))
 }
@@ -77,15 +205,26 @@ func capRows(n, cap int) (show, hidden int) {
 	return cap - 1, n - (cap - 1)
 }
 
-// stationRow is one rendered board row's action handle — its contract id
-// plus the two things widgets.StackRow rendered (the root the section
-// tiles, the trailing action button) — so tests can find, read and press
-// it. The row itself is a rich row built by the table module; only this
-// handle over it lives here.
-type stationRow struct {
-	id   content.ContractID
-	btn  *widget.Button
-	root *widget.Container
+// BoardRow is one rendered board row's handle — its contract id plus the
+// two things widgets.StackRow rendered (the root the section tiles, the
+// trailing action button) — so the host's tests and captures can find,
+// read and press it. The row itself is a rich row built by the table
+// module; only this handle over it lives here. Note rows ("+N more", the
+// empty states) carry a nil button.
+type BoardRow struct {
+	ID   content.ContractID
+	Btn  *widget.Button
+	Root *widget.Container
+}
+
+// Rows returns the rows rendered into one section, in order: available
+// (active false) or accepted contracts. It is the handle tests and
+// captures use; the panel's model stays unexported.
+func (b *StationBoard) Rows(active bool) []BoardRow {
+	if active {
+		return b.actRows
+	}
+	return b.availRows
 }
 
 // boardRowModel is one contract-board row in pure, comparable form — the
@@ -105,7 +244,7 @@ type boardRowModel struct {
 }
 
 // stationBoardModel is the whole board: the docked station's offerings
-// plus every accepted contract. Comparable via sig (fmt of the struct).
+// plus every accepted contract.
 type stationBoardModel struct {
 	Station  content.CelID
 	Standing float64
@@ -113,10 +252,9 @@ type stationBoardModel struct {
 	Active   []boardRowModel
 }
 
-// same is the change detector for syncStationBoard: field-wise equality
-// against the last rebuilt model (boardRowModel is comparable, so the
-// rows compare through slices.Equal). It replaces a fmt.Sprintf("%v", m)
-// signature that ran every docked frame just to detect no change.
+// same is the change detector for Sync: field-wise equality against the
+// last rebuilt model (boardRowModel is comparable, so the rows compare
+// through slices.Equal).
 func (m stationBoardModel) same(o stationBoardModel) bool {
 	return m.Station == o.Station && m.Standing == o.Standing &&
 		slices.Equal(m.Avail, o.Avail) && slices.Equal(m.Active, o.Active)
@@ -126,40 +264,40 @@ func noteRow(text string) boardRowModel {
 	return boardRowModel{Title: text, Note: true}
 }
 
-// buildStationBoard derives the board model from the simulation: the
-// docked station's Content.Board() offerings (gated by standing, disabled
-// once accepted) and the active contracts with their live progress. It
-// never mutates the sim.
-func (g *Game) buildStationBoard() stationBoardModel {
+// build derives the board model from the ContentView: the docked
+// station's Board offerings (gated by standing, disabled once accepted)
+// and the active contracts with their live progress. It never mutates
+// anything.
+func (b *StationBoard) build() stationBoardModel {
 	var m stationBoardModel
-	at, ok := g.s.Docked.Get(g.s.Player())
-	if !ok {
+	at := b.cv.Contracts()
+	if at.Station == "" {
 		return m // undocked: empty board (the window is unmounted anyway)
 	}
-	c := g.opts.Content
-	m.Station = at.At
-	m.Standing = g.s.Standing()
+	c := b.cv.Defs()
+	m.Station = at.Station
+	m.Standing = at.Standing
 
 	accepted := map[content.ContractID]bool{}
-	for _, ms := range g.s.Missions() {
+	for _, ms := range at.Active {
 		accepted[ms.ID] = true
 	}
 
-	board := c.Board(at.At)
+	board := at.Board
 	show, hidden := capRows(len(board), availMaxRows)
 	for i := 0; i < show; i++ {
 		def := board[i]
 		r := boardRowModel{
 			ID:      def.ID,
 			Title:   def.Title,
-			Summary: objectiveSummary(g.env, def),
+			Summary: objectiveSummary(b.cv, def),
 			Reward:  rewardText(def),
 			Icon:    theme.ContractIcon(def.Kind),
 			Action:  "Accept",
 		}
 		if accepted[def.ID] {
 			r.Action, r.Disabled = "Accepted", true
-		} else if !g.env.MeetsStanding(def.MinStanding) { // the sim's accept gate, epsilon included
+		} else if !b.cv.MeetsStanding(def.MinStanding) { // the sim's accept gate, epsilon included
 			r.Require = fmt.Sprintf("Requires standing %.2f", def.MinStanding)
 			r.Disabled = true
 		}
@@ -177,7 +315,7 @@ func (g *Game) buildStationBoard() stationBoardModel {
 		ms  sim.MissionState
 	}
 	var active []activeContract
-	for _, ms := range g.s.Missions() {
+	for _, ms := range at.Active {
 		if def, ok := c.Contract(ms.ID); ok { // stale save refs are skipped, not rendered
 			active = append(active, activeContract{def, ms})
 		}
@@ -187,7 +325,7 @@ func (g *Game) buildStationBoard() stationBoardModel {
 		a := active[i]
 		have := a.ms.Progress
 		if a.def.Kind == content.ContractDeliver {
-			have = g.env.DeliverProgress(a.def) // the sim counts deliver objectives only at the claim
+			have = b.cv.DeliverProgress(a.def) // the sim counts deliver objectives only at the claim
 		}
 		m.Active = append(m.Active, boardRowModel{
 			ID:     a.ms.ID,
@@ -205,72 +343,40 @@ func (g *Game) buildStationBoard() stationBoardModel {
 	return m
 }
 
-// syncStationBoard rebuilds the services view's contract board when its
-// model signature changes and resizes the window to the content. It is
-// called on drained EvMission/EvDocked/EvUndocked events (the same path
-// the log drains) and every frame while docked from syncMounts — the
-// frame-level call also catches state that emits no mission event (cargo
-// bought at the market feeds the deliver progress line).
-func (g *Game) syncStationBoard() {
-	if g.svcWin == nil || g.stAvail == nil || g.stBody == nil {
-		return
-	}
-	m := g.buildStationBoard()
-	if !m.same(g.stModel) {
-		g.stModel = m
-		g.rebuildStationBoard(m)
-	}
-}
-
-// rebuildStationBoard replaces both sections' row widgets from the model
-// and hugs the window to the new content height (the row caps in the
-// model bound it well above the log at the minimum screen size).
-func (g *Game) rebuildStationBoard(m stationBoardModel) {
-	g.stAvail.RemoveChildren()
-	g.stActive.RemoveChildren()
-	g.stAvailRows, g.stActRows = nil, nil
+// rebuild replaces both sections' row widgets from the model and caches
+// the body's content height (the row caps in the model bound it well above
+// the log at the minimum screen size).
+func (b *StationBoard) rebuild(m stationBoardModel) {
+	b.avail.RemoveChildren()
+	b.active.RemoveChildren()
+	b.availRows, b.actRows = nil, nil
 	for _, r := range m.Avail {
-		root, btn := g.buildContractRow(r, false)
-		g.stAvail.AddChild(root)
-		if btn != nil {
-			g.stAvailRows = append(g.stAvailRows, stationRow{id: r.ID, btn: btn, root: root})
-		}
+		root, btn := b.buildRow(r, false)
+		b.avail.AddChild(root)
+		b.availRows = append(b.availRows, BoardRow{ID: r.ID, Btn: btn, Root: root})
 	}
 	for _, r := range m.Active {
-		root, btn := g.buildContractRow(r, true)
-		g.stActive.AddChild(root)
-		if btn != nil {
-			g.stActRows = append(g.stActRows, stationRow{id: r.ID, btn: btn, root: root})
-		}
+		root, btn := b.buildRow(r, true)
+		b.active.AddChild(root)
+		b.actRows = append(b.actRows, BoardRow{ID: r.ID, Btn: btn, Root: root})
 	}
-	_, h := g.stBody.PreferredSize()
-	// The board IS the window's content floor: the chrome clamps a grip
-	// drag to MinSize, so pinning MinSize at the body's preferred height
-	// (capped rows + headers, never the static 200 the empty board wore)
-	// stops a manual shrink at the frame that still holds every row. The
-	// rebuild re-derives it, so a board that grows raises the floor too.
-	h = max(h, theme.Px(stationMinH))
-	g.svcWin.MinSize = &image.Point{X: theme.Px(stationMinW), Y: h}
-	// The services column's rect comes from stationRect — the same source
-	// of truth as placeDefaults — so the board's content hug and the
-	// default placement can never disagree — and it goes through the
-	// placement tracker like every other placed rect: a direct SetLocation
-	// here would leave the tracker stale and the window would read as
-	// player-moved (never recomposed again).
-	g.host.Place(g.svcWin, stationRect(h))
+	_, h := b.body.PreferredSize()
+	// The body's preferred height, in the DESIGN units the host fits
+	// with: the floor the grip stops at and FitSize caches.
+	b.fit = max(int(math.Round(float64(h)/theme.Scale())), StationMinH)
 }
 
-// buildContractRow renders one board row as a rich row of the table
-// module (widgets.NewStackRow): the line stack below, the kind icon
-// leading line 1 and the row's own RowSpec.Actions drawn as its trailing
-// button — the declaration carries the same action, gating and command
-// the context menu runs, so button and menu can never disagree on the
-// verb. The row's context menu rides the RowSpec seam: a right-click on
-// the objective label (wired by the builder, as that stack line's Ref)
-// replaces this menu — handlers run parent-first, so the child's
-// OpenMenu lands last and wins. Returns a nil button for note rows.
-func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container, *widget.Button) {
-	p := g.env.Pal()
+// buildRow renders one board row as a rich row of the table module
+// (widgets.NewStackRow): the line stack below, the kind icon leading line
+// 1 and the row's own RowSpec.Actions drawn as its trailing button — the
+// declaration carries the same action, gating and command the context
+// menu runs, so button and menu can never disagree on the verb. The row's
+// context menu rides the RowSpec seam: a right-click on the objective
+// label (wired by the builder, as that stack line's Ref) replaces this
+// menu — handlers run parent-first, so the child's OpenMenu lands last and
+// wins. Returns a nil button for note rows.
+func (b *StationBoard) buildRow(r boardRowModel, active bool) (*widget.Container, *widget.Button) {
+	p := b.env.Pal()
 	row := widgets.TableRow{}
 	if r.Icon != "" {
 		row.Icons = []string{r.Icon}
@@ -282,34 +388,34 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	// entry reads. Note rows declare nothing: no button, no menu.
 	menuSpec := widgets.RowSpec{}
 	if !r.Note {
-		menuSpec = g.contractRowSpec(r, active)
+		menuSpec = b.contractRowSpec(r, active)
 		row.Spec = menuSpec
 		if r.Action != "" && r.Action != menuSpec.Actions[0].Label {
 			row.Spec.Actions = append([]widgets.RowAction(nil), menuSpec.Actions...)
 			row.Spec.Actions[0].Label = r.Action
 		}
-		row.Stack = g.boardRowStack(r, active)
+		row.Stack = b.rowStack(r, active)
 	} else {
 		// "+N more" / empty state: one dim line, no verbs, no menu.
 		row.Stack = []widgets.RowLine{{Segs: []widgets.RowSeg{{
-			Text: g.ellip(r.Title, theme.StepTiny, float64(theme.Px(boardContentW))),
+			Text: b.ellip(r.Title, theme.StepTiny, float64(theme.Px(boardContentW))),
 			Tint: p.Dim,
 			Step: theme.StepTiny,
 		}}}}
 	}
-	sr := widgets.NewStackRow(g.env, row, g.env.Face(theme.StepSmall))
+	sr := widgets.NewStackRow(b.env, row, b.env.Face(theme.StepSmall))
 	// The board's own row strip: the bordered translucent band every
 	// board row has worn (the table paints its row tints; this chrome is
 	// the board's). The builder already bound the session's widget theme
 	// to the row, so setting the strip may validate buttons and all
 	// before the row joins the window.
-	sr.Root.SetBackgroundImage(bordered(nrgba(p.Cell, 160), nrgba(p.Border, 140), 1))
+	sr.Root.SetBackgroundImage(boardBox(theme.NRGBA(p.Cell, 160), theme.NRGBA(p.Border, 140), 1))
 	sr.Root.GetWidget().MouseButtonClickedEvent.AddHandler(func(args any) {
 		a, ok := args.(*widget.WidgetMouseButtonClickedEventArgs)
 		if !ok || a.Button != ebiten.MouseButtonRight {
 			return
 		}
-		g.env.OpenRowMenu(menuSpec, widgets.ClickPoint(a))
+		widgets.OpenRowMenu(b.cv, b.env, menuSpec, widgets.ClickPoint(a))
 	})
 	if len(sr.Buttons) == 0 {
 		return sr.Root, nil
@@ -317,15 +423,15 @@ func (g *Game) buildContractRow(r boardRowModel, active bool) (*widget.Container
 	return sr.Root, sr.Buttons[0]
 }
 
-// boardRowStack is one contract row's lines: the title over the objective
+// rowStack is one contract row's lines: the title over the objective
 // summary, the gated standing requirement and the reward on an available
 // row — the reward owns line 3 alone, so the payout is the one string on
 // a board row that must never ellipsize — and just the title + progress
 // line on an active one. The title keeps its fixed width (the ellipsis
 // budget the row reserves, icon box included), so every row measures the
 // same with or without a glyph.
-func (g *Game) boardRowStack(r boardRowModel, active bool) []widgets.RowLine {
-	p := g.env.Pal()
+func (b *StationBoard) rowStack(r boardRowModel, active bool) []widgets.RowLine {
+	p := b.env.Pal()
 	// The active line is title + progress ("Belt cleanup — 1/3") and only
 	// fits the title column at the tiny step in IBM Plex Sans (at small
 	// the em-dash suffix alone costs 56 px); available titles, which
@@ -340,7 +446,7 @@ func (g *Game) boardRowStack(r boardRowModel, active bool) []widgets.RowLine {
 		titleW -= theme.Px(theme.IconInline) + theme.Px(theme.IconGap)
 	}
 	lines := []widgets.RowLine{{Segs: []widgets.RowSeg{{
-		Text: g.ellip(r.Title, step, float64(titleW)),
+		Text: b.ellip(r.Title, step, float64(titleW)),
 		Tint: p.Accent,
 		Step: step,
 		MinW: titleW,
@@ -353,15 +459,15 @@ func (g *Game) boardRowStack(r boardRowModel, active bool) []widgets.RowLine {
 	// (line 2) so line 3 gives the payout the whole row.
 	summaryW := float64(theme.Px(boardContentW))
 	if r.Require != "" {
-		reqW := g.textW(r.Require, theme.StepTiny)
+		reqW := b.textW(r.Require, theme.StepTiny)
 		if capW := summaryW - float64(theme.Px(boardBtnGap)) - float64(theme.Px(40)); reqW > capW {
-			r.Require = g.ellip(r.Require, theme.StepTiny, capW)
-			reqW = g.textW(r.Require, theme.StepTiny)
+			r.Require = b.ellip(r.Require, theme.StepTiny, capW)
+			reqW = b.textW(r.Require, theme.StepTiny)
 		}
 		summaryW -= reqW + float64(theme.Px(boardBtnGap))
 	}
 	summary := widgets.RowLine{Segs: []widgets.RowSeg{{
-		Text: g.ellip(r.Summary, theme.StepTiny, summaryW),
+		Text: b.ellip(r.Summary, theme.StepTiny, summaryW),
 		Tint: p.Dim,
 		Step: theme.StepTiny,
 	}}}
@@ -376,11 +482,11 @@ func (g *Game) boardRowStack(r boardRowModel, active bool) []widgets.RowLine {
 	// swaps the window — the installer's halves, strictly. It sits INSIDE
 	// the row and child handlers run after the parent's, so this Show
 	// Info menu replaces the row's Accept menu when the click lands here.
-	if ref, showable := g.objectiveRef(r.ID); showable {
+	if ref, showable := b.objectiveRef(r.ID); showable {
 		summary.Ref = &ref
 	}
 	lines = append(lines, summary, widgets.RowLine{Segs: []widgets.RowSeg{{
-		Text: g.ellip(r.Reward, theme.StepTiny, float64(theme.Px(boardContentW))),
+		Text: b.ellip(r.Reward, theme.StepTiny, float64(theme.Px(boardContentW))),
 		Tint: p.Good,
 		Step: theme.StepTiny,
 		MinW: theme.Px(boardContentW),
@@ -392,8 +498,8 @@ func (g *Game) boardRowStack(r boardRowModel, active bool) []widgets.RowLine {
 // action the button carries (Accept on an available row, Abandon on an
 // active one), the same gating, through the same command — a contract
 // has no def of its own, so the row declares no Ref (its menu is the
-// single action entry, exactly as before).
-func (g *Game) contractRowSpec(r boardRowModel, active bool) widgets.RowSpec {
+// single action entry).
+func (b *StationBoard) contractRowSpec(r boardRowModel, active bool) widgets.RowSpec {
 	label, intent := "Accept", widgets.Intent(widgets.Accept{Contract: r.ID})
 	if active {
 		label, intent = "Abandon", widgets.Abandon{Contract: r.ID}
@@ -409,8 +515,8 @@ func (g *Game) contractRowSpec(r boardRowModel, active bool) widgets.RowSpec {
 // Show Info window reads: a kill contract links its caste, deliver/mine
 // contracts their item. The ref is validated against the loaded content
 // (a stale save ref shows nothing rather than a hollow window).
-func (g *Game) objectiveRef(id content.ContractID) (widgets.InfoRef, bool) {
-	def, ok := g.opts.Content.Contract(id)
+func (b *StationBoard) objectiveRef(id content.ContractID) (widgets.InfoRef, bool) {
+	def, ok := b.cv.Defs().Contract(id)
 	if !ok {
 		return widgets.InfoRef{}, false
 	}
@@ -419,11 +525,11 @@ func (g *Game) objectiveRef(id content.ContractID) (widgets.InfoRef, bool) {
 	case def.Objective.Target != "":
 		ref = widgets.NpcRef(def.Objective.Target)
 	case def.Objective.Item != "":
-		ref, _ = widgets.ResolveTradeable(g.env.Defs(), def.Objective.Item).Ref()
+		ref, _ = widgets.ResolveTradeable(b.cv.Defs(), def.Objective.Item).Ref()
 	default:
 		return widgets.InfoRef{}, false
 	}
-	return g.env.InfoRefOf(ref)
+	return b.cv.InfoRefOf(ref)
 }
 
 // objectiveSummary renders the contract's kind + objective, e.g.
@@ -487,8 +593,8 @@ func celName(c *content.Content, id content.CelID) string {
 
 // ellip truncates s with "…" so it measures at most w in the given
 // type-scale step (single line: board rows never wrap).
-func (g *Game) ellip(s, step string, w float64) string {
-	face := g.env.Face(step)
+func (b *StationBoard) ellip(s, step string, w float64) string {
+	face := b.env.Face(step)
 	return widgets.Ellipsize(s, w, func(x string) float64 {
 		tw, _ := text.Measure(x, *face, 0)
 		return tw
@@ -496,8 +602,8 @@ func (g *Game) ellip(s, step string, w float64) string {
 }
 
 // textW measures s in the given type-scale step (row-column sizing).
-func (g *Game) textW(s, step string) float64 {
-	face := g.env.Face(step)
+func (b *StationBoard) textW(s, step string) float64 {
+	face := b.env.Face(step)
 	w, _ := text.Measure(s, *face, 0)
 	return w
 }

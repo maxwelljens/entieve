@@ -261,7 +261,7 @@ func TestDockOpensExactlyTheServicesView(t *testing.T) {
 func TestRailPlacesOpenedWindowsWhileDocked(t *testing.T) {
 	g := dockedShowcaseGame(t, 1280, 720)
 
-	if r := g.svcWin.GetContainer().GetWidget().Rect; r != stationRect(r.Dy()) {
+	if r := g.host.Window(idServices).GetContainer().GetWidget().Rect; r != stationRect(r.Dy()) {
 		t.Errorf("services view at %v, want the station column %v", r, stationRect(r.Dy()))
 	}
 
@@ -291,23 +291,23 @@ func TestRailPlacesOpenedWindowsWhileDocked(t *testing.T) {
 // row the host resolves, and Undock queues the sim's undock command.
 func TestServicesViewButtonsOnTheRealStations(t *testing.T) {
 	g := dockedShowcaseGame(t, 1280, 720)
-	if !g.svcUI.Visible("market") || !g.svcUI.Visible("fitting") || !g.svcUI.Visible("industry") {
+	if !stationBoard(t, g).Services().Visible("market") || !stationBoard(t, g).Services().Visible("fitting") || !stationBoard(t, g).Services().Visible("industry") {
 		t.Fatal("start station's market/fitting/industry buttons hidden")
 	}
-	if !g.svcUI.Visible("undock") || !g.svcUI.Visible("cargo") {
+	if !stationBoard(t, g).Services().Visible("undock") || !stationBoard(t, g).Services().Visible("cargo") {
 		t.Error("Undock/Cargo are not station services — they must always show")
 	}
-	if g.svcUI.Identity() == "" {
+	if stationBoard(t, g).Services().Identity() == "" {
 		t.Error("identity line empty while docked")
 	}
 
 	// Cargo toggles the inventory window.
-	click(t, g, g.svcUI.Button("cargo"))
+	click(t, g, stationBoard(t, g).Services().Button("cargo"))
 	g.syncMounts()
 	if !g.host.IsOpen(idInventory) || !g.host.Mounted(idInventory) {
 		t.Error("Cargo did not toggle the inventory window")
 	}
-	click(t, g, g.svcUI.Button("cargo"))
+	click(t, g, stationBoard(t, g).Services().Button("cargo"))
 	g.syncMounts()
 
 	// Every service button toggles a real spec row (Toggle carries the
@@ -322,7 +322,7 @@ func TestServicesViewButtonsOnTheRealStations(t *testing.T) {
 	// Undock button used).
 	var got []sim.Command
 	g.enqueue = func(c sim.Command) { got = append(got, c) }
-	click(t, g, g.svcUI.Button("undock"))
+	click(t, g, stationBoard(t, g).Services().Button("undock"))
 	if len(got) != 1 {
 		t.Fatalf("Undock queued %#v, want the single CmdUndock", got)
 	}
@@ -338,7 +338,7 @@ func TestServicesViewButtonsOnTheRealStations(t *testing.T) {
 	g.s.Stations.Set(dockedStationEntity(t, g, "cel-haven-rest"),
 		sim.Station{Services: []string{"repair"}})
 	pump(t, g, 1280, 720)
-	if g.svcUI.Visible("industry") || g.svcUI.Visible("fitting") || g.svcUI.Visible("market") {
+	if stationBoard(t, g).Services().Visible("industry") || stationBoard(t, g).Services().Visible("fitting") || stationBoard(t, g).Services().Visible("market") {
 		t.Error("service button shown where the station lacks the service")
 	}
 }

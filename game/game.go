@@ -108,13 +108,6 @@ type Game struct {
 	// (the log's feed, the market's search field).
 	host *ScreenHost
 
-	// The station services view (the one window docking opens): its
-	// window rides the panel registry like every Screen row, and svcUI
-	// is the uikit row it is built from — identity, Undock, Cargo and
-	// this station's service buttons (uikit/screens/services.go).
-	svcWin *widget.Window
-	svcUI  *uikit.Services
-
 	// The left navigation rail (uikit/screens/rail.go): root-overlay
 	// chrome like the HUD and rack, but mounted TOP (Kit.AddTopContainer):
 	// it paints above windows and its clicks win over a window dragged
@@ -155,16 +148,6 @@ type Game struct {
 	// (game/keyhints.go): the rail tip, the settings footer and the help
 	// rows read it instead of a chord baked into a string.
 	hints keyHints
-
-	// The station window's contract board (contracts.go): the body, the
-	// two row sections, the signature of the last rebuild and the
-	// actionable rows (Accept/Abandon buttons by contract id).
-	stBody      *widget.Container
-	stAvail     *widget.Container
-	stActive    *widget.Container
-	stModel     stationBoardModel
-	stAvailRows []stationRow
-	stActRows   []stationRow
 
 	// mktSearchFocus opens the market for Ctrl+F and focuses its search
 	// field once the panel exists (the mount happens after the key pass).
@@ -589,8 +572,9 @@ func (g *Game) handleKeys(in Input) error {
 }
 
 // onEvents reacts to events the interface does not own (view resets on
-// travel, contract-board refresh on mission/dock transitions — the board
-// also re-syncs every frame while docked, see syncStationBoard).
+// travel). The station board is a Screen panel: its mounted Sync follows
+// the docked station and the live mission state every frame (onEvents
+// drains before it, see Update).
 func (g *Game) onEvents(evs []sim.Event) {
 	for _, e := range evs {
 		switch e.Kind {
@@ -598,9 +582,6 @@ func (g *Game) onEvents(evs []sim.Event) {
 			g.space.ResetView()
 		case sim.EvDocked, sim.EvUndocked:
 			g.space.ResetView()
-			g.syncStationBoard() // the board follows the docked station
-		case sim.EvMission:
-			g.syncStationBoard() // accept / progress / ready / claim / refuse
 		}
 	}
 }
@@ -655,14 +636,6 @@ func (g *Game) syncMounts() {
 	// Space chrome (HUD, rack, the kit's core windows) follows the room;
 	// top chrome (the rail) follows gameplay — the title shows neither.
 	g.applyChrome(!docked && !g.title, !g.title)
-
-	// The services view is an ordinary panel now (the station scene
-	// opens it, the host mounts it); only the contract board keeps a
-	// docked-only refresh — it follows the docked station and the live
-	// mission state while the scene is up.
-	if docked && !g.title {
-		g.syncStationBoard()
-	}
 
 	// The order mini-window is transient and docked-only: a player who
 	// leaves the station has no book to post to, so it closes with the
@@ -847,12 +820,8 @@ func (g *Game) gameServices() screenServices {
 		},
 		HelpRows: func() []uikit.KeyRow { return helpRowsFor(g) },
 		Menu:     func() widgets.WindowPanel { return winPanel{win: g.buildMenuWindow()} },
-		Station: func() widgets.WindowPanel {
-			win := g.buildServicesWindow()
-			return winPanel{win: win, sync: func() { g.svcUI.Sync() }}
-		},
-		Close:  g.toggleScreenID,
-		Cancel: g.cancelCapture,
+		Close:    g.toggleScreenID,
+		Cancel:   g.cancelCapture,
 	}
 }
 
@@ -867,9 +836,9 @@ func (g *Game) gameServices() screenServices {
 // Anchor (anchorRect): the log's bottom-left pocket, the scanner in the
 // centre column under the top row, the on-demand overlays centred, help
 // top-center, the market/inventory/fitting their own per-type defaults
-// and the services view its station column (re-placed to the board's
-// content height by contracts.go). Nothing is composed specially for the
-// docked state.
+// and the station board its column (the panel answers its content floor,
+// FitSize, and the host composes the height there). Nothing is composed
+// specially for the docked state.
 //
 // Every placement goes through ScreenHost.Place: a window the player
 // dragged, or one restored from the layout sidecar, keeps its

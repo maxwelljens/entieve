@@ -28,16 +28,29 @@ func (r *recordingSink) Do(i widgets.Intent) { r.got = append(r.got, i) }
 // instead of quietly finding a sim — no simulation exists in this test.
 type stubView struct {
 	widgets.ContentView
-	c       *content.Content
-	orders  []sim.MarketStock
-	docked  bool
-	wallet  float64
-	station widgets.StationInfo // docked-at identity + services (nil = none)
+	c         *content.Content
+	orders    []sim.MarketStock
+	docked    bool
+	wallet    float64
+	station   widgets.StationInfo // docked-at identity + services (nil = none)
+	contracts widgets.Contracts   // the station board read
+	deliver   float64             // deliver-objective progress the stub reports
 }
 
 func (v *stubView) Defs() *content.Content { return v.c }
 
 func (v *stubView) PlayerDocked() bool { return v.docked }
+
+// Contracts hands the stub's board read to the station board panel.
+func (v *stubView) Contracts() widgets.Contracts { return v.contracts }
+
+// MeetsStanding applies the stub board's own standing, epsilon included —
+// the same gate the view derives from the sim.
+func (v *stubView) MeetsStanding(min float64) bool { return v.contracts.Standing+1e-9 >= min }
+
+// DeliverProgress reports the stub's fixed deliver count (the board's
+// active progress line).
+func (v *stubView) DeliverProgress(*content.ContractDef) float64 { return v.deliver }
 
 // DockedStation hands the stub's station back while "docked" — the read
 // the services view and the rail's gray-out share.
@@ -71,8 +84,11 @@ func (v *stubView) TradeableName(id content.ItemID) string {
 func (v *stubView) Wallet() float64 { return v.wallet }
 
 func (v *stubView) InfoRefOf(data any) (widgets.InfoRef, bool) {
-	if id, ok := data.(content.ItemID); ok {
-		return widgets.ItemRef(id), true
+	switch d := data.(type) {
+	case content.ItemID:
+		return widgets.ItemRef(d), true
+	case widgets.InfoRef:
+		return d, d.Valid()
 	}
 	return widgets.InfoRef{}, false
 }

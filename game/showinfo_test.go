@@ -71,8 +71,8 @@ func TestContractRowContextMenu(t *testing.T) {
 	g.enqueue = func(c sim.Command) { got = append(got, c) }
 
 	// Ungated available row: one enabled Accept entry.
-	row := findRow(t, g.stAvailRows, "contract-solace-cleanup-1")
-	rightClick(t, g, row.root.GetWidget())
+	row := findRow(t, stationBoard(t, g).Rows(false), "contract-solace-cleanup-1")
+	rightClick(t, g, row.Root.GetWidget())
 	if e := menuEntry(t, g, "Accept"); e.Disabled {
 		t.Fatal("ungated Accept entry is disabled")
 	}
@@ -94,8 +94,8 @@ func TestContractRowContextMenu(t *testing.T) {
 	g.syncMounts()
 	pump(t, g, 1280, 720)
 	got = nil
-	gated := findRow(t, g.stAvailRows, "contract-penumbra-den-hunt-1")
-	rightClick(t, g, gated.root.GetWidget())
+	gated := findRow(t, stationBoard(t, g).Rows(false), "contract-penumbra-den-hunt-1")
+	rightClick(t, g, gated.Root.GetWidget())
 	if e := menuEntry(t, g, "Accept"); !e.Disabled {
 		t.Fatal("gated Accept entry is enabled")
 	}
@@ -116,8 +116,8 @@ func TestContractRowContextMenu(t *testing.T) {
 	setMissions(t, g, sim.MissionState{ID: "contract-solace-cleanup-1"})
 	g.syncMounts()
 	pump(t, g, 1280, 720)
-	active := findRow(t, g.stActRows, "contract-solace-cleanup-1")
-	rightClick(t, g, active.root.GetWidget())
+	active := findRow(t, stationBoard(t, g).Rows(true), "contract-solace-cleanup-1")
+	rightClick(t, g, active.Root.GetWidget())
 	if e := menuEntry(t, g, "Abandon"); e.Disabled {
 		t.Fatal("Abandon entry is disabled on an active row")
 	}
@@ -139,11 +139,11 @@ func TestContractObjectiveShowInfo(t *testing.T) {
 	var got []sim.Command
 	g.enqueue = func(c sim.Command) { got = append(got, c) }
 
-	row := findRow(t, g.stAvailRows, "contract-solace-cleanup-1")
-	if len(row.root.Children()) < 2 {
-		t.Fatalf("available row has %d lines, want title/summary/reward", len(row.root.Children()))
+	row := findRow(t, stationBoard(t, g).Rows(false), "contract-solace-cleanup-1")
+	if len(row.Root.Children()) < 2 {
+		t.Fatalf("available row has %d lines, want title/summary/reward", len(row.Root.Children()))
 	}
-	objective := row.root.Children()[1].GetWidget() // line 2: the summary
+	objective := row.Root.Children()[1].GetWidget() // line 2: the summary
 	def, ok := g.opts.Content.Contract("contract-solace-cleanup-1")
 	if !ok {
 		t.Fatal("fixture: contract missing from content")
@@ -242,39 +242,6 @@ func TestInfoWindowSidecarGeometryOnly(t *testing.T) {
 	}
 	if again := readDoc(t, g2.layoutPath()).Windows["infowin"]; again.Open {
 		t.Error("second write carried open=true")
-	}
-}
-
-// TestContractRowSpecData pins the board rows' declared data (the
-// RowSpec the seam derives the menu from): one action — Accept on an
-// available row, Abandon on an active one — carrying the model's gate,
-// no Ref (a contract has no def of its own to show), and the objective
-// label's Ref pointing at the objective's def.
-func TestContractRowSpecData(t *testing.T) {
-	g := dockedShowcaseGame(t, 1280, 720)
-
-	avail := boardRowModel{ID: "contract-solace-cleanup-1"}
-	spec := g.contractRowSpec(avail, false)
-	if spec.Ref != nil || spec.SecRef != nil {
-		t.Errorf("contract row declares refs %v/%v, want none (nothing to show)", spec.Ref, spec.SecRef)
-	}
-	if len(spec.Actions) != 1 || spec.Actions[0].Label != "Accept" || spec.Actions[0].Disabled {
-		t.Fatalf("ungated available row = %+v, want one enabled Accept", spec.Actions)
-	}
-	gated := boardRowModel{ID: "contract-penumbra-den-hunt-1", Disabled: true}
-	if a := g.contractRowSpec(gated, false).Actions[0]; !a.Disabled {
-		t.Error("standing-gated row's Accept is not grayed")
-	}
-	active := g.contractRowSpec(avail, true)
-	if len(active.Actions) != 1 || active.Actions[0].Label != "Abandon" || active.Actions[0].Disabled {
-		t.Errorf("active row = %+v, want one enabled Abandon", active.Actions)
-	}
-
-	// The objective label (line 2) declares the objective's def as its
-	// Ref — Show Info, strictly, through the installer.
-	ref, ok := g.objectiveRef("contract-solace-cleanup-1")
-	if !ok || !ref.Valid() {
-		t.Fatalf("objective ref = %v (%v), want a valid ref", ref, ok)
 	}
 }
 

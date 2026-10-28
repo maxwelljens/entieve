@@ -270,12 +270,13 @@ func TestPlacementTrackerMatchesActualRects(t *testing.T) {
 	g.syncMounts()
 	pump(t, g, 1280, 720)
 	assertTracked("docked board hug")
-	station := g.svcWin.GetContainer().GetWidget().Rect
+	svcWin := g.host.Window(idServices)
+	station := svcWin.GetContainer().GetWidget().Rect
 	if want := stationRect(station.Dy()); station != want {
 		t.Errorf("station = %v, want the station column %v", station, want)
 	}
-	if g.host.placed[g.svcWin] != station {
-		t.Errorf("station tracker = %v, want the actual %v", g.host.placed[g.svcWin], station)
+	if g.host.placed[svcWin] != station {
+		t.Errorf("station tracker = %v, want the actual %v", g.host.placed[svcWin], station)
 	}
 
 	// Restore path: a fresh session over this session's sidecar tracks
