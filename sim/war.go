@@ -72,13 +72,17 @@ const (
 	warBidModuleQty = 5
 	// warFleetCap caps live Corporate Fleets hulls in the loaded system.
 	warFleetCap = 2
+	// warFleetNpc is the commissioned fleet cutter (content/data/npcs/
+	// fleets.json): the hull the Corporate Fleets fly under the Commission.
+	warFleetNpc = content.NpcID("npc-fleet-cutter")
 )
 
 // warWorlds is the world gate (the agentWorlds pattern): the war runs in the
-// shipping free-play world. The showcase tour and the test fixtures run
-// without it, so their economies cannot drift; waves 2/3 wire the showcase.
+// shipping free-play world and in the showcase tour, which proves it
+// end-to-end (tests/showcase_test.go).
 var warWorlds = map[content.WorldID]bool{
-	"world-default": true,
+	"world-default":  true,
+	"world-showcase": true,
 }
 
 // WarState is the war's persisted state (Save.War): which side holds every
@@ -312,6 +316,29 @@ func (s *Sim) warCredit(sys content.SystemID, value float64) {
 	}
 }
 
+// warPush is CmdWarPush: the script harness moves one front's meter directly,
+// positive toward a flip and negative back toward the holder, so the tour can
+// show a fall and a reclaim inside one run. The beat still does the work:
+// pressure is applied and a meter at or past its threshold flips the system.
+// A system that is not on the front carries no meter, so the push lands
+// nowhere; the shipping game never issues this command.
+func (s *Sim) warPush(sys content.SystemID, value float64) {
+	if s.war == nil || value == 0 {
+		return
+	}
+	c := s.war.Contest[sys]
+	if c == nil {
+		return
+	}
+	before := c.Meter
+	c.Meter = math.Max(c.Meter+value, 0)
+	// A move that leaves the meter past the threshold is the beat's flip to
+	// report; only a hold earns a contest line here.
+	if math.Abs(c.Meter-before) >= newsThreshold && c.Meter < c.Threshold {
+		s.warNewsContest(sys, c.Meter)
+	}
+}
+
 // warFlip hands a front system to the other side: control, geography, the
 // news line, and — when the player is standing in it — the grid itself.
 func (s *Sim) warFlip(id content.SystemID) {
@@ -470,8 +497,8 @@ func warWorksCastes(c *content.Content) []content.NpcID {
 
 // warSpawn lands one war hull on the loaded grid, off the living-universe
 // stream so war activity never shifts the player's combat rolls. A faction
-// tag overrides the hull's authored colours (the Corporate Fleets fly machine
-// hulls content has not named yet).
+// tag overrides the hull's authored colours (the fixture fallback flies a
+// Works frame in bloc colours).
 func (s *Sim) warSpawn(id content.NpcID, pos core.Vec2, spread float64, faction string) ecs.Entity {
 	e := s.spawnNpcStream(id, pos, spread, s.trafficRNG)
 	if !e.IsZero() && faction != "" {
@@ -487,9 +514,9 @@ func (s *Sim) warSpawn(id content.NpcID, pos core.Vec2, spread float64, faction 
 // ---------------------------------------------------------------------------
 
 // warFleets puts a Corporate Fleets group over a contested system: the
-// toughest authored machine hull, at the belt the Works are working (or the
-// patrol anchor when they are not). They fight through the ordinary threat
-// machine — the hostility row does the rest.
+// commissioned fleet hull, at the belt the Works are working (or the patrol
+// anchor when they are not). They fight through the ordinary threat machine —
+// the hostility row does the rest.
 func (s *Sim) warFleets() {
 	sys := s.System()
 	if sys == nil {
@@ -501,12 +528,25 @@ func (s *Sim) warFleets() {
 	if s.warFleetCount() >= warFleetCap {
 		return
 	}
-	castes := warWorksCastes(s.Content)
-	if len(castes) == 0 {
+	hull, tag := warFleetHull(s.Content)
+	if hull == "" {
 		return
 	}
 	pos, spread := s.warFleetAnchor(sys)
-	s.warSpawn(castes[0], pos, spread, factionFleets)
+	s.warSpawn(hull, pos, spread, tag)
+}
+
+// warFleetHull is the hull the fleets fly: the commissioned Corporate Fleets
+// cutter when content ships it, else the toughest authored Works frame tagged
+// into the bloc (test fixtures that carry no fleet content keep their fleets).
+func warFleetHull(c *content.Content) (content.NpcID, string) {
+	if _, ok := c.Npc(warFleetNpc); ok {
+		return warFleetNpc, ""
+	}
+	if castes := warWorksCastes(c); len(castes) > 0 {
+		return castes[0], factionFleets
+	}
+	return "", ""
 }
 
 // warFleetCount counts live Corporate Fleets hulls (the cap is per grid).
@@ -520,10 +560,24 @@ func (s *Sim) warFleetCount() int {
 	return n
 }
 
-// warFleetAnchor is where a fleet lands: the occupied belt (the Works' own
-// ground), else the patrol anchor the response wing uses.
+// warFleetAnchor is where a fleet lands: on the Works hull it came for at the
+// occupied belt, else the belt itself, else the patrol anchor the response
+// wing uses. Landing on the target is what makes the front fight visible from
+// the first tick (a system-scale belt is wider than any gun).
 func (s *Sim) warFleetAnchor(sys *content.SystemDef) (core.Vec2, float64) {
-	if belt := s.occupiedBelt(sys, s.EffectiveSecurity(sys.ID)); !belt.IsZero() {
+	sec := s.EffectiveSecurity(sys.ID)
+	for i := range sys.Celestials {
+		cel := &sys.Celestials[i]
+		if cel.Kind != content.CelBelt {
+			continue
+		}
+		if rat := s.ratTargetAt(cel.Position, sec); !rat.IsZero() {
+			if tr, ok := s.Transforms.Get(rat); ok {
+				return tr.Pos, trafficPatrolScatter
+			}
+		}
+	}
+	if belt := s.occupiedBelt(sys, sec); !belt.IsZero() {
 		if tr, ok := s.Transforms.Get(belt); ok {
 			if c, ok := s.Celestials.Get(belt); ok {
 				return tr.Pos, c.Radius
@@ -543,17 +597,21 @@ func (s *Sim) warObserveKill(e, src ecs.Entity, def *content.NpcDef) {
 	}
 	side := s.factionOf(e)
 	if side == factionOldWorks {
-		s.warCredit(s.systemID, killAttrition*supplyPerFlip)
-		if src == s.player {
-			s.emit(Event{Kind: EvWar, Phase: WarKill, Severity: SevGood, Actor: src,
-				Target: e, System: s.systemID,
-				Text: "Works " + def.Name + " destroyed at the front"})
+		// Only a kill at a front counts (and only there is it news): the
+		// credit is the meter's, and the log says so.
+		if _, onFront := s.war.Contest[s.systemID]; onFront {
+			s.warCredit(s.systemID, killAttrition*supplyPerFlip)
+			if src == s.player {
+				s.emit(Event{Kind: EvWar, Phase: WarKill, Severity: SevGood, Actor: src,
+					Target: e, System: s.systemID,
+					Text: "Kill — Old Works " + def.Name + " destroyed at the front"})
+			}
 		}
 	}
 	if side == factionFleets || s.factionOf(src) == factionFleets {
 		s.emit(Event{Kind: EvWar, Phase: WarSkirmish, Severity: SevInfo, Actor: e,
 			Target: src, System: s.systemID,
-			Text: "Front skirmish — " + s.nameOf(e) + " destroyed"})
+			Text: "Skirmish — " + s.nameOf(e) + " destroyed at the front"})
 	}
 }
 

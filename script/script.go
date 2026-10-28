@@ -45,8 +45,10 @@ type Step struct {
 	Range   float64 `json:"range,omitempty"`   // orbit range, m
 	DirX    float64 `json:"dir_x,omitempty"`
 	DirY    float64 `json:"dir_y,omitempty"`
-	Speed   float64 `json:"speed,omitempty"` // manual throttle 0..1
-	Note    string  `json:"note,omitempty"`  // ignored; documentation for humans
+	Speed   float64 `json:"speed,omitempty"`  // manual throttle 0..1
+	System  string  `json:"system,omitempty"` // system id (war-push)
+	Value   float64 `json:"value,omitempty"`  // war-push meter move, in thresholds (positive = toward a flip)
+	Note    string  `json:"note,omitempty"`   // ignored; documentation for humans
 }
 
 // Valid action names.
@@ -59,6 +61,7 @@ var validActions = map[string]bool{
 	"assemble": true, "fit": true, "unfit": true, "transfer": true,
 	"setammo":        true,
 	"accept-mission": true, "abandon-mission": true,
+	"war-push": true,
 }
 
 // Parse decodes a JSON step array (an object with a "steps" array is also
@@ -166,6 +169,13 @@ func (st Step) validate(i int) error {
 		}
 	case "orbit":
 		if err := need(st.Range <= 0, "range must be > 0"); err != nil {
+			return err
+		}
+	case "war-push":
+		if err := need(st.System == "", "system id required"); err != nil {
+			return err
+		}
+		if err := need(st.Value == 0, "value must be non-zero"); err != nil {
 			return err
 		}
 	}
@@ -288,6 +298,8 @@ func (st Step) command(eng Engine) (sim.Command, bool) {
 		return sim.CmdAbandonMission{ID: content.ContractID(st.Mission)}, true
 	case "assemble":
 		return sim.CmdAssemble{Ship: content.ShipID(st.Ship)}, true
+	case "war-push":
+		return sim.CmdWarPush{System: content.SystemID(st.System), Value: st.Value}, true
 	case "activate":
 		slot, _ := ParseSlot(st.Slot)
 		if st.Target == "" {

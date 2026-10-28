@@ -444,6 +444,11 @@ func (s *Sim) execSell(c CmdSell) {
 	// Selling into a standing war bid is the player's own delivery to the
 	// front: the treasury paid, the goods are consumed, the meter will move.
 	if s.war != nil {
+		front, onFront := s.warNearestFront(station)
+		to := "the front"
+		if onFront {
+			to = s.warSystemName(front)
+		}
 		for _, m := range ms {
 			if m.order.Owner != OwnerWar {
 				continue
@@ -451,7 +456,8 @@ func (s *Sim) execSell(c CmdSell) {
 			s.emit(Event{Kind: EvWar, Phase: WarSupply, Severity: SevGood, Actor: s.player,
 				Item: m.order.Item, System: s.systemID,
 				Value: m.order.Price * float64(m.qty),
-				Text:  "The war takes " + itoaN(m.qty) + " x " + s.itemName(m.order.Item)})
+				Text: "Supply — " + itoaN(m.qty) + " x " + s.itemName(m.order.Item) +
+					" to " + to + " (" + euro(m.order.Price*float64(m.qty)) + ")"})
 		}
 	}
 	received := proceeds - tax - fee

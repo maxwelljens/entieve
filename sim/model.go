@@ -607,6 +607,16 @@ type (
 	// committed materials return to the player's hangar, the fee is kept
 	// and the slot frees. Finished jobs must be collected instead.
 	CmdCancelJob struct{ ID uint64 }
+
+	// CmdWarPush moves one front system's contest meter directly: positive
+	// toward a flip, negative back toward the holder, one unit = one
+	// threshold. It is the script harness's lever (scripts/showcase.json,
+	// `just simulate`), never a player command — a player feeds the war
+	// through war-bid fills and kills.
+	CmdWarPush struct {
+		System content.SystemID
+		Value  float64
+	}
 )
 
 func (CmdStop) isCommand()           {}
@@ -640,6 +650,7 @@ func (CmdAbandonMission) isCommand() {}
 func (CmdStartJob) isCommand()       {}
 func (CmdCollectJob) isCommand()     {}
 func (CmdCancelJob) isCommand()      {}
+func (CmdWarPush) isCommand()        {}
 
 // ---------------------------------------------------------------------------
 // Events — the observation surface

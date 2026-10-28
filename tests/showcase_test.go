@@ -11,6 +11,7 @@ package tests
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/entieve/entieve/content"
@@ -23,7 +24,7 @@ import (
 const (
 	showcaseWorldID = "world-showcase"
 	showcaseScript  = "scripts/showcase.json"
-	showcaseTicks   = 66_000 // ~18.3 sim minutes; covers the full script tour
+	showcaseTicks   = 72_600 // ~20.2 sim minutes; covers the tour and the war's last beat
 	probeEveryTicks = 300    // 5 sim seconds (state vocabularies track every tick)
 )
 
@@ -351,6 +352,136 @@ var rules = map[string]featureRule{
 		}
 		return true, ""
 	},
+
+	// --- the Long Attrition -------------------------------------------------
+	"war-procurement": func(c *content.Content, e *evidence) (bool, string) {
+		// A war bid only fills via settle (EvWar supply) and only for the
+		// materiel the war buys; the goods leave the hold either way, so the
+		// pair proves the sink: paid, consumed, credited.
+		for _, ev := range e.Events {
+			if ev.Kind != sim.EvWar || ev.Phase != sim.WarSupply || ev.Value <= 0 || ev.Item == "" {
+				continue
+			}
+			if e.itemQtyDropped(ev.Item) > 0 {
+				return true, ""
+			}
+		}
+		return false, "no war-bid sale of military goods was observed"
+	},
+	"war-contest": func(c *content.Content, e *evidence) (bool, string) {
+		for _, ev := range e.Events {
+			if ev.Kind == sim.EvWar && ev.Phase == sim.WarContest && ev.System != "" &&
+				ev.Value > 0 && ev.Value < 1 {
+				return true, ""
+			}
+		}
+		return false, "no contest line on the front"
+	},
+	"war-fall": func(c *content.Content, e *evidence) (bool, string) {
+		for _, ev := range e.Events {
+			if ev.Kind == sim.EvWar && ev.Phase == sim.WarFlip && ev.Severity == sim.SevDanger &&
+				strings.Contains(ev.Text, "lost to the Old Works") {
+				return true, ""
+			}
+		}
+		return false, "no system fell to the Old Works"
+	},
+	"war-reclaim": func(c *content.Content, e *evidence) (bool, string) {
+		for _, ev := range e.Events {
+			if ev.Kind == sim.EvWar && ev.Phase == sim.WarFlip && ev.Severity == sim.SevGood &&
+				strings.Contains(ev.Text, "returns to the charter") {
+				return true, ""
+			}
+		}
+		return false, "no system came back to the charter"
+	},
+	"war-remnant": func(c *content.Content, e *evidence) (bool, string) {
+		if checkWarRemnant(c) {
+			return true, ""
+		}
+		return false, "a docked pilot in fallen space was served like charter space"
+	},
+	"war-fleet": func(c *content.Content, e *evidence) (bool, string) {
+		for _, ev := range e.Events {
+			if ev.Kind == sim.EvWar && ev.Phase == sim.WarSkirmish {
+				return true, ""
+			}
+		}
+		return false, "no Corporate Fleets skirmish at the front"
+	},
+	"war-news": func(c *content.Content, e *evidence) (bool, string) {
+		seen := map[string]bool{}
+		for _, ev := range e.Events {
+			if ev.Kind != sim.EvWar {
+				continue
+			}
+			seen[ev.Phase] = true
+			if !strings.Contains(ev.Text, " — ") {
+				return false, "war line is not the 'Phase — detail' shape: " + ev.Text
+			}
+		}
+		for _, phase := range []string{sim.WarSupply, sim.WarContest, sim.WarFlip, sim.WarSkirmish} {
+			if !seen[phase] {
+				return false, "no " + phase + " line in the log"
+			}
+		}
+		return true, ""
+	},
+}
+
+// checkWarRemnant proves the remnant behavior the tour cannot reach: the tour's
+// ship is warp-scrambled in its last fight, so it cannot dock at Hauvnok after
+// the fall. This replays the same run to the Kvonice gate, flies to the front
+// station instead, drives the fall with the script harness's war lever and
+// checks the station: the charter desk refuses (services dark) while the
+// berth, market and repair keep working.
+func checkWarRemnant(c *content.Content) bool {
+	wd, ok := c.World(showcaseWorldID)
+	if !ok {
+		return false
+	}
+	data, err := readFile(showcaseScript)
+	if err != nil {
+		return false
+	}
+	all, err := script.Parse(data)
+	if err != nil {
+		return false
+	}
+	var steps []script.Step
+	for _, st := range all {
+		if st.AtTick <= 59060 { // ...through the jump into Kvonice
+			steps = append(steps, st)
+		}
+	}
+	steps = append(steps,
+		script.Step{AtTick: 59120, Action: "warp", Target: "Hauvnok"},
+		script.Step{AtTick: 60000, Action: "dock", Target: "Hauvnok"},
+		script.Step{AtTick: 61100, Action: "war-push", System: "sys-penumbra", Value: 1.2},
+		script.Step{AtTick: 61500, Action: "accept-mission", Mission: "contract-penumbra-den-hunt-1"},
+		script.Step{AtTick: 61600, Action: "sell", Item: "ore-cordite", Qty: 10},
+	)
+	s, err := sim.New(c, wd, 42)
+	if err != nil {
+		return false
+	}
+	fell, refused, sold := false, false, false
+	script.RunH(s, steps, 62_000, script.Hooks{OnEvent: func(ev sim.Event) {
+		switch {
+		case ev.Kind == sim.EvWar && ev.Phase == sim.WarFlip && ev.System == "sys-penumbra":
+			fell = true
+		case ev.Kind == sim.EvMission && ev.Phase == sim.MissionRefused &&
+			strings.Contains(ev.Text, "remnant"):
+			refused = fell
+		case ev.Kind == sim.EvMarket && strings.Contains(ev.Text, "Sold"):
+			sold = sold || fell
+		}
+	}})
+	if !fell || !refused || !sold {
+		return false
+	}
+	w := s.War()
+	return w != nil && w.Control["sys-penumbra"] == "works"
 }
 
 // TestShowcaseCoversEveryFeature is the game's end-to-end guarantee: the

@@ -125,6 +125,9 @@ func (s *Sim) applyCommand(cmd Command) {
 
 	case CmdStartJob, CmdCollectJob, CmdCancelJob:
 		s.deferIndustry = append(s.deferIndustry, c)
+
+	case CmdWarPush:
+		s.warPush(c.System, c.Value)
 	}
 }
 

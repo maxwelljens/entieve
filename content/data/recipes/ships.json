@@ -48,6 +48,14 @@
     "family": "hulls"
   },
   {
+    "id": "rec-ship-npc-fleet",
+    "product": "ship-npc-fleet",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 120000 }, { "item": "min-nickel", "qty": 14000 }, { "item": "min-cobalt", "qty": 8000 }, { "item": "min-silex", "qty": 5000 }, { "item": "min-argon", "qty": 1500 }],
+    "time": 600,
+    "family": "hulls"
+  },
+  {
     "id": "rec-ship-rat-hierarch",
     "product": "ship-rat-hierarch",
     "qty": 1,
