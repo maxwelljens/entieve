@@ -38,17 +38,6 @@ func haulerCargo(s *Sim, item content.ItemID) int {
 	return n
 }
 
-// bookSellQty sums a station's resting sell orders for an item.
-func bookSellQty(s *Sim, station StationID, item content.ItemID) int {
-	n := 0
-	for _, o := range s.BookOrders(station) {
-		if o.Item == item && o.Side == OrderSell {
-			n += o.Qty
-		}
-	}
-	return n
-}
-
 // gridNPCCount counts living NPC pilot entities on the grid (static spawns,
 // traffic raiders and patrols alike).
 func gridNPCCount(s *Sim) int {
@@ -187,7 +176,7 @@ func TestTrafficBacklogDrainsCappedWithCargoConserved(t *testing.T) {
 				t.Fatalf("tick %d: live haulers = %d, cap %d", tick, n, trafficMaxLive)
 			}
 			parked, live := parkedCargo(s), haulerCargo(s, "min-ferrite")
-			book := bookSellQty(s, "cel-b-dock", "min-ferrite")
+			book := bookAskQty(s, "cel-b-dock", "min-ferrite")
 			if parked+live+book != total {
 				t.Fatalf("tick %d: cargo parked %d + live %d + delivered %d != %d (mass balance broken)",
 					tick, parked, live, book, total)
@@ -211,7 +200,7 @@ func TestTrafficBacklogDrainsCappedWithCargoConserved(t *testing.T) {
 				hashes = append(hashes, s.Hash())
 			}
 			if parkedCargo(s) == 0 && s.Traffic.Len() == 0 &&
-				bookSellQty(s, "cel-b-dock", "min-ferrite") == total {
+				bookAskQty(s, "cel-b-dock", "min-ferrite") == total {
 				hashes = append(hashes, s.Hash())
 				if !sawStaged {
 					t.Fatal("backlog drained without ever staging behind the cap")
@@ -220,7 +209,7 @@ func TestTrafficBacklogDrainsCappedWithCargoConserved(t *testing.T) {
 			}
 		}
 		t.Fatalf("backlog never drained (parked=%d live=%d book=%d)",
-			parkedCargo(s), s.Traffic.Len(), bookSellQty(s, "cel-b-dock", "min-ferrite"))
+			parkedCargo(s), s.Traffic.Len(), bookAskQty(s, "cel-b-dock", "min-ferrite"))
 		return nil, nil
 	}
 	hA, eA := run(t)
@@ -287,7 +276,7 @@ func TestTrafficGateQueueCeilingHolds(t *testing.T) {
 	check := func(tick int) {
 		t.Helper()
 		parked, live := parkedCargo(s), haulerCargo(s, "min-ferrite")
-		book := bookSellQty(s, "cel-b-dock", "min-ferrite")
+		book := bookAskQty(s, "cel-b-dock", "min-ferrite")
 		if parked+live+book != total {
 			t.Fatalf("tick %d: cargo parked %d + live %d + delivered %d != %d (mass balance broken)",
 				tick, parked, live, book, total)
@@ -336,7 +325,7 @@ func TestTrafficGateQueueCeilingHolds(t *testing.T) {
 	}
 	if !runUntil(t, s, &evs, 6000, func() bool {
 		check(int(s.Ticks()))
-		return bookSellQty(s, "cel-b-dock", "min-ferrite") >= qty
+		return bookAskQty(s, "cel-b-dock", "min-ferrite") >= qty
 	}) {
 		t.Fatalf("sys-b queue never drained a delivery; %v", trafficTexts(evs))
 	}

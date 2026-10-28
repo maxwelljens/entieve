@@ -392,7 +392,7 @@ func TestPacingStationTurnaroundOrdering(t *testing.T) {
 	if c, ok := s.Cargos.Get(e); ok && len(c.Stacks) > 0 {
 		t.Fatalf("hold still carries %v after the cargo action", c.Stacks)
 	}
-	if q, _ := askAt(s, "cel-a-dock", "min-ferrite"); q != 100 {
+	if q, _ := bestAt(s, "cel-a-dock", "min-ferrite", OrderSell); q != 100 {
 		t.Fatalf("destination ask = %d, want 100 (posted at the action)", q)
 	}
 }
@@ -415,14 +415,14 @@ func TestPacingCargoConservedAcrossDelayedTransitions(t *testing.T) {
 		return n
 	}
 	total := func() int {
-		return hold() + parkedCargo(s) + bookSellQty(s, "cel-b-dock", "min-ferrite")
+		return hold() + parkedCargo(s) + bookAskQty(s, "cel-b-dock", "min-ferrite")
 	}
 	check := func(when string) {
 		t.Helper()
 		if got := total(); got != qty {
 			t.Fatalf("%s: total %d, want %d (hold %d, parked %d, book %d)",
 				when, got, qty, hold(), parkedCargo(s),
-				bookSellQty(s, "cel-b-dock", "min-ferrite"))
+				bookAskQty(s, "cel-b-dock", "min-ferrite"))
 		}
 	}
 	spawnCross(t, s)
@@ -444,16 +444,16 @@ func TestPacingCargoConservedAcrossDelayedTransitions(t *testing.T) {
 	s.Queue(CmdJump{Gate: back})
 	s.Step()
 	evs = append(evs, drain(s)...)
-	for i := 0; i < 6000 && bookSellQty(s, "cel-b-dock", "min-ferrite") == 0; i++ {
+	for i := 0; i < 6000 && bookAskQty(s, "cel-b-dock", "min-ferrite") == 0; i++ {
 		s.Step()
 		evs = append(evs, drain(s)...)
 		check("continuation")
 	}
 	check("after delivery")
-	if q, _ := askAt(s, "cel-b-dock", "min-ferrite"); q != qty {
+	if q, _ := bestAt(s, "cel-b-dock", "min-ferrite", OrderSell); q != qty {
 		t.Fatalf("delivered = %d, want %d", q, qty)
 	}
-	if q, _ := askAt(s, "cel-station-a", "min-ferrite"); q != 400 {
+	if q, _ := bestAt(s, "cel-station-a", "min-ferrite", OrderSell); q != 400 {
 		t.Fatalf("origin ask = %d, want 400 (debited once at spawn)", q)
 	}
 }
@@ -512,7 +512,7 @@ func TestPacingHoldLogsOncePerEpisode(t *testing.T) {
 		t.Fatalf("system = %q, want sys-b", s.systemID)
 	}
 	if !runUntil(t, s, &evs, 6000, func() bool {
-		return bookSellQty(s, "cel-b-dock", "min-ferrite") >= 50
+		return bookAskQty(s, "cel-b-dock", "min-ferrite") >= 50
 	}) {
 		t.Fatalf("far queue never drained a delivery; %d parked", s.trafficParkedIn("sys-b"))
 	}

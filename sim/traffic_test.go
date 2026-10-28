@@ -383,7 +383,7 @@ func TestTrafficLifecycleDeliveryOrder(t *testing.T) {
 		// Provenance is booked at SPAWN: the moment the first hauler
 		// departs, Haven Rest's ask must already carry the withdrawal.
 		if originAtSpawn < 0 && firstPhase(evs, EvTraffic, TrafficDeparted) != nil {
-			originAtSpawn, _ = askAt(s, "cel-station-a", "min-ferrite")
+			originAtSpawn, _ = bestAt(s, "cel-station-a", "min-ferrite", OrderSell)
 		}
 		return firstPhase(evs, EvTraffic, TrafficDelivered) != nil
 	}) {
@@ -423,11 +423,11 @@ func TestTrafficLifecycleDeliveryOrder(t *testing.T) {
 	}
 	// Delivery never touches the origin again: no reversal, no second
 	// debit (a later scheduled spawn may have drawn another shipment).
-	if originQty, originPrice := askAt(s, "cel-station-a", "min-ferrite"); originQty > 400 || originPrice != 10 {
+	if originQty, originPrice := bestAt(s, "cel-station-a", "min-ferrite", OrderSell); originQty > 400 || originPrice != 10 {
 		t.Fatalf("origin ask after delivery = %d @ %v, want <= 400 @ 10 (no delivery-time debit)",
 			originQty, originPrice)
 	}
-	dockQty, dockPrice := askAt(s, "cel-a-dock", "min-ferrite")
+	dockQty, dockPrice := bestAt(s, "cel-a-dock", "min-ferrite", OrderSell)
 	if dockQty != 100 {
 		t.Fatalf("destination ask qty = %d, want 100 (exact integer units)", dockQty)
 	}
@@ -437,17 +437,6 @@ func TestTrafficLifecycleDeliveryOrder(t *testing.T) {
 	if !hasEvent(evs, EvMarket, "price falls to") {
 		t.Fatalf("no price-falls market event; events=%v", trafficTexts(evs))
 	}
-}
-
-// askAt returns the best ask's qty and price for an item at a station's
-// book (0, 0 when the station keeps no ask for it).
-func askAt(s *Sim, station StationID, item content.ItemID) (int, float64) {
-	for _, st := range s.BookOrders(station) {
-		if st.Item == item && st.Side == OrderSell {
-			return st.Qty, st.Price
-		}
-	}
-	return 0, 0
 }
 
 // TestTrafficSpawnRateBySecurity pins the spawn-rate derivation with exact
@@ -1019,19 +1008,19 @@ func TestTrafficDeliveriesTickTheBookDown(t *testing.T) {
 	// First delivery: empty destination book, cost basis 10.00 (the origin
 	// ask) -> the ask lists at 9.99, one tick under it.
 	deliver()
-	if qty, price := askAt(s, "cel-a-dock", "min-ferrite"); qty != 100 || price != 9.99 {
+	if qty, price := bestAt(s, "cel-a-dock", "min-ferrite", OrderSell); qty != 100 || price != 9.99 {
 		t.Fatalf("after 1st delivery ask = %d @ %v, want 100 @ 9.99", qty, price)
 	}
-	if qty, price := askAt(s, "cel-station-a", "min-ferrite"); qty != 400 || price != 10 {
+	if qty, price := bestAt(s, "cel-station-a", "min-ferrite", OrderSell); qty != 400 || price != 10 {
 		t.Fatalf("origin ask = %d @ %v, want 400 @ 10 (provenance debit)", qty, price)
 	}
 	// Second delivery: undercuts the prevailing 9.99 ask by one tick (the
 	// tick grid narrows below 10: 4 significant figures means 9.99 -> 9.989).
 	deliver()
-	if qty, price := askAt(s, "cel-a-dock", "min-ferrite"); qty != 100 || price != 9.989 {
+	if qty, price := bestAt(s, "cel-a-dock", "min-ferrite", OrderSell); qty != 100 || price != 9.989 {
 		t.Fatalf("after 2nd delivery ask = %d @ %v, want 100 @ 9.989 (one tick down)", qty, price)
 	}
-	if qty, price := askAt(s, "cel-station-a", "min-ferrite"); qty != 300 || price != 10 {
+	if qty, price := bestAt(s, "cel-station-a", "min-ferrite", OrderSell); qty != 300 || price != 10 {
 		t.Fatalf("origin ask = %d @ %v, want 300 @ 10", qty, price)
 	}
 }
@@ -1059,7 +1048,7 @@ func TestTrafficNoDecayWithoutTrades(t *testing.T) {
 	}) {
 		t.Fatal("seed delivery never landed")
 	}
-	if _, price := askAt(s, "cel-a-dock", "min-ferrite"); price != 9.99 {
+	if _, price := bestAt(s, "cel-a-dock", "min-ferrite", OrderSell); price != 9.99 {
 		t.Fatalf("post-delivery price = %v, want 9.99", price)
 	}
 
@@ -1070,7 +1059,7 @@ func TestTrafficNoDecayWithoutTrades(t *testing.T) {
 		s.Step()
 		drain(s)
 	}
-	if qty, price := askAt(s, "cel-a-dock", "min-ferrite"); qty != 100 || price != 9.99 {
+	if qty, price := bestAt(s, "cel-a-dock", "min-ferrite", OrderSell); qty != 100 || price != 9.99 {
 		t.Fatalf("after 7200 idle ticks ask = %d @ %v, want 100 @ 9.99 (no decay)", qty, price)
 	}
 }

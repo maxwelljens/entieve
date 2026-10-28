@@ -461,3 +461,26 @@ func hudModule(s *Sim, slot SlotRef) (ModuleRuntime, bool) {
 	}
 	return *rt, true
 }
+
+// bestAt returns the qty and price of a station book's best order on one side
+// (0, 0 when it holds none). It reads through the book's own best rule, never
+// a re-walk, so a test cannot disagree with production about what "best" is.
+func bestAt(s *Sim, station StationID, item content.ItemID, side OrderSide) (int, float64) {
+	if book := s.market[station]; book != nil {
+		if o, ok := book.best(item, side); ok {
+			return o.Qty, o.Price
+		}
+	}
+	return 0, 0
+}
+
+// bookAskQty sums a station's resting asks for one item.
+func bookAskQty(s *Sim, station StationID, item content.ItemID) int {
+	q := 0
+	for _, o := range s.BookOrders(station) {
+		if o.Item == item && o.Side == OrderSell {
+			q += o.Qty
+		}
+	}
+	return q
+}

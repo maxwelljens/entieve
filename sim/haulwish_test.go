@@ -156,7 +156,7 @@ func TestHaulWishSpawnsConvoyAndDelivers(t *testing.T) {
 		t.Fatalf("wish = %+v, want %s cel-a-dock→cel-b-dock min-ferrite ×%d (stock 20): %+v",
 			w, wantOwner, wantQty, w)
 	}
-	if q, p := askAt(s, "cel-a-dock", "min-ferrite"); q != 20 || p != 8.25 {
+	if q, p := bestAt(s, "cel-a-dock", "min-ferrite", OrderSell); q != 20 || p != 8.25 {
 		t.Fatalf("origin ask = %d @ %v, want 20 @ 8.25 (reservation × margin)", q, p)
 	}
 
@@ -181,7 +181,7 @@ func TestHaulWishSpawnsConvoyAndDelivers(t *testing.T) {
 	if cargo, _ := s.Cargos.Get(e); stacksCount(cargo.Stacks, "min-ferrite") != wantQty {
 		t.Fatalf("hauler cargo = %d, want %d (the wished units)", stacksCount(cargo.Stacks, "min-ferrite"), wantQty)
 	}
-	if q, _ := askAt(s, "cel-a-dock", "min-ferrite"); q != 0 {
+	if q, _ := bestAt(s, "cel-a-dock", "min-ferrite", OrderSell); q != 0 {
 		t.Fatalf("origin ask after spawn = %d, want 0 (sourced from the agent's own ask)", q)
 	}
 	if n := a.Inventory["min-ferrite"]; n != 20-wantQty {
@@ -283,7 +283,7 @@ func TestHaulWishSpawnsConvoyAndDelivers(t *testing.T) {
 		}
 	}
 	// The cargo lists at the destination under the agent's own ask.
-	if q, p := askAt(s, "cel-b-dock", "min-ferrite"); q != wantQty || p != wantAsk {
+	if q, p := bestAt(s, "cel-b-dock", "min-ferrite", OrderSell); q != wantQty || p != wantAsk {
 		t.Fatalf("destination ask = %d @ %v, want %d @ %v (agent reservation)", q, p, wantQty, wantAsk)
 	}
 	o, ok := restOrder(s, "cel-b-dock", OrderSell, "min-ferrite", wantOwner)
@@ -295,7 +295,7 @@ func TestHaulWishSpawnsConvoyAndDelivers(t *testing.T) {
 	}
 	// The origin books were touched exactly once: the agent's ask at Dock
 	// Two is gone, Haven Rest's founding stock was never touched.
-	if q, p := askAt(s, "cel-station-a", "min-ferrite"); q != 500 || p != 10 {
+	if q, p := bestAt(s, "cel-station-a", "min-ferrite", OrderSell); q != 500 || p != 10 {
 		t.Fatalf("founding origin ask = %d @ %v, want 500 @ 10 (never touched)", q, p)
 	}
 	// The existing market voice reports the arriving supply.
@@ -333,7 +333,7 @@ func TestHaulWishStaleSpreadSkipsSpawn(t *testing.T) {
 	// Fixture state, checked before any paced act could churn it: the skip
 	// below must not source the origin — the agent still holds stock and
 	// its own ask stands.
-	if q, p := askAt(s, "cel-a-dock", "min-ferrite"); q != 20 || p != 8.25 {
+	if q, p := bestAt(s, "cel-a-dock", "min-ferrite", OrderSell); q != 20 || p != 8.25 {
 		t.Fatalf("origin ask = %d @ %v, want 20 @ 8.25 (fixture)", q, p)
 	}
 
@@ -459,10 +459,10 @@ func TestHaulWishLostShipmentNoPayment(t *testing.T) {
 	if got != wantQty {
 		t.Fatalf("wreck cargo = %d, want %d (the wished units)", got, wantQty)
 	}
-	if q, p := askAt(s, "cel-b-dock", "min-ferrite"); q != 500 || p != 50 {
+	if q, p := bestAt(s, "cel-b-dock", "min-ferrite", OrderSell); q != 500 || p != 50 {
 		t.Fatalf("destination ask = %d @ %v, want 500 @ 50 (nothing arrived)", q, p)
 	}
-	if q, _ := askAt(s, "cel-a-dock", "min-ferrite"); q != 0 {
+	if q, _ := bestAt(s, "cel-a-dock", "min-ferrite", OrderSell); q != 0 {
 		t.Fatalf("origin ask = %d, want 0 (no reversal of the spawn-time debit)", q)
 	}
 }

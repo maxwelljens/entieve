@@ -75,12 +75,12 @@ func TestLogisticsStationOriginDebitsAtSpawn(t *testing.T) {
 	}
 	td, _ := s.Content.TrafficFor("sys-a")
 
-	before, price := askAt(s, "cel-station-a", "min-ferrite")
+	before, price := bestAt(s, "cel-station-a", "min-ferrite", OrderSell)
 	if before != 500 || price != 10 {
 		t.Fatalf("fixture ask = %d @ %v, want 500 @ 10", before, price)
 	}
 	s.spawnTrafficHauler(s.System(), td, crossRouteFromStation())
-	after, price2 := askAt(s, "cel-station-a", "min-ferrite")
+	after, price2 := bestAt(s, "cel-station-a", "min-ferrite", OrderSell)
 	if after != 400 || price2 != 10 {
 		t.Fatalf("origin ask at spawn = %d @ %v, want 400 @ 10 (sourced at spawn)", after, price2)
 	}
@@ -102,10 +102,10 @@ func TestLogisticsStationOriginDebitsAtSpawn(t *testing.T) {
 		t.Fatalf("no delivery; %v", trafficTexts(evs))
 	}
 	// Delivery posts at the destination and never debits the origin again.
-	if q, p := askAt(s, "cel-station-a", "min-ferrite"); q != 400 || p != 10 {
+	if q, p := bestAt(s, "cel-station-a", "min-ferrite", OrderSell); q != 400 || p != 10 {
 		t.Fatalf("origin ask after delivery = %d @ %v, want 400 @ 10 (delivery-time debit removed)", q, p)
 	}
-	if q, p := askAt(s, "cel-a-dock", "min-ferrite"); q != 100 || p != 9.99 {
+	if q, p := bestAt(s, "cel-a-dock", "min-ferrite", OrderSell); q != 100 || p != 9.99 {
 		t.Fatalf("destination ask = %d @ %v, want 100 @ 9.99 (one tick under the basis)", q, p)
 	}
 }
@@ -163,7 +163,7 @@ func TestLogisticsStationOriginShortageSpawnsNothing(t *testing.T) {
 	if !hasEvent(evs, EvLog, "no Ferrite to ship from Dock Two") {
 		t.Fatalf("missing no-stock event: %v", trafficTexts(evs))
 	}
-	if q, p := askAt(s, "cel-a-dock", "min-ferrite"); q != 50 || p != 12 {
+	if q, p := bestAt(s, "cel-a-dock", "min-ferrite", OrderSell); q != 50 || p != 12 {
 		t.Fatalf("origin ask = %d @ %v, want 50 @ 12 (no partial withdrawal)", q, p)
 	}
 }
@@ -224,8 +224,8 @@ func TestLogisticsGateOriginImportUnchanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	td, _ := s.Content.TrafficFor("sys-a")
-	havenBefore, _ := askAt(s, "cel-station-a", "ammo-emp-s")
-	dockBefore, _ := askAt(s, "cel-a-dock", "ammo-emp-s")
+	havenBefore, _ := bestAt(s, "cel-station-a", "ammo-emp-s", OrderSell)
+	dockBefore, _ := bestAt(s, "cel-a-dock", "ammo-emp-s", OrderSell)
 
 	s.spawnTrafficHauler(s.System(), td, content.RouteDef{
 		From: "cel-gate-b", To: "cel-a-dock", Hull: "ship-convoy",
@@ -239,10 +239,10 @@ func TestLogisticsGateOriginImportUnchanged(t *testing.T) {
 	if tc.Basis != 5 {
 		t.Fatalf("basis = %v, want 5 (import prices at the def base price)", tc.Basis)
 	}
-	if h, _ := askAt(s, "cel-station-a", "ammo-emp-s"); h != havenBefore {
+	if h, _ := bestAt(s, "cel-station-a", "ammo-emp-s", OrderSell); h != havenBefore {
 		t.Fatal("a gate import debited a station book")
 	}
-	if d, _ := askAt(s, "cel-a-dock", "ammo-emp-s"); d != dockBefore {
+	if d, _ := bestAt(s, "cel-a-dock", "ammo-emp-s", OrderSell); d != dockBefore {
 		t.Fatal("a gate import debited the destination book at spawn")
 	}
 	_ = e
@@ -253,7 +253,7 @@ func TestLogisticsGateOriginImportUnchanged(t *testing.T) {
 	}) {
 		t.Fatalf("import never delivered; %v", trafficTexts(evs))
 	}
-	if q, p := askAt(s, "cel-a-dock", "ammo-emp-s"); q != 600 || p != 4.999 {
+	if q, p := bestAt(s, "cel-a-dock", "ammo-emp-s", OrderSell); q != 600 || p != 4.999 {
 		t.Fatalf("delivered import = %d @ %v, want 600 @ 4.999 (one tick under the base)",
 			q, p)
 	}
@@ -276,7 +276,7 @@ func TestLogisticsLostShipmentNoReversal(t *testing.T) {
 	if !ok {
 		t.Fatal("no hauler")
 	}
-	if q, _ := askAt(s, "cel-station-a", "min-ferrite"); q != 400 {
+	if q, _ := bestAt(s, "cel-station-a", "min-ferrite", OrderSell); q != 400 {
 		t.Fatalf("origin ask at spawn = %d, want 400", q)
 	}
 
@@ -290,7 +290,7 @@ func TestLogisticsLostShipmentNoReversal(t *testing.T) {
 		t.Fatalf("no supply-risk event; %v", trafficTexts(evs))
 	}
 	// No reversal: the origin keeps the debit.
-	if q, p := askAt(s, "cel-station-a", "min-ferrite"); q != 400 || p != 10 {
+	if q, p := bestAt(s, "cel-station-a", "min-ferrite", OrderSell); q != 400 || p != 10 {
 		t.Fatalf("origin ask after loss = %d @ %v, want 400 @ 10 (no reversal)", q, p)
 	}
 	// The goods exist as a wreck, lootable through the normal path.
@@ -299,7 +299,7 @@ func TestLogisticsLostShipmentNoReversal(t *testing.T) {
 		t.Fatal("lost shipment left no wreck carrying the cargo")
 	}
 	// The destination never saw it.
-	if q, _ := askAt(s, "cel-a-dock", "min-ferrite"); q != 0 {
+	if q, _ := bestAt(s, "cel-a-dock", "min-ferrite", OrderSell); q != 0 {
 		t.Fatalf("destination ask = %d, want 0 (nothing arrived)", q)
 	}
 }
@@ -329,7 +329,7 @@ func TestLogisticsCrossSystemJourney(t *testing.T) {
 
 	var evs []Event
 	s.spawnTrafficHauler(s.System(), td, crossRoute())
-	if q, _ := askAt(s, "cel-station-a", "min-ferrite"); q != 400 {
+	if q, _ := bestAt(s, "cel-station-a", "min-ferrite", OrderSell); q != 400 {
 		t.Fatalf("origin ask at spawn = %d, want 400", q)
 	}
 	// First leg: toward the sys-a gate.
@@ -409,11 +409,11 @@ func TestLogisticsCrossSystemJourney(t *testing.T) {
 	if delivered.System != "sys-b" || delivered.Cel != "cel-b-dock" {
 		t.Fatalf("delivered = %q/%q, want sys-b/cel-b-dock", delivered.System, delivered.Cel)
 	}
-	if q, p := askAt(s, "cel-b-dock", "min-ferrite"); q != 100 || p != 9.99 {
+	if q, p := bestAt(s, "cel-b-dock", "min-ferrite", OrderSell); q != 100 || p != 9.99 {
 		t.Fatalf("sys-b book = %d @ %v, want 100 @ 9.99", q, p)
 	}
 	// A's origin stays debited exactly once — no reversal, no second debit.
-	if q, p := askAt(s, "cel-station-a", "min-ferrite"); q != 400 || p != 10 {
+	if q, p := bestAt(s, "cel-station-a", "min-ferrite", OrderSell); q != 400 || p != 10 {
 		t.Fatalf("origin ask = %d @ %v, want 400 @ 10", q, p)
 	}
 	// Phase order: departed (A) → jumped (A) → departed (B) → delivered (B).
@@ -760,10 +760,10 @@ func TestLogisticsMultiHopJourney(t *testing.T) {
 	if delivered.System != "sys-c" || delivered.Cel != "cel-c-dock" {
 		t.Fatalf("delivered = %q/%q, want sys-c/cel-c-dock", delivered.System, delivered.Cel)
 	}
-	if q, p := askAt(s, "cel-c-dock", "min-ferrite"); q != 100 || p != 9.99 {
+	if q, p := bestAt(s, "cel-c-dock", "min-ferrite", OrderSell); q != 100 || p != 9.99 {
 		t.Fatalf("sys-c book = %d @ %v, want 100 @ 9.99", q, p)
 	}
-	if q, p := askAt(s, "cel-station-a", "min-ferrite"); q != 400 || p != 10 {
+	if q, p := bestAt(s, "cel-station-a", "min-ferrite", OrderSell); q != 400 || p != 10 {
 		t.Fatalf("origin ask = %d @ %v, want a single spawn-time debit (400 @ 10)", q, p)
 	}
 	// Two hops happened (sys-a → sys-b → sys-c).

@@ -462,10 +462,10 @@ func TestPerStationBooksAreIsolated(t *testing.T) {
 	s.Queue(CmdBuy{Item: "ammo-emp-s", Qty: 30})
 	s.Step()
 	drain(s)
-	if qty, price := askAtBook(s, haven, "ammo-emp-s"); qty != 100 || price != 5 {
+	if qty, price := bestAt(s, haven, "ammo-emp-s", OrderSell); qty != 100 || price != 5 {
 		t.Fatalf("haven ask = %d @ %v, want 100 @ 5 (isolated)", qty, price)
 	}
-	if qty, _ := askAtBook(s, anvil, "ammo-emp-s"); qty != 0 {
+	if qty, _ := bestAt(s, anvil, "ammo-emp-s", OrderSell); qty != 0 {
 		t.Fatalf("anvil ask = %d, want 0 (bought out)", qty)
 	}
 	if s.Wallet() >= walletBefore {
@@ -481,16 +481,6 @@ func TestPerStationBooksAreIsolated(t *testing.T) {
 		t.Fatalf("haven ladder = %v, want the best ask 5", p)
 	}
 	assertBooksSane(t, s)
-}
-
-// askAtBook returns the best ask at one station's book (test helper).
-func askAtBook(s *Sim, station StationID, item content.ItemID) (int, float64) {
-	for _, o := range s.BookOrders(station) {
-		if o.Item == item && o.Side == OrderSell {
-			return o.Qty, o.Price
-		}
-	}
-	return 0, 0
 }
 
 // dockAtStation docks the player at a named station (any system) and

@@ -31,17 +31,6 @@ func rockByIndex(t *testing.T, s *Sim, cel content.CelID, index int) ecs.Entity 
 	return 0
 }
 
-// bookAskQty sums a station's resting asks for one item.
-func bookAskQty(s *Sim, station StationID, item content.ItemID) int {
-	q := 0
-	for _, o := range s.BookOrders(station) {
-		if o.Item == item && o.Side == OrderSell {
-			q += o.Qty
-		}
-	}
-	return q
-}
-
 // ---------------------------------------------------------------------------
 // R1 — persistent belts
 // ---------------------------------------------------------------------------
