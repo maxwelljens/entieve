@@ -329,8 +329,8 @@ func TestHelpWindowFits(t *testing.T) {
 	if r.Min.X < 0 || r.Min.Y < 0 || r.Max.X > 1024 || r.Max.Y > 700 {
 		t.Fatalf("help window %v out of bounds at 1024x700", r)
 	}
-	if len(helpRows()) != len(KeyMap) {
-		t.Fatalf("help rows = %d, want %d (one per KeyMap binding)", len(helpRows()), len(KeyMap))
+	if len(helpRowsFor(nil)) != len(KeyMap) {
+		t.Fatalf("help rows = %d, want %d (one per KeyMap binding)", len(helpRowsFor(nil)), len(KeyMap))
 	}
 }
 

@@ -15,7 +15,6 @@ const (
 	stationX    = uikit.StationX
 	stationY    = uikit.StationY
 	stationWinW = uikit.StationWinW
-	stationMinW = uikit.StationMinW
 	stationMinH = uikit.StationMinH
 )
 

@@ -67,7 +67,9 @@ func TestFitColumns(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := FitColumns(natural(), tt.avail)
+			// The overview's arrangement: later columns yield first (priority
+			// = index), surplus all to Name (index 0).
+			got := fitColumns(natural(), []int{0, 1, 2, 3}, 0, tt.avail)
 			for i, w := range tt.want {
 				if math.Abs(got[i].Width-w) > 1e-9 {
 					t.Errorf("cols[%d] (%s) width = %v, want %v",

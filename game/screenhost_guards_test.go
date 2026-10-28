@@ -58,7 +58,7 @@ func TestLayoutSidecarBytesStable(t *testing.T) {
 	g.host.SetOpen(idMarket, true)
 	g.syncMounts()
 	pump(t, g, 1280, 720)
-	for _, sm := range g.host.Splits(idInventory) {
+	for _, sm := range g.host.Slot(string(idInventory)).Splits() {
 		if sm.Name == "inventory-ore" {
 			sm.Split.SetRatio(sm.Index, 0.42)
 		}

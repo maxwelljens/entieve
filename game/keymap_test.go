@@ -87,7 +87,7 @@ func TestKeyMapScreenRowsDeriveFromSpec(t *testing.T) {
 	}
 	// The chord is composed and the description is the spec's text alone:
 	// the help overlay renders both, nothing is parsed back out of a row.
-	help := helpRows()
+	help := helpRowsFor(nil)
 	for _, b := range derived {
 		key, desc := chordOf(b.Key, b.Shift, b.Ctrl), descOf(b.Action)
 		if strings.Contains(desc, " — ") {

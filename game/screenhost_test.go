@@ -308,8 +308,8 @@ func TestHostLayoutFacetsRoundTrip(t *testing.T) {
 	_ = plain
 	other := newScreenHost([]Screen{fixtureRow("plain", newFixturePanel(), nil)}, gameScope, newFakeSink(), screenServices{})
 	other.Warm()
-	if got := other.Splits("plain"); got != nil || other.Tables("plain") != nil {
-		t.Fatalf("facetless row exposed facets: %v / %v", got, other.Tables("plain"))
+	if got := other.Slot("plain").Splits(); got != nil || other.Slot("plain").Tables() != nil {
+		t.Fatalf("facetless row exposed facets: %v / %v", got, other.Slot("plain").Tables())
 	}
 }
 

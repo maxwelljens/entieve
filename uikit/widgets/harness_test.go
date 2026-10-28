@@ -34,8 +34,8 @@ type testEnv struct {
 // menu/row-menu tests drive).
 func (e *testEnv) Menu() *Menu { return e.menu }
 
-// OpenRowMenu derives the menu for spec and opens it at at — the
-// installer the session's version wraps.
+// OpenRowMenu derives the menu for spec and opens it at at — the form the
+// panels call, against this env's own seams.
 func (e *testEnv) OpenRowMenu(spec RowSpec, at image.Point) {
 	OpenRowMenu(e, e, spec, at)
 }
@@ -85,74 +85,29 @@ func newChromeEnv(t *testing.T) (*testEnv, *[]sim.Command) {
 	return newTestEnv(t)
 }
 
-// chromeUI is the shared chrome test harness: an interface root (anchor
-// layout) holding the anchored panels plus any windows, driven through
-// Sync → Update → Draw exactly the way the game will drive it.
+// chromeUI is the anchored-panel fixture the tooltip surface test draws
+// through: an interface root it attaches the panel to, pumped like the
+// game pumps the interface.
 type chromeUI struct {
-	env    Seams
-	ui     *ebitenui.UI
-	root   *widget.Container
-	panels []Panel
-	wins   []*widget.Window
+	ui   *ebitenui.UI
+	root *widget.Container
 }
 
 func newChromeUI(env Seams) *chromeUI {
 	root := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
 	return &chromeUI{
-		env:  env,
 		ui:   &ebitenui.UI{Container: root, PrimaryTheme: env.WidgetTheme()},
 		root: root,
 	}
 }
 
-// AddPanel attaches an anchored panel's container and its Sync target.
-func (c *chromeUI) AddPanel(container *widget.Container, p Panel) *chromeUI {
-	c.root.AddChild(container)
-	c.panels = append(c.panels, p)
-	return c
-}
-
-// AddWindow adds a window panel to the UI.
-func (c *chromeUI) AddWindow(w WindowPanel) *chromeUI {
-	c.ui.AddWindow(w.Win())
-	c.panels = append(c.panels, w)
-	c.wins = append(c.wins, w.Win())
-	return c
-}
-
-// Update runs one UI update (this is what flushes ebitenui's deferred
-// event queue: handler registration, event delivery).
-func (c *chromeUI) Update(t *testing.T) {
-	t.Helper()
-	c.ui.Update()
-}
-
-// Frame runs one full Sync/Update/Draw cycle at w×h.
+// Frame runs one Update/Draw cycle at w×h.
 func (c *chromeUI) Frame(t *testing.T, w, h int) *ebiten.Image {
 	t.Helper()
 	img := ebiten.NewImage(w, h)
-	for _, p := range c.panels {
-		p.Sync()
-	}
 	c.ui.Update()
 	c.ui.Draw(img)
 	return img
-}
-
-// Smoke draws two frames at both design sizes and asserts every window
-// stays inside the screen.
-func (c *chromeUI) Smoke(t *testing.T) {
-	t.Helper()
-	for _, size := range [][2]int{{1280, 720}, {1024, 700}} {
-		c.Frame(t, size[0], size[1])
-		c.Frame(t, size[0], size[1])
-		for _, w := range c.wins {
-			r := w.GetContainer().GetWidget().Rect
-			if r.Min.X < 0 || r.Min.Y < 0 || r.Max.X > size[0] || r.Max.Y > size[1] {
-				t.Errorf("%dx%d: window %v out of bounds", size[0], size[1], r)
-			}
-		}
-	}
 }
 
 // newWindowUI mounts windows on their own UI (the kit's AddWindow seam
@@ -178,79 +133,6 @@ func newPumpedTable(t *testing.T, env Seams, cols []Column, opts ...TableOption)
 	ui.Update()
 	ui.Draw(ebiten.NewImage(640, 400))
 	return tbl, ui
-}
-
-// clickRow fires a real deferred click on row i and dispatches it on the
-// next UI pump (ebitenui queues both handlers and events until Update).
-func clickRow(ui *ebitenui.UI, tbl *Table, i int) {
-	tbl.RowWidgetForTest(i).MouseButtonClickedEvent.Fire(&widget.WidgetMouseButtonClickedEventArgs{
-		Button: ebiten.MouseButtonLeft,
-	})
-	ui.Update()
-}
-
-// menuHost is what the menu-entry helpers need: the env's menu.
-type menuHost interface{ Menu() *Menu }
-
-// clickMenuEntry clicks the labelled entry in the open menu (fails when
-// there is no menu open or no such entry).
-func clickMenuEntry(t *testing.T, env menuHost, label string) {
-	t.Helper()
-	m := env.Menu()
-	if !m.IsOpen() {
-		t.Fatalf("no menu open (want the %q entry)", label)
-	}
-	for i, e := range m.Entries() {
-		if e.Label != label {
-			continue
-		}
-		m.Click(m.RowRect(i).Min.Add(image.Pt(1, 1)))
-		return
-	}
-	t.Fatalf("menu has no %q entry: %+v", label, m.Entries())
-}
-
-// pressMenuEntry picks the labelled entry in the already-open menu and
-// fails when it is disabled.
-func pressMenuEntry(t *testing.T, env menuHost, label string) {
-	t.Helper()
-	if e := entry(t, env, label); e.Disabled {
-		t.Fatalf("menu entry %q is disabled", label)
-	}
-	clickMenuEntry(t, env, label)
-}
-
-// entry returns the menu entry with the label (fails when missing).
-func entry(t *testing.T, env menuHost, label string) MenuEntry {
-	t.Helper()
-	m := env.Menu()
-	if !m.IsOpen() {
-		t.Fatalf("no menu open (want the %q entry)", label)
-	}
-	for _, e := range m.Entries() {
-		if e.Label == label {
-			return e
-		}
-	}
-	t.Fatalf("menu has no %q entry: %+v", label, m.Entries())
-	return MenuEntry{}
-}
-
-// pickMenuEntry right-clicks btn open and presses the labelled entry.
-func pickMenuEntry(t *testing.T, c *chromeUI, env menuHost, btn *widget.Button, label string) {
-	t.Helper()
-	w := btn.GetWidget()
-	w.MouseButtonClickedEvent.Fire(&widget.WidgetMouseButtonClickedEventArgs{
-		Widget:  w,
-		Button:  ebiten.MouseButtonRight,
-		OffsetX: 12,
-		OffsetY: 6,
-	})
-	c.Update(t)
-	if !env.Menu().IsOpen() {
-		t.Fatal("right-click opened no menu")
-	}
-	pressMenuEntry(t, env, label)
 }
 
 // tipSection returns a model's section by label (nil when the model

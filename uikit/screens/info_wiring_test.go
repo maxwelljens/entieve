@@ -182,7 +182,7 @@ func TestOverviewEntityMenu(t *testing.T) {
 		t.Fatal("celestial row declares no Ref (its Show Info entry must exist, grayed)")
 	}
 
-	env.OpenRowMenu(celSpec, image.Point{X: 100, Y: 100})
+	widgets.OpenRowMenu(env, env, celSpec, image.Point{X: 100, Y: 100})
 	m := env.Menu()
 	if !m.IsOpen() {
 		t.Fatal("entity menu did not open")
@@ -219,7 +219,7 @@ func TestOverviewEntityMenu(t *testing.T) {
 		t.Skip("showcase grid has no visible ship")
 	}
 	shipSpec := k.overviewSpec(&ovRow{info: ship})
-	env.OpenRowMenu(shipSpec, image.Point{X: 100, Y: 100})
+	widgets.OpenRowMenu(env, env, shipSpec, image.Point{X: 100, Y: 100})
 	if e := entry(t, env, "Warp to"); !e.Disabled {
 		t.Error("Warp to enabled for a non-warpable ship")
 	}
@@ -230,7 +230,7 @@ func TestOverviewEntityMenu(t *testing.T) {
 		t.Error("Show Info disabled for a ship with a hull def")
 	}
 	pressMenuEntry(t, env, "Lock target")
-	env.OpenRowMenu(shipSpec, image.Point{X: 100, Y: 100}) // the menu closed with the press
+	widgets.OpenRowMenu(env, env, shipSpec, image.Point{X: 100, Y: 100}) // the menu closed with the press
 	pressMenuEntry(t, env, "Show Info")
 	if len(*cmds) != 2 {
 		t.Fatalf("Lock target enqueued %d commands, want 2", len(*cmds))
@@ -361,7 +361,7 @@ func TestRowSpecMenuShape(t *testing.T) {
 	// Dispatch through the seam: a disabled entry closes without emitting,
 	// an enabled one emits its intent — here through the session's own
 	// sink, which maps it onto the command the trade button fires.
-	env.OpenRowMenu(spec, image.Pt(50, 60))
+	widgets.OpenRowMenu(env, env, spec, image.Pt(50, 60))
 	if !env.Menu().IsOpen() || env.Menu().Rect().Min != (image.Pt(50, 60)) {
 		t.Fatalf("menu open=%v origin=%v, want open at the click point",
 			env.Menu().IsOpen(), env.Menu().Rect().Min)
@@ -370,7 +370,7 @@ func TestRowSpecMenuShape(t *testing.T) {
 	if len(*cmds) != 0 {
 		t.Fatalf("disabled Sell emitted %v, want nothing", *cmds)
 	}
-	env.OpenRowMenu(spec, image.Pt(50, 60))
+	widgets.OpenRowMenu(env, env, spec, image.Pt(50, 60))
 	clickMenuEntry(t, env, "Buy")
 	if len(*cmds) != 1 {
 		t.Fatalf("enabled Buy emitted %v, want the single CmdBuy", *cmds)
@@ -391,7 +391,7 @@ func TestRowSpecMenuShape(t *testing.T) {
 	}
 	// Empty spec: no popup at all.
 	env.Menu().Close()
-	env.OpenRowMenu(widgets.RowSpec{}, image.Pt(0, 0))
+	widgets.OpenRowMenu(env, env, widgets.RowSpec{}, image.Pt(0, 0))
 	if env.Menu().IsOpen() {
 		t.Error("an empty spec opened a menu")
 	}
@@ -403,7 +403,7 @@ func TestRowSpecMenuShape(t *testing.T) {
 	if len(entries) != 1 || entries[0].Label != "Show Info" || !entries[0].Bold || !entries[0].Disabled {
 		t.Fatalf("unresolvable spec = %+v, want one grayed Show Info", entries)
 	}
-	env.OpenRowMenu(gone, image.Pt(10, 10))
+	widgets.OpenRowMenu(env, env, gone, image.Pt(10, 10))
 	clickMenuEntry(t, env, "Show Info")
 	if env.InfoWindow().IsOpen() {
 		t.Error("a grayed Show Info opened the window")

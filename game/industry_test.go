@@ -152,8 +152,8 @@ func TestManufacturingKeyDocumented(t *testing.T) {
 		t.Fatalf("manufacturing bindings = %d, want exactly 1", found)
 	}
 	// The help rows derive from KeyMap (one row per binding).
-	if len(helpRows()) != len(KeyMap) {
-		t.Fatalf("help rows = %d, want %d", len(helpRows()), len(KeyMap))
+	if len(helpRowsFor(nil)) != len(KeyMap) {
+		t.Fatalf("help rows = %d, want %d", len(helpRowsFor(nil)), len(KeyMap))
 	}
 }
 
