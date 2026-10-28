@@ -131,6 +131,7 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | `ship-hauler` | Furmek | **Furdžan** | Polish | carter, weathered past *furman*; the workhorse hauler |
 | `ship-npc-hauler` | Taborek | **Tobřek** | Polish | wagon train, weathered past *tabor*; civilian convoy freighter. Overview role labels documented in [../GAMEPLAY.md](../GAMEPLAY.md) ride along in the content pass |
 | `ship-npc-patrol` | Custor | **Kuštor** | Latinate | guardian, weathered past Latin *custos* (classical *-or* shape kept); charter patrol cutter. Same caveat as `ship-npc-hauler` |
+| `ship-npc-miner` | — | **Kutřek** | Moravian | digging barge, weathered past Czech *kutat* "to dig"; civilian belt miner hull, shipped 2026-10-28 with `npc-miner-barge` |
 | `ship-rat-scuttler` | Scuttler | Scuttler | Old Works | caste name retained (canon); description says "corsair skiff" — machine framing in the content pass |
 | `ship-rat-marauder` | Marauder | Marauder | Old Works | caste name retained (canon); description says "corsair gunship" — same pass |
 | `ship-rat-hierarch` | Hierarch | Hierarch | Old Works | caste name retained (canon); description implies a human "crew" — same pass |
@@ -222,6 +223,7 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
 | `npc-guard-patrol` | Patrol | keep | trade | role label; its `faction` string is renamed below |
+| `npc-miner-barge` | — | **Kutřek** | Moravian | digging barge, weathered past Czech *kutat* "to dig"; civilian belt miner (Dvužek), shipped 2026-10-28 |
 | `npc-rat-scuttler` | Scuttler | Scuttler | Old Works | caste name retained (canon) |
 | `npc-rat-marauder` | Marauder | Marauder | Old Works | caste name retained (canon) |
 | `npc-rat-hierarch` | Hierarch | Hierarch | Old Works | caste name retained (canon) |
@@ -254,6 +256,7 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | `npcs/guards.json` `faction` | Loomfall Security | **Charter Authority** | Latinate | full form "Far Moravia Charter Authority" ([FACTIONS.md](FACTIONS.md#the-charter-authority)) |
 | `npcs/rats.json` `faction` (Scuttler, Marauder) | Mire Corsairs | **Old Works** | Old Works | two placeholder strings collapse into one faction |
 | `npcs/rats.json` `faction` (Hierarch) | Gloam Hierarchy | **Old Works** | Old Works | same |
+| `npcs/miners.json` `faction` | — | **Dvužek** | Moravian | corp roster name reused as a faction string (see the corporations table); the extraction/barging house its miners belong to |
 
 `traffic/*.json` carry no display names (keyed by system id) and need no row.
 
