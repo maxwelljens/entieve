@@ -26,6 +26,7 @@ library. **Unit tests use only the standard `testing` package.**
 |---------------|----------------|
 | `core/`       | Deterministic math (`Vec2`) and PRNG (`RNG`, SplitMix64). |
 | `ecs/`        | Minimal deterministic ECS: `World`, `Entity`, `Store[T]`. |
+| `docstore/`   | Leaf document store (stdlib only, no game imports): the one tolerant reader (`ErrMissing` / `ErrFormat` / `ErrVersion`, versioned or plain documents) and atomic writer (exact `MarshalIndent` bytes → dot-hidden `.<doc>.<random>.tmp` in the same directory, chmod 0644, fsync, rename) for the JSON documents beside a save. Paths, version numbers and migrations stay in `game`. |
 | `content/`    | Data schema (`model.go`), the station service vocabulary (`services.go`: ids, labels, icons, windows), JSON loading (`load.go`), cross-reference validation (`validate.go`), embedded game data (`data/`). |
 | `sim/`        | The deterministic game simulation: components, commands, events, systems. Headless — never imports Ebitengine. |
 | `render/`     | Draws `sim` state: starfield, grid, ships (vector art), brackets, effects. |
@@ -38,6 +39,7 @@ Dependency direction (never invert):
 ```
 cmd/entieve → game → {render, uikit} → sim → content → (core, ecs)
                           └────────────→ content
+game → docstore (leaf; stdlib only)
 ```
 
 `sim` is fully playable/testable with no window: an AI agent drives the game

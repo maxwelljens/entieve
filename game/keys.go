@@ -1,11 +1,9 @@
 package game
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 
+	"github.com/entieve/entieve/docstore"
 	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -35,6 +33,10 @@ import (
 // load reproduces the same state.
 
 const keysVersion = 1
+
+// keysReadFrom is the oldest sidecar version readKeys accepts: version 1 is
+// the only format this file has ever had.
+const keysReadFrom = 1
 
 // binding is one live key combination: the key plus whether Shift must be
 // held (Shift+Tab and Shift+L are defaults).
@@ -187,15 +189,8 @@ func (g *Game) loadKeys() {
 	for id, b := range defaultBinds {
 		g.binds[id] = b
 	}
-	data, err := os.ReadFile(g.keysPath())
-	if err != nil {
-		return
-	}
 	var f keysFile
-	if err := json.Unmarshal(data, &f); err != nil {
-		return
-	}
-	if f.Version < 1 || f.Version > keysVersion {
+	if err := docstore.Versioned(g.keysPath(), keysVersion, keysReadFrom).Load(&f); err != nil {
 		return
 	}
 	// Explicit unbound entries first, then the bindings: each stored key
@@ -245,20 +240,9 @@ func (g *Game) writeKeys() error {
 		f.Binds[a.ID] = &keyBind{Key: cur.Key.String(), Shift: cur.Shift}
 	}
 	if len(f.Binds) == 0 {
-		if err := os.Remove(g.keysPath()); err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		return nil
+		return docstore.Versioned(g.keysPath(), keysVersion, keysReadFrom).Remove()
 	}
-	data, err := json.MarshalIndent(f, "", "  ")
-	if err != nil {
-		return err
-	}
-	path := g.keysPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o644)
+	return docstore.Versioned(g.keysPath(), keysVersion, keysReadFrom).Save(f)
 }
 
 // resetKeys restores every default and clears the sidecar.
@@ -268,7 +252,7 @@ func (g *Game) resetKeys() {
 		g.binds[id] = b
 	}
 	g.cancelCapture()
-	if err := os.Remove(g.keysPath()); err != nil && !os.IsNotExist(err) {
+	if err := docstore.Versioned(g.keysPath(), keysVersion, keysReadFrom).Remove(); err != nil {
 		g.report(err, "")
 	}
 	g.refreshHelp()

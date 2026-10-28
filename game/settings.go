@@ -1,11 +1,9 @@
 package game
 
 import (
-	"encoding/json"
 	"math"
-	"os"
-	"path/filepath"
 
+	"github.com/entieve/entieve/docstore"
 	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -98,12 +96,8 @@ func (g *Game) loadSettings() {
 	g.uiScale, g.fullscreen, g.vsync, g.railCollapsed = defaultUIScale, false, true, false
 	g.masterVol, g.musicVol, g.uiVol, g.shuffle = defaultMasterVolume, defaultMusicVolume, defaultUIVolume, defaultShuffle
 	g.winW, g.winH = 0, 0
-	data, err := os.ReadFile(g.settingsPath())
-	if err != nil {
-		return
-	}
 	var f settingsFile
-	if err := json.Unmarshal(data, &f); err != nil {
+	if err := docstore.Plain(g.settingsPath()).Load(&f); err != nil {
 		return
 	}
 	if s, ok := scaleOnLadder(f.UIScale); ok {
@@ -145,15 +139,7 @@ func (g *Game) writeSettings() error {
 	if g.flushSize {
 		f.WindowW, f.WindowH = g.windowSize()
 	}
-	data, err := json.MarshalIndent(f, "", "  ")
-	if err != nil {
-		return err
-	}
-	path := g.settingsPath()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o644)
+	return docstore.Plain(g.settingsPath()).Save(f)
 }
 
 // windowSize is the size Run opens the window at: the last windowed size
@@ -379,7 +365,7 @@ func (g *Game) resetAllSettings() {
 // and placeDefaults re-slots them for the current screen. Open/closed
 // flags of this session are untouched — only geometry resets.
 func (g *Game) resetLayout() {
-	if err := os.Remove(g.layoutPath()); err != nil && !os.IsNotExist(err) {
+	if err := docstore.Versioned(g.layoutPath(), layoutVersion, layoutReadFrom).Remove(); err != nil {
 		g.report(err, "")
 		return // a failed clear must not half-apply
 	}

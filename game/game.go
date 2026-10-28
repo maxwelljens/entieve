@@ -6,7 +6,6 @@
 package game
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -19,6 +18,7 @@ import (
 	enuiinput "github.com/ebitenui/ebitenui/input"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/docstore"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
@@ -1118,15 +1118,9 @@ func (g *Game) SaveGame() error {
 	if err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(save, "", "  ")
-	if err != nil {
-		return err
-	}
-	path := g.activeSavePath()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	// Plain, never version-gated: schema 3 belongs to sim.Save (legacy v2
+	// saves must still reach sim.Restore).
+	if err := docstore.Plain(g.activeSavePath()).Save(save); err != nil {
 		return err
 	}
 	return g.writeLayout()
@@ -1167,13 +1161,8 @@ func (g *Game) nextSavePath() string {
 // stay open; the log history is carried across the rebuild). The saved
 // window layout is restored after the rebuild, over the fresh defaults.
 func (g *Game) LoadGame() error {
-	path := g.activeSavePath()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
 	var save sim.Save
-	if err := json.Unmarshal(data, &save); err != nil {
+	if err := docstore.Plain(g.activeSavePath()).Load(&save); err != nil {
 		return err
 	}
 	// The log is not part of the save: capture it before the rebuild and
