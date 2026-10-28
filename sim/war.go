@@ -462,6 +462,52 @@ func warProfileTier(sq float64, n int) int {
 	return idx
 }
 
+// squeezeCaste shifts one authored Old Works rat's caste toward the tougher
+// entries of the authored palate as the squeeze rises — one caste per squeeze
+// step, the very ladder the fallen-system holding force climbs. This is the
+// grid half of the curve: every authored spawn anywhere (belt conjure,
+// anomaly, respawn replacement) stiffens with the Works' map, and at the
+// tick-0 share (squeeze 1) it is exactly the authored id. Only the rat family
+// is re-drawn (a belt's ambient furniture: the guards' sweeps key on
+// npc-rat-*) and no stat is edited — the curve picks among what content ships.
+func (s *Sim) squeezeCaste(id content.NpcID) content.NpcID {
+	def, ok := s.Content.Npc(id)
+	if !ok || def.Faction != factionOldWorks || !isRatNpc(def) {
+		return id
+	}
+	castes := ratCastes(s.Content)
+	at := len(castes)
+	for i := range castes {
+		if castes[i] == id {
+			at = i
+			break
+		}
+	}
+	if at == len(castes) {
+		return id // not on the palate: leave the authored id alone
+	}
+	// shortcut: the squeeze is astronomic at the Works floor (float64 → int
+	// would overflow), so clamp it to the palate length before converting.
+	step := int(math.Min(s.Squeeze(), float64(len(castes)))) - 1
+	if step < 0 {
+		step = 0
+	}
+	return castes[max(at-step, 0)]
+}
+
+// ratCastes is the authored Old Works rat palate, toughest first: the ambient
+// spawn's slice of warWorksCastes (a Works hull that is not a belt rat keeps
+// its authored spawn semantics).
+func ratCastes(c *content.Content) []content.NpcID {
+	var out []content.NpcID
+	for _, id := range warWorksCastes(c) {
+		if def, ok := c.Npc(id); ok && isRatNpc(def) {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
 // warWorksCastes ranks the authored Old Works hulls by toughness (total hit
 // points, ties by id ascending) — the deterministic palate the holding force
 // and the fleets are drawn from. No stat is edited: the war only picks winners

@@ -80,6 +80,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   modules gain a concrete, dry second line — welds, oversize holds, the
   refinery's arithmetic. Mechanical one-liners stay mechanical; no field, no
   schema and no layout changed.
+- **Every Works fight now scales with the squeeze** (`sim`): the grid half of
+  the Long Attrition's one global curve lands. As the Old Works lose systems,
+  every authored Works spawn anywhere on the grid — a charter belt's rats, a
+  works-held belt, the Gnazvor anomaly, and a respawn replacement — shifts one
+  caste toward the tougher ones per squeeze step: Scuttlers become Marauders,
+  Marauders Hierarchs, and the Works at their last system field Hierarchs
+  everywhere. No content stat is touched: the curve only picks among the hulls
+  content already ships, and the spawn count stays as authored. At the tick-0
+  share the mix is exactly the old authored one, so nothing changes until the
+  Works actually lose ground. A scaled hull remembers its spawn group, so its
+  replacement re-arms the authored timer and buys its own hull — the curve
+  never compounds.
 
 - **War news in the house voice** (`sim`): the five log lines read "Supply —
   5 x Capacitor Booster Cell to Kvonice (4,995.00 €)", "Contested — Kvonice

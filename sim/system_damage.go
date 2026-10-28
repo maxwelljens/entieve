@@ -289,12 +289,16 @@ func (s *Sim) recordRespawn(e ecs.Entity, ai *NpcAI) {
 	if celDef == nil {
 		return
 	}
-	sec := respawnSecOf(celDef, ai.Npc)
+	npc := ai.Npc
+	if ai.Authored != "" {
+		npc = ai.Authored // a squeeze-scaled hull re-arms the authored group
+	}
+	sec := respawnSecOf(celDef, npc)
 	if sec <= 0 {
 		return
 	}
 	s.respawns = append(s.respawns, RespawnTimer{
-		System: s.systemID, Cel: celDef.ID, Npc: ai.Npc, At: s.time + sec,
+		System: s.systemID, Cel: celDef.ID, Npc: npc, At: s.time + sec,
 	})
 }
 

@@ -268,7 +268,7 @@ func (s *Sim) spawnGroup(cel *content.CelestialDef, sp content.SpawnDef, pending
 			owed--
 			continue
 		}
-		s.spawnNpc(sp.NpcID, cel.Position, celestialSpread(cel))
+		s.spawnSqueezed(sp.NpcID, cel.Position, celestialSpread(cel))
 	}
 }
 
@@ -345,6 +345,22 @@ func (s *Sim) spawnAsteroid(cel *content.CelestialDef, rock BeltRock, index int)
 // rng_roles_test.go); the Fork seed below only reads the master state.
 func (s *Sim) spawnNpc(id content.NpcID, celPos core.Vec2, spread float64) ecs.Entity {
 	return s.spawnNpcStream(id, celPos, spread, s.RNG)
+}
+
+// spawnSqueezed conjures one authored spawn-group member with the caste the
+// global squeeze asks for (squeezeCaste), remembering the authored id so a
+// replacement re-arms the authored group rather than the scaled caste.
+func (s *Sim) spawnSqueezed(id content.NpcID, celPos core.Vec2, spread float64) ecs.Entity {
+	caste := s.squeezeCaste(id)
+	e := s.spawnNpc(caste, celPos, spread)
+	if e.IsZero() || caste == id {
+		return e
+	}
+	if ai, ok := s.AIs.Get(e); ok {
+		ai.Authored = id
+		s.AIs.Set(e, *ai)
+	}
+	return e
 }
 
 // spawnNpcStream is spawnNpc drawing its spawn scatter from the given RNG

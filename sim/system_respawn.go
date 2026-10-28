@@ -79,7 +79,9 @@ func (s *Sim) respawnTimer(t RespawnTimer) bool {
 	if cel == nil {
 		return false // the celestial no longer exists: drop the timer
 	}
-	def, ok := s.Content.Npc(t.Npc)
+	// The replacement lands the caste the global squeeze asks for; the
+	// authored group (t.Npc) still owns the cadence and re-arms next death.
+	def, ok := s.Content.Npc(s.squeezeCaste(t.Npc))
 	if !ok {
 		return false
 	}
@@ -116,7 +118,7 @@ func (s *Sim) respawnTimer(t RespawnTimer) bool {
 	// count are unchanged. Respawn still SPEAKS at timer time ("respawned
 	// near …"); the hull is simply still in warp when it does.
 	insert := core.Vec2{X: WarpMinRange}
-	e := s.spawnNpc(t.Npc, cel.Position.Add(insert), celestialSpread(cel))
+	e := s.spawnNpc(def.ID, cel.Position.Add(insert), celestialSpread(cel))
 	if e.IsZero() {
 		return false
 	}
@@ -126,6 +128,9 @@ func (s *Sim) respawnTimer(t RespawnTimer) bool {
 	}
 	if ai, ok := s.AIs.Get(e); ok {
 		ai.Home = cel.Position // the anchor, not the off-grid insertion point
+		if def.ID != t.Npc {
+			ai.Authored = t.Npc // a scaled replacement re-arms the authored group
+		}
 	}
 	// The hull carries exactly what the requisition bought — the free
 	// default grant is replaced, possibly by no charges at all.
