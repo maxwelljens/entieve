@@ -788,6 +788,83 @@ the destination once more (or set the system you are already in) to clear
 it. Destination, selection and hover are session-only view state — they
 are never saved and never command your ship.
 
+**The starmap also carries the war** (see *The Long Attrition* below).
+Every node shows who holds it — **filled** while the Charter holds the
+system, a **hollow outline** once the Old Works take it — and a system on
+the **front** wears an outer blue ring. The top-right corner is the war
+key, ending with the **war treasury**: the corporate fleets' balance, the
+war's health, in one line. The selected system's card adds its holder
+("Held — the charter" or "Held — the Old Works") and, on the front, the
+meter — "Contested — the Works press at 42%" where the Works are eroding a
+charter hold, "Contested — the charter pushes at 42%" where the charter is
+pushing a Works system back. In a world without a war the map shows none
+of it.
+
+## The Long Attrition
+
+Out past the charter's paperwork, the **Old Works** hold their ground and
+the corporations want it back. Under the **Commission** — the weak
+confederation that binds the corporations, Swiss-canton style — they raise
+and crew **corporate fleets** and send them at the Works. It has been going
+on for years and it will go on for years: the **Long Attrition** is the
+weather of the Wild Fields, not a campaign with a last battle.
+
+**Control and the front.** Every system in the Wild Fields belongs to one
+side or the other — the charter (Struvok, Rydnok, Kvonice, Młondan,
+Kamžal) or the Old Works (Pušťov, Glůšan) — and the war only moves where
+the two sides touch across a gate: the **front**. Every system on the front
+carries a **contest meter**. Supply delivered to the war and Works hulls
+you kill push it one way; the Works' own pressure grinds it the other. At
+the threshold the system **flips**: a charter world falls to the Works, or
+a Works world is reclaimed. Flips are deliberately rare — an unsupplied
+front takes days to fall, and the fronts at Kvonice and Kamžal have been
+holding for a long time — so most of the time the war is a meter moving by
+a few percent, and the news stays quiet.
+
+**The squeeze.** Every system the Works lose makes the rest of the Works
+stiffer — exponentially. Their pressure on the front rises, the force they
+land when they take a system comes tougher and heavier, and it never gets
+easier. That is the equilibrium: a cornered Works is not a dying Works.
+Their last system is, for all practical purposes, unbreakable. The charter
+has no such protection — its fronts hold only while the economy feeds them
+supply. **Starve the war and the charter loses ground.**
+
+**Remnants.** When a system falls under you, nothing evicts you and nothing
+closes your dock. The station becomes a **remnant**: market and repair stay
+open (lawless), while industry, fitting and the contract desk go dark until
+someone reclaims the system. The charter's guards and patrols are gone
+outright, the belts are Works ground, and any manufacturing job already
+running finishes and can be collected — paid work is paid work. A reclaim
+puts the authored services back.
+
+**Selling to the war.** The corporate fleets buy **everything military** —
+guns, EWAR, tank modules, every line of ammo and charges — on **every
+charter station's book**, at a standing bid priced just under the best ask.
+Sell into it and you are paid immediately, like any other sale: the goods
+are consumed by the war, and the value is credited to the nearest front on
+the next war beat (the haul is abstract — there is no convoy to escort or
+wait for). **Your earnings are the feedback** — the war never posts you a
+score. Works-held systems buy nothing: a remnant's book carries no war
+demand.
+
+**War contracts.** Front staging and raiding boards carry commissioned
+work — hauling materiel to front staging and killing Works hulls at the
+front — gated on standing like every other contract. The flavour line names
+the Commission; the board and its pay are ordinary station work.
+
+**In the log.** The war speaks through the same log lines as everything
+else: "Fall — Kvonice lost to the Old Works", "Reclaimed — Pušťov returns
+to the charter", "Contested — Kamžal holds at 42%", "The war takes 100 x
+…" when your goods go to the front, "Works Marauder destroyed at the
+front" for your kills, "Front skirmish — …" for a fleet action you witness.
+
+**Reading the war.** The war treasury in the starmap's key is the war's
+health: fees from every market trade feed it, and it pays for everything
+the fleets buy. A full treasury means a supplied front and a war that can
+push; a thin one means the charter is living off its losses. Watch the
+treasury, the ringed fronts and the hollow nodes — those three read the
+whole war.
+
 ## Living universe
 
 The systems keep moving while you do something else. Overlapping systems
