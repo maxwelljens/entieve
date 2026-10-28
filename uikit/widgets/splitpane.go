@@ -52,6 +52,8 @@ type SplitPane struct {
 	startUpper int // leading pane's extent at the press, px
 	pairPx     int // the grabbed pair's combined extent at the press, px
 	availPx    int // the stack's split extent (without the seams) at the press
+
+	ptr *Pointer // the frame Poll was last given (its cursor claims land here)
 }
 
 // SplitPane metrics in DESIGN units (theme.Px at every measure). The
@@ -245,11 +247,12 @@ func (s *SplitPane) Reset() {
 	s.root.RequestRelayout()
 }
 
-// Poll advances one frame of seam dragging from the live cursor and the
-// left button. The screen calls it from Sync, before Kit.Update.
-func (s *SplitPane) Poll() {
-	x, y := PollCursor()
-	s.Step(image.Pt(x, y), PressEdge(ebiten.MouseButtonLeft), splitHeld())
+// Poll advances one frame of seam dragging from the frame's pointer and
+// the left button. The screen calls it from Sync, before Kit.Update; the
+// frame it was polled with is the one its cursor claims land on.
+func (s *SplitPane) Poll(p *Pointer) {
+	s.ptr = p
+	s.Step(p.At(), p.Press(Left), p.Down(Left))
 }
 
 // Step is Poll's testable core: a rising press in a seam's grab band
@@ -333,8 +336,7 @@ func (s *SplitPane) seamAt(p image.Point) int {
 	if !root.IsVisible() {
 		return -1
 	}
-	if l := root.EffectiveInputLayer(); l == &input.DefaultLayer ||
-		!l.ActiveFor(p.X, p.Y, input.LayerEventTypeWheel) {
+	if !OwnsAt(root, p, input.LayerEventTypeWheel) {
 		return -1
 	}
 	// The grab band is 8 px total, centred on the track (the track counts
@@ -438,28 +440,14 @@ func (s *SplitPane) sizes(avail int) []int {
 	return out
 }
 
-// splitHeld reads the left button state for the drag. The indirection is
-// the test seam: headless tests cannot press a real button (the
-// pressEdge/pollCursor precedent).
-var splitHeld = func() bool { return ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) }
-
-// SetSplitHeldForTest overrides the seam drag's button read for a
-// headless test and returns a restore func. Test-only seam: never call
-// it from production code.
-func SetSplitHeldForTest(f func() bool) func() {
-	prev := splitHeld
-	splitHeld = f
-	return func() { splitHeld = prev }
-}
-
-// setCursor claims the seam's cursor: NS over a stack's horizontal seam,
-// EW over a row's vertical one. It only declares the shape — the kit's
-// single ApplyCursor writes it after the chrome pass, so a window grip
-// still wins in its own band.
+// setCursor claims the seam's cursor on the frame it last polled with: NS
+// over a stack's horizontal seam, EW over a row's vertical one. It only
+// declares the shape — the frame's single Apply writes it after the chrome
+// pass, so a window grip still wins in its own band.
 func (s *SplitPane) setCursor() {
 	shape := ebiten.CursorShapeNSResize
 	if s.row {
 		shape = ebiten.CursorShapeEWResize
 	}
-	ClaimCursor(shape)
+	s.ptr.ClaimShape(shape)
 }

@@ -38,7 +38,7 @@ func (f *fakeUISound) SetVolume(master, ui float64) {
 
 // newUISoundGame builds the showcase session on savePath with an injected
 // UI cue seam.
-func newUISoundGame(t *testing.T, savePath string, u UISound) *Game {
+func newUISoundGame(t *testing.T, savePath string, u UISound, ptr ...*widgets.Pointer) *Game {
 	t.Helper()
 	c, err := content.Load(content.FS())
 	if err != nil {
@@ -48,7 +48,7 @@ func newUISoundGame(t *testing.T, savePath string, u UISound) *Game {
 	if !ok {
 		t.Fatal("world-showcase missing")
 	}
-	g, err := New(Options{Content: c, World: wd, Seed: 42, SavePath: savePath, UISound: u})
+	g, err := New(Options{Content: c, World: wd, Seed: 42, SavePath: savePath, UISound: u, Pointer: firstPointer(ptr)})
 	if err != nil {
 		t.Fatalf("game.New: %v", err)
 	}

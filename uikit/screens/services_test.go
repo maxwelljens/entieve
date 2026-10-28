@@ -25,7 +25,7 @@ func newServicesView(t *testing.T, inner int, services []string) (*Services, *re
 		station: widgets.StationInfo{Name: "Jalvrek", System: "Genesis", Services: services},
 	}
 	sink := &recordingSink{}
-	env := widgets.NewSeams(th, cv, sink)
+	env := widgets.NewSeams(th, cv, sink, nil)
 	c := newChromeUI(env)
 	s := NewServices(env, inner)
 	c.AddPanel(s.Container(), s)

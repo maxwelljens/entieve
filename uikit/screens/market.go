@@ -105,6 +105,7 @@ type Market struct {
 	th  theme.Theme
 	cv  widgets.ContentView
 	as  widgets.ActionSink
+	ptr *widgets.Pointer
 	win *widget.Window
 
 	tbl   *widgets.Table
@@ -597,7 +598,7 @@ func mktJoin(rows []widgets.TableRow, blocks [][]widgets.TableRow) {
 // it on a Kit with Kit.AddWindow and call Sync every frame.
 func NewMarket(env widgets.Seams) *Market {
 	m := &Market{
-		th: env, cv: env, as: env,
+		th: env, cv: env, as: env, ptr: env.Pointer(),
 		items:    marketCatalog(env),
 		open:     map[content.ItemID]bool{},
 		expanded: map[string]bool{"": true},
@@ -915,7 +916,7 @@ func (m *Market) Dismissed() {
 // Sync refreshes the rows, the tree and the docked gating from the
 // simulation. Call it every frame before Kit.Update.
 func (m *Market) Sync() {
-	m.split.Poll()
+	m.split.Poll(m.ptr)
 	orders := m.orders()
 	sortBookOrders(orders)
 	// Trades only happen docked at a station — the same gate feeds the
@@ -1270,7 +1271,7 @@ func (m *Market) orderRow(o sim.MarketStock, gated bool) *widgets.StackRow {
 			{Label: "Cancel", Disabled: gated, Intent: widgets.CancelOrder{ID: o.ID}},
 		}},
 	}
-	return widgets.NewStackRow(widgets.NewSeams(m.th, m.cv, m.as), row, m.th.Face(theme.StepSmall))
+	return widgets.NewStackRow(widgets.NewSeams(m.th, m.cv, m.as, m.ptr), row, m.th.Face(theme.StepSmall))
 }
 
 // scrollMine turns wheel notches into the My orders viewport's offset:

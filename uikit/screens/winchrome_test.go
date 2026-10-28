@@ -197,6 +197,18 @@ func (f *fakeMouse) MouseButtonJustReleased(b ebiten.MouseButton) bool {
 	return b == ebiten.MouseButtonLeft && f.justUp
 }
 
+// fakeMouse is also a widgets.Source: a kit built over it reads the same
+// script for its pointer frame that ebitenui's widgets read from the
+// CursorUpdater seam (see mouseKit).
+func (f *fakeMouse) Cursor() (int, int) { return f.x, f.y }
+func (f *fakeMouse) Down(b widgets.Button) bool {
+	return b == widgets.Left && f.pressed
+}
+func (f *fakeMouse) JustPressed(b widgets.Button) bool {
+	return b == widgets.Left && f.justDown
+}
+func (f *fakeMouse) SetShape(ebiten.CursorShapeType) {}
+
 // at moves the scripted cursor (frame N-1 state must be settled first).
 func (f *fakeMouse) at(x, y int) { f.x, f.y = x, y }
 
@@ -418,8 +430,8 @@ func TestAddWindowChromeIsIdempotent(t *testing.T) {
 // the first one's grips — the old package-global registry was cleared by
 // every NewKit, silently killing the first kit's windows.
 func TestTwoKitsKeepTheirOwnGrips(t *testing.T) {
-	k1, _ := newTestKit(t)
 	fm := useFakeMouse(t)
+	k1, _ := newTestKitWith(t, widgets.NewPointer(fm))
 	log1 := NewLog(k1.Env())
 	k1.AddWindow(log1.Win())
 	log1.Win().SetLocation(image.Rect(10, 430, 10+logDefaultW, 430+logDefaultH))
@@ -456,8 +468,8 @@ func TestTwoKitsKeepTheirOwnGrips(t *testing.T) {
 // under a still-held button and no ResizeEvent ever fires. The registry
 // entry goes with the unmount, so the window is not pumped any more.
 func TestUnmountMidDragLeavesNoSideEffects(t *testing.T) {
-	k, _ := newTestKit(t)
 	fm := useFakeMouse(t)
+	k, _ := newTestKitWith(t, widgets.NewPointer(fm))
 	log := NewLog(k.Env())
 	win := log.Win()
 	remove := k.AddWindow(win)
@@ -560,8 +572,8 @@ func dragAt(t *testing.T, k *Kit, fm *fakeMouse, win *widget.Window, from image.
 // the press is no longer swallowed; the cases below still pin that every
 // edge and corner resizes exactly like the pure resizeRect math.
 func TestOverviewLogEdgeGripsResize(t *testing.T) {
-	k, _ := newTestKit(t)
 	fm := useFakeMouse(t)
+	k, _ := newTestKitWith(t, widgets.NewPointer(fm))
 	log := NewLog(k.Env())
 	k.AddWindow(log.Win())
 	// Park the Selected Item window clear of both test windows so the
@@ -737,8 +749,8 @@ func TestRowClickNearGripEdgeDoesNotResize(t *testing.T) {
 // TestTopmostWindowWinsGrip: two windows' grip bands overlap at the same
 // pixel; only the topmost one (the later AddWindow) may start a resize.
 func TestTopmostWindowWinsGrip(t *testing.T) {
-	k, _ := newTestKit(t)
 	fm := useFakeMouse(t)
+	k, _ := newTestKitWith(t, widgets.NewPointer(fm))
 	log := NewLog(k.Env())
 	k.AddWindow(log.Win())
 	pumpKit(t, k, 1024, 700)
@@ -807,8 +819,8 @@ func TestGripBandScalesWithUI(t *testing.T) {
 // on the four corners (left+top / right+bottom NWSE, right+top /
 // left+bottom NESW) — while hovering, while the press is held (armed)
 // and while the drag is in flight (active). The chrome only declares the
-// shape; the kit's single ApplyCursor writes it through the shared seam,
-// so the assertion needs no OS cursor.
+// shape; the frame's single Apply writes it through the source, so the
+// assertion needs no OS cursor.
 func TestResizeGripCursorShapes(t *testing.T) {
 	win, ch := newChromeTestWindow(t)
 	rect := win.GetContainer().GetWidget().Rect
@@ -816,10 +828,12 @@ func TestResizeGripCursorShapes(t *testing.T) {
 		t.Fatalf("fixture: window never laid out (%v)", rect)
 	}
 
-	var got ebiten.CursorShapeType
-	writes := 0
-	restore := widgets.SetCursorShapeForTest(func(s ebiten.CursorShapeType) { got, writes = s, writes+1 })
-	defer restore()
+	src := &scriptPointer{}
+	ch.ptr = widgets.NewPointer(src)
+	claim := func() { // one frame's Update: sample, step, the one write
+		src.shape, src.writes = ebiten.CursorShapeDefault, 0
+		ch.ptr.Begin()
+	}
 
 	midY := (rect.Min.Y + rect.Max.Y) / 2
 	midX := (rect.Min.X + rect.Max.X) / 2
@@ -843,44 +857,44 @@ func TestResizeGripCursorShapes(t *testing.T) {
 		}
 
 		// Idle hover: the band claims its own shape.
-		got, writes = 0, 0
+		claim()
 		ch.step(c.p, false)
-		widgets.ApplyCursor()
-		if writes == 0 || got != c.want {
-			t.Errorf("%s: hover cursor = %v (%d writes), want %v", c.name, got, writes, c.want)
+		ch.ptr.Apply()
+		if src.writes == 0 || src.shape != c.want {
+			t.Errorf("%s: hover cursor = %v (%d writes), want %v", c.name, src.shape, src.writes, c.want)
 		}
 
 		// Pressed and held without moving (armed): the shape stays up.
-		got, writes = 0, 0
+		claim()
 		ch.step(c.p, true) // rising edge: arms the grip
 		ch.step(c.p, true) // held, cursor unmoved
-		widgets.ApplyCursor()
-		if writes == 0 || got != c.want {
-			t.Errorf("%s: held cursor = %v (%d writes), want %v", c.name, got, writes, c.want)
+		ch.ptr.Apply()
+		if src.writes == 0 || src.shape != c.want {
+			t.Errorf("%s: held cursor = %v (%d writes), want %v", c.name, src.shape, src.writes, c.want)
 		}
 		ch.step(c.p, false) // release without a drag: a click, state resets
 	}
 
 	// Dragging: the active branch keeps the shape while the rect follows.
 	corner := image.Point{rect.Max.X - 2, rect.Max.Y - 2}
+	claim()
 	ch.step(corner, true)
-	got, writes = 0, 0
+	src.shape, src.writes = ebiten.CursorShapeDefault, 0
 	ch.step(corner.Add(image.Point{20, 20}), true)
-	widgets.ApplyCursor()
-	if writes == 0 || got != ebiten.CursorShapeNWSEResize {
+	ch.ptr.Apply()
+	if src.writes == 0 || src.shape != ebiten.CursorShapeNWSEResize {
 		t.Errorf("dragging the bottom-right corner: cursor = %v (%d writes), want %v",
-			got, writes, ebiten.CursorShapeNWSEResize)
+			src.shape, src.writes, ebiten.CursorShapeNWSEResize)
 	}
 	ch.step(corner.Add(image.Point{20, 20}), false)
 
 	// Clear of every band the chrome claims nothing: the pass's write
 	// falls back to the default arrow (the chrome runs inside Draw, so a
 	// body hover claims nothing there either).
-	got, writes = 0, 0
-	widgets.BeginCursorFrame()
+	claim()
 	ch.step(image.Point{midX, midY}, false)
-	widgets.ApplyCursor()
-	if got != ebiten.CursorShapeDefault {
-		t.Errorf("body hover claimed %v, want the default arrow", got)
+	ch.ptr.Apply()
+	if src.shape != ebiten.CursorShapeDefault {
+		t.Errorf("body hover claimed %v, want the default arrow", src.shape)
 	}
 }

@@ -23,23 +23,26 @@ import (
 // unit under test here; the real input path (rail over a window) is
 // pinned game-side in TestRailClicksWinOverAWindowUnderneath.
 
-// raiseMouse scripts the two raw reads the raise polls. btn narrows the
-// edge to one button (any = both).
+// raiseMouse scripts the pointer frame the raise polls. btn narrows the
+// edge to one button (widgets.Left = both, unless only is set).
 type raiseMouse struct {
 	x, y int
 	edge bool
-	btn  ebiten.MouseButton // MouseButton(0) = left: the seam reports it when edge is armed for every button
+	btn  widgets.Button // widgets.Left reports the edge for every button unless only
 	only bool
 }
 
+// raiseMouse is a widgets.Source: the kit's frame reads it.
+func (m *raiseMouse) Cursor() (int, int)       { return m.x, m.y }
+func (m *raiseMouse) Down(widgets.Button) bool { return false } // the raise reads edges only
+func (m *raiseMouse) JustPressed(b widgets.Button) bool {
+	return m.edge && (!m.only || b == m.btn)
+}
+func (m *raiseMouse) SetShape(ebiten.CursorShapeType) {}
+
 func useRaiseMouse(t *testing.T) *raiseMouse {
 	t.Helper()
-	m := &raiseMouse{}
-	t.Cleanup(widgets.SetPressEdgeForTest(func(b ebiten.MouseButton) bool {
-		return m.edge && (!m.only || b == m.btn)
-	}))
-	t.Cleanup(widgets.SetPollCursorForTest(func() (int, int) { return m.x, m.y }))
-	return m
+	return &raiseMouse{}
 }
 
 // press fires one scripted press edge at pt and runs one kit frame.
@@ -48,6 +51,7 @@ func press(t *testing.T, k *Kit, m *raiseMouse, pt image.Point) {
 	m.x, m.y = pt.X, pt.Y
 	m.edge = true
 	defer func() { m.edge = false }()
+	k.Pointer().Begin() // the host's sample for this frame
 	if err := k.Update(); err != nil {
 		t.Fatalf("Update at %v: %v", pt, err)
 	}
@@ -59,9 +63,9 @@ func press(t *testing.T, k *Kit, m *raiseMouse, pt image.Point) {
 // and the overview-only point, overlap point and title/grip points the
 // cases drive (derived from the live rects, so they stay inside at any
 // scale).
-func raiseFixture(t *testing.T) (k *Kit, ov, overlap, title, grip image.Point) {
+func raiseFixture(t *testing.T, m *raiseMouse) (k *Kit, ov, overlap, title, grip image.Point) {
 	t.Helper()
-	k, _ = newTestKit(t)
+	k, _ = newTestKitWith(t, widgets.NewPointer(m))
 	ovW, spW := k.OverviewWindow(), k.SelectedWindow()
 	ovr := ovW.GetContainer().GetWidget().Rect
 	spr := spW.GetContainer().GetWidget().Rect
@@ -98,7 +102,7 @@ func assertTop(t *testing.T, k *Kit, want *widget.Window, what string) {
 // from its own visible body. A raise never moves the window.
 func TestPressInsideWindowRaisesIt(t *testing.T) {
 	m := useRaiseMouse(t)
-	k, bodyPt, overlap, titlePt, gripPt := raiseFixture(t)
+	k, bodyPt, overlap, titlePt, gripPt := raiseFixture(t, m)
 	ov, sp := k.OverviewWindow(), k.SelectedWindow()
 	// Mount order: NewKit mounts the overview first, Selected Item on top.
 	assertTop(t, k, sp, "fixture")
@@ -152,8 +156,8 @@ func TestPressInsideWindowRaisesIt(t *testing.T) {
 // the context-menu gesture re-stacks the window it landed on.
 func TestRightPressRaises(t *testing.T) {
 	m := useRaiseMouse(t)
-	m.only, m.btn = true, ebiten.MouseButtonRight
-	k, bodyPt, _, _, _ := raiseFixture(t)
+	m.only, m.btn = true, widgets.Right
+	k, bodyPt, _, _, _ := raiseFixture(t, m)
 	ov, sp := k.OverviewWindow(), k.SelectedWindow()
 	assertTop(t, k, sp, "fixture")
 
@@ -168,7 +172,7 @@ func TestRightPressRaises(t *testing.T) {
 // the popup.
 func TestRaiseNeverFiresThroughTheMenu(t *testing.T) {
 	m := useRaiseMouse(t)
-	k, bodyPt, _, _, _ := raiseFixture(t)
+	k, bodyPt, _, _, _ := raiseFixture(t, m)
 	sp := k.SelectedWindow()
 	assertTop(t, k, sp, "fixture")
 
@@ -196,7 +200,7 @@ func TestRaiseNeverFiresThroughTheMenu(t *testing.T) {
 // clear of the rail still raises it.
 func TestTopChromeOwnsItsRect(t *testing.T) {
 	m := useRaiseMouse(t)
-	k, _, _, _, _ := raiseFixture(t)
+	k, _, _, _, _ := raiseFixture(t, m)
 	ov, sp := k.OverviewWindow(), k.SelectedWindow()
 
 	open := false
@@ -235,7 +239,7 @@ func TestTopChromeOwnsItsRect(t *testing.T) {
 // not the geometry, was holding it back).
 func TestRaiseStopsAtAModalWindow(t *testing.T) {
 	m := useRaiseMouse(t)
-	k, bodyPt, _, _, _ := raiseFixture(t)
+	k, bodyPt, _, _, _ := raiseFixture(t, m)
 	ov := k.OverviewWindow()
 
 	log := NewLog(k.Env())

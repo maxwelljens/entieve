@@ -726,7 +726,7 @@ func TestTableRichRowLineRefRoutes(t *testing.T) {
 		if om, ok := i.(OpenMenu); ok {
 			env.Menu().Open(om.Entries, om.At) // what the host's sink does
 		}
-	}))
+	}), env.Pointer())
 	ref := ItemRef("ammo-emp-s")
 	tbl, ui := newRichTable(t, seams, []TableRow{{
 		Cells: []string{"emp"},
@@ -801,7 +801,7 @@ func TestTableRichRowLineRefRoutes(t *testing.T) {
 func TestTableRichRowActionButtons(t *testing.T) {
 	env, _ := newTestEnv(t)
 	var intents []Intent
-	seams := NewSeams(env, env, SinkFunc(func(i Intent) { intents = append(intents, i) }))
+	seams := NewSeams(env, env, SinkFunc(func(i Intent) { intents = append(intents, i) }), env.Pointer())
 	tbl, ui := newRichTable(t, seams, []TableRow{{
 		Cells: []string{"cleanup"},
 		Stack: []RowLine{{Segs: []RowSeg{{Text: "Belt cleanup"}}}},

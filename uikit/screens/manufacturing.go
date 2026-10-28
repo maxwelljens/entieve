@@ -34,6 +34,7 @@ type Manufacturing struct {
 	th  theme.Theme
 	cv  widgets.ContentView
 	as  widgets.ActionSink
+	ptr *widgets.Pointer
 	win *widget.Window
 
 	recipes *widgets.Table
@@ -68,7 +69,7 @@ func (r manufacturingRow) InfoRefOf(cv widgets.ContentView) (widgets.InfoRef, bo
 // NewManufacturing builds the Manufacturing window over the shared environment. Mount
 // it on a Kit with Kit.AddWindow and call Sync every frame.
 func NewManufacturing(env widgets.Seams) *Manufacturing {
-	f := &Manufacturing{th: env, cv: env, as: env}
+	f := &Manufacturing{th: env, cv: env, as: env, ptr: env.Pointer()}
 	p := env.Pal()
 
 	recipeCols := []widgets.Column{
@@ -231,7 +232,7 @@ func canonicalFirst(key string, cols []widgets.Column) func(string, bool, []widg
 // Sync refreshes the recipe board, the job list and every gate from the
 // simulation. Call it every frame before Kit.Update.
 func (f *Manufacturing) Sync() {
-	f.split.Poll()
+	f.split.Poll(f.ptr)
 	s := f.cv
 	station := s.DockedIndustry()
 	// The board quotes one run: the chosen run count lives in the quantity

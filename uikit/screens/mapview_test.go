@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/entieve/entieve/content"
-	"github.com/entieve/entieve/uikit/widgets"
-	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // TestMapViewDrawsAndRedraws pins the graph repaint rule: first sync
@@ -123,7 +121,7 @@ func TestZoneLabel(t *testing.T) {
 
 // mapUnderTest lays the map out at 1280×720 and returns it with a screen
 // point for one node's centre and for its label band.
-func mapUnderTest(t *testing.T) (*MapView, func(content.SystemID) image.Point, func(content.SystemID) image.Point) {
+func mapUnderTest(t *testing.T) (*MapView, func(content.SystemID) image.Point, func(content.SystemID) image.Point, *testEnv) {
 	t.Helper()
 	env, _ := newChromeEnv(t)
 	m := NewMapView(env)
@@ -154,13 +152,13 @@ func mapUnderTest(t *testing.T) (*MapView, func(content.SystemID) image.Point, f
 		t.Fatalf("fixture: no node %q", id)
 		return image.Point{}
 	}
-	return m, at, label
+	return m, at, label, env
 }
 
 // TestMapViewHitTest pins the click resolution: a node's disc, its label
 // band and a point outside the graph resolve as the pointer expects.
 func TestMapViewHitTest(t *testing.T) {
-	m, at, label := mapUnderTest(t)
+	m, at, label, _ := mapUnderTest(t)
 	if id, ok := m.nodeAt(at("sys-glusza")); !ok || id != "sys-glusza" {
 		t.Errorf("nodeAt(centre) = %q,%v, want sys-glusza,true", id, ok)
 	}
@@ -172,57 +170,50 @@ func TestMapViewHitTest(t *testing.T) {
 	}
 }
 
-// TestMapViewHoverSelectDestination drives the pointer through the kit's
-// seams: hover lights a node, a press selects it, a second press sets it
+// TestMapViewHoverSelectDestination drives the pointer through the host's
+// frame: hover lights a node, a press selects it, a second press sets it
 // as the destination, a third clears it — and each change repaints.
 func TestMapViewHoverSelectDestination(t *testing.T) {
-	m, at, _ := mapUnderTest(t)
-	cursor := at("sys-glusza")
-	restoreCursor := widgets.SetPollCursorForTest(func() (int, int) { return cursor.X, cursor.Y })
-	defer restoreCursor()
-	pressed := false
-	restorePress := widgets.SetPressEdgeForTest(func(ebiten.MouseButton) bool { return pressed })
-	defer restorePress()
+	m, at, _, env := mapUnderTest(t)
 
-	m.Sync()
+	// sync samples the frame at p, with the left button as given.
+	sync := func(p image.Point, pressed bool) {
+		env.in.x, env.in.y = p.X, p.Y
+		env.in.edge = [3]bool{pressed, false, false}
+		env.Pointer().Begin()
+		m.Sync()
+	}
+
+	cursor := at("sys-glusza")
+	sync(cursor, false)
 	if m.hover != "sys-glusza" {
 		t.Fatalf("hover = %q, want sys-glusza", m.hover)
 	}
 	if m.sel != "" {
 		t.Fatalf("hover selected %q", m.sel)
 	}
-	pressed = true
-	m.Sync()
-	pressed = false
+	sync(cursor, true)
 	if m.sel != "sys-glusza" || m.dest != "" {
 		t.Fatalf("first press: sel=%q dest=%q, want glusza/none", m.sel, m.dest)
 	}
-	pressed = true
-	m.Sync()
-	pressed = false
+	sync(cursor, true)
 	if m.dest != "sys-glusza" {
 		t.Fatalf("second press: dest=%q, want sys-glusza", m.dest)
 	}
-	pressed = true
-	m.Sync()
-	pressed = false
+	sync(cursor, true)
 	if m.dest != "" {
 		t.Errorf("third press: dest=%q, want cleared", m.dest)
 	}
 
 	// The current system never becomes a destination: a press on it just
 	// selects it (a route to where you are is no route).
-	cursor = at("sys-solace")
-	pressed = true
-	m.Sync()
-	pressed = false
+	sync(at("sys-solace"), true)
 	if m.sel != "sys-solace" || m.dest != "" {
 		t.Errorf("current system press: sel=%q dest=%q, want solace/none", m.sel, m.dest)
 	}
 
 	// A pointer away from every node clears hover again.
-	cursor = image.Pt(1, 1)
-	m.Sync()
+	sync(image.Pt(1, 1), false)
 	if m.hover != "" {
 		t.Errorf("hover = %q after leaving the graph, want none", m.hover)
 	}
@@ -232,7 +223,7 @@ func TestMapViewHoverSelectDestination(t *testing.T) {
 // graph, both ends included, every step a real gate — and no route to
 // nothing.
 func TestMapViewRoute(t *testing.T) {
-	m, _, _ := mapUnderTest(t)
+	m, _, _, _ := mapUnderTest(t)
 	path := m.route("sys-solace", "sys-glusza")
 	if len(path) != 4 || path[0] != "sys-solace" || path[3] != "sys-glusza" {
 		t.Fatalf("route = %v, want solution → penumbra → gloam → glusza", path)

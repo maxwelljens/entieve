@@ -209,10 +209,16 @@ func TestApplyUIScaleLiveRelayout(t *testing.T) {
 	faceBefore, _ := text.Measure("Entieve", *g.env.FaceBold(theme.StepBase), 0)
 	bodyOf[*uikit.LogPanel](g.host, idLog).PushLine(sim.SevInfo, "kept across the rebuild")
 
+	frame := g.kit.Pointer()
 	g.applyUIScale(1.5)
 
 	if got := theme.Scale(); got != 1.5 {
 		t.Fatalf("global scale after change = %v, want 1.5", got)
+	}
+	// The rebuild keeps the host's pointer frame: one sample feeds every
+	// kit built over the session, exactly as before the scale change.
+	if got := g.kit.Pointer(); got != frame {
+		t.Error("applyUIScale rebuilt the kit with a fresh pointer frame")
 	}
 	if g.uiScale != 1.5 {
 		t.Errorf("uiScale = %v, want 1.5", g.uiScale)

@@ -70,6 +70,11 @@ type Options struct {
 	// silent nop, and cmdRun builds the real one beside the music
 	// (NewAudio, one shared context).
 	UISound UISound
+	// Pointer is the host's pointer frame (CONTEXT.md "Pointer frame"):
+	// nil installs a fresh OS one. The game Begins it every Update and
+	// hands the SAME frame to every kit it builds, so a rebuild (load,
+	// scale change) keeps the frame's gesture.
+	Pointer *widgets.Pointer
 }
 
 // Game implements ebiten.Game and hosts the uikit interface.
@@ -85,6 +90,7 @@ type Game struct {
 	// panels are constructed from.
 	kit *uikit.Kit
 	env uikit.Session
+	ptr *widgets.Pointer
 
 	// enqueue is the executor's tail onto the sim: the intent dispatch
 	// queues every command through it (tests swap it to observe what a
@@ -242,6 +248,10 @@ func New(opts Options) (*Game, error) {
 		s:     s,
 		ren:   render.New(opts.Content),
 		title: opts.StartInTitle,
+		ptr:   opts.Pointer,
+	}
+	if g.ptr == nil {
+		g.ptr = widgets.NewPointer(nil)
 	}
 	g.enqueue = s.Queue
 	// Scale before anything is built: the device factor (pinned by tests,
@@ -394,11 +404,14 @@ func (g *Game) applySize(w, h int) {
 // drains events into the log and the scene reactions, then syncs and
 // advances the interface.
 func (g *Game) Update() error {
-	// One input pass per Update: the previous pass's cursor claim is spent
-	// (a pointer that left a seam falls back to the arrow). ebiten may run
-	// Draw without an Update, and ApplyCursor then repeats this pass's
-	// decision instead of clearing it.
-	widgets.BeginCursorFrame()
+	// One pointer frame per Update: one sample, the previous frame's spent
+	// gesture and cursor claim gone (a pointer that left a seam falls back
+	// to the arrow). Everything below — the menu's first read, the world's
+	// buildInput, the chrome pass — reads this one sample, so the world and
+	// the interface hit-test the same point. ebiten may run Draw without an
+	// Update, and the frame's Apply then repeats this decision instead of
+	// clearing it.
+	g.ptr.Begin()
 	// The context menu appearing is its own cue: the popup is kit-level
 	// (no mount edge speaks for it), so the closed→open edge is read here —
 	// before this frame's poll, which may dismiss it.
@@ -742,7 +755,7 @@ func (g *Game) report(err error, okMsg string) {
 // across, and LoadGame re-applies the saved window layout after this
 // returns).
 func (g *Game) buildKit() error {
-	kit, err := uikit.NewKit(g.opts.Content, g.s, func(cmd sim.Command) { g.enqueue(cmd) })
+	kit, err := uikit.NewKit(g.opts.Content, g.s, func(cmd sim.Command) { g.enqueue(cmd) }, uikit.WithPointer(g.ptr))
 	if err != nil {
 		return fmt.Errorf("game: uikit.NewKit: %w", err)
 	}
@@ -1053,20 +1066,20 @@ func frameSec() float64 {
 
 // buildInput snapshots ebiten input into a pure Input for the scenes.
 func (g *Game) buildInput() Input {
-	cx, cy := ebiten.CursorPosition()
+	pt := g.ptr.At()
 	in := Input{
-		MouseX:      float64(cx),
-		MouseY:      float64(cy),
+		MouseX:      float64(pt.X),
+		MouseY:      float64(pt.Y),
 		JustPressed: inpututil.AppendJustPressedKeys(nil),
 		KeysDown:    inpututil.AppendPressedKeys(nil),
 		MouseButton: [3]bool{
-			ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft),
-			ebiten.IsMouseButtonPressed(ebiten.MouseButtonRight),
-			ebiten.IsMouseButtonPressed(ebiten.MouseButtonMiddle),
+			g.ptr.Down(widgets.Left),
+			g.ptr.Down(widgets.Right),
+			g.ptr.Down(widgets.Middle),
 		},
 		JustClicked: [2]bool{
-			inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft),
-			inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight),
+			g.ptr.Press(widgets.Left),
+			g.ptr.Press(widgets.Right),
 		},
 	}
 	_, wheelY := ebiten.Wheel()

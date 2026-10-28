@@ -148,6 +148,7 @@ type winChrome struct {
 	// settle drops the window's open animation when a drag arms — the
 	// fade must not relayout the subtree a drag is translating (nil for
 	// a chrome a test builds on its own).
+	ptr      *widgets.Pointer // the kit's frame: cursor claims land here
 	closable bool
 	settle   func()
 }
@@ -177,11 +178,9 @@ func (c *winChrome) gripStart(p image.Point) edgeMask {
 	if e == 0 {
 		return 0
 	}
-	// A never-mounted window has no layer of its own — EffectiveInputLayer
-	// falls back to DefaultLayer, which passes anywhere, so reject that
-	// explicitly (its stale rect would fake grips across the screen).
-	layer := wgt.EffectiveInputLayer()
-	if layer == &input.DefaultLayer || !layer.ActiveFor(p.X, p.Y, input.LayerEventTypeWheel) {
+	// On the window's own layer (a never-mounted window has none — its
+	// stale rect would otherwise fake grips across the screen).
+	if !widgets.OwnsAt(wgt, p, input.LayerEventTypeWheel) {
 		return 0
 	}
 	return e
@@ -211,13 +210,8 @@ func (c *winChrome) moveStart(p image.Point) bool {
 	if c.closable && p.In(closeButtonRect(c.win.TitleBar.GetWidget().Rect)) {
 		return false
 	}
-	// A never-mounted window has no layer of its own — same reject as
-	// gripStart (DefaultLayer would pass anywhere).
-	layer := wgt.EffectiveInputLayer()
-	if layer == &input.DefaultLayer || !layer.ActiveFor(p.X, p.Y, input.LayerEventTypeMouseButton) {
-		return false
-	}
-	return true
+	// Same layer test as gripStart.
+	return widgets.OwnsAt(wgt, p, input.LayerEventTypeMouseButton)
 }
 
 // step pumps one frame from the cursor and the left-button state.
@@ -276,7 +270,7 @@ func (c *winChrome) step(cursor image.Point, pressed bool) {
 		}
 		// Still held in the band: keep advertising the grip (ebitenui
 		// resets the OS cursor from its own cache every frame).
-		setResizeCursor(c.edges)
+		c.setResizeCursor(c.edges)
 		if cursor != c.origin {
 			c.armed, c.active = false, true
 			c.apply(cursor, wgt)
@@ -325,7 +319,7 @@ func (c *winChrome) step(cursor image.Point, pressed bool) {
 	// same topmost-layer test as gripStart, so a grip covered by another
 	// window does not advertise resizing.
 	if e := c.gripStart(cursor); e != 0 {
-		setResizeCursor(e)
+		c.setResizeCursor(e)
 	}
 }
 
@@ -336,7 +330,7 @@ func (c *winChrome) apply(cursor image.Point, wgt *widget.Widget) {
 	if r != wgt.Rect {
 		c.win.SetLocation(r)
 	}
-	setResizeCursor(c.edges)
+	c.setResizeCursor(c.edges)
 }
 
 // fireMove reports a completed title press: exactly one MoveEvent when
@@ -441,12 +435,12 @@ func windowMin(win *widget.Window, start image.Rectangle) image.Point {
 	return min
 }
 
-// setResizeCursor claims the cursor for the gripped axes: the plain EW/NS
-// arrows on an edge, the matching diagonal on a corner (left+top and
-// right+bottom run NWSE, right+top and left+bottom NESW). The chrome
-// re-claims it every frame it classifies a grip; the kit's single
-// ApplyCursor writes the frame's winner after the chrome pass.
-func setResizeCursor(e edgeMask) {
+// setResizeCursor claims the frame's cursor for the gripped axes: the
+// plain EW/NS arrows on an edge, the matching diagonal on a corner
+// (left+top and right+bottom run NWSE, right+top and left+bottom NESW).
+// The chrome re-claims it every frame it classifies a grip; the frame's
+// single Apply writes the winner after the chrome pass.
+func (c *winChrome) setResizeCursor(e edgeMask) {
 	var shape ebiten.CursorShapeType
 	switch {
 	case e&(edgeLeft|edgeRight) != 0 && e&(edgeTop|edgeBottom) != 0:
@@ -460,7 +454,7 @@ func setResizeCursor(e edgeMask) {
 	default:
 		shape = ebiten.CursorShapeNSResize
 	}
-	widgets.ClaimCursor(shape)
+	c.ptr.ClaimShape(shape)
 }
 
 // stepChromes pumps the chrome of every window currently mounted on this
@@ -471,9 +465,7 @@ func setResizeCursor(e edgeMask) {
 // their rect absolutely from the press, so this pass applies the fresh
 // cursor or derives an identical rect and does nothing).
 func (k *Kit) stepChromes() {
-	cursor := image.Point{}
-	cursor.X, cursor.Y = input.CursorPosition()
-	pressed := input.MouseButtonPressed(ebiten.MouseButtonLeft)
+	cursor, pressed := k.pointer.At(), k.pointer.Down(widgets.Left)
 	for _, ch := range k.chromes {
 		ch.step(cursor, pressed)
 	}

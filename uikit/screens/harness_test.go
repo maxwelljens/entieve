@@ -27,10 +27,39 @@ type testEnv struct {
 	Session
 	Sim     *sim.Sim
 	Content *content.Content
+	in      *scriptPointer // the frame's source: a test moves the pointer here
 }
 
-// newTestEnv builds that session, capturing every enqueued command.
+// scriptPointer is a widgets.Source the screens tests drive by hand: the
+// session's pointer frame reads it instead of the OS.
+type scriptPointer struct {
+	x, y   int
+	down   [3]bool
+	edge   [3]bool
+	shape  ebiten.CursorShapeType
+	writes int
+}
+
+func (s *scriptPointer) Cursor() (int, int)                { return s.x, s.y }
+func (s *scriptPointer) Down(b widgets.Button) bool        { return s.down[b] }
+func (s *scriptPointer) JustPressed(b widgets.Button) bool { return s.edge[b] }
+func (s *scriptPointer) SetShape(sh ebiten.CursorShapeType) {
+	s.shape, s.writes = sh, s.writes+1
+}
+
+// newTestEnv builds that session, capturing every enqueued command. Its
+// pointer frame reads the testEnv's own script (env.in).
 func newTestEnv(t *testing.T) (*testEnv, *[]sim.Command) {
+	t.Helper()
+	in := &scriptPointer{}
+	env, cmds := newTestEnvSource(t, widgets.NewPointer(in))
+	env.in = in
+	return env, cmds
+}
+
+// newTestEnvSource builds the session over a caller's frame — a test that
+// shares one scripted frame with a Kit (its windows poll the same sample).
+func newTestEnvSource(t *testing.T, p *widgets.Pointer) (*testEnv, *[]sim.Command) {
 	t.Helper()
 	c, err := content.Load(content.FS())
 	if err != nil {
@@ -45,7 +74,7 @@ func newTestEnv(t *testing.T) (*testEnv, *[]sim.Command) {
 		t.Fatalf("sim.New: %v", err)
 	}
 	var cmds []sim.Command
-	sess := NewEnv(c, s, func(cmd sim.Command) { cmds = append(cmds, cmd) })
+	sess := NewEnv(c, s, func(cmd sim.Command) { cmds = append(cmds, cmd) }, p)
 	return &testEnv{Session: sess, Sim: s, Content: c}, &cmds
 }
 
@@ -158,27 +187,30 @@ func pumpQty(t *testing.T, ui *ebitenui.UI, env Session, sync func(), w, h int) 
 }
 
 // qtyClick presses the picker's slider at value v through the production
-// input path (the shared cursor/press/held seams): a press-and-release
-// gesture inside the widget, then a frame each side of it. The slider's
-// unit is a pixel of its track, so aim at the ends (min/max land exactly)
-// or set mid values with Slider.SetValue.
-func qtyClick(t *testing.T, ui *ebitenui.UI, env Session, sync func(), v float64) {
+// input path (the session's pointer frame): a press-and-release gesture
+// inside the widget, then a frame each side of it. The slider's unit is a
+// pixel of its track, so aim at the ends (min/max land exactly) or set mid
+// values with Slider.SetValue.
+func qtyClick(t *testing.T, ui *ebitenui.UI, env *testEnv, sync func(), v float64) {
 	t.Helper()
 	pt := sliderPoint(env.QtyWindow().Slider(), v)
-	var press, held bool
-	cursor := pt
-	defer widgets.SetPollCursorForTest(func() (int, int) { return cursor.X, cursor.Y })()
-	defer widgets.SetPressEdgeForTest(func(ebiten.MouseButton) bool { return press })()
-	defer widgets.SetSliderHeldForTest(func() bool { return held })()
-	press, held = true, true
+	env.in.x, env.in.y = pt.X, pt.Y
+	env.in.edge, env.in.down = [3]bool{true, false, false}, [3]bool{true, false, false}
+	env.Pointer().Begin()
 	pumpQty(t, ui, env, sync, 1024, 700) // rising press: grab + jump to v
-	press, held = false, false
+	env.in.edge, env.in.down = [3]bool{}, [3]bool{}
+	env.Pointer().Begin()
 	pumpQty(t, ui, env, sync, 1024, 700) // release: the grab ends
 }
 
 // newTestKit builds a Kit over the embedded content and world-showcase,
-// capturing every enqueued command.
-func newTestKit(t *testing.T) (*Kit, *[]sim.Command) {
+// capturing every enqueued command. Its pointer frame is a fresh OS one.
+func newTestKit(t *testing.T) (*Kit, *[]sim.Command) { return newTestKitWith(t, nil) }
+
+// newTestKitWith builds the kit over a caller's pointer frame (nil = a
+// fresh OS one): a test that scripts the pointer shares the frame with the
+// panels it mounts.
+func newTestKitWith(t *testing.T, p *widgets.Pointer) (*Kit, *[]sim.Command) {
 	t.Helper()
 	c, err := content.Load(content.FS())
 	if err != nil {
@@ -193,7 +225,7 @@ func newTestKit(t *testing.T) (*Kit, *[]sim.Command) {
 		t.Fatalf("sim.New: %v", err)
 	}
 	var cmds []sim.Command
-	k, err := NewKit(c, s, func(cmd sim.Command) { cmds = append(cmds, cmd) })
+	k, err := NewKit(c, s, func(cmd sim.Command) { cmds = append(cmds, cmd) }, WithPointer(p))
 	if err != nil {
 		t.Fatalf("NewKit: %v", err)
 	}
@@ -205,6 +237,7 @@ func newTestKit(t *testing.T) (*Kit, *[]sim.Command) {
 // queue, Draw performs the widget layout pass.
 func pumpKit(t *testing.T, k *Kit, w, h int) *ebiten.Image {
 	t.Helper()
+	k.Pointer().Begin() // the host's one sample per Update
 	k.Sync()
 	if err := k.Update(); err != nil {
 		t.Fatalf("Update: %v", err)

@@ -61,6 +61,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One pointer frame per update** (`uikit/widgets`, `uikit/screens`, `game`):
+  every widget that reads the pointer — the context menu, pane seams, sliders,
+  column grips, window chrome and the starmap — now reads one `widgets.Pointer`
+  sample taken at the top of `Game.Update` instead of each polling ebiten (or
+  ebitenui's cache) itself. The world and the interface therefore hit-test the
+  same point, the menu's click is spent on the menu for the frame (nothing
+  underneath sees it), and the cursor shape is one claim-then-`Apply` per frame
+  that repeats on ebiten's draw-only frames. Replaces the five package-level
+  input seams (`pressEdge`, `pollCursor`, `pressClaim`, `splitHeld`,
+  `sliderHeld`), the whole `widgets/cursor.go` and the `Set…ForTest` setters;
+  tests script a `Source` instead. Behaviour is unchanged for the player,
+  except that a widget with no input layer of its own can no longer claim a
+  press anywhere (the column grips' missing guard).
 - **One dialog lifecycle for the on-demand windows** (`uikit/screens`): Show
   Info, the order mini-window and the quantity picker now share one
   Kit-internal `dialog` (`kitdialog.go`) instead of three copies of the

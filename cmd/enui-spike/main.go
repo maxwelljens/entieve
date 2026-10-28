@@ -47,6 +47,7 @@ var accelLevels = []int{1, 2, 5, 10, 30}
 
 // spike implements ebiten.Game for the evaluation demo.
 type spike struct {
+	ptr   *widgets.Pointer
 	sim   *sim.Sim
 	ren   *render.Renderer
 	kit   *screens.Kit
@@ -80,14 +81,18 @@ func main() {
 	if err != nil {
 		log.Fatalf("sim.New: %v", err)
 	}
-	kit, err := screens.NewKit(c, s, s.Queue)
+	// One pointer frame for the whole spike: the kit and the bare session
+	// the station windows are built from poll the same sample.
+	ptr := widgets.NewPointer(nil)
+	kit, err := screens.NewKit(c, s, s.Queue, screens.WithPointer(ptr))
 	if err != nil {
 		log.Fatalf("screens.NewKit: %v", err)
 	}
 	// The station windows ride the kit's window stack (same theme,
 	// stacking and input pump) through the AddWindow seam.
-	env := screens.NewEnv(c, s, s.Queue)
+	env := screens.NewEnv(c, s, s.Queue, ptr)
 	g := &spike{
+		ptr:       ptr,
 		sim:       s,
 		ren:       render.New(c),
 		kit:       kit,
@@ -118,9 +123,10 @@ func main() {
 // syncs the kit and the station windows, and steps the simulation on a
 // fixed 60 tps timestep.
 func (g *spike) Update() error {
-	// Announce the input pass so the cursor claims below (seam polls, ebitenui
-	// input) apply to this pass only and can fall back to the arrow.
-	widgets.BeginCursorFrame()
+	// One pointer frame per Update: the sample the seam polls and cursor
+	// claims below read (a claim applies to this frame only, so a pointer
+	// that left a seam falls back to the arrow).
+	g.ptr.Begin()
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 		return ebiten.Termination
 	}

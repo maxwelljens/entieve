@@ -143,7 +143,7 @@ func (s *session) OpenRowMenu(spec widgets.RowSpec, at image.Point) {
 // hosts that build several panels from one source without a Kit
 // (cmd/enui-spike, the uikit tests); the game builds its session from
 // Kit.Env instead, so one theme, view and sink serve the whole session.
-func NewEnv(c *content.Content, s *sim.Sim, enqueue EnqueueFunc) Session {
+func NewEnv(c *content.Content, s *sim.Sim, enqueue EnqueueFunc, p *widgets.Pointer) Session {
 	sess := &session{}
 	exec := widgets.NewExec(
 		func(ref widgets.InfoRef) { sess.ShowInfo(ref) },
@@ -163,9 +163,12 @@ func NewEnv(c *content.Content, s *sim.Sim, enqueue EnqueueFunc) Session {
 			}
 			exec.Do(i)
 		}),
+		// A bare session may be given the host's frame (the kit's session
+		// always is); nil builds its own OS one.
+		p,
 	)
 	sess.svc = &services{}
-	sess.svc.menu = widgets.NewMenu(sess)
+	sess.svc.menu = widgets.NewMenu(sess, sess.Pointer())
 	sess.svc.info = NewInfoWin(sess)
 	sess.svc.qty = NewQtyWin(sess)
 	return sess

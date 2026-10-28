@@ -44,9 +44,10 @@ const (
 // QtyWindow) and a Kit mounts it on first use (Kit.OpenQty). A bare
 // session only shows it — its host mounts the window by hand.
 type QtyWin struct {
-	th theme.Theme
-	cv widgets.ContentView
-	as widgets.ActionSink
+	th  theme.Theme
+	cv  widgets.ContentView
+	as  widgets.ActionSink
+	ptr *widgets.Pointer
 
 	win   *widget.Window
 	title *theme.ChromeText
@@ -74,7 +75,7 @@ type QtyWin struct {
 // NewQtyWin builds the closed picker over the given environment.
 func NewQtyWin(env widgets.Seams) *QtyWin {
 	p := env.Pal()
-	o := &QtyWin{th: env, cv: env, as: env, last: map[widgets.QtyMode]int{}}
+	o := &QtyWin{th: env, cv: env, as: env, ptr: env.Pointer(), last: map[widgets.QtyMode]int{}}
 
 	o.info = widget.NewText(
 		widget.TextOpts.Text("", env.Face(theme.StepTiny), theme.Solid(p.Dim)),
@@ -242,7 +243,7 @@ func (o *QtyWin) Sync() {
 	if !o.IsOpen() {
 		return
 	}
-	o.slider.Poll()
+	o.slider.Poll(o.ptr)
 	// The refinery ladder follows the stock (a refine lands, cargo moves):
 	// re-point it and let the slider clamp to the nearest whole batch — the
 	// retired stepper's SetSteps rule.

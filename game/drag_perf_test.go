@@ -13,7 +13,6 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -210,12 +209,12 @@ func titlePoint(win *widget.Window) image.Point {
 }
 
 // dragSetup parks the cursor on win's title bar, settles the hover and
-// fires ONE press frame (with the raise edge, like production) outside
-// the measured window. It returns the tick that OSCILLATES the cursor by
+// fires ONE press frame (the frame's own press edge, like production)
+// outside the measured window. It returns the tick that OSCILLATES the cursor by
 // ±amp px around the press point every frame — the window moves every
 // frame (the chrome translates it per drag frame, as production) but
 // never leaves the screen.
-func dragSetup(t *testing.T, g *Game, img *ebiten.Image, mm *loopMouse, win *widget.Window, pressEdge *bool, amp int) func(i int) {
+func dragSetup(t *testing.T, g *Game, img *ebiten.Image, mm *loopMouse, win *widget.Window, amp int) func(i int) {
 	t.Helper()
 	frame := func() {
 		t.Helper()
@@ -232,10 +231,8 @@ func dragSetup(t *testing.T, g *Game, img *ebiten.Image, mm *loopMouse, win *wid
 	frame()
 	frame()
 	before := win.GetContainer().GetWidget().Rect
-	mm.left = true
-	*pressEdge = true
+	mm.left = true // the frame reports the rising edge
 	frame()
-	*pressEdge = false
 	if r := win.GetContainer().GetWidget().Rect; r != before {
 		t.Fatalf("fixture: rect changed on the press frame (%v -> %v), not during the drag", before, r)
 	}
@@ -277,22 +274,6 @@ func release(t *testing.T, g *Game, img *ebiten.Image, mm *loopMouse) {
 	g.Draw(img)
 }
 
-// installSeams wires the loopMouse into ebitenui + the raw uikit polls
-// and returns the press-edge toggle (armed for exactly one frame).
-func installSeams(t *testing.T, mm *loopMouse) *bool {
-	t.Helper()
-	pressEdge := new(bool)
-	restoreEdge := widgets.SetPressEdgeForTest(func(b ebiten.MouseButton) bool {
-		return b == ebiten.MouseButtonLeft && *pressEdge
-	})
-	restoreCursor := widgets.SetPollCursorForTest(func() (int, int) { return mm.x, mm.y })
-	t.Cleanup(func() {
-		restoreEdge()
-		restoreCursor()
-	})
-	return pressEdge
-}
-
 // TestDragFrameCost measures idle vs drag cost in the real loop for the
 // heavy (market, seeded to hundreds of rows) and light (log) window.
 // Wall time is LOGGED (the headless atlas backlog makes absolute frame
@@ -313,15 +294,13 @@ func TestDragFrameCost(t *testing.T) {
 	)
 
 	// ---- heavy fixture: docked showcase + market seeded to ~300 rows ----
-	g := dockedShowcaseGame(t, 1280, 720)
+	mm := useLoopMouse(t)
+	g := dockedShowcaseGame(t, 1280, 720, mm.pointer())
 	g.host.SetOpen(idMarket, true)
 	g.syncMounts()
 	pump(t, g, 1280, 720)
 	seedBook(t, g, g.s.DockedMarket(), 300)
 	pump(t, g, 1280, 720)
-
-	mm := useLoopMouse(t)
-	pressEdge := installSeams(t, mm)
 	img := ebiten.NewImage(1280, 720)
 
 	orders := len(g.s.BookOrders(g.s.DockedMarket()))
@@ -345,7 +324,7 @@ func TestDragFrameCost(t *testing.T) {
 	idleA := runPhase(t, "idle-A", g, img, idleFrames, idleTick)
 	phases = append(phases, idleA)
 
-	dragTick := dragSetup(t, g, img, mm, mk, pressEdge, 40)
+	dragTick := dragSetup(t, g, img, mm, mk, 40)
 	mkBefore := mk.GetContainer().GetWidget().Rect
 	dragA := runPhase(t, "market-drag-A", g, img, dragFrames, dragTick)
 	phases = append(phases, dragA)
@@ -359,7 +338,7 @@ func TestDragFrameCost(t *testing.T) {
 	idleB := runPhase(t, "idle-B", g, img, idleFrames, idleTick)
 	phases = append(phases, idleB)
 
-	dragTick2 := dragSetup(t, g, img, mm, mk, pressEdge, 40)
+	dragTick2 := dragSetup(t, g, img, mm, mk, 40)
 	dragB := runPhase(t, "market-drag-B", g, img, dragFrames, dragTick2)
 	phases = append(phases, dragB)
 	release(t, g, img, mm)
@@ -386,11 +365,10 @@ func TestDragFrameCost(t *testing.T) {
 	}
 
 	// ---- light fixture: space showcase, log window ----
-	g2 := newShowcaseGame(t)
+	mm2 := useLoopMouse(t)
+	g2 := newShowcaseGame(t, mm2.pointer())
 	g2.applySize(1280, 720)
 	pump(t, g2, 1280, 720)
-	mm2 := useLoopMouse(t)
-	pressEdge2 := installSeams(t, mm2)
 	img2 := ebiten.NewImage(1280, 720)
 
 	lg := g2.host.Window(idLog)
@@ -407,7 +385,7 @@ func TestDragFrameCost(t *testing.T) {
 	}
 
 	lIdle := runPhase(t, "light-idle", g2, img2, idleFrames, lIdleTick)
-	lDragTick := dragSetup(t, g2, img2, mm2, lg, pressEdge2, 40)
+	lDragTick := dragSetup(t, g2, img2, mm2, lg, 40)
 	lgBefore := lg.GetContainer().GetWidget().Rect
 	lDrag := runPhase(t, "log-drag", g2, img2, dragFrames, lDragTick)
 	if lgAfter := lg.GetContainer().GetWidget().Rect; lgAfter == lgBefore {
@@ -471,7 +449,8 @@ func TestDragCPUProfile(t *testing.T) {
 	allocFrames := envInt("ENTIEVE_ALLOC_FRAMES", 30)
 	seed := envInt("ENTIEVE_SEED_ORDERS", 300)
 
-	g := dockedShowcaseGame(t, 1280, 720)
+	mm := useLoopMouse(t)
+	g := dockedShowcaseGame(t, 1280, 720, mm.pointer())
 	g.host.SetOpen(idMarket, true)
 	g.syncMounts()
 	pump(t, g, 1280, 720)
@@ -479,8 +458,6 @@ func TestDragCPUProfile(t *testing.T) {
 	pump(t, g, 1280, 720)
 	t.Logf("heavy fixture: %d resting orders", len(g.s.BookOrders(g.s.DockedMarket())))
 
-	mm := useLoopMouse(t)
-	pressEdge := installSeams(t, mm)
 	img := ebiten.NewImage(1280, 720)
 	mk := g.host.Window(idMarket)
 	idleTick := func(i int) {
@@ -555,7 +532,7 @@ func TestDragCPUProfile(t *testing.T) {
 	allocWindow("idle", idleTick)
 	cpuWindow("idle", idleTick)
 
-	dragTick := dragSetup(t, g, img, mm, mk, pressEdge, 40)
+	dragTick := dragSetup(t, g, img, mm, mk, 40)
 	mkBefore := mk.GetContainer().GetWidget().Rect
 	allocWindow("drag", dragTick)
 	if mk.GetContainer().GetWidget().Rect == mkBefore {

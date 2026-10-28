@@ -128,34 +128,40 @@ func TestMenuBuildAndDispatch(t *testing.T) {
 	}
 }
 
-// TestMenuSpendsTheFramesPressEdge pins the popup's claim on the raw press
-// edge: the gesture that dismisses the popup (or lands an entry) belongs to
-// the popup, so widgets.PressEdge — what every non-menu poller reads (the
+// TestPointerSpendsTheFramePress pins the popup's claim on the frame's
+// press: the gesture that dismisses the popup (or lands an entry) belongs
+// to the popup, so Pointer.Press — what every non-menu poller reads (the
 // starmap's nodes, the slider bands, the split panes, the column grips) —
-// reports nothing for that frame. Menu.TakeBlocked, the once-per-frame
-// clearer in Kit.Update, hands the seam back.
-func TestMenuSpendsTheFramesPressEdge(t *testing.T) {
+// reports nothing for that frame, while the popup's own raw edge (what
+// Menu.Poll read) still did. The next Begin hands the next frame back.
+func TestPointerSpendsTheFramePress(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	m := env.Menu()
 	var hits []string
-	defer SetPressEdgeForTest(func(ebiten.MouseButton) bool { return true })()
-	defer SetPollCursorForTest(func() (int, int) { return 10, 10 })()
 
-	if !PressEdge(ebiten.MouseButtonLeft) {
+	env.in.x, env.in.y = 10, 10
+	env.in.edge = [3]bool{true, true, false}
+	env.Pointer().Begin()
+
+	if !env.Pointer().Press(Left) {
 		t.Fatal("fixture: the free press edge is already spent")
 	}
 	m.Open(menuTestEntries(&hits), image.Pt(10, 10))
 	if !m.Poll() {
 		t.Fatal("the popup did not take the frame's press")
 	}
-	if PressEdge(ebiten.MouseButtonLeft) || PressEdge(ebiten.MouseButtonRight) {
-		t.Error("the popup's own press reached the raw seam too")
+	if env.Pointer().Press(Left) || env.Pointer().Press(Right) {
+		t.Error("the popup's own press reached the gated edge too")
+	}
+	if !env.Pointer().RawPress(Left) {
+		t.Error("Spend took the raw edge the popup reads")
 	}
 	if !m.TakeBlocked() {
 		t.Fatal("the press set no consumed-gesture latch")
 	}
-	if !PressEdge(ebiten.MouseButtonLeft) {
-		t.Error("TakeBlocked left the press spent: the next frame is silent")
+	env.Pointer().Begin() // the next frame
+	if !env.Pointer().Press(Left) {
+		t.Error("the frame's Spend outlived its frame: the next one is silent")
 	}
 	if len(hits) != 0 {
 		t.Errorf("a dismiss outside every band ran %v, want nothing", hits)

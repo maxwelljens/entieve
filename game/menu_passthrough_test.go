@@ -15,32 +15,31 @@ import (
 //   - ebitenui's cached input advances on that frame too (Kit.Update's skip
 //     branch), or the unspent press edge fires on the widget under the popup
 //     as soon as ui.Update runs again — the row behind "show info";
-//   - every raw press poller in the kit reads widgets.PressEdge, which the
-//     popup claims (Menu.Click/Esc → Menu.TakeBlocked), so the starmap, the
-//     sliders, the split panes and the column grips never see it either.
+//   - every other poller in the kit reads the frame's gated press
+//     (Pointer.Press), which the popup spends (Menu.Click/Esc), so the
+//     starmap, the sliders, the split panes and the column grips never see
+//     it either.
 //
 // These pins drive one human click (press, held frames, release — the hold
 // is what a real click has, and what makes a parked ebitenui edge surface)
 // through the real frame loop.
 
 // popupGesture is the frame rig a popup click needs headless: the scripted
-// mouse (ebitenui's cache plus the kit's live seams, exactly as
+// mouse (ebitenui's cache plus the game's pointer frame, exactly as
 // menu_click_loop_test's loopMouse describes) and the frame pump.
 type popupGesture struct {
-	g    *Game
-	mm   *loopMouse
-	edge bool
-	img  *ebiten.Image
+	g   *Game
+	mm  *loopMouse
+	img *ebiten.Image
 }
 
-func newPopupGesture(t *testing.T, g *Game, w, h int) *popupGesture {
+// newPopupGesture builds the game over the scripted mouse (so the frame's
+// Begin samples it) and returns the rig.
+func newPopupGesture(t *testing.T, build func(p *widgets.Pointer) *Game, w, h int) *popupGesture {
 	t.Helper()
-	p := &popupGesture{g: g, mm: useLoopMouse(t), img: pump(t, g, w, h)}
-	t.Cleanup(widgets.SetPollCursorForTest(func() (int, int) { return p.mm.x, p.mm.y }))
-	t.Cleanup(widgets.SetPressEdgeForTest(func(b ebiten.MouseButton) bool {
-		return p.edge && b == ebiten.MouseButtonLeft
-	}))
-	return p
+	mm := useLoopMouse(t)
+	g := build(mm.pointer())
+	return &popupGesture{g: g, mm: mm, img: pump(t, g, w, h)}
 }
 
 func (p *popupGesture) frame(t *testing.T) {
@@ -56,9 +55,8 @@ func (p *popupGesture) frame(t *testing.T) {
 func (p *popupGesture) click(t *testing.T, pt image.Point) {
 	t.Helper()
 	p.mm.moveTo(pt.X, pt.Y)
-	p.mm.left, p.edge = true, true
+	p.mm.left = true
 	p.frame(t)
-	p.edge = false
 	p.frame(t)
 	p.frame(t)
 	p.mm.left = false
@@ -78,9 +76,12 @@ func centre(r image.Rectangle) image.Point {
 func TestMenuEntryClickDoesNotReachTheRowBehind(t *testing.T) {
 	resetScale(t)
 	sfx := &fakeUISound{}
-	g := newUISoundGame(t, t.TempDir()+"/save.json", sfx)
-	p := newPopupGesture(t, g, 1280, 720)
+	path := t.TempDir() + "/save.json"
+	p := newPopupGesture(t, func(ptr *widgets.Pointer) *Game {
+		return newUISoundGame(t, path, sfx, ptr)
+	}, 1280, 720)
 
+	g := p.g
 	tbl := g.kit.OverviewTable()
 	row := tbl.RowWidgetForTest(1)
 	if row.Rect.Empty() {
@@ -131,9 +132,11 @@ func TestMenuEntryClickDoesNotReachTheRowBehind(t *testing.T) {
 // row under that press — the popup rect never gates it — must stay untouched.
 func TestColumnMenuDismissPressDoesNotReachTheTableRows(t *testing.T) {
 	resetScale(t)
-	g := newShowcaseGame(t)
-	p := newPopupGesture(t, g, 1280, 720)
+	p := newPopupGesture(t, func(ptr *widgets.Pointer) *Game {
+		return newShowcaseGame(t, ptr)
+	}, 1280, 720)
 
+	g := p.g
 	tbl := g.kit.OverviewTable()
 	dots := tbl.MenuBtnForTest()
 	row := tbl.RowWidgetForTest(1)

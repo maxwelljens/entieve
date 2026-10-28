@@ -46,8 +46,9 @@ func factoryEnv(t *testing.T) (*testEnv, *[]sim.Command) {
 		t.Fatalf("sim.New: %v", err)
 	}
 	var cmds []sim.Command
-	sess := NewEnv(c, s, func(cmd sim.Command) { cmds = append(cmds, cmd) })
-	return &testEnv{Session: sess, Sim: s, Content: c}, &cmds
+	in := &scriptPointer{}
+	sess := NewEnv(c, s, func(cmd sim.Command) { cmds = append(cmds, cmd) }, widgets.NewPointer(in))
+	return &testEnv{Session: sess, Sim: s, Content: c, in: in}, &cmds
 }
 
 // giveItem stacks qty units of an item into the player's general cargo.

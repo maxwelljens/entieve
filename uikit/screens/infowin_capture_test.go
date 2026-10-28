@@ -40,8 +40,9 @@ func TestInfoWindowCaptureFrame(t *testing.T) {
 		outDir = "/tmp/opencode"
 	}
 
-	k, _ := newTestKit(t)
-	env := &testEnv{Session: k.Env(), Sim: k.Sim, Content: k.Content}
+	src := &scriptPointer{}
+	k, _ := newTestKitWith(t, widgets.NewPointer(src))
+	env := &testEnv{Session: k.Env(), Sim: k.Sim, Content: k.Content, in: src}
 	fm := useFakeMouse(t)
 
 	// A hull page with every block (the content stream authors the
@@ -70,16 +71,12 @@ func TestInfoWindowCaptureFrame(t *testing.T) {
 		widgets.MenuSep,
 		{Label: "Cycle charge", Disabled: true, Action: func() {}},
 	}, image.Pt(760, 140))
-	// Park the (fake) cursor on the second row: Kit.Update's menu poll
-	// reads the live cursor for the hover band, exactly as in game — and
-	// the menu's live poll is the RAW ebiten cursor (menu.go's
-	// pollCursor), not the ebitenui seam above, so pin it to the parked
-	// point through its test seam or the band would follow the operator's
-	// real pointer.
+	// Park the pointer on the second row: Kit.Update's menu poll reads the
+	// frame's sample for the hover band, exactly as in game.
 	hov := m.RowRect(1)
 	cx, cy := (hov.Min.X+hov.Max.X)/2, (hov.Min.Y+hov.Max.Y)/2
 	fm.at(cx, cy)
-	t.Cleanup(widgets.SetPollCursorForTest(func() (int, int) { return cx, cy }))
+	src.x, src.y = cx, cy
 	m.Hover(m.RowRect(1).Min.Add(image.Pt(6, 6)))
 
 	g := &infoCaptureGame{k: k, out: filepath.Join(outDir, "infowin_capture.png")}
@@ -108,6 +105,7 @@ func (g *infoCaptureGame) Update() error {
 	if g.saved || g.err != nil {
 		return ebiten.Termination
 	}
+	g.k.Pointer().Begin() // the host's one sample per Update
 	g.k.Sync()
 	if err := g.k.Update(); err != nil {
 		g.err = err

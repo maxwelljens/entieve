@@ -13,6 +13,7 @@ import (
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
 	uikit "github.com/entieve/entieve/uikit/screens"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -33,15 +34,15 @@ func newSmokeGame(t *testing.T) *Game {
 
 // newShowcaseGame builds a session over the world-showcase sim, the same
 // fixture the uikit panel tests drive, on a fresh temp save path.
-func newShowcaseGame(t *testing.T) *Game {
+func newShowcaseGame(t *testing.T, ptr ...*widgets.Pointer) *Game {
 	t.Helper()
-	return newShowcaseGameAt(t, filepath.Join(t.TempDir(), "save.json"))
+	return newShowcaseGameAt(t, filepath.Join(t.TempDir(), "save.json"), ptr...)
 }
 
 // newShowcaseGameAt builds the same session on an explicit save path —
 // several sessions can share one path to simulate restarts (and their
 // layout sidecars).
-func newShowcaseGameAt(t *testing.T, savePath string) *Game {
+func newShowcaseGameAt(t *testing.T, savePath string, ptr ...*widgets.Pointer) *Game {
 	t.Helper()
 	c, err := content.Load(content.FS())
 	if err != nil {
@@ -56,11 +57,21 @@ func newShowcaseGameAt(t *testing.T, savePath string) *Game {
 		World:    wd,
 		Seed:     42,
 		SavePath: savePath,
+		Pointer:  firstPointer(ptr),
 	})
 	if err != nil {
 		t.Fatalf("game.New: %v", err)
 	}
 	return g
+}
+
+// firstPointer is the optional frame a test hands a game builder (nil =
+// the game's own OS frame).
+func firstPointer(ptr []*widgets.Pointer) *widgets.Pointer {
+	if len(ptr) == 0 {
+		return nil
+	}
+	return ptr[0]
 }
 
 // newShowcaseGameLoaded builds the same session restored from the save

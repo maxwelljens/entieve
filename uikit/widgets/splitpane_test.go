@@ -264,13 +264,13 @@ func TestSplitPaneGrabBand(t *testing.T) {
 		t.Errorf("press inside the grab band = seam %d, want 0", got)
 	}
 
-	var shape ebiten.CursorShapeType
-	defer SetCursorShapeForTest(func(c ebiten.CursorShapeType) { shape = c })()
-	BeginCursorFrame()       // the host's input pass
-	s.Step(at, false, false) // idle hover: the seam claims the pass
-	ApplyCursor()            // the kit's one per-frame write
-	if shape != ebiten.CursorShapeNSResize {
-		t.Errorf("hovering the seam claimed %v, want NS-resize", shape)
+	src := &scriptInput{x: at.X, y: at.Y}
+	frame := NewPointer(src)
+	frame.Begin()
+	s.Poll(frame) // idle hover: the seam claims the frame
+	frame.Apply() // the host's one per-frame write
+	if src.shape != ebiten.CursorShapeNSResize {
+		t.Errorf("hovering the seam claimed %v, want NS-resize", src.shape)
 	}
 }
 
@@ -282,37 +282,37 @@ func TestSplitPaneGrabBand(t *testing.T) {
 func TestSplitPaneCursorStableOverSeam(t *testing.T) {
 	s, _ := newPumpedSplit(t, 2)
 	at := seamMid(s, 0)
-	var shape ebiten.CursorShapeType
-	writes := 0
-	defer SetCursorShapeForTest(func(c ebiten.CursorShapeType) { shape, writes = c, writes+1 })()
+	src := &scriptInput{x: at.X, y: at.Y}
+	frame := NewPointer(src)
 
-	for frame := 0; frame < 8; frame++ {
-		shape, writes = ebiten.CursorShapeDefault, 0
-		BeginCursorFrame()       // each frame is a new input pass
-		s.Step(at, false, false) // Update phase: records the claim, writes nothing
-		if writes != 0 {
-			t.Fatalf("frame %d: the Update phase wrote the cursor %d time(s) (%v); only the kit's apply writes",
-				frame, writes, shape)
+	for i := 0; i < 8; i++ {
+		src.shape, src.writes = ebiten.CursorShapeDefault, 0
+		frame.Begin() // each frame is a new sample
+		s.Poll(frame) // Update phase: records the claim, writes nothing
+		if src.writes != 0 {
+			t.Fatalf("frame %d: the Update phase wrote the cursor %d time(s) (%v); only Apply writes",
+				i, src.writes, src.shape)
 		}
-		ApplyCursor() // the kit's one per-frame write
-		if shape != ebiten.CursorShapeNSResize {
-			t.Fatalf("frame %d: presented cursor = %v, want NS-resize", frame, shape)
+		frame.Apply() // the host's one per-frame write
+		if src.shape != ebiten.CursorShapeNSResize {
+			t.Fatalf("frame %d: presented cursor = %v, want NS-resize", i, src.shape)
 		}
-		if writes != 1 {
-			t.Fatalf("frame %d: %d cursor writes, want exactly one", frame, writes)
+		if src.writes != 1 {
+			t.Fatalf("frame %d: %d cursor writes, want exactly one", i, src.writes)
 		}
 	}
 
-	// Off the band: no claim, so the next pass presents the arrow again.
-	shape, writes = ebiten.CursorShapeDefault, 0
-	BeginCursorFrame()
-	s.Step(image.Pt(at.X, at.Y+theme.Px(SplitGrabPx)+4), false, false)
-	ApplyCursor()
-	if shape != ebiten.CursorShapeDefault {
-		t.Errorf("off the band: presented %v; want the default", shape)
+	// Off the band: no claim, so the next frame presents the arrow again.
+	src.shape, src.writes = ebiten.CursorShapeDefault, 0
+	src.x, src.y = at.X, at.Y+theme.Px(SplitGrabPx)+4
+	frame.Begin()
+	s.Poll(frame)
+	frame.Apply()
+	if src.shape != ebiten.CursorShapeDefault {
+		t.Errorf("off the band: presented %v; want the default", src.shape)
 	}
-	if writes != 1 {
-		t.Errorf("off the band: %d cursor writes, want the frame's single default write", writes)
+	if src.writes != 1 {
+		t.Errorf("off the band: %d cursor writes, want the frame's single default write", src.writes)
 	}
 }
 
@@ -321,20 +321,19 @@ func TestSplitPaneCursorStableOverSeam(t *testing.T) {
 func TestSplitPaneRowCursorStableOverSeam(t *testing.T) {
 	s, _ := newPumpedRow(t, 2)
 	at := rowSeamMid(s, 0)
-	var shape ebiten.CursorShapeType
-	writes := 0
-	defer SetCursorShapeForTest(func(c ebiten.CursorShapeType) { shape, writes = c, writes+1 })()
+	src := &scriptInput{x: at.X, y: at.Y}
+	frame := NewPointer(src)
 
-	for frame := 0; frame < 4; frame++ {
-		shape, writes = ebiten.CursorShapeDefault, 0
-		BeginCursorFrame() // each frame is a new input pass
-		s.Step(at, false, false)
-		if writes != 0 {
-			t.Fatalf("frame %d: the Update phase wrote the cursor (%v)", frame, shape)
+	for i := 0; i < 4; i++ {
+		src.shape, src.writes = ebiten.CursorShapeDefault, 0
+		frame.Begin() // each frame is a new sample
+		s.Poll(frame)
+		if src.writes != 0 {
+			t.Fatalf("frame %d: the Update phase wrote the cursor (%v)", i, src.shape)
 		}
-		ApplyCursor()
-		if shape != ebiten.CursorShapeEWResize || writes != 1 {
-			t.Fatalf("frame %d: presented %v (%d writes), want one EW-resize", frame, shape, writes)
+		frame.Apply()
+		if src.shape != ebiten.CursorShapeEWResize || src.writes != 1 {
+			t.Fatalf("frame %d: presented %v (%d writes), want one EW-resize", i, src.shape, src.writes)
 		}
 	}
 }
@@ -412,13 +411,13 @@ func TestSplitPaneRowEqualShares(t *testing.T) {
 		t.Errorf("press inside the grab band = seam %d, want 0", got)
 	}
 
-	var shape ebiten.CursorShapeType
-	defer SetCursorShapeForTest(func(c ebiten.CursorShapeType) { shape = c })()
-	BeginCursorFrame()
-	s.Step(at, false, false) // idle hover
-	ApplyCursor()
-	if shape != ebiten.CursorShapeEWResize {
-		t.Errorf("row seam cursor = %v, want EW-resize", shape)
+	src := &scriptInput{x: at.X, y: at.Y}
+	frame := NewPointer(src)
+	frame.Begin()
+	s.Poll(frame) // idle hover
+	frame.Apply()
+	if src.shape != ebiten.CursorShapeEWResize {
+		t.Errorf("row seam cursor = %v, want EW-resize", src.shape)
 	}
 }
 

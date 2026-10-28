@@ -10,6 +10,7 @@ import (
 	"github.com/entieve/entieve/sim"
 	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -19,9 +20,9 @@ import (
 
 // dockedShowcaseGame builds the showcase session, docks at the current
 // system's station and pumps one frame so the contract board is laid out.
-func dockedShowcaseGame(t *testing.T, w, h int) *Game {
+func dockedShowcaseGame(t *testing.T, w, h int, ptr ...*widgets.Pointer) *Game {
 	t.Helper()
-	g := newShowcaseGame(t)
+	g := newShowcaseGame(t, ptr...)
 	g.applySize(w, h)
 	dockAt(t, g)
 	g.syncScenes()
@@ -550,7 +551,8 @@ func findMissionPhase(evs []sim.Event, phase string) *sim.Event {
 // -- not at the static stationMinH the empty board used to declare -- and
 // every row still sits inside the frame at that floor.
 func TestStationWindowGripStopsAtContentMin(t *testing.T) {
-	g := dockedShowcaseGame(t, 1280, 720)
+	mm := useLoopMouse(t)
+	g := dockedShowcaseGame(t, 1280, 720, mm.pointer())
 	// Worst case: a full available board plus a capped active one, so the
 	// content floor is well above the static minimum.
 	setMissions(t, g, sim.MissionState{ID: "contract-solace-cleanup-1"})
@@ -566,8 +568,6 @@ func TestStationWindowGripStopsAtContentMin(t *testing.T) {
 	win := g.svcWin
 	start := win.GetContainer().GetWidget().Rect
 
-	mm := useLoopMouse(t)
-	pressEdge := installSeams(t, mm)
 	img := ebiten.NewImage(1280, 720)
 	frame := func() {
 		if err := g.Update(); err != nil {
@@ -581,9 +581,7 @@ func TestStationWindowGripStopsAtContentMin(t *testing.T) {
 	mm.moveTo(from.X, from.Y)
 	frame()
 	mm.left = true
-	*pressEdge = true
 	frame()
-	*pressEdge = false
 	mm.moveTo(from.X, from.Y+200)
 	frame()
 	mm.left = false
@@ -605,9 +603,7 @@ func TestStationWindowGripStopsAtContentMin(t *testing.T) {
 	mm.moveTo(from.X, from.Y)
 	frame()
 	mm.left = true
-	*pressEdge = true
 	frame()
-	*pressEdge = false
 	mm.moveTo(from.X, from.Y-10000)
 	frame()
 	mm.left = false

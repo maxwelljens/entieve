@@ -12,7 +12,6 @@ import (
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/icons"
 	uikit "github.com/entieve/entieve/uikit/screens"
-	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -379,17 +378,10 @@ func entryByTitle(t *testing.T, g *Game, title string) uikit.RailEntry {
 // mouse feeds ebitenui's cursor cache for the widgets, the raw press
 // edge and live cursor feed uikit's polls (the menu-loop test's split).
 func TestRailClicksWinOverAWindowUnderneath(t *testing.T) {
-	g := newShowcaseGame(t)
-	g.applySize(1280, 720)
 	mm := useLoopMouse(t)
+	g := newShowcaseGame(t, mm.pointer())
+	g.applySize(1280, 720)
 	img := ebiten.NewImage(1280, 720)
-
-	// The kit's raw press-edge seam, armed for the click frame only.
-	clickEdge := false
-	defer widgets.SetPressEdgeForTest(func(b ebiten.MouseButton) bool {
-		return b == ebiten.MouseButtonLeft && clickEdge
-	})()
-	defer widgets.SetPollCursorForTest(func() (int, int) { return mm.x, mm.y })()
 
 	frame := func() {
 		t.Helper()
@@ -416,9 +408,9 @@ func TestRailClicksWinOverAWindowUnderneath(t *testing.T) {
 	// Hover one frame, then press and release inside the cell.
 	mm.moveTo(cell.Min.X+cell.Dx()/2, cell.Min.Y+cell.Dy()/2)
 	frame()
-	clickEdge, mm.left = true, true
+	mm.left = true
 	frame()
-	clickEdge, mm.left = false, false
+	mm.left = false
 	frame()
 
 	g.syncMounts()

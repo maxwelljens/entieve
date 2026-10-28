@@ -52,13 +52,14 @@ type mapPoint struct {
 // selection, destination).
 //
 // Interaction is view state — session-only, never persisted and never a sim
-// command: the pointer is read through the kit's shared seams (PollCursor /
-// PressEdge, the SplitPane idiom) once per Sync; a press on a node selects
+// command: the pointer is read through the host's frame (the SplitPane
+// idiom) once per Sync; a press on a node selects
 // it, a press on the already-selected node makes it the destination (or
 // clears it), and the route from the current system is BFS over the gates.
 type MapView struct {
 	th      theme.Theme
 	cv      widgets.ContentView
+	ptr     *widgets.Pointer
 	win     *widget.Window
 	img     *ebiten.Image
 	gfx     *widget.Graphic
@@ -79,9 +80,10 @@ type MapView struct {
 func NewMapView(env interface {
 	theme.Theme
 	widgets.ContentView
+	Pointer() *widgets.Pointer
 }) *MapView {
 	p := env.Pal()
-	m := &MapView{th: env, cv: env}
+	m := &MapView{th: env, cv: env, ptr: env.Pointer()}
 	m.img = ebiten.NewImage(theme.Px(mapImgW), theme.Px(mapImgH))
 	m.gfx = widget.NewGraphic(widget.GraphicOpts.Image(m.img))
 
@@ -144,13 +146,12 @@ func (m *MapView) poll(cur content.SystemID) {
 	if len(m.pts) == 0 {
 		return
 	}
-	x, y := widgets.PollCursor()
-	id, on := m.nodeAt(image.Pt(x, y))
+	id, on := m.nodeAt(m.ptr.At())
 	if id != m.hover {
 		m.hover = id
 		m.dirty = true
 	}
-	if !on || !widgets.PressEdge(ebiten.MouseButtonLeft) {
+	if !on || !m.ptr.Press(widgets.Left) {
 		return
 	}
 	switch {
