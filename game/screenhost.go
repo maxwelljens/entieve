@@ -17,11 +17,13 @@ import (
 )
 
 // hostSink is what the host needs from the interface kit: mount/remove a
-// window, register its ×, and read whether a committed close fade is
-// running. *uikit.Kit implements it; tests substitute a recorder.
+// window, register its × and its row surface, and read whether a committed
+// close fade is running. *uikit.Kit implements it; tests substitute a
+// recorder.
 type hostSink interface {
 	AddWindow(*widget.Window) widget.RemoveWindowFunc
 	SetWindowClose(*widget.Window, func())
+	SetWindowRows(*widget.Window, func(image.Point) bool)
 	Closing(*widget.Window) bool
 }
 
@@ -202,7 +204,12 @@ func (h *ScreenHost) setMounted(s *screenSlot, want, quiet bool) {
 	}
 	if want {
 		h.build(s)
-		s.mount = h.sink.AddWindow(s.panel.Win())
+		win := s.panel.Win()
+		s.mount = h.sink.AddWindow(win)
+		// The window's table rows are its hit-test row surface: one live
+		// closure per mount, over the row's tables, so a table swapped
+		// inside the panel is seen.
+		h.sink.SetWindowRows(win, h.rowSurface(s.row.ID))
 		s.dismissed = false
 		s.panel.Sync()
 		if h.onMount != nil && !quiet {
@@ -386,21 +393,17 @@ func (h *ScreenHost) Tables(id ScreenID) []*widgets.Table {
 	return nil
 }
 
-// TablesHit reports whether pt lands on one of win's table rows: the click
-// cue's row test, asked per window so the kit's press gate honours the
-// stack (only the topmost window under the pointer is consulted).
-func (h *ScreenHost) TablesHit(win *widget.Window, pt image.Point) bool {
-	for _, s := range h.slots {
-		if s.panel == nil || s.panel.Win() != win {
-			continue
-		}
-		for _, t := range h.Tables(s.row.ID) {
+// rowSurface is a row's table-row surface for the kit's hit test: its
+// tables, resolved live through Tables(id) — a panel may swap them.
+func (h *ScreenHost) rowSurface(id ScreenID) func(image.Point) bool {
+	return func(pt image.Point) bool {
+		for _, t := range h.Tables(id) {
 			if t.RowAt(pt) {
 				return true
 			}
 		}
+		return false
 	}
-	return false
 }
 
 // PersistedOpen is the open value the sidecar records for a persisted row.

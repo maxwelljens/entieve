@@ -86,6 +86,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sidecar or the rail — pinned by `TestTitleRowsStaySceneOwned`, and
   `TestTitleWindowsAreOneSet` walks the menu/key/× lifecycle including the
   rebind.
+- **One hit test owns every press** (`uikit/screens`, `game`): the kit's
+  layering had four copies — `Over`'s window/rail rects, `PressTarget`'s
+  widget walk, `raisePressed`'s own stack loop and `Game.overUI`'s HUD/rack
+  checks plus the `menuModal` latch. They collapse into
+  `Kit.Own(pt) Owner{Layer, Window, Control}` (`screens/hittest.go`), one
+  walk in this precedence: the popup latch (`Kit.Held` — the context menu
+  and the quantity picker own their frame; it replaces `Game.menuModal`, and
+  the per-frame key switches read it), the popup's own rect, a visible
+  **modal** window's fullscreen layer, the rail, the window stack topmost
+  first, the HUD/rack **descendants only** (their container stretches over
+  the whole screen and owns nothing by itself), and last ebitenui's hover
+  flag, which gates but never raises. The world gate (`overUI`) is now
+  layer ≠ World, the click cue (`PressTarget`) is `Control` and the raise is
+  a press edge whose owner is a window that is not the stack top, so paint
+  order, input order and the gate cannot disagree. A window's table rows
+  join the walk through `Kit.SetWindowRows`, registered by `ScreenHost` at
+  mount over `Tables(id)` (a live closure — a table swap is seen), and the
+  Kit registers the built-in Overview's table the same way; `TablesHit` and
+  the `PressTarget` rows callback are gone, and so are `overTop` and the
+  duplicated `hitWidget`.
+  `Popup.Control` is true for the popup's entries (and the picker's
+  controls) only, so the press that just dismisses the popup no longer
+  reads as a click on whatever lay beneath it
+  (`TestPopupCueSpeaksForEntriesOnly` pins both halves; the old
+  `PressTarget` said "control" for the popup's padding and for the row under
+  the dismiss). `TestOwnPointTable` replaces the duplicated
+  synthetic-position gate checks with one table over the walk: a world
+  point, the HUD container's own full-screen rect, its painted pair, the
+  rail, a window body, its button and registered row, a real Overview row, a
+  menu entry, the popup's separator, a dismiss point, a modal picker control
+  and the hover backstop, each asserted as `{Layer, Control, Window}`.
 
 - **Key hints follow a rebind everywhere** (`game`, `uikit/screens`): the
   chord is no longer baked into the text each surface prints. The Screen
