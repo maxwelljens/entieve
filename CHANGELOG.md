@@ -72,6 +72,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The station board is a Screen panel** (`uikit/screens`, `game`): the
+  docked contract board — service row, available and active contract rows —
+  moved out of `game/contracts.go` into `uikit/screens/stationboard.go`
+  (`NewStationBoard`, one `ContentView.Contracts()` read, Accept/Abandon as
+  typed intents). A new `Fitted` host facet (`FitSize()`) applies the
+  board's content floor to the window's `MinSize` and composes its column
+  through the placement tracker, so the window hugs the board and a
+  player-moved window keeps its place. Rendering is pixel-identical (docked
+  capture pins it); the board now refreshes through one path — its mounted
+  `Sync` — instead of the event drain plus the docked frame pass.
 - **One title-owned window set** (`game`): the title screen's windows — the
   save manager, Settings, Keybindings and the credits — are now rows of ONE
   Screen table (`titleRows`) mounted by the title's one Screen host, instead

@@ -41,7 +41,7 @@ func TestViewTradeableName(t *testing.T) {
 	for _, tc := range []struct{ id, want string }{
 		{"ore-cordite", item.Name},
 		{"mod-autocannon-s", mod.Name},
-		{"ship-sloop", hull.Name}, // the hull branch contracts.go used to miss
+		{"ship-sloop", hull.Name}, // the hull branch the old board helper missed
 		{"not-a-thing", "not-a-thing"},
 	} {
 		if got := cv.TradeableName(content.ItemID(tc.id)); got != tc.want {

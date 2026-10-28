@@ -8,7 +8,6 @@ import (
 	eimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/render"
-	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -16,7 +15,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-// Window chrome metrics for the game-built windows (menu, services):
+// Window chrome metrics for the game-built window (the Esc menu):
 // mirrored from the uikit title-bar scale so they read as one theme.
 const (
 	winTitleH = 44
@@ -301,64 +300,5 @@ func (g *Game) buildMenuWindow() *widget.Window {
 		widget.WindowOpts.TitleBar(g.titleBar("Menu"), theme.Px(winTitleH)),
 		widget.WindowOpts.Modal(),
 		widget.WindowOpts.Location(image.Rect(0, 0, theme.Px(int(menuBtnW)+20), locH)),
-	)
-}
-
-// buildServicesWindow constructs the station services view — the ONE
-// window docking opens: uikit.NewServices' service row (docked-at
-// identity, Undock, Cargo and one button per service this station
-// offers) over the two contract-board sections — Available contracts
-// (this station's board) and Active contracts (every accepted contract).
-// The sections' rows are laid out by boardRowRects (contracts.go);
-// syncStationBoard rebuilds them and hugs the window to the content
-// height. The window owns no title bar — the service row is its header,
-// exactly as tall as the strip's header was, so the column's worst-case
-// height (and its clearance over the log) is unchanged.
-func (g *Game) buildServicesWindow() *widget.Window {
-	p := g.env.Pal()
-	g.svcUI = uikit.NewServices(g.env, boardInnerW)
-
-	g.stAvail = g.newBoardSection()
-	g.stActive = g.newBoardSection()
-	availHead := widget.NewText(
-		widget.TextOpts.Text("Available contracts", g.env.Face(theme.StepSmall), solid(p.Accent)),
-	)
-	actHead := widget.NewText(
-		widget.TextOpts.Text("Active contracts", g.env.Face(theme.StepSmall), solid(p.Accent)),
-	)
-
-	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(theme.WindowBody(p.BG), nrgba(p.Border, 200), 1)),
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(theme.Px(boardSpacing)),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(boardPad))),
-		)),
-	)
-	body.AddChild(g.svcUI.Container(), availHead, g.stAvail, actHead, g.stActive)
-	g.stBody = body
-	g.stModel, g.stAvailRows, g.stActRows = stationBoardModel{}, nil, nil // fresh window: rebuild on next sync
-
-	win := widget.NewWindow(
-		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.MinSize(theme.Px(stationMinW), theme.Px(stationMinH)),
-		widget.WindowOpts.Location(image.Rect(theme.Px(stationX), theme.Px(stationY), theme.Px(stationX+stationWinW), theme.Px(stationY+stationMinH))),
-	)
-	// Bind the theme now: syncStationBoard sizes the window from the body's
-	// preferred size before the window is first mounted, and ebitenui
-	// validates (and themes) buttons during that measurement. Same palette
-	// and type scale as the kit's own theme.
-	win.GetContainer().GetWidget().SetTheme(g.env.WidgetTheme())
-	g.svcWin = win
-	return win
-}
-
-// newBoardSection builds one contract-row section: a bare container
-// whose rows are tiled by the table module's row stack — equal heights,
-// boardRowGap apart, the pure pin of which is boardRowRects.
-func (g *Game) newBoardSection() *widget.Container {
-	return widget.NewContainer(
-		widget.ContainerOpts.Layout(widgets.StackLayout{Gap: theme.Px(boardRowGap)}),
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
 }

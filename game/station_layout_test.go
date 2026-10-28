@@ -97,7 +97,7 @@ func TestServiceWindowsOpenAtTheirDefaults(t *testing.T) {
 		}
 
 		// The services view is the only docked rect: the station column.
-		station := g.svcWin.GetContainer().GetWidget().Rect
+		station := g.host.Window(idServices).GetContainer().GetWidget().Rect
 		if want := stationRect(station.Dy()); station != want {
 			t.Errorf("%dx%d: services view %v, want the station column %v", w, h, station, want)
 		}

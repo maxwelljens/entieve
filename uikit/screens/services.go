@@ -9,18 +9,19 @@ import (
 	"slices"
 )
 
-// The station services view — the one window docking opens. It is the
-// docked station's face: the docked-at identity (station name · system),
-// an Undock button, a Cargo button and one button per service the
-// station actually offers — buttons the station LACKS are hidden, never
-// grayed, because an absent service is not offered at all. Every button
+// The station services row — the header of the station board, the one
+// window docking opens. It is the docked station's face: the docked-at
+// identity (station name · system), an Undock button, a Cargo button and
+// one button per service the station actually offers — buttons the station
+// LACKS are hidden, never grayed, because an absent service is not offered
+// at all. Every button
 // emits a typed intent (Undock, Toggle{Screen}) on the ActionSink; the
 // host maps the toggles onto its window table.
 //
-// The contract board the host composes under this row lives in game
-// (contracts.go): the view is the row above it, sized like the strip
-// header it replaces, so the docked column's content height — and
-// therefore its clearance over the log — is unchanged.
+// The contract board this row heads lives beside it in stationboard.go:
+// the panel composes the row first, then the two sections, so the row is
+// sized like the strip header it replaced and the docked column's content
+// height — and therefore its clearance over the log — is unchanged.
 const (
 	// svcBtnW/svcBtnH are one icon button's design box: the strip
 	// header's height over a square the 20 px glyph centres in, so a

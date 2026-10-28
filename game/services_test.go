@@ -16,7 +16,7 @@ import (
 func TestServiceTableAgreesWithScreens(t *testing.T) {
 	g := dockedShowcaseGame(t, 1280, 720)
 	for _, svc := range content.Services {
-		b := g.svcUI.Button(svc.ID)
+		b := stationBoard(t, g).Services().Button(svc.ID)
 		if svc.Window == "" {
 			if b != nil {
 				t.Errorf("%s: no window, but the services row drew a %q button", svc.ID, svc.ID)

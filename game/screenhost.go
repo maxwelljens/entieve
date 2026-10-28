@@ -13,6 +13,7 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	uikit "github.com/entieve/entieve/uikit/screens"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 )
 
@@ -36,7 +37,6 @@ type screenServices struct {
 	Keys     uikit.KeybindActions
 	HelpRows func() []uikit.KeyRow
 	Menu     func() widgets.WindowPanel
-	Station  func() widgets.WindowPanel
 	// Close is the owner's close semantics for a row's ×: the game routes
 	// modal rows to their scene, the title host leaves it nil (plain
 	// toggle).
@@ -195,9 +195,35 @@ func (h *ScreenHost) Reconcile(room Room) {
 	}
 }
 
+// Fitted is the Screen panel capability a content-hugging window answers:
+// FitSize is its content floor in DESIGN units. The host mirrors it onto
+// the window's MinSize and recomposes the row's declared rect through
+// Place — only AnchorFixed rows fit (their declared rect is an absolute
+// column, so the height can follow the content).
+type Fitted interface {
+	FitSize() (w, h int)
+}
+
+// fit applies a mounted fitted panel's content floor. It goes through
+// Place, never SetLocation: a direct move would leave the placement
+// tracker stale and the window would read as player-moved forever.
+func (h *ScreenHost) fit(s *screenSlot) {
+	if s.mount == nil || s.row.Anchor != AnchorFixed {
+		return
+	}
+	f, ok := s.panel.(Fitted)
+	if !ok {
+		return
+	}
+	w, fh := f.FitSize()
+	win := s.panel.Win()
+	win.MinSize = &image.Point{X: theme.Px(w), Y: theme.Px(fh)}
+	h.Place(win, anchorRect(s.row.DefaultRect, s.row.Anchor, theme.Px(w), theme.Px(fh), 0, 0))
+}
+
 // setMounted is the mount lifecycle: a mount builds on demand (title),
-// mounts and runs Sync in the same frame; an unmount runs the panel's
-// Unmounted hook, then removes.
+// mounts and runs Sync in the same frame — then applies a fitted panel's
+// content floor; an unmount runs the panel's Unmounted hook, then removes.
 func (h *ScreenHost) setMounted(s *screenSlot, want, quiet bool) {
 	if want == (s.mount != nil) {
 		return
@@ -212,6 +238,7 @@ func (h *ScreenHost) setMounted(s *screenSlot, want, quiet bool) {
 		h.sink.SetWindowRows(win, h.rowSurface(s.row.ID))
 		s.dismissed = false
 		s.panel.Sync()
+		h.fit(s)
 		if h.onMount != nil && !quiet {
 			h.onMount(s.row.ID)
 		}
@@ -233,7 +260,8 @@ func (h *ScreenHost) setMounted(s *screenSlot, want, quiet bool) {
 // Sync refreshes the mounted panels. A committed chrome close (the ×)
 // runs the panel's one-shot Dismissed hook first — same frame, before the
 // body Sync — so a hotkey unmount, which never reports Closing, leaves the
-// session state alone.
+// session state alone. A fitted panel's floor is re-applied after its
+// Sync (the board follows the docked station and live mission state).
 func (h *ScreenHost) Sync() {
 	for _, s := range h.slots {
 		if s.mount == nil {
@@ -246,6 +274,7 @@ func (h *ScreenHost) Sync() {
 			}
 		}
 		s.panel.Sync()
+		h.fit(s)
 	}
 }
 
@@ -543,8 +572,7 @@ func (p keybindPanel) Unmounted() {
 	}
 }
 
-// winPanel adapts a game-built window (the Esc menu, the station view)
-// to the panel seam.
+// winPanel adapts a game-built window (the Esc menu) to the panel seam.
 type winPanel struct {
 	win  *widget.Window
 	sync func()

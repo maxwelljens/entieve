@@ -199,8 +199,8 @@ func TestMenuClickDispatchesThroughUpdateLoop(t *testing.T) {
 	}
 
 	// 1. Cursor onto the objective label of a wired row.
-	row := findRow(t, g.stAvailRows, "contract-solace-cleanup-1")
-	objective := row.root.Children()[1].GetWidget()
+	row := findRow(t, stationBoard(t, g).Rows(false), "contract-solace-cleanup-1")
+	objective := row.Root.Children()[1].GetWidget()
 	if objective.Rect.Empty() {
 		t.Fatal("fixture: objective label never laid out")
 	}

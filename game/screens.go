@@ -45,9 +45,9 @@ import (
 // There is no docked special case any more: a service window opened while
 // docked is an ordinary floating window (the market's three-pane rect, the
 // inventory/fitting rects) exactly like it is in space. The one window
-// docking opens — the Station Services view — declares the station column
-// as its DefaultRect and is re-placed to the board's content height by
-// contracts.go.
+// docking opens — the station board — declares the station column as its
+// DefaultRect and answers its content floor (Fitted, uikit/screens/
+// stationboard.go), so the host composes the height.
 type DockPolicy uint8
 
 const (
@@ -279,21 +279,21 @@ var screens = []Screen{
 		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewSettings(h.services.Env, h.services.Settings) },
 	},
 	{
-		// The station services view: the ONE window docking opens, the
-		// window that replaced the old station strip. An ordinary floating
-		// window whose declared default is the station column (left of the
-		// viewport, clear of the rail gutter); its content height drives
-		// the column — contracts.go re-places it to the board's height
-		// (stationRect). Unkeyed by design — docking opens it, the rail
-		// reopens it, and there is nothing to press in space where it
-		// cannot mount.
+		// The station board: the ONE window docking opens, the window that
+		// replaced the old station strip. An ordinary floating window whose
+		// declared default is the station column (left of the viewport,
+		// clear of the rail gutter); the panel answers its content floor
+		// (FitSize, uikit/screens/stationboard.go) and the host composes
+		// the column from it (stationRect). Unkeyed by design — docking
+		// opens it, the rail reopens it, and there is nothing to press in
+		// space where it cannot mount.
 		ID: idServices, Title: "Station Services", Icon: "kind_station",
 		Key:         keyNone, // docking opens it; the rail reopens it
 		DefaultRect: image.Rect(stationX, stationY, stationX+stationWinW, stationY+stationMinH),
 		Anchor:      AnchorFixed,
 		DockPolicy:  DockFloating, DockedOnly: true,
 		Group: "Station",
-		Build: func(h *ScreenHost) widgets.WindowPanel { return h.services.Station() },
+		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewStationBoard(h.services.Env) },
 	},
 	{
 		// The refinery: an ore→mineral service window, docked-only like the
