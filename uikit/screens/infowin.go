@@ -44,6 +44,9 @@ const (
 	infoMinH   = 340
 	infoGap    = 6 // vertical gap between page blocks
 	infoWheelN = 3 // wheel notches per scroll step (rows), like the tables
+	// infoPlatePad is the dark plate's padding around the header hero icon
+	// (all four sides): the icon keeps its token size, the plate grows.
+	infoPlatePad = 10
 )
 
 // ---------------------------------------------------------------------------
@@ -593,16 +596,20 @@ type InfoWin struct {
 	cv widgets.ContentView
 	as widgets.ActionSink
 
-	win    *widget.Window
-	title  *theme.ChromeText
-	page   *widget.Container
-	scroll *widget.ScrollContainer
-	rail   *widgets.ScrollRail
-	prose  *widget.Text
-	emblem *widget.Graphic // Sub line corporation mark (nil when the def has none)
-	hero   *widget.Graphic // body hero icon (nil when the page has none)
+	win       *widget.Window
+	title     *theme.ChromeText
+	page      *widget.Container
+	scroll    *widget.ScrollContainer
+	rail      *widgets.ScrollRail
+	prose     *widget.Text
+	emblem    *widget.Graphic   // Sub line corporation mark (nil when the def has none)
+	hero      *widget.Graphic   // body hero icon (nil when the page has none)
+	plate     *widget.Container // the dark plate the hero icon sits on (same nil)
+	titleText *widget.Text      // header column title, wrapped to colW
+	subText   *widget.Text      // header column Sub line text, wrapped beside the mark
 
 	proseW  float64 // inner width the prose is wrapped to
+	colW    float64 // width the header column is wrapped to
 	refRows []InfoRefRow
 	ref     widgets.InfoRef
 	hasRef  bool
@@ -720,6 +727,10 @@ func (w *InfoWin) Emblem() *widget.Graphic { return w.emblem }
 // or nil when the page has no hero.
 func (w *InfoWin) Hero() *widget.Graphic { return w.hero }
 
+// HeroPlate is the dark plate the hero icon is drawn on (nil when the page
+// has no hero).
+func (w *InfoWin) HeroPlate() *widget.Container { return w.plate }
+
 // Show swaps the window's whole page to ref's details and reveals the
 // window. It reports whether the ref resolved: unknown ids open nothing.
 // Mounting (and the raise-to-top remount) is the host's job — see
@@ -768,26 +779,53 @@ func (w *InfoWin) scrollBy(notches float64) {
 	w.scroll.ScrollTop = max(0, min(1, top))
 }
 
-// rewrap keeps the description paragraph at the page's inner width: the
-// window is resizable, widget.Text wraps at MaxWidth rather than at its
+// rewrap keeps the description paragraph at the page's inner width and the
+// header column at its share of it (the plate and its gap are taken out):
+// the window is resizable, widget.Text wraps at MaxWidth rather than at its
 // rect, so the width comes from the scroll viewport (never from the page
 // body — a long paragraph would pin the body wider than the window and
-// clip itself) and the page is relaid out around the new wrap width.
+// clip itself) and the page is relaid out around the new wrap widths.
 func (w *InfoWin) rewrap() {
-	if w.prose == nil {
-		return
-	}
 	d := w.scroll.ViewRect().Dx() - 2*theme.Px(theme.ContentsPad)
 	if d <= 0 {
 		return
 	}
 	want := float64(d)
-	if want != w.proseW {
+	relayout := false
+	if w.prose != nil && want != w.proseW {
 		w.proseW = want
 		w.prose.MaxWidth = want
+		relayout = true
+	}
+	if w.titleText != nil || w.subText != nil {
+		col := want - float64(theme.Px(infoGap))
+		if w.plate != nil {
+			col -= float64(infoPlateW())
+		}
+		if col > 0 && col != w.colW {
+			w.colW = col
+			if w.titleText != nil {
+				w.titleText.MaxWidth = col
+			}
+			if w.subText != nil {
+				// The corp mark leads the Sub line: the text wraps beside it.
+				sub := col
+				if w.emblem != nil {
+					sub -= float64(theme.Px(theme.IconCorpInfo + theme.IconGap))
+				}
+				w.subText.MaxWidth = sub
+			}
+			relayout = true
+		}
+	}
+	if relayout {
 		w.page.RequestRelayout()
 	}
 }
+
+// infoPlateW is the header plate's side: the hero icon plus its padding on
+// both sides.
+func infoPlateW() int { return theme.Px(theme.IconHero) + 2*theme.Px(infoPlatePad) }
 
 // corpMark builds the corporation graphic a panel shows at the given token
 // (IconCorpInfo on the info maker line, IconCorp in the fitting window): the
@@ -813,31 +851,54 @@ func (w *InfoWin) render(p infoPage) {
 	w.prose = nil
 	w.emblem = nil
 	w.hero = nil
+	w.plate = nil
+	w.titleText, w.subText = nil, nil
+	w.colW = 0
 
-	// Hero: the entity's big render alone at the top of the body. The
-	// corporation mark is attribution, so it rides the Sub line below —
-	// theme.IconHero stays strictly bigger than theme.IconCorp
-	// (TestHeroOutgrowsCorpLogo), and a panel never shows the mark twice.
+	// Header: ONE row — the entity's icon on a dark plate, then the
+	// title/Sub column. The plate keeps the icon apart from the name and
+	// the corporation mark (theme.WellBox); the icon keeps its hero size
+	// and the plate grows around it. theme.IconHero stays strictly bigger
+	// than theme.IconCorp (TestHeroOutgrowsCorpLogo), and a panel never
+	// shows the mark twice: the mark rides the Sub line, never the plate.
+	head := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(theme.Px(infoGap)),
+		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+	)
 	if p.Hero != "" {
-		hero := widget.NewContainer(
-			widget.ContainerOpts.Layout(widget.NewRowLayout(
-				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Spacing(theme.Px(theme.SpMd)),
+		plate := widget.NewContainer(
+			widget.ContainerOpts.BackgroundImage(theme.WellBox(pal, theme.NRGBA(pal.Border, 200))),
+			widget.ContainerOpts.Layout(widget.NewGridLayout(
+				widget.GridLayoutOpts.Columns(1),
+				widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
+				widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(infoPlatePad))),
 			)),
-			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Position: widget.RowLayoutPositionCenter})),
 		)
 		g := theme.NewIcon(p.Hero, theme.IconHero, pal.Text)
-		g.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
-		hero.AddChild(g)
-		w.hero = g
-		w.page.AddChild(hero)
+		plate.AddChild(g)
+		w.hero, w.plate = g, plate
+		head.AddChild(plate)
 	}
 
-	// The title row is text alone (the header icon moved into the hero).
-	w.page.AddChild(widget.NewText(
+	// The column beside the plate: title over Sub, exactly the two rows
+	// the page always had. It wraps to its share of the page (rewrap).
+	col := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Spacing(theme.Px(infoGap)),
+		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+	)
+	title := widget.NewText(
 		widget.TextOpts.Text(p.Title, env.FaceBold(theme.StepBase), theme.Solid(pal.Text)),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
-	))
+	)
+	w.titleText = title
+	col.AddChild(title)
 	if p.Sub != "" || p.Emblem != "" {
 		sub := widget.NewContainer(
 			widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -857,12 +918,16 @@ func (w *InfoWin) render(p infoPage) {
 			}
 		}
 		if p.Sub != "" {
-			sub.AddChild(widget.NewText(
+			st := widget.NewText(
 				widget.TextOpts.Text(p.Sub, env.Face(theme.StepSmall), theme.Solid(pal.Dim)),
-			))
+			)
+			w.subText = st
+			sub.AddChild(st)
 		}
-		w.page.AddChild(sub)
+		col.AddChild(sub)
 	}
+	head.AddChild(col)
+	w.page.AddChild(head)
 
 	// The description prose: wrapped, present only when the def carries
 	// one (empty content never renders a placeholder block).

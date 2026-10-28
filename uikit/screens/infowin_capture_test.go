@@ -214,10 +214,26 @@ func (g *infoCaptureGame) verify(img *ebiten.Image) {
 		if n := uitest.InkIn(img, body); n < 200 {
 			fail("body %v drew %d ink pixels, want ≥ 200", body, n)
 		}
-		// The header line carries the hull name in the bold title face.
-		head := image.Rect(r.Min.X+8, r.Min.Y+theme.TitleBarH+6, r.Max.X-8, r.Min.Y+theme.TitleBarH+34)
-		if n := uitest.InkIn(img, head); n < 40 {
-			fail("header line %v drew %d ink pixels, want the hull name", n, n)
+		// The header row draws: the entity icon on its dark plate, the hull
+		// name on the column beside it. The plate is opaque where the body
+		// is translucent, with a Border hairline: sample its top edge
+		// against its own fill (that stroke is what makes it read as a box
+		// over the dark world).
+		if pl := g.k.svc.info.HeroPlate(); pl == nil || g.k.svc.info.Hero() == nil {
+			fail("header has no icon plate")
+		} else if n := uitest.InkIn(img, pl.GetWidget().Rect); n < 40 {
+			fail("icon plate %v drew %d ink pixels, want the entity icon", pl.GetWidget().Rect, n)
+		} else {
+			box := pl.GetWidget().Rect
+			mid := box.Min.X + box.Dx()/2
+			er, eg, eb, _ := img.At(mid, box.Min.Y).RGBA()
+			fr, fg, fb, _ := img.At(mid, box.Min.Y+theme.Px(infoPlatePad/2)).RGBA()
+			if uitest.AbsInt(int(er>>8)-int(fr>>8)) < 10 &&
+				uitest.AbsInt(int(eg>>8)-int(fg>>8)) < 10 &&
+				uitest.AbsInt(int(eb>>8)-int(fb>>8)) < 10 {
+				fail("icon plate %v: its top edge = its fill (%d,%d,%d) — no hairline, the box does not read",
+					box, fr>>8, fg>>8, fb>>8)
+			}
 		}
 		// The maker line leads with the dropped corporation art at the corp
 		// token (the corp icons replace the vector emblems here).
@@ -227,6 +243,17 @@ func (g *infoCaptureGame) verify(img *ebiten.Image) {
 			fail("maker mark box = %v, want %d px", b, theme.Px(theme.IconCorpInfo))
 		} else {
 			box := e.GetWidget().Rect
+			// The hull name sits in the header column directly above the
+			// mark: the column's rows down to the mark must carry the bold
+			// title's ink.
+			top := box.Min.Y
+			if pl := g.k.svc.info.HeroPlate(); pl != nil {
+				top = pl.GetWidget().Rect.Min.Y
+			}
+			name := image.Rect(box.Min.X, top, r.Max.X-theme.Px(theme.ContentsPad), box.Min.Y)
+			if n := uitest.InkIn(img, name); n < 20 {
+				fail("header column %v drew %d ink pixels, want the hull name", name, n)
+			}
 			br, bg, bb, _ := img.At(box.Min.X-3, box.Min.Y+box.Dy()/2).RGBA()
 			diff := 0
 			for y := box.Min.Y; y < box.Max.Y; y++ {
