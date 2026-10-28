@@ -99,7 +99,7 @@ func (s *Sim) buildSave() (*Save, error) {
 		if v, ok := s.AIs.Get(e); ok {
 			c := SavedNpcAI{
 				Npc: v.Npc, State: v.State, Target: uint64(v.Target), Home: v.Home,
-				LastHitBy: uint64(v.LastHitBy), Faction: v.Faction,
+				LastHitBy: uint64(v.LastHitBy), Faction: v.Faction, Authored: v.Authored,
 			}
 			if v.Rand != nil {
 				c.RandState = v.Rand.Snapshot()
@@ -699,6 +699,7 @@ func (s *Sim) attach(e ecs.Entity, se SavedEntity) {
 			// restores as zero — the "no recorded attacker" state.
 			LastHitBy: ecs.Entity(se.NPC.LastHitBy),
 			Faction:   se.NPC.Faction,
+			Authored:  se.NPC.Authored,
 		})
 	}
 	if se.Asteroid != nil {

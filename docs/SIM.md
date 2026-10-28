@@ -579,8 +579,9 @@ least `newsThreshold` (5 %) only, so quiet stretches stay quiet, and
 
 One global curve off the Works' share of the map (`Squeeze`) is both their
 meter stiffness and the war's spawn-difficulty input — the force they land
-when a system falls and the caste the fleets fly. With `start` = the systems
-authored `null` and `works` = the systems they hold now:
+when a system falls and the caste of every ambient Works spawn on the grid.
+With `start` = the systems authored `null` and `works` = the systems they
+hold now:
 
     excess  = max((works − 1) / (start − 1), 0.01)
     squeeze = exp(2 · (1/excess − 1))
@@ -645,10 +646,17 @@ is standing in that system — the grid changes with it (`warApplyControl`):
   (`warProfileCount`). The caste comes from the authored Old Works hulls
   ranked by total hit points and stiffens with the squeeze
   (`warWorksCastes`, `warProfileTier`) — no stat is edited, the war only
-  chooses among what content ships. Ambient Works spawns (respawn timers,
-  belt populations) are **not** rescaled in this wave: the design's global
-  spawn-mix shift is intent, not landed; only the war's own spawns move
-  with the curve.
+  chooses among what content ships. Ambient Works spawns scale with the same
+  curve: every authored rat conjured on the grid — a charter belt, a
+  works-held belt, the Gnazvor anomaly, a respawn replacement — shifts one
+  caste toward the tougher rats per squeeze step (`squeezeCaste`), so the mix
+  is exactly the authored one at the tick-0 share and a fight anywhere
+  stiffens as the Works' map shrinks. Counts stay as authored (density is the
+  holding force's lever) and the authored spawn group keeps its cadence: a
+  scaled hull carries its group id in `NpcAI.Authored`, so a replacement
+  re-arms the authored group and the curve never compounds on itself.
+  Traffic ambush raiders are spawned by the traffic system, not the spawn
+  groups, and are not rescaled.
 - **reclaim** — the authored guard posts respawn (`warSpawnGuards`) and
   Works hulls already on the grid are left to be shot, never silently
   swept.
@@ -669,9 +677,9 @@ the Works are working, else at the patrol anchor (`warFleets`). The
 hostility table does the rest: the bloc is hostile to the Old Works and
 neutral to everyone else unless provoked, so fleet-vs-Works engagements are
 witnessed and joinable through the ordinary threat machine. The fleet
-always flies the toughest authored machine hull; the Works' *own* holding
-force is what scales with the squeeze. The ambient Works populations are as
-authored.
+always flies the toughest authored machine hull; the Works' own holding
+force and the ambient Works populations both scale with the squeeze
+(`warSpawnWorks`, `squeezeCaste`).
 
 Kills feed the meter too (`warObserveKill`): every Works hull destroyed in
 a loaded front system credits `killAttrition` (2 %) of a flip to that
@@ -685,8 +693,11 @@ system's meter — 5,000 € of supply — and a player kill emits
 bid book and its budget, fill → supply → flip, the squeeze floor, effective
 security and the remnant mask, the fleet spawn and the kill credit, the
 world gate, the treasury's place in the money-supply enumeration
-(`TestWarMoneySupplyEnumeration`) and the twin-run hash. The war is all
-transfers, never a mint.
+(`TestWarMoneySupplyEnumeration`) and the twin-run hash. The grid half of the
+curve is pinned in `sim/war_spawnmix_test.go`: the authored mix at the tick-0
+share, the toughest caste at the floor, a scaled respawn re-arming the
+authored group, and its own twin-run hash. The war is all transfers, never a
+mint.
 
 ## 7. Extension guide (descriptive)
 

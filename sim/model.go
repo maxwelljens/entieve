@@ -215,6 +215,10 @@ type NpcAI struct {
 	// own colours): the Corporate Fleets fly machine hulls content has not
 	// named yet, so the fleet's colours ride the entity.
 	Faction string
+	// Authored is the spawn group's id when the squeeze scaled this hull's
+	// caste ("" = Npc is the authored id): a replacement re-arms the authored
+	// group's cadence and buys its own hull, so the squeeze never compounds.
+	Authored content.NpcID
 }
 
 // Asteroid is a minable rock.
@@ -1054,6 +1058,9 @@ type SavedNpcAI struct {
 	// Faction is NpcAI.Faction (omitempty: an ordinary NPC keeps its def's
 	// colours and serializes exactly as before the field existed).
 	Faction string `json:"faction,omitempty"`
+	// Authored is NpcAI.Authored (omitempty: only a squeeze-scaled hull
+	// carries one, so an ordinary save serializes exactly as before).
+	Authored content.NpcID `json:"authored,omitempty"`
 }
 
 // SavedModTarget is an active-module target binding.
