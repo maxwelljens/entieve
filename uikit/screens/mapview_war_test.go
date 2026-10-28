@@ -87,9 +87,12 @@ func TestWarSeam(t *testing.T) {
 		t.Error("War seam handed out the live control map")
 	}
 
+	// world-showcase carries the war too — the showcase proves it
+	// end-to-end (the wave-2 gate) — so the plain seam must show it. The
+	// no-war path stays pinned by TestMapWarCard's empty-view case.
 	plain, _ := newChromeEnv(t)
-	if plain.War().Has() {
-		t.Error("world-showcase War seam carries a war")
+	if !plain.War().Has() {
+		t.Error("world-showcase War seam lost its war")
 	}
 }
 
@@ -132,29 +135,29 @@ func TestMapWarCard(t *testing.T) {
 
 	m.sel = "sys-penumbra" // charter-held front: the Works press
 	lines := m.cardLines("sys-solace")
-	if !hasCardLine(lines, "Held — the charter") {
+	if !hasCardLine(lines, "Charter-held") {
 		t.Errorf("charter card lacks the holder line: %q", cardTexts(lines))
 	}
-	if !hasCardLine(lines, "Contested — the Works press at 42%") {
+	if !hasCardLine(lines, "Front — the Works press at 42%") {
 		t.Errorf("charter front lacks its meter line: %q", cardTexts(lines))
 	}
 
 	m.sel = "sys-glusza" // works-held front: the charter pushes
 	lines = m.cardLines("sys-solace")
-	if !hasCardLine(lines, "Held — the Old Works") {
+	if !hasCardLine(lines, "Works-held") {
 		t.Errorf("works card lacks the holder line: %q", cardTexts(lines))
 	}
-	if !hasCardLine(lines, "Contested — the charter pushes at 17%") {
+	if !hasCardLine(lines, "Front — the charter pushes at 17%") {
 		t.Errorf("works front lacks its meter line: %q", cardTexts(lines))
 	}
 
 	m.sel = "sys-solace" // charter-held, behind the front: holder only
 	lines = m.cardLines("sys-solace")
-	if !hasCardLine(lines, "Held — the charter") {
+	if !hasCardLine(lines, "Charter-held") {
 		t.Errorf("home card lacks the holder line: %q", cardTexts(lines))
 	}
 	for _, l := range lines {
-		if strings.HasPrefix(l.text, "Contested") {
+		if strings.HasPrefix(l.text, "Front") {
 			t.Errorf("non-front card carries a meter line %q", l.text)
 		}
 	}
@@ -164,7 +167,7 @@ func TestMapWarCard(t *testing.T) {
 	we.war.Contest["sys-penumbra"] = widgets.ContestView{Meter: 0.004, Threshold: 1}
 	m.Sync()
 	for _, l := range m.cardLines("sys-solace") {
-		if strings.HasPrefix(l.text, "Contested") {
+		if strings.HasPrefix(l.text, "Front") {
 			t.Errorf("a quiet meter still renders %q", l.text)
 		}
 	}
@@ -174,13 +177,13 @@ func TestMapWarCard(t *testing.T) {
 	m.Sync()
 	lines = m.cardLines("sys-solace")
 	for _, l := range lines {
-		if strings.HasPrefix(l.text, "Held") || strings.HasPrefix(l.text, "Contested") {
+		if strings.HasPrefix(l.text, "Charter-held") || strings.HasPrefix(l.text, "Works-held") || strings.HasPrefix(l.text, "Front") {
 			t.Errorf("war-less card carries %q", l.text)
 		}
 	}
 }
 
-// TestMapWarKey pins the legend: control, the contested marker and the war
+// TestMapWarKey pins the legend: control, the front marker and the war
 // treasury — and no key in a world without a war.
 func TestMapWarKey(t *testing.T) {
 	env, _ := newChromeEnv(t)
@@ -190,7 +193,7 @@ func TestMapWarKey(t *testing.T) {
 		Treasury: 96_500_000,
 	})
 	want := []string{
-		"Charter · holds", "Old Works · holds", "Contested · the front",
+		"Charter-held", "Works-held", "Front",
 		"War treasury — 96,500,000.00 €",
 	}
 	if len(rows) != len(want) {

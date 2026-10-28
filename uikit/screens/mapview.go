@@ -454,9 +454,9 @@ func (m *MapView) cardLines(cur content.SystemID) []mapCardLine {
 	// The war readout: the holder, and on the front the meter the design
 	// keeps to the aggregate war (never the player's own share).
 	if _, holds := m.war.Control[def.ID]; holds {
-		holder := "Held — the charter"
+		holder := "Charter-held"
 		if m.war.WorksHeld(def.ID) {
-			holder = "Held — the Old Works"
+			holder = "Works-held"
 		}
 		lines = append(lines, mapCardLine{text: holder, col: p.Text})
 		// A quiet meter (under one percent) stays off the card: the ring
@@ -497,9 +497,9 @@ func (m *MapView) cardLines(cur content.SystemID) []mapCardLine {
 // the other side's progress toward the flip.
 func contestLine(worksHeld bool, meter float64) string {
 	if worksHeld {
-		return "Contested — the charter pushes at " + theme.PctLabel(meter)
+		return "Front — the charter pushes at " + theme.PctLabel(meter)
 	}
-	return "Contested — the Works press at " + theme.PctLabel(meter)
+	return "Front — the Works press at " + theme.PctLabel(meter)
 }
 
 // warKeyMark is one war-legend marker shape: the node vocabulary the key
@@ -528,9 +528,9 @@ func warKeyRows(p theme.Palette, w widgets.WarView) []warKey {
 		return nil
 	}
 	return []warKey{
-		{mark: warMarkCharter, text: "Charter · holds", col: p.Text},
-		{mark: warMarkWorks, text: "Old Works · holds", col: p.Text},
-		{mark: warMarkFront, text: "Contested · the front", col: p.Info},
+		{mark: warMarkCharter, text: "Charter-held", col: p.Text},
+		{mark: warMarkWorks, text: "Works-held", col: p.Text},
+		{mark: warMarkFront, text: "Front", col: p.Info},
 		{text: "War treasury — " + theme.FormatCredits(w.Treasury), col: p.Dim},
 	}
 }
