@@ -204,18 +204,7 @@ func (k *Kit) buildOverview() {
 	)
 	contents.AddChild(tbl.Container())
 
-	title := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.WindowTitleBox(theme.Solid(k.th.Pal().BGHard), theme.NRGBA(k.th.Pal().Border, 200))),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-	)
-	ovTitle := theme.NewChromeText(k.th, theme.StepBase, "Overview", k.th.Pal().Accent)
-	ovTitle.GetWidget().LayoutData = widget.AnchorLayoutData{
-		HorizontalPosition: widget.AnchorLayoutPositionStart,
-		VerticalPosition:   widget.AnchorLayoutPositionCenter,
-		Padding:            &widget.Insets{Left: theme.Px(theme.SpMd + theme.TitleDotsW + theme.TitleDotsGap)},
-	}
-	title.AddChild(theme.TitleDotsWidget(k.th.Pal()))
-	title.AddChild(ovTitle)
+	title, _ := theme.NewTitleBar(k.th, "Overview", "")
 
 	o.win = widget.NewWindow(
 		widget.WindowOpts.Contents(contents),

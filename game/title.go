@@ -41,7 +41,7 @@ const (
 	titleWinH    = 400
 	creditWinW   = 400 // credits window
 	creditWinH   = 520
-	titleTitleH  = winTitleH
+	titleTitleH  = theme.TitleBarH
 	titleScrollH = 3 * 20 // wheel step (design px) for the title windows
 )
 
@@ -583,7 +583,7 @@ func (t *titleScreen) window(bar *widget.Container, page *widget.Container, w, h
 		widget.ScrollContainerOpts.Content(page),
 		widget.ScrollContainerOpts.StretchContentWidth(),
 		widget.ScrollContainerOpts.Image(&widget.ScrollContainerImage{
-			Idle: bordered(theme.WindowBody(p.BG), nrgba(p.Border, 160), 1),
+			Idle: theme.SquareBox(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 160), 1),
 			Mask: theme.NineSlice(theme.Solid(p.BG)),
 		}),
 	)
@@ -603,7 +603,7 @@ func (t *titleScreen) window(bar *widget.Container, page *widget.Container, w, h
 	widgets.AttachScrollContent(scroll, page)
 	rail := widgets.NewScrollRail(g.env, scroll, scroll, page)
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.WindowBodyBox(p, theme.WindowBody(p.BG), nrgba(p.Border, 200))),
+		widget.ContainerOpts.BackgroundImage(theme.WindowBodyBox(p, theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
 			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),

@@ -166,7 +166,7 @@ func NineSlice(c color.NRGBA) *eimage.NineSlice { return eimage.NewNineSliceColo
 // design-unit hairline is 1 DIP, so it must thicken with the rest of the
 // interface (at 2× it is 2 device px = 1 DIP, still a hairline).
 // Panels, window pieces and square strips call Rounded/PanelBox/
-// WindowBodyBox/WindowTitleBox for their own radii (round.go).
+// WindowBodyBox/WindowTitleBox/SquareBox for their own radii (round.go).
 func Bordered(body, edge color.NRGBA, w int) *eimage.NineSlice {
 	return Rounded(body, edge, w, AllRadii(RadiusControl))
 }

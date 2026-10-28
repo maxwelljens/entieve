@@ -43,6 +43,9 @@ const (
 //	well                WellBox: panel radii, the opaque BGHard fill and a
 //	                    hairline edge — a dark plate laid on the body.
 //	square              Rounded(…, Radii{}): view masks, meter strips, seams.
+//	square strip        SquareBox: no corner arc, flat hairline edge — thin
+//	                    chrome (the game-built menu body, the station
+//	                    board's body and row backs).
 //
 // Naming map: WindowAlpha is the one translucency token and WindowBody the
 // palette colour it applies to (chrome.go); PanelTop/PanelBottom are the depth
@@ -93,6 +96,16 @@ func PanelBottom(p Palette, body color.NRGBA) color.NRGBA {
 // w design px, drawn inside the box edge.
 func Rounded(body, edge color.NRGBA, w int, radii Radii) *eimage.NineSlice {
 	return roundedBox(body, body, edge, w, radii)
+}
+
+// SquareBox is the square strip: a flat hairline-bordered box with no corner
+// arc — thin chrome where a control radius (Bordered) would read as a button
+// (the game-built menu body, the title windows' scroll backs, the station
+// board's body and row backs). It is Rounded's square form on ebitenui's
+// bordered colour rather than the SDF rasteriser: the 1 px edge and the fill
+// are written exactly, so the strips keep the pixels every capture pins.
+func SquareBox(body, edge color.NRGBA, w int) *eimage.NineSlice {
+	return eimage.NewBorderedNineSliceColor(body, edge, w)
 }
 
 // PanelBox is an in-window panel or card: 8 px all round, body fill
