@@ -95,7 +95,8 @@ type ScreenHost struct {
 }
 
 // newScreenHost builds the host over a row table. scope title keeps
-// panels lazy (fresh on every open) and rows exclusive.
+// panels lazy (fresh on every open) and rows exclusive; its table is the
+// title's own set (game/title.go).
 func newScreenHost(rows []Screen, scope hostScope, sink hostSink, services screenServices) *ScreenHost {
 	h := &ScreenHost{
 		scope:    scope,
@@ -166,12 +167,14 @@ func (h *ScreenHost) closeRow(id ScreenID) {
 	h.Toggle(id)
 }
 
-// want is the per-row mount rule.
+// want is the per-row mount rule. A title host's table IS the title set
+// (game/title.go: titleRows), so its rows follow their flag inside the
+// title room — the room, not a per-row marker, gates the host.
 func (h *ScreenHost) want(s *screenSlot, room Room) bool {
-	if room.Title {
-		return h.scope == titleScope && s.row.InTitle && s.open
-	}
 	if h.scope == titleScope {
+		return room.Title && s.open
+	}
+	if room.Title {
 		return false
 	}
 	return s.open &&

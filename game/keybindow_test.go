@@ -231,7 +231,7 @@ func TestKeybindScrollReach(t *testing.T) {
 			g := newTitleGameAt(t, filepath.Join(t.TempDir(), "save.json"))
 			w, h := int(1280*sc), int(720*sc)
 			g.applySize(w, h)
-			g.titleUI.open("keybindings")
+			g.titleUI.openID(idKeybindings)
 			pump(t, g, w, h)
 
 			kb := keybinds(t, g.titleUI.host)

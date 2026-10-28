@@ -84,7 +84,7 @@ func (cg *titleWindowCapture) Update() error {
 	}
 	cg.frames++
 	if !cg.opened && cg.frames == 4 {
-		cg.g.titleUI.open(cg.which)
+		cg.g.titleUI.openID(ScreenID(cg.which))
 		cg.opened, cg.openedDraw = true, cg.draws // the fade counts DRAWN frames
 	}
 	return cg.g.Update()
@@ -119,8 +119,9 @@ func (cg *titleWindowCapture) capture(img *ebiten.Image) {
 		}
 
 	case "credits":
-		win = g.titleUI.credits
-		page = widgets.ScrollContentOf(g.titleUI.creditScroll)
+		cp := bodyOf[creditPanel](g.titleUI.host, idCredits)
+		win = cp.Win()
+		page = widgets.ScrollContentOf(cp.scroll)
 	}
 	if win == nil || page == nil {
 		cg.err = fmt.Errorf("%s window did not mount (title=%v open=%v mounted=%v)",

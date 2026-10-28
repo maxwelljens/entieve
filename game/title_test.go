@@ -261,14 +261,15 @@ func TestSaveManagerWindows(t *testing.T) {
 	dir := t.TempDir()
 	g := newTitleGameAt(t, filepath.Join(dir, "save.json"))
 	g.applySize(1280, 720)
-	g.titleUI.open("manager")
+	g.titleUI.openID(idManager)
 	if err := g.Update(); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
-	if g.titleUI.manager == nil || g.titleUI.managerPage == nil {
+	m := bodyOf[*managerPanel](g.titleUI.host, idManager)
+	if m == nil || m.page == nil {
 		t.Fatal("save manager did not mount")
 	}
-	if kids := g.titleUI.managerPage.Children(); len(kids) != 1 {
+	if kids := m.page.Children(); len(kids) != 1 {
 		t.Fatalf("empty manager has %d rows, want the empty state", len(kids))
 	} else if txt, ok := kids[0].(*widget.Text); !ok || txt.Label != "No saves yet." {
 		t.Errorf("empty state = %v, want %q", kids[0], "No saves yet.")
@@ -277,29 +278,29 @@ func TestSaveManagerWindows(t *testing.T) {
 	src := newShowcaseGameAt(t, filepath.Join(dir, "save.json"))
 	writeStateSave(t, src, filepath.Join(dir, "save.json"), 2)
 	writeStateSave(t, src, filepath.Join(dir, "save-2.json"), 4)
-	g.titleUI.saves = g.listSaves()
-	g.titleUI.refreshManager()
-	if kids := g.titleUI.managerPage.Children(); len(kids) != 2 {
+	m.saves = g.listSaves()
+	m.refresh()
+	if kids := m.page.Children(); len(kids) != 2 {
 		t.Fatalf("manager lists %d rows, want 2", len(kids))
 	}
 
 	victim := filepath.Join(dir, "save-2.json")
-	g.titleUI.deleteSave(victim) // arm
+	m.delete(victim) // arm
 	if _, err := os.Stat(victim); err != nil {
 		t.Fatal("first Delete click removed the file (needs a confirm)")
 	}
-	g.titleUI.deleteSave(victim) // confirm
+	m.delete(victim) // confirm
 	if _, err := os.Stat(victim); !os.IsNotExist(err) {
 		t.Fatalf("confirm did not remove %s: %v", victim, err)
 	}
-	if len(g.titleUI.saves) != 1 {
-		t.Errorf("one delete left %d saves", len(g.titleUI.saves))
+	if len(m.saves) != 1 {
+		t.Errorf("one delete left %d saves", len(m.saves))
 	}
 
-	g.titleUI.deleteSave(filepath.Join(dir, "save.json"))
-	g.titleUI.deleteSave(filepath.Join(dir, "save.json"))
-	if kids := g.titleUI.managerPage.Children(); len(g.titleUI.saves) != 0 || len(kids) != 1 {
-		t.Errorf("deleting the only save left %d saves, %d rows", len(g.titleUI.saves), len(kids))
+	m.delete(filepath.Join(dir, "save.json"))
+	m.delete(filepath.Join(dir, "save.json"))
+	if kids := m.page.Children(); len(m.saves) != 0 || len(kids) != 1 {
+		t.Errorf("deleting the only save left %d saves, %d rows", len(m.saves), len(kids))
 	}
 }
 
@@ -381,7 +382,7 @@ func TestTitleSettingsAndCredits(t *testing.T) {
 	g := newTitleGameAt(t, filepath.Join(dir, "save.json"))
 	g.applySize(1280, 720)
 
-	g.titleUI.open("settings")
+	g.titleUI.openID(idSettings)
 	if err := g.Update(); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
@@ -438,15 +439,16 @@ func TestTitleSettingsAndCredits(t *testing.T) {
 		t.Errorf("title audio sidecar = %v, want master %d, music 60, shuffle_off true", raw, g.masterVol)
 	}
 
-	g.titleUI.open("credits")
+	g.titleUI.openID(idCredits)
 	if err := g.Update(); err != nil {
 		t.Fatalf("Update credits: %v", err)
 	}
-	if g.titleUI.credits == nil || g.titleUI.creditsRem == nil {
+	credits := g.titleUI.host.Window(idCredits)
+	if credits == nil || !g.titleUI.host.Mounted(idCredits) {
 		t.Fatal("credits window did not mount from the title")
 	}
 	g.Draw(ebiten.NewImage(1280, 720)) // layout the window once
-	if r := g.titleUI.credits.GetContainer().GetWidget().Rect; r.Dx() <= 0 || r.Dy() <= 0 {
+	if r := credits.GetContainer().GetWidget().Rect; r.Dx() <= 0 || r.Dy() <= 0 {
 		t.Errorf("credits window never laid out (%v)", r)
 	}
 	if g.titleUI.host.Mounted(idSettings) {
@@ -456,7 +458,7 @@ func TestTitleSettingsAndCredits(t *testing.T) {
 	if err := g.Update(); err != nil {
 		t.Fatalf("Update after Esc: %v", err)
 	}
-	if g.titleUI.credits != nil {
+	if g.titleUI.host.Window(idCredits) != nil || g.titleUI.host.Mounted(idCredits) {
 		t.Error("Esc did not close the credits window")
 	}
 	if !g.title {
@@ -464,14 +466,21 @@ func TestTitleSettingsAndCredits(t *testing.T) {
 	}
 }
 
-// TestTitlePSettingsToggle: P behaves at the title exactly as the
-// settings window's hint says — it closes that window (and opens it when
-// closed), so the in-game component's "P closes" line stays true in both
-// places.
-func TestTitlePSettingsToggle(t *testing.T) {
+// TestTitleSettingsActionToggle: the settings toggle behaves at the title
+// exactly as the settings window's hint says — its key closes that window
+// (and opens it when closed) — and it is settings' LIVE key: the row's
+// action id resolves through the binding table, never a hardcoded P.
+//
+// Renamed from TestTitlePSettingsToggle (wave 6): the story is unchanged,
+// but it is the action id's toggle now, not a P-shaped special case.
+func TestTitleSettingsActionToggle(t *testing.T) {
 	g := newTitleGameAt(t, filepath.Join(t.TempDir(), "save.json"))
 	g.applySize(1280, 720)
 
+	action, ok := g.actionFor(ebiten.KeyP, false)
+	if !ok || action != "settings" {
+		t.Fatalf("P resolves to %q (ok=%v), want the settings action", action, ok)
+	}
 	if err := g.updateTitle(Input{JustPressed: []ebiten.Key{ebiten.KeyP}}); err != nil {
 		t.Fatalf("P open: %v", err)
 	}

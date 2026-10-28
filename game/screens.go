@@ -140,8 +140,10 @@ const (
 //	              station lacking it the rail entry grays, clicking it
 //	              does nothing ("" = no dependency; in space the window
 //	              opens exactly as its key always did)
-//	InTitle       the row also lives on the title screen: its host mounts
-//	              it lazily and exclusively there (Settings, Keybindings)
+//	InTitle       the row also lives on the title screen: inTitleRows
+//	              (game/title.go) selects it into the title host's table,
+//	              which mounts it lazily and exclusively there (Settings,
+//	              Keybindings)
 //	Build         constructs the panel (window + Sync) on the host, once
 //	              per Warm and freshly per title mount; the window is the
 //	              Build's return value — there is no side-channel registry

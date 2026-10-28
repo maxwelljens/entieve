@@ -11,6 +11,11 @@ import (
 	"github.com/entieve/entieve/uikit/widgets"
 )
 
+// creditsScrollOf is the mounted credits window's scroll viewport.
+func creditsScrollOf(g *Game) *widget.ScrollContainer {
+	return bodyOf[creditPanel](g.titleUI.host, idCredits).scroll
+}
+
 // The credits screen's layout: the tracked wordmark and subtitle, one
 // section header per creditSection, the role/credit rows and the footer —
 // all reachable by scrolling at every supported UI scale.
@@ -23,13 +28,13 @@ func TestCreditsWindowLayout(t *testing.T) {
 			g := newTitleGameAt(t, filepath.Join(t.TempDir(), "save.json"))
 			w, h := int(1280*sc), int(720*sc)
 			g.applySize(w, h)
-			g.titleUI.open("credits")
+			g.titleUI.openID(idCredits)
 			pump(t, g, w, h)
 
-			if g.titleUI.creditScroll == nil {
+			if creditsScrollOf(g) == nil {
 				t.Fatal("the credits window mounted without its scroll viewport")
 			}
-			content := widgets.ScrollContentOf(g.titleUI.creditScroll)
+			content := widgets.ScrollContentOf(creditsScrollOf(g))
 			page, ok := content.(widget.Containerer)
 			if !ok {
 				t.Fatal("no credits page")
@@ -59,7 +64,7 @@ func TestCreditsWindowLayout(t *testing.T) {
 					len(creditSections), strings.Contains(joined, "MIT License"))
 			}
 
-			scroll := g.titleUI.creditScroll
+			scroll := creditsScrollOf(g)
 			scroll.ScrollTop = 1
 			pump(t, g, w, h)
 			view := scroll.ViewRect()
