@@ -1,0 +1,48 @@
+{
+  "id": "ship-npc-miner",
+  "group": "Ships/Industrials",
+  "base_price": 380000,
+  "name": "Kutřek",
+  "class": "industrial",
+  "description": "A mining cooperative's working barge: one strip laser, a shallow ore hold, and enough hull to survive a rock falling on it. It cuts, it fills, it runs the load to market.",
+  "maker": "corp-druzstvo",
+  "origin": "moravian",
+  "slots": {
+    "high": 1,
+    "mid": 1,
+    "low": 2
+  },
+  "high_mounts": [
+    {
+      "kind": "turret",
+      "size": "s"
+    }
+  ],
+  "grid_classes": {
+    "i": 1
+  },
+  "cpu_classes": {
+    "ii": 1
+  },
+  "shield": 320,
+  "armor": 550,
+  "structure": 650,
+  "resists": {
+    "em": 0.1,
+    "thermal": 0.15,
+    "kinetic": 0.3,
+    "explosive": 0.3
+  },
+  "capacitor": 1000,
+  "recharge": 150,
+  "max_speed": 150,
+  "agility": 1.3,
+  "mass": 5000000,
+  "sig_radius": 80,
+  "cargo": 300,
+  "ore_hold": 1200,
+  "warp_speed": 2.2,
+  "max_target_range": 30000,
+  "max_targets": 2,
+  "scan_resolution": 320
+}

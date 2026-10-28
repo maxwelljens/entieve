@@ -192,13 +192,18 @@ const (
 	NpcOrbit    NpcAIState = "orbit"
 	NpcFlee     NpcAIState = "flee"
 	NpcReturn   NpcAIState = "return"
+	// NpcMine and NpcHaul are the civilian miner's two states (npc-miner-*,
+	// see npcMiner): cutting rock in a belt, and carrying a full hold to
+	// the nearest station. Plain strings, so saves stay compatible.
+	NpcMine NpcAIState = "mine"
+	NpcHaul NpcAIState = "haul"
 )
 
 // NpcAI is the behavior state of an NPC ship.
 type NpcAI struct {
 	Npc    content.NpcID
 	State  NpcAIState
-	Target ecs.Entity // current hostile (usually the player)
+	Target ecs.Entity // current hostile (usually the player); a miner's rock or haul station
 	Home   core.Vec2  // spawn anchor
 	Rand   *core.RNG  // per-NPC stream (Fork'd); marshaled via Snapshot/RestoreRNG
 	// LastHitBy is the source of the most recent damage this ship took
@@ -221,8 +226,9 @@ type Asteroid struct {
 }
 
 // BeltRock is one rock's persistent belt state: the volume remaining
-// against the definition volume it was seeded with (Volume is the
-// regrowth cap, persisted so the state is self-contained).
+// against the definition volume it was seeded with (Volume is the cap the
+// cycle refill resets Remaining to, persisted so the state is
+// self-contained).
 type BeltRock struct {
 	Ore       content.ItemID `json:"ore"`
 	Remaining float64        `json:"remaining"`
@@ -230,8 +236,10 @@ type BeltRock struct {
 }
 
 // BeltState is one belt's persistent state. Rocks are in BeltDef order
-// (the flat rock index spawnCelestial iterates); GrownAt is the tick the
-// regrowth window last advanced (see systemBelts).
+// (the flat rock index spawnCelestial iterates). GrownAt is the anchor of
+// the last cycle boundary: the belt refills once every beltCycleTicks
+// (60 sim minutes) derived from it by pure division (see systemBelts). The
+// json key keeps the old name — no save schema change.
 type BeltState struct {
 	System  content.SystemID `json:"system"`
 	Cel     content.CelID    `json:"cel"`
@@ -1110,8 +1118,9 @@ type Save struct {
 	// Belts is every belt's persistent per-rock remaining volume, in
 	// canonical order: system id ascending, then celestial id ascending
 	// (rocks in BeltDef order). Seeded from the BeltDef on first
-	// generation, decremented by mining and rat requisitions, regrown by
-	// the 600-tick window — belt depletion survives reloads.
+	// generation, decremented by mining, NPC miners and rat requisitions, and
+	// refilled at the 60-minute cycle boundary — belt depletion survives
+	// reloads.
 	Belts []BeltState `json:"belts,omitempty"`
 	// FactionLedger is the per-faction requisition balance NPC replacements
 	// draw on when they buy hulls, modules, charges or ore through a

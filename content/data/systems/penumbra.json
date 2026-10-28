@@ -36,7 +36,7 @@
         "X": -959446719972,
         "Y": 811839532284
       },
-      "radius": 280000,
+      "radius": 840000,
       "colors": [
         "#7c6f63"
       ],
@@ -44,13 +44,13 @@
         "asteroids": [
           {
             "ore": "ore-cordite",
-            "count": 10,
-            "volume": 5500
+            "count": 30,
+            "volume": 16500
           },
           {
             "ore": "ore-lucidite",
-            "count": 6,
-            "volume": 7000
+            "count": 18,
+            "volume": 21000
           }
         ]
       },
@@ -59,6 +59,11 @@
           "npc_id": "npc-rat-scuttler",
           "count": 2,
           "respawn_sec": 120
+        },
+        {
+          "npc_id": "npc-miner-barge",
+          "count": 1,
+          "respawn_sec": 600
         }
       ]
     },

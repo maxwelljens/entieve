@@ -84,18 +84,19 @@
       "name": "Asteroid Belt I",
       "kind": "belt",
       "position": { "X": -330134854342, "Y": 476861456272 },
-      "radius": 290000,
+      "radius": 870000,
       "colors": ["#8f8475"],
       "belt": {
         "asteroids": [
-          { "ore": "ore-sterngrit", "count": 12, "volume": 3000 },
-          { "ore": "ore-cordite", "count": 10, "volume": 4000 },
-          { "ore": "ore-lucidite", "count": 4, "volume": 5500 }
+          { "ore": "ore-sterngrit", "count": 36, "volume": 9000 },
+          { "ore": "ore-cordite", "count": 30, "volume": 12000 },
+          { "ore": "ore-lucidite", "count": 12, "volume": 16500 }
         ]
       },
       "spawns": [
         { "npc_id": "npc-rat-scuttler", "count": 3, "respawn_sec": 120 },
-        { "npc_id": "npc-rat-marauder", "count": 2, "respawn_sec": 300 }
+        { "npc_id": "npc-rat-marauder", "count": 2, "respawn_sec": 300 },
+        { "npc_id": "npc-miner-barge", "count": 1, "respawn_sec": 600 }
       ]
     },
     {

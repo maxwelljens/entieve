@@ -487,7 +487,9 @@ agility × 10 s); the afterburner multiplies speed while its cycle runs.
 
 **Mining.** Select an asteroid and press `M`: the first mining laser cycles,
 ore lands in the ore hold, and depleted asteroids vanish. Sell the ore at a
-station's market or stockpile it.
+station's market or stockpile it. Fields are worked by civilian miners too,
+and they **refill on a fixed 60-minute cycle**: a live rock tops back up in
+place at the boundary, a destroyed one comes back at a fresh scatter.
 
 **Overview distances** follow EVE conventions: meters under 2 km
 (`1,250 m`), kilometers under 0.1 AU (`3.4 km`), AU beyond (`1.2 AU`).

@@ -277,7 +277,11 @@ func (s *Sim) activate(e ecs.Entity, slot SlotRef, target ecs.Entity, quiet bool
 	if reqForKind(def.Kind) != targetNone && !target.IsZero() {
 		text += " on " + s.nameOf(target)
 	}
-	s.emit(Event{Kind: EvModule, Actor: e, Target: target, Text: text})
+	// A civilian miner's laser cycling is ambient, not news: no module
+	// event for it (its ore and deliveries still speak).
+	if e == s.player || def.Kind != content.KindMiningLaser {
+		s.emit(Event{Kind: EvModule, Actor: e, Target: target, Text: text})
+	}
 	return true
 }
 
@@ -295,9 +299,11 @@ func (s *Sim) deactivate(e ecs.Entity, slot SlotRef, reason string, sev Severity
 	}
 	name := string(rt.Def)
 	isAB := false
+	isMine := false
 	if def, ok := s.Content.Module(rt.Def); ok {
 		name = def.Name
 		isAB = def.Kind == content.KindAfterburner
+		isMine = def.Kind == content.KindMiningLaser
 	}
 	rt.Active = false
 	if reason != "" {
@@ -306,7 +312,10 @@ func (s *Sim) deactivate(e ecs.Entity, slot SlotRef, reason string, sev Severity
 	if isAB {
 		s.recomputeFit(e)
 	}
-	s.emit(Event{Kind: EvModule, Actor: e, Text: name + " deactivated"})
+	// Same rule as activation: a miner's laser cycling is ambient.
+	if e == s.player || !isMine {
+		s.emit(Event{Kind: EvModule, Actor: e, Text: name + " deactivated"})
+	}
 }
 
 // stopAllModules clears every fitted module's active state and cycle clock.

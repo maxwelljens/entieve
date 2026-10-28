@@ -24,3 +24,12 @@ type NpcDef struct {
 func (d *NpcDef) IsGuard() bool {
 	return strings.HasPrefix(string(d.ID), "npc-guard-")
 }
+
+// IsMiner reports whether the def is a civilian belt miner (npc-miner-*):
+// the one NPC family with its own extraction state machine (sim/npcMiner)
+// instead of the player-centric threat machine. Miners are passive — they
+// never initiate on the player and never flee — so the threat triggers do
+// not apply to them (the rat threat response is untouched).
+func (d *NpcDef) IsMiner() bool {
+	return strings.HasPrefix(string(d.ID), "npc-miner-")
+}

@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Civilian belt miners** (`npc-miner-barge`, `ship-npc-miner`, sim): the
+  belts are worked. A Dvužek cooperative barge — the `Kutřek` hull, one
+  mining laser, no guns — cuts the nearest rock with volume left, moves on
+  when it depletes, and when its ore hold fills it warps to the nearest
+  station of the system and offloads: the hold lands on that station's book
+  as system-owned supply one tick under its own price, so the ore is
+  buyable there and no money is minted (nobody's wallet, no ledger entry).
+  The barge then despawns and its spawn group's timer (600 s) re-arms it.
+  Passive by its own def: it never aggros the player, never flees and never
+  locks — but it is an ordinary ship otherwise, and a killed miner's wreck
+  carries the hold as loot. Mining cycle logs stay player-only. Two miners
+  in the Struvok belt, one in each other belt with a market station.
+- **Belt cycle refill pins** (`sim`): the boundary refills state and grid
+  (live rock in place, destroyed rock at a fresh scatter), is pure tick math,
+  and survives a save/restore across the boundary bit-for-bit.
+
 - **Document store** (`docstore`, `game`): every JSON document beside a save
   — the save itself, the layout, settings and keybindings sidecars — now
   reads through one tolerant contract (missing / corrupt / out-of-range
@@ -132,6 +148,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `widgets.OpenRowMenu`, the layout sidecar reads the slot — so tests now
   drive the live functions and the widgets test harness lost its uncalled
   chrome half. No behavior change.
+- **Fields are 3× bigger** (`content/data/systems`): every shipped belt's
+  rock counts and per-rock volumes ×3 and its scatter radius ×3, ore mixes
+  unchanged — Struvok 12×200 + 8×1,000 m³ → 36×600 + 24×3,000 m³ at
+  12 km, and the same ratio out to the frontier belts.
+- **Belts refill on a fixed 60-minute cycle** (sim): the +1 %-per-10-seconds
+  trickle is gone. One rule instead: every rock resets to its definition
+  volume at the cycle boundary (`beltCycleTicks` = 216,000 ticks), derived
+  from the tick count alone (`GrownAt` is reused as the cycle anchor — the
+  save schema and its `grown_at` key are unchanged, so old saves load and
+  simply refill once). A live rock tops up in place, a destroyed rock
+  re-enters the grid at a fresh scatter, and the twin-run determinism pin
+  is untouched.
 - **Panel gating and the Tab cycle follow the verb table** (`uikit/screens`):
   the Selected Item panel's `syncSelected` is one loop of `VerbReady` (the
   Warp `tooClose` case is the row's `Ready` reason; `canLock` and

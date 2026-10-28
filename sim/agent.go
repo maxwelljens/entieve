@@ -499,7 +499,7 @@ func (s *Sim) ExtractBeltOre(sys content.SystemID, vol float64) float64 {
 // ensureSystemBelts seeds persistent belt state for every belt of a system
 // from its content defs (the same first-generation semantics loadSystem
 // uses), so miners extract from systems the player has never visited and
-// depletion/regrowth stay tracked there.
+// depletion/cycle refill stay tracked there.
 func (s *Sim) ensureSystemBelts(sys content.SystemID) {
 	def, ok := s.Content.System(sys)
 	if !ok {

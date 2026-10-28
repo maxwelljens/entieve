@@ -249,11 +249,32 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
 
 1. **Extraction — persistent belts.** Every belt rock carries remaining
    volume in `belts` (`Save.Belts`), seeded from the `BeltDef` on first
-   generation and never re-seeded by a reload. Mining and rat requisitions
-   decrement it in step with the live asteroid entities; every 600-tick
-   window a rock regrows **+1 % of its definition volume**, capped at that
-   volume (`systemBelts`, `sim/system_mining.go`). A drained belt stays
-   drained until regrowth — across save/restore and system reloads.
+   generation and never re-seeded by a reload. Mining, NPC miners and rat
+   requisitions decrement it in step with the live asteroid entities. Belts
+   refill on a **fixed 60-minute cycle** (`beltCycleTicks` = 216,000 ticks,
+   `systemBelts`, `sim/system_mining.go`): the cycle is pure tick math —
+   `n := (ticks - GrownAt) / beltCycleTicks`, `GrownAt` the anchor of the
+   last boundary (the persisted field, unchanged on the wire) — and at the
+   boundary every rock resets to its **definition volume**. A live rock tops
+   up in place (the entity is kept, so a mining target survives the
+   boundary); a destroyed rock re-enters the grid through `spawnAsteroid`
+   with a fresh scatter, which is why the boundary consumes the master RNG
+   stream exactly like a system load. Off-system belts refill state-only and
+   scatter on their next load. A drained belt stays drained between
+   boundaries — across save/restore and system reloads.
+
+   **NPC extraction.** Civilian miners (`npc-miner-*`, `npcMiner`,
+   `sim/system_npc.go`) run the same cycle machinery: they cut the nearest
+   rock with volume left, move on when it depletes, and when the ore hold is
+   full they warp to the nearest station of the system and offload. The
+   delivery posts the hold on that station's book as system-owned asks one
+   tick under its own price — the convoy-delivery rule — so the ore is real
+   supply and **no money is minted** (`settle` only moves currency for
+   player-owned orders); the miner then despawns and its spawn group's timer
+   re-arms it. Miners are passive: the threat triggers never apply to them,
+   they hold no lock on the player and never flee, but they are ordinary
+   ships otherwise — lockable, damageable, and their death runs the normal
+   wreck path with the hold as loot.
 2. **Refining — ore to minerals.** `CmdRefine` at a `refine` station turns
    ore into minerals at `floor(refine_yield × qty)` per mineral (`execRefine`,
    `sim/system_economy.go`), in whole **100-ore batches** only: any quantity

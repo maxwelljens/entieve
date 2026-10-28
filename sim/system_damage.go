@@ -189,6 +189,16 @@ func (s *Sim) handleDeath(e, src ecs.Entity) {
 		s.trafficHaulerDestroyed(e, tc)
 	}
 
+	// A miner's ore hold rides its wreck: the load it cut is lootable back
+	// (the ordinary wreck path carries the hold, not the loot table).
+	if def != nil && def.IsMiner() {
+		if c, ok := s.Cargos.Get(e); ok {
+			for _, st := range c.Ore {
+				loot = addStacks(loot, st.Item, st.Qty)
+			}
+		}
+	}
+
 	// Wreck reprocessing: a destroyed ship whose hull has a manufacturing
 	// recipe returns part of its mineral bill as reclaimed material, so
 	// wrecks are organic material sources without conjuring products.
