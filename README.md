@@ -1,248 +1,103 @@
 # Entieve
 
-Entieve is a single-player 2D space sandbox in Go (Ebitengine). You fly one
-ship through a seven-system star cluster: you take jobs, mine asteroids, fight
-rats, haul ore, trade, and spend the money on ships and modules. The rules are
-modelled on EVE Online — four damage types, shield/armor/structure, capacitor,
-turret tracking — and the whole thing runs locally on your machine.
+**A single-player 2D space sandbox, modelled on EVE Online, running entirely
+on your machine.** One ship, seven systems, no subscriptions, no server, no
+other players — just the frontier and its ledgers.
+
+You take jobs, mine asteroids, fight rats, haul ore, trade on real order
+books, and spend the money on ships and modules. The rules you know from EVE
+are here: four damage types, shield / armour / structure, capacitor pressure,
+turret tracking and falloff, ammo with purpose. Everything is simulated
+locally at 60 ticks per second — the universe keeps its books whether you
+watch or not.
 
 ```
-go run ./cmd/entieve run        # play
-go test ./...                   # the whole test suite (headless, no GPU needed)
+Download: https://github.com/maxwelljens/entieve/releases
+Play from source: go run ./cmd/entieve run
 ```
 
-## Flying
+---
 
 ![Vaštrek next to Jalvrek station, with the overview, log and ship HUD open](screenshots/1.png)
 
-*Undocked at Jalvrek in the Struvok system. The overview lists everything
-on grid, the Selected Item panel acts on the highlighted object, and the HUD
-holds shield/armor/structure, speed, wallet and capacitor.*
+## Fly
 
-You look down on one system at a time. Movement and orders are keyboard and
-mouse: approach, orbit, align, stop, warp, dock, jump a gate, lock a target,
-run a module. The overview only lists what is on your grid (250 km) — anything
-further out appears in the scanner as anonymous long-range contacts ("Ship
-×3") until you go there. You warp to 0, 10 or 50 km of a destination, which
-decides where you come out.
+Keyboard and mouse, top-down on one system at a time: approach, orbit,
+align, warp, dock, jump gates, lock targets, run modules. The overview shows
+what is on your grid; the scanner sweeps for anonymous long-range contacts
+you have to go see for yourself. Warp to 0, 10 or 50 km — your landing is
+your choice. Time acceleration (1×–8×) shortens the trips.
 
-Most of flying is travel: station to belt to gate to the next system. Time
-acceleration runs 1× to 8× to shorten the trips.
-
-Windows toggle from the keyboard (`I`, `F`, `G`, `B`, `C`, `N`, `H`, `P`,
-`Shift+L`) or from the **left navigation rail** — one glyph per window in
-six sections (Ship, Trade, Industry, Station, World, Help & System).
-Hover for the name and hotkey, click once to open (the window lands on
-top) and again to close; an entry you cannot use in the current context
-is grayed, never hidden, and the slim edge tab collapses the rail
-between sessions (`rail_collapsed` in the settings sidecar). The rail is
-derived from the window table, so every window is one row in it; the
-Esc menu keeps its own key and the HUD and module rack are permanent
-chrome with no entries.
-
-## Stations
+Everything lives in windows you toggle from the keyboard (`I`, `F`, `G`,
+`B`, `C`, `N`, `H`, `P`, `Shift+L`) or open from the navigation rail on the
+left — hover for the name and hotkey, grayed entries tell you what you
+cannot use yet, and the rail collapses when you want the screen back.
+Controls and concepts: [docs/GAMEPLAY.md](docs/GAMEPLAY.md).
 
 ![Station interior with contracts, market, inventory and fitting windows open](screenshots/2.png)
 
-*Docked at Jalvrek. Contracts on the left, the market with stock and prices
-at the top, cargo and ore hold in the middle, the fitting window on the right.*
+## Trade and build
 
-Docking opens exactly one window: the **station services view**, with
-the docked-at identity, an **Undock** button, a **Cargo** button and one
-button per service *this* station offers (repair, market, refine,
-fitting; industry where it exists — an absent service is not offered)
-over the contract board on the left. Market, inventory, fitting and the
-factory are ordinary windows you open from it, their keys, or the left
-rail — each opens at its own default size and position, docked or in
-space, and undocking closes the services view and leaves your own windows
-as they were. Contracts give you
-specific work — destroy a named rat, mine a volume of ore, deliver cargo to
-another system — and pay money and standing on completion. The market is an
-order book: buying and selling take the best resting prices, with a broker
-fee on buys and a sales tax on sells, and prices move only when real goods
-trade hands — your trades, the agents' trades, or a convoy's fresh supply
-arriving. Refining turns ore into minerals; the hangar stores ships and
-modules between trips.
+Docking opens the station services view: Undock, Cargo, and one button per
+service *this* station actually offers — over its contract board. Contracts
+give you specific work (kill, mine, deliver) and pay money and standing.
 
-Fitting is slot-based: high slots take turrets and mining lasers, mid slots
-take propulsion and electronic warfare, low slots take tank and repair. The
-fitting window shows what each change does to the hull — shield/armor/structure,
-capacitor and recharge, speed, alignment, signature, cargo, and resists per
-damage type. There are four player hulls (Vaštrek, Ždanek, Hušnek, Furdžan), and
-the market is where the parts come from.
+The market is a real order book: broker fees, sales tax, and prices that
+move only when real goods change hands — yours, the agents', or a convoy's
+fresh supply arriving. Refining turns ore into minerals; industry stations
+run timed manufacturing jobs (minerals → hulls, modules and charges) and
+their craft grows with every completed run; the hangar keeps your ships
+between trips.
 
-## Combat and mining
+Fitting is slot-based — turrets and mining lasers up front, propulsion and
+electronic warfare in the middle, tank in the back — and the window shows
+what every change does to the hull: shield, armour, structure, capacitor
+and recharge, speed, alignment, signature and per-type resists. Four player
+hulls to work toward; the market is where the parts come from.
 
-![Fight at the Kvonice belt with a Scutter locked, asteroids in the overview and the EMP turret stats open](screenshots/3.png)
+![Fight at the Kvonice belt with a Scuttler locked, asteroids in the overview and the EMP turret stats open](screenshots/3.png)
 
-*A fight at the Kvonice belt. The locked target gets its own readout at the
-top; the module panel on the right shows the turret's damage profile, optimal
-range, falloff, tracking and capacitor use; the log records every shot.*
+## Fight and mine
 
-Mining is straightforward: lock the asteroid, switch on a mining laser, and the
-ore lands in your ore hold. Combat is decided by numbers you can see. Whether
-a turret hits depends on its tracking and range against the target's speed,
-angle and signature; hits can be wrecking shots. Ammo changes the damage
-profile across EM, thermal, kinetic and explosive, and every hull has its own
-resists on shield, armor and structure, with damage overflowing from one layer
-to the next. Guns, active tank and boosters all draw on the same capacitor,
-which recharges on a curve of its own, so a fit is a trade-off.
+Mining is honest: lock the rock, switch on the laser, fill the ore hold.
+Combat is decided by numbers you can see — tracking against your target's
+speed and angle, range against falloff, ammo chosen for the resists you are
+shooting, and a capacitor that the guns and the tank share. Wrecking shots
+happen. So do losses: your pod is recovered and the insurer issues a fresh
+Vaštrek.
 
-Rats patrol the belts and defend them against miners and shooters, and they
-behave differently across the cluster: skittish in Charter space, fighting to
-the death out in the Unincorporated systems. Combat anomalies hide the boss
-rats and the best loot. Lose your ship and you are not finished — your pod is
-recovered and the insurer issues a fresh Vaštrek.
+Rats work the belts and defend them — skittish in Charter space, fighting to
+the death out in the Unincorporated systems — and civilian miners work them
+too, if you let them. Combat anomalies hide the boss rats and the best loot.
 
-Controls and concepts: [docs/GAMEPLAY.md](docs/GAMEPLAY.md).
+## Yours to change
 
-## Rules
+Drop a PNG named after a content ID into `assets/` and the game draws it
+instead of the built-in art: `assets/hulls/ship-sloop.png`,
+`assets/stations/cel-haven-rest.png`. Any size works, missing files fall
+back to the procedural art, and an empty `assets/` plays exactly like the
+stock game. Sizing and fallback rules: [docs/ART.md](docs/ART.md).
 
-- **Turrets** use the tracking formula
-  (`0.5^((angular/(tracking·sig/40k))² + (max(0,d−optimal)/falloff)²)`) with
-  wrecking shots, ammo that changes the damage profile, and resists across
-  EM/thermal/kinetic/explosive.
-- **Shield / armor / structure** with per-layer resists and overflow
-  carry-over.
-- **Capacitor** with EVE's recharge curve (peak at ~25%), boosters with
-  charges, active tank that competes for the same cap as the guns.
-- **Order-book economy.** Stations run repair, market, refine, fitting and
-  (at industry stations) the factory; each market is a real order book with
-  a broker fee, sales tax and escrow; ore refines into minerals; ships and
-  modules live in the hangar. A roster of traders, miners and industrialist
-  agents trades, mines and manufactures alongside you, and convoys haul
-  real cargo between the systems.
-- **Manufacturing.** Two-tier production — ore refines into minerals,
-  recipes turn minerals into hulls, modules and charges — run as timed jobs
-  at industry stations (factory window, `B`), with station craft that grows
-  with every completed run.
-- **Seven systems** in the Wild Fields frontier — the ring: Struvok
-  and Rydnok (Charter space), Kvonice, Młondan and Kamžal (the Fringe),
-  Pušťov and Glůšan (Unincorporated) — with escalating danger, stargates
-  between them, and combat anomalies with boss rats. Rat temperament
-  follows charter reach: Charter space rats are skittish, Unincorporated
-  rats fight to the death.
-- **Visibility.** The overview shows only the 250 km grid; the scanner sweeps
-  for anonymous long-range contacts; warp-to-within (0/10/50 km) shapes
-  landings.
-- **Show Info.** Right-click any item where it appears for a flat EVE-style
-  context menu (bold **Show Info** first) and one floating **Info** window
-  (its body is headed with the entity's name) — description prose, stats,
-  charges, market data, loot.
-- **Time acceleration** (1×–8×).
+## Universe
 
-## Custom art
+Seven systems in the Wild Fields frontier — Struvok and Rydnok (Charter
+space), Kvonice, Młondan and Kamžal (the Fringe), Pušťov and Glůšan
+(Unincorporated) — with escalating danger between the stargates. The
+economy is populated: traders, miners and industrialists trade, mine and
+manufacture alongside you, and convoys haul real cargo system to system.
 
-Drop a PNG into `assets/` — `assets/hulls/ship-sloop.png`,
-`assets/stations/cel-haven-rest.png` — and the game draws it instead of the
-built-in vector art. No config: the file name is the content ID, any size
-works, and every missing file falls back to the procedural art, so an empty
-`assets/` plays exactly like the stock game. Convention, sizing and fallback
-rules: [docs/ART.md](docs/ART.md).
+## Legal
 
-## Typeface
+Licence: **European Union Public Licence 1.2** (see [LICENSE](LICENSE)) —
+© 2026 The Entieve Authors, distributed without warranty.
 
-The UI is set in **IBM Plex Sans** — Regular for body text, Medium for window
-titles, table headers, buttons and HUD readouts — embedded from
-`render/fonts/` alongside its license, so `IBM Plex Sans, SIL Open Font
-License 1.1` ("Copyright 2018 The IBM Plex Sans Project Authors"
-<https://github.com/noponies/turret-road>) is included in every binary
-([`render/fonts/OFL.txt`](render/fonts/OFL.txt), [docs/ART.md](docs/ART.md)).
+Set in **IBM Plex Sans** (SIL Open Font License 1.1). Interface icons from
+[game-icons.net](https://game-icons.net) (CC BY 3.0); every icon's author
+credit is kept in [`uikit/icons/CREDITS.md`](uikit/icons/CREDITS.md).
 
-## Icons
+---
 
-The interface's glyphs come from
-[game-icons.net](https://game-icons.net) — monochrome silhouettes embedded in
-[`uikit/icons/`](uikit/icons), converted to white-alpha at load and tinted
-from the palette (16/20/24 px on the type grid). They mark kinds in the
-overview and HUD, actions on the Selected Item buttons, module classes on the
-rack, objectives on contract rows, and the service window titles.
-
-**License — CC BY 3.0**: every icon keeps its author credit — the full list
-(name, slug, author, source, license) is
-[`uikit/icons/CREDITS.md`](uikit/icons/CREDITS.md), and a test pins each PNG
-to both a manifest entry and a credits line. Required wording: *Icons made by
-{author}. Available on https://game-icons.net*.
-
-## Architecture
-
-```
-cmd/entieve → game → {render, uikit} → sim → content → (core, ecs)
-```
-
-- [`sim/`](sim) is a fully deterministic fixed-timestep simulation
-  (60 ticks/s) with **no rendering dependency**. Everything is driven through
-  `sim.Command` values and observed through `sim.Event` values — the same
-  interface that lets tests and AI agents play the game headlessly.
-- [`content/`](content) is data-driven: ships, modules, items, NPCs, recipes,
-  star systems and worlds are JSON under `content/data/`, loaded,
-  cross-validated and embedded into the binary.
-- [`ecs/`](ecs) is a minimal deterministic ECS; [`core/`](core) has the
-  vector math and a golden-pinned SplitMix64 PRNG so twin runs are bit-identical.
-- [`render/`](render), [`uikit/`](uikit), [`game/`](game) are the Ebitengine
-  client.
-
-Design notes: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (the binding
-contract) and [docs/SIM.md](docs/SIM.md) (the simulation reference:
-tick anatomy, world metabolism, the ledger-agent economy, price
-formation).
-
-## Tooling (humans and AI agents alike)
-
-```sh
-go run ./cmd/entieve validate                 # lint all content, cross-check refs
-go run ./cmd/entieve describe mod-autocannon-s  # introspect any content id (JSON)
-go run ./cmd/entieve simulate \
-    --world world-showcase --ticks 36000 \
-    --script scripts/showcase.json            # headless run + report
-go run ./cmd/entieve run --world world-default
-```
-
-`simulate` executes tick-scheduled command scripts — JSON steps like
-`{"at_tick": 300, "action": "warp", "target": "Asteroid Belt I"}` — and prints
-every event plus a final state report (wallet, grid, state hash). Adding
-content without touching engine code is the intended workflow:
-[docs/CONTENT_AUTHORING.md](docs/CONTENT_AUTHORING.md) covers it, including
-"how to add a star system in 5 minutes".
-
-## Worlds
-
-- `world-default` — the normal game start at Struvok.
-- `world-showcase` — the test world: exercises **every** feature in the game
-  (see its `scenario` checklist) and powers the integration suite in
-  [`tests/`](tests).
-
-## Development
-
-```sh
-just            # the recipe list
-just run        # play the game
-just check      # the release gate: gofmt, go vet, tests, content validate
-```
-
-Agent-facing workflow notes live in [AGENTS.md](AGENTS.md).
-
-Everything is a [just](https://github.com/casey/just) recipe: `just test` /
-`just test-race` / `just cover`, `just validate` / `just simulate …` /
-`just describe <id>`, `just lint` / `just lint-deep` / `just fmt` /
-`just tidy`. `just build` stamps the version from `git describe` into
-`bin/entieve`; the raw `go test ./...` and friends work too.
-
-Testing policy: heavy stdlib `testing` coverage per package; `sim` is
-deterministic (twin-run hash equality is asserted); `content` always loads and
-validates the real data; `tests/` proves the showcase world exercises every
-feature end-to-end.
-
-### Releasing
-
-`just release <version>` cuts a release end to end: it runs `just check`,
-folds the `[Unreleased]` CHANGELOG section into `## [x.y.z] - date`, commits,
-tags `vx.y.z`, pushes to Codeberg (origin) and GitHub, then GoReleaser
-(`.goreleaser.yaml`) cross-compiles linux/windows/darwin on amd64 + arm64
-(cgo-free, so one machine builds them all) and publishes the GitHub release at
-[maxwelljens/entieve](https://github.com/maxwelljens/entieve) with the
-CHANGELOG section as the release notes and a SHA-256 sums file. `just dist`
-builds every target into `dist/` without publishing, and `just
-release-notes <version>` previews the notes a release would use.
-
-License: MIT (the bundled IBM Plex Sans fonts: SIL Open Font License 1.1).
+For developers and agents: [AGENTS.md](AGENTS.md) (commands, layout,
+release flow). Design contract: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md);
+simulation reference: [docs/SIM.md](docs/SIM.md); release history:
+[CHANGELOG.md](CHANGELOG.md).
