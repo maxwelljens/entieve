@@ -107,6 +107,22 @@ type Kit struct {
 	// and module rack keep their under-window position (AddContainer).
 	tops []TopChrome
 
+	// rows is each mounted window's registered row surface (SetWindowRows):
+	// the hit test consults it after the window's widget walk fails, because
+	// a table's rows sit in a scroll viewport the walk cannot descend into.
+	rows map[*widget.Window]func(image.Point) bool
+
+	// held is the popup latch (the context menu and the quantity picker own
+	// the frame): the world gate, the key switches and the raise all read
+	// it. popupAt/popupControl are the popup's own answer for the frame's
+	// press point, sampled before Poll acted — the press that runs an entry
+	// closes the popup and runs its action, and the click cue must still
+	// hear that entry.
+	held         bool
+	popupAt      image.Point
+	popupControl bool
+	polled       bool // the host's MenuInput already polled this frame
+
 	// svc is the shared interaction state every panel built from this
 	// kit's Env reaches: the context menu and the Show Info window.
 	svc *services
@@ -205,6 +221,7 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command), opts ...K
 	k.closes = map[*widget.Window]func(){}
 	k.closeBtns = map[*widget.Window]*widget.Button{}
 	k.anims = map[*widget.Window]*winAnim{}
+	k.rows = map[*widget.Window]func(image.Point) bool{}
 	k.coreClosed = map[string]bool{}
 	k.coreShown = true
 
@@ -257,6 +274,11 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command), opts ...K
 	k.SetWindowClose(k.sp.win, func() { k.ToggleCore("Selected Item") })
 	k.AddWindow(k.ov.win)
 	k.AddWindow(k.sp.win)
+	// The Overview's table rows are its row surface, registered the same way
+	// every host window's is (SetWindowRows).
+	k.SetWindowRows(k.ov.win, func(pt image.Point) bool {
+		return k.ov.tbl != nil && k.ov.tbl.RowAt(pt)
+	})
 
 	k.Sync()
 	return k, nil
@@ -282,9 +304,11 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command), opts ...K
 // is on widgets.Menu): Menu.Poll sets it, TakeBlocked clears it — once per
 // frame, here — so the next frame's poll is live again.
 func (k *Kit) Update() error {
-	k.svc.menu.Poll()
+	if !k.polled { // the host's MenuInput did not poll this frame: fall back
+		k.pollPopup()
+	}
+	k.polled = false
 	menuBlocked := k.svc.menu.TakeBlocked()
-	k.pickPoll() // the picker's own Esc (hosts that skip MenuInput still cancel)
 	if !k.svc.menu.IsOpen() && !menuBlocked {
 		k.raisePressed()
 		k.ui.Update()
@@ -355,66 +379,31 @@ func (k *Kit) Draw(screen *ebiten.Image) {
 // so a modal menu's dismiss click can never re-stack what lies beneath
 // the popup.
 //
-// Selection: the topmost mounted window under the cursor wins when
-// windows overlap — that is the window receiving the click, so that is
-// the one that rises. Top chrome (the rail) owns its rect outright, and
-// a modal window between the top and the candidate owns every gesture
-// (its ebitenui layer is fullscreen — input below it is gated, so
-// nothing below it may rise either). A window already at the top of the
-// stack is a no-op: the remount leak (documented in showDialog and
-// game.setPanel) is paid only when the stacking actually changes.
+// Selection: the walk's own answer (Own) picks the winner — the topmost
+// visible window under the cursor, with the popup, a modal window, the top
+// chrome (the rail) and the root chrome all claiming a point first. A
+// window already at the top of the stack is a no-op: the remount leak
+// (documented in showDialog and game.setPanel) is paid only when the
+// stacking actually changes.
 func (k *Kit) raisePressed() {
 	p := k.pointer
 	if !p.Press(widgets.Left) && !p.Press(widgets.Right) {
 		return
 	}
-	pt := p.At()
-	if k.overTop(pt) {
-		return // top chrome (the rail) owns this point — no raise
+	o := k.Own(p.At())
+	// Only a window owns a raise: the popup, the rail, the root chrome and
+	// the hover backstop never re-stack anything, and a modal window owns
+	// every point through the walk (nothing below it may rise).
+	if o.Layer != LayerWindow || o.Window == nil || o.Window == k.stackTop() {
+		return
 	}
-	for i := len(k.stack) - 1; i >= 0; i-- {
-		w := k.stack[i].win.GetContainer().GetWidget()
-		if !w.IsVisible() {
-			continue // a hidden window keeps its rect but claims nothing
-		}
-		if pt.In(w.Rect) {
-			if i == len(k.stack)-1 {
-				return // already the topmost window
-			}
-			k.raise(k.stack[i].win)
-			return
-		}
-		if k.stack[i].win.Modal {
-			return // a modal above the candidate owns every gesture
-		}
-	}
+	k.raise(o.Window)
 }
 
-// overTop reports whether pt sits on visible top chrome (the rail).
-func (k *Kit) overTop(pt image.Point) bool {
-	for _, t := range k.tops {
-		if w := t.Container().GetWidget(); w.IsVisible() && pt.In(w.Rect) {
-			return true
-		}
-	}
-	return false
-}
-
-// Over reports whether pt sits on interface chrome the kit owns: visible
-// top chrome or a visible mounted window. Hidden windows keep their last
-// rect but claim nothing, and an unmounted window is not in the stack at
-// all — the world-input gate's exact-conjunct rule.
-func (k *Kit) Over(pt image.Point) bool {
-	if k.overTop(pt) {
-		return true
-	}
-	for _, m := range k.stack {
-		if w := m.win.GetContainer().GetWidget(); w.IsVisible() && pt.In(w.Rect) {
-			return true
-		}
-	}
-	return false
-}
+// Over reports whether pt sits on interface chrome the kit owns — any layer
+// but the world (Own's one walk). Hidden windows keep their last rect but
+// claim nothing, and an unmounted window is not in the stack at all.
+func (k *Kit) Over(pt image.Point) bool { return k.Own(pt).Layer != LayerWorld }
 
 // raise re-tops win: the kit's own remove closure (chrome, stack entry,
 // ebitenui window) followed by a fresh AddWindow, which appends it on
@@ -439,14 +428,7 @@ func (k *Kit) raise(win *widget.Window) {
 // under-window input (the modal keeps gating exactly as it did before
 // the chrome was lifted). Paint is unaffected — no modal covers the
 // rail's column.
-func (k *Kit) modalUp() bool {
-	for _, m := range k.stack {
-		if m.win.Modal && m.win.GetContainer().GetWidget().IsVisible() {
-			return true
-		}
-	}
-	return false
-}
+func (k *Kit) modalUp() bool { return k.modalWindow() != nil }
 
 // drawTops runs Kit.Draw's top pass: each top chrome comes back from its
 // park, paints over every window (its tooltips with it), and its input
@@ -778,15 +760,28 @@ func (k *Kit) applyCore() {
 // MenuInput polls the host's pointer and Esc key for the context menu and,
 // if it is up, the quantity picker. It must run BEFORE scene and key
 // handling (Game.Update calls it first): it returns whether one of them
-// owned this frame's input, which the host latches to gate world input and
-// its own key switches. Kit.Update polls the same seam afterwards, so a
-// host that never calls it still gets dismissal — just a frame later and
-// without the same-frame gate.
+// owned this frame's input — Kit.Held, which the host reads to gate world
+// input and its own key switches. Kit.Update polls the same seam afterwards,
+// so a host that never calls it still gets dismissal — just a frame later
+// and without the same-frame gate.
 func (k *Kit) MenuInput() bool {
-	if k.svc.menu.Poll() {
-		return true
+	k.polled = true
+	return k.pollPopup()
+}
+
+// pollPopup is the frame's one popup poll (MenuInput, Kit.Update's
+// fallback): the popup's answer for the frame's press point is sampled
+// FIRST — the press that runs an entry closes the popup and runs its
+// action, and the click cue must still hear it — then the menu and the
+// picker act, and the frame's latch is set.
+func (k *Kit) pollPopup() bool {
+	k.popupAt = k.pointer.At()
+	k.popupControl = k.popupHit(k.popupAt)
+	k.held = k.svc.menu.Poll()
+	if k.pickPoll() {
+		k.held = true
 	}
-	return k.pickPoll()
+	return k.held
 }
 
 // pickPoll runs the quantity picker's modal frame: Esc cancels it — before
@@ -797,6 +792,7 @@ func (k *Kit) pickPoll() bool {
 	if k.qtyWin == nil || !k.qtyWin.IsOpen() {
 		return false
 	}
+	k.held = true
 	if qtyEsc() {
 		k.CloseQty()
 	}

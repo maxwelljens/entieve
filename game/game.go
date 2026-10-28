@@ -15,7 +15,6 @@ import (
 	"sort"
 	"strings"
 
-	enuiinput "github.com/ebitenui/ebitenui/input"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/docstore"
@@ -189,13 +188,6 @@ type Game struct {
 	titleUI           *titleScreen
 	pendingTitleEnter bool
 	pendingTitleLoad  string
-
-	// menuModal latches the frame's popup state (the context menu and the
-	// quantity picker): Game.Update samples it (Kit.MenuInput) before any
-	// scene or key handling, so a popup that is up — or that consumed this
-	// frame's click/Esc — gates world input (overUI) and the key switches
-	// for the whole frame.
-	menuModal bool
 
 	// menuWasOpen is the previous frame's popup state: the popup's open
 	// EDGE is its appearance cue. The menu is kit-level (never a mounted
@@ -426,9 +418,9 @@ func (g *Game) Update() error {
 	}
 	g.menuWasOpen = menuUp
 	// The context menu owns its frame: sample it before anything reads
-	// input (it may consume this frame's Esc or click), then gate the
-	// scene and key switches on the latch.
-	g.menuModal = g.kit.MenuInput()
+	// input (it may consume this frame's Esc or click). The latch (Kit.Held)
+	// then gates the scene and key switches for the whole frame.
+	g.kit.MenuInput()
 
 	in := g.buildInput()
 
@@ -547,7 +539,7 @@ func (g *Game) handleKeys(in Input) error {
 			// A context menu that was up this frame consumed the Esc
 			// (Kit.MenuInput closed it) — it must not also push the menu
 			// scene behind the dismissed popup.
-			if g.menuModal {
+			if g.kit.Held() {
 				continue
 			}
 			if err := g.onEscape(); err != nil {
@@ -576,7 +568,7 @@ func (g *Game) handleKeys(in Input) error {
 			case menuOpen:
 				// The Esc menu is modal: nothing else toggles while it
 			// is open (save/load/time above still work).
-			case g.menuModal:
+			case g.kit.Held():
 				// So is a context menu: it owns this frame's keys until
 				// the click or Esc that dismisses it has been spent.
 			default:
@@ -689,51 +681,18 @@ func (g *Game) applyChrome(space, gameplay bool) {
 	g.kit.SetTopsVisible(gameplay)
 }
 
-// overUI reports whether the pointer sits on interface panel chrome: the
-// kit's own exact rects (the core windows, every mounted window — the log
-// among them while it is open — and the rail), the root-overlay chrome
-// (HUD, rack) and ebitenui's hover flag, which covers what the game cannot
-// measure (rack tooltips, ephemeral windows). The hover flag only
-// refreshes in Draw, so it lags a frame behind the pointer — the exact
-// rects are the honest gate, the flag is a backstop.
+// overUI reports whether the pointer sits on interface panel chrome. It is
+// the kit's one hit test (Kit.Own): the popup's frame latch and rect, a
+// modal window's fullscreen layer, the top chrome (the rail), every mounted
+// window (the log among them while it is open), the root-overlay chrome's
+// descendants (HUD, rack) and last ebitenui's hover flag, which covers what
+// the rects cannot measure (rack tooltips, ephemeral windows). The hover
+// flag only refreshes in Draw, so it lags a frame behind the pointer — the
+// exact rects are the honest gate, the flag is a backstop.
 // ebitenui does not gate raw ebiten input, so world mouse handling must
 // ask this first.
 func (g *Game) overUI(x, y float64) bool {
-	if enuiinput.UIHovered {
-		return true
-	}
-	pt := image.Point{X: int(x), Y: int(y)}
-	// The popups gate in two deterministic parts: the context menu's popup
-	// rect — uikit exposes it because an ebitenui-drawn popup would be
-	// invisible to this rect test — and the frame latch, which is the
-	// quantity picker's only gate (its window is in the kit's stack, so
-	// kit.Over covers the rect below): a popup that was up when the frame's
-	// input was sampled owns every gesture on it, so a click outside it
-	// never reaches the world.
-	if r, open := g.kit.MenuRect(); open && pt.In(r) {
-		return true
-	}
-	if g.menuModal {
-		return true
-	}
-	// The HUD's children are anchored root-overlay chrome, not windows.
-	if g.hud != nil && isVisible(g.hud.Container().GetWidget()) {
-		for _, ch := range g.hud.Container().Children() {
-			if hitWidget(pt, ch.GetWidget()) {
-				return true
-			}
-		}
-	}
-	if g.rack != nil && hitWidget(pt, g.rack.Container().GetWidget()) {
-		return true
-	}
-	return g.kit.Over(pt)
-}
-
-// hitWidget reports whether pt sits on w: visible (a hidden widget keeps
-// its last rect) and inside it. A never-laid-out zero rect never hits.
-func hitWidget(pt image.Point, w *widget.Widget) bool {
-	return w.IsVisible() && pt.In(w.Rect)
+	return g.kit.Over(image.Pt(int(x), int(y)))
 }
 
 // isVisible reports whether w is shown (it and its parents are visible).

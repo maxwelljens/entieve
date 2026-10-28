@@ -925,13 +925,34 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > kit's one dialog lifecycle (`screens/kitdialog.go`, CONTEXT.md "Dialog"),
 > shared with the order mini-window and the quantity picker. The popup is
 > custom rather than ebitenui's own context-menu windows because those bypass the
-> deterministic world-input gate: the menu rect joins `Game.overUI`'s
-> exact-rect list, so a click over the popup can never reach world input,
-> and the press itself is spent on the popup for the rest of the frame —
-> `Kit.Update` still advances ebitenui's cached input while it skips
+> deterministic world-input gate: the popup rect *and* the frame's popup latch
+> are `Game.overUI`'s (`Kit.Own`'s popup layer, so a click over the popup can
+> never reach world input, and neither can any click on a frame the popup
+> holds), and the press itself is spent on the popup for the rest of the
+> frame — `Kit.Update` still advances ebitenui's cached input while it skips
 > `ui.Update`, and `Menu.Click`/`Esc` spend the pointer frame's press
 > (`Pointer.Spend`) until the next `Begin` — so no widget, table row,
 > starmap node or slider under the popup sees the gesture either.
+>
+> **One hit test (2026-10, wave 5):** every "does the interface own this
+> point?" question now asks `Kit.Own(pt)` (`screens/hittest.go`, CONTEXT.md
+> "Hit test") instead of keeping its own copy of the layering. It answers
+> `Owner{Layer, Window, Control}` — popup latch, popup rect, a visible
+> **modal** window (its input layer is fullscreen, so nothing below it is
+> owned, which is also what stops a raise through it), the rail, the window
+> stack topmost first, the HUD/rack's **descendants only** (their container
+> stretches over the whole screen), and last ebitenui's hover flag (gates,
+> never raises). The world gate (`Game.overUI`) is layer ≠ World, the click
+> cue (`Game.uiClick` → `Kit.PressTarget`) is `Control`, and the window
+> raise is a press edge whose owner is a window that is not the stack top —
+> so paint order, input order and the gate can no longer disagree. A
+> window's table rows join the walk through `Kit.SetWindowRows`, registered
+> by `ScreenHost` at mount (a live closure over `Tables(id)`, so a table
+> swap is seen) and by the Kit for the built-in Overview; the old per-window
+> row callback (`TablesHit`) is gone. The context menu and the quantity
+> picker own their frame through `Kit.Held` (the old `Game.menuModal`), and
+> `Control` is true for the popup's entries and the picker's controls only:
+> a press that just dismisses the popup stays silent.
 
 > **Split panes (2026-10):** a multi-pane window divides its leftover
 > height — or width — by **ratio**, not ebitenui's equal `GridLayout`

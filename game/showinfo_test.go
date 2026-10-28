@@ -301,7 +301,8 @@ func TestContextMenuGatesWorldInput(t *testing.T) {
 	if r.Empty() {
 		t.Fatal("open menu exposes no rect")
 	}
-	g.menuModal = false // isolate the rect half of the gate
+	// Before the frame's poll, only the popup's own rect gates (the rect
+	// half of the gate).
 	if !g.overUI(float64(r.Min.X+2), float64(r.Min.Y+2)) {
 		t.Error("a point on the popup reaches the world")
 	}
@@ -309,23 +310,30 @@ func TestContextMenuGatesWorldInput(t *testing.T) {
 		t.Error("the rect gate covers points off the popup")
 	}
 
-	// The frame latch: the dismiss gesture's frame gates everywhere.
-	g.menuModal = true
+	// The frame latch: polling with the popup up gates everywhere (the
+	// dismiss gesture's frame, and every frame the popup holds).
+	if !g.kit.MenuInput() {
+		t.Fatal("the open popup did not take the frame")
+	}
+	if !g.kit.Held() {
+		t.Error("the popup's poll did not latch the frame")
+	}
 	if !g.overUI(cx, cy) {
 		t.Error("the frame latch does not gate off-popup points")
 	}
-	g.menuModal = false
-	m.Close()
 
 	// Esc: consumed while the menu owns the frame, plain after it.
-	g.menuModal = true
 	if err := g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyEscape}}); err != nil {
 		t.Fatalf("handleKeys: %v", err)
 	}
 	if _, ok := g.top().(*MenuScene); ok {
 		t.Error("Esc behind a context menu pushed the menu scene")
 	}
-	g.menuModal = false
+	m.Close()
+	g.kit.MenuInput() // the popup is gone: the next frame's poll drops the latch
+	if g.kit.Held() {
+		t.Error("a closed popup still holds the frame")
+	}
 	if err := g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyEscape}}); err != nil {
 		t.Fatalf("handleKeys: %v", err)
 	}

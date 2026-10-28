@@ -1,6 +1,7 @@
 package game
 
 import (
+	"image"
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
@@ -17,6 +18,7 @@ type fakeSink struct {
 	removed []*widget.Window
 	closes  map[*widget.Window]func()
 	closing map[*widget.Window]bool
+	rows    map[*widget.Window]func(image.Point) bool
 }
 
 func newFakeSink() *fakeSink {
@@ -33,6 +35,12 @@ func (f *fakeSink) SetWindowClose(w *widget.Window, close func()) {
 	f.closes[w] = close
 }
 func (f *fakeSink) Closing(w *widget.Window) bool { return f.closing[w] }
+func (f *fakeSink) SetWindowRows(w *widget.Window, hit func(image.Point) bool) {
+	if f.rows == nil {
+		f.rows = map[*widget.Window]func(image.Point) bool{}
+	}
+	f.rows[w] = hit
+}
 
 type fixturePanel struct {
 	win       *widget.Window
