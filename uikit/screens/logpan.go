@@ -29,18 +29,23 @@ const (
 	logViewH     = logViewLines * 23 // lines × lineH(FontSmall)
 	logMaxLines  = 200
 
-	logDefaultW = 264 // 361 − (10 + RailInset): the pocket's right edge (clear of the HUD pair at 1280×720; see the note above)
-	logDefaultH = 240
-	logMinW     = logViewW + 2*theme.ContentsPad                   // text-area floor + body padding
-	logMinH     = theme.TitleBarH + logViewH + 2*theme.ContentsPad // + title bar
+	LogDefaultW = 264 // 361 − (10 + RailInset): the pocket's right edge (clear of the HUD pair at 1280×720; see the note above)
+	LogDefaultH = 240
+	// logFallbackViewH is the viewport the constructor's fallback rect is
+	// composed at: the 1024×700 minimum, where the pocket has to fit.
+	logFallbackViewH = 700
+	logMinW          = logViewW + 2*theme.ContentsPad                   // text-area floor + body padding
+	logMinH          = theme.TitleBarH + logViewH + 2*theme.ContentsPad // + title bar
 )
 
 // logDefaultRect is the construction-time placement (bottom-left pocket
 // at the 1024×700 minimum, clear of the rail's left gutter); the game
 // re-anchors it to the real screen on first layout, like every other
-// movable window — its spec row carries the same 10+RailInset inset.
+// movable window — its spec row anchors the same pocket (10+RailInset
+// gutter x, 10 px bottom margin) to the design viewport and reads
+// LogDefaultW/H from here.
 func logDefaultRect() image.Rectangle {
-	return image.Rect(theme.Px(10+RailInset), theme.Px(700-10-logDefaultH), theme.Px(10+RailInset+logDefaultW), theme.Px(700-10))
+	return image.Rect(theme.Px(10+RailInset), theme.Px(logFallbackViewH-10-LogDefaultH), theme.Px(10+RailInset+LogDefaultW), theme.Px(logFallbackViewH-10))
 }
 
 // LogPanel is the combat/action log: a scrollable text area whose lines
@@ -57,8 +62,8 @@ type LogPanel struct {
 }
 
 // NewLog builds the log panel over the given environment as a window on
-// the interface's window stack (WindowPanel): default logDefaultW ×
-// logDefaultH, bottom-left, edge-resize chrome attached.
+// the interface's window stack (WindowPanel): default LogDefaultW ×
+// LogDefaultH, bottom-left, edge-resize chrome attached.
 func NewLog(env interface {
 	theme.Theme
 	widgets.ContentView

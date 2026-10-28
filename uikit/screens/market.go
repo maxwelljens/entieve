@@ -831,12 +831,18 @@ func NewMarket(env widgets.Seams) *Market {
 		// height the search field, the catalog and the My-orders column
 		// need. It overlaps the log pocket at the minimum (the trade
 		// window is the big one; the log raises back over it on a click).
-		// The game's Market Screen row declares the same rect as its
-		// per-type default (game/screens.go), so it opens here on first
-		// use, docked and in space alike.
-		widget.WindowOpts.Location(image.Rect(theme.Px(97), theme.Px(8), theme.Px(97+mktDefaultW), theme.Px(8+mktDefaultH))),
+		// The game's Market Screen row declares the same rect
+		// (MarketRect), so it opens here on first use, docked and in
+		// space alike.
+		widget.WindowOpts.Location(pxRect(MarketRect())),
 	)
 	return m
+}
+
+// MarketRect is the market window's landing rect in design units: the
+// one number its Screen row's DefaultRect and its constructor share.
+func MarketRect() image.Rectangle {
+	return image.Rect(97, 8, 97+mktDefaultW, 8+mktDefaultH)
 }
 
 // Win returns the market window for Kit.AddWindow.

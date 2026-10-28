@@ -85,6 +85,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One landing rect per window** (`uikit/screens`, `game`): every panel's
+  landing rect is exported beside the panel (`InventoryRect`, `FittingRect`,
+  `MarketRect`, `ManufacturingRect`, `ScannerRect`, `MapViewRect`,
+  `SettingsRect`, `RefineryRect`, `FinancesRect`, `KeybindingsRect`; the log
+  exports its `LogDefaultW`/`LogDefaultH`) and its Screen row's `DefaultRect`
+  declares that same rect, so a constructor's default position and the row
+  the host places from can no longer disagree (`TestLandingRectIdentity`).
+  Two shipped drifts disappear: the scanner's stale constructor origin
+  (`10+RailInset,251`) is now the row's centre-column position — the host
+  always placed from the row, so nothing moves — and the keybindings panel's
+  hand-coded `410,40` is the row's own rect. The starmap's and the log's
+  row declarations also pick up their panels' true sizes (870×634 → 876×640,
+  and the log pocket's full 264 px width); neither number is read for
+  placement, so no window moves.
 - **One display formatter leaf** (`format`): money (`Credits`, the
   NAMING.md `12,345.67 €` / `50¢` rule), distance bands (`Dist` + the one
   `AU = 1.496e11` constant), thousands grouping (`GroupInt`/`GroupFloat`) and

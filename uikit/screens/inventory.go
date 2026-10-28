@@ -128,13 +128,17 @@ func NewInventory(env widgets.Seams) *Inventory {
 		// four-verb toolbar's: Cargo/Ore/Hangar/Sell need 320 design px on
 		// one row (three rows of 40 px would not fit at 300).
 		widget.WindowOpts.MinSize(theme.Px(320), theme.Px(420)),
-		// The game's Inventory Screen row declares the same rect as its
-		// per-type default (game/screens.go), so it opens here on first
-		// use, docked and in space alike.
-		widget.WindowOpts.Location(image.Rect(theme.Px(396), theme.Px(256), theme.Px(716), theme.Px(690))),
+		// The landing rect the game's Inventory Screen row also declares
+		// (InventoryRect), so it opens here on first use, docked and in
+		// space alike.
+		widget.WindowOpts.Location(pxRect(InventoryRect())),
 	)
 	return inv
 }
+
+// InventoryRect is the inventory window's landing rect in design units:
+// the one number its Screen row's DefaultRect and its constructor share.
+func InventoryRect() image.Rectangle { return image.Rect(396, 256, 716, 690) }
 
 // Win returns the inventory window for Kit.AddWindow.
 func (inv *Inventory) Win() *widget.Window { return inv.win }

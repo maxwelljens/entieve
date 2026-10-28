@@ -434,7 +434,7 @@ func TestTwoKitsKeepTheirOwnGrips(t *testing.T) {
 	k1, _ := newTestKitWith(t, widgets.NewPointer(fm))
 	log1 := NewLog(k1.Env())
 	k1.AddWindow(log1.Win())
-	log1.Win().SetLocation(image.Rect(10, 430, 10+logDefaultW, 430+logDefaultH))
+	log1.Win().SetLocation(image.Rect(10, 430, 10+LogDefaultW, 430+LogDefaultH))
 	pumpKit(t, k1, 1024, 700)
 	pumpKit(t, k1, 1024, 700)
 	before := len(k1.chromes)
@@ -473,7 +473,7 @@ func TestUnmountMidDragLeavesNoSideEffects(t *testing.T) {
 	log := NewLog(k.Env())
 	win := log.Win()
 	remove := k.AddWindow(win)
-	win.SetLocation(image.Rect(10, 430, 10+logDefaultW, 430+logDefaultH))
+	win.SetLocation(image.Rect(10, 430, 10+LogDefaultW, 430+LogDefaultH))
 	pumpKit(t, k, 1024, 700)
 	pumpKit(t, k, 1024, 700)
 	resizes := countResizes(win)
@@ -581,7 +581,7 @@ func TestOverviewLogEdgeGripsResize(t *testing.T) {
 	// size the log to its minimum so the text area fills the body all
 	// the way to the bottom grip band.
 	k.sp.win.SetLocation(image.Rect(600, 436, 980, 696))
-	logTestRect := image.Rect(10, 690-logMinH, 10+logDefaultW, 690)
+	logTestRect := image.Rect(10, 690-logMinH, 10+LogDefaultW, 690)
 	log.Win().SetLocation(logTestRect)
 	pumpKit(t, k, 1024, 700)
 	pumpKit(t, k, 1024, 700)
@@ -759,7 +759,7 @@ func TestTopmostWindowWinsGrip(t *testing.T) {
 	// Stack the log so its left band and the overview's right band
 	// share a pixel column.
 	ovRect := k.ov.win.GetContainer().GetWidget().Rect
-	logRect := image.Rect(ovRect.Max.X-4, 60, ovRect.Max.X-4+logDefaultW, 60+logDefaultH)
+	logRect := image.Rect(ovRect.Max.X-4, 60, ovRect.Max.X-4+LogDefaultW, 60+LogDefaultH)
 	log.Win().SetLocation(logRect)
 	pumpKit(t, k, 1024, 700)
 
