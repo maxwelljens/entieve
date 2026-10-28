@@ -1,0 +1,57 @@
+{
+  "id": "ship-npc-fleet",
+  "group": "Ships/Destroyers",
+  "base_price": 2200000,
+  "name": "Clastor",
+  "class": "destroyer",
+  "description": "A commissioned line cutter: Preštor yards, three medium mounts, a web and the Commission's warrant behind it. It holds the front and it is not for sale.",
+  "maker": "corp-praetor",
+  "origin": "latinate",
+  "slots": {
+    "high": 3,
+    "mid": 3,
+    "low": 2
+  },
+  "high_mounts": [
+    {
+      "kind": "turret",
+      "size": "m"
+    },
+    {
+      "kind": "turret",
+      "size": "m"
+    },
+    {
+      "kind": "turret",
+      "size": "m"
+    }
+  ],
+  "grid_classes": {
+    "i": 3,
+    "ii": 4
+  },
+  "cpu_classes": {
+    "ii": 1
+  },
+  "shield": 520,
+  "armor": 620,
+  "structure": 700,
+  "resists": {
+    "em": 0.25,
+    "thermal": 0.25,
+    "kinetic": 0.3,
+    "explosive": 0.3
+  },
+  "capacitor": 2600,
+  "recharge": 260,
+  "max_speed": 320,
+  "agility": 0.6,
+  "mass": 8000000,
+  "sig_radius": 110,
+  "cargo": 350,
+  "ore_hold": 0,
+  "warp_speed": 3.2,
+  "max_target_range": 55000,
+  "max_targets": 4,
+  "scan_resolution": 420
+}

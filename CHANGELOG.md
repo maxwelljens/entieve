@@ -7,7 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The Long Attrition, in content and lore** (`content`, `docs/lore`): the
+  war now has its words — **the Long Attrition**, **the Svaz** (the
+  corporations' league: a treaty, dues, the Commission), **the Commission**
+  (the mandate the fleets are raised under), **Corporate Fleets** and
+  **Remnant** — all registered in NAMING.md. FACTIONS.md and UNIVERSE.md carry
+  the war: the charter stays army-less and its law is insurance, the houses
+  raise and crew fleets under warrant while still owning no territory, the Old
+  Works hold ground and stiffen as they are squeezed, and the zones are the
+  war's scoreboard — with the starmap's **Charter-held / Works-held / Front**
+  words authored for the UI wave.
+
+- **Commissioned fleet cutters** (`npc-fleet-cutter`, `ship-npc-fleet`): the
+  **Clastor** — a Preštor-built destroyer, three medium mounts and a web, no
+  mining gear — flies for the Corporate Fleets over contested systems. It
+  lands on the Works hull it came for and fights it through the ordinary
+  threat machine, and it is neutral to everyone but the Old Works unless fired
+  on.
+
+- **War contracts** (`contract-war-materiel-1`, `contract-war-kill-1`):
+  *Materiel for the front* hauls three Medium Artillery from Dukšan to the
+  Hauvnok staging yard; *Clear the front* pays for two Marauders. Both ride
+  Dukšan's board under the Commission's name, gated by standing, and pay out
+  like every other contract (the pre-existing mint-on-completion rule).
+
+- **The showcase proves the war** (`world-showcase`, `scripts/showcase.json`,
+  `tests`): seven new checkpoints — procurement sink, contest line, a fall,
+  remnant service behavior, a reclaim, a fleet skirmish, war news — each with
+  an evidence rule, driven by a new `war-push` script step (a harness-only sim
+  command, never a player one).
+
 ### Changed
+
+- **War news in the house voice** (`sim`): the five log lines read "Supply —
+  5 x Capacitor Booster Cell to Kvonice (4,995.00 €)", "Contested — Kvonice
+  holds at 28%", "Fall — Kvonice lost to the Old Works", "Reclaimed — Kvonice
+  returns to the charter", "Skirmish — Scuttler destroyed at the front"; a
+  player's kills report only where they count, at a front.
+
 
 - **Settings opens from the Esc menu** — the pause menu gained a **Settings**
   entry (Resume / Save / Save as… / Load / Settings / Quit): the in-game

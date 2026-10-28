@@ -262,6 +262,13 @@
     "qty": 5
   },
   {
+    "at_tick": 51190,
+    "action": "sell",
+    "item": "charge-cap-cell",
+    "qty": 5,
+    "note": "war procurement: five cap cells sell into the standing war bid — the treasury pays at once and the goods are consumed into the war (the sink)"
+  },
+  {
     "at_tick": 51240,
     "action": "transfer",
     "item": "ore-sterngrit",
@@ -384,6 +391,13 @@
     "range": 6000
   },
   {
+    "at_tick": 61100,
+    "action": "war-push",
+    "system": "sys-penumbra",
+    "value": 0.12,
+    "note": "the front moves: the Works press Kvonice's meter past the news threshold (the harness lever; player supply arrives through war bids and kills)"
+  },
+  {
     "at_tick": 61280,
     "action": "activate",
     "slot": "high0",
@@ -419,5 +433,19 @@
     "action": "activate",
     "slot": "high0",
     "target": "Hierarch"
+  },
+  {
+    "at_tick": 68300,
+    "action": "war-push",
+    "system": "sys-penumbra",
+    "value": 1.2,
+    "note": "Kvonice falls to the Old Works: guards leave, the belts go hostile, Hauvnok becomes a remnant (late, so the Fringe's convoy traffic still answers through its patrol wing first)"
+  },
+  {
+    "at_tick": 71900,
+    "action": "war-push",
+    "system": "sys-penumbra",
+    "value": 1.2,
+    "note": "the charter takes Kvonice back: the meter flips the system and the news says so"
   }
 ]

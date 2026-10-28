@@ -23,6 +23,11 @@ Remit:
 It is bureaucratic, slow, and better than the alternative. Its people are
 functionaries; its ships are cutters; its formularies outlive its admirals.
 
+The war is not the Charter's. The Charter Authority licenses hulls, insures
+them and writes the losses down; the fleets that fight the Old Works are
+raised and crewed by the corporations under the Commission (below), and no
+charter officer commands one. The Charter's law is insurance, not war.
+
 **Binding rules**
 
 - MUST keep the Charter Authority the only legal authority in the region.
@@ -42,9 +47,10 @@ trade and in one heritage form-word where a house keeps one.
 The ten-firm roster below is the **manufacturer layer** of the economy: the
 houses that make the goods the market sells and whose marks appear on them
 (`maker` in the content; registered in
-[NAMING.md — Corporations](NAMING.md#corporations--manufacturers)). It is
-*not* a fifth power bloc — the firms own no territory, hold no law and fly
-no warships, and they stay independent of each other and of the Charter.
+[NAMING.md — Corporations](NAMING.md#corporations--manufacturers)). The firms
+own no territory and hold no law, and they stay independent of each other and
+of the Charter. Since the Commission they do raise and crew fleets — one joint
+war, flown under one bloc's colours, never a government of their own.
 
 | House | Origin | Trade | Notes |
 |---|---|---|---|
@@ -69,19 +75,53 @@ Steelworks**), and Zakłady Burza became **Bríždan Factory**. Only
 is [NAMING.md — Corporations](NAMING.md#corporations--manufacturers).
 
 Corps buy ore, sell hulls and modules, post contracts on the boards, and
-occasionally sue each other. They do not patrol and they do not fight the
-Old Works — they write the losses down and raise the risk premium.
+occasionally sue each other. They do not patrol — patrols are the Charter's —
+but they do fight the Old Works: the fleets are theirs, the materiel is bought
+on their treasuries, and the crews are on their payroll. They still write the
+losses down. The premium has simply moved into the war chest.
 
 **Binding rules**
 
 - MUST keep every corporate house's trade aligned with its origin's trait
   skew ([AESTHETIC.md — Origins and traits](AESTHETIC.md#origins-and-traits)).
 - MUST name institutions in the Latinate register.
-- MUST keep the roster a manufacturer layer: firms are independent
-  suppliers that appear on goods and markets, never a bloc.
-- NEVER let a corporation hold territory, law or a military. It holds
-  contracts.
+- MUST keep the roster a manufacturer layer: firms are independent suppliers
+  that appear on goods and markets. The one thing they share is the
+  Commission's war, and that is a mandate, not a state.
+- NEVER let a corporation hold territory or law. It holds contracts, and —
+  under the Commission — a share in the fleets.
 - NEVER add a fifth power bloc without registering it here.
+
+## The Svaz and the Commission
+
+The corporations are not a state, and they know it. What binds them is **the
+Svaz** — "the confederation" in plain prose, "the empire" when a pilot is being
+sarcastic — a league of the houses, older than the charter and far weaker. It
+has a treaty, a dues schedule, a standing committee that meets nowhere in
+particular, and no territory at all. It cannot tax a system, post a patrol or
+answer a letter from the Wild Fields. It can only bind the houses to each
+other.
+
+What it can do, and did, is name the Old Works a standing menace and
+commission a war. That mandate is **the Commission**: the houses raise fleets,
+crew them and pay for them, and the Svaz puts its warrant on the hull, so a
+Preštor cutter firing on a Works swarm is a commissioned act and not a
+corporate brawl. The Charter licenses those hulls and insures them. It does
+not command them.
+
+It is canton law without the cantons: dues paid to a committee nobody has met,
+fleets flown on a corporate payroll, and a mandate that renews because the
+alternative is admitting the Works are winning. Nobody in the Wild Fields
+calls it an empire to its face.
+
+**Binding rules**
+
+- MUST keep the Svaz institutional only: a treaty, dues, a commission. No
+  territory, no office, no officer in the Wild Fields.
+- MUST keep the war a corporate undertaking under warrant — never the
+  Charter's war, never the Svaz's army.
+- NEVER let the Svaz send reinforcements, orders, recall notices or answers.
+  What it sends is a warrant and a bill for dues.
 
 ## Freeports and independents
 
@@ -93,6 +133,11 @@ whoever docked last.
 Independents are the rest of the workforce: pilots, refiners, haulers,
 one-ship operators. The player is one of them — insured, licensed where it
 matters, and welcome everywhere a berth is paid for.
+
+A station whose system falls to the Old Works becomes a **remnant**: the
+berth, the market and the repair bay keep trading because they always did,
+and the charter's desk goes dark because there is no charter left to staff it.
+No flag goes up. The neighbours simply stop being answered.
 
 **Binding rules**
 
@@ -125,6 +170,13 @@ Fringe. They nest in anomalies and derelict works — a machine den is a
 **Gnazvor** (*gniazdo* "nest", grafted with Latin *vor-* "devour") on pilot
 slang — and raid outward.
 
+Since the war they hold ground too. A system whose charter fails is theirs:
+the patrols leave, the belts go hostile, and the swarms dig in at the rocks
+and the anchors while the berths keep selling fuel to whoever docks. Take a
+system back and the next one stiffens — the Works do not replace what they
+lose, they make what is left harder to take. That is the whole reason the
+Attrition has no end in sight.
+
 **Binding rules**
 
 - MUST keep the castes named Scuttler, Marauder and Hierarch, capitalized.
@@ -132,6 +184,44 @@ slang — and raid outward.
 - NEVER give the machines speeches, kings, a homeworld or a plan. The
   Hierarch caste directs; it does not monologue.
 - NEVER call them an empire, a rebellion or a species.
+
+## The Long Attrition
+
+The war has one name on the lanes: **the Long Attrition**. Corporate fleets
+under the Commission against the Old Works, over the only thing either side
+can hold — which systems answer the charter and which answer nothing.
+
+Nobody declared it on a given day. The houses wrote off one convoy too many,
+the Svaz named the Works a standing menace, and the first commissioned
+squadron left Dukšan's yard with its transponders on. The Charter licensed the
+hulls and insured them; the premium went into a war chest instead of a
+dividend. The war has run ever since, quietly, at the edges of the map, and
+most pilots meet it as a line on a contract board.
+
+What is at stake is not territory in the map-room sense. A system is charter
+or it is not: patrols answer there or they do not, insurance pays there or it
+does not, the courts sit — and where the charter's reach fails, the Works take
+the belts and the belt is theirs, with the berths still selling fuel to
+whoever docks. The front is where those two answers meet across a gate. It
+moves by systems, rarely, over hours.
+
+The economy is the war's other half. The fleets buy everything that shoots,
+jams or tanks, on every charter-held book, at the going price — the one buyer
+who never haggles — and the goods go to the front and are gone. The houses'
+cut of the market's fees feeds the same chest. Sell into it, haul for it, kill
+Works at the front, and it shows up in your earnings and nowhere else. Nobody
+is thanked. The meter moves.
+
+**Binding rules**
+
+- MUST keep the war a slow background: systems flip rarely, meters move by
+  degrees, and the front is a place pilots pass through, not a campaign.
+- MUST keep the war funded by the economy it feeds — market fees and materiel
+  sales, never a mint.
+- NEVER let either side win: the Works stiffen as they are squeezed, and a
+  charter that starves its own front loses it. Both are the same rule.
+- NEVER make the player a commander, a hero of the war or its deciding vote.
+  The player is paid.
 
 ## Smugglers and fences
 
@@ -154,20 +244,30 @@ names in warnings. They are not a combat roster.
 
 ## Relations
 
-|  | Charter Authority | Corporate houses | Freeports & independents | The Old Works | The Amber Run |
-|---|---|---|---|---|---|
-| **Charter Authority** | — | licensed, taxed, occasionally sued | regulated at arm's length; Hauvnok pays berths, not taxes | attrition; no negotiation | warrants, not wars |
-| **Corporate houses** | | — | buy their ore, sell them hulls | written off as losses; premiums raised | buy deniable cargo |
-| **Freeports & independents** | | | — | survive or don't | customers and competition |
-| **The Old Works** | | | | — | eat their ships too |
-| **The Amber Run** | | | | | — |
+|  | Charter Authority | Corporate Fleets | Dvužek | Freeports & independents | The Old Works | The Amber Run |
+|---|---|---|---|---|---|---|
+| **Charter Authority** | — | licensed and insured, never commanded | licensed, taxed, occasionally sued | regulated at arm's length; Hauvnok pays berths, not taxes | attrition; no negotiation | warrants, not wars |
+| **Corporate Fleets** | a warrant, not an order | — | buyer of ore, never of barges | neutral; a pilot who fires first is answered | the war, and only the war | cargo is cargo |
+| **Dvužek** | dues and licences | ore contracts | — | customers | barges are mass | indifferent |
+| **Freeports & independents** | berths and paperwork | a market and a contract board | customers and competition | — | survive or don't | customers and competition |
+| **The Old Works** | attrition; no negotiation | the fleets come, the swarms meet them | barges are mass | everything that floats is salvage | — | eat their ships too |
+| **The Amber Run** | warrants, not wars | cargo is cargo | indifferent | customers and competition | eat their ships too | — |
+
+Read down a column for who may shoot first: the Old Works initiate on
+everything that floats; the Charter and the fleets initiate on the Old Works;
+Dvužek, the freeports, the independents and the smugglers start nothing. Same
+faction and unknown factions never fire — the table is the whole of it
+(`sim/hostility.go`).
 
 **Binding rules**
 
-- MUST keep relations commercial. Nothing in the Wild Fields is at war; things
-  are uninsured.
-- MUST keep the asymmetry: the Old Works are a hazard, not a rival
-  government.
+- MUST keep one war, and only one: the corporate fleets against the Old Works.
+  Everything else in the Wild Fields stays commercial, uninsured and priced.
+- MUST keep the asymmetry: the Old Works hold ground, never a state — no
+  treaty, no demand, no flag.
+- MUST keep the fleets a mandate: they answer the Commission and their
+  treasuries, never a charter officer, and they never open on the Charter,
+  Dvužek or independents.
 - NEVER write inter-faction arcs of alliance, betrayal or succession.
 
 ## Roster summary (in-game)
@@ -175,5 +275,9 @@ names in warnings. They are not a combat roster.
 | Faction string | Who | Where |
 |---|---|---|
 | `Charter Authority` | patrols (`npc-guard-patrol`) | Charter space and the Fringe |
-| `Old Works` | Scuttler / Marauder / Hierarch spawns | belts, anomalies, Unincorporated |
-| *(contract text only)* | corporate houses, freeports, the Amber Run | markets, boards, descriptions |
+| `Corporate Fleets` | commissioned fleet cutters (`npc-fleet-cutter`) | the front: contested systems |
+| `Old Works` | Scuttler / Marauder / Hierarch spawns | belts, anomalies, works-held systems |
+| *(contract text only)* | corporate houses, the Svaz and the Commission, freeports, the Amber Run | markets, boards, descriptions |
+
+The Svaz and the Commission have no hulls and no officers anywhere in the Wild
+Fields. They are a warrant on the fleets and a dues bill for the houses.

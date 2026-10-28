@@ -132,6 +132,7 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | `ship-npc-hauler` | Taborek | **Tobřek** | Polish | wagon train, weathered past *tabor*; civilian convoy freighter. Overview role labels documented in [../GAMEPLAY.md](../GAMEPLAY.md) ride along in the content pass |
 | `ship-npc-patrol` | Custor | **Kuštor** | Latinate | guardian, weathered past Latin *custos* (classical *-or* shape kept); charter patrol cutter. Same caveat as `ship-npc-hauler` |
 | `ship-npc-miner` | — | **Kutřek** | Moravian | digging barge, weathered past Czech *kutat* "to dig"; civilian belt miner hull, shipped 2026-10-28 with `npc-miner-barge` |
+| `ship-npc-fleet` | — | **Clastor** | Latinate | fleet, weathered past Latin *classis* (classical *-or* shape kept); the commissioned corporate fleet cutter, shipped 2026-10-28 with `npc-fleet-cutter` (FA `Corporate Fleets`) |
 | `ship-rat-scuttler` | Scuttler | Scuttler | Old Works | caste name retained (canon); description says "corsair skiff" — machine framing in the content pass |
 | `ship-rat-marauder` | Marauder | Marauder | Old Works | caste name retained (canon); description says "corsair gunship" — same pass |
 | `ship-rat-hierarch` | Hierarch | Hierarch | Old Works | caste name retained (canon); description implies a human "crew" — same pass |
@@ -224,6 +225,7 @@ Rat hulls, ores, minerals and loot stay unattributed.
 |---|---|---|---|---|
 | `npc-guard-patrol` | Patrol | keep | trade | role label; its `faction` string is renamed below |
 | `npc-miner-barge` | — | **Kutřek** | Moravian | digging barge, weathered past Czech *kutat* "to dig"; civilian belt miner (Dvužek), shipped 2026-10-28 |
+| `npc-fleet-cutter` | — | **Clastor** | Latinate | the commissioned fleet cutter (Preštor hull, FA `Corporate Fleets`), shipped 2026-10-28 with `ship-npc-fleet`; shares the hull's name, the Kutřek precedent |
 | `npc-rat-scuttler` | Scuttler | Scuttler | Old Works | caste name retained (canon) |
 | `npc-rat-marauder` | Marauder | Marauder | Old Works | caste name retained (canon) |
 | `npc-rat-hierarch` | Hierarch | Hierarch | Old Works | caste name retained (canon) |
@@ -239,6 +241,8 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | `contract-penumbra-lucidite-1` | Lucidite contract | keep | trade | description: "Hauvnok", "the Kvonice belt" |
 | `contract-manufacturing-shield-1` | — | **Shield booster order** | trade | durable manufactured goods (Shield Booster, a non-weapon module); offering Dukšan, delivery Hauvnok |
 | `contract-manufacturing-web-1` | — | **Web units for the yard** | trade | durable manufactured goods (Stasis Web, a non-weapon module); offering Hovžan, delivery Dukšan |
+| `contract-war-materiel-1` | — | **Materiel for the front** | trade | the Commission's haul order (Medium Artillery, three units); offering Dukšan, delivery Hauvnok — the Kvonice staging yard; war contract, reward mints (pre-existing payout rule) |
+| `contract-war-kill-1` | — | **Clear the front** | trade | the Commission's kill order (two Marauders); offering Dukšan, the Kamžal front; description cites the Kvonice belt |
 
 ### Worlds
 
@@ -257,6 +261,11 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | `npcs/rats.json` `faction` (Scuttler, Marauder) | Mire Corsairs | **Old Works** | Old Works | two placeholder strings collapse into one faction |
 | `npcs/rats.json` `faction` (Hierarch) | Gloam Hierarchy | **Old Works** | Old Works | same |
 | `npcs/miners.json` `faction` | — | **Dvužek** | Moravian | corp roster name reused as a faction string (see the corporations table); the extraction/barging house its miners belong to |
+| `npcs/fleets.json` `faction` | — | **Corporate Fleets** | Latinate | the commissioned bloc ([FACTIONS.md](FACTIONS.md#the-svaz-and-the-commission)); one faction string now, per-corp rows later when a corp needs its name on screen |
+| war (log, contracts, starmap) | — | **the Long Attrition** | place | the war of the Wild Fields; the name echoes FACTIONS' "attrition; no negotiation" ([FACTIONS.md](FACTIONS.md#the-long-attrition)) |
+| the confederation (+ "the empire" in prose) | — | **the Svaz** | Moravian | a weathered league (*svaz* "union"); institutional only — treaty, dues, the Commission; no territory and no office ([UNIVERSE.md](UNIVERSE.md#the-old-worlds)) |
+| the war mandate | — | **the Commission** | Latinate | the Svaz's commission: the warrant the corporate fleets are raised and crewed under |
+| a fallen system's station | — | **Remnant** | trade | berth, market and repair stay live, the charter's desk goes dark ([FACTIONS.md](FACTIONS.md#freeports-and-independents)) |
 
 `traffic/*.json` carry no display names (keyed by system id) and need no row.
 

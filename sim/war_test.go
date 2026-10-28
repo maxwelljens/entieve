@@ -553,7 +553,7 @@ func TestWarSinkConsumesAndPays(t *testing.T) {
 	if c == nil || math.Abs(c.SupplyPending-value) > 1e-6 {
 		t.Fatalf("front supply pending = %+v, want %v", c, value)
 	}
-	if !hasEvent(evs, EvWar, "The war takes") {
+	if !hasEvent(evs, EvWar, "Supply —") {
 		t.Fatalf("no war-supply line: %v", evs)
 	}
 	// Goods are gone from the book too: the bid's remaining quantity dropped.
@@ -979,8 +979,10 @@ func TestWarFleetsSpawnAndEngage(t *testing.T) {
 	if ai.State == NpcIdle {
 		t.Fatalf("the fleet ignored a Works hull on its belt (state %q)", ai.State)
 	}
-	if ai.Target != rat {
-		t.Fatalf("the fleet targets %v, want the Works hull %v", ai.Target, rat)
+	// The fleet lands on a Works hull at the occupied belt and fights it (the
+	// fixture belt already carries rats, so the target need not be this one).
+	if ai.Target.IsZero() || s.factionOf(ai.Target) != factionOldWorks {
+		t.Fatalf("the fleet targets %v, want an Old Works hull", ai.Target)
 	}
 	// Never the player: the bloc is neutral to independents.
 	setPlayerPos(s, mustPos(s, rat).Add(v(200, 0)))
@@ -1089,5 +1091,45 @@ func TestWarTwinRunDeterminism(t *testing.T) {
 		if b[tick] != ha {
 			t.Fatalf("checkpoint %d: %016x vs %016x", tick, ha, b[tick])
 		}
+	}
+}
+
+// TestWarPushCommand pins the script harness's war lever: the value is meter
+// units toward a flip — whoever holds the front, the meter crossing its
+// threshold hands the system to the other side — and the beat does the flip.
+// A system off the front has no meter to move.
+func TestWarPushCommand(t *testing.T) {
+	s := newWarSim(t)
+	stepToWarBeat(s)
+	push := meterThreshold * 1.2 // one threshold, with room for the beat's own pressure
+
+	// A works-held front comes back to the charter.
+	s.Queue(CmdWarPush{System: "sys-w", Value: push})
+	s.Step()
+	if got := s.war.Contest["sys-w"].Meter; got != push {
+		t.Fatalf("meter = %v, want the pushed %v", got, push)
+	}
+	stepToWarBeat(s)
+	if s.war.Control["sys-w"] != controlCharter {
+		t.Fatal("a pushed-past-threshold works front did not come back to the charter")
+	}
+	// The same lever falls a charter-held front.
+	s.Queue(CmdWarPush{System: "sys-w", Value: push})
+	s.Step()
+	stepToWarBeat(s)
+	if s.war.Control["sys-w"] != controlWorks {
+		t.Fatal("a pushed-past-threshold charter front did not fall")
+	}
+	// Pulling back is floored at a held front's zero; off the front there is
+	// no meter at all.
+	s.Queue(CmdWarPush{System: "sys-w", Value: -push})
+	s.Step()
+	if got := s.war.Contest["sys-w"].Meter; got < 0 {
+		t.Fatalf("meter = %v, want a floor at 0", got)
+	}
+	s.Queue(CmdWarPush{System: "sys-b", Value: push})
+	s.Step()
+	if _, onFront := s.war.Contest["sys-b"]; onFront {
+		t.Fatal("sys-b carries a meter without an enemy across a gate")
 	}
 }

@@ -186,6 +186,7 @@ var hullReferencePrices = map[ShipID]float64{
 	"ship-npc-hauler":   600000,
 	"ship-npc-miner":    380000,
 	"ship-rat-hierarch": 900000,
+	"ship-npc-fleet":    2200000,
 }
 
 // recipeReferencePrice resolves the product's reference price: item
@@ -292,7 +293,7 @@ func TestHullRecipeMaterialLadder(t *testing.T) {
 	ladder := []ShipID{
 		"ship-rat-scuttler", "ship-sloop", "ship-npc-miner", "ship-npc-patrol", "ship-cutlass",
 		"ship-rat-marauder", "ship-npc-hauler", "ship-hauler", "ship-barge",
-		"ship-rat-hierarch",
+		"ship-rat-hierarch", "ship-npc-fleet",
 	}
 	if len(ladder) != len(c.Ships) {
 		inLadder := map[ShipID]bool{}

@@ -27,6 +27,10 @@ seven systems on the ring of stargates:
 Everything else in the Wild Fields is off the map: other districts, other
 constellations, other rushes. Mention them if you must; name nothing.
 
+The Zone column is where each system stands at the start of a run. The war
+moves those answers ([Zones: charter reach](#zones-charter-reach)); the names
+never move.
+
 **Binding rules**
 
 - MUST keep the Wild Fields a working frontier district — mines, refineries,
@@ -76,8 +80,11 @@ pilots — the player among them — chasing the ore rush. They sleep in the
 first wave's berths, weld onto the first wave's hulls, and pay in a currency
 the first wave carried with it.
 
-The waves are not at war and not at peace. The second wave simply moved into
-the first wave's buildings and started working.
+The waves did not stay separate. The second wave moved into the first wave's
+buildings, started working, and — under the Commission — started a war:
+corporate fleets against the Old Works, fought over the old towns' berths and
+belts. The first wave's people are not a side in it. They are the
+infrastructure it happens to.
 
 **Binding rules**
 
@@ -100,6 +107,12 @@ not flags. The manufacturers take their names from these heritages (see
 heritage shapes the house, never the other way round.
 
 Nobody in the Wild Fields sends mail home and gets an answer.
+
+The one institution that reaches across the heritage lines is not an old-world
+government either. **The Svaz** is a league *of* the corporations — a treaty, a
+dues schedule and the Commission — with no territory, no office and no officer
+in the Wild Fields. It is the closest thing the region has to an empire, and
+the least able to act like one. It sends warrants and invoices, not mail.
 
 **Binding rules**
 
@@ -136,6 +149,26 @@ secure", "Fringe · contested", "Unincorporated · no charter". The values
 `content/data/systems/*.json`) as implementation; they are never
 world-facing words.
 
+Charter reach is not a fixed map any more. Since the **Long Attrition** the war
+moves it: a system the charter loses drops to Unincorporated, a system it takes
+back returns to its authored tier, and the **front** — the systems where the
+two answers meet across a gate — is where that happens. The zones are the war's
+scoreboard, not its constitution.
+
+The starmap carries the war as a second layer over the zone words. These are
+the words for it:
+
+| Word | What it marks |
+|---|---|
+| **Charter-held** | a system the charter answers in today: its authored zone word is live |
+| **Works-held** | a system the Old Works hold: Unincorporated in practice, belts hostile, its stations remnants |
+| **Front** | a system gated to the other side, carrying a contest meter — the war's moving edge |
+
+A front that moves reports as "Contested — Kvonice holds at 28%"; a flip is
+"Fall — Kvonice lost to the Old Works" or "Reclaimed — Kvonice returns to the
+charter". The overlay never replaces the zone word: a Works-held system is
+Unincorporated and says so.
+
 **Binding rules**
 
 - MUST use the zone words in all lore, UI text and description fields.
@@ -144,6 +177,9 @@ world-facing words.
 - NEVER give the zones governments, capitals or borders. They are degrees of
   reach, not countries: Charter space thins out, the Fringe frays,
   Unincorporated simply stops.
+- MUST let the war move the reach: a system's zone word is today's answer, not
+  a border, and the front overlay (Charter-held / Works-held / Front) is the
+  only place the war is drawn.
 
 ## Daily life and the pilot's place
 

@@ -318,6 +318,41 @@
       "name": "Charter patrol response",
       "feature": "traffic-patrol",
       "detail": "The ambushed Kvonice convoy calls for its patrol wing: EvTraffic phase 'patrol-response' (System sys-penumbra) dispatches a floor(3σ) wing from the patrol anchor, the patrol warps to the incident through the normal warp profile, locks the raiders with the real turret pipeline — and the pressure lets the convoy warp clear (EvTraffic phase 'escaped'). Charter space responds immediately with 3 ships, the Fringe after 15 s with 1, Unincorporated never."
+    },
+    {
+      "name": "War procurement sink",
+      "feature": "war-procurement",
+      "detail": "A war bid on Jalvrek's book pays the seller at once and consumes the goods into the war: the sale logs a Supply line naming the front, the cap cells leave the hold, and the value is credited to that front's meter. The economy feeds the war — the sink the market never had."
+    },
+    {
+      "name": "Contested front",
+      "feature": "war-contest",
+      "detail": "A front system's meter moves on the hourly beat and reports a contest line when it moves 5% or more: 'Contested — Kvonice holds at 28%' when the Works press it, quiet the rest of the time."
+    },
+    {
+      "name": "A system falls",
+      "feature": "war-fall",
+      "detail": "Pushing a meter past its threshold hands the system to the Old Works: the news says Fall, the charter's guards leave outright, and the Works take the belts and anchors — never the docking ring."
+    },
+    {
+      "name": "Remnant station",
+      "feature": "war-remnant",
+      "detail": "A station in fallen space is a remnant: the charter desk, industry and fitting go dark, while the berth, market and repair stay live. In-flight work finishes; reclaim restores the authored services."
+    },
+    {
+      "name": "A system is reclaimed",
+      "feature": "war-reclaim",
+      "detail": "Supply pushes the meter the other way and the charter takes the system back: 'Reclaimed — Kvonice returns to the charter', guards return to their posts, and the Works already on the grid are left to be shot."
+    },
+    {
+      "name": "Corporate fleet action",
+      "feature": "war-fleet",
+      "detail": "Corporate Fleets cutters spawn over a contested system under the Commission and hunt the Old Works through the ordinary threat machine: a witnessed skirmish, joinable, and never aimed at the neutral pilot."
+    },
+    {
+      "name": "War news on the log",
+      "feature": "war-news",
+      "detail": "The war speaks through the log only, in one 'Phase — detail' shape: Supply, Contested, Fall, Reclaimed and Skirmish lines, with euro amounts trailing the sum (4,995.00 €). Quiet fronts stay quiet."
     }
   ]
 }
