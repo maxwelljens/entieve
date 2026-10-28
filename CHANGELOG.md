@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The starmap shows the war** (`uikit`, `docs`) — the map is the war's
+  surface (no separate window): every system node now says which side holds
+  it (**filled** disc = the charter, **hollow outline** = the Old Works), a
+  system on the contested front wears an outer **contested ring**, and the
+  top-right corner carries the **war key** ending in the **war treasury** —
+  the corporate fleets' balance, the war's health, in one line. The selected
+  system's card adds its holder and, on a front, the meter ("the Works press
+  at 42%" on a charter hold, "the charter pushes at 42%" on a Works system).
+  Flips, meter moves and the treasury repaint the map as they change; a world
+  without a war draws none of it.
+  [GAMEPLAY.md](docs/GAMEPLAY.md) has the player-facing section and
+  [SIM.md](docs/SIM.md) §6 the simulation reference.
+- **War news reads in the log** — flips ("Fall — Kvonice lost to the Old
+  Works", "Reclaimed — Pušťov returns to the charter"), front movement
+  ("Contested — Kamžal holds at 42%"), your deliveries into the war's
+  standing bids, your front kills and witnessed fleet skirmishes arrive as
+  ordinary log lines, coloured by their severity (danger for a fall, good
+  for a reclaim or a delivery). Nothing new to open: the log is the channel.
+
 ### Changed
 
 - **Settings opens from the Esc menu** — the pause menu gained a **Settings**

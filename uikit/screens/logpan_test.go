@@ -56,6 +56,30 @@ func TestLogPushAndColors(t *testing.T) {
 	}
 }
 
+// TestLogWarNews pins the war's journey into the log: an EvWar event is an
+// ordinary sim event, so the panel renders its text in the phase's
+// severity colour and the event's own stamp — the game pushes every event,
+// with no kind filter between sim and line.
+func TestLogWarNews(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	l := NewLog(env)
+	l.Push([]sim.Event{
+		{Kind: sim.EvWar, Phase: sim.WarFlip, Severity: sim.SevDanger, Time: 120,
+			Text: "Fall — Kvonice lost to the Old Works"},
+		{Kind: sim.EvWar, Phase: sim.WarContest, Severity: sim.SevInfo, Time: 3600,
+			Text: "Contested — Kvonice holds at 42%"},
+	})
+	got := l.ta.GetText()
+	for _, want := range []string{
+		"[color=#7a8494][2:00][/color] [color=#e05555]Fall — Kvonice lost to the Old Works[/color]",
+		"[color=#7a8494][60:00][/color] [color=#8fb8e0]Contested — Kvonice holds at 42%[/color]",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("war line missing from the log:\nwant %q\ngot  %s", want, got)
+		}
+	}
+}
+
 // TestLogCapDropsOldest pushes past the cap and checks the history keeps
 // exactly the newest logMaxLines lines.
 func TestLogCapDropsOldest(t *testing.T) {

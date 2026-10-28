@@ -109,7 +109,7 @@ Positions are `core.Vec2` JSON: `{"X": ..., "Y": ...}` (Y grows downward).
 System bodies are placed at real-solar-system scale (1 AU = 1.496e11 m):
 planets 0.4–2 AU from the star, belts/belt-like anomalies 2–10 AU, stations
 1–10 AU, gates 20–40 AU, with separation floors keeping landmarks off each
-other's grids — the scheme is described in [../SIM.md](../SIM.md) §7 and
+other's grids — the scheme is described in [../SIM.md](../SIM.md) §8 and
 pinned by `content/layout_test.go`, which a system outside the bands fails.
 
 ## Lore fields: hull `origin`, `maker` and NPC `description`
@@ -829,6 +829,76 @@ the event line `Risk premium — <item> shipment lost en route to <station>`
 `ammo-emp-s` imported through a gate land as a 600-unit ask one tick under
 its base price (`4.999 €` for a `5.00 €` base). The mechanics behind all
 of this are documented in [SIM.md](SIM.md).
+
+## Recipe 10: author war content
+
+The war (docs/GAMEPLAY.md *The Long Attrition*, docs/SIM.md §6) is
+mostly **derived from content you already author** — there is no war
+registry, no spawn table and no control map to fill in. Authoring it well
+means knowing which knobs are data and which are sim.
+
+| Want | Where it lives | Kind |
+|---|---|---|
+| A system on the front | `content/data/systems/*.json` + a `gate` to a system the other side holds | data (derived at load) |
+| Tick-0 sides | the system's `security` tier: `high`/`low` charter, `null` Works | data (derived) |
+| The Works' holding force and fleets | authored NPCs with `"faction": "Old Works"`, ranked by total hit points | data |
+| War demand (what the fleets buy) | module `kind` (weapons, EWAR, tank) + every `ammo`/`charge` item | data, but a new module **kind** needs `warKind` in `sim/war.go` |
+| War contracts | `content/data/contracts/*.json`, `station` = a charter board | data |
+| War news wording | `sim/war.go` (wave 2 polishes) | sim |
+| Whether a world has the war | `warWorlds` in `sim/war.go` (`world-default` only) | sim |
+
+**Fleet-hull patterns.** The war draws its castes from the authored
+`"Old Works"` NPCs, sorted by shield + armor + structure: the toughest hull
+leads the Corporate Fleets groups, the weakest lands first when the Works
+take a system, and squeeze steps the choice toward the tough end. Two
+consequences for authors: a new Old Works hull immediately enters the war
+palette (no wiring), and the *combat numbers* you author are the war's
+difficulty curve — there is no separate war stat file. Fleets themselves
+carry no authored NPC: `warSpawn` tags the toughest Works hull
+`factionFleets` at spawn (relations, aggro and kill credit; the hull's
+definition, name and loot stay as authored). A dedicated fleet hull (own
+`ship-*`, own NPC row) would need a sim change; flag it as a design
+decision, do not fake it with a second Works faction.
+
+**War contracts.** The board model is the ordinary one (Recipe 8): the
+three kinds are `kill`, `deliver` and `mine`, and a contract's flavour text
+may cite the Commission (attribution only). Two limits to author around:
+
+- a **kill** objective counts kills of its exact `target` NPC class
+  anywhere, not "at the front" — the objective model has no system
+  predicate, so front location is flavour text and payout calibration, not
+  a gate;
+- a **deliver** objective needs a real station at the destination, and a
+  system that falls turns its stations into remnants whose contract desk
+  stops accepting new work — a war contract offered at a front station can
+  therefore go dark mid-campaign, which is intended, but do not make it the
+  only path to a reward.
+
+Procurement is not a contract: the war's standing bids rest on **every**
+charter-held station book (so a military-good sell anywhere in charter space
+sells into the war), they are withdrawn and re-priced every sim hour, and
+fills are consumed. A contract that asks the player to *supply* the war
+should therefore haul materiel to a front station or sell into a bid —
+never rely on a resting war order surviving between beats.
+
+**Showcase checkpoints.** The showcase must prove the war mechanically if
+its world carries it (`warWorlds` is sim-owned: adding `world-showcase`
+there is a code change, not a content one). War checkpoints should name the
+event they resolve on — `EvWar` phases `flip`, `contest`, `supply`, `kill`,
+`skirmish` — and cite the observable in `detail` ("sell 100 x ammo into
+Hauvnok's bid, advance to the next war beat, expect `EvWar` supply and a
+contest move"). A tick-0 checkpoint (control + four idle meters) and a
+flip checkpoint (both directions) are the two the design asks for; the
+`sim/war_test.go` pins cover the mechanics, so the showcase only needs the
+player-visible path.
+
+> **Reconcile with wave 2:** the canonical legend/voice words
+> (*the Long Attrition*, *the front*, *contested*, *remnant*, *the
+> Commission*) are UNIVERSE.md's to settle; this recipe uses the CONTEXT.md
+> vocabulary and the codes (`charter` / `works`, `high` / `low` / `null`)
+> stay internal.
+
+---
 
 ## Recipes (manufacturing)
 

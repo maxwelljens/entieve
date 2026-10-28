@@ -41,6 +41,7 @@ run in this fixed order:
 | 16 | traffic | `sim/system_traffic.go` | convoys, ambushes, patrols, book supply, journeys |
 | 17 | industry | `sim/system_industry.go` | manufacturing jobs, craft growth |
 | 18 | agents | `sim/system_agent.go` | ledger economy: settle, behavior pass, upkeep |
+| 19 | war | `sim/war.go` | the Long Attrition: contest meters, procurement bids, fleets |
 
 After all systems, the **deferred player death respawn** runs
 (`pendingPlayerRespawn`): a cross-system clone-bay respawn rebuilds the
@@ -109,13 +110,15 @@ last so the rebuilt grid is never observed mid-Step.
 covers everything — `sim.Event` in `sim/model.go` — with kinds `EvLog`,
 `EvDestroyed`, `EvWarp`, `EvLooted`, `EvDocked`, `EvUndocked`, `EvJumped`,
 `EvMarket`, `EvModule`, `EvTargetLocked`, `EvCargoFull`, `EvAnomalyCleared`,
-`EvMission`, `EvTraffic`. Phases: `EvWarp` carries `"start" | "land" |
+`EvMission`, `EvTraffic`, `EvWar`. Phases: `EvWarp` carries `"start" | "land" |
 "scrammed"`; `EvMission` carries `"accepted" | "progress" | "ready" |
 "completed" | "abandoned" | "refused"` (with `ID`/`Name` for the contract);
 `EvTraffic` carries `"departed" | "jumped" | "delivered" | "attacked" |
 "destroyed" | "escaped" | "patrol-response" | "saved"` (with `System`/`Cel`
 for the route endpoint or incident celestial, `Item`/`Value` for the
-shipment). `Severity` is `SevInfo | SevGood | SevWarning | SevDanger`.
+shipment); `EvWar` carries `"flip" | "contest" | "supply" | "kill" |
+"skirmish"` (see [§6](#6-the-war-the-long-attrition)). `Severity` is
+`SevInfo | SevGood | SevWarning | SevDanger`.
 
 ### Command surface
 
@@ -213,7 +216,7 @@ selection riding inside its fitting runtime (`ModuleRuntime.Clip` /
 `.Selection`) — and the living-economy state the v2 schema added: `Market`
 (per-station books), `MarketLasts`,
 `MarketSeq`, `Belts`, `FactionLedger`, `Jobs`, `JobSeq`, `Craft`,
-`Agents`, `Upkeep`, `TrafficJourneys` (plus `TrafficLeaves`).
+`Agents`, `Upkeep`, `TrafficJourneys` (plus `TrafficLeaves`), `War`.
 `Ledger` (`sim/ledger.go`) is the one additive field outside that break:
 the capped ring of the player's last `LedgerCap` wallet movements, empty
 (and omitted) on saves written before it existed.
@@ -240,6 +243,12 @@ a different market, so it fails loudly instead. One piece of state is
 deliberately outside the versioned schema and resets on Restore by design:
 the recent-player-work aggro trigger (`sim/save_completeness_test.go`
 classifies every `Sim` field and fails on unclassified additions).
+
+`Save.War` is the newest additive field (`*WarState`, `omitempty`, no schema
+bump): control, the front's meters and the war treasury. A save written
+before the war existed restores into the tick-0 map derived from authored
+security whenever the world carries the war; every other world restores
+war-free (see [§6](#6-the-war-the-long-attrition)).
 
 ## 3. World metabolism
 
@@ -471,7 +480,9 @@ no drift model.
 - **Fees.** A 3 % broker fee rides the placed value of a buy at placement
   (never refunded, EVE's rule); a 2.5 % sales tax rides the executed value
   of a sell at execution. A round trip costs 5.5 % — the institutional
-  load every quote and wish accounts for.
+  load every quote and wish accounts for. A fifth of both is routed to the
+  war treasury instead of burned (`routeFee`, [§6](#6-the-war-the-long-attrition));
+  the rest vanishes exactly as before, so the round trip still costs 5.5 %.
 - **Full escrow.** A player buy debits price × qty + fee up front and
   refunds the escrow of whatever never trades (price improvement included);
   a player sell escrows the goods themselves (fitted hulls are refused).
@@ -500,7 +511,184 @@ economies, and the evidence — lives in
 (§1 marginal utility & imputation, §2 ACE convergence, §3 EVE market
 microstructure, §5 the candidate mechanisms).
 
-## 6. Extension guide (descriptive)
+## 6. The war (the Long Attrition)
+
+The war is **system 19** (`sim/war.go`), the last beat of the tick.
+Corporate fleets raised under the Commission fight the Old Works for
+territory: **control** is the scoreboard, **contest meters** on the front
+are its pulse, and the economy funds it. The war is world-gated
+(`warWorlds` = `world-default` today, the `agentWorlds` pattern) — a world
+outside the gate runs without it, so the current showcase tour and test
+fixtures keep war-free economies. All of it is deterministic: every
+iteration the war acts on walks ascending system ids (seeding is
+order-independent), the war spawns through the traffic stream rather than a
+new one, and the whole state rides `Save.War`, so the twin-run hash covers
+it.
+
+### Control and the tick-0 map
+
+`WarState` has three fields: `Control` (system → `"charter" | "works"`),
+`Contest` (front system → meter) and `Treasury` (the Corporate Fleets' bloc
+balance, `float64` like every purse in the house). `newWarState` seeds
+control from the authored `security` tier — `high` and `low` are chartered,
+`null` is the Works' — and derives the first front from the gates, so a
+fresh game starts on today's map exactly: Struvok and Rydnok chartered at
+high security, Kvonice, Młondan and Kamžal at low, Pušťov and Glůšan held
+by the Works; Kvonice, Kamžal, Pušťov and Glůšan carry the idle meters. The
+treasury starts at its one-time endowment (100,000,000 €, the
+faction-ledger seed pattern); it is refilled only by the fee cut below, so
+it is a finite sink.
+
+**Effective security** (`EffectiveSecurity`) is the one authority every
+other behavior derives from: a works-held system reads `"null"` — guards
+and patrols leave, ambush rolls and NPC temperament go lawless, belt
+sweeps stop — and a reclaim returns the authored tier, because nothing
+about the effective tier is stored. Authored `security` still classifies
+the zone on the starmap and in content.
+
+### The front and its meters
+
+A system carries a **contest meter** exactly while it is gated to a system
+the other side holds: the front is contiguous, and control moves only
+across it. The meter is the attacking side's progress in `[0, Threshold]`
+(`meterThreshold` = 1) — the Works' against a charter hold, the charter's
+against a works hold — so the sign of the push follows the holder:
+
+- on a **charter-held** front the Works press: `pressure − supply`;
+- on a **works-held** front the charter pushes: `supply − pressure`.
+
+Both apply once per hourly war beat (`procureCadence` = 3600 ticks):
+
+- **works pressure** is `1/96 h`, scaled by the global squeeze curve and
+  capped at `pressureCap` = 8× — an unsupplied front at squeeze 1 falls in
+  four days, a front against a cornered Works much sooner;
+- **charter supply** is everything credited to that front
+  (`Contest.SupplyPending`) ÷ (`supplyPerFlip` = 250,000 € × squeeze) —
+  delivered materiel and kill attrition in one euro-equivalent unit,
+  released on the beat. That release *is* the abstract haul leg: supply
+  never travels as a convoy entity.
+
+The meter clamps to `[0, Threshold]`; reaching the threshold **flips** the
+system and the meter geography re-derives (`warRederive`) — a system that
+stays on the front keeps its pressure, a system that just flipped starts
+idle on its new side. The beat emits `EvWar`/`"contest"` for moves of at
+least `newsThreshold` (5 %) only, so quiet stretches stay quiet, and
+`EvWar`/`"flip"` always (see [§2](#2-contracts) for the event surface).
+
+### The squeeze curve and the works floor
+
+One global curve off the Works' share of the map (`Squeeze`) is both their
+meter stiffness and the war's spawn-difficulty input — the force they land
+when a system falls and the caste the fleets fly. With `start` = the systems
+authored `null` and `works` = the systems they hold now:
+
+    excess  = max((works − 1) / (start − 1), 0.01)
+    squeeze = exp(2 · (1/excess − 1))
+
+It is 1 while they hold their tick-0 share (or more, after a reclaim) and
+rises exponentially as they are cornered. The floor (`warWorksFloor` = 1
+system, `squeezeFloor` = 0.01) makes their last system's defensive
+stiffness astronomically large while keeping it finite — the charter supply
+needed to take it is unreachable in any realistic session. The *offensive*
+squeeze is capped at `pressureCap`, so a cornered Works hits the front
+harder without ever becoming able to lose its last system.
+
+The charter has **no mirror guard** (the design's explicit choice): its
+resistance is whatever supply the economy delivers. Starve the war and the
+front erodes — that is the bargain, not an oversight.
+
+### Procurement (the sink)
+
+On the same beat every standing war bid is withdrawn and re-posted
+(`warRefreshBids`), so no book ever carries stale war demand. Bids rest on
+**every charter-held station's book** for the derived materiel set
+(`warMateriel`, pinned in `sim/war_test.go`): every module of a war kind
+(weapons, stasis web, warp scrambler, shield boost/extender, armor
+repairer/plate, resist coating, cap booster/recharger — an unknown kind is
+never bought, so a new kind is a deliberate decision) plus every ammo line
+and charge, in ascending item id. Lot sizes are `warBidQty` = 100 for items
+and `warBidModuleQty` = 5 for modules.
+
+The reservation price is **one tick under the best ask** — or one tick
+above the displayed price (last → best bid → base) when no ask rests — so a
+fresh bid never crosses the station's own supply and the war is competitive
+on any book (`warBidPrice`). The fresh book's whole exposure is budgeted
+against the treasury at post time, so a fill can never overdraw it.
+
+A fill (`warFill`, called from `settle`) is the player's delivery to the
+front: the seller is paid immediately through the ordinary sell path
+(earnings are the feedback), the treasury pays the same amount — **a
+transfer; the war mints nothing** — the goods are consumed into the war
+(the sink the economy was missing), and the value credits the **nearest
+front**: the station's own system when it is on the front, else the closest
+front by starmap distance, ties by id (`warNearestFront`). Works-held
+remnants carry no war demand, and a system that falls has its bids cleared
+at once.
+
+The treasury is refilled by the **fee cut** (`routeFee`): a fifth
+(`feeCut` = 0.2) of every broker fee and sales tax is routed into it before
+the rest is burned — about 1.1 % of turnover at the 5.5 % institutional
+load — so money already cycling funds the war instead of vanishing.
+Selling into a war bid also emits `EvWar`/`"supply"` naming the goods
+taken.
+
+### Flips under the player
+
+A flip is structural and instant. Control changes, the news line fires,
+the meter leaves the front, the geography re-derives and — when the player
+is standing in that system — the grid changes with it (`warApplyControl`):
+
+- **fall** — the charter's ships leave outright (no retreat flight this
+  wave) and the Works land a holding force at the system's belts and
+  anomalies only, never on the docking ring: two hulls per anchor at
+  squeeze 1, one more per squeeze step, capped at four
+  (`warProfileCount`). The caste comes from the authored Old Works hulls
+  ranked by total hit points and stiffens with the squeeze
+  (`warWorksCastes`, `warProfileTier`) — no stat is edited, the war only
+  chooses among what content ships. Ambient Works spawns (respawn timers,
+  belt populations) are **not** rescaled in this wave: the design's global
+  spawn-mix shift is intent, not landed; only the war's own spawns move
+  with the curve.
+- **reclaim** — the authored guard posts respawn (`warSpawnGuards`) and
+  Works hulls already on the grid are left to be shot, never silently
+  swept.
+
+Nothing evicts the player. A fall while docked keeps the dock: market,
+repair and refining stay live, industry and fitting go dark
+(`stationOffers`), and the contract desk stops handing out new charter work
+(`remnant`). In-flight manufacturing jobs run to completion — they are paid
+work and the job pool is global. A reclaim restores the authored services.
+
+### Fleets and the grid
+
+The war never simulates an off-grid battle: the meters are the aggregate.
+On the contest beat, when the loaded system is on the front and fewer than
+`warFleetCap` = 2 Corporate Fleets hulls are live, one fleet group lands —
+the toughest authored machine hull, tagged `factionFleets` — over the belt
+the Works are working, else at the patrol anchor (`warFleets`). The
+hostility table does the rest: the bloc is hostile to the Old Works and
+neutral to everyone else unless provoked, so fleet-vs-Works engagements are
+witnessed and joinable through the ordinary threat machine. The fleet
+always flies the toughest authored machine hull; the Works' *own* holding
+force is what scales with the squeeze. The ambient Works populations are as
+authored.
+
+Kills feed the meter too (`warObserveKill`): every Works hull destroyed in
+a loaded front system credits `killAttrition` (2 %) of a flip to that
+system's meter — 5,000 € of supply — and a player kill emits
+`EvWar`/`"kill"`. Any death involving a fleets hull emits
+`EvWar`/`"skirmish"`.
+
+### Pins
+
+`sim/war_test.go` holds the behavior pins: the tick-0 map, the deterministic
+bid book and its budget, fill → supply → flip, the squeeze floor, effective
+security and the remnant mask, the fleet spawn and the kill credit, the
+world gate, the treasury's place in the money-supply enumeration
+(`TestWarMoneySupplyEnumeration`) and the twin-run hash. The war is all
+transfers, never a mint.
+
+## 7. Extension guide (descriptive)
 
 How the seams above are extended in practice. Not rules — patterns the
 code already follows.
@@ -549,7 +737,7 @@ cross-checks + the ID registry in ARCHITECTURE.md + a NAMING.md registry
 row — then a showcase checkpoint so `tests/` keeps proving the feature
 end-to-end.
 
-## 7. System layout (placement)
+## 8. System layout (placement)
 
 What the shipped system geometry in `content/data/systems/*.json` looks
 like. Descriptive — `content/layout_test.go` pins the contract.

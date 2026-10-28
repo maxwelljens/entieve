@@ -443,10 +443,14 @@ Events (`sim/model.go`) — read via `(*Sim).Events() []Event` (drained each
 call) or `DrainEvents()`. Kinds: `EvLog` (combat/mining/system log lines
 with severity), `EvDestroyed`, `EvWarp{Phase}`, `EvLooted`, `EvDocked`,
 `EvUndocked`, `EvJumped`, `EvMarket`, `EvModule`, `EvTargetLocked`,
-`EvCargoFull`, `EvAnomalyCleared`, `EvMission`, `EvTraffic`.
+`EvCargoFull`, `EvAnomalyCleared`, `EvMission`, `EvTraffic`, `EvWar`.
 `EvMission{Phase, ID, Name}` reports the contract lifecycle with phases
 `"accepted" | "progress" | "ready" | "completed" | "abandoned" | "refused"`
 (ID/Name carry the contract ID and title; Value carries the payout).
+`EvWar{Phase, System, Actor, Target, Item, Value}` reports the war with
+phases `"flip" | "contest" | "supply" | "kill" | "skirmish"` — flips
+always, meter moves of 5 % or more, the goods a war bid took, the player's
+front kills and any witnessed fleet skirmish (see `docs/SIM.md` §6).
 `EvTraffic{Phase, System, Cel, Item, Value, Text}` reports the
 living-universe convoy lifecycle with phases `"departed" | "jumped" |
 "delivered" | "attacked" | "destroyed" | "escaped" | "patrol-response" |
@@ -474,6 +478,10 @@ func (s *Sim) System() *content.SystemDef     // current system
 func (s *Sim) LoadSystem(id content.SystemID, entryAtCel content.CelID) error // gate jumps / new game
 func (s *Sim) Snapshot() (*Save, error)       // full serializable state
 func (s *Sim) Restore(*Save) error
+func (s *Sim) War() *WarState                 // nil in a world without the war
+func (s *Sim) WarTreasury() float64           // the Corporate Fleets' balance (war health)
+func (s *Sim) Squeeze() float64               // the Works' resistance multiplier
+func (s *Sim) EffectiveSecurity(content.SystemID) string // authored tier, or "null" under the Works
 ```
 
 Read model: `(*Sim).Grid() []Info` lists on-grid entities (docked excluded)
@@ -527,7 +535,10 @@ anatomy lives in `docs/SIM.md`):
     job fees/cancels, craft growth and idle decay),
 18. `agents` (the ledger economy: settle resting fills every tick, the
     agent behavior pass on per-agent cooldowns of 60-600 ticks, the station upkeep cycle every
-    3600 ticks).
+    3600 ticks),
+19. `war` (the Long Attrition: the hourly contest beat — meters settle and
+    flip, the standing war bids refresh against the treasury, fleets look
+    for the front; `sim/war.go`, anatomy in `docs/SIM.md` §6).
 
 After all systems, the **deferred player death respawn** runs (so a
 cross-system clone-bay respawn can rebuild the grid without yanking
@@ -613,7 +624,10 @@ The living-economy fields riding the schema: `Market` / `MarketLasts` /
 (persistent belt state), `FactionLedger` (respawn requisition money),
 `Jobs` / `JobSeq` / `Craft` (manufacturing jobs and station craft
 counters), `Agents` / `Upkeep` (ledger agents and station upkeep
-ledgers), `TrafficJourneys` (shipments parked between grids). All lists
+ledgers), `TrafficJourneys` (shipments parked between grids), `War` (the
+Long Attrition: per-system control, the front's contest meters and the
+Corporate Fleets' treasury — `omitempty`, old saves initialize to the
+tick-0 map in a war world). All lists
 serialize in canonical order and map keys marshal sorted;
 `Sim.Hash()` is FNV-1a over the full canonical Save JSON
 (`sim/hash.go`), with no degraded fallback (it panics on a

@@ -16,13 +16,17 @@ const mapCaptureFrames = 3
 // TestMapCaptureFrame renders the starmap through a real ebiten game loop
 // (pixel readback panics before the game starts) and asserts the kit's
 // 28 px lattice: accent lines at ~3.5 % alpha under the gate graph, on the
-// map image only.
+// map image only. The frame is the war's starmap — world-default (the one
+// world that carries the war) with a front selected, so the capture pins
+// the control markers, the contested ring, the war key and the card's war
+// readout as well as the lattice; world-showcase carries no war.
 //
 // Skipped unless ENTIEVE_CAPTURE=1 so the regular suite stays windowless.
 // The PNG lands in $ENTIEVE_CAPTURE_DIR (default /tmp/opencode).
 func TestMapCaptureFrame(t *testing.T) {
-	env, _ := newChromeEnv(t)
+	env := newWarEnv(t)
 	m := NewMapView(env)
+	m.sel = "sys-penumbra" // Kvonice: a charter-held front
 	c := newChromeUI(env)
 	c.AddWindow(m)
 

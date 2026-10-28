@@ -4,6 +4,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -47,9 +48,10 @@ type mapPoint struct {
 
 // MapView is the starmap window: the universe graph (systems from content,
 // gate edges from their gate celestials) drawn into an image shown through
-// a widget.Graphic, with the current system highlighted in accent. The
-// image is redrawn only when what it shows changes (current system, hover,
-// selection, destination).
+// a widget.Graphic, with the current system highlighted in accent and the
+// war's control and contested fronts on the nodes. The image is redrawn only
+// when what it shows changes (current system, hover, selection, destination,
+// war state).
 //
 // Interaction is view state — session-only, never persisted and never a sim
 // command: the pointer is read through the host's frame (the SplitPane
@@ -57,22 +59,24 @@ type mapPoint struct {
 // it, a press on the already-selected node makes it the destination (or
 // clears it), and the route from the current system is BFS over the gates.
 type MapView struct {
-	th      theme.Theme
-	cv      widgets.ContentView
-	ptr     *widgets.Pointer
-	win     *widget.Window
-	img     *ebiten.Image
-	gfx     *widget.Graphic
-	drawn   bool
-	dirty   bool              // selection/hover changed since the last paint
-	nodes   []mapNode         // the laid-out graph (hit-test geometry)
-	pts     []mapPoint        // projected node centres (image px)
-	labels  []image.Rectangle // label bands, parallel to pts (image px)
-	redraws int               // graph repaint count (TestMapViewRedraws watches it)
-	system  content.SystemID
-	hover   content.SystemID // pointer's node ("" = none)
-	sel     content.SystemID // inspected node ("" = none)
-	dest    content.SystemID // planned destination ("" = none)
+	th       theme.Theme
+	cv       widgets.ContentView
+	ptr      *widgets.Pointer
+	win      *widget.Window
+	img      *ebiten.Image
+	gfx      *widget.Graphic
+	drawn    bool
+	dirty    bool              // selection/hover changed since the last paint
+	nodes    []mapNode         // the laid-out graph (hit-test geometry)
+	pts      []mapPoint        // projected node centres (image px)
+	labels   []image.Rectangle // label bands, parallel to pts (image px)
+	redraws  int               // graph repaint count (TestMapViewRedraws watches it)
+	system   content.SystemID
+	hover    content.SystemID // pointer's node ("" = none)
+	sel      content.SystemID // inspected node ("" = none)
+	dest     content.SystemID // planned destination ("" = none)
+	war      widgets.WarView  // this frame's war read (zero = no war)
+	warShown widgets.WarView  // the war the last repaint showed
 }
 
 // NewMapView builds the starmap window (draggable, fixed size) over the
@@ -133,8 +137,9 @@ func (m *MapView) Sync() {
 	if sys := m.cv.System(); sys != nil {
 		cur = sys.ID
 	}
+	m.war = m.cv.War()
 	m.poll(cur)
-	if m.drawn && cur == m.system && !m.dirty {
+	if m.drawn && cur == m.system && !m.dirty && reflect.DeepEqual(m.war, m.warShown) {
 		return
 	}
 	m.dirty = false
@@ -142,6 +147,7 @@ func (m *MapView) Sync() {
 	m.system = cur
 	m.redraws++
 	m.drawMap(cur)
+	m.warShown = m.war
 }
 
 // poll reads one frame of pointer input: the cursor drives hover, and a
@@ -313,7 +319,10 @@ func (m *MapView) drawMap(cur content.SystemID) {
 	}
 
 	// System nodes: hover ring, selection ring, destination ring, current
-	// ring, then the zone-colored disc and the label band.
+	// ring, then the zone-colored disc and the label band. Control is the
+	// disc's shape — filled while the charter holds, an outline under the
+	// Old Works — and a front system wears the contested ring outside every
+	// interaction ring.
 	face := m.th.Face(theme.StepSmall)
 	for i, n := range nodes {
 		pt := pts[i]
@@ -327,6 +336,9 @@ func (m *MapView) drawMap(cur content.SystemID) {
 		case n.id == m.hover:
 			rad = float32(6.5 * s)
 		}
+		if _, contested := m.war.Contest[n.id]; contested {
+			vector.StrokeCircle(m.img, float32(pt.x), float32(pt.y), float32(17*s), float32(1.5*s), theme.NRGBA(p.Info, 220), true)
+		}
 		if n.id == m.hover && n.id != m.dest {
 			vector.StrokeCircle(m.img, float32(pt.x), float32(pt.y), float32(9*s), float32(s), theme.NRGBA(p.Text, 160), true)
 		}
@@ -337,7 +349,12 @@ func (m *MapView) drawMap(cur content.SystemID) {
 			// The destination wears the widest ring: the route ends here.
 			vector.StrokeCircle(m.img, float32(pt.x), float32(pt.y), float32(15*s), float32(2*s), p.Accent, true)
 		}
-		vector.DrawFilledCircle(m.img, float32(pt.x), float32(pt.y), rad, m.mapSecurity(n.security), true)
+		zone := m.mapSecurity(n.security)
+		if m.war.WorksHeld(n.id) {
+			vector.StrokeCircle(m.img, float32(pt.x), float32(pt.y), rad, float32(1.5*s), zone, true)
+		} else {
+			vector.DrawFilledCircle(m.img, float32(pt.x), float32(pt.y), rad, zone, true)
+		}
 		col := p.Dim
 		switch {
 		case n.id == cur || n.id == m.dest:
@@ -358,6 +375,9 @@ func (m *MapView) drawMap(cur content.SystemID) {
 		vector.DrawFilledCircle(m.img, float32(12*s), float32(y)+float32(6*s), float32(4*s), m.mapSecurity(sec), true)
 		render.Text(m.img, zoneLabel(sec), 24*s, y, m.th.TS().Tiny, p.Dim)
 	}
+	// The war key takes the empty top-right corner: the zone block below is
+	// full, and the card's corner is the top-left.
+	m.drawWarKey()
 	// How the pointer works, tucked into the empty bottom-right corner.
 	hint := "Click a system · click again to set destination"
 	hw := render.Measure(hint, m.th.TS().Tiny)
@@ -378,13 +398,49 @@ type mapCardLine struct {
 }
 
 // drawCard paints the selected system's card (the map image's empty
-// top-left corner): display name, zone, its stations and gate destinations,
-// and the route line — how many gate jumps to the destination, or the offer
-// to set one. Rows are one line each; the card grows with the content.
+// top-left corner) from its model.
 func (m *MapView) drawCard(cur content.SystemID) {
+	lines := m.cardLines(cur)
+	if lines == nil {
+		return
+	}
+	pad, lineH := theme.Px(10), theme.Px(21)
+	height := 2 * pad
+	for _, l := range lines {
+		h := lineH
+		if l.tiny {
+			h = theme.Px(17)
+		}
+		height += h
+	}
+	rect := image.Rect(theme.Px(12), theme.Px(10), theme.Px(12)+theme.Px(mapCardW), theme.Px(10)+height)
+	p := m.th.Pal()
+	theme.DrawRoundBox(m.img, rect, theme.NRGBA(p.BGHard, 225), theme.NRGBA(p.Border, 210), 1, theme.AllRadii(theme.RadiusPanel))
+	y := rect.Min.Y + pad
+	for _, l := range lines {
+		face := m.th.Face(theme.StepSmall)
+		switch {
+		case l.tiny:
+			face = m.th.Face(theme.StepTiny)
+		case l.bold:
+			face = m.th.FaceBold(theme.StepSmall)
+		}
+		theme.DrawCardText(m.img, l.text, face, rect.Min.X+pad, y, l.col)
+		if l.tiny {
+			y += theme.Px(17)
+		} else {
+			y += lineH
+		}
+	}
+}
+
+// cardLines is the selected system's card model: display name, zone, who
+// holds it and — on a contested front — the meter, its stations and gate
+// destinations, and the route line. Nil when the selection is not a system.
+func (m *MapView) cardLines(cur content.SystemID) []mapCardLine {
 	def, ok := m.cv.Defs().System(m.sel)
 	if !ok {
-		return
+		return nil
 	}
 	p := m.th.Pal()
 	name := def.Name
@@ -394,6 +450,20 @@ func (m *MapView) drawCard(cur content.SystemID) {
 	lines := []mapCardLine{{text: name, bold: true, col: p.Text}}
 	if z := zoneLabel(def.Security); z != "" {
 		lines = append(lines, mapCardLine{text: z, tiny: true, col: p.Dim})
+	}
+	// The war readout: the holder, and on the front the meter the design
+	// keeps to the aggregate war (never the player's own share).
+	if _, holds := m.war.Control[def.ID]; holds {
+		holder := "Held — the charter"
+		if m.war.WorksHeld(def.ID) {
+			holder = "Held — the Old Works"
+		}
+		lines = append(lines, mapCardLine{text: holder, col: p.Text})
+		// A quiet meter (under one percent) stays off the card: the ring
+		// already marks the front, and "press at 0%" is noise.
+		if c, front := m.war.Contest[def.ID]; front && math.Round(c.Meter*100) >= 1 {
+			lines = append(lines, mapCardLine{text: contestLine(m.war.WorksHeld(def.ID), c.Meter), col: p.Info})
+		}
 	}
 	var stations []string
 	for i := range def.Celestials {
@@ -420,33 +490,78 @@ func (m *MapView) drawCard(cur content.SystemID) {
 	default:
 		lines = append(lines, mapCardLine{text: "Route — no gate path", tiny: true, col: p.Danger})
 	}
+	return lines
+}
 
-	pad, lineH := theme.Px(10), theme.Px(21)
-	height := 2 * pad
-	for _, l := range lines {
-		h := lineH
-		if l.tiny {
-			h = theme.Px(17)
-		}
-		height += h
+// contestLine renders a front's meter from the holder's side: the number is
+// the other side's progress toward the flip.
+func contestLine(worksHeld bool, meter float64) string {
+	if worksHeld {
+		return "Contested — the charter pushes at " + theme.PctLabel(meter)
 	}
-	rect := image.Rect(theme.Px(12), theme.Px(10), theme.Px(12)+theme.Px(mapCardW), theme.Px(10)+height)
-	theme.DrawRoundBox(m.img, rect, theme.NRGBA(p.BGHard, 225), theme.NRGBA(p.Border, 210), 1, theme.AllRadii(theme.RadiusPanel))
-	y := rect.Min.Y + pad
-	for _, l := range lines {
-		face := m.th.Face(theme.StepSmall)
-		switch {
-		case l.tiny:
-			face = m.th.Face(theme.StepTiny)
-		case l.bold:
-			face = m.th.FaceBold(theme.StepSmall)
+	return "Contested — the Works press at " + theme.PctLabel(meter)
+}
+
+// warKeyMark is one war-legend marker shape: the node vocabulary the key
+// decodes.
+type warKeyMark int
+
+const (
+	warMarkNone warKeyMark = iota
+	warMarkCharter
+	warMarkWorks
+	warMarkFront
+)
+
+// warKey is one war-legend row: the marker and the words.
+type warKey struct {
+	mark warKeyMark
+	text string
+	col  color.RGBA
+}
+
+// warKeyRows builds the war legend: control (filled = charter, outline =
+// Old Works), the contested ring, and the war treasury — the war's health
+// in one line. No war, no rows.
+func warKeyRows(p theme.Palette, w widgets.WarView) []warKey {
+	if !w.Has() {
+		return nil
+	}
+	return []warKey{
+		{mark: warMarkCharter, text: "Charter · holds", col: p.Text},
+		{mark: warMarkWorks, text: "Old Works · holds", col: p.Text},
+		{mark: warMarkFront, text: "Contested · the front", col: p.Info},
+		{text: "War treasury — " + theme.FormatCredits(w.Treasury), col: p.Dim},
+	}
+}
+
+// drawWarKey paints the war legend in the image's empty top-right corner
+// (the zone block bottom-left is full, the card owns the top-left).
+func (m *MapView) drawWarKey() {
+	p := m.th.Pal()
+	rows := warKeyRows(p, m.war)
+	if len(rows) == 0 {
+		return
+	}
+	s := theme.Scale()
+	face := m.th.TS().Tiny
+	width := 0.0
+	for _, r := range rows {
+		width = math.Max(width, render.Measure(r.text, face))
+	}
+	x := float64(theme.Px(mapImgW-12)) - width
+	for i, r := range rows {
+		y := 12*s + float64(i)*16*s
+		mx, my := float32(x-9*s), float32(y+6*s)
+		switch r.mark {
+		case warMarkCharter:
+			vector.DrawFilledCircle(m.img, mx, my, float32(4*s), p.Dim, true)
+		case warMarkWorks:
+			vector.StrokeCircle(m.img, mx, my, float32(4*s), float32(1.5*s), p.Dim, true)
+		case warMarkFront:
+			vector.StrokeCircle(m.img, mx, my, float32(5*s), float32(1.5*s), p.Info, true)
 		}
-		theme.DrawCardText(m.img, l.text, face, rect.Min.X+pad, y, l.col)
-		if l.tiny {
-			y += theme.Px(17)
-		} else {
-			y += lineH
-		}
+		render.Text(m.img, r.text, x, y, face, r.col)
 	}
 }
 

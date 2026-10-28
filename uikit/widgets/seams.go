@@ -156,7 +156,37 @@ type ContentView interface {
 	Ledger() []sim.LedgerEntry
 	Deployed() float64
 	Receivables() float64
+
+	// War is the war as the screens read it (the starmap's control and
+	// contested display). The zero value means the world carries no war.
+	War() WarView
 }
+
+// WarView is the war as the screens read it (CONTEXT.md: war, front,
+// contest, war treasury): which side holds each system, the front's
+// contest meters and the Corporate Fleets' treasury — the war's health.
+// The maps are copies, never a live handle into the simulation's state,
+// and the zero value (nil Control) is a world with no war.
+type WarView struct {
+	Control  map[content.SystemID]string // WarState.Control: "charter" | "works"
+	Contest  map[content.SystemID]ContestView
+	Treasury float64
+}
+
+// ContestView is one front system's meter: the attacking side's progress
+// in [0, Threshold] — the Works' on a charter hold, the charter's on a
+// works hold.
+type ContestView struct {
+	Meter     float64
+	Threshold float64
+}
+
+// Has reports whether the world carries a war at all.
+func (w WarView) Has() bool { return w.Control != nil }
+
+// WorksHeld reports whether the Old Works hold a system. This is the one
+// place the UI spells the simulation's works control value.
+func (w WarView) WorksHeld(id content.SystemID) bool { return w.Control[id] == "works" }
 
 // StationInfo is one docked station as the interface reads it: the
 // identity the station view shows (celestial name + system name) and the
@@ -562,6 +592,29 @@ func (v *view) Ledger() []sim.LedgerEntry { return v.s.Ledger() }
 func (v *view) Deployed() float64 { return v.s.Deployed() }
 
 func (v *view) Receivables() float64 { return v.s.Receivables() }
+
+// War copies the war state: control, the front's meters and the treasury.
+// A world without a war reads as the zero WarView (nil maps).
+func (v *view) War() WarView {
+	st := v.s.War()
+	if st == nil {
+		return WarView{}
+	}
+	w := WarView{
+		Control:  make(map[content.SystemID]string, len(st.Control)),
+		Contest:  make(map[content.SystemID]ContestView, len(st.Contest)),
+		Treasury: st.Treasury,
+	}
+	for id, side := range st.Control {
+		w.Control[id] = side
+	}
+	for id, c := range st.Contest {
+		if c != nil {
+			w.Contest[id] = ContestView{Meter: c.Meter, Threshold: c.Threshold}
+		}
+	}
+	return w
+}
 
 // ActionSink is the write seam: a screen expresses "do this" as a typed
 // Intent (uikit/widgets/intents.go) and never touches the simulation. The host
