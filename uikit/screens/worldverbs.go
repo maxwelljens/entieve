@@ -43,10 +43,11 @@ type Resolved struct {
 }
 
 // WorldVerb is one row. Emit is pure: it builds the intent and never
-// queues — the sink does that.
+// queues — the sink does that. Action is the row's only name: a surface
+// that speaks a verb carries its own wording (the Selected Item caption,
+// worldKeyMap.Desc), so no second vocabulary is stored here.
 type WorldVerb struct {
 	Action   string // the frozen worldKeyMap id
-	Label    string
 	Rule     TargetRule
 	Eligible func(Resolved) bool
 	Ready    func(Resolved) (ok bool, why string)
@@ -56,33 +57,33 @@ type WorldVerb struct {
 // WorldVerbs is the table, in worldKeyMap order (a slice: the cycle's
 // distance sort and every surface's scan must stay deterministic).
 var WorldVerbs = []WorldVerb{
-	{Action: "lock-nearest", Label: "Cycle-lock nearest target", Rule: TargetCycle,
+	{Action: "lock-nearest", Rule: TargetCycle,
 		Eligible: lockable, Emit: func(r Resolved) widgets.Intent { return widgets.Lock{Entity: r.Entity} }},
-	{Action: "lock-selected", Label: "Lock selected target", Rule: TargetSelected,
+	{Action: "lock-selected", Rule: TargetSelected,
 		Eligible: lockable, Emit: func(r Resolved) widgets.Intent { return widgets.Lock{Entity: r.Entity} }},
 	highVerb(1), highVerb(2), highVerb(3), highVerb(4),
 	highVerb(5), highVerb(6), highVerb(7), highVerb(8),
-	{Action: "approach", Label: "Approach selected", Rule: TargetSelected,
+	{Action: "approach", Rule: TargetSelected,
 		Emit: func(r Resolved) widgets.Intent { return widgets.Approach{Entity: r.Entity} }},
-	{Action: "orbit", Label: "Orbit selected", Rule: TargetSelected,
+	{Action: "orbit", Rule: TargetSelected,
 		Emit: func(r Resolved) widgets.Intent { return widgets.Orbit{Entity: r.Entity} }},
-	{Action: "stop", Label: "Stop", Rule: TargetSelf, Ready: needsSelection,
+	{Action: "stop", Rule: TargetSelf, Ready: needsSelection,
 		Emit: func(Resolved) widgets.Intent { return widgets.Stop{} }},
-	{Action: "align", Label: "Align to selected", Rule: TargetSelected,
+	{Action: "align", Rule: TargetSelected,
 		Emit: func(r Resolved) widgets.Intent { return widgets.Align{Entity: r.Entity} }},
-	{Action: "warp", Label: "Warp to selected", Rule: TargetSelected,
+	{Action: "warp", Rule: TargetSelected,
 		Eligible: func(r Resolved) bool { return r.Info.CanWarp }, Ready: warpReady,
 		Emit: func(r Resolved) widgets.Intent { return widgets.WarpTo{Entity: r.Entity} }},
-	{Action: "dock", Label: "Dock (selected station, else nearest)", Rule: TargetSelectedElseNearest,
+	{Action: "dock", Rule: TargetSelectedElseNearest,
 		Eligible: func(r Resolved) bool { return r.Info.CanDock },
 		Emit:     func(r Resolved) widgets.Intent { return widgets.Dock{Entity: r.Entity} }},
-	{Action: "jump", Label: "Jump through gate (selected, else nearest)", Rule: TargetSelectedElseNearest,
+	{Action: "jump", Rule: TargetSelectedElseNearest,
 		Eligible: func(r Resolved) bool { return r.Info.CanJump },
 		Emit:     func(r Resolved) widgets.Intent { return widgets.Jump{Entity: r.Entity} }},
-	{Action: "loot", Label: "Loot nearest wreck", Rule: TargetNearest,
+	{Action: "loot", Rule: TargetNearest,
 		Eligible: func(r Resolved) bool { return r.Info.CanLoot },
 		Emit:     func(r Resolved) widgets.Intent { return widgets.Loot{Entity: r.Entity} }},
-	{Action: "mine", Label: "Mine selected asteroid", Rule: TargetSelected,
+	{Action: "mine", Rule: TargetSelected,
 		Eligible: func(r Resolved) bool { return r.Info.Kind == sim.KindAsteroid && r.Slot.Class != "" },
 		Ready:    func(r Resolved) (bool, string) { return r.Info.CanMine, "" },
 		Emit:     func(r Resolved) widgets.Intent { return widgets.Mine{Entity: r.Entity, Slot: r.Slot} }},
@@ -94,7 +95,6 @@ func highVerb(n int) WorldVerb {
 	label := strconv.Itoa(n)
 	return WorldVerb{
 		Action:   "high-" + label,
-		Label:    "Toggle high slot " + label,
 		Rule:     TargetSelf,
 		Eligible: func(r Resolved) bool { return r.Slot.Class != "" },
 		Emit: func(r Resolved) widgets.Intent {

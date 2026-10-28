@@ -40,6 +40,13 @@ type selectedPanel struct {
 	loot, mine                  *widget.Button
 	orbitRange, warpRange       *widget.Button
 
+	// verbs is the action bar in pinned button order: one row per verb,
+	// carrying the frozen id and the button buildSelected made for it.
+	// Build appends, syncSelected gates, the tests walk — the panel's
+	// button list and its gating list are this slice, so they cannot drift.
+	// The named fields above are handles onto the same buttons.
+	verbs []panelVerb
+
 	// warpTip explains why Warp is disabled when the selected target
 	// sits inside the warp minimum range (sim.WarpMinRange).
 	warpTip     *widget.ToolTip
@@ -54,6 +61,13 @@ type selectedPanel struct {
 // orbit, stop), context actions and the two range selectors (one
 // full-width cell each).
 var selectedBands = [...]int{4, 5, 1, 1}
+
+// panelVerb is one Selected Item action button: the frozen world verb id
+// (worldverbs.go) beside the button the panel built for it.
+type panelVerb struct {
+	action string
+	btn    *widget.Button
+}
 
 // buildSelected constructs the Selected Item window and its handlers.
 func (k *Kit) buildSelected() {
@@ -103,17 +117,26 @@ func (k *Kit) buildSelected() {
 	// their selector shows, never a range of their own. Every handler is
 	// the one verb table's row (worldverbs.go) — the key path and the
 	// overview rows resolve through the same rows.
-	sp.approach = newBtn("Approach", "act_approach", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("approach") })
-	sp.warp = newBtn("Warp", "act_warp", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("warp") })
-	sp.orbit = newBtn("Orbit", "act_orbit", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("orbit") })
-	sp.stop = newBtn("Stop", "act_stop", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("stop") })
+	//
+	// verb builds one action button and registers it, in call order: this
+	// list is both the body's button order and the gating order, so a
+	// button can never be added without its gate (and vice versa).
+	verb := func(action, caption, icon string) *widget.Button {
+		btn := newBtn(caption, icon, func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb(action) })
+		sp.verbs = append(sp.verbs, panelVerb{action: action, btn: btn})
+		return btn
+	}
+	sp.approach = verb("approach", "Approach", "act_approach")
+	sp.warp = verb("warp", "Warp", "act_warp")
+	sp.orbit = verb("orbit", "Orbit", "act_orbit")
+	sp.stop = verb("stop", "Stop", "act_stop")
 	// Context actions, gated by syncSelected from the same rows' VerbReady
 	// (disabled buttons take the theme's disabled look).
-	sp.lock = newBtn("Lock", "act_lock", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("lock-selected") })
-	sp.dock = newBtn("Dock", "act_dock", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("dock") })
-	sp.jump = newBtn("Jump", "act_jump", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("jump") })
-	sp.loot = newBtn("Loot", "act_loot", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("loot") })
-	sp.mine = newBtn("Mine", "act_mine", func(*widget.ButtonClickedEventArgs) { k.DoWorldVerb("mine") })
+	sp.lock = verb("lock-selected", "Lock", "act_lock")
+	sp.dock = verb("dock", "Dock", "act_dock")
+	sp.jump = verb("jump", "Jump", "act_jump")
+	sp.loot = verb("loot", "Loot", "act_loot")
+	sp.mine = verb("mine", "Mine", "act_mine")
 	// Pure selectors: always enabled, they only cycle their own value —
 	// they never enqueue. The Warp/Orbit actions and the Z/Q keys read
 	// that value back through Kit.WarpRange / Kit.OrbitRange.
@@ -134,10 +157,11 @@ func (k *Kit) buildSelected() {
 		widget.ContainerOpts.Layout(&selectedLayouter{bands: selectedBands[:]}),
 	)
 	sp.body = body
-	body.AddChild(nameRow, sp.dist,
-		sp.approach, sp.warp, sp.orbit, sp.stop,
-		sp.lock, sp.dock, sp.jump, sp.loot, sp.mine,
-		sp.orbitRange, sp.warpRange)
+	body.AddChild(nameRow, sp.dist)
+	for _, v := range sp.verbs {
+		body.AddChild(v.btn)
+	}
+	body.AddChild(sp.orbitRange, sp.warpRange)
 
 	title := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.WindowTitleBox(theme.Solid(p.BGHard), theme.NRGBA(p.Border, 200))),
@@ -366,17 +390,10 @@ func (k *Kit) syncSelected() {
 		// over the first button row) and draws on top of the buttons.
 		sp.body.RequestRelayout()
 	}
-	for _, row := range []struct {
-		action string
-		btn    *widget.Button
-	}{
-		{"approach", sp.approach}, {"warp", sp.warp}, {"orbit", sp.orbit},
-		{"stop", sp.stop}, {"lock-selected", sp.lock}, {"dock", sp.dock},
-		{"jump", sp.jump}, {"loot", sp.loot}, {"mine", sp.mine},
-	} {
-		ready, why := k.VerbReady(row.action)
-		row.btn.GetWidget().Disabled = !ready
-		if row.action == "warp" {
+	for _, v := range sp.verbs {
+		ready, why := k.VerbReady(v.action)
+		v.btn.GetWidget().Disabled = !ready
+		if v.action == "warp" {
 			k.setWarpHint(why)
 		}
 	}

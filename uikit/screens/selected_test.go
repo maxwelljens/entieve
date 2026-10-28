@@ -318,13 +318,11 @@ func TestSelectedRangeControls(t *testing.T) {
 	}
 
 	// No selection: every ACTION is disabled, both selectors stay enabled
-	// (they are state, not actions).
-	for name, b := range map[string]*widget.Button{
-		"approach": sp.approach, "warp": sp.warp, "orbit": sp.orbit, "stop": sp.stop,
-		"lock": sp.lock, "dock": sp.dock, "jump": sp.jump, "loot": sp.loot, "mine": sp.mine,
-	} {
-		if !b.GetWidget().Disabled {
-			t.Errorf("%s enabled with no selection", name)
+	// (they are state, not actions). The list is the panel's own
+	// declaration, never a copy of it.
+	for _, v := range sp.verbs {
+		if !v.btn.GetWidget().Disabled {
+			t.Errorf("%s enabled with no selection", v.action)
 		}
 	}
 	if sp.orbitRange.GetWidget().Disabled || sp.warpRange.GetWidget().Disabled {
@@ -585,19 +583,52 @@ func TestSelectedButtonContentFitsItsCell(t *testing.T) {
 	}
 	for _, tc := range cases {
 		_, sp, _ := pumpSelected(t, tc.w, tc.h, tc.minSize, true)
-		for _, b := range []*widget.Button{
-			sp.approach, sp.warp, sp.orbit, sp.stop,
-			sp.lock, sp.dock, sp.jump, sp.loot, sp.mine,
-		} {
-			nat, _ := b.PreferredSize()
-			if cell := b.GetWidget().Rect.Dx(); nat > cell {
-				label := ""
-				if txt := b.Text(); txt != nil {
-					label = txt.Label
-				}
+		for _, v := range sp.verbs {
+			nat, _ := v.btn.PreferredSize()
+			if cell := v.btn.GetWidget().Rect.Dx(); nat > cell {
 				t.Errorf("%s: %q button content %d px > its %d px cell",
-					tc.tag, label, nat, cell)
+					tc.tag, v.action, nat, cell)
 			}
+		}
+	}
+}
+
+// TestSelectedVerbsDriveButtonsAndGates pins the one declaration: the
+// panel's action bar is a single ordered slice, and every row in it is a
+// real world verb with a caption and the body child at its own position.
+// syncSelected gates this same slice, so a button without a gate — the
+// drift the old second list allowed — is unrepresentable.
+func TestSelectedVerbsDriveButtonsAndGates(t *testing.T) {
+	k, _ := newTestKit(t)
+	pumpKit(t, k, 1280, 720)
+	sp := k.sp
+
+	cells := 0
+	for _, n := range selectedBands[:2] {
+		cells += n
+	}
+	if len(sp.verbs) != cells {
+		t.Fatalf("%d declared verbs, the two action bands hold %d cells", len(sp.verbs), cells)
+	}
+	kids := sp.body.Children()
+	if len(kids) != 2+len(sp.verbs)+2 {
+		t.Fatalf("%d body children, want %d (two text lines, %d verbs, two selectors)",
+			len(kids), 2+len(sp.verbs)+2, len(sp.verbs))
+	}
+	seen := map[string]bool{}
+	for i, v := range sp.verbs {
+		if seen[v.action] {
+			t.Errorf("action %q declared twice", v.action)
+		}
+		seen[v.action] = true
+		if _, ok := k.Verb(v.action); !ok {
+			t.Errorf("row %d: %q is not a world verb", i, v.action)
+		}
+		if btnLabel(v.btn) == "" {
+			t.Errorf("row %d (%q) has no caption", i, v.action)
+		}
+		if kids[2+i].GetWidget() != v.btn.GetWidget() {
+			t.Errorf("row %d (%q) is not body child %d", i, v.action, 2+i)
 		}
 	}
 }

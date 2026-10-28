@@ -85,6 +85,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One Selected Item verb declaration** (`uikit/screens`): the panel's
+  action bar is a single ordered slice — the build appends each button
+  beside its verb id, `syncSelected` gates that same slice and the tests
+  walk it — so the second gating list (nine hand-typed ids) is gone and a
+  button can no longer exist without its gate. Captions, icons and button
+  order are unchanged. `WorldVerb.Label` is deleted: it had no reader but
+  one test's emptiness check, and the surfaces that speak a verb already
+  carry their own wording (the panel caption, `worldKeyMap.Desc`); the
+  "a verb has a human name" story is now pinned on the panel captions.
+
 - **One display formatter leaf** (`format`): money (`Credits`, the
   NAMING.md `12,345.67 €` / `50¢` rule), distance bands (`Dist` + the one
   `AU = 1.496e11` constant), thousands grouping (`GroupInt`/`GroupFloat`) and
