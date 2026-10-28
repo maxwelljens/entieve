@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Relicensed to the European Union Public Licence 1.2** — the LICENSE file
+  now carries the official EUPL-1.2 text, and the in-game credits screen and
+  title footer say EUPL 1.2 (a test pins the phrase in both, so they cannot
+  drift). Third-party dependencies keep their own licences (ebitenui,
+  sahilm/fuzzy — MIT; IBM Plex Sans — SIL OFL 1.1; icons — CC BY 3.0).
+- **README.md now reads like a store entry** — pitch, screenshots, feature
+  sections, legal block; the architecture tree, tooling walkthrough, worlds,
+  testing policy and release mechanics moved to AGENTS.md. Also fixed a
+  stale font-licence path the old README carried.
+
 ## [0.10.0] - 2026-10-28
 
 ### Added
