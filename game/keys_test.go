@@ -45,14 +45,15 @@ func TestKeybindDefaults(t *testing.T) {
 	if _, err := os.Stat(g.keysPath()); !os.IsNotExist(err) {
 		t.Errorf("sidecar exists without a rebind: %v", err)
 	}
-	// The new window's default key opens and closes it like any row.
-	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyO}})
-	if !g.host.IsOpen(idKeybindings) {
-		t.Fatal("O did not open the keybindings window")
-	}
+	// Keybindings has no key of its own: O drives nothing, so a rebound
+	// chord cannot become a second door (the Settings button is the only
+	// one).
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyO}})
 	if g.host.IsOpen(idKeybindings) {
-		t.Fatal("O did not close the keybindings window")
+		t.Fatal("O opened the keybindings window (it must have no key)")
+	}
+	if _, ok := g.actionFor(ebiten.KeyO, false); ok {
+		t.Error("O still resolves to an action")
 	}
 }
 
@@ -307,19 +308,28 @@ func TestKeybindSidecarExcludedFromSaves(t *testing.T) {
 	}
 }
 
-// TestTitleKeybindings: the menu entry sits between Settings and Credits,
-// the window mounts from the title, and a capture there binds for the
-// session that follows.
+// TestTitleKeybindings: the window has no menu row of its own (Settings >
+// Credits on the menu, no Keybindings), it mounts from the title through
+// the Settings window's button, and a capture there binds for the session
+// that follows.
 func TestTitleKeybindings(t *testing.T) {
 	g := newTitleGameAt(t, filepath.Join(t.TempDir(), "save.json"))
 	g.applySize(1280, 720)
 	labels := g.titleUI.labels()
-	si, ki, ci := slices.Index(labels, "Settings"), slices.Index(labels, "Keybindings"), slices.Index(labels, "Credits")
-	if ki < 0 || !(si < ki && ki < ci) {
-		t.Fatalf("menu = %v, want Settings < Keybindings < Credits", labels)
+	si, ci := slices.Index(labels, "Settings"), slices.Index(labels, "Credits")
+	if si < 0 || ci < 0 || si > ci {
+		t.Fatalf("menu = %v, want Settings before Credits", labels)
+	}
+	if slices.Contains(labels, "Keybindings") {
+		t.Fatalf("menu = %v, want no Keybindings row (the Settings window owns that door)", labels)
 	}
 
-	g.titleUI.openID(idKeybindings)
+	// The door: P opens Settings, the Settings window's button opens
+	// Keybindings (the title host is exclusive, so Settings closes).
+	if err := g.updateTitle(Input{JustPressed: []ebiten.Key{ebiten.KeyP}}); err != nil {
+		t.Fatalf("P: %v", err)
+	}
+	click(t, g, settingsPanel(t, g.titleUI.host).KeybindingsButtonForTest())
 	if err := g.Update(); err != nil {
 		t.Fatalf("Update: %v", err)
 	}

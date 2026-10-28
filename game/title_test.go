@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -130,7 +131,8 @@ func TestTitleSuppressesGameplayChrome(t *testing.T) {
 }
 
 // TestTitleMenuComposition: New game / Save manager / Settings / Credits
-// / Quit always, Continue only while a save exists.
+// / Quit always, Continue only while a save exists — and no Keybindings
+// row: that window is opened from the Settings window's button.
 func TestTitleMenuComposition(t *testing.T) {
 	dir := t.TempDir()
 	g := newTitleGameAt(t, filepath.Join(dir, "save.json"))
@@ -143,6 +145,9 @@ func TestTitleMenuComposition(t *testing.T) {
 		if !found {
 			t.Errorf("menu has no %q row (%v)", want, labels)
 		}
+	}
+	if slices.Contains(labels, "Keybindings") {
+		t.Errorf("menu still lists Keybindings (%v): it opens from the Settings window only", labels)
 	}
 	if titleItemByLabel(g, "Continue") != nil {
 		t.Fatal("Continue shown with an empty saves directory")
@@ -389,12 +394,12 @@ func TestTitleSettingsAndCredits(t *testing.T) {
 	if !g.titleUI.host.Mounted(idSettings) {
 		t.Fatal("settings window did not mount from the title")
 	}
-	// The title mounts the same grown settings window: nine rows + hint
+	// The title mounts the same grown settings window: ten rows + hint
 	// (the kit wraps a plain body in its clip container, so unwrap once).
 	clip := g.titleUI.host.Window(idSettings).Contents.(widget.Containerer)
 	body := clip.Children()[0].(widget.Containerer)
-	if n := len(body.Children()); n != 10 {
-		t.Errorf("title settings body rows = %d, want 10 (stepper, fullscreen, rail, master, music, UI, shuffle, reset, reset all, hint)", n)
+	if n := len(body.Children()); n != 11 {
+		t.Errorf("title settings body rows = %d, want 11 (stepper, fullscreen, rail, keybindings, master, music, UI, shuffle, reset, reset all, hint)", n)
 	}
 	// The new rail row is wired from the title too (same action bundle).
 	g.host.services.Settings.SetRailCollapsed(true)

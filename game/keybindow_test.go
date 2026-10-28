@@ -95,6 +95,95 @@ func TestKeybindSections(t *testing.T) {
 	}
 }
 
+// TestKeybindingsIsNotARebindableAction: the window lost its own binding,
+// so it is absent from the action table, the defaults, the KeyMap, the
+// help rows AND its own row list — a rebound chord can never become a back
+// door to it. (Before the Settings/Keybindings navigation pass its
+// self-row read Action:keybindings Label:toggle keybindings Key:O
+// Group:Windows, and the KeyMap carried "O — toggle keybindings (rebind
+// screen and world keys)".)
+func TestKeybindingsIsNotARebindableAction(t *testing.T) {
+	g := newShowcaseGameAt(t, filepath.Join(t.TempDir(), "save.json"))
+	g.applySize(1280, 720)
+	g.host.SetOpen(idKeybindings, true)
+	pump(t, g, 1280, 720)
+
+	if _, ok := defaultBinds["keybindings"]; ok {
+		t.Error("keybindings is a rebindable action")
+	}
+	for _, a := range keyActions {
+		if a.ID == "keybindings" {
+			t.Errorf("keybindings still has an action row (%+v)", a)
+		}
+	}
+	for _, b := range KeyMap {
+		if b.Action == "keybindings" {
+			t.Errorf("KeyMap still carries %+v", b)
+		}
+	}
+	for _, r := range helpRowsFor(g) {
+		if strings.Contains(r.Desc, "toggle keybindings") {
+			t.Errorf("help rows still carry %+v", r)
+		}
+	}
+	for _, r := range keybinds(t, g.host).ModelForTest() {
+		if r.Action == "keybindings" {
+			t.Errorf("the window lists itself: %+v", r)
+		}
+	}
+}
+
+// TestSettingsButtonOpensKeybindings: the Settings window's Keybindings
+// button is that window's only door. In the game it toggles the row (the
+// rail's old click, so a second press closes it and Settings stays up); at
+// the title the host is exclusive, so the button closes Settings and opens
+// Keybindings.
+func TestSettingsButtonOpensKeybindings(t *testing.T) {
+	t.Run("game host", func(t *testing.T) {
+		g := newShowcaseGame(t)
+		g.applySize(1280, 720)
+		g.host.SetOpen(idSettings, true)
+		pump(t, g, 1280, 720)
+
+		click(t, g, settingsPanel(t, g.host).KeybindingsButtonForTest())
+		g.syncMounts()
+		pump(t, g, 1280, 720)
+		if !g.host.IsOpen(idKeybindings) || !g.host.Mounted(idKeybindings) {
+			t.Fatal("the button did not open the keybindings window")
+		}
+		if !g.host.IsOpen(idSettings) {
+			t.Error("the button closed Settings (the rail's entry never did)")
+		}
+		click(t, g, settingsPanel(t, g.host).KeybindingsButtonForTest())
+		g.syncMounts()
+		if g.host.IsOpen(idKeybindings) || g.host.Mounted(idKeybindings) {
+			t.Error("the second press did not close the keybindings window")
+		}
+	})
+
+	t.Run("title host", func(t *testing.T) {
+		g := newTitleGameAt(t, filepath.Join(t.TempDir(), "save.json"))
+		g.applySize(1280, 720)
+		pump(t, g, 1280, 720)
+		if err := g.updateTitle(Input{JustPressed: []ebiten.Key{ebiten.KeyP}}); err != nil {
+			t.Fatalf("P: %v", err)
+		}
+		click(t, g, settingsPanel(t, g.titleUI.host).KeybindingsButtonForTest())
+		if err := g.Update(); err != nil {
+			t.Fatalf("Update: %v", err)
+		}
+		if !g.titleUI.host.IsOpen(idKeybindings) || !g.titleUI.host.Mounted(idKeybindings) {
+			t.Fatal("the title's Settings button did not open its keybindings window")
+		}
+		if g.titleUI.host.IsOpen(idSettings) || g.titleUI.host.Mounted(idSettings) {
+			t.Error("the title kept Settings open beside Keybindings (one window, ever)")
+		}
+		if g.host.IsOpen(idKeybindings) {
+			t.Error("the title's button touched the game host")
+		}
+	})
+}
+
 // TestKeybindChipStates: the chip classifies each row — default, rebound,
 // unbound, capturing — and a rebound row offers its Reset.
 func TestKeybindChipStates(t *testing.T) {

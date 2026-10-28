@@ -28,8 +28,9 @@ import (
 // rule for the whole
 // table (New refuses to build on a bad spec, the tests drive it with
 // deliberately broken rows). The left navigation rail derives from the
-// same rows (game/rail.go): every openable row is one rail entry, its
-// Icon its glyph, its Group the rail section it lands in.
+// same rows (game/rail.go): every openable, listed row is one rail entry,
+// its Icon its glyph, its Group the rail section it lands in — a row opened
+// from another window opts out with NoRail / Unlisted.
 //
 // Default geometry is DESIGN units (theme.Px scales them — see the Px
 // funnel, uikit/theme/scale.go) written against the 1280×720 design viewport
@@ -144,6 +145,13 @@ const (
 //	              (game/title.go) selects it into the title host's table,
 //	              which mounts it lazily and exclusively there (Settings,
 //	              Keybindings)
+//	NoRail        the row is not a navigation-rail launcher, while every
+//	              other entry point stands (its own key, its title-menu
+//	              row) — Settings
+//	Unlisted      the row is opened from another window: never a rail
+//	              entry and never a title-menu label (the Settings window's
+//	              Keybindings button is its door; it has no key of its own,
+//	              so a rebound chord cannot become a back door) — Keybindings
 //	Build         constructs the panel (window + Sync) on the host, once
 //	              per Warm and freshly per title mount; the window is the
 //	              Build's return value — there is no side-channel registry
@@ -167,6 +175,8 @@ type Screen struct {
 	Group      string
 	Service    string
 	InTitle    bool
+	NoRail     bool
+	Unlisted   bool
 
 	Build func(*ScreenHost) widgets.WindowPanel
 }
@@ -274,12 +284,24 @@ var screens = []Screen{
 		// Like every panel it is rebuilt by the host's Warm, so its live
 		// state (scale ladder, fullscreen, vsync, rail, audio volumes,
 		// shuffle, resets) is re-read from the action bundle in Sync.
+		// Not a rail launcher (NoRail): its key and its title-menu row are
+		// its doors. The Keybindings button inside it is the second
+		// window's only door, wired per host in Build.
 		ID: idSettings, Title: "Settings", Icon: "kind_unknown",
 		Key: ebiten.KeyP, Action: "settings", Desc: "toggle settings (UI scale, display, layout)",
 		DefaultRect: uikit.SettingsRect(),
-		DockPolicy:  DockFloating, InTitle: true,
+		DockPolicy:  DockFloating, InTitle: true, NoRail: true,
 		Group: "Help & System",
-		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewSettings(h.services.Env, h.services.Settings) },
+		Build: func(h *ScreenHost) widgets.WindowPanel {
+			// The Settings window's Keybindings button: one host, one
+			// toggle. The game host flips the row's flag exactly as the
+			// rail's entry did; the title host's SetOpen is exclusive, so
+			// the button there closes Settings and opens Keybindings (the
+			// menu row it used to have).
+			act := h.services.Settings
+			act.OpenKeybindings = func() { h.Toggle(idKeybindings) }
+			return uikit.NewSettings(h.services.Env, act)
+		},
 	},
 	{
 		// The station board: the ONE window docking opens, the window that
@@ -324,9 +346,12 @@ var screens = []Screen{
 		// The rebinding window: one row per rebindable action (the screen
 		// toggles and the world commands), a click arms capture and the
 		// next key assigns. The fixed chord layer is not listed (it never
-		// rebinds). O: the remaining free letter near the UI cluster.
+		// rebinds). Unlisted: the Settings window's Keybindings button is
+		// its ONLY door — no rail entry, no title-menu label, and no key of
+		// its own, so a rebound chord can never become a back door.
 		ID: idKeybindings, Title: "Keybindings", Icon: "svc_help",
-		Key: ebiten.KeyO, Action: "keybindings", Desc: "toggle keybindings (rebind screen and world keys)",
+		Key:         keyNone, // the Settings button opens it
+		Unlisted:    true,
 		DefaultRect: uikit.KeybindingsRect(),
 		DockPolicy:  DockFloating, InTitle: true,
 		Group: "Help & System",

@@ -36,6 +36,10 @@ type SettingsActions struct {
 	// action is unbound): the footer's "· P closes" clause follows it, and
 	// an unbound action drops the clause rather than printing a dash.
 	CloseHint func() string
+	// OpenKeybindings opens (or closes) the Keybindings window — its ONLY
+	// door: that window has no rail entry, no title-menu label and no key
+	// of its own.
+	OpenKeybindings func()
 	// MasterVolume, MusicVolume and UIVolume are whole percents (0..100).
 	// The Set callbacks apply a drag's value live WITHOUT writing the
 	// sidecar; PersistSettings is the release/persist point, so one drag
@@ -59,7 +63,8 @@ type SettingsActions struct {
 }
 
 // Settings is the settings window: a notched UI-scale slider, fullscreen
-// and rail toggles, freeflow master/music/UI volume sliders, a shuffle
+// and rail toggles, the Keybindings button (that window's only door),
+// freeflow master/music/UI volume sliders, a shuffle
 // toggle and the two reset buttons. It mounts like every other panel (Screen id
 // "settings" — its sidecar key — key P) and rebuilds with the interface, so all
 // of its displayed state is re-read from the actions in Sync — including
@@ -89,6 +94,9 @@ type Settings struct {
 	railState   bool
 	shufBtn     *widget.Button
 	shufState   bool
+	// keybinds is the Keybindings row: the only door to that window, so it
+	// is the full-width action button the toggles use.
+	keybinds *widget.Button
 	// resetAll is the two-step destructive button (the save manager's
 	// Delete pattern): the first press swaps the label, the second acts.
 	resetAll   *widget.Button
@@ -182,6 +190,10 @@ func NewSettings(d interface {
 		"Rail: expanded",
 		func() { act.SetRailCollapsed(!act.RailCollapsed()) },
 	)
+	// The Keybindings window's only door (it has no key and no rail or
+	// menu entry); a plain action row, so it sits with the interface
+	// controls and above the audio block.
+	s.keybinds = newToggle("Keybindings…", func() { act.OpenKeybindings() })
 
 	// Rows 4–6: audio. The three volumes are freeflow sliders (whole
 	// percents, 1% steps): the drag applies live through Set*, the release
@@ -242,18 +254,18 @@ func NewSettings(d interface {
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	body.AddChild(s.scaleRow, s.fsBtn, s.railBtn, s.masterRow, s.musicRow, s.uiRow, s.shufBtn, resetBtn, s.resetAll, s.hint)
+	body.AddChild(s.scaleRow, s.fsBtn, s.railBtn, s.keybinds, s.masterRow, s.musicRow, s.uiRow, s.shufBtn, resetBtn, s.resetAll, s.hint)
 
 	title, _ := theme.NewTitleBar(d, "Settings", "")
 
 	s.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
-		// Content floor: title + nine 40 px rows + the hint line (the
+		// Content floor: title + ten 40 px rows + the hint line (the
 		// frame does not auto-grow, so the fallback is exactly this tall),
 		// and wide enough for a slider's full travel beside its label and
 		// readout (the three-way grid leaves the middle column the rest).
-		widget.WindowOpts.MinSize(theme.Px(380), theme.Px(508)),
+		widget.WindowOpts.MinSize(theme.Px(380), theme.Px(556)),
 		// Fallback only: the game re-centers it from placeDefaults like
 		// the other overlays; the row declares the same rect
 		// (SettingsRect) as its size.
@@ -264,7 +276,7 @@ func NewSettings(d interface {
 
 // SettingsRect is the settings window's landing rect in design units: the
 // one number its Screen row's DefaultRect and its constructor share.
-func SettingsRect() image.Rectangle { return image.Rect(450, 106, 830, 614) }
+func SettingsRect() image.Rectangle { return image.Rect(450, 82, 830, 638) }
 
 // Win returns the settings window for Kit.AddWindow.
 func (s *Settings) Win() *widget.Window { return s.win }
@@ -350,3 +362,7 @@ func (s *Settings) UISliderForTest() *widgets.Slider     { return s.uiSlide }
 // CloseHintForTest returns the footer line as drawn — the live close chord
 // in place of the construction-time literal.
 func (s *Settings) CloseHintForTest() string { return s.hint.Label }
+
+// KeybindingsButtonForTest returns the row that opens the Keybindings
+// window — the tests' handle on that window's only door.
+func (s *Settings) KeybindingsButtonForTest() *widget.Button { return s.keybinds }
