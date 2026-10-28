@@ -97,7 +97,7 @@ func trafficContent() *content.Content {
 		MaxTargetRange: 40000, MaxTargets: 3, ScanResolution: 550,
 	}
 	c.NPCs["npc-guard-test"] = &content.NpcDef{
-		ID: "npc-guard-test", Name: "Guard", Faction: "Test", Ship: "ship-guard",
+		ID: "npc-guard-test", Name: "Guard", Faction: "Charter Authority", Ship: "ship-guard",
 		Fit:           []content.ModuleID{"mod-test-turret", "mod-test-turret", "mod-test-turret"},
 		AggroRange:    6000,
 		OrbitRange:    1500,
@@ -106,7 +106,7 @@ func trafficContent() *content.Content {
 	}
 	// The traffic raiders (pinning pirate included).
 	c.NPCs["npc-rat-raider"] = &content.NpcDef{
-		ID: "npc-rat-raider", Name: "Raider", Faction: "Test", Ship: "ship-rat",
+		ID: "npc-rat-raider", Name: "Raider", Faction: "Old Works", Ship: "ship-rat",
 		Fit:           []content.ModuleID{"mod-test-turret", "mod-test-turret"},
 		AggroRange:    8000,
 		OrbitRange:    2000,
@@ -115,7 +115,7 @@ func trafficContent() *content.Content {
 		Loot:          []content.LootDrop{{Item: "loot-alloy-scrap", Chance: 1, MinQty: 1, MaxQty: 1}},
 	}
 	c.NPCs["npc-rat-pirate"] = &content.NpcDef{
-		ID: "npc-rat-pirate", Name: "Pirate", Faction: "Test", Ship: "ship-rat",
+		ID: "npc-rat-pirate", Name: "Pirate", Faction: "Old Works", Ship: "ship-rat",
 		Fit:           []content.ModuleID{"mod-test-turret", "mod-test-turret", "mod-warp-scram"},
 		AggroRange:    8000,
 		OrbitRange:    2000,

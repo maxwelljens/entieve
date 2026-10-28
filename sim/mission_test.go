@@ -27,7 +27,7 @@ func missionContent(t *testing.T) *content.Content {
 
 	// A second rat class so "wrong class does not count" is observable.
 	c.NPCs["npc-rat-marauder"] = &content.NpcDef{
-		ID: "npc-rat-marauder", Name: "Rat Marauder", Faction: "Test",
+		ID: "npc-rat-marauder", Name: "Rat Marauder", Faction: "Old Works",
 		Ship:          "ship-rat",
 		Fit:           []content.ModuleID{"mod-autocannon-s"},
 		AggroRange:    15000,

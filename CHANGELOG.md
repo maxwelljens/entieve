@@ -101,6 +101,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One threat machine for the player and the NPCs** (`sim`): the NPC state
+  machine no longer hardcodes the player. It resolves every on-grid ship —
+  you, AI hulls, traffic haulers — as a candidate and runs the same four
+  triggers (proximity, damage from another faction, recent work near Home,
+  Home intrusion) against each, gated by `sim/hostility.go`:
+  [FACTIONS.md](docs/lore/FACTIONS.md)'s Relations table as code (Old Works
+  hostile to everything non-Old-Works; the Charter answers only them;
+  corporate houses, independents and unknown factions initiate nothing).
+  Belt rats now attack civilian miners cutting rock and the traffic passing
+  through, a rat shot by a Charter patrol fights back (the damage trigger
+  used to accept the player only), and a high-sec guard's belt rule now
+  visibly covers a rat mid-attack on a mining op. Guards keep their
+  neutrality and miners their passivity; the player's aggro warning is
+  byte-identical, and an NPC-vs-NPC fight logs one `<attacker> attacks
+  <target>` line on the idle→approach edge. The chosen target persists in
+  `NpcAI.Target`, so an engagement round-trips through save/restore exactly
+  (no schema change). The showcase script's fight-2 timing and leftover
+  shell counts were re-calibrated to the shifted fight stream.
 - **One book read in the sim tests** (`sim`): the seven test helpers that
   re-walked `BookOrders`/`Market` for "the best ask/bid" now read through the
   book's own `best` rule via one `bestAt` helper (`askAt`/`askAtBook`,

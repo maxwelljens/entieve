@@ -10,16 +10,20 @@ import (
 
 // ---------------------------------------------------------------------------
 // F3 — NPC engagement ownership pins (behavior only, no resolver refactor):
-// (a) aggro trigger (b) is source-checked — third-party damage never flips
-// an NPC onto the player; (b) a patrol responding to a convoy ambush holds
+// (a) aggro trigger (b) is source-checked AND faction-checked — third-party
+// damage from another faction turns an NPC onto ITS ATTACKER (never onto the
+// player, who took no part); (b) a patrol responding to a convoy ambush holds
 // station on the incident instead of being steered back to its Home circle
 // by the idle-patrol loop.
 // ---------------------------------------------------------------------------
 
 // TestThirdPartyDamageDoesNotAggroOntoPlayer: a raider shot by a patrol (as
-// happens when the response joins a convoy ambush) stays idle — no aggro
-// onto a distant player — while the identical damage from the player still
-// aggros (positive control, so the trigger cannot silently die).
+// happens when the response joins a convoy ambush) fights back against the
+// patrol — never onto the distant player, who took no part and gets no
+// attack warning — while the identical damage from the player still aggros
+// onto the player with its own warning (positive control, so the trigger
+// cannot silently die). Re-aimed when trigger (b) generalized from
+// "source == player" to "source is another in-grid faction".
 func TestThirdPartyDamageDoesNotAggroOntoPlayer(t *testing.T) {
 	s := newTrafficSim(t) // player parked at -5e6,-5e6: outside every trigger
 	patrol := s.spawnPatrolShip(s.System(), "ship-guard")
@@ -41,20 +45,27 @@ func TestThirdPartyDamageDoesNotAggroOntoPlayer(t *testing.T) {
 	if ai.LastHitBy != patrol {
 		t.Fatalf("LastHitBy=%v want the patrol %v", ai.LastHitBy, patrol)
 	}
-	if ai.State != NpcIdle {
-		t.Fatalf("state=%q want idle: patrol damage aggroed the raider onto the player", ai.State)
+	if ai.State != NpcApproach {
+		t.Fatalf("state=%q want approach on the patrol that shot it", ai.State)
+	}
+	if ai.Target != patrol {
+		t.Fatalf("target=%v want the patrol %v (never the player)", ai.Target, patrol)
 	}
 	if hasEvent(evs, EvLog, "is attacking you") {
-		t.Fatalf("aggro warning emitted for third-party damage: %v", evs)
+		t.Fatalf("player aggro warning emitted for third-party damage: %v", evs)
 	}
-	// It must stay that way — the HP-based "damaged" flag persists.
+	if !hasEvent(evs, EvLog, "attacks") {
+		t.Fatalf("missing the NPC-vs-NPC aggro line: %v", evs)
+	}
+	// It must stay that way — the HP-based "damaged" flag persists and the
+	// player stays out of the fight.
 	stepN(s, 300)
 	drain(s)
-	if ai, _ = s.AIs.Get(raider); ai.State != NpcIdle {
-		t.Fatalf("state=%q after 300 ticks, want idle", ai.State)
+	if ai, _ = s.AIs.Get(raider); ai.State != NpcApproach && ai.State != NpcOrbit {
+		t.Fatalf("state=%q after 300 ticks, want an engagement", ai.State)
 	}
-	if infoHostile(s, raider) {
-		t.Fatal("idle NPC must not be hostile")
+	if ai.Target != patrol {
+		t.Fatalf("target=%v after 300 ticks, want the patrol %v", ai.Target, patrol)
 	}
 
 	// Positive control: the same damage from the player aggros.
