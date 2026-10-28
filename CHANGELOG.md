@@ -101,6 +101,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One book read in the sim tests** (`sim`): the seven test helpers that
+  re-walked `BookOrders`/`Market` for "the best ask/bid" now read through the
+  book's own `best` rule via one `bestAt` helper (`askAt`/`askAtBook`,
+  `marketQty`/`bidPrice`/`bidQty` are gone), and the duplicated ask-sum helper
+  is one `bookAskQty`. A change to what "best" means can no longer leave the
+  tests silently disagreeing with production. Test-only; no behavior change.
 - **One landing rect per window** (`uikit/screens`, `game`): every panel's
   landing rect is exported beside the panel (`InventoryRect`, `FittingRect`,
   `MarketRect`, `ManufacturingRect`, `ScannerRect`, `MapViewRect`,
