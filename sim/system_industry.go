@@ -503,7 +503,7 @@ func (s *Sim) industryRefusal(reason string) {
 // answer never depends on map order (the stationSystem pattern), and the
 // lookup is content-side so agents address off-grid stations.
 func (s *Sim) stationService(station StationID, svc string) bool {
-	if station == "" {
+	if station == "" || !s.stationOffers(station, svc) {
 		return false
 	}
 	systems := make([]content.SystemID, 0, len(s.Content.Systems))

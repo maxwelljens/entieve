@@ -192,6 +192,12 @@ func (s *Sim) loadSystem(id content.SystemID, entryAtCel content.CelID) error {
 	for i := range sys.Celestials {
 		s.spawnCelestial(&sys.Celestials[i], pending)
 	}
+	// A system the Works hold carries their holding force instead of the
+	// charter's: the profile lands at the belts and anomalies (never the
+	// docking ring), its caste and count scaled by the squeeze curve.
+	if s.war != nil && s.war.Control[id] == controlWorks {
+		s.warSpawnWorks(sys)
+	}
 
 	if entryAtCel != "" && !s.player.IsZero() {
 		var found bool
@@ -246,6 +252,13 @@ func (s *Sim) spawnCelestial(cel *content.CelestialDef, pending map[string]int) 
 // from the celestial definition when a member dies, so it needs no storage
 // here (it must also survive save/restore, which only persists timers).
 func (s *Sim) spawnGroup(cel *content.CelestialDef, sp content.SpawnDef, pending map[string]int) {
+	// The charter's guard posts do not stand in space the Works hold: a fallen
+	// system loads without them, and a reclaim brings them back through
+	// warApplyControl.
+	if def, ok := s.Content.Npc(sp.NpcID); ok && def.IsGuard() &&
+		s.war != nil && s.war.Control[s.systemID] == controlWorks {
+		return
+	}
 	key := string(cel.ID) + "|" + string(sp.NpcID)
 	owed := pending[key]
 	for i := 0; i < sp.Count; i++ {

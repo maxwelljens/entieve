@@ -9,17 +9,23 @@ const (
 	factionOldWorks    = "Old Works"
 	factionDvuzek      = "Dvužek"
 	factionIndependent = "independents" // the player and its traffic haulers: no flag
+	// factionFleets is the Corporate Fleets bloc — the commissioned war
+	// fleets. One row now; per-corp rows may grow when a corp needs its name
+	// on screen.
+	factionFleets = "Corporate Fleets"
 )
 
 // hostility is FACTIONS.md's Relations table as code: faction -> the factions
-// it may act against. Only the Old Works raid outward (material-driven: every
+// it may act against. The Old Works raid outward (material-driven: every
 // non-Old-Works hull is salvage) and the Charter answers them (attrition); the
-// corporate houses write their losses off, and independents start nothing.
-// Same-faction and unknown factions are never hostile (fail closed): a
-// missing row means "neutral", never "hostile by default".
+// Corporate Fleets fight the Old Works under the Commission and nothing else;
+// the corporate houses write their losses off, and independents start nothing.
+// Same-faction and unknown factions are never hostile (fail closed): a missing
+// row means "neutral", never "hostile by default".
 var hostility = map[string]map[string]bool{
-	factionOldWorks:    {factionCharter: true, factionDvuzek: true, factionIndependent: true},
+	factionOldWorks:    {factionCharter: true, factionDvuzek: true, factionIndependent: true, factionFleets: true},
 	factionCharter:     {factionOldWorks: true},
+	factionFleets:      {factionOldWorks: true},
 	factionDvuzek:      {},
 	factionIndependent: {},
 }

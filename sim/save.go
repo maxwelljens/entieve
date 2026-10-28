@@ -99,7 +99,7 @@ func (s *Sim) buildSave() (*Save, error) {
 		if v, ok := s.AIs.Get(e); ok {
 			c := SavedNpcAI{
 				Npc: v.Npc, State: v.State, Target: uint64(v.Target), Home: v.Home,
-				LastHitBy: uint64(v.LastHitBy),
+				LastHitBy: uint64(v.LastHitBy), Faction: v.Faction,
 			}
 			if v.Rand != nil {
 				c.RandState = v.Rand.Snapshot()
@@ -254,6 +254,9 @@ func (s *Sim) buildSave() (*Save, error) {
 	if len(s.trafficJourneys) > 0 {
 		save.TrafficJourneys = append([]TrafficJourney(nil), s.trafficJourneys...)
 	}
+	// The war (control map, front meters, bloc treasury). Maps marshal with
+	// sorted keys, so the serialization stays canonical for Hash.
+	save.War = s.war
 	return save, nil
 }
 
@@ -614,6 +617,25 @@ func (s *Sim) restore(save *Save) error {
 	// --- logistics: shipments parked between grids, replayed verbatim
 	// (park order is the canonical serialization — see buildSave). ---
 	s.trafficJourneys = append([]TrafficJourney(nil), save.TrafficJourneys...)
+
+	// ---- the war: control, the front's meters, the bloc treasury ----
+	// A save written before the war existed (War nil) restores into the
+	// tick-0 map derived from authored security when the world carries the
+	// war; any other world stays war-free.
+	s.war = nil
+	if save.War != nil {
+		for id, side := range save.War.Control {
+			if side != controlCharter && side != controlWorks {
+				return errf("sim: save has system %s on unknown side %q", id, side)
+			}
+		}
+		if save.War.Treasury < 0 {
+			return errf("sim: save war treasury is negative (%v)", save.War.Treasury)
+		}
+		s.war = save.War
+	} else if warWorlds[save.World] {
+		s.newWarState()
+	}
 	return nil
 }
 
@@ -676,6 +698,7 @@ func (s *Sim) attach(e ecs.Entity, se SavedEntity) {
 			// A handle absent from the save (never hit, or a pre-field save)
 			// restores as zero — the "no recorded attacker" state.
 			LastHitBy: ecs.Entity(se.NPC.LastHitBy),
+			Faction:   se.NPC.Faction,
 		})
 	}
 	if se.Asteroid != nil {

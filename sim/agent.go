@@ -1015,6 +1015,7 @@ func (s *Sim) agentApplyQuotes(a *Agent, quotes []agentQuote) {
 			continue
 		}
 		a.Capital -= MarketBrokerFee * limit * float64(qty)
+		s.routeFee(MarketBrokerFee * limit * float64(qty))
 		switch q.side {
 		case OrderBuy:
 			a.Capital -= res.Cost
@@ -1025,6 +1026,7 @@ func (s *Sim) agentApplyQuotes(a *Agent, quotes []agentQuote) {
 			}
 		case OrderSell:
 			a.Capital += res.Cost * (1 - MarketSalesTax)
+			s.routeFee(MarketSalesTax * res.Cost)
 			takeInv(a, q.item, res.Filled)
 			if res.Remaining > 0 {
 				a.Orders = append(a.Orders, AgentOrder{ID: res.ID, Station: a.Home,
@@ -1276,6 +1278,7 @@ func (s *Sim) haulPlaceAgentAsk(a *Agent, station StationID, item content.ItemID
 	}
 	takeInv(a, item, res.Filled)
 	a.Capital += res.Cost * (1 - MarketSalesTax)
+	s.routeFee(MarketSalesTax * res.Cost)
 	if res.Remaining > 0 {
 		a.Orders = append(a.Orders, AgentOrder{ID: res.ID, Station: station,
 			Side: OrderSell, Item: item, Price: price, Qty: res.Remaining})

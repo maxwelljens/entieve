@@ -218,6 +218,11 @@ func (s *Sim) execAcceptMission(c CmdAcceptMission) {
 		s.missionRefused(def.ID, def.Title, "Contract not offered here")
 		return
 	}
+	// A remnant's charter desk is dark: no new contracts until a reclaim.
+	if s.remnant(at.At) {
+		s.missionRefused(def.ID, def.Title, "This station is a remnant — its charter desk is dark")
+		return
+	}
 	if s.standing+1e-9 < def.MinStanding {
 		s.missionRefused(def.ID, def.Title,
 			"Requires standing "+strconv.FormatFloat(def.MinStanding, 'f', 2, 64))

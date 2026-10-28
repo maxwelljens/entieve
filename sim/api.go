@@ -132,6 +132,12 @@ type Sim struct {
 		at  float64
 	}
 
+	// war is the Long Attrition's state (Save.War; see war.go): control per
+	// system, the front's contest meters and the Corporate Fleets' treasury.
+	// Nil in a world that carries no war (warWorlds), which keeps the
+	// showcase tour and the test fixtures free of war demand.
+	war *WarState
+
 	// Per-tick working state (never snapshotted; always empty between Steps).
 	deferLoot    []CmdLoot
 	deferEcon    []Command
@@ -213,6 +219,12 @@ func New(c *content.Content, w *content.WorldDef, seed int64) (*Sim, error) {
 	if agentWorlds[w.ID] {
 		s.spawnAgents()
 	}
+	// The war runs from tick 0 in the shipping free-play world (the same
+	// world gate, its own list): control seeds from authored security, the
+	// front derives from it, and the treasury seeds once.
+	if warWorlds[w.ID] {
+		s.newWarState()
+	}
 	// Fresh fits pre-load: every bay fills from cargo before the first Step,
 	// settled at once — no UI exists yet to show a load cycle (all later loads
 	// are clocked; see preloadBays).
@@ -267,6 +279,7 @@ func (s *Sim) Step() {
 	s.systemTraffic()   // 16 traffic (convoys, ambushes, patrols, book supply)
 	s.systemIndustry()  // 17 industry (manufacturing jobs, craft growth)
 	s.systemAgent()     // 18 agents (ledger economy: settle, behavior pass, upkeep)
+	s.systemWar()       // 19 the war (meters, procurement bids, fleets)
 	// Death respawn runs after all systems so that a cross-system clone-bay
 	// respawn can rebuild the grid without yanking entities out from under
 	// the systems still running this tick.
@@ -607,6 +620,9 @@ func (s *Sim) dockedStationFor(svc string) StationID {
 		return ""
 	}
 	if c, ok := s.Celestials.Get(e); ok {
+		if !s.stationOffers(c.Cel, svc) {
+			return ""
+		}
 		return c.Cel
 	}
 	return ""

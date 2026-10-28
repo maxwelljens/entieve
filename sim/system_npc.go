@@ -134,7 +134,7 @@ func (s *Sim) systemNpc() {
 	candidates := s.npcCandidates()
 	security := ""
 	if sys := s.System(); sys != nil {
-		security = sys.Security
+		security = s.EffectiveSecurity(sys.ID)
 	}
 
 	for _, e := range sortedEntities(s.AIs) {
@@ -320,10 +320,15 @@ func (s *Sim) npcCandidates() []npcCandidate {
 	return out
 }
 
-// factionOf returns the faction a ship fights for: its NPC def's, else the
-// independents' flag (the player and traffic haulers carry no colours).
+// factionOf returns the faction a ship fights for: the entity's own override
+// (a Corporate Fleets hull flying an authored machine), else its NPC def's,
+// else the independents' flag (the player and traffic haulers carry no
+// colours).
 func (s *Sim) factionOf(e ecs.Entity) string {
 	if ai, ok := s.AIs.Get(e); ok {
+		if ai.Faction != "" {
+			return ai.Faction
+		}
 		if def, ok := s.Content.Npc(ai.Npc); ok {
 			return def.Faction
 		}
@@ -360,7 +365,7 @@ func (s *Sim) npcWorking(e ecs.Entity) bool {
 // initiate, and their answer to Old Works hulls is guardEngageRat. playerOnly
 // restricts the scan to the player (a live traffic ambusher, see systemNpc).
 func (s *Sim) npcThreat(e ecs.Entity, selfPos core.Vec2, ai *NpcAI, def *content.NpcDef, damaged bool, candidates []npcCandidate, effAggro, maxHomeDist float64, playerOnly bool) ecs.Entity {
-	mine := def.Faction
+	mine := s.factionOf(e)
 	var best ecs.Entity
 	bestD := math.MaxFloat64
 	for _, c := range candidates {
@@ -660,7 +665,10 @@ func (s *Sim) ratTargetAt(home core.Vec2, sec string) ecs.Entity {
 		if !ok || ai.Home != home {
 			continue
 		}
-		if def, ok := s.Content.Npc(ai.Npc); !ok || !isRatNpc(def) {
+		if def, ok := s.Content.Npc(ai.Npc); !ok || !isRatNpc(def) || ai.Faction != "" {
+			// A war hull (the Corporate Fleets' override) flying a machine is
+			// not a belt rat: security does not clear it, and a fleet fight is
+			// a front action, not a belt sweep.
 			continue
 		}
 		if s.ratFree(ai, sec) {
