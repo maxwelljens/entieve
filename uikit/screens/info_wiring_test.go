@@ -7,8 +7,8 @@ import (
 
 	"github.com/ebitenui/ebitenui"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit/internal/uitest"
 )
 
 // TestMarketRowMenu: a market row's RowSpec declares Show Info plus the

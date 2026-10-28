@@ -60,6 +60,13 @@ fmt-check:
         exit 1
     fi
 
+# Render the gated capture PNGs — every capture test in its own process (one
+# ebiten loop per process) → $ENTIEVE_CAPTURE_DIR (default /tmp/opencode).
+# `just capture hud` runs the captures whose test name matches. New captures
+# must be added to scripts/captures.sh.
+capture *ARGS:
+    scripts/captures.sh {{ ARGS }}
+
 # Tidy and verify the module files.
 tidy:
     go mod tidy

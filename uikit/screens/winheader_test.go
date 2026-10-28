@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/render"
-	"github.com/entieve/entieve/uikit/internal/uitest"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 

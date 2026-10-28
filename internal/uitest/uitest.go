@@ -1,9 +1,9 @@
 // Package uitest holds the uikit test support with no widgets/screens
-// dependency of its own — the ebiten capture loop, the pixel-ink probes,
-// the frame pumps and the scale fixture — shared by the widgets and
-// screens test suites. The theme tests never import it: a theme-internal
-// test may not import a package that imports theme, so scale_test keeps
-// its own local useScale.
+// dependency of its own — the pixel-ink probes, the frame pumps and the
+// scale fixture — shared by the widgets and screens test suites. The gated
+// capture driver lives in internal/capture, a leaf: this package imports
+// theme, so a theme-internal test may not import it and scale_test keeps its
+// own local useScale.
 package uitest
 
 import (
@@ -15,35 +15,6 @@ import (
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
-
-// ebitenLoopRan records whether this process already drove a window
-// loop, so running the whole capture set skips the extras instead of
-// panicking.
-var ebitenLoopRan bool
-
-// SkipIfLoopRan skips the test when this process already ran a loop.
-func SkipIfLoopRan(t *testing.T) {
-	t.Helper()
-	if ebitenLoopRan {
-		t.Skip("one ebiten game loop per test process: run this capture on its own")
-	}
-}
-
-// RunCaptureLoop drives one capture game through ebiten, records that the
-// loop ran and skips when the window system is unavailable.
-func RunCaptureLoop(t *testing.T, title string, g ebiten.Game) {
-	t.Helper()
-	ebiten.SetWindowTitle(title)
-	ebiten.SetWindowSize(1280, 720)
-	// Run the loop without showing the window: captures render offscreen
-	// (SetWindowVisible before RunGame — the desktop stays clear).
-	ebiten.SetWindowVisible(false)
-	err := ebiten.RunGame(g)
-	ebitenLoopRan = true
-	if err != nil {
-		t.Skipf("cannot run capture game loop: %v", err)
-	}
-}
 
 // PumpWindow runs one frame: Sync (rows + gating), Update (dispatch
 // deferred events) and Draw (layout). It does NOT begin the host's pointer

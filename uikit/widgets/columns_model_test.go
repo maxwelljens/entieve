@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/ebitenui/ebitenui"
-	"github.com/entieve/entieve/uikit/internal/uitest"
+	"github.com/entieve/entieve/internal/uitest"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 

@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/png"
-	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/entieve/entieve/internal/capture"
 	"github.com/entieve/entieve/render"
-	"github.com/entieve/entieve/uikit/internal/uitest"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -29,14 +27,6 @@ import (
 //
 //	ENTIEVE_CAPTURE=1 go test ./uikit/screens/ -run TestHeaderCaptureFrame
 func TestHeaderCaptureFrame(t *testing.T) {
-	if os.Getenv("ENTIEVE_CAPTURE") == "" {
-		t.Skip("set ENTIEVE_CAPTURE=1 to render a capture frame")
-	}
-	uitest.SkipIfLoopRan(t)
-	outDir := os.Getenv("ENTIEVE_CAPTURE_DIR")
-	if outDir == "" {
-		outDir = "/tmp/opencode"
-	}
 	assets, err := filepath.Abs("../../assets")
 	if err != nil {
 		t.Fatalf("assets path: %v", err)
@@ -53,145 +43,96 @@ func TestHeaderCaptureFrame(t *testing.T) {
 	ref.Win().SetLocation(image.Rect(24, 24, 24+theme.Px(430), 24+theme.Px(430)))
 	man.Win().SetLocation(image.Rect(500, 24, 500+theme.Px(460), 24+theme.Px(520)))
 
-	g := &headerCaptureGame{k: k, ref: ref, man: man, out: filepath.Join(outDir, "window_headers_capture.png")}
-	uitest.RunCaptureLoop(t, "Entieve window headers capture", g)
-	if g.err != nil {
-		t.Fatal(g.err)
-	}
-	if !g.saved {
-		t.Fatal("capture never rendered")
-	}
-	t.Logf("capture written to %s (plates present: %v)", g.out, g.plates)
-}
+	var plates bool
+	out := capture.Out("window_headers_capture.png")
+	(&capture.Capture{
+		Name:   "Entieve window headers capture",
+		Frames: openFrames + 3,
+		Update: func(int) error {
+			ref.Sync()
+			man.Sync()
+			return k.Update()
+		},
+		Draw: func(_ int, img *ebiten.Image) error {
+			img.Fill(color.White)
+			k.Draw(img)
+			return nil
+		},
+		// verify compares the settled frame (plates loaded) with the plain one (empty
+		// registry, same widgets) and with the release frame (empty registry, the
+		// tables pumped so their viewports are today's filled ones).
+		Verify: func(img *ebiten.Image) error {
+			plates = render.RefiningHeader() != nil && render.ManufacturingHeader() != nil
+			render.LoadAssets("")
+			// The plain frame: the same widget state (the banded viewport still in
+			// place) with the plate gone — what the band contributes.
+			plain := ebiten.NewImage(1280, 720)
+			plain.Fill(color.White)
+			k.Draw(plain)
+			// The release frame: no plate, so the tables pump the empty band and the
+			// viewport is today's again (the fill covers it) — the old look.
+			ref.Sync()
+			man.Sync()
+			today := ebiten.NewImage(1280, 720)
+			today.Fill(color.White)
+			k.Draw(today)
 
-// headerCaptureGame drives the kit and, on the settled frame, draws once more
-// with an empty sprite registry (no plates) to compare against.
-type headerCaptureGame struct {
-	k   *Kit
-	ref *Refinery
-	man *Manufacturing
-	out string
+			shot, was, now := readFrame(img), readFrame(plain), readFrame(today)
 
-	frames int
-	last   *ebiten.Image
-	plates bool
-	saved  bool
-	err    error
-}
+			refBody := ref.Win().Contents.(*headerBand).GetWidget().Rect
+			manBody := man.Win().Contents.(*headerBand).GetWidget().Rect
+			bands := []image.Rectangle{headerBandRect(refBody), headerBandRect(manBody)}
 
-func (g *headerCaptureGame) Update() error {
-	if g.saved || g.err != nil {
-		return ebiten.Termination
-	}
-	g.ref.Sync()
-	g.man.Sync()
-	if err := g.k.Update(); err != nil {
-		g.err = err
-		return ebiten.Termination
-	}
-	if g.frames > openFrames+2 && g.last != nil {
-		g.err = g.verify(g.last)
-		return ebiten.Termination
-	}
-	return nil
-}
+			var errs []string
+			fail := func(format string, args ...any) { errs = append(errs, fmt.Sprintf(format, args...)) }
 
-func (g *headerCaptureGame) Draw(screen *ebiten.Image) {
-	img := ebiten.NewImage(1280, 720)
-	img.Fill(color.White)
-	g.k.Draw(img)
-	g.last = img
-	g.frames++
-	screen.DrawImage(img, nil)
-}
+			// Anything outside the two bands must be identical to the no-plate frame:
+			// the plate is confined to the band and no layout moved, plates or not.
+			if n := diffsOutside(shot, was, bands, 0); n > 0 {
+				fail("%d sampled pixels outside the bands changed against the plain frame "+
+					"(the plate must stay in the band)", n)
+			}
 
-func (g *headerCaptureGame) Layout(w, h int) (int, int) { return 1280, 720 }
+			if !plates {
+				if n := diffsOutside(shot, was, nil, 0); n > 0 {
+					fail("no plates, yet %d pixels differ from the plain frame "+
+						"(the bands must be invisible without artwork)", n)
+				}
+				return joinErrs(out, errs)
+			}
 
-// verify compares the settled frame (plates loaded) with the plain one (empty
-// registry, same widgets) and with the release frame (empty registry, the
-// tables pumped so their viewports are today's filled ones).
-func (g *headerCaptureGame) verify(img *ebiten.Image) error {
-	plates := render.RefiningHeader() != nil && render.ManufacturingHeader() != nil
-	render.LoadAssets("")
-	// The plain frame: the same widget state (the banded viewport still in
-	// place) with the plate gone — what the band contributes.
-	plain := ebiten.NewImage(1280, 720)
-	plain.Fill(color.White)
-	g.k.Draw(plain)
-	// The release frame: no plate, so the tables pump the empty band and the
-	// viewport is today's again (the fill covers it) — the old look.
-	g.ref.Sync()
-	g.man.Sync()
-	today := ebiten.NewImage(1280, 720)
-	today.Fill(color.White)
-	g.k.Draw(today)
-	g.plates = plates
-
-	f, err := os.Create(g.out)
-	if err != nil {
-		return err
-	}
-	if err := png.Encode(f, img); err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	g.saved = true
-
-	shot, was, now := readFrame(img), readFrame(plain), readFrame(today)
-
-	refBody := g.ref.Win().Contents.(*headerBand).GetWidget().Rect
-	manBody := g.man.Win().Contents.(*headerBand).GetWidget().Rect
-	bands := []image.Rectangle{headerBandRect(refBody), headerBandRect(manBody)}
-
-	var errs []string
-	fail := func(format string, args ...any) { errs = append(errs, fmt.Sprintf(format, args...)) }
-
-	// Anything outside the two bands must be identical to the no-plate frame:
-	// the plate is confined to the band and no layout moved, plates or not.
-	if n := diffsOutside(shot, was, bands, 0); n > 0 {
-		fail("%d sampled pixels outside the bands changed against the plain frame "+
-			"(the plate must stay in the band)", n)
-	}
-
-	if !plates {
-		if n := diffsOutside(shot, was, nil, 0); n > 0 {
-			fail("no plates, yet %d pixels differ from the plain frame "+
-				"(the bands must be invisible without artwork)", n)
-		}
-		return joinErrs(g.out, errs)
-	}
-
-	for _, w := range []struct {
-		name       string
-		band, body image.Rectangle
-	}{
-		{"refinery", bands[0], refBody},
-		{"manufacturing", bands[1], manBody},
-	} {
-		// The panel, well inside the body's padding: the reference every
-		// "content pixel" probe compares against.
-		// Clear of the body's rounded bottom corner: the radius is the
-		// window token, so the reference sits inside the straight edge.
-		panel := shot.px(w.body.Min.X+theme.Px(theme.RadiusWindow)+6, w.body.Max.Y-4)
-		checkBand(w.name, w.band, w.body, panel, shot, was, fail)
-	}
-	// The rows on the band let it through: their background moves far from
-	// the no-plate frame, while a row below the band is byte-identical (the
-	// viewport's fill starts at the band's bottom edge only).
-	for _, w := range []struct {
-		name string
-		tbl  *widgets.Table
-		band image.Rectangle
-	}{
-		{"refinery", g.ref.ores, bands[0]},
-		{"manufacturing", g.man.recipes, bands[1]},
-	} {
-		checkHeaderRows(w.name, w.tbl, w.band, shot, now, fail)
-	}
-	return joinErrs(g.out, errs)
+			for _, w := range []struct {
+				name       string
+				band, body image.Rectangle
+			}{
+				{"refinery", bands[0], refBody},
+				{"manufacturing", bands[1], manBody},
+			} {
+				// The panel, well inside the body's padding: the reference every
+				// "content pixel" probe compares against.
+				// Clear of the body's rounded bottom corner: the radius is the
+				// window token, so the reference sits inside the straight edge.
+				panel := shot.px(w.body.Min.X+theme.Px(theme.RadiusWindow)+6, w.body.Max.Y-4)
+				checkBand(w.name, w.band, w.body, panel, shot, was, fail)
+			}
+			// The rows on the band let it through: their background moves far from
+			// the no-plate frame, while a row below the band is byte-identical (the
+			// viewport's fill starts at the band's bottom edge only).
+			for _, w := range []struct {
+				name string
+				tbl  *widgets.Table
+				band image.Rectangle
+			}{
+				{"refinery", ref.ores, bands[0]},
+				{"manufacturing", man.recipes, bands[1]},
+			} {
+				checkHeaderRows(w.name, w.tbl, w.band, shot, now, fail)
+			}
+			return joinErrs(out, errs)
+		},
+		Out: out,
+	}).Run(t)
+	t.Logf("capture written to %s (plates present: %v)", out, plates)
 }
 
 // checkHeaderRows pins the plate reading through the table rows on the band:

@@ -3,13 +3,11 @@ package screens
 import (
 	"fmt"
 	"image"
-	"image/png"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/uikit/internal/uitest"
+	"github.com/entieve/entieve/internal/capture"
+	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -164,29 +162,69 @@ func assertBodyInFrame(t *testing.T, win *widget.Window) {
 // drawn pixel inside the window frame (with glyph pixels inside, so the
 // check is not vacuous). Skipped unless ENTIEVE_CAPTURE=1.
 func TestWindowClipCapture(t *testing.T) {
-	if os.Getenv("ENTIEVE_CAPTURE") == "" {
-		t.Skip("set ENTIEVE_CAPTURE=1 to render a capture frame")
-	}
-	uitest.SkipIfLoopRan(t)
-	outDir := os.Getenv("ENTIEVE_CAPTURE_DIR")
-	if outDir == "" {
-		outDir = "/tmp/opencode"
-	}
-
 	env, _ := newChromeEnv(t)
 	win := newOverflowWindow(env, 40)
 	clipWindowBody(win)
 	ui := newWindowUI(t, env, win)
 
-	g := &clipCaptureGame{ui: ui, win: win, out: filepath.Join(outDir, "window_clip.png")}
-	uitest.RunCaptureLoop(t, "Entieve window clip capture", g)
-	if g.err != nil {
-		t.Fatal(g.err)
+	out := capture.Out("window_clip.png")
+	var cap *capture.Capture
+	cap = &capture.Capture{
+		Name: "Entieve window clip capture",
+		Size: image.Pt(800, 600),
+		Update: func(n int) error {
+			if n == 3 {
+				// Shrink far below the content: the frame clip must confine the
+				// overflowing rows. SetLocation is the outer boundary (ebitenui's
+				// own MinSize clamp); the grip clamp is pinned separately.
+				win.SetLocation(image.Rect(40, 40, 260, 180))
+			}
+			ui.Update()
+			// The sixth tick is the settled frame: the shrink has been drawn.
+			if n > 5 {
+				cap.Stop()
+			}
+			return nil
+		},
+		Draw: func(_ int, img *ebiten.Image) error {
+			ui.Draw(img)
+			return nil
+		},
+		Verify: func(img *ebiten.Image) error {
+			win := win.GetContainer().GetWidget().Rect
+			leak, in := 0, 0
+			var leakBox image.Rectangle
+			b := img.Bounds()
+			for y := b.Min.Y; y < b.Max.Y; y++ {
+				for x := b.Min.X; x < b.Max.X; x++ {
+					_, _, _, a := img.At(x, y).RGBA()
+					if a == 0 {
+						continue
+					}
+					if x >= win.Min.X && x < win.Max.X && y >= win.Min.Y && y < win.Max.Y {
+						in++
+						continue
+					}
+					px := image.Rect(x, y, x+1, y+1)
+					if leak == 0 {
+						leakBox = px
+					} else {
+						leakBox = leakBox.Union(px)
+					}
+					leak++
+				}
+			}
+			if leak != 0 {
+				return fmt.Errorf("window %v: %d pixels drawn outside the frame (leak box %v)", win, leak, leakBox)
+			}
+			if in == 0 {
+				return fmt.Errorf("window %v: no pixels inside the frame — the check is vacuous", win)
+			}
+			return nil
+		},
+		Out: out,
 	}
-	if !g.saved {
-		t.Fatal("capture never rendered")
-	}
-	t.Logf("capture written to %s", g.out)
+	cap.Run(t)
 }
 
 // newOverflowWindow builds a title-less window whose flat body is a 40-row
@@ -209,90 +247,4 @@ func newOverflowWindow(env widgets.Env, rows int) *widget.Window {
 		widget.WindowOpts.MinSize(theme.Px(120), theme.Px(80)),
 		widget.WindowOpts.Location(image.Rect(40, 40, 500, 320)),
 	)
-}
-
-type clipCaptureGame struct {
-	ui interface {
-		Update()
-		Draw(*ebiten.Image)
-	}
-	win    *widget.Window
-	out    string
-	frames int
-	last   *ebiten.Image
-	saved  bool
-	err    error
-}
-
-func (g *clipCaptureGame) Update() error {
-	if g.saved || g.err != nil {
-		return ebiten.Termination
-	}
-	if g.frames == 2 {
-		// Shrink far below the content: the frame clip must confine the
-		// overflowing rows. SetLocation is the outer boundary (ebitenui's
-		// own MinSize clamp); the grip clamp is pinned separately.
-		g.win.SetLocation(image.Rect(40, 40, 260, 180))
-	}
-	g.ui.Update()
-	g.frames++
-	if g.frames > 5 && g.last != nil {
-		g.verify(g.last)
-		return ebiten.Termination
-	}
-	return nil
-}
-
-func (g *clipCaptureGame) Draw(screen *ebiten.Image) {
-	img := ebiten.NewImage(800, 600)
-	g.ui.Draw(img)
-	screen.DrawImage(img, nil)
-	g.last = img
-}
-
-func (g *clipCaptureGame) Layout(w, h int) (int, int) { return 800, 600 }
-
-func (g *clipCaptureGame) verify(img *ebiten.Image) {
-	f, err := os.Create(g.out)
-	if err != nil {
-		g.err = err
-		return
-	}
-	defer f.Close()
-	if err := png.Encode(f, img); err != nil {
-		g.err = err
-		return
-	}
-	g.saved = true
-
-	win := g.win.GetContainer().GetWidget().Rect
-	leak, in := 0, 0
-	var leakBox image.Rectangle
-	b := img.Bounds()
-	for y := b.Min.Y; y < b.Max.Y; y++ {
-		for x := b.Min.X; x < b.Max.X; x++ {
-			_, _, _, a := img.At(x, y).RGBA()
-			if a == 0 {
-				continue
-			}
-			if x >= win.Min.X && x < win.Max.X && y >= win.Min.Y && y < win.Max.Y {
-				in++
-				continue
-			}
-			px := image.Rect(x, y, x+1, y+1)
-			if leak == 0 {
-				leakBox = px
-			} else {
-				leakBox = leakBox.Union(px)
-			}
-			leak++
-		}
-	}
-	if leak != 0 {
-		g.err = fmt.Errorf("window %v: %d pixels drawn outside the frame (leak box %v)", win, leak, leakBox)
-		return
-	}
-	if in == 0 {
-		g.err = fmt.Errorf("window %v: no pixels inside the frame — the check is vacuous", win)
-	}
 }
