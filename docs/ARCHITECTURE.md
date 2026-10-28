@@ -1114,7 +1114,10 @@ through `sim`'s read side rather than re-derived in `uikit`.
   runs the one **World verb** table (`uikit/screens/worldverbs.go`): the
   key path (`Game.worldKey`), the Selected Item buttons and the overview
   row actions ask the same rows for a target and emit the same typed
-  intents, so their gating and fallbacks cannot drift. World clicks are
+  intents, so their gating and fallbacks cannot drift. The panel's
+  buttons are one declared slice (`selectedPanel.verbs`): the build
+  appends each button and its verb id, `syncSelected` gates that same
+  slice, and the tests walk it — no second gating list. World clicks are
   intents too — left double-click `Approach`, `Ctrl`+click `Lock`,
   right-click `Orbit` — and the right-click spells its range out
   (`uikit.OrbitRanges[0]`) instead of letting the Orbit intent follow the

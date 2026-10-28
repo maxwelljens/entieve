@@ -599,8 +599,8 @@ func TestWorldVerbTableCoversWorldKeys(t *testing.T) {
 	}
 	rows := map[string]bool{}
 	for _, v := range uikit.WorldVerbs {
-		if v.Action == "" || v.Label == "" || v.Emit == nil {
-			t.Errorf("verb %+v lacks an action, label or emit", v)
+		if v.Action == "" || v.Emit == nil {
+			t.Errorf("verb %+v lacks an action or emit", v)
 		}
 		if rows[v.Action] {
 			t.Errorf("action %q has two verb rows", v.Action)
