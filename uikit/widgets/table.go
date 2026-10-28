@@ -520,20 +520,15 @@ func NewTable(env Seams, cols []Column, opts ...TableOption) *Table {
 	m := (*face).Metrics()
 	t.rowH = math.Ceil(m.HAscent+m.HDescent) + 2*float64(theme.Px(entryPadV))
 
-	t.hdrIdle = &widget.ButtonImage{
-		Idle:         theme.Bordered(theme.Solid(p.HeadBg), theme.NRGBA(p.Border, 160), 1),
-		Hover:        theme.Bordered(theme.NRGBA(p.Hover, 18), theme.NRGBA(p.Accent, 200), 1),
-		Pressed:      theme.Bordered(theme.NRGBA(p.Hover, 45), theme.NRGBA(p.Border, 220), 1),
-		PressedHover: theme.Bordered(theme.NRGBA(p.Hover, 45), theme.NRGBA(p.Accent, 200), 1),
-		Disabled:     theme.Bordered(theme.NRGBA(p.Cell, 140), theme.NRGBA(p.Border, 110), 1),
-	}
-	t.hdrOn = &widget.ButtonImage{
-		Idle:         theme.Bordered(theme.NRGBA(p.Accent, 36), theme.NRGBA(p.Accent, 200), 1),
-		Hover:        theme.Bordered(theme.NRGBA(p.Accent, 60), theme.NRGBA(p.Accent, 220), 1),
-		Pressed:      theme.Bordered(theme.NRGBA(p.Accent, 80), theme.NRGBA(p.Accent, 220), 1),
-		PressedHover: theme.Bordered(theme.NRGBA(p.Accent, 80), theme.NRGBA(p.Accent, 220), 1),
-		Disabled:     theme.Bordered(theme.NRGBA(p.Cell, 140), theme.NRGBA(p.Border, 110), 1),
-	}
+	// Header chrome is the house button with the strip's own idle; the
+	// sorted-on state swaps in the accent emphasis states on top of it.
+	t.hdrIdle = theme.HouseButton(p)
+	t.hdrIdle.Idle = theme.Bordered(theme.Solid(p.HeadBg), theme.NRGBA(p.Border, 160), 1)
+	t.hdrOn = theme.HouseButton(p)
+	t.hdrOn.Idle = theme.Bordered(theme.NRGBA(p.Accent, 36), theme.NRGBA(p.Accent, 200), 1)
+	t.hdrOn.Hover = theme.Bordered(theme.NRGBA(p.Accent, 60), theme.NRGBA(p.Accent, 220), 1)
+	t.hdrOn.Pressed = theme.Bordered(theme.NRGBA(p.Accent, 80), theme.NRGBA(p.Accent, 220), 1)
+	t.hdrOn.PressedHover = t.hdrOn.Pressed
 
 	// Header: one sort button per column in a row that tiles the strip; the
 	// column chrome (the resize grips and the ⋯ menu) is anchored over it

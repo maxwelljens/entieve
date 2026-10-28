@@ -157,7 +157,9 @@ func NewRail(env widgets.Seams, entries []RailEntry) *Rail {
 		tips:    make([]widgets.RowTip, len(entries)),
 	}
 
-	r.imgIdle, r.imgOpen = railCellImages(p, false), railCellImages(p, true)
+	// The OPEN entry wears the cell glow — the module rack's active-cell
+	// treatment, so "this window is up" reads like "this module is running".
+	r.imgIdle, r.imgOpen = theme.CellImage(p, false), theme.CellImage(p, true)
 
 	r.tab = widget.NewButton(
 		widget.ButtonOpts.Image(r.imgIdle),
@@ -557,22 +559,4 @@ func railSeparator(p theme.Palette) *widget.Container {
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 		),
 	)
-}
-
-// railCellImages is the entry cell chrome: quiet idle/hover/press, and
-// the OPEN state's accent glow — the module rack's active-cell
-// treatment, so "this window is up" reads like "this module is running".
-// Disabled (grayed) draws the theme's dim cell over whichever is set.
-func railCellImages(p theme.Palette, open bool) *widget.ButtonImage {
-	body, edge := theme.NRGBA(p.BG, 210), theme.NRGBA(p.Border, 200)
-	if open {
-		body, edge = theme.NRGBA(p.Accent, 60), theme.Solid(p.Accent)
-	}
-	return &widget.ButtonImage{
-		Idle:         theme.Bordered(body, edge, 1),
-		Hover:        theme.Bordered(theme.NRGBA(p.Accent, 95), theme.Solid(p.Accent), 1),
-		Pressed:      theme.Bordered(theme.NRGBA(p.Accent, 110), theme.NRGBA(p.Accent, 220), 1),
-		PressedHover: theme.Bordered(theme.NRGBA(p.Accent, 110), theme.Solid(p.Accent), 1),
-		Disabled:     theme.Bordered(theme.NRGBA(p.Cell, 140), theme.NRGBA(p.Border, 110), 1),
-	}
 }

@@ -548,26 +548,15 @@ func fitGlyph(name string, tint color.RGBA) *ebiten.Image {
 	return icons.Get(name, theme.Px(theme.IconTile), tint)
 }
 
-// fitTileImages builds the slot tile chrome: accent-edged cells for fitted
-// modules and the dashed outline of an empty slot (one per hull slot, so
-// the grid always shows the hull's shape).
+// fitTileImages builds the slot tile chrome: the cell recipe's accent glow
+// for a fitted module, and the dashed outline of an empty slot in every
+// state (one per hull slot, so the grid always shows the hull's shape).
 func fitTileImages(p theme.Palette, empty bool) *widget.ButtonImage {
 	if empty {
-		return &widget.ButtonImage{
-			Idle:         fitDashTile(p),
-			Hover:        fitDashTile(p),
-			Pressed:      fitDashTile(p),
-			PressedHover: fitDashTile(p),
-			Disabled:     fitDashTile(p),
-		}
+		dash := fitDashTile(p)
+		return &widget.ButtonImage{Idle: dash, Hover: dash, Pressed: dash, PressedHover: dash, Disabled: dash}
 	}
-	return &widget.ButtonImage{
-		Idle:         theme.Bordered(theme.NRGBA(p.Accent, 60), theme.Solid(p.Accent), 1),
-		Hover:        theme.Bordered(theme.NRGBA(p.Accent, 95), theme.Solid(p.Accent), 1),
-		Pressed:      theme.Bordered(theme.NRGBA(p.Accent, 110), theme.NRGBA(p.Accent, 220), 1),
-		PressedHover: theme.Bordered(theme.NRGBA(p.Accent, 110), theme.Solid(p.Accent), 1),
-		Disabled:     theme.Bordered(theme.NRGBA(p.Cell, 140), theme.NRGBA(p.Border, 110), 1),
-	}
+	return theme.CellImage(p, true)
 }
 
 // fitDashTile draws the empty-slot placeholder: a dashed outline in the

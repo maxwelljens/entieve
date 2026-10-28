@@ -171,6 +171,61 @@ func Bordered(body, edge color.NRGBA, w int) *eimage.NineSlice {
 	return Rounded(body, edge, w, AllRadii(RadiusControl))
 }
 
+// buttonState is one state of a five-state button image: the nineslice
+// body and edge the chrome paints.
+type buttonState struct{ body, edge color.NRGBA }
+
+// houseStates is the house control recipe: cell fill idle, accent-tinted
+// hover, deeper accent press, dimmed disabled.
+func houseStates(p Palette) [5]buttonState {
+	return [5]buttonState{
+		{Solid(p.Cell), NRGBA(p.Border, 220)},
+		{NRGBA(p.Hover, 18), NRGBA(p.Accent, 200)},
+		{NRGBA(p.Hover, 45), NRGBA(p.Border, 220)},
+		{NRGBA(p.Hover, 45), NRGBA(p.Accent, 200)},
+		{NRGBA(p.Cell, 140), NRGBA(p.Border, 110)},
+	}
+}
+
+// cellStates is the cell recipe: accent-tinted hover/press states and the
+// house disabled over an idle that glows accent when highlighted (a running
+// module, an open window, a fitted slot) and stays a quiet BG cell otherwise.
+func cellStates(p Palette, highlighted bool) [5]buttonState {
+	idle := buttonState{NRGBA(p.BG, 210), NRGBA(p.Border, 200)}
+	if highlighted {
+		idle = buttonState{NRGBA(p.Accent, 60), Solid(p.Accent)}
+	}
+	return [5]buttonState{
+		idle,
+		{NRGBA(p.Accent, 95), Solid(p.Accent)},
+		{NRGBA(p.Accent, 110), NRGBA(p.Accent, 220)},
+		{NRGBA(p.Accent, 110), Solid(p.Accent)},
+		{NRGBA(p.Cell, 140), NRGBA(p.Border, 110)},
+	}
+}
+
+// buttonImage turns the five state pairs into ebitenui's button chrome.
+func buttonImage(s [5]buttonState) *widget.ButtonImage {
+	slice := func(st buttonState) *eimage.NineSlice { return Bordered(st.body, st.edge, 1) }
+	return &widget.ButtonImage{
+		Idle:         slice(s[0]),
+		Hover:        slice(s[1]),
+		Pressed:      slice(s[2]),
+		PressedHover: slice(s[3]),
+		Disabled:     slice(s[4]),
+	}
+}
+
+// HouseButton is the standard five-state control chrome (theme buttons, tabs,
+// combo buttons and the table header's shared states).
+func HouseButton(p Palette) *widget.ButtonImage { return buttonImage(houseStates(p)) }
+
+// CellImage is the cell chrome shared by the rack, rail, services strip and
+// fitting grid: highlight sets the accent-glow idle, else it is a quiet cell.
+func CellImage(p Palette, highlighted bool) *widget.ButtonImage {
+	return buttonImage(cellStates(p, highlighted))
+}
+
 // NewTheme builds a complete ebitenui widget theme for the EVE-dark look.
 // Every widget theme entry is populated with nineslices generated from the
 // palette; button states visibly differ (idle = cell fill, hover = accent
@@ -178,13 +233,7 @@ func Bordered(body, edge color.NRGBA, w int) *eimage.NineSlice {
 func NewTheme(p Palette, ts TypeScale) *widget.Theme {
 	f := NewFaces(ts)
 
-	buttonImage := &widget.ButtonImage{
-		Idle:         Bordered(Solid(p.Cell), NRGBA(p.Border, 220), 1),
-		Hover:        Bordered(NRGBA(p.Hover, 18), NRGBA(p.Accent, 200), 1),
-		Pressed:      Bordered(NRGBA(p.Hover, 45), NRGBA(p.Border, 220), 1),
-		PressedHover: Bordered(NRGBA(p.Hover, 45), NRGBA(p.Accent, 200), 1),
-		Disabled:     Bordered(NRGBA(p.Cell, 140), NRGBA(p.Border, 110), 1),
-	}
+	buttonImage := HouseButton(p)
 	buttonText := &widget.ButtonTextColor{
 		Idle:     Solid(p.Text),
 		Hover:    Solid(p.Text),
@@ -313,13 +362,7 @@ func NewTheme(p Palette, ts TypeScale) *widget.Theme {
 // newButtonParams builds a standalone ButtonParams (for ListComboButton).
 func newButtonParams(p Palette, f kitFaces) *widget.ButtonParams {
 	return &widget.ButtonParams{
-		Image: &widget.ButtonImage{
-			Idle:         Bordered(Solid(p.Cell), NRGBA(p.Border, 220), 1),
-			Hover:        Bordered(NRGBA(p.Hover, 18), NRGBA(p.Accent, 200), 1),
-			Pressed:      Bordered(NRGBA(p.Hover, 45), NRGBA(p.Border, 220), 1),
-			PressedHover: Bordered(NRGBA(p.Hover, 45), NRGBA(p.Accent, 200), 1),
-			Disabled:     Bordered(NRGBA(p.Cell, 140), NRGBA(p.Border, 110), 1),
-		},
+		Image: HouseButton(p),
 		TextColor: &widget.ButtonTextColor{
 			Idle:     Solid(p.Text),
 			Hover:    Solid(p.Text),

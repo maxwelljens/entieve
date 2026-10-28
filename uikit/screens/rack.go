@@ -247,8 +247,10 @@ func (r *Rack) newCell(row, idx int) *rackCell {
 	// padding puts the (empty) text cell first and centers the glyph —
 	// paddingRight = paddingLeft + spacing is the centering condition.
 	// TestRackTileIconIsCentred pins the result to the tile.
+	// The active cell glows; an inactive one is a disabled button, so the
+	// theme's dim cell (and dim label) rides along.
 	cell.btn = widget.NewButton(
-		widget.ButtonOpts.Image(rackCellImages(p)),
+		widget.ButtonOpts.Image(theme.CellImage(p, true)),
 		widget.ButtonOpts.Graphic(&widget.GraphicImage{
 			Idle:     rackGlyph("", color.RGBA{}),
 			Disabled: rackGlyph("", color.RGBA{}),
@@ -340,19 +342,6 @@ func rackGlyph(name string, tint color.RGBA) *ebiten.Image {
 		return icons.Get(icons.Fallback, theme.Px(theme.IconTile), color.RGBA{})
 	}
 	return icons.Get(name, theme.Px(theme.IconTile), tint)
-}
-
-// rackCellImages builds the cell chrome: an amber-tinted glow for active
-// modules and a dimmed cell for inactive/empty slots (the button's Disabled
-// state picks the look, so the theme's dim label rides along).
-func rackCellImages(p theme.Palette) *widget.ButtonImage {
-	return &widget.ButtonImage{
-		Idle:         theme.Bordered(theme.NRGBA(p.Accent, 60), theme.Solid(p.Accent), 1),
-		Hover:        theme.Bordered(theme.NRGBA(p.Accent, 95), theme.Solid(p.Accent), 1),
-		Pressed:      theme.Bordered(theme.NRGBA(p.Accent, 110), theme.NRGBA(p.Accent, 220), 1),
-		PressedHover: theme.Bordered(theme.NRGBA(p.Accent, 110), theme.Solid(p.Accent), 1),
-		Disabled:     theme.Bordered(theme.NRGBA(p.Cell, 140), theme.NRGBA(p.Border, 110), 1),
-	}
 }
 
 // Container returns the rack's root widget for the interface root (anchor

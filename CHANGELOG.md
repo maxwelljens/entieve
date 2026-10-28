@@ -95,6 +95,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   implementation; the duplicated golden tables collapse into one. No rendered
   string changes.
 
+- **Button and cell state recipes have one owner** (`uikit/theme`,
+  `uikit/screens`, `uikit/widgets`): the five-state button chrome
+  (`theme.HouseButton`) and the cell chrome (`theme.CellImage(p, highlighted)`)
+  replace the recipe typed out in `NewTheme`, `newButtonParams`, the rack, the
+  rail, the services strip, the fitting tiles and the table header — a hover
+  tint or disabled-alpha change is now one edit, not six. Every value is the
+  one those sites already painted, so there is no visual change.
 - **Panel gating and the Tab cycle follow the verb table** (`uikit/screens`):
   the Selected Item panel's `syncSelected` is one loop of `VerbReady` (the
   Warp `tooClose` case is the row's `Ready` reason; `canLock` and
