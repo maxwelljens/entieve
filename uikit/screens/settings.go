@@ -254,12 +254,17 @@ func NewSettings(d interface {
 		// and wide enough for a slider's full travel beside its label and
 		// readout (the three-way grid leaves the middle column the rest).
 		widget.WindowOpts.MinSize(theme.Px(380), theme.Px(508)),
-		// Fallback only: centred at the 1280×720 design size (the game
-		// re-centers it from placeDefaults like the other overlays).
-		widget.WindowOpts.Location(image.Rect(theme.Px(450), theme.Px(106), theme.Px(830), theme.Px(614))),
+		// Fallback only: the game re-centers it from placeDefaults like
+		// the other overlays; the row declares the same rect
+		// (SettingsRect) as its size.
+		widget.WindowOpts.Location(pxRect(SettingsRect())),
 	)
 	return s
 }
+
+// SettingsRect is the settings window's landing rect in design units: the
+// one number its Screen row's DefaultRect and its constructor share.
+func SettingsRect() image.Rectangle { return image.Rect(450, 106, 830, 614) }
 
 // Win returns the settings window for Kit.AddWindow.
 func (s *Settings) Win() *widget.Window { return s.win }

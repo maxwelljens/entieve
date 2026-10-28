@@ -175,31 +175,31 @@ type Screen struct {
 var screens = []Screen{
 	{
 		// An ordinary floating window, docked or in space: it opens at its
-		// own declared default (uikit.NewInventory's landing rect), not in
-		// a composed docked band.
+		// own declared default (uikit.InventoryRect, the panel's landing
+		// rect), not in a composed docked band.
 		ID: idInventory, Title: "Inventory", Icon: "svc_inventory",
 		Key: ebiten.KeyI, Action: "inventory", Desc: "toggle inventory",
-		DefaultRect: image.Rect(396, 256, 716, 690), Anchor: AnchorFixed,
+		DefaultRect: uikit.InventoryRect(), Anchor: AnchorFixed,
 		DockPolicy: DockFloating, Group: "Trade",
 		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewInventory(h.services.Env) },
 	},
 	{
 		ID: idFitting, Title: "Fitting", Icon: "svc_fitting",
 		Key: ebiten.KeyF, Action: "fitting", Desc: "toggle fitting",
-		DefaultRect: image.Rect(370, 8, 1014, 690), Anchor: AnchorFixed,
+		DefaultRect: uikit.FittingRect(), Anchor: AnchorFixed,
 		DockPolicy: DockFloating,
 		Group:      "Ship", Service: "fitting",
 		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewFitting(h.services.Env) },
 	},
 	{
 		// The market's per-type default is its landing rect
-		// (uikit.NewMarket) — 760×560, the three-pane width that starts on
+		// (uikit.MarketRect) — 760×560, the three-pane width that starts on
 		// the rail gutter's clear line and stays inside the 1024×700
 		// minimum. Docked or in space it opens here; the old docked band
 		// stretched it across the viewport.
 		ID: idMarket, Title: "Market", Icon: "svc_market",
 		Key: ebiten.KeyG, Action: "market", Desc: "toggle market window (trade while docked)",
-		DefaultRect: image.Rect(97, 8, 857, 568), Anchor: AnchorFixed,
+		DefaultRect: uikit.MarketRect(), Anchor: AnchorFixed,
 		DockPolicy: DockFloating,
 		Group:      "Trade", Service: "market",
 		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewMarket(h.services.Env) },
@@ -210,20 +210,21 @@ var screens = []Screen{
 		// no Anchor, so the centred fallback applies).
 		ID: idManufacturing, Title: "Manufacturing", Icon: "svc_manufacturing",
 		Key: ebiten.KeyB, Action: "manufacturing", Desc: "toggle manufacturing window (manufacture while docked)",
-		DefaultRect: image.Rect(312, 120, 792, 600),
+		DefaultRect: uikit.ManufacturingRect(),
 		DockPolicy:  DockFloating, DockedOnly: true,
 		Group: "Industry", Service: "industry",
 		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewManufacturing(h.services.Env) },
 	},
 	{
 		// Space chrome: hidden while docked (legacy parity). Fixed in the
-		// centre column under the top row — uikit.NewScanner's own
-		// constructor default is 10+RailInset,251 (above the bottom-left
-		// log). The x carries the rail inset: the left column (rail,
-		// overview, log, station) all start clear of uikit.RailInset.
+		// centre column under the top row — uikit.ScannerRect, which the
+		// panel's constructor also lands at (its old 10+RailInset,251 copy
+		// was stale; the host always placed from this row). The x carries
+		// the rail inset: the left column (rail, overview, log, station)
+		// all start clear of uikit.RailInset.
 		ID: idScanner, Title: "Scanner", Icon: "svc_scanner",
 		Key: ebiten.KeyC, Action: "scanner", Desc: "toggle scanner (off-grid sweep)",
-		DefaultRect: image.Rect(396+uikit.RailInset, 276, 696+uikit.RailInset, 524), // 300×248 (uikit scanW × titleBarH+scanBodyH)
+		DefaultRect: uikit.ScannerRect(), // 300×248 (uikit scanW × titleBarH+scanBodyH)
 		Anchor:      AnchorFixed,
 		DockPolicy:  DockFloating, SpaceOnly: true,
 		Group: "World",
@@ -235,7 +236,7 @@ var screens = []Screen{
 		// the view (uikit/screens/mapview.go).
 		ID: idMap, Title: "Starmap", Icon: "svc_map",
 		Key: ebiten.KeyN, Action: "starmap", Desc: "toggle starmap",
-		DefaultRect: image.Rect(160, 80, 870, 634), // uikit.NewMapView's landing rect
+		DefaultRect: uikit.MapViewRect(),
 		DockPolicy:  DockFloating,
 		Group:       "World",
 		Build:       func(h *ScreenHost) widgets.WindowPanel { return uikit.NewMapView(h.services.Env) },
@@ -254,18 +255,20 @@ var screens = []Screen{
 	},
 	{
 		// Bottom-left pocket beside the HUD pair: left/bottom insets of 10
-		// against the design viewport (uikit logDefaultW/H = 264×240).
+		// against the design viewport (uikit.LogDefaultW/H = 264×240; the
+		// panel's own fallback rect is composed at the 1024×700 minimum).
 		// The pocket starts clear of the rail and keeps the historical
 		// 361 right edge, so the log narrows by the rail inset to its
 		// content floor (its overlap with the HUD pair at the 1024×700
 		// minimum is inherent — see TestVirginPlacementTable).
 		ID: idLog, Title: "Log", Icon: "svc_log",
 		Key: ebiten.KeyL, Shift: true, Action: "log", Desc: "toggle log window",
-		DefaultRect: image.Rect(10+uikit.RailInset, defaultH-10-240, 10+264, defaultH-10),
-		Anchor:      AnchorBottomLeft,
-		DockPolicy:  DockFloating,
-		Group:       "World",
-		Build:       func(h *ScreenHost) widgets.WindowPanel { return uikit.NewLog(h.services.Env) },
+		DefaultRect: image.Rect(10+uikit.RailInset, defaultH-10-uikit.LogDefaultH,
+			10+uikit.RailInset+uikit.LogDefaultW, defaultH-10),
+		Anchor:     AnchorBottomLeft,
+		DockPolicy: DockFloating,
+		Group:      "World",
+		Build:      func(h *ScreenHost) widgets.WindowPanel { return uikit.NewLog(h.services.Env) },
 	},
 	{
 		// Like every panel it is rebuilt by the host's Warm, so its live
@@ -273,7 +276,7 @@ var screens = []Screen{
 		// shuffle, resets) is re-read from the action bundle in Sync.
 		ID: idSettings, Title: "Settings", Icon: "kind_unknown",
 		Key: ebiten.KeyP, Action: "settings", Desc: "toggle settings (UI scale, display, layout)",
-		DefaultRect: image.Rect(450, 106, 830, 614), // uikit.NewSettings' landing rect
+		DefaultRect: uikit.SettingsRect(),
 		DockPolicy:  DockFloating, InTitle: true,
 		Group: "Help & System",
 		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewSettings(h.services.Env, h.services.Settings) },
@@ -301,7 +304,7 @@ var screens = []Screen{
 		// crowd the bindings; the rail and the services row open it.
 		ID: idRefinery, Title: "Refinery", Icon: "svc_refinery",
 		Key:         keyNone,
-		DefaultRect: image.Rect(430, 160, 850, 560),
+		DefaultRect: uikit.RefineryRect(),
 		DockPolicy:  DockFloating, DockedOnly: true,
 		Group: "Industry", Service: "refine",
 		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewRefinery(h.services.Env) },
@@ -312,7 +315,7 @@ var screens = []Screen{
 		// K: F and G already belong to fitting and market.
 		ID: idFinances, Title: "Finances", Icon: "svc_finances",
 		Key: ebiten.KeyK, Action: "finances", Desc: "toggle finances window (holdings and transactions)",
-		DefaultRect: image.Rect(312, 170, 712, 530),
+		DefaultRect: uikit.FinancesRect(),
 		DockPolicy:  DockFloating,
 		Group:       "Trade",
 		Build:       func(h *ScreenHost) widgets.WindowPanel { return uikit.NewFinances(h.services.Env) },
@@ -324,7 +327,7 @@ var screens = []Screen{
 		// rebinds). O: the remaining free letter near the UI cluster.
 		ID: idKeybindings, Title: "Keybindings", Icon: "svc_help",
 		Key: ebiten.KeyO, Action: "keybindings", Desc: "toggle keybindings (rebind screen and world keys)",
-		DefaultRect: image.Rect(0, 0, 480, 640), // uikit.NewKeybindings' content floor
+		DefaultRect: uikit.KeybindingsRect(),
 		DockPolicy:  DockFloating, InTitle: true,
 		Group: "Help & System",
 		Build: func(h *ScreenHost) widgets.WindowPanel {

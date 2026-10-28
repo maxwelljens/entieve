@@ -106,11 +106,17 @@ func NewMapView(env interface {
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(titleBar, theme.Px(theme.TitleBarH)),
 		widget.WindowOpts.MinSize(theme.Px(400), theme.Px(300)),
-		// Default: roughly centered at both design sizes (1024×700 and
-		// 1280×720); the integrator re-centers it on real layout.
-		widget.WindowOpts.Location(image.Rect(theme.Px(160), theme.Px(80), theme.Px(160+mapImgW+2*theme.ContentsPad), theme.Px(80+theme.TitleBarH+mapImgH+2*theme.ContentsPad))),
+		// The landing rect the game's Starmap Screen row declares
+		// (MapViewRect); the integrator re-centers it on real layout.
+		widget.WindowOpts.Location(pxRect(MapViewRect())),
 	)
 	return m
+}
+
+// MapViewRect is the starmap window's landing rect in design units: the
+// one number its Screen row's DefaultRect and its constructor share.
+func MapViewRect() image.Rectangle {
+	return image.Rect(160, 80, 160+mapImgW+2*theme.ContentsPad, 80+theme.TitleBarH+mapImgH+2*theme.ContentsPad)
 }
 
 // Win returns the starmap window for the interface to add.

@@ -100,11 +100,16 @@ func NewRefinery(env widgets.Seams) *Refinery {
 		widget.WindowOpts.Contents(newHeaderBand(body, panel, render.RefiningHeader)),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
 		widget.WindowOpts.MinSize(theme.Px(340), theme.Px(320)),
-		// Construction landing rect: the game centers it on first open.
-		widget.WindowOpts.Location(image.Rect(theme.Px(430), theme.Px(160), theme.Px(850), theme.Px(560))),
+		// Construction landing rect: the game centers it on first open;
+		// the row declares the same rect (RefineryRect) as its size.
+		widget.WindowOpts.Location(pxRect(RefineryRect())),
 	)
 	return r
 }
+
+// RefineryRect is the refinery window's landing rect in design units: the
+// one number its Screen row's DefaultRect and its constructor share.
+func RefineryRect() image.Rectangle { return image.Rect(430, 160, 850, 560) }
 
 // Win returns the refinery window for Kit.AddWindow.
 func (r *Refinery) Win() *widget.Window { return r.win }

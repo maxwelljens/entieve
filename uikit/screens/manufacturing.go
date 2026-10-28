@@ -177,11 +177,17 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 		// job toolbar.
 		widget.WindowOpts.MinSize(theme.Px(420), theme.Px(440)),
 		// Construction landing rect: the game centers the window on first
-		// open (placeDefaults, AnchorCenter).
-		widget.WindowOpts.Location(image.Rect(theme.Px(312), theme.Px(120), theme.Px(792), theme.Px(600))),
+		// open (placeDefaults, AnchorCenter); the row declares the same
+		// rect (ManufacturingRect) as its size.
+		widget.WindowOpts.Location(pxRect(ManufacturingRect())),
 	)
 	return f
 }
+
+// ManufacturingRect is the manufacturing window's landing rect in design
+// units: the one number its Screen row's DefaultRect and its constructor
+// share.
+func ManufacturingRect() image.Rectangle { return image.Rect(312, 120, 792, 600) }
 
 // Win returns the manufacturing window for Kit.AddWindow.
 func (f *Manufacturing) Win() *widget.Window { return f.win }

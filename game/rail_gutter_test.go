@@ -69,6 +69,59 @@ func TestPlacedDefaultRectsClearTheRailGutter(t *testing.T) {
 	}
 }
 
+// TestLandingRectIdentity pins ONE number per window: the rect a panel's
+// constructor lands at (uikit.XRect through the px funnel) and the rect
+// its Screen row declares are the same rect. The host places from the row
+// (PlaceDefaults); the constructor's copy is what a directly-mounted
+// panel shows — the title host builds lazily and never places defaults —
+// and the two drifted once while every placement test stayed green
+// (scanner, keybindings, the starmap's size).
+//
+// Scale 1 only: DefaultRect is design units and the constructor's rect is
+// live px, the same number at the identity scale.
+//
+// The log panel is the one inset identity: its constructor default is
+// composed at the 1024×700 minimum (the fallback frame its capture draws)
+// while the row anchors to the 1280×720 design viewport. The gutter x,
+// the size and the 10 px bottom margin are the shared numbers.
+func TestLandingRectIdentity(t *testing.T) {
+	resetScale(t)
+	g := newScaleGameAt(t, filepath.Join(t.TempDir(), "save.json"), 1)
+	sv := g.host.services
+	cases := []struct {
+		id  ScreenID
+		win func() *widget.Window
+	}{
+		{idInventory, func() *widget.Window { return uikit.NewInventory(sv.Env).Win() }},
+		{idFitting, func() *widget.Window { return uikit.NewFitting(sv.Env).Win() }},
+		{idMarket, func() *widget.Window { return uikit.NewMarket(sv.Env).Win() }},
+		{idManufacturing, func() *widget.Window { return uikit.NewManufacturing(sv.Env).Win() }},
+		{idScanner, func() *widget.Window { return uikit.NewScanner(sv.Env).Win() }},
+		{idMap, func() *widget.Window { return uikit.NewMapView(sv.Env).Win() }},
+		{idSettings, func() *widget.Window { return uikit.NewSettings(sv.Env, sv.Settings).Win() }},
+		{idRefinery, func() *widget.Window { return uikit.NewRefinery(sv.Env).Win() }},
+		{idFinances, func() *widget.Window { return uikit.NewFinances(sv.Env).Win() }},
+		{idKeybindings, func() *widget.Window { return uikit.NewKeybindings(sv.Env, sv.Keys).Win() }},
+	}
+	row := map[ScreenID]image.Rectangle{}
+	for _, s := range screens {
+		row[s.ID] = s.DefaultRect
+	}
+	for _, c := range cases {
+		got := c.win().GetContainer().GetWidget().Rect
+		if got != row[c.id] {
+			t.Errorf("%s: constructor lands at %v, Screen row declares %v", c.id, got, row[c.id])
+		}
+	}
+
+	lg := uikit.NewLog(sv.Env).Win().GetContainer().GetWidget().Rect
+	lr := row[idLog]
+	if lg.Min.X != lr.Min.X || lg.Dx() != lr.Dx() || lg.Dy() != lr.Dy() ||
+		minH-lg.Max.Y != defaultH-lr.Max.Y {
+		t.Errorf("log: constructor %v, Screen row %v — the pocket (gutter x, size, 10 px bottom margin) must agree", lg, lr)
+	}
+}
+
 // TestVirginPlacementTable pins the whole virgin placement table at both
 // design viewports and both scales (device 1 and 1.5: the framebuffer
 // grows with the scale, so the design layout is scale-invariant):

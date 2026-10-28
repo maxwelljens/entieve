@@ -136,11 +136,20 @@ func NewScanner(env interface {
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
 		widget.WindowOpts.MinSize(theme.Px(260), theme.Px(theme.TitleBarH+scanBodyH)),
-		// Default clears the rail's left gutter (RailInset); the game
-		// re-anchors it to the centre column on first layout.
-		widget.WindowOpts.Location(image.Rect(theme.Px(10+RailInset), theme.Px(251), theme.Px(10+RailInset+scanW), theme.Px(251+theme.TitleBarH+scanBodyH))),
+		// The landing rect the game's Scanner Screen row declares
+		// (ScannerRect): the centre column, clear of the rail's gutter.
+		widget.WindowOpts.Location(pxRect(ScannerRect())),
 	)
 	return s
+}
+
+// ScannerRect is the scanner window's landing rect in design units: the
+// one number its Screen row's DefaultRect and its constructor share. The
+// constructor used to carry a second, stale origin (10+RailInset, 251);
+// the host always placed from the row, so this is the position production
+// already showed.
+func ScannerRect() image.Rectangle {
+	return image.Rect(396+RailInset, 276, 396+RailInset+scanW, 276+theme.TitleBarH+scanBodyH)
 }
 
 // Win returns the scanner window for the interface to add.

@@ -73,11 +73,16 @@ func NewFinances(env widgets.Seams) *Finances {
 		// ledger rows (the list scrolls below that).
 		widget.WindowOpts.MinSize(theme.Px(360), theme.Px(300)),
 		// Construction landing rect: the game centers the window on first
-		// open (placeDefaults, AnchorCenter).
-		widget.WindowOpts.Location(image.Rect(theme.Px(312), theme.Px(170), theme.Px(712), theme.Px(530))),
+		// open (placeDefaults, AnchorCenter); the row declares the same
+		// rect (FinancesRect) as its size.
+		widget.WindowOpts.Location(pxRect(FinancesRect())),
 	)
 	return f
 }
+
+// FinancesRect is the finances window's landing rect in design units: the
+// one number its Screen row's DefaultRect and its constructor share.
+func FinancesRect() image.Rectangle { return image.Rect(312, 170, 712, 530) }
 
 // Win returns the finances window for Kit.AddWindow.
 func (f *Finances) Win() *widget.Window { return f.win }

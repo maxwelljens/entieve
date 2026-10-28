@@ -250,11 +250,21 @@ func NewKeybindings(d widgets.Seams, act KeybindActions) *Keybindings {
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
 		// Content floor: the window keeps this size; the list scrolls.
 		widget.WindowOpts.MinSize(theme.Px(keybindW), theme.Px(keybindH)),
-		// Fallback only: centred at the 1280×720 design size (the game
-		// re-centres it from placeDefaults like the other overlays).
-		widget.WindowOpts.Location(image.Rect(theme.Px(410), theme.Px(40), theme.Px(410+keybindW), theme.Px(40+keybindH))),
+		// Fallback only: the game host centres it from placeDefaults
+		// (AnchorCenter); the title host mounts its panels directly, so
+		// this is the title screen's position. The row declares the same
+		// rect (KeybindingsRect).
+		widget.WindowOpts.Location(pxRect(KeybindingsRect())),
 	)
 	return k
+}
+
+// KeybindingsRect is the keybindings window's landing rect in design
+// units: the one number its Screen row's DefaultRect and its
+// constructor share. Centred at the 1280×720 design size — the game host
+// re-centres it (AnchorCenter), the title host shows it here.
+func KeybindingsRect() image.Rectangle {
+	return image.Rect(410, 40, 410+keybindW, 40+keybindH)
 }
 
 // newRow builds one list row: [label][chip][Reset]. A rebindable label is

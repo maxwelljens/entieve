@@ -253,13 +253,17 @@ func NewFitting(env widgets.Seams) *Fitting {
 		// Content floor: the left column's identity + two-column stats and
 		// the slot grid beside it, the summary strip and the buttons.
 		widget.WindowOpts.MinSize(theme.Px(580), theme.Px(660)),
-		// The game's Fitting Screen row declares the same rect as its
-		// per-type default (game/screens.go), so it opens here on first
-		// use, docked and in space alike.
-		widget.WindowOpts.Location(image.Rect(theme.Px(370), theme.Px(8), theme.Px(1014), theme.Px(690))),
+		// The landing rect the game's Fitting Screen row also declares
+		// (FittingRect), so it opens here on first use, docked and in
+		// space alike.
+		widget.WindowOpts.Location(pxRect(FittingRect())),
 	)
 	return f
 }
+
+// FittingRect is the fitting window's landing rect in design units: the
+// one number its Screen row's DefaultRect and its constructor share.
+func FittingRect() image.Rectangle { return image.Rect(370, 8, 1014, 690) }
 
 // Win returns the fitting window for Kit.AddWindow.
 func (f *Fitting) Win() *widget.Window { return f.win }
