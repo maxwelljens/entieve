@@ -706,7 +706,7 @@ func TestRespawnRatBuysOreWhenBeltCannotPay(t *testing.T) {
 	if got := bookAskQty(s, station, "ore-sterngrit"); got != 50 {
 		t.Errorf("ore asks = %d, want 50", got)
 	}
-	bal := s.factionLedger["Mire Corsairs"]
+	bal := s.factionLedger["Old Works"]
 	if want := factionEndowment - 50*20; bal != want {
 		t.Errorf("ledger = %v, want %v", bal, want)
 	}
@@ -732,7 +732,7 @@ func TestRespawnRatRequeuesWhenNoOreAnywhere(t *testing.T) {
 	before := s.AIs.Len()
 	s.Step()
 	evs := drain(s)
-	const delayed = "Mire Corsairs requisition delayed — no ore for Rat Hull at Haven Rest"
+	const delayed = "Old Works requisition delayed — no ore for Rat Hull at Haven Rest"
 	late := findEvent(evs, EvLog, delayed)
 	if late == nil {
 		t.Fatalf("missing delay event, want %q: %v", delayed, evs)

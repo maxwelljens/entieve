@@ -127,9 +127,11 @@ func TestGuardPatrolNeverInitiates(t *testing.T) {
 	}
 }
 
-// TestGuardPatrolDefendsWhenAttacked: third-party damage leaves the guard
-// on duty, player-sourced damage flips it onto the player (self-defense,
-// LastHitBy attribution) and it locks through the normal targeting system.
+// TestGuardPatrolDefendsWhenAttacked: same-faction damage (a sister patrol)
+// leaves the guard on duty — trigger (b) is source-checked, so an ally's
+// fire never flips it — while player-sourced damage flips it onto the player
+// (self-defense, LastHitBy attribution) and it locks through the normal
+// targeting system.
 func TestGuardPatrolDefendsWhenAttacked(t *testing.T) {
 	s := newTrafficSim(t)
 	guard := spawnIdleGuard(t, s, v(1e7+5000, 500))
@@ -140,13 +142,13 @@ func TestGuardPatrolDefendsWhenAttacked(t *testing.T) {
 		t.Fatal("guard has no AI state")
 	}
 
-	// Third-party hit: on duty, not the player's fight.
-	src := dummyTarget(t, s, v(-5e6, -5e6), content.Resists{})
+	// Same-faction hit: a sister patrol's fire is not the player's fight.
+	src := spawnIdleGuard(t, s, v(1e7+40000, 500))
 	damageNPC(s, src, guard, scratchDamage(), false)
 	s.Step()
 	drain(s)
 	if ai.State != NpcIdle {
-		t.Fatalf("state=%q want idle after third-party damage", ai.State)
+		t.Fatalf("state=%q want idle after same-faction damage", ai.State)
 	}
 	if ai.LastHitBy != src {
 		t.Fatalf("LastHitBy=%v want the third party %v", ai.LastHitBy, src)

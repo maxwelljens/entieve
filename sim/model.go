@@ -203,13 +203,13 @@ const (
 type NpcAI struct {
 	Npc    content.NpcID
 	State  NpcAIState
-	Target ecs.Entity // current hostile (usually the player); a miner's rock or haul station
+	Target ecs.Entity // current target (a hostile ship or the player); a miner's rock or haul station
 	Home   core.Vec2  // spawn anchor
 	Rand   *core.RNG  // per-NPC stream (Fork'd); marshaled via Snapshot/RestoreRNG
 	// LastHitBy is the source of the most recent damage this ship took
-	// (aggro trigger (b): only player-attributed damage aggroes an NPC onto
-	// the player — third-party fire, e.g. a patrol during a convoy ambush,
-	// must not). Persisted with the rest of the NPC state (SavedNpcAI).
+	// (aggro trigger (b): the NPC answers an attacker of another faction,
+	// never a same-faction ally). Persisted with the rest of the NPC state
+	// (SavedNpcAI).
 	LastHitBy ecs.Entity
 }
 

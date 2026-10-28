@@ -71,10 +71,10 @@ func (s *Sim) systemDamage() {
 		if !ok || deadSeen[d.dst] {
 			continue
 		}
-		// Record the damage source on NPCs: aggro trigger (b) only fires for
-		// player-attributed damage (systemNpc), so third-party fire — a
-		// patrol shooting raiders, one rat shooting another — can never flip
-		// an NPC onto the player.
+		// Record the damage source on NPCs: aggro trigger (b) answers the
+		// attacker itself (systemNpc), and only when it fights for another
+		// faction — so a sister patrol's fire, or one rat shooting another,
+		// never flips an NPC.
 		if ai, ok := s.AIs.Get(d.dst); ok {
 			ai.LastHitBy = d.src
 		}

@@ -96,6 +96,11 @@ func TestHighSecGuardEngagesBeltRats(t *testing.T) {
 	// 0.4 and never lands on a drifting hull — same reason trafficContent
 	// gives its guards mod-test-turret).
 	c.NPCs["npc-rat-scuttler"].Fit = []content.ModuleID{"mod-test-turret"}
+	// One sustained turret: a rat that fights back orbits its attacker and
+	// flees at the high-sec 35% threshold, so the chase outlives a
+	// three-turret loadout's capacitor (re-aimed when NPCs gained
+	// inter-NPC aggression).
+	c.NPCs["npc-guard-test"].Fit = []content.ModuleID{"mod-test-turret"}
 	s := newBeltSim(t, c, 7)
 	belt := beltPosOf(t, s, "cel-belt-a")
 	guard := spawnStaticGuard(t, s, belt)
@@ -106,7 +111,7 @@ func TestHighSecGuardEngagesBeltRats(t *testing.T) {
 	drain(s)
 
 	var evs []Event
-	stepCollect(s, &evs, 8000)
+	stepCollect(s, &evs, 25000)
 
 	if !hasEvent(evs, EvDestroyed, "Rat Scuttler destroyed") {
 		t.Fatalf("guard never cleared the belt rat (state=%s)", aiState(s, rat))
@@ -440,6 +445,11 @@ func TestHighSecGuardFinishesPlayerTouchedRat(t *testing.T) {
 	c := trafficContent()
 	c.Traffic["sys-a"].Patrol = nil // isolate: no scheduled patrols in this pin
 	c.NPCs["npc-rat-scuttler"].Fit = []content.ModuleID{"mod-test-turret"}
+	// One sustained turret: a rat that fights back orbits its attacker and
+	// flees at the high-sec 35% threshold, so the chase outlives a
+	// three-turret loadout's capacitor (re-aimed when NPCs gained
+	// inter-NPC aggression).
+	c.NPCs["npc-guard-test"].Fit = []content.ModuleID{"mod-test-turret"}
 	s := newBeltSim(t, c, 7)
 	belt := beltPosOf(t, s, "cel-belt-a")
 	setPlayerPos(s, belt.Add(core.Vec2{X: 12000}))

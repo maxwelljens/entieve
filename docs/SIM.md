@@ -32,7 +32,7 @@ run in this fixed order:
 | 7 | damage | `sim/system_damage.go` | shield → armor → structure; death → wreck |
 | 8 | capacitor | `sim/system_cap.go` | EVE recharge curve |
 | 9 | mining | `sim/system_mining.go` | cycle yields into the ore hold; belt-state decrement |
-| 10 | npc | `sim/system_npc.go` | rat/guard behavior state machine |
+| 10 | npc | `sim/system_npc.go` | candidate-based threat state machine (rats/guards/miners) |
 | 11 | loot | `sim/system_loot.go` | loot command → cargo; bounties |
 | 12 | economy | `sim/system_economy.go` | station services (the `content.Services` ids): buy/sell/refine/repair/fitting |
 | 13 | travel | `sim/system_travel.go` | dock (free full restore, all modules off) / undock (modules off) / jump: grid swaps |
@@ -275,6 +275,26 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    they hold no lock on the player and never flee, but they are ordinary
    ships otherwise — lockable, damageable, and their death runs the normal
    wreck path with the hold as loot.
+
+   **Inter-NPC hostility.** The threat machine is candidate-based, not
+   player-based: `sim/systemNpc` resolves every on-grid ship — you, AI hulls,
+   traffic haulers — as a candidate and runs the same four triggers for each
+   (proximity, damage from another faction, recent work near Home, Home
+   intrusion). Who may act on whom is `sim/hostility.go`, the Relations
+   table of [lore/FACTIONS.md](lore/FACTIONS.md) as code: the Old Works act
+   on everything non-Old-Works (so belt rats now attack miners cutting rock
+   and the traffic passing through), the Charter answers only the Old Works,
+   and corporate houses and independents — you and the haulers — initiate
+   nothing; same-faction and unknown factions are neutral (fail closed). A
+   content pin fails if a shipped NPC def names a faction with no relations
+   row. Role passivity stacks on top: guards never initiate (they only
+   self-defend against you and clear high-sec rats at their celestial), and
+   miners never initiate or flee. The chosen target is the damage source
+   first, else the nearest triggered candidate (canonical order breaks
+   ties); its handle persists in `NpcAI.Target` (saving/restoring an
+   engagement bit-for-bit), and only the player's announcement is the
+   warning line — an NPC-vs-NPC fight logs one `<attacker> attacks
+   <target>` line on the idle→approach edge.
 2. **Refining — ore to minerals.** `CmdRefine` at a `refine` station turns
    ore into minerals at `floor(refine_yield × qty)` per mineral (`execRefine`,
    `sim/system_economy.go`), in whole **100-ore batches** only: any quantity

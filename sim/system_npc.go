@@ -19,7 +19,7 @@ func isRatNpc(def *content.NpcDef) bool {
 	return strings.HasPrefix(string(def.ID), ratNpcPrefix)
 }
 
-// npcFleeSeconds is how long a fleeing NPC burns away from the player
+// npcFleeSeconds is how long a fleeing NPC burns away from its target
 // before despawning quietly (Intent.Range stores the flee start time —
 // unused by manual intents and serialized with the component).
 const npcFleeSeconds = 20
@@ -36,16 +36,17 @@ const npcRetryCooldown = 3
 // (aggro trigger d; guards themselves never initiate, see systemNpc).
 const npcGuardRange = 8_000
 
-// npcWorkRange is the radius (m) around a recorded player weapon/mining
-// work position that alerts NPC Homes inside it (aggro trigger c).
+// npcWorkRange is the radius (m) around an NPC's Home inside which recent
+// work — the player's recorded weapon/mining position, an NPC's live mining
+// laser — alerts it (aggro trigger c).
 const npcWorkRange = 30_000
 
-// npcWorkWindow is how long (sim seconds) recent player weapon/mining work
-// keeps guards alert (aggro trigger c).
+// npcWorkWindow is how long (sim seconds) recent player work (the frozen
+// lastPlayerWork marker) alerts NPC Homes inside npcWorkRange (trigger c).
 const npcWorkWindow = 20
 
 // npcLeashFactor multiplies the effective aggro range into the pursuit
-// leash: an aggroed NPC engages while the player is within
+// leash: an aggroed NPC engages while its target is within
 // leash = npcLeashFactor * effAggro of its Home, and breaks off beyond it.
 const npcLeashFactor = 2.5
 
@@ -58,19 +59,29 @@ const npcPatrolMaxRadius = 2500
 // systemNpc advances every NPC state machine:
 //
 //	idle (patrolling) -> approach -> orbit -> flee -> despawn
-//	     \-> return (player beyond the pursuit leash or gone) -> idle
+//	     \-> return (target beyond the pursuit leash or gone) -> idle
 //
-// Aggro (idle -> approach) fires when any of these triggers holds for an
-// on-grid player:
+// The machine is candidate-based, not player-based: the player and every
+// other on-grid ship (AI hulls, traffic haulers — see npcCandidates) are
+// evaluated through the same triggers, gated by the faction relations in
+// hostile (sim/hostility.go — FACTIONS.md's Relations table). Aggro
+// (idle -> approach) fires when any of these triggers holds for a candidate
+// the NPC may act on:
 //
-//	(a) the player is within the NPC's effective aggro range;
-//	(b) the NPC took damage from the player (source-checked: third-party
-//	    fire — a patrol during a convoy ambush — never aggroes an NPC
-//	    onto the player);
+//	(a) the candidate is within the NPC's effective aggro range;
+//	(b) the NPC took damage from the candidate (source-checked: same-faction
+//	    fire never flips it, so a patrol's own side or a rat's own swarm
+//	    cannot turn it);
 //	(c) the player fired a weapon or ran a mining cycle within 30 km of the
-//	    NPC's Home in the last 20 sim-seconds;
-//	(d) the player is within 8 km of the NPC's Home (guardians investigate
+//	    NPC's Home in the last 20 sim-seconds (the frozen work marker), or
+//	    an NPC candidate is cutting rock with a live mining laser inside
+//	    that radius — a mining op draws the same aggro a pilot does;
+//	(d) the candidate is within 8 km of the NPC's Home (guardians investigate
 //	    interlopers — belt/anomaly guards especially).
+//
+// When several candidates trigger, the damage source wins, else the nearest,
+// with ties broken by canonical entity order. The chosen handle persists in
+// NpcAI.Target (SavedNpcAI.Target), so an engagement survives save/restore.
 //
 // Guards are the exception: security patrols (npc-guard-*, NpcDef.IsGuard)
 // are friendly and never initiate on the player — triggers (a), (c) and
@@ -81,23 +92,30 @@ const npcPatrolMaxRadius = 2500
 // is unaffected. Guards do have one threat of their own: in a HIGH-security
 // system a static guard clears pirate rats (npc-rat-*) anchored at its own
 // celestial whenever they are not already engaged (guardEngageRat) — the
-// ambient security rule. Traffic patrols are exempt from that rule (their
-// belt sweep lives in systemTraffic) and low/null space keeps guards
-// passive. The threat triggers exist so pirate rats are not passive, and
-// apply to every non-guard NPC exactly as before.
+// ambient security rule, which also covers a rat mid-attack on a miner.
+// Traffic patrols are exempt from that rule (their belt sweep lives in
+// systemTraffic) and low/null space keeps guards passive. Rats they clear
+// still fight back through trigger (b) — the rat's machine now answers any
+// other-faction attacker, not just the player.
 //
 // Civilian miners are the second exception (npc-miner-*, NpcDef.IsMiner):
-// they never enter this machine at all — npcMiner runs their extraction loop
-// and they stay passive through it (no trigger, no flee). Their own def is
-// what makes them passive; nothing here is weakened for rats.
+// they never enter this machine as aggressors — npcMiner runs their
+// extraction loop and they stay passive through it (no trigger, no flee).
+// They are ordinary candidate targets for everyone else: a rat that finds
+// one working in its territory attacks it, and the miner keeps cutting until
+// its wreck carries the hold.
 //
 // The pursuit leash is leash = npcLeashFactor * effAggro measured from the
-// NPC's Home: an engaged NPC chases/engages while the player stays inside
+// NPC's Home: an engaged NPC chases/engages while its target stays inside
 // it and breaks off to return when it is crossed; a returning NPC only
-// re-engages while a trigger holds AND the player is back inside the leash
+// re-engages while a trigger holds AND the target is back inside the leash
 // (symmetric with the break-off, so the state machine can never flip-flop
 // across the leash line). A fleeing NPC ignores the leash and keeps the
 // 20 s burn-away-then-despawn.
+//
+// Aggro is announced once, on the idle -> approach transition: the player
+// line ("<npc> is attacking you") is unchanged, an NPC target gets one
+// SevInfo line naming both (npcAggroLog).
 //
 // SystemDef.Security tunes temperament through npcTemperament:
 //
@@ -109,18 +127,11 @@ const npcPatrolMaxRadius = 2500
 //
 // Idle NPCs never sit still: they drift on a slow deterministic patrol
 // circle around NpcAI.Home (npcPatrol, phase hashed from the entity handle
-// — no RNG draws). Aggroed NPCs lock the player through the normal targeting
-// system and activate their weapons/tank/ewar modules through the normal
-// module system, with npcRetryCooldown gating failed re-attempts.
+// — no RNG draws). Aggroed NPCs lock their target through the normal
+// targeting system and activate their weapons/tank/ewar modules through the
+// normal module system, with npcRetryCooldown gating failed re-attempts.
 func (s *Sim) systemNpc() {
-	playerAlive := !s.player.IsZero() && s.World.Alive(s.player)
-	playerOnGrid := playerAlive && !s.playerDocked()
-	var pPos core.Vec2
-	if playerAlive {
-		if tr, ok := s.Transforms.Get(s.player); ok {
-			pPos = tr.Pos
-		}
-	}
+	candidates := s.npcCandidates()
 	security := ""
 	if sys := s.System(); sys != nil {
 		security = sys.Security
@@ -145,64 +156,44 @@ func (s *Sim) systemNpc() {
 		}
 		// Civilian miners run their own extraction loop and never enter the
 		// threat machine below: passive by definition, never aggroed by the
-		// player and never fleeing.
+		// player and never fleeing. They are ordinary targets for everyone
+		// else (npcCandidates).
 		if def.IsMiner() {
 			s.npcMiner(e, ai, tr, def)
 			continue
 		}
 
 		effAggro, effFlee := npcTemperament(security, def)
-
-		dist := 0.0
-		homeDist := 0.0
-		if playerAlive {
-			dist = tr.Pos.Dist(pPos)
-			homeDist = ai.Home.Dist(pPos)
-		}
+		leash := npcLeashFactor * effAggro
 		structFrac := 1.0
 		if ship.MaxStructure > 0 {
 			structFrac = ship.Structure / ship.MaxStructure
 		}
 		damaged := ship.Shield < ship.MaxShield || ship.Armor < ship.MaxArmor ||
 			ship.Structure < ship.MaxStructure
-
-		// Aggro triggers (a)-(d); (b)-(d) only pull a non-pursuing NPC in.
-		// Guards never initiate on the player: for npc-guard-* the
-		// proximity (a), recent-work (c) and intrusion (d) triggers are
-		// skipped — friendly security only defends (b), while pirate rats
-		// keep the full threat response ("rats must not be passive").
 		isGuard := def.IsGuard()
-		aggroOK := !isGuard && playerOnGrid && effAggro > 0 && dist <= effAggro
-		if playerOnGrid && (ai.State == NpcIdle || ai.State == "" || ai.State == NpcReturn) {
-			// (b) source-blind damage would flip every NPC on the grid onto
-			// the player whenever anything else shot it (a patrol fighting
-			// raiders, rat-on-rat fire), at any distance: the damage must
-			// have come from the player.
-			if damaged && ai.LastHitBy == s.player {
-				aggroOK = true
-			}
-			if !isGuard {
-				if s.recentPlayerWorkNear(ai.Home) {
-					aggroOK = true
-				}
-				if homeDist <= npcGuardRange {
-					aggroOK = true
-				}
-			}
+		// A live ambusher's target belongs to the traffic incident
+		// (trafficRaidersAct) — candidate resolution would hijack its
+		// warp-in onto the hauler it already means to take. Only the player
+		// pulls it into the machine, exactly as before.
+		playerOnly := s.isTrafficRaider(e)
+
+		// The persisted target, resolved for this tick: a dead or docked
+		// target ends the engagement (-> return).
+		tPos, targetOnGrid := s.posOf(ai.Target)
+		if targetOnGrid && (!s.World.Alive(ai.Target) || s.Docked.Has(ai.Target)) {
+			targetOnGrid = false
 		}
-		// Pursuit leash measured from Home: engagement requires the player
-		// inside leash = npcLeashFactor * effAggro.
-		leashed := playerOnGrid && homeDist <= npcLeashFactor*effAggro
 
 		switch ai.State {
 		case NpcIdle, "":
-			// Any trigger aggros a fresh NPC from wherever the player is;
+			// Any trigger aggros a fresh NPC from wherever its target is;
 			// the leash then governs whether the pursuit actually continues
 			// (approach/orbit break off when it is crossed).
-			if aggroOK {
+			if target := s.npcThreat(e, tr.Pos, ai, def, damaged, candidates, effAggro, math.MaxFloat64, playerOnly); !target.IsZero() {
 				ai.State = NpcApproach
-				ai.Target = s.player
-				s.log(SevWarning, e, s.nameOf(e)+" is attacking you")
+				ai.Target = target
+				s.npcAggroLog(e, target)
 				break
 			}
 			// The ambient security rule: a high-sec guard clears the rats
@@ -223,47 +214,34 @@ func (s *Sim) systemNpc() {
 				s.npcPatrol(e, ai, tr, def)
 			}
 
-		case NpcApproach:
-			if !playerOnGrid {
+		case NpcApproach, NpcOrbit:
+			if !targetOnGrid {
 				ai.State = NpcReturn
 				ai.Target = 0
 				break
 			}
 			if structFrac < effFlee {
-				s.npcEnterFlee(e, ai, tr, pPos)
+				s.npcEnterFlee(e, ai, tr, tPos)
 				break
 			}
-			if !leashed {
-				// Player crossed the pursuit leash: break off.
+			if ai.Home.Dist(tPos) > leash {
+				// The target crossed the pursuit leash: break off.
 				ai.State = NpcReturn
 				ai.Target = 0
 				break
 			}
-			s.Intents.Set(e, Intent{Kind: IntentApproach, Target: s.player})
-			if dist <= def.OrbitRange+50 {
-				ai.State = NpcOrbit
+			if ai.State == NpcApproach {
+				s.Intents.Set(e, Intent{Kind: IntentApproach, Target: ai.Target})
+				if tr.Pos.Dist(tPos) <= def.OrbitRange+50 {
+					ai.State = NpcOrbit
+				}
+			} else {
+				s.Intents.Set(e, Intent{Kind: IntentOrbit, Target: ai.Target, Range: def.OrbitRange})
 			}
-
-		case NpcOrbit:
-			if !playerOnGrid {
-				ai.State = NpcReturn
-				ai.Target = 0
-				break
-			}
-			if structFrac < effFlee {
-				s.npcEnterFlee(e, ai, tr, pPos)
-				break
-			}
-			if !leashed {
-				ai.State = NpcReturn
-				ai.Target = 0
-				break
-			}
-			s.Intents.Set(e, Intent{Kind: IntentOrbit, Target: s.player, Range: def.OrbitRange})
 
 		case NpcFlee:
-			// Burn away from the player; despawn after npcFleeSeconds.
-			away := tr.Pos.Sub(pPos)
+			// Burn away from the target; despawn after npcFleeSeconds.
+			away := tr.Pos.Sub(tPos)
 			if away.IsZero() {
 				away = core.Vec2{X: 1}
 			}
@@ -281,12 +259,12 @@ func (s *Sim) systemNpc() {
 			continue // no combat actions while fleeing
 
 		case NpcReturn:
-			// Re-engage only while the player is both a trigger and inside
+			// Re-engage only while a candidate is both a trigger and inside
 			// the leash — symmetric with the approach break-off, so the
 			// state machine can never flip-flop across the leash line.
-			if aggroOK && leashed {
+			if target := s.npcThreat(e, tr.Pos, ai, def, damaged, candidates, effAggro, leash, playerOnly); !target.IsZero() {
 				ai.State = NpcApproach
-				ai.Target = s.player
+				ai.Target = target
 				break
 			}
 			home := ai.Home.Sub(tr.Pos)
@@ -299,14 +277,139 @@ func (s *Sim) systemNpc() {
 			continue
 		}
 
-		// Combat actions: aggroed NPCs lock the player and run their modules.
+		// Combat actions: aggroed NPCs lock their target and run their
+		// modules.
 		if ai.State == NpcApproach || ai.State == NpcOrbit {
-			if playerOnGrid {
-				s.npcEnsureLock(e, s.player)
-				s.npcActivate(e, ai, s.player)
+			if targetOnGrid {
+				s.npcEnsureLock(e, ai.Target)
+				s.npcActivate(e, ai, ai.Target)
 			}
 		}
 	}
+}
+
+// npcCandidate is one ship the threat machine may consider: who it is, where
+// it is, what it fights for and whether it is working a rock.
+type npcCandidate struct {
+	e       ecs.Entity
+	pos     core.Vec2
+	faction string
+	working bool
+}
+
+// npcCandidates lists the ships every NPC evaluates the same way — the
+// player, AI hulls and traffic haulers — in canonical handle order. Wrecks,
+// rocks, drones and other props are not candidates.
+func (s *Sim) npcCandidates() []npcCandidate {
+	var out []npcCandidate
+	for _, e := range sortedEntities(s.Ships) {
+		if !s.World.Alive(e) || s.Docked.Has(e) {
+			continue
+		}
+		if e != s.player && !s.AIs.Has(e) && !s.Traffic.Has(e) {
+			continue
+		}
+		tr, ok := s.Transforms.Get(e)
+		if !ok {
+			continue
+		}
+		out = append(out, npcCandidate{
+			e: e, pos: tr.Pos, faction: s.factionOf(e), working: s.npcWorking(e),
+		})
+	}
+	return out
+}
+
+// factionOf returns the faction a ship fights for: its NPC def's, else the
+// independents' flag (the player and traffic haulers carry no colours).
+func (s *Sim) factionOf(e ecs.Entity) string {
+	if ai, ok := s.AIs.Get(e); ok {
+		if def, ok := s.Content.Npc(ai.Npc); ok {
+			return def.Faction
+		}
+	}
+	return factionIndependent
+}
+
+// npcWorking reports whether e is running a mining cycle — the live form of
+// the player's frozen work marker for NPC candidates (aggro trigger c).
+func (s *Sim) npcWorking(e ecs.Entity) bool {
+	fit, ok := s.Fittings.Get(e)
+	if !ok {
+		return false
+	}
+	for _, class := range slotClasses {
+		rts := fit.Runtimes(class)
+		for i := range rts {
+			if !rts[i].Active {
+				continue
+			}
+			if def, ok := s.Content.Module(rts[i].Def); ok && def.Kind == content.KindMiningLaser {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// npcThreat returns the candidate e should engage this tick, or zero. It
+// evaluates triggers (a)-(d) for every candidate of another hostile faction
+// inside maxHomeDist of Home (the leash; math.MaxFloat64 for a fresh aggro):
+// the damage source (b) always wins, else the nearest, ties by canonical
+// order. Guards only ever self-defend against the player (b) — they never
+// initiate, and their answer to Old Works hulls is guardEngageRat. playerOnly
+// restricts the scan to the player (a live traffic ambusher, see systemNpc).
+func (s *Sim) npcThreat(e ecs.Entity, selfPos core.Vec2, ai *NpcAI, def *content.NpcDef, damaged bool, candidates []npcCandidate, effAggro, maxHomeDist float64, playerOnly bool) ecs.Entity {
+	mine := def.Faction
+	var best ecs.Entity
+	bestD := math.MaxFloat64
+	for _, c := range candidates {
+		if c.e == e || (playerOnly && c.e != s.player) {
+			continue
+		}
+		homeDist := ai.Home.Dist(c.pos)
+		if homeDist > maxHomeDist {
+			continue
+		}
+		// (b) source-checked damage: same-faction fire never flips an NPC.
+		hit := damaged && ai.LastHitBy == c.e && c.faction != mine
+		if hit && def.IsGuard() && c.e != s.player {
+			hit = false // guards keep their player-only self-defense rule
+		}
+		if !hit && !def.IsGuard() && hostile(mine, c.faction) {
+			switch {
+			case effAggro > 0 && selfPos.Dist(c.pos) <= effAggro:
+				hit = true // (a) proximity
+			case c.e == s.player && s.recentPlayerWorkNear(ai.Home):
+				hit = true // (c) frozen player work marker
+			case c.working && homeDist <= npcWorkRange:
+				hit = true // (c) an NPC mining op inside the work radius
+			case homeDist <= npcGuardRange:
+				hit = true // (d) intrusion
+			}
+		}
+		if !hit {
+			continue
+		}
+		if damaged && ai.LastHitBy == c.e {
+			return c.e // (b) beats every ambient trigger
+		}
+		if d := selfPos.Dist(c.pos); best.IsZero() || d < bestD {
+			best, bestD = c.e, d
+		}
+	}
+	return best
+}
+
+// npcAggroLog announces an engagement once, on the idle -> approach
+// transition. The player line is byte-identical to the old machine's; an NPC
+// target gets one SevInfo line naming both hulls.
+func (s *Sim) npcAggroLog(e, target ecs.Entity) {
+	if target == s.player {
+		s.log(SevWarning, e, s.nameOf(e)+" is attacking you")
+		return
+	}
+	s.log(SevInfo, e, s.nameOf(e)+" attacks "+s.nameOf(target))
 }
 
 // npcTemperament maps a system's Security rating onto an NPC's effective
@@ -365,10 +468,10 @@ const npcMinerWarpRange = 100_000
 //	       post the hold's ore on that station's market as system supply,
 //	       then despawn (recordRespawn re-arms the spawn group's timer)
 //
-// The player is never a target and never an aggro trigger: miners skip the
-// player-centric threat machine entirely (no lock, no flee). They are
-// otherwise normal ships — lockable, damageable, and death runs the ordinary
-// wreck path.
+// Miners never initiate and never flee: they skip the threat machine entirely
+// (no lock, no trigger). They are otherwise normal ships — ordinary candidate
+// targets for every non-miner NPC, lockable, damageable, and death runs the
+// ordinary wreck path (the wreck carries the hold).
 func (s *Sim) npcMiner(e ecs.Entity, ai *NpcAI, tr *Transform, def *content.NpcDef) {
 	switch ai.State {
 	case NpcHaul:
@@ -543,7 +646,7 @@ func (s *Sim) nearestStation(pos core.Vec2) ecs.Entity {
 // ratTargetAt returns the rat (npc-rat-*) anchored at home the security
 // forces should engage next, in canonical handle order — the target a
 // high-sec guard clears, and the belt occupancy a patrol sweep looks for.
-// Free rats come first (a pilot's fight stays the pilot's while other rats
+// Free rats come first (an NPC's fight stays its own while other rats
 // are free), but when none are free any live rat is returned: security
 // finishes the belt rather than leaving a player-touched rat parked there.
 // Zero only when the belt is empty. Home is the spawn anchor (the celestial
@@ -571,12 +674,12 @@ func (s *Sim) ratTargetAt(home core.Vec2, sec string) ecs.Entity {
 }
 
 // ratFree reports whether a rat is free to engage before the belt's
-// player-touched stragglers: idle, or holding a pursuit the player has
+// player-touched stragglers: idle, or holding a pursuit its target has
 // already left — outside the rat's own leash, which systemNpc breaks off on
 // the next tick (trigger (b) never expires, so a rat the player damaged and
 // flew away from flinches onto the player every few ticks; that flinch is
-// not a fight). A rat the player is actually fighting stays the player's
-// only while another rat is free; ratTargetAt falls back to it otherwise.
+// not a fight). A rat actually in a fight stays that target's only while
+// another rat is free; ratTargetAt falls back to it otherwise.
 func (s *Sim) ratFree(ai *NpcAI, sec string) bool {
 	switch ai.State {
 	case NpcIdle, "":
@@ -587,8 +690,8 @@ func (s *Sim) ratFree(ai *NpcAI, sec string) bool {
 			return false
 		}
 		effAggro, _ := npcTemperament(sec, def)
-		pp, ok := s.posOf(s.player)
-		return !ok || ai.Home.Dist(pp) > npcLeashFactor*effAggro
+		tp, ok := s.posOf(ai.Target)
+		return !ok || ai.Home.Dist(tp) > npcLeashFactor*effAggro
 	}
 	return false
 }
@@ -596,9 +699,11 @@ func (s *Sim) ratFree(ai *NpcAI, sec string) bool {
 // guardEngageRat drives a static high-sec guard onto a belt rat: close to
 // orbit range, lock, and fire through the normal module pipeline. The
 // guard's AI state stays idle — guards remain friendly on the overview and
-// the player-centric state machine above is untouched — and the target is
-// recomputed from world state every tick, so a killed rat needs no cleanup:
-// the next tick finds the next rat or resumes the idle patrol.
+// only ever enter the threat machine to self-defend against the player —
+// and the target is recomputed from world state every tick, so a killed rat
+// needs no cleanup: the next tick finds the next rat or resumes the idle
+// patrol. This is also the coverage a mining op gets: a rat mid-attack on a
+// miner anchored here is just a rat at the guard's celestial.
 func (s *Sim) guardEngageRat(e ecs.Entity, ai *NpcAI, tr *Transform, rat ecs.Entity, def *content.NpcDef) {
 	rp, ok := s.posOf(rat)
 	if !ok {
@@ -616,9 +721,9 @@ func (s *Sim) guardEngageRat(e ecs.Entity, ai *NpcAI, tr *Transform, rat ecs.Ent
 
 // ratDefend points an idle rat's weapons at the security ship clearing it —
 // the trafficRaidersAct pattern (an idle NPC's weapons are driven at an
-// explicit target without touching its AI state). The rat's own state
-// machine stays player-centric, so its return fire can never pull it onto
-// the player; it fights the patrol to the death while it lives.
+// explicit target without touching its AI state). A rat that takes the
+// guard's fire also aggros it through the machine's damage trigger (b); this
+// gives it return fire on the first lock, before that damage lands.
 //
 // No retargetWeapons here: several security ships can work one rat, and
 // re-pointing a running gun between them every tick would churn
@@ -670,9 +775,9 @@ func (s *Sim) recentPlayerWorkNear(home core.Vec2) bool {
 
 // npcEnterFlee switches an NPC into the flee state, recording the flee
 // start time in the (otherwise unused) manual-intent Range field.
-func (s *Sim) npcEnterFlee(e ecs.Entity, ai *NpcAI, tr *Transform, pPos core.Vec2) {
+func (s *Sim) npcEnterFlee(e ecs.Entity, ai *NpcAI, tr *Transform, awayFrom core.Vec2) {
 	ai.State = NpcFlee
-	away := tr.Pos.Sub(pPos)
+	away := tr.Pos.Sub(awayFrom)
 	if away.IsZero() {
 		away = core.Vec2{X: 1}
 	}
@@ -680,7 +785,7 @@ func (s *Sim) npcEnterFlee(e ecs.Entity, ai *NpcAI, tr *Transform, pPos core.Vec
 	s.log(SevInfo, e, s.nameOf(e)+" is fleeing")
 }
 
-// npcEnsureLock starts locking the player if the NPC is not already.
+// npcEnsureLock starts locking target if the NPC is not already.
 func (s *Sim) npcEnsureLock(e, target ecs.Entity) {
 	tg, ok := s.Targetings.Get(e)
 	if !ok {
@@ -701,10 +806,10 @@ func (s *Sim) npcEnsureLock(e, target ecs.Entity) {
 // explicit target: weapons and ewar once the target is locked and in range,
 // mining lasers on a rock (no lock needed), tank when damaged, cap booster
 // when low, afterburner while fleeing.
-// Failures are silent (quiet). systemNpc passes the player; the traffic
-// system passes the ambushed hauler or an attacking patrol, which is what
-// makes NPC-vs-NPC combat run through the normal lock/activate/turret/
-// damage pipeline.
+// Failures are silent (quiet). systemNpc passes whatever its threat machine
+// resolved (the player or another NPC); the traffic system passes the
+// ambushed hauler or an attacking patrol — both run NPC-vs-NPC combat
+// through the normal lock/activate/turret/damage pipeline.
 func (s *Sim) npcActivate(e ecs.Entity, ai *NpcAI, target ecs.Entity) {
 	fit, ok := s.Fittings.Get(e)
 	if !ok {
