@@ -196,11 +196,13 @@ func (sc *HelpScene) Draw(dst *ebiten.Image) {
 // MenuScene (Esc)
 // ---------------------------------------------------------------------------
 
-// menuItems are the Esc menu buttons, in draw order.
-var menuItems = []string{"Resume", "Save", "Save as…", "Load", "Quit"}
+// menuItems are the Esc menu buttons, in draw order. Settings is the
+// in-game mouse path to the settings window (the rail no longer
+// launches it).
+var menuItems = []string{"Resume", "Save", "Save as…", "Load", "Settings", "Quit"}
 
 // MenuScene is the Esc menu: a small modal uikit window with Resume /
-// Save / Load / Quit. Scene and window toggle together.
+// Save / Load / Settings / Quit. Scene and window toggle together.
 type MenuScene struct{ g *Game }
 
 // OnEnter implements Scene: mounts the menu window.
@@ -263,6 +265,15 @@ func (g *Game) buildMenuWindow() *widget.Window {
 			g.report(err, "Saved as "+filepath.Base(g.activeSavePath()))
 		},
 		"Load": func() { g.Do(widgets.Load{}) },
+		"Settings": func() {
+			// Leave the pause menu first (it is modal and dims the
+			// screen), the way Resume does, then ensure-show Settings:
+			// SetOpen(true) never flips an already-open window shut, so
+			// Settings behind the menu stays open — this entry enters
+			// Settings, it does not toggle it.
+			g.Do(widgets.Toggle{Screen: "Menu"})
+			g.host.SetOpen(idSettings, true)
+		},
 		"Quit": func() { g.Do(widgets.Quit{}) },
 	}
 	for _, item := range menuItems {

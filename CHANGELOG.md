@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Settings opens from the Esc menu** — the pause menu gained a **Settings**
+  entry (Resume / Save / Save as… / Load / Settings / Quit): the in-game
+  mouse path to the settings window now the rail no longer launches it.
+  Clicking it leaves the pause menu with Settings showing, and never flips an
+  already-open Settings shut.
+
 - **Relicensed to the European Union Public Licence 1.2** — the LICENSE file
   now carries the official EUPL-1.2 text, and the in-game credits screen and
   title footer say EUPL 1.2 (a test pins the phrase in both, so they cannot

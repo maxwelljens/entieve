@@ -529,3 +529,59 @@ func TestEscMenuSaveAsButton(t *testing.T) {
 		t.Errorf("active save after Save as… = %q", g.activeSavePath())
 	}
 }
+
+// TestEscMenuSettingsEntry: the pause menu offers Settings — the in-game
+// mouse path to the settings window now the rail no longer launches it —
+// and clicking it leaves the pause menu with Settings showing. The
+// already-open case must not flip Settings shut (it is entered FROM the
+// menu, never toggled by it).
+func TestEscMenuSettingsEntry(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+
+	// Entry exists: the menu builds one button per menuItems row.
+	g.push(&MenuScene{g: g})
+	g.syncMounts()
+	if err := g.kit.Update(); err != nil {
+		t.Fatalf("kit.Update: %v", err)
+	}
+	btn := menuButton(t, g, "Settings")
+	if btn == nil {
+		t.Fatal("no Settings button in the Esc menu")
+	}
+	if g.host.IsOpen(idSettings) {
+		t.Fatal("fixture: settings already open before the click")
+	}
+	btn.ClickedEvent.Fire(&widget.ButtonClickedEventArgs{Button: btn})
+	if err := g.Update(); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if _, top := g.top().(*MenuScene); top {
+		t.Error("Settings click left the pause menu on top")
+	}
+	if !g.host.IsOpen(idSettings) {
+		t.Error("Settings click did not open the settings window")
+	}
+
+	// Settings open behind the menu: the click closes the menu and KEEPS
+	// Settings open (SetOpen(true) is ensure-show, never a flip).
+	g.push(&MenuScene{g: g})
+	g.syncMounts()
+	if err := g.kit.Update(); err != nil {
+		t.Fatalf("kit.Update (2): %v", err)
+	}
+	btn = menuButton(t, g, "Settings")
+	if btn == nil {
+		t.Fatal("no Settings button in the second menu")
+	}
+	btn.ClickedEvent.Fire(&widget.ButtonClickedEventArgs{Button: btn})
+	if err := g.Update(); err != nil {
+		t.Fatalf("Update (2): %v", err)
+	}
+	if _, top := g.top().(*MenuScene); top {
+		t.Error("second Settings click left the pause menu on top")
+	}
+	if !g.host.IsOpen(idSettings) {
+		t.Error("second Settings click closed an already-open settings window")
+	}
+}

@@ -48,7 +48,7 @@ rebindable (see **Keybindings** below); the global chords (`Esc`, `Ctrl+S`,
 | `H` | Toggle help window |
 | `P` | Toggle settings (UI scale, display, rail, layout) |
 | `K` | Toggle finances window (holdings and transactions) |
-| `Esc` | Menu: Resume / Save / Save as… / Load / Quit |
+| `Esc` | Menu: Resume / Save / Save as… / Load / Settings / Quit |
 | `[` or `-` | Time acceleration down (8 → 4 → 2 → 1×) |
 | `]` or `=` | Time acceleration up (1 → 2 → 4 → 8×) |
 | `Ctrl+S` | Save game |
@@ -159,8 +159,9 @@ tab — a setting that persists as `rail_collapsed` in
 and the module rack are permanent ship chrome and have no rail entries, and
 the Esc menu keeps its own key — the rail is not its launcher. **Settings**
 and **Keybindings** are not rail launchers either: Settings keeps its key
-(`P`) and its title-menu row, and Keybindings is opened from the Settings
-window's **Keybindings…** button only.
+(`P`), its title-menu row and a **Settings** entry in the Esc menu (the
+in-game mouse path), and Keybindings is opened from the Settings window's
+**Keybindings…** button only.
 
 The **Settings**
 window (`P`) holds the **UI scale** slider — a notched track over the six
