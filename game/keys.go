@@ -112,7 +112,7 @@ func init() {
 
 // fixedRows is the fixed chord layer as the window's informational
 // section: one row per fixed ACTION in KeyMap order, its keys joined
-// ("[ / -"). Derived from KeyMap (which screens.go's init assigns after
+// ("[ · -"). Derived from KeyMap (which screens.go's init assigns after
 // this file's), never a second hand-written list.
 var fixedRows []keyAction
 
@@ -128,40 +128,30 @@ func fixedKeyRows() []keyAction {
 		if !fixedActions[b.Action] {
 			continue
 		}
+		keys := chordOf(b.Key, b.Shift, b.Ctrl)
 		if i, ok := at[b.Action]; ok {
-			fixedRows[i].Keys += " · " + chordText(b.Desc)
+			fixedRows[i].Keys += " · " + keys
 			continue
 		}
 		at[b.Action] = len(fixedRows)
 		fixedRows = append(fixedRows, keyAction{
 			ID:    b.Action,
-			Label: actionLabel(b.Desc),
+			Label: actionLabel(descOf(b.Action)),
 			Group: groupFixed,
-			Keys:  chordText(b.Desc),
+			Keys:  keys,
 		})
 	}
 	return fixedRows
 }
 
-// chordText is a KeyMap row's key text: the part before the em dash, which
-// is how the chord is documented ("Ctrl+S", "[", "Esc") — the fixed layer
-// shows it verbatim, modifiers included.
-func chordText(desc string) string {
-	key, _, _ := strings.Cut(desc, " — ")
-	return key
-}
-
-// actionLabel turns a KeyMap description into a row label: the text after
-// the em dash, without the trailing parenthetical.
+// actionLabel turns a description into a row label: the text without its
+// trailing parenthetical ("toggle market window (trade while docked)" →
+// "toggle market window").
 func actionLabel(desc string) string {
-	_, d, ok := strings.Cut(desc, " — ")
-	if !ok {
-		return desc
+	if i := strings.Index(desc, " ("); i > 0 {
+		return desc[:i]
 	}
-	if i := strings.Index(d, " ("); i > 0 {
-		d = d[:i]
-	}
-	return d
+	return desc
 }
 
 // keysFile is the overrides sidecar document.
@@ -370,8 +360,8 @@ func (g *Game) keybindRows() []uikit.KeybindRow {
 	rows := make([]uikit.KeybindRow, 0, len(keyActions)+len(fixedKeyRows()))
 	for _, a := range keyActions {
 		row := uikit.KeybindRow{Action: a.ID, Label: a.Label, Group: a.Group}
+		row.Key = g.hints.Chord(a.ID) // "" while unbound: the chip draws "—"
 		if b, ok := g.binds[a.ID]; ok {
-			row.Key = bindText(b)
 			row.Rebound = b != a.Def
 		}
 		if g.captureAction == a.ID {
@@ -386,24 +376,6 @@ func (g *Game) keybindRows() []uikit.KeybindRow {
 		})
 	}
 	return rows
-}
-
-// liveKeyLabel is an action's display key when the player changed it:
-// "" for an unchanged default or a fixed chord, "—" when unbound.
-func (g *Game) liveKeyLabel(action string) string {
-	def, ok := defaultBinds[action]
-	if !ok {
-		return ""
-	}
-	cur, bound := g.binds[action]
-	switch {
-	case !bound:
-		return "—"
-	case cur == def:
-		return ""
-	default:
-		return bindText(cur)
-	}
 }
 
 // refreshHelp re-renders an already-built help overlay with the live keys.
@@ -425,8 +397,10 @@ func reservedKey(k ebiten.Key) bool {
 	return false
 }
 
-// keyText is a key's display name (arrow keys read as words, the rest as
-// ebiten names them).
+// keyText is a key's display name (arrow keys read as words, the fixed
+// layer's punctuation as the glyph it is, the rest as ebiten names them).
+// Nothing rebindable can reach Esc, F9 or the punctuation keys
+// (reservedKey), so their short names never collide with a stored name.
 func keyText(k ebiten.Key) string {
 	switch k {
 	case ebiten.KeyArrowUp:
@@ -437,16 +411,32 @@ func keyText(k ebiten.Key) string {
 		return "Left arrow"
 	case ebiten.KeyArrowRight:
 		return "Right arrow"
+	case ebiten.KeyEscape:
+		return "Esc"
+	case ebiten.KeyBracketLeft:
+		return "["
+	case ebiten.KeyBracketRight:
+		return "]"
+	case ebiten.KeyMinus:
+		return "-"
+	case ebiten.KeyEqual:
+		return "="
 	}
 	return k.String()
 }
 
-// bindText is a combination's display text ("Shift+Q").
-func bindText(b binding) string {
-	if b.Shift {
-		return "Shift+" + keyText(b.Key)
+// chordOf is a combination's display text — the ONE chord formatter the
+// KeyMap, the help overlay, the keybindings chips and the rail hints
+// agree on ("Ctrl+S", "Shift+L", "Esc", "F1", "[").
+func chordOf(k ebiten.Key, shift, ctrl bool) string {
+	s := keyText(k)
+	if shift {
+		s = "Shift+" + s
 	}
-	return keyText(b.Key)
+	if ctrl {
+		s = "Ctrl+" + s
+	}
+	return s
 }
 
 // keyByName maps ebiten's key names back to keys (the sidecar's spelling).
@@ -468,21 +458,19 @@ func parseKey(name string) (ebiten.Key, bool) {
 	return k, ok
 }
 
-// helpRowsFor converts KeyMap into the help panel's row shape, with the
-// session's live keys in place of the unchanged defaults (nil = defaults).
+// helpRowsFor converts KeyMap into the help panel's row shape: the chord a
+// row declares, replaced by the session's live binding for a rebindable
+// action ("—" while it is unbound), and the description-only text.
 func helpRowsFor(g *Game) []uikit.KeyRow {
 	rows := make([]uikit.KeyRow, 0, len(KeyMap))
 	for _, b := range KeyMap {
-		key, desc := b.Desc, ""
-		if i := strings.Index(b.Desc, " — "); i >= 0 {
-			key, desc = b.Desc[:i], b.Desc[i+len(" — "):]
-		}
-		if g != nil {
-			if live := g.liveKeyLabel(b.Action); live != "" {
-				key = live
+		key := chordOf(b.Key, b.Shift, b.Ctrl)
+		if _, rebindable := defaultBinds[b.Action]; rebindable && g != nil {
+			if key = g.hints.Chord(b.Action); key == "" {
+				key = "—"
 			}
 		}
-		rows = append(rows, uikit.KeyRow{Key: key, Desc: desc})
+		rows = append(rows, uikit.KeyRow{Key: key, Desc: descOf(b.Action)})
 	}
 	return rows
 }

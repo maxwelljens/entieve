@@ -8,7 +8,7 @@ import (
 // Binding documents one keyboard binding. KeyMap is the default table the
 // live key layer (game/keys.go) overlays the player's overrides onto; the
 // help overlay and docs/GAMEPLAY.md read these rows (the help overlay
-// substitutes the live key when the player rebound an action).
+// asks the live binding table for the action's current chord).
 //
 // Conflict resolutions (documented): F1–F8 are high-slot module toggles, so
 // the classic "F5 save" moved to Ctrl+S (F9 load kept: no conflict). "M" is
@@ -18,7 +18,7 @@ type Binding struct {
 	Shift  bool
 	Ctrl   bool
 	Action string // stable action id
-	Desc   string // help-overlay text
+	Desc   string // "chord — description" in KeyMap; description ONLY in the tables below
 }
 
 // KeyMap lists every keyboard binding: the world bindings (the ship, the
@@ -33,39 +33,41 @@ type Binding struct {
 var KeyMap []Binding
 
 // worldKeyMap is the hand-written half of KeyMap: bindings that belong to
-// the world and the session, not to a window. The screen toggles
+// the world and the session, not to a window. Its Desc is the DESCRIPTION
+// only — keyMapRows (screens.go) composes the chord in front of it, so a
+// hint can never quote a key baked into a string. The screen toggles
 // (screens.go) follow it in KeyMap.
 var worldKeyMap = []Binding{
-	{Key: ebiten.KeyTab, Action: "lock-nearest", Desc: "Tab — cycle-lock nearest target"},
-	{Key: ebiten.KeyTab, Shift: true, Action: "lock-selected", Desc: "Shift+Tab — lock selected target"},
-	{Key: ebiten.KeyF1, Action: "high-1", Desc: "F1 — toggle high slot 1"},
-	{Key: ebiten.KeyF2, Action: "high-2", Desc: "F2 — toggle high slot 2"},
-	{Key: ebiten.KeyF3, Action: "high-3", Desc: "F3 — toggle high slot 3"},
-	{Key: ebiten.KeyF4, Action: "high-4", Desc: "F4 — toggle high slot 4"},
-	{Key: ebiten.KeyF5, Action: "high-5", Desc: "F5 — toggle high slot 5"},
-	{Key: ebiten.KeyF6, Action: "high-6", Desc: "F6 — toggle high slot 6"},
-	{Key: ebiten.KeyF7, Action: "high-7", Desc: "F7 — toggle high slot 7"},
-	{Key: ebiten.KeyF8, Action: "high-8", Desc: "F8 — toggle high slot 8"},
-	{Key: ebiten.KeyA, Action: "approach", Desc: "A — approach selected"},
-	{Key: ebiten.KeyQ, Action: "orbit", Desc: "Q — orbit selected (at the Selected Item orbit range)"},
-	{Key: ebiten.KeyS, Action: "stop", Desc: "S — stop"},
-	{Key: ebiten.KeyW, Action: "align", Desc: "W — align to selected"},
-	{Key: ebiten.KeyZ, Action: "warp", Desc: "Z — warp to selected (at the Selected Item warp range)"},
-	{Key: ebiten.KeyD, Action: "dock", Desc: "D — dock (selected station, else nearest)"},
-	{Key: ebiten.KeyJ, Action: "jump", Desc: "J — jump through gate (selected, else nearest)"},
-	{Key: ebiten.KeyL, Action: "loot", Desc: "L — loot nearest wreck"},
-	{Key: ebiten.KeyM, Action: "mine", Desc: "M — mine selected asteroid"},
-	{Key: ebiten.KeyBracketLeft, Action: "time-slower", Desc: "[ — time acceleration down"},
-	{Key: ebiten.KeyMinus, Action: "time-slower", Desc: "- — time acceleration down"},
-	{Key: ebiten.KeyBracketRight, Action: "time-faster", Desc: "] — time acceleration up"},
-	{Key: ebiten.KeyEqual, Action: "time-faster", Desc: "= — time acceleration up"},
-	{Key: ebiten.KeyS, Ctrl: true, Action: "save", Desc: "Ctrl+S — save game"},
-	{Key: ebiten.KeyF, Ctrl: true, Action: "market-search", Desc: "Ctrl+F — find in the market"},
-	{Key: ebiten.KeyF9, Action: "load", Desc: "F9 — load game"},
-	{Key: ebiten.KeyArrowUp, Action: "pan-up", Desc: "Up arrow — pan camera up"},
-	{Key: ebiten.KeyArrowDown, Action: "pan-down", Desc: "Down arrow — pan camera down"},
-	{Key: ebiten.KeyArrowLeft, Action: "pan-left", Desc: "Left arrow — pan camera left"},
-	{Key: ebiten.KeyArrowRight, Action: "pan-right", Desc: "Right arrow — pan camera right"},
+	{Key: ebiten.KeyTab, Action: "lock-nearest", Desc: "cycle-lock nearest target"},
+	{Key: ebiten.KeyTab, Shift: true, Action: "lock-selected", Desc: "lock selected target"},
+	{Key: ebiten.KeyF1, Action: "high-1", Desc: "toggle high slot 1"},
+	{Key: ebiten.KeyF2, Action: "high-2", Desc: "toggle high slot 2"},
+	{Key: ebiten.KeyF3, Action: "high-3", Desc: "toggle high slot 3"},
+	{Key: ebiten.KeyF4, Action: "high-4", Desc: "toggle high slot 4"},
+	{Key: ebiten.KeyF5, Action: "high-5", Desc: "toggle high slot 5"},
+	{Key: ebiten.KeyF6, Action: "high-6", Desc: "toggle high slot 6"},
+	{Key: ebiten.KeyF7, Action: "high-7", Desc: "toggle high slot 7"},
+	{Key: ebiten.KeyF8, Action: "high-8", Desc: "toggle high slot 8"},
+	{Key: ebiten.KeyA, Action: "approach", Desc: "approach selected"},
+	{Key: ebiten.KeyQ, Action: "orbit", Desc: "orbit selected (at the Selected Item orbit range)"},
+	{Key: ebiten.KeyS, Action: "stop", Desc: "stop"},
+	{Key: ebiten.KeyW, Action: "align", Desc: "align to selected"},
+	{Key: ebiten.KeyZ, Action: "warp", Desc: "warp to selected (at the Selected Item warp range)"},
+	{Key: ebiten.KeyD, Action: "dock", Desc: "dock (selected station, else nearest)"},
+	{Key: ebiten.KeyJ, Action: "jump", Desc: "jump through gate (selected, else nearest)"},
+	{Key: ebiten.KeyL, Action: "loot", Desc: "loot nearest wreck"},
+	{Key: ebiten.KeyM, Action: "mine", Desc: "mine selected asteroid"},
+	{Key: ebiten.KeyBracketLeft, Action: "time-slower", Desc: "time acceleration down"},
+	{Key: ebiten.KeyMinus, Action: "time-slower", Desc: "time acceleration down"},
+	{Key: ebiten.KeyBracketRight, Action: "time-faster", Desc: "time acceleration up"},
+	{Key: ebiten.KeyEqual, Action: "time-faster", Desc: "time acceleration up"},
+	{Key: ebiten.KeyS, Ctrl: true, Action: "save", Desc: "save game"},
+	{Key: ebiten.KeyF, Ctrl: true, Action: "market-search", Desc: "find in the market"},
+	{Key: ebiten.KeyF9, Action: "load", Desc: "load game"},
+	{Key: ebiten.KeyArrowUp, Action: "pan-up", Desc: "pan camera up"},
+	{Key: ebiten.KeyArrowDown, Action: "pan-down", Desc: "pan camera down"},
+	{Key: ebiten.KeyArrowLeft, Action: "pan-left", Desc: "pan camera left"},
+	{Key: ebiten.KeyArrowRight, Action: "pan-right", Desc: "pan camera right"},
 }
 
 // MouseBinding documents one mouse gesture for the help overlay.

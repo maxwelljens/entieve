@@ -116,8 +116,12 @@ const (
 //	Key, Shift    the toggle binding's DEFAULT (keyNone = none); Action +
 //	              Desc are the KeyMap row that derives from it, which is
 //	              also what the help overlay renders and what the rail's
-//	              tooltip quotes as its hint. The live binding is the
-//	              default overlaid with the player's overrides
+//	              tooltip quotes as its hint. Desc is the DESCRIPTION
+//	              only ("toggle inventory"): keyMapRow composes the chord
+//	              in front of it, and the live key comes from the binding
+//	              table (game/keyhints.go), so no surface ever quotes a
+//	              chord frozen at declaration time. The live binding is
+//	              the default overlaid with the player's overrides
 //	              (game/keys.go) — pressScreen resolves by Action. A MODAL
 //	              screen's key is wired to its scene instead (Esc → onEscape,
 //	              H → help), so Modal rows are never flag-toggled here
@@ -172,14 +176,14 @@ var screens = []Screen{
 		// own declared default (uikit.NewInventory's landing rect), not in
 		// a composed docked band.
 		ID: idInventory, Title: "Inventory", Icon: "svc_inventory",
-		Key: ebiten.KeyI, Action: "inventory", Desc: "I — toggle inventory",
+		Key: ebiten.KeyI, Action: "inventory", Desc: "toggle inventory",
 		DefaultRect: image.Rect(396, 256, 716, 690), Anchor: AnchorFixed,
 		DockPolicy: DockFloating, Group: "Trade",
 		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewInventory(h.services.Env) },
 	},
 	{
 		ID: idFitting, Title: "Fitting", Icon: "svc_fitting",
-		Key: ebiten.KeyF, Action: "fitting", Desc: "F — toggle fitting",
+		Key: ebiten.KeyF, Action: "fitting", Desc: "toggle fitting",
 		DefaultRect: image.Rect(370, 8, 1014, 690), Anchor: AnchorFixed,
 		DockPolicy: DockFloating,
 		Group:      "Ship", Service: "fitting",
@@ -192,7 +196,7 @@ var screens = []Screen{
 		// minimum. Docked or in space it opens here; the old docked band
 		// stretched it across the viewport.
 		ID: idMarket, Title: "Market", Icon: "svc_market",
-		Key: ebiten.KeyG, Action: "market", Desc: "G — toggle market window (trade while docked)",
+		Key: ebiten.KeyG, Action: "market", Desc: "toggle market window (trade while docked)",
 		DefaultRect: image.Rect(97, 8, 857, 568), Anchor: AnchorFixed,
 		DockPolicy: DockFloating,
 		Group:      "Trade", Service: "market",
@@ -203,7 +207,7 @@ var screens = []Screen{
 		// centres like the overlays on first open (its Screen row carries
 		// no Anchor, so the centred fallback applies).
 		ID: idManufacturing, Title: "Manufacturing", Icon: "svc_manufacturing",
-		Key: ebiten.KeyB, Action: "manufacturing", Desc: "B — toggle manufacturing window (manufacture while docked)",
+		Key: ebiten.KeyB, Action: "manufacturing", Desc: "toggle manufacturing window (manufacture while docked)",
 		DefaultRect: image.Rect(312, 120, 792, 600),
 		DockPolicy:  DockFloating, DockedOnly: true,
 		Group: "Industry", Service: "industry",
@@ -216,7 +220,7 @@ var screens = []Screen{
 		// log). The x carries the rail inset: the left column (rail,
 		// overview, log, station) all start clear of uikit.RailInset.
 		ID: idScanner, Title: "Scanner", Icon: "svc_scanner",
-		Key: ebiten.KeyC, Action: "scanner", Desc: "C — toggle scanner (off-grid sweep)",
+		Key: ebiten.KeyC, Action: "scanner", Desc: "toggle scanner (off-grid sweep)",
 		DefaultRect: image.Rect(396+uikit.RailInset, 276, 696+uikit.RailInset, 524), // 300×248 (uikit scanW × titleBarH+scanBodyH)
 		Anchor:      AnchorFixed,
 		DockPolicy:  DockFloating, SpaceOnly: true,
@@ -228,7 +232,7 @@ var screens = []Screen{
 		// keyed row, and the graph's own hover/select/destination live in
 		// the view (uikit/screens/mapview.go).
 		ID: idMap, Title: "Starmap", Icon: "svc_map",
-		Key: ebiten.KeyN, Action: "starmap", Desc: "N — toggle starmap",
+		Key: ebiten.KeyN, Action: "starmap", Desc: "toggle starmap",
 		DefaultRect: image.Rect(160, 80, 870, 634), // uikit.NewMapView's landing rect
 		DockPolicy:  DockFloating,
 		Group:       "World",
@@ -239,7 +243,7 @@ var screens = []Screen{
 		// its rows (uikit.NewHelp), so the rect declares the top inset
 		// and the design viewport edges only.
 		ID: idHelp, Title: "Help", Icon: "svc_help",
-		Key: ebiten.KeyH, Action: "help", Desc: "H — toggle help",
+		Key: ebiten.KeyH, Action: "help", Desc: "toggle help",
 		DefaultRect: image.Rect(0, 24, defaultW, defaultH),
 		Anchor:      AnchorTopCenter,
 		DockPolicy:  DockFloating, Modal: true,
@@ -254,7 +258,7 @@ var screens = []Screen{
 		// content floor (its overlap with the HUD pair at the 1024×700
 		// minimum is inherent — see TestVirginPlacementTable).
 		ID: idLog, Title: "Log", Icon: "svc_log",
-		Key: ebiten.KeyL, Shift: true, Action: "log", Desc: "Shift+L — toggle log window",
+		Key: ebiten.KeyL, Shift: true, Action: "log", Desc: "toggle log window",
 		DefaultRect: image.Rect(10+uikit.RailInset, defaultH-10-240, 10+264, defaultH-10),
 		Anchor:      AnchorBottomLeft,
 		DockPolicy:  DockFloating,
@@ -266,7 +270,7 @@ var screens = []Screen{
 		// state (scale ladder, fullscreen, vsync, rail, audio volumes,
 		// shuffle, resets) is re-read from the action bundle in Sync.
 		ID: idSettings, Title: "Settings", Icon: "kind_unknown",
-		Key: ebiten.KeyP, Action: "settings", Desc: "P — toggle settings (UI scale, display, layout)",
+		Key: ebiten.KeyP, Action: "settings", Desc: "toggle settings (UI scale, display, layout)",
 		DefaultRect: image.Rect(450, 106, 830, 614), // uikit.NewSettings' landing rect
 		DockPolicy:  DockFloating, InTitle: true,
 		Group: "Help & System",
@@ -305,7 +309,7 @@ var screens = []Screen{
 		// space and docked alike (nothing in it needs a station service).
 		// K: F and G already belong to fitting and market.
 		ID: idFinances, Title: "Finances", Icon: "svc_finances",
-		Key: ebiten.KeyK, Action: "finances", Desc: "K — toggle finances window (holdings and transactions)",
+		Key: ebiten.KeyK, Action: "finances", Desc: "toggle finances window (holdings and transactions)",
 		DefaultRect: image.Rect(312, 170, 712, 530),
 		DockPolicy:  DockFloating,
 		Group:       "Trade",
@@ -317,7 +321,7 @@ var screens = []Screen{
 		// next key assigns. The fixed chord layer is not listed (it never
 		// rebinds). O: the remaining free letter near the UI cluster.
 		ID: idKeybindings, Title: "Keybindings", Icon: "svc_help",
-		Key: ebiten.KeyO, Action: "keybindings", Desc: "O — toggle keybindings (rebind screen and world keys)",
+		Key: ebiten.KeyO, Action: "keybindings", Desc: "toggle keybindings (rebind screen and world keys)",
 		DefaultRect: image.Rect(0, 0, 480, 640), // uikit.NewKeybindings' content floor
 		DockPolicy:  DockFloating, InTitle: true,
 		Group: "Help & System",
@@ -331,7 +335,7 @@ var screens = []Screen{
 		// cannot reopen it. It is deliberately NOT in the rail: the pause
 		// menu keeps its key and its function.
 		ID: idMenu, Title: "Menu",
-		Key: ebiten.KeyEscape, Action: "menu", Desc: "Esc — menu (Resume / Save / Load / Quit)",
+		Key: ebiten.KeyEscape, Action: "menu", Desc: "menu (Resume / Save / Load / Quit)",
 		DefaultRect: image.Rect(0, 0, 240, 304), // buildMenuWindow's landing rect (5 rows)
 		DockPolicy:  DockTransient, Modal: true,
 		Build: func(h *ScreenHost) widgets.WindowPanel { return h.services.Menu() },
@@ -339,11 +343,31 @@ var screens = []Screen{
 }
 
 // init derives the two package-level registries from the spec: the
-// KeyMap toggle rows and the sidecar name list. The rows' Build closures
-// run later (on a host), so nothing here reaches session code.
+// KeyMap rows (composed from the description-only tables) and the sidecar
+// name list. The rows' Build closures run later (on a host), so nothing
+// here reaches session code.
 func init() {
-	KeyMap = slices.Concat(worldKeyMap, screenBindings(screens))
+	KeyMap = keyMapRows(slices.Concat(worldKeyMap, screenBindings(screens)))
 	layoutNames = append(coreLayoutNames(), sidecarNames(screens)...)
+}
+
+// keyMapRow composes one KeyMap row from a description-only declaration:
+// the chord the binding names, the em dash, the description. Every row is
+// built here, so no table can bake a chord into its own text — the rot
+// screenSpecErrors guards against on the Screen spec.
+func keyMapRow(key ebiten.Key, shift, ctrl bool, action, desc string) Binding {
+	return Binding{Key: key, Shift: shift, Ctrl: ctrl, Action: action,
+		Desc: chordOf(key, shift, ctrl) + " — " + desc}
+}
+
+// keyMapRows composes the description-only tables — worldKeyMap and the
+// Screen spec's bindings — into KeyMap rows.
+func keyMapRows(rows []Binding) []Binding {
+	out := make([]Binding, len(rows))
+	for i, b := range rows {
+		out[i] = keyMapRow(b.Key, b.Shift, b.Ctrl, b.Action, b.Desc)
+	}
+	return out
 }
 
 // sidecarNames returns the persisted windows' keys in spec order;
@@ -359,9 +383,9 @@ func sidecarNames(rows []Screen) []string {
 	return names
 }
 
-// screenBindings returns one KeyMap entry per keyed Screen row — the
-// help overlay's toggle rows derive from this (game/input.go appends it
-// to the world bindings).
+// screenBindings returns one description-only KeyMap entry per keyed
+// Screen row — the help overlay's toggle rows derive from this
+// (game/input.go appends it to the world bindings).
 func screenBindings(rows []Screen) []Binding {
 	out := make([]Binding, 0, len(rows))
 	for _, s := range rows {
@@ -501,8 +525,8 @@ func screenSpecErrors(rows []Screen) []string {
 			} else {
 				actions[s.Action] = s.Title
 			}
-			if !strings.Contains(s.Desc, " — ") {
-				add("row %d (%s): desc %q must read \"key — description\" (the help overlay splits it)", i, s.Title, s.Desc)
+			if strings.Contains(s.Desc, " — ") {
+				add("row %d (%s): desc %q carries a chord; the KeyMap row composes it (Desc is the description only)", i, s.Title, s.Desc)
 			}
 			combo := keyCombo{s.Key, s.Shift}
 			if prev, dup := keys[combo]; dup {

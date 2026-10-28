@@ -1071,10 +1071,18 @@ through `sim`'s read side rather than re-derived in `uikit`.
   the title (New game, Continue, a manager load) runs one normal boot
   reconcile. The keyboard map is
   `game.KeyMap` (`game/input.go`, the single source shared with the
-  in-game help overlay `H`) and is documented in `docs/GAMEPLAY.md`. The
+  in-game help overlay `H`) and is documented in `docs/GAMEPLAY.md`. Its
+  rows are composed, not written: the declaration tables (`worldKeyMap`,
+  the Screen spec's `Key`/`Shift`/`Desc`) hold the description only and
+  `keyMapRow` puts the chord in front with the one `chordOf` formatter, so
+  no hint string can go stale on its own — the rendered chord comes from
+  the session's live bindings through `game/keyhints.go` (`Chord`/`Desc`/
+  `Hint`), which the rail tooltip (`RailEntry.Hint`), the keybindings chips
+  and the settings footer (`SettingsActions.CloseHint`) also read. The
   input seam has two layers: the **fixed chord layer** (Esc menu, `Ctrl+S`,
   `Ctrl+F`, `F9`, `[` `]` `-` `=`) is matched literally in
-  `handleKeys`, and the **data layer** — the Screen rows' toggles and the
+  `handleKeys` and answered literally by `keyHints`, and the **data
+  layer** — the Screen rows' toggles and the
   world commands — resolves `(key, shift)` through the session's live
   bindings (`Game.actionFor`, `game/keys.go`: defaults overlaid with the
   `<save>.keys.json` overrides, replace policy).

@@ -32,6 +32,10 @@ type SettingsActions struct {
 	// SetRailCollapsed flips it (the host persists it).
 	RailCollapsed    func() bool
 	SetRailCollapsed func(bool)
+	// CloseHint is the live chord that closes this window ("" while the
+	// action is unbound): the footer's "· P closes" clause follows it, and
+	// an unbound action drops the clause rather than printing a dash.
+	CloseHint func() string
 	// MasterVolume, MusicVolume and UIVolume are whole percents (0..100).
 	// The Set callbacks apply a drag's value live WITHOUT writing the
 	// sidecar; PersistSettings is the release/persist point, so one drag
@@ -88,6 +92,10 @@ type Settings struct {
 	// Delete pattern): the first press swaps the label, the second acts.
 	resetAll   *widget.Button
 	confirmAll bool
+	// hint is the footer line (the apply note plus the live close chord);
+	// hintState is the text it last drew, to keep Sync a compare.
+	hint      *widget.Text
+	hintState string
 }
 
 // NewSettings builds the Settings window over the shared environment.
@@ -217,8 +225,9 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 		s.resetAll.SetText("Reset all settings")
 		act.ResetAll()
 	})
-	hint := widget.NewText(
-		widget.TextOpts.Text("Applies immediately · P closes", s.th.Face(theme.StepTiny), theme.Solid(p.Dim)),
+	s.hintState = hintText(act.CloseHint())
+	s.hint = widget.NewText(
+		widget.TextOpts.Text(s.hintState, s.th.Face(theme.StepTiny), theme.Solid(p.Dim)),
 	)
 
 	body := widget.NewContainer(
@@ -229,7 +238,7 @@ func NewSettings(d theme.Theme, act SettingsActions) *Settings {
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	body.AddChild(s.scaleRow, s.fsBtn, s.railBtn, s.masterRow, s.musicRow, s.uiRow, s.shufBtn, resetBtn, s.resetAll, hint)
+	body.AddChild(s.scaleRow, s.fsBtn, s.railBtn, s.masterRow, s.musicRow, s.uiRow, s.shufBtn, resetBtn, s.resetAll, s.hint)
 
 	title, _ := theme.NewTitleBar(d, "Settings", "")
 
@@ -306,6 +315,18 @@ func (s *Settings) Sync() {
 			s.shufBtn.SetText("Shuffle: off")
 		}
 	}
+	if h := hintText(s.act.CloseHint()); h != s.hintState {
+		s.hintState, s.hint.Label = h, h
+	}
+}
+
+// hintText is the footer line: the apply note, plus the live close chord
+// while the Close action has one.
+func hintText(close string) string {
+	if close == "" {
+		return "Applies immediately"
+	}
+	return "Applies immediately · " + close + " closes"
 }
 
 // ScaleSliderForTest, MasterSliderForTest, MusicSliderForTest and
@@ -316,3 +337,7 @@ func (s *Settings) ScaleSliderForTest() *widgets.Slider  { return s.scaleSlider 
 func (s *Settings) MasterSliderForTest() *widgets.Slider { return s.masterSlide }
 func (s *Settings) MusicSliderForTest() *widgets.Slider  { return s.musicSlide }
 func (s *Settings) UISliderForTest() *widgets.Slider     { return s.uiSlide }
+
+// CloseHintForTest returns the footer line as drawn — the live close chord
+// in place of the construction-time literal.
+func (s *Settings) CloseHintForTest() string { return s.hint.Label }

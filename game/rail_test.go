@@ -22,7 +22,7 @@ import (
 // and the composition that places what the player opens while docked.
 
 // TestRailDerivesFromScreenSpec: every non-transient spec row is
-// exactly one rail entry — its icon, display key and group — in section
+// exactly one rail entry — its icon, live hint and group — in section
 // order, next to the two core windows; the Esc menu, the HUD and the
 // rack have no entries (the pause menu keeps its key, the ship chrome
 // has no window to open), and every entry names a manifest icon.
@@ -69,8 +69,10 @@ func TestRailDerivesFromScreenSpec(t *testing.T) {
 		if e.Icon != s.Icon {
 			t.Errorf("%s: entry icon = %q, spec says %q", s.Title, e.Icon, s.Icon)
 		}
-		if e.Key != keyLabel(s) {
-			t.Errorf("%s: entry key = %q, want %q", s.Title, e.Key, keyLabel(s))
+		if e.Hint == nil {
+			t.Errorf("%s: entry has no live hint closure", s.Title)
+		} else if got, want := e.Hint(), g.hints.Hint(s.Action); got != want {
+			t.Errorf("%s: entry hint = %q, want the live %q", s.Title, got, want)
 		}
 		if e.Group != s.Group {
 			t.Errorf("%s: entry group = %q, spec says %q", s.Title, e.Group, s.Group)

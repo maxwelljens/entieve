@@ -36,7 +36,7 @@ func screenByID(id ScreenID) Screen { return screens[screenIndex(id)] }
 func withFixture() []Screen {
 	fixture := Screen{
 		ID: "fixture", Title: "Fixture", Icon: "svc_inventory",
-		Key: ebiten.KeyV, Action: "fixture", Desc: "V — toggle fixture",
+		Key: ebiten.KeyV, Action: "fixture", Desc: "toggle fixture",
 		DefaultRect: image.Rect(0, 0, defaultW, defaultH),
 		DockPolicy:  DockFloating, Group: "Trade",
 		Build: func(*ScreenHost) widgets.WindowPanel { return nil },
@@ -77,7 +77,7 @@ func TestScreenSpecRejectsMalformedRows(t *testing.T) {
 		{"key without an action id", func(r []Screen) { r[0].Action = "" }, "without an action id"},
 		{"duplicate action id", func(r []Screen) { r[1].Action = "inventory" }, "already used by"},
 		{"help text without a key", func(r []Screen) { r[0].Key = keyNone }, "help text without a key binding"},
-		{"desc without the em dash", func(r []Screen) { r[0].Desc = "toggle inventory" }, "must read"},
+		{"desc with a baked key", func(r []Screen) { r[0].Desc = "I — toggle inventory" }, "carries a chord"},
 		{"missing rail group", func(r []Screen) { r[0].Group = "" }, "missing rail group"},
 		{"unknown rail group", func(r []Screen) { r[0].Group = "Cargo Bay" }, "unknown rail group"},
 		{"transient row claiming a group", func(r []Screen) { r[screenIndex(idMenu)].Group = "Ship" }, "transient screen must not carry"},

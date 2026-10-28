@@ -58,12 +58,13 @@ func TestKeyMapWellFormed(t *testing.T) {
 }
 
 // TestKeyMapScreenRowsDeriveFromSpec: the screen toggles in KeyMap are
-// the Screen spec's rows — one binding per keyed row, byte-identical to
-// its declaration, no other binding claims a screen action, and the help
-// overlay renders exactly those rows. A new keyed Screen shows up in the
-// help window without touching this file.
+// the Screen spec's rows — one binding per keyed row, its chord the one
+// chordOf composes from the declared key and its description the spec's
+// own text, no other binding claims a screen action, and the help overlay
+// renders exactly those rows. A new keyed Screen shows up in the help
+// window without touching this file.
 func TestKeyMapScreenRowsDeriveFromSpec(t *testing.T) {
-	derived := screenBindings(screens)
+	derived := keyMapRows(screenBindings(screens))
 	for _, b := range derived {
 		if n := countBinding(KeyMap, b); n != 1 {
 			t.Errorf("screen binding %+v appears %d times in KeyMap, want 1", b, n)
@@ -84,13 +85,13 @@ func TestKeyMapScreenRowsDeriveFromSpec(t *testing.T) {
 	if rows != len(derived) {
 		t.Errorf("KeyMap carries %d screen rows, want %d", rows, len(derived))
 	}
-	// helpRows splits KeyMap on the em dash: the spec's text lands whole.
+	// The chord is composed and the description is the spec's text alone:
+	// the help overlay renders both, nothing is parsed back out of a row.
 	help := helpRows()
 	for _, b := range derived {
-		key, desc, ok := strings.Cut(b.Desc, " — ")
-		if !ok {
-			t.Errorf("binding %q does not read \"key — description\"", b.Desc)
-			continue
+		key, desc := chordOf(b.Key, b.Shift, b.Ctrl), descOf(b.Action)
+		if strings.Contains(desc, " — ") {
+			t.Errorf("spec description %q carries a chord", desc)
 		}
 		if !slices.Contains(help, uikit.KeyRow{Key: key, Desc: desc}) {
 			t.Errorf("help rows lack the spec's row %q — %q", key, desc)

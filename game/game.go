@@ -146,6 +146,10 @@ type Game struct {
 	binds         map[string]binding
 	captureAction string
 	keyNotice     string
+	// hints answers every rendered key line from the live binds
+	// (game/keyhints.go): the rail tip, the settings footer and the help
+	// rows read it instead of a chord baked into a string.
+	hints keyHints
 
 	// The station window's contract board (contracts.go): the body, the
 	// two row sections, the signature of the last rebuild and the
@@ -266,6 +270,7 @@ func New(opts Options) (*Game, error) {
 	g.applyAudioSettings()
 	g.music.Start() // a real engine's Play is pending until the device opens
 	g.loadKeys()    // <SavePath>.keys.json: the keybinding overrides
+	g.hints = keyHints{g: g}
 	theme.SetScale(g.uiScale * g.dev)
 	g.w = int(math.Round(float64(defaultW) * g.dev))
 	g.h = int(math.Round(float64(defaultH) * g.dev))
@@ -849,6 +854,7 @@ func (g *Game) gameServices() screenServices {
 			SetFullscreen:    func(on bool) { g.setFullscreen(on) },
 			RailCollapsed:    func() bool { return g.railCollapsed },
 			SetRailCollapsed: func(on bool) { g.setRailCollapsed(on) },
+			CloseHint:        func() string { return g.hints.Chord("settings") }, // the settings Screen row's action
 			MasterVolume:     func() int { return g.masterVol },
 			SetMasterVolume:  func(v int) { g.setMasterVolume(v) },
 			MusicVolume:      func() int { return g.musicVol },
@@ -951,8 +957,8 @@ func (g *Game) placeDefaults(w, h int) {
 }
 
 // helpRows converts KeyMap into the help panel's row shape (the shared
-// "key — description" strings split on the em dash). The session variant
-// (helpRowsFor) overlays the player's overrides.
+// "key — description" rows, description-only tables composed). The
+// session variant (helpRowsFor) uses the live keys.
 func helpRows() []uikit.KeyRow { return helpRowsFor(nil) }
 
 // ---------------------------------------------------------------------------
