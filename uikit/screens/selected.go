@@ -163,18 +163,7 @@ func (k *Kit) buildSelected() {
 	}
 	body.AddChild(sp.orbitRange, sp.warpRange)
 
-	title := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.WindowTitleBox(theme.Solid(p.BGHard), theme.NRGBA(p.Border, 200))),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-	)
-	spTitle := theme.NewChromeText(k.th, theme.StepBase, "Selected Item", p.Accent)
-	spTitle.GetWidget().LayoutData = widget.AnchorLayoutData{
-		HorizontalPosition: widget.AnchorLayoutPositionStart,
-		VerticalPosition:   widget.AnchorLayoutPositionCenter,
-		Padding:            &widget.Insets{Left: theme.Px(theme.SpMd + theme.TitleDotsW + theme.TitleDotsGap)},
-	}
-	title.AddChild(theme.TitleDotsWidget(p))
-	title.AddChild(spTitle)
+	title, _ := theme.NewTitleBar(k.th, "Selected Item", "")
 
 	sp.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),

@@ -85,6 +85,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Game chrome through the theme** (`game`, `uikit/theme`, `uikit/screens`):
+  the Esc menu and the title phase's save manager now wear the house title
+  bar — `theme.NewTitleBar`'s ring dots, tracked title and bar-bound
+  ellipsis — instead of the plain text bar the game built for itself (a menu
+  title longer than the window now ellipsizes instead of running out of the
+  bar). Overview and Selected Item drop their inline copies of the same bar
+  for the same call. The hand-built square strips (the menu body, the title
+  windows' scroll backs, the station board's body and row backs) are one
+  `theme.SquareBox` piece, and the game's `nrgba`/`solid`/`bordered` helpers
+  are gone in favour of `theme.NRGBA`/`Solid`/`SquareBox`. Visible change:
+  the Esc menu and the save manager gain the dots and the tracked title; no
+  other pixel moves (the station board's strips stay byte-identical).
+
 - **One landing rect per window** (`uikit/screens`, `game`): every panel's
   landing rect is exported beside the panel (`InventoryRect`, `FittingRect`,
   `MarketRect`, `ManufacturingRect`, `ScannerRect`, `MapViewRect`,

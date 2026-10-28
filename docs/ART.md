@@ -385,11 +385,12 @@ A box smaller than twice its radius is out of the scale — thin chrome
 diameter, 1 px stroke, 7 px apart (41 px block), drawn in the bar's border
 role at alpha 200 — nothing filled. They sit `SpMd` from the bar's left
 edge; the icon starts after the block plus `SpMd`, the tracked title after
-the icon plus `IconGap`. Every `theme.NewTitleBar` window carries them, and
-so do the hand-built window bars (Overview, Selected Item) through
-`theme.TitleDotsWidget`. Two headers deliberately lead with their own mark
-instead: the fitting window's hull-portrait header and the HUD rack's
-"Modules" panel head.
+the icon plus `IconGap`. Every window bar is `theme.NewTitleBar` — the
+uikit panels, the Overview and Selected Item core windows, the game's Esc
+menu and the title phase's save manager — so they all carry them; the bar
+adds `theme.TitleDotsWidget`'s rings first. Two headers deliberately lead
+with their own mark instead: the fitting window's hull-portrait header and
+the HUD rack's "Modules" panel head.
 
 **Panel depth** (`theme.PanelTop` / `PanelBottom`). Panel and window-body
 fills ramp top→bottom: the body lifted 35 % toward `HeadBg` at the top

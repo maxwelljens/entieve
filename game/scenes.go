@@ -5,7 +5,6 @@ import (
 	"image/color"
 	"path/filepath"
 
-	eimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/uikit/theme"
@@ -15,26 +14,12 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-// Window chrome metrics for the game-built window (the Esc menu):
-// mirrored from the uikit title-bar scale so they read as one theme.
+// Window chrome metrics for the game-built window (the Esc menu): the bar
+// itself is the house token (theme.TitleBarH), the buttons its own.
 const (
-	winTitleH = 44
-	menuBtnW  = 220
-	menuBtnH  = 40 // minimum hit area
+	menuBtnW = 220
+	menuBtnH = 40 // minimum hit area
 )
-
-// nrgba converts a palette RGBA to an NRGBA with the given alpha.
-func nrgba(c color.RGBA, a uint8) color.NRGBA {
-	return color.NRGBA{R: c.R, G: c.G, B: c.B, A: a}
-}
-
-// solid converts a palette RGBA to a full-alpha NRGBA nine-slice color.
-func solid(c color.RGBA) color.NRGBA { return nrgba(c, c.A) }
-
-// bordered builds the body+edge nine-slice every uikit panel uses.
-func bordered(body, edge color.NRGBA, w int) *eimage.NineSlice {
-	return eimage.NewBorderedNineSliceColor(body, edge, w)
-}
 
 // ---------------------------------------------------------------------------
 // StationScene (pushed while docked)
@@ -236,22 +221,12 @@ func (sc *MenuScene) Draw(dst *ebiten.Image) {
 // Game-built windows (menu, station)
 // ---------------------------------------------------------------------------
 
-// titleBar builds a uikit-style title bar for a game-owned window.
+// titleBar is the house title bar for a game-owned window (the Esc menu and
+// the title phase's save manager): theme.NewTitleBar's ring dots, tracked
+// title and ellipsis, text-only.
 func (g *Game) titleBar(label string) *widget.Container {
-	p := g.env.Pal()
-	title := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(solid(p.BGHard), nrgba(p.Border, 200), 1)),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-	)
-	title.AddChild(widget.NewText(
-		widget.TextOpts.Text(label, g.env.FaceBold(theme.StepBase), solid(p.Accent)),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            widget.NewInsetsSimple(theme.Px(5)),
-		})),
-	))
-	return title
+	bar, _ := theme.NewTitleBar(g.env, label, "")
+	return bar
 }
 
 // newBtn builds a themed button (the kit's PrimaryTheme styles it once
@@ -270,7 +245,7 @@ func (g *Game) newBtn(label string, minW, minH int, clicked func()) *widget.Butt
 func (g *Game) buildMenuWindow() *widget.Window {
 	p := g.env.Pal()
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(bordered(theme.WindowBody(p.BG), nrgba(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.SquareBox(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Spacing(theme.Px(10)),
@@ -294,10 +269,10 @@ func (g *Game) buildMenuWindow() *widget.Window {
 		item := item
 		body.AddChild(g.newBtn(item, menuBtnW, menuBtnH, actions[item]))
 	}
-	locH := theme.Px(len(menuItems)*int(menuBtnH) + (len(menuItems)-1)*10 + 20 + winTitleH)
+	locH := theme.Px(len(menuItems)*int(menuBtnH) + (len(menuItems)-1)*10 + 20 + theme.TitleBarH)
 	return widget.NewWindow(
 		widget.WindowOpts.Contents(body),
-		widget.WindowOpts.TitleBar(g.titleBar("Menu"), theme.Px(winTitleH)),
+		widget.WindowOpts.TitleBar(g.titleBar("Menu"), theme.Px(theme.TitleBarH)),
 		widget.WindowOpts.Modal(),
 		widget.WindowOpts.Location(image.Rect(0, 0, theme.Px(int(menuBtnW)+20), locH)),
 	)

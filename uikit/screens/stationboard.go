@@ -3,12 +3,10 @@ package screens
 import (
 	"fmt"
 	"image"
-	"image/color"
 	"math"
 	"slices"
 	"sort"
 
-	eimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
@@ -72,14 +70,6 @@ func StationRect(stationH int) image.Rectangle {
 		theme.Px(StationX+StationWinW), theme.Px(StationY)+max(stationH, theme.Px(StationMinH)))
 }
 
-// boardBox is the board's chrome: the square 1 px bordered strip the board
-// rows and body have always worn (not theme.Bordered's 5 px control
-// radius) — panel chrome is a deliberate piece, pinned by the docked
-// capture.
-func boardBox(body, edge color.NRGBA, w int) *eimage.NineSlice {
-	return eimage.NewBorderedNineSliceColor(body, edge, w)
-}
-
 // StationBoard is the docked station's contract board panel: the service
 // row (identity / Undock / Cargo / this station's services), the available
 // contracts and the active ones. Sync re-reads the board every mounted
@@ -121,7 +111,7 @@ func NewStationBoard(env widgets.Seams) *StationBoard {
 	)
 
 	body := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(boardBox(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
+		widget.ContainerOpts.BackgroundImage(theme.SquareBox(theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200), 1)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Spacing(theme.Px(boardSpacing)),
@@ -409,7 +399,7 @@ func (b *StationBoard) buildRow(r boardRowModel, active bool) (*widget.Container
 	// the board's). The builder already bound the session's widget theme
 	// to the row, so setting the strip may validate buttons and all
 	// before the row joins the window.
-	sr.Root.SetBackgroundImage(boardBox(theme.NRGBA(p.Cell, 160), theme.NRGBA(p.Border, 140), 1))
+	sr.Root.SetBackgroundImage(theme.SquareBox(theme.NRGBA(p.Cell, 160), theme.NRGBA(p.Border, 140), 1))
 	sr.Root.GetWidget().MouseButtonClickedEvent.AddHandler(func(args any) {
 		a, ok := args.(*widget.WidgetMouseButtonClickedEventArgs)
 		if !ok || a.Button != ebiten.MouseButtonRight {
