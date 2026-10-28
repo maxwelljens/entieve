@@ -59,6 +59,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The lore pass: the Predecessors** (`docs/lore`, `CONTEXT.md`, `content`):
+  the Old Works are not the settlers' building programme any more. They were
+  built by the **Predecessors**, a previous civilisation that lost the
+  oversight for reasons tradition does not preserve; the Works were built to
+  finish a system as a machine world (Gnazvor is the model), their nests
+  coordinate without a mind anyone can prove, and "the crews stopped coming;
+  the Works did not stop working" survives as the oldest fragment of oral
+  tradition. Settlement history loses its decline narrative — first wave,
+  second wave, no thinning towns. The Svaz gains a heart in the old worlds and
+  a rim of cantons (**the Žemdan**, **the Lešvok**, **the Můstvan** — named,
+  never mapped), its AI ban gains its offstage enforcer (**the Kanžar
+  Inspectorate** — named, never seen), the corporate houses lose any hint of
+  dynasty or home berth, Dvužek's barges belong to the crews who work them,
+  and the pilot gains the paperwork around an intentionally empty biography:
+  pods, premiums, licences, fines. All names registered in NAMING.md, the two
+  domain terms in CONTEXT.md.
+- **Show Info descriptions carry the voice** (`content/data`): hulls, the Old
+  Works castes, the Corporate Fleets cutter, ores, loot and a few notable
+  modules gain a concrete, dry second line — welds, oversize holds, the
+  refinery's arithmetic. Mechanical one-liners stay mechanical; no field, no
+  schema and no layout changed.
+
 - **War news in the house voice** (`sim`): the five log lines read "Supply —
   5 x Capacitor Booster Cell to Kvonice (4,995.00 €)", "Contested — Kvonice
   holds at 28%", "Fall — Kvonice lost to the Old Works", "Reclaimed — Kvonice

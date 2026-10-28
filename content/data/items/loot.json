@@ -3,7 +3,7 @@
     "id": "loot-navdata",
     "group": "Loot",
     "name": "Encrypted Navdata",
-    "description": "Partially corrupted navigation core; fenced data brokers pay well for it.",
+    "description": "Partially corrupted navigation core; fenced data brokers pay well for it. Half the files are checksums and the other half are somebody's berth bookings.",
     "category": "loot",
     "volume": 0.1,
     "base_price": 25000
@@ -12,7 +12,7 @@
     "id": "loot-alloy-scrap",
     "group": "Loot",
     "name": "Alloy Scrap",
-    "description": "Twisted plating and hull fragments scooped from wrecks.",
+    "description": "Twisted plating and hull fragments scooped from wrecks. The refinery does not ask what it used to be.",
     "category": "loot",
     "volume": 0.5,
     "base_price": 4000
@@ -21,7 +21,7 @@
     "id": "loot-iced-core",
     "group": "Loot",
     "name": "Iced Core",
-    "description": "Cryogenically sealed reactor core pulled from tougher rats.",
+    "description": "Cryogenically sealed reactor core pulled from tougher rats. It is still warm when it comes out, which is the part the fringe writes papers about.",
     "category": "loot",
     "volume": 1,
     "base_price": 90000
@@ -30,7 +30,7 @@
     "id": "loot-hierarch-crest",
     "group": "Loot",
     "name": "Hierarch's Crest",
-    "description": "Salvage from a Pušťov hierarch: a polished identification crest worth a fortune.",
+    "description": "Salvage from a Pušťov hierarch: a polished identification crest worth a fortune. What it identifies is a question with an invoice attached — the Kanžar Inspectorate buys crests and does not say why.",
     "category": "loot",
     "volume": 0.5,
     "base_price": 450000

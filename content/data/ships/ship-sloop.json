@@ -4,7 +4,7 @@
   "base_price": 360000,
   "name": "Vaštrek",
   "class": "frigate",
-  "description": "A quick, precise frigate: clean lock electronics and a capacitor that keeps up. The standard-issue hull for new pilots in the Wild Fields.",
+  "description": "A quick, precise frigate: clean lock electronics and a capacitor that keeps up. The standard-issue hull for new pilots in the Wild Fields, which is why half the yards in the district know every weld on it by sight.",
   "maker": "corp-borealis",
   "origin": "nordic",
   "slots": {

@@ -4,7 +4,7 @@
   "base_price": 180000,
   "name": "Scuttler",
   "class": "rat",
-  "description": "An Old Works worker frame: it cuts rock, strips wrecks and hauls scrap. Fragile, fast, and everywhere.",
+  "description": "An Old Works worker frame: it cuts rock, strips wrecks and hauls scrap. Fragile, fast, and everywhere. There is no cockpit and no marking on it — the only panel anyone has managed to read says 4, and the fringe still argues about four of what.",
   "origin": "old-works",
   "slots": {
     "high": 2,

@@ -4,7 +4,7 @@
   "base_price": 480000,
   "name": "Furdžan",
   "class": "industrial",
-  "description": "A fat industrial hauler. One high slot, one big hold: it runs, it does not fight.",
+  "description": "A fat industrial hauler. One high slot, one big hold: it runs, it does not fight. Pilots who bolt a gun to it are carrying a gun, not a plan.",
   "maker": "corp-ferrum",
   "origin": "polish",
   "slots": {

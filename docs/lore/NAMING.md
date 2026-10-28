@@ -257,17 +257,25 @@ Rat hulls, ores, minerals and loot stay unattributed.
 |---|---|---|---|---|
 | `universe.json` `region` | Far Moravia | **the Wild Fields** | place | one weathering serves both levels; the article is part of the value, like "the Fringe" |
 | `universe.json` `constellation` | Kresy | **the Wild Fields** | place | same value as the region — the map is one district of one wild country |
-| `npcs/guards.json` `faction` | Loomfall Security | **Charter Authority** | Latinate | full form "Far Moravia Charter Authority" ([FACTIONS.md](FACTIONS.md#the-charter-authority)) |
+| `npcs/guards.json` `faction` | Loomfall Security | **Charter Authority** | Latinate | full form "Wild Fields Charter Authority" ([FACTIONS.md](FACTIONS.md#the-charter-authority)) — the same authority the region and constellation are named for. Far Moravia stays retired (line above): no record, full form included, carries it |
 | `npcs/rats.json` `faction` (Scuttler, Marauder) | Mire Corsairs | **Old Works** | Old Works | two placeholder strings collapse into one faction |
 | `npcs/rats.json` `faction` (Hierarch) | Gloam Hierarchy | **Old Works** | Old Works | same |
 | `npcs/miners.json` `faction` | — | **Dvužek** | Moravian | corp roster name reused as a faction string (see the corporations table); the extraction/barging house its miners belong to |
 | `npcs/fleets.json` `faction` | — | **Corporate Fleets** | Latinate | the commissioned bloc ([FACTIONS.md](FACTIONS.md#the-svaz-and-the-commission)); one faction string now, per-corp rows later when a corp needs its name on screen |
 | war (log, contracts, starmap) | — | **the Long Attrition** | place | the war of the Wild Fields; the name echoes FACTIONS' "attrition; no negotiation" ([FACTIONS.md](FACTIONS.md#the-long-attrition)) |
-| the confederation (+ "the empire" in prose) | — | **the Svaz** | Moravian | a weathered league (*svaz* "union"); institutional only — treaty, dues, the Commission; no territory and no office ([UNIVERSE.md](UNIVERSE.md#the-old-worlds)) |
+| the confederation (+ "the empire" in prose) | — | **the Svaz** | Moravian | a weathered league (*svaz* "union"); heart in the old worlds, a dues line and a warrant at the rim — treaty, dues, the Commission; no office and no officer in the Wild Fields ([UNIVERSE.md](UNIVERSE.md#the-old-worlds)) |
 | the war mandate | — | **the Commission** | Latinate | the Svaz's commission: the warrant the corporate fleets are raised and crewed under |
+| the pre-settlement civilisation | — | **the Predecessors** | trade | the plain word, not a coined name: they are the Predecessors because that is what they were. The scholars' word for them is worse and stays offscreen; folklore gives them no other name |
+| the Svaz's machine ban, in institutional form | — | **the Kanžar Inspectorate** | Latinate | *censura* "assessment, censure", weathered to *kanž-* + the classical *-ar* shape (Cylvar, Kuštor); the holder of the ban on machine minds and autonomous self-replicating systems. Offstage: no office in the Wild Fields, no officer, never seen |
+| Svaz cantons beside the Wild Fields | — | **the Žemdan**, **the Lešvok**, **the Můstvan** | place | *ziemia*/*země* "land", *les* "forest", *most* "bridge", all weathered past recognition (*zem* → *žem-*, *les* → *leš-*, *most* → *můst-*); named-but-unmapped — prose flavour only, never a system, gate or celestial |
 | a fallen system's station | — | **Remnant** | trade | berth, market and repair stay live, the charter's desk goes dark ([FACTIONS.md](FACTIONS.md#freeports-and-independents)) |
 
 `traffic/*.json` carry no display names (keyed by system id) and need no row.
+
+The Predecessors, the Kanžar Inspectorate and the three cantons are
+author-confirmed 2026-10-28 (the lore pass); none of them reaches
+`content/data/**` — they live in prose and, for the inspectorate at most, one
+Show Info line.
 
 ### Interface strings
 

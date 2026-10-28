@@ -2,7 +2,7 @@
   {
     "id": "npc-fleet-cutter",
     "name": "Clastor",
-    "description": "A corporate fleet cutter: a Preštor hull flown on the Commission's warrant, three guns and a web. It hunts the Old Works at the front and has no business with you unless you give it one.",
+    "description": "A corporate fleet cutter: a Preštor hull flown on the Commission's warrant, three guns and a web. It hunts the Old Works at the front and has no business with you unless you give it one. The crew is on a corporate payroll and the warrant is on the hull, so the paperwork for firing on you exists before you do.",
     "faction": "Corporate Fleets",
     "ship": "ship-npc-fleet",
     "fit": [

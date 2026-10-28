@@ -4,7 +4,7 @@
     "group": "Modules/Mid/EWAR",
     "maker": "corp-borealis",
     "name": "Stasis Web",
-    "description": "Projects a stasis field that slows the locked target by 45% while active.",
+    "description": "Projects a stasis field that slows the locked target by 45% while active. It buys time, and time is what a hauler with a thin tank is actually short of.",
     "slot": "mid",
     "kind": "stasis_web",
     "grid_class": "i",

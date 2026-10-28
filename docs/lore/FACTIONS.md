@@ -58,7 +58,7 @@ war, flown under one bloc's colours, never a government of their own.
 | **Noldvar Guard** | Nordic | ordnance, turrets, guidance | founded by artillery officers; still believes every problem has a caliber |
 | **Iškoven** | Nordic | energy systems, capacitors, cells | cold-weather power systems; the grid nobody notices until it fails |
 | **Kumbřan Steelworks** | Polish | heavy hulls, armor, structures | the iron combine: heavy hulls, heavier contracts |
-| **Dvužek** | Moravian | extraction, refining, barging | a miners' cooperative that outgrew its own pit |
+| **Dvužek** | Moravian | extraction, refining, barging | a miners' cooperative that outgrew its own pit; every hand on a barge holds a share |
 | **Bríždan Factory** | Polish/Moravian | munitions, energetic materials | Storm Works: propellants, warheads, and very good insurance |
 | **Cylvar** | Latinate | propulsion, express logistics, recovery | if it must arrive yesterday — for a price, it does |
 | **Preštor** | Latinate | security services, patrol craft, protective systems | security is a service; the Kuštor hull is the receipt |
@@ -75,10 +75,13 @@ Steelworks**), and Zakłady Burza became **Bríždan Factory**. Only
 is [NAMING.md — Corporations](NAMING.md#corporations--manufacturers).
 
 Corps buy ore, sell hulls and modules, post contracts on the boards, and
-occasionally sue each other. They do not patrol — patrols are the Charter's —
-but they do fight the Old Works: the fleets are theirs, the materiel is bought
-on their treasuries, and the crews are on their payroll. They still write the
-losses down. The premium has simply moved into the war chest.
+occasionally sue each other. A house is a market presence and nothing else:
+boards, brands, factories, a maker's mark on the goods it sells. There are no
+dynasties and no home berths — a shareholder is a shareholder, not a subject.
+They do not patrol — patrols are the Charter's — but they do fight the Old
+Works: the fleets are theirs, the materiel is bought on their treasuries, and
+the crews are on their payroll. They still write the losses down. The premium
+has simply moved into the war chest.
 
 **Binding rules**
 
@@ -89,16 +92,18 @@ losses down. The premium has simply moved into the war chest.
   that appear on goods and markets. The one thing they share is the
   Commission's war, and that is a mandate, not a state.
 - NEVER let a corporation hold territory or law. It holds contracts, and —
-  under the Commission — a share in the fleets.
+  under the Commission — a share in the fleets. No dynasty, no home berth, no
+  flag.
 - NEVER add a fifth power bloc without registering it here.
 
 ## The Svaz and the Commission
 
 The corporations are not a state, and they know it. What binds them is **the
 Svaz** — "the confederation" in plain prose, "the empire" when a pilot is being
-sarcastic — a league of the houses, older than the charter and far weaker. It
-has a treaty, a dues schedule, a standing committee that meets nowhere in
-particular, and no territory at all. It cannot tax a system, post a patrol or
+sarcastic — a league of houses and cantons, older than the charter and far
+weaker. Its heart is the old worlds; its rim is places like this one. It has a
+treaty, a dues schedule, a standing committee that meets nowhere in particular,
+and no office in the Wild Fields. It cannot tax a system, post a patrol or
 answer a letter from the Wild Fields. It can only bind the houses to each
 other.
 
@@ -117,7 +122,7 @@ calls it an empire to its face.
 **Binding rules**
 
 - MUST keep the Svaz institutional only: a treaty, dues, a commission. No
-  territory, no office, no officer in the Wild Fields.
+  territory in the Wild Fields, no office, no officer here.
 - MUST keep the war a corporate undertaking under warrant — never the
   Charter's war, never the Svaz's army.
 - NEVER let the Svaz send reinforcements, orders, recall notices or answers.
@@ -148,14 +153,42 @@ No flag goes up. The neighbours simply stop being answered.
 ## The Old Works
 
 The hostile power of the Wild Fields is not people. It is the **Old Works** —
-unshackled self-replicating industrial and terraforming machine swarms left
-over from the settlement era, when the first wave's building programme was
-called simply "the Works". The crews stopped coming; the Works did not stop
-working. They are still growing.
+self-replicating industrial and terraforming machines built by the
+**Predecessors**, the civilisation that held this country before either
+settlement wave landed.
+
+The Predecessors ran the Works, and then they lost them. Tradition says only
+that the oversight decayed — the supervisors stopped supervising, the knots
+came untied — and never why. The fall took the record with it, and what it left
+nobody wrote down again. Knowledge survives as oral tradition, plus a scholarly
+fringe that keeps artefact collections, transcribes what the old people still
+recite, and disagrees about what a Predecessor seam on a Works frame actually
+says. They agree on the goal. The Works were built to finish the
+job: strip a system, plant it, run it, hand back a machine world. **Gnazvor**,
+out in Kvonice, is the one they point at when they argue.
+
+The name is folk etymology, the way most names here are: the **Works** because
+working is what they do, **Old** because they were old before the first wave
+landed. The oldest surviving fragment of the tradition is a line about the
+Predecessors' crews — not a story, a rota:
+
+> The crews stopped coming. The Works did not stop working.
 
 **Motive: material.** The swarms raid frontier traffic for metal, ore, ice
 and hull mass to feed replication. No demands, no negotiation, no malice —
 heavy plant that never clocked out.
+
+**Nests coordinate.** Not under a mind anyone can prove: a nest answers the
+pressure its neighbours put on a region, and the same few answers keep paying,
+so the pattern reads as strategy. No kings, no homeworld, no plan. They can be
+cornered — the squeeze has taken systems back — but never extinguished: there
+is always a deeper nest nobody has found, and that is the war's equilibrium.
+
+**The ban.** Unshackled replication is why the Svaz bans what it bans: no
+autonomous self-replicating systems, no machine minds, no exception for a good
+cause. The **Kanžar Inspectorate** holds the ban. It has no office in the Wild
+Fields and no officer anyone has met; what it has is a form, and the form gets
+filed. Nobody here has ever been inspected.
 
 **Castes** (names are canon and untouchable):
 
@@ -166,9 +199,9 @@ heavy plant that never clocked out.
 | **Hierarch** | overseer / command — coordinates the swarm, fights to the last |
 
 **Territory:** Unincorporated space in practice (Pušťov) and the deep
-Fringe. They nest in anomalies and derelict works — a machine den is a
-**Gnazvor** (*gniazdo* "nest", grafted with Latin *vor-* "devour") on pilot
-slang — and raid outward.
+Fringe. They nest in anomalies and derelict works — a finished nest is a
+**gnazvor** on pilot slang (*gniazdo* "nest", grafted with Latin *vor-*
+"devour") — and raid outward.
 
 Since the war they hold ground too. A system whose charter fails is theirs:
 the patrols leave, the belts go hostile, and the swarms dig in at the rocks
@@ -181,6 +214,11 @@ Attrition has no end in sight.
 
 - MUST keep the castes named Scuttler, Marauder and Hierarch, capitalized.
 - MUST keep the Old Works material-driven: they take stuff, not sides.
+- MUST keep the Predecessors' fall unexplained: the oversight decayed, the why
+  is dark, and no text ever supplies it.
+- MUST keep the machine ban in force — no machine minds, no autonomous
+  self-replicating systems — and its inspectorate offstage: named, never seen,
+  no office in the Wild Fields, never on screen.
 - NEVER give the machines speeches, kings, a homeworld or a plan. The
   Hierarch caste directs; it does not monologue.
 - NEVER call them an empire, a rebellion or a species.

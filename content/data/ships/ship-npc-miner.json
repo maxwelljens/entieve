@@ -4,7 +4,7 @@
   "base_price": 380000,
   "name": "Kutřek",
   "class": "industrial",
-  "description": "A mining cooperative's working barge: one strip laser, a shallow ore hold, and enough hull to survive a rock falling on it. It cuts, it fills, it runs the load to market.",
+  "description": "A mining cooperative's working barge: one strip laser, a shallow ore hold, and enough hull to survive a rock falling on it. It cuts, it fills, it runs the load to market. The crew holds shares in the barge, so nobody runs it harder than the hull wants.",
   "maker": "corp-druzstvo",
   "origin": "moravian",
   "slots": {

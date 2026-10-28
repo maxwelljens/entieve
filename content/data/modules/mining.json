@@ -4,7 +4,7 @@
     "group": "Modules/High/Turrets",
     "maker": "corp-druzstvo",
     "name": "Mining Laser",
-    "description": "Strip-mines 100 m³ of asteroid per 30 s cycle straight into the ore hold.",
+    "description": "Strip-mines 100 m³ of asteroid per 30 s cycle straight into the ore hold. The beam does not care what the rock is worth; the refinery will tell you later.",
     "slot": "high",
     "kind": "mining_laser",
     "mount": "turret",

@@ -4,7 +4,7 @@
     "group": "Modules/Mid/Capacitor",
     "maker": "corp-iskald",
     "name": "Cap Booster",
-    "description": "Burns a capacitor booster cell from cargo to slam GJ back into the capacitor at once.",
+    "description": "Burns a capacitor booster cell from cargo to slam GJ back into the capacitor at once. Cells are cheap. Being cap-dry is not.",
     "slot": "mid",
     "kind": "cap_booster",
     "grid_class": "i",

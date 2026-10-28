@@ -4,7 +4,7 @@
   "base_price": 1250000,
   "name": "Ždanek",
   "class": "destroyer",
-  "description": "A yard-built close-range brawler: extra guns and thick plating for pilots who like to brawl on top of their target.",
+  "description": "A yard-built close-range brawler: extra guns and thick plating for pilots who like to brawl on top of their target. The plating overlaps in two courses; the yard did not file the seams and nobody asked it to.",
   "maker": "corp-ferrum",
   "origin": "polish",
   "slots": {
