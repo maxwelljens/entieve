@@ -5,6 +5,7 @@ import (
 
 	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/ecs"
+	"github.com/entieve/entieve/format"
 )
 
 // warpLandRange is the distance (m) at which the warp drive catches its
@@ -341,8 +342,8 @@ func (s *Sim) warpSpeedMS(e ecs.Entity, m *Motion) float64 {
 	// Motion does not carry warp speed; read it from the hull definition.
 	if ship, ok := s.Ships.Get(e); ok {
 		if hull, ok := s.Content.Ship(ship.Hull); ok && hull.WarpSpeed > 0 {
-			return hull.WarpSpeed * 1.496e11
+			return hull.WarpSpeed * format.AU
 		}
 	}
-	return 1.496e11 // fallback: 1 AU/s
+	return format.AU // fallback: 1 AU/s
 }

@@ -10,20 +10,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-// TestFmtDistBands pins the world-label distance formatter — the duplicated
-// twin of theme.FormatDistance: meters under 2 km, 1-decimal km through
-// 99,999 km, "<0.01 AU" below 0.01 AU, 2-decimal AU beyond.
-func TestFmtDistBands(t *testing.T) {
-	for m, want := range map[float64]string{
-		42: "42 m", 2000: "2.0 km", 9.9999e7: "99,999.0 km",
-		1e8: "<0.01 AU", 1.496e9: "0.01 AU", 3e11: "2.01 AU",
-	} {
-		if got := fmtDist(m); got != want {
-			t.Errorf("fmtDist(%v) = %q, want %q", m, got, want)
-		}
-	}
-}
-
 // TestColorScalePremultiplies pins the straight-alpha → premultiplied
 // conversion at the seam: a straight (255,0,0,55) must reach the compositor
 // as (55,0,0,55), not (255,0,0,55). Opaque colors are unchanged. Pure

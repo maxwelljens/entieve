@@ -85,6 +85,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One display formatter leaf** (`format`): money (`Credits`, the
+  NAMING.md `12,345.67 €` / `50¢` rule), distance bands (`Dist` + the one
+  `AU = 1.496e11` constant), thousands grouping (`GroupInt`/`GroupFloat`) and
+  percent (`Pct`) now live once in a stdlib-only leaf. `sim`'s `euro`,
+  `theme`'s `FormatCredits`/`FormatDistance`/`FormatInt`/`GroupFloat`/
+  `PctLabel` and `render`'s world-label distance are one-line delegates, so
+  the money rule, the distance bands and the AU conversion each have one
+  implementation; the duplicated golden tables collapse into one. No rendered
+  string changes.
+
 - **Panel gating and the Tab cycle follow the verb table** (`uikit/screens`):
   the Selected Item panel's `syncSelected` is one loop of `VerbReady` (the
   Warp `tooClose` case is the row's `Ready` reason; `canLock` and

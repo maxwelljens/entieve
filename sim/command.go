@@ -5,6 +5,7 @@ import (
 
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
+	"github.com/entieve/entieve/format"
 )
 
 // runCommands drains the queue and applies each command. Movement/lock/
@@ -141,17 +142,17 @@ func holdLabel(hold string) string {
 }
 
 // KmLabel renders a metre distance as the kilometre figure the refusal
-// log lines and the UI hints quote ("150 km" for WarpMinRange). Beyond
-// 99,999 km it switches like theme.FormatDistance: "<0.01 AU" below
-// 0.01 AU, then two-decimal AU.
+// log lines and the UI hints quote ("150 km" for WarpMinRange) — the log
+// form: no thousands separators and no trailing decimals. Beyond 99,999 km
+// it switches like format.Dist: "<0.01 AU" below 0.01 AU, then two-decimal AU.
 func KmLabel(m float64) string {
 	switch {
 	case m <= 9.9999e7:
 		return strconv.FormatFloat(m/1000, 'f', -1, 64) + " km"
-	case m < 1.496e9:
+	case m < format.AU/100:
 		return "<0.01 AU"
 	default:
-		return strconv.FormatFloat(m/1.496e11, 'f', 2, 64) + " AU"
+		return strconv.FormatFloat(m/format.AU, 'f', 2, 64) + " AU"
 	}
 }
 
