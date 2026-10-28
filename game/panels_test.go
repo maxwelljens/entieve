@@ -533,12 +533,35 @@ func TestFrameUpdateAndWorldKeys(t *testing.T) {
 		t.Fatal("turret activated without a target")
 	}
 
-	// The remaining world keys must run without panicking (their effects
-	// depend on grid state; no selection is set here).
+	// The remaining world keys run through the verb table's intent
+	// emission (worldKey → DoWorldVerb → Game.Do → commandFor → this
+	// tail): record the enqueue so a key that stops emitting shows up.
+	var cmds []sim.Command
+	g.enqueue = func(cmd sim.Command) { cmds = append(cmds, cmd) }
 	g.handleKeys(Input{JustPressed: []ebiten.Key{
 		ebiten.KeyTab, ebiten.KeyA, ebiten.KeyQ, ebiten.KeyS, ebiten.KeyW,
 		ebiten.KeyZ, ebiten.KeyD, ebiten.KeyJ, ebiten.KeyL, ebiten.KeyM,
 	}})
+	g.enqueue = g.s.Queue
+	if len(cmds) == 0 {
+		t.Fatal("the world keys enqueued nothing")
+	}
+	stopped := false
+	for _, cmd := range cmds {
+		switch cmd.(type) {
+		case sim.CmdApproach, sim.CmdOrbit, sim.CmdStop, sim.CmdAlignTo,
+			sim.CmdWarpTo, sim.CmdDock, sim.CmdJump, sim.CmdLoot,
+			sim.CmdMine, sim.CmdLock, sim.CmdActivate, sim.CmdDeactivate:
+		default:
+			t.Errorf("world key enqueued %T, want a world command", cmd)
+		}
+		if _, ok := cmd.(sim.CmdStop); ok {
+			stopped = true
+		}
+	}
+	if !stopped {
+		t.Error("S did not stop the ship")
+	}
 	for i := 0; i < 10; i++ {
 		g.s.Step()
 	}
@@ -563,33 +586,44 @@ func TestFrameUpdateAndWorldKeys(t *testing.T) {
 	}
 }
 
-// TestNextLockIdx pins the Tab cycle's anchoring semantics: the step is
-// the position after the SELECTED candidate in the freshly sorted list
-// (wrapping), and a selection outside the list restarts at the nearest —
-// a remembered index would skip or repeat entries once the distances
-// re-sort. The showcase grid spawns no lockable entities, so the pure
-// step is where this can be pinned exactly.
-func TestNextLockIdx(t *testing.T) {
-	cands := []sim.Info{{Entity: 10}, {Entity: 11}, {Entity: 12}}
-	cases := []struct {
-		name string
-		sel  ecs.Entity
-		want int
-	}{
-		{"no selection starts at the nearest", 0, 0},
-		{"advances from the first candidate", 10, 1},
-		{"advances from the middle", 11, 2},
-		{"wraps after the farthest", 12, 0},
-		{"non-candidate selection restarts", 99, 0},
+// TestWorldVerbTableCoversWorldKeys: the one world-verb table's rows are
+// exactly the command-emitting world bindings — a new world key without a
+// row fails here, and a row with no key fails too. The fixed chord layer
+// (save/load/time/market search, handled literally in handleKeys) and the
+// held camera pan are not verbs and must stay out.
+func TestWorldVerbTableCoversWorldKeys(t *testing.T) {
+	fixed := map[string]bool{
+		"save": true, "load": true, "market-search": true,
+		"time-slower": true, "time-faster": true,
+		"pan-up": true, "pan-down": true, "pan-left": true, "pan-right": true,
 	}
-	for _, c := range cases {
-		if got := nextLockIdx(cands, c.sel); got != c.want {
-			t.Errorf("%s: nextLockIdx(_, %v) = %d, want %d", c.name, c.sel, got, c.want)
+	rows := map[string]bool{}
+	for _, v := range uikit.WorldVerbs {
+		if v.Action == "" || v.Label == "" || v.Emit == nil {
+			t.Errorf("verb %+v lacks an action, label or emit", v)
+		}
+		if rows[v.Action] {
+			t.Errorf("action %q has two verb rows", v.Action)
+		}
+		rows[v.Action] = true
+	}
+	bound := map[string]bool{}
+	for _, b := range worldKeyMap {
+		bound[b.Action] = true
+		if fixed[b.Action] {
+			if rows[b.Action] {
+				t.Errorf("fixed-layer action %q must not have a verb row", b.Action)
+			}
+			continue
+		}
+		if !rows[b.Action] {
+			t.Errorf("world key %q has no verb row (add it to WorldVerbs)", b.Action)
 		}
 	}
-	// A single candidate always wraps to itself.
-	if got := nextLockIdx(cands[:1], 10); got != 0 {
-		t.Errorf("single candidate: nextLockIdx = %d, want 0", got)
+	for a := range rows {
+		if !bound[a] {
+			t.Errorf("verb %q is not a world key (not in worldKeyMap)", a)
+		}
 	}
 }
 

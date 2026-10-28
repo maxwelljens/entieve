@@ -1107,7 +1107,15 @@ through `sim`'s read side rather than re-derived in `uikit`.
   layer** — the Screen rows' toggles and the
   world commands — resolves `(key, shift)` through the session's live
   bindings (`Game.actionFor`, `game/keys.go`: defaults overlaid with the
-  `<save>.keys.json` overrides, replace policy).
+  `<save>.keys.json` overrides, replace policy). A resolved world command
+  runs the one **World verb** table (`uikit/screens/worldverbs.go`): the
+  key path (`Game.worldKey`), the Selected Item buttons and the overview
+  row actions ask the same rows for a target and emit the same typed
+  intents, so their gating and fallbacks cannot drift. World clicks are
+  intents too — left double-click `Approach`, `Ctrl`+click `Lock`,
+  right-click `Orbit` — and the right-click spells its range out
+  (`uikit.OrbitRanges[0]`) instead of letting the Orbit intent follow the
+  Selected Item selector.
 - Save/load: `game` writes `Save` JSON to
   `os.UserConfigDir()/entieve/save.json` on `Ctrl+S` and loads on `F9` (also
   `--load` CLI flag).

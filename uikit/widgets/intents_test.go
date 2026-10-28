@@ -45,6 +45,7 @@ func TestCommandForMapsEveryCommandIntent(t *testing.T) {
 		{"cycle charge", CycleCharge{Slot: slot, Item: "ammo-fusion-s"},
 			sim.CmdSetAmmo{Slot: slot, Item: "ammo-fusion-s"}},
 		{"approach", Approach{Entity: e}, sim.CmdApproach{Target: e}},
+		{"align", Align{Entity: e}, sim.CmdAlignTo{Target: e}},
 		{"lock", Lock{Entity: e}, sim.CmdLock{Target: e}},
 		{"stop", Stop{}, sim.CmdStop{}},
 		{"dock", Dock{Entity: e}, sim.CmdDock{Station: e}},
@@ -65,9 +66,11 @@ func TestCommandForMapsEveryCommandIntent(t *testing.T) {
 	}
 }
 
-// TestCommandForReadsRangeAtDispatch: WarpTo/Orbit carry no range — the
-// executor reads the Selected Item selectors when the intent fires, so
-// the declared intent never freezes a stale landing distance.
+// TestCommandForReadsRangeAtDispatch: WarpTo carries no range — the
+// executor reads the Selected Item selector when the intent fires, so the
+// declared intent never freezes a stale landing distance. Orbit's own
+// Range wins when set (the world click spells out uikit.OrbitRanges[0]);
+// a zero Range means the same selector at dispatch (the panel and Q).
 func TestCommandForReadsRangeAtDispatch(t *testing.T) {
 	e := ecs.Entity(3)
 	if c, ok := commandFor(WarpTo{Entity: e}, 12000, 0); !ok ||
@@ -76,7 +79,11 @@ func TestCommandForReadsRangeAtDispatch(t *testing.T) {
 	}
 	if c, ok := commandFor(Orbit{Entity: e}, 0, 2500); !ok ||
 		c != (sim.CmdOrbit{Target: e, Range: 2500}) {
-		t.Errorf("Orbit → %#v, want CmdOrbit at the passed orbit range", c)
+		t.Errorf("Orbit{Range:0} → %#v, want CmdOrbit at the passed orbit range", c)
+	}
+	if c, ok := commandFor(Orbit{Entity: e, Range: 2500}, 0, 50000); !ok ||
+		c != (sim.CmdOrbit{Target: e, Range: 2500}) {
+		t.Errorf("Orbit{Range:2500} → %#v, want the intent's explicit range", c)
 	}
 }
 

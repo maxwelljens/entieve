@@ -16,9 +16,10 @@ import (
 // Intents are data only: no behaviour, no sim handles. Where a
 // sim.Command exists the intent mirrors it (the Cmd prefix is the only
 // name it drops — Buy dispatches to CmdBuy, StartJob to CmdStartJob, …),
-// with two documented exceptions: WarpTo/Orbit read their Range from the
-// Selected Item selectors at press time (so Range is not on the intent),
-// and the world actions carry Entity instead of Target.
+// with one documented exception: WarpTo reads its Range from the Selected
+// Item selector at press time (so Range is not on the intent), while
+// Orbit carries an explicit Range whose zero means that same selector at
+// dispatch. The world actions carry Entity instead of Target.
 
 // Intent is one "do this" a screen expresses. Like sim.Command it is a
 // closed set of data types behind a marker method.
@@ -126,18 +127,23 @@ type (
 		Item content.ItemID
 	}
 
-	// WarpTo/Orbit/Approach/Lock/Stop/Dock/Jump/Loot/Mine are the world
-	// actions the Selected Item panel and the overview rows offer. Range
-	// (warp, orbit) is read from the selectors when the intent executes;
-	// Mine carries the laser slot the panel resolved at press.
-	WarpTo   struct{ Entity ecs.Entity }
-	Orbit    struct{ Entity ecs.Entity }
+	// WarpTo/Orbit/Approach/Lock/Stop/Dock/Jump/Loot/Mine/Align are the
+	// world actions the Selected Item panel, the overview rows and the
+	// world clicks offer. WarpTo's Range is read from the selector when the
+	// intent executes; Orbit carries its own Range (0 = the same selector
+	// at dispatch); Mine carries the laser slot the panel resolved at press.
+	WarpTo struct{ Entity ecs.Entity }
+	Orbit  struct {
+		Entity ecs.Entity
+		Range  float64 // 0 = the Selected Item orbit selector at dispatch
+	}
 	Approach struct{ Entity ecs.Entity }
 	Lock     struct{ Entity ecs.Entity }
 	Stop     struct{}
 	Dock     struct{ Entity ecs.Entity }
 	Jump     struct{ Entity ecs.Entity }
 	Loot     struct{ Entity ecs.Entity }
+	Align    struct{ Entity ecs.Entity }
 	Mine     struct {
 		Entity ecs.Entity
 		Slot   sim.SlotRef
@@ -197,6 +203,7 @@ func (Stop) isIntent()        {}
 func (Dock) isIntent()        {}
 func (Jump) isIntent()        {}
 func (Loot) isIntent()        {}
+func (Align) isIntent()       {}
 func (Mine) isIntent()        {}
 func (Toggle) isIntent()      {}
 func (Undock) isIntent()      {}
@@ -208,8 +215,9 @@ func (Quit) isIntent()        {}
 // the ONE intent→command table, shared by uikit's built-in executor and
 // the game's. warpRange/orbitRange are the Selected Item selectors'
 // current values, read at press (0 where there is no selector, e.g. a
-// kit-less session). ok is false for the intents a host handles itself:
-// ShowInfo, OpenMenu, OpenOrder, QtyPick, Toggle, Save, Load, Quit.
+// kit-less session); Orbit's own Range wins when it is set. ok is false
+// for the intents a host handles itself: ShowInfo, OpenMenu, OpenOrder,
+// QtyPick, Toggle, Save, Load, Quit.
 func commandFor(i Intent, warpRange, orbitRange float64) (sim.Command, bool) {
 	switch v := i.(type) {
 	case ShowInfo, OpenMenu, OpenOrder, QtyPick, Toggle, Save, Load, Quit:
@@ -251,9 +259,14 @@ func commandFor(i Intent, warpRange, orbitRange float64) (sim.Command, bool) {
 	case WarpTo:
 		return sim.CmdWarpTo{Target: v.Entity, Range: warpRange}, true
 	case Orbit:
-		return sim.CmdOrbit{Target: v.Entity, Range: orbitRange}, true
+		if v.Range == 0 {
+			v.Range = orbitRange
+		}
+		return sim.CmdOrbit{Target: v.Entity, Range: v.Range}, true
 	case Approach:
 		return sim.CmdApproach{Target: v.Entity}, true
+	case Align:
+		return sim.CmdAlignTo{Target: v.Entity}, true
 	case Lock:
 		return sim.CmdLock{Target: v.Entity}, true
 	case Stop:

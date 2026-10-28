@@ -27,7 +27,7 @@ rebindable (see **Keybindings** below); the global chords (`Esc`, `Ctrl+S`,
 | Key | Action |
 |---|---|
 | `Tab` | Cycle-lock nearest target (distance-ordered) |
-| `Shift+Tab` | Lock the currently selected target |
+| `Shift+Tab` | Lock the currently selected target (ships, wrecks and asteroids — a station is not lockable) |
 | `F1` … `F8` | Toggle high-slot module 1…8 (activate/deactivate) |
 | `A` | Approach selected |
 | `Q` | Orbit selected at the Selected Item **Orbit range** selector's value (2.5k → 5k → 10k → 20k → 50k m; the key never changes it) |
@@ -224,7 +224,11 @@ like the rest. The **Overview** (top right) and **Selected Item** window
 reopen them) and draggable — a click in space selects the
 target that **Selected Item** then shows and that every
 `selected`-targeted key acts on. Its action buttons (Approach, Warp,
-Orbit, Stop, Lock, Dock, Jump, Loot, Mine) act on that selection; the two
+Orbit, Stop, Lock, Dock, Jump, Loot, Mine) act on that selection —
+Dock, Jump and Loot fall back to the nearest station/gate/wreck when the
+selection cannot serve, exactly like `D`/`J`/`L` — and a button greys out
+when its verb has no target (or the drive would refuse it, as for Warp
+inside 150 km); the two
 selectors — **Orbit range** (2.5k–50k m) and **Warp to within** (0/10/50 km)
 — are pure state: clicking one only cycles its value and never issues a
 command. Warp, Orbit, `Z` and `Q` all act at the range their selector

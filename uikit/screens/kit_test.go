@@ -189,91 +189,120 @@ func TestOverviewRowClickSelectsThenShowsInfo(t *testing.T) {
 }
 
 // TestSelectedButtonsEnqueueCommands covers the Selected Item window's
-// command seam, including the disabled/no-selection guards.
+// command seam, which is now the world-verb table itself (the handlers
+// are one-liners over DoWorldVerb): no selection silences the
+// selected-target verbs, while Stop still fires (the panel — not the
+// resolver — greys its button), and a real grid selection emits the
+// intent's command at the selector ranges.
 func TestSelectedButtonsEnqueueCommands(t *testing.T) {
 	k, cmds := newTestKit(t)
 
-	// No selection: the guarded handlers stay quiet.
-	k.approachSelected()
-	k.warpSelected()
-	k.lockSelected()
-	k.dockSelected()
-	k.jumpSelected()
-	k.lootSelected()
-	k.mineSelected()
+	// No selection: the selected-target verbs stay quiet. (An arbitrary
+	// entity id is no longer a target: the table resolves against the
+	// live grid.)
+	for _, action := range []string{"approach", "orbit", "lock-selected", "align", "mine"} {
+		k.DoWorldVerb(action)
+	}
 	if len(*cmds) != 0 {
 		t.Fatalf("no-selection click enqueued %d commands, want 0", len(*cmds))
 	}
+	// Stop needs no target, so the key path always stops; the button's
+	// disabled state is the panel's own.
+	k.DoWorldVerb("stop")
+	if len(*cmds) != 1 {
+		t.Fatalf("Stop enqueued %d commands, want 1", len(*cmds))
+	}
+	if _, ok := (*cmds)[0].(sim.CmdStop); !ok {
+		t.Errorf("cmd[0] = %#v, want sim.CmdStop", (*cmds)[0])
+	}
+	*cmds = (*cmds)[:0]
 
-	k.selected = ecs.Entity(42)
-	k.approachSelected()
-	k.warpSelected()
-	k.stopSelected()
-	k.lockSelected()
-	k.dockSelected()
-	k.jumpSelected()
-	k.lootSelected()
-	if len(*cmds) != 7 {
-		t.Fatalf("enqueued %d commands, want 7", len(*cmds))
+	// A real lockable target: the first asteroid on the grid.
+	var rock sim.Info
+	for _, info := range k.Sim.Grid() {
+		if info.Kind == sim.KindAsteroid {
+			rock = info
+			break
+		}
 	}
-	if c, ok := (*cmds)[0].(sim.CmdApproach); !ok || c.Target != ecs.Entity(42) {
-		t.Errorf("cmd[0] = %#v, want CmdApproach{42}", (*cmds)[0])
+	if rock.Entity.IsZero() {
+		t.Fatal("fixture: no asteroid on the grid")
 	}
-	// The Warp action carries the warp selector's value (Kit.WarpRange,
-	// default WarpRanges[0] = 0) — not a range of its own.
-	if c, ok := (*cmds)[1].(sim.CmdWarpTo); !ok || c.Target != ecs.Entity(42) || c.Range != k.WarpRange() {
-		t.Errorf("cmd[1] = %#v, want CmdWarpTo{42, WarpRange %v}", (*cmds)[1], k.WarpRange())
+	k.Select(rock.Entity)
+	for _, action := range []string{"approach", "orbit", "stop", "align", "lock-selected"} {
+		k.DoWorldVerb(action)
 	}
-	if c, ok := (*cmds)[1].(sim.CmdWarpTo); !ok || c.Range != WarpRanges[0] {
-		t.Errorf("default WarpRange = %v, want WarpRanges[0] %v", k.WarpRange(), WarpRanges[0])
+	if len(*cmds) != 5 {
+		t.Fatalf("enqueued %d commands, want 5", len(*cmds))
+	}
+	if c, ok := (*cmds)[0].(sim.CmdApproach); !ok || c.Target != rock.Entity {
+		t.Errorf("cmd[0] = %#v, want CmdApproach{%v}", (*cmds)[0], rock.Entity)
+	}
+	// The Orbit action carries the orbit selector's value (Kit.OrbitRange)
+	// through the intent's zero Range.
+	if c, ok := (*cmds)[1].(sim.CmdOrbit); !ok || c.Target != rock.Entity || c.Range != k.OrbitRange() {
+		t.Errorf("cmd[1] = %#v, want CmdOrbit{%v, OrbitRange %v}", (*cmds)[1], rock.Entity, k.OrbitRange())
 	}
 	if _, ok := (*cmds)[2].(sim.CmdStop); !ok {
 		t.Errorf("cmd[2] = %T, want sim.CmdStop", (*cmds)[2])
 	}
-	if c, ok := (*cmds)[3].(sim.CmdLock); !ok || c.Target != ecs.Entity(42) {
-		t.Errorf("cmd[3] = %#v, want CmdLock{42}", (*cmds)[3])
+	if c, ok := (*cmds)[3].(sim.CmdAlignTo); !ok || c.Target != rock.Entity {
+		t.Errorf("cmd[3] = %#v, want CmdAlignTo{%v}", (*cmds)[3], rock.Entity)
 	}
-	if c, ok := (*cmds)[4].(sim.CmdDock); !ok || c.Station != ecs.Entity(42) {
-		t.Errorf("cmd[4] = %#v, want CmdDock{42}", (*cmds)[4])
+	if c, ok := (*cmds)[4].(sim.CmdLock); !ok || c.Target != rock.Entity {
+		t.Errorf("cmd[4] = %#v, want CmdLock{%v}", (*cmds)[4], rock.Entity)
 	}
-	if c, ok := (*cmds)[5].(sim.CmdJump); !ok || c.Gate != ecs.Entity(42) {
-		t.Errorf("cmd[5] = %#v, want CmdJump{42}", (*cmds)[5])
-	}
-	if c, ok := (*cmds)[6].(sim.CmdLoot); !ok || c.Wreck != ecs.Entity(42) {
-		t.Errorf("cmd[6] = %#v, want CmdLoot{42}", (*cmds)[6])
-	}
+	*cmds = (*cmds)[:0]
 
-	// Mine needs a real asteroid and a fitted mining laser.
-	for _, info := range k.Sim.Grid() {
-		if info.Kind == sim.KindAsteroid {
-			k.selected = info.Entity
-			break
-		}
+	// Mine resolves the first fitted mining laser at press and rides the
+	// intent's Slot.
+	k.DoWorldVerb("mine")
+	if len(*cmds) != 1 {
+		t.Fatalf("mine enqueued %d commands, want 1", len(*cmds))
 	}
-	if k.selected != ecs.Entity(42) {
-		k.mineSelected()
-		if len(*cmds) != 8 {
-			t.Fatalf("mine enqueued %d commands total, want 8", len(*cmds))
-		}
-		if c, ok := (*cmds)[7].(sim.CmdMine); !ok || c.Asteroid != k.selected {
-			t.Errorf("cmd[7] = %#v, want CmdMine{%v}", (*cmds)[7], k.selected)
-		}
+	if c, ok := (*cmds)[0].(sim.CmdMine); !ok || c.Asteroid != rock.Entity || c.Slot.Class == "" {
+		t.Errorf("cmd = %#v, want CmdMine{%v, a fitted slot}", (*cmds)[0], rock.Entity)
+	}
+	*cmds = (*cmds)[:0]
+
+	// Warp at the warp selector's value (Kit.WarpRange, the default 0) on
+	// a real warpable target.
+	target := warpableTarget(t, k, sim.WarpMinRange)
+	k.Select(target.Entity)
+	k.DoWorldVerb("warp")
+	if len(*cmds) != 1 {
+		t.Fatalf("warp enqueued %d commands, want 1", len(*cmds))
+	}
+	if c, ok := (*cmds)[0].(sim.CmdWarpTo); !ok || c.Target != target.Entity || c.Range != k.WarpRange() {
+		t.Errorf("cmd = %#v, want CmdWarpTo{%v, WarpRange %v}", (*cmds)[0], target.Entity, k.WarpRange())
+	}
+	if c, ok := (*cmds)[0].(sim.CmdWarpTo); !ok || c.Range != WarpRanges[0] {
+		t.Errorf("default WarpRange = %v, want WarpRanges[0] %v", k.WarpRange(), WarpRanges[0])
 	}
 }
 
-// TestSelectedContextGating: with no selection every action is disabled;
-// with a live selection the context buttons follow the Info flags.
+// TestSelectedContextGating: the buttons are the verb table's panel
+// state. With no selection the selected-target verbs are disabled; the
+// fallback verbs (dock/jump/loot) are offered exactly when a nearest
+// eligible target exists — TestDockOffersTheNearestWithoutSelection pins
+// the other half.
 func TestSelectedContextGating(t *testing.T) {
 	k, _ := newTestKit(t)
 	k.selected = 0
 	k.Sync()
 	for name, b := range map[string]*widget.Button{
 		"approach": k.sp.approach, "warp": k.sp.warp, "stop": k.sp.stop,
-		"lock": k.sp.lock, "dock": k.sp.dock, "jump": k.sp.jump,
-		"loot": k.sp.loot, "mine": k.sp.mine,
+		"lock": k.sp.lock, "orbit": k.sp.orbit, "mine": k.sp.mine,
 	} {
 		if !b.GetWidget().Disabled {
 			t.Errorf("%s enabled with no selection", name)
+		}
+	}
+	for name, b := range map[string]*widget.Button{
+		"dock": k.sp.dock, "jump": k.sp.jump, "loot": k.sp.loot,
+	} {
+		if !b.GetWidget().Disabled {
+			t.Errorf("%s offered with no selection and no eligible nearest target", name)
 		}
 	}
 
@@ -291,13 +320,25 @@ func TestSelectedContextGating(t *testing.T) {
 	if celestial == nil {
 		t.Fatal("no warpable celestial on the grid")
 	}
+	// Dock answers the verb, not just the selected flag: the fallback may
+	// still find a dockable station with a non-station selected.
+	dockable := celestial.CanDock
+	if !dockable {
+		for _, info := range k.Sim.Grid() {
+			if info.CanDock {
+				dockable = true
+				break
+			}
+		}
+	}
 	k.selected = celestial.Entity
 	k.Sync()
 	if k.sp.warp.GetWidget().Disabled {
 		t.Error("warp disabled for a warpable celestial")
 	}
-	if got, want := k.sp.dock.GetWidget().Disabled, !celestial.CanDock; got != want {
-		t.Errorf("dock Disabled = %v, want %v (Info.CanDock=%v)", got, want, celestial.CanDock)
+	if got, want := k.sp.dock.GetWidget().Disabled, !dockable; got != want {
+		t.Errorf("dock Disabled = %v, want %v (a dockable station resolves: %v)",
+			got, want, dockable)
 	}
 	if ship != nil {
 		k.selected = ship.Entity

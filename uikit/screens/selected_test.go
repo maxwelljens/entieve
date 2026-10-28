@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/sim"
 )
 
@@ -530,6 +531,42 @@ func TestWarpMinimumRangeGate(t *testing.T) {
 		t.Error("warp selector disabled inside the minimum range")
 	}
 	_ = tr
+}
+
+// TestDockOffersTheNearestWithoutSelection pins the unified fallback: the
+// Dock button is the table's SelectedElseNearest row, so with nothing
+// selected it offers the nearest dockable station (the old panel greyed
+// it out) and acts on it.
+func TestDockOffersTheNearestWithoutSelection(t *testing.T) {
+	k, cmds := newTestKit(t)
+	pumpKit(t, k, 1280, 720)
+
+	var station sim.Info
+	for _, info := range k.Sim.Grid() {
+		if info.Kind == sim.KindStation {
+			station = info
+			break
+		}
+	}
+	if station.Entity.IsZero() {
+		t.Fatal("fixture: no station on the grid")
+	}
+	// Park it inside dock range of the player.
+	ply, _ := k.Sim.Transforms.Get(k.Sim.Player())
+	k.Sim.Transforms.Set(station.Entity, sim.Transform{Pos: ply.Pos.Add(core.V(1000, 0))})
+	k.Select(0)
+	pumpKit(t, k, 1280, 720)
+
+	if k.sp.dock.GetWidget().Disabled {
+		t.Fatal("Dock disabled with a dockable station in range and no selection")
+	}
+	uitest.FireButton(k.ui, k.sp.dock)
+	if len(*cmds) != 1 {
+		t.Fatalf("Dock enqueued %d commands, want 1", len(*cmds))
+	}
+	if c, ok := (*cmds)[0].(sim.CmdDock); !ok || c.Station != station.Entity {
+		t.Errorf("cmd = %#v, want CmdDock{%v}", (*cmds)[0], station.Entity)
+	}
 }
 
 // TestSelectedButtonContentFitsItsCell: an icon+label action button never

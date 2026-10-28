@@ -69,9 +69,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same one audio context (`game.NewAudio`), and every headless path gets a
   silent nop — no test decodes or plays a cue. Pack licence unknown, so it
   stays uncredited (source path documented in `assets/README.md`).
+- **One world-verb table** (`uikit/screens/worldverbs.go`): every in-space
+  command is a row — `{Action, Label, Rule, Eligible, Ready, Emit}` — and
+  the key path (`Game.worldKey`), the Selected Item buttons and the overview
+  row actions all resolve and emit through it, so the three surfaces cannot
+  gate or target differently. `Eligible` decides whether a verb may act at
+  all (it is also the nearest-fallback filter); `Ready` is the panel's
+  disabled state and its why text only, leaving a refusal on the key path to
+  the sim. A new `widgets.Align` intent gives the `W` key the same
+  intent→command parity as the rest (`commandFor` → `CmdAlignTo`), and
+  `widgets.Orbit` gained a `Range` (zero = the Selected Item selector at
+  dispatch; the right-click passes 2,500 m explicitly). World clicks —
+  `Ctrl`+click Lock, double-click Approach, right-click Orbit — now emit
+  those intents instead of queueing sim commands directly.
 
 ### Changed
 
+- **Panel gating and the Tab cycle follow the verb table** (`uikit/screens`):
+  the Selected Item panel's `syncSelected` is one loop of `VerbReady` (the
+  Warp `tooClose` case is the row's `Ready` reason; `canLock` and
+  `firstMiningSlot` have one home each), the overview rows read the same
+  answer for their row entity, and `nextLockIdx` moved with the cycle (same
+  anchoring, its test moved package). Behavior: `Shift+Tab` on a station no
+  longer locks it (the panel always greyed Lock there); the Dock/Jump/Loot
+  buttons now offer the nearest eligible target when the selection cannot
+  serve (they greyed out before); Mine greys out when no mining laser is
+  fitted. The right-click orbit still flies at 2,500 m whatever the selector
+  shows.
 - **The station board is a Screen panel** (`uikit/screens`, `game`): the
   docked contract board — service row, available and active contract rows —
   moved out of `game/contracts.go` into `uikit/screens/stationboard.go`
