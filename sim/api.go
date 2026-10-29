@@ -113,12 +113,12 @@ type Sim struct {
 	jobSeq uint64
 	craft  []SavedCraft
 
-	// --- ledger agents (system 18; see agent.go) ---
+	// --- ledger agents (system 19; see agent.go) ---
 	// agents is the deterministic roster in ascending id order (canonical
 	// iteration — maps never reach behavior). Empty outside agentWorlds
 	// (the showcase tour and test fixtures), which also gates upkeep.
 	agents []Agent
-	// upkeep is the per-station maintenance ledger system 18's upkeep
+	// upkeep is the per-station maintenance ledger system 19's upkeep
 	// cycle spends and burns (Save.Upkeep), seeded once per station and
 	// never refilled.
 	upkeep map[StationID]float64
@@ -269,17 +269,18 @@ func (s *Sim) Step() {
 	s.systemWeapons()   // 6  weapons
 	s.systemDamage()    // 7  damage
 	s.systemCap()       // 8  capacitor
-	s.systemMining()    // 9  mining
-	s.systemNpc()       // 10 npc
-	s.systemLoot()      // 11 loot
-	s.systemEconomy()   // 12 economy
-	s.systemTravel()    // 13 travel
-	s.systemMission()   // 14 mission (accept/abandon, objectives, auto-claim)
-	s.systemRespawn()   // 15 respawn
-	s.systemTraffic()   // 16 traffic (convoys, ambushes, patrols, book supply)
-	s.systemIndustry()  // 17 industry (manufacturing jobs, craft growth)
-	s.systemAgent()     // 18 agents (ledger economy: settle, behavior pass, upkeep)
-	s.systemWar()       // 19 the war (meters, procurement bids, fleets)
+	s.systemShield()    // 9  shield recharge
+	s.systemMining()    // 10 mining
+	s.systemNpc()       // 11 npc
+	s.systemLoot()      // 12 loot
+	s.systemEconomy()   // 13 economy
+	s.systemTravel()    // 14 travel
+	s.systemMission()   // 15 mission (accept/abandon, objectives, auto-claim)
+	s.systemRespawn()   // 16 respawn
+	s.systemTraffic()   // 17 traffic (convoys, ambushes, patrols, book supply)
+	s.systemIndustry()  // 18 industry (manufacturing jobs, craft growth)
+	s.systemAgent()     // 19 agents (ledger economy: settle, behavior pass, upkeep)
+	s.systemWar()       // 20 the war (meters, procurement bids, fleets)
 	// Death respawn runs after all systems so that a cross-system clone-bay
 	// respawn can rebuild the grid without yanking entities out from under
 	// the systems still running this tick.
@@ -628,7 +629,7 @@ func (s *Sim) dockedStationFor(svc string) StationID {
 	return ""
 }
 
-// --- industry (system 17) ---
+// --- industry (system 18) ---
 
 // DockedIndustry returns the station the player is docked at when it
 // offers the industry service ("" otherwise) — the station the factory
@@ -644,7 +645,7 @@ func IndustrySlots() int { return industrySlots }
 // panel's have/need column and exactly what StartJob commits from.
 func (s *Sim) PlayerStock(item content.ItemID) int { return s.playerStock(item) }
 
-// --- ledger agents (system 18) ---
+// --- ledger agents (system 19) ---
 
 // Agents returns the roster in canonical (ascending id) order: the
 // read-only view of every ledger agent (empty in worlds without agents).

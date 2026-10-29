@@ -103,11 +103,11 @@ var simFieldClasses = map[string]fieldClass{
 	"craft":         {save: []string{"Craft"}},
 	"deferIndustry": {transient: true},
 
-	// --- ledger agents (system 18: roster + station upkeep ledgers) ---
+	// --- ledger agents (system 19: roster + station upkeep ledgers) ---
 	"agents": {save: []string{"Agents"}},
 	"upkeep": {save: []string{"Upkeep"}},
 
-	// --- the war (system 19: control, front meters, bloc treasury) ---
+	// --- the war (system 20: control, front meters, bloc treasury) ---
 	"war": {save: []string{"War"}},
 }
 

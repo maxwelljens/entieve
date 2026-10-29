@@ -430,7 +430,7 @@ CmdRefine{Item, Qty}, CmdRepair{}, CmdAssemble{ShipID},
 CmdFitModule{ModuleID, Slot SlotRef}, CmdUnfitModule{Slot SlotRef},
 CmdAcceptMission{ID content.ContractID}, CmdAbandonMission{ID content.ContractID},
 CmdStartJob{Recipe content.RecipeID, Runs int}, CmdCollectJob{ID uint64},
-CmdCancelJob{ID uint64} // industry (system 17)
+CmdCancelJob{ID uint64} // industry (system 18)
 ```
 (`Target ecs.Entity`; module index = flat slot index within its slot class.
 The two mission commands validate against the docked station's contract
@@ -517,26 +517,27 @@ anatomy lives in `docs/SIM.md`):
 6. `weapons` (turret math below, ammo consumption),
 7. `damage` (shield → armor → structure with resists; death → wreck),
 8. `capacitor` (recharge curve),
-9. `mining` (cycle yields into ore hold; persistent belt-state decrement),
-10. `npc` (state machine: idle→approach→orbit→fire→flee; uses Fork'd RNG),
-11. `loot` (loot command → cargo; bounty on NPC death → wallet),
-12. `economy` (buy/sell/refine/repair/fitting at station; the per-station
+9. `shield` (passive shield recharge curve, peak at 25% shield),
+10. `mining` (cycle yields into ore hold; persistent belt-state decrement),
+11. `npc` (state machine: idle→approach→orbit→fire→flee; uses Fork'd RNG),
+12. `loot` (loot command → cargo; bounty on NPC death → wallet),
+13. `economy` (buy/sell/refine/repair/fitting at station; the per-station
     order books; wallet),
-13. `travel` (dock/undock/jump: swaps system content),
-14. `mission` (contract accept/abandon against the docked station's board,
+14. `travel` (dock/undock/jump: swaps system content),
+15. `mission` (contract accept/abandon against the docked station's board,
     folds kill/ore objective observations, auto-claims ready contracts on
     docking at the claim station → wallet + standing),
-15. `respawn` (funded NPC replacement timers — requisitioned through books
+16. `respawn` (funded NPC replacement timers — requisitioned through books
     and ledgers, see "world metabolism" in `docs/SIM.md`),
-16. `traffic` (the living universe: convoy spawn/warp/deliver schedules,
+17. `traffic` (the living universe: convoy spawn/warp/deliver schedules,
     real-cargo provenance, per-leg ambush rolls, raider and patrol combat,
     cross-system journey parking/resume, book supply),
-17. `industry` (manufacturing jobs from recipes, the 3-slot global pool,
+18. `industry` (manufacturing jobs from recipes, the 3-slot global pool,
     job fees/cancels, craft growth and idle decay),
-18. `agents` (the ledger economy: settle resting fills every tick, the
+19. `agents` (the ledger economy: settle resting fills every tick, the
     agent behavior pass on per-agent cooldowns of 60-600 ticks, the station upkeep cycle every
     3600 ticks),
-19. `war` (the Long Attrition: the hourly contest beat — meters settle and
+20. `war` (the Long Attrition: the hourly contest beat — meters settle and
     flip, the standing war bids refresh against the treasury, fleets look
     for the front; `sim/war.go`, anatomy in `docs/SIM.md` §6).
 

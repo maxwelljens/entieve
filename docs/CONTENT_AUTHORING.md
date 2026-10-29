@@ -326,6 +326,7 @@ Create `content/data/ships/ship-<name>.json` (one file per hull). Populate
   "grid_classes": { "i": 4, "ii": 2 },
   "cpu_classes": { "ii": 1 },
   "shield": 260,
+  "shield_recharge": 220,
   "armor": 140,
   "structure": 220,
   "resists": { "em": 0.2, "thermal": 0.3, "kinetic": 0.2, "explosive": 0.15 },
@@ -343,6 +344,11 @@ Create `content/data/ships/ship-<name>.json` (one file per hull). Populate
   "scan_resolution": 640
 }
 ```
+
+`shield_recharge` is the passive shield recharge time in seconds (0% to
+~98% while idle, the `T` of EVE's curve); every hull needs one, and shield
+extenders raise capacity without touching it, so a bigger pool recharges
+faster in HP/s.
 
 Balance rules of thumb: small hull total HP (shield+armor+structure) 300–800;
 frigate price 200k–400k euro (`base_price` on the hull, and a founding

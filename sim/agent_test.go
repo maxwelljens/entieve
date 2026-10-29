@@ -11,7 +11,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Ledger-agent test fixtures and drivers (system 18).
+// Ledger-agent test fixtures and drivers (system 19).
 //
 // Roster agents only spawn in agentWorlds (world-default); these tests
 // construct agents directly so every fixture stays explicit and every

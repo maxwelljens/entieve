@@ -708,8 +708,8 @@ func TestIndustryNoRNGDraws(t *testing.T) {
 	}
 }
 
-// TestIndustrySystemOrderPinned: industry runs as system 17, the ledger
-// agents as system 18 and the war as system 19, appended at the END of
+// TestIndustrySystemOrderPinned: industry runs as system 18, the ledger
+// agents as system 19 and the war as system 20, appended at the END of
 // Step — the documented system order is a contract, so the sequence itself is
 // what this test reads out of api.go.
 func TestIndustrySystemOrderPinned(t *testing.T) {
@@ -724,7 +724,7 @@ func TestIndustrySystemOrderPinned(t *testing.T) {
 	}
 	want := []string{
 		"systemMovement", "systemWarp", "systemTargeting", "systemModules",
-		"systemWeapons", "systemDamage", "systemCap", "systemMining",
+		"systemWeapons", "systemDamage", "systemCap", "systemShield", "systemMining",
 		"systemNpc", "systemLoot", "systemEconomy", "systemTravel",
 		"systemMission", "systemRespawn", "systemTraffic", "systemIndustry",
 		"systemAgent", "systemWar",

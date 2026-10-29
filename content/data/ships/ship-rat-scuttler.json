@@ -27,6 +27,7 @@
   },
   "cpu_classes": {},
   "shield": 80,
+  "shield_recharge": 200,
   "armor": 100,
   "structure": 130,
   "resists": {

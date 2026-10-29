@@ -170,6 +170,7 @@ type ShipDef struct {
 	GridClasses    ClassQuota `json:"grid_classes,omitempty"` // per-class fit allowance on the powergrid axis
 	CPUClasses     ClassQuota `json:"cpu_classes,omitempty"`  // per-class fit allowance on the cpu axis
 	Shield         float64    `json:"shield"`
+	ShieldRecharge float64    `json:"shield_recharge"` // seconds from 0% to ~98% shielded, idle (EVE T)
 	Armor          float64    `json:"armor"`
 	Structure      float64    `json:"structure"`
 	Resists        Resists    `json:"resists"`
