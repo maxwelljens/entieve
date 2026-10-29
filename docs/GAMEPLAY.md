@@ -462,6 +462,14 @@ documented simplification: overflow damage carries to the next layer at *full*
 value (no EVE-style bleed-through halving). Structure at zero means the ship
 is destroyed.
 
+**Shields recharge on their own.** A damaged shield rebuilds along EVE's
+curve: `dC/dt = (10·Cmax/T)·(√(C/Cmax) − C/Cmax)`, where `T` is the hull's
+`shield_recharge` time — the idle time from 0% to roughly 98%. The rate peaks
+at 25% shield at 2.5× the average `Cmax/T`, so a shield near empty or near
+full creeps, and one held at a quarter refills fastest. Shield extenders add
+capacity and leave `T` alone, which raises HP/s; shield boosters stack on top
+of the regen. Armor and structure do not regenerate — dock for those.
+
 **Capacitor.** Active modules consume GJ from the capacitor, which recharges
 on EVE's curve (peak recharge near 25% of capacity; the fitting window shows
 capacity and recharge time). Running dry means guns and tanks stop cycling —

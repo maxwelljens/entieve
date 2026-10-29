@@ -1,7 +1,7 @@
 package sim
 
 // ---------------------------------------------------------------------------
-// Ledger agents — the economic agent layer (system 18): autonomous traders,
+// Ledger agents — the economic agent layer (system 19): autonomous traders,
 // miners and manufacturers that make the economy player-driven without
 // players. Approved design: docs/research/price-formation-brief.md §5
 // candidate A ("Imputed-Marginal-Utility") layered over ZIP placement and
@@ -227,7 +227,7 @@ type Agent struct {
 	InFlight []HaulWish
 }
 
-// AgentView is the read-only roster view (system 18's reader surface).
+// AgentView is the read-only roster view (system 19's reader surface).
 type AgentView struct {
 	ID      string
 	Home    StationID

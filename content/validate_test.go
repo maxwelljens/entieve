@@ -17,6 +17,23 @@ func TestValidateRealContent(t *testing.T) {
 	}
 }
 
+// TestEveryHullCarriesShieldRecharge pins that every shipped hull declares a
+// passive shield recharge time: zero would mean a shield that never rebuilds.
+func TestEveryHullCarriesShieldRecharge(t *testing.T) {
+	c, err := Load(FS())
+	if err != nil {
+		t.Fatalf("Load(FS()): %v", err)
+	}
+	if len(c.Ships) != 11 {
+		t.Fatalf("hulls = %d, want 11", len(c.Ships))
+	}
+	for id, h := range c.Ships {
+		if h.ShieldRecharge <= 0 {
+			t.Errorf("%s: shield_recharge = %v, want > 0", id, h.ShieldRecharge)
+		}
+	}
+}
+
 // baseContent builds a minimal, fully valid in-memory world used as the
 // starting point for negative validation cases.
 func baseContent() *Content {
@@ -211,6 +228,13 @@ func TestValidateNegativeCases(t *testing.T) {
 				c.Ships["ship-hull"].Resists.EM = 1.2
 			},
 			want: "resist em 1.2 outside [0,1)",
+		},
+		{
+			name: "negative shield recharge",
+			mutate: func(c *Content) {
+				c.Ships["ship-hull"].ShieldRecharge = -5
+			},
+			want: "negative shield recharge -5",
 		},
 		{
 			name: "unknown npc in spawn",

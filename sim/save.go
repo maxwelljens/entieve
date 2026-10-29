@@ -230,7 +230,7 @@ func (s *Sim) buildSave() (*Save, error) {
 		})
 	}
 
-	// ---- ledger agents (system 18): roster in id order + upkeep ledgers ----
+	// ---- ledger agents (system 19): roster in id order + upkeep ledgers ----
 	// Canonical order re-asserted here so the serialization — and therefore
 	// Hash — never depends on insertion order; per-agent keys (inventory,
 	// beliefs, margins) sort inside Agent.saved().
@@ -567,7 +567,7 @@ func (s *Sim) restore(save *Save) error {
 		return a.Family < b.Family
 	})
 
-	// ---- ledger agents (system 18): roster, beliefs, capital, wishes ----
+	// ---- ledger agents (system 19): roster, beliefs, capital, wishes ----
 	// Resting-order ledgers are DERIVED from the restored books (a Save
 	// lands on Step boundaries, where agentSettle has run and every fill
 	// has settled), so an order book is the single source of truth for
@@ -671,6 +671,13 @@ func (s *Sim) attach(e ecs.Entity, se SavedEntity) {
 		s.Motions.Set(e, *se.Motion)
 	}
 	if se.Ship != nil {
+		// A pre-field save restores zero: recharge time is hull-fixed, so
+		// re-derive it rather than leave the hull permanently without regen.
+		if se.Ship.ShieldTau == 0 {
+			if hull, ok := s.Content.Ship(se.Ship.Hull); ok {
+				se.Ship.ShieldTau = hull.ShieldRecharge
+			}
+		}
 		s.Ships.Set(e, *se.Ship)
 	}
 	if se.Cap != nil {

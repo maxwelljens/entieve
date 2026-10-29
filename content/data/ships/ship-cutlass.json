@@ -39,6 +39,7 @@
     "ii": 1
   },
   "shield": 640,
+  "shield_recharge": 300,
   "armor": 880,
   "structure": 880,
   "resists": {

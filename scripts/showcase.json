@@ -290,10 +290,10 @@
     "at_tick": 51310,
     "action": "transfer",
     "item": "ammo-emp-s",
-    "qty": 3,
+    "qty": 1,
     "from": "cargo",
     "to": "hangar",
-    "note": "stash every leftover shell (the bay was dumped 50060): inter-NPC aggression moved the fight-2 stream, so leftover counts were recalibrated to 3 EMP / 3 fusion / 4 plutonium / 10 AP. EMP and fusion leave together, then plutonium and AP leave on the same tick, so the idle gun never sees a single type it would auto-load — and with no matching round in cargo the fight-3 cycle is truly dry"
+    "note": "stash every leftover shell (the bay was dumped 50060): inter-NPC aggression moved the fight-2 stream, so leftover counts were recalibrated to 1 EMP / 3 fusion / 2 plutonium / 1 AP (was 3/3/4/10 before passive shield recharge extended the fights and burned more shells). EMP and fusion leave together, then plutonium and AP leave on the same tick, so the idle gun never sees a single type it would auto-load — and with no matching round in cargo the fight-3 cycle is truly dry"
   },
   {
     "at_tick": 51310,
@@ -307,7 +307,7 @@
     "at_tick": 51320,
     "action": "transfer",
     "item": "ammo-plutonium-s",
-    "qty": 4,
+    "qty": 2,
     "from": "cargo",
     "to": "hangar"
   },
@@ -315,7 +315,7 @@
     "at_tick": 51320,
     "action": "transfer",
     "item": "ammo-ap-s",
-    "qty": 10,
+    "qty": 1,
     "from": "cargo",
     "to": "hangar"
   },

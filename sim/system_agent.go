@@ -91,7 +91,7 @@ func (s *Sim) agentSettleFill(a *Agent, o AgentOrder, qty int) {
 	}
 }
 
-// systemAgent runs system 18: settle resting agent fills, then (per agent
+// systemAgent runs system 19: settle resting agent fills, then (per agent
 // cooldown) the behavior pass and, on the clock, the station upkeep cycle.
 // No-op in worlds without a roster (the showcase tour and fixtures).
 func (s *Sim) systemAgent() {

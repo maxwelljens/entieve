@@ -261,7 +261,7 @@ func (s *Sim) warContestIDs() []content.SystemID {
 // The beat
 // ---------------------------------------------------------------------------
 
-// systemWar runs the war's hourly beat (system 19): settle the meters,
+// systemWar runs the war's hourly beat (system 20): settle the meters,
 // refresh the standing war bids, and look for a fleet action at the front.
 // Only the loaded system ticks — like every other system, the war's grid-side
 // effects need the player here; the meters themselves are made of state.

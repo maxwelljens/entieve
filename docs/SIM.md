@@ -31,17 +31,18 @@ run in this fixed order:
 | 6 | weapons | `sim/system_weapons.go` | turret math, one round drawn from the bay per shot |
 | 7 | damage | `sim/system_damage.go` | shield → armor → structure; death → wreck |
 | 8 | capacitor | `sim/system_cap.go` | EVE recharge curve |
-| 9 | mining | `sim/system_mining.go` | cycle yields into the ore hold; belt-state decrement |
-| 10 | npc | `sim/system_npc.go` | candidate-based threat state machine (rats/guards/miners) |
-| 11 | loot | `sim/system_loot.go` | loot command → cargo; bounties |
-| 12 | economy | `sim/system_economy.go` | station services (the `content.Services` ids): buy/sell/refine/repair/fitting |
-| 13 | travel | `sim/system_travel.go` | dock (free full restore, all modules off) / undock (modules off) / jump: grid swaps |
-| 14 | mission | `sim/system_mission.go` | contract accept/abandon, objectives, auto-claim |
-| 15 | respawn | `sim/system_respawn.go` | funded NPC replacement timers |
-| 16 | traffic | `sim/system_traffic.go` | convoys, ambushes, patrols, book supply, journeys |
-| 17 | industry | `sim/system_industry.go` | manufacturing jobs, craft growth |
-| 18 | agents | `sim/system_agent.go` | ledger economy: settle, behavior pass, upkeep |
-| 19 | war | `sim/war.go` | the Long Attrition: contest meters, procurement bids, fleets |
+| 9 | shield | `sim/system_shield.go` | EVE passive shield recharge curve (peak at 25%) |
+| 10 | mining | `sim/system_mining.go` | cycle yields into the ore hold; belt-state decrement |
+| 11 | npc | `sim/system_npc.go` | candidate-based threat state machine (rats/guards/miners) |
+| 12 | loot | `sim/system_loot.go` | loot command → cargo; bounties |
+| 13 | economy | `sim/system_economy.go` | station services (the `content.Services` ids): buy/sell/refine/repair/fitting |
+| 14 | travel | `sim/system_travel.go` | dock (free full restore, all modules off) / undock (modules off) / jump: grid swaps |
+| 15 | mission | `sim/system_mission.go` | contract accept/abandon, objectives, auto-claim |
+| 16 | respawn | `sim/system_respawn.go` | funded NPC replacement timers |
+| 17 | traffic | `sim/system_traffic.go` | convoys, ambushes, patrols, book supply, journeys |
+| 18 | industry | `sim/system_industry.go` | manufacturing jobs, craft growth |
+| 19 | agents | `sim/system_agent.go` | ledger economy: settle, behavior pass, upkeep |
+| 20 | war | `sim/war.go` | the Long Attrition: contest meters, procurement bids, fleets |
 
 After all systems, the **deferred player death respawn** runs
 (`pendingPlayerRespawn`): a cross-system clone-bay respawn rebuilds the
@@ -513,7 +514,7 @@ microstructure, §5 the candidate mechanisms).
 
 ## 6. The war (the Long Attrition)
 
-The war is **system 19** (`sim/war.go`), the last beat of the tick.
+The war is **system 20** (`sim/war.go`), the last beat of the tick.
 Corporate fleets raised under the Commission fight the Old Works for
 territory: **control** is the scoreboard, **contest meters** on the front
 are its pulse, and the economy funds it. The war is world-gated

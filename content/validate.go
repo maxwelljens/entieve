@@ -247,6 +247,9 @@ func (v *validator) ships() {
 		if s.Recharge < 0 {
 			v.addf("%s: negative recharge %v", ctx, s.Recharge)
 		}
+		if s.ShieldRecharge < 0 {
+			v.addf("%s: negative shield recharge %v", ctx, s.ShieldRecharge)
+		}
 		if s.MaxSpeed < 0 {
 			v.addf("%s: negative max speed %v", ctx, s.MaxSpeed)
 		}

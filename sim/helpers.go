@@ -540,6 +540,7 @@ func (s *Sim) recomputeFit(e ecs.Entity) {
 	// starts at full strength — an NPC spawning "damaged" would aggro at any
 	// range.
 	ship.MaxShield = maxShield
+	ship.ShieldTau = hull.ShieldRecharge // recharge TIME is hull-fixed: extenders add capacity, so regen HP/s rises
 	ship.MaxArmor = maxArmor
 	ship.MaxStructure = maxStruct
 	ship.Resists = res

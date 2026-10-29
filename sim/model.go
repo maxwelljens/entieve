@@ -79,6 +79,7 @@ type ShipState struct {
 	Hull                              content.ShipID
 	Shield, Armor, Structure          float64 // current HP
 	MaxShield, MaxArmor, MaxStructure float64
+	ShieldTau                         float64         // shield recharge time, seconds (hull-fixed; extenders raise MaxShield only)
 	Resists                           content.Resists // base hull + passive module bonuses
 	ScrambledUntil                    float64         // warp disruption expiry (sim time)
 }
@@ -1181,7 +1182,7 @@ type Save struct {
 	// idle ticks), sorted by (station, family) — the CraftLevel input.
 	Craft []SavedCraft `json:"craft,omitempty"`
 
-	// ---- ledger agents (system 18) ----
+	// ---- ledger agents (system 19) ----
 
 	// Agents is the roster in ascending id order: capital, inventory,
 	// EWMA beliefs, ZIP margins and haul wishes per agent (inventory,

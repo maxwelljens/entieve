@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Passive shield recharge** (`sim`, `content`) — a damaged shield rebuilds
+  itself on EVE's curve, `dC/dt = (10·Cmax/T)·(√(C/Cmax) − C/Cmax)`, peak at
+  25% shield for 2.5× the average `Cmax/T`. `T` is the hull's new
+  `shield_recharge` attribute (the idle time from 0% to ~98%), authored for
+  all 11 hulls in `content/data/ships`; it is hull-fixed, so shield extenders
+  raise capacity and with it HP/s. Shield boosters stack on top. Armor and
+  structure still do not regenerate.
 - **The starmap shows the war** (`uikit`, `docs`) — the map is the war's
   surface (no separate window): every system node now says which side holds
   it (**filled** disc = the charter, **hollow outline** = the Old Works), a
