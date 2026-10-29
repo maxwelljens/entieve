@@ -198,7 +198,7 @@ func (sc *HelpScene) Draw(dst *ebiten.Image) {
 
 // menuItems are the Esc menu buttons, in draw order. Settings is the
 // in-game mouse path to the settings window (the rail no longer
-// launches it).
+// launches it): it enters the menu's settings session.
 var menuItems = []string{"Resume", "Save", "Save as…", "Load", "Settings", "Quit"}
 
 // MenuScene is the Esc menu: a small modal uikit window with Resume /
@@ -216,6 +216,52 @@ func (sc *MenuScene) Update(in Input) error { return nil }
 
 // Draw dims the screen behind the menu window.
 func (sc *MenuScene) Draw(dst *ebiten.Image) {
+	dimScreen(dst, sc.g.w, sc.g.h, 170)
+}
+
+// ---------------------------------------------------------------------------
+// SettingsScene (the pause menu's settings session)
+// ---------------------------------------------------------------------------
+
+// SettingsScene is the settings window as the pause menu owns it: entering
+// Settings from the Esc menu trades the menu scene for this one, which
+// opens the window modal and dims the screen behind it; Esc (or the
+// window's ×) hands the session back to the menu. The row itself stays
+// non-modal, so the P key's window is still a plain floating one.
+type SettingsScene struct{ g *Game }
+
+// OnEnter implements Scene: opens the settings window and makes it modal
+// for the session only.
+func (sc *SettingsScene) OnEnter() {
+	sc.g.host.SetOpen(idSettings, true)
+	sc.setModal(true)
+}
+
+// OnLeave implements Scene: closes the window and restores its plain
+// (non-modal) flag — the P path must never inherit the session's layer.
+func (sc *SettingsScene) OnLeave() {
+	sc.g.host.SetOpen(idSettings, false)
+	sc.setModal(false)
+}
+
+// Update re-asserts the modal flag: a load rebuilds the kit's windows
+// (LoadGame → buildKit → Warm) and the session outlives the rebuild.
+func (sc *SettingsScene) Update(in Input) error {
+	sc.setModal(true)
+	return nil
+}
+
+// setModal flips the built window's flag (the row's Modal field is the
+// build-time default and stays false).
+func (sc *SettingsScene) setModal(on bool) {
+	if w := sc.g.host.Window(idSettings); w != nil {
+		w.Modal = on
+	}
+}
+
+// Draw dims the screen behind the settings window, like the menu it
+// replaced.
+func (sc *SettingsScene) Draw(dst *ebiten.Image) {
 	dimScreen(dst, sc.g.w, sc.g.h, 170)
 }
 
@@ -264,17 +310,9 @@ func (g *Game) buildMenuWindow() *widget.Window {
 			err := g.SaveAs()
 			g.report(err, "Saved as "+filepath.Base(g.activeSavePath()))
 		},
-		"Load": func() { g.Do(widgets.Load{}) },
-		"Settings": func() {
-			// Leave the pause menu first (it is modal and dims the
-			// screen), the way Resume does, then ensure-show Settings:
-			// SetOpen(true) never flips an already-open window shut, so
-			// Settings behind the menu stays open — this entry enters
-			// Settings, it does not toggle it.
-			g.Do(widgets.Toggle{Screen: "Menu"})
-			g.host.SetOpen(idSettings, true)
-		},
-		"Quit": func() { g.Do(widgets.Quit{}) },
+		"Load":     func() { g.Do(widgets.Load{}) },
+		"Settings": func() { g.Do(widgets.Toggle{Screen: "Settings"}) },
+		"Quit":     func() { g.Do(widgets.Quit{}) },
 	}
 	for _, item := range menuItems {
 		item := item

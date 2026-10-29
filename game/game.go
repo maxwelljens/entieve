@@ -489,6 +489,7 @@ func (g *Game) handleKeys(in Input) error {
 	ctrl := held(in.KeysDown, ebiten.KeyControl)
 	shift := held(in.KeysDown, ebiten.KeyShift)
 	_, menuOpen := g.top().(*MenuScene)
+	_, settingsSession := g.top().(*SettingsScene)
 	world := false
 	switch g.top().(type) {
 	case *SpaceScene, *StationScene:
@@ -548,9 +549,10 @@ func (g *Game) handleKeys(in Input) error {
 				continue
 			}
 			switch {
-			case menuOpen:
-				// The Esc menu is modal: nothing else toggles while it
-			// is open (save/load/time above still work).
+			case menuOpen || settingsSession:
+				// The Esc menu is modal, and so is the settings session
+				// it opens: nothing else toggles while either is up
+				// (save/load/time above still work).
 			case g.kit.Held():
 				// So is a context menu: it owns this frame's keys until
 				// the click or Esc that dismisses it has been spent.
@@ -962,6 +964,8 @@ func (g *Game) onEscape() error {
 	switch g.top().(type) {
 	case *MenuScene:
 		g.closeMenu()
+	case *SettingsScene:
+		g.exitSettings()
 	case *HelpScene:
 		g.pop()
 	default:

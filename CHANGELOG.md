@@ -115,8 +115,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Settings opens from the Esc menu** — the pause menu gained a **Settings**
   entry (Resume / Save / Save as… / Load / Settings / Quit): the in-game
   mouse path to the settings window now the rail no longer launches it.
-  Clicking it leaves the pause menu with Settings showing, and never flips an
-  already-open Settings shut.
+  Clicking it turns the pause menu into its **settings session** — the menu
+  gives way to the settings window, dimmed screen and all — and `Esc` (or the
+  window's ×) returns to the pause menu. An already-open Settings stays open
+  as the session starts; it is never flipped shut.
 
 - **Relicensed to the European Union Public Licence 1.2** — the LICENSE file
   now carries the official EUPL-1.2 text, and the in-game credits screen and
@@ -150,14 +152,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Settings from the pause menu is a window, not a modal** (`game`): clicking
-  **Settings** in the Esc menu now leaves the pause menu completely — no
-  scene, no dim, no modal input layer — with Settings as the ordinary floating
-  window `P` opens. The menu verb closed the menu only when it was the scene on
-  top; a menu sitting under another scene (a dock landing in the same frame as
-  the Esc press pushes the station above it) pushed a second menu instead, so
-  the modal menu and its dim stayed up around the settings window. The menu
-  toggle now finds and closes the pause menu wherever it sits.
+- **Settings from the pause menu is a modal part of the menu, not a window**
+  (`game`): clicking **Settings** in the Esc menu hands the window to a
+  settings session — the pause menu scene leaves the stack, the settings
+  window opens **modal** over the same dim the menu drew, and `Esc` (or the
+  window's ×) ends the session and brings the pause menu back. The `P` key is
+  untouched: it still opens the ordinary floating window. The menu verb closed
+  the menu only when it was the scene on top; a menu sitting under another
+  scene (a dock landing in the same frame as the Esc press pushes the station
+  above it) pushed a second menu instead, so the modal menu and its dim stayed
+  up around the settings window. The menu toggle now finds and closes the
+  pause menu wherever it sits.
 
 - **Firing graphics aim at the ship the gun is firing at** (`render`, `sim`):
   with several locked targets, every gun's shots were drawn toward the first
