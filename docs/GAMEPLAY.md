@@ -161,7 +161,12 @@ the Esc menu keeps its own key — the rail is not its launcher. **Settings**
 and **Keybindings** are not rail launchers either: Settings keeps its key
 (`P`), its title-menu row and a **Settings** entry in the Esc menu (the
 in-game mouse path), and Keybindings is opened from the Settings window's
-**Keybindings…** button only.
+**Keybindings…** button only. The Esc menu's **Settings** entry opens the
+settings window as a **modal session of the pause menu** — the menu gives way
+to it and the screen stays dimmed while it is up; `Esc` (or the window's ×)
+ends the session and returns to the pause menu, not to the game. The `P` key
+stays the ordinary floating window: no dim, no modal layer, and `Esc` opens
+the pause menu over it rather than ending a session.
 
 The **Settings**
 window (`P`) holds the **UI scale** slider — a notched track over the six

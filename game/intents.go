@@ -40,7 +40,8 @@ func (g *Game) Do(i widgets.Intent) {
 
 // toggleScreen flips the Screen row titled name (case-insensitive). The
 // non-modal rows flip their host flag exactly like their key does; the
-// modal rows are scene-owned, so they push/pop the scene their key drives.
+// modal rows are scene-owned, so they push/pop the scene their key drives
+// (Settings is the plain flag, except inside the pause menu's session).
 func (g *Game) toggleScreen(name string) {
 	id, ok := g.host.ByTitle(name)
 	if !ok {
@@ -64,6 +65,19 @@ func (g *Game) toggleScreenID(id ScreenID) {
 		} else {
 			g.push(&MenuScene{g: g})
 		}
+	case idSettings:
+		// Within the menu's settings session the row belongs to the
+		// session: closing it (×) returns to the pause menu. From the
+		// pause menu it opens that session; everywhere else — the P key,
+		// the title host — it is the plain flag toggle.
+		switch {
+		case g.settingsUp():
+			g.exitSettings()
+		case g.menuUp():
+			g.enterSettings()
+		default:
+			g.host.Toggle(id)
+		}
 	default:
 		g.host.Toggle(id)
 	}
@@ -82,4 +96,28 @@ func (g *Game) menuUp() bool {
 // survives it.
 func (g *Game) closeMenu() {
 	g.removeScene(func(s Scene) bool { _, ok := s.(*MenuScene); return ok })
+}
+
+// enterSettings turns the pause menu into its settings session: the menu
+// scene and its window go, the SettingsScene takes over the settings window
+// as a modal, dimmed session.
+func (g *Game) enterSettings() {
+	if g.settingsUp() {
+		return
+	}
+	g.closeMenu()
+	g.push(&SettingsScene{g: g})
+}
+
+// exitSettings ends the session and brings the pause menu back: the
+// settings scene closes the window (restoring its plain flag) and the menu
+// remounts above the world.
+func (g *Game) exitSettings() {
+	g.removeScene(func(s Scene) bool { _, ok := s.(*SettingsScene); return ok })
+	g.push(&MenuScene{g: g})
+}
+
+// settingsUp reports whether the settings session is on the scene stack.
+func (g *Game) settingsUp() bool {
+	return g.findScene(func(s Scene) bool { _, ok := s.(*SettingsScene); return ok })
 }

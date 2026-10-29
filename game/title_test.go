@@ -532,9 +532,10 @@ func TestEscMenuSaveAsButton(t *testing.T) {
 
 // TestEscMenuSettingsEntry: the pause menu offers Settings — the in-game
 // mouse path to the settings window now the rail no longer launches it —
-// and clicking it leaves the pause menu with Settings showing. The
-// already-open case must not flip Settings shut (it is entered FROM the
-// menu, never toggled by it).
+// and clicking it turns the pause menu into its SETTINGS SESSION: the menu
+// scene and window go, the SettingsScene owns the window as a modal, and
+// Esc hands the session back to the menu (it is part of the pause menu,
+// not a window floating over the game).
 func TestEscMenuSettingsEntry(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
@@ -556,56 +557,166 @@ func TestEscMenuSettingsEntry(t *testing.T) {
 	if err := g.Update(); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
-	if _, top := g.top().(*MenuScene); top {
-		t.Error("Settings click left the pause menu on top")
+	if _, top := g.top().(*SettingsScene); !top {
+		t.Fatalf("top scene after the Settings click = %T, want the settings session", g.top())
+	}
+	if g.menuUp() {
+		t.Error("Settings click left the pause menu scene on the stack")
 	}
 	if !g.host.IsOpen(idSettings) {
 		t.Error("Settings click did not open the settings window")
 	}
-	// The click's end state is the P-key end state: no pause menu scene
-	// (MenuScene.Draw veils the world with dimScreen 170), no menu window
-	// (it is modal), no modal layer owning the frame, and Settings itself a
-	// plain floating window.
-	if g.menuUp() {
-		t.Error("Settings click left a pause menu scene on the stack")
-	}
 	// One more frame: the handler runs inside kit.Update, after that frame's
 	// mount pass, so the unmount reconciles on the next one.
-	if err := g.Update(); err != nil {
-		t.Fatalf("Update (reconcile): %v", err)
-	}
+	pump(t, g, 1280, 720)
 	if g.host.Mounted(idMenu) {
-		t.Error("Settings click left the modal menu window mounted")
+		t.Error("Settings click left the menu window mounted")
 	}
-	if w := g.host.Window(idSettings); w == nil || w.Modal {
-		t.Error("settings window is modal, want an ordinary floating window")
+	if w := g.host.Window(idSettings); w == nil || !w.Modal {
+		t.Error("settings window is not modal in the session")
 	}
-	// A bare world point answers to the world again; a modal's fullscreen
-	// input layer would still own it.
-	if g.overUI(1000, 500) {
-		t.Error("the interface owns a bare world point after the click: a modal layer is up")
+	// The session is a modal layer: a bare world point answers to it, not
+	// to the world (the menu's dim is replaced by the session's own).
+	if !g.overUI(1000, 500) {
+		t.Error("the world owns a bare point during the settings session: no modal layer is up")
 	}
 
-	// Settings open behind the menu: the click closes the menu and KEEPS
-	// Settings open (SetOpen(true) is ensure-show, never a flip).
-	g.push(&MenuScene{g: g})
+	// Esc returns to the pause menu — not to the game.
+	if err := g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyEscape}}); err != nil {
+		t.Fatalf("handleKeys (Esc): %v", err)
+	}
+	if _, top := g.top().(*MenuScene); !top {
+		t.Fatalf("top scene after Esc from the session = %T, want the pause menu", g.top())
+	}
+	if g.settingsUp() {
+		t.Error("Esc left the settings session on the stack")
+	}
+	pump(t, g, 1280, 720)
+	if !g.host.Mounted(idMenu) || !g.host.IsOpen(idMenu) {
+		t.Error("Esc did not bring the pause menu window back")
+	}
+	if g.host.IsOpen(idSettings) || g.host.Mounted(idSettings) {
+		t.Error("Esc left the settings window up")
+	}
+	if w := g.host.Window(idSettings); w == nil || w.Modal {
+		t.Error("settings window still modal after the session ended: the P path would inherit it")
+	}
+
+	// From the returned menu, Settings enters the session again (the cycle
+	// works, and Settings already-open behind the menu does not flip it).
+	g.host.SetOpen(idSettings, true)
 	g.syncMounts()
 	if err := g.kit.Update(); err != nil {
-		t.Fatalf("kit.Update (2): %v", err)
+		t.Fatalf("kit.Update (cycle): %v", err)
 	}
 	btn = menuButton(t, g, "Settings")
 	if btn == nil {
-		t.Fatal("no Settings button in the second menu")
+		t.Fatal("no Settings button in the returned menu")
 	}
 	btn.ClickedEvent.Fire(&widget.ButtonClickedEventArgs{Button: btn})
 	if err := g.Update(); err != nil {
-		t.Fatalf("Update (2): %v", err)
+		t.Fatalf("Update (cycle): %v", err)
 	}
-	if _, top := g.top().(*MenuScene); top {
-		t.Error("second Settings click left the pause menu on top")
+	if _, top := g.top().(*SettingsScene); !top {
+		t.Errorf("second Settings click left top scene %T, want the settings session", g.top())
 	}
 	if !g.host.IsOpen(idSettings) {
 		t.Error("second Settings click closed an already-open settings window")
+	}
+	if w := g.host.Window(idSettings); w == nil || !w.Modal {
+		t.Error("second session did not make settings modal")
+	}
+}
+
+// TestSettingsSessionCloseButton: the window's × is part of the session
+// too — closing settings during it returns to the pause menu (the window
+// is owned by the menu, not a floating panel over the game), and the
+// window's modal flag is restored.
+func TestSettingsSessionCloseButton(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	g.enterSettings()
+	pump(t, g, 1280, 720)
+	win := g.host.Window(idSettings)
+	btn := g.kit.CloseButtonOf(win)
+	if btn == nil {
+		t.Fatal("settings window mounted with no × button")
+	}
+	click(t, g, btn)
+	pump(t, g, 1280, 720)
+	if _, top := g.top().(*MenuScene); !top {
+		t.Fatalf("top scene after × = %T, want the pause menu", g.top())
+	}
+	if g.settingsUp() {
+		t.Error("× left the settings session on the stack")
+	}
+	if g.host.IsOpen(idSettings) || g.host.Mounted(idSettings) {
+		t.Error("× left the settings window up")
+	}
+	if !g.host.Mounted(idMenu) {
+		t.Error("× did not bring the pause menu window back")
+	}
+	if w := g.host.Window(idSettings); w == nil || w.Modal {
+		t.Error("settings window still modal after ×: the P path would inherit it")
+	}
+}
+
+// TestSettingsSessionSurvivesRebuild: a load (or any kit rebuild) replaces
+// every window datablock; the session outlives it, so it re-asserts the
+// modal flag on the fresh window instead of leaking a plain one.
+func TestSettingsSessionSurvivesRebuild(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	g.enterSettings()
+	pump(t, g, 1280, 720)
+	if err := g.buildKit(); err != nil {
+		t.Fatalf("buildKit: %v", err)
+	}
+	pump(t, g, 1280, 720) // Update re-asserts on the rebuilt window
+	if w := g.host.Window(idSettings); w == nil || !w.Modal {
+		t.Error("rebuilt settings window is not modal: the session lost its layer")
+	}
+	if _, top := g.top().(*SettingsScene); !top {
+		t.Fatalf("top scene after the rebuild = %T, want the session still up", g.top())
+	}
+}
+
+// TestSettingsSessionKeyGate: while the session is up it is the pause menu
+// for the key layer too — P and the window toggles stay dead.
+func TestSettingsSessionKeyGate(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	g.enterSettings()
+	pump(t, g, 1280, 720)
+	if err := g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyI, ebiten.KeyN, ebiten.KeyP}}); err != nil {
+		t.Fatalf("handleKeys: %v", err)
+	}
+	if g.host.IsOpen(idInventory) || g.host.IsOpen(idMap) {
+		t.Error("window toggles fired during the settings session")
+	}
+	if !g.host.IsOpen(idSettings) || !g.settingsUp() {
+		t.Error("P ended the settings session")
+	}
+}
+
+// TestSettingsPPathStaysPlain: the session is the pause menu's, not the
+// row's — P still opens the ordinary floating window (no session scene, no
+// modal layer).
+func TestSettingsPPathStaysPlain(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	if err := g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyP}}); err != nil {
+		t.Fatalf("handleKeys: %v", err)
+	}
+	if g.settingsUp() {
+		t.Fatal("P entered the menu's settings session")
+	}
+	pump(t, g, 1280, 720)
+	if w := g.host.Window(idSettings); w == nil || w.Modal {
+		t.Error("P opened settings modal, want the ordinary floating window")
+	}
+	if g.overUI(1000, 500) {
+		t.Error("P put a modal layer over the world")
 	}
 }
 
@@ -614,7 +725,9 @@ func TestEscMenuSettingsEntry(t *testing.T) {
 // pushes the station above it (Update order: handleKeys, the sim step, then
 // syncScenes). Every menu verb must close that menu: a top-only pop missed it
 // and the Settings click pushed a SECOND MenuScene above the station, leaving
-// the modal menu window (and its dim) up with Settings behind it.
+// the modal menu window (and its dim) up with Settings behind it. The click
+// now enters the settings session instead, and the menu scene goes wherever
+// it sat.
 func TestEscMenuSettingsClosesMenuUnderAnotherScene(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
@@ -640,6 +753,9 @@ func TestEscMenuSettingsClosesMenuUnderAnotherScene(t *testing.T) {
 	if g.menuUp() {
 		t.Error("Settings click left the pause menu on the stack (modal window + dim)")
 	}
+	if _, top := g.top().(*SettingsScene); !top {
+		t.Fatalf("top scene after the click = %T, want the settings session above the station", g.top())
+	}
 	// The unmount reconciles on the frame after the click.
 	if err := g.Update(); err != nil {
 		t.Fatalf("Update (reconcile): %v", err)
@@ -649,5 +765,8 @@ func TestEscMenuSettingsClosesMenuUnderAnotherScene(t *testing.T) {
 	}
 	if !g.host.IsOpen(idSettings) {
 		t.Error("Settings click did not open the settings window")
+	}
+	if w := g.host.Window(idSettings); w == nil || !w.Modal {
+		t.Error("settings window is not modal in the session")
 	}
 }
