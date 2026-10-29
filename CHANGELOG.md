@@ -127,6 +127,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sections, legal block; the architecture tree, tooling walkthrough, worlds,
   testing policy and release mechanics moved to AGENTS.md. Also fixed a
   stale font-licence path the old README carried.
+- **Miners run when they are shot at** (`sim`, `content`): a civilian barge
+  still never fights back — it holds no lock and never turns on anyone — but
+  damage that takes its structure under its flee threshold now ends the
+  extraction loop: the laser cuts out and it burns away from the attacker for
+  20 s and escapes, instead of sitting in the belt until it explodes. The
+  threshold is the ordinary temperament one (`npc-miner-barge`:
+  `flee_threshold` 0.5, so high security raises it to 50% and low security
+  uses it as authored; null space still never flees). A miner caught with its
+  hull already opened up still dies at the rock, and its wreck still carries
+  the hold.
+
 - **Settings and Keybindings left the navigation** (`game`, `uikit/screens`):
   the left rail no longer lists either window (its *Help & System* section is
   Help alone), and the title menu no longer has a **Keybindings** row. The
@@ -136,6 +147,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only its listings and its own `O` binding are gone. Settings is unchanged
   otherwise: `P` still toggles it, and the title menu still lists it. A
   rebound chord can no longer open Keybindings (it has no action of its own).
+
+### Fixed
+
+- **Settings from the pause menu is a window, not a modal** (`game`): clicking
+  **Settings** in the Esc menu now leaves the pause menu completely — no
+  scene, no dim, no modal input layer — with Settings as the ordinary floating
+  window `P` opens. The menu verb closed the menu only when it was the scene on
+  top; a menu sitting under another scene (a dock landing in the same frame as
+  the Esc press pushes the station above it) pushed a second menu instead, so
+  the modal menu and its dim stayed up around the settings window. The menu
+  toggle now finds and closes the pause menu wherever it sits.
+
+- **Firing graphics aim at the ship the gun is firing at** (`render`, `sim`):
+  with several locked targets, every gun's shots were drawn toward the first
+  fully locked target while the simulation damaged the target each module was
+  actually activated on, so the attacker appeared to shoot a different ship
+  than the one being hit. Each gun's effect now follows its own target
+  (`Sim.ModuleTarget`, a read-only accessor); the mining beam had the same
+  first-rock shortcut and now follows the rock its laser is cutting.
 
 ## [0.10.0] - 2026-10-28
 

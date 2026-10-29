@@ -562,6 +562,29 @@ func TestEscMenuSettingsEntry(t *testing.T) {
 	if !g.host.IsOpen(idSettings) {
 		t.Error("Settings click did not open the settings window")
 	}
+	// The click's end state is the P-key end state: no pause menu scene
+	// (MenuScene.Draw veils the world with dimScreen 170), no menu window
+	// (it is modal), no modal layer owning the frame, and Settings itself a
+	// plain floating window.
+	if g.menuUp() {
+		t.Error("Settings click left a pause menu scene on the stack")
+	}
+	// One more frame: the handler runs inside kit.Update, after that frame's
+	// mount pass, so the unmount reconciles on the next one.
+	if err := g.Update(); err != nil {
+		t.Fatalf("Update (reconcile): %v", err)
+	}
+	if g.host.Mounted(idMenu) {
+		t.Error("Settings click left the modal menu window mounted")
+	}
+	if w := g.host.Window(idSettings); w == nil || w.Modal {
+		t.Error("settings window is modal, want an ordinary floating window")
+	}
+	// A bare world point answers to the world again; a modal's fullscreen
+	// input layer would still own it.
+	if g.overUI(1000, 500) {
+		t.Error("the interface owns a bare world point after the click: a modal layer is up")
+	}
 
 	// Settings open behind the menu: the click closes the menu and KEEPS
 	// Settings open (SetOpen(true) is ensure-show, never a flip).
@@ -583,5 +606,48 @@ func TestEscMenuSettingsEntry(t *testing.T) {
 	}
 	if !g.host.IsOpen(idSettings) {
 		t.Error("second Settings click closed an already-open settings window")
+	}
+}
+
+// TestEscMenuSettingsClosesMenuUnderAnotherScene: the pause menu can sit
+// UNDER another scene — a dock landing in the same frame as the Esc press
+// pushes the station above it (Update order: handleKeys, the sim step, then
+// syncScenes). Every menu verb must close that menu: a top-only pop missed it
+// and the Settings click pushed a SECOND MenuScene above the station, leaving
+// the modal menu window (and its dim) up with Settings behind it.
+func TestEscMenuSettingsClosesMenuUnderAnotherScene(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+
+	g.push(&MenuScene{g: g})
+	dockAt(t, g)
+	g.syncScenes() // the dock lands while the menu is up
+	if _, top := g.top().(*StationScene); !top {
+		t.Fatalf("fixture: top scene is %T, want the station above the menu", g.top())
+	}
+	g.syncMounts()
+	if err := g.kit.Update(); err != nil {
+		t.Fatalf("kit.Update: %v", err)
+	}
+	btn := menuButton(t, g, "Settings")
+	if btn == nil {
+		t.Fatal("no Settings button in the Esc menu")
+	}
+	btn.ClickedEvent.Fire(&widget.ButtonClickedEventArgs{Button: btn})
+	if err := g.Update(); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if g.menuUp() {
+		t.Error("Settings click left the pause menu on the stack (modal window + dim)")
+	}
+	// The unmount reconciles on the frame after the click.
+	if err := g.Update(); err != nil {
+		t.Fatalf("Update (reconcile): %v", err)
+	}
+	if g.host.Mounted(idMenu) || g.host.IsOpen(idMenu) {
+		t.Error("Settings click left the menu window up")
+	}
+	if !g.host.IsOpen(idSettings) {
+		t.Error("Settings click did not open the settings window")
 	}
 }

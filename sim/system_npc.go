@@ -100,10 +100,13 @@ const npcPatrolMaxRadius = 2500
 //
 // Civilian miners are the second exception (npc-miner-*, NpcDef.IsMiner):
 // they never enter this machine as aggressors — npcMiner runs their
-// extraction loop and they stay passive through it (no trigger, no flee).
-// They are ordinary candidate targets for everyone else: a rat that finds
-// one working in its territory attacks it, and the miner keeps cutting until
-// its wreck carries the hold.
+// extraction loop and they never initiate a fight (no trigger, no lock). They
+// do flee: damage that drops their structure under the temperament-scaled
+// flee threshold ends the extraction loop and they burn for the edge for the
+// same 20 s, then despawn (npcMiner). They are ordinary candidate targets for
+// everyone else: a rat that finds one working in its territory attacks it,
+// and the miner runs — or dies at the rock if it cannot get under the
+// threshold in time.
 //
 // The pursuit leash is leash = npcLeashFactor * effAggro measured from the
 // NPC's Home: an engaged NPC chases/engages while its target stays inside
@@ -124,6 +127,10 @@ const npcPatrolMaxRadius = 2500
 //	"low"  — effAggro = AggroRange, thresholds exactly as authored;
 //	"null" — effAggro = AggroRange * 1.3, flee threshold 0 (fights to the
 //	         death — never flees).
+//
+// The temperament applies to miners too: their flee threshold is the same
+// structure fraction, so a Dvužek barge runs at max(def, 0.35) in high
+// security and at its authored def in low (never in null).
 //
 // Idle NPCs never sit still: they drift on a slow deterministic patrol
 // circle around NpcAI.Home (npcPatrol, phase hashed from the entity handle
@@ -155,11 +162,11 @@ func (s *Sim) systemNpc() {
 			continue
 		}
 		// Civilian miners run their own extraction loop and never enter the
-		// threat machine below: passive by definition, never aggroed by the
-		// player and never fleeing. They are ordinary targets for everyone
-		// else (npcCandidates).
+		// threat machine below: they never initiate, and their flee is the
+		// miner loop's own (a damaged barge runs). They are ordinary targets
+		// for everyone else (npcCandidates).
 		if def.IsMiner() {
-			s.npcMiner(e, ai, tr, def)
+			s.npcMiner(e, ai, tr, def, security)
 			continue
 		}
 
@@ -240,22 +247,7 @@ func (s *Sim) systemNpc() {
 			}
 
 		case NpcFlee:
-			// Burn away from the target; despawn after npcFleeSeconds.
-			away := tr.Pos.Sub(tPos)
-			if away.IsZero() {
-				away = core.Vec2{X: 1}
-			}
-			start := s.time
-			if in, ok := s.Intents.Get(e); ok && in.Kind == IntentManual && in.Range > 0 {
-				start = in.Range
-			}
-			s.Intents.Set(e, Intent{Kind: IntentManual, Dir: away.Norm(), SpeedFrac: 1, Range: start})
-			if s.time-start >= npcFleeSeconds {
-				s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: e,
-					Text: s.nameOf(e) + " retreats and escapes"})
-				s.recordRespawn(e, ai)
-				s.destroy(e)
-			}
+			s.npcFleeStep(e, ai, tr, tPos)
 			continue // no combat actions while fleeing
 
 		case NpcReturn:
@@ -473,11 +465,23 @@ const npcMinerWarpRange = 100_000
 //	       post the hold's ore on that station's market as system supply,
 //	       then despawn (recordRespawn re-arms the spawn group's timer)
 //
-// Miners never initiate and never flee: they skip the threat machine entirely
-// (no lock, no trigger). They are otherwise normal ships — ordinary candidate
-// targets for every non-miner NPC, lockable, damageable, and death runs the
-// ordinary wreck path (the wreck carries the hold).
-func (s *Sim) npcMiner(e ecs.Entity, ai *NpcAI, tr *Transform, def *content.NpcDef) {
+// Miners never initiate: they skip the threat machine entirely (no lock, no
+// trigger). They do run, though — damage from a hostile hull under the
+// temperament-scaled flee threshold turns the extraction loop into the shared
+// flee (burn away from the attacker 20 s, despawn, respawn timer re-armed), so
+// a miner caught by rats leaves the belt instead of dying at the rock. They
+// are otherwise normal ships — ordinary candidate targets for every non-miner
+// NPC, lockable, damageable, and death runs the ordinary wreck path (the wreck
+// carries the hold).
+func (s *Sim) npcMiner(e ecs.Entity, ai *NpcAI, tr *Transform, def *content.NpcDef, security string) {
+	if ai.State != NpcFlee && s.minerRuns(e, def, security) {
+		s.stopAllModules(e) // the laser cuts out: it is leaving, not working
+		s.npcEnterFlee(e, ai, tr, s.minerAttackerPos(ai))
+	}
+	if ai.State == NpcFlee {
+		s.npcFleeStep(e, ai, tr, s.minerAttackerPos(ai))
+		return
+	}
 	switch ai.State {
 	case NpcHaul:
 		s.minerHaul(e, ai, tr)
@@ -485,6 +489,28 @@ func (s *Sim) npcMiner(e ecs.Entity, ai *NpcAI, tr *Transform, def *content.NpcD
 		ai.State = NpcMine
 		s.minerMine(e, ai, tr, def)
 	}
+}
+
+// minerRuns reports whether a damaged miner's structure has fallen under its
+// temperament-scaled flee threshold (the same fraction the threat machine's
+// flee trigger reads). A 0 threshold (null space) keeps even a miner at the
+// rock.
+func (s *Sim) minerRuns(e ecs.Entity, def *content.NpcDef, security string) bool {
+	ship, ok := s.Ships.Get(e)
+	if !ok || ship.MaxStructure <= 0 {
+		return false
+	}
+	_, effFlee := npcTemperament(security, def)
+	return effFlee > 0 && ship.Structure/ship.MaxStructure < effFlee
+}
+
+// minerAttackerPos is where a miner runs from: its last attacker while that
+// hull is still on the grid, else its Home — it leaves the belt either way.
+func (s *Sim) minerAttackerPos(ai *NpcAI) core.Vec2 {
+	if p, ok := s.posOf(ai.LastHitBy); ok {
+		return p
+	}
+	return ai.Home
 }
 
 // minerMine cuts the nearest rock with volume left. The mining laser needs no
@@ -791,6 +817,27 @@ func (s *Sim) npcEnterFlee(e ecs.Entity, ai *NpcAI, tr *Transform, awayFrom core
 	}
 	s.Intents.Set(e, Intent{Kind: IntentManual, Dir: away.Norm(), SpeedFrac: 1, Range: s.time})
 	s.log(SevInfo, e, s.nameOf(e)+" is fleeing")
+}
+
+// npcFleeStep is the NpcFlee state: burn away from awayFrom (the target for
+// an engaged NPC, the attacker for a damaged miner) and despawn quietly
+// after npcFleeSeconds. The flee start time rides Intent.Range.
+func (s *Sim) npcFleeStep(e ecs.Entity, ai *NpcAI, tr *Transform, awayFrom core.Vec2) {
+	away := tr.Pos.Sub(awayFrom)
+	if away.IsZero() {
+		away = core.Vec2{X: 1}
+	}
+	start := s.time
+	if in, ok := s.Intents.Get(e); ok && in.Kind == IntentManual && in.Range > 0 {
+		start = in.Range
+	}
+	s.Intents.Set(e, Intent{Kind: IntentManual, Dir: away.Norm(), SpeedFrac: 1, Range: start})
+	if s.time-start >= npcFleeSeconds {
+		s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: e,
+			Text: s.nameOf(e) + " retreats and escapes"})
+		s.recordRespawn(e, ai)
+		s.destroy(e)
+	}
 }
 
 // npcEnsureLock starts locking target if the NPC is not already.

@@ -961,7 +961,7 @@ func (g *Game) removeScene(match func(Scene) bool) {
 func (g *Game) onEscape() error {
 	switch g.top().(type) {
 	case *MenuScene:
-		g.pop()
+		g.closeMenu()
 	case *HelpScene:
 		g.pop()
 	default:

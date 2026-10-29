@@ -281,10 +281,13 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    tick under its own price — the convoy-delivery rule — so the ore is real
    supply and **no money is minted** (`settle` only moves currency for
    player-owned orders); the miner then despawns and its spawn group's timer
-   re-arms it. Miners are passive: the threat triggers never apply to them,
-   they hold no lock on the player and never flee, but they are ordinary
-   ships otherwise — lockable, damageable, and their death runs the normal
-   wreck path with the hold as loot.
+   re-arms it. Miners never initiate: the threat triggers never make them
+   aggressors, they hold no lock on the player, and they never turn on anyone.
+   They do run — damage that takes a miner's structure under its
+   temperament-scaled flee threshold ends the extraction loop (the laser cuts
+   out, it burns away from the attacker for the same 20 s and escapes) — but
+   they are ordinary ships otherwise: lockable, damageable, and their death
+   runs the normal wreck path with the hold as loot.
 
    **Inter-NPC hostility.** The threat machine is candidate-based, not
    player-based: `sim/systemNpc` resolves every on-grid ship — you, AI hulls,
@@ -299,9 +302,11 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    content pin fails if a shipped NPC def names a faction with no relations
    row. Role passivity stacks on top: guards never initiate (they only
    self-defend against you and clear high-sec rats at their celestial), and
-   miners never initiate or flee. The chosen target is the damage source
-   first, else the nearest triggered candidate (canonical order breaks
-   ties); its handle persists in `NpcAI.Target` (saving/restoring an
+   miners never initiate — but a miner does flee once its structure drops
+   under the threshold, so a rat that corners a working barge drives it off
+   the belt instead of killing it where it cuts. The chosen target is the
+   damage source first, else the nearest triggered candidate (canonical order
+   breaks ties); its handle persists in `NpcAI.Target` (saving/restoring an
    engagement bit-for-bit), and only the player's announcement is the
    warning line — an NPC-vs-NPC fight logs one `<attacker> attacks
    <target>` line on the idle→approach edge.

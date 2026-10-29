@@ -79,51 +79,51 @@
     "note": "wake the fresh gun: four shell types in cargo make it wait for a choice, so pick EMP before the first lock"
   },
   {
-    "at_tick": 12060,
+    "at_tick": 11940,
     "action": "lock",
     "target": "Scuttler",
-    "note": "fight 1: rockets cripple the rat - it breaks and runs (or dies fighting)"
+    "note": "fight 1: rockets cripple the rat - it breaks and runs (or dies fighting). The fight-1 block sits 120 ticks earlier than 12060/12420/13260-13560: a belt miner now flees the rat that used to kill it at ~140 s (the miner-flee change), which reseeded the belt stream - at the old timing the guard patrol took both killing blows and the player lost the bounty race"
   },
   {
-    "at_tick": 12420,
+    "at_tick": 12300,
     "action": "orbit",
     "target": "Scuttler",
     "range": 3000
   },
   {
-    "at_tick": 13260,
+    "at_tick": 13140,
     "action": "activate",
     "slot": "mid2",
     "target": "Scuttler",
     "note": "stasis web"
   },
   {
-    "at_tick": 13320,
+    "at_tick": 13200,
     "action": "activate",
     "slot": "mid1",
     "note": "shield booster"
   },
   {
-    "at_tick": 13380,
+    "at_tick": 13260,
     "action": "activate",
     "slot": "low0",
     "note": "armor repper"
   },
   {
-    "at_tick": 13440,
+    "at_tick": 13320,
     "action": "activate",
     "slot": "mid0",
     "note": "afterburner"
   },
   {
-    "at_tick": 13500,
+    "at_tick": 13380,
     "action": "activate",
     "slot": "high0",
     "target": "Scuttler",
     "note": "emp turret: burns the EMP damage profile"
   },
   {
-    "at_tick": 13560,
+    "at_tick": 13440,
     "action": "activate",
     "slot": "high2",
     "target": "Scuttler",
@@ -290,10 +290,10 @@
     "at_tick": 51310,
     "action": "transfer",
     "item": "ammo-emp-s",
-    "qty": 1,
+    "qty": 2,
     "from": "cargo",
     "to": "hangar",
-    "note": "stash every leftover shell (the bay was dumped 50060): inter-NPC aggression moved the fight-2 stream, so leftover counts were recalibrated to 1 EMP / 3 fusion / 2 plutonium / 1 AP (was 3/3/4/10 before passive shield recharge extended the fights and burned more shells). EMP and fusion leave together, then plutonium and AP leave on the same tick, so the idle gun never sees a single type it would auto-load — and with no matching round in cargo the fight-3 cycle is truly dry"
+    "note": "stash every leftover shell (the bay was dumped 50060): inter-NPC aggression moved the fight-2 stream and a fleeing belt miner reseeded the fights after it, so the leftover counts were recalibrated to 2 EMP / 3 fusion / 2 plutonium / 9 AP (was 1/3/2/1 after the shield-recharge pass, 3/3/4/10 before it). EMP and fusion leave together, then plutonium and AP leave on the same tick, so the idle gun never sees a single type it would auto-load — and with no matching round in cargo the fight-3 cycle is truly dry"
   },
   {
     "at_tick": 51310,
@@ -315,7 +315,7 @@
     "at_tick": 51320,
     "action": "transfer",
     "item": "ammo-ap-s",
-    "qty": 1,
+    "qty": 9,
     "from": "cargo",
     "to": "hangar"
   },
