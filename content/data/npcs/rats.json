@@ -6,7 +6,7 @@
     "faction": "Old Works",
     "ship": "ship-rat-scuttler",
     "fit": ["mod-autocannon-s", "mod-autocannon-s", "mod-afterburner", "mod-armor-plate"],
-    "aggro_range": 20000,
+    "aggro_range": 250000,
     "orbit_range": 3000,
     "flee_threshold": 0.15,
     "bounty": 7500,
@@ -30,7 +30,7 @@
       "mod-armor-plate",
       "mod-resist-coat"
     ],
-    "aggro_range": 30000,
+    "aggro_range": 250000,
     "orbit_range": 8000,
     "flee_threshold": 0.2,
     "bounty": 65000,
@@ -58,7 +58,7 @@
       "mod-resist-coat",
       "mod-cap-recharger"
     ],
-    "aggro_range": 40000,
+    "aggro_range": 250000,
     "orbit_range": 12000,
     "flee_threshold": 0,
     "bounty": 250000,

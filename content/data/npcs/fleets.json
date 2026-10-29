@@ -14,7 +14,7 @@
       "mod-armor-plate",
       "mod-resist-coat"
     ],
-    "aggro_range": 30000,
+    "aggro_range": 250000,
     "orbit_range": 6000,
     "flee_threshold": 0.2,
     "bounty": 0,

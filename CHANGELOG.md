@@ -58,6 +58,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   command, never a player one).
 
 ### Changed
+- **Rats and fleet cutters aggro across the whole grid** — the authored base
+  `aggro_range` is now 250 km for the Old Works castes and the Clastor
+  (was 20/30/40 km). The trigger system, security scaling (high = 0.4×,
+  null = 1.3×), flee thresholds and the 2.5× pursuit leash all stay as they
+  are — only the base range moved.
 
 - **The lore pass: the Predecessors** (`docs/lore`, `CONTEXT.md`, `content`):
   the Old Works are not the settlers' building programme any more. They were
