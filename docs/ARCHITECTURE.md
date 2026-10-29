@@ -211,9 +211,11 @@ system list with starmap positions, `start_system: "sys-solace"`.
 **Contracts** (`content/data/contracts/*.json`) — mission-board offerings
 pinned to one station (`station` = offering station; kinds `kill`, `deliver`,
 `mine`; objectives reference NPC IDs / cargo items / stations, validated):
-- `contract-solace-cleanup-1` (kill 1 scuttler), `contract-solace-supply-run-1`
-  (deliver 2 m³ ammo-emp-s to `cel-penumbra-port`), `contract-solace-cordite-1`
-  (mine 400 m³ ore-cordite) — the `cel-haven-rest` board (level 1, standing 0).
+- `contract-solace-cleanup-1` (kill 1 scuttler) — the `cel-huta` board (level
+  1, standing 0; the id keeps its frozen name though the order moved to
+  Młondan); `contract-solace-supply-run-1` (deliver 2 m³ ammo-emp-s to
+  `cel-penumbra-port`) and `contract-solace-cordite-1` (mine 400 m³
+  ore-cordite) — the `cel-haven-rest` board (level 1, standing 0).
 - `contract-penumbra-den-hunt-1` (kill 1 marauder), `contract-penumbra-lucidite-1`
   (mine 500 m³ ore-lucidite) — the `cel-penumbra-port` board (level 2,
   `min_standing` 0.2).

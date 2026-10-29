@@ -36,7 +36,7 @@
         "X": -959446719972,
         "Y": 811839532284
       },
-      "radius": 840000,
+      "radius": 300000,
       "colors": [
         "#7c6f63"
       ],
@@ -58,7 +58,7 @@
         {
           "npc_id": "npc-rat-scuttler",
           "count": 2,
-          "respawn_sec": 120
+          "respawn_sec": 600
         },
         {
           "npc_id": "npc-miner-barge",
@@ -84,12 +84,12 @@
           {
             "npc_id": "npc-rat-marauder",
             "count": 1,
-            "respawn_sec": 300
+            "respawn_sec": 600
           },
           {
             "npc_id": "npc-rat-hierarch",
             "count": 1,
-            "respawn_sec": 300
+            "respawn_sec": 600
           }
         ],
         "respawn_sec": 300

@@ -894,9 +894,19 @@ lock one, shoot it, or just watch it work.
 friendly: they do not fire on you no matter how close you fly — they only
 defend themselves if you attack them first. Charter patrols (overview name
 **Kuštor**) circle their anchor station and warp to a convoy ambush when
-one breaks out, scaled by zone: a three-ship wing lands on the spot in
-Charter space, a single responder arrives after about 15 seconds in the
-Fringe, and Unincorporated Pušťov has no patrols at all. In Charter
+one breaks out, scaled by zone: a ten-ship wing of medium-gun cutters lands
+on the spot in Charter space, a single responder arrives after about 15
+seconds in the Fringe, and Unincorporated Pušťov has no patrols at all.
+Charter security is now overwhelming: every high-sec station
+carries a four-cutter static post (Rydnok's belt has one too, and the
+Struvok belt is the one authored exception — the Authority posts at the
+station there and sweeps the belt), and a high-sec patrol schedule comes
+round every minute instead of every two and a half. A miner under fire in
+Charter space calls the same answer — the wing holds on the barge it was
+sent to, clears the rats around it (only ever rats: a guard never turns on
+you unprovoked), and flies home when none are left; a second call waits
+until the first wing has left or died. Inside Works control, no one
+answers. In Charter
 space they also work the belts: a static guard takes on the pirate rats
 anchored at its own celestial, and a patrol sweeps an occupied belt once a
 beat, hunts the rats down and flies home only once the belt is empty. Free

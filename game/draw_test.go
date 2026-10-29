@@ -437,7 +437,7 @@ func TestFrameDrainsSimEventSameFrame(t *testing.T) {
 		t.Fatalf("fixture: %d missions already accepted", n)
 	}
 	before := len(bodyOf[*uikit.LogPanel](g.host, idLog).Lines())
-	g.s.Queue(sim.CmdAcceptMission{ID: "contract-solace-cleanup-1"})
+	g.s.Queue(sim.CmdAcceptMission{ID: "contract-solace-cordite-1"})
 
 	// Whichever frame's sim step runs the queued command must also drain
 	// its event into the log inside the same call.

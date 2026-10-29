@@ -707,6 +707,30 @@ func (s *Sim) ratTargetAt(home core.Vec2, sec string) ecs.Entity {
 	return live
 }
 
+// ratNear returns the closest live rat (npc-rat-*) within r of pos, ties in
+// canonical handle order — the hostiles a distress wing clears around the
+// miner it was sent to (no Home comparison: the rats it hunts are wherever
+// the attack is).
+func (s *Sim) ratNear(pos core.Vec2, r float64) ecs.Entity {
+	var best ecs.Entity
+	bestD := math.MaxFloat64
+	for _, e := range sortedEntities(s.AIs) {
+		ai, ok := s.AIs.Get(e)
+		if !ok || ai.Faction != "" {
+			continue
+		}
+		if def, ok := s.Content.Npc(ai.Npc); !ok || !isRatNpc(def) {
+			continue
+		}
+		if p, ok := s.posOf(e); ok {
+			if d := p.Dist(pos); d <= r && d < bestD {
+				best, bestD = e, d
+			}
+		}
+	}
+	return best
+}
+
 // ratFree reports whether a rat is free to engage before the belt's
 // player-touched stragglers: idle, or holding a pursuit its target has
 // already left — outside the rat's own leash, which systemNpc breaks off on

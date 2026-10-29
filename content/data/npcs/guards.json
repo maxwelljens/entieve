@@ -6,14 +6,14 @@
     "faction": "Charter Authority",
     "ship": "ship-npc-patrol",
     "fit": [
-      "mod-autocannon-s",
-      "mod-autocannon-s",
-      "mod-autocannon-s",
+      "mod-autocannon-m",
+      "mod-autocannon-m",
+      "mod-autocannon-m",
       "mod-shield-boost"
     ],
     "aggro_range": 6000,
     "orbit_range": 2500,
-    "flee_threshold": 0.25,
+    "flee_threshold": 0,
     "bounty": 0,
     "loot": []
   }

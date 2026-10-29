@@ -62,14 +62,13 @@ func dockedBoard(t *testing.T, cel string) (*StationBoard, *testEnv, *ebitenui.U
 // unchanged — the column's right edge never moved, so the composition to
 // its right is untouched. Widths of content-sized rects are identical.
 func TestBoardOnTableRowRects(t *testing.T) {
-	// --- The default showcase board: three available rows over the
-	// empty-state note.
+	// --- The default showcase board: two available rows (the kill order
+	// moved to Hovžan) over the empty-state note.
 	b, env, ui := dockedBoard(t, "cel-haven-rest")
-	pinRect(t, "available section", b.avail, image.Rect(103, 85, 398, 327))
+	pinRect(t, "available section", b.avail, image.Rect(103, 85, 398, 245))
 	wantRows := []image.Rectangle{
 		image.Rect(103, 85, 398, 163),
 		image.Rect(103, 167, 398, 245),
-		image.Rect(103, 249, 398, 327),
 	}
 	avail := b.avail.Children()
 	if len(avail) != len(wantRows) {
@@ -83,7 +82,7 @@ func TestBoardOnTableRowRects(t *testing.T) {
 		t.Fatalf("available row lines = %d, want 3", len(first.Children()))
 	}
 	pinRect(t, "title line", lineAt(t, first, 0), image.Rect(106, 85, 395, 125))
-	pinRect(t, "summary line", lineAt(t, first, 1), image.Rect(106, 125, 228, 144))
+	pinRect(t, "summary line", lineAt(t, first, 1), image.Rect(106, 125, 265, 144))
 	pinRect(t, "reward line", lineAt(t, first, 2), image.Rect(106, 144, 395, 163))
 	line1 := lineAt(t, first, 0).(*widget.Container)
 	pinRect(t, "icon+title cell", line1.Children()[0], image.Rect(106, 94, 297, 115))
@@ -92,10 +91,10 @@ func TestBoardOnTableRowRects(t *testing.T) {
 	pinRect(t, "kind icon", lead.Children()[0], image.Rect(106, 96, 122, 112))
 	pinRect(t, "title", lead.Children()[1], image.Rect(126, 94, 297, 115))
 
-	pinRect(t, "active section", b.active, image.Rect(103, 358, 398, 377))
+	pinRect(t, "active section", b.active, image.Rect(103, 276, 398, 295))
 	note := b.active.Children()[0].(*widget.Container)
-	pinRect(t, "empty-state row", note, image.Rect(103, 358, 398, 377))
-	pinRect(t, "empty-state line", lineAt(t, note, 0), image.Rect(106, 358, 231, 377))
+	pinRect(t, "empty-state row", note, image.Rect(103, 276, 398, 295))
+	pinRect(t, "empty-state line", lineAt(t, note, 0), image.Rect(106, 276, 231, 295))
 
 	// --- Row caps: an active contract beside a "+N more" note, both
 	// stretched to the section's shared row height — the note's line
@@ -109,22 +108,25 @@ func TestBoardOnTableRowRects(t *testing.T) {
 		sim.MissionState{ID: "contract-penumbra-lucidite-1"},
 	)
 	uitest.PumpWindow(t, ui, b.Sync, 1280, 720)
-	pinRect(t, "capped active section", b.active, image.Rect(103, 358, 398, 442))
+	pinRect(t, "capped active section", b.active, image.Rect(103, 276, 398, 360))
 	active := b.active.Children()
 	if len(active) != 2 {
 		t.Fatalf("capped active rows = %d, want 2", len(active))
 	}
-	pinRect(t, "active contract row", active[0], image.Rect(103, 358, 398, 398))
+	pinRect(t, "active contract row", active[0], image.Rect(103, 276, 398, 316))
 	actLine := lineAt(t, active[0].(*widget.Container), 0)
-	pinRect(t, "active title line", actLine, image.Rect(106, 358, 395, 398))
-	pinRect(t, "abandon button", actLine.(*widget.Container).Children()[1], image.Rect(303, 358, 395, 398))
-	pinRect(t, "capped note row", active[1], image.Rect(103, 402, 398, 442))
-	pinRect(t, "centred note line", lineAt(t, active[1].(*widget.Container), 0), image.Rect(106, 412, 159, 431))
+	pinRect(t, "active title line", actLine, image.Rect(106, 276, 395, 316))
+	pinRect(t, "abandon button", actLine.(*widget.Container).Children()[1], image.Rect(303, 276, 395, 316))
+	pinRect(t, "capped note row", active[1], image.Rect(103, 320, 398, 360))
+	pinRect(t, "centred note line", lineAt(t, active[1].(*widget.Container), 0), image.Rect(106, 330, 159, 349))
 
 	// All five missions are taken, so every offering wears the model's
 	// own button label and gate: "Accepted", grayed (never hidden).
-	if got := len(b.Rows(false)); got != availMaxRows {
-		t.Fatalf("capped available rows = %d, want %d", got, availMaxRows)
+	// The kill order moved to Hovžan: Jalvrek now offers two, so every
+	// offering is taken without reaching availMaxRows (the cap itself is
+	// pinned by the stub-board section below).
+	if got, want := len(b.Rows(false)), len(env.Content.Board("cel-haven-rest")); got != want {
+		t.Fatalf("available rows = %d, want %d", got, want)
 	}
 	for _, r := range b.Rows(false) {
 		if got := r.Btn.Text().Label; got != "Accepted" {

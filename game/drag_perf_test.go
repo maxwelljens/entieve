@@ -290,7 +290,10 @@ func TestDragFrameCost(t *testing.T) {
 		// tooltip idle-state hide spam while the button is held, H3,
 		// ebitenui-internal) sits far below this bound. Anything above
 		// it is OUR-side churn creeping back into the drag path.
-		maxDragAllocDelta = 700
+		// Re-aimed 700 -> 800: the high-sec guard posts put two more
+		// orders on the docked book (394 -> 396 rows, ~+64 allocs per
+		// visible row), which is fixture size, not drag-path churn.
+		maxDragAllocDelta = 800
 	)
 
 	// ---- heavy fixture: docked showcase + market seeded to ~300 rows ----

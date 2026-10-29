@@ -336,12 +336,12 @@ func TestTrafficSecurityMathPinned(t *testing.T) {
 	if _, ok := trafficPatrolInterval(9000, "null"); ok {
 		t.Error("patrol interval null must be disabled")
 	}
-	// response: delay 1800*(1-sigma) ticks, wing floor(3*sigma)
+	// response: delay 1800*(1-sigma) ticks, wing table (10 high / 1 low / 0 null)
 	for _, tc := range []struct {
 		sec      string
 		delay    int64
 		wantWing int
-	}{{"high", 0, 3}, {"low", 900, 1}, {"null", 1800, 0}} {
+	}{{"high", 0, 10}, {"low", 900, 1}, {"null", 1800, 0}} {
 		if got := trafficResponseDelay(tc.sec); got != tc.delay {
 			t.Errorf("trafficResponseDelay(%q) = %d, want %d", tc.sec, got, tc.delay)
 		}
@@ -763,7 +763,7 @@ func TestTrafficSavedOutcomeEmitsEvent(t *testing.T) {
 }
 
 // TestTrafficPatrolResponseSavesConvoy: the high-sec response dispatches
-// immediately (delay 0, wing floor(3*sigma) = 3), the patrol warps to the
+// immediately (delay 0, the full ten-ship wing), the patrol warps to the
 // incident, the raiders switch their guns off the convoy and onto the
 // patrol — and the un-pinned hauler warps clear and delivers.
 func TestTrafficPatrolResponseSavesConvoy(t *testing.T) {
@@ -788,8 +788,8 @@ func TestTrafficPatrolResponseSavesConvoy(t *testing.T) {
 	if resp == nil {
 		t.Fatalf("no patrol response: %v", trafficTexts(evs))
 	}
-	if resp.Value < 1 || resp.Value > 3 {
-		t.Fatalf("response wing = %v, want 1..3", resp.Value)
+	if want := float64(trafficPatrolWing("high")); resp.Value != want {
+		t.Fatalf("response wing = %v, want the high-sec wing %v", resp.Value, want)
 	}
 	responding := 0
 	s.Patrols.Each(func(_ ecs.Entity, p *Patrol) {

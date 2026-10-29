@@ -25,7 +25,7 @@
       "name": "Asteroid Belt I",
       "kind": "belt",
       "position": { "X": -492723823375, "Y": -766459280806 },
-      "radius": 900000,
+      "radius": 366000,
       "colors": ["#9db8d0"],
       "belt": {
         "asteroids": [
@@ -33,9 +33,9 @@
         ]
       },
       "spawns": [
-        { "npc_id": "npc-rat-scuttler", "count": 3, "respawn_sec": 90 },
-        { "npc_id": "npc-rat-marauder", "count": 2, "respawn_sec": 180 },
-        { "npc_id": "npc-rat-hierarch", "count": 1, "respawn_sec": 600 }
+        { "npc_id": "npc-rat-scuttler", "count": 3, "respawn_sec": 300 },
+        { "npc_id": "npc-rat-marauder", "count": 2, "respawn_sec": 300 },
+        { "npc_id": "npc-rat-hierarch", "count": 1, "respawn_sec": 300 }
       ]
     },
     {

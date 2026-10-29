@@ -77,6 +77,12 @@ func (s *Sim) systemDamage() {
 		// never flips an NPC.
 		if ai, ok := s.AIs.Get(d.dst); ok {
 			ai.LastHitBy = d.src
+			// A miner under fire in charter space calls the authority: the
+			// first damaging hit dispatches the wing (minerDistress).
+			if def, ok := s.Content.Npc(ai.Npc); ok && def.IsMiner() &&
+				d.src != 0 && s.factionOf(d.src) != def.Faction {
+				s.minerDistress(d.dst)
+			}
 		}
 		pen := applyDamageToShip(ship, d.dmg)
 		text := s.nameOf(d.src) + " hits " + s.nounOf(d.dst) + " for " + num(pen) + " damage"

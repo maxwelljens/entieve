@@ -24,8 +24,12 @@ import (
 const (
 	showcaseWorldID = "world-showcase"
 	showcaseScript  = "scripts/showcase.json"
-	showcaseTicks   = 72_600 // ~20.2 sim minutes; covers the tour and the war's last beat
-	probeEveryTicks = 300    // 5 sim seconds (state vocabularies track every tick)
+	// 33.6 sim-minutes: the Młondan belt fight, the 600 s respawn watched
+	// docked (only the loaded system's timers tick), the two Solace belt
+	// passes it takes to spend a rock, and the war's last beat. The two
+	// waits are forced; see scripts/showcase.json's notes.
+	showcaseTicks   = 121_000
+	probeEveryTicks = 300 // 5 sim seconds (state vocabularies track every tick)
 )
 
 // featureRule observes one feature in the evidence gathered from the run.
@@ -448,25 +452,42 @@ func checkWarRemnant(c *content.Content) bool {
 	if err != nil {
 		return false
 	}
+	// The last Gate (Kvonice) jump is the tour's arrival in the Fringe; the
+	// probe re-anchors on it so a re-timed tour does not need a new literal.
+	var cut int64
+	for _, st := range all {
+		if st.Action == "jump" && st.Target == "Gate (Kvonice)" {
+			cut = st.AtTick
+		}
+	}
+	if cut == 0 {
+		return false
+	}
+	// warBeatTicks mirrors sim's procureCadence: pushes land on the hourly beat.
+	const warBeatTicks = 3_600
+	beat := (cut + 1_200 + warBeatTicks - 1) / warBeatTicks * warBeatTicks
 	var steps []script.Step
 	for _, st := range all {
-		if st.AtTick <= 59060 { // ...through the jump into Kvonice
+		if st.AtTick <= cut { // ...through the jump into Kvonice
 			steps = append(steps, st)
 		}
 	}
 	steps = append(steps,
-		script.Step{AtTick: 59120, Action: "warp", Target: "Hauvnok"},
-		script.Step{AtTick: 60000, Action: "dock", Target: "Hauvnok"},
-		script.Step{AtTick: 61100, Action: "war-push", System: "sys-penumbra", Value: 1.2},
-		script.Step{AtTick: 61500, Action: "accept-mission", Mission: "contract-penumbra-den-hunt-1"},
-		script.Step{AtTick: 61600, Action: "sell", Item: "ore-cordite", Qty: 10},
+		script.Step{AtTick: cut + 60, Action: "warp", Target: "Hauvnok"},
+		script.Step{AtTick: cut + 940, Action: "dock", Target: "Hauvnok"},
+		// The front applies a push on its hourly beat (sim/system_war.go
+		// procureCadence), so the lever lands just before the next beat and
+		// the desk is probed right after it.
+		script.Step{AtTick: beat - 60, Action: "war-push", System: "sys-penumbra", Value: 1.2},
+		script.Step{AtTick: beat + 120, Action: "accept-mission", Mission: "contract-penumbra-den-hunt-1"},
+		script.Step{AtTick: beat + 180, Action: "sell", Item: "ore-cordite", Qty: 10},
 	)
 	s, err := sim.New(c, wd, 42)
 	if err != nil {
 		return false
 	}
 	fell, refused, sold := false, false, false
-	script.RunH(s, steps, 62_000, script.Hooks{OnEvent: func(ev sim.Event) {
+	script.RunH(s, steps, beat+600, script.Hooks{OnEvent: func(ev sim.Event) {
 		switch {
 		case ev.Kind == sim.EvWar && ev.Phase == sim.WarFlip && ev.System == "sys-penumbra":
 			fell = true

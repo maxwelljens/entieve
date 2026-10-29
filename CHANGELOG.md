@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **High-sec security is overwhelming** (`content`, `sim`) — the Kuštor
+  patrol cutter now carries three medium autocannons (≈41.7 dps, parity with
+  a Marauder per hull) and 2000 EHP (700 shield / 600 armor / 700
+  structure); it no longer flees (`flee_threshold` 0.25 → 0). A response
+  wing is ten ships in Charter space (one in the Fringe, none in
+  Unincorporated), the live-patrol cap 4 → 16, and the high-sec patrol
+  cadence 9000 → 3600 ticks. High-sec stations carry a four-cutter static
+  post (Jalvrek gains one) and Rydnok's belt post goes 2 → 4, respawning in
+  300 s — with one authored exception: the Struvok belt has no static post,
+  and the Authority holds it with the station's cutters, the response wing
+  and the belt sweep instead. The requisition stock those posts need is on
+  the local books.
+- **Old Works cadence follows the zone** (`content`) — belt and anomaly rat
+  groups respawn in 1800 s in Charter space (Struvok, Rydnok), 600 s in the
+  Fringe and 300 s in Unincorporated space; miner claims stay at 600 s.
+- **Security answers miner distress** (`sim`) — the first hostile hit on a
+  civilian barge in charter space dispatches the same patrol wing a convoy
+  ambush gets, held on the barge and the rats around it; one live response
+  per miner, nothing inside Works control, and the Fringe's wing waits out
+  the usual delay at its anchor. [`SIM.md`](docs/SIM.md) and
+  [`GAMEPLAY.md`](docs/GAMEPLAY.md) describe the mechanic and
+  [`CONTEXT.md`](CONTEXT.md) adds **patrol response**.
+
 ## [0.11.0] - 2026-10-29
 
 ### Added

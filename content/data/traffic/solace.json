@@ -25,6 +25,6 @@
   ],
   "patrol": {
     "hulls": ["ship-npc-patrol"],
-    "interval_ticks": 9000
+    "interval_ticks": 3600
   }
 }

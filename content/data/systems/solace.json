@@ -42,7 +42,9 @@
           { "item": "ship-cutlass", "qty": 8, "price": 480000 },
           { "item": "ship-barge", "qty": 6, "price": 750000 },
           { "item": "ship-hauler", "qty": 6, "price": 650000 },
+          { "item": "ship-npc-patrol", "qty": 8, "price": 400000 },
           { "item": "mod-autocannon-s", "qty": 25, "price": 250000 },
+          { "item": "mod-autocannon-m", "qty": 12, "price": 275000 },
           { "item": "mod-artillery-s", "qty": 25, "price": 320000 },
           { "item": "mod-rocket-pod", "qty": 25, "price": 180000 },
           { "item": "mod-shield-boost", "qty": 25, "price": 230000 },
@@ -92,7 +94,10 @@
           { "item": "ore-lucidite", "qty": 2000, "price": 72, "side": "buy" },
           { "item": "ore-sterngrit", "qty": 5000, "price": 21, "side": "buy" }
         ]
-      }
+      },
+      "spawns": [
+        { "npc_id": "npc-guard-patrol", "count": 4, "respawn_sec": 300 }
+      ]
     },
     {
       "id": "cel-solace-belt",
@@ -108,7 +113,7 @@
         ]
       },
       "spawns": [
-        { "npc_id": "npc-rat-scuttler", "count": 2, "respawn_sec": 90 },
+        { "npc_id": "npc-rat-scuttler", "count": 2, "respawn_sec": 1800 },
         { "npc_id": "npc-miner-barge", "count": 2, "respawn_sec": 600 }
       ]
     },

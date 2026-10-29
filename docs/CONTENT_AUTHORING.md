@@ -283,6 +283,13 @@ Rules enforced by the validator: `to_system` must exist; `to_cel` must exist
 **in that destination system**; the destination must contain a gate whose
 `to_system` points back at you and whose `to_cel` is *your* gate's ID.
 
+**Spawn cadences (`respawn_sec`).** A group's timer re-arms the whole group
+after a member dies, so the number is a *zone* statement, not a per-hull
+one: an Old Works belt re-forms in 1800 s in Charter space (the Fringe 600,
+Unincorporated 300 — the Works' home turf is the fastest), guards respawn in
+300 s where they post, and a civilian miner's claim repopulates in 600 s
+wherever it works. Anomaly groups follow their system's tier.
+
 **3. Keep `universe.json` untouched** except when your system should be the
 start: systems are discovered from `systems/*.json`, and reachability is
 computed by walking gates from `start_system`. Your new system is reachable
