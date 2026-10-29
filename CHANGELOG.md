@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-29
+
 ### Added
 
 - **Passive shield recharge** (`sim`, `content`) — a damaged shield rebuilds
@@ -2358,7 +2360,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rats are no longer inert: they patrol, notice intruders and defend their
   belts against miners and shooters.
 
-[Unreleased]: https://github.com/maxwelljens/entieve/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/maxwelljens/entieve/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/maxwelljens/entieve/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/maxwelljens/entieve/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/maxwelljens/entieve/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/maxwelljens/entieve/compare/v0.7.0...v0.8.0
