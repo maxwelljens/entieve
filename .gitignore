@@ -24,3 +24,6 @@ assets/**/*.png
 assets/*.zip
 # Serena MCP project metadata (local tooling state).
 .serena/
+
+# Local drop-in material (audio lives beside the gitignored png art).
+assets/audio/
