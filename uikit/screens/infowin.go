@@ -38,7 +38,7 @@ import (
 // Window geometry: a floating page, wide enough for label/value rows at
 // the small step and tall enough to show several sections at once.
 const (
-	infoW      = 420 // default width
+	infoW      = 630 // default width: two- and three-column stat lines
 	infoH      = 460 // default height
 	infoMinW   = 300 // content floor: header + prose + two rows
 	infoMinH   = 340
@@ -65,10 +65,12 @@ type infoRow struct {
 	RefOnValue bool
 }
 
-// infoSection is a labelled group of rows ("DAMAGE", "LOOT").
+// infoSection is a labelled group of rows ("DAMAGE", "LOOT"). Lines group
+// rows into one tiled line: a single entry is full-width, two or three share
+// the line equally (the ship page's paired stat blocks).
 type infoSection struct {
 	Label string
-	Rows  []infoRow
+	Lines [][]infoRow
 }
 
 // infoPage is one windowful of content: header, prose and sections.
@@ -105,13 +107,42 @@ func makerRows(maker string) []infoRow {
 	return nil
 }
 
-// addSection appends a section only when it has rows — a def without the
-// fields simply has no section (never "N/A").
+// Rows flattens the section's lines in reading order (the read seam the
+// tests and callers use to ask for a row by label).
+func (sec infoSection) Rows() []infoRow {
+	var out []infoRow
+	for _, line := range sec.Lines {
+		out = append(out, line...)
+	}
+	return out
+}
+
+// addSection appends a single-column section (one row per line) only when it
+// has rows — a def without the fields simply has no section (never "N/A").
 func addSection(p *infoPage, label string, rows []infoRow) {
 	if len(rows) == 0 {
 		return
 	}
-	p.Sections = append(p.Sections, infoSection{Label: label, Rows: rows})
+	lines := make([][]infoRow, len(rows))
+	for i, r := range rows {
+		lines[i] = []infoRow{r}
+	}
+	p.Sections = append(p.Sections, infoSection{Label: label, Lines: lines})
+}
+
+// addLines appends a section whose rows sit on explicit lines: each inner
+// slice is one line of equal cells (a one-cell line is full-width).
+func addLines(p *infoPage, label string, lines ...[]infoRow) {
+	kept := lines[:0]
+	for _, line := range lines {
+		if len(line) > 0 {
+			kept = append(kept, line)
+		}
+	}
+	if len(kept) == 0 {
+		return
+	}
+	p.Sections = append(p.Sections, infoSection{Label: label, Lines: kept})
 }
 
 // refRow builds a link row whose LABEL carries the linked name.
@@ -227,9 +258,34 @@ func sectionsOf(secs []widgets.TooltipSection) []infoSection {
 		for _, r := range s.Rows {
 			rows = append(rows, infoRow{Label: r.Label, Value: r.Value, Tint: r.Tint})
 		}
-		out = append(out, infoSection{Label: s.Label, Rows: rows})
+		out = append(out, infoSection{Label: s.Label, Lines: pairLines(s.Label, rows)})
 	}
 	return out
+}
+
+// pairLines is the module page's pairing rule over the shared tooltip
+// blocks (the tooltip itself stays single-column): the damage profile puts
+// the per-shot total alone over a 2×2 type grid, and the fitting, range and
+// charge blocks read as pairs. Everything else keeps one row per line.
+func pairLines(label string, rows []infoRow) [][]infoRow {
+	switch label {
+	case "DAMAGE":
+		if len(rows) == 0 {
+			return nil
+		}
+		return chunkLines(rows[1:], 2, [][]infoRow{{rows[0]}})
+	case "FITTING", "RANGE", "CHARGE":
+		return chunkLines(rows, 2, nil)
+	}
+	return chunkLines(rows, 1, nil)
+}
+
+// chunkLines tiles rows into lines of n cells, after any leading lines.
+func chunkLines(rows []infoRow, n int, lines [][]infoRow) [][]infoRow {
+	for i := 0; i < len(rows); i += n {
+		lines = append(lines, rows[i:min(i+n, len(rows))])
+	}
+	return lines
 }
 
 // originLabel renders a ShipDef.Origin heritage tag ("moravian",
@@ -267,6 +323,42 @@ func infoPageFor(cv widgets.ContentView, ref widgets.InfoRef) (infoPage, bool) {
 	return infoPage{}, false
 }
 
+// mountsText renders a hull's high mounts as one human line, grouped by kind
+// and size in authored order ("2 turrets (S) · 1 launcher (M)"; "" = none).
+func mountsText(mounts []content.Mount) string {
+	var order []string
+	count := map[string]int{}
+	for _, m := range mounts {
+		key := m.Kind + "|" + m.Size
+		if count[key] == 0 {
+			order = append(order, key)
+		}
+		count[key]++
+	}
+	var parts []string
+	for _, key := range order {
+		kind, size, _ := strings.Cut(key, "|")
+		word := kind
+		if count[key] != 1 {
+			word = kind + "s"
+		}
+		parts = append(parts, theme.FormatInt(int64(count[key]))+" "+word+" ("+strings.ToUpper(size)+")")
+	}
+	return strings.Join(parts, " · ")
+}
+
+// quotaText renders one axis's class allowance, zero classes skipped
+// ("4× I, 2× II"; "" = no allowance).
+func quotaText(q content.ClassQuota) string {
+	var parts []string
+	for _, class := range []string{content.ClassI, content.ClassII, content.ClassIII} {
+		if n := q.Count(class); n > 0 {
+			parts = append(parts, theme.FormatInt(int64(n))+"× "+strings.TrimPrefix(content.ClassLabel(class), "Class "))
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+
 // shipPage renders a hull: construction (class · maker, or class · origin
 // for the unattributed rat hulls), slots, the survival block with resists,
 // capacitor, propulsion, sensors and cargo.
@@ -297,6 +389,24 @@ func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
 	}
 	addSection(&p, "CONSTRUCTION", cons)
 
+	// Fitting limits: what the hull can mount and how many modules of each
+	// class it allows, in the same words the fitting window uses.
+	var fitLines [][]infoRow
+	if m := mountsText(def.Mounts); m != "" {
+		fitLines = append(fitLines, []infoRow{{Label: "Mounts", Value: m}})
+	}
+	var quotas []infoRow
+	if q := quotaText(def.GridClasses); q != "" {
+		quotas = append(quotas, infoRow{Label: "Grid quotas", Value: q})
+	}
+	if q := quotaText(def.CPUClasses); q != "" {
+		quotas = append(quotas, infoRow{Label: "CPU quotas", Value: q})
+	}
+	if len(quotas) > 0 {
+		fitLines = append(fitLines, quotas)
+	}
+	addLines(&p, "FITTING", fitLines...)
+
 	var slots []infoRow
 	for _, s := range []struct {
 		label string
@@ -306,7 +416,7 @@ func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
 			slots = append(slots, infoRow{Label: s.label, Value: theme.FormatInt(int64(s.n))})
 		}
 	}
-	addSection(&p, "SLOTS", slots)
+	addLines(&p, "SLOTS", slots)
 
 	var surv []infoRow
 	for _, l := range []struct {
@@ -317,6 +427,7 @@ func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
 			surv = append(surv, infoRow{Label: l.label, Value: theme.GroupFloat(l.v, 0) + " HP"})
 		}
 	}
+	var resists []infoRow
 	if def.Resists != (content.Resists{}) {
 		for _, r := range []struct {
 			label string
@@ -327,19 +438,21 @@ func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
 			{"Kinetic resist", def.Resists.Kinetic},
 			{"Explosive resist", def.Resists.Explosive},
 		} {
-			surv = append(surv, infoRow{Label: r.label, Value: theme.FormatPct(r.v)})
+			resists = append(resists, infoRow{Label: r.label, Value: theme.FormatPct(r.v)})
 		}
 	}
-	addSection(&p, "SURVIVAL", surv)
+	survLines := chunkLines(surv, 3, nil)
+	survLines = append(survLines, chunkLines(resists, 2, nil)...)
+	addLines(&p, "SURVIVAL", survLines...)
 
-	var cap []infoRow
+	var capRows []infoRow
 	if def.Capacitor > 0 {
-		cap = append(cap, infoRow{Label: "Capacity", Value: theme.GroupFloat(def.Capacitor, 1) + " GJ"})
+		capRows = append(capRows, infoRow{Label: "Capacity", Value: theme.GroupFloat(def.Capacitor, 1) + " GJ"})
 	}
 	if def.Recharge > 0 {
-		cap = append(cap, infoRow{Label: "Recharge", Value: theme.GroupFloat(def.Recharge, 1) + " s"})
+		capRows = append(capRows, infoRow{Label: "Recharge", Value: theme.GroupFloat(def.Recharge, 1) + " s"})
 	}
-	addSection(&p, "CAPACITOR", cap)
+	addLines(&p, "CAPACITOR", chunkLines(capRows, 2, nil)...)
 
 	var prop []infoRow
 	if def.MaxSpeed > 0 {
@@ -354,7 +467,7 @@ func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
 	if def.WarpSpeed > 0 {
 		prop = append(prop, infoRow{Label: "Warp speed", Value: theme.GroupFloat(def.WarpSpeed, 1) + " AU/s"})
 	}
-	addSection(&p, "PROPULSION", prop)
+	addLines(&p, "PROPULSION", chunkLines(prop, 2, nil)...)
 
 	var sens []infoRow
 	if def.SigRadius > 0 {
@@ -369,7 +482,7 @@ func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
 	if def.MaxTargets > 0 {
 		sens = append(sens, infoRow{Label: "Max targets", Value: theme.FormatInt(int64(def.MaxTargets))})
 	}
-	addSection(&p, "SENSORS", sens)
+	addLines(&p, "SENSORS", chunkLines(sens, 2, nil)...)
 
 	var cargo []infoRow
 	if def.Cargo > 0 {
@@ -378,7 +491,7 @@ func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
 	if def.OreHold > 0 {
 		cargo = append(cargo, infoRow{Label: "Ore hold", Value: theme.FormatVolume(def.OreHold)})
 	}
-	addSection(&p, "CARGO", cargo)
+	addLines(&p, "CARGO", chunkLines(cargo, 2, nil)...)
 
 	// Manufacturing chain: only when a recipe actually references this def.
 	addSection(&p, "MANUFACTURED FROM", manufacturedRows(cv, string(def.ID)))
@@ -396,20 +509,18 @@ func modulePage(cv widgets.ContentView, def *content.ModuleDef) infoPage {
 	}
 	p.Sub = makerSub(p.Sub, def.Maker)
 
-	var act []infoRow
+	var slotCycle []infoRow
 	if def.Slot != "" {
-		act = append(act, infoRow{Label: "Slot", Value: spacedKind(def.Slot)})
-	}
-	if def.Kind != "" {
-		act = append(act, infoRow{Label: "Kind", Value: spacedKind(def.Kind)})
+		slotCycle = append(slotCycle, infoRow{Label: "Slot", Value: spacedKind(def.Slot)})
 	}
 	if def.ActivationTime > 0 {
-		act = append(act, infoRow{Label: "Cycle", Value: theme.GroupFloat(def.ActivationTime, 1) + " s"})
+		slotCycle = append(slotCycle, infoRow{Label: "Cycle", Value: theme.GroupFloat(def.ActivationTime, 1) + " s"})
 	}
+	var capUse []infoRow
 	if def.ActivationCost > 0 {
-		act = append(act, infoRow{Label: "Cap use", Value: theme.GroupFloat(def.ActivationCost, 1) + " GJ"})
+		capUse = append(capUse, infoRow{Label: "Cap use", Value: theme.GroupFloat(def.ActivationCost, 1) + " GJ"})
 	}
-	addSection(&p, "ACTIVATION", act)
+	addLines(&p, "ACTIVATION", slotCycle, capUse)
 	// The maker block follows the activation lead (ACTIVATION stays the
 	// module page's first section).
 	addSection(&p, "CONSTRUCTION", makerRows(def.Maker))
@@ -674,7 +785,7 @@ func NewInfoWin(env widgets.Seams) *InfoWin {
 		widget.WindowOpts.MinSize(theme.Px(infoMinW), theme.Px(infoMinH)),
 		// Construction landing rect; the game centers the Show Info window
 		// on first use (placeDefaults).
-		widget.WindowOpts.Location(image.Rect(theme.Px(302), theme.Px(120), theme.Px(722), theme.Px(580))),
+		widget.WindowOpts.Location(image.Rect(theme.Px(197), theme.Px(120), theme.Px(827), theme.Px(580))),
 	)
 	theme.ShowWidget(w.win.GetContainer().GetWidget(), false)
 	return w
@@ -943,19 +1054,96 @@ func (w *InfoWin) render(p infoPage) {
 			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, theme.Px(widgets.TipRuleH))),
 		))
 	}
+	inner := infoInnerW()
 	for _, sec := range p.Sections {
-		w.page.AddChild(theme.NewChromeText(env, theme.StepSmall, sec.Label, pal.Head))
-		for _, row := range sec.Rows {
-			w.page.AddChild(w.rowWidget(row))
+		w.page.AddChild(w.sectionBar(sec.Label))
+		for _, line := range sec.Lines {
+			w.page.AddChild(w.lineWidget(line, inner))
 		}
 	}
 	w.rewrap()
 }
 
+// sectionBar is a section heading as a bar: the section's stat glyph, the
+// tracked label and a hairline rule filling the rest of the row (grey for the
+// identity blocks, tinted by the section's family otherwise).
+func (w *InfoWin) sectionBar(label string) *widget.Container {
+	env, pal := w.th, w.th.Pal()
+	icon, tint := theme.SectionBar(pal, label)
+	bar := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(3),
+			widget.GridLayoutOpts.Stretch([]bool{false, false, true}, nil),
+			widget.GridLayoutOpts.Spacing(theme.Px(theme.IconGap), 0),
+		)),
+		widget.ContainerOpts.WidgetOpts(
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+			widget.WidgetOpts.MinSize(0, widgets.TipLineH(env.Face(theme.StepSmall))),
+		),
+	)
+	// The mark cell is always one icon box wide, so every section's label
+	// starts at the same x (an identity bar just leaves it empty).
+	mark := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+		widget.ContainerOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(theme.Px(theme.IconInline), theme.Px(theme.IconInline)),
+			widget.WidgetOpts.LayoutData(widget.GridLayoutData{VerticalPosition: widget.GridLayoutPositionCenter}),
+		),
+	)
+	if icon != "" {
+		g := theme.NewIcon(icon, theme.IconInline, tint)
+		g.GetWidget().LayoutData = widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionCenter,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		}
+		mark.AddChild(g)
+	}
+	head := theme.NewChromeText(env, theme.StepSmall, label, pal.Head)
+	head.GetWidget().LayoutData = widget.GridLayoutData{VerticalPosition: widget.GridLayoutPositionCenter}
+	// The tracked label reports no width of its own: pin its cell so the
+	// rule starts after the text, never underneath it.
+	head.GetWidget().MinWidth = int(math.Ceil(
+		theme.MeasureTracked(label, *env.FaceMono(theme.StepSmall), env.TS().Small)))
+	rule := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(theme.NineSlice(theme.NRGBA(tint, widgets.TipRuleA))),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.GridLayoutData{
+			MaxHeight:        theme.Px(widgets.TipRuleH),
+			VerticalPosition: widget.GridLayoutPositionCenter,
+		})),
+	)
+	bar.AddChild(mark, head, rule)
+	return bar
+}
+
+// lineWidget tiles one line's rows: a single row is full-width, two or three
+// share the width equally (the fitting window's stat-pair grid).
+func (w *InfoWin) lineWidget(line []infoRow, inner float64) widget.PreferredSizeLocateableWidget {
+	if len(line) == 1 {
+		return w.rowWidget(line[0], inner)
+	}
+	stretch := make([]bool, len(line))
+	for i := range stretch {
+		stretch[i] = true
+	}
+	row := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(len(line)),
+			widget.GridLayoutOpts.Stretch(stretch, nil),
+			widget.GridLayoutOpts.Spacing(theme.Px(theme.SpLg), 0),
+		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+	)
+	cell := (inner - float64(theme.Px(theme.SpLg)*(len(line)-1))) / float64(len(line))
+	for _, r := range line {
+		row.AddChild(w.rowWidget(r, cell))
+	}
+	return row
+}
+
 // rowWidget builds one label/value line: label left, value right-anchored
 // on the row's shared edge, link rows tinted accent and wired for
 // right-click (menu) and double-click (swap).
-func (w *InfoWin) rowWidget(row infoRow) widget.PreferredSizeLocateableWidget {
+func (w *InfoWin) rowWidget(row infoRow, maxW float64) widget.PreferredSizeLocateableWidget {
 	env, pal := w.th, w.th.Pal()
 	face := env.Face(theme.StepSmall)
 	lineH := widgets.TipLineH(face)
@@ -972,13 +1160,20 @@ func (w *InfoWin) rowWidget(row infoRow) widget.PreferredSizeLocateableWidget {
 		}
 	}
 
-	// Long labels ellipsize against the room the value leaves them (at
-	// the default width; a resize refits the prose, not these).
+	// A stat row leads with its glyph in a fixed gutter, so labels of
+	// different families still align down the page.
+	icon := theme.StatIcon(row.Label)
+	inset := 0
+	if icon != "" {
+		inset = theme.StatIconSize + theme.StatIconGap
+	}
+
+	// Long labels ellipsize against the room the value (and the glyph
+	// gutter) leaves them inside the line's cell.
 	label := row.Label
 	if row.Value != "" && row.Label != "" {
-		maxW := float64(theme.Px(infoW-2*theme.ContentsPad-2*theme.ContentsPad-widgets.TipRowGap)) -
-			widgets.TipMeasure(row.Value, face)
-		label = widgets.Ellipsize(label, maxW, func(s string) float64 { return widgets.TipMeasure(s, face) })
+		room := maxW - float64(theme.Px(inset+widgets.TipRowGap)) - widgets.TipMeasure(row.Value, face)
+		label = widgets.Ellipsize(label, room, func(s string) float64 { return widgets.TipMeasure(s, face) })
 	}
 
 	ref := widgets.InfoRef{}
@@ -1009,13 +1204,25 @@ func (w *InfoWin) rowWidget(row infoRow) widget.PreferredSizeLocateableWidget {
 			widget.WidgetOpts.MouseButtonClickedHandler(handler),
 		),
 	)
+	if icon != "" {
+		g := theme.NewIcon(icon, theme.StatIconSize, theme.StatTint(pal, row.Label))
+		g.GetWidget().LayoutData = widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionStart,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		}
+		ctr.AddChild(g)
+	}
+	labelData := widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+	}
+	if inset > 0 {
+		labelData.Padding = &widget.Insets{Left: theme.Px(inset)}
+	}
 	ctr.AddChild(widget.NewText(
 		widget.TextOpts.Text(label, face, labelCol),
 		widget.TextOpts.Position(widget.TextPositionStart, widget.TextPositionCenter),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-		})),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(labelData)),
 	))
 	if row.Value != "" {
 		ctr.AddChild(widget.NewText(

@@ -86,7 +86,7 @@ func rowOf(s *infoSection, label string) (infoRow, bool) {
 	if s == nil {
 		return infoRow{}, false
 	}
-	for _, r := range s.Rows {
+	for _, r := range s.Rows() {
 		if r.Label == label {
 			return r, true
 		}
@@ -199,7 +199,7 @@ func TestInfoPageHull(t *testing.T) {
 	// Sections whose fields are unset never render.
 	for _, absent := range []string{"SENSORS", "CAPACITOR"} {
 		if s := sectionOf(bare, absent); s != nil {
-			t.Errorf("%s rendered with unset fields: %+v", absent, s.Rows)
+			t.Errorf("%s rendered with unset fields: %+v", absent, s.Rows())
 		}
 	}
 	// CARGO exists (the hull carries a cargo bay) but the unset ore hold
@@ -240,8 +240,10 @@ func TestInfoPageModule(t *testing.T) {
 	if r := mustRow(t, page, "ACTIVATION", "Slot"); r.Value != "High" {
 		t.Errorf("slot row = %+v, want High", r)
 	}
-	if r := mustRow(t, page, "ACTIVATION", "Kind"); r.Value != "Weapon" {
-		t.Errorf("kind row = %+v, want Weapon", r)
+	// The kind is the header's Sub line now, not an ACTIVATION row (the
+	// paired activation line is Slot|Cycle, then Cap use).
+	if !strings.Contains(page.Sub, "Weapon") {
+		t.Errorf("Sub = %q, want the kind in the header line", page.Sub)
 	}
 	if r := mustRow(t, page, "ACTIVATION", "Cycle"); r.Value != "3.0 s" {
 		t.Errorf("cycle row = %+v", r)
@@ -269,7 +271,7 @@ func TestInfoPageModule(t *testing.T) {
 	}
 	// Every compatible charge is a link to a loaded item def.
 	links := 0
-	for _, r := range charges.Rows {
+	for _, r := range charges.Rows() {
 		if r.Label == "Class" {
 			continue
 		}
@@ -431,13 +433,13 @@ func TestInfoPageCaste(t *testing.T) {
 		t.Errorf("flee row = %+v", r)
 	}
 	loot := sectionOf(page, "LOOT")
-	if loot == nil || len(loot.Rows) != 1 {
+	if loot == nil || len(loot.Rows()) != 1 {
 		t.Fatalf("loot section = %+v, want one drop row", loot)
 	}
-	if r := loot.Rows[0]; r.Ref == nil || r.Label != "Fixture Scrap" || r.RefOnValue {
+	if r := loot.Rows()[0]; r.Ref == nil || r.Label != "Fixture Scrap" || r.RefOnValue {
 		t.Errorf("loot row = %+v, want the item name as a label-side link", r)
 	}
-	if r := loot.Rows[0]; r.Value != "40% · ×1–3" {
+	if r := loot.Rows()[0]; r.Value != "40% · ×1–3" {
 		t.Errorf("loot value = %q, want chance and qty range", r.Value)
 	}
 
@@ -454,7 +456,7 @@ func TestInfoPageCaste(t *testing.T) {
 	// Its loot/behavior blocks are absent, the dossier keeps its bounty.
 	for _, absent := range []string{"BEHAVIOR", "LOOT"} {
 		if s := sectionOf(silentPage, absent); s != nil {
-			t.Errorf("%s rendered for a caste without the fields: %+v", absent, s.Rows)
+			t.Errorf("%s rendered for a caste without the fields: %+v", absent, s.Rows())
 		}
 	}
 	if r := mustRow(t, silentPage, "DOSSIER", "Bounty"); r.Value != theme.FormatCredits(5000) {

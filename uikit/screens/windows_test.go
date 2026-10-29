@@ -343,6 +343,9 @@ func TestFittingActions(t *testing.T) {
 	if !ok {
 		t.Fatal("player has no fitting")
 	}
+	// The freed slot's own module is the legal refit: a different mount kind
+	// would now break the hull's mount rule (the FitProblem gate).
+	freed := fit.High[len(fit.High)-1]
 	fit.High = fit.High[:len(fit.High)-1]
 	frame()
 
@@ -378,12 +381,12 @@ func TestFittingActions(t *testing.T) {
 	}
 
 	// Fit a hangar module into the empty slot.
-	def, ok := env.Content.Module("mod-artillery-s")
+	def, ok := env.Content.Module(freed)
 	if !ok || def.Slot != content.SlotHigh {
-		t.Fatalf("fixture: mod-artillery-s slot = %q (ok=%v), want a high module", def.Slot, ok)
+		t.Fatalf("fixture: %s slot = %q (ok=%v), want a high module", freed, def.Slot, ok)
 	}
 	env.Sim.Hangar.Items = append(env.Sim.Hangar.Items,
-		content.CargoStack{Item: "mod-artillery-s", Qty: 1})
+		content.CargoStack{Item: content.ItemID(freed), Qty: 1})
 	frame()
 	modRow := -1
 	for i, r := range f.hangar.Rows {

@@ -57,6 +57,18 @@ func ClassLabel(class string) string {
 	return ""
 }
 
+// FitIssueText renders a fitting-limit refusal in the one wording the sim's
+// log line and the interface's greyed Fit action both quote.
+func FitIssueText(name string, issue *FitIssue) string {
+	switch {
+	case issue.Rule != RuleMount:
+		return name + " exceeds the hull's " + issue.Rule + " " + ClassLabel(issue.Kind) + " quota"
+	case issue.Oversize:
+		return name + " is oversize for the hull's " + issue.Kind + " mounts"
+	}
+	return "No free " + issue.Kind + " mount for " + name
+}
+
 // Mount is one high slot: a turret or launcher of a size class
 // (ShipDef.Mounts, JSON "high_mounts").
 type Mount struct {

@@ -109,6 +109,15 @@ names the *modules and seams* we build that vocabulary into.
 | **Window animation** | the render-only open/close fade: a mount fades + slides in over 12 frames, a close-button close fades out over 10 frames before its unmount runs. The animating window is parked out of ebitenui's window pass and composited through one offscreen with alpha/translate — input is live throughout the open fade, inert throughout the close fade; no rects, layout or simulation state move |
 | **Settle** | an animation completing: an open window snaps to the normal paint path, a closing window runs its deferred unmount. A raise settles every animation (nothing may fade below a retopped window); a new open mount settles the close fades only (the other open fades below it keep running — the composite walks the stack in paint order); a drag-arming press settles that window's open fade, so a fade's park flips can never relayout a subtree a drag is translating |
 
+## The stat language (icons + families)
+
+| Term | Meaning |
+|---|---|
+| **Stat family** | the hue a stat row is tinted by, one per kind of number: **Offence** (crimson), **Defence** (shield blue), **Capacitor** (green), **Mobility** (teal), **Utility** (info blue), **Mining** (amber), **Economy** (good green), **Fitting** (structure silver) — six owned hues in `theme.Palette` (`StatOffence`…`StatExplosive`) and six reused chrome roles; identity rows (Class, Maker, Origin, Family, Faction, Hull, Kind, Category, Qty) carry no glyph and no tint |
+| **Damage sub-system** | the damage types are their own four families behind the eight — **EM** violet, **Thermal** red, **Kinetic** yellow, **Explosive** orange — one glyph per type serving its damage row, its EHP row and its resist row |
+| **Stat table** | the one census (`uikit/theme/stat.go`): label → glyph + family, plus the section-bar map. Every renderer (info page rows and section bars, tooltip rows, the fitting window's stat rows and hull limits, stat-mapped table headers, HUD bar glyphs) reads it, so a new stat lights up on every surface or fails `TestStatTaxonomyCoversCensus` |
+| **Paired info line** | the ship and module pages' stat layout: a section's rows sit on explicit lines of one to three equal cells (single rows are full-width), so related figures share a line and long or dynamic rows span it |
+
 ## Vocabulary rules
 
 - Display names follow `docs/lore/NAMING.md`; ids (`sys-*`, `mod-*`, …) are frozen artifacts.

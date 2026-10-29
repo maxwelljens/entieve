@@ -17,6 +17,8 @@ func TestPaletteGoldenValues(t *testing.T) {
 		"Danger": "#e05555", "Info": "#8fb8e0", "Shield": "#6fa8ff",
 		"Struct": "#c9ced6", "Cell": "#141a24", "Cap": "#5fcf80",
 		"Player": "#7fe3ff", "Hover": "#ffb454", "HeadBg": "#131926",
+		"StatOffence": "#cf3f52", "StatMobility": "#45bdb4", "StatEM": "#9b6fe0",
+		"StatThermal": "#e84d3d", "StatKinetic": "#d8c94a", "StatExplosive": "#e8843c",
 	}
 	got := map[string]string{
 		"BG": hexRGBA(p.BG), "BGHard": hexRGBA(p.BGHard), "Border": hexRGBA(p.Border),
@@ -25,6 +27,8 @@ func TestPaletteGoldenValues(t *testing.T) {
 		"Danger": hexRGBA(p.Danger), "Info": hexRGBA(p.Info), "Shield": hexRGBA(p.Shield),
 		"Struct": hexRGBA(p.Struct), "Cell": hexRGBA(p.Cell), "Cap": hexRGBA(p.Cap),
 		"Player": hexRGBA(p.Player), "Hover": hexRGBA(p.Hover), "HeadBg": hexRGBA(p.HeadBg),
+		"StatOffence": hexRGBA(p.StatOffence), "StatMobility": hexRGBA(p.StatMobility), "StatEM": hexRGBA(p.StatEM),
+		"StatThermal": hexRGBA(p.StatThermal), "StatKinetic": hexRGBA(p.StatKinetic), "StatExplosive": hexRGBA(p.StatExplosive),
 	}
 	for name, w := range want {
 		if got[name] != w {

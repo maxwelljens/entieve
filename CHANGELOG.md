@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The stat language: icons, families and the paired info panel**
+  (`uikit`) — every stat row now leads with a glyph in one family hue
+  (offence crimson, defence shield-blue, capacitor green, mobility teal,
+  utility blue, mining amber, economy green, fitting silver, plus one hue per
+  damage type), the same table (`uikit/theme/stat.go`) behind the info page,
+  the tooltips, the fitting window, the table headers and the HUD bars (bars
+  keep their own layer colour). Section headings became bars — glyph, label,
+  rule — and the Show Info ship and module pages lay their stats out in
+  paired and three-cell lines on a wider landing. The fitting window gained a
+  **HULL LIMITS** block (mounts, grid and CPU quotas), and its Fit action now
+  honours the hull's real fitting rules: a refused module keeps the action
+  greyed and quotes the sim's own rule (`content.FitIssueText`, moved out of
+  `sim` so both read one wording). No new stats: organisation only.
+
 ## [0.11.0] - 2026-10-29
 
 ### Added

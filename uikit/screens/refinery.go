@@ -60,7 +60,7 @@ func NewRefinery(env widgets.Seams) *Refinery {
 	cols := []widgets.Column{
 		{Key: "Ore", Title: "Ore", Priority: 0},
 		{Key: "Held", Title: "Held", Priority: 2, AlignRight: true},
-		{Key: "Yield", Title: "Yield / batch → hangar", Priority: 1},
+		{Key: "Yield", Title: "Yield / batch → hangar", Icon: "mod_mining", Priority: 1},
 	}
 	r.ores = widgets.NewTable(env, cols, widgets.PrefsID("ores"), widgets.PlateBand(func() image.Rectangle {
 		return headerPlateBand(r.win)

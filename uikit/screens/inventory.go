@@ -49,7 +49,7 @@ func NewInventory(env widgets.Seams) *Inventory {
 	cols := []widgets.Column{
 		{Key: "Item", Title: "Item", Priority: 0},
 		{Key: "Qty", Title: "Qty", Priority: 1, AlignRight: true},
-		{Key: "Vol", Title: "m³", Priority: 2, AlignRight: true},
+		{Key: "Vol", Title: "m³", Icon: "stat_cargo", Priority: 2, AlignRight: true},
 	}
 	// One selection callback per section: the source hold of the next
 	// transfer is whichever table the row was clicked in. Contents face:

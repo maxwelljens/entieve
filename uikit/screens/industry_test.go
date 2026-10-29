@@ -422,7 +422,7 @@ func rowIn(t *testing.T, s *infoSection, label string) infoRow {
 	t.Helper()
 	r, ok := rowOf(s, label)
 	if !ok {
-		t.Fatalf("section %q has no %q row (rows %v)", s.Label, label, s.Rows)
+		t.Fatalf("section %q has no %q row (rows %v)", s.Label, label, s.Rows())
 	}
 	return r
 }

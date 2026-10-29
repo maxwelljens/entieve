@@ -917,7 +917,7 @@ func (s *Sim) execFit(c CmdFitModule) {
 		return
 	}
 	if issue := hull.FitProblem(def, s.fitDefs(fit)); issue != nil {
-		s.log(SevWarning, s.player, fitIssueText(def.Name, issue))
+		s.log(SevWarning, s.player, content.FitIssueText(def.Name, issue))
 		return
 	}
 	hangar, n := takeStacks(s.Hangar.Items, content.ItemID(c.Item), 1)
@@ -1117,17 +1117,6 @@ func (s *Sim) fitDefs(fit *Fitting) []*content.ModuleDef {
 		}
 	}
 	return defs
-}
-
-// fitIssueText renders a fitting-limit refusal for a log line.
-func fitIssueText(name string, issue *content.FitIssue) string {
-	switch {
-	case issue.Rule != content.RuleMount:
-		return name + " exceeds the hull's " + issue.Rule + " " + content.ClassLabel(issue.Kind) + " quota"
-	case issue.Oversize:
-		return name + " is oversize for the hull's " + issue.Kind + " mounts"
-	}
-	return "No free " + issue.Kind + " mount for " + name
 }
 
 // itoaN formats an int for event text.

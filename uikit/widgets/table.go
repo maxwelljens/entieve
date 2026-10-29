@@ -10,6 +10,7 @@ import (
 
 	eimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -45,6 +46,7 @@ const doubleClickWindow = 350 * time.Millisecond
 type Column struct {
 	Key        string  // sort key passed to SetSort/SetSortFunc
 	Title      string  // header label
+	Icon       string  // optional stat glyph leading the header label ("" = text only)
 	Width      float64 // preferred (content) width; 0 = measure the content
 	MinWidth   float64 // never shrink below this (the title's own width is an implicit floor)
 	Priority   int     // shrink order when over space (higher drops first)
@@ -551,7 +553,7 @@ func NewTable(env Seams, cols []Column, opts ...TableOption) *Table {
 		if c.AlignRight {
 			align = widget.TextPositionEnd
 		}
-		btn := widget.NewButton(
+		opts := []widget.ButtonOpt{
 			widget.ButtonOpts.TextLabel(c.Title),
 			widget.ButtonOpts.TextFace(headFace),
 			widget.ButtonOpts.TextColor(&widget.ButtonTextColor{
@@ -576,7 +578,21 @@ func NewTable(env Seams, cols []Column, opts ...TableOption) *Table {
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
 				t.headerClicked(i)
 			}),
-		)
+		}
+		if c.Icon != "" {
+			// A stat column's header leads with its glyph (the same tint
+			// family as the rows' figures).
+			opts = append(opts,
+				widget.ButtonOpts.Graphic(&widget.GraphicImage{
+					Idle:     icons.Get(c.Icon, theme.Px(theme.StatIconSize), p.Head),
+					Hover:    icons.Get(c.Icon, theme.Px(theme.StatIconSize), p.Text),
+					Pressed:  icons.Get(c.Icon, theme.Px(theme.StatIconSize), p.Text),
+					Disabled: icons.Get(c.Icon, theme.Px(theme.StatIconSize), p.Dim),
+				}),
+				widget.ButtonOpts.GraphicPadding(widget.Insets{Right: theme.Px(theme.StatIconGap)}),
+			)
+		}
+		btn := widget.NewButton(opts...)
 		t.hdrBtn = append(t.hdrBtn, btn)
 		t.hdrRow.AddChild(btn)
 	}
@@ -1460,6 +1476,9 @@ func (t *Table) ensureFrozen(avail float64) {
 // the cell padding, or the declared MinWidth when that is wider.
 func (t *Table) colFloor(i int, c Column) float64 {
 	f := t.headMeasure(c.Title+t.indicator(i)) + 2*float64(theme.Px(cellPad))
+	if c.Icon != "" {
+		f += float64(theme.Px(theme.StatIconSize + theme.StatIconGap))
+	}
 	if c.MinWidth > f {
 		f = c.MinWidth
 	}
@@ -1549,6 +1568,9 @@ func setVis(w *widget.Widget, v widget.Visibility) {
 func (t *Table) headerLabel(i int) string {
 	ind := t.indicator(i)
 	avail := t.widths[i] - 2*float64(theme.Px(cellPad)) - t.headMeasure(ind)
+	if t.cols[i].Icon != "" {
+		avail -= float64(theme.Px(theme.StatIconSize + theme.StatIconGap))
+	}
 	if avail < 0 {
 		avail = 0
 	}

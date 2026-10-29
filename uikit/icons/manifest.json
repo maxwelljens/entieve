@@ -297,6 +297,138 @@
       "url": "https://game-icons.net/1x1/lorc/radar-sweep.html",
       "file": "radar-sweep.png"
     },
+    "stat_align": {
+      "slug": "clockwise-rotation",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/clockwise-rotation.html",
+      "file": "stat_align.png"
+    },
+    "stat_armor": {
+      "slug": "breastplate",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/breastplate.html",
+      "file": "stat_armor.png"
+    },
+    "stat_burst": {
+      "slug": "explosion-rays",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/explosion-rays.html",
+      "file": "stat_burst.png"
+    },
+    "stat_capacitor": {
+      "slug": "car-battery",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/car-battery.html",
+      "file": "stat_capacitor.png"
+    },
+    "stat_cargo": {
+      "slug": "cargo-crate",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/cargo-crate.html",
+      "file": "stat_cargo.png"
+    },
+    "stat_cash": {
+      "slug": "cash",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/cash.html",
+      "file": "stat_cash.png"
+    },
+    "stat_cpu": {
+      "slug": "cpu",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/cpu.html",
+      "file": "stat_cpu.png"
+    },
+    "stat_em": {
+      "slug": "lightning-arc",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/lightning-arc.html",
+      "file": "stat_em.png"
+    },
+    "stat_explosive": {
+      "slug": "grenade",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/grenade.html",
+      "file": "stat_explosive.png"
+    },
+    "stat_falloff": {
+      "slug": "path-distance",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/path-distance.html",
+      "file": "stat_falloff.png"
+    },
+    "stat_flee": {
+      "slug": "sprint",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/sprint.html",
+      "file": "stat_flee.png"
+    },
+    "stat_grid": {
+      "slug": "power-generator",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/power-generator.html",
+      "file": "stat_grid.png"
+    },
+    "stat_kinetic": {
+      "slug": "impact-point",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/impact-point.html",
+      "file": "stat_kinetic.png"
+    },
+    "stat_mass": {
+      "slug": "weight",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/weight.html",
+      "file": "stat_mass.png"
+    },
+    "stat_range": {
+      "slug": "pencil-ruler",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/pencil-ruler.html",
+      "file": "stat_range.png"
+    },
+    "stat_signature": {
+      "slug": "radar-dish",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/radar-dish.html",
+      "file": "stat_signature.png"
+    },
+    "stat_size": {
+      "slug": "resize",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/resize.html",
+      "file": "stat_size.png"
+    },
+    "stat_speed": {
+      "slug": "speedometer",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/speedometer.html",
+      "file": "stat_speed.png"
+    },
+    "stat_structure": {
+      "slug": "cubes",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/cubes.html",
+      "file": "stat_structure.png"
+    },
+    "stat_thermal": {
+      "slug": "flame",
+      "author": "Carl Olsen",
+      "url": "https://game-icons.net/1x1/carl-olsen/flame.html",
+      "file": "stat_thermal.png"
+    },
+    "stat_tracking": {
+      "slug": "on-target",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/on-target.html",
+      "file": "stat_tracking.png"
+    },
+    "stat_warp": {
+      "slug": "rocket-flight",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/rocket-flight.html",
+      "file": "stat_warp.png"
+    },
     "mod_autocannon_s": {
       "slug": "small-autocannon",
       "author": "public domain",
