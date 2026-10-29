@@ -127,7 +127,11 @@ func NewOrderWin(env widgets.Seams) *OrderWin {
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	body.AddChild(o.modeBtn, row(label("Price"), o.price), o.preview, row(label("Qty"), o.qty), row(o.accept, o.cancel))
+	// The price row leads with the economy coin (the stat language's row
+	// glyph); the labelled field keeps its own layout slot.
+	priceMark := theme.NewIcon("svc_market", theme.StatIconSize, theme.StatTint(p, "Price"))
+	priceMark.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+	body.AddChild(o.modeBtn, row(priceMark, label("Price"), o.price), o.preview, row(label("Qty"), o.qty), row(o.accept, o.cancel))
 	o.body = body
 
 	// The title bar carries the base display name; the × close is attached

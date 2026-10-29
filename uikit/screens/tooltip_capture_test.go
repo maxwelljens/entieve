@@ -125,11 +125,15 @@ func TestTooltipCaptureFrame(t *testing.T) {
 				} else if right.Max.X > anchor+1 || right.Max.X < anchor-8 {
 					fail("value ink ends at x=%d, want within a pixel of the anchor %d", right.Max.X, anchor)
 				}
-				// The label starts at the content edge (left-anchored).
+				// The row's glyph inks its gutter box and the label starts
+				// right of it (left-anchored inside the row's own rect).
 				lr := at(row.Label)
-				if left, n := uitest.InkBounds(img, lr); n > 0 && left.Min.X > panel.Min.X+widgets.TipPadX+4 {
-					fail("label ink starts at x=%d, want near the content edge %d",
-						left.Min.X, panel.Min.X+widgets.TipPadX)
+				if left, n := uitest.InkBounds(img, lr); n > 0 && left.Min.X > lr.Min.X+4 {
+					fail("label ink starts at x=%d, want near the row's label edge %d",
+						left.Min.X, lr.Min.X)
+				}
+				if ic := at(row.Icon); !ic.Empty() && uitest.InkIn(img, ic) < 4 {
+					fail("stat glyph box %v drew too little ink", ic)
 				}
 			}
 

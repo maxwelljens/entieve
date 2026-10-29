@@ -195,6 +195,8 @@ type Hud struct {
 	speedLbl   *widget.Text
 	timeLbl    *widget.Text
 	walletLbl  *widget.Text
+	walletIcon *widget.Graphic
+	walletFace *text.Face
 
 	measure     func(string) float64
 	measureTiny func(string) float64
@@ -268,7 +270,15 @@ func NewHud(env interface {
 		widget.ContainerOpts.Layout(widget.NewStackedLayout()),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
-	capStack.AddChild(h.capBar, h.capValue)
+	capMark := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
+	capGlyph := theme.NewIcon("stat_capacitor", theme.StatIconSize, p.Cap)
+	capGlyph.GetWidget().LayoutData = widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		Padding:            &widget.Insets{Left: theme.Px(4)},
+	}
+	capMark.AddChild(capGlyph)
+	capStack.AddChild(h.capBar, capMark, h.capValue)
 	h.recharging = widget.NewText(widget.TextOpts.Text("recharging", env.Face(theme.StepTiny), theme.Solid(p.Warn)))
 	rechargeRow := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -354,6 +364,17 @@ func NewHud(env interface {
 			Padding:            &widget.Insets{Right: theme.Px(theme.ContentsPad)},
 		})),
 	)
+	// The economy coin rides just left of the figure: its right inset is
+	// the wallet's own width plus the gutter, updated in Sync (the wallet is
+	// a live number, so the glyph tracks it and never crowds the text).
+	coin := theme.NewIcon("stat_cash", theme.IconInline, p.Good)
+	coin.GetWidget().LayoutData = widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionEnd,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		Padding:            &widget.Insets{Right: theme.Px(theme.ContentsPad)},
+	}
+	h.walletIcon = coin
+	h.walletFace = env.FaceMono(theme.StepSmall)
 	clock := theme.NewIcon("hud_time", theme.IconInline, p.Accent)
 	clock.GetWidget().LayoutData = widget.AnchorLayoutData{
 		HorizontalPosition: widget.AnchorLayoutPositionStart,
@@ -368,7 +389,7 @@ func NewHud(env interface {
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 		),
 	)
-	h.strip.AddChild(clock, h.timeLbl, h.walletLbl)
+	h.strip.AddChild(clock, coin, h.timeLbl, h.walletLbl)
 
 	// The left column: strip over status, bottom-aligned in the pair (the
 	// rack is taller, so the pair's own bottom is the shared baseline).
@@ -478,7 +499,33 @@ func (h *Hud) paintHealth() {
 			s, theme.NRGBA(p.Border, 160), false)
 		x := bar.Min.X + (bar.Dx()-int(math.Round(h.measureTiny(st.label))))/2
 		theme.DrawCardText(h.health, st.label, face, x, bar.Min.Y, theme.Solid(p.BGHard))
+		drawBarGlyph(h.health, hudLayerGlyphs[i], bar, cols[i], p.BGHard, theme.StatIconSize)
 	}
+}
+
+// hudLayerGlyphs are the three layer bars' glyphs (shield, armor, structure).
+var hudLayerGlyphs = [3]string{"mod_defense", "stat_armor", "stat_structure"}
+
+// drawBarGlyph paints one glyph at a bar's left inside edge, tinted the bar's
+// own colour (never the stat category's) and clamped to the bar's height.
+func drawBarGlyph(dst *ebiten.Image, name string, bar image.Rectangle, tint, dark color.RGBA, size int) {
+	if size > bar.Dy()-4 {
+		size = bar.Dy() - 4
+	}
+	if name == "" || size < 4 || bar.Dx() < size+6 {
+		return
+	}
+	x := bar.Min.X + 3
+	y := bar.Min.Y + (bar.Dy()-size)/2
+	// The layer-coloured glyph reads against its own fill through a one-pixel
+	// dark outline (the bars' value text is dark over the fill for the same
+	// reason) — the glyph itself keeps the bar's colour.
+	opts := &ebiten.DrawImageOptions{}
+	opts.GeoM.Translate(float64(x-1), float64(y-1))
+	dst.DrawImage(icons.Get(name, size+2, dark), opts)
+	opts = &ebiten.DrawImageOptions{}
+	opts.GeoM.Translate(float64(x), float64(y))
+	dst.DrawImage(icons.Get(name, size, tint), opts)
 }
 
 // newBox builds one target card from the fixed widget pool: a container
@@ -583,6 +630,7 @@ func drawTargetCard(dst *ebiten.Image, c targetCard, env theme.Theme) {
 		if f := barFill(bar, c.layers[i]); f.Dx() > 0 {
 			theme.FillRect(dst, f, theme.Solid(col))
 		}
+		drawBarGlyph(dst, hudLayerGlyphs[i], bar, col, p.BGHard, theme.StatIconSize)
 		vector.StrokeRect(dst,
 			float32(bar.Min.X)+s/2, float32(bar.Min.Y)+s/2,
 			float32(bar.Dx())-s, float32(bar.Dy())-s,
@@ -654,6 +702,20 @@ func (h *Hud) Sync() {
 	h.speedLbl.Label = theme.FormatSpeed(speed)
 	h.timeLbl.Label = "×" + strconv.Itoa(h.timeScale) + " time"
 	h.walletLbl.Label = theme.FormatCredits(s.Wallet())
+	if h.walletIcon != nil && h.walletFace != nil {
+		walletW, _ := text.Measure(h.walletLbl.Label, *h.walletFace, 0)
+		timeW, _ := text.Measure(h.timeLbl.Label, *h.th.FaceBold(theme.StepSmall), 0)
+		coin := float64(theme.Px(theme.IconInline + 2*theme.IconGap))
+		room := float64(h.strip.GetWidget().Rect.Dx()) - float64(theme.Px(2*theme.ContentsPad))
+		// A long wallet in a narrow strip drops its coin rather than overlap
+		// the time readout (the figure never moves).
+		theme.ShowWidget(h.walletIcon.GetWidget(), room <= 0 || walletW+timeW+coin <= room)
+		h.walletIcon.GetWidget().LayoutData = widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionEnd,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			Padding:            &widget.Insets{Right: theme.Px(theme.ContentsPad) + int(math.Ceil(walletW)) + theme.Px(theme.IconGap)},
+		}
+	}
 
 	// 4 — locked-target cards (name, distance, lock strip, layer bars).
 	var locks []sim.Lock
@@ -759,6 +821,14 @@ func (h *Hud) paintWedge(frac float64) {
 		fill.Close()
 		vector.FillPath(h.wedge, &fill, nil, &vector.DrawPathOptions{AntiAlias: true, ColorScale: hudColorScale(p.Accent)})
 	}
+	// The speed glyph sits inside the wedge's bottom-left edge, in the fill's
+	// own colour (the wedge is the bar: no category tint here).
+	size := theme.StatIconSize
+	y := int(hh) - size - 1
+	half := float64(hh-float32(y)) / float64(hh) * float64(cx)
+	opts := &ebiten.DrawImageOptions{}
+	opts.GeoM.Translate(float64(cx)-half+1, float64(y))
+	h.wedge.DrawImage(icons.Get("stat_speed", size, p.Accent), opts)
 }
 
 // hudFrac returns cur/max clamped to 0..1 (1 when max is unknown, so an

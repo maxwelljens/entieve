@@ -43,7 +43,7 @@ func NewFinances(env widgets.Seams) *Finances {
 		{Key: "When", Title: "When", Priority: 3},
 		{Key: "What", Title: "What", Priority: 0},
 		{Key: "Where", Title: "Where", Priority: 2},
-		{Key: "Amount", Title: "Amount", Priority: 1, AlignRight: true},
+		{Key: "Amount", Title: "Amount", Icon: "svc_market", Priority: 1, AlignRight: true},
 	}
 	// The ledger is names, dates and amounts: the mono contents face lines
 	// the columns up. Chronological order is the sim's own; the window

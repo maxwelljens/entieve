@@ -89,7 +89,7 @@ func TestInfoPageUnattributedItemUnchanged(t *testing.T) {
 		t.Errorf("ore carries emblem %q (want none)", page.Emblem)
 	}
 	if s := sectionOf(page, "CONSTRUCTION"); s != nil {
-		t.Errorf("ore rendered a CONSTRUCTION block: %+v", s.Rows)
+		t.Errorf("ore rendered a CONSTRUCTION block: %+v", s.Rows())
 	}
 	if page.Sub != "Ore" {
 		t.Errorf("ore Sub = %q, want just the category", page.Sub)

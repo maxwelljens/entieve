@@ -124,12 +124,18 @@ type tipSectionLayout struct {
 	Rows  []tipRowLayout
 }
 
-// tipRowLayout is one row: label and value rects share a Y range and can
-// never touch horizontally (the value keeps a tipRowGap gutter).
+// tipRowLayout is one row: the optional stat glyph, the label beside it and
+// the value; label and value share a Y range and can never touch
+// horizontally (the value keeps a rowGap gutter).
 type tipRowLayout struct {
+	Icon  image.Rectangle
 	Label image.Rectangle
 	Value image.Rectangle
 }
+
+// tipStatGutter is the icon gutter a stat row reserves: the glyph box plus
+// its gap (14 design units — the tooltip's width cap for row icons).
+const tipStatGutter = theme.StatIconSize + theme.StatIconGap
 
 // tipMeasure is the advance width of s in one of the panel's faces.
 func TipMeasure(s string, face *text.Face) float64 {
@@ -164,6 +170,9 @@ func tipInnerWidth(t theme.Theme, m TooltipModel) int {
 		for _, row := range sec.Rows {
 			rw := TipMeasure(row.Label, t.Face(theme.StepSmall)) + float64(theme.Px(TipRowGap)) +
 				TipMeasure(row.Value, t.Face(theme.StepSmall))
+			if theme.StatIcon(row.Label) != "" {
+				rw += float64(theme.Px(tipStatGutter))
+			}
 			if rw > w {
 				w = rw
 			}
@@ -244,17 +253,27 @@ func tipLayoutAt(t theme.Theme, m TooltipModel, iw int) tipLayout {
 					vw = iw
 				}
 				value := image.Rect(x1-vw, y, x1, y+smallH)
+				// A stat row keeps its glyph in a fixed gutter left of the
+				// label, so labels of different stats still align.
+				lx := x0
+				var ic image.Rectangle
+				if theme.StatIcon(row.Label) != "" {
+					g := theme.Px(theme.StatIconSize)
+					ic = image.Rect(x0, y+(smallH-g)/2, x0+g, y+(smallH-g)/2+g)
+					lx += theme.Px(tipStatGutter)
+				}
 				lw := int(math.Ceil(TipMeasure(row.Label, t.Face(theme.StepSmall))))
 				// The label gets everything left of the value's gutter, so
 				// the two rects are disjoint by construction.
-				if room := value.Min.X - rowGap - x0; lw > room {
+				if room := value.Min.X - rowGap - lx; lw > room {
 					lw = room
 				}
 				if lw < 0 {
 					lw = 0
 				}
 				sl.Rows = append(sl.Rows, tipRowLayout{
-					Label: image.Rect(x0, y, x0+lw, y+smallH),
+					Icon:  ic,
+					Label: image.Rect(lx, y, lx+lw, y+smallH),
 					Value: value,
 				})
 				y += smallH
@@ -367,6 +386,12 @@ func drawTooltip(dst *ebiten.Image, m TooltipModel, l tipLayout, t theme.Theme, 
 			float64(at(sl.Label).Min.X), float64(at(sl.Label).Min.Y), theme.Solid(p.Head))
 		for ri, row := range sec.Rows {
 			rr := sl.Rows[ri]
+			if !rr.Icon.Empty() {
+				opts := &ebiten.DrawImageOptions{}
+				opts.GeoM.Translate(float64(at(rr.Icon).Min.X), float64(at(rr.Icon).Min.Y))
+				dst.DrawImage(icons.Get(theme.StatIcon(row.Label), theme.Px(theme.StatIconSize),
+					theme.StatTint(p, row.Label)), opts)
+			}
 			theme.DrawCardText(dst, row.Label, t.Face(theme.StepSmall), at(rr.Label).Min.X, at(rr.Label).Min.Y, theme.Solid(p.Dim))
 			col := row.Tint
 			if col == (color.RGBA{}) {
@@ -583,6 +608,25 @@ func ModuleSections(def *content.ModuleDef, charge string, chargeQty int) []Tool
 		return nil
 	}
 	var secs []TooltipSection
+
+	// FITTING leads: the hull-facing demand (classes, mount, size) before
+	// any performance block — the same rows the hull's limits are checked
+	// against.
+	var fit []TooltipRow
+	if def.GridClass != "" {
+		fit = append(fit, TooltipRow{Label: "Grid class", Value: content.ClassLabel(def.GridClass)})
+	}
+	if def.CPUClass != "" {
+		fit = append(fit, TooltipRow{Label: "CPU class", Value: content.ClassLabel(def.CPUClass)})
+	}
+	if def.Mount != "" {
+		fit = append(fit,
+			TooltipRow{Label: "Mount", Value: theme.KindLabel(def.Mount)},
+			TooltipRow{Label: "Size", Value: strings.ToUpper(def.Size)})
+	}
+	if len(fit) > 0 {
+		secs = append(secs, TooltipSection{Label: "FITTING", Rows: fit})
+	}
 
 	switch {
 	case def.Weapon != nil:

@@ -75,8 +75,8 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	recipeCols := []widgets.Column{
 		{Key: "Product", Title: "Product", Priority: 0},
 		{Key: "Family", Title: "Family", Priority: 1},
-		{Key: "Time", Title: "Time", Priority: 2, AlignRight: true},
-		{Key: "Fee", Title: "Fee", Priority: 3, AlignRight: true},
+		{Key: "Time", Title: "Time", Icon: "hud_time", Priority: 2, AlignRight: true},
+		{Key: "Fee", Title: "Fee", Icon: "stat_cash", Priority: 3, AlignRight: true},
 		{Key: "Inputs", Title: "Inputs", Priority: 4},
 	}
 	f.recipes = widgets.NewTable(env, recipeCols, widgets.PrefsID("recipes"), widgets.PlateBand(func() image.Rectangle {

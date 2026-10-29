@@ -34,6 +34,16 @@ type Palette struct {
 	Player color.RGBA // the player's own ship
 	Hover  color.RGBA // hover tint (drawn translucent)
 	HeadBg color.RGBA // table header strip
+
+	// The stat language's own hues (stat.go): the six families no chrome
+	// role already owned. Defence, capacitor, utility, mining, economy and
+	// fitting reuse Shield, Cap, Info, Warn, Good and Struct.
+	StatOffence   color.RGBA // crimson: weapons and DPS
+	StatMobility  color.RGBA // teal: speed, align, mass, warp
+	StatEM        color.RGBA // violet: electro-magnetic damage
+	StatThermal   color.RGBA // red: thermal damage
+	StatKinetic   color.RGBA // yellow: kinetic damage
+	StatExplosive color.RGBA // orange: explosive damage
 }
 
 // DefaultPalette returns the EVE-dark palette used by the current game UI
@@ -58,6 +68,13 @@ func DefaultPalette() Palette {
 		Player: mustHex("#7fe3ff"),
 		Hover:  mustHex("#ffb454"),
 		HeadBg: mustHex("#131926"),
+
+		StatOffence:   mustHex("#cf3f52"),
+		StatMobility:  mustHex("#45bdb4"),
+		StatEM:        mustHex("#9b6fe0"),
+		StatThermal:   mustHex("#e84d3d"),
+		StatKinetic:   mustHex("#d8c94a"),
+		StatExplosive: mustHex("#e8843c"),
 	}
 }
 

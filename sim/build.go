@@ -59,7 +59,7 @@ func (s *Sim) buildFitting(ids []content.ModuleID, hull *content.ShipDef) (Fitti
 			return f, errf("sim: unknown module %s in fit", id)
 		}
 		if issue := hull.FitProblem(def, fitted); issue != nil {
-			return f, errf("sim: %s", fitIssueText(def.Name, issue))
+			return f, errf("sim: %s", content.FitIssueText(def.Name, issue))
 		}
 		rt := ModuleRuntime{Def: id}
 		switch def.Slot {

@@ -27,15 +27,15 @@ import (
 // HUD rack's 62×62 cells (a local copy — the rack's own metrics are its
 // business) with a StepTiny name line under each.
 const (
-	fitColW       = 300 // identity + stats column (design px)
-	fitPortrait   = 120 // hull portrait box, hudPortrait's twin
-	fitTileW      = 62  // slot tile width (rackCellW's twin: IconTile + 6)
-	fitTileH      = 62  // slot tile height (theme.IconTile + 6)
-	fitTileNameH  = 19  // name line under a filled tile (StepTiny line box)
-	fitTileLabelW = 30  // "High"/"Mid"/"Low" label column
-	fitTileGap    = 4   // gap between tiles
-	fitMaxCells   = 4   // widest slot row across the hull roster
-	fitRowGap     = 4   // gap between the class rows (the frozen window height)
+	fitColW       = 300 + theme.ScrollGutter // identity + stats column, its scroll rail included
+	fitPortrait   = 120                      // hull portrait box, hudPortrait's twin
+	fitTileW      = 62                       // slot tile width (rackCellW's twin: IconTile + 6)
+	fitTileH      = 62                       // slot tile height (theme.IconTile + 6)
+	fitTileNameH  = 19                       // name line under a filled tile (StepTiny line box)
+	fitTileLabelW = 30                       // "High"/"Mid"/"Low" label column
+	fitTileGap    = 4                        // gap between tiles
+	fitMaxCells   = 4                        // widest slot row across the hull roster
+	fitRowGap     = 4                        // gap between the class rows (the frozen window height)
 	// fitIconPad centres a tile glyph: ebitenui lays a graphic button out
 	// as [empty text][10 px spacing][glyph], so paddingRight =
 	// paddingLeft + spacing is the centring condition (rackIconPad's twin).
@@ -95,9 +95,13 @@ type Fitting struct {
 	idText        *widget.Text
 	emblemSlug    string
 
-	// Zone 2 — the structured stats and per-type EHP rows.
-	stats []fitRow
-	ehp   []fitRow
+	// Zone 2 — the structured stats, the per-type EHP rows and the hull's
+	// fitting limits.
+	stats  []fitRow
+	ehp    []fitRow
+	limits []fitRow
+	// fitDefs is this frame's fitted module defs (the FitProblem input).
+	fitDefs []*content.ModuleDef
 
 	// Zone 3 — the slot tile grid and its interactions.
 	tiles   [3][fitMaxCells]*fitTile
@@ -112,8 +116,10 @@ type Fitting struct {
 	capLit    bool
 	capStable bool
 
-	hangar *widgets.Table
-	split  *widgets.SplitPane
+	hangar   *widgets.Table
+	split    *widgets.SplitPane
+	left     *widget.ScrollContainer
+	leftRail *widgets.ScrollRail
 
 	unfit    *widget.Button
 	fitMod   *widget.Button
@@ -131,6 +137,7 @@ type Fitting struct {
 // right-anchored on the row's shared edge. Both are live cells (the EHP
 // labels carry the resist they price in).
 type fitRow struct {
+	icon  *widget.Graphic // the row's stat glyph (nil on an iconless row)
 	label *widget.Text
 	value *widget.Text
 }
@@ -170,7 +177,33 @@ func NewFitting(env widgets.Seams) *Fitting {
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(fitColW), 0)),
 	)
-	left.AddChild(f.newIdentity(), f.newRule(p), f.newStats(), f.newEHP())
+	left.AddChild(f.newIdentity(), f.newRule(p), f.newStats(), f.newEHP(), f.newLimits())
+
+	// The stats column scrolls (its own rail, the info page's pattern): a
+	// window dragged shorter than the design height clips the tail behind a
+	// scrollbar instead of letting EHP and the limits collide with the
+	// summary strip.
+	f.left = widget.NewScrollContainer(
+		widget.ScrollContainerOpts.Content(left),
+		widget.ScrollContainerOpts.StretchContentWidth(),
+		widget.ScrollContainerOpts.Image(&widget.ScrollContainerImage{
+			// No fill of its own (the window body already paints): the
+			// scroll container is here to clip and scroll, not to restyle.
+			Idle:     theme.NineSlice(color.NRGBA{}),
+			Disabled: theme.NineSlice(color.NRGBA{}),
+			Mask:     theme.NineSlice(color.NRGBA{A: 255}),
+		}),
+	)
+	widgets.AttachScrollContent(f.left, left)
+	f.leftRail = widgets.NewScrollRail(env, f.left, f.left, left)
+	leftCol := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(1),
+			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{true}),
+		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(fitColW), 0)),
+	)
+	leftCol.AddChild(f.leftRail.Container())
 
 	// Zone 3 over the hangar: the split's two panes, the grid above the
 	// hangar table, still the "fitting-hangar" seam the sidecar stores.
@@ -206,7 +239,7 @@ func NewFitting(env widgets.Seams) *Fitting {
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
-	main.AddChild(left, f.split.Container())
+	main.AddChild(leftCol, f.split.Container())
 
 	newBtn := func(label string, clicked func()) *widget.Button {
 		return widget.NewButton(
@@ -396,6 +429,24 @@ func (f *Fitting) newEHP() *widget.Container {
 	return col
 }
 
+// newLimits builds the HULL LIMITS block: the hull's mounts and its per-class
+// grid/CPU allowances, in the words the info page and the sim's refusals use.
+func (f *Fitting) newLimits() *widget.Container {
+	// No gap under the caption: the design height is exactly full, and this
+	// block is the last one in the column.
+	col := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+	)
+	col.AddChild(f.caption("HULL LIMITS", f.th.Pal()))
+	// One row per limit: a mount list and a class-quota pair are both too
+	// wide for a 300 px column's half.
+	col.AddChild(f.newPairs([]string{"Mounts", "Grid quotas", "CPU quotas"}, &f.limits, 1))
+	return col
+}
+
 // caption is a section label in the info window's head style.
 func (f *Fitting) caption(s string, p theme.Palette) *widget.Text {
 	return widget.NewText(
@@ -438,14 +489,26 @@ func (f *Fitting) newPairs(labels []string, rows *[]fitRow, cols int) *widget.Co
 func (f *Fitting) newRow(label string, rows *[]fitRow) *widget.Container {
 	p := f.th.Pal()
 	face := f.th.Face(theme.StepTiny)
+	icon := theme.StatIcon(label)
+	var mark *widget.Graphic
+	labelData := widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+	}
+	if icon != "" {
+		mark = theme.NewIcon(icon, theme.StatIconSize, theme.StatTint(p, label))
+		mark.GetWidget().LayoutData = widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionStart,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		}
+		labelData.Padding = &widget.Insets{Left: theme.Px(theme.StatIconSize + theme.StatIconGap)}
+	}
 	row := fitRow{
+		icon: mark,
 		label: widget.NewText(
 			widget.TextOpts.Text(label, face, theme.Solid(p.Dim)),
 			widget.TextOpts.Position(widget.TextPositionStart, widget.TextPositionCenter),
-			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-				HorizontalPosition: widget.AnchorLayoutPositionStart,
-				VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			})),
+			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(labelData)),
 		),
 		value: widget.NewText(
 			widget.TextOpts.Text("", face, theme.Solid(p.Text)),
@@ -464,6 +527,9 @@ func (f *Fitting) newRow(label string, rows *[]fitRow) *widget.Container {
 			widget.WidgetOpts.MinSize(0, widgets.TipLineH(face)),
 		),
 	)
+	if row.icon != nil {
+		ctr.AddChild(row.icon)
+	}
 	ctr.AddChild(row.label, row.value)
 	return ctr
 }
@@ -656,6 +722,16 @@ func (f *Fitting) Sync() {
 	f.split.Poll(f.ptr)
 	s := f.cv
 	player := s.Player()
+	f.fitDefs = nil
+	if fit, ok := s.Fitting(player); ok {
+		for _, class := range fitClasses {
+			for _, id := range fit.Defs(class) {
+				if def, ok := f.cv.Defs().Module(id); ok {
+					f.fitDefs = append(f.fitDefs, def)
+				}
+			}
+		}
+	}
 
 	ship, hasShip := s.ShipState(player)
 	f.syncIdentity(ship, hasShip)
@@ -672,6 +748,7 @@ func (f *Fitting) Sync() {
 	f.unfit.GetWidget().Disabled = !f.hasSlot || !unequipReady(f.selSlot)
 	f.fitMod.GetWidget().Disabled = !f.hasMod || !f.fitReady(f.selMod, f.selSlot)
 	f.assemble.GetWidget().Disabled = !f.hasShip
+	f.leftRail.Sync()
 }
 
 // syncIdentity refreshes the title, the portrait (repainted on a hull
@@ -741,6 +818,9 @@ func (f *Fitting) statValues(player ecs.Entity, ship sim.ShipState, hasShip bool
 	}
 	if def, ok := f.cv.Defs().Ship(ship.Hull); ok {
 		v["Warp"] = theme.GroupFloat(def.WarpSpeed, 1) + " AU/s"
+		v["Mounts"] = mountsText(def.Mounts)
+		v["Grid quotas"] = quotaText(def.GridClasses)
+		v["CPU quotas"] = quotaText(def.CPUClasses)
 	}
 	return v
 }
@@ -750,6 +830,9 @@ func (f *Fitting) statValues(player ecs.Entity, ship sim.ShipState, hasShip bool
 func (f *Fitting) syncStats(player ecs.Entity, ship sim.ShipState, hasShip bool) {
 	vals := f.statValues(player, ship, hasShip)
 	for _, r := range f.stats {
+		r.value.Label = vals[r.label.Label]
+	}
+	for _, r := range f.limits {
 		r.value.Label = vals[r.label.Label]
 	}
 	for i, t := range []content.DamageType{
@@ -1003,15 +1086,51 @@ func (f *Fitting) paintCapBar(frac float64, stable bool) {
 }
 
 // fitReady reports whether mod fits into slot: a real module into a real
-// empty slot of its class. The toolbar's Fit button and both row menus
-// (slot tiles, hangar rows) gate through this one rule, so the seam keeps
-// them from drifting apart.
+// empty slot of its class that also clears the hull's fitting limits
+// (content.ShipDef.FitProblem — mount kind/size, grid and CPU quotas). The
+// toolbar's Fit button and both row menus (slot tiles, hangar rows) gate
+// through this one rule, so the seam keeps them from drifting apart.
 func (f *Fitting) fitReady(mod content.ModuleID, slot widgets.SlotPick) bool {
 	if mod == "" || slot.Mod != "" {
 		return false
 	}
 	def, ok := f.cv.Defs().Module(mod)
-	return ok && def.Slot == slot.Ref.Class
+	if !ok || def.Slot != slot.Ref.Class {
+		return false
+	}
+	return f.fitIssue(def) == nil
+}
+
+// fitIssue is the hull's first fitting-limit refusal for def (nil = it
+// fits). It is the sim's own rule on the same fitted modules, computed
+// client-side: no command is needed to know the answer.
+func (f *Fitting) fitIssue(def *content.ModuleDef) *content.FitIssue {
+	ship, hasShip := f.cv.ShipState(f.cv.Player())
+	if !hasShip {
+		return nil
+	}
+	hull, ok := f.cv.Defs().Ship(ship.Hull)
+	if !ok {
+		return nil
+	}
+	return hull.FitProblem(def, f.fitDefs)
+}
+
+// fitRefusal is the rule that blocks mod from slot, in the sim's exact
+// wording ("" = nothing to quote: wrong class, occupied slot or a legal
+// fit). The row menu has no sub-line, so this rides the action's label.
+func (f *Fitting) fitRefusal(mod content.ModuleID, slot widgets.SlotPick) string {
+	if mod == "" || slot.Mod != "" {
+		return ""
+	}
+	def, ok := f.cv.Defs().Module(mod)
+	if !ok || def.Slot != slot.Ref.Class {
+		return ""
+	}
+	if issue := f.fitIssue(def); issue != nil {
+		return content.FitIssueText(def.Name, issue)
+	}
+	return ""
 }
 
 // unequipReady reports whether a slot can be unfit (it holds a module) —
@@ -1024,10 +1143,14 @@ func unequipReady(slot widgets.SlotPick) bool { return slot.Mod != "" }
 // on; the toolbar keeps acting on the selection) and the shared module
 // tooltip with the slot in its sub line.
 func (f *Fitting) slotSpec(pick widgets.SlotPick) widgets.RowSpec {
+	fitLabel := "Fit module"
+	if refused := f.fitRefusal(f.selMod, pick); refused != "" {
+		fitLabel += " · " + refused
+	}
 	spec := widgets.RowSpec{
 		Ref: widgets.RowRef(f.cv, pick),
 		Actions: []widgets.RowAction{
-			{Label: "Fit module", Disabled: !f.hasMod || !f.fitReady(f.selMod, pick),
+			{Label: fitLabel, Disabled: !f.hasMod || !f.fitReady(f.selMod, pick),
 				Intent: widgets.Fit{Module: f.selMod, Slot: pick.Ref}},
 			{Label: "Unefit slot", Disabled: !unequipReady(pick),
 				Intent: widgets.Unequip{Slot: pick.Ref}},
@@ -1090,8 +1213,12 @@ func (f *Fitting) hangarSpec(data any) widgets.RowSpec {
 		Ref: widgets.RowRef(f.cv, data),
 	}
 	mod, isMod := data.(content.ModuleID)
+	fitLabel := "Fit module"
+	if refused := f.fitRefusal(mod, f.selSlot); refused != "" {
+		fitLabel += " · " + refused
+	}
 	spec.Actions = []widgets.RowAction{
-		{Label: "Fit module", Disabled: !f.fitReady(mod, f.selSlot),
+		{Label: fitLabel, Disabled: !f.fitReady(mod, f.selSlot),
 			Intent: widgets.Fit{Module: mod, Slot: f.selSlot.Ref}},
 	}
 	def, ok := f.cv.Defs().Module(mod)

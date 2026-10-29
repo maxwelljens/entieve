@@ -103,9 +103,9 @@ const layoutBytesGolden = `{
       "open": false
     },
     "infowin": {
-      "x": 430,
+      "x": 325,
       "y": 130,
-      "w": 420,
+      "w": 630,
       "h": 460,
       "open": false
     },
@@ -122,13 +122,13 @@ const layoutBytesGolden = `{
       "tables": {
         "inventory": {
           "Item": {
-            "width": 180.96875
+            "width": 166.96875
           },
           "Qty": {
             "width": 41.4375
           },
           "Vol": {
-            "width": 35.59375
+            "width": 49.59375
           }
         }
       }
@@ -177,10 +177,10 @@ const layoutBytesGolden = `{
       "tables": {
         "book": {
           "Item": {
-            "width": 131.25
+            "width": 117.25
           },
           "Price": {
-            "width": 53.15625
+            "width": 67.15625
           },
           "Qty": {
             "width": 41.4375
