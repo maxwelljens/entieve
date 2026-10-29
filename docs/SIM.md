@@ -101,6 +101,18 @@ last so the rebuilt grid is never observed mid-Step.
   authored patrol cadence, security-scaled like the patrol schedule) after
   the patrol comes on duty, and the deadline rides the already-persisted
   `Patrol.Next`.
+- **The authority answers distress.** A hostile hit on a civilian miner
+  (`systemDamage`, the same step that records `LastHitBy`) calls
+  `minerDistress`: the traffic step's patrol response is dispatched with the
+  MINER as the incident — the same wing table as a convoy ambush (ten in
+  high, one in low, none in null), rate-limited by `respondingTo` (any live
+  patrol already holding that miner), skipped inside Works control, and
+  delayed in low space by holding the wing at its anchor (`Patrol.Next`)
+  before it warps. `patrolMinerStep` then holds station on the miner, shoots
+  the rats within `trafficPatrolEngageRange` of it (the ambush engagement
+  range — rats only, never the player) and takes the ordinary
+  `patrolReturnStep` home when none are left. No new save field: the
+  incident rides `Patrol.Incident` like an ambush.
 - **Twin-run tests.** `sim/determinism_test.go`, `sim/world_metabolism_test.go`,
   `sim/traffic_test.go` and friends drive two sims through the same
   commands and compare `Hash()`.

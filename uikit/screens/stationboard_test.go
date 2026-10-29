@@ -437,11 +437,8 @@ func TestStationBoardRendersShippedContent(t *testing.T) {
 	b, _, ui := boardPanel(t, cv)
 	pumpBoard(t, ui, b)
 
-	if got, want := availLine(t, b, "contract-solace-cleanup-1", 1), "Destroy 1× Scuttler"; got != want {
-		t.Errorf("cleanup summary = %q, want %q", got, want)
-	}
-	if got, want := availLine(t, b, "contract-solace-cleanup-1", 2), "40,000.00 € · +0.10 standing"; got != want {
-		t.Errorf("cleanup reward = %q, want %q", got, want)
+	if got, want := availLine(t, b, "contract-solace-cordite-1", 2), "38,400.00 € · +0.10 standing"; got != want {
+		t.Errorf("cordite reward = %q, want %q", got, want)
 	}
 	if got, want := availLine(t, b, "contract-solace-supply-run-1", 1),
 		"Deliver 1 m³ 40mm ion to Hauvnok"; got != want {
@@ -451,7 +448,7 @@ func TestStationBoardRendersShippedContent(t *testing.T) {
 		t.Errorf("cordite summary = %q, want %q", got, want)
 	}
 	for _, id := range []content.ContractID{
-		"contract-solace-cleanup-1", "contract-solace-cordite-1", "contract-solace-supply-run-1",
+		"contract-solace-cordite-1", "contract-solace-supply-run-1",
 	} {
 		for line := 0; line < 3; line++ {
 			if s := availLine(t, b, id, line); strings.Contains(s, "…") {

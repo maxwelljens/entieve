@@ -71,7 +71,7 @@ const (
 	// The resume path shares trafficMaxLive with the fresh schedules, so a
 	// deep parked ledger can never unload as one fleet.
 	trafficMaxLive    = 6
-	trafficMaxPatrols = 4
+	trafficMaxPatrols = 16
 
 	// trafficMaxRaiders caps CONCURRENT live traffic raiders per grid —
 	// static spawnGroup NPCs and patrols are not raiders and never count.
@@ -203,10 +203,18 @@ func trafficResponseDelay(security string) int64 {
 	return int64(math.Round(1800 * (1 - securitySigma(security))))
 }
 
-// trafficPatrolWing is the response wing size: floor(3σ) => 3 high, 1 low,
-// 0 null.
+// trafficPatrolWing is the response wing size: a full flight of ten in
+// high-sec (the answer is overwhelming), one late cutter in low, none in
+// null.
 func trafficPatrolWing(security string) int {
-	return int(3 * securitySigma(security))
+	switch security {
+	case "high":
+		return 10
+	case "null":
+		return 0
+	default:
+		return 1
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1712,17 +1720,27 @@ func (s *Sim) trafficAttackOf(e ecs.Entity) *TrafficAttack {
 // Patrol response
 // ---------------------------------------------------------------------------
 
-// trafficRespond dispatches the security response: a wing of floor(3σ)
-// ships (fast and overwhelming in high-sec, a single late responder in
-// low-sec, nothing in null), spawned at the anchor when the wing is under
-// cap, otherwise reassigned from an idle patrol already on duty.
-func (s *Sim) trafficRespond(sys *content.SystemDef, hauler ecs.Entity, td *content.TrafficDef, sec string) {
+// trafficRespond dispatches the security response: a wing of
+// trafficPatrolWing(σ) ships (a full ten in high-sec, a single late
+// responder in low, nothing in null), spawned at the anchor when the wing is
+// under cap, otherwise reassigned from an idle patrol already on duty. The
+// incident is an ambushed convoy hauler or a miner under fire (minerDistress):
+// a miner's wing waits out trafficResponseDelay at the anchor before it warps
+// (an ambush already carries the delay in RespondAt).
+func (s *Sim) trafficRespond(sys *content.SystemDef, incident ecs.Entity, td *content.TrafficDef, sec string) {
 	if td == nil || td.Patrol == nil || len(td.Patrol.Hulls) == 0 {
 		return
 	}
 	wing := trafficPatrolWing(sec)
 	if wing <= 0 {
 		return
+	}
+	miner := s.isMinerIncident(incident)
+	what := "the ambush"
+	delay := int64(0)
+	if miner {
+		what = "the miner under fire"
+		delay = trafficResponseDelay(sec)
 	}
 	dispatched := 0
 	for i := 0; i < wing; i++ {
@@ -1737,19 +1755,70 @@ func (s *Sim) trafficRespond(sys *content.SystemDef, hauler ecs.Entity, td *cont
 		}
 		if p, ok := s.Patrols.Get(e); ok {
 			p.State = PatrolRespond
-			p.Incident = hauler
-			p.Next = 0
+			p.Incident = incident
+			p.Next = s.time + float64(delay)*DT
 		}
 		dispatched++
 	}
 	if dispatched == 0 {
 		return
 	}
-	pos := mustPos(s, hauler)
+	pos := mustPos(s, incident)
 	celID, celName := s.nearestLandmark(pos)
 	s.emit(Event{Kind: EvTraffic, Phase: TrafficPatrolResponse, Severity: SevGood,
 		System: sys.ID, Cel: celID, Value: float64(dispatched),
-		Text: "Patrol wing responding to the ambush near " + celName})
+		Text: "Patrol wing responding to " + what + " near " + celName})
+}
+
+// minerDistress dispatches the Charter Authority's answer to a miner under
+// fire: the same wing as a convoy ambush, held on the miner and the rats
+// around it, and only one live response per miner (a new dispatch after that
+// wing left or died and the miner is hit again). Works-held systems get none
+// — charter security does not answer inside Works control — and null space
+// has no wing to send. Any attacker calls it: the authority answers distress,
+// not only the Old Works.
+func (s *Sim) minerDistress(miner ecs.Entity) {
+	sys := s.System()
+	if sys == nil || (s.war != nil && s.war.Control[sys.ID] == controlWorks) {
+		return
+	}
+	if s.respondingTo(miner) {
+		return
+	}
+	td, ok := s.Content.TrafficFor(sys.ID)
+	if !ok || td.Patrol == nil || len(td.Patrol.Hulls) == 0 {
+		return
+	}
+	sec := s.EffectiveSecurity(sys.ID)
+	if trafficPatrolWing(sec) <= 0 {
+		return
+	}
+	s.trafficRespond(sys, miner, td, sec)
+}
+
+// respondingTo reports whether a live patrol is already working incident e.
+func (s *Sim) respondingTo(e ecs.Entity) bool {
+	for _, p := range sortedEntities(s.Patrols) {
+		if st, ok := s.Patrols.Get(p); ok && st.Incident == e &&
+			st.State == PatrolRespond && s.World.Alive(p) {
+			return true
+		}
+	}
+	return false
+}
+
+// isMinerIncident reports whether e is a live civilian miner — the incident
+// kind a distress wing holds on.
+func (s *Sim) isMinerIncident(e ecs.Entity) bool {
+	if e.IsZero() || !s.World.Alive(e) {
+		return false
+	}
+	ai, ok := s.AIs.Get(e)
+	if !ok {
+		return false
+	}
+	def, ok := s.Content.Npc(ai.Npc)
+	return ok && def.IsMiner()
 }
 
 // idlePatrol returns the first patrol sitting idle (canonical handle order),
@@ -1867,10 +1936,15 @@ func (s *Sim) occupiedBelt(sys *content.SystemDef, sec string) ecs.Entity {
 
 // patrolRespondStep advances one responding patrol toward and into the
 // fight, or sends it home when the raid is over. A belt incident (the
-// celestial entity of an occupied high-sec belt) is a sweep instead.
+// celestial entity of an occupied high-sec belt) is a sweep instead, and a
+// miner incident is a distress hold (patrolMinerStep).
 func (s *Sim) patrolRespondStep(e ecs.Entity, p *Patrol, ai *NpcAI, sec string) {
 	if c, ok := s.Celestials.Get(p.Incident); ok && c.Kind == content.CelBelt {
 		s.patrolSweepStep(e, p, ai, sec)
+		return
+	}
+	if s.isMinerIncident(p.Incident) {
+		s.patrolMinerStep(e, p, ai)
 		return
 	}
 	atk := s.trafficAttackOf(p.Incident)
@@ -1969,6 +2043,56 @@ func (s *Sim) patrolSweepStep(e ecs.Entity, p *Patrol, ai *NpcAI, sec string) {
 			return
 		}
 		s.Intents.Set(e, Intent{Kind: IntentApproach, Target: target})
+		return
+	}
+	s.retargetWeapons(e, target)
+	s.npcEnsureLock(e, target)
+	s.npcActivate(e, ai, target)
+	s.ratDefend(target, e)
+}
+
+// patrolMinerStep holds a distress wing on a miner under fire: it waits out
+// the response delay at the anchor, warps to the miner, shoots the rats
+// within trafficPatrolEngageRange of it (the same range it engages an
+// ambush at), and flies home when none are left. Rats only: a guard never
+// initiates on the player (systemNpc's player-only self-defence), so the
+// wing answers the miner's attackers and nothing else.
+func (s *Sim) patrolMinerStep(e ecs.Entity, p *Patrol, ai *NpcAI) {
+	if !s.isMinerIncident(p.Incident) {
+		p.State = PatrolReturn
+		p.Incident = 0
+		p.Next = 0
+		return
+	}
+	if s.Warps.Has(e) {
+		return // warp state machine owns movement
+	}
+	mp, ok := s.posOf(p.Incident)
+	if !ok {
+		return
+	}
+	ep, ok := s.posOf(e)
+	if !ok {
+		return
+	}
+	if s.time < p.Next {
+		// The response delay (low-sec): hold at the anchor, then fly.
+		s.Intents.Set(e, Intent{Kind: IntentStop})
+		return
+	}
+	if ep.Dist(mp) > trafficPatrolEngageRange {
+		if s.warpToPoint(e, mp) {
+			p.Next = s.time + trafficWarpRetrySec
+		}
+		return
+	}
+	// Hold station on the miner while the rats around it are cleared.
+	s.Intents.Set(e, Intent{Kind: IntentStop})
+	target := s.ratNear(mp, trafficPatrolEngageRange)
+	if target.IsZero() {
+		p.State = PatrolReturn
+		p.Incident = 0
+		p.Next = 0
 		return
 	}
 	s.retargetWeapons(e, target)

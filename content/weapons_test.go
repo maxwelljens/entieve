@@ -198,7 +198,7 @@ func TestBayCalibration(t *testing.T) {
 }
 
 // TestNpcFitsMatchHullCalibre pins the hull-to-family fitting: the small rat
-// and the patrol cutter load small autocannons, the marauder medium
+// loads small autocannons, the patrol cutter and the marauder medium
 // autocannons, the hierarch large artillery and large autocannons. Every
 // fitted gun's family must also have shells to load.
 func TestNpcFitsMatchHullCalibre(t *testing.T) {
@@ -207,7 +207,7 @@ func TestNpcFitsMatchHullCalibre(t *testing.T) {
 		"npc-rat-scuttler": {"small-autocannon"},
 		"npc-rat-marauder": {"medium-autocannon"},
 		"npc-rat-hierarch": {"large-artillery", "large-autocannon"},
-		"npc-guard-patrol": {"small-autocannon"},
+		"npc-guard-patrol": {"medium-autocannon"},
 	}
 	for id, classes := range want {
 		npc, ok := c.NPCs[id]

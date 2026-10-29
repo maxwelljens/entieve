@@ -47,7 +47,8 @@ func TestShowcaseFightThreeOpensOnGrid(t *testing.T) {
 		OnTick: func(t int64, _ script.Engine) { tick = t },
 		OnEvent: func(e sim.Event) {
 			switch {
-			case e.Kind == sim.EvTargetLocked && strings.Contains(e.Text, "Marauder") && lockSeen < 0:
+			case e.Kind == sim.EvTargetLocked && strings.HasSuffix(e.Text, "Locked Marauder") && lockSeen < 0:
+				// Exact name: traffic's "Marauder Ambusher" raiders lock too.
 				lockSeen = tick
 			case strings.Contains(e.Text, "out of lock range"):
 				refusals++

@@ -38,14 +38,16 @@
       "station": {
         "services": ["market", "repair"],
         "market": [
-          { "item": "ship-npc-patrol", "qty": 3, "price": 400000 },
+          { "item": "ship-npc-patrol", "qty": 8, "price": 400000 },
           { "item": "mod-artillery-s", "qty": 12, "price": 320000 },
+          { "item": "mod-autocannon-m", "qty": 12, "price": 275000 },
           { "item": "mod-shield-boost", "qty": 8, "price": 230000 },
           { "item": "mod-mining-laser", "qty": 20, "price": 175000 },
           { "item": "mod-afterburner", "qty": 12, "price": 155000 },
           { "item": "mod-armor-rep", "qty": 10, "price": 210000 },
           { "item": "mod-armor-plate", "qty": 15, "price": 120000 },
           { "item": "ammo-emp-s", "qty": 3000, "price": 120 },
+          { "item": "ammo-emp-m", "qty": 2000, "price": 240 },
           { "item": "ammo-art-emp-s", "qty": 3000, "price": 120 },
           { "item": "charge-cap-cell", "qty": 600, "price": 1000 },
           { "item": "ore-sterngrit", "qty": 4000, "price": 22, "side": "buy" },
@@ -69,14 +71,17 @@
           { "item": "min-silex", "qty": 4000, "price": 28, "side": "buy" },
           { "item": "ore-glacierite", "qty": 800, "price": 96, "side": "buy" }
         ]
-      }
+      },
+      "spawns": [
+        { "npc_id": "npc-guard-patrol", "count": 4, "respawn_sec": 300 }
+      ]
     },
     {
       "id": "cel-rudnik-belt",
       "name": "Asteroid Belt I",
       "kind": "belt",
       "position": { "X": -371770736261, "Y": 294318499540 },
-      "radius": 900000,
+      "radius": 366000,
       "colors": ["#8f8475"],
       "belt": {
         "asteroids": [
@@ -86,8 +91,8 @@
         ]
       },
       "spawns": [
-        { "npc_id": "npc-guard-patrol", "count": 2, "respawn_sec": 300 },
-        { "npc_id": "npc-rat-scuttler", "count": 3, "respawn_sec": 90 },
+        { "npc_id": "npc-guard-patrol", "count": 4, "respawn_sec": 300 },
+        { "npc_id": "npc-rat-scuttler", "count": 3, "respawn_sec": 1800 },
         { "npc_id": "npc-miner-barge", "count": 1, "respawn_sec": 600 }
       ]
     },

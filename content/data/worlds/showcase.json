@@ -82,7 +82,7 @@
     {
       "name": "Dry gun refuses to fire",
       "feature": "dry-gun",
-      "detail": "Fire a gun with no matching shell left in cargo: exactly one 'no charges' warning per dry cycle, then the module deactivates (the tour stashes its leftover shells in the Jalvrek hangar, so the fight-3 activation on the Marauder demonstrates it)."
+      "detail": "Fire a gun with no matching shell left in cargo: exactly one 'no charges' warning per dry cycle, then the module deactivates (the tour burns and dumps every small shell before the Fringe, so the fight-3 activation on the Marauder demonstrates it)."
     },
     {
       "name": "Turret hit chance",
@@ -172,7 +172,7 @@
     {
       "name": "NPC aggro",
       "feature": "npc-aggro",
-      "detail": "Approach a Struvok belt rat within its aggro_range (20000 m): its bracket turns hostile red and it breaks orbit to come at you - EvtLog aggro line."
+      "detail": "Approach a belt rat within its aggro_range (250 km): its bracket turns hostile red and it breaks orbit to come at you - EvtLog aggro line."
     },
     {
       "name": "NPC flee",
@@ -267,7 +267,7 @@
     {
       "name": "NPC respawn timers",
       "feature": "npc-respawn",
-      "detail": "Clear a spawn (Struvok belt 90 s, Kvonice belt 120 s; anomaly cel-penumbra-den 300 s): after respawn_sec the group is back - the log reports the respawn."
+      "detail": "Clear a spawn and it returns on its zone-scaled timer: high-sec 1 800 s, low-sec 600 s, null-sec 300 s (anomalies 600 s). The tour clears the Młondan belt Scuttler and watches the log from Hovžan - only the loaded system's timers tick."
     },
     {
       "name": "Save and restore",
@@ -302,7 +302,7 @@
     {
       "name": "Contracts and standing loop",
       "feature": "contract-loop",
-      "detail": "CmdAcceptMission (script action 'accept-mission') takes contract-solace-cleanup-1 off the Jalvrek board: EvMission 'accepted' on acceptance, 'progress' when the belt Scuttler dies (kills count by rat class), 'ready' when the objective is met, and 'completed' auto-claimed when the player docks at the offering station again — wallet +40,000 € and Player.Standing +0.10 land in the same tick. Refused commands (not docked / wrong board / insufficient standing / unknown id) report EvMission phase 'refused'."
+      "detail": "CmdAcceptMission (script action 'accept-mission') takes contract-solace-cleanup-1 off the Hovžan board in Młondan (security owns the high-sec belts now, so the kill orders live in the Fringe): EvMission 'accepted' on acceptance, 'progress' when the belt Scuttler dies (kills count by rat class), 'ready' when the objective is met, and 'completed' auto-claimed when the player docks at the offering station again — wallet +40,000 € and Player.Standing +0.10 land in the same tick. Refused commands (not docked / wrong board / insufficient standing / unknown id) report EvMission phase 'refused'."
     },
     {
       "name": "NPC traffic delivery and market drift",

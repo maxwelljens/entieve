@@ -15,28 +15,28 @@
   "high_mounts": [
     {
       "kind": "turret",
-      "size": "s"
+      "size": "m"
     },
     {
       "kind": "turret",
-      "size": "s"
+      "size": "m"
     },
     {
       "kind": "turret",
-      "size": "s"
+      "size": "m"
     }
   ],
   "grid_classes": {
     "i": 3,
-    "ii": 2
+    "ii": 4
   },
   "cpu_classes": {
     "i": 1
   },
-  "shield": 300,
+  "shield": 700,
   "shield_recharge": 220,
-  "armor": 250,
-  "structure": 250,
+  "armor": 600,
+  "structure": 700,
   "resists": {
     "em": 0.2,
     "thermal": 0.25,

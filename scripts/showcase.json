@@ -12,264 +12,390 @@
     "action": "stop"
   },
   {
-    "at_tick": 2400,
+    "at_tick": 2000,
     "action": "warp",
-    "target": "Jalvrek"
+    "target": "Gate (Kvonice)",
+    "note": "relocated from the Jalvrek run (old 2 400): the kill contract moved to Hovžan's board in Młondan because high-sec security now owns the Solace belt (owner decision) - the tour opens on the Fringe leg instead of the Solace station leg"
   },
   {
-    "at_tick": 6300,
-    "action": "approach",
-    "target": "Jalvrek",
-    "note": "closes the gap after a possible clone respawn"
+    "at_tick": 3200,
+    "action": "jump",
+    "target": "Gate (Kvonice)"
+  },
+  {
+    "at_tick": 3500,
+    "action": "warp",
+    "target": "Gate (Młondan)"
+  },
+  {
+    "at_tick": 5000,
+    "action": "jump",
+    "target": "Gate (Młondan)"
+  },
+  {
+    "at_tick": 5300,
+    "action": "warp",
+    "target": "Hovžan"
+  },
+  {
+    "at_tick": 7000,
+    "action": "dock",
+    "target": "Hovžan",
+    "note": "relocated from Jalvrek (old 7 200): Hovžan is the cleanup contract's offering station"
+  },
+  {
+    "at_tick": 7100,
+    "action": "accept-mission",
+    "mission": "contract-solace-cleanup-1",
+    "note": "contract leg: take the kill contract off Hovžan's board (old 7 230 at Jalvrek); the Młondan belt kill counts progress, and the tick-35 200 dock back at Hovžan auto-claims it"
   },
   {
     "at_tick": 7200,
-    "action": "dock",
-    "target": "Jalvrek"
-  },
-  {
-    "at_tick": 7230,
-    "action": "accept-mission",
-    "mission": "contract-solace-cleanup-1",
-    "note": "contract leg: take the kill contract off the Jalvrek board; the belt fight counts progress, the tick-51060 dock auto-claims it"
-  },
-  {
-    "at_tick": 7260,
-    "action": "repair"
-  },
-  {
-    "at_tick": 7320,
-    "action": "buy",
-    "item": "mod-cap-booster",
-    "qty": 1
-  },
-  {
-    "at_tick": 7380,
-    "action": "buy",
-    "item": "ship-barge",
-    "qty": 1
-  },
-  {
-    "at_tick": 7440,
-    "action": "sell",
-    "item": "loot-navdata",
-    "qty": 1,
-    "note": "market sell"
-  },
-  {
-    "at_tick": 7500,
-    "action": "refine",
-    "item": "ore-sterngrit",
-    "qty": 100
-  },
-  {
-    "at_tick": 7560,
     "action": "undock"
   },
   {
-    "at_tick": 7800,
+    "at_tick": 7500,
     "action": "warp",
-    "target": "Asteroid Belt I"
+    "target": "Asteroid Belt I",
+    "note": "relocated from the Struvok belt (old 7 800): high-sec security clears that arena in ~45 s now (station posts + patrol wings), so the fight lives in the low-sec Młondan belt - quiet ground: no static posts, one guard cutter on the station, and the resident miner ~278 km out with the distress retinue holding on it"
   },
   {
-    "at_tick": 11060,
+    "at_tick": 9200,
+    "action": "approach",
+    "target": "Scuttler"
+  },
+  {
+    "at_tick": 9800,
     "action": "setammo",
     "slot": "high0",
     "item": "ammo-emp-s",
     "note": "wake the fresh gun: four shell types in cargo make it wait for a choice, so pick EMP before the first lock"
   },
   {
-    "at_tick": 11940,
+    "at_tick": 10000,
     "action": "lock",
     "target": "Scuttler",
-    "note": "fight 1: rockets cripple the rat - it breaks and runs (or dies fighting). The fight-1 block sits 120 ticks earlier than 12060/12420/13260-13560: a belt miner now flees the rat that used to kill it at ~140 s (the miner-flee change), which reseeded the belt stream - at the old timing the guard patrol took both killing blows and the player lost the bounty race"
+    "note": "fight 1 (old 11 940, Struvok belt): rockets cripple the rat - it breaks and runs before the security wing can take the killing blow"
   },
   {
-    "at_tick": 12300,
+    "at_tick": 10600,
     "action": "orbit",
     "target": "Scuttler",
     "range": 3000
   },
   {
-    "at_tick": 13140,
+    "at_tick": 10900,
     "action": "activate",
     "slot": "mid2",
     "target": "Scuttler",
     "note": "stasis web"
   },
   {
-    "at_tick": 13200,
+    "at_tick": 11000,
     "action": "activate",
     "slot": "mid1",
     "note": "shield booster"
   },
   {
-    "at_tick": 13260,
+    "at_tick": 11100,
     "action": "activate",
     "slot": "low0",
     "note": "armor repper"
   },
   {
-    "at_tick": 13320,
-    "action": "activate",
-    "slot": "mid0",
-    "note": "afterburner"
-  },
-  {
-    "at_tick": 13380,
-    "action": "activate",
-    "slot": "high0",
-    "target": "Scuttler",
-    "note": "emp turret: burns the EMP damage profile"
-  },
-  {
-    "at_tick": 13440,
+    "at_tick": 11600,
     "action": "activate",
     "slot": "high2",
     "target": "Scuttler",
     "note": "rocket pod"
   },
   {
-    "at_tick": 16060,
+    "at_tick": 11900,
+    "action": "activate",
+    "slot": "high0",
+    "target": "Scuttler",
+    "note": "emp turret: burns the EMP damage profile"
+  },
+  {
+    "at_tick": 15000,
     "action": "setammo",
     "slot": "high0",
     "item": "ammo-fusion-s",
-    "note": "EMP left the gun waiting; load the explosive profile, then take the next rat with it"
+    "note": "a spent profile deactivates the gun; selecting a shell only loads the bay, so every profile change is followed by an activate - that is what burns all four charge types in one fight (the old tour spread them over three fights)"
   },
   {
-    "at_tick": 16140,
-    "action": "lock",
-    "target": "Scuttler",
-    "note": "fight 1b: the second belt rat takes the fusion pass"
-  },
-  {
-    "at_tick": 16500,
+    "at_tick": 15060,
     "action": "activate",
     "slot": "high0",
     "target": "Scuttler",
     "note": "fusion turret"
   },
   {
-    "at_tick": 18060,
-    "action": "lock",
-    "target": "Scuttler",
-    "note": "fight 2: the second rat meets the fusion-hungry turret and the rockets"
-  },
-  {
-    "at_tick": 18120,
+    "at_tick": 18000,
     "action": "setammo",
     "slot": "high0",
     "item": "ammo-plutonium-s",
-    "note": "load plutonium for fight 2: the bay reloads only the selected type"
+    "note": "load plutonium: the bay reloads only the selected type"
   },
   {
-    "at_tick": 19150,
+    "at_tick": 18060,
     "action": "activate",
     "slot": "high0",
     "target": "Scuttler",
     "note": "plutonium turret"
   },
   {
-    "at_tick": 19210,
-    "action": "activate",
-    "slot": "high2",
-    "target": "Scuttler"
+    "at_tick": 21000,
+    "action": "setammo",
+    "slot": "high0",
+    "item": "ammo-ap-s",
+    "note": "burn the last untouched damage profile: armor-piercing"
   },
   {
-    "at_tick": 29060,
+    "at_tick": 21060,
+    "action": "activate",
+    "slot": "high0",
+    "target": "Scuttler",
+    "note": "armor-piercing turret"
+  },
+  {
+    "at_tick": 29000,
     "action": "approach",
     "target": "Scuttler Wreck"
   },
   {
-    "at_tick": 30060,
+    "at_tick": 30000,
     "action": "loot",
     "target": "Scuttler Wreck",
     "item": "loot-alloy-scrap",
-    "note": "take only the salvage: the wreck's 34 armor-piercing rounds would out-weigh the AP we fire (the four-damage proof is a net drop)"
+    "note": "take only the salvage: the wreck's armor-piercing rounds would out-weigh the AP burned here, and the four-damage proof is a net drop per shell type"
   },
   {
-    "at_tick": 30600,
-    "action": "lock",
-    "target": "Scuttler",
-    "note": "the respawned rat"
-  },
-  {
-    "at_tick": 31000,
-    "action": "setammo",
-    "slot": "high0",
-    "item": "ammo-ap-s",
-    "note": "burn the last untouched damage profile: the 31800 cycle loads armor-piercing"
-  },
-  {
-    "at_tick": 30800,
+    "at_tick": 30100,
     "action": "activate",
-    "slot": "high0",
-    "target": "Scuttler",
-    "note": "turret pass on the respawned rat"
+    "slot": "mid0",
+    "note": "afterburner - and the way out: Młondan's resident Marauder pins the belt with its scrambler from tick ~26 700 (t 445 s; old tour burned the afterburner at 13 320 in the Struvok fight)"
   },
   {
-    "at_tick": 34060,
+    "at_tick": 30200,
     "action": "approach",
-    "target": "Sterngrit Ore Asteroid"
+    "target": "Hovžan",
+    "note": "burn clear of the Marauder's 45 km max_target_range; its 10 s scram disruption rides out every cap gap, so no warp start catches a window - only leaving its lock range un-pins the ship"
   },
   {
-    "at_tick": 36060,
-    "action": "mine",
-    "target": "Sterngrit Ore Asteroid",
-    "slot": "high1",
-    "note": "mining into the hold until the rock depletes"
-  },
-  {
-    "at_tick": 38000,
-    "action": "mine",
-    "target": "Sterngrit Ore Asteroid",
-    "slot": "high1",
-    "note": "the first rock is spent; a second sterngrit rock keeps the hold filling"
-  },
-  {
-    "at_tick": 42060,
+    "at_tick": 34000,
     "action": "warp",
-    "target": "Jalvrek",
-    "range": 50000,
-    "note": "warp to within 50 km: the approach step closes the last gap"
+    "target": "Hovžan",
+    "note": "the scrambler drops (target not locked) at tick ~33 400 (t 557 s) once the burn is 45 km out"
   },
   {
-    "at_tick": 42300,
+    "at_tick": 35200,
+    "action": "dock",
+    "target": "Hovžan",
+    "note": "contract claim, and the wait: the 600 s Młondan belt timer only ticks in the loaded system, so the respawn has to be watched docked here"
+  },
+  {
+    "at_tick": 62000,
+    "action": "undock",
+    "note": "the Scuttler respawned at ~t=60 500 (zone-scaled low-sec 600 s timer); undock once it is in the log"
+  },
+  {
+    "at_tick": 62600,
+    "action": "warp",
+    "target": "Gate (Kvonice)"
+  },
+  {
+    "at_tick": 68000,
+    "action": "jump",
+    "target": "Gate (Kvonice)"
+  },
+  {
+    "at_tick": 68400,
+    "action": "warp",
+    "target": "Gate (Struvok)"
+  },
+  {
+    "at_tick": 72500,
+    "action": "jump",
+    "target": "Gate (Struvok)"
+  },
+  {
+    "at_tick": 72900,
+    "action": "warp",
+    "target": "Jalvrek"
+  },
+  {
+    "at_tick": 75000,
     "action": "approach",
     "target": "Jalvrek"
   },
   {
-    "at_tick": 50060,
-    "action": "setammo",
-    "slot": "high0",
-    "item": "",
-    "note": "dump the bay to cargo before docking (dock never touches a bay) so the dock stash can empty the ship completely: the gun then waits, and with no shells aboard the fight-3 cycle warns 'no charges'"
-  },
-  {
-    "at_tick": 51060,
+    "at_tick": 76500,
     "action": "dock",
     "target": "Jalvrek",
-    "note": "station session 2: services, stash, fit swap, hull swap"
+    "note": "station session 1 (old 51 060): repair, market and industry live here; fitting and the hull swap follow on the second dock"
   },
   {
-    "at_tick": 51120,
+    "at_tick": 76560,
     "action": "repair"
   },
   {
-    "at_tick": 51180,
+    "at_tick": 76620,
+    "action": "buy",
+    "item": "mod-cap-booster",
+    "qty": 1
+  },
+  {
+    "at_tick": 76680,
+    "action": "buy",
+    "item": "ship-barge",
+    "qty": 1
+  },
+  {
+    "at_tick": 76740,
+    "action": "sell",
+    "item": "loot-navdata",
+    "qty": 1,
+    "note": "market sell"
+  },
+  {
+    "at_tick": 76800,
+    "action": "refine",
+    "item": "ore-sterngrit",
+    "qty": 100,
+    "note": "the authored ore refines while the hold is emptied for the belt"
+  },
+  {
+    "at_tick": 76900,
+    "action": "undock"
+  },
+  {
+    "at_tick": 77300,
+    "action": "warp",
+    "target": "Asteroid Belt I"
+  },
+  {
+    "at_tick": 78400,
+    "action": "approach",
+    "target": "Sterngrit Ore Asteroid"
+  },
+  {
+    "at_tick": 79200,
+    "action": "mine",
+    "target": "Sterngrit Ore Asteroid",
+    "slot": "high1",
+    "note": "belt visit 1 (old single visit 36 060/38 000): the rock carries the authored pre-mined 600 m³ and the sloop's 400 m³ cargo takes ~300 of it, so it is opened here and finished after the hold is emptied - the only player-visible way to a spent rock (NPC depletion lines are quiet)"
+  },
+  {
+    "at_tick": 82800,
+    "action": "warp",
+    "target": "Jalvrek",
+    "range": 50000,
+    "note": "warp to within 50 km (warp-to-range evidence): the approach closes the last gap"
+  },
+  {
+    "at_tick": 83100,
+    "action": "approach",
+    "target": "Jalvrek"
+  },
+  {
+    "at_tick": 91500,
+    "action": "setammo",
+    "slot": "high0",
+    "item": "",
+    "note": "dump the bay to cargo before docking (dock never touches a bay) so the hold can be emptied completely and the fight-3 gun has no shell to load"
+  },
+  {
+    "at_tick": 92000,
+    "action": "dock",
+    "target": "Jalvrek",
+    "note": "between the two belt visits: the hold is emptied here, nothing else"
+  },
+  {
+    "at_tick": 92060,
+    "action": "transfer",
+    "item": "ore-cordite",
+    "qty": 50,
+    "from": "cargo",
+    "to": "hangar",
+    "note": "free the hold for the second pass; 10 Kerngrit Ore stays aboard (the remnant probe sells it at Hauvnok)"
+  },
+  {
+    "at_tick": 92070,
+    "action": "transfer",
+    "item": "ore-sterngrit",
+    "qty": 300,
+    "from": "cargo",
+    "to": "hangar",
+    "note": "the first pass' haul goes into the hangar"
+  },
+  {
+    "at_tick": 92080,
+    "action": "transfer",
+    "item": "loot-alloy-scrap",
+    "qty": 6,
+    "from": "cargo",
+    "to": "hangar"
+  },
+  {
+    "at_tick": 92090,
+    "action": "transfer",
+    "item": "loot-iced-core",
+    "qty": 2,
+    "from": "cargo",
+    "to": "hangar"
+  },
+  {
+    "at_tick": 92200,
+    "action": "undock"
+  },
+  {
+    "at_tick": 92600,
+    "action": "warp",
+    "target": "Asteroid Belt I"
+  },
+  {
+    "at_tick": 93700,
+    "action": "approach",
+    "target": "Sterngrit Ore Asteroid"
+  },
+  {
+    "at_tick": 94500,
+    "action": "mine",
+    "target": "Sterngrit Ore Asteroid",
+    "slot": "high1",
+    "note": "belt visit 2: the rock's remaining volume fits the empty 400 m³ hold, so the third cycle depletes it - 'Sterngrit Ore Asteroid depleted' at ~t=98 100"
+  },
+  {
+    "at_tick": 106500,
+    "action": "warp",
+    "target": "Jalvrek"
+  },
+  {
+    "at_tick": 107500,
+    "action": "dock",
+    "target": "Jalvrek",
+    "note": "station session 2"
+  },
+  {
+    "at_tick": 107560,
+    "action": "repair"
+  },
+  {
+    "at_tick": 107620,
     "action": "sell",
     "item": "loot-alloy-scrap",
     "qty": 5
   },
   {
-    "at_tick": 51190,
+    "at_tick": 107630,
     "action": "sell",
     "item": "charge-cap-cell",
     "qty": 5,
-    "note": "war procurement: five cap cells sell into the standing war bid — the treasury pays at once and the goods are consumed into the war (the sink)"
+    "note": "war procurement: five cap cells sell into the standing war bid - the treasury pays at once and the goods are consumed into the war (the sink)"
   },
   {
-    "at_tick": 51240,
+    "at_tick": 107680,
     "action": "transfer",
     "item": "ore-sterngrit",
     "qty": 50,
@@ -278,174 +404,143 @@
     "note": "stash ore at the station"
   },
   {
-    "at_tick": 51300,
+    "at_tick": 107740,
     "action": "transfer",
     "item": "ore-sterngrit",
     "qty": 100,
     "from": "cargo",
     "to": "hangar",
-    "note": "the mined haul goes into the hangar"
+    "note": "the second pass' haul goes into the hangar"
   },
   {
-    "at_tick": 51310,
-    "action": "transfer",
-    "item": "ammo-emp-s",
-    "qty": 2,
-    "from": "cargo",
-    "to": "hangar",
-    "note": "stash every leftover shell (the bay was dumped 50060): inter-NPC aggression moved the fight-2 stream and a fleeing belt miner reseeded the fights after it, so the leftover counts were recalibrated to 2 EMP / 3 fusion / 2 plutonium / 9 AP (was 1/3/2/1 after the shield-recharge pass, 3/3/4/10 before it). EMP and fusion leave together, then plutonium and AP leave on the same tick, so the idle gun never sees a single type it would auto-load — and with no matching round in cargo the fight-3 cycle is truly dry"
-  },
-  {
-    "at_tick": 51310,
-    "action": "transfer",
-    "item": "ammo-fusion-s",
-    "qty": 3,
-    "from": "cargo",
-    "to": "hangar"
-  },
-  {
-    "at_tick": 51320,
-    "action": "transfer",
-    "item": "ammo-plutonium-s",
-    "qty": 2,
-    "from": "cargo",
-    "to": "hangar"
-  },
-  {
-    "at_tick": 51320,
-    "action": "transfer",
-    "item": "ammo-ap-s",
-    "qty": 9,
-    "from": "cargo",
-    "to": "hangar"
-  },
-  {
-    "at_tick": 51360,
+    "at_tick": 107800,
     "action": "unfit",
     "slot": "mid2",
     "note": "web to hangar"
   },
   {
-    "at_tick": 51420,
+    "at_tick": 107860,
     "action": "fit",
     "item": "mod-cap-booster",
     "slot": "mid2"
   },
   {
-    "at_tick": 51480,
+    "at_tick": 107920,
     "action": "assemble",
-    "ship": "ship-barge"
+    "ship": "ship-barge",
+    "note": "hull swap: the barge is assembled out of the hangar and flown out of the sloop (ship-assembly); the sloop goes back in"
   },
   {
-    "at_tick": 51540,
+    "at_tick": 107980,
     "action": "assemble",
-    "ship": "ship-sloop"
+    "ship": "ship-sloop",
+    "note": "and back into the sloop: the barge swap is the demonstration, the sloop flies the Fringe"
   },
   {
-    "at_tick": 51600,
+    "at_tick": 108040,
     "action": "undock"
   },
   {
-    "at_tick": 51660,
+    "at_tick": 108100,
     "action": "activate",
     "slot": "mid2",
     "note": "cap booster burns a charge-cap-cell"
   },
   {
-    "at_tick": 51720,
+    "at_tick": 108160,
     "action": "activate",
     "slot": "mid1",
     "note": "shield booster drains cap"
   },
   {
-    "at_tick": 51780,
+    "at_tick": 108220,
     "action": "activate",
     "slot": "low0",
     "note": "armor repper drains cap"
   },
   {
-    "at_tick": 53060,
+    "at_tick": 109500,
     "action": "warp",
     "target": "Gate (Kvonice)"
   },
   {
-    "at_tick": 59060,
+    "at_tick": 111000,
     "action": "jump",
     "target": "Gate (Kvonice)"
   },
   {
-    "at_tick": 59120,
+    "at_tick": 111300,
     "action": "warp",
     "target": "Gnazvor"
   },
   {
-    "at_tick": 60180,
+    "at_tick": 112500,
     "action": "lock",
     "target": "Marauder",
-    "note": "fight 3: the marauder webs us and hits us with its warp scrambler"
+    "note": "fight 3 (old 60 180): the marauder webs us and hits us with its warp scrambler"
   },
   {
-    "at_tick": 60380,
+    "at_tick": 112700,
     "action": "orbit",
     "target": "Marauder",
     "range": 6000
   },
   {
-    "at_tick": 61100,
+    "at_tick": 113000,
     "action": "war-push",
     "system": "sys-penumbra",
     "value": 0.12,
-    "note": "the front moves: the Works press Kvonice's meter past the news threshold (the harness lever; player supply arrives through war bids and kills)"
+    "note": "the front moves (old 61 100): the Works press Kvonice's meter past the news threshold (the harness lever; player supply arrives through war bids and kills)"
   },
   {
-    "at_tick": 61280,
+    "at_tick": 113100,
     "action": "activate",
     "slot": "high0",
     "target": "Marauder",
-    "note": "dry gun: the shells were stashed in the hangar, so this cycle warns 'no charges'"
+    "note": "dry gun: every shell was fired or dumped into the hangar, so this cycle warns 'no charges'"
   },
   {
-    "at_tick": 61340,
+    "at_tick": 113160,
     "action": "activate",
     "slot": "mid2",
     "target": "Marauder"
   },
   {
-    "at_tick": 61400,
+    "at_tick": 113220,
     "action": "activate",
     "slot": "high2",
     "target": "Marauder"
   },
   {
-    "at_tick": 62000,
+    "at_tick": 114000,
     "action": "lock",
     "target": "Hierarch",
     "note": "boss fight: the hierarch tanks, boosts and webs; it never flees"
   },
   {
-    "at_tick": 62300,
+    "at_tick": 114300,
     "action": "orbit",
     "target": "Hierarch",
     "range": 20000
   },
   {
-    "at_tick": 63200,
+    "at_tick": 115000,
+    "action": "war-push",
+    "system": "sys-penumbra",
+    "value": 1.2,
+    "note": "Kvonice falls to the Old Works on the hourly beat (t=1 920 s, old 68 300): guards leave, the belts go hostile, Hauvnok becomes a remnant"
+  },
+  {
+    "at_tick": 115100,
     "action": "activate",
     "slot": "high0",
     "target": "Hierarch"
   },
   {
-    "at_tick": 68300,
+    "at_tick": 116000,
     "action": "war-push",
     "system": "sys-penumbra",
     "value": 1.2,
-    "note": "Kvonice falls to the Old Works: guards leave, the belts go hostile, Hauvnok becomes a remnant (late, so the Fringe's convoy traffic still answers through its patrol wing first)"
-  },
-  {
-    "at_tick": 71900,
-    "action": "war-push",
-    "system": "sys-penumbra",
-    "value": 1.2,
-    "note": "the charter takes Kvonice back: the meter flips the system and the news says so"
+    "note": "the charter takes Kvonice back on the next beat (t=1 980 s, old 71 900): the meter flips the system and the news says so"
   }
 ]

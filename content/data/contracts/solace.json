@@ -5,10 +5,10 @@
     "kind": "kill",
     "level": 1,
     "min_standing": 0.0,
-    "station": "cel-haven-rest",
+    "station": "cel-huta",
     "objective": { "target": "npc-rat-scuttler", "count": 1 },
     "reward": { "credits": 40000, "item": null, "standing_gain": 0.1 },
-    "description": "An Old Works Scuttler is shadowing the ore haulers out of the Struvok belt. Cull it, dock at Jalvrek, and the bounty office settles the fee."
+    "description": "An Old Works Scuttler is shadowing the ore haulers out of the Młondan belt. Cull it, dock at Hovžan, and the bounty office settles the fee."
   },
   {
     "id": "contract-solace-supply-run-1",

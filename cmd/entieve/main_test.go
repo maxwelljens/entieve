@@ -189,7 +189,7 @@ func TestReportStandingAndMissions(t *testing.T) {
 	}
 	// Dock, accept a contract, then raise standing (save surgery).
 	s.Docked.Set(s.Player(), sim.Docked{At: "cel-haven-rest"})
-	s.Queue(sim.CmdAcceptMission{ID: "contract-solace-cleanup-1"})
+	s.Queue(sim.CmdAcceptMission{ID: "contract-solace-cordite-1"})
 	s.Step()
 	sv, err := s.Snapshot()
 	if err != nil {
@@ -200,7 +200,7 @@ func TestReportStandingAndMissions(t *testing.T) {
 		t.Fatalf("Restore: %v", err)
 	}
 	res := &script.Result{Events: []sim.Event{{
-		Kind: sim.EvMission, Phase: sim.MissionCompleted, ID: "contract-solace-cleanup-1",
+		Kind: sim.EvMission, Phase: sim.MissionCompleted, ID: "contract-solace-cordite-1",
 	}}}
 
 	var buf bytes.Buffer
@@ -209,8 +209,8 @@ func TestReportStandingAndMissions(t *testing.T) {
 	for _, want := range []string{
 		"standing: 0.25",
 		"missions: 1 active, 1 completed",
-		"  active contract-solace-cleanup-1 0/1",
-		"  completed contract-solace-cleanup-1",
+		"  active contract-solace-cordite-1 0/400",
+		"  completed contract-solace-cordite-1",
 	} {
 		if !strings.Contains(report, want) {
 			t.Errorf("report missing %q:\n%s", want, report)

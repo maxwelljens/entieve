@@ -48,7 +48,7 @@ var hullFittingTable = []struct {
 	{"ship-hauler", "turret s", ClassQuota{I: 2, II: 1}, ClassQuota{I: 1}},
 	{"ship-npc-hauler", "turret s", ClassQuota{I: 2, II: 1}, ClassQuota{I: 1}},
 	{"ship-npc-miner", "turret s", ClassQuota{I: 1}, ClassQuota{II: 1}},
-	{"ship-npc-patrol", "turret s, turret s, turret s", ClassQuota{I: 3, II: 2}, ClassQuota{I: 1}},
+	{"ship-npc-patrol", "turret m, turret m, turret m", ClassQuota{I: 3, II: 4}, ClassQuota{I: 1}},
 	{"ship-npc-fleet", "turret m, turret m, turret m", ClassQuota{I: 3, II: 4}, ClassQuota{II: 1}},
 	{"ship-rat-scuttler", "turret s, turret s", ClassQuota{I: 3, II: 1}, ClassQuota{}},
 	{"ship-rat-marauder", "turret m, turret m, turret m", ClassQuota{I: 3, II: 4}, ClassQuota{II: 1}},

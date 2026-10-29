@@ -71,7 +71,7 @@ func TestContractRowContextMenu(t *testing.T) {
 	g.enqueue = func(c sim.Command) { got = append(got, c) }
 
 	// Ungated available row: one enabled Accept entry.
-	row := findRow(t, stationBoard(t, g).Rows(false), "contract-solace-cleanup-1")
+	row := findRow(t, stationBoard(t, g).Rows(false), "contract-solace-cordite-1")
 	rightClick(t, g, row.Root.GetWidget())
 	if e := menuEntry(t, g, "Accept"); e.Disabled {
 		t.Fatal("ungated Accept entry is disabled")
@@ -83,8 +83,8 @@ func TestContractRowContextMenu(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("menu Accept enqueued %d commands, want 1", len(got))
 	}
-	if c, ok := got[0].(sim.CmdAcceptMission); !ok || c.ID != "contract-solace-cleanup-1" {
-		t.Fatalf("cmd = %#v, want CmdAcceptMission{contract-solace-cleanup-1}", got[0])
+	if c, ok := got[0].(sim.CmdAcceptMission); !ok || c.ID != "contract-solace-cordite-1" {
+		t.Fatalf("cmd = %#v, want CmdAcceptMission{contract-solace-cordite-1}", got[0])
 	}
 
 	// A standing-gated row: the entry is visible but disabled, and
@@ -113,10 +113,10 @@ func TestContractRowContextMenu(t *testing.T) {
 	g.s.Docked.Set(g.s.Player(), sim.Docked{At: "cel-solace"})
 	g.syncScenes()
 	g.syncMounts()
-	setMissions(t, g, sim.MissionState{ID: "contract-solace-cleanup-1"})
+	setMissions(t, g, sim.MissionState{ID: "contract-solace-cordite-1"})
 	g.syncMounts()
 	pump(t, g, 1280, 720)
-	active := findRow(t, stationBoard(t, g).Rows(true), "contract-solace-cleanup-1")
+	active := findRow(t, stationBoard(t, g).Rows(true), "contract-solace-cordite-1")
 	rightClick(t, g, active.Root.GetWidget())
 	if e := menuEntry(t, g, "Abandon"); e.Disabled {
 		t.Fatal("Abandon entry is disabled on an active row")
@@ -125,7 +125,7 @@ func TestContractRowContextMenu(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("menu Abandon enqueued %d commands, want 1", len(got))
 	}
-	if c, ok := got[0].(sim.CmdAbandonMission); !ok || c.ID != "contract-solace-cleanup-1" {
+	if c, ok := got[0].(sim.CmdAbandonMission); !ok || c.ID != "contract-solace-cordite-1" {
 		t.Fatalf("cmd = %#v, want CmdAbandonMission", got[0])
 	}
 }
@@ -139,12 +139,12 @@ func TestContractObjectiveShowInfo(t *testing.T) {
 	var got []sim.Command
 	g.enqueue = func(c sim.Command) { got = append(got, c) }
 
-	row := findRow(t, stationBoard(t, g).Rows(false), "contract-solace-cleanup-1")
+	row := findRow(t, stationBoard(t, g).Rows(false), "contract-solace-cordite-1")
 	if len(row.Root.Children()) < 2 {
 		t.Fatalf("available row has %d lines, want title/summary/reward", len(row.Root.Children()))
 	}
 	objective := row.Root.Children()[1].GetWidget() // line 2: the summary
-	def, ok := g.opts.Content.Contract("contract-solace-cleanup-1")
+	def, ok := g.opts.Content.Contract("contract-solace-cordite-1")
 	if !ok {
 		t.Fatal("fixture: contract missing from content")
 	}
