@@ -59,12 +59,27 @@ func (g *Game) toggleScreenID(id ScreenID) {
 	case idHelp:
 		g.toggleHelp()
 	case idMenu:
-		if _, top := g.top().(*MenuScene); top {
-			g.pop()
+		if g.menuUp() {
+			g.closeMenu()
 		} else {
 			g.push(&MenuScene{g: g})
 		}
 	default:
 		g.host.Toggle(id)
 	}
+}
+
+// menuUp reports whether the pause menu is on the scene stack. The menu can
+// sit UNDER another scene (the docked station is pushed above it), so the top
+// scene is not the test: a top-only check turns every menu verb into a second
+// menu pushed above the station, leaving the modal window and its dim up.
+func (g *Game) menuUp() bool {
+	return g.findScene(func(s Scene) bool { _, ok := s.(*MenuScene); return ok })
+}
+
+// closeMenu removes the pause menu wherever it sits; its OnLeave unmounts the
+// menu window, so neither the modal input layer nor MenuScene.Draw's dim
+// survives it.
+func (g *Game) closeMenu() {
+	g.removeScene(func(s Scene) bool { _, ok := s.(*MenuScene); return ok })
 }

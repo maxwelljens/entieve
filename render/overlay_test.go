@@ -230,3 +230,97 @@ func TestWeaponFireStrokesOnlyBolts(t *testing.T) {
 		t.Error("weaponFire strokes a line directly — weapon fire must go through shotLine (bolts only)")
 	}
 }
+
+// TestFireFXAimsAtTheGunsOwnTarget: with two targets locked, a gun
+// activated on the SECOND lock must draw its shot at that ship — not at
+// the first lock (the pre-fix targetPoint aimed every gun at the first
+// fully locked target, so a multi-lock ship showed its fire going to the
+// wrong hull while the sim damaged the right one).
+func TestFireFXAimsAtTheGunsOwnTarget(t *testing.T) {
+	c, err := content.Load(content.FS())
+	if err != nil {
+		t.Fatalf("content.Load: %v", err)
+	}
+	wd, ok := c.World("world-showcase")
+	if !ok {
+		t.Fatal("world-showcase missing")
+	}
+	s, err := sim.New(c, wd, 42)
+	if err != nil {
+		t.Fatalf("sim.New: %v", err)
+	}
+	save, err := s.Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	// Two NPC hulls to lock, in save order (the lock order follows it).
+	var first, second ecs.Entity
+	var firstPos core.Vec2
+	for i := range save.Entities {
+		e := &save.Entities[i]
+		if e.NPC == nil || e.Transform == nil {
+			continue
+		}
+		if first.IsZero() {
+			first, firstPos = ecs.Entity(e.ID), e.Transform.Pos
+		} else if second.IsZero() {
+			second = ecs.Entity(e.ID)
+		}
+	}
+	if first.IsZero() || second.IsZero() {
+		t.Skip("showcase save carries fewer than two NPCs")
+	}
+	for i := range save.Entities {
+		if save.Entities[i].ID == uint64(s.Player()) && save.Entities[i].Transform != nil {
+			save.Entities[i].Transform.Pos = firstPos.Add(core.V(-20000, 0))
+		}
+	}
+	if err := s.Restore(save); err != nil {
+		t.Fatalf("Restore: %v", err)
+	}
+
+	lock := func(target ecs.Entity) {
+		s.Queue(sim.CmdLock{Target: target})
+		for i := 0; i < 60*sim.TickRate; i++ {
+			s.Step()
+			if tg, ok := s.Targetings.Get(s.Player()); ok && tg.Locked(target) {
+				return
+			}
+		}
+		t.Fatalf("lock on %v never completed", target)
+	}
+	lock(first)
+	lock(second)
+
+	fit, _ := s.Fittings.Get(s.Player())
+	idx := -1
+	for i, id := range fit.High {
+		if d, ok := c.Module(id); ok && d.Kind == content.KindWeapon {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		t.Fatal("start fit has no high-slot weapon")
+	}
+	s.Queue(sim.CmdSetAmmo{Slot: sim.SlotRef{Class: content.SlotHigh, Index: idx}, Item: "ammo-emp-s"})
+	s.Queue(sim.CmdActivate{Slot: sim.SlotRef{Class: content.SlotHigh, Index: idx}, Target: second})
+	for i := 0; i < 10*sim.TickRate; i++ {
+		s.Step()
+	}
+
+	pp, _ := s.Transforms.Get(s.Player())
+	cam := Camera{Center: pp.Pos, Zoom: 0.02, ScreenW: 1280, ScreenH: 720}
+	aim, ok := targetPoint(cam, s, s.Player(), content.SlotHigh, idx)
+	if !ok {
+		t.Fatal("a firing gun has no aim point")
+	}
+	tf, _ := s.Transforms.Get(first)
+	ts, _ := s.Transforms.Get(second)
+	fx, fy := cam.WorldToScreen(tf.Pos)
+	sx, sy := cam.WorldToScreen(ts.Pos)
+	if aim != core.V(sx, sy) {
+		t.Fatalf("shot aims at (%.1f,%.1f): the first lock sits at (%.1f,%.1f), "+
+			"the gun's own target at (%.1f,%.1f)", aim.X, aim.Y, fx, fy, sx, sy)
+	}
+}

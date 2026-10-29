@@ -27,9 +27,9 @@ func (d *NpcDef) IsGuard() bool {
 
 // IsMiner reports whether the def is a civilian belt miner (npc-miner-*):
 // the one NPC family with its own extraction state machine (sim/npcMiner)
-// instead of the threat machine. Miners are passive — they never initiate
-// and never flee — so the threat triggers do not apply to them; other NPCs
-// may still target them (sim/systemNpc).
+// instead of the threat machine. Miners never initiate (the threat triggers
+// do not make them aggressors), but they do flee under the temperament
+// threshold; other NPCs may still target them (sim/systemNpc).
 func (d *NpcDef) IsMiner() bool {
 	return strings.HasPrefix(string(d.ID), "npc-miner-")
 }

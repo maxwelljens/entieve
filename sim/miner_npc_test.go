@@ -185,3 +185,107 @@ func TestMinerNeverTurnsOnThePlayer(t *testing.T) {
 		t.Fatal("miner reads hostile")
 	}
 }
+
+// TestMinerFleesWhenAttacked is the reaction half of the rat-vs-miner rule:
+// a working miner never fires back, but damage that drops its structure under
+// the flee threshold ends the extraction loop — the laser cuts out, it burns
+// away from the attacker and escapes instead of dying at the rock.
+func TestMinerFleesWhenAttacked(t *testing.T) {
+	s := newTestSim(t)
+	beltPos := mustPos(s, s.celEntity("cel-belt-a"))
+	miner := spawnMiner(t, s, beltPos)
+	// The attacker, for LastHitBy and the run direction.
+	rat := s.spawnNpc("npc-rat-scuttler", beltPos.Add(v(10000, 0)), 100)
+	if rat.IsZero() {
+		t.Fatal("rat spawn failed")
+	}
+	setPlayerPos(s, v(-5e6, -5e6))
+	drain(s)
+
+	// Rat fire, a trickle: the miner must cross the threshold without being
+	// one-shot, and must keep cutting until it does.
+	var fled []Event
+	for i := 0; i < 3000 && fled == nil; i++ {
+		if i%10 == 0 {
+			damageNPC(s, rat, miner, content.Damage{EM: 8}, false)
+		}
+		s.Step()
+		evs := drain(s)
+		if findEvent(evs, EvLog, "is fleeing") != nil {
+			fled = evs
+			break
+		}
+		if ai, ok := s.AIs.Get(miner); ok && ai.State != NpcMine && ai.State != NpcHaul {
+			t.Fatalf("tick %d: state=%q before the flee threshold", i, ai.State)
+		}
+	}
+	if fled == nil {
+		t.Fatal("miner never fled under rat fire")
+	}
+	ai, ok := s.AIs.Get(miner)
+	if !ok || ai.State != NpcFlee {
+		t.Fatalf("state=%v want %q after the flee log", ai.State, NpcFlee)
+	}
+	// Never initiates: no lock, no weapon.
+	if tg, ok := s.Targetings.Get(miner); ok && len(tg.Locks) != 0 {
+		t.Fatalf("fleeing miner holds %d lock(s)", len(tg.Locks))
+	}
+	for _, class := range slotClasses {
+		fit, ok := s.Fittings.Get(miner)
+		if !ok {
+			break
+		}
+		rts := fit.Runtimes(class)
+		for i := range rts {
+			if rts[i].Active {
+				if def, ok := s.Content.Module(rts[i].Def); ok && def.Kind == content.KindMiningLaser {
+					t.Fatal("miner left its mining laser running while fleeing")
+				}
+			}
+		}
+	}
+	// Runs away from the attacker, at full throttle.
+	mp, _ := s.posOf(miner)
+	rp, _ := s.posOf(rat)
+	away := mp.Sub(rp).Norm()
+	in, ok := s.Intents.Get(miner)
+	if !ok || in.Kind != IntentManual || in.SpeedFrac != 1 || in.Dir.Dot(away) <= 0 {
+		t.Fatalf("flee intent = %+v, want a full-throttle run away from the rat (away %v)", in, away)
+	}
+
+	// And it leaves: the shared escape ends in despawn, not a wreck.
+	for i := 0; i < int(npcFleeSeconds)*TickRate+120; i++ {
+		s.Step()
+		drain(s)
+		if !s.World.Alive(miner) {
+			return
+		}
+	}
+	t.Fatal("fleeing miner never escaped the belt")
+}
+
+// TestShippedMinersCarryAFleeThreshold: the miner's own def must carry a
+// threshold. npcTemperament takes the def as authored in low security and
+// forces 0 in null, so a 0 def would leave low-security miners dying at the
+// rock — high security alone survives a 0 def (it floors the threshold at
+// 0.35).
+func TestShippedMinersCarryAFleeThreshold(t *testing.T) {
+	c, err := content.Load(content.FS())
+	if err != nil {
+		t.Fatalf("content.Load: %v", err)
+	}
+	miners := 0
+	for id, def := range c.NPCs {
+		if !def.IsMiner() {
+			continue
+		}
+		miners++
+		if def.FleeThreshold <= 0 {
+			t.Errorf("%s: flee_threshold %v, want > 0 (low-security miners never flee otherwise)",
+				id, def.FleeThreshold)
+		}
+	}
+	if miners == 0 {
+		t.Fatal("no miner NPCs in the shipped content")
+	}
+}

@@ -145,7 +145,6 @@ func (r *Renderer) drawEffects(dst *ebiten.Image, cam Camera, s *sim.Sim, now fl
 			continue // its effects would build paths far outside the viewport
 		}
 		nose := core.V(sx, sy).Add(core.V(math.Cos(o.facing), math.Sin(o.facing)).Scale(sizePx))
-		tgt, haveTgt := lockPoint(cam, s, o.info.Entity)
 
 		for _, class := range [...]string{content.SlotHigh, content.SlotMid} {
 			defs := fit.Defs(class)
@@ -164,9 +163,12 @@ func (r *Renderer) drawEffects(dst *ebiten.Image, cam Camera, s *sim.Sim, now fl
 					if !fired {
 						continue
 					}
+					tgt, haveTgt := targetPoint(cam, s, o.info.Entity, class, i)
 					r.weaponFire(dst, nose, tgt, haveTgt, sizePx, age, def.Weapon.ShotTime >= heavyCycle)
 				case content.KindMiningLaser:
-					r.miningBeam(dst, cam, o, nose)
+					if rp, ok := targetPoint(cam, s, o.info.Entity, class, i); ok {
+						r.miningBeam(dst, nose, rp)
+					}
 				}
 			}
 		}
@@ -177,23 +179,22 @@ func (r *Renderer) drawEffects(dst *ebiten.Image, cam Camera, s *sim.Sim, now fl
 // a slow heavy projectile instead of an autocannon's fast rattle.
 const heavyCycle = 6
 
-// lockPoint returns the screen position of the ship's first fully locked
-// target — where its guns fire.
-func lockPoint(cam Camera, s *sim.Sim, ship ecs.Entity) (core.Vec2, bool) {
-	tg, ok := s.Targetings.Get(ship)
+// targetPoint is the screen position of one module's own target — the ship
+// its activation bound it to. A ship engaging several locks fires every
+// module at the target that module was activated on (the sim resolves each
+// cycle against it), so its effects follow the same binding instead of
+// picking a lock.
+func targetPoint(cam Camera, s *sim.Sim, ship ecs.Entity, class string, index int) (core.Vec2, bool) {
+	tgt, ok := s.ModuleTarget(ship, sim.SlotRef{Class: class, Index: index})
 	if !ok {
 		return core.Vec2{}, false
 	}
-	for _, l := range tg.Locks {
-		if l.Progress < 1 {
-			continue
-		}
-		if tr, ok := s.Transforms.Get(l.Target); ok {
-			x, y := cam.WorldToScreen(tr.Pos)
-			return core.V(x, y), true
-		}
+	tr, ok := s.Transforms.Get(tgt)
+	if !ok {
+		return core.Vec2{}, false
 	}
-	return core.Vec2{}, false
+	x, y := cam.WorldToScreen(tr.Pos)
+	return core.V(x, y), true
 }
 
 // shotAge is the time since a weapon's last shot, read off its cycle clock:
@@ -297,19 +298,10 @@ func (r *Renderer) shotLine(dst *ebiten.Image, x0, y0, x1, y1 float64, w float32
 	r.shotStrokes = append(r.shotStrokes, float32(math.Hypot(x1-x0, y1-y0)))
 }
 
-// miningBeam draws the laser link from ship to the nearest asteroid.
-func (r *Renderer) miningBeam(dst *ebiten.Image, cam Camera, o gridObj, nose core.Vec2) {
-	best, bestD := -1, math.MaxFloat64
-	for j, rock := range r.bRock {
-		d := rock.info.Pos.Dist2(o.info.Pos)
-		if d < bestD {
-			best, bestD = j, d
-		}
-	}
-	if best < 0 || bestD > 1e5*1e5 { // within ~100 km
-		return
-	}
-	rx, ry := cam.WorldToScreen(r.bRock[best].info.Pos)
+// miningBeam draws the laser link from ship to the rock its laser is cutting
+// (the module's own target, not the nearest rock on screen).
+func (r *Renderer) miningBeam(dst *ebiten.Image, nose, rock core.Vec2) {
+	rx, ry := rock.X, rock.Y
 	vector.StrokeLine(dst, float32(nose.X), float32(nose.Y), float32(rx), float32(ry),
 		2.4, color.RGBA{110, 235, 150, 190}, true)
 	vector.StrokeLine(dst, float32(nose.X), float32(nose.Y), float32(rx), float32(ry),

@@ -370,6 +370,14 @@ func (s *Sim) Clip(e ecs.Entity, slot SlotRef) (ClipState, bool) {
 	}, true
 }
 
+// ModuleTarget reports the target an active module is bound to — the
+// activation target its cycles are validated and resolved against. Read
+// only: the renderer aims a gun's shot at the ship that gun actually
+// fires at, not at whichever lock happens to be first.
+func (s *Sim) ModuleTarget(e ecs.Entity, slot SlotRef) (ecs.Entity, bool) {
+	return s.modTarget(e, slot)
+}
+
 // Time returns simulated seconds since world start.
 func (s *Sim) Time() float64 { return s.time }
 

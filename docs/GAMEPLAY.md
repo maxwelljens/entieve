@@ -928,8 +928,9 @@ attack the civilian miners cutting rock beside it — a mining op draws the
 same attention your own lasers do. The Charter is the only power that
 shoots back: patrols and static guards engage rats, and only ever the
 Charter's; corporate houses and independents (you included) start nothing.
-Miners never fight — a barge under fire keeps cutting until it comes
-apart, and its wreck carries the hold.
+Miners never fight — a barge under fire cuts its laser and runs for the
+edge (its wreck carries the hold only if it cannot get clear), and the rats
+keep working the belt it left.
 
 **Deliveries land in the market.** A convoy's cargo is real: it is bought
 from the origin station's own stock (or drawn from the belt, or imported
