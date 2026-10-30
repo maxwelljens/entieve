@@ -580,7 +580,10 @@ economy sits on top of:
   8 km NPC guard radius so station traffic never trips them), and respond
   to convoy ambushes: instant 3-ship wings in high security, a single
   responder after 15 s in low security, nothing in null. Responding
-  patrols warp to the incident and fight raiders through the normal
+  patrols warp to their own station on a ring around the incident
+  (`patrolStation`: even angular slots, hash-varied radius, so a wing holds
+  a formation instead of stacking every hull on one point) and fight raiders
+  through the normal
   lock/activate/turret/damage pipeline — NPC-vs-NPC combat reuses the
   player pipeline with an explicit activation target (`npcActivate(e, ai,
   target)`); only the *aggro* state machine remains player-centric.

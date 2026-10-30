@@ -77,6 +77,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scores, switch verdict with window sums and dwell): read-only, and a
   traced run hashes exactly like its untraced twin.
 
+### Fixed
+
+- **Security wings hold a formation, not a single stack** (`sim`) — a
+  responding patrol warped to the incident point itself and held there, so a
+  ten-ship high-sec wing landed on one identical coordinate and read as one
+  hull. Each responder now warps to its own station on a ring around the
+  incident (1.8–3.0 km, angle dealt by even slot in handle order, radius
+  hash-varied from the handle — no RNG draw, nothing persisted), applies to
+  both the ambush and the miner-distress wings, and the wing still engages
+  inside `trafficPatrolEngageRange`.
+
 ## [0.11.0] - 2026-10-29
 
 ### Added
