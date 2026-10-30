@@ -83,7 +83,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filter changes only the list: the world, the Selected Item window and
   target locks are untouched, and the state rides the layout sidecar's
   overview row, omitted while every kind is at its default. New
-  `widgets.CheckBox` is the house tick element.
+  `widgets.CheckBox` is the house tick element. (Fixed in the same change:
+  the cog glyph rode the button's graphic slot, which pinned it to the
+  button's right border, and the button's box landed exactly on the ×'s
+  left edge; the glyph is now centred in its own square cell — services/
+  rail `iconCell`'s twin — and the cell stops one `SpSm` hairline short of
+  the ×.)
 - **`entieve simulate --trace-npc <name>`** (`cmd/entieve`) — prints the
   named NPC's per-tick decision trace (handled branch, per-candidate prey
   scores, switch verdict with window sums and dwell): read-only, and a

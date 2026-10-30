@@ -8,7 +8,6 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -252,8 +251,24 @@ func (k *Kit) buildOverview() {
 	contents.AddChild(tbl.Container())
 
 	title, _ := theme.NewTitleBar(k.th, "Overview", "")
-	k.ovCog = k.overviewCog()
-	title.AddChild(k.ovCog)
+	// The cog's square cell: the chrome button stretched edge to edge under
+	// its glyph (services iconCell's twin), end-anchored clear of the ×'s
+	// closeBtnW-column strip by one hairline.
+	cogBtn, cogGlyph := k.overviewCog()
+	k.ovCog, k.ovCogGlyph = cogBtn, cogGlyph
+	cogCell := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+		widget.ContainerOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(theme.Px(closeBtnH), theme.Px(closeBtnH)),
+			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionEnd,
+				VerticalPosition:   widget.AnchorLayoutPositionCenter,
+				Padding:            &widget.Insets{Right: theme.Px(closeBtnW + ovCogGap)},
+			}),
+		),
+	)
+	cogCell.AddChild(cogBtn, cogGlyph) // glyph last: it draws over the chrome
+	title.AddChild(cogCell)
 
 	o.win = widget.NewWindow(
 		widget.WindowOpts.Contents(contents),
@@ -272,37 +287,40 @@ func (k *Kit) buildOverview() {
 	)
 }
 
+// ovCogGap is the air between the cog cell and the × (design px): the ×
+// owns the bar's last closeBtnW columns and the two bordered buttons must
+// not touch — SpSm, the house hairline.
+const ovCogGap = theme.SpSm
+
 // overviewCog is the overview title bar's filter door: the manifest's cog
 // glyph ("kind_unknown", Lorc's cog — the same silhouette as the neutral
 // kind fallback) sitting immediately left of the ×. A press on it arms the
 // title drag like the rest of the bar; a click without a drag still opens
 // the window.
-func (k *Kit) overviewCog() *widget.Button {
-	p := k.th.Pal()
-	cog := func(a uint8) *ebiten.Image {
-		return icons.Get("kind_unknown", theme.Px(theme.IconButton), iconColor(p.Dim, a))
-	}
+//
+// It returns the glyph box beside the button so the caller can spread them
+// over one square cell: the glyph must not ride the button's graphic slot,
+// which ebitenui lays out as [empty label][10 px fixed spacing][graphic] —
+// a fixed right-offset that pinned the glyph to the button's right border
+// (rail iconCell's twin).
+func (k *Kit) overviewCog() (*widget.Button, *widget.Graphic) {
 	btn := widget.NewButton(
-		widget.ButtonOpts.Graphic(&widget.GraphicImage{
-			Idle:     cog(255),
-			Disabled: cog(theme.IconDisabledA),
-		}),
-		widget.ButtonOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(theme.Px(closeBtnH), theme.Px(closeBtnH)),
-			// The × owns the bar's last closeBtnW columns; the cog clears it.
-			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-				HorizontalPosition: widget.AnchorLayoutPositionEnd,
-				VerticalPosition:   widget.AnchorLayoutPositionCenter,
-				Padding:            &widget.Insets{Right: theme.Px(closeBtnW)},
-			}),
-		),
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			StretchHorizontal: true,
+			StretchVertical:   true,
+		})),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
 			k.OpenOverviewFilter()
 		}),
 	)
 	tip, _ := widgets.NewTip(k.th, widgets.TooltipModel{Title: "Overview filters"})
 	btn.GetWidget().ToolTips = []*widget.ToolTip{tip}
-	return btn
+	glyph := theme.NewIcon("kind_unknown", theme.IconButton, iconColor(k.th.Pal().Dim, 255))
+	glyph.GetWidget().LayoutData = widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionCenter,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+	}
+	return btn, glyph
 }
 
 // overviewSpec is one overview row's declared interactions: Show Info on
