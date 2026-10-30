@@ -72,6 +72,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The overview filter window** (`uikit`, "ticker box"): a cog in the
+  overview's title bar opens one small window with a **Show** and a
+  **Colour** tick per entity kind — ship, wreck, asteroid, belt, station,
+  gate, anomaly, star, planet, moon. Unticking Show leaves that kind out of
+  the list; your own hull is never hidden (KindPlayer has no switch, the
+  Ship switch governs every other ship). Unticking Colour drops the kind's
+  row and icon tint — today only your ship and hostiles carry one, so the
+  other kinds are forward-compatible no-ops rather than new colouring. The
+  filter changes only the list: the world, the Selected Item window and
+  target locks are untouched, and the state rides the layout sidecar's
+  overview row, omitted while every kind is at its default. New
+  `widgets.CheckBox` is the house tick element.
 - **`entieve simulate --trace-npc <name>`** (`cmd/entieve`) — prints the
   named NPC's per-tick decision trace (handled branch, per-candidate prey
   scores, switch verdict with window sums and dwell): read-only, and a

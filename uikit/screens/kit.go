@@ -134,6 +134,14 @@ type Kit struct {
 	info  *dialog
 	order *dialog
 	qty   *dialog
+	// ovFilt is the overview's filter window (the title bar's cog): one
+	// instance, transient, never in the layout sidecar — its STATE rides
+	// the overview's sidecar row instead.
+	ovFilt    *dialog
+	ovFiltWin *OvFilterWin
+	// ovCog is the overview title bar's filter button (the dialog's only
+	// door), kept for the tests that press it.
+	ovCog *widget.Button
 
 	// orderWin is the player market-order mini-window's panel. It is
 	// deliberately NOT in the layout sidecar: a transient dialog, never
@@ -472,7 +480,10 @@ func (k *Kit) Sync() {
 	k.ov.sync(k)
 	k.syncSelected()
 	k.svc.info.Sync()
-	k.svc.qty.Sync() // the picker's slider input + live preview
+	k.svc.qty.Sync()        // the picker's slider input + live preview
+	if k.ovFiltWin != nil { // built on first open
+		k.ovFiltWin.Sync()
+	}
 }
 
 // seams packages the kit's three seams for the panels it builds: the
@@ -586,6 +597,53 @@ func (k *Kit) InfoWindow() *widget.Window { return k.svc.info.Win() }
 // OverviewTable returns the built-in overview's table (the layout
 // sidecar's column prefs resolve it through here).
 func (k *Kit) OverviewTable() *widgets.Table { return k.ov.tbl }
+
+// OverviewFilter returns the overview's per-kind filter state — the layout
+// sidecar's read/write side. A kind absent from the map is shown and
+// coloured (the default, and what a fresh session holds).
+func (k *Kit) OverviewFilter() OvFilter { return k.ov.filter }
+
+// SetOverviewFilter restores the state (a sidecar read): default entries
+// are dropped so the next write stays empty, and the list re-syncs at once.
+// The filter window re-reads its ticks the next time it opens.
+func (k *Kit) SetOverviewFilter(f OvFilter) {
+	k.ov.filter = normalizeOvFilter(f)
+	k.ov.sync(k)
+}
+
+// OpenOverviewFilter opens the overview's filter window — the cog in the
+// overview title bar is its only door — and raises it when already up. The
+// panel is built on this first open, not at boot: its labels would put their
+// glyphs in the shared face atlas and shift the title phase's text
+// anti-aliasing (a capture baseline no feature should move).
+func (k *Kit) OpenOverviewFilter() {
+	f := k.filterWin()
+	k.showDialog(k.ovFilt, func() bool { f.Show(); return true })
+}
+
+// filterWin builds the filter dialog on first use (one instance, like every
+// dialog).
+func (k *Kit) filterWin() *OvFilterWin {
+	if k.ovFiltWin == nil {
+		k.ovFiltWin = NewOvFilterWin(k.seams(),
+			func(kind string) (bool, bool) { return k.ov.filter.Shown(kind), k.ov.filter.Coloured(kind) },
+			func(kind string, show, colour bool) { k.ov.filter.set(kind, show, colour) },
+			func() { k.ov.sync(k) })
+		k.ovFilt = k.newDialog(k.ovFiltWin.Win(), k.ovFiltWin.hide, k.ovFiltWin.IsOpen, nil, k.CloseOverviewFilter)
+	}
+	return k.ovFiltWin
+}
+
+// CloseOverviewFilter closes the filter window: unmount and hide. Its rect
+// is transient (never persisted).
+func (k *Kit) CloseOverviewFilter() {
+	if k.ovFilt != nil {
+		k.closeDialog(k.ovFilt)
+	}
+}
+
+// OverviewFilterOpen reports whether the filter window is up.
+func (k *Kit) OverviewFilterOpen() bool { return k.ovFilt != nil && k.ovFilt.isOpen() }
 
 // InfoOpen reports whether the Show Info window is up.
 func (k *Kit) InfoOpen() bool { return k.info.isOpen() }
