@@ -134,7 +134,7 @@ type tipRowLayout struct {
 }
 
 // tipStatGutter is the icon gutter a stat row reserves: the glyph box plus
-// its gap (14 design units — the tooltip's width cap for row icons).
+// its gap (24 design units — the tooltip's width cap for row icons).
 const tipStatGutter = theme.StatIconSize + theme.StatIconGap
 
 // tipMeasure is the advance width of s in one of the panel's faces.
