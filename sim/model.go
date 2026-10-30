@@ -207,6 +207,17 @@ type NpcAI struct {
 	Target ecs.Entity // current target (a hostile ship or the player); a miner's rock or haul station
 	Home   core.Vec2  // spawn anchor
 	Rand   *core.RNG  // per-NPC stream (Fork'd); marshaled via Snapshot/RestoreRNG
+	// HitLog is the rolling per-source damage ledger behind the threat
+	// switch rule (system_npc.go): the last npcHitRingLen damage events
+	// this hull took, hitHead the next write slot. DELIBERATELY not in
+	// SavedNpcAI: a restore starts the window empty, so a restored NPC
+	// needs fresh damage before the relative-lead rule can switch it
+	// (lastPlayerWork's class of intentional reset).
+	HitLog  [npcHitRingLen]npcHitEvent
+	HitHead int
+	// SwitchAt is the tick this hull last acquired or switched its target
+	// (the switch rule's dwell marker). Transient like HitLog.
+	SwitchAt int64
 	// LastHitBy is the source of the most recent damage this ship took
 	// (aggro trigger (b): the NPC answers an attacker of another faction,
 	// never a same-faction ally). Persisted with the rest of the NPC state
@@ -1047,6 +1058,11 @@ type SavedEntity struct {
 }
 
 // SavedNpcAI is NpcAI with serializable RNG state.
+//
+// NpcAI.HitLog and NpcAI.SwitchAt are intentionally absent: the threat-switch
+// damage window and dwell marker are transient (like Sim.lastPlayerWork), so
+// a save carries the decision (State/Target) but not the recent-damage
+// evidence behind it.
 type SavedNpcAI struct {
 	Npc       content.NpcID `json:"npc"`
 	State     NpcAIState    `json:"state"`

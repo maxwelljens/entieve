@@ -85,6 +85,11 @@ func (s *Sim) systemDamage() {
 			}
 		}
 		pen := applyDamageToShip(ship, d.dmg)
+		// The switch rule's evidence: every damage event lands in the
+		// victim NPC's rolling per-source window (systemNpc).
+		if ai, ok := s.AIs.Get(d.dst); ok {
+			ai.noteHit(s.ticks, d.src, pen)
+		}
 		text := s.nameOf(d.src) + " hits " + s.nounOf(d.dst) + " for " + num(pen) + " damage"
 		if d.wrecking {
 			text = "Wrecking hit! " + text

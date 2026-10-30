@@ -317,11 +317,46 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    miners never initiate — but a miner does flee once its structure drops
    under the threshold, so a rat that corners a working barge drives it off
    the belt instead of killing it where it cuts. The chosen target is the
-   damage source first, else the nearest triggered candidate (canonical order
-   breaks ties); its handle persists in `NpcAI.Target` (saving/restoring an
+   damage source first (initial aggro), else the candidate the prey score
+   favours: `0.5·(carry/max carry) + 0.5·(guns/max guns)` over the triggered
+   set, where carry is `Cargo.Capacity + Cargo.OreCapacity` (the hull def's
+   numbers when the entity has no cargo component) and guns counts fitted
+   `KindWeapon` modules; equal scores go to the nearer candidate, then
+   canonical order. Handles persist in `NpcAI.Target` (saving/restoring an
    engagement bit-for-bit), and only the player's announcement is the
    warning line — an NPC-vs-NPC fight logs one `<attacker> attacks
    <target>` line on the idle→approach edge.
+
+   **NPC behaviour trees.** Each role's per-tick policy is one behaviour
+   tree (`sim/btree.go`, `sim/system_npc.go`): a `Sequence`/`Selector` of
+   named rule leaves (`aggressiveTree`, `guardTree`, `minerTree`,
+   `patrolTree`, `raiderTree`). Evaluation is synchronous, allocation-free
+   and pure — the children are static, a tick draws no RNG and reads no
+   clock, and `NpcAI.State`/`Target` plus the tick's `Intent` remain the
+   whole decision memory, so a tree never introduces state of its own. The
+   leaves still call the motion machinery (`npcPatrol`, `npcApproach`,
+   `npcFleeStep`, warp state machines): the tree decides, the existing
+   routines act. Traffic leg scheduling and war episode timelines stay
+   hand-written; they call the trees for their per-agent decisions only.
+   `just simulate --trace-npc <name>` prints a traced hull's per-tick
+   branch, selection scores and switch verdict (read-only: the traced run
+   hashes like its untraced twin).
+
+   **Threat switch.** An engaged hull re-evaluates its target from damage,
+   not from proximity: when another hostile's damage to it over the trailing
+   `npcSwitchWindow` (120 ticks) is at least `npcSwitchLead` (2×) the current
+   target's over the same window, and `npcSwitchDwell` (600 ticks) have
+   passed since it acquired or switched, it re-enters approach on the new
+   hull (the damage window then restarts). A wing-mate of the current target
+   never triggers the rule — the wing is already the engagement — and an
+   ordinary hull with no live target still answers any attacker immediately
+   (initial aggro). The same rule gates the engaged-idle flip: a high-sec
+   guard clearing a rat, or a raider holding an ambush, no longer turns on
+   the first hull that pokes it — the new attacker must be the considerable
+   threat. The per-source window (`NpcAI.HitLog`) and the dwell marker
+   (`NpcAI.SwitchAt`) are deliberately not saved, like
+   `Sim.lastPlayerWork`: a restore starts the window empty, so a restored
+   hull needs fresh damage before it can switch.
 2. **Refining — ore to minerals.** `CmdRefine` at a `refine` station turns
    ore into minerals at `floor(refine_yield × qty)` per mineral (`execRefine`,
    `sim/system_economy.go`), in whole **100-ore batches** only: any quantity

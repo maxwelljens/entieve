@@ -342,8 +342,12 @@ func TestHighSecGuardClearsRatAttackingMiner(t *testing.T) {
 	// The guard stands off its anchor (Home unchanged): the rat picks the
 	// miner working at the belt, and the guard answers the rat. The rat is
 	// anchored AT the celestial (its Home must equal the guard's, the belt
-	// rule's exact match) while its hull scatters.
-	teleport(s, guard, belt.Add(v(5000, 0)))
+	// rule's exact match) while its hull scatters. 12 km also keeps the
+	// guard outside the rat's 6 km high-sec proximity trigger: prey
+	// preference ranks cargo against guns, so a guard inside that band would
+	// out-score the unarmed barge (the rat would answer the warship first,
+	// which is the policy, not the chain this test proves).
+	teleport(s, guard, belt.Add(v(12000, 0)))
 	spawnMiner(t, s, belt)
 	rat := s.spawnNpc("npc-rat-scuttler", belt, 1000)
 	if rat.IsZero() {

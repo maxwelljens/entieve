@@ -132,6 +132,11 @@ type Sim struct {
 		at  float64
 	}
 
+	// npcTrace is the harness-only per-tick decision observer behind
+	// `entieve simulate --trace-npc` (system_npc.go TraceNpc): read-only,
+	// nil unless requested, and never part of the sim state.
+	npcTrace *npcTraceCfg
+
 	// war is the Long Attrition's state (Save.War; see war.go): control per
 	// system, the front's contest meters and the Corporate Fleets' treasury.
 	// Nil in a world that carries no war (warWorlds), which keeps the
