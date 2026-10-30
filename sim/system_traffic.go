@@ -1639,6 +1639,7 @@ func (s *Sim) trafficDriveAttacks(sys *content.SystemDef, td *content.TrafficDef
 // convoy. Raiding only happens while the raider's own AI state machine is
 // idle: if it has aggroed the player, systemNpc owns it.
 func (s *Sim) trafficRaidersAct(tc *Traffic, atk *TrafficAttack, hauler ecs.Entity) {
+	var c btCtx
 	for _, r := range atk.Raiders {
 		if !s.World.Alive(r) {
 			continue
@@ -1647,27 +1648,11 @@ func (s *Sim) trafficRaidersAct(tc *Traffic, atk *TrafficAttack, hauler ecs.Enti
 		if !ok {
 			continue
 		}
-		if ai.State != NpcIdle {
-			// Engaged with the player: point its combat modules at the
-			// player (targets bind at activation, so retarget explicitly).
-			if ai.Target == s.player && (ai.State == NpcApproach || ai.State == NpcOrbit) {
-				s.retargetWeapons(r, s.player)
-			}
-			continue
-		}
-		if atk.Outcome != "" {
-			continue // incident resolved: weapons cold until break-off
-		}
-		target := s.nearbyRespondingPatrol(r)
-		if target.IsZero() {
-			if !s.World.Alive(hauler) {
-				continue
-			}
-			target = hauler
-		}
-		s.retargetWeapons(r, target)
-		s.npcEnsureLock(r, target)
-		s.npcActivate(r, ai, target)
+		c = btCtx{s: s, ai: ai, atk: atk, hauler: hauler}
+		c.e = r
+		c.role = "raider"
+		raiderTree.Tick(&c)
+		c.done()
 	}
 }
 
@@ -1847,6 +1832,7 @@ func (s *Sim) patrolResponding(e ecs.Entity) bool {
 // patrols onto occupied high-sec belts (patrolSweepDispatch). Only idle AI
 // states are driven here — an aggroed patrol belongs to systemNpc.
 func (s *Sim) trafficDrivePatrols(sys *content.SystemDef, td *content.TrafficDef, sec string) {
+	var c btCtx
 	for _, e := range sortedEntities(s.Patrols) {
 		p, ok := s.Patrols.Get(e)
 		if !ok {
@@ -1856,20 +1842,10 @@ func (s *Sim) trafficDrivePatrols(sys *content.SystemDef, td *content.TrafficDef
 		if !hasAI {
 			continue
 		}
-		if ai.State != NpcIdle {
-			if ai.Target == s.player && (ai.State == NpcApproach || ai.State == NpcOrbit) {
-				s.retargetWeapons(e, s.player)
-			}
-			continue
-		}
-		switch p.State {
-		case PatrolRespond:
-			s.patrolRespondStep(e, p, ai, sec)
-		case PatrolReturn:
-			s.patrolReturnStep(e, p, ai)
-		case PatrolIdle:
-			s.patrolSweepDispatch(p, sys, td, sec)
-		}
+		c = btCtx{s: s, e: e, ai: ai, p: p, security: sec, sys: sys, td: td}
+		c.role = "patrol"
+		patrolTree.Tick(&c)
+		c.done()
 	}
 }
 

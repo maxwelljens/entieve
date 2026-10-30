@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **NPC roles are behaviour trees** (`sim`) — every non-miner role's
+  per-tick policy is now one readable tree of named rule leaves
+  (`sim/btree.go`: `Sequence`/`Selector`, no clock, no RNG, no per-tick
+  allocation) instead of a state switch: `aggressiveTree` (rats, cutters,
+  war hulls, guards), `guardTree`, `minerTree`, `patrolTree`, `raiderTree`.
+  Behaviour is unchanged (the existing suite is the proof), and
+  `NpcAI.State`/`Target` stay the only decision memory, so saves and
+  restore stay byte-identical. [`SIM.md`](docs/SIM.md) and
+  [`CONTEXT.md`](CONTEXT.md) document the vocabulary.
+- **Prey preference and the threat switch** (`sim`) — a triggered NPC now
+  ranks its candidates by one score, half cargo capacity (hold + ore hold)
+  and half fitted weapons, normalised over the eligible set, ties to the
+  nearer hull; a high-sec guard ranks the rats it clears the same way.
+  An engaged NPC re-targets only a considerable threat: another hostile's
+  damage over the last 120 ticks at least 2× the current target's, after
+  600 ticks on that target. A light hit no longer flips an engaged guard or
+  raider, while a hull with no live target still answers any attacker at
+  once. The damage window is transient (a restore starts it empty).
 - **High-sec security is overwhelming** (`content`, `sim`) — the Kuštor
   patrol cutter now carries three medium autocannons (≈41.7 dps, parity with
   a Marauder per hull) and 2000 EHP (700 shield / 600 armor / 700
@@ -51,6 +69,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cap the glyph instead (14 px on health/capacitor, 4 px on the target-card
   layers), and the velocity wedge keeps its 26 px width with the glyph
   clamped inside it.
+
+### Added
+
+- **`entieve simulate --trace-npc <name>`** (`cmd/entieve`) — prints the
+  named NPC's per-tick decision trace (handled branch, per-candidate prey
+  scores, switch verdict with window sums and dwell): read-only, and a
+  traced run hashes exactly like its untraced twin.
 
 ## [0.11.0] - 2026-10-29
 

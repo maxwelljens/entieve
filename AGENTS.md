@@ -15,7 +15,7 @@ Everything runs through the [justfile](justfile) — `just` lists the recipes.
 | `just test` | the whole test suite (headless, no GPU needed) |
 | `just capture [name]` | render the gated capture PNGs (one ebiten loop per process) |
 | `just validate` | lint and cross-check all game content |
-| `just simulate …` | headless sim + state report (tick-scheduled `--script` steps) |
+| `just simulate …` | headless sim + state report (tick-scheduled `--script` steps, `--trace-npc NAME` decision trace) |
 | `just describe <id>` | any content id as JSON (near-miss suggestions on typos) |
 | `just build` | local version-stamped binary → `bin/entieve` |
 | `just release <ver>` | gate → changelog fold → tag → push → GitHub release |

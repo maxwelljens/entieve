@@ -96,6 +96,7 @@ var simFieldClasses = map[string]fieldClass{
 	// Documented exceptions: persistent, deliberately not in Save.
 	"events":         {exempt: "drained by Events(), capped at emit time — observation surface, not sim state"},
 	"lastPlayerWork": {exempt: "frozen Save schema: the recent-work aggro marker resets on restore (intentional)"},
+	"npcTrace":       {exempt: "harness observer for --trace-npc: read-only, nil unless requested"},
 
 	// --- industry (jobs + station craft growth) ---
 	"jobs":          {save: []string{"Jobs"}},

@@ -1,6 +1,7 @@
 package sim
 
 import (
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -144,6 +145,7 @@ func (s *Sim) systemNpc() {
 		security = s.EffectiveSecurity(sys.ID)
 	}
 
+	var t btCtx
 	for _, e := range sortedEntities(s.AIs) {
 		ai, ok := s.AIs.Get(e)
 		if !ok {
@@ -161,123 +163,801 @@ func (s *Sim) systemNpc() {
 		if !hasDef {
 			continue
 		}
+		t.init(s, e, ai, ship, tr, def, security, candidates)
 		// Civilian miners run their own extraction loop and never enter the
 		// threat machine below: they never initiate, and their flee is the
 		// miner loop's own (a damaged barge runs). They are ordinary targets
 		// for everyone else (npcCandidates).
 		if def.IsMiner() {
-			s.npcMiner(e, ai, tr, def, security)
+			t.role = "miner"
+			minerTree.Tick(&t)
+			t.done()
 			continue
 		}
-
-		effAggro, effFlee := npcTemperament(security, def)
-		leash := npcLeashFactor * effAggro
-		structFrac := 1.0
-		if ship.MaxStructure > 0 {
-			structFrac = ship.Structure / ship.MaxStructure
-		}
-		damaged := ship.Shield < ship.MaxShield || ship.Armor < ship.MaxArmor ||
-			ship.Structure < ship.MaxStructure
-		isGuard := def.IsGuard()
-		// A live ambusher's target belongs to the traffic incident
-		// (trafficRaidersAct) — candidate resolution would hijack its
-		// warp-in onto the hauler it already means to take. Only the player
-		// pulls it into the machine, exactly as before.
-		playerOnly := s.isTrafficRaider(e)
-
-		// The persisted target, resolved for this tick: a dead or docked
-		// target ends the engagement (-> return).
-		tPos, targetOnGrid := s.posOf(ai.Target)
-		if targetOnGrid && (!s.World.Alive(ai.Target) || s.Docked.Has(ai.Target)) {
-			targetOnGrid = false
-		}
-
-		switch ai.State {
-		case NpcIdle, "":
-			// Any trigger aggros a fresh NPC from wherever its target is;
-			// the leash then governs whether the pursuit actually continues
-			// (approach/orbit break off when it is crossed).
-			if target := s.npcThreat(e, tr.Pos, ai, def, damaged, candidates, effAggro, math.MaxFloat64, playerOnly); !target.IsZero() {
-				ai.State = NpcApproach
-				ai.Target = target
-				s.npcAggroLog(e, target)
-				break
-			}
-			// The ambient security rule: a high-sec guard clears the rats
-			// anchored at its own celestial (see the systemNpc doc). Traffic
-			// patrols are driven by the belt sweep in systemTraffic instead.
-			if isGuard && security == "high" && !s.Patrols.Has(e) {
-				if rat := s.ratTargetAt(ai.Home, security); !rat.IsZero() {
-					s.guardEngageRat(e, ai, tr, rat, def)
-					break
-				}
-			}
-			if !s.patrolResponding(e) {
-				// Guards never sit still: slow patrol around Home — but a
-				// patrol working an incident (PatrolRespond) holds station:
-				// steering it back to its Home circle mid-fight would drift
-				// it out of engagement range of the raiders it is covering
-				// (trafficDrivePatrols owns its movement while responding).
-				s.npcPatrol(e, ai, tr, def)
-			}
-
-		case NpcApproach, NpcOrbit:
-			if !targetOnGrid {
-				ai.State = NpcReturn
-				ai.Target = 0
-				break
-			}
-			if structFrac < effFlee {
-				s.npcEnterFlee(e, ai, tr, tPos)
-				break
-			}
-			if ai.Home.Dist(tPos) > leash {
-				// The target crossed the pursuit leash: break off.
-				ai.State = NpcReturn
-				ai.Target = 0
-				break
-			}
-			if ai.State == NpcApproach {
-				s.Intents.Set(e, Intent{Kind: IntentApproach, Target: ai.Target})
-				if tr.Pos.Dist(tPos) <= def.OrbitRange+50 {
-					ai.State = NpcOrbit
-				}
-			} else {
-				s.Intents.Set(e, Intent{Kind: IntentOrbit, Target: ai.Target, Range: def.OrbitRange})
-			}
-
-		case NpcFlee:
-			s.npcFleeStep(e, ai, tr, tPos)
-			continue // no combat actions while fleeing
-
-		case NpcReturn:
-			// Re-engage only while a candidate is both a trigger and inside
-			// the leash — symmetric with the approach break-off, so the
-			// state machine can never flip-flop across the leash line.
-			if target := s.npcThreat(e, tr.Pos, ai, def, damaged, candidates, effAggro, leash, playerOnly); !target.IsZero() {
-				ai.State = NpcApproach
-				ai.Target = target
-				break
-			}
-			home := ai.Home.Sub(tr.Pos)
-			if home.Len() <= npcReturnRange {
-				ai.State = NpcIdle
-				s.Intents.Set(e, Intent{Kind: IntentStop})
-			} else {
-				s.Intents.Set(e, Intent{Kind: IntentManual, Dir: home.Norm(), SpeedFrac: 1})
-			}
-			continue
-		}
+		t.role = "aggressive"
+		aggressiveTree.Tick(&t)
 
 		// Combat actions: aggroed NPCs lock their target and run their
-		// modules.
+		// modules. targetOnGrid is the one resolved before the tree ran
+		// (it still describes the PREVIOUS target on the tick a fresh aggro
+		// picks one): a pre-existing quirk, kept — the observable tick order
+		// is the contract.
 		if ai.State == NpcApproach || ai.State == NpcOrbit {
-			if targetOnGrid {
+			if t.targetOnGrid {
 				s.npcEnsureLock(e, ai.Target)
 				s.npcActivate(e, ai, ai.Target)
 			}
 		}
+		t.done()
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Behaviour trees
+//
+// Each role's per-tick policy is one tree below. The leaves are the rules;
+// the combinators give them their precedence, so reading the tree top to
+// bottom reads the policy. The trees are stateless: every leaf re-derives its
+// answer from Sim state, and the decision it writes lives in NpcAI (the
+// persisted memory) and the tick's Intent.
+// ---------------------------------------------------------------------------
+
+// aggressiveTree is the per-tick policy of every non-miner NPC — rats,
+// cutters, war hulls and guards. Guards differ only in leaves (player-only
+// self-defence inside npcThreat, the high-sec rat rule in guardTree), never in
+// the state machine itself. Branch order mirrors the old dispatch: idle,
+// engaged (approach/orbit), flee, return.
+var aggressiveTree = btSel("aggressive",
+	btSeq("idle", btLeaf("idle-state", leafIdleState),
+		btSel("idle-policy",
+			btLeaf("threat", leafThreat),
+			guardTree)),
+	btSeq("engaged", btLeaf("engaged-state", leafEngagedState),
+		btSel("engaged-policy",
+			btLeaf("target-lost", leafTargetLost),
+			btLeaf("structure-low", leafFleeEntry),
+			btLeaf("beyond-leash", leafLeashBreak),
+			btLeaf("switch-lead", leafSwitch),
+			btLeaf("approach", leafApproach),
+			btLeaf("orbit", leafOrbit))),
+	btSeq("flee", btLeaf("flee-state", leafFleeState), btLeaf("flee-step", leafFleeStep)),
+	btSeq("returning", btLeaf("return-state", leafReturnState), btLeaf("return", leafReturn)),
+)
+
+// guardTree is a static guard's idle policy: clear the rats anchored at its
+// own celestial in high security, then drift the idle patrol circle. A guard
+// fighting here stays NpcIdle on purpose (friendly on the overview; the
+// traffic gates and Info.Hostile read the state).
+var guardTree = btSel("guard",
+	btLeaf("clear-rat", leafGuardRat),
+	btLeaf("patrol", leafIdlePatrol),
+)
+
+// minerTree is the civilian extraction loop of npc-miner-* (NpcDef.IsMiner):
+//
+//	flee — a damaged hull under its temperament-scaled flee threshold stops
+//	       cutting and runs the shared flee (burn away 20 s, despawn,
+//	       respawn timer re-armed)
+//	haul — warp to the NEAREST STATION of the same system, and on arrival
+//	       post the hold's ore on that station's market as system supply,
+//	       then despawn (recordRespawn re-arms the spawn group's timer)
+//	mine — cut the nearest rock with volume left, moving on when it
+//	       depletes; when the hold is full switch to haul
+//
+// Miners never initiate: they skip the threat machine entirely (no lock, no
+// trigger). They do run, though, so a miner caught by rats leaves the belt
+// instead of dying at the rock. They are otherwise normal ships — ordinary
+// candidate targets for every non-miner NPC, lockable, damageable, and death
+// runs the ordinary wreck path (the wreck carries the hold).
+var minerTree = btSel("miner",
+	btLeaf("run-or-flee", leafMinerFlee),
+	btLeaf("haul", leafMinerHaul),
+	btLeaf("mine", leafMinerMine),
+)
+
+// patrolTree drives one traffic patrol's dispatched states (system_traffic's
+// trafficDrivePatrols). The dispatch/scheduling itself stays in the traffic
+// system; this tree is the per-tick policy of a patrol already assigned.
+var patrolTree = btSel("patrol",
+	btLeaf("aggroed", leafPatrolAggroed),
+	btLeaf("respond", leafPatrolRespond),
+	btLeaf("return", leafPatrolReturn),
+	btLeaf("sweep", leafPatrolSweep),
+)
+
+// raiderTree is one ambush raider's per-tick policy (trafficRaidersAct). The
+// ambush schedule, hauler and break-off stay in the traffic system.
+var raiderTree = btSel("raider",
+	btLeaf("engaged", leafRaiderEngaged),
+	btLeaf("resolved", leafRaiderResolved),
+	btLeaf("fight", leafRaiderFight),
+)
+
+// btCtx is the caller-owned evaluation context of one NPC tick: the entity
+// being decided, its tree's inputs, and the decision the leaves write back
+// (ai.State / ai.Target / the tick's Intent). One context is reused across
+// entities and roles, so init clears every field a leaf reads.
+type btCtx struct {
+	s      *Sim
+	role   string // trace label: aggressive | miner | patrol | raider
+	branch string // top-level branch that handled the tick (trace)
+
+	e        ecs.Entity
+	ai       *NpcAI
+	tr       *Transform
+	def      *content.NpcDef
+	security string
+	cands    []npcCandidate
+	ship     *ShipState
+
+	damaged    bool
+	structFrac float64
+	effAggro   float64
+	effFlee    float64
+	leash      float64
+	playerOnly bool
+
+	tPos         core.Vec2
+	targetOnGrid bool
+
+	// patrol / raider leaves
+	p      *Patrol
+	sys    *content.SystemDef
+	td     *content.TrafficDef
+	atk    *TrafficAttack
+	hauler ecs.Entity
+}
+
+func (t *btCtx) init(s *Sim, e ecs.Entity, ai *NpcAI, ship *ShipState, tr *Transform, def *content.NpcDef, security string, cands []npcCandidate) {
+	*t = btCtx{s: s, e: e, ai: ai, ship: ship, tr: tr, def: def, security: security, cands: cands}
+	t.effAggro, t.effFlee = npcTemperament(security, def)
+	t.leash = npcLeashFactor * t.effAggro
+	t.structFrac = 1
+	if ship.MaxStructure > 0 {
+		t.structFrac = ship.Structure / ship.MaxStructure
+	}
+	t.damaged = ship.Shield < ship.MaxShield || ship.Armor < ship.MaxArmor ||
+		ship.Structure < ship.MaxStructure
+	// A live ambusher's target belongs to the traffic incident
+	// (trafficRaidersAct) — candidate resolution would hijack its warp-in
+	// onto the hauler it already means to take. Only the player pulls it
+	// into the machine, exactly as before. (Miners skip the threat machine
+	// entirely, so they skip this per-tick traffic scan.)
+	if !def.IsMiner() {
+		t.playerOnly = s.isTrafficRaider(e)
+	}
+
+	// The persisted target, resolved for this tick: a dead or docked target
+	// ends the engagement (-> return).
+	t.tPos, t.targetOnGrid = s.posOf(ai.Target)
+	if t.targetOnGrid && (!s.World.Alive(ai.Target) || s.Docked.Has(ai.Target)) {
+		t.targetOnGrid = false
+	}
+}
+
+// --- aggressive tree leaves ---
+
+func leafIdleState(c *btCtx) btStatus {
+	if c.ai.State != NpcIdle && c.ai.State != "" {
+		return btFailure
+	}
+	return btSuccess
+}
+
+func leafEngagedState(c *btCtx) btStatus {
+	if c.ai.State != NpcApproach && c.ai.State != NpcOrbit {
+		return btFailure
+	}
+	return btSuccess
+}
+
+func leafFleeState(c *btCtx) btStatus {
+	if c.ai.State != NpcFlee {
+		return btFailure
+	}
+	return btSuccess
+}
+
+func leafReturnState(c *btCtx) btStatus {
+	if c.ai.State != NpcReturn {
+		return btFailure
+	}
+	return btSuccess
+}
+
+// leafThreat is the idle selection: any trigger aggros a fresh NPC from
+// wherever its target is (the leash then governs whether the pursuit
+// continues). An NPC already fighting while idle — a guard clearing a rat, a
+// raider holding an ambush — keeps that fight unless the new attacker is the
+// considerable threat the switch rule asks for.
+func leafThreat(c *btCtx) btStatus {
+	target := c.s.npcThreat(c.e, c.tr.Pos, c.ai, c.def, c.damaged, c.cands, c.effAggro, math.MaxFloat64, c.playerOnly)
+	if target.IsZero() {
+		return btFailure
+	}
+	if c.s.npcFlipBlocked(c.e, c.ai, target) {
+		return btFailure
+	}
+	c.ai.State = NpcApproach
+	c.ai.Target = target
+	c.ai.SwitchAt = c.s.ticks
+	c.s.npcAggroLog(c.e, target)
+	return btSuccess
+}
+
+func leafGuardRat(c *btCtx) btStatus {
+	// The ambient security rule: a high-sec guard clears the rats anchored
+	// at its own celestial (see the systemNpc doc). Traffic patrols are
+	// driven by the belt sweep in systemTraffic instead.
+	if !c.def.IsGuard() || c.security != "high" || c.s.Patrols.Has(c.e) {
+		return btFailure
+	}
+	rat := c.s.ratTargetAt(c.ai.Home, c.security)
+	if rat.IsZero() {
+		return btFailure
+	}
+	c.s.guardEngageRat(c.e, c.ai, c.tr, rat, c.def)
+	return btSuccess
+}
+
+func leafIdlePatrol(c *btCtx) btStatus {
+	// Guards never sit still: slow patrol around Home — but a patrol working
+	// an incident (PatrolRespond) holds station: steering it back to its Home
+	// circle mid-fight would drift it out of engagement range of the raiders
+	// it is covering (trafficDrivePatrols owns its movement while responding).
+	if c.s.patrolResponding(c.e) {
+		return btFailure
+	}
+	c.s.npcPatrol(c.e, c.ai, c.tr, c.def)
+	return btSuccess
+}
+
+func leafTargetLost(c *btCtx) btStatus {
+	if c.targetOnGrid {
+		return btFailure
+	}
+	c.ai.State = NpcReturn
+	c.ai.Target = 0
+	return btSuccess
+}
+
+func leafFleeEntry(c *btCtx) btStatus {
+	if c.structFrac >= c.effFlee {
+		return btFailure
+	}
+	c.s.npcEnterFlee(c.e, c.ai, c.tr, c.tPos)
+	return btSuccess
+}
+
+func leafLeashBreak(c *btCtx) btStatus {
+	if c.ai.Home.Dist(c.tPos) <= c.leash {
+		return btFailure
+	}
+	// The target crossed the pursuit leash: break off.
+	c.ai.State = NpcReturn
+	c.ai.Target = 0
+	return btSuccess
+}
+
+// leafSwitch is the relative-lead switch: a considerable new attacker takes
+// the engagement. It reports Failure after switching on purpose, so the
+// approach leaf below steers the tick at the new target (the existing
+// "re-enter approach" flow).
+func leafSwitch(c *btCtx) btStatus {
+	next := c.s.npcSwitchThreat(c)
+	if next.IsZero() {
+		return btFailure
+	}
+	c.ai.Target = next
+	c.ai.State = NpcApproach
+	c.ai.SwitchAt = c.s.ticks
+	c.ai.resetHits()
+	c.tPos, c.targetOnGrid = c.s.posOf(next)
+	return btFailure
+}
+
+func leafApproach(c *btCtx) btStatus {
+	if c.ai.State != NpcApproach {
+		return btFailure
+	}
+	c.s.Intents.Set(c.e, Intent{Kind: IntentApproach, Target: c.ai.Target})
+	if c.tr.Pos.Dist(c.tPos) <= c.def.OrbitRange+50 {
+		c.ai.State = NpcOrbit
+	}
+	return btSuccess
+}
+
+func leafOrbit(c *btCtx) btStatus {
+	if c.ai.State != NpcOrbit {
+		return btFailure
+	}
+	c.s.Intents.Set(c.e, Intent{Kind: IntentOrbit, Target: c.ai.Target, Range: c.def.OrbitRange})
+	return btSuccess
+}
+
+func leafFleeStep(c *btCtx) btStatus {
+	c.s.npcFleeStep(c.e, c.ai, c.tr, c.tPos)
+	return btSuccess
+}
+
+func leafReturn(c *btCtx) btStatus {
+	// Re-engage only while a candidate is both a trigger and inside the
+	// leash — symmetric with the approach break-off, so the state machine can
+	// never flip-flop across the leash line.
+	if target := c.s.npcThreat(c.e, c.tr.Pos, c.ai, c.def, c.damaged, c.cands, c.effAggro, c.leash, c.playerOnly); !target.IsZero() {
+		c.ai.State = NpcApproach
+		c.ai.Target = target
+		c.ai.SwitchAt = c.s.ticks
+		return btSuccess
+	}
+	home := c.ai.Home.Sub(c.tr.Pos)
+	if home.Len() <= npcReturnRange {
+		c.ai.State = NpcIdle
+		c.s.Intents.Set(c.e, Intent{Kind: IntentStop})
+	} else {
+		c.s.Intents.Set(c.e, Intent{Kind: IntentManual, Dir: home.Norm(), SpeedFrac: 1})
+	}
+	return btSuccess
+}
+
+// --- miner tree leaves ---
+
+func leafMinerFlee(c *btCtx) btStatus {
+	if c.ai.State != NpcFlee && c.s.minerRuns(c.e, c.def, c.security) {
+		c.s.stopAllModules(c.e) // the laser cuts out: it is leaving, not working
+		c.s.npcEnterFlee(c.e, c.ai, c.tr, c.s.minerAttackerPos(c.ai))
+	}
+	if c.ai.State != NpcFlee {
+		return btFailure
+	}
+	c.s.npcFleeStep(c.e, c.ai, c.tr, c.s.minerAttackerPos(c.ai))
+	return btSuccess
+}
+
+func leafMinerHaul(c *btCtx) btStatus {
+	if c.ai.State != NpcHaul {
+		return btFailure
+	}
+	c.s.minerHaul(c.e, c.ai, c.tr)
+	return btSuccess
+}
+
+func leafMinerMine(c *btCtx) btStatus {
+	c.ai.State = NpcMine
+	c.s.minerMine(c.e, c.ai, c.tr, c.def)
+	return btSuccess
+}
+
+// --- patrol tree leaves (traffic dispatch owns the assignment) ---
+
+func leafPatrolAggroed(c *btCtx) btStatus {
+	if c.ai.State == NpcIdle {
+		return btFailure
+	}
+	if c.ai.Target == c.s.player && (c.ai.State == NpcApproach || c.ai.State == NpcOrbit) {
+		c.s.retargetWeapons(c.e, c.s.player)
+	}
+	return btSuccess
+}
+
+func leafPatrolRespond(c *btCtx) btStatus {
+	if c.p.State != PatrolRespond {
+		return btFailure
+	}
+	c.s.patrolRespondStep(c.e, c.p, c.ai, c.security)
+	return btSuccess
+}
+
+func leafPatrolReturn(c *btCtx) btStatus {
+	if c.p.State != PatrolReturn {
+		return btFailure
+	}
+	c.s.patrolReturnStep(c.e, c.p, c.ai)
+	return btSuccess
+}
+
+func leafPatrolSweep(c *btCtx) btStatus {
+	if c.p.State != PatrolIdle {
+		return btFailure
+	}
+	c.s.patrolSweepDispatch(c.p, c.sys, c.td, c.security)
+	return btSuccess
+}
+
+// --- raider tree leaves ---
+
+func leafRaiderEngaged(c *btCtx) btStatus {
+	if c.ai.State == NpcIdle {
+		return btFailure
+	}
+	// Engaged with the player: point its combat modules at the player
+	// (targets bind at activation, so retarget explicitly).
+	if c.ai.Target == c.s.player && (c.ai.State == NpcApproach || c.ai.State == NpcOrbit) {
+		c.s.retargetWeapons(c.e, c.s.player)
+	}
+	return btSuccess
+}
+
+func leafRaiderResolved(c *btCtx) btStatus {
+	if c.atk.Outcome == "" {
+		return btFailure
+	}
+	return btSuccess // incident resolved: weapons cold until break-off
+}
+
+func leafRaiderFight(c *btCtx) btStatus {
+	target := c.s.nearbyRespondingPatrol(c.e)
+	if target.IsZero() {
+		if !c.s.World.Alive(c.hauler) {
+			return btFailure
+		}
+		target = c.hauler
+	}
+	c.s.retargetWeapons(c.e, target)
+	c.s.npcEnsureLock(c.e, target)
+	c.s.npcActivate(c.e, c.ai, target)
+	return btSuccess
+}
+
+// ---------------------------------------------------------------------------
+// Prey preference, the damage ledger and the relative-lead switch
+// ---------------------------------------------------------------------------
+
+const (
+	// npcSwitchLead is how far a new attacker's damage to me must lead the
+	// current target's (over the same window) before it can take the
+	// engagement: 2x the current target is a considerable threat.
+	npcSwitchLead = 2.0
+	// npcSwitchWindow is the trailing window (ticks) both damage sums cover.
+	npcSwitchWindow = 120
+	// npcSwitchDwell is how long (ticks) a hull keeps a target it acquired or
+	// switched to before the lead rule may move it again.
+	npcSwitchDwell = 600
+	// npcHitRingLen bounds the per-hull damage ledger.
+	// shortcut: a 64-event ring; a long, many-source brawl can evict events
+	// still inside the 120-tick window and under-report a source's lead —
+	// enlarge the ring if fights ever get denser than a few shooters.
+	npcHitRingLen = 64
+)
+
+// npcHitEvent is one damage event in NpcAI.HitLog.
+type npcHitEvent struct {
+	at  int64      // sim tick the damage landed
+	src ecs.Entity // attacker
+	dmg float64    // penetrating damage
+}
+
+// noteHit records damage this hull just took (systemDamage). The ledger is
+// transient — see SavedNpcAI.
+func (ai *NpcAI) noteHit(tick int64, src ecs.Entity, dmg float64) {
+	if src == 0 || dmg <= 0 {
+		return
+	}
+	ai.HitLog[ai.HitHead] = npcHitEvent{at: tick, src: src, dmg: dmg}
+	ai.HitHead = (ai.HitHead + 1) % npcHitRingLen
+}
+
+// hitSum is the damage src dealt this hull inside the trailing switch window
+// (0 for a source with no live hits). Pure scan: fixed order, no alloc.
+func (ai *NpcAI) hitSum(tick int64, src ecs.Entity) float64 {
+	var sum float64
+	for i := range ai.HitLog {
+		if e := &ai.HitLog[i]; e.src == src && tick-e.at <= npcSwitchWindow {
+			sum += e.dmg
+		}
+	}
+	return sum
+}
+
+// resetHits clears the damage window (on a target switch).
+func (ai *NpcAI) resetHits() {
+	ai.HitLog = [npcHitRingLen]npcHitEvent{}
+	ai.HitHead = 0
+}
+
+// preyProfile is one candidate's prey value: cargo capacity (general hold plus
+// ore hold, the hull def's numbers when the entity carries no cargo
+// component) and fitted weapon count. Pure reads, no allocation.
+func (s *Sim) preyProfile(e ecs.Entity) (carry, guns float64) {
+	if c, ok := s.Cargos.Get(e); ok {
+		carry = c.Capacity + c.OreCapacity
+	} else if sh, ok := s.Ships.Get(e); ok {
+		if def, ok := s.Content.Ship(sh.Hull); ok {
+			carry = def.Cargo + def.OreHold
+		}
+	}
+	if fit, ok := s.Fittings.Get(e); ok {
+		for _, class := range slotClasses {
+			for _, id := range fit.Defs(class) {
+				if def, ok := s.Content.Module(id); ok && def.Kind == content.KindWeapon {
+					guns++
+				}
+			}
+		}
+	}
+	return carry, guns
+}
+
+// preyScore ranks one candidate among the eligible set: half its cargo share
+// and half its gun share, each normalised against the set's maximum (equal
+// weights; a term whose maximum is 0 contributes 0).
+func preyScore(carry, guns, maxCarry, maxGuns float64) float64 {
+	var score float64
+	if maxCarry > 0 {
+		score += 0.5 * carry / maxCarry
+	}
+	if maxGuns > 0 {
+		score += 0.5 * guns / maxGuns
+	}
+	return score
+}
+
+// npcTrigger classifies one candidate against the threat machine's triggers.
+type npcTrigger uint8
+
+const (
+	npcTriggerNone npcTrigger = iota
+	npcTriggerAmbient
+	npcTriggerHit // trigger (b): the candidate is the damage source
+)
+
+// npcTriggered evaluates triggers (a)-(d) for one candidate, unchanged: the
+// damage source of another faction (b), else for non-guards an ambient
+// trigger — proximity (a), the player's frozen work marker or an NPC mining
+// op (c), intrusion (d) — inside maxHomeDist of Home (the leash; MaxFloat64
+// for a fresh aggro). Guards only ever self-defend against the player.
+func (s *Sim) npcTriggered(ai *NpcAI, def *content.NpcDef, damaged bool, c npcCandidate, selfPos core.Vec2, mine string, effAggro, maxHomeDist float64, playerOnly bool) npcTrigger {
+	if playerOnly && c.e != s.player {
+		return npcTriggerNone
+	}
+	homeDist := ai.Home.Dist(c.pos)
+	if homeDist > maxHomeDist {
+		return npcTriggerNone
+	}
+	// (b) source-checked damage: same-faction fire never flips an NPC.
+	hit := damaged && ai.LastHitBy == c.e && c.faction != mine
+	if hit && def.IsGuard() && c.e != s.player {
+		hit = false // guards keep their player-only self-defense rule
+	}
+	if hit {
+		return npcTriggerHit
+	}
+	if def.IsGuard() || !hostile(mine, c.faction) {
+		return npcTriggerNone
+	}
+	switch {
+	case effAggro > 0 && selfPos.Dist(c.pos) <= effAggro:
+		return npcTriggerAmbient // (a) proximity
+	case c.e == s.player && s.recentPlayerWorkNear(ai.Home):
+		return npcTriggerAmbient // (c) frozen player work marker
+	case c.working && homeDist <= npcWorkRange:
+		return npcTriggerAmbient // (c) an NPC mining op inside the work radius
+	case homeDist <= npcGuardRange:
+		return npcTriggerAmbient // (d) intrusion
+	}
+	return npcTriggerNone
+}
+
+// npcThreat returns the candidate e should engage this tick, or zero.
+//
+// The damage source (b) keeps initial aggro unchanged: the hull that just hit
+// me is answered immediately. Every other candidate that passes today's
+// triggers inside the leash is ranked by prey score (cargo capacity and guns
+// over the eligible set) — ties go to the nearer candidate, then canonical
+// handle order. Guards only ever self-defend against the player (b) — they
+// never initiate, and their answer to Old Works hulls is guardEngageRat.
+// playerOnly restricts the scan to the player (a live traffic ambusher).
+func (s *Sim) npcThreat(e ecs.Entity, selfPos core.Vec2, ai *NpcAI, def *content.NpcDef, damaged bool, candidates []npcCandidate, effAggro, maxHomeDist float64, playerOnly bool) ecs.Entity {
+	mine := s.factionOf(e)
+	tr := s.traceFor(e)
+	for _, c := range candidates {
+		if c.e == e {
+			continue
+		}
+		if s.npcTriggered(ai, def, damaged, c, selfPos, mine, effAggro, maxHomeDist, playerOnly) == npcTriggerHit {
+			if tr != nil {
+				tr.out(fmt.Sprintf("npc-trace tick=%d npc=%q select winner=%q rule=damage-source",
+					s.ticks, s.nameOf(e), s.nameOf(c.e)))
+			}
+			return c.e
+		}
+	}
+
+	var maxCarry, maxGuns float64
+	for _, c := range candidates {
+		if c.e == e || s.npcTriggered(ai, def, damaged, c, selfPos, mine, effAggro, maxHomeDist, playerOnly) != npcTriggerAmbient {
+			continue
+		}
+		carry, guns := s.preyProfile(c.e)
+		maxCarry = math.Max(maxCarry, carry)
+		maxGuns = math.Max(maxGuns, guns)
+	}
+	var best ecs.Entity
+	var bestScore, bestD float64
+	for _, c := range candidates {
+		if c.e == e || s.npcTriggered(ai, def, damaged, c, selfPos, mine, effAggro, maxHomeDist, playerOnly) != npcTriggerAmbient {
+			continue
+		}
+		carry, guns := s.preyProfile(c.e)
+		score := preyScore(carry, guns, maxCarry, maxGuns)
+		d := selfPos.Dist(c.pos)
+		if best.IsZero() || score > bestScore || (score == bestScore && d < bestD) {
+			best, bestScore, bestD = c.e, score, d
+		}
+		if tr != nil {
+			tr.out(fmt.Sprintf("npc-trace tick=%d npc=%q select cand=%q carry=%.0f/%.0f guns=%.0f/%.0f score=%.3f dist=%.0f",
+				s.ticks, s.nameOf(e), s.nameOf(c.e), carry, maxCarry, guns, maxGuns, score, d))
+		}
+	}
+	if tr != nil && !best.IsZero() {
+		tr.out(fmt.Sprintf("npc-trace tick=%d npc=%q select winner=%q rule=prey-score score=%.3f",
+			s.ticks, s.nameOf(e), s.nameOf(best), bestScore))
+	}
+	return best
+}
+
+// npcEngagement is the hull this NPC is already fighting: its persisted
+// target while that is live, else whatever its guns are locked on — an NPC
+// fighting while its AI state stays idle (a static guard clearing rats, a
+// raider holding an ambush). Zero when it has no live engagement.
+func (s *Sim) npcEngagement(e ecs.Entity, ai *NpcAI) ecs.Entity {
+	if ai.Target != 0 && s.World.Alive(ai.Target) && !s.Docked.Has(ai.Target) {
+		return ai.Target
+	}
+	if tg, ok := s.Targetings.Get(e); ok {
+		for _, l := range tg.Locks {
+			if l.Target != 0 && s.World.Alive(l.Target) {
+				return l.Target
+			}
+		}
+	}
+	return 0
+}
+
+// npcFlipBlocked reports whether a fresh attacker must NOT flip this NPC: it
+// is a role hull already fighting while idle (a static guard clearing rats, a
+// raider holding an ambush) and the attacker neither leads the damage window
+// by npcSwitchLead nor arrives after the dwell. With no live target any
+// attacker leads, and an ordinary hull's idle flip is plain initial aggro —
+// the gate exists only where the old code flipped unconditionally mid-fight.
+func (s *Sim) npcFlipBlocked(e ecs.Entity, ai *NpcAI, want ecs.Entity) bool {
+	def, ok := s.Content.Npc(ai.Npc)
+	if !ok || (!def.IsGuard() && !s.isTrafficRaider(e)) {
+		return false
+	}
+	cur := s.npcEngagement(e, ai)
+	blocked := false
+	if !cur.IsZero() && cur != want {
+		newDmg := ai.hitSum(s.ticks, want)
+		lead := newDmg >= npcSwitchLead*ai.hitSum(s.ticks, cur)
+		blocked = !(lead && newDmg > 0 && s.ticks-ai.SwitchAt >= npcSwitchDwell)
+	}
+	if tr := s.traceFor(e); tr != nil && blocked {
+		tr.out(fmt.Sprintf("npc-trace tick=%d npc=%q switch verdict=hold cur=%q cur-dmg=%.1f new=%q new-dmg=%.1f dwell=%d",
+			s.ticks, s.nameOf(e), s.nameOf(cur), ai.hitSum(s.ticks, cur), s.nameOf(want),
+			ai.hitSum(s.ticks, want), npcSwitchDwell-(s.ticks-ai.SwitchAt)))
+	}
+	return blocked
+}
+
+// npcSwitchThreat returns the attacker that takes an engaged NPC's target
+// under the relative-lead rule, or zero: another eligible hostile whose
+// damage over the trailing window leads the current target's by npcSwitchLead,
+// once the dwell since the last acquisition has passed (a switch clears the
+// window). Ties go to canonical handle order.
+func (s *Sim) npcSwitchThreat(c *btCtx) ecs.Entity {
+	cur := c.ai.Target
+	curDmg := c.ai.hitSum(c.s.ticks, cur)
+	curFaction := ""
+	if !cur.IsZero() {
+		curFaction = c.s.factionOf(cur)
+	}
+	mine := c.s.factionOf(c.e)
+	dwell := c.s.ticks - c.ai.SwitchAt
+	var best ecs.Entity
+	var bestDmg float64
+	if dwell >= npcSwitchDwell {
+		for _, cand := range c.cands {
+			if cand.e == c.e || cand.e == cur {
+				continue
+			}
+			// A wing-mate of the current target is the same threat already
+			// engaged: switching between identical hulls changes nothing.
+			if !cur.IsZero() && cand.faction == curFaction {
+				continue
+			}
+			if c.playerOnly && cand.e != c.s.player {
+				continue
+			}
+			if c.def.IsGuard() && cand.e != c.s.player {
+				continue
+			}
+			if !hostile(mine, cand.faction) || c.ai.Home.Dist(cand.pos) > c.leash {
+				continue
+			}
+			dmg := c.ai.hitSum(c.s.ticks, cand.e)
+			if dmg <= 0 || dmg < npcSwitchLead*curDmg {
+				continue
+			}
+			if best.IsZero() || dmg > bestDmg {
+				best, bestDmg = cand.e, dmg
+			}
+		}
+	}
+	if tr := c.s.traceFor(c.e); tr != nil {
+		for _, cand := range c.cands {
+			if cand.e == c.e {
+				continue
+			}
+			if d := c.ai.hitSum(c.s.ticks, cand.e); d > 0 {
+				tr.out(fmt.Sprintf("npc-trace tick=%d npc=%q switch src=%q dmg=%.1f window=%d",
+					c.s.ticks, c.s.nameOf(c.e), c.s.nameOf(cand.e), d, npcSwitchWindow))
+			}
+		}
+		verdict := "hold"
+		if !best.IsZero() {
+			verdict = "switch"
+		} else if dwell < npcSwitchDwell {
+			verdict = "dwell"
+		}
+		top, topDmg := "none", 0.0
+		if !best.IsZero() {
+			top, topDmg = c.s.nameOf(best), bestDmg
+		}
+		tr.out(fmt.Sprintf("npc-trace tick=%d npc=%q switch verdict=%s cur=%q cur-dmg=%.1f top=%q top-dmg=%.1f lead=%.2f dwell=%d",
+			c.s.ticks, c.s.nameOf(c.e), verdict, c.s.nameOf(cur), curDmg, top, topDmg,
+			leadRatio(topDmg, curDmg), npcSwitchDwell-dwell))
+	}
+	return best
+}
+
+// leadRatio is the trace's lead figure: the challenger's share of the current
+// target's damage (infinite when the current target has taken none).
+func leadRatio(top, cur float64) float64 {
+	if cur <= 0 {
+		return math.Inf(1)
+	}
+	return top / cur
+}
+
+// npcTraceCfg is the harness observer behind `entieve simulate --trace-npc`
+// (Sim.npcTrace). Read-only: it formats lines and never touches sim state.
+type npcTraceCfg struct {
+	name string
+	out  func(line string)
+}
+
+// TraceNpc attaches a read-only, per-tick decision trace to the NPC with this
+// display name ("" detaches). Zero cost when off: every trace site is guarded
+// by a nil check, and a traced run must hash identically to an untraced twin.
+func (s *Sim) TraceNpc(name string, out func(line string)) {
+	if name == "" || out == nil {
+		s.npcTrace = nil
+		return
+	}
+	s.npcTrace = &npcTraceCfg{name: name, out: out}
+}
+
+func (s *Sim) traceFor(e ecs.Entity) *npcTraceCfg {
+	if s.npcTrace == nil || s.nameOf(e) != s.npcTrace.name {
+		return nil
+	}
+	return s.npcTrace
+}
+
+// done writes the tick's decision line: which top-level branch handled it and
+// the state/target it produced.
+func (t *btCtx) done() {
+	tr := t.s.traceFor(t.e)
+	if tr == nil {
+		return
+	}
+	target := "none"
+	if t.ai.Target != 0 {
+		target = t.s.nameOf(t.ai.Target)
+	}
+	tr.out(fmt.Sprintf("npc-trace tick=%d npc=%q role=%s branch=%s state=%s target=%q",
+		t.s.ticks, t.s.nameOf(t.e), t.role, t.branch, t.ai.State, target))
 }
 
 // npcCandidate is one ship the threat machine may consider: who it is, where
@@ -349,55 +1029,6 @@ func (s *Sim) npcWorking(e ecs.Entity) bool {
 	return false
 }
 
-// npcThreat returns the candidate e should engage this tick, or zero. It
-// evaluates triggers (a)-(d) for every candidate of another hostile faction
-// inside maxHomeDist of Home (the leash; math.MaxFloat64 for a fresh aggro):
-// the damage source (b) always wins, else the nearest, ties by canonical
-// order. Guards only ever self-defend against the player (b) — they never
-// initiate, and their answer to Old Works hulls is guardEngageRat. playerOnly
-// restricts the scan to the player (a live traffic ambusher, see systemNpc).
-func (s *Sim) npcThreat(e ecs.Entity, selfPos core.Vec2, ai *NpcAI, def *content.NpcDef, damaged bool, candidates []npcCandidate, effAggro, maxHomeDist float64, playerOnly bool) ecs.Entity {
-	mine := s.factionOf(e)
-	var best ecs.Entity
-	bestD := math.MaxFloat64
-	for _, c := range candidates {
-		if c.e == e || (playerOnly && c.e != s.player) {
-			continue
-		}
-		homeDist := ai.Home.Dist(c.pos)
-		if homeDist > maxHomeDist {
-			continue
-		}
-		// (b) source-checked damage: same-faction fire never flips an NPC.
-		hit := damaged && ai.LastHitBy == c.e && c.faction != mine
-		if hit && def.IsGuard() && c.e != s.player {
-			hit = false // guards keep their player-only self-defense rule
-		}
-		if !hit && !def.IsGuard() && hostile(mine, c.faction) {
-			switch {
-			case effAggro > 0 && selfPos.Dist(c.pos) <= effAggro:
-				hit = true // (a) proximity
-			case c.e == s.player && s.recentPlayerWorkNear(ai.Home):
-				hit = true // (c) frozen player work marker
-			case c.working && homeDist <= npcWorkRange:
-				hit = true // (c) an NPC mining op inside the work radius
-			case homeDist <= npcGuardRange:
-				hit = true // (d) intrusion
-			}
-		}
-		if !hit {
-			continue
-		}
-		if damaged && ai.LastHitBy == c.e {
-			return c.e // (b) beats every ambient trigger
-		}
-		if d := selfPos.Dist(c.pos); best.IsZero() || d < bestD {
-			best, bestD = c.e, d
-		}
-	}
-	return best
-}
-
 // npcAggroLog announces an engagement once, on the idle -> approach
 // transition. The player line is byte-identical to the old machine's; an NPC
 // target gets one SevInfo line naming both hulls.
@@ -456,40 +1087,6 @@ func (s *Sim) npcPatrol(e ecs.Entity, ai *NpcAI, tr *Transform, def *content.Npc
 // work: frontier belts scatter wider than the sensor grid, and sublight
 // would never cross them.
 const npcMinerWarpRange = 100_000
-
-// npcMiner runs the civilian extraction loop of npc-miner-* (NpcDef.IsMiner):
-//
-//	mine — cut the nearest rock with volume left, moving on when it
-//	       depletes; when the hold is full switch to haul
-//	haul — warp to the NEAREST STATION of the same system, and on arrival
-//	       post the hold's ore on that station's market as system supply,
-//	       then despawn (recordRespawn re-arms the spawn group's timer)
-//
-// Miners never initiate: they skip the threat machine entirely (no lock, no
-// trigger). They do run, though — damage from a hostile hull under the
-// temperament-scaled flee threshold turns the extraction loop into the shared
-// flee (burn away from the attacker 20 s, despawn, respawn timer re-armed), so
-// a miner caught by rats leaves the belt instead of dying at the rock. They
-// are otherwise normal ships — ordinary candidate targets for every non-miner
-// NPC, lockable, damageable, and death runs the ordinary wreck path (the wreck
-// carries the hold).
-func (s *Sim) npcMiner(e ecs.Entity, ai *NpcAI, tr *Transform, def *content.NpcDef, security string) {
-	if ai.State != NpcFlee && s.minerRuns(e, def, security) {
-		s.stopAllModules(e) // the laser cuts out: it is leaving, not working
-		s.npcEnterFlee(e, ai, tr, s.minerAttackerPos(ai))
-	}
-	if ai.State == NpcFlee {
-		s.npcFleeStep(e, ai, tr, s.minerAttackerPos(ai))
-		return
-	}
-	switch ai.State {
-	case NpcHaul:
-		s.minerHaul(e, ai, tr)
-	default:
-		ai.State = NpcMine
-		s.minerMine(e, ai, tr, def)
-	}
-}
 
 // minerRuns reports whether a damaged miner's structure has fallen under its
 // temperament-scaled flee threshold (the same fraction the threat machine's
@@ -675,36 +1272,68 @@ func (s *Sim) nearestStation(pos core.Vec2) ecs.Entity {
 }
 
 // ratTargetAt returns the rat (npc-rat-*) anchored at home the security
-// forces should engage next, in canonical handle order — the target a
-// high-sec guard clears, and the belt occupancy a patrol sweep looks for.
-// Free rats come first (an NPC's fight stays its own while other rats
-// are free), but when none are free any live rat is returned: security
-// finishes the belt rather than leaving a player-touched rat parked there.
-// Zero only when the belt is empty. Home is the spawn anchor (the celestial
-// position), so the match is an exact comparison: no distance scan, no
-// persisted state, and the chase that follows is whatever the belt's own
-// scatter gives.
+// forces should engage next — the target a high-sec guard clears, and the
+// belt occupancy a patrol sweep looks for. Free rats come first (an NPC's
+// fight stays its own while other rats are free); within each set the rats
+// are ranked by the same prey score as the threat machine (cargo capacity and
+// guns, ties to the nearer rat, then canonical handle order), because a guard
+// clearing a belt wants the fat hull, not the first handle. When no rat is
+// free any live rat ranks the same way: security finishes the belt rather
+// than leaving a player-touched rat parked there. Zero only when the belt is
+// empty. Home is the spawn anchor (the celestial position), so the match is
+// an exact comparison: no distance scan beyond the ranking, no persisted
+// state, and the chase that follows is whatever the belt's own scatter gives.
 func (s *Sim) ratTargetAt(home core.Vec2, sec string) ecs.Entity {
-	var live ecs.Entity
+	var maxCarry, maxGuns float64
 	for _, e := range sortedEntities(s.AIs) {
-		ai, ok := s.AIs.Get(e)
-		if !ok || ai.Home != home {
+		if _, ok := s.beltRatAt(e, home); !ok {
 			continue
 		}
-		if def, ok := s.Content.Npc(ai.Npc); !ok || !isRatNpc(def) || ai.Faction != "" {
-			// A war hull (the Corporate Fleets' override) flying a machine is
-			// not a belt rat: security does not clear it, and a fleet fight is
-			// a front action, not a belt sweep.
+		carry, guns := s.preyProfile(e)
+		maxCarry = math.Max(maxCarry, carry)
+		maxGuns = math.Max(maxGuns, guns)
+	}
+	var free, live ecs.Entity
+	var freeScore, liveScore, freeD, liveD float64
+	for _, e := range sortedEntities(s.AIs) {
+		ai, ok := s.beltRatAt(e, home)
+		if !ok {
 			continue
+		}
+		carry, guns := s.preyProfile(e)
+		score := preyScore(carry, guns, maxCarry, maxGuns)
+		d := math.MaxFloat64
+		if p, ok := s.posOf(e); ok {
+			d = home.Dist(p)
 		}
 		if s.ratFree(ai, sec) {
-			return e
+			if free.IsZero() || score > freeScore || (score == freeScore && d < freeD) {
+				free, freeScore, freeD = e, score, d
+			}
+			continue
 		}
-		if live.IsZero() {
-			live = e
+		if live.IsZero() || score > liveScore || (score == liveScore && d < liveD) {
+			live, liveScore, liveD = e, score, d
 		}
 	}
+	if !free.IsZero() {
+		return free
+	}
 	return live
+}
+
+// beltRatAt reports whether e is a live belt rat anchored at home: the rat
+// hulls security clears, never a war hull flying one (the Corporate Fleets'
+// faction override is a front action, not a belt sweep).
+func (s *Sim) beltRatAt(e ecs.Entity, home core.Vec2) (*NpcAI, bool) {
+	ai, ok := s.AIs.Get(e)
+	if !ok || ai.Home != home {
+		return nil, false
+	}
+	if def, ok := s.Content.Npc(ai.Npc); !ok || !isRatNpc(def) || ai.Faction != "" {
+		return nil, false
+	}
+	return ai, true
 }
 
 // ratNear returns the closest live rat (npc-rat-*) within r of pos, ties in

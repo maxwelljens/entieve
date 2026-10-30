@@ -38,7 +38,7 @@ const usage = `Entieve — a love letter to EVE Online
 Usage:
   entieve run       [--world ID] [--seed N] [--load save.json] [--save save.json]
   entieve validate  [--dir content/data]
-  entieve simulate  [--world ID] [--seed N] [--ticks N] [--script steps.json] [--quiet]
+  entieve simulate  [--world ID] [--seed N] [--ticks N] [--script steps.json] [--quiet] [--trace-npc NAME]
   entieve describe  <id>            (any content id: item, ship, module, npc, system, world, contract)
   entieve version
 
@@ -177,6 +177,7 @@ func cmdSimulate(args []string, stdout, stderr io.Writer) int {
 	ticks := fs.Int64("ticks", 600, "number of ticks to run (60 ticks = 1 sim second)")
 	scriptPath := fs.String("script", "", "JSON command script to execute during the run")
 	quiet := fs.Bool("quiet", false, "suppress the event log (report still printed)")
+	traceNpc := fs.String("trace-npc", "", "print this NPC's per-tick decision trace (display name)")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -194,6 +195,11 @@ func cmdSimulate(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintf(stderr, "entieve simulate: %v\n", err)
 		return 1
+	}
+	if *traceNpc != "" {
+		// Read-only observer: the traced run must hash exactly like its
+		// untraced twin (sim/npc_threat_tree_test.go).
+		s.TraceNpc(*traceNpc, func(line string) { fmt.Fprintln(stdout, line) })
 	}
 	var steps []script.Step
 	if *scriptPath != "" {
