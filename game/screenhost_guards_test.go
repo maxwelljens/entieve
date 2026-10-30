@@ -122,13 +122,13 @@ const layoutBytesGolden = `{
       "tables": {
         "inventory": {
           "Item": {
-            "width": 166.96875
+            "width": 156.96875
           },
           "Qty": {
             "width": 41.4375
           },
           "Vol": {
-            "width": 49.59375
+            "width": 59.59375
           }
         }
       }
@@ -177,10 +177,10 @@ const layoutBytesGolden = `{
       "tables": {
         "book": {
           "Item": {
-            "width": 117.25
+            "width": 107.25
           },
           "Price": {
-            "width": 67.15625
+            "width": 77.15625
           },
           "Qty": {
             "width": 41.4375

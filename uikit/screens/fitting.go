@@ -432,8 +432,8 @@ func (f *Fitting) newEHP() *widget.Container {
 // newLimits builds the HULL LIMITS block: the hull's mounts and its per-class
 // grid/CPU allowances, in the words the info page and the sim's refusals use.
 func (f *Fitting) newLimits() *widget.Container {
-	// No gap under the caption: the design height is exactly full, and this
-	// block is the last one in the column.
+	// No gap under the caption: this block is the last one in the
+	// (scrollable) left column.
 	col := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
@@ -503,6 +503,14 @@ func (f *Fitting) newRow(label string, rows *[]fitRow) *widget.Container {
 		}
 		labelData.Padding = &widget.Insets{Left: theme.Px(theme.StatIconSize + theme.StatIconGap)}
 	}
+	// The doubled stat glyph is taller than the tiny line box: give icon
+	// rows their glyph's height so it cannot overlap the neighbouring row.
+	rowH := widgets.TipLineH(face)
+	if icon != "" {
+		if h := theme.Px(theme.StatIconSize); h > rowH {
+			rowH = h
+		}
+	}
 	row := fitRow{
 		icon: mark,
 		label: widget.NewText(
@@ -524,7 +532,7 @@ func (f *Fitting) newRow(label string, rows *[]fitRow) *widget.Container {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 		widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-			widget.WidgetOpts.MinSize(0, widgets.TipLineH(face)),
+			widget.WidgetOpts.MinSize(0, rowH),
 		),
 	)
 	if row.icon != nil {

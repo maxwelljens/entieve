@@ -219,7 +219,7 @@ func TestTipLayoutTilesAtBothWidths(t *testing.T) {
 	if got, want := maxed.Size, (image.Point{X: tipMaxW, Y: 231}); got != want {
 		t.Errorf("capped fixture panel = %v, want %v", got, want)
 	}
-	if got, want := minW.Size, (image.Point{X: 191, Y: 231}); got != want {
+	if got, want := minW.Size, (image.Point{X: 201, Y: 231}); got != want {
 		t.Errorf("content-sized fixture panel = %v, want %v", got, want)
 	}
 	if minW.Size.X >= maxed.Size.X {

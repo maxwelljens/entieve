@@ -271,7 +271,9 @@ func NewHud(env interface {
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
 	capMark := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
-	capGlyph := theme.NewIcon("stat_capacitor", theme.StatIconSize, p.Cap)
+	// The capacitor bar is shorter than a doubled glyph: cap it to the
+	// health bars' inner height (the bar less the outline inset).
+	capGlyph := theme.NewIcon("stat_capacitor", min(theme.StatIconSize, hudBarH-4), p.Cap)
 	capGlyph.GetWidget().LayoutData = widget.AnchorLayoutData{
 		HorizontalPosition: widget.AnchorLayoutPositionStart,
 		VerticalPosition:   widget.AnchorLayoutPositionCenter,
@@ -824,11 +826,26 @@ func (h *Hud) paintWedge(frac float64) {
 	// The speed glyph sits inside the wedge's bottom-left edge, in the fill's
 	// own colour (the wedge is the bar: no category tint here).
 	size := theme.StatIconSize
-	y := int(hh) - size - 1
-	half := float64(hh-float32(y)) / float64(hh) * float64(cx)
+	x, y := wedgeGlyphXY(int(w), int(hh), size)
 	opts := &ebiten.DrawImageOptions{}
-	opts.GeoM.Translate(float64(cx)-half+1, float64(y))
+	opts.GeoM.Translate(float64(x), float64(y))
 	h.wedge.DrawImage(icons.Get("stat_speed", size, p.Accent), opts)
+}
+
+// wedgeGlyphXY places the speed glyph at the wedge's bottom-left edge, pulled
+// left when the doubled glyph would otherwise clip the image's right side.
+func wedgeGlyphXY(w, h, size int) (int, int) {
+	cx := float64(w) / 2
+	y := h - size - 1
+	half := float64(h-y) / float64(h) * cx
+	x := cx - half + 1
+	if x+float64(size) > float64(w-1) {
+		x = float64(w - 1 - size)
+	}
+	if x < 1 {
+		x = 1
+	}
+	return int(math.Round(x)), y
 }
 
 // hudFrac returns cur/max clamped to 0..1 (1 when max is unknown, so an

@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   honours the hull's real fitting rules: a refused module keeps the action
   greyed and quotes the sim's own rule (`content.FitIssueText`, moved out of
   `sim` so both read one wording). No new stats: organisation only.
+- **Stat icons double** (`uikit`) — the stat glyph goes 10 → 20 design units
+  and its gutter 14 → 24. Info, tooltip and fitting rows, table headers and
+  the order window draw it full size; the tooltip's content width grows by
+  10 and icon columns' floor grows by 10. The HUD bars stay their height and
+  cap the glyph instead (14 px on health/capacitor, 4 px on the target-card
+  layers), and the velocity wedge keeps its 26 px width with the glyph
+  clamped inside it.
 
 ## [0.11.0] - 2026-10-29
 

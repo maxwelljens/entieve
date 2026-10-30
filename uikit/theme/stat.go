@@ -29,9 +29,9 @@ const (
 )
 
 // StatIconSize and StatIconGap are the row gutter: the glyph box and the air
-// between it and the label (14 design units of gutter, the tooltip's cap).
+// between it and the label (24 design units of gutter, the tooltip's cap).
 const (
-	StatIconSize = 10
+	StatIconSize = 20
 	StatIconGap  = 4
 )
 

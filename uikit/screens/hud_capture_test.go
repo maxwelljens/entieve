@@ -125,7 +125,9 @@ func TestHudCaptureFrame(t *testing.T) {
 				{"structure@90%", image.Rect(hpBox.Min.X, hpBox.Min.Y+2*(hudBarH+hudHpGap), hpBox.Max.X, hpBox.Min.Y+3*hudBarH+2*hudHpGap), func(r, gch, b int) bool { return r > 170 && gch > 170 && b > 170 }},
 			} {
 				y := (bar.rect.Min.Y + bar.rect.Max.Y) / 2
-				r, gch, b := rgb(bar.rect.Min.X+12, y)
+				// Sample just inside the fill's left edge: the doubled layer
+				// glyph and its outline now reach x+18, so x+12 is glyph ink.
+				r, gch, b := rgb(bar.rect.Min.X+1, y)
 				if !bar.check(r, gch, b) {
 					fail("%s: fill pixel = (%d,%d,%d), want the layer colour", bar.name, r, gch, b)
 				}

@@ -161,6 +161,18 @@ func TestHudStatusOnDamage(t *testing.T) {
 	}
 }
 
+// TestWedgeGlyphFits pins the speed glyph inside the wedge image at the
+// doubled stat size: the bottom-left placement is clamped, never clipped.
+func TestWedgeGlyphFits(t *testing.T) {
+	for size := 4; size <= theme.StatIconSize; size++ {
+		x, y := wedgeGlyphXY(hudWedgeW, hudWedgeH, size)
+		if x < 0 || y < 0 || x+size > hudWedgeW || y+size > hudWedgeH {
+			t.Errorf("size %d: glyph %dx%d at %d,%d escapes the %dx%d wedge",
+				size, size, size, x, y, hudWedgeW, hudWedgeH)
+		}
+	}
+}
+
 // TestHudVelocityWedge pins the wedge fraction: current / base max speed
 // (a stable top), clamped, zero when max is unknown.
 func TestHudVelocityWedge(t *testing.T) {
