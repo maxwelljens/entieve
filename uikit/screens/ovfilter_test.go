@@ -8,6 +8,7 @@ import (
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 )
 
@@ -233,6 +234,43 @@ func TestOverviewFilterWindowOpensFromTheCog(t *testing.T) {
 	pumpKit(t, k, 1024, 700)
 	if k.OverviewFilterOpen() {
 		t.Error("CloseOverviewFilter left the window up")
+	}
+}
+
+// TestOverviewCogCentredAndClearOfClose pins the cog's alignment: the glyph
+// box sits centred inside its square button — the glyph must not ride
+// ebitenui's graphic slot, whose fixed [label][10 px spacing] offset pinned
+// it to the right border (measured before the fix: insets L20 R0 T10 B10) —
+// and the cell stops a hairline short of the ×'s strip, whose left edge the
+// button's right edge used to land on exactly (gap 0). At scale 1 and 1.5,
+// through the Px funnel.
+func TestOverviewCogCentredAndClearOfClose(t *testing.T) {
+	for _, scale := range []float64{1, 1.5} {
+		uitest.UseScale(t, scale)
+		k, _ := newTestKit(t)
+		pumpKit(t, k, 1024, 700)
+		btn := k.ovCog.GetWidget().Rect
+		glyph := k.ovCogGlyph.GetWidget().Rect
+		if box := theme.Px(closeBtnH); btn.Dx() != box || btn.Dy() != box {
+			t.Errorf("scale %v: cog button = %v, want the %d design square", scale, btn, closeBtnH)
+		}
+		if box := theme.Px(theme.IconButton); glyph.Dx() != box || glyph.Dy() != box {
+			t.Errorf("scale %v: cog glyph = %v, want %d² design", scale, glyph, theme.IconButton)
+		}
+		l, r := glyph.Min.X-btn.Min.X, btn.Max.X-glyph.Max.X
+		tp, bt := glyph.Min.Y-btn.Min.Y, btn.Max.Y-glyph.Max.Y
+		if floor := theme.Px(3); l < floor || r < floor || tp < floor || bt < floor {
+			t.Errorf("scale %v: glyph margins L%d R%d T%d B%d, want ≥%d px on every side",
+				scale, l, r, tp, bt, floor)
+		}
+		if abs(l-r) > 1 || abs(tp-bt) > 1 {
+			t.Errorf("scale %v: glyph margins L%d R%d T%d B%d, want centred ±1", scale, l, r, tp, bt)
+		}
+		x := k.CloseButtonOf(k.OverviewWindow()).GetWidget().Rect
+		if gap := x.Min.X - btn.Max.X; gap < theme.Px(ovCogGap) {
+			t.Errorf("scale %v: cog %v touches the × %v — gap %d px, want ≥%d design",
+				scale, btn, x, gap, ovCogGap)
+		}
 	}
 }
 

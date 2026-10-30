@@ -140,8 +140,10 @@ type Kit struct {
 	ovFilt    *dialog
 	ovFiltWin *OvFilterWin
 	// ovCog is the overview title bar's filter button (the dialog's only
-	// door), kept for the tests that press it.
-	ovCog *widget.Button
+	// door), kept for the tests that press it; ovCogGlyph is the glyph box
+	// its cell centres, kept for the alignment pin.
+	ovCog      *widget.Button
+	ovCogGlyph *widget.Graphic
 
 	// orderWin is the player market-order mini-window's panel. It is
 	// deliberately NOT in the layout sidecar: a transient dialog, never
