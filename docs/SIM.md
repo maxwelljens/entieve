@@ -108,7 +108,9 @@ last so the rebuilt grid is never observed mid-Step.
   high, one in low, none in null), rate-limited by `respondingTo` (any live
   patrol already holding that miner), skipped inside Works control, and
   delayed in low space by holding the wing at its anchor (`Patrol.Next`)
-  before it warps. `patrolMinerStep` then holds station on the miner, shoots
+  before it warps. `patrolMinerStep` then warps each ship to its own station
+  on a ring around the miner (`patrolStation`: even angular slots,
+  hash-varied radius, nothing persisted) and holds there, shoots
   the rats within `trafficPatrolEngageRange` of it (the ambush engagement
   range — rats only, never the player) and takes the ordinary
   `patrolReturnStep` home when none are left. No new save field: the

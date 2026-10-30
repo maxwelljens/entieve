@@ -1425,17 +1425,23 @@ func (s *Sim) ratDefend(rat, attacker ecs.Entity) {
 	s.npcActivate(rat, ai, attacker)
 }
 
-// patrolPhase maps an entity handle to its patrol start angle in [0, 2π)
-// through the SplitMix64 finalizer — a pure hash of the handle, kept
-// deliberately separate from any *core.RNG so patrolling draws nothing.
-func patrolPhase(e ecs.Entity) float64 {
+// patrolHash maps an entity handle through the SplitMix64 finalizer — a pure
+// hash of the handle, kept deliberately separate from any *core.RNG so
+// patrolling draws nothing.
+func patrolHash(e ecs.Entity) uint64 {
 	h := uint64(e)
 	h ^= h >> 30
 	h *= 0xbf58476d1ce4e5b9
 	h ^= h >> 27
 	h *= 0x94d049bb133111eb
 	h ^= h >> 31
-	return float64(h>>11) * (2 * math.Pi / float64(uint64(1)<<53))
+	return h
+}
+
+// patrolPhase maps an entity handle to its patrol start angle in [0, 2π)
+// (patrolHash's high 53 bits).
+func patrolPhase(e ecs.Entity) float64 {
+	return float64(patrolHash(e)>>11) * (2 * math.Pi / float64(uint64(1)<<53))
 }
 
 // playerWorkNever marks lastPlayerWork.at as "no work recorded this run".

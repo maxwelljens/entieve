@@ -109,6 +109,13 @@ const (
 	trafficPatrolScatter       = 2000.0
 	trafficPatrolEngageRange   = 12000.0
 
+	// patrolStationRMin/patrolStationRMax bound the station ring a responding
+	// wing holds around its incident (m): each responder owns a point on it,
+	// so a ten-ship wing reads as a formation instead of one stacked hull.
+	// Still far inside trafficPatrolEngageRange.
+	patrolStationRMin = 1800.0
+	patrolStationRMax = 3000.0
+
 	// trafficWishInterval is the wish-consumption poll cadence (ticks) —
 	// stateless like every traffic schedule (trafficDue), so a skipped
 	// attempt never reschedules anything. One shipment per poll: convoys
@@ -1910,6 +1917,33 @@ func (s *Sim) occupiedBelt(sys *content.SystemDef, sec string) ecs.Entity {
 	return 0
 }
 
+// patrolStation returns the station point a responder holds on the ring
+// around centre: responders to the same incident get even angular slots in
+// handle order (a ten-ship wing is then at least
+// 2*patrolStationRMin*sin(π/10) ≈ 1.1 km apart, so no two hulls stack), and
+// the radius varies with the handle hash (patrolHash, no RNG draw) so the
+// ring never reads as a drawn circle. Recomputed on each warp, never stored
+// (no save-schema change), so the layout is a pure function of world state.
+func (s *Sim) patrolStation(e, incident ecs.Entity, centre core.Vec2) core.Vec2 {
+	slot, n := 0, 0
+	for _, o := range sortedEntities(s.Patrols) {
+		p, ok := s.Patrols.Get(o)
+		if !ok || p.State != PatrolRespond || p.Incident != incident || !s.World.Alive(o) {
+			continue
+		}
+		if o == e {
+			slot = n
+		}
+		n++
+	}
+	if n == 0 {
+		n = 1 // not in the table yet: its own slot 0 ring
+	}
+	a := 2 * math.Pi * float64(slot) / float64(n)
+	r := patrolStationRMin + (patrolStationRMax-patrolStationRMin)*patrolPhase(e)/(2*math.Pi)
+	return centre.Add(core.Vec2{X: math.Cos(a) * r, Y: math.Sin(a) * r})
+}
+
 // patrolRespondStep advances one responding patrol toward and into the
 // fight, or sends it home when the raid is over. A belt incident (the
 // celestial entity of an occupied high-sec belt) is a sweep instead, and a
@@ -1960,12 +1994,16 @@ func (s *Sim) patrolRespondStep(e ecs.Entity, p *Patrol, ai *NpcAI, sec string) 
 		return
 	}
 	if bestD > trafficPatrolEngageRange {
-		// The sortie warps to the INCIDENT (the ambushed hauler's position),
-		// not to a live raider: a raider mid-warp-in moves faster than any
-		// lock and would drag the patrol into stale-point hop chasing. The
-		// raiders land on the same fight grid, so the first warp closes the
-		// distance to the engagement range in one align + tunnel.
-		if ip, ok := s.posOf(p.Incident); ok && s.time >= p.Next && s.warpToPoint(e, ip) {
+		// The sortie warps to the patrol's STATION on the ring around the
+		// incident (the ambushed hauler's position), not to a live raider: a
+		// raider mid-warp-in moves faster than any lock and would drag the
+		// patrol into stale-point hop chasing. The ring spreads the wing so
+		// ten hulls do not land on one point; the raiders land on the same
+		// fight grid, so the first warp still closes to engagement range in
+		// one align + tunnel (the ring is well inside it). warpToPoint lands
+		// exactly on the station, and the hold below keeps the ship there.
+		if ip, ok := s.posOf(p.Incident); ok && s.time >= p.Next &&
+			s.warpToPoint(e, s.patrolStation(e, p.Incident, ip)) {
 			p.Next = s.time + trafficWarpRetrySec
 		}
 		return
@@ -2057,7 +2095,10 @@ func (s *Sim) patrolMinerStep(e ecs.Entity, p *Patrol, ai *NpcAI) {
 		return
 	}
 	if ep.Dist(mp) > trafficPatrolEngageRange {
-		if s.warpToPoint(e, mp) {
+		// Warp to the wing slot on the ring around the barge: the wing holds
+		// a formation over the miner, never a stack on its hull. The ring is
+		// inside the engage range, so the rats stay in reach.
+		if s.warpToPoint(e, s.patrolStation(e, p.Incident, mp)) {
 			p.Next = s.time + trafficWarpRetrySec
 		}
 		return
