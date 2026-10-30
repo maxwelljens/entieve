@@ -63,6 +63,11 @@ type winLayout struct {
 	// bump: an absent map is the measured default, which is exactly what a
 	// v3 file written before it means.
 	Tables map[string]map[string]widgets.ColumnPref `json:"tables,omitempty"`
+	// Filter is a window's tick-box state (the overview's per-kind Show and
+	// Colour switches), absent while every kind is at its default — so a
+	// player who never opened the filter window writes no bytes, and an
+	// absent map is exactly that state.
+	Filter uikit.OvFilter `json:"filter,omitempty"`
 }
 
 // layoutFile is the sidecar document.
@@ -92,15 +97,29 @@ type coreLayoutEntry struct {
 	win    func(*uikit.Kit) *widget.Window
 	tables func(*uikit.Kit) []*widgets.Table
 	open   bool
+	// filter/setFilter are the row's tick-box state accessor pair (the
+	// overview's kind filters); nil rows persist none.
+	filter    func(*uikit.Kit) uikit.OvFilter
+	setFilter func(*uikit.Kit, uikit.OvFilter)
 }
 
 var coreLayout = []coreLayoutEntry{
 	{
 		name: "overview", win: (*uikit.Kit).OverviewWindow, open: true,
-		tables: func(k *uikit.Kit) []*widgets.Table { return []*widgets.Table{k.OverviewTable()} },
+		tables:    func(k *uikit.Kit) []*widgets.Table { return []*widgets.Table{k.OverviewTable()} },
+		filter:    (*uikit.Kit).OverviewFilter,
+		setFilter: (*uikit.Kit).SetOverviewFilter,
 	},
 	{name: "selected", win: (*uikit.Kit).SelectedWindow, open: true},
 	{name: "infowin", win: (*uikit.Kit).InfoWindow, open: false},
+}
+
+// filterEntry is the optional layout facet for a window carrying tick-box
+// state beside its geometry. Rows without it persist none, so no name
+// switch decides who has one.
+type filterEntry interface {
+	Filter() uikit.OvFilter
+	SetFilter(uikit.OvFilter)
 }
 
 // coreEntry adapts a core row to the layoutEntry interface.
@@ -118,6 +137,21 @@ func (c coreEntry) Tables() []*widgets.Table {
 		return nil
 	}
 	return c.e.tables(c.kit)
+}
+
+// Filter/SetFilter are the filterEntry facet: the overview row declares the
+// accessor pair, every other core row declares none and persists none.
+func (c coreEntry) Filter() uikit.OvFilter {
+	if c.e.filter == nil {
+		return nil
+	}
+	return c.e.filter(c.kit)
+}
+
+func (c coreEntry) SetFilter(f uikit.OvFilter) {
+	if c.e.setFilter != nil {
+		c.e.setFilter(c.kit, f)
+	}
 }
 
 func coreLayoutNames() []string {
@@ -196,6 +230,7 @@ func (g *Game) writeLayout() error {
 			Open:   e.PersistOpen(),
 			Splits: splitRatios(e),
 			Tables: tablePrefs(e),
+			Filter: filterState(e),
 		}
 	}
 	return docstore.Versioned(g.layoutPath(), layoutVersion, layoutReadFrom).Save(f)
@@ -285,6 +320,23 @@ func applyTablePrefs(e layoutEntry, prefs map[string]map[string]widgets.ColumnPr
 	}
 }
 
+// filterState is the write side of the tick-box facet: the row's own state,
+// nil (nothing written) when the window has no such facet.
+func filterState(e layoutEntry) uikit.OvFilter {
+	if fe, ok := e.(filterEntry); ok {
+		return fe.Filter()
+	}
+	return nil
+}
+
+// applyFilter is the read side: restore the stored state (absent = every
+// kind at its default).
+func applyFilter(e layoutEntry, f uikit.OvFilter) {
+	if fe, ok := e.(filterEntry); ok {
+		fe.SetFilter(f)
+	}
+}
+
 // applyLayout restores the sidecar over the built-in defaults: geometry
 // (clamped to MinSize and the screen) for every named window present,
 // open state for the toggleable ones, and the scene stack for the help
@@ -347,6 +399,9 @@ func (g *Game) applyLayout(screenW, screenH int) {
 		// The column state (additive, no version bump): a file without it
 		// leaves each table at its measured freeze.
 		applyTablePrefs(entry, saved.Tables)
+		// The tick-box state (additive too): a file without it is every
+		// kind at the default.
+		applyFilter(entry, saved.Filter)
 	}
 	// The help window only exists through its overlay scene (modal + dim
 	// backdrop): sync the stack to the restored flag. The starmap is an

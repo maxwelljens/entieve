@@ -8,6 +8,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -26,12 +27,58 @@ func (r *ovRow) InfoRefOf(cv widgets.ContentView) (widgets.InfoRef, bool) {
 	return widgets.InfoRefFor(cv, r.info.Entity)
 }
 
+// OvFlag is one overview kind's deviations from the default (shown,
+// coloured) — the filter window's two switches. The fields are the OFF
+// switches, so the zero value means "nothing stored" and an absent kind is
+// the default.
+type OvFlag struct {
+	Hidden bool `json:"hidden,omitempty"`
+	Plain  bool `json:"plain,omitempty"`
+}
+
+// OvFilter is the overview's per-kind filter state, keyed by sim kind. Only
+// deviations are held: a kind back at its default drops its entry, so a
+// fresh state serialises to nothing and the layout sidecar stays
+// byte-identical for a player who never opened the filter window.
+type OvFilter map[string]OvFlag
+
+// Shown reports whether kind's rows are listed (the default).
+func (f OvFilter) Shown(kind string) bool { return !f[kind].Hidden }
+
+// Coloured reports whether kind's rows keep their row/icon tint (the
+// default).
+func (f OvFilter) Coloured(kind string) bool { return !f[kind].Plain }
+
+// set writes kind's two switches, dropping the entry when both are default.
+func (f OvFilter) set(kind string, show, colour bool) {
+	if show && colour {
+		delete(f, kind)
+		return
+	}
+	f[kind] = OvFlag{Hidden: !show, Plain: !colour}
+}
+
+// normalizeOvFilter drops entries that spell the default, so a stored file
+// can never make the next write carry dead keys.
+func normalizeOvFilter(f OvFilter) OvFilter {
+	out := OvFilter{}
+	for kind, fl := range f {
+		if fl.Hidden || fl.Plain {
+			out[kind] = fl
+		}
+	}
+	return out
+}
+
 // overview owns the Overview window: a WindowPanel whose body is a
 // Table of the visible grid.
 type overview struct {
 	win  *widget.Window
 	tbl  *widgets.Table
 	rows map[ecs.Entity]*ovRow // persistent row objects keyed by entity
+	// filter is the player's per-kind list state (the cog window's ticks).
+	// Absent kinds are shown and coloured, exactly as before it existed.
+	filter OvFilter
 }
 
 // Env returns this kit's session — the three seams (one Theme, the
@@ -168,7 +215,7 @@ func (k *Kit) unstack(w *widget.Window) {
 
 // buildOverview constructs the Overview window around its Table.
 func (k *Kit) buildOverview() {
-	o := &overview{rows: map[ecs.Entity]*ovRow{}}
+	o := &overview{rows: map[ecs.Entity]*ovRow{}, filter: OvFilter{}}
 	k.ov = o
 
 	tbl := widgets.NewTable(k.Env(), []widgets.Column{
@@ -205,6 +252,8 @@ func (k *Kit) buildOverview() {
 	contents.AddChild(tbl.Container())
 
 	title, _ := theme.NewTitleBar(k.th, "Overview", "")
+	k.ovCog = k.overviewCog()
+	title.AddChild(k.ovCog)
 
 	o.win = widget.NewWindow(
 		widget.WindowOpts.Contents(contents),
@@ -221,6 +270,39 @@ func (k *Kit) buildOverview() {
 		// 409), so the corner placement never overlaps the rack.
 		widget.WindowOpts.Location(image.Rect(theme.Px(8+RailInset), theme.Px(8), theme.Px(388+RailInset), theme.Px(8+409))),
 	)
+}
+
+// overviewCog is the overview title bar's filter door: the manifest's cog
+// glyph ("kind_unknown", Lorc's cog — the same silhouette as the neutral
+// kind fallback) sitting immediately left of the ×. A press on it arms the
+// title drag like the rest of the bar; a click without a drag still opens
+// the window.
+func (k *Kit) overviewCog() *widget.Button {
+	p := k.th.Pal()
+	cog := func(a uint8) *ebiten.Image {
+		return icons.Get("kind_unknown", theme.Px(theme.IconButton), iconColor(p.Dim, a))
+	}
+	btn := widget.NewButton(
+		widget.ButtonOpts.Graphic(&widget.GraphicImage{
+			Idle:     cog(255),
+			Disabled: cog(theme.IconDisabledA),
+		}),
+		widget.ButtonOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(theme.Px(closeBtnH), theme.Px(closeBtnH)),
+			// The × owns the bar's last closeBtnW columns; the cog clears it.
+			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionEnd,
+				VerticalPosition:   widget.AnchorLayoutPositionCenter,
+				Padding:            &widget.Insets{Right: theme.Px(closeBtnW)},
+			}),
+		),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			k.OpenOverviewFilter()
+		}),
+	)
+	tip, _ := widgets.NewTip(k.th, widgets.TooltipModel{Title: "Overview filters"})
+	btn.GetWidget().ToolTips = []*widget.ToolTip{tip}
+	return btn
 }
 
 // overviewSpec is one overview row's declared interactions: Show Info on
@@ -252,22 +334,31 @@ func (k *Kit) overviewSpec(row *ovRow) widgets.RowSpec {
 	return spec
 }
 
-// sync refreshes the rows from the sim: visible grid entities only, with
-// hostile/player tints, then lets the table sort and diff the widgets.
+// sync refreshes the rows from the sim: visible grid entities whose kind is
+// switched on, with hostile/player tints (unless that kind's colour is off),
+// then lets the table sort and diff the widgets. The default filter state
+// keeps every row and tint exactly as it was before the filter existed.
 func (o *overview) sync(k *Kit) {
 	order := make([]widgets.TableRow, 0, 32)
 	for _, info := range k.cv.Grid() {
 		if !info.Visible {
 			continue
 		}
+		// The pilot's own hull is never filtered: KindPlayer is its own kind
+		// and carries no switch (the Ship switch governs KindShip only).
+		if info.Kind != sim.KindPlayer && !o.filter.Shown(info.Kind) {
+			continue
+		}
 		var tint, iconTint color.RGBA
-		switch {
-		case info.Entity == k.cv.Player():
-			tint = widgets.WithA(k.th.Pal().Player, 60)
-			iconTint = k.th.Pal().Info // own ship wears ColInfo
-		case info.Hostile:
-			tint = widgets.WithA(k.th.Pal().Danger, 60)
-			iconTint = k.th.Pal().Danger // hostiles wear ColDanger
+		if o.filter.Coloured(info.Kind) {
+			switch {
+			case info.Entity == k.cv.Player():
+				tint = widgets.WithA(k.th.Pal().Player, 60)
+				iconTint = k.th.Pal().Info // own ship wears ColInfo
+			case info.Hostile:
+				tint = widgets.WithA(k.th.Pal().Danger, 60)
+				iconTint = k.th.Pal().Danger // hostiles wear ColDanger
+			}
 		}
 		row := o.rowFor(info)
 		order = append(order, widgets.TableRow{

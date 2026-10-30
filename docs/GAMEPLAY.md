@@ -236,7 +236,13 @@ like the rest. The **Overview** (top right) and **Selected Item** window
 (top left) are open by default (the rail's Ship entries close and
 reopen them) and draggable — a click in space selects the
 target that **Selected Item** then shows and that every
-`selected`-targeted key acts on. Its action buttons (Approach, Warp,
+`selected`-targeted key acts on. The **cog** in the overview's title bar
+opens its filter window: one **Show** and one **Colour** tick per kind of
+entity (ship, wreck, asteroid, belt, station, gate, anomaly, star, planet,
+moon), where unticking Show leaves that kind out of the list and unticking
+Colour drops its row and icon tint. Your own hull is always listed, nothing
+outside the list (the world, the Selected Item window, your locks) is
+affected, and the switches persist with your saved layout. Its action buttons (Approach, Warp,
 Orbit, Stop, Lock, Dock, Jump, Loot, Mine) act on that selection —
 Dock, Jump and Loot fall back to the nearest station/gate/wreck when the
 selection cannot serve, exactly like `D`/`J`/`L` — and a button greys out
