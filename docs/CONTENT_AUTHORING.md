@@ -39,7 +39,8 @@ content/data/
 │   └── guards.json          # npc-guard-* IDs (security patrol loadouts)
 ├── systems/                 # one system per file, sys-* IDs
 │   ├── solace.json  penumbra.json  gloam.json
-├── contracts/               # mission-board offerings, contract-* IDs
+├── contacts/                # dock-side contacts + their offer pools,
+│   ├── commission.json  manufacturing.json  # contact-* / offer-* IDs
 │   ├── solace.json  penumbra.json
 ├── traffic/                 # living-universe convoys/patrols, one def per system
 │   ├── solace.json  penumbra.json  gloam.json
@@ -64,7 +65,8 @@ All IDs are kebab-case strings, cross-referenced everywhere:
 | NPC (guard) | `npc-guard-` | `npc-guard-patrol`  | global (non-rat NPC loadouts: zero bounty, no loot; traffic patrols) |
 | System      | `sys-`      | `sys-solace`         | global                 |
 | Celestial   | `cel-`      | `cel-haven-rest`     | **unique within its system** (gate `to_cel` resolves inside the destination system; `cel-gate-penumbra` legitimately exists in both `sys-solace` and `sys-gloam`) |
-| Contract    | `contract-` | `contract-solace-cleanup-1` | global            |
+| Contact     | `contact-`  | `contact-jalvrek-charter` | global (a registered extension of the frozen id list) |
+| Offer       | `offer-`    | `offer-jalvrek-kerngrit`  | global (a contact's offer template; also the engine's flattened def) |
 | Traffic     | *(no id)*   | keyed by `system`    | one def per system (`traffic/*.json`) |
 | Recipe      | `rec-`      | `rec-ship-sloop`     | global (frozen once shipped) |
 | World       | `world-`    | `world-showcase`     | global                 |
@@ -75,7 +77,7 @@ extend around them.
 ## File format
 
 Every JSON file under `items/`, `ships/`, `modules/`, `npcs/`, `systems/`,
-`contracts/`, `traffic/`, `recipes/`, `worlds/` may contain **either a single
+`contacts/`, `traffic/`, `recipes/`, `worlds/` may contain **either a single
 object or an array of objects**:
 
 ```json
@@ -158,7 +160,7 @@ Loomfall, Mire Corsairs, Gloam Hierarchy — nor any name the time-depth drift
 retired, see [NAMING.md](lore/NAMING.md#time-depth-drift)). One or two
 sentences, same shape as a ship/module `description`. Shipped NPCs must all
 have one (`TestShippedNpcsCarryDescription`, enforced the same way as the
-contract title/description rule).
+offer prose/description rule).
 
 ## Market orders: the ship-order convention
 
@@ -650,39 +652,58 @@ too with a `detail` that says how to observe it (event names, commands).
 
 ---
 
-## Recipe 8: add a contract (mission board)
+## Recipe 8: add a contact and its offers (the dock)
 
-Contracts are the motivation layer: `undock → accept → do the activity →
-dock at the claim station → euro + standing`. Each contract lives on one
-station's board (`station` = the offering station) and is loaded from
-`content/data/contracts/*.json` (object or array, like every other dir):
+Contacts are the motivation layer: `undock → accept → do the activity →
+dock at the claim station → euro + standing`, with the work DERIVED from
+the world rather than rolled. A contact is one patron's representative at
+one station; its offers are authored tasks whose parameters the sim fills
+from its own state. Everything lives in `content/data/contacts/*.json`
+(object or array, like every other dir):
 
 ```json
 {
-  "id": "contract-solace-cleanup-1",
-  "title": "Belt cleanup",
-  "kind": "kill",
-  "level": 1,
-  "min_standing": 0.0,
+  "id": "contact-jalvrek-charter",
+  "name": "Jalvrek Charter Office",
+  "patron": "charter",
   "station": "cel-haven-rest",
-  "objective": { "target": "npc-rat-scuttler", "count": 1 },
-  "reward": { "credits": 40000, "item": null, "standing_gain": 0.1 },
-  "description": "The Old Works are shadowing the ore haulers out of the Struvok belt. Cull the Scuttler and dock at Jalvrek to collect the bounty office's fee."
+  "min_standing": 0.0,
+  "offers": [
+    {
+      "id": "offer-jalvrek-kerngrit",
+      "title": "Kerngrit order",
+      "kind": "mine",
+      "level": 1,
+      "objective": { "item": "ore-cordite", "count": 400 },
+      "reward": { "credits": 38400, "item": null, "standing_gain": 0.1 },
+      "description": "Jalvrek's refinery needs {count} m³ of raw Kerngrit. Fill the ore hold at the {system} belt and dock to turn the order in.",
+      "source": { "kind": "stock", "item": "ore-cordite", "target": 2400, "base": 100, "max": 1000 }
+    }
+  ]
 }
 ```
 
-Fields:
+Contact fields:
+
+| Field | Meaning |
+|-------|---------|
+| `patron` | `commission` \| `charter` \| `corporation` (who the contact answers to) |
+| `station` | the station the contact is posted at (must exist, kind `station`) |
+| `min_standing` | the one career standing the contact gates on (all its offers share it) |
+| `offers` | ≥ 1 authored offer templates |
+
+Offer fields (the task fields are the old contract def's, unchanged):
 
 | Field | Meaning |
 |-------|---------|
 | `kind` | `kill` \| `deliver` \| `mine` (exactly three kinds) |
-| `level` | board tier, `>= 1` (flavor + doc convention) |
-| `min_standing` | player career standing required to accept |
-| `station` | offering station celestial ID — the board (must exist, kind `station`) |
-| `objective` | per-kind block (below) |
-| `reward.credits` | paid to the wallet on claim (must be `>= 0`) |
-| `reward.item` / `reward.qty` | optional bonus item granted to the station hangar (`qty >= 1` when set) |
+| `level` | tier, `>= 1` (flavor + doc convention) |
+| `objective` | per-kind block (below); the authored count is the fallback and the reward-calibration count |
+| `reward.credits` | paid to wallet on claim (must be `>= 0`); scaled with a derived count |
+| `reward.item` / `reward.qty` | optional material reward (a rare module, loot, a requisition right) to the station hangar |
 | `reward.standing_gain` | career standing credited on claim |
+| `description` | the contact's own words, with slots: `{count}` `{system}` `{station}` `{item}` `{caste}` `{urgency}` |
+| `source` | how the sim derives the live parameters (below) |
 
 Objective per kind (the validator rejects anything else):
 
@@ -691,35 +712,51 @@ Objective per kind (the validator rejects anything else):
 - `deliver`: `{"item": "<item-id>", "count": <m³>, "destination": "<station cel-id>"}` —
   dock at the destination carrying at least `count` m³ of `item` in the hold
   (count must be a whole number of units: `count / volume` is an integer);
-  the cargo is consumed on claim. Destination must exist and differ from
-  `station`.
+  the cargo is consumed on claim and **lands on the destination's book as
+  requisition stock**. Destination must exist and differ from `station`.
 - `mine`: `{"item": "<ore-id>", "count": <m³>}` — `count` m³ of that ore
-  mined into the hold while the contract is accepted (transfers don't count).
+  mined into the hold while the offer is accepted (transfers don't count).
 
-Lifecycle: `offered` (board) → `accepted` (`CmdAcceptMission`, docked at the
-offering station with standing ≥ `min_standing`) → `progress` → `ready` →
+Derivation sources — the offer's parameters, its expiry rule and its prose
+slots all come from ONE sim read, recomputed on every evaluation (no RNG,
+no wall-clock, no persistence):
+
+| `source.kind` | Signal | Live while | Derives |
+|---------------|--------|-----------|---------|
+| `stock` | the claim station's requisition stock of `source.item` (resting asks, in the objective's own unit) | stock < `target` | count = the shortfall, clamped to `base..max`; `{station}` = the destination (deliver) or the contact's station (mine) |
+| `rats` | live Old Works hulls of the objective class in `source.system` | at least one alive | count stays authored; `{system}` = the system |
+| `war-supply` | the nearest front with a supply gap (charter-held: the meter; works-held: the room to the threshold) | gap > 0 | count = the gap's worth of the item, clamped `base..max`; destination = the front's station (the contact's own on a works-held front); completing it credits that front |
+| `war-clear` | a charter-held front at or past half its meter (overrun) | meter ≥ half | count = the works' holding profile, clamped `base..max`; caste re-drawn by the squeeze; `{system}` names the front |
+
+`{urgency}` is `critical` / `urgent` / `standing` from the gap's fraction.
+A closed gap simply stops producing the offer — nothing is persisted before
+accept, so there is no timer and no penalty. Accepted work materializes the
+derived def into the save, so it survives the gap closing and still pays.
+
+Lifecycle: `offered` (derived) → `accepted` (`CmdAcceptMission`, docked at
+the contact's station, standing ≥ `min_standing`) → `progress` → `ready` →
 `completed` — auto-claimed the moment you dock at the **claim station**
-(offering station for kill/mine, `objective.destination` for deliver), which
-pays `reward.credits`, grants standing and consumes deliver cargo — or
-`abandoned` (`CmdAbandonMission`, again from the offering station). No
-expiry; completed/abandoned contracts may be re-accepted (repeatable board
-jobs). Refusals emit `EvMission` phase `refused`.
+(the contact's station for kill/mine work, `objective.destination` for a
+delivery), which pays `reward.credits`, grants standing and consumes the
+delivered cargo — or `abandoned` (`CmdAbandonMission`, again from the
+contact's station). Refusals emit `EvMission` phase `refused`.
 
 ### Payout ratio table (the calibration contract)
 
 Rewards are derived from live economy values, never vibes. The ratio bands
 below are pinned by `content.TestContractPayoutRatios`; future mission
-content must land inside them:
+content must land inside them (a derived count scales the authored reward
+linearly, so the per-unit calibration holds):
 
-| Kind | Reference value | Payout rule | Shipped contracts |
-|------|-----------------|-------------|-------------------|
-| `kill` | `count × (bounty + Σ chance × avg_qty × base_price)` per target (bounty + expected loot) | **2.0–3.0 × reference** | cleanup-1: 1 × (7,500 + 7,350) = 14,850 → **40,000** (2.69×); den-hunt-1: 1 × (65,000 + 31,125) = 96,125 → **240,000** (2.50×) |
-| `mine` | `count(m³) × ore base_price` | **1.9–2.1 × reference** (2.0× ore premium) | cordite-1: 400 × 48 = 19,200 → **38,400** (2.00×); lucidite-1: 500 × 85 = 42,500 → **85,000** (2.00×) |
-| `deliver` | `units × item base_price`, `units = count(m³) / volume` | **1.5 × cargo value + 50,000 × gate jumps** (offer system → destination system) | supply-run-1: 200 × 120 = 24,000, 1 jump → 1.5 × 24,000 + 50,000 = **86,000** |
+| Kind | Reference value | Payout rule | Shipped offers |
+|------|-----------------|-------------|----------------|
+| `kill` | `count × (bounty + Σ chance × avg_qty × base_price)` per target (bounty + expected loot) | **2.0–3.0 × reference** | cleanup: 1 × (7,500 + 7,350) = 14,850 → **40,000** (2.69×); den-hunt: 1 × (65,000 + 31,125) = 96,125 → **240,000** (2.50×) |
+| `mine` | `count(m³) × ore base_price` | **1.9–2.1 × reference** (2.0× ore premium) | kerngrit: 400 × 48 = 19,200 → **38,400** (2.00×); lucidite: 500 × 85 = 42,500 → **85,000** (2.00×) |
+| `deliver` | `units × item base_price`, `units = count(m³) / volume` | **1.5 × cargo value + 50,000 × gate jumps** (offering station → destination system) | supply-run: 200 × 120 = 24,000, 1 jump → 1.5 × 24,000 + 50,000 = **86,000** |
 
-Standing conventions: level-1 boards carry `min_standing: 0.0` and
-`standing_gain: 0.10`; level-2 boards gate at `min_standing: 0.2` (two
-level-1 completions) and pay `standing_gain: 0.15`. Expected loot is
+Standing conventions: level-1 contacts gate at `min_standing: 0.0` and pay
+`standing_gain: 0.10`; level-2 contacts gate at `min_standing: 0.2` (two
+level-1 completions) and pay `standing_gain: 0.12–0.15`. Expected loot is
 `chance × (min_qty+max_qty)/2 × base_price` summed over the rat's loot
 table.
 
@@ -856,7 +893,7 @@ means knowing which knobs are data and which are sim.
 | Tick-0 sides | the system's `security` tier: `high`/`low` charter, `null` Works | data (derived) |
 | The Works' holding force and fleets | authored NPCs with `"faction": "Old Works"`, ranked by total hit points | data |
 | War demand (what the fleets buy) | module `kind` (weapons, EWAR, tank) + every `ammo`/`charge` item | data, but a new module **kind** needs `warKind` in `sim/war.go` |
-| War contracts | `content/data/contracts/*.json`, `station` = a charter board | data |
+| War offers | `content/data/contacts/*.json`, a `commission` contact with a `war-supply`/`war-clear` source | data |
 | War news wording | `sim/war.go` (wave 2 polishes) | sim |
 | Whether a world has the war | `warWorlds` in `sim/war.go` (`world-default` only) | sim |
 
@@ -873,24 +910,28 @@ definition, name and loot stay as authored). A dedicated fleet hull (own
 `ship-*`, own NPC row) would need a sim change; flag it as a design
 decision, do not fake it with a second Works faction.
 
-**War contracts.** The board model is the ordinary one (Recipe 8): the
-three kinds are `kill`, `deliver` and `mine`, and a contract's flavour text
-may cite the Commission (attribution only). Two limits to author around:
+**War offers.** The contact model is the ordinary one (Recipe 8), with two
+derived sources: `war-supply` names the front a materiel haul serves and
+credits that front's meter on completion, and `war-clear` names a front
+whose meter is at or past half (the Works overrunning it). The offer's
+flavour text may cite the Commission (attribution only). Two limits to
+author around:
 
 - a **kill** objective counts kills of its exact `target` NPC class
   anywhere, not "at the front" — the objective model has no system
-  predicate, so front location is flavour text and payout calibration, not
-  a gate;
+  predicate, so the front is prose, the squeeze-derived caste and the
+  count, not a gate;
 - a **deliver** objective needs a real station at the destination, and a
-  system that falls turns its stations into remnants whose contract desk
-  stops accepting new work — a war contract offered at a front station can
-  therefore go dark mid-campaign, which is intended, but do not make it the
-  only path to a reward.
+  system that falls turns its stations into remnants whose charter desk
+  stops accepting new work — a war offer at a front contact can therefore
+  go dark mid-campaign, which is intended, but do not make it the only
+  path to a reward (a works-held front destinations the contact's own
+  station, so the haul still lands).
 
-Procurement is not a contract: the war's standing bids rest on **every**
+Procurement is not an offer: the war's standing bids rest on **every**
 charter-held station book (so a military-good sell anywhere in charter space
 sells into the war), they are withdrawn and re-priced every sim hour, and
-fills are consumed. A contract that asks the player to *supply* the war
+fills are consumed. An offer that asks the player to *supply* the war
 should therefore haul materiel to a front station or sell into a bid —
 never rely on a resting war order surviving between beats.
 
@@ -1014,9 +1055,9 @@ ten-minute families are deliberate pacing, not a per-recipe knob: keep a
 new module near 180 s and a new hull near 600 s so the ladder reads at a
 glance.
 
-Deliver contracts may demand **module ids** as cargo (modules trade as
-whole units, no volume), which is how the manufacturing contracts
-(`contracts/manufacturing.json`) ask for manufactured goods; ammo and
+Deliver offers may demand **module ids** as cargo (modules trade as
+units, no volume), which is how the manufacturing contacts
+(`contacts/manufacturing.json`) ask for manufactured goods; ammo and
 weapon ids are not stable targets for them.
 
 ## Checklist before you finish
@@ -1030,7 +1071,7 @@ weapon ids are not stable targets for them.
 4. **Cross-references resolve**: gates both ways, fits exist and fit the
    hull (high→mid→low order, mounts and class quotas), belts reference ores, spawns reference NPCs,
    loot/market/cargo reference existing items-or-ships-or-modules,
-   weapon `ammo_class` matches some ammo/charge, contract targets/destinations
+   weapon `ammo_class` matches some ammo/charge, contact/offer targets/destinations
    are real NPCs/items/stations; traffic endpoints/hulls/cargo/raiders
    resolve inside their system (Recipe 9); every recipe product resolves,
    its inputs are minerals, and every ship/module/ammo/charge product is
@@ -1041,7 +1082,7 @@ weapon ids are not stable targets for them.
    200k–400k; modules 10k–400k; minerals 5–60/unit; ores 20–120/unit;
    bounties 5k–250k; resists in [0,1); refine yields in (0,1] summing ≤ 1;
    weapons `shot_time > 0` with non-zero damage; active modules
-   `activation_time > 0`; contract rewards inside the Recipe 8 payout
+   `activation_time > 0`; offer rewards inside the Recipe 8 payout
    ratio table; traffic cadences/probabilities inside the
    Recipe 9 calibration tables; recipe material cost inside the 55–75 %
    envelope with hull recipes costing more than module recipes

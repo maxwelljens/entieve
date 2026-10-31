@@ -444,6 +444,11 @@ type ContractReward struct {
 // ContractDef is one mission-board offering, pinned to the station whose
 // board lists it (Station). Kill/mine contracts claim at Station; deliver
 // contracts claim at Objective.Destination.
+//
+// Since the contacts tranche it is also the shape of an offer: a contact's
+// authored offer template is one of these (flattened into Content.Contracts,
+// min_standing inherited from its contact), and the sim hands the engine a
+// derived copy with its parameters filled.
 type ContractDef struct {
 	ID          ContractID        `json:"id"`
 	Title       string            `json:"title"`
@@ -454,6 +459,61 @@ type ContractDef struct {
 	Objective   ContractObjective `json:"objective"`
 	Reward      ContractReward    `json:"reward"`
 	Description string            `json:"description"`
+}
+
+// ContactID is a dock-side mission-giver's id ("contact-" prefix, kebab-case,
+// globally unique). A contact represents one patron at one station.
+type ContactID string
+
+// Contact patrons: who the contact works for.
+const (
+	PatronCommission  = "commission"  // the Svaz's war commission
+	PatronCharter     = "charter"     // the Wild Fields Charter Authority
+	PatronCorporation = "corporation" // a manufacturing house
+)
+
+// OfferSource says how the sim derives an offer's live parameters from world
+// state. It is the offer's expiry rule too: a closed gap stops producing the
+// offer, so nothing is ever persisted before accept.
+//
+//	stock       a station's requisition stock of Item is below Target
+//	            (deliver: the objective destination; mine: the contact's
+//	            station). Count = the shortfall, in the objective's unit.
+//	rats        live Old Works hulls of the objective's class work System.
+//	            The offer lives while at least one is alive; count is authored.
+//	war-supply  a front carries a supply gap. Objective.Destination becomes the
+//	            front's station (the contact's own when the front is works-held);
+//	            count is the gap's worth of the objective item.
+//	war-clear   a charter-held front is overrun (meter at or past half). The
+//	            objective's caste is re-drawn by the squeeze and count by the
+//	            works' holding profile; prose names the front.
+type OfferSource struct {
+	Kind   string   `json:"kind"`
+	Item   ItemID   `json:"item,omitempty"`
+	System SystemID `json:"system,omitempty"`
+	Target int      `json:"target,omitempty"`
+	Base   int      `json:"base,omitempty"`
+	Max    int      `json:"max,omitempty"`
+}
+
+// ContactOffer is one authored offer of a contact's pool: the task template
+// (its own ContractDef fields inline) plus the derivation source and the
+// prose slots.
+type ContactOffer struct {
+	ContractDef
+	Source OfferSource `json:"source"`
+}
+
+// ContactDef is one dock-side mission-giver: a patron's representative at one
+// station, gated by the player's single career standing, with a pool of
+// offers whose live parameters the sim derives.
+type ContactDef struct {
+	ID          ContactID      `json:"id"`
+	Name        string         `json:"name"`
+	Patron      string         `json:"patron"`
+	Station     CelID          `json:"station"`
+	MinStanding float64        `json:"min_standing"`
+	Offers      []ContactOffer `json:"offers"`
 }
 
 // RouteCargo is the shipment carried by one traffic route.
@@ -529,6 +589,7 @@ type Content struct {
 	NPCs      map[NpcID]*NpcDef
 	Systems   map[SystemID]*SystemDef
 	Contracts map[ContractID]*ContractDef
+	Contacts  map[ContactID]*ContactDef
 	Traffic   map[SystemID]*TrafficDef
 	Universe  *UniverseDef
 	Worlds    map[WorldID]*WorldDef
@@ -572,19 +633,26 @@ func (c *Content) GuardFor(hull ShipID) (*NpcDef, bool) {
 	return nil, false
 }
 
-// Contract returns the contract def for id.
+// Contract returns the offer template for id (a contact offer's flattened
+// def, or a test fixture's authored contract).
 func (c *Content) Contract(id ContractID) (*ContractDef, bool) {
 	d, ok := c.Contracts[id]
 	return d, ok
 }
 
-// Board returns the contracts offered on the given station's mission board,
-// sorted by ID (deterministic order for UI and tests).
-func (c *Content) Board(cel CelID) []*ContractDef {
-	var out []*ContractDef
-	for _, id := range keys(c.Contracts) {
-		if c.Contracts[id].Station == cel {
-			out = append(out, c.Contracts[id])
+// Contact returns the contact def for id.
+func (c *Content) Contact(id ContactID) (*ContactDef, bool) {
+	d, ok := c.Contacts[id]
+	return d, ok
+}
+
+// ContactsAt returns the contacts stationed at cel, sorted by id (the
+// canonical order the dock view lists them in).
+func (c *Content) ContactsAt(cel CelID) []*ContactDef {
+	var out []*ContactDef
+	for _, id := range keys(c.Contacts) {
+		if c.Contacts[id].Station == cel {
+			out = append(out, c.Contacts[id])
 		}
 	}
 	return out

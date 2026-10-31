@@ -233,7 +233,7 @@ func TestRailGrayedClicksDoNothing(t *testing.T) {
 	if g.host.IsOpen(idServices) {
 		t.Fatal("fixture: services view open in space")
 	}
-	click(t, g, g.rail.Button("Station Services"))
+	click(t, g, g.rail.Button("Contacts"))
 	if g.host.IsOpen(idServices) {
 		t.Error("grayed services entry toggled its window in space")
 	}
@@ -246,7 +246,7 @@ func TestRailGrayedClicksDoNothing(t *testing.T) {
 	if g.host.IsOpen(idScanner) {
 		t.Error("grayed scanner entry toggled its window while docked")
 	}
-	if g.rail.Button("Station Services").GetWidget().Disabled {
+	if g.rail.Button("Contacts").GetWidget().Disabled {
 		t.Error("services entry grayed while docked")
 	}
 	// The core windows are space chrome too: their entries gray with

@@ -1,6 +1,7 @@
 package game
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
@@ -45,17 +46,34 @@ func click(t *testing.T, g *Game, btn *widget.Button) {
 }
 
 // stationBoard returns the docked station's mounted board panel.
-func stationBoard(t *testing.T, g *Game) *uikit.StationBoard {
+func stationBoard(t *testing.T, g *Game) *uikit.ContactsPanel {
 	t.Helper()
-	b := bodyOf[*uikit.StationBoard](g.host, idServices)
+	b := bodyOf[*uikit.ContactsPanel](g.host, idServices)
 	if b == nil {
 		t.Fatal("station board panel missing")
 	}
 	return b
 }
 
-// findRow returns the board row with the given contract id.
-func findRow(t *testing.T, rows []uikit.BoardRow, id content.ContractID) uikit.BoardRow {
+// cappedMissions builds n accepted work rows (distinct ids, materialized
+// defs) to drive the board's active-section caps without running combat.
+func cappedMissions(n int) []sim.MissionState {
+	out := make([]sim.MissionState, 0, n)
+	for i := 0; i < n; i++ {
+		id := content.ContractID(fmt.Sprintf("offer-test-%d", i))
+		def := &content.ContractDef{
+			ID: id, Title: fmt.Sprintf("Work %d", i), Kind: content.ContractMine,
+			Station: "cel-haven-rest", Level: 1,
+			Objective: content.ContractObjective{Item: "ore-cordite", Count: 10},
+			Reward:    content.ContractReward{Credits: 1000, StandingGain: 0.1},
+		}
+		out = append(out, sim.MissionState{ID: id, Def: def})
+	}
+	return out
+}
+
+// findRow returns the board row with the given offer id.
+func findRow(t *testing.T, rows []uikit.ContactRow, id content.ContractID) uikit.ContactRow {
 	t.Helper()
 	for _, r := range rows {
 		if r.ID == id {
@@ -63,7 +81,7 @@ func findRow(t *testing.T, rows []uikit.BoardRow, id content.ContractID) uikit.B
 		}
 	}
 	t.Fatalf("no board row for %s", id)
-	return uikit.BoardRow{}
+	return uikit.ContactRow{}
 }
 
 // setMissions swaps the sim's accepted contracts (save surgery) so tests
@@ -87,13 +105,7 @@ func setMissions(t *testing.T, g *Game, ms ...sim.MissionState) {
 func TestStationColumnClearsLog(t *testing.T) {
 	for _, size := range [][2]int{{1280, 720}, {1024, 700}} {
 		g := dockedShowcaseGame(t, size[0], size[1])
-		setMissions(t, g,
-			sim.MissionState{ID: "contract-solace-cleanup-1"},
-			sim.MissionState{ID: "contract-solace-cordite-1"},
-			sim.MissionState{ID: "contract-solace-supply-run-1"},
-			sim.MissionState{ID: "contract-penumbra-den-hunt-1"},
-			sim.MissionState{ID: "contract-penumbra-lucidite-1"},
-		)
+		setMissions(t, g, cappedMissions(5)...)
 		g.syncMounts()
 		pump(t, g, size[0], size[1])
 

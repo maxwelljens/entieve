@@ -1,0 +1,55 @@
+[
+  {
+    "id": "contact-commission-liaison",
+    "name": "Commission Liaison",
+    "patron": "commission",
+    "station": "cel-doki",
+    "min_standing": 0.15,
+    "offers": [
+      {
+        "id": "offer-war-materiel",
+        "title": "Materiel for the front",
+        "kind": "deliver",
+        "level": 2,
+        "objective": {
+          "item": "mod-artillery-m",
+          "count": 3,
+          "destination": "cel-penumbra-port"
+        },
+        "reward": {
+          "credits": 1580000,
+          "item": null,
+          "standing_gain": 0.15
+        },
+        "description": "The Commission buys guns at the front. {count} Medium Artillery to {station} — {urgency}: the {system} front needs them.",
+        "source": {
+          "kind": "war-supply",
+          "base": 1,
+          "max": 6
+        }
+      },
+      {
+        "id": "offer-war-clear",
+        "title": "Clear the front",
+        "kind": "kill",
+        "level": 2,
+        "objective": {
+          "target": "npc-rat-marauder",
+          "count": 2
+        },
+        "reward": {
+          "credits": 520000,
+          "item": "loot-hierarch-crest",
+          "standing_gain": 0.12,
+          "qty": 1
+        },
+        "description": "The {system} front is overrun: {count} {caste} hold the belt. Kill them, dock at {station}, and the Commission settles.",
+        "source": {
+          "kind": "war-clear",
+          "base": 2,
+          "max": 4
+        }
+      }
+    ]
+  }
+]

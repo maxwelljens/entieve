@@ -316,7 +316,7 @@ func TestLedgerRepairsAndBountiesAndContracts(t *testing.T) {
 		killOne(t, s, "npc-rat-scuttler")
 	}
 	got = runRecorded(t, s, 1, func() { dockNamed(t, s, "Haven Rest") })
-	if !strings.Contains(got[0].What, "Contract — Test Cleanup") || got[0].Amount != 30000 {
+	if !strings.Contains(got[0].What, "Contact — Test Cleanup") || got[0].Amount != 30000 {
 		t.Errorf("payout row = %+v, want 30,000.00 €", got[0])
 	}
 	if got[0].Where != "Haven Rest" {

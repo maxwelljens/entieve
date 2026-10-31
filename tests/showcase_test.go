@@ -479,7 +479,7 @@ func checkWarRemnant(c *content.Content) bool {
 		// procureCadence), so the lever lands just before the next beat and
 		// the desk is probed right after it.
 		script.Step{AtTick: beat - 60, Action: "war-push", System: "sys-penumbra", Value: 1.2},
-		script.Step{AtTick: beat + 120, Action: "accept-mission", Mission: "contract-penumbra-den-hunt-1"},
+		script.Step{AtTick: beat + 120, Action: "accept-mission", Mission: "offer-hauvnok-lucidite"},
 		script.Step{AtTick: beat + 180, Action: "sell", Item: "ore-cordite", Qty: 10},
 	)
 	s, err := sim.New(c, wd, 42)

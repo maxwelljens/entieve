@@ -449,7 +449,7 @@ func TestFrameDrainsSimEventSameFrame(t *testing.T) {
 		t.Fatalf("fixture: %d missions already accepted", n)
 	}
 	before := len(bodyOf[*uikit.LogPanel](g.host, idLog).Lines())
-	g.s.Queue(sim.CmdAcceptMission{ID: "contract-solace-cordite-1"})
+	g.s.Queue(sim.CmdAcceptMission{ID: "offer-jalvrek-kerngrit"})
 
 	// Whichever frame's sim step runs the queued command must also drain
 	// its event into the log inside the same call.
@@ -467,7 +467,7 @@ func TestFrameDrainsSimEventSameFrame(t *testing.T) {
 			t.Fatalf("mission accepted but its event never reached the log in that frame (%d → %d lines)",
 				before, len(lines))
 		}
-		if joined := strings.Join(lines[before:], "\n"); !strings.Contains(joined, "Contract accepted:") {
+		if joined := strings.Join(lines[before:], "\n"); !strings.Contains(joined, "Offer accepted:") {
 			t.Errorf("log lines added by the frame do not carry the event: %q", lines[len(lines)-1])
 		}
 	}

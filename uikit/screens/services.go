@@ -9,7 +9,7 @@ import (
 	"slices"
 )
 
-// The station services row — the header of the station board, the one
+// The station services row — the header of the contacts view, the one
 // window docking opens. It is the docked station's face: the docked-at
 // identity (station name · system), an Undock button, a Cargo button and
 // one button per service the station actually offers — buttons the station
@@ -18,7 +18,7 @@ import (
 // emits a typed intent (Undock, Toggle{Screen}) on the ActionSink; the
 // host maps the toggles onto its window table.
 //
-// The contract board this row heads lives beside it in stationboard.go:
+// The contacts panel this row heads lives beside it in contacts.go:
 // the panel composes the row first, then the two sections, so the row is
 // sized like the strip header it replaced and the docked column's content
 // height — and therefore its clearance over the log — is unchanged.

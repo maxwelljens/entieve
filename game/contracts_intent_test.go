@@ -16,15 +16,15 @@ func TestStationIntentReachesSim(t *testing.T) {
 	var got []sim.Command
 	g.enqueue = func(c sim.Command) { got = append(got, c) }
 
-	g.Do(widgets.Accept{Contract: "contract-solace-cleanup-1"})
-	g.Do(widgets.Abandon{Contract: "contract-solace-cleanup-1"})
+	g.Do(widgets.Accept{Contract: "offer-hovzan-cleanup"})
+	g.Do(widgets.Abandon{Contract: "offer-hovzan-cleanup"})
 	if len(got) != 2 {
 		t.Fatalf("intents enqueued %d commands, want 2", len(got))
 	}
-	if cmd, ok := got[0].(sim.CmdAcceptMission); !ok || cmd.ID != "contract-solace-cleanup-1" {
-		t.Errorf("Accept enqueued %#v, want CmdAcceptMission{contract-solace-cleanup-1}", got[0])
+	if cmd, ok := got[0].(sim.CmdAcceptMission); !ok || cmd.ID != "offer-hovzan-cleanup" {
+		t.Errorf("Accept enqueued %#v, want CmdAcceptMission{offer-hovzan-cleanup}", got[0])
 	}
-	if cmd, ok := got[1].(sim.CmdAbandonMission); !ok || cmd.ID != "contract-solace-cleanup-1" {
-		t.Errorf("Abandon enqueued %#v, want CmdAbandonMission{contract-solace-cleanup-1}", got[1])
+	if cmd, ok := got[1].(sim.CmdAbandonMission); !ok || cmd.ID != "offer-hovzan-cleanup" {
+		t.Errorf("Abandon enqueued %#v, want CmdAbandonMission{offer-hovzan-cleanup}", got[1])
 	}
 }

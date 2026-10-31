@@ -129,47 +129,61 @@ func TestDescribeWantsOneArg(t *testing.T) {
 	}
 }
 
-// TestDescribeContract: contract-* ids resolve to their full definition —
-// id, kind, level, station, objective, reward and standing requirement.
-func TestDescribeContract(t *testing.T) {
+// TestDescribeContact: contact-* ids resolve to the contact (patron, station,
+// offer pool) and offer-* ids to the offer template (id, kind, level,
+// station, objective, reward, standing requirement).
+func TestDescribeContact(t *testing.T) {
 	var out, errOut bytes.Buffer
-	code := run([]string{"describe", "contract-solace-cleanup-1"}, &out, &errOut)
+	code := run([]string{"describe", "contact-jalvrek-charter"}, &out, &errOut)
 	if code != 0 {
-		t.Fatalf("describe contract: exit = %d, stderr = %q", code, errOut.String())
+		t.Fatalf("describe contact: exit = %d, stderr = %q", code, errOut.String())
+	}
+	var ct map[string]any
+	if err := json.Unmarshal(out.Bytes(), &ct); err != nil {
+		t.Fatalf("describe contact: invalid JSON: %v", err)
+	}
+	for _, key := range []string{"id", "name", "patron", "station", "min_standing", "offers"} {
+		if _, ok := ct[key]; !ok {
+			t.Errorf("describe contact: missing %q in %s", key, out.String())
+		}
+	}
+
+	out.Reset()
+	code = run([]string{"describe", "offer-hovzan-cleanup"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("describe offer: exit = %d, stderr = %q", code, errOut.String())
 	}
 	var def map[string]any
 	if err := json.Unmarshal(out.Bytes(), &def); err != nil {
-		t.Fatalf("describe contract: invalid JSON: %v", err)
+		t.Fatalf("describe offer: invalid JSON: %v", err)
 	}
 	for _, key := range []string{"id", "kind", "level", "station", "objective", "reward", "min_standing"} {
 		if _, ok := def[key]; !ok {
-			t.Errorf("describe contract: missing %q in %s", key, out.String())
+			t.Errorf("describe offer: missing %q in %s", key, out.String())
 		}
-	}
-	if got, want := def["id"], "contract-solace-cleanup-1"; got != want {
-		t.Errorf("id = %v, want %v", got, want)
 	}
 	if got, want := def["kind"], "kill"; got != want {
 		t.Errorf("kind = %v, want %v", got, want)
 	}
-	// Near-miss suggestions cover contracts too.
+	// Near-miss suggestions cover offers too.
 	errOut.Reset()
-	if code := run([]string{"describe", "contract-solace"}, &out, &errOut); code != 1 {
-		t.Fatalf("partial contract id: exit = %d, want 1", code)
+	if code := run([]string{"describe", "offer-hovzan"}, &out, &errOut); code != 1 {
+		t.Fatalf("partial offer id: exit = %d, want 1", code)
 	}
-	if !strings.Contains(errOut.String(), "contract-solace-cleanup-1") {
-		t.Errorf("stderr %q missing contract suggestions", errOut.String())
+	if !strings.Contains(errOut.String(), "offer-hovzan-cleanup") {
+		t.Errorf("stderr %q missing offer suggestions", errOut.String())
 	}
 }
 
-// TestValidateCountsContracts: the summary counts contracts alongside the
-// other content kinds.
-func TestValidateCountsContracts(t *testing.T) {
+// TestValidateCountsContacts: the summary counts contacts and offers
+// alongside the other content kinds.
+func TestValidateCountsContacts(t *testing.T) {
 	var out, errOut bytes.Buffer
 	if code := run([]string{"validate"}, &out, &errOut); code != 0 {
 		t.Fatalf("validate exit = %d, stderr = %q", code, errOut.String())
 	}
-	want := fmt.Sprintf("contracts: %d", len(content.MustLoad().Contracts))
+	c := content.MustLoad()
+	want := fmt.Sprintf("contacts: %d, offers: %d", len(c.Contacts), len(c.Contracts))
 	if !strings.Contains(out.String(), want) {
 		t.Errorf("output %q missing %q", out.String(), want)
 	}
@@ -187,9 +201,9 @@ func TestReportStandingAndMissions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sim.New: %v", err)
 	}
-	// Dock, accept a contract, then raise standing (save surgery).
+	// Dock, accept an offer, then raise standing (save surgery).
 	s.Docked.Set(s.Player(), sim.Docked{At: "cel-haven-rest"})
-	s.Queue(sim.CmdAcceptMission{ID: "contract-solace-cordite-1"})
+	s.Queue(sim.CmdAcceptMission{ID: "offer-jalvrek-kerngrit"})
 	s.Step()
 	sv, err := s.Snapshot()
 	if err != nil {
@@ -200,7 +214,7 @@ func TestReportStandingAndMissions(t *testing.T) {
 		t.Fatalf("Restore: %v", err)
 	}
 	res := &script.Result{Events: []sim.Event{{
-		Kind: sim.EvMission, Phase: sim.MissionCompleted, ID: "contract-solace-cordite-1",
+		Kind: sim.EvMission, Phase: sim.MissionCompleted, ID: "offer-jalvrek-kerngrit",
 	}}}
 
 	var buf bytes.Buffer
@@ -209,8 +223,8 @@ func TestReportStandingAndMissions(t *testing.T) {
 	for _, want := range []string{
 		"standing: 0.25",
 		"missions: 1 active, 1 completed",
-		"  active contract-solace-cordite-1 0/400",
-		"  completed contract-solace-cordite-1",
+		"  active offer-jalvrek-kerngrit 0/400",
+		"  completed offer-jalvrek-kerngrit",
 	} {
 		if !strings.Contains(report, want) {
 			t.Errorf("report missing %q:\n%s", want, report)

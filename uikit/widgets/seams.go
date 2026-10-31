@@ -145,11 +145,11 @@ type ContentView interface {
 	// minimum (the sim's contract-accept gate, epsilon included).
 	MeetsStanding(float64) bool
 
-	// Contracts is the docked station's contract board: the docked-at
-	// celestial, the player's standing, the station's offerings in
-	// canonical order and every accepted contract. The zero value means
-	// undocked (the board panel renders its empty read).
-	Contracts() Contracts
+	// Contacts is the docked station's contact view: the docked-at
+	// celestial, the player's standing, the station's live offers (derived
+	// from sim state, canonical order) and every accepted offer. The zero
+	// value means undocked (the contact panel renders its empty read).
+	Contacts() Contacts
 
 	// Show Info reference resolution (the info catalog seam).
 	InfoRefFor(ecs.Entity) (InfoRef, bool)
@@ -203,15 +203,16 @@ type StationInfo struct {
 	Services []string
 }
 
-// Contracts is the docked station's contract board as one read (CONTEXT.md
-// "Station board"): where the player is docked, the standing that gates
-// the offerings, the station's board in canonical order and every accepted
-// contract with its live progress. The zero value means undocked; a panel
-// built on it renders the empty board.
-type Contracts struct {
+// Contacts is the docked station's contact view as one read (CONTEXT.md
+// "Station board", "Contact offer"): where the player is docked, the
+// standing that gates the contacts, the station's live offers in canonical
+// order (derived, never persisted) and every accepted offer with its live
+// progress. The zero value means undocked; a panel built on it renders the
+// empty view.
+type Contacts struct {
 	Station  content.CelID
 	Standing float64
-	Board    []*content.ContractDef // canonical order (content.Board)
+	Offers   []sim.Offer
 	Active   []sim.MissionState
 }
 
@@ -559,18 +560,18 @@ func (v *view) DeliverProgress(def *content.ContractDef) float64 {
 
 func (v *view) MeetsStanding(min float64) bool { return v.s.Standing()+1e-9 >= min }
 
-// Contracts is the board read once: the docked celestial, the standing
-// (the sim's own epsilon gate is MeetsStanding's), the station's offerings
-// and the accepted missions. Undocked → the zero value.
-func (v *view) Contracts() Contracts {
+// Contacts is the contact view read once: the docked celestial, the standing
+// (the sim's own epsilon gate is MeetsStanding's), the station's derived
+// offers and the accepted missions. Undocked → the zero value.
+func (v *view) Contacts() Contacts {
 	at, ok := v.s.Docked.Get(v.s.Player())
 	if !ok {
-		return Contracts{}
+		return Contacts{}
 	}
-	return Contracts{
+	return Contacts{
 		Station:  at.At,
 		Standing: v.s.Standing(),
-		Board:    v.c.Board(at.At),
+		Offers:   v.s.ContactOffers(at.At),
 		Active:   v.s.Missions(),
 	}
 }

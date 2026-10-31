@@ -46,8 +46,8 @@
   {
     "at_tick": 7100,
     "action": "accept-mission",
-    "mission": "contract-solace-cleanup-1",
-    "note": "contract leg: take the kill contract off Hovžan's board (old 7 230 at Jalvrek); the Młondan belt kill counts progress, and the tick-35 200 dock back at Hovžan auto-claims it"
+    "mission": "offer-hovzan-cleanup",
+    "note": "contact leg: take the cleanup offer off Hovžan's board (old 7 230 at Jalvrek); the Młondan belt kill counts progress, and the tick-35 200 dock back at Hovžan auto-claims it"
   },
   {
     "at_tick": 7200,

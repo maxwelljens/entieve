@@ -1,0 +1,50 @@
+[
+  {
+    "id": "contact-hovzan-charter",
+    "name": "Hovžan Charter Office",
+    "patron": "charter",
+    "station": "cel-huta",
+    "min_standing": 0.0,
+    "offers": [
+      {
+        "id": "offer-hovzan-cleanup",
+        "title": "Belt cleanup",
+        "kind": "kill",
+        "level": 1,
+        "objective": { "target": "npc-rat-scuttler", "count": 1 },
+        "reward": { "credits": 40000, "item": null, "standing_gain": 0.1 },
+        "description": "An Old Works Scuttler is shadowing the ore haulers in the {system} belt. Cull it, dock at {station}, and the bounty office settles the fee.",
+        "source": { "kind": "rats", "system": "sys-mlynow" }
+      }
+    ]
+  },
+  {
+    "id": "contact-jalvrek-charter",
+    "name": "Jalvrek Charter Office",
+    "patron": "charter",
+    "station": "cel-haven-rest",
+    "min_standing": 0.0,
+    "offers": [
+      {
+        "id": "offer-jalvrek-supply",
+        "title": "Supply run to Hauvnok",
+        "kind": "deliver",
+        "level": 1,
+        "objective": { "item": "ammo-emp-s", "count": 1, "destination": "cel-penumbra-port" },
+        "reward": { "credits": 86000, "item": null, "standing_gain": 0.1 },
+        "description": "Hauvnok is short on ion rounds: {count} m³ of them. Buy them on the Jalvrek market and carry them to {station} — the cargo is the delivery, so do not spend it on the way.",
+        "source": { "kind": "stock", "item": "ammo-emp-s", "target": 20, "base": 1, "max": 10 }
+      },
+      {
+        "id": "offer-jalvrek-kerngrit",
+        "title": "Kerngrit order",
+        "kind": "mine",
+        "level": 1,
+        "objective": { "item": "ore-cordite", "count": 400 },
+        "reward": { "credits": 38400, "item": null, "standing_gain": 0.1 },
+        "description": "Jalvrek's refinery needs {count} m³ of raw Kerngrit. Fill the ore hold at the {system} belt and dock to turn the order in.",
+        "source": { "kind": "stock", "item": "ore-cordite", "target": 2400, "base": 100, "max": 1000 }
+      }
+    ]
+  }
+]

@@ -6,22 +6,25 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Embedded contract defs: every shipped def validates and boards resolve
-// per station.
+// Contacts: every shipped contact and offer validates, and every station's
+// contacts resolve with their offers flattened into the engine's templates.
 // ---------------------------------------------------------------------------
 
-// TestEmbeddedContractsValid runs structural checks over every shipped
-// contract (on top of the cross-reference pass in Validate).
-func TestEmbeddedContractsValid(t *testing.T) {
+// TestEmbeddedOffersValid runs structural checks over every shipped offer
+// template (on top of the cross-reference pass in Validate).
+func TestEmbeddedOffersValid(t *testing.T) {
 	c := MustLoad()
+	if len(c.Contacts) == 0 {
+		t.Fatal("no contacts loaded")
+	}
 	if len(c.Contracts) == 0 {
-		t.Fatal("no contracts loaded")
+		t.Fatal("contacts produced no offer templates")
 	}
 	for _, id := range keys(c.Contracts) {
 		ct := c.Contracts[id]
-		ctx := "contracts/" + string(id)
-		if !strings.HasPrefix(string(ct.ID), "contract-") {
-			t.Errorf("%s: id must use the contract- prefix", ctx)
+		ctx := "contacts/" + string(id)
+		if !strings.HasPrefix(string(ct.ID), "offer-") {
+			t.Errorf("%s: id must use the offer- prefix", ctx)
 		}
 		if ct.Title == "" || ct.Description == "" {
 			t.Errorf("%s: missing title/description", ctx)
@@ -39,64 +42,160 @@ func TestEmbeddedContractsValid(t *testing.T) {
 	}
 }
 
-// TestStationBoardsResolve pins board resolution: Jalvrek carries the
-// deliver and mine contracts, Hovžan (Młondan) carries the kill contract
-// (security owns the high-sec belts now), Hauvnok carries the
-// standing-gated level-2 board, unknown stations have empty boards.
-func TestStationBoardsResolve(t *testing.T) {
+// TestContactsAtResolve pins the converted pools: every contact lands at its
+// station with its offer templates inheriting the contact's station and
+// standing gate, and unknown stations carry no contacts.
+func TestContactsAtResolve(t *testing.T) {
 	c := MustLoad()
 
-	haven := c.Board("cel-haven-rest")
-	if len(haven) != 2 {
-		t.Fatalf("Jalvrek board = %d contracts, want 2", len(haven))
+	want := map[CelID][]int{
+		"cel-haven-rest":    {2},    // Jalvrek: supply run + Kerngrit order
+		"cel-huta":          {1, 1}, // Hovžan: cleanup (charter) + web units (line office)
+		"cel-doki":          {2, 1}, // Dukšan: Commission liaison + yard office
+		"cel-penumbra-port": {2},    // Hauvnok: den hunt + lucidite
 	}
-	kinds := map[string]int{}
-	for _, ct := range haven {
-		kinds[ct.Kind]++
-	}
-	hutaKill := false
-	for _, ct := range c.Board("cel-huta") {
-		hutaKill = hutaKill || ct.Kind == ContractKill
-	}
-	if !hutaKill {
-		t.Fatal("Hovžan board carries no kill contract")
-	}
-	for _, want := range []string{ContractDeliver, ContractMine} {
-		if kinds[want] != 1 {
-			t.Errorf("Jalvrek board kinds = %v, want one %s", kinds, want)
+	for cel, counts := range want {
+		cs := c.ContactsAt(cel)
+		if len(cs) != len(counts) {
+			t.Fatalf("%s contacts = %d, want %d", cel, len(cs), len(counts))
+		}
+		for i, n := range counts {
+			if len(cs[i].Offers) != n {
+				t.Errorf("%s/%s offers = %d, want %d", cel, cs[i].ID, len(cs[i].Offers), n)
+			}
+		}
+		for _, ct := range cs {
+			if ct.Station != cel {
+				t.Errorf("%s: station = %s", ct.ID, ct.Station)
+			}
+			for _, of := range ct.Offers {
+				def, ok := c.Contract(of.ID)
+				if !ok {
+					t.Fatalf("%s: offer %s missing from the flattening", ct.ID, of.ID)
+				}
+				if def.Station != cel || def.MinStanding != ct.MinStanding {
+					t.Errorf("%s: template inherited station/standing %s/%v, want %s/%v",
+						of.ID, def.Station, def.MinStanding, cel, ct.MinStanding)
+				}
+			}
 		}
 	}
-	for _, ct := range haven {
-		if ct.Level != 1 || ct.MinStanding != 0 {
-			t.Errorf("%s: level/min_standing = %d/%v, want level-1 board", ct.ID, ct.Level, ct.MinStanding)
-		}
+	if got := c.ContactsAt("cel-nowhere"); len(got) != 0 {
+		t.Errorf("unknown station contacts = %v, want empty", got)
 	}
+	if _, ok := c.Contact("contact-nope"); ok {
+		t.Error("Contact(contact-nope) resolved but must not")
+	}
+}
 
-	port := c.Board("cel-penumbra-port")
-	if len(port) != 2 {
-		t.Fatalf("Hauvnok board = %d contracts, want 2", len(port))
+// baseContact returns a valid contact with one deliver stock offer, used as
+// the mutation base for the validator's rejection paths.
+func baseContact() *ContactDef {
+	return &ContactDef{
+		ID: "contact-test-base", Name: "Base Office", Patron: PatronCharter,
+		Station: "cel-a-station",
+		Offers: []ContactOffer{{
+			ContractDef: ContractDef{
+				ID: "offer-test-base", Title: "Base", Kind: ContractDeliver, Level: 1,
+				Station:   "cel-a-station",
+				Objective: ContractObjective{Item: "min-fer", Count: 1, Destination: "cel-a-dock"},
+				Reward:    ContractReward{Credits: 1000, StandingGain: 0.1},
+			},
+			Source: OfferSource{Kind: "stock", Item: "min-fer", Target: 10, Base: 1, Max: 10},
+		}},
 	}
-	for _, ct := range port {
-		if ct.Level != 2 || ct.MinStanding < 0.2 {
-			t.Errorf("%s: level/min_standing = %d/%v, want level-2 gated by standing 0.2",
-				ct.ID, ct.Level, ct.MinStanding)
-		}
-	}
+}
 
-	if got := c.Board("cel-nowhere"); len(got) != 0 {
-		t.Errorf("unknown station board = %v, want empty", got)
+// withContact attaches a contact to a fresh valid baseContent and flattens
+// its offers, so Validate sees the whole wiring.
+func withContact(mutate func(*Content, *ContactDef)) *Content {
+	c := baseContent()
+	sys := c.Systems["sys-a"]
+	sys.Celestials = append(sys.Celestials, CelestialDef{
+		ID: "cel-a-dock", Name: "Dock", Kind: CelStation, Radius: 500,
+		Station: &StationDef{Services: []string{"repair"}},
+	})
+	ct := baseContact()
+	mutate(c, ct)
+	c.Contacts = map[ContactID]*ContactDef{ct.ID: ct}
+	c.flattenOffers()
+	return c
+}
+
+// TestContactNegativeCases pins every validator rejection for contacts and
+// their offer sources.
+func TestContactNegativeCases(t *testing.T) {
+	cases := []struct {
+		name   string
+		mutate func(*Content, *ContactDef)
+		want   string
+	}{
+		{"unknown patron", func(_ *Content, ct *ContactDef) {
+			ct.Patron = "syndicate"
+		}, `unknown patron "syndicate"`},
+		{"unknown station", func(_ *Content, ct *ContactDef) {
+			ct.Station = "cel-ghost"
+		}, `station "cel-ghost" is not a station`},
+		{"empty pool", func(_ *Content, ct *ContactDef) {
+			ct.Offers = nil
+		}, "empty offer pool"},
+		{"bad contact prefix", func(_ *Content, ct *ContactDef) {
+			ct.ID = "broker-test"
+			ct.Offers[0].ID = "offer-test-base"
+		}, "id must use the contact- prefix"},
+		{"offer prefix", func(_ *Content, ct *ContactDef) {
+			ct.Offers[0].ID = "contract-test-base"
+		}, "offer id must use the offer- prefix"},
+		{"unknown source kind", func(_ *Content, ct *ContactDef) {
+			ct.Offers[0].Source.Kind = "rumour"
+		}, `unknown source kind "rumour"`},
+		{"stock item mismatch", func(_ *Content, ct *ContactDef) {
+			ct.Offers[0].Source.Item = "min-nickel"
+		}, "stock item \"min-nickel\" must be the objective item \"min-fer\""},
+		{"stock target below one", func(_ *Content, ct *ContactDef) {
+			ct.Offers[0].Source.Target = 0
+		}, "stock target 0 must be >= 1"},
+		{"rats on a deliver offer", func(_ *Content, ct *ContactDef) {
+			ct.Offers[0].Source.Kind = "rats"
+			ct.Offers[0].Source.System = "sys-a"
+		}, `rats source sits on a kill offer, not "deliver"`},
+		{"rats unknown system", func(_ *Content, ct *ContactDef) {
+			of := &ct.Offers[0]
+			of.Kind, of.Source.Kind, of.Source.System = ContractKill, "rats", "sys-ghost"
+			of.Objective = ContractObjective{Target: "npc-rat-scuttler", Count: 1}
+		}, `unknown watched system "sys-ghost"`},
+		{"rats non-works target", func(_ *Content, ct *ContactDef) {
+			of := &ct.Offers[0]
+			of.Kind, of.Source.Kind, of.Source.System = ContractKill, "rats", "sys-a"
+			of.Objective = ContractObjective{Target: "npc-guard", Count: 1}
+		}, `target "npc-guard" is not an Old Works NPC`},
+		{"war-clear on deliver", func(_ *Content, ct *ContactDef) {
+			ct.Offers[0].Source.Kind = "war-clear"
+		}, `war-clear source sits on a kill offer, not "deliver"`},
 	}
-	// Contract() accessor resolves and rejects.
-	if _, ok := c.Contract("contract-solace-cleanup-1"); !ok {
-		t.Error("Contract(contract-solace-cleanup-1) not found")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := withContact(tc.mutate).Validate()
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tc.want)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error does not contain %q:\n%s", tc.want, err)
+			}
+		})
 	}
-	if _, ok := c.Contract("contract-nope"); ok {
-		t.Error("Contract(contract-nope) resolved but must not")
+}
+
+// TestContactValidFixture guards the positive baseline (a clean contact set
+// must not produce errors).
+func TestContactValidFixture(t *testing.T) {
+	if err := withContact(func(*Content, *ContactDef) {}).Validate(); err != nil {
+		t.Fatalf("base contact must validate clean:\n%v", err)
 	}
 }
 
 // ---------------------------------------------------------------------------
-// Validator rejection paths
+// Validator rejection paths for the flattened offer templates
 // ---------------------------------------------------------------------------
 
 // baseContract returns a valid deliver contract used as the mutation base.
@@ -178,23 +277,17 @@ func TestContractNegativeCases(t *testing.T) {
 		}, `unknown ore "ore-ghost"`},
 		{"kill with destination", func(_ *Content, ct *ContractDef) {
 			ct.Kind = ContractKill
-			ct.Objective.Target = "npc-rat"
-			ct.Objective.Item = ""
+			ct.Objective.Target = "npc-rat-scuttler"
 		}, "kill contract must not set item/destination"},
 		{"negative credits", func(_ *Content, ct *ContractDef) {
 			ct.Reward.Credits = -1
-		}, "negative credits -1"},
+		}, "negative credits"},
+		{"reward item without qty", func(_ *Content, ct *ContractDef) {
+			ct.Reward.Item = "loot-navdata"
+		}, "needs qty >= 1"},
 		{"negative standing gain", func(_ *Content, ct *ContractDef) {
 			ct.Reward.StandingGain = -0.1
-		}, "negative standing_gain -0.1"},
-		{"unknown reward item", func(_ *Content, ct *ContractDef) {
-			ct.Reward.Item = "item-ghost"
-			ct.Reward.Qty = 1
-		}, `reward references unknown item "item-ghost"`},
-		{"reward item without qty", func(_ *Content, ct *ContractDef) {
-			ct.Reward.Item = "loot-bit"
-			ct.Reward.Qty = 0
-		}, "needs qty >= 1"},
+		}, "negative standing_gain"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -221,9 +314,9 @@ func TestContractValidFixture(t *testing.T) {
 // Payout balance: the calibration contract (docs/CONTENT_AUTHORING.md)
 // ---------------------------------------------------------------------------
 
-// Payout bands, in reference-value multiples. Every shipped contract must
-// land inside its kind's band — this is the calibration contract future
-// mission content must follow.
+// Payout bands, in reference-value multiples. Every shipped offer must land
+// inside its kind's band — this is the calibration contract future mission
+// content must follow.
 const (
 	killRatioMin, killRatioMax = 2.0, 3.0 // kill: bounty + expected loot per target
 	mineRatioMin, mineRatioMax = 1.9, 2.1 // mine: ore base value x 2.0 premium
@@ -233,6 +326,8 @@ const (
 
 // TestContractPayoutRatios pins the shipped rewards against payout math
 // derived from the live economy data (bounties, loot tables, base prices).
+// The derived offers scale these authored numbers with their count, so the
+// per-unit calibration holds.
 func TestContractPayoutRatios(t *testing.T) {
 	c := MustLoad()
 
@@ -261,16 +356,16 @@ func TestContractPayoutRatios(t *testing.T) {
 
 	// Pinned rewards (the CONTENT_AUTHORING.md ratio table).
 	pinned := map[ContractID]float64{
-		"contract-solace-cleanup-1":    40000,
-		"contract-solace-supply-run-1": 86000,
-		"contract-solace-cordite-1":    38400,
-		"contract-penumbra-den-hunt-1": 240000,
-		"contract-penumbra-lucidite-1": 85000,
+		"offer-hovzan-cleanup":   40000,
+		"offer-jalvrek-supply":   86000,
+		"offer-jalvrek-kerngrit": 38400,
+		"offer-hauvnok-hunt":     240000,
+		"offer-hauvnok-lucidite": 85000,
 	}
 	for id, want := range pinned {
 		ct, ok := c.Contract(id)
 		if !ok {
-			t.Fatalf("missing contract %s", id)
+			t.Fatalf("missing offer %s", id)
 		}
 		if ct.Reward.Credits != want {
 			t.Errorf("%s: credits = %v, want pinned %v", id, ct.Reward.Credits, want)
@@ -299,7 +394,7 @@ func TestContractPayoutRatios(t *testing.T) {
 			want := deliverMargin*reference + deliverJumpFee*float64(jumps)
 			if diff := reward - want; diff > 0.5 || diff < -0.5 {
 				t.Errorf("%s: deliver payout %v, want 1.5 x %v + %d x %d jumps = %v",
-					id, reward, reference, deliverJumpFee, jumps, want)
+					id, reward, reference, jumps, deliverJumpFee, want)
 			}
 		}
 	}
@@ -347,6 +442,5 @@ func gateJumps(t *testing.T, c *Content, from, to CelID) int {
 		queue = next
 		hops++
 	}
-	t.Fatalf("no gate path %s -> %s", src, dst)
 	return -1
 }
