@@ -133,6 +133,7 @@ func (c *Content) Validate(opts ...ValidateOption) error {
 	v.npcs()
 	v.systems()
 	v.stationMarkets()
+	v.contacts()
 	v.contracts()
 	v.traffic()
 	v.worlds()
@@ -932,6 +933,121 @@ func (v *validator) stationMarkets() {
 	}
 }
 
+// factionOldWorksName is the authored Old Works faction string (sim owns the
+// behaviour constant; content only validates the wiring).
+const factionOldWorksName = "Old Works"
+
+// contacts cross-checks every contact and its offer pool: the patron, the
+// station, the standing gate, unique offer ids and each offer's derivation
+// source (the item/system/caste the sim watches, and the reward shape the
+// source must derive into).
+func (v *validator) contacts() {
+	offers := map[ContractID]string{}
+	for _, id := range keys(v.c.Contacts) {
+		ct := v.c.Contacts[id]
+		ctx := "contacts/" + string(id)
+		if id == "" || !strings.HasPrefix(string(id), "contact-") {
+			v.addf("%s: id must use the contact- prefix", ctx)
+			continue
+		}
+		if ct.Name == "" {
+			v.addf("%s: missing name", ctx)
+		}
+		switch ct.Patron {
+		case PatronCommission, PatronCharter, PatronCorporation:
+		default:
+			v.addf("%s: unknown patron %q (want commission|charter|corporation)", ctx, ct.Patron)
+		}
+		if !v.isStation(ct.Station) {
+			v.addf("%s: station %q is not a station", ctx, ct.Station)
+		}
+		if ct.MinStanding < 0 {
+			v.addf("%s: negative min_standing %v", ctx, ct.MinStanding)
+		}
+		if len(ct.Offers) == 0 {
+			v.addf("%s: empty offer pool", ctx)
+		}
+		for i := range ct.Offers {
+			of := &ct.Offers[i]
+			octx := ctx + "/" + string(of.ID)
+			if !strings.HasPrefix(string(of.ID), "offer-") {
+				v.addf("%s: offer id must use the offer- prefix", octx)
+			}
+			if prev, dup := offers[of.ID]; dup {
+				v.addf("%s: offer id already used by %s", octx, prev)
+			}
+			offers[of.ID] = string(id)
+			v.contactSource(ctx, of)
+		}
+	}
+}
+
+// contactSource validates one offer's derivation source: the signal it
+// watches must exist and must be able to fill the objective it sits on.
+func (v *validator) contactSource(contactCtx string, of *ContactOffer) {
+	ctx := contactCtx + "/" + string(of.ID)
+	src := &of.Source
+	obj := &of.Objective
+	switch src.Kind {
+	case "stock":
+		if _, ok := v.c.Items[src.Item]; !ok {
+			if _, mok := v.c.Modules[ModuleID(src.Item)]; !mok {
+				v.addf("%s: unknown stock item %q", ctx, src.Item)
+			}
+		}
+		if src.Item != obj.Item {
+			v.addf("%s: stock item %q must be the objective item %q", ctx, src.Item, obj.Item)
+		}
+		if src.Target < 1 {
+			v.addf("%s: stock target %d must be >= 1", ctx, src.Target)
+		}
+		if src.Base < 1 || src.Max < src.Base {
+			v.addf("%s: stock count window %d..%d is not 1 <= base <= max", ctx, src.Base, src.Max)
+		}
+		switch of.Kind {
+		case ContractDeliver:
+			if !v.isStation(obj.Destination) {
+				v.addf("%s: deliver stock offer needs a destination station", ctx)
+			}
+		case ContractMine:
+			if def, ok := v.c.Items[obj.Item]; !ok || def.Category != CatOre {
+				v.addf("%s: mine stock offer needs an ore objective", ctx)
+			}
+		default:
+			v.addf("%s: stock source sits on a deliver or mine offer, not %q", ctx, of.Kind)
+		}
+	case "rats":
+		if of.Kind != ContractKill {
+			v.addf("%s: rats source sits on a kill offer, not %q", ctx, of.Kind)
+		}
+		if _, ok := v.c.Systems[src.System]; !ok {
+			v.addf("%s: unknown watched system %q", ctx, src.System)
+		}
+		if def, ok := v.c.NPCs[obj.Target]; !ok || def.Faction != factionOldWorksName {
+			v.addf("%s: rats source target %q is not an Old Works NPC", ctx, obj.Target)
+		}
+	case "war-supply":
+		if of.Kind != ContractDeliver {
+			v.addf("%s: war-supply source sits on a deliver offer, not %q", ctx, of.Kind)
+		}
+		if src.Base < 1 || src.Max < src.Base {
+			v.addf("%s: war-supply count window %d..%d is not 1 <= base <= max", ctx, src.Base, src.Max)
+		}
+	case "war-clear":
+		if of.Kind != ContractKill {
+			v.addf("%s: war-clear source sits on a kill offer, not %q", ctx, of.Kind)
+		}
+		if def, ok := v.c.NPCs[obj.Target]; !ok || def.Faction != factionOldWorksName {
+			v.addf("%s: war-clear target %q is not an Old Works NPC", ctx, obj.Target)
+		}
+		if src.Base < 1 || src.Max < src.Base {
+			v.addf("%s: war-clear count window %d..%d is not 1 <= base <= max", ctx, src.Base, src.Max)
+		}
+	default:
+		v.addf("%s: unknown source kind %q (want stock|rats|war-supply|war-clear)", ctx, src.Kind)
+	}
+}
+
 // contracts cross-checks every mission-board contract: kind-specific
 // objective references (rat class, cargo item, stations), counts and reward.
 func (v *validator) contracts() {
@@ -941,7 +1057,7 @@ func (v *validator) contracts() {
 			v.addf("contracts: missing id (title %q)", ct.Title)
 			continue
 		}
-		ctx := "contracts/" + string(id)
+		ctx := "offers/" + string(id)
 		if ct.Title == "" {
 			v.addf("%s: missing title", ctx)
 		}

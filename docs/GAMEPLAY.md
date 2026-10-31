@@ -65,7 +65,7 @@ rebindable (see **Keybindings** below); the global chords (`Esc`, `Ctrl+S`,
 | Left click | On a table column header: sort (click again flips direction); on the **⋯ button** at the header's end: the column menu (hide/show a column) |
 | Left drag | On a column's right edge in a table header (the 6 px strip): widen or narrow that column — the change trades with the next column, the header title is the floor, and the cursor is the left/right arrow |
 | `Ctrl` + left click | Lock target under cursor |
-| Left double-click | Show Info — open the item's details window directly, anywhere the item appears (rack, fitting slots and hangar modules, market, inventory, overview, contract rows); on a **hangar module** it fits that module into the first empty slot of its class; on empty space, fly straight toward that point |
+| Left double-click | Show Info — open the item's details window directly, anywhere the item appears (rack, fitting slots and hangar modules, market, inventory, overview, offer rows); on a **hangar module** it fits that module into the first empty slot of its class; on empty space, fly straight toward that point |
 | Right click | Orbit target under cursor (2,500 m) — in the world; unchanged |
 | Right click | On an item anywhere it appears: flat context menu — **Show Info** first (always bold), then the surface's actions (grayed-but-visible when impossible); on a charge-fed cell in the module rack: Show Info / Show Info — `<charge>` / ─ / **Load** `<round>` per round type in cargo / **Cycle charge** |
 | Middle drag | Pan camera |
@@ -192,7 +192,7 @@ applies its rung as the handle snaps
 to it. Icons (from
 [game-icons.net](https://game-icons.net), credited per-icon in
 `uikit/icons/CREDITS.md`) mark service titles, action buttons, overview
-kinds and contract types — monochrome glyphs tinted to the theme, and
+kinds and offer types — monochrome glyphs tinted to the theme, and
 every icon keeps its text label.
 
 **Music** plays everywhere — the title, space and a docked station — from
@@ -274,7 +274,7 @@ size and position for its first open — the market's 760×560 three-pane
 rect, the inventory and fitting rects, the manufacturing and refinery,
 finances and settings — and a genuinely
 new window type with no declared position opens centred. While docked the
-Station window (contract board included) takes the top-left column
+Contacts window (the station column) takes the top-left column
 (overview and selected item step aside); the service windows open at
 those same per-type defaults, not tiled into a docked band.
 
@@ -311,13 +311,13 @@ simulation save format is unchanged for the CLI tools.
 
 ### Docked at a station
 
-Docking (`D`) opens exactly one window: the **Station Services** view —
-the docked-at identity (station name · system), the **Undock** button,
-a **Cargo** button and one button per service *this* station offers
-(Market, Fitting, Industry — a service the station lacks is not offered
-at all) over the contract board (see
-[Contracts & standing](#contracts--standing)) — and hides the space
-chrome (ship status, module rack, scanner) together with the
+Docking (`D`) opens exactly one window: the **Contacts** view — the
+docked-at identity (station name · system), the **Undock** button, a
+**Cargo** button and one button per service *this* station offers (Market,
+Fitting, Industry, Refinery — a service the station lacks is not offered
+at all) over the **contacts** posted here and their live offers, then your
+active work (see [Contacts & standing](#contacts--standing)) — and hides
+the space chrome (ship status, module rack, scanner) together with the
 **Overview** and **Selected Item** windows. Nothing else auto-opens:
 the market, fitting, inventory and manufacturing are ordinary windows you
 open from the services view, their keys, or the rail, and they open at
@@ -366,7 +366,7 @@ column keeps sorting on the real figure.
 
 Anything you can see is inspectable. **Right-click** an item anywhere it
 appears — rack cell, fitting row, market row, inventory row, overview or
-scanner row, contract board row, contract objective label — for a flat
+scanner row, offer row, offer objective label — for a flat
 context menu: **Show Info** first, always bold, then that surface's
 actions. Actions you cannot currently take are shown grayed, never
 hidden. **Double-click** the item to skip the menu and go straight to the
@@ -397,8 +397,8 @@ surface: rack cells — Show Info (module) / Show Info — `<charge>` / ─ /
 Unequip; market rows —
 Show Info / Buy / Sell (grayed while undocked, both opening the quantity
 picker); inventory rows — Show Info; overview rows — Show Info / Warp to / Orbit / Approach / Lock target
-(the entity's hull or caste info plus the usual commands); contract board
-rows — Accept / Abandon (grayed when gated); contract objective labels —
+(the entity's hull or caste info plus the usual commands); offer
+rows — Accept / Abandon (grayed when gated); offer objective labels —
 Show Info.
 
 ## EVE concepts primer
@@ -581,51 +581,71 @@ The currency of Entieve is the **euro**, displayed as `12,345.67 €` (the
 sign trails the amount; anything under one euro shows as `50¢`). You earn euros from NPC bounties,
 selling loot and market trades, and spend them on market buys. Every readout
 that quotes money uses that one format — the wallet on the HUD, the market
-title and the contract boards — so a reward line on the board reads
+title and the contact offers — so a reward line on an offer reads
 `40,000.00 € · +0.10 standing`.
 
-## Contracts & standing
+## Contacts & standing
 
-Every station with a contract office runs a **board** of contracts — the
-kind of repeatable work an EVE pilot knows: cull rats, haul cargo, mine
-ore. Boards are **per station**: while docked, the **Station** window
-shows two sections.
+Work is handed out by **contacts** at the dock: the kind of repeatable
+jobs an EVE pilot knows — cull rats, haul cargo, mine ore — but posted
+because the world has a gap to fill. Contacts are **per station**: while
+docked, the **Contacts** window shows two sections.
 
-**Available contracts** — the docked station's board. Each row shows the
-title, the objective (`Destroy 1× Scuttler`,
-`Deliver 2 m³ 40mm ion to Hauvnok`, `Mine 400 m³ Kerngrit Ore` — every
-objective label right-clicks to **Show Info** on the item it names) and
-the reward (`40,000.00 € · +0.10 standing`). Press **Accept** to take it; a
-contract above your standing shows its requirement
-(`Requires standing 0.20`) with the button disabled, and an
-already-accepted one is marked **Accepted**.
+**Contacts** are the people who hand out work: a representative of the
+Charter, the Commission or a corporation, posted at one station. Each
+contact answers to one standing gate and offers a pool of jobs. You meet
+them in the **Contacts** window: sections for **Offers** (this station's
+live offers) and **Active work**.
 
-**Active contracts** — everything you have accepted, anywhere, with live
+**Offers** are derived from the world, not rolled: a contact lists a job
+exactly while there is a gap to fill. A front short of materiel posts a
+delivery in that front's system; a station short of requisition stock
+posts a manufacturing or hauling order; an Old Works hull working the
+local belt posts a kill order; a station short of ore posts a mining
+order. Each row shows the title, the contact's office name and its own words
+with the numbers filled in (the count, station, system or caste — every prose line
+right-clicks to **Show Info** on the objective it names) and the reward
+(`40,000.00 € · +0.10 standing`), with a delivery also naming its
+destination's **requisition stock**. Press **Accept** to take it; an offer
+above your standing shows its requirement (`Requires standing 0.20`) with
+the button disabled, and an already-accepted one is marked **Accepted**.
+An offer whose gap closes simply stops being listed — no timer, no
+penalty, nothing to lose.
+
+**Active work** — everything you have accepted, anywhere, with live
 progress (`Belt cleanup — 1/3`) and an **Abandon** button. Accepting and
 abandoning both happen while docked, at the station that issued the
-contract; abandoning costs only the progress made so far.
+offer; abandoning costs only the progress made so far.
 
 **Lifecycle.** `accepted → progress → ready → auto-claimed`. Kills count
 rats of exactly the requested class, mining counts the requested ore
-mined into your hold while the contract is active, and a delivery wants
-its cargo sitting in your hold. The claim is automatic the moment you
-dock at the **claim station**: the offering station for kill and mining
-contracts, the destination for a delivery — which consumes the delivered
-cargo on the spot. There is **no expiry**: contracts wait on the board
-until taken, and completed or abandoned ones can be accepted again
-(boards are repeatable jobs).
+mined into your hold while the work is active, and a delivery wants its
+cargo sitting in your hold. The claim is automatic the moment you dock at
+the **claim station**: the offering station for kill and mining work, the
+destination for a delivery — which consumes the delivered cargo on the
+spot. Accepted work **never expires and never fails**: a job whose gap
+closed stays yours until you finish it or abandon it.
+
+Deliveries now **land in the world**: the delivered cargo posts on the
+destination station's book as requisition stock — the goods its guard
+posts buy replacement hulls, fits and ammunition from. A materiel run to
+a front also credits that front's contest meter (the same rail a war-bid
+sale feeds), so carrying guns actually holds ground, and the **in stock**
+figure on a delivery offer is that station's live stock for the item.
 
 **Payouts** are calibrated against the live economy rather than vibes: a
-kill contract pays a multiple (2.0–3.0×) of its target's value — bounty
+kill offer pays a multiple (2.0–3.0×) of its target's value — bounty
 plus expected loot — so rat work has the highest ceiling; a mining
-contract pays a flat ~2.0× premium over the ore's base value; a hauling
-contract pays 1.5× the cargo's value plus a flat fee per gate jump, which
-makes delivery the dependable-margin option.
+offer pays a flat ~2.0× premium over the ore's base value; a hauling
+offer pays 1.5× the cargo's value plus a flat fee per gate jump, which
+makes delivery the dependable-margin option. A derived offer scales its
+reward with the count it derives, so the per-unit calibration holds.
 
-**Standing** is the career score the boards gate on: every completed
-contract raises it (`+0.10` on today's level-1 boards, `+0.15` on
-level-2), and level-2 boards require **0.20** standing — two level-1
-completions — before they hand out their orders.
+**Standing** is the single career scalar the contacts gate on: every
+completed offer raises it (`+0.10` on level-1 work, `+0.15–0.12` on
+level-2), and the deeper pools require **0.20** standing — two level-1
+completions — before the contact will hand out their orders. Standing is
+a key, not a score.
 
 Note that Kvonice now has a station, **Hauvnok**, so the insurer can hand
 over the replacement hull locally: a pilot destroyed over Kvonice has their
@@ -789,7 +809,7 @@ on to Młondan.
 aggressive, the belt holding richer ore (kerngrit, lucidite), and the
 anomaly **Gnazvor** hiding Marauders plus a Hierarch boss with the best
 loot. Its station, **Hauvnok**, is a freeport: it runs the level-2 board,
-doubles as the local insurance point (see Contracts & standing) and builds
+doubles as the local insurance point (see Contacts & standing) and builds
 things (see Manufacturing). **Młondan** is the refinery step of the chain —
 its platform **Hovžan** refines and manufactures (market, refine, industry).
 **Kamžal** is the shipyard country: **Dukšan**, its depot (market,
@@ -857,7 +877,7 @@ supply. **Starve the war and the charter loses ground.**
 
 **Remnants.** When a system falls under you, nothing evicts you and nothing
 closes your dock. The station becomes a **remnant**: market and repair stay
-open (lawless), while industry, fitting and the contract desk go dark until
+open (lawless), while industry, fitting and the charter desk go dark until
 someone reclaims the system. The charter's guards and patrols are gone
 outright, the belts are Works ground, and any manufacturing job already
 running finishes and can be collected — paid work is paid work. A reclaim
@@ -873,9 +893,9 @@ wait for). **Your earnings are the feedback** — the war never posts you a
 score. Works-held systems buy nothing: a remnant's book carries no war
 demand.
 
-**War contracts.** Front staging and raiding boards carry commissioned
+**War offers.** Front staging contacts carry commissioned
 work — hauling materiel to front staging and killing Works hulls at the
-front — gated on standing like every other contract. The flavour line names
+front — gated on standing like any other offer. The flavour line names
 the Commission; the board and its pay are ordinary station work.
 
 **In the log.** The war speaks through the same log lines as everything
@@ -946,7 +966,7 @@ You can intervene in any of them: strip the wreck, guard the convoy
 yourself, or let the rats do the work and take the loot.
 
 **Rats also hold the belts.** They sit on every belt, the Charter-space
-belts included — that is what the belt-cleanup contracts are for — and in
+belts included — that is what the belt-cleanup offers are for — and in
 Charter space the patrols grind them down on their own: the wreck is left
 for whoever gets there first, and the belt repopulates on its own timers.
 

@@ -1103,9 +1103,17 @@ type SavedSlot struct {
 // deliver counts stay 0 until the claim check at the destination). Phase is
 // derived: Progress < count is in-progress, otherwise ready to claim.
 // Persisted verbatim in Save.Missions.
+//
+// Def is the offer as derived at accept time (contacts): offers are not
+// persisted before acceptance, so an accepted mission carries its own task
+// and survives its gap closing. A pre-contacts save carries no Def and
+// resolves through the content lookup instead (stale ids drop as before).
+// Front is the war front the completed work credits.
 type MissionState struct {
-	ID       content.ContractID `json:"id"`
-	Progress float64            `json:"progress"`
+	ID       content.ContractID   `json:"id"`
+	Progress float64              `json:"progress"`
+	Def      *content.ContractDef `json:"offer,omitempty"`
+	Front    content.SystemID     `json:"front,omitempty"`
 }
 
 // saveSchemaV3 is the save-schema version written since shell bays (v3):

@@ -89,7 +89,7 @@ func TestSameTickCommandOrdering(t *testing.T) {
 			},
 			want: []string{
 				"undocked||Undocked from Haven Rest",
-				"mission|refused|Contract refused: You must be docked to accept a contract",
+				"mission|refused|Offer refused: You must be docked to accept an offer",
 			},
 			wantDocked: false,
 		},
@@ -104,7 +104,7 @@ func TestSameTickCommandOrdering(t *testing.T) {
 			},
 			want: []string{
 				"undocked||Undocked from Haven Rest",
-				"mission|refused|Contract refused: You must be docked to accept a contract",
+				"mission|refused|Offer refused: You must be docked to accept an offer",
 			},
 			wantDocked: false,
 		},

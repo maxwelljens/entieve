@@ -28,25 +28,25 @@ func (r *recordingSink) Do(i widgets.Intent) { r.got = append(r.got, i) }
 // instead of quietly finding a sim — no simulation exists in this test.
 type stubView struct {
 	widgets.ContentView
-	c         *content.Content
-	orders    []sim.MarketStock
-	docked    bool
-	wallet    float64
-	station   widgets.StationInfo // docked-at identity + services (nil = none)
-	contracts widgets.Contracts   // the station board read
-	deliver   float64             // deliver-objective progress the stub reports
+	c        *content.Content
+	orders   []sim.MarketStock
+	docked   bool
+	wallet   float64
+	station  widgets.StationInfo // docked-at identity + services (nil = none)
+	contacts widgets.Contacts    // the docked contact view read
+	deliver  float64             // deliver-objective progress the stub reports
 }
 
 func (v *stubView) Defs() *content.Content { return v.c }
 
 func (v *stubView) PlayerDocked() bool { return v.docked }
 
-// Contracts hands the stub's board read to the station board panel.
-func (v *stubView) Contracts() widgets.Contracts { return v.contracts }
+// Contacts hands the stub's read to the contact panel.
+func (v *stubView) Contacts() widgets.Contacts { return v.contacts }
 
 // MeetsStanding applies the stub board's own standing, epsilon included —
 // the same gate the view derives from the sim.
-func (v *stubView) MeetsStanding(min float64) bool { return v.contracts.Standing+1e-9 >= min }
+func (v *stubView) MeetsStanding(min float64) bool { return v.contacts.Standing+1e-9 >= min }
 
 // DeliverProgress reports the stub's fixed deliver count (the board's
 // active progress line).

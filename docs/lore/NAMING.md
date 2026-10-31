@@ -230,19 +230,40 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | `npc-rat-marauder` | Marauder | Marauder | Old Works | caste name retained (canon) |
 | `npc-rat-hierarch` | Hierarch | Hierarch | Old Works | caste name retained (canon) |
 
-### Contracts
+### Contacts (dock-side mission-givers)
+
+Contacts are the people who post work at a station. They are **offices**,
+never named individuals: a patron's desk uses the place it sits at plus an
+English form-word (`Office`, `Liaison`), the institutional layer's rule.
+The `contact-` prefix and the `offer-` prefix are registered extensions of
+the frozen id list (user-approved 2026-10-31); the old `contract-*` ids
+retired with the mechanic.
 
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
-| `contract-solace-cleanup-1` | Belt cleanup | keep | trade | description: "the Old Works", "Struvok belt", "Jalvrek" |
-| `contract-solace-supply-run-1` | Supply run to Havstov | **Supply run to Hauvnok** | place | description: "Hauvnok", "the Jalvrek market", "the Fringe" |
-| `contract-solace-cordite-1` | Cordite order | **Kerngrit order** | trade | renamed 2026-10-22 with the ore; description: "Jalvrek's refinery", "Struvok belt" |
-| `contract-penumbra-den-hunt-1` | Gniazvor hunt | **Gnazvor hunt** | place | description: "the Gnazvor", "the Hauvnok office" |
-| `contract-penumbra-lucidite-1` | Lucidite contract | keep | trade | description: "Hauvnok", "the Kvonice belt" |
-| `contract-manufacturing-shield-1` | — | **Shield booster order** | trade | durable manufactured goods (Shield Booster, a non-weapon module); offering Dukšan, delivery Hauvnok |
-| `contract-manufacturing-web-1` | — | **Web units for the yard** | trade | durable manufactured goods (Stasis Web, a non-weapon module); offering Hovžan, delivery Dukšan |
-| `contract-war-materiel-1` | — | **Materiel for the front** | trade | the Commission's haul order (Medium Artillery, three units); offering Dukšan, delivery Hauvnok — the Kvonice staging yard; war contract, reward mints (pre-existing payout rule) |
-| `contract-war-kill-1` | — | **Clear the front** | trade | the Commission's kill order (two Marauders); offering Dukšan, the Kamžal front; description cites the Kvonice belt |
+| `contact-commission-liaison` | — | **Commission Liaison** | Latinate | the Svaz war commission's desk at Dukšan; the patron's word, no personal name |
+| `contact-duksan-yard` | — | **Dukšan Yard Office** | place | the yard's own office at Dukšan (a corporation patron) |
+| `contact-hovzan-line` | — | **Hovžan Line Office** | place | the ore line's office at Hovžan |
+| `contact-hovzan-charter` | — | **Hovžan Charter Office** | place | the Charter Authority's desk at Hovžan |
+| `contact-jalvrek-charter` | — | **Jalvrek Charter Office** | place | the Charter Authority's desk at Jalvrek |
+| `contact-hauvnok-freeport` | — | **Hauvnok Freeport Office** | place | the freeport's charter desk |
+
+### Contact offers
+
+An offer is one authored task in a contact's pool; its title is the
+authored voice, its prose carries the sim's slots.
+
+| id | current name | proposed name | origin | notes |
+|---|---|---|---|---|
+| `offer-war-materiel` | — | **Materiel for the front** | trade | the Commission's materiel haul to the front |
+| `offer-war-clear` | — | **Clear the front** | trade | the Commission's kill order at an overrun front |
+| `offer-duksan-shield` | — | **Shield booster order** | trade | durable manufactured goods (Shield Booster); offering Dukšan, delivery Hauvnok |
+| `offer-hovzan-web` | — | **Web units for the yard** | trade | durable manufactured goods (Stasis Web); offering Hovžan, delivery Dukšan |
+| `offer-hovzan-cleanup` | Belt cleanup | keep | trade | description: "the Old Works", the Młondan belt, Hovžan |
+| `offer-jalvrek-supply` | Supply run to Havstov | **Supply run to Hauvnok** | place | description: "Hauvnok", "the Jalvrek market" |
+| `offer-jalvrek-kerngrit` | Cordite order | **Kerngrit order** | trade | renamed 2026-10-22 with the ore; description: "Jalvrek's refinery" |
+| `offer-hauvnok-hunt` | Gniazvor hunt | **Gnazvor hunt** | place | description: "the Gnazvor", "the Hauvnok office" |
+| `offer-hauvnok-lucidite` | Lucidite contract | keep | trade | description: "Hauvnok", "the Kvonice belt" |
 
 ### Worlds
 
@@ -304,6 +325,7 @@ Show Info line.
 | Ammo selection cleared (`sim/command.go`) | — | **&lt;module&gt; ammo selection cleared** | trade | `CmdSetAmmo ""`: the bay dumped to cargo and the gun re-resolved by the bay rule (auto-load one type, wait on two or more). Replaces the retired "set to auto ammo". Proposed 2026-10-22, awaiting user approval |
 | Bay refusals (`sim/command.go`) | — | **Cannot load &lt;round&gt; into &lt;module&gt;** | trade | unchanged wording; now also covers a round of another family and a reload with no rounds in cargo. Proposed 2026-10-22, awaiting user approval |
 | Belt-cleared log (`sim/system_damage.go`) | — | **&lt;belt name&gt; cleared** | trade | the high-sec belt response's news line: the last live rat of a belt died, whoever landed the kill (the anomaly-cleared line already uses the same "&lt;place&gt; cleared" form). Proposed 2026-10-21, awaiting user approval |
+| Contacts window title (`game/screens.go`) | Station Services | **Contacts** | trade | the dock screen: contacts over their live offers, with the station services row as its navigation. Plain trade noun; the Screen id stays `services` (the layout-sidecar key) |
 | Docked backdrop caption (`game/scenes.go`) | — | **Docked: &lt;station name&gt;** | trade | the station view's backdrop caption: the docked-at station's display name after a plain colon, set in the display face lower-centre over the hangar plate. No coined term — the player reads where they are. Approved 2026-10-21 |
 | High-slot mount labels (`uikit/screens/fitting.go`) | — | **Turret mount** / **Launcher mount** | ship | the two mount kinds drawn on an empty high-slot tile and in the hull's SLOTS section: guns and the mining laser are turret-mounted, rockets and missiles launcher-mounted (EVE's split). The short tile form is **Turret** / **Launcher**. Proposed 2026-10-22, awaiting user approval |
 | Mount sizes (`uikit/screens/fitting.go`, `content/data/ships`) | — | **Small** / **Medium** / **Large** | trade | a mount's size class, rendered beside its kind (**Small turret mount**); the same three words the module names already use (Small/Medium/Large Autocannon). Proposed 2026-10-22, awaiting user approval |

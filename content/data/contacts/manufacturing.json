@@ -1,0 +1,40 @@
+[
+  {
+    "id": "contact-duksan-yard",
+    "name": "Dukšan Yard Office",
+    "patron": "corporation",
+    "station": "cel-doki",
+    "min_standing": 0.1,
+    "offers": [
+      {
+        "id": "offer-duksan-shield",
+        "title": "Shield booster order",
+        "kind": "deliver",
+        "level": 2,
+        "objective": { "item": "mod-shield-boost", "count": 4, "destination": "cel-penumbra-port" },
+        "reward": { "credits": 1430000, "item": null, "standing_gain": 0.15 },
+        "description": "Hauvnok's fitters are short {count} units of Shield Booster. Manufacture or buy them, load them in the hold, and dock at {station} — the order is open at standing 0.10.",
+        "source": { "kind": "stock", "item": "mod-shield-boost", "target": 4, "base": 1, "max": 8 }
+      }
+    ]
+  },
+  {
+    "id": "contact-hovzan-line",
+    "name": "Hovžan Line Office",
+    "patron": "corporation",
+    "station": "cel-huta",
+    "min_standing": 0.05,
+    "offers": [
+      {
+        "id": "offer-hovzan-web",
+        "title": "Web units for the yard",
+        "kind": "deliver",
+        "level": 2,
+        "objective": { "item": "mod-stasis-web", "count": 3, "destination": "cel-doki" },
+        "reward": { "credits": 685000, "item": null, "standing_gain": 0.12 },
+        "description": "Hovžan's platform runs its ore lines with Stasis Web units from Dukšan, and {station}'s last shipment never arrived. Bring {count} units — the order is open to pilots at standing 0.05.",
+        "source": { "kind": "stock", "item": "mod-stasis-web", "target": 3, "base": 1, "max": 6 }
+      }
+    ]
+  }
+]

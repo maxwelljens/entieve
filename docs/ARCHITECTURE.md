@@ -31,7 +31,7 @@ library. **Unit tests use only the standard `testing` package.**
 | `content/`    | Data schema (`model.go`), the station service vocabulary (`services.go`: ids, labels, icons, windows), JSON loading (`load.go`), cross-reference validation (`validate.go`), embedded game data (`data/`). |
 | `sim/`        | The deterministic game simulation: components, commands, events, systems. Headless — never imports Ebitengine. |
 | `render/`     | Draws `sim` state: starfield, grid, ships (vector art), brackets, effects. |
-| `uikit/`      | The UI platform (ebitenui v0.7.3): EVE-style windows — overview, HUD, module rack, selected item, inventory, fitting, manufacturing, refinery, station board, starmap, log — plus the Show Info window (`infowin.go`), the flat context menu (`menu.go`) and the icon set (`icons/`). The legacy hand-drawn `ui/` package is retired. |
+| `uikit/`      | The UI platform (ebitenui v0.7.3): EVE-style windows — overview, HUD, module rack, selected item, inventory, fitting, manufacturing, refinery, contacts view, starmap, log — plus the Show Info window (`infowin.go`), the flat context menu (`menu.go`) and the icon set (`icons/`). The legacy hand-drawn `ui/` package is retired. |
 | `game/`       | Ebiten `Game` implementation, scene stack (menu / space / station / starmap), input→`sim` commands, camera, time acceleration, save/load wiring, the manufacturing panel wiring. |
 | `cmd/entieve` | CLI entrypoint: `run` (play), `validate` (content lint), `simulate` (headless run with report), `version`. |
 
@@ -208,19 +208,24 @@ system list with starmap positions, `start_system: "sys-solace"`.
   the belt. Its `scenario` block lists feature checkpoints (see
   "Showcase world" below).
 
-**Contracts** (`content/data/contracts/*.json`) — mission-board offerings
-pinned to one station (`station` = offering station; kinds `kill`, `deliver`,
-`mine`; objectives reference NPC IDs / cargo items / stations, validated):
-- `contract-solace-cleanup-1` (kill 1 scuttler) — the `cel-huta` board (level
-  1, standing 0; the id keeps its frozen name though the order moved to
-  Młondan); `contract-solace-supply-run-1` (deliver 2 m³ ammo-emp-s to
-  `cel-penumbra-port`) and `contract-solace-cordite-1` (mine 400 m³
-  ore-cordite) — the `cel-haven-rest` board (level 1, standing 0).
-- `contract-penumbra-den-hunt-1` (kill 1 marauder), `contract-penumbra-lucidite-1`
-  (mine 500 m³ ore-lucidite) — the `cel-penumbra-port` board (level 2,
-  `min_standing` 0.2).
-Rewards are calibrated by the payout ratio table in
-`docs/CONTENT_AUTHORING.md` ("add a contract").
+**Contacts and offers** (`content/data/contacts/*.json`) — the dock-side
+mission-givers and their offer pools. A contact is a patron's desk at one
+station (`contact-*`, patron `commission`|`charter`|`corporation`, one
+`min_standing` gate, ≥ 1 offers); each offer (`offer-*`) is an authored
+task in the old contract shape (`kill`/`deliver`/`mine`, objective,
+reward, prose) plus a `source` that tells the sim what to derive it from:
+
+- `stock` — the claim station's requisition stock of an item is below the
+  target (the manufacturing/supply/mining orders);
+- `rats` — live Old Works hulls of the objective class work the system
+  (the belt cleanups);
+- `war-supply` / `war-clear` — a front's supply gap or an overrun front
+  (the Commission's materiel and kill orders).
+
+Offers are derived per evaluation (`sim/contacts.go`), never stored; a
+contact's authored template also flattens into `Content.Contracts` so the
+engine (and the payout calibration) reads one shape. Rewards are calibrated
+by the payout ratio table in `docs/CONTENT_AUTHORING.md` (Recipe 8).
 
 **Traffic** (`content/data/traffic/*.json`, one def per system, keyed by
 its `system` field): convoy `routes` (station/gate/belt endpoints;
@@ -304,10 +309,25 @@ type SystemDef struct {
     // book); a system-level Market block is rejected by Validate.
 }
 type UniverseDef struct { Region, Constellation string; StartSystem SystemID; Systems []SystemDef }
-type ContractDef struct {                        // contracts/*.json
+type ContactDef struct {                        // contacts/*.json
+    ID ContactID; Name, Patron string             // Patron: commission|charter|corporation
+    Station CelID; MinStanding float64            // the one gate (career standing)
+    Offers []ContactOffer                         // the pool (≥ 1)
+}
+type ContactOffer struct {
+    ContractDef                                   // the authored task (inline)
+    Source OfferSource                            // derivation + expiry rule
+}
+type OfferSource struct {
+    Kind string                                   // stock|rats|war-supply|war-clear
+    Item ItemID; System SystemID                  // the watched signal
+    Target int                                    // stock: units on hand the station keeps
+    Base, Max int                                 // the derived count window
+}
+type ContractDef struct {                        // the engine's offer shape
     ID ContractID; Title, Kind, Description string // Kind: "kill"|"deliver"|"mine"
-    Level int; MinStanding float64                 // board gate (career standing)
-    Station CelID                                 // offering station (the board)
+    Level int; MinStanding float64                 // contact gate (career standing)
+    Station CelID                                 // offering station (the contact's)
     Objective struct{ Target NpcID; Item ItemID; Destination CelID; Count int }
     // kill: Target+Count rats; deliver: Item+Count m³ to Destination;
     // mine: Item (ore) + Count m³ mined into the hold.
@@ -549,7 +569,7 @@ entities out from under the systems still running this tick); events are
 capped at emit time, so there is no end-of-Step event system.
 
 The **contracts loop** ties the activities together: undock → accept a
-contract from a station board → count objectives from the existing flows
+offer from a contact → count objectives from the existing flows
 (rat kills by class, ore mined into the hold, cargo delivered to the
 destination station) → return to the claim station → payout + career
 standing (`Save.Standing` / `Save.Missions`, both persisted). Contracts are
@@ -1066,7 +1086,7 @@ map only says where each thing derives from.
 
 | Concern | Owner | Contract |
 |---|---|---|
-| Generator families | `uikit/theme/round.go` | One rasteriser behind `Bordered` (control, 5 px, flat), `PanelBox` (panel, 8 px, depth), `WindowTitleBox` (top corners only) + `WindowBodyBox` (bottom corners only, depth) — the two window pieces — `BandedBox` (control radii, fill starts under a plate band) and `Rounded` (explicit per-corner radii; square = zero). `SquareBox` is the square strip — no corner arc, flat hairline edge — for thin chrome (the game-built menu body, the title windows' scroll backs, the station board's body and row backs); it rides ebitenui's bordered colour so those strips keep their pinned pixels. A screen asks for a **piece**, never a radius outside `Rounded`. |
+| Generator families | `uikit/theme/round.go` | One rasteriser behind `Bordered` (control, 5 px, flat), `PanelBox` (panel, 8 px, depth), `WindowTitleBox` (top corners only) + `WindowBodyBox` (bottom corners only, depth) — the two window pieces — `BandedBox` (control radii, fill starts under a plate band) and `Rounded` (explicit per-corner radii; square = zero). `SquareBox` is the square strip — no corner arc, flat hairline edge — for thin chrome (the game-built menu body, the title windows' scroll backs, the contacts view's body and row backs); it rides ebitenui's bordered colour so those strips keep their pinned pixels. A screen asks for a **piece**, never a radius outside `Rounded`. |
 | Title bars | `theme.NewTitleBar` (`uikit/theme/iconmap.go`) | The one bar: ring dots, an optional 24 px leading icon, then the tracked `ChromeText` title bound to the bar (a title longer than the window ellipsizes clear of the ×). Every window asks for it — the uikit panels, the Overview and Selected Item core windows, the game's Esc menu and the title phase's save manager (via `Game.titleBar`) — and nothing hand-builds a bar. |
 | Radius / depth / dots / tracking tokens | `theme/round.go`, `theme/dots.go`, `theme/tracked.go` | `RadiusWindow/Panel/Control` are design px through `Px`; `depthRows` is the ramp's source resolution (the nine-slice centre row stretches it); `PanelTop`/`PanelBottom` are the ramp's ends derived from the body colour; `TitleDot*` the ring mark; `trackEm` the 0.12 em chrome tracking. One home each — no call site re-types them. |
 | Tracked chrome labels | `theme/tracked.go` | `ChromeText` (widget), `DrawTracked` (hand-drawn) and `MeasureTracked` are the only tracking path; body/row text stays untracked Sans. A tracked label measures with the same step it draws. |
@@ -1079,7 +1099,7 @@ map only says where each thing derives from.
 | Quantity picker | `screens/qtypicker.go` + `screens/env.go` + `screens/kit.go` | The one replacement for every −/+ ticker. The popup is a session **service** (like the menu and Show Info), so a bare `NewEnv` and a `Kit` share one instance and one per-mode memory of the last confirmed value; panels never hold it — they emit the host-owned `widgets.QtyPick{Mode, Item, Recipe, From, To}` intent through the sink, which the Kit's `RunIntent` (or a bare session's wrapped sink) turns into `Session.OpenQty`. `Kit.OpenQty` mounts the window on first open, centres it on the root overlay and raises it; `Kit.CloseQty` unmounts and hides, so Cancel, Esc, `×` and Confirm all end in the same idempotent place. That is the kit's one **dialog** lifecycle (`screens/kitdialog.go`, Kit-internal): Show Info, the order mini-window and the picker all go through `newDialog` (the single `×` registration) + `showDialog` (re-target, optional `place`, then remove + re-add on top with `animate=false` — a launch on the open window never restarts the fade, and a launch during a close fade drops the pending unmount) + `closeDialog` (idempotent unmount + hide). Only the picker sets `place` (it centres on every show); a re-target of Show Info or the order window never moves it. The window is **modal** (ebitenui's fullscreen input layer: a click outside cannot reach the window beneath) and its slider is the house `widgets.Slider` polled from `Kit.Sync` — the refinery's notched whole-batch ladder, everything else freeflow 1..100. Esc is the one key it consumes, read in `Kit.MenuInput`/`Kit.Update` (`pickPoll`) ahead of any window close, so the host's Esc-menu latch already owns that frame. Confirm emits the surface's existing intent (`Refine`, `StartJob`, `Buy`, `Sell`, `Transfer`) — no new sim command, no new payload |
 | Menu latch | `widgets/menu.go` + `screens/kit.go` | The **consumed-gesture latch**: `Menu.Click/Esc` set it, `Menu.Poll` reads it (one gesture, one action per frame), `Kit.Update` clears it via `Menu.TakeBlocked` and skips `ui.Update` that frame. Contract documented on `Menu`. |
 | Clip seam | `sim/api.go` (`ClipState`) | The bay as the UI reads it: loaded rounds, capacity for the reference shell, selection/options, `Loading`, plus the derived bay spec `BayM3`/`CycleSeconds` (recomputed per call from `sim/clips.go`'s privates — never persisted). The rack's waiting dot, ready marker and tooltip bay row read this one state; the cycle ring reads the module runtime. |
-| Screen host | `game/screenhost.go` + `game/screens.go` | One row (frozen id = the layout-sidecar key), one built panel. The host owns the mount order (spec order), the same-frame mount Sync, the × `Dismissed` hook — committed chrome close only, so a hotkey unmount keeps session folds — and the layout entry (geometry always; splits/tables only when the panel implements the facet). A panel implementing `Fitted` (`FitSize() (w, h)` in DESIGN units) is fitted after every mount Sync and every frame Sync: the host mirrors the floor onto the window's `MinSize` and composes the row's declared column through `Place`, never `SetLocation` — a player-moved window keeps its position (the **Station board** is the one fitted row). Two instances: the game host and the title host (lazy, exclusive, fresh on reopen, never persisted). The owner's close hook (`screenServices.Close`) rides only the game host — its modals close through their scene; the title host's rows close by a plain toggle on its own flag. |
+| Screen host | `game/screenhost.go` + `game/screens.go` | One row (frozen id = the layout-sidecar key), one built panel. The host owns the mount order (spec order), the same-frame mount Sync, the × `Dismissed` hook — committed chrome close only, so a hotkey unmount keeps session folds — and the layout entry (geometry always; splits/tables only when the panel implements the facet). A panel implementing `Fitted` (`FitSize() (w, h)` in DESIGN units) is fitted after every mount Sync and every frame Sync: the host mirrors the floor onto the window's `MinSize` and composes the row's declared column through `Place`, never `SetLocation` — a player-moved window keeps its position (the **Contacts view** is the one fitted row). Two instances: the game host and the title host (lazy, exclusive, fresh on reopen, never persisted). The owner's close hook (`screenServices.Close`) rides only the game host — its modals close through their scene; the title host's rows close by a plain toggle on its own flag. |
 | Title phase | `game/title.go` + `Options.StartInTitle` | The boot menu (wordmark, New game / Continue / Save manager / Settings / Keybindings / Credits / Quit) and its **scene-owned** window set: one Screen host over one title table (`titleRows` — the transient save manager, the `InTitle` rows (Settings, Keybindings) and the transient credits), so the menu rows, the live key bindings and every × drive the same open flags; the title-only rows are transient, modal and unkeyed, and never enter the game table, the KeyMap, the layout sidecar or the rail. The phase freezes the sim, applies one chrome rule (HUD/rack/core follow space, rail follows gameplay; panels unmounted) and leaves through one reconcile (`leaveTitle`, which never touches the player's open flags). Save plumbing (`SaveAs`, the save list, the active save path) lives here; the sim format is untouched. |
 
 Rules that keep it one system: a screen names a piece or a token, never a

@@ -165,7 +165,7 @@ func TestKillContractLifecycle(t *testing.T) {
 			t.Fatalf("after kill %d: missions=%+v", i, m)
 		}
 		pr := findMission(evs, MissionProgress)
-		if pr == nil || !strings.Contains(pr.Text, "Contract progress: Test Cleanup") {
+		if pr == nil || !strings.Contains(pr.Text, "Offer progress: Test Cleanup") {
 			t.Fatalf("kill %d: missing progress event: %v", i, evs)
 		}
 		if i < 3 && findMission(evs, MissionReady) != nil {
@@ -326,8 +326,8 @@ func TestMissionRefusalPaths(t *testing.T) {
 		dockNamed(t, s, "Haven Rest")
 		evs := acceptMission(t, s, "contract-test-nope")
 		ref := findMission(evs, MissionRefused)
-		if ref == nil || !strings.Contains(ref.Text, "No such contract contract-test-nope") {
-			t.Fatalf("expected unknown-contract refusal, got %v", evs)
+		if ref == nil || !strings.Contains(ref.Text, "No such offer contract-test-nope") {
+			t.Fatalf("expected unknown-offer refusal, got %v", evs)
 		}
 	})
 
@@ -408,7 +408,7 @@ func TestAbandonMissionMidProgress(t *testing.T) {
 	s.Queue(CmdAbandonMission{ID: "contract-test-nope"})
 	s.Step()
 	evs = drain(s)
-	if ref := findMission(evs, MissionRefused); ref == nil || !strings.Contains(ref.Text, "No active contract") {
+	if ref := findMission(evs, MissionRefused); ref == nil || !strings.Contains(ref.Text, "No active offer") {
 		t.Fatalf("expected inactive refusal, got %v", evs)
 	}
 
@@ -417,7 +417,7 @@ func TestAbandonMissionMidProgress(t *testing.T) {
 	s.Queue(CmdAbandonMission{ID: "contract-test-kill"})
 	s.Step()
 	evs = drain(s)
-	if ab := findMission(evs, MissionAbandoned); ab == nil || !strings.Contains(ab.Text, "Contract abandoned: Test Cleanup") {
+	if ab := findMission(evs, MissionAbandoned); ab == nil || !strings.Contains(ab.Text, "Offer abandoned: Test Cleanup") {
 		t.Fatalf("no abandoned event: %v", evs)
 	}
 	if len(s.Missions()) != 0 {

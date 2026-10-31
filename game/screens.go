@@ -304,21 +304,20 @@ var screens = []Screen{
 		},
 	},
 	{
-		// The station board: the ONE window docking opens, the window that
-		// replaced the old station strip. An ordinary floating window whose
-		// declared default is the station column (left of the viewport,
-		// clear of the rail gutter); the panel answers its content floor
-		// (FitSize, uikit/screens/stationboard.go) and the host composes
-		// the column from it (stationRect). Unkeyed by design — docking
-		// opens it, the rail reopens it, and there is nothing to press in
-		// space where it cannot mount.
-		ID: idServices, Title: "Station Services", Icon: "kind_station",
+		// The contacts view: the ONE window docking opens. An ordinary
+		// floating window whose declared default is the station column
+		// (left of the viewport, clear of the rail gutter); the panel
+		// answers its content floor (FitSize, uikit/screens/contacts.go) and
+		// the host composes the column from it (stationRect). Unkeyed by
+		// design — docking opens it, the rail reopens it, and there is
+		// nothing to press in space where it cannot mount.
+		ID: idServices, Title: "Contacts", Icon: "kind_station",
 		Key:         keyNone, // docking opens it; the rail reopens it
 		DefaultRect: image.Rect(stationX, stationY, stationX+stationWinW, stationY+stationMinH),
 		Anchor:      AnchorFixed,
 		DockPolicy:  DockFloating, DockedOnly: true,
 		Group: "Station",
-		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewStationBoard(h.services.Env) },
+		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewContacts(h.services.Env) },
 	},
 	{
 		// The refinery: an ore→mineral service window, docked-only like the

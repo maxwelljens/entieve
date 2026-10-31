@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Contacts replace the contract board** — the dock screen is now the
+  **Contacts** view: the station services row (Undock, Cargo, and one button
+  per service window — Market, Fitting, Industry, Refinery — so no door was
+  lost) over the contacts posted there and their live offers, then your
+  active work. A contact represents the Charter, the Commission or a
+  corporation, answers to one standing gate, and owns a pool of offers.
+- **Offers are derived from the world, not rolled** — a front short of
+  materiel posts a delivery naming that front system and count, an overrun
+  front posts a kill order, a station short of requisition stock posts a
+  manufacturing or hauling order, live Old Works hulls in a system post a
+  belt cleanup, and a station short of ore posts a mining order. No RNG: two
+  runs over the same state derive identical offers.
+- **Gap-driven expiry** — an offer stops being listed when its gap closes
+  (the stock arrives, the front is held, the rats are dead). Nothing is
+  persisted before accept: accepted work never fails and has no timer.
+- **Deliveries land in the world** — completed deliveries post their cargo
+  as requisition stock on the destination station's book (the goods its
+  guard posts buy replacements from), and a materiel run credits the war
+  front it served. Delivery offer rows show the destination's live stock.
+
 - **Target cards are clickable** — a left click on a locked target's card in
   the top-centre row selects that target, exactly as a world click does (the
   Selected Item panel and the overview row highlight follow it). It does not
@@ -26,6 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The contract board is gone** — `StationBoard` and the `contract-*`
+  content are replaced by contacts and offers (`contact-*`, `offer-*` under
+  `content/data/contacts/`); the accepted-work save surface now carries the
+  derived offer it accepted (old saves referencing a retired contract id
+  drop that mission gracefully). Event and ledger lines say Offer/Contact.
 - **The Overview opens twice as wide** (380 → 760 design px, same height and
   top-right corner). At the 1024×700 minimum its right edge now reaches the
   top-centre target cards and the Selected Item window's body — committed,

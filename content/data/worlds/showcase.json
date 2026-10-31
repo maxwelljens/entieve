@@ -302,7 +302,7 @@
     {
       "name": "Contracts and standing loop",
       "feature": "contract-loop",
-      "detail": "CmdAcceptMission (script action 'accept-mission') takes contract-solace-cleanup-1 off the Hovžan board in Młondan (security owns the high-sec belts now, so the kill orders live in the Fringe): EvMission 'accepted' on acceptance, 'progress' when the belt Scuttler dies (kills count by rat class), 'ready' when the objective is met, and 'completed' auto-claimed when the player docks at the offering station again — wallet +40,000 € and Player.Standing +0.10 land in the same tick. Refused commands (not docked / wrong board / insufficient standing / unknown id) report EvMission phase 'refused'."
+      "detail": "CmdAcceptMission (script action 'accept-mission') takes offer-hovzan-cleanup off Hovžan's charter contact in Młondan (the offer is derived from live Old Works hulls in the system; security owns the high-sec belts, so the kill orders live in the Fringe): EvMission 'accepted' on acceptance, 'progress' when the belt Scuttler dies (kills count by rat class), 'ready' when the objective is met, and 'completed' auto-claimed when the player docks at the offering station again — wallet +40,000 € and Player.Standing +0.10 land in the same tick. Refused commands (not docked / wrong contact / insufficient standing / unknown offer) report EvMission phase 'refused'."
     },
     {
       "name": "NPC traffic delivery and market drift",

@@ -120,7 +120,7 @@ func TestViewDeliverProgress(t *testing.T) {
 	cv, c := newViewTest(t)
 	v := cv.(*view)
 
-	itemDef, _ := c.Contract("contract-solace-supply-run-1") // 2 m³ of ammo-emp-s
+	itemDef, _ := c.Contract("offer-jalvrek-supply") // 2 m³ of ammo-emp-s
 	ammo, _ := c.Item(itemDef.Objective.Item)
 	v.s.Cargos.Set(v.s.Player(), sim.Cargo{Stacks: []content.CargoStack{
 		{Item: itemDef.Objective.Item, Qty: 100},
@@ -136,7 +136,7 @@ func TestViewDeliverProgress(t *testing.T) {
 		t.Errorf("DeliverProgress(ore) = %v m³, want %v", got, want)
 	}
 	// Volume-less cargo (a module) counts as whole units and caps.
-	modDef, _ := c.Contract("contract-manufacturing-shield-1") // 4 units
+	modDef, _ := c.Contract("offer-duksan-shield") // 4 units
 	v.s.Cargos.Set(v.s.Player(), sim.Cargo{Stacks: []content.CargoStack{
 		{Item: modDef.Objective.Item, Qty: 9},
 	}})

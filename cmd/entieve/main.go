@@ -40,7 +40,7 @@ Usage:
   entieve run       [--world ID] [--seed N] [--load save.json] [--save save.json]
   entieve validate  [--dir content/data]
   entieve simulate  [--world ID] [--seed N] [--ticks N] [--script steps.json] [--quiet] [--trace-npc NAME]
-  entieve describe  <id>            (any content id: item, ship, module, npc, system, world, contract)
+  entieve describe  <id>            (any content id: item, ship, module, npc, system, world, contact, offer)
   entieve version
 
 Run "entieve <subcommand> -h" for subcommand flags.`
@@ -156,8 +156,8 @@ func cmdValidate(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "entieve validate: FAILED\n%v\n", err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "content OK: %d items, %d ships, %d modules, %d npcs, %d systems, %d worlds, contracts: %d\n",
-		len(c.Items), len(c.Ships), len(c.Modules), len(c.NPCs), len(c.Systems), len(c.Worlds), len(c.Contracts))
+	fmt.Fprintf(stdout, "content OK: %d items, %d ships, %d modules, %d npcs, %d systems, %d worlds, contacts: %d, offers: %d\n",
+		len(c.Items), len(c.Ships), len(c.Modules), len(c.NPCs), len(c.Systems), len(c.Worlds), len(c.Contacts), len(c.Contracts))
 	return 0
 }
 
@@ -229,12 +229,24 @@ func cmdSimulate(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+// missionDef resolves accepted work's task for the report: the mission's
+// materialized offer (contacts) or the content template (a pre-contacts save).
+func missionDef(s *sim.Sim, m sim.MissionState) *content.ContractDef {
+	if m.Def != nil {
+		return m.Def
+	}
+	if def, ok := s.Content.Contract(m.ID); ok {
+		return def
+	}
+	return nil
+}
+
 func printReport(w io.Writer, s *sim.Sim, res *script.Result, ticks int64) {
 	fmt.Fprintf(w, "\n== simulation report ==\n")
 	fmt.Fprintf(w, "ticks: %d (%.2fs sim time)\n", ticks, s.Time())
 	fmt.Fprintf(w, "wallet: %.2f €\n", s.Wallet())
-	// Standing and the contract book next to the wallet: the read surface
-	// of the contracts loop (docs/GAMEPLAY.md, "Contracts & standing").
+	// Standing and the accepted work next to the wallet: the read surface
+	// of the contacts loop (docs/GAMEPLAY.md, "Contacts & standing").
 	fmt.Fprintf(w, "standing: %.2f\n", s.Standing())
 	active := s.Missions()
 	var completed []string
@@ -246,7 +258,7 @@ func printReport(w io.Writer, s *sim.Sim, res *script.Result, ticks int64) {
 	fmt.Fprintf(w, "missions: %d active, %d completed\n", len(active), len(completed))
 	for _, m := range active {
 		line := "  active " + string(m.ID)
-		if def, ok := s.Content.Contract(m.ID); ok {
+		if def := missionDef(s, m); def != nil {
 			line += fmt.Sprintf(" %g/%g", m.Progress, float64(def.Objective.Count))
 		}
 		fmt.Fprintln(w, line)
@@ -366,7 +378,15 @@ func describeLookup(c *content.Content, id string) (any, error) {
 					}
 				})
 			}},
-		{"contract", func(s string) (any, bool) { d, ok := c.Contract(content.ContractID(s)); return d, ok },
+		{"contact", func(s string) (any, bool) { d, ok := c.Contact(content.ContactID(s)); return d, ok },
+			func() []string {
+				return ids(len(c.Contacts), func(yield func(string)) {
+					for k := range c.Contacts {
+						yield(string(k))
+					}
+				})
+			}},
+		{"offer", func(s string) (any, bool) { d, ok := c.Contract(content.ContractID(s)); return d, ok },
 			func() []string {
 				return ids(len(c.Contracts), func(yield func(string)) {
 					for k := range c.Contracts {
@@ -397,7 +417,7 @@ func describeLookup(c *content.Content, id string) (any, error) {
 	if len(near) > 0 {
 		return nil, fmt.Errorf("unknown id %q (did you mean: %s?)", id, strings.Join(near, ", "))
 	}
-	return nil, fmt.Errorf("unknown id %q (%d known ids across items/ships/modules/npcs/systems/worlds/contracts)", id, len(all))
+	return nil, fmt.Errorf("unknown id %q (%d known ids across items/ships/modules/npcs/systems/worlds/contacts/offers)", id, len(all))
 }
 
 // ids collects a range-over-func style iterator into a slice.

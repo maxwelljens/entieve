@@ -171,8 +171,8 @@ func TestShippedTextAvoidsRetiredNames(t *testing.T) {
 	}
 	for _, id := range keys(c.Contracts) {
 		ct := c.Contracts[id]
-		check("contracts/"+string(id), ct.Title)
-		check("contracts/"+string(id), ct.Description)
+		check("offers/"+string(id), ct.Title)
+		check("offers/"+string(id), ct.Description)
 	}
 	for _, id := range keys(c.Items) {
 		it := c.Items[id]

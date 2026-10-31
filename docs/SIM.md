@@ -37,7 +37,7 @@ run in this fixed order:
 | 12 | loot | `sim/system_loot.go` | loot command → cargo; bounties |
 | 13 | economy | `sim/system_economy.go` | station services (the `content.Services` ids): buy/sell/refine/repair/fitting |
 | 14 | travel | `sim/system_travel.go` | dock (free full restore, all modules off) / undock (modules off) / jump: grid swaps |
-| 15 | mission | `sim/system_mission.go` | contract accept/abandon, objectives, auto-claim |
+| 15 | mission | `sim/system_mission.go` | offer accept/abandon, objectives, auto-claim |
 | 16 | respawn | `sim/system_respawn.go` | funded NPC replacement timers |
 | 17 | traffic | `sim/system_traffic.go` | convoys, ambushes, patrols, book supply, journeys |
 | 18 | industry | `sim/system_industry.go` | manufacturing jobs, craft growth |
@@ -75,6 +75,13 @@ last so the rebuilt grid is never observed mid-Step.
   subsystem reaching for `s.RNG` fails a test. Traffic draws only its own
   stream (`TestTrafficNeverDrawsMasterStream`). The agent layer draws no
   RNG at all: imputation, ZIP and upkeep are pure math.
+- **Derived offers, never rolled.** A contact's live offers are a pure
+  function of state (`sim/contacts.go`): fronts in ascending id (distance
+  from the contact's system, then id), live Old Works hulls by handle
+  order, station requisition stock read straight off the book. Derivation
+  draws no RNG, persists nothing and moves no hash; two evaluations over
+  one state are byte-identical, and a completed delivery lands its cargo as
+  an ask on the destination's book (the guard-post requisition source).
 - **Canonical sorted iteration.** Systems iterate entities in handle order
   (`allEntities`, `sortEntities`), markets in ascending station id
   (`stationsSorted`), books in canonical order (item, side, price, arrival
@@ -127,7 +134,7 @@ covers everything — `sim.Event` in `sim/model.go` — with kinds `EvLog`,
 `EvMarket`, `EvModule`, `EvTargetLocked`, `EvCargoFull`, `EvAnomalyCleared`,
 `EvMission`, `EvTraffic`, `EvWar`. Phases: `EvWarp` carries `"start" | "land" |
 "scrammed"`; `EvMission` carries `"accepted" | "progress" | "ready" |
-"completed" | "abandoned" | "refused"` (with `ID`/`Name` for the contract);
+"completed" | "abandoned" | "refused"` (with `ID`/`Name` for the offer);
 `EvTraffic` carries `"departed" | "jumped" | "delivered" | "attacked" |
 "destroyed" | "escaped" | "patrol-response" | "saved"` (with `System`/`Cel`
 for the route endpoint or incident celestial, `Item`/`Value` for the
@@ -718,7 +725,7 @@ is standing in that system — the grid changes with it (`warApplyControl`):
 
 Nothing evicts the player. A fall while docked keeps the dock: market,
 repair and refining stay live, industry and fitting go dark
-(`stationOffers`), and the contract desk stops handing out new charter work
+(`stationOffers`), and the charter desk stops handing out new charter work
 (`remnant`). In-flight manufacturing jobs run to completion — they are paid
 work and the job pool is global. A reclaim restores the authored services.
 

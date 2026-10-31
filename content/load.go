@@ -7,17 +7,22 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"sort"
 	"strings"
 )
 
 // Load reads game data from fsys.
 //
-// It walks items/, ships/, modules/, npcs/, systems/, worlds/, contracts/,
+// It walks items/, ships/, modules/, npcs/, systems/, worlds/, contacts/,
 // traffic/, recipes/ plus universe.json under the filesystem root. Every JSON
 // file may contain a single object or an array of objects. universe.json must
 // contain exactly one UniverseDef whose "systems" field is empty (systems come
 // from systems/*.json; the universe file only supplies region/constellation/
 // start_system).
+//
+// A contact's offers flatten into Content.Contracts as offer templates: the
+// engine and the payout calibration read them like the old contract defs, and
+// the sim derives the live parameters from world state.
 //
 // Errors never fail at the first problem: every parse error names its file
 // and duplicate-ID errors accumulate, all reported in one joined error.
@@ -29,6 +34,7 @@ func Load(fsys fs.FS) (*Content, error) {
 		NPCs:      map[NpcID]*NpcDef{},
 		Systems:   map[SystemID]*SystemDef{},
 		Contracts: map[ContractID]*ContractDef{},
+		Contacts:  map[ContactID]*ContactDef{},
 		Traffic:   map[SystemID]*TrafficDef{},
 		Worlds:    map[WorldID]*WorldDef{},
 		Recipes:   map[RecipeID]*RecipeDef{},
@@ -53,9 +59,10 @@ func Load(fsys fs.FS) (*Content, error) {
 	loadObjects[WorldDef](l, fsys, "worlds", "world",
 		func(d *WorldDef) string { return string(d.ID) },
 		func(d *WorldDef) { c.Worlds[d.ID] = d })
-	loadObjects[ContractDef](l, fsys, "contracts", "contract",
-		func(d *ContractDef) string { return string(d.ID) },
-		func(d *ContractDef) { c.Contracts[d.ID] = d })
+	loadObjects[ContactDef](l, fsys, "contacts", "contact",
+		func(d *ContactDef) string { return string(d.ID) },
+		func(d *ContactDef) { c.Contacts[d.ID] = d })
+	c.flattenOffers()
 	// Traffic defs are keyed by their system (one def per system), so the
 	// system ID doubles as the duplicate-detection identity.
 	loadObjects[TrafficDef](l, fsys, "traffic", "traffic",
@@ -77,6 +84,33 @@ func Load(fsys fs.FS) (*Content, error) {
 // LoadDir("content/data") during development or hot-reload.
 func LoadDir(dir string) (*Content, error) {
 	return Load(os.DirFS(dir))
+}
+
+// flattenOffers fills Content.Contracts with one template per contact offer:
+// the offer's own task fields plus the contact's station and standing gate
+// (the two facts the contact owns). Contacts are visited in id order so a
+// duplicate offer id resolves the same way every load; the validator reports
+// the duplicate.
+func (c *Content) flattenOffers() {
+	ids := make([]string, 0, len(c.Contacts))
+	for id := range c.Contacts {
+		ids = append(ids, string(id))
+	}
+	sort.Strings(ids)
+	if c.Contracts == nil {
+		c.Contracts = map[ContractID]*ContractDef{}
+	}
+	for _, id := range ids {
+		ct := c.Contacts[ContactID(id)]
+		for i := range ct.Offers {
+			def := ct.Offers[i].ContractDef
+			def.Station = ct.Station
+			def.MinStanding = ct.MinStanding
+			if _, dup := c.Contracts[def.ID]; !dup {
+				c.Contracts[def.ID] = &def
+			}
+		}
+	}
 }
 
 // MustLoad loads the embedded game data and panics on error. Intended for

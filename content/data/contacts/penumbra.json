@@ -1,0 +1,31 @@
+[
+  {
+    "id": "contact-hauvnok-freeport",
+    "name": "Hauvnok Freeport Office",
+    "patron": "charter",
+    "station": "cel-penumbra-port",
+    "min_standing": 0.2,
+    "offers": [
+      {
+        "id": "offer-hauvnok-hunt",
+        "title": "Gnazvor hunt",
+        "kind": "kill",
+        "level": 2,
+        "objective": { "target": "npc-rat-marauder", "count": 1 },
+        "reward": { "credits": 240000, "item": "loot-navdata", "qty": 1, "standing_gain": 0.15 },
+        "description": "A Marauder holds station in the Gnazvor and raids Hauvnok's shipping lanes. Prove yourself to the {station} office (standing 0.20) and put it down.",
+        "source": { "kind": "rats", "system": "sys-penumbra" }
+      },
+      {
+        "id": "offer-hauvnok-lucidite",
+        "title": "Lucidite contract",
+        "kind": "mine",
+        "level": 2,
+        "objective": { "item": "ore-lucidite", "count": 500 },
+        "reward": { "credits": 85000, "item": null, "standing_gain": 0.15 },
+        "description": "{station} pays a premium on {count} m³ of lucidite out of the {system} belt. Standing 0.20 required before they hand out the order.",
+        "source": { "kind": "stock", "item": "ore-lucidite", "target": 2000, "base": 100, "max": 1000 }
+      }
+    ]
+  }
+]
