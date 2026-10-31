@@ -31,7 +31,8 @@ import (
 )
 
 // version is stamped at build time via -ldflags "-X main.version=...".
-var version = "0.1.0-dev"
+// An unstamped source run reports git's describe instead (versionString).
+var version = versionDev
 
 const usage = `Entieve — a love letter to EVE Online
 
@@ -63,7 +64,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	case "describe":
 		return cmdDescribe(args[1:], stdout, stderr)
 	case "version":
-		fmt.Fprintf(stdout, "entieve %s\n", version)
+		fmt.Fprintf(stdout, "entieve %s\n", versionString())
 		return 0
 	case "-h", "--help", "help":
 		fmt.Fprintln(stdout, usage)
@@ -108,7 +109,7 @@ func cmdRun(args []string, stdout, stderr io.Writer) int {
 		SavePath:     *save,
 		Seed:         *seed,
 		StartInTitle: startInTitle(*load),
-		Version:      version,
+		Version:      versionString(),
 		Music:        musicSeam,
 		UISound:      uiSeam,
 	}
