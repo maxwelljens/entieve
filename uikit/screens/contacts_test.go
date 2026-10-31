@@ -217,14 +217,17 @@ func TestContactsPanelOnStubView(t *testing.T) {
 		t.Errorf("active overflow note = %q, want \"+2 more\"", got)
 	}
 
-	// FitSize is the rebuilt content floor: taller than the static
-	// minimum, at the column's fixed width.
+	// FitSize is the rebuilt content floor: the disclosed column width and
+	// the height the row cap measures (taller than the static minimum).
 	w, h := b.FitSize()
+	if StationWinW != 355 {
+		t.Errorf("StationWinW = %d, want the disclosed 355", StationWinW)
+	}
 	if w != StationWinW {
 		t.Errorf("FitSize width = %d, want the column %d", w, StationWinW)
 	}
-	if h <= StationMinH {
-		t.Errorf("FitSize height = %d, want above the static %d", h, StationMinH)
+	if h != 475 {
+		t.Errorf("FitSize height = %d, want the 475 px cap floor", h)
 	}
 
 	// The ungated row's one verb is Details: the accept lives in the dialog.
@@ -281,17 +284,146 @@ func TestContactsPanelOnStubView(t *testing.T) {
 	}
 }
 
+// fitBoard mirrors what the Screen host does with a fitted panel: apply the
+// content floor as the window's MinSize and compose the declared column,
+// then lay out.
+func fitBoard(t *testing.T, ui *ebitenui.UI, b *ContactsPanel, w, h int) {
+	t.Helper()
+	uitest.PumpWindow(t, ui, b.Sync, w, h)
+	fw, fh := b.FitSize()
+	b.Win().MinSize = &image.Point{X: theme.Px(fw), Y: theme.Px(fh)}
+	b.Win().SetLocation(StationRect(theme.Px(fh)))
+	uitest.PumpWindow(t, ui, b.Sync, w, h)
+}
+
+// TestBoardThumbSpansTheRow is the dock view's portrait rule: an offer
+// row's portrait covers the row's whole inner height (the text stack's
+// height), so it is 2:3 by construction — the height drives the width — and
+// the row is the taller of the two.
+func TestBoardThumbSpansTheRow(t *testing.T) {
+	c, defs := contactContent()
+	cv := &stubView{c: c, docked: true}
+	cv.contacts = widgets.Contacts{
+		Station: "cel-stub",
+		Offers:  offersFor(defs, "ct-a-open", "ct-b-open"),
+	}
+	b, _, ui := boardPanel(t, cv)
+	fitBoard(t, ui, b, 1280, 720)
+
+	for _, r := range b.offerRows {
+		row := r.Root.GetWidget().Rect
+		thumb := r.Root.Children()[0].GetWidget().Rect
+		if row.Dy() < theme.Px(boardRowH) {
+			t.Errorf("%s: row %v is below the %d px row floor", r.ID, row, theme.Px(boardRowH))
+		}
+		if thumb.Dy() != row.Dy() {
+			t.Errorf("%s: portrait %v does not span the row %v", r.ID, thumb, row)
+		}
+		if thumb.Dx()*3 != thumb.Dy()*2 {
+			t.Errorf("%s: portrait %v is not 2:3", r.ID, thumb)
+		}
+		if !thumb.In(row) {
+			t.Errorf("%s: portrait %v escapes its row %v", r.ID, thumb, row)
+		}
+	}
+}
+
+// TestBoardColumnsFollowTheBody pins the column budget the rows derive from
+// one content width: the stack line, its title/payout columns and active
+// work's title all grow with the body, and a degenerate width clamps to one
+// pixel instead of producing a negative text box.
+func TestBoardColumnsFollowTheBody(t *testing.T) {
+	narrow := columnWidths(boardInnerW, boardThumbW)
+	wide := columnWidths(boardInnerW+120, boardThumbW)
+	if wide.line != narrow.line+120 || wide.text != narrow.text+120 || wide.reward != narrow.reward+120 {
+		t.Errorf("wider body: %+v → %+v, want every column +120", narrow, wide)
+	}
+	if wide.title != narrow.title+120 {
+		t.Errorf("active title %d → %d, want +120", narrow.title, wide.title)
+	}
+	tiny := columnWidths(1, boardThumbW)
+	if tiny.line < 1 || tiny.text < 1 || tiny.reward < 1 || tiny.title < 1 {
+		t.Errorf("degenerate width produced a non-positive column: %+v", tiny)
+	}
+}
+
+// TestBoardFollowsTheLiveWindow is the resize pin: the panel reads its
+// body's laid-out width every Sync, so a window widened by its grips (the
+// chrome resizes the rect; SetLocation is what it calls) re-derives every
+// row at the new width — Details lands on the row's inner right edge at both
+// widths and the title column grows — while a frame at an unchanged width
+// rebuilds nothing (the row trees keep their identity).
+func TestBoardFollowsTheLiveWindow(t *testing.T) {
+	c, defs := contactContent()
+	cv := &stubView{c: c, docked: true}
+	cv.contacts = widgets.Contacts{
+		Station: "cel-stub",
+		Offers:  offersFor(defs, "ct-a-open", "ct-b-open", "ct-c-gated"),
+	}
+	b, _, ui := boardPanel(t, cv)
+	fitBoard(t, ui, b, 1280, 720)
+
+	// Churn: two more frames at the same width keep the same row trees.
+	before := findRow(t, b.offerRows, "ct-a-open")
+	beforeCols := b.cols
+	uitest.PumpWindow(t, ui, b.Sync, 1280, 720)
+	uitest.PumpWindow(t, ui, b.Sync, 1280, 720)
+	after := findRow(t, b.offerRows, "ct-a-open")
+	if after.Root != before.Root || after.Btn != before.Btn {
+		t.Error("a frame at an unchanged width rebuilt the rows (churn)")
+	}
+	if b.cols != beforeCols {
+		t.Errorf("columns drifted without a resize: %+v → %+v", beforeCols, b.cols)
+	}
+
+	detailRight := func() (btn, row int) {
+		r := findRow(t, b.offerRows, "ct-a-open")
+		return r.Btn.GetWidget().Rect.Max.X, r.Root.GetWidget().Rect.Max.X
+	}
+
+	// Width A: the fitted column.
+	btnA, rowA := detailRight()
+	if gap := rowA - btnA; gap > theme.Px(widgets.RichPad)+1 {
+		t.Errorf("Details ends %d px short of the row's edge, want the row padding %d",
+			gap, theme.Px(widgets.RichPad))
+	}
+
+	// Width B: the player drags the right edge out by 120.
+	rect := b.Win().GetContainer().GetWidget().Rect
+	b.Win().SetLocation(image.Rect(rect.Min.X, rect.Min.Y, rect.Max.X+120, rect.Max.Y))
+	uitest.PumpWindow(t, ui, b.Sync, 1280, 720)
+	uitest.PumpWindow(t, ui, b.Sync, 1280, 720)
+
+	if got := b.Win().GetContainer().GetWidget().Rect.Dx(); got != rect.Dx()+120 {
+		t.Fatalf("window width = %d after the drag, want %d", got, rect.Dx()+120)
+	}
+	if b.cols.text <= beforeCols.text {
+		t.Errorf("title column = %d after widening, want above %d", b.cols.text, beforeCols.text)
+	}
+	btnB, rowB := detailRight()
+	if rowB-rowA != 120 {
+		t.Errorf("row right edge moved %d, want the 120 px drag", rowB-rowA)
+	}
+	if gap := rowB - btnB; gap > theme.Px(widgets.RichPad)+1 {
+		t.Errorf("at the wider window Details ends %d px short of the row's edge, want %d",
+			gap, theme.Px(widgets.RichPad))
+	}
+	if btnB-btnA != rowB-rowA {
+		t.Errorf("Details moved %d px while the row grew %d", btnB-btnA, rowB-rowA)
+	}
+}
+
 // TestBoardRowRects pins the pure row layout: exact rects for a known inner,
 // then the invariants (equal heights, equal gaps, pairwise non-overlap,
 // everything inside the inner rect) on the panel's real section rect and at
 // the window minimum.
 func TestBoardRowRects(t *testing.T) {
-	// Exact: 176 px of inner, 3 rows, gap 4 → 56 each.
+	// Exact: 176 px of inner, 3 rows, gap 5 → 55 each.
 	inner := image.Rect(0, 0, boardInnerW, 176)
 	want := []image.Rectangle{
-		image.Rect(0, 0, boardInnerW, 56),
-		image.Rect(0, 60, boardInnerW, 116),
-		image.Rect(0, 120, boardInnerW, 176),
+		image.Rect(0, 0, boardInnerW, 55),
+		image.Rect(0, 60, boardInnerW, 115),
+		image.Rect(0, 120, boardInnerW, 175),
 	}
 	got := boardRowRects(inner, 3)
 	if len(got) != len(want) {

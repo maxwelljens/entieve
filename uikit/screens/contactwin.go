@@ -107,15 +107,18 @@ func (b *portraitBox) Set(id content.ContactID) {
 }
 
 // paintPortrait covers dst with the contact's dropped portrait, or reports
-// false so the caller draws the fallback glyph. A stray aspect is cropped,
-// never letterboxed — a portrait fills its frame.
+// false so the caller draws the fallback glyph. The source is the portrait's
+// mip level that covers dst (render.ContactPortraitFor), so a 56×84 thumb
+// samples a level built for it instead of the full-size photo. A stray
+// aspect is cropped, never letterboxed — a portrait fills its frame.
 func paintPortrait(dst *ebiten.Image, id content.ContactID) bool {
-	src := render.ContactPortrait(id)
+	db := dst.Bounds()
+	src := render.ContactPortraitFor(id, db.Dx(), db.Dy())
 	if src == nil {
 		return false
 	}
 	dst.Clear()
-	sb, db := src.Bounds(), dst.Bounds()
+	sb := src.Bounds()
 	s := math.Max(float64(db.Dx())/float64(sb.Dx()), float64(db.Dy())/float64(sb.Dy()))
 	var op ebiten.DrawImageOptions
 	op.GeoM.Scale(s, s)

@@ -243,7 +243,7 @@ const layoutBytesGolden = `{
     "services": {
       "x": 97,
       "y": 8,
-      "w": 307,
+      "w": 355,
       "h": 200,
       "open": false
     },

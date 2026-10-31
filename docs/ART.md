@@ -158,6 +158,28 @@ constants:
 The full sprite draw path and its tests live in `render/assets.go` and
 `render/assets_test.go`.
 
+## Mipmaps
+
+Every sprite the walk registers also carries a **halving chain** of its own
+pixels: level 0 is the sprite, level 1 half its size, and so on until the
+next level would drop a side below 32 px (`render/mip.go`). The levels are
+built on the CPU at load with a 2×2 box filter (`draw.Draw` into premultiplied
+RGBA, then averages rounded down), not by the GPU — so captures, twin runs
+and every machine build the identical levels. A chain costs a third of the
+sprite's own texture memory and about 5 ms per 592×880 portrait.
+
+`render.MipFor(key, w, h)` answers with the **smallest level that still
+covers** a `w×h` draw frame, so a sampled texel is never stretched past 2×
+and a photo shrunk into a thumb no longer shimmers. Sites adopt it
+deliberately, one at a time: today the **contact portraits** do (the dock
+row's full-height thumb and the Details dialog's frame, via
+`ContactPortraitFor`). Hull, station and asteroid sprites still draw their
+full-resolution image, and the icon set is not part of the sprite registry at
+all. Backgrounds are only indexed (their plates decode per system, on demand)
+and `assets/artwork/` plates are window-sized — neither carries a chain
+until a draw site asks for one (`MipFor` answers those keys with the full
+image).
+
 ## Interface icons
 
 The chrome carries a monochrome glyph set from
