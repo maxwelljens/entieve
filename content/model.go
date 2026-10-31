@@ -646,6 +646,21 @@ func (c *Content) Contact(id ContactID) (*ContactDef, bool) {
 	return d, ok
 }
 
+// ContactForOffer returns the contact whose pool authored the offer — the
+// drop-in key of the contact's portrait (assets/contacts/<contact-id>.png).
+// Contacts are visited in id order, so a duplicate offer id resolves the
+// same way every load (the validator reports it).
+func (c *Content) ContactForOffer(id ContractID) (ContactID, bool) {
+	for _, cid := range keys(c.Contacts) {
+		for i := range c.Contacts[cid].Offers {
+			if c.Contacts[cid].Offers[i].ID == id {
+				return cid, true
+			}
+		}
+	}
+	return "", false
+}
+
 // ContactsAt returns the contacts stationed at cel, sorted by id (the
 // canonical order the dock view lists them in).
 func (c *Content) ContactsAt(cel CelID) []*ContactDef {

@@ -17,9 +17,10 @@ import (
 
 // The contacts view — the dock screen (CONTEXT.md "Contact", "Station
 // board") — is a Screen panel of its own: the station services row (the
-// docked station's face and its navigation: Undock, Cargo, and one button
-// per service window the station offers) over the contact offers the sim
-// derives from world state, then the accepted work.
+// docked station's face and its one navigation: Undock — every window it
+// opens is the rail's own row, so the row carries no window buttons) over
+// the contact offers the sim derives from world state, then the accepted
+// work.
 //
 // It is the ONE window docking opens. The host asks it for its content floor
 // (FitSize, DESIGN units) and mirrors that onto the window's MinSize and the
@@ -48,14 +49,26 @@ const (
 	// derive from them, so a rendered row and its ellipsis budgets can
 	// never drift apart.
 	boardRowPad  = widgets.RichPad  // horizontal padding inside a row
-	boardBtnGap  = widgets.RichGap  // text ↔ action button gap inside a row
+	boardBtnGap  = widgets.RichGap  // gap between a row's cells
 	boardBtnW    = widgets.RichBtnW // action button width (fits the widest label, "Accepted", set in the emphasis face)
 	availMaxRows = 3                // visible offer rows ("+N more" beyond)
 	actMaxRows   = 2                // visible active rows ("+N more" beyond)
 
-	boardInnerW   = StationWinW - 2*boardPad                // body inner width: 382
-	boardContentW = boardInnerW - 2*boardRowPad             // row content width: 376
-	boardTextW    = boardContentW - boardBtnW - boardBtnGap // text column width: 278
+	// An offer row leads with the contact's 2:3 portrait thumb, then the
+	// rich row, whose lines are the title and the type chip beside the
+	// payout. boardTextW/boardRewardW are the two lines' text columns: the
+	// stack's own padding and the icon box included, so a title and a
+	// reward never drift from the row they sit in.
+	boardThumbW  = 28
+	boardThumbH  = 42 // 2:3
+	boardKindW   = 60 // the type chip's column: every reward starts on the same x
+	stackPad     = 2 * widgets.RichPad
+	boardRowW    = boardContentW - boardRowPad - boardThumbW - boardBtnGap - stackPad // the offer row's line width
+	boardTextW   = boardRowW - theme.IconInline - theme.IconGap - boardBtnGap - boardBtnW
+	boardRewardW = boardRowW - boardKindW - boardBtnGap
+
+	boardInnerW   = StationWinW - 2*boardPad // body inner width: 382
+	boardContentW = boardInnerW - 2*boardRowPad
 )
 
 // StationRect is the contacts window's rect in live px: the left column,
@@ -85,9 +98,6 @@ type ContactsPanel struct {
 	model     contactsModel
 	offerRows []ContactRow
 	actRows   []ContactRow
-	// defs is the live offers' defs by id, for the rows' Show Info refs
-	// (the model stays comparable; the defs are rebuilt with the rows).
-	defs map[content.ContractID]*content.ContractDef
 
 	// fit is the content floor in DESIGN units, cached at the last
 	// rebuild (FitSize's answer — never a per-frame PreferredSize).
@@ -214,12 +224,15 @@ func (b *ContactsPanel) Rows(active bool) []ContactRow {
 // refresh rule simple: any state the rows display must appear in the model.
 type contactRowModel struct {
 	ID       content.ContractID
-	Title    string // line 1
-	Prose    string // line 2 (offer) / progress (active)
-	Reward   string // line 3, offers only
-	Require  string // gate line, gated offers only
-	Icon     string // uikit icon name for the objective kind ("" = none)
-	Action   string // button label; "" for note rows
+	Contact  content.ContactID // portrait key, offers only
+	Title    string            // line 1
+	Kind     string            // the mission-type chip, offers only
+	Reward   string            // line 2, offers only (the money and the item)
+	Require  string            // the standing gate, gated offers only
+	Gain     string            // the standing gain, offers only
+	Stock    string            // the destination's requisition stock, deliveries only
+	Icon     string            // uikit icon name for the objective kind ("" = none)
+	Action   string            // button label; "" for note rows
 	Disabled bool
 	Note     bool // "+N more" / empty-state row (no button)
 }
@@ -262,30 +275,32 @@ func (b *ContactsPanel) build() contactsModel {
 		accepted[ms.ID] = true
 	}
 
-	defs := make(map[content.ContractID]*content.ContractDef, len(at.Offers))
 	show, hidden := capRows(len(at.Offers), availMaxRows)
 	for i := 0; i < show; i++ {
 		o := at.Offers[i]
-		defs[o.Def.ID] = o.Def
+		contact, _ := b.cv.Defs().ContactForOffer(o.Def.ID)
 		r := contactRowModel{
-			ID:     o.Def.ID,
-			Title:  o.Def.Title,
-			Prose:  o.ContactName + " · " + o.Prose,
-			Reward: rewardText(o.Def),
-			Icon:   theme.ContractIcon(o.Def.Kind),
-			Action: "Accept",
+			ID:      o.Def.ID,
+			Contact: contact,
+			Title:   o.Def.Title,
+			Kind:    theme.ContractLabel(o.Def.Kind),
+			Reward:  theme.FormatCredits(o.Def.Reward.Credits),
+			Icon:    theme.ContractIcon(o.Def.Kind),
+			Action:  "Details",
+		}
+		if o.Def.Reward.StandingGain != 0 {
+			r.Gain = fmt.Sprintf("%+.2f standing", o.Def.Reward.StandingGain)
 		}
 		if o.Def.Reward.Item != "" {
 			r.Reward += " · " + b.cv.TradeableName(o.Def.Reward.Item)
 		}
 		if o.Def.Kind == content.ContractDeliver {
-			r.Reward += fmt.Sprintf(" · in stock %d", o.Stock)
+			r.Stock = fmt.Sprintf("in stock %d", o.Stock)
 		}
 		if accepted[o.Def.ID] {
 			r.Action, r.Disabled = "Accepted", true
 		} else if !b.cv.MeetsStanding(o.MinStanding) { // the sim's accept gate, epsilon included
-			r.Require = fmt.Sprintf("Requires standing %.2f", o.MinStanding)
-			r.Disabled = true
+			r.Require = gateText(o.MinStanding)
 		}
 		m.Offers = append(m.Offers, r)
 	}
@@ -316,7 +331,6 @@ func (b *ContactsPanel) build() contactsModel {
 	show, hidden = capRows(len(work), actMaxRows)
 	for i := 0; i < show; i++ {
 		a := work[i]
-		defs[a.ms.ID] = a.def
 		have := a.ms.Progress
 		if a.def.Kind == content.ContractDeliver {
 			have = b.cv.DeliverProgress(a.def) // the sim counts deliver objectives only at the claim
@@ -334,7 +348,6 @@ func (b *ContactsPanel) build() contactsModel {
 	case len(work) == 0:
 		m.Active = append(m.Active, noteRow("No active work."))
 	}
-	b.defs = defs
 	return m
 }
 
@@ -361,12 +374,13 @@ func (b *ContactsPanel) rebuild(m contactsModel) {
 	b.fit = max(int(math.Round(float64(h)/theme.Scale())), StationMinH)
 }
 
-// buildRow renders one row as a rich row of the table module
-// (widgets.NewStackRow): the line stack below, the kind icon leading line 1
-// and the row's own RowSpec.Actions drawn as its trailing button. The row's
-// context menu rides the RowSpec seam: a right-click on the prose replaces
-// this menu with the objective's Show Info menu (that stack line's Ref).
-// Returns a nil button for note rows.
+// buildRow renders one row: an offer is the contact's portrait thumb beside
+// a rich row of the table module (widgets.NewStackRow) — the title with the
+// kind icon leading it, the mission-type chip and the payout under it and
+// the row's own RowSpec.Action drawn as its trailing buttons (Details) —
+// while active work keeps its one-line title/progress and Abandon. The row's
+// context menu rides the RowSpec seam: a right-click opens the same single
+// action the button carries. Returns a nil button for note rows.
 func (b *ContactsPanel) buildRow(r contactRowModel, active bool) (*widget.Container, *widget.Button) {
 	p := b.env.Pal()
 	row := widgets.TableRow{}
@@ -390,8 +404,12 @@ func (b *ContactsPanel) buildRow(r contactRowModel, active bool) (*widget.Contai
 		}}}}
 	}
 	sr := widgets.NewStackRow(b.env, row, b.env.Face(theme.StepSmall))
-	sr.Root.SetBackgroundImage(theme.SquareBox(theme.NRGBA(p.Cell, 160), theme.NRGBA(p.Border, 140), 1))
-	sr.Root.GetWidget().MouseButtonClickedEvent.AddHandler(func(args any) {
+	root := sr.Root
+	if !active && !r.Note {
+		root = b.offerRow(r, sr.Root)
+	}
+	root.SetBackgroundImage(theme.SquareBox(theme.NRGBA(p.Cell, 160), theme.NRGBA(p.Border, 140), 1))
+	root.GetWidget().MouseButtonClickedEvent.AddHandler(func(args any) {
 		a, ok := args.(*widget.WidgetMouseButtonClickedEventArgs)
 		if !ok || a.Button != ebiten.MouseButtonRight {
 			return
@@ -399,80 +417,85 @@ func (b *ContactsPanel) buildRow(r contactRowModel, active bool) (*widget.Contai
 		widgets.OpenRowMenu(b.cv, b.env, menuSpec, widgets.ClickPoint(a))
 	})
 	if len(sr.Buttons) == 0 {
-		return sr.Root, nil
+		return root, nil
 	}
-	return sr.Root, sr.Buttons[0]
+	return root, sr.Buttons[0]
 }
 
-// rowStack is one row's lines: the title over the offer's prose (the authored
-// words with the sim's parameters filled) and the reward on an offer row;
-// just title + progress on active work. The title keeps its fixed width (the
-// ellipsis budget the row reserves, icon box included), so every row measures
-// the same with or without a glyph.
+// offerRow wraps one offer's rich row beside the contact's portrait thumb:
+// [face] [title · kind · payout · Details].
+func (b *ContactsPanel) offerRow(r contactRowModel, stack *widget.Container) *widget.Container {
+	port := newPortraitBox(b.env, boardThumbW, boardThumbH, theme.IconInline)
+	port.Set(r.Contact)
+	outer := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(theme.Px(boardBtnGap)),
+			widget.RowLayoutOpts.Padding(&widget.Insets{Left: theme.Px(boardRowPad)}),
+		)),
+	)
+	stack.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+	outer.AddChild(port.Widget(), stack)
+	return outer
+}
+
+// rowStack is one row's lines: an offer leads with its title (the kind icon
+// in the row's icon box) and the mission-type chip beside the payout under
+// it; active work keeps its single title + progress line. The title keeps its
+// fixed width (the ellipsis budget the row reserves, icon box included), so
+// every row measures the same with or without a glyph.
 func (b *ContactsPanel) rowStack(r contactRowModel, active bool) []widgets.RowLine {
 	p := b.env.Pal()
-	step := theme.StepSmall
 	if active {
-		step = theme.StepTiny
-	}
-	titleW := theme.Px(boardTextW)
-	if r.Icon != "" {
-		titleW -= theme.Px(theme.IconInline) + theme.Px(theme.IconGap)
+		titleW := theme.Px(boardContentW - boardBtnW - boardBtnGap)
+		if r.Icon != "" {
+			titleW -= theme.Px(theme.IconInline) + theme.Px(theme.IconGap)
+		}
+		return []widgets.RowLine{{Segs: []widgets.RowSeg{{
+			Text: b.ellip(r.Title, theme.StepTiny, float64(titleW)),
+			Tint: p.Accent,
+			Step: theme.StepTiny,
+			MinW: titleW,
+		}}}}
 	}
 	lines := []widgets.RowLine{{Segs: []widgets.RowSeg{{
-		Text: b.ellip(r.Title, step, float64(titleW)),
+		Text: b.ellip(r.Title, theme.StepSmall, float64(theme.Px(boardTextW))),
 		Tint: p.Accent,
-		Step: step,
-		MinW: titleW,
+		Step: theme.StepSmall,
+		MinW: theme.Px(boardTextW),
 	}}}}
-	if active {
-		return lines // one line: "Belt cleanup — 1/3" + Abandon
-	}
 
-	// A gated row parks its standing requirement beside the prose (line 2)
-	// so line 3 gives the payout the whole row.
-	proseW := float64(theme.Px(boardContentW))
+	// Line 2: the type chip, then the payout.
+	lines = append(lines, widgets.RowLine{Segs: []widgets.RowSeg{
+		{Text: r.Kind, Tint: p.Head, Step: theme.StepTiny, MinW: theme.Px(boardKindW)},
+		{Text: b.ellip(r.Reward, theme.StepTiny, float64(theme.Px(boardRewardW))), Tint: p.Good, Step: theme.StepTiny},
+	}})
+
+	// Line 3: the asides a summary row still owes the player — why the
+	// accept inside Details is gated, the standing the work pays and a
+	// delivery's live stock.
+	var aside []widgets.RowSeg
 	if r.Require != "" {
-		reqW := b.textW(r.Require, theme.StepTiny)
-		if capW := proseW - float64(theme.Px(boardBtnGap)) - float64(theme.Px(40)); reqW > capW {
-			r.Require = b.ellip(r.Require, theme.StepTiny, capW)
-			reqW = b.textW(r.Require, theme.StepTiny)
-		}
-		proseW -= reqW + float64(theme.Px(boardBtnGap))
+		aside = append(aside, widgets.RowSeg{Text: r.Require, Tint: p.Warn, Step: theme.StepTiny})
 	}
-	prose := widgets.RowLine{Segs: []widgets.RowSeg{{
-		Text: b.ellip(r.Prose, theme.StepTiny, proseW),
-		Tint: p.Dim,
-		Step: theme.StepTiny,
-	}}}
-	if r.Require != "" {
-		prose.Segs = append(prose.Segs, widgets.RowSeg{
-			Text: r.Require, Tint: p.Warn, Step: theme.StepTiny,
-		})
+	if r.Gain != "" {
+		aside = append(aside, widgets.RowSeg{Text: r.Gain, Tint: p.Dim, Step: theme.StepTiny})
 	}
-	// The prose is its own gesture target: its Ref declares Show Info on the
-	// objective's def (the caste it asks you to kill, the item it wants), so
-	// right-click opens that menu and double-click swaps the window. It sits
-	// INSIDE the row and child handlers run after the parent's, so this Show
-	// Info menu replaces the row's Accept menu when the click lands here.
-	if ref, showable := b.objectiveRef(r.ID); showable {
-		prose.Ref = &ref
+	if r.Stock != "" {
+		aside = append(aside, widgets.RowSeg{Text: r.Stock, Tint: p.Dim, Step: theme.StepTiny})
 	}
-	lines = append(lines, prose, widgets.RowLine{Segs: []widgets.RowSeg{{
-		Text: b.ellip(r.Reward, theme.StepTiny, float64(theme.Px(boardContentW))),
-		Tint: p.Good,
-		Step: theme.StepTiny,
-		MinW: theme.Px(boardContentW),
-	}}})
+	if len(aside) > 0 {
+		lines = append(lines, widgets.RowLine{Segs: aside})
+	}
 	return lines
 }
 
-// contactRowSpec is one row's declared interactions: the same action the
-// button carries (Accept on a live offer, Abandon on active work), the same
-// gating, through the same command. The offer def is derived, so the row
-// declares no Ref (its menu is the single action entry).
+// contactRowSpec is one row's declared interactions: Details on a live offer
+// (the dialog carries the accept), Abandon on active work — through the same
+// command the board always emitted. The offer def is derived, so the row
+// declares no Ref (Details is its one entry point).
 func (b *ContactsPanel) contactRowSpec(r contactRowModel, active bool) widgets.RowSpec {
-	label, intent := "Accept", widgets.Intent(widgets.Accept{Contract: r.ID})
+	label, intent := "Details", widgets.Intent(widgets.ShowContact{Offer: r.ID})
 	if active {
 		label, intent = "Abandon", widgets.Abandon{Contract: r.ID}
 	}
@@ -483,26 +506,12 @@ func (b *ContactsPanel) contactRowSpec(r contactRowModel, active bool) widgets.R
 	}}}
 }
 
-// objectiveRef resolves an offer's objective to the definition its Show Info
-// window reads: a kill offer links its caste, deliver/mine offers their item.
-// The ref is validated against the loaded content (a stale ref shows nothing
-// rather than a hollow window).
-func (b *ContactsPanel) objectiveRef(id content.ContractID) (widgets.InfoRef, bool) {
-	def := b.defs[id]
-	if def == nil {
-		return widgets.InfoRef{}, false
-	}
-	var ref widgets.InfoRef
-	switch {
-	case def.Objective.Target != "":
-		ref = widgets.NpcRef(def.Objective.Target)
-	case def.Objective.Item != "":
-		ref, _ = widgets.ResolveTradeable(b.cv.Defs(), def.Objective.Item).Ref()
-	default:
-		return widgets.InfoRef{}, false
-	}
-	return b.cv.InfoRefOf(ref)
-}
+// objectiveRef moved to contactwin.go: the Details dialog resolves the
+// objective for its Inspect verb.
+
+// gateText is the standing gate stated the same way on the row and in the
+// Details dialog.
+func gateText(min float64) string { return fmt.Sprintf("Requires standing %.2f", min) }
 
 // rewardText renders the offer's reward line, e.g.
 // "40,000.00 € · +0.10 standing" — the shared money presentation

@@ -2,21 +2,19 @@ package screens
 
 import (
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
-	"slices"
 )
 
 // The station services row — the header of the contacts view, the one
-// window docking opens. It is the docked station's face: the docked-at
-// identity (station name · system), an Undock button, a Cargo button and
-// one button per service the station actually offers — buttons the station
-// LACKS are hidden, never grayed, because an absent service is not offered
-// at all. Every button
-// emits a typed intent (Undock, Toggle{Screen}) on the ActionSink; the
-// host maps the toggles onto its window table.
+// window docking opens. It is the docked station's face and its one
+// navigation: the docked-at identity (station name · system) and Undock.
+// Every window a station offers is already a row of the navigation rail
+// (Inventory, Market, Fitting, Manufacturing, Refinery, …), so the row
+// carries no window buttons: a second door to the same window is a second
+// thing to keep in sync. The button emits its typed intent (Undock) on the
+// ActionSink.
 //
 // The contacts panel this row heads lives beside it in contacts.go:
 // the panel composes the row first, then the two sections, so the row is
@@ -34,19 +32,15 @@ const (
 	svcGap = theme.SpMd
 )
 
-// svcButton is one button of the view: its handle name, its glyph, the
-// screen its Toggle names ("" = the undock intent instead) and whether
-// the station must offer a service for it to appear ("" = always).
+// svcButton is one button of the view: its handle name, its glyph and its
+// tooltip title.
 type svcButton struct {
-	name    string
-	icon    string
-	screen  string
-	service string
-	label   string // tooltip title
-	cell    *widget.Container
-	btn     *widget.Button
-	glyph   *theme.IconBox
-	visible bool
+	name  string
+	icon  string
+	label string // tooltip title
+	cell  *widget.Container
+	btn   *widget.Button
+	glyph *theme.IconBox
 }
 
 // Services is the docked station's service row: Theme + ContentView +
@@ -90,27 +84,9 @@ func NewServices(env widgets.Seams, innerWidth int) *Services {
 		widget.TextOpts.Text("", face, theme.Solid(p.Text)),
 		widget.TextOpts.Position(widget.TextPositionStart, widget.TextPositionCenter),
 	)
-	// The row's buttons, in order: leave, cargo, then one per service of
-	// content.Services that owns a window (repair has none — the sim's
-	// CmdRepair — so it draws no button). The table is the single owner of
-	// the id/label/icon/toggle tuple: a renamed window fails the host's
-	// pin instead of leaving a button that toggles nothing. The icon names
-	// match the Screen spec's own Icon per window, so the services view
-	// and the rail draw the same glyph for the same window. Icons are 20 px
+	// The row's one button: leave. Windows are the rail's. Icons are 20 px
 	// (IconButton), the cell box keeps the strip header's 40 px row height.
-	s.btns = []svcButton{
-		{name: "undock", icon: "act_undock", label: "Undock"},
-		{name: "cargo", icon: "svc_inventory", screen: "Inventory", label: "Cargo"},
-	}
-	for _, svc := range content.Services {
-		if svc.Window == "" {
-			continue
-		}
-		s.btns = append(s.btns, svcButton{
-			name: svc.ID, icon: svc.Icon, screen: svc.Window,
-			service: svc.ID, label: svc.Label,
-		})
-	}
+	s.btns = []svcButton{{name: "undock", icon: "act_undock", label: "Undock"}}
 	s.tips = make([]widgets.RowTip, len(s.btns))
 	for i := range s.btns {
 		b := &s.btns[i]
@@ -170,9 +146,8 @@ func NewServices(env widgets.Seams, innerWidth int) *Services {
 // Container returns the view's row for the host window body.
 func (s *Services) Container() *widget.Container { return s.row }
 
-// Button returns one button by handle name — "undock", "cargo",
-// "market", "fitting", "industry" (nil when there is no such button) —
-// the handle tests click and captures pin.
+// Button returns one button by handle name — "undock" (nil when there is
+// no such button) — the handle tests click and captures pin.
 func (s *Services) Button(name string) *widget.Button {
 	for i := range s.btns {
 		if s.btns[i].name == name {
@@ -185,32 +160,22 @@ func (s *Services) Button(name string) *widget.Button {
 // Identity is the identity line currently shown ("Station · System").
 func (s *Services) Identity() string { return s.label }
 
-// Visible reports whether the named button shows right now (the
-// station's service set decides; "undock"/"cargo" always do).
+// Visible reports whether the named button shows right now.
 func (s *Services) Visible(name string) bool {
 	for i := range s.btns {
 		if s.btns[i].name == name {
-			return s.btns[i].visible
+			return s.btns[i].btn.GetWidget().IsVisible()
 		}
 	}
 	return false
 }
 
-// fire emits one button's intent: Undock for the leave button, the
-// screen's Toggle for everything else.
-func (s *Services) fire(b *svcButton) {
-	if b.name == "undock" {
-		s.as.Do(widgets.Undock{})
-		return
-	}
-	s.as.Do(widgets.Toggle{Screen: b.screen})
-}
+// fire emits the leave button's intent.
+func (s *Services) fire(*svcButton) { s.as.Do(widgets.Undock{}) }
 
-// Sync re-reads the docked station: the identity line, and which service
-// buttons exist at THIS station (absent services hide, they are never
-// grayed — a grayed button would offer something the station does not
-// have). The identity ellipsizes to the room the visible buttons leave,
-// so the row can never push the window past its composed column.
+// Sync re-reads the docked station's identity. The identity ellipsizes to
+// the room the button leaves, so the row can never push the window past its
+// composed column.
 func (s *Services) Sync() {
 	if s.cv == nil {
 		return
@@ -223,24 +188,9 @@ func (s *Services) Sync() {
 		}
 		s.label = label
 	}
-	visible := 0
-	for i := range s.btns {
-		b := &s.btns[i]
-		show := b.service == "" || slices.Contains(info.Services, b.service)
-		b.visible = show
-		// Hide the whole cell (the glyph is its sibling) and the button
-		// handle alike: the row skips the cell's space, the pin reads the
-		// button's visibility, and a hidden button fires nothing.
-		theme.ShowWidget(b.cell.GetWidget(), show)
-		theme.ShowWidget(b.btn.GetWidget(), show)
-		if show {
-			visible++
-		}
-	}
-	// Room for the identity: content width minus the visible buttons
-	// and the gaps around them (the identity leads the row).
-	children := 1 + visible
-	room := theme.Px(s.innerWidth) - visible*theme.Px(svcBtnW) - (children-1)*theme.Px(svcGap)
+	// Room for the identity: content width minus the button and the gap
+	// between them (the identity leads the row).
+	room := theme.Px(s.innerWidth) - theme.Px(svcBtnW) - theme.Px(svcGap)
 	label := widgets.Ellipsize(s.label, float64(room), s.measure)
 	if s.name.Label != label {
 		s.name.Label = label

@@ -1056,7 +1056,7 @@ func (w *InfoWin) render(p infoPage) {
 	}
 	inner := infoInnerW()
 	for _, sec := range p.Sections {
-		w.page.AddChild(w.sectionBar(sec.Label))
+		w.page.AddChild(sectionBar(w.th, sec.Label))
 		for _, line := range sec.Lines {
 			w.page.AddChild(w.lineWidget(line, inner))
 		}
@@ -1066,9 +1066,10 @@ func (w *InfoWin) render(p infoPage) {
 
 // sectionBar is a section heading as a bar: the section's stat glyph, the
 // tracked label and a hairline rule filling the rest of the row (grey for the
-// identity blocks, tinted by the section's family otherwise).
-func (w *InfoWin) sectionBar(label string) *widget.Container {
-	env, pal := w.th, w.th.Pal()
+// identity blocks, tinted by the section's family otherwise). Show Info and
+// the contact Details dialog draw the same bar.
+func sectionBar(env theme.Theme, label string) *widget.Container {
+	pal := env.Pal()
 	icon, tint := theme.SectionBar(pal, label)
 	bar := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(

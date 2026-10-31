@@ -9,54 +9,52 @@ import (
 
 // TestServiceTableAgreesWithScreens pins the two ends of the station
 // service vocabulary: content.Services (the owner) and the Screen rows the
-// services row's buttons toggle. A renamed window, a drifted icon or a
-// lost button fails here instead of dying silently — Toggle{Screen} falls
-// through to the kit on an unknown title, and a hidden button offers
-// nothing.
+// rail opens. The contacts strip carries no window button at all — a second
+// door to a window the rail already lists is a second thing to keep in
+// sync — so the pin is that every service's window IS a Screen row, gated
+// on that service, with the table's icon, and that the strip offers none of
+// them.
 func TestServiceTableAgreesWithScreens(t *testing.T) {
 	g := dockedShowcaseGame(t, 1280, 720)
-	for _, svc := range content.Services {
-		b := stationBoard(t, g).Services().Button(svc.ID)
-		if svc.Window == "" {
-			if b != nil {
-				t.Errorf("%s: no window, but the services row drew a %q button", svc.ID, svc.ID)
-			}
-			if svc.Icon != "" {
-				t.Errorf("%s: no window, but the table names icon %q", svc.ID, svc.Icon)
+	svc := stationBoard(t, g).Services()
+	for _, s := range content.Services {
+		if s.Window == "" {
+			if s.Icon != "" {
+				t.Errorf("%s: no window, but the table names icon %q", s.ID, s.Icon)
 			}
 			continue
 		}
-		if b == nil {
-			t.Fatalf("%s: the services row has no %q button", svc.ID, svc.ID)
+		if b := svc.Button(s.ID); b != nil {
+			t.Errorf("%s: the contacts strip draws a %q window button — the rail owns that window", s.ID, s.ID)
 		}
-		id, ok := g.host.ByTitle(strings.ToLower(svc.Window))
+		id, ok := g.host.ByTitle(strings.ToLower(s.Window))
 		if !ok {
-			t.Fatalf("%s: window %q names no Screen row", svc.ID, svc.Window)
+			t.Fatalf("%s: window %q names no Screen row", s.ID, s.Window)
 		}
 		row := screenByID(id)
-		if row.Title != svc.Window {
-			t.Errorf("%s: window %q resolves to row %q", svc.ID, svc.Window, row.Title)
+		if row.Title != s.Window {
+			t.Errorf("%s: window %q resolves to row %q", s.ID, s.Window, row.Title)
 		}
-		if row.Service != svc.ID {
-			t.Errorf("%s: window %q is gated on service %q", svc.ID, row.Title, row.Service)
+		if row.Service != s.ID {
+			t.Errorf("%s: window %q is gated on service %q", s.ID, row.Title, row.Service)
 		}
-		if row.Icon != svc.Icon {
-			t.Errorf("%s: row icon %q, table icon %q", svc.ID, row.Icon, svc.Icon)
+		if row.Icon != s.Icon {
+			t.Errorf("%s: row icon %q, table icon %q", s.ID, row.Icon, s.Icon)
 		}
 	}
-	// The other direction: every service-gated row is a table entry whose
-	// button opens that very row.
+	// The other direction: every service-gated row is a table entry naming
+	// that very window.
 	for _, s := range screens {
 		if s.Service == "" {
 			continue
 		}
-		svc, ok := content.Service(s.Service)
+		srv, ok := content.Service(s.Service)
 		if !ok {
 			t.Errorf("row %q is gated on unknown service %q", s.Title, s.Service)
 			continue
 		}
-		if svc.Window != s.Title {
-			t.Errorf("row %q needs %q, but that service's button opens %q", s.Title, s.Service, svc.Window)
+		if srv.Window != s.Title {
+			t.Errorf("row %q needs %q, but that service names window %q", s.Title, s.Service, srv.Window)
 		}
 	}
 }

@@ -639,11 +639,13 @@ func (g *Game) syncMounts() {
 	// top chrome (the rail) follows gameplay — the title shows neither.
 	g.applyChrome(!docked && !g.title, !g.title)
 
-	// The order mini-window is transient and docked-only: a player who
-	// leaves the station has no book to post to, so it closes with the
-	// dock (undock and jump — a jump implies undocked — both land here).
+	// The order mini-window and the contact Details page are transient and
+	// docked-only: a player who leaves the station has no book to post to
+	// and no contact to talk to, so both close with the dock (undock and
+	// jump — a jump implies undocked — both land here).
 	if !docked && !g.title {
 		g.kit.CloseOrder()
+		g.kit.CloseContact()
 	}
 }
 

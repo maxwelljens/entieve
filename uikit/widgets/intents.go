@@ -115,6 +115,11 @@ type (
 	Accept  struct{ Contract content.ContractID }
 	Abandon struct{ Contract content.ContractID }
 
+	// ShowContact opens the contact Details dialog on one live offer —
+	// the board row's Details button (the accept verb lives inside that
+	// dialog, so this carries no command).
+	ShowContact struct{ Offer content.ContractID }
+
 	// Activate/Deactivate/CycleCharge are the module rack's three verbs:
 	// click (toggle), and the cell menu's charge cycle.
 	Activate struct {
@@ -192,6 +197,7 @@ func (CancelJob) isIntent()   {}
 func (Refine) isIntent()      {}
 func (Accept) isIntent()      {}
 func (Abandon) isIntent()     {}
+func (ShowContact) isIntent() {}
 func (Activate) isIntent()    {}
 func (Deactivate) isIntent()  {}
 func (CycleCharge) isIntent() {}
@@ -217,10 +223,10 @@ func (Quit) isIntent()        {}
 // current values, read at press (0 where there is no selector, e.g. a
 // kit-less session); Orbit's own Range wins when it is set. ok is false
 // for the intents a host handles itself: ShowInfo, OpenMenu, OpenOrder,
-// QtyPick, Toggle, Save, Load, Quit.
+// QtyPick, ShowContact, Toggle, Save, Load, Quit.
 func commandFor(i Intent, warpRange, orbitRange float64) (sim.Command, bool) {
 	switch v := i.(type) {
-	case ShowInfo, OpenMenu, OpenOrder, QtyPick, Toggle, Save, Load, Quit:
+	case ShowInfo, OpenMenu, OpenOrder, QtyPick, ShowContact, Toggle, Save, Load, Quit:
 		return nil, false
 	case Buy:
 		return sim.CmdBuy{Item: v.Item, Qty: v.Qty}, true

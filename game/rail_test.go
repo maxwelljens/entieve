@@ -3,7 +3,6 @@ package game
 import (
 	"image"
 	"slices"
-	"strings"
 	"testing"
 
 	enuiinput "github.com/ebitenui/ebitenui/input"
@@ -330,42 +329,29 @@ func TestRailPlacesOpenedWindowsWhileDocked(t *testing.T) {
 	}
 }
 
-// TestServicesViewButtonsOnTheRealStations: at the start station
-// (Jalvrek: repair, market, refine, fitting, industry) the view offers
-// market, fitting and industry; a repair-only service set hides them. Cargo toggles the
-// inventory window, every service button's Toggle names a Screen spec
-// row the host resolves, and Undock queues the sim's undock command.
-func TestServicesViewButtonsOnTheRealStations(t *testing.T) {
+// TestServicesViewOnTheRealStations: the contacts strip carries the docked
+// station's face and Undock — no window buttons at all, at any station's
+// service set (the rail lists every window; the strip is not a second
+// index). Undock queues the sim's undock command.
+func TestServicesViewOnTheRealStations(t *testing.T) {
 	g := dockedShowcaseGame(t, 1280, 720)
-	if !stationBoard(t, g).Services().Visible("market") || !stationBoard(t, g).Services().Visible("fitting") || !stationBoard(t, g).Services().Visible("industry") {
-		t.Fatal("start station's market/fitting/industry buttons hidden")
+	svc := stationBoard(t, g).Services()
+	if !svc.Visible("undock") {
+		t.Error("Undock hidden while docked")
 	}
-	if !stationBoard(t, g).Services().Visible("undock") || !stationBoard(t, g).Services().Visible("cargo") {
-		t.Error("Undock/Cargo are not station services — they must always show")
-	}
-	if stationBoard(t, g).Services().Identity() == "" {
+	if svc.Identity() == "" {
 		t.Error("identity line empty while docked")
 	}
-
-	// Cargo toggles the inventory window.
-	click(t, g, stationBoard(t, g).Services().Button("cargo"))
-	g.syncMounts()
-	if !g.host.IsOpen(idInventory) || !g.host.Mounted(idInventory) {
-		t.Error("Cargo did not toggle the inventory window")
-	}
-	click(t, g, stationBoard(t, g).Services().Button("cargo"))
-	g.syncMounts()
-
-	// Every service button toggles a real spec row (Toggle carries the
-	// spec's own Title, so the host title index resolves it).
-	for _, title := range []string{"Market", "Fitting", "Manufacturing", "Inventory"} {
-		if _, ok := g.host.ByTitle(strings.ToLower(title)); !ok {
-			t.Errorf("spec lost the row %q the services view toggles", title)
+	for _, svc := range content.Services {
+		if b := stationBoard(t, g).Services().Button(svc.ID); b != nil {
+			t.Errorf("%s: a window button is back on the strip — the rail owns that row", svc.ID)
 		}
 	}
+	if b := stationBoard(t, g).Services().Button("cargo"); b != nil {
+		t.Error("a Cargo button is back on the strip — Inventory is a rail row")
+	}
 
-	// Undock queues exactly the sim command (the path the strip's
-	// Undock button used).
+	// Undock queues exactly the sim command.
 	var got []sim.Command
 	g.enqueue = func(c sim.Command) { got = append(got, c) }
 	click(t, g, stationBoard(t, g).Services().Button("undock"))
@@ -374,18 +360,6 @@ func TestServicesViewButtonsOnTheRealStations(t *testing.T) {
 	}
 	if _, ok := got[0].(sim.CmdUndock); !ok {
 		t.Errorf("cmd = %#v, want CmdUndock", got[0])
-	}
-
-	// A second station's service set: the sim copies a station's
-	// services into its Station component at build (sim/build.go), so
-	// the second set goes on the docked station's component — a
-	// repair-only outpost. The view follows the list: the trade and
-	// industry buttons disappear.
-	g.s.Stations.Set(dockedStationEntity(t, g, "cel-haven-rest"),
-		sim.Station{Services: []string{"repair"}})
-	pump(t, g, 1280, 720)
-	if stationBoard(t, g).Services().Visible("industry") || stationBoard(t, g).Services().Visible("fitting") || stationBoard(t, g).Services().Visible("market") {
-		t.Error("service button shown where the station lacks the service")
 	}
 }
 

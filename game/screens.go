@@ -322,7 +322,7 @@ var screens = []Screen{
 	{
 		// The refinery: an ore→mineral service window, docked-only like the
 		// manufacturing panel, centred on first open. Its own key would
-		// crowd the bindings; the rail and the services row open it.
+		// crowd the bindings; the rail's Industry section opens it.
 		ID: idRefinery, Title: "Refinery", Icon: "svc_refinery",
 		Key:         keyNone,
 		DefaultRect: uikit.RefineryRect(),

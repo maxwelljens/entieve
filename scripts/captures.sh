@@ -13,6 +13,7 @@ cd "$(dirname "$0")/.."
 
 captures() {
 	cat <<'EOF'
+./game TestContactDetailsCapture
 ./game TestDockedBackdropCapture
 ./game TestTitleCaptureFrame
 ./game TestTitleKeybindingsCapture

@@ -199,11 +199,15 @@ func TestDialogLifecycle(t *testing.T) {
 		show(k, pd, plain) // must not panic or move anything
 	})
 
-	// The Kit's own wiring: all three dialogs register their × through
+	// The Kit's own wiring: all four dialogs register their × through
 	// newDialog, and place is the picker's alone.
 	t.Run("kit dialogs register the × and only the picker places", func(t *testing.T) {
 		k, _ := newTestKit(t)
-		for name, d := range map[string]*dialog{"info": k.info, "order": k.order, "qty": k.qty} {
+		k.OpenContact("") // the Details page is built on first open
+		if k.contact == nil {
+			t.Fatal("the Details dialog is nil after its first open")
+		}
+		for name, d := range map[string]*dialog{"info": k.info, "order": k.order, "qty": k.qty, "contact": k.contact} {
 			if d == nil {
 				t.Fatalf("%s dialog is nil after NewKit", name)
 			}
@@ -211,8 +215,8 @@ func TestDialogLifecycle(t *testing.T) {
 				t.Errorf("%s dialog has no registered × close", name)
 			}
 		}
-		if k.info.place != nil || k.order.place != nil {
-			t.Error("Show Info / order dialogs must not re-place on show")
+		if k.info.place != nil || k.order.place != nil || k.contact.place != nil {
+			t.Error("Show Info / order / Details dialogs must not re-place on show")
 		}
 		if k.qty.place == nil {
 			t.Error("the quantity picker must centre on every show")
