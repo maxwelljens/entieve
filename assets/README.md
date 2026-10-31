@@ -2,7 +2,8 @@
 
 Drop-in art. PNGs placed here replace the game's procedural vector art for
 the matching content ID — no config needed. Anything missing falls back to
-the built-in art. `artwork/` holds the full-window plates (JPEG allowed).
+the built-in art. `artwork/` holds the full-window plates and `portraits/`
+the contact faces (both JPEG allowed).
 
 ```
 assets/
@@ -10,6 +11,7 @@ assets/
 ├── stations/<celestial-id>.png    e.g. cel-haven-rest.png    (unrotated)
 ├── asteroids/<ore-id>.png         e.g. ore-cordite.png       (unrotated)
 ├── icons/<content-id>.png         e.g. mod-autocannon-s.png  (UI icon, square box)
+├── portraits/<contact-id>.jpg     e.g. contact-commission-liaison.jpg  (2:3 face; JPEG allowed)
 ├── backgrounds/<system-id>.png    e.g. default.png          (unrotated, tiles; default.png serves all systems)
 ├── artwork/spaceship_hangar.jpg   the docked-station backdrop (JPEG, cover-fit)
 ├── artwork/title_background.jpg    the title screen's backdrop (JPEG, cover-fit, embedded via artwork.go)
