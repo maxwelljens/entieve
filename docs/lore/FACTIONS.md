@@ -6,19 +6,19 @@ for all content. Names are settled here and registered in
 
 ## The charter authority
 
-**The Wild Fields Charter Authority** — "the Charter Authority" in documents,
-"the Charter" on the lanes — is the colonial authority that makes Charter
+**The Wild Fields Charter Authority** ("the Charter Authority" in documents,
+"the Charter" on the lanes) is the colonial authority that makes Charter
 space Charter space. It holds the founding grant for the region and is the
 only institution with a reach worth arguing with.
 
 Remit:
 
-- **Patrols** — security wings that answer incidents in Charter space and,
+- **Patrols**: security wings that answer incidents in Charter space and,
   thinly, in the Fringe. (In game: the `npc-guard-patrol` loadout.)
-- **Courts** — claims, salvage disputes, contract standings, bounties.
-- **Insurance** — hull replacement after a loss (see
-  [UNIVERSE.md — Death and insurance](UNIVERSE.md#death-and-insurance)).
-- **Registers** — pilot licences, hull registries, station charters.
+- **Courts**: claims, salvage disputes, contract standings, bounties.
+- **Insurance**: hull replacement after a loss (see
+  [UNIVERSE.md: Death and insurance](UNIVERSE.md#death-and-insurance)).
+- **Registers**: pilot licences, hull registries, station charters.
 
 It is bureaucratic, slow, and better than the alternative. Its people are
 functionaries; its ships are cutters; its formularies outlive its admirals.
@@ -40,16 +40,16 @@ charter officer commands one. The Charter's law is insurance, not war.
 ## Corporate members
 
 The second wave's corporate members are origin-flavoured houses (heritages
-per [UNIVERSE.md — The settlement waves](UNIVERSE.md#the-settlement-waves)).
+per [UNIVERSE.md: The settlement waves](UNIVERSE.md#the-settlement-waves)).
 Institutional cores follow the Latinate register; the origin shows in the
 trade and in one heritage form-word where a house keeps one.
 
 The ten-firm roster below is the **manufacturer layer** of the economy: the
 houses that make the goods the market sells and whose marks appear on them
 (`maker` in the content; registered in
-[NAMING.md — Corporations](NAMING.md#corporations--manufacturers)). The firms
+[NAMING.md: Corporations](NAMING.md#corporations-manufacturers)). The firms
 own no territory and hold no law, and they stay independent of each other and
-of the Charter. Since the Commission they do raise and crew fleets — one joint
+of the Charter. Since the Commission they do raise and crew fleets: one joint
 war, flown under one bloc's colours, never a government of their own.
 
 | House | Origin | Trade | Notes |
@@ -60,7 +60,7 @@ war, flown under one bloc's colours, never a government of their own.
 | **Kumbřan Steelworks** | Polish | heavy hulls, armor, structures | the iron combine: heavy hulls, heavier contracts |
 | **Dvužek** | Moravian | extraction, refining, barging | a miners' cooperative that outgrew its own pit; every hand on a barge holds a share |
 | **Bríždan Factory** | Polish/Moravian | munitions, energetic materials | Storm Works: propellants, warheads, and very good insurance |
-| **Cylvar** | Latinate | propulsion, express logistics, recovery | if it must arrive yesterday — for a price, it does |
+| **Cylvar** | Latinate | propulsion, express logistics, recovery | if it must arrive yesterday, for a price, it does |
 | **Preštor** | Latinate | security services, patrol craft, protective systems | security is a service; the Kuštor hull is the receipt |
 | **Alďmar** | indistinct European | instrumentation, field repair, components | components for everyone; a boardroom for no one |
 | **Vantera** | indistinct European | industrial automation, shielding, station systems | station infrastructure, shielding, and quiet shareholdings |
@@ -72,13 +72,13 @@ Celeritas → Celerita → Cylvar**. Kombinat Ferrum was a charter-era fossil
 until the second depth broke it too (**Kombinat Ferrum → Kumbřan
 Steelworks**), and Zakłady Burza became **Bríždan Factory**. Only
 **Vantera** keeps its name: it was coined, not inherited. The full registry
-is [NAMING.md — Corporations](NAMING.md#corporations--manufacturers).
+is [NAMING.md: Corporations](NAMING.md#corporations-manufacturers).
 
 Corps buy ore, sell hulls and modules, post contracts on the boards, and
 occasionally sue each other. A house is a market presence and nothing else:
 boards, brands, factories, a maker's mark on the goods it sells. There are no
-dynasties and no home berths — a shareholder is a shareholder, not a subject.
-They do not patrol — patrols are the Charter's — but they do fight the Old
+dynasties and no home berths: a shareholder is a shareholder, not a subject.
+They do not patrol (patrols are the Charter's), but they do fight the Old
 Works: the fleets are theirs, the materiel is bought on their treasuries, and
 the crews are on their payroll. They still write the losses down. The premium
 has simply moved into the war chest.
@@ -86,21 +86,21 @@ has simply moved into the war chest.
 **Binding rules**
 
 - MUST keep every corporate house's trade aligned with its origin's trait
-  skew ([AESTHETIC.md — Origins and traits](AESTHETIC.md#origins-and-traits)).
+  skew ([AESTHETIC.md: Origins and traits](AESTHETIC.md#origins-and-traits)).
 - MUST name institutions in the Latinate register.
 - MUST keep the roster a manufacturer layer: firms are independent suppliers
   that appear on goods and markets. The one thing they share is the
   Commission's war, and that is a mandate, not a state.
-- NEVER let a corporation hold territory or law. It holds contracts, and —
-  under the Commission — a share in the fleets. No dynasty, no home berth, no
+- NEVER let a corporation hold territory or law. It holds contracts, and,
+  under the Commission, a share in the fleets. No dynasty, no home berth, no
   flag.
 - NEVER add a fifth power bloc without registering it here.
 
 ## The Svaz and the Commission
 
 The corporations are not a state, and they know it. What binds them is **the
-Svaz** — "the confederation" in plain prose, "the empire" when a pilot is being
-sarcastic — a league of houses and cantons, older than the charter and far
+Svaz** ("the confederation" in plain prose, "the empire" when a pilot is being
+sarcastic), a league of houses and cantons, older than the charter and far
 weaker. Its heart is the old worlds; its rim is places like this one. It has a
 treaty, a dues schedule, a standing committee that meets nowhere in particular,
 and no office in the Wild Fields. It cannot tax a system, post a patrol or
@@ -123,7 +123,7 @@ calls it an empire to its face.
 
 - MUST keep the Svaz institutional only: a treaty, dues, a commission. No
   territory in the Wild Fields, no office, no officer here.
-- MUST keep the war a corporate undertaking under warrant — never the
+- MUST keep the war a corporate undertaking under warrant, never the
   Charter's war, never the Svaz's army.
 - NEVER let the Svaz send reinforcements, orders, recall notices or answers.
   What it sends is a warrant and a bill for dues.
@@ -131,12 +131,12 @@ calls it an empire to its face.
 ## Freeports and independents
 
 Freeports are stations no charter owns: berthing fee, market, refinery, no
-questions. **Hauvnok** in Kvonice is the working example — the Fringe's
+questions. **Hauvnok** in Kvonice is the working example: the Fringe's
 living room, where the contract board pays well and the neighbours are
 whoever docked last.
 
 Independents are the rest of the workforce: pilots, refiners, haulers,
-one-ship operators. The player is one of them — insured, licensed where it
+one-ship operators. The player is one of them: insured, licensed where it
 matters, and welcome everywhere a berth is paid for.
 
 A station whose system falls to the Old Works becomes a **remnant**: the
@@ -152,14 +152,14 @@ No flag goes up. The neighbours simply stop being answered.
 
 ## The Old Works
 
-The hostile power of the Wild Fields is not people. It is the **Old Works** —
+The hostile power of the Wild Fields is not people. It is the **Old Works**:
 self-replicating industrial and terraforming machines built by the
 **Predecessors**, the civilisation that held this country before either
 settlement wave landed.
 
 The Predecessors ran the Works, and then they lost them. Tradition says only
-that the oversight decayed — the supervisors stopped supervising, the knots
-came untied — and never why. The fall took the record with it, and what it left
+that the oversight decayed (the supervisors stopped supervising, the knots
+came untied) and never why. The fall took the record with it, and what it left
 nobody wrote down again. Knowledge survives as oral tradition, plus a scholarly
 fringe that keeps artefact collections, transcribes what the old people still
 recite, and disagrees about what a Predecessor seam on a Works frame actually
@@ -170,18 +170,18 @@ out in Kvonice, is the one they point at when they argue.
 The name is folk etymology, the way most names here are: the **Works** because
 working is what they do, **Old** because they were old before the first wave
 landed. The oldest surviving fragment of the tradition is a line about the
-Predecessors' crews — not a story, a rota:
+Predecessors' crews, not a story, a rota:
 
 > The crews stopped coming. The Works did not stop working.
 
 **Motive: material.** The swarms raid frontier traffic for metal, ore, ice
-and hull mass to feed replication. No demands, no negotiation, no malice —
+and hull mass to feed replication. No demands, no negotiation, no malice;
 heavy plant that never clocked out.
 
 **Nests coordinate.** Not under a mind anyone can prove: a nest answers the
 pressure its neighbours put on a region, and the same few answers keep paying,
 so the pattern reads as strategy. No kings, no homeworld, no plan. They can be
-cornered — the squeeze has taken systems back — but never extinguished: there
+cornered (the squeeze has taken systems back) but never extinguished: there
 is always a deeper nest nobody has found, and that is the war's equilibrium.
 
 **The ban.** Unshackled replication is why the Svaz bans what it bans: no
@@ -194,19 +194,19 @@ filed. Nobody here has ever been inspected.
 
 | Caste | Role |
 |---|---|
-| **Scuttler** | worker / scavenger — cuts rock, strips wrecks, hauls |
-| **Marauder** | assault — jumps convoys, pins targets |
-| **Hierarch** | overseer / command — coordinates the swarm, fights to the last |
+| **Scuttler** | worker / scavenger: cuts rock, strips wrecks, hauls |
+| **Marauder** | assault: jumps convoys, pins targets |
+| **Hierarch** | overseer / command: coordinates the swarm, fights to the last |
 
 **Territory:** Unincorporated space in practice (Pušťov) and the deep
-Fringe. They nest in anomalies and derelict works — a finished nest is a
-**gnazvor** on pilot slang (*gniazdo* "nest", grafted with Latin *vor-*
-"devour") — and raid outward.
+Fringe. They nest in anomalies and derelict works (a finished nest is a
+**gnazvor** on pilot slang: *gniazdo* "nest", grafted with Latin *vor-*
+"devour") and raid outward.
 
 Since the war they hold ground too. A system whose charter fails is theirs:
 the patrols leave, the belts go hostile, and the swarms dig in at the rocks
 and the anchors while the berths keep selling fuel to whoever docks. Take a
-system back and the next one stiffens — the Works do not replace what they
+system back and the next one stiffens: the Works do not replace what they
 lose, they make what is left harder to take. That is the whole reason the
 Attrition has no end in sight.
 
@@ -216,8 +216,8 @@ Attrition has no end in sight.
 - MUST keep the Old Works material-driven: they take stuff, not sides.
 - MUST keep the Predecessors' fall unexplained: the oversight decayed, the why
   is dark, and no text ever supplies it.
-- MUST keep the machine ban in force — no machine minds, no autonomous
-  self-replicating systems — and its inspectorate offstage: named, never seen,
+- MUST keep the machine ban in force (no machine minds, no autonomous
+  self-replicating systems) and its inspectorate offstage: named, never seen,
   no office in the Wild Fields, never on screen.
 - NEVER give the machines speeches, kings, a homeworld or a plan. The
   Hierarch caste directs; it does not monologue.
@@ -227,7 +227,7 @@ Attrition has no end in sight.
 
 The war has one name on the lanes: **the Long Attrition**. Corporate fleets
 under the Commission against the Old Works, over the only thing either side
-can hold — which systems answer the charter and which answer nothing.
+can hold: which systems answer the charter and which answer nothing.
 
 Nobody declared it on a given day. The houses wrote off one convoy too many,
 the Svaz named the Works a standing menace, and the first commissioned
@@ -238,14 +238,14 @@ most pilots meet it as a line on a contract board.
 
 What is at stake is not territory in the map-room sense. A system is charter
 or it is not: patrols answer there or they do not, insurance pays there or it
-does not, the courts sit — and where the charter's reach fails, the Works take
+does not, the courts sit; where the charter's reach fails, the Works take
 the belts and the belt is theirs, with the berths still selling fuel to
 whoever docks. The front is where those two answers meet across a gate. It
 moves by systems, rarely, over hours.
 
 The economy is the war's other half. The fleets buy everything that shoots,
-jams or tanks, on every charter-held book, at the going price — the one buyer
-who never haggles — and the goods go to the front and are gone. The houses'
+jams or tanks, on every charter-held book, at the going price (the one buyer
+who never haggles), and the goods go to the front and are gone. The houses'
 cut of the market's fees feeds the same chest. Sell into it, haul for it, kill
 Works at the front, and it shows up in your earnings and nowhere else. Nobody
 is thanked. The meter moves.
@@ -254,7 +254,7 @@ is thanked. The meter moves.
 
 - MUST keep the war a slow background: systems flip rarely, meters move by
   degrees, and the front is a place pilots pass through, not a campaign.
-- MUST keep the war funded by the economy it feeds — market fees and materiel
+- MUST keep the war funded by the economy it feeds: market fees and materiel
   sales, never a mint.
 - NEVER let either side win: the Works stiffen as they are squeezed, and a
   charter that starves its own front loses it. Both are the same rule.
@@ -268,7 +268,7 @@ Smugglers, fences and opportunists move cargo around charter paperwork,
 resell what the Old Works leave behind, and price risk like everyone else.
 
 One ring's name gets said out loud: **the Amber Run** (*Bursztynowy Szlak*,
-the old amber road) — runners who move ore and unpapered goods through the
+the old amber road). Runners who move ore and unpapered goods through the
 Fringe without appearing on anybody's ledger.
 
 They appear as **contract flavour only**: smuggling runs, fences for loot,
@@ -294,14 +294,14 @@ names in warnings. They are not a combat roster.
 Read down a column for who may shoot first: the Old Works initiate on
 everything that floats; the Charter and the fleets initiate on the Old Works;
 Dvužek, the freeports, the independents and the smugglers start nothing. Same
-faction and unknown factions never fire — the table is the whole of it
+faction and unknown factions never fire: the table is the whole of it
 (`sim/hostility.go`).
 
 **Binding rules**
 
 - MUST keep one war, and only one: the corporate fleets against the Old Works.
   Everything else in the Wild Fields stays commercial, uninsured and priced.
-- MUST keep the asymmetry: the Old Works hold ground, never a state — no
+- MUST keep the asymmetry: the Old Works hold ground, never a state: no
   treaty, no demand, no flag.
 - MUST keep the fleets a mandate: they answer the Commission and their
   treasuries, never a charter officer, and they never open on the Charter,

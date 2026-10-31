@@ -553,7 +553,7 @@ func TestWarSinkConsumesAndPays(t *testing.T) {
 	if c == nil || math.Abs(c.SupplyPending-value) > 1e-6 {
 		t.Fatalf("front supply pending = %+v, want %v", c, value)
 	}
-	if !hasEvent(evs, EvWar, "Supply —") {
+	if !hasEvent(evs, EvWar, "Supply:") {
 		t.Fatalf("no war-supply line: %v", evs)
 	}
 	// Goods are gone from the book too: the bid's remaining quantity dropped.
@@ -763,7 +763,7 @@ func TestWarFlipUnderYouIsInstant(t *testing.T) {
 			t.Fatalf("a Works hull landed on a station celestial (%s)", cel.Cel)
 		}
 	}
-	if !hasEvent(evs, EvWar, "Fall —") {
+	if !hasEvent(evs, EvWar, "Fall:") {
 		t.Fatalf("no fall news: %v", evs)
 	}
 	// Effective security is lawless now.

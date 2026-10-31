@@ -1,4 +1,4 @@
-# Entieve — How to Play
+# Entieve: How to Play
 
 *Entieve* is a single-player 2D space sandbox, a love letter to EVE Online:
 top-down star systems, ship fitting, shield/armor/structure combat, capacitor
@@ -11,13 +11,13 @@ entieve run [--world world-default] [--seed N] [--save save.json] [--load save.j
 ```
 
 The window opens at its last windowed size (1280×720 on a fresh install),
-resizable, vsync on by default, minimum 1024×700 — smaller windows clamp up
+resizable, vsync on by default, minimum 1024×700; smaller windows clamp up
 rather than breaking the HUD layout. Everything in the keyboard table below
 is also available in-game via the help window (`H`).
 
 ## Controls
 
-The key map below is generated from `game.KeyMap` — the same source the
+The key map below is generated from `game.KeyMap`, the same source the
 in-game help window renders. Screen toggles and world commands are
 rebindable (see **Keybindings** below); the global chords (`Esc`, `Ctrl+S`,
 `Ctrl+F`, `F9`, `[` `]` `-` `=`) are fixed.
@@ -27,7 +27,7 @@ rebindable (see **Keybindings** below); the global chords (`Esc`, `Ctrl+S`,
 | Key | Action |
 |---|---|
 | `Tab` | Cycle-lock nearest target (distance-ordered) |
-| `Shift+Tab` | Lock the currently selected target (ships, wrecks and asteroids — a station is not lockable) |
+| `Shift+Tab` | Lock the currently selected target (ships, wrecks and asteroids; a station is not lockable) |
 | `F1` … `F8` | Toggle high-slot module 1…8 (activate/deactivate) |
 | `A` | Approach selected |
 | `Q` | Orbit selected at the Selected Item **Orbit range** selector's value (2.5k → 5k → 10k → 20k → 50k m; the key never changes it) |
@@ -61,15 +61,15 @@ rebindable (see **Keybindings** below); the global chords (`Esc`, `Ctrl+S`,
 | Input | Action |
 |---|---|
 | Left click | Select entity / press UI buttons; drag a window's title bar to move it (click also raises it to the front) |
-| Left drag | On any window **edge or corner** (≈8 px grip): resize from all four sides — the opposite edge stays fixed, the window never shrinks past its minimum |
+| Left drag | On any window **edge or corner** (≈8 px grip): resize from all four sides, the opposite edge stays fixed, the window never shrinks past its minimum |
 | Left click | On a table column header: sort (click again flips direction); on the **⋯ button** at the header's end: the column menu (hide/show a column) |
-| Left drag | On a column's right edge in a table header (the 6 px strip): widen or narrow that column — the change trades with the next column, the header title is the floor, and the cursor is the left/right arrow |
+| Left drag | On a column's right edge in a table header (the 6 px strip): widen or narrow that column, the change trades with the next column, the header title is the floor, and the cursor is the left/right arrow |
 | `Ctrl` + left click | Lock target under cursor |
-| Left double-click | Show Info — open the item's details window directly, anywhere the item appears (rack, fitting slots and hangar modules, market, inventory, overview, offer rows); on a **hangar module** it fits that module into the first empty slot of its class; on empty space, fly straight toward that point |
-| Right click | Orbit target under cursor (2,500 m) — in the world; unchanged |
-| Right click | On an item anywhere it appears: flat context menu — **Show Info** first (always bold), then the surface's actions (grayed-but-visible when impossible); on a charge-fed cell in the module rack: Show Info / Show Info — `<charge>` / ─ / **Load** `<round>` per round type in cargo / **Cycle charge** |
+| Left double-click | Show Info: open the item's details window directly, anywhere the item appears (rack, fitting slots and hangar modules, market, inventory, overview, offer rows); on a **hangar module** it fits that module into the first empty slot of its class; on empty space, fly straight toward that point |
+| Right click | Orbit target under cursor (2,500 m) in the world; unchanged |
+| Right click | On an item anywhere it appears: flat context menu, **Show Info** first (always bold), then the surface's actions (grayed-but-visible when impossible); on a charge-fed cell in the module rack: Show Info / Show Info: `<charge>` / ─ / **Load** `<round>` per round type in cargo / **Cycle charge** |
 | Middle drag | Pan camera |
-| Wheel | Zoom (2×10⁻⁹ – 4×: the whole system down to a grid); over a table (overview, market, inventory, fitting, hangar), scroll it — wheel up moves toward the top |
+| Wheel | Zoom (2×10⁻⁹ – 4×: the whole system down to a grid); over a table (overview, market, inventory, fitting, hangar), scroll it, wheel up moves toward the top |
 
 Mouse handling is fully context-aware: a click, drag or wheel over *any*
 window or the HUD chrome never reaches the world behind it.
@@ -87,7 +87,7 @@ and every world command (`Tab` locks, `A/Q/S/W/Z/D/J/L/M`, `F1–F8`, the
 arrows) can be rebound from the **Keybindings** window. That window has no
 key, no rail entry and no title-menu row of its own: its only door is the
 **Keybindings…** button in the **Settings** window (`P`, or the title
-menu's *Settings* row) — in the game it toggles the window like the rail
+menu's *Settings* row). In the game it toggles the window like the rail
 entry it used to be, and at the title it replaces Settings on screen. The
 window is the controls
 screen: **Ship controls** (the world commands) and **Windows** (the screen
@@ -95,7 +95,7 @@ toggles) list each action against its live key, and a dim **Fixed
 shortcuts** block lists the chords that never rebind. Click a row, then
 press the key you want: its key chip shows *press a key…* while it waits,
 and `Esc` cancels. Binding a key another action already holds **replaces**
-it — the old holder becomes unbound (its chip shows `—`) and can be
+it: the old holder becomes unbound (its chip shows `—`) and can be
 rebound again; one key is one action, and the window always shows the
 current bindings so a theft is visible. A rebound action's chip turns
 accent and the row offers **Reset**, which restores that one default (and
@@ -114,13 +114,13 @@ the save; a missing or damaged file means the defaults.
 
 The interface is a stack of **draggable, resizable windows** with title
 bars: drag a title bar to move a window, grab **any edge or corner** to
-resize it (about an 8 px grip — all four edges and all four corners
+resize it (about an 8 px grip: all four edges and all four corners
 work; the opposite edge stays fixed and the window never shrinks below
 its minimum size), and click anywhere on a window to raise it to the
 front.
 
-**Multi-pane windows** — Inventory, Fitting, Manufacturing and the
-Market (browse tree | catalog | My orders) — carry
+**Multi-pane windows** (Inventory, Fitting, Manufacturing and the
+Market: browse tree | catalog | My orders) carry
 **draggable seams** between their lists: the seam is a recessed track with
 a dotted grip in its middle (the grip lights up under the pointer) and an
 about 8 px grab band (the cursor turns into the up/down arrow over it),
@@ -131,47 +131,47 @@ window's layout (see **Your layout persists**). The market's two seams
 run left/right and trade width the same way.
 
 The **Refinery** and **Manufacturing** windows carry an artwork **header band**
-under their title bar — `assets/artwork/refining_header.jpg` and
-`manufacturing_header.jpg` (see [ART.md](ART.md#window-headers)) — with the
+under their title bar: `assets/artwork/refining_header.jpg` and
+`manufacturing_header.jpg` (see [ART.md](ART.md#window-headers)), with the
 lists scrolling over it. The band fades in with the window, and a build
 without those plates (every release ships no `assets/`) draws the plain panel,
 exactly as before.
 
 Toggle keys open and close their window (`I`, `F`, `G`, `B`, `C`, `N`, `H`,
-`P`, `K`, `Shift+L`) — windows have no separate close button. The same
+`P`, `K`, `Shift+L`); windows have no separate close button. The same
 toggles live on the **left navigation rail**: one glyph per window in
-six sections — **Ship** (Overview, Selected Item, Fitting), **Trade**
+six sections: **Ship** (Overview, Selected Item, Fitting), **Trade**
 (Market, Inventory, Finances), **Industry** (Manufacturing, Refinery), **Station** (Station
 Services), **World** (Scanner, Starmap, Log) and **Help & System**
 (Help). Hover an entry for its tooltip (icon, name and hotkey
-hint); click once to open — a freshly opened window lands on top — and
+hint); click once to open (a freshly opened window lands on top) and
 again to close it. An entry you cannot use right now is **grayed, never
 hidden** (the services view and manufacturing in space, the scanner while
 docked, fitting at a station without the fitting service); clicking a
 grayed entry does nothing. A window that is open wears the entry's amber
-glow, and the glyphs are colour-coded by section — **Ship** cyan,
+glow, and the glyphs are colour-coded by section: **Ship** cyan,
 **Trade** green, **Industry** orange, **Station** gold, **World** blue,
-**Help & System** silver — so the rail reads group-first at a glance
+**Help & System** silver, so the rail reads group-first at a glance
 (a grayed entry stays dim whatever its group). The slim tab at the rail's
 top edge collapses the rail to its
-tab — a setting that persists as `rail_collapsed` in
+tab, a setting that persists as `rail_collapsed` in
 `<save>.settings.json` (a missing key means expanded). The ship status
 and the module rack are permanent ship chrome and have no rail entries, and
-the Esc menu keeps its own key — the rail is not its launcher. **Settings**
+the Esc menu keeps its own key: the rail is not its launcher. **Settings**
 and **Keybindings** are not rail launchers either: Settings keeps its key
 (`P`), its title-menu row and a **Settings** entry in the Esc menu (the
 in-game mouse path), and Keybindings is opened from the Settings window's
 **Keybindings…** button only. The Esc menu's **Settings** entry opens the
-settings window as a **modal session of the pause menu** — the menu gives way
+settings window as a **modal session of the pause menu**: the menu gives way
 to it and the screen stays dimmed while it is up; `Esc` (or the window's ×)
 ends the session and returns to the pause menu, not to the game. The `P` key
 stays the ordinary floating window: no dim, no modal layer, and `Esc` opens
 the pause menu over it rather than ending a session.
 
 The **Settings**
-window (`P`) holds the **UI scale** slider — a notched track over the six
+window (`P`) holds the **UI scale** slider, a notched track over the six
 rungs 0.75× – 2.5× whose handle snaps to a rung and applies it live (every
-window, control and font rescales and keeps its arrangement) — a
+window, control and font rescales and keeps its arrangement), a
 **fullscreen** toggle, a **rail** collapse toggle, the **Keybindings…**
 button (the rebinding window's only door), **Master**, **Music**
 and **UI** volume sliders (freeflow, 0–100% in 1% steps; a fresh install
@@ -185,17 +185,17 @@ collapse state, the three volumes, the shuffle flag and the last windowed
 size (written on clean quit) persist next to
 the save in `<save>.settings.json`, and
 the window arrangement itself persists in design units, so one saved
-layout works at every scale. Dragging a volume slider is live — the music
-(and the UI cues, on their own slider) follow the handle — but the sidecar
+layout works at every scale. Dragging a volume slider is live (the music,
+and the UI cues on their own slider, follow the handle), but the sidecar
 is written once, when the drag is released; the notched scale slider
 applies its rung as the handle snaps
 to it. Icons (from
 [game-icons.net](https://game-icons.net), credited per-icon in
 `uikit/icons/CREDITS.md`) mark service titles, action buttons, overview
-kinds and offer types — monochrome glyphs tinted to the theme, and
+kinds and offer types: monochrome glyphs tinted to the theme, and
 every icon keeps its text label.
 
-**Music** plays everywhere — the title, space and a docked station — from
+**Music** plays everywhere (the title, space and a docked station) from
 the six embedded tracks (`assets/audio/`): one shuffled pool, the next
 track starting when the current one ends, with no gap and no per-screen
 switch. The engine's output volume is the product of the two steppers,
@@ -205,15 +205,15 @@ release needs no `assets/` folder next to it.
 
 **UI sounds** are five short cues from a local SFX pack, embedded the same
 way (`assets/sfx/`, see [assets/README](../assets/README.md) for
-provenance): a **click** on a press that lands on a control — a button, a
-text field, a slider's grab band, a table row or a context-menu entry —
+provenance): a **click** on a press that lands on a control (a button, a
+text field, a slider's grab band, a table row or a context-menu entry)
 and silence on window bodies, title bars, backgrounds, slider rows outside
 their band, disabled buttons, dead space and every world press (never per
 drag frame either). An **open** and a **close** sound when a
 window mounts or unmounts (the Esc menu, the station services view and
-every floating window — including the title's Settings and Keybindings),
+every floating window, including the title's Settings and Keybindings),
 an **open** when the right-click context menu appears (its **dismissal is
-deliberately silent** — the press that closes it is already the click the
+deliberately silent**: the press that closes it is already the click the
 cue reports),
 a **confirm** when a verb lands (Refine, Start Job, Buy, Sell, Transfer,
 save-as, a keybinding assignment, a save-manager load or delete, and the
@@ -222,7 +222,7 @@ two resets) and a **refuse** when the keybindings window rejects a chord
 play at 80% on a fresh install. Two panels are
 **always-on chrome** and cannot be closed or moved: the **ship status**
 panel (bottom center left half: the hull portrait, then a readout
-column — shield / armor / structure bars with their current/max values
+column: shield / armor / structure bars with their current/max values
 inside, the velocity wedge and its m/s figure immediately right of them
 on the same band, and the capacitor bar spanning the full column
 beneath) and the **module rack**
@@ -230,16 +230,16 @@ beneath) and the **module rack**
 module's name under it and a cycle ring that depletes clockwise over the
 tile while the module runs). A small strip above the status carries the
 time multiplier and the wallet, and the **target-box row** sits at top
-center — a click on a card selects that target (exactly like a world
+center: a click on a card selects that target (exactly like a world
 click); the speed figure reads `WARP` while the drive is engaged, a card
 carries the glyphs of your modules cycling on it, and a stasis web or warp
 scramble on your hull puts a box per effect directly above the ship status
 (its glyph, a depleting cycle ring and the seconds left) until it expires.
-The **log** is a normal window now —
+The **log** is a normal window now:
 bottom left by default, toggle with `Shift+L`, draggable and resizable
 like the rest. The **Overview** (top right) and **Selected Item** window
 (top left) are open by default (the rail's Ship entries close and
-reopen them) and draggable — a click in space selects the
+reopen them) and draggable; a click in space selects the
 target that **Selected Item** then shows and that every
 `selected`-targeted key acts on. The **cog** in the overview's title bar
 opens its filter window: one **Show** and one **Colour** tick per kind of
@@ -248,17 +248,17 @@ moon), where unticking Show leaves that kind out of the list and unticking
 Colour drops its row and icon tint. Your own hull is always listed, nothing
 outside the list (the world, the Selected Item window, your locks) is
 affected, and the switches persist with your saved layout. Its action buttons (Approach, Warp,
-Orbit, Stop, Lock, Dock, Jump, Loot, Mine) act on that selection —
-Dock, Jump and Loot fall back to the nearest station/gate/wreck when the
-selection cannot serve, exactly like `D`/`J`/`L` — and a button greys out
+Orbit, Stop, Lock, Dock, Jump, Loot, Mine) act on that selection
+(Dock, Jump and Loot fall back to the nearest station/gate/wreck when the
+selection cannot serve, exactly like `D`/`J`/`L`), and a button greys out
 when its verb has no target (or the drive would refuse it, as for Warp
 inside 150 km); the two
-selectors — **Orbit range** (2.5k–50k m) and **Warp to within** (0/10/50 km)
-— are pure state: clicking one only cycles its value and never issues a
+selectors, **Orbit range** (2.5k–50k m) and **Warp to within** (0/10/50 km),
+are pure state: clicking one only cycles its value and never issues a
 command. Warp, Orbit, `Z` and `Q` all act at the range their selector
 currently shows.
 
-**Music** plays everywhere — the title, space and a docked station — from
+**Music** plays everywhere (the title, space and a docked station) from
 the six embedded tracks (`assets/audio/`): one shuffled pool, the next
 track starting when the current one ends, with no gap and no per-screen
 switch. The engine's output volume is the product of the two steppers,
@@ -270,9 +270,9 @@ Default positions: overview top-right, selected item top-left, scanner
 in the center column under the top row, log bottom-left, the HUD pair
 (ship status + module rack) bottom-center, starmap and the Esc menu
 centered, help top-center. Every window type also carries its own default
-size and position for its first open — the market's 760×560 three-pane
+size and position for its first open (the market's 760×560 three-pane
 rect, the inventory and fitting rects, the manufacturing and refinery,
-finances and settings — and a genuinely
+finances and settings), and a genuinely
 new window type with no declared position opens centred. While docked the
 Contacts window (the station column) takes the top-left column
 (overview and selected item step aside); the service windows open at
@@ -287,8 +287,8 @@ while the untouched ones re-place on their defaults.
 open/closed state (overview, selected item, log, market, inventory,
 fitting, manufacturing, refinery, scanner, map, help, keybindings) is
 saved to a sidecar file next to the
-save — `<save path>.layout.json`, e.g.
-`os.UserConfigDir()/entieve/save.json.layout.json` — whenever you save
+save: `<save path>.layout.json`, e.g.
+`os.UserConfigDir()/entieve/save.json.layout.json`, whenever you save
 (`Ctrl+S` / menu **Save**) and again when you quit cleanly from the
 menu. The pane proportions of the split windows (inventory, fitting,
 manufacturing, market) ride along in the same file, so a dragged seam comes back
@@ -297,32 +297,32 @@ hidden columns. It is read back on startup and after
 loading a save, so a
 favorite arrangement survives restarts and loads. Restored windows are
 clamped to their minimum size and to the screen (always fully
-on-screen) — the clamp is re-established whenever you resize the game
+on-screen), and the clamp is re-established whenever you resize the game
 window too, so a layout saved at a larger resolution can never strand a
-window off-screen — and only what no longer fits slides back in; a
+window off-screen; only what no longer fits slides back in. A
 missing, corrupt, wrong-version or partial sidecar simply falls back to
 the defaults, and unknown entries in the file are ignored. **Your saved
-arrangement wins**: a window with a sidecar entry is never recomposed —
+arrangement wins**: a window with a sidecar entry is never recomposed;
 the defaults only fill in the windows the sidecar does not mention. Every
 window is ordinary, so a saved overlap is honored as-is (it is your
 arrangement), and open/closed state is always honored.
-The layout sidecar is deliberately separate from the save itself — the
+The layout sidecar is deliberately separate from the save itself: the
 simulation save format is unchanged for the CLI tools.
 
 ### Docked at a station
 
-Docking (`D`) opens exactly one window: the **Contacts** view — the
-docked-at identity (station name · system), the **Undock** button, a
+Docking (`D`) opens exactly one window: the **Contacts** view. It carries
+the docked-at identity (station name · system), the **Undock** button, a
 **Cargo** button and one button per service *this* station offers (Market,
-Fitting, Industry, Refinery — a service the station lacks is not offered
+Fitting, Industry, Refinery; a service the station lacks is not offered
 at all) over the **contacts** posted here and their live offers, then your
-active work (see [Contacts & standing](#contacts--standing)) — and hides
+active work (see [Contacts & standing](#contacts--standing)), and hides
 the space chrome (ship status, module rack, scanner) together with the
 **Overview** and **Selected Item** windows. Nothing else auto-opens:
 the market, fitting, inventory, manufacturing and refinery are ordinary
 windows you open from their keys or the rail (the dock strip carries no
 second door to them), and they open at
-their own per-type defaults exactly as they do in space — the services
+their own per-type defaults exactly as they do in space: the services
 view keeps the station's left column. Any arrangement you saved or
 dragged wins over the defaults (see **Your layout persists**).
 Undocking closes the services view and leaves every window you opened
@@ -333,11 +333,11 @@ reopens precisely that arrangement. The log stays mounted while docked
 so its history comes with you.
 
 While docked the **hangar backdrop** fades in over 12 frames under every
-window and the rail — `assets/artwork/spaceship_hangar.jpg`, cover-fit to
+window and the rail: `assets/artwork/spaceship_hangar.jpg`, cover-fit to
 the window, captioned **Docked: &lt;station name&gt;** in the lower-centre band
 (see [ART.md](ART.md#docked-backdrop)). Without that asset (released
 binaries ship no `assets/`) the station view keeps its plain black veil.
-Undocking cuts straight back to the world — the fade is entry-only.
+Undocking cuts straight back to the world: the fade is entry-only.
 
 ### Overview (top-left)
 
@@ -351,7 +351,7 @@ changing never shift the columns.
 
 Columns are yours: **drag a column's right edge** in the header to set its
 width (the change trades with the next column, and the header title is the
-floor), and the **⋯ button** at the header's end hides or shows columns —
+floor), and the **⋯ button** at the header's end hides or shows columns:
 the same ⋯ every list in the game carries. Widths are measured once on first
 open and then stay put: a value that grows (velocity mid-warp) ellipsizes
 rather than pushing the columns after it. Widths and hidden columns are
@@ -366,8 +366,8 @@ column keeps sorting on the real figure.
 ## Inspecting items (Show Info)
 
 Anything you can see is inspectable. **Right-click** an item anywhere it
-appears — rack cell, fitting row, market row, inventory row, overview or
-scanner row, offer row, offer objective label — for a flat
+appears (rack cell, fitting row, market row, inventory row, overview or
+scanner row, offer row, offer objective label) for a flat
 context menu: **Show Info** first, always bold, then that surface's
 actions. Actions you cannot currently take are shown grayed, never
 hidden. **Double-click** the item to skip the menu and go straight to the
@@ -375,7 +375,7 @@ details window. There is no keyboard key for this: inspecting is
 mouse-only.
 
 One reusable floating window, titled **Info** (its body is headed with the
-entity's name), holds the details — dragable, resizable, closeable,
+entity's name), holds the details: dragable, resizable, closeable,
 non-modal. Show Info swaps its content instead of stacking windows, and the item references inside it (charges,
 ores, hulls) are themselves right-clickable. Its position and size
 persist in the layout sidecar, but it never opens on its own.
@@ -393,13 +393,13 @@ Every window opens with the def's description prose, word-wrapped to the
 window's own width and re-wrapped whenever the window is resized narrower
 or wider; long pages scroll inside the body instead of pushing the rows
 out of view. The menus per
-surface: rack cells — Show Info (module) / Show Info — `<charge>` / ─ /
-**Load** `<round>` (one per round type in cargo) / **Cycle charge**; fitting slot tiles and hangar rows — Show Info / Fit /
-Unequip; market rows —
+surface. Rack cells: Show Info (module) / Show Info: `<charge>` / ─ /
+**Load** `<round>` (one per round type in cargo) / **Cycle charge**; fitting slot tiles and hangar rows: Show Info / Fit /
+Unequip; market rows:
 Show Info / Buy / Sell (grayed while undocked, both opening the quantity
-picker); inventory rows — Show Info; overview rows — Show Info / Warp to / Orbit / Approach / Lock target
+picker); inventory rows: Show Info; overview rows: Show Info / Warp to / Orbit / Approach / Lock target
 (the entity's hull or caste info plus the usual commands); offer
-rows — Accept / Abandon (grayed when gated); offer objective labels —
+rows: Accept / Abandon (grayed when gated); offer objective labels:
 Show Info.
 
 ## EVE concepts primer
@@ -409,7 +409,7 @@ weapons and mining lasers (toggled with `F1…F8`). Mid slots hold propulsion,
 ewar and capacitor modules. Low slots hold tank (armor/resist) modules.
 
 **Mounts and fitting limits.** Every high slot is a **mount**: a **turret**
-mount or a **launcher** mount, of a size — small, medium or large. Guns and
+mount or a **launcher** mount, of a size: small, medium or large. Guns and
 the mining laser are turret-mounted; rockets and missiles are
 launcher-mounted. A module fits a mount only when the kinds match and the
 module is no bigger than the mount, so a hull's mounts are its design
@@ -419,15 +419,15 @@ hull carries large mounts. Modules also declare a **grid class** and a **cpu
 class** (Class I, II or III, or none on an axis they do not use), and each
 hull carries a **class quota** per axis: a fit is legal only while no class's
 module count exceeds the hull's allowance. Slot count is therefore not the
-only limit — a hull with empty slots can still refuse another module
+only limit: a hull with empty slots can still refuse another module
 because its grid or cpu class is spoken for. Refused fits log a warning and
 leave the module in the hangar; unfitting a module frees what it demanded.
 
 **The fitting window** (`F`) is laid out like EVE's: the hull's portrait,
 name, class · maker and corporation emblem head the left column, with the
-derived stats beneath it — shield / armor / structure maxima, capacitor
+derived stats beneath it (shield / armor / structure maxima, capacitor
 capacity and recharge, speed / align / signature, warp / targets / scan,
-cargo — as dense label/value rows, plus a per-type **EHP** row (the three
+cargo) as dense label/value rows, plus a per-type **EHP** row (the three
 layer maxima over the penetrating share each of the four resists leaves).
 The **slot grid** sits right of it: one 50×40 tile per hull slot, the
 module's class glyph and short name on the fitted ones, a dashed
@@ -440,28 +440,28 @@ their first free slot (double-click a module does exactly that) and
 strip closes the window: the fit's **Total DPS** (each weapon's loaded or
 selected round over its fire period, exactly the round the bay would fire),
 the **Cap drain** of the running modules against the
-**Cap recharge** curve's peak, and the verdict — **Cap stable** or
-**Cap unstable (~Ns)** — over a drain-vs-recharge bar. The slots/hangar
+**Cap recharge** curve's peak, and the verdict (**Cap stable** or
+**Cap unstable (~Ns)**) over a drain-vs-recharge bar. The slots/hangar
 seam still drags, and the arrangement persists.
 
 **Weapons and rounds.** Projectile guns come in two families:
 **autocannons** (fast cycle, high tracking, short optimal range) and
 **artillery** (slow cycle, poor tracking, long optimal range, a heavier
-volley out of a longer shell). Both are built in three calibres — small,
-medium, large — so there are six **round families** (small/medium/large ×
+volley out of a longer shell). Both are built in three calibres (small,
+medium, large), so there are six **round families** (small/medium/large ×
 autocannon/artillery), each with four damage profiles (ion, high-explosive,
 armour-piercing, plutonium). A gun loads only the rounds of its own family.
 The round carries the damage mix; the gun's multiplier and cycle decide how
 hard and how often it lands. Projectile guns draw no capacitor.
 
-**Bays.** Every gun that loads rounds — and the cap booster — carries a
+**Bays.** Every gun that loads rounds, and the cap booster, carries a
 **bay** sized in m³. A **load cycle** fills it from cargo with a full bay of
 one round type and costs one firing cycle, so a reload pauses the gun for a
 beat (about every forty small autocannon rounds, or every ~120 s of
 sustained fire; twenty-five cap booster cells). The load is visible: its
 rack cell draws the cycle ring lit while the bay loads (a cancelled cycle
 keeps its ring greyed), and once the bay is loaded and not loading a small
-shell marker appears in the tile's bottom-right corner — armed, as opposed
+shell marker appears in the tile's bottom-right corner: armed, as opposed
 to the waiting dot in the top-right, which means the bay needs a choice. With
 one round type in
 cargo the bay looks after itself: pre-loaded when fitted, topped up while
@@ -483,16 +483,16 @@ is destroyed.
 
 **Shields recharge on their own.** A damaged shield rebuilds along EVE's
 curve: `dC/dt = (10·Cmax/T)·(√(C/Cmax) − C/Cmax)`, where `T` is the hull's
-`shield_recharge` time — the idle time from 0% to roughly 98%. The rate peaks
+`shield_recharge` time: the idle time from 0% to roughly 98%. The rate peaks
 at 25% shield at 2.5× the average `Cmax/T`, so a shield near empty or near
 full creeps, and one held at a quarter refills fastest. Shield extenders add
 capacity and leave `T` alone, which raises HP/s; shield boosters stack on top
-of the regen. Armor and structure do not regenerate — dock for those.
+of the regen. Armor and structure do not regenerate; dock for those.
 
 **Capacitor.** Active modules consume GJ from the capacitor, which recharges
 on EVE's curve (peak recharge near 25% of capacity; the fitting window shows
-capacity and recharge time). Running dry means guns and tanks stop cycling —
-manage it like EVE: inactive modules when you don't need them, cap boosters
+capacity and recharge time). Running dry means guns and tanks stop cycling.
+Manage it like EVE: inactive modules when you don't need them, cap boosters
 when you do.
 
 **Cycles are bound by time, not by toggling.** Activating a module resolves
@@ -502,7 +502,7 @@ it back on inside the same cycle resumes at the original boundary, so
 flicking modules on and off can never buy extra shots, repairs or boosts.
 
 **Docking restores the ship.** Docking switches every module off and brings
-shield, armor, structure and capacitor back to full, free of charge — and
+shield, armor, structure and capacitor back to full, free of charge, and
 undocking always leaves with everything switched off.
 
 **Turret tracking.** Chance to hit follows EVE's formula: angular velocity vs.
@@ -535,8 +535,8 @@ Entieve has **no omniscience**: the client only ever shows what your ship
 could perceive. This is a deliberate design decision (documented anti-
 omniscience), enforced in the sim's read model and the renderer alike.
 
-- **Grid / landmark visibility.** System landmarks — the star, planets,
-  moons, station, gates, belt markers and anomalies — are always `Visible`;
+- **Grid / landmark visibility.** System landmarks (the star, planets,
+  moons, station, gates, belt markers and anomalies) are always `Visible`;
   they appear in the overview, on the starmap, and get in-world brackets.
 - **Sensor range.** Ships, asteroids and wrecks are `Visible` only within
   **`sim.SensorRange` = 250 km** of your ship. Anything farther is off-grid:
@@ -545,34 +545,34 @@ omniscience), enforced in the sim's read model and the renderer alike.
   helpers only ever consider perceivable entities.
 - **The Scanner (`C`).** A slow sweep with a **2-second cycle** and an
   animated progress bar probes out to **3 × sensor range (750 km)**. It
-  reports **anonymous counts only** — e.g. `Ship ×3`, `Asteroid ×22`,
-  `Wreck ×2` — with *no names and no distances*, refreshed on each completed
+  reports **anonymous counts only** (e.g. `Ship ×3`, `Asteroid ×22`,
+  `Wreck ×2`) with *no names and no distances*, refreshed on each completed
   sweep. You learn that something is out there, not what it is or where it
   sits; you still have to fly there to see it. (Deliberate: the scanner is a
   hint system, not a map.)
 - **Warp-to-range**: `Z` and the Warp button land at the Selected Item
   **Warp to within** selector's range (0 / 10 / 50 km). The selector is
-  pure state — clicking it only cycles the value; the Warp button (or `Z`)
+  pure state: clicking it only cycles the value; the Warp button (or `Z`)
   fires at that value, and **Orbit range** / the Orbit button / `Q` follow
   the same split. Both selectors start at their first entry, so the
   default warp lands *on* the target and the default orbit is 2,500 m.
 
 **Ammo cycling.** Right-click a charge-fed cell in the module rack for its
-context menu: **Show Info** for the module, **Show Info —** the selected
+context menu: **Show Info** for the module, **Show Info:** the selected
 round, one **Load** `<round>` entry per round type of that module's family
 that sits in your cargo (the cap booster's cells included), and **Cycle
 charge**, which steps the bay through those same types in item-id order and
 wraps (the sim validates the family and cargo, dumps the old rounds back
 and logs the load). There is no auto/"none" entry: the bay only ever loads
 a real type. With two or more types in cargo and none chosen the cell shows
-the waiting badge and a left click opens that same menu — the charge
-picker — instead of toggling; every other cell toggles as always.
-The module tooltip — hover any rack cell for 300 ms — is a structured
+the waiting badge and a left click opens that same menu (the charge
+picker) instead of toggling; every other cell toggles as always.
+The module tooltip, on 300 ms of hover over any rack cell, is a structured
 panel: class icon, **bold** module name, a dim `slot · class` line, then
 sectioned stats with values right-aligned on one column (damage mix,
-range, tracking, loaded charge + cargo count, the bay's **Clip** line —
-`0.2 m³ · 40 rounds · 3.0 s`, or `waiting for ammo selection` while no
-type is chosen — cycle/capacitor) and footers for what the mouse does. The
+range, tracking, loaded charge + cargo count, the bay's **Clip** line
+(`0.2 m³ · 40 rounds · 3.0 s`, or `waiting for ammo selection` while no
+type is chosen), cycle/capacitor) and footers for what the mouse does. The
 Fitting window's module rows show the same panel, and a warp inside 150 km
 explains itself as "Warp unavailable". Non-weapons don't cycle.
 
@@ -581,14 +581,14 @@ explains itself as "Warp unavailable". Non-weapons don't cycle.
 The currency of Entieve is the **euro**, displayed as `12,345.67 €` (the
 sign trails the amount; anything under one euro shows as `50¢`). You earn euros from NPC bounties,
 selling loot and market trades, and spend them on market buys. Every readout
-that quotes money uses that one format — the wallet on the HUD, the market
-title and the contact offers — so a reward line on an offer reads
+that quotes money uses that one format (the wallet on the HUD, the market
+title and the contact offers), so a reward line on an offer reads
 `40,000.00 € · +0.10 standing`.
 
 ## Contacts & standing
 
 Work is handed out by **contacts** at the dock: the kind of repeatable
-jobs an EVE pilot knows — cull rats, haul cargo, mine ore — but posted
+jobs an EVE pilot knows (cull rats, haul cargo, mine ore), but posted
 because the world has a gap to fill. Contacts are **per station**: while
 docked, the **Contacts** window shows two sections.
 
@@ -606,13 +606,13 @@ local belt posts a kill order; a station short of ore posts a mining
 order. Each row is a summary, not a paragraph: the contact's **portrait**
 thumb, the title with its **mission type** (`Delivery`, `Kill order`,
 `Mining`) and the payout (`430,000.00 €`), with the standing gain, a
-delivery's destination **requisition stock** and — when you are below the
-gate — `Requires standing 0.20` on the line under it. Press **Details** to
+delivery's destination **requisition stock** and, when you are below the
+gate, `Requires standing 0.20` on the line under it. Press **Details** to
 open the offer.
 
 **Details** is the conversation behind the row: the contact's 2:3 portrait
 (drop-in art, else the office's mark), their own words with the sim's
-numbers filled in and attributed to them, and the contract at a glance —
+numbers filled in and attributed to them, and the contract at a glance:
 mission type, objective (what, how many, and the destination for a
 delivery), payout and standing gate. Three options, all of them real:
 **Accept work** takes the offer (the same command the button always sent;
@@ -620,10 +620,10 @@ greyed with its reason while your standing is short, and reading
 **Accepted** once taken), **Inspect item** / **Inspect target** opens the
 objective's Show Info page, and **Decline** closes the dialog. One offer
 at a time: a second Details click re-targets the same window. An offer
-whose gap closes simply stops being listed — no timer, no penalty,
+whose gap closes simply stops being listed: no timer, no penalty,
 nothing to lose.
 
-**Active work** — everything you have accepted, anywhere, with live
+**Active work**: everything you have accepted, anywhere, with live
 progress (`Belt cleanup — 1/3`) and an **Abandon** button. Accepting and
 abandoning both happen while docked, at the station that issued the
 offer; abandoning costs only the progress made so far.
@@ -633,20 +633,20 @@ rats of exactly the requested class, mining counts the requested ore
 mined into your hold while the work is active, and a delivery wants its
 cargo sitting in your hold. The claim is automatic the moment you dock at
 the **claim station**: the offering station for kill and mining work, the
-destination for a delivery — which consumes the delivered cargo on the
+destination for a delivery, which consumes the delivered cargo on the
 spot. Accepted work **never expires and never fails**: a job whose gap
 closed stays yours until you finish it or abandon it.
 
 Deliveries now **land in the world**: the delivered cargo posts on the
-destination station's book as requisition stock — the goods its guard
-posts buy replacement hulls, fits and ammunition from. A materiel run to
+destination station's book as requisition stock (the goods its guard
+posts buy replacement hulls, fits and ammunition from). A materiel run to
 a front also credits that front's contest meter (the same rail a war-bid
 sale feeds), so carrying guns actually holds ground, and the **in stock**
 figure on a delivery offer is that station's live stock for the item.
 
 **Payouts** are calibrated against the live economy rather than vibes: a
-kill offer pays a multiple (2.0–3.0×) of its target's value — bounty
-plus expected loot — so rat work has the highest ceiling; a mining
+kill offer pays a multiple (2.0–3.0×) of its target's value (bounty
+plus expected loot), so rat work has the highest ceiling; a mining
 offer pays a flat ~2.0× premium over the ore's base value; a hauling
 offer pays 1.5× the cargo's value plus a flat fee per gate jump, which
 makes delivery the dependable-margin option. A derived offer scales its
@@ -654,21 +654,21 @@ reward with the count it derives, so the per-unit calibration holds.
 
 **Standing** is the single career scalar the contacts gate on: every
 completed offer raises it (`+0.10` on level-1 work, `+0.15–0.12` on
-level-2), and the deeper pools require **0.20** standing — two level-1
-completions — before the contact will hand out their orders. Standing is
+level-2), and the deeper pools require **0.20** standing (two level-1
+completions) before the contact will hand out their orders. Standing is
 a key, not a score.
 
 Note that Kvonice now has a station, **Hauvnok**, so the insurer can hand
 over the replacement hull locally: a pilot destroyed over Kvonice has their
-escape pod picked up at Hauvnok — their last in-system docking, or the
-system's first station otherwise — instead of being shipped back to
+escape pod picked up at Hauvnok (their last in-system docking, or the
+system's first station otherwise) instead of being shipped back to
 Struvok. Death is paperwork; the log line `Respawned at <station> in a
 <hull>` is the insurer's replacement notice arriving.
 
 ## Setting a quantity
 
 Every −/+ ticker is gone: whatever needs an amount now asks for it in one
-small popup — the **quantity picker**. It opens from the gesture that
+small popup: the **quantity picker**. It opens from the gesture that
 already names the action and shows what it is working on, a **slider**,
 the current amount and a live preview of what the amount buys or costs,
 then **Confirm** (the action you came from: Refine, Start, Buy, Sell, To
@@ -676,7 +676,7 @@ Hangar…) and **Cancel**. The window is modal and transient: it never persists 
 and it remembers the amount you last **confirmed** for that action, so a
 second refine or a second trade opens where the first one left off (a
 rebuilt interface starts at 1 again). `Esc` cancels it *before* anything
-else — no window closes behind it and the Esc menu never opens — and a
+else (no window closes behind it and the Esc menu never opens), and a
 cancelled picker commits nothing.
 
 What opens it is the action, not the amount: in the **Refinery** and
@@ -695,12 +695,12 @@ line, exactly as it did behind the ticker.
 
 Manufacturing is a station service like any other. Press **`B`** for the
 **Manufacturing** window (or its Manufacturing button on the services
-view) — docked at a station with the **industry** service it opens there
+view); docked at a station with the **industry** service it opens there
 like the other service windows (Hauvnok, Hovžan at Młondan, Dukšan at
 Kamžal), and it only ever mounts while docked.
 
-The window turns **minerals into products**: pick a recipe — a hull, a
-module or a batch of charges — and the quantity picker opens on its
+The window turns **minerals into products**: pick a recipe (a hull, a
+module or a batch of charges) and the quantity picker opens on its
 **runs** (1–100, starting at the run count you last started); Confirm
 starts the job. The materials for every run are committed up front from
 your stock (the have/need column shows exactly what you hold against what
@@ -712,25 +712,25 @@ by station; you can collect or cancel only the jobs at the station you are
 docked at. Cancelling a running job returns its materials to the hangar
 and keeps the fee. Collect the output into your hangar when it is done.
 Ore is not a manufacturing input: it refines into minerals at a refinery
-first — the two-tier chain.
+first; the two-tier chain.
 
 ## The refinery
 
 The **Refinery** window (the rail's Industry section) lists every ore stack in your cargo and ore hold and
-previews exactly what **Refine** would yield — `floor(refine_yield × qty)`
+previews exactly what **Refine** would yield: `floor(refine_yield × qty)`
 per mineral. Selecting an ore opens the **quantity picker** with a notched
-ladder of whole **100-ore batches** — 100, 200, 300, … capped at that
-ore's stock — so 250 ore offers two batches and 50 ore offers none (the
+ladder of whole **100-ore batches** (100, 200, 300, … capped at that
+ore's stock), so 250 ore offers two batches and 50 ore offers none (the
 picker's preview says a batch needs 100 ore and Confirm stays grayed).
-Refined minerals always land in the station hangar — never in your ship's
-hold — and the hangar is unlimited, so a full hold never blocks a refine;
+Refined minerals always land in the station hangar (never in your ship's
+hold), and the hangar is unlimited, so a full hold never blocks a refine;
 the picker's preview names the destination (`→ station hangar`). **Hovžan**
 at Młondan and **Jalvrek** run refineries.
 
 Stations get better at their own work: every completed run raises that
 station's **craft** in the recipe's family (hulls, modules, charges), up
 to five levels. Higher craft means faster jobs and less material per run.
-Unused craft decays slowly, so a station left idle slides back — and a
+Unused craft decays slowly, so a station left idle slides back, and a
 job already running is never re-timed by a mid-job level-up.
 
 ## The economy
@@ -740,56 +740,56 @@ job already running is never re-timed by a mid-job level-up.
 The market is three panes: a **browse tree** on the left, the **catalog**
 in the middle and **My orders** on the right, with a draggable seam between
 each pair (both proportions persist with the layout). The tree is the
-content's own category path — `All` at the root, then `Ships`, `Modules`,
+content's own category path: `All` at the root, then `Ships`, `Modules`,
 `Ammunition`, `Materials` and `Loot` with their children (hull classes,
 slot/role groups, round families). Clicking a branch expands it and scopes
 the catalog to its subtree; clicking an item highlights its branch. Every
-item is listed, including the hulls and wares no one sells here — a dim row
+item is listed, including the hulls and wares no one sells here: a dim row
 whose **Buy** is grayed until some local order offers it (**Request on
 Market** stays live, and placing the first order is how a market wakes up).
 
 **Search.** The field above the tree filters the selected branch live as
 you type (name, group path and maker all match, case-insensitive and
-diacritic-folded — "zaklady" finds Zakłady, and a typed "zakłady" still
+diacritic-folded: "zaklady" finds Zakłady, and a typed "zakłady" still
 matches). Results
-are flat and ranked by fuzzy score — best match first, the header sort
-yielding while the query is up — with the matched letters highlighted;
+are flat and ranked by fuzzy score (best match first, the header sort
+yielding while the query is up) with the matched letters highlighted;
 clearing the query restores the branch view and its sort. The query
 survives a branch click, so re-scoping is one click. Focus the field with
 `Ctrl+F` or a click: while it holds focus the world hotkeys yield. `↑`/`↓`
 walk the results, `Enter` selects the highlighted one (the tree follows),
-and `Esc` clears the query first — a second `Esc` on the empty field leaves
+and `Esc` clears the query first: a second `Esc` on the empty field leaves
 the field and then the window handles the key normally.
 
 **Cross-station availability.** The columns stay local (this station's
 ladder, this station's resting quantity), but when another station's book
 stocks the item the Qty cell carries a dim `· N more` suffix (how many
-other books ask for it) — the window title stays the plain **Market**, so
+other books ask for it); the window title stays the plain **Market**, so
 the exact cheapest ask on the other book is read at that station.
 
 Every station's market is an **order book**: your Buy and Sell are market
 orders that take the best resting prices at that station and fill only
-what the book actually holds — nothing is conjured for you. Both go
+what the book actually holds: nothing is conjured for you. Both go
 through the quantity picker: select the item (or use its row menu) and
 press **Buy** or **Sell**, pick the amount in the popup, confirm. A **broker
 fee** (3 % of the value) rides every buy, a **sales tax** (2.5 %) rides
 every sell; the Finances ledger books each fill with its fee.
-Prices are displayed on a ladder — last
-trade, best ask, best bid, then the item's base price — and they move
+Prices are displayed on a ladder (last
+trade, best ask, best bid, then the item's base price), and they move
 only when real goods trade hands.
 
-The book is not yours alone. A roster of **economy agents** — traders,
-miners and industrialists with their own capital, stock and beliefs —
+The book is not yours alone. A roster of **economy agents** (traders,
+miners and industrialists with their own capital, stock and beliefs)
 works every market station in the cluster: miners cut rock and sell ore,
 industrialists buy minerals and run manufacturing jobs, traders quote between
 the two. They post real orders, pay the same fees you do, and when a
 spread between two stations is worth the freight they post **haul
-wishes** that the convoy traffic works off — cargo bought at one station,
-delivered and sold at another. Agents live in the normal game
+wishes** that the convoy traffic works off (cargo bought at one station,
+delivered and sold at another). Agents live in the normal game
 (`world-default`); the showcase tour runs without them.
 
 The rest of the ring buys and sells too. Convoy haulers carry real cargo
-sourced from the stations and belts they serve — and the goods you shoot
+sourced from the stations and belts they serve, and the goods you shoot
 down stay shot down. Guard and rat replacements are **requisitioned**
 from the same economy: the Charter's patrols buy their replacement hulls,
 fits and ammo on the local books, machine castes pay for theirs in belt
@@ -798,91 +798,90 @@ somewhere.
 
 ## The systems of Entieve
 
-Three zones grade the map by **charter reach** — how far the Charter
-Authority's patrols, courts and insurers actually work: **Charter space**,
+Three zones grade the map by **charter reach**: how far the Charter
+Authority's patrols, courts and insurers actually work. **Charter space**,
 **the Fringe** and **Unincorporated**, the lanes an EVE pilot would call
 high-sec, low-sec and null-sec.
 
-The playable map is **the Wild Fields** — region and constellation carry
-one name — on the ring of stargates: seven systems out from Struvok.
+The playable map is **the Wild Fields** (region and constellation carry
+one name) on the ring of stargates: seven systems out from Struvok.
 
 **Charter space.** You start in **Struvok** (the Wild Fields): the
 first-wave heartland, safe lanes and working paperwork. *Jalvrek* station
 (market, inventory and fitting) is the oldest town's berth, an asteroid
 belt sits close, and gates run on to Kvonice and Rydnok. **Rydnok** is the
-ring's ore country — from Polish *rudnik* "ore-works", weathered past the word —
+ring's ore country (from Polish *rudnik* "ore-works", weathered past the word)
 anchored by its mining
 outpost **Halžek** (market and repairs), with gates back to Struvok and
 on to Młondan.
 
-**The Fringe.** **Kvonice** is the junction of the rush — four gates, NPCs
+**The Fringe.** **Kvonice** is the junction of the rush: four gates, NPCs
 aggressive, the belt holding richer ore (kerngrit, lucidite), and the
 anomaly **Gnazvor** hiding Marauders plus a Hierarch boss with the best
 loot. Its station, **Hauvnok**, is a freeport: it runs the level-2 board,
 doubles as the local insurance point (see Contacts & standing) and builds
-things (see Manufacturing). **Młondan** is the refinery step of the chain —
+things (see Manufacturing). **Młondan** is the refinery step of the chain:
 its platform **Hovžan** refines and manufactures (market, refine, industry).
 **Kamžal** is the shipyard country: **Dukšan**, its depot (market,
 fitting, industry), and the lane on to Glůšan.
 
-**Unincorporated.** **Pušťov** is the dead-end frontier — Old Works
-country, deliberately dangerous: borealite belt ore and heavy spawns
+**Unincorporated.** **Pušťov** is the dead-end frontier, Old Works
+country and deliberately dangerous: borealite belt ore and heavy spawns
 including Hierarchs, with no patrols and no station at all. **Glůšan** is
 quiet in the wrong way; its Unincorporated freeport **Kanšev** runs a
 market and little else. Travel system-to-system by flying to a stargate
-and pressing `J` — the starmap (`N`) shows the gate graph with every
+and pressing `J`; the starmap (`N`) shows the gate graph with every
 system under its own name and your current system highlighted.
 
 **The starmap is an interactive window** (a normal one: no dimmed
 backdrop, draggable and stacking with the rest). Hovering a system lights
 it and its name; **click** it to open its card in the window's top-left
-corner — display name, zone, its stations and every gate destination.
+corner: display name, zone, its stations and every gate destination.
 **Click the selected system again** to set it as your **destination**: the
 shortest gate route from your current system is drawn in amber, the
 destination wears the widest ring, and the card counts the jumps. Click
 the destination once more (or set the system you are already in) to clear
-it. Destination, selection and hover are session-only view state — they
+it. Destination, selection and hover are session-only view state: they
 are never saved and never command your ship.
 
 **The starmap also carries the war** (see *The Long Attrition* below).
-Every node shows who holds it — **filled** while the Charter holds the
-system, a **hollow outline** once the Old Works take it — and a system on
+Every node shows who holds it (**filled** while the Charter holds the
+system, a **hollow outline** once the Old Works take it), and a system on
 the **front** wears an outer blue ring. The top-right corner is the war
 key, ending with the **war treasury**: the corporate fleets' balance, the
 war's health, in one line. The selected system's card adds its holder
-("Held — the charter" or "Held — the Old Works") and, on the front, the
-meter — "Contested — the Works press at 42%" where the Works are eroding a
-charter hold, "Contested — the charter pushes at 42%" where the charter is
-pushing a Works system back. In a world without a war the map shows none
+("Charter-held" or "Works-held") and, on the front, the meter: "Front: the
+Works press at 42%" where the Works are eroding a charter hold, "Front: the
+charter pushes at 42%" where the charter is pushing a Works system back. In a world without a war the map shows none
 of it.
 
 ## The Long Attrition
 
 Out past the charter's paperwork, the **Old Works** hold their ground and
-the corporations want it back. Under the **Commission** — the weak
-confederation that binds the corporations, Swiss-canton style — they raise
+the corporations want it back. Under the **Commission** (the weak
+confederation that binds the corporations, Swiss-canton style) they raise
 and crew **corporate fleets** and send them at the Works. It has been going
 on for years and it will go on for years: the **Long Attrition** is the
 weather of the Wild Fields, not a campaign with a last battle.
 
 **Control and the front.** Every system in the Wild Fields belongs to one
-side or the other — the charter (Struvok, Rydnok, Kvonice, Młondan,
-Kamžal) or the Old Works (Pušťov, Glůšan) — and the war only moves where
+side or the other: the charter (Struvok, Rydnok, Kvonice, Młondan,
+Kamžal) or the Old Works (Pušťov, Glůšan). The war only moves where
 the two sides touch across a gate: the **front**. Every system on the front
 carries a **contest meter**. Supply delivered to the war and Works hulls
 you kill push it one way; the Works' own pressure grinds it the other. At
 the threshold the system **flips**: a charter world falls to the Works, or
-a Works world is reclaimed. Flips are deliberately rare — an unsupplied
+a Works world is reclaimed. Flips are deliberately rare (an unsupplied
 front takes days to fall, and the fronts at Kvonice and Kamžal have been
-holding for a long time — so most of the time the war is a meter moving by
+holding for a long time), so most of the time the war is a meter moving by
 a few percent, and the news stays quiet.
 
 **The squeeze.** Every system the Works lose makes the rest of the Works
-stiffer — exponentially. Their pressure on the front rises, the force they
+stiffer, exponentially. Their pressure on the front rises, the force they
 land when they take a system comes tougher and heavier, and it never gets
 easier. That is the equilibrium: a cornered Works is not a dying Works.
 Their last system is, for all practical purposes, unbreakable. The charter
-has no such protection — its fronts hold only while the economy feeds them
+has no such protection: its fronts hold only while the economy feeds them
 supply. **Starve the war and the charter loses ground.**
 
 **Remnants.** When a system falls under you, nothing evicts you and nothing
@@ -890,35 +889,36 @@ closes your dock. The station becomes a **remnant**: market and repair stay
 open (lawless), while industry, fitting and the charter desk go dark until
 someone reclaims the system. The charter's guards and patrols are gone
 outright, the belts are Works ground, and any manufacturing job already
-running finishes and can be collected — paid work is paid work. A reclaim
+running finishes and can be collected: paid work is paid work. A reclaim
 puts the authored services back.
 
-**Selling to the war.** The corporate fleets buy **everything military** —
-guns, EWAR, tank modules, every line of ammo and charges — on **every
+**Selling to the war.** The corporate fleets buy **everything military**
+(guns, EWAR, tank modules, every line of ammo and charges) on **every
 charter station's book**, at a standing bid priced just under the best ask.
 Sell into it and you are paid immediately, like any other sale: the goods
 are consumed by the war, and the value is credited to the nearest front on
-the next war beat (the haul is abstract — there is no convoy to escort or
-wait for). **Your earnings are the feedback** — the war never posts you a
+the next war beat (the haul is abstract: there is no convoy to escort or
+wait for). **Your earnings are the feedback**: the war never posts you a
 score. Works-held systems buy nothing: a remnant's book carries no war
 demand.
 
 **War offers.** Front staging contacts carry commissioned
-work — hauling materiel to front staging and killing Works hulls at the
-front — gated on standing like any other offer. The flavour line names
+work (hauling materiel to front staging and killing Works hulls at the
+front), gated on standing like any other offer. The flavour line names
 the Commission; the board and its pay are ordinary station work.
 
 **In the log.** The war speaks through the same log lines as everything
-else: "Fall — Kvonice lost to the Old Works", "Reclaimed — Pušťov returns
-to the charter", "Contested — Kamžal holds at 42%", "The war takes 100 x
-…" when your goods go to the front, "Works Marauder destroyed at the
-front" for your kills, "Front skirmish — …" for a fleet action you witness.
+else: "Fall: Kvonice lost to the Old Works", "Reclaimed: Pušťov returns
+to the charter", "Contested: Kamžal holds at 42%", "The war takes 100 x
+…" when your goods go to the front, "Kill: Old Works Marauder destroyed
+at the front" for your kills, "Skirmish: … destroyed at the front" for a
+fleet action you witness.
 
 **Reading the war.** The war treasury in the starmap's key is the war's
 health: fees from every market trade feed it, and it pays for everything
 the fleets buy. A full treasury means a supplied front and a war that can
 push; a thin one means the charter is living off its losses. Watch the
-treasury, the ringed fronts and the hollow nodes — those three read the
+treasury, the ringed fronts and the hollow nodes: those three read the
 whole war.
 
 ## Living universe
@@ -927,14 +927,14 @@ The systems keep moving while you do something else. Overlapping systems
 run underneath the economy:
 
 **NPC convoys haul cargo on the lanes.** Each system runs freighters
-(along the trade routes — they appear in the overview as **Tobřek**) on
+(along the trade routes, where they appear in the overview as **Tobřek**) on
 its own schedule: they spawn at the route's origin, warp the leg exactly
-like a player ship — align, tunnel, land — and deliver their cargo at the
+like a player ship (align, tunnel, land) and deliver their cargo at the
 station endpoint, or leave the system at a gate. They are ordinary ships:
 lock one, shoot it, or just watch it work.
 
 **Guard patrols respond to incidents, never the player.** Patrols are
-friendly: they do not fire on you no matter how close you fly — they only
+friendly: they do not fire on you no matter how close you fly; they only
 defend themselves if you attack them first. Charter patrols (overview name
 **Kuštor**) circle their anchor station and warp to a convoy ambush when
 one breaks out, scaled by zone: a ten-ship wing of medium-gun cutters lands
@@ -942,10 +942,10 @@ on the spot in Charter space, a single responder arrives after about 15
 seconds in the Fringe, and Unincorporated Pušťov has no patrols at all.
 Charter security is now overwhelming: every high-sec station
 carries a four-cutter static post (Rydnok's belt has one too, and the
-Struvok belt is the one authored exception — the Authority posts at the
+Struvok belt is the one authored exception: the Authority posts at the
 station there and sweeps the belt), and a high-sec patrol schedule comes
 round every minute instead of every two and a half. A miner under fire in
-Charter space calls the same answer — the wing holds on the barge it was
+Charter space calls the same answer: the wing holds on the barge it was
 sent to, clears the rats around it (only ever rats: a guard never turns on
 you unprovoked), and flies home when none are left; a second call waits
 until the first wing has left or died. Inside Works control, no one
@@ -953,48 +953,48 @@ answers. In Charter
 space they also work the belts: a static guard takes on the pirate rats
 anchored at its own celestial, and a patrol sweeps an occupied belt once a
 beat, hunts the rats down and flies home only once the belt is empty. Free
-rats come first — a belt you are working stays yours while there are others
-to shoot — but security finishes the job: if yours is the last rat left, the
+rats come first (a belt you are working stays yours while there are others
+to shoot), but security finishes the job: if yours is the last rat left, the
 sweep takes it too. A rat they kill leaves the same lootable wreck as any
 other kill; the bounty is paid only when the kill is yours.
 
 **Rats ambush convoys in the Fringe and Unincorporated.** Every convoy
 transit in Kvonice has roughly a 1-in-6 chance of being jumped, Pušťov
 about 1 in 3, Struvok never. On a hit, one to three raiders of that
-system's own rat class drop in mid-leg — renamed for the job, so a
+system's own rat class drop in mid-leg, renamed for the job, so a
 Marauder hitting a haul becomes a **Marauder Ambusher** in your overview.
 The hauler is dragged out of warp and burns for 20 seconds before
 attempting its warp-out; scramblers pin it, and the arriving patrols pull
 the raiders' guns off it. The incident ends one of three ways:
 
-- **destroyed** — the hauler dies leaving a **lootable cargo wreck**
+- **destroyed**: the hauler dies leaving a **lootable cargo wreck**
   holding the exact shipment (fly over it and press `L`);
-- **escaped** — it warps clear and delivers anyway;
-- **saved** — the raiders are all dead while the hauler still lives.
+- **escaped**: it warps clear and delivers anyway;
+- **saved**: the raiders are all dead while the hauler still lives.
 
 You can intervene in any of them: strip the wreck, guard the convoy
 yourself, or let the rats do the work and take the loot.
 
 **Rats also hold the belts.** They sit on every belt, the Charter-space
-belts included — that is what the belt-cleanup offers are for — and in
+belts included (that is what the belt-cleanup offers are for), and in
 Charter space the patrols grind them down on their own: the wreck is left
 for whoever gets there first, and the belt repopulates on its own timers.
 
 **The Old Works are everybody's problem.** A rat does not care whose hull
 is in front of it: it will jump a convoy, strip a passing freighter, and
-attack the civilian miners cutting rock beside it — a mining op draws the
+attack the civilian miners cutting rock beside it: a mining op draws the
 same attention your own lasers do. The Charter is the only power that
 shoots back: patrols and static guards engage rats, and only ever the
 Charter's; corporate houses and independents (you included) start nothing.
-Miners never fight — a barge under fire cuts its laser and runs for the
+Miners never fight: a barge under fire cuts its laser and runs for the
 edge (its wreck carries the hold only if it cannot get clear), and the rats
 keep working the belt it left.
 
 **Deliveries land in the market.** A convoy's cargo is real: it is bought
 from the origin station's own stock (or drawn from the belt, or imported
 from outside the ring) at spawn and posted as fresh supply on the
-destination station's order book when it arrives — listed just under the
-local cost basis — which is why lanes that run get cheaper. A shipment
+destination station's order book when it arrives (listed just under the
+local cost basis), which is why lanes that run get cheaper. A shipment
 lost to an ambush touches no book at all: the loss surfaces as a log line
 ("Risk premium — …") and, if you are quick, a lootable cargo wreck with
 the exact shipment. Prices form in the books alone (see
@@ -1007,7 +1007,7 @@ another system hops the gates and finishes its run there.
 `]` / `=` cycle time forward (1× → 2× → 4× → 8×), `[` / `-` cycle back. The
 strip above the ship status shows the current `×N` (with a clock glyph)
 beside the wallet. Acceleration simply
-runs more fixed 60 Hz simulation steps per rendered frame — determinism and
+runs more fixed 60 Hz simulation steps per rendered frame: determinism and
 replays are unaffected.
 
 ## Save / load
@@ -1022,14 +1022,14 @@ replays are unaffected.
   its **Keybindings…** button swaps it for the keybindings window (one
   title window is up at a time), and every title window's **×** (and `Esc`)
   closes it back to the menu.
-  **Credits** lists the project's provenance by section — Development,
+  **Credits** lists the project's provenance by section: Development,
   Iconography (game-icons.net, CC BY 3.0), Module renders (CC0),
   Hull & emblem artwork, Interface form (Cyber Terminal UI Kit), Typefaces
-  (IBM Plex, OFL) and Built with — in a scrollable role/credit block under
+  (IBM Plex, OFL) and Built with, in a scrollable role/credit block under
   the tracked **ENTIEVE** wordmark.
 - **`Ctrl+S`** writes a full JSON snapshot (`sim.Snapshot()`) to the
-  active save path — `os.UserConfigDir()/entieve/save.json` (override
-  with `--save`) until a load or a save-as makes another file active —
+  active save path, `os.UserConfigDir()/entieve/save.json` (override
+  with `--save`) until a load or a save-as makes another file active,
   and the window layout alongside the *configured* path
   (`save.json.layout.json`).
 - **`F9`** restores that snapshot mid-run and rebuilds the interface
@@ -1049,12 +1049,12 @@ replays are unaffected.
   arrangement survives a restart even without saving the game.
 
 Saving is the only way progress persists: quitting from the menu does not
-autosave. (The window layout is the exception — it is written on every
+autosave. (The window layout is the exception: it is written on every
 clean quit as well.) The layout and settings sidecars are global to the
 configured save path: UI preferences never follow the active save.
 
 **Restoring mid-run rebuilds the interface**: the selection clears and
 window positions return to the layout saved with the game (their
 defaults, if there is no sidecar yet), while the log history
-carries across the rebuild — the simulation itself comes back exactly,
+carries across the rebuild; the simulation itself comes back exactly,
 including docked state and any windows you had open.

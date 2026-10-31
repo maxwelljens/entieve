@@ -420,8 +420,8 @@ var rules = map[string]featureRule{
 				continue
 			}
 			seen[ev.Phase] = true
-			if !strings.Contains(ev.Text, " — ") {
-				return false, "war line is not the 'Phase — detail' shape: " + ev.Text
+			if !strings.Contains(ev.Text, ": ") {
+				return false, "war line is not the 'Phase: detail' shape: " + ev.Text
 			}
 		}
 		for _, phase := range []string{sim.WarSupply, sim.WarContest, sim.WarFlip, sim.WarSkirmish} {

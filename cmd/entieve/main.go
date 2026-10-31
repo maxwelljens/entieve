@@ -34,7 +34,7 @@ import (
 // An unstamped source run reports git's describe instead (versionString).
 var version = versionDev
 
-const usage = `Entieve — a love letter to EVE Online
+const usage = `Entieve: a love letter to EVE Online
 
 Usage:
   entieve run       [--world ID] [--seed N] [--load save.json] [--save save.json]
@@ -105,7 +105,7 @@ func cmdRun(args []string, stdout, stderr io.Writer) int {
 	opts := game.Options{
 		Content:      c,
 		World:        wd,
-		Title:        "Entieve — " + wd.Name,
+		Title:        "Entieve: " + wd.Name,
 		SavePath:     *save,
 		Seed:         *seed,
 		StartInTitle: startInTitle(*load),

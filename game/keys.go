@@ -314,7 +314,7 @@ func (g *Game) captureKey(k ebiten.Key, ctrl, shift bool) bool {
 	case k == ebiten.KeyBackspace || k == ebiten.KeyDelete:
 		g.unbindAction(action)
 	case ctrl:
-		g.keyNotice = "Ctrl chords are fixed — try another key"
+		g.keyNotice = "Ctrl chords are fixed; try another key"
 		g.ui.Play(sfxRefuse)
 	case reservedKey(k):
 		g.keyNotice = keyText(k) + " is a fixed shortcut"

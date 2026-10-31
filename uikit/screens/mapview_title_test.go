@@ -9,10 +9,10 @@ import "testing"
 // half never renders as a dangling separator.
 func TestStarmapTitleCollapsesOneName(t *testing.T) {
 	cases := []struct{ region, constellation, want string }{
-		{"the Wild Fields", "the Wild Fields", "Starmap — the Wild Fields"},
-		{"Far Moravia", "Kresy", "Starmap — Far Moravia / Kresy"},
-		{"", "Kresy", "Starmap — Kresy"},
-		{"Far Moravia", "", "Starmap — Far Moravia"},
+		{"the Wild Fields", "the Wild Fields", "Starmap: the Wild Fields"},
+		{"Far Moravia", "Kresy", "Starmap: Far Moravia / Kresy"},
+		{"", "Kresy", "Starmap: Kresy"},
+		{"Far Moravia", "", "Starmap: Far Moravia"},
 		{"", "", "Starmap"},
 	}
 	for _, c := range cases {

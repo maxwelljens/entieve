@@ -151,7 +151,7 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 		!strings.Contains(f.craftLbl.Label, "hulls L1") {
 		t.Errorf("craft line = %q, want per-family levels", f.craftLbl.Label)
 	}
-	if f.jobsLbl.Label != "Jobs — 0/3 slots" {
+	if f.jobsLbl.Label != "Jobs: 0/3 slots" {
 		t.Errorf("jobs line = %q, want the 0/3 slot readout", f.jobsLbl.Label)
 	}
 	clickRow(ui, f.recipes, chargeRow)

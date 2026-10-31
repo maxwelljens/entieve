@@ -5,7 +5,7 @@ Every glyph icon in this directory is a 512×512 transparent render fetched from
 Requested attribution format: *Icons made by {author}. Available on https://game-icons.net*
 
 The `mod_*` art rows below are Entieve's own full-colour module renders
-(downscaled to 256×256), dedicated to the public domain under CC0 —
+(downscaled to 256×256), dedicated to the public domain under CC0:
 no attribution is requested, but the source is the project repository.
 
 | icon | slug | credit | source | license |

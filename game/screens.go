@@ -386,7 +386,7 @@ func init() {
 // screenSpecErrors guards against on the Screen spec.
 func keyMapRow(key ebiten.Key, shift, ctrl bool, action, desc string) Binding {
 	return Binding{Key: key, Shift: shift, Ctrl: ctrl, Action: action,
-		Desc: chordOf(key, shift, ctrl) + " — " + desc}
+		Desc: chordOf(key, shift, ctrl) + ": " + desc}
 }
 
 // keyMapRows composes the description-only tables — worldKeyMap and the
@@ -554,7 +554,7 @@ func screenSpecErrors(rows []Screen) []string {
 			} else {
 				actions[s.Action] = s.Title
 			}
-			if strings.Contains(s.Desc, " — ") {
+			if strings.Contains(s.Desc, ": ") {
 				add("row %d (%s): desc %q carries a chord; the KeyMap row composes it (Desc is the description only)", i, s.Title, s.Desc)
 			}
 			combo := keyCombo{s.Key, s.Shift}

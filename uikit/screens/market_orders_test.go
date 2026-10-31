@@ -144,7 +144,7 @@ func TestMarketMyOrdersListsEveryOrder(t *testing.T) {
 	if len(m.mineRows) != 20 {
 		t.Fatalf("mineRows = %d, want all 20 player orders listed", len(m.mineRows))
 	}
-	if want := "My orders — " + theme.FormatInt(20); m.mineLbl.Label != want {
+	if want := "My orders: " + theme.FormatInt(20); m.mineLbl.Label != want {
 		t.Errorf("label = %q, want %q", m.mineLbl.Label, want)
 	}
 	// The uncapped list must not grow the window: the default rect stands
@@ -288,7 +288,7 @@ func TestMarketMyOrdersAfterOrderDialog(t *testing.T) {
 	if btn := m.mineRows[0].Buttons; len(btn) != 1 {
 		t.Fatalf("my-orders row has %d verbs, want one Cancel", len(btn))
 	}
-	if want := "My orders — 1"; m.mineLbl.Label != want {
+	if want := "My orders: 1"; m.mineLbl.Label != want {
 		t.Errorf("label = %q, want %q", m.mineLbl.Label, want)
 	}
 

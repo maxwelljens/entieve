@@ -1,11 +1,11 @@
-# Entieve — Simulation Reference
+# Entieve: Simulation Reference
 
 > **Scope note.** This document is a *reference*, not a contract: it explains
 > what the simulation does and why, and has **no binding authority**.
 > [ARCHITECTURE.md](ARCHITECTURE.md) remains the binding cross-workstream
 > contract, [CONTENT_AUTHORING.md](CONTENT_AUTHORING.md) the data cookbook,
 > and `docs/lore/` the canon. Where this file and the code disagree, the code
-> wins — file names are cited in passing so you can check every claim.
+> wins: file names are cited in passing so you can check every claim.
 
 Everything below is the deterministic core in `sim/`: the fixed-step
 simulation, its command/event surfaces, the world metabolism that keeps
@@ -15,7 +15,7 @@ model described in ARCHITECTURE.md.
 
 ## 1. Tick anatomy
 
-`Sim.Step()` (`sim/api.go`) advances exactly one tick — `sim.TickRate` = 60
+`Sim.Step()` (`sim/api.go`) advances exactly one tick: `sim.TickRate` = 60
 ticks/second, `sim.DT` = 1/60 s of simulated time. `Time()` is derived from
 the tick count (never accumulated), so it is an exact function of `Ticks()`
 across snapshot/restore. Queued commands are consumed first, then systems
@@ -47,7 +47,7 @@ run in this fixed order:
 After all systems, the **deferred player death respawn** runs
 (`pendingPlayerRespawn`): a cross-system clone-bay respawn rebuilds the
 grid, which would otherwise yank entities out from under the systems still
-running this tick. Events are not a system — they are capped at emit time
+running this tick. Events are not a system: they are capped at emit time
 (`maxEvents` = 512 in `sim/helpers.go`, oldest dropped), so there is
 nothing to trim at the end of a Step. The tick counter and derived clock
 close the Step.
@@ -69,9 +69,9 @@ last so the rebuilt grid is never observed mid-Step.
   `Fork(stream)` derives independent streams; every NPC holds its own fork,
   and the living-universe stream (`trafficRNG`, keyed `trafficStreamID` in
   `sim/system_traffic.go`) is forked from the master at `New`.
-- **Role pins.** The master stream carries exactly two roles — player
+- **Role pins.** The master stream carries exactly two roles, player
   combat rolls and spawn entropy (asteroid/NPC scatter plus NPC fork
-  seeds) — and `sim/rng_roles_test.go` pins its draw set, so a future
+  seeds), and `sim/rng_roles_test.go` pins its draw set, so a future
   subsystem reaching for `s.RNG` fails a test. Traffic draws only its own
   stream (`TestTrafficNeverDrawsMasterStream`). The agent layer draws no
   RNG at all: imputation, ZIP and upkeep are pure math.
@@ -91,7 +91,7 @@ last so the rebuilt grid is never observed mid-Step.
   (tick, key, interval) (`trafficDue`), not persisted timers; agent acts
   fire on each agent's own hashed cooldown (`agentCooldownTicks`). A
   skipped spawn attempt never reschedules anything.
-- **The beat — paced commencement.** Nothing commences the tick it first
+- **The beat: paced commencement.** Nothing commences the tick it first
   becomes possible (CONTEXT.md: departure beat / gate cycle / turnaround /
   agent cooldown / belt sweep): spawns and resumes hold a departure beat (120–480
   ticks), gate arrivals hold a gate cycle (dwell 120–300, then a jump
@@ -100,18 +100,18 @@ last so the rebuilt grid is never observed mid-Step.
   docked dwell of 300–900 whose cargo action fires partway through, then
   undock + departure beat), and each agent's capital actions sit at least
   one jittered cooldown (60–600 ticks) apart, at most one capital-moving
-  step per act. Every window is jittered by `trafficBeat` — a pure hash of
-  (tick, canonical key), no entropy — and the running deadlines ride the
+  step per act. Every window is jittered by `trafficBeat`, a pure hash of
+  (tick, canonical key) with no entropy, and the running deadlines ride the
   already-persisted `Traffic.Next`/`Traffic.Phase` fields, so the beat
   changes no save schema. A patrol's belt sweep is a beat too, but not a
-  jittered one: it waits one **patrol beat** (`trafficBeltSweepBeat` — the
+  jittered one: it waits one **patrol beat** (`trafficBeltSweepBeat`, the
   authored patrol cadence, security-scaled like the patrol schedule) after
   the patrol comes on duty, and the deadline rides the already-persisted
   `Patrol.Next`.
 - **The authority answers distress.** A hostile hit on a civilian miner
   (`systemDamage`, the same step that records `LastHitBy`) calls
   `minerDistress`: the traffic step's patrol response is dispatched with the
-  MINER as the incident — the same wing table as a convoy ambush (ten in
+  MINER as the incident: the same wing table as a convoy ambush (ten in
   high, one in low, none in null), rate-limited by `respondingTo` (any live
   patrol already holding that miner), skipped inside Works control, and
   delayed in low space by holding the wing at its anchor (`Patrol.Next`)
@@ -119,7 +119,7 @@ last so the rebuilt grid is never observed mid-Step.
   on a ring around the miner (`patrolStation`: even angular slots,
   hash-varied radius, nothing persisted) and holds there, shoots
   the rats within `trafficPatrolEngageRange` of it (the ambush engagement
-  range — rats only, never the player) and takes the ordinary
+  range: rats only, never the player) and takes the ordinary
   `patrolReturnStep` home when none are left. No new save field: the
   incident rides `Patrol.Incident` like an ambush.
 - **Twin-run tests.** `sim/determinism_test.go`, `sim/world_metabolism_test.go`,
@@ -129,7 +129,7 @@ last so the rebuilt grid is never observed mid-Step.
 ### Event surface
 
 `Sim.Events()` (alias `DrainEvents()`) drains the pending list. One struct
-covers everything — `sim.Event` in `sim/model.go` — with kinds `EvLog`,
+covers everything (`sim.Event` in `sim/model.go`) with kinds `EvLog`,
 `EvDestroyed`, `EvWarp`, `EvLooted`, `EvDocked`, `EvUndocked`, `EvJumped`,
 `EvMarket`, `EvModule`, `EvTargetLocked`, `EvCargoFull`, `EvAnomalyCleared`,
 `EvMission`, `EvTraffic`, `EvWar`. Phases: `EvWarp` carries `"start" | "land" |
@@ -161,15 +161,15 @@ silent.
 Every cyclic module resolves its first cycle the tick it is activated: the
 activation cost is paid and the effect applied then (`activate` sets
 `CycleEnds = now`, `systemModules` pays and applies), and the same happens
-at every later boundary — `ActivationTime` for tank/cap/prop/ewar,
+at every later boundary: `ActivationTime` for tank/cap/prop/ewar,
 `Weapon.ShotTime` for guns, `Mining.CycleTime` for lasers. `CycleEnds` is
 the boundary of the cycle **in flight**.
 
 `CmdDeactivate` cancels the repeat, not the cycle: the module switches off
 at once (an afterburner's speed multiplier drops, tanking and webs stop
 refreshing) and the cycle clock is **kept**. Re-activating inside that
-cycle cancels the pending stop and resumes at the original boundary — no
-restart, no extra effect — and nothing resolves while a module is off, so
+cycle cancels the pending stop and resumes at the original boundary (no
+restart, no extra effect) and nothing resolves while a module is off, so
 toggling can never buy more than one effect per cycle time (the pre-fix
 clock reset let a deactivate/activate pair replay the effect every tick;
 `sim/cycle_semantics_test.go` pins the exploit shut). NPCs run the same
@@ -178,8 +178,8 @@ boundary rule.
 
 ### Round bays (clips)
 
-Every charge-fed module — a projectile gun (`weapon.ammo_class != ""`) and
-the cap booster — carries a **bay** (`weapon.bay_m3` / `boost.bay_m3`) that
+Every charge-fed module (a projectile gun (`weapon.ammo_class != ""`) and
+the cap booster) carries a **bay** (`weapon.bay_m3` / `boost.bay_m3`) that
 holds whole rounds of exactly one round type. `sim/clips.go` owns the
 machinery:
 
@@ -199,23 +199,23 @@ machinery:
   type has cargo stock the bay reloads it; when it runs out the bay switches
   if **exactly one** type remains in cargo and **waits** if two or more
   compete. A fresh fit (no selection) does the same. There is no
-  cargo-order mode — `CmdSetAmmo ""` clears the selection (dumping the bay
+  cargo-order mode: `CmdSetAmmo ""` clears the selection (dumping the bay
   back to cargo) and re-resolves by that rule.
 - **Waiting vs. dry.** Empty bay + 2+ types = the waiting state: one
   `EvLog` line (`<module> waiting for ammo selection`, `SevInfo`) and a
-  silent deactivate — never the dry-gun warning. Empty bay + no matching
+  silent deactivate, never the dry-gun warning. Empty bay + no matching
   rounds at all is truly dry: the existing `no charges` warning and
   deactivation, unchanged.
 - **Round travels.** `CmdUnfitModule` and `CmdAssemble` dump bays back to
   cargo; a destroyed ship's loaded rounds land in its wreck's loot; docking
   and undocking never touch a bay.
 - **Read surface for the UI.** `Sim.Clip(e, slot) (sim.ClipState, bool)`
-  reports `{Item, Rounds, Capacity, Selection, Options, Loading}` — `Options`
+  reports `{Item, Rounds, Capacity, Selection, Options, Loading}`: `Options`
   is every round type in cargo that fits the bay (2+ with `Rounds == 0` is
   the waiting state the rack will offer a choice from), and `Loading` is true
   from a load's start until its cycle completes (derived from the runtime's
   bay and not-yet-written selection, so a save mid-load restores into the
-  same load — no schema field was added).
+  same load; no schema field was added).
 - NPCs run the identical machinery; their single-type spawn grant resolves
   to auto-load with no interaction.
 
@@ -223,7 +223,7 @@ Docking (`execDock`, `sim/system_travel.go`) is a free full restore: every
 fitted module is cleared (active state *and* cycle clock, which also drops
 the afterburner multiplier) and shield, armor, structure and capacitor are
 set to their maxima. No wallet movement, no ledger entry and no repair
-service involved — `CmdRepair`/`execRepair` stay unchanged. `execUndock`
+service involved: `CmdRepair`/`execRepair` stay unchanged. `execUndock`
 clears the modules again, so a ship always undocks with everything off.
 No save field was added: the cycle clock already exists and the state
 transition is deterministic.
@@ -233,9 +233,9 @@ transition is deterministic.
 `Save` (`sim/model.go`) is the full serializable snapshot: world/system/
 ticks/seed, both RNG stream states, wallet, standing, missions, the hangar,
 every entity's components, the free-slot mirror (exact future handles), the
-respawn anchor, module target bindings — each slot's bay rounds and ammo
+respawn anchor, module target bindings (each slot's bay rounds and ammo
 selection riding inside its fitting runtime (`ModuleRuntime.Clip` /
-`.Selection`) — and the living-economy state the v2 schema added: `Market`
+`.Selection`)), and the living-economy state the v2 schema added: `Market`
 (per-station books), `MarketLasts`,
 `MarketSeq`, `Belts`, `FactionLedger`, `Jobs`, `JobSeq`, `Craft`,
 `Agents`, `Upkeep`, `TrafficJourneys` (plus `TrafficLeaves`), `War`.
@@ -245,7 +245,7 @@ the capped ring of the player's last `LedgerCap` wallet movements, empty
 Every list carries its canonical order and map keys marshal sorted, so the
 JSON is canonical.
 
-`Hash()` (`sim/hash.go`) is FNV-1a 64 over that canonical Save JSON — by
+`Hash()` (`sim/hash.go`) is FNV-1a 64 over that canonical Save JSON: by
 construction the whole state. There is no degraded fallback: a
 non-finite float makes `hash()` panic through `hashFail` rather than
 return a plausible-looking partial fingerprint. Because `hash()` and
@@ -256,9 +256,9 @@ preserves `Hash()` exactly.
 loaded rounds and ammo selections; both ride the existing fitting runtime
 (`ModuleRuntime.Clip` / `.Selection`, `{Item, Qty}` rounds), so no new Save
 field appeared. `Restore` accepts v2 and **migrates it in place**
-(`migrateSaveV2ToV3`: every bay empty, no selection — the next tick's bay
+(`migrateSaveV2ToV3`: every bay empty, no selection; the next tick's bay
 rule auto-loads a single round type or waits for a choice), and rejects
-anything older — the **clean break** introduced with the per-station market
+anything older: the **clean break** introduced with the per-station market
 tranche (the v0.2.0 era). Pre-v2 saves carried per-system stock lists with
 drifting prices; restoring one into a book-based economy would silently mean
 a different market, so it fails loudly instead. One piece of state is
@@ -278,52 +278,52 @@ Seven rules keep goods real: nothing is conjured, nothing disappears
 without bookkeeping. The tests in `sim/world_metabolism_test.go` and
 `sim/logistics_test.go` pin each.
 
-1. **Extraction — persistent belts.** Every belt rock carries remaining
+1. **Extraction: persistent belts.** Every belt rock carries remaining
    volume in `belts` (`Save.Belts`), seeded from the `BeltDef` on first
    generation and never re-seeded by a reload. Mining, NPC miners and rat
    requisitions decrement it in step with the live asteroid entities. Belts
    refill on a **fixed 60-minute cycle** (`beltCycleTicks` = 216,000 ticks,
-   `systemBelts`, `sim/system_mining.go`): the cycle is pure tick math —
-   `n := (ticks - GrownAt) / beltCycleTicks`, `GrownAt` the anchor of the
-   last boundary (the persisted field, unchanged on the wire) — and at the
+   `systemBelts`, `sim/system_mining.go`): the cycle is pure tick math,
+   `n := (ticks - GrownAt) / beltCycleTicks`, with `GrownAt` the anchor of the
+   last boundary (the persisted field, unchanged on the wire), and at the
    boundary every rock resets to its **definition volume**. A live rock tops
    up in place (the entity is kept, so a mining target survives the
    boundary); a destroyed rock re-enters the grid through `spawnAsteroid`
    with a fresh scatter, which is why the boundary consumes the master RNG
    stream exactly like a system load. Off-system belts refill state-only and
    scatter on their next load. A drained belt stays drained between
-   boundaries — across save/restore and system reloads.
+   boundaries: across save/restore and system reloads.
 
    **NPC extraction.** Civilian miners (`npc-miner-*`, `npcMiner`,
    `sim/system_npc.go`) run the same cycle machinery: they cut the nearest
    rock with volume left, move on when it depletes, and when the ore hold is
    full they warp to the nearest station of the system and offload. The
    delivery posts the hold on that station's book as system-owned asks one
-   tick under its own price — the convoy-delivery rule — so the ore is real
+   tick under its own price (the convoy-delivery rule), so the ore is real
    supply and **no money is minted** (`settle` only moves currency for
    player-owned orders); the miner then despawns and its spawn group's timer
    re-arms it. Miners never initiate: the threat triggers never make them
    aggressors, they hold no lock on the player, and they never turn on anyone.
-   They do run — damage that takes a miner's structure under its
+   They do run: damage that takes a miner's structure under its
    temperament-scaled flee threshold ends the extraction loop (the laser cuts
-   out, it burns away from the attacker for the same 20 s and escapes) — but
+   out, it burns away from the attacker for the same 20 s and escapes), but
    they are ordinary ships otherwise: lockable, damageable, and their death
    runs the normal wreck path with the hold as loot.
 
    **Inter-NPC hostility.** The threat machine is candidate-based, not
-   player-based: `sim/systemNpc` resolves every on-grid ship — you, AI hulls,
-   traffic haulers — as a candidate and runs the same four triggers for each
+   player-based: `sim/systemNpc` resolves every on-grid ship (you, AI hulls,
+   traffic haulers) as a candidate and runs the same four triggers for each
    (proximity, damage from another faction, recent work near Home, Home
    intrusion). Who may act on whom is `sim/hostility.go`, the Relations
    table of [lore/FACTIONS.md](lore/FACTIONS.md) as code: the Old Works act
    on everything non-Old-Works (so belt rats now attack miners cutting rock
    and the traffic passing through), the Charter answers only the Old Works,
-   and corporate houses and independents — you and the haulers — initiate
+   and corporate houses and independents (you and the haulers) initiate
    nothing; same-faction and unknown factions are neutral (fail closed). A
    content pin fails if a shipped NPC def names a faction with no relations
    row. Role passivity stacks on top: guards never initiate (they only
    self-defend against you and clear high-sec rats at their celestial), and
-   miners never initiate — but a miner does flee once its structure drops
+   miners never initiate, but a miner does flee once its structure drops
    under the threshold, so a rat that corners a working barge drives it off
    the belt instead of killing it where it cuts. The chosen target is the
    damage source first (initial aggro), else the candidate the prey score
@@ -333,14 +333,14 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    `KindWeapon` modules; equal scores go to the nearer candidate, then
    canonical order. Handles persist in `NpcAI.Target` (saving/restoring an
    engagement bit-for-bit), and only the player's announcement is the
-   warning line — an NPC-vs-NPC fight logs one `<attacker> attacks
+   warning line; an NPC-vs-NPC fight logs one `<attacker> attacks
    <target>` line on the idle→approach edge.
 
    **NPC behaviour trees.** Each role's per-tick policy is one behaviour
    tree (`sim/btree.go`, `sim/system_npc.go`): a `Sequence`/`Selector` of
    named rule leaves (`aggressiveTree`, `guardTree`, `minerTree`,
    `patrolTree`, `raiderTree`). Evaluation is synchronous, allocation-free
-   and pure — the children are static, a tick draws no RNG and reads no
+   and pure: the children are static, a tick draws no RNG and reads no
    clock, and `NpcAI.State`/`Target` plus the tick's `Intent` remain the
    whole decision memory, so a tree never introduces state of its own. The
    leaves still call the motion machinery (`npcPatrol`, `npcApproach`,
@@ -357,80 +357,80 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    target's over the same window, and `npcSwitchDwell` (600 ticks) have
    passed since it acquired or switched, it re-enters approach on the new
    hull (the damage window then restarts). A wing-mate of the current target
-   never triggers the rule — the wing is already the engagement — and an
+   never triggers the rule (the wing is already the engagement), and an
    ordinary hull with no live target still answers any attacker immediately
    (initial aggro). The same rule gates the engaged-idle flip: a high-sec
    guard clearing a rat, or a raider holding an ambush, no longer turns on
-   the first hull that pokes it — the new attacker must be the considerable
+   the first hull that pokes it: the new attacker must be the considerable
    threat. The per-source window (`NpcAI.HitLog`) and the dwell marker
    (`NpcAI.SwitchAt`) are deliberately not saved, like
    `Sim.lastPlayerWork`: a restore starts the window empty, so a restored
    hull needs fresh damage before it can switch.
-2. **Refining — ore to minerals.** `CmdRefine` at a `refine` station turns
+2. **Refining: ore to minerals.** `CmdRefine` at a `refine` station turns
    ore into minerals at `floor(refine_yield × qty)` per mineral (`execRefine`,
    `sim/system_economy.go`), in whole **100-ore batches** only: any quantity
    that is not a positive multiple of 100 is refused untouched (never floored
    to nothing while eating the ore), and a stock that is not a multiple refines
    only its whole batches. Tier 1 of the two-tier recipe economy; outputs
-   always land in the station hangar (unlimited — no capacity model), never
+   always land in the station hangar (unlimited, no capacity model), never
    in the ship's hold.
-3. **Manufacturing — jobs, fees and craft growth.** Tier 2: `RecipeDef`
+3. **Manufacturing: jobs, fees and craft growth.** Tier 2: `RecipeDef`
    (`content/data/recipes/`, `rec-*`) turns minerals into ships, modules or
    charges at an `industry` station. `CmdStartJob` commits the materials
-   for every run up front (integer units) and pays the job fee — **3 % of
-   the recipe's mineral value at base prices**, per run, `Sim.JobFee` —
+   for every run up front (integer units) and pays the job fee (**3 % of
+   the recipe's mineral value at base prices**, per run, `Sim.JobFee`)
    from the wallet into the ledger; all stations share **3 global job
    slots**. `CmdCollectJob` delivers the output to the hangar;
    `CmdCancelJob` cancels a running job (materials back to the hangar, the
    fee kept, the slot freed). Timing is pure clock math
-   (`Job.StartedAt`/`DoneAt`) — zero RNG. Craft grows per
+   (`Job.StartedAt`/`DoneAt`): zero RNG. Craft grows per
    (station, recipe family): `L = min(5, 1 + floor(sqrt(runs)/2))`, each
    level cutting job time 4 % and materials 2 % below the L1 baseline
    (both frozen at job start). Every 3600 idle ticks a family's counter
    decays one run-equivalent, floor 0 (`sim/system_industry.go`).
-4. **Distribution — real-cargo convoys.** Route cargo is **sourced at
+4. **Distribution: real-cargo convoys.** Route cargo is **sourced at
    spawn, never conjured** (`sim/system_traffic.go`): a *station* origin
    withdraws the units from that station's own asks (the weighted price
    paid is the shipment's cost basis); a *belt* origin draws the persistent
    belt state (dry belt ⇒ no shipment this cycle); a *gate* origin is the
-   economy's one sanctioned import — the named world boundary, where
+   economy's one sanctioned import: the named world boundary, where
    shipments arrive undebited and post as supply only at the destination.
    An origin without stock spawns nothing. Delivery posts the shipment as
    an ask on the destination station's book one tick under
    `min(cost basis, best ask)`, so arriving supply always improves the
    displayed price; a posting that crosses the destination's bids executes
    immediately at the resting bid (never-crossed invariant) and only the
-   remainder rests. Cross-system legs — and haulers whose grid was rebuilt
-   under them — park as journeys (`Save.TrafficJourneys`) and continue when
+   remainder rests. Cross-system legs (and haulers whose grid was rebuilt
+   under them) park as journeys (`Save.TrafficJourneys`) and continue when
    their system loads next; multi-hop routing finds the next gate toward
    the destination (`trafficNextHop`). Authored interval lanes
    (`content/data/traffic/`) coexist with this ledger.
    Everything commences on the beat (this file's §2): a departure beat
    after spawn/resume, the gate cycle at stargates (dwell → hop → jump
-   cycle), and a turnaround at station endpoints — approach, then the
+   cycle), and a turnaround at station endpoints: approach, then the
    docked dwell with the delivery posting partway through (the hold
    leaves the hauler exactly when the book gains it, so the units are
    counted once), then undock + departure beat before the hauler leaves
    the grid. A gate-queue hold announces itself once on entering the
    hold: the held shipment waits in the ledger and hops straight across
-   once the far queue drains, closing the episode with one jump line —
+   once the far queue drains, closing the episode with one jump line;
    no respawn/re-hold cycle exists to re-log.
-5. **Consumption — real burns.** Guns consume one round per shot, of their
+5. **Consumption: real burns.** Guns consume one round per shot, of their
    own calibre (dry guns refuse to fire; artillery's damage multiplier is
    the gun's share of the round's volley). Every 3600 ticks each market station's **upkeep** cycle
    burns a 5,000 € maintenance fee and buys a repair/rearm basket (every
    ammo item × 50 plus the lowest-id armor-repair module) against its own
-   book at up to ×1.25 the displayed price, consuming the goods outright —
+   book at up to ×1.25 the displayed price, consuming the goods outright:
    a money sink seeded once with a 100,000,000 € endowment and never
    refilled (`upkeepPass`, `sim/agent.go`). Replacement NPCs are
    **requisitioned**: a guard buys its hull, fit and a 1,000-round
    basket from the respawn station's book against its faction's ledger
-   (`Save.FactionLedger`, likewise seeded once — only respawn requisitions
+   (`Save.FactionLedger`, likewise seeded once: only respawn requisitions
    debit it); a rat pays belt ore (1 m³ per 200 mineral units of its hull
    recipe bill) or buys local ore asks when the belt cannot pay. An
-   unfunded requisition warns and re-queues 600 ticks later, forever — a
+   unfunded requisition warns and re-queues 600 ticks later, forever: a
    replacement never spawns from nothing (`sim/system_respawn.go`).
-6. **Destruction — losses destroy debited goods.** A hauler killed by
+6. **Destruction: losses destroy debited goods.** A hauler killed by
    raiders or by you takes its shipment to a **lootable wreck**; unlooted,
    those goods are gone. The origin book was debited at spawn, so no
    reversal ever touches it, and a shipment that never arrived never
@@ -440,11 +440,11 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    bounty. The bounty is paid only for kills attributed to you: a belt rat
    the Charter's patrols grind down leaves the same lootable wreck and pays
    nobody.
-7. **Reprocessing — wreck reclaim.** A destroyed ship's wreck carries
-   `floor(0.4 × hull-recipe mineral inputs)` as reclaimed minerals — the
+7. **Reprocessing: wreck reclaim.** A destroyed ship's wreck carries
+   `floor(0.4 × hull-recipe mineral inputs)` as reclaimed minerals: the
    Scuttler's 19,900 sideron + 2,800 vetril bill reclaims 7,960 + 1,120
-   (`reclaimedMinerals`, `sim/system_damage.go`). The value-added part —
-   fitting, labor, craft — burns off; rolled loot is a separate table.
+   (`reclaimedMinerals`, `sim/system_damage.go`). The value-added part
+   (fitting, labor, craft) burns off; rolled loot is a separate table.
 
 ## 4. Economy agents
 
@@ -454,14 +454,14 @@ players. The design is the approved one in
 [research/price-formation-brief.md](research/price-formation-brief.md)
 §5 candidate A, layered over ZIP placement.
 
-**Roster.** 24 agents (`agentRosterSize`) spread over every market station
-— `floor(24 / #stations)` each, ≥ 1. The shipped six-station universe gets
+**Roster.** 24 agents (`agentRosterSize`) spread over every market station,
+`floor(24 / #stations)` each, ≥ 1. The shipped six-station universe gets
 four per station: industry stations lead with two **industrialists** and
-then alternate trader/miner, market-only stations alternate from the top —
+then alternate trader/miner, market-only stations alternate from the top:
 8 industrialists, 8 traders, 8 miners. Ids (`ag-001`…), homes, roles and
 starting capital (250,000 €) are pure functions of content: no RNG. The
 roster is world-gated to `world-default` (`agentWorlds`); the showcase tour
-and test fixtures run without agents — and therefore without upkeep.
+and test fixtures run without agents, and therefore without upkeep.
 
 **State** per agent: `ID`, `Home` station, `Role` (a bootstrap leaning,
 not a class), `Capital` and `Start`, `Inventory`, `Beliefs`, `Margin`
@@ -474,9 +474,9 @@ quarter of free capital, and an agent under 1 € takes no actions at all.
 
 1. **Impute value** (Menger/Wieser). Consumption-anchored goods are valued
    at the agent's EWMA belief of executed trade prices. Recipe *inputs* are
-   backward-imputed through the recipe tree to a fixpoint —
+   backward-imputed through the recipe tree to a fixpoint:
    `V(m) = max over recipes r containing m of ((MV(out_r) − Σ other inputs) / qty)`
-   with `MV` = belief net of the 5.5 % round-trip fee load — and ore floors
+   with `MV` = belief net of the 5.5 % round-trip fee load, and ore floors
    at its refine yield. Reservation prices spread ±25 % around `V` by
    inventory need: deficit raises the bid, surplus discounts the ask, and
    no order ever crosses the agent's own valuation.
@@ -489,13 +489,13 @@ quarter of free capital, and an agent under 1 € takes no actions at all.
 3. **Act where margin is positive.** Miners draw belt ore and sell it (or
    restock when their belt runs dry); industrialists commission the
    best-margin recipe and restock its materials while that margin is
-   ≥ 0 (within float noise — imputation makes the binding recipe
+   ≥ 0 (within float noise: imputation makes the binding recipe
    break-even by construction); traders market-make and stockpile a small
    basket.
 
 **Cadence.** Resting fills settle every tick (`agentSettle`); each agent's
 behavior act fires on its own stateless cooldown (a hashed 60–600-tick
-window per agent id — CONTEXT.md "agent cooldown"), and one act performs
+window per agent id, the CONTEXT.md "agent cooldown"), and one act performs
 at most ONE capital-moving step: the applicable steps of {commission a
 job, quote orders, contract a haul wish} rotate on a hashed slot of the
 act ordinal, so two capital-moving actions are never less than one
@@ -505,27 +505,27 @@ ascending id order everywhere and draw zero RNG.
 **Haul wishes and fulfillment.** Traders and industrialists rebuild a wish
 list each pass: for every item they hold or quote, when the cheapest and
 dearest data-bearing stations differ by more than the round-trip fee load,
-they append a `HaulWish` for the gap (`MaxCost` = spread − fees — what is
+they append a `HaulWish` for the gap (`MaxCost` = spread − fees, what is
 left for the hauler). Miners produce no wishes; the list is rebuilt, never
 accumulated. The fulfillment contract is wish-driven logistics: the
-logistics side spawns a convoy per wish — the cargo is **debited from the
+logistics side spawns a convoy per wish: the cargo is **debited from the
 owning agent's stock at spawn**, delivered as **agent-owned asks at the
 destination at the agent's reservation price**, and the **hauling cost is
-paid by the agent** (charged against its free capital — resting-order
-escrow is untouchable — and burned, a money sink). Authored interval lanes
+paid by the agent** (charged against its free capital, where resting-order
+escrow is untouchable, and burned, a money sink). Authored interval lanes
 coexist with the wish lane. *Landed:* `sim/system_traffic.go`'s wish poll
-(`trafficSpawnWishHaulers`) consumes the seam — one validated shipment per
+(`trafficSpawnWishHaulers`) consumes the seam: one validated shipment per
 60-tick poll after the authored lanes, sourced from the owning agent's own
 asks and stock (all-or-nothing), owner-tagged through the journey ledger,
 delivered as asks at `belief × (1 + margin)`, and settled through
-`FulfillHaul` at **2.5 € per m³ per transit leg**, charged on delivery —
+`FulfillHaul` at **2.5 € per m³ per transit leg**, charged on delivery;
 a lost shipment drops the wish unpaid.
 
 ## 5. Price formation
 
 **Per-station continuous double auction.** Each station keeps one order
 book (`MarketBook`, keyed by `StationID` = the station's celestial id,
-universe-wide — content validation rejects a station id shared by two
+universe-wide; content validation rejects a station id shared by two
 systems). The book is the *only* price former: there is no band, no decay,
 no drift model.
 
@@ -533,7 +533,7 @@ no drift model.
   in price-time priority at the *resting* orders' prices; only the
   unfilled remainder rests (`matchCrossing` / `applyMatches` in
   `sim/model.go`), so a book can never cross itself.
-- **Price-time priority.** Canonical book order — item ascending, asks
+- **Price-time priority.** Canonical book order: item ascending, asks
   before bids, best price first, arrival id (`MarketSeq`) breaking ties.
 - **Price ticks.** Every order price is quantized to four significant
   figures (`quantizeTick`, `sim/system_economy.go`): 48 ticks in 0.01
@@ -541,7 +541,7 @@ no drift model.
   lists at.
 - **Fees.** A 3 % broker fee rides the placed value of a buy at placement
   (never refunded, EVE's rule); a 2.5 % sales tax rides the executed value
-  of a sell at execution. A round trip costs 5.5 % — the institutional
+  of a sell at execution. A round trip costs 5.5 %: the institutional
   load every quote and wish accounts for. A fifth of both is routed to the
   war treasury instead of burned (`routeFee`, [§6](#6-the-war-the-long-attrition));
   the rest vanishes exactly as before, so the round trip still costs 5.5 %.
@@ -550,25 +550,25 @@ no drift model.
   a player sell escrows the goods themselves (fitted hulls are refused).
   Agent buys escrow capital, agent sells escrow inventory.
 - **Player Buy/Sell are market orders**: immediate-or-cancel against the
-  docked station's book at the resting prices — whatever the book cannot
+  docked station's book at the resting prices: whatever the book cannot
   fill simply stays with the seller/buyer (`execBuy`/`execSell`).
   `PlaceOrder` is the resting surface used by traffic supply, agents and
   upkeep.
 
 **Displayed price** (`MarketPrice`) is a ladder: last trade → best ask →
-best bid → the item's base price. Moves print as `EvMarket` lines —
-"Surplus — … price falls to …" / "Demand — … price rises to …" — the
+best bid → the item's base price. Moves print as `EvMarket` lines
+("Surplus — … price falls to …" / "Demand — … price rises to …"), the
 displayed price of the book moving, not an external model.
 
 **Beliefs** are EWMA of executed trades (γ = 0.1 on the last trade price at
 the agent's home book; own quotes never move a belief), bootstrapped from
 the ladder's base-price rung. **Imputation anchors input value to product
 value**, so a mineral is worth what its most profitable use is worth net
-of fees — prices in the ring are chained through the recipe tree rather
+of fees: prices in the ring are chained through the recipe tree rather
 than set by fiat.
 
-Theory grounding — why marginal utility plus ZIP converges in agent-based
-economies, and the evidence — lives in
+Theory grounding (why marginal utility plus ZIP converges in agent-based
+economies, and the evidence) lives in
 [research/price-formation-brief.md](research/price-formation-brief.md)
 (§1 marginal utility & imputation, §2 ACE convergence, §3 EVE market
 microstructure, §5 the candidate mechanisms).
@@ -579,7 +579,7 @@ The war is **system 20** (`sim/war.go`), the last beat of the tick.
 Corporate fleets raised under the Commission fight the Old Works for
 territory: **control** is the scoreboard, **contest meters** on the front
 are its pulse, and the economy funds it. The war is world-gated
-(`warWorlds` = `world-default` today, the `agentWorlds` pattern) — a world
+(`warWorlds` = `world-default` today, the `agentWorlds` pattern): a world
 outside the gate runs without it, so the current showcase tour and test
 fixtures keep war-free economies. All of it is deterministic: every
 iteration the war acts on walks ascending system ids (seeding is
@@ -592,8 +592,8 @@ it.
 `WarState` has three fields: `Control` (system → `"charter" | "works"`),
 `Contest` (front system → meter) and `Treasury` (the Corporate Fleets' bloc
 balance, `float64` like every purse in the house). `newWarState` seeds
-control from the authored `security` tier — `high` and `low` are chartered,
-`null` is the Works' — and derives the first front from the gates, so a
+control from the authored `security` tier (`high` and `low` are chartered,
+`null` is the Works'), and derives the first front from the gates, so a
 fresh game starts on today's map exactly: Struvok and Rydnok chartered at
 high security, Kvonice, Młondan and Kamžal at low, Pušťov and Glůšan held
 by the Works; Kvonice, Kamžal, Pušťov and Glůšan carry the idle meters. The
@@ -602,9 +602,9 @@ faction-ledger seed pattern); it is refilled only by the fee cut below, so
 it is a finite sink.
 
 **Effective security** (`EffectiveSecurity`) is the one authority every
-other behavior derives from: a works-held system reads `"null"` — guards
+other behavior derives from: a works-held system reads `"null"` (guards
 and patrols leave, ambush rolls and NPC temperament go lawless, belt
-sweeps stop — and a reclaim returns the authored tier, because nothing
+sweeps stop) and a reclaim returns the authored tier, because nothing
 about the effective tier is stored. Authored `security` still classifies
 the zone on the starmap and in content.
 
@@ -613,8 +613,8 @@ the zone on the starmap and in content.
 A system carries a **contest meter** exactly while it is gated to a system
 the other side holds: the front is contiguous, and control moves only
 across it. The meter is the attacking side's progress in `[0, Threshold]`
-(`meterThreshold` = 1) — the Works' against a charter hold, the charter's
-against a works hold — so the sign of the push follows the holder:
+(`meterThreshold` = 1), the Works' against a charter hold and the charter's
+against a works hold, so the sign of the push follows the holder:
 
 - on a **charter-held** front the Works press: `pressure − supply`;
 - on a **works-held** front the charter pushes: `supply − pressure`.
@@ -622,16 +622,16 @@ against a works hold — so the sign of the push follows the holder:
 Both apply once per hourly war beat (`procureCadence` = 3600 ticks):
 
 - **works pressure** is `1/96 h`, scaled by the global squeeze curve and
-  capped at `pressureCap` = 8× — an unsupplied front at squeeze 1 falls in
+  capped at `pressureCap` = 8×: an unsupplied front at squeeze 1 falls in
   four days, a front against a cornered Works much sooner;
 - **charter supply** is everything credited to that front
-  (`Contest.SupplyPending`) ÷ (`supplyPerFlip` = 250,000 € × squeeze) —
+  (`Contest.SupplyPending`) ÷ (`supplyPerFlip` = 250,000 € × squeeze):
   delivered materiel and kill attrition in one euro-equivalent unit,
   released on the beat. That release *is* the abstract haul leg: supply
   never travels as a convoy entity.
 
 The meter clamps to `[0, Threshold]`; reaching the threshold **flips** the
-system and the meter geography re-derives (`warRederive`) — a system that
+system and the meter geography re-derives (`warRederive`): a system that
 stays on the front keeps its pressure, a system that just flipped starts
 idle on its new side. The beat emits `EvWar`/`"contest"` for moves of at
 least `newsThreshold` (5 %) only, so quiet stretches stay quiet, and
@@ -640,7 +640,7 @@ least `newsThreshold` (5 %) only, so quiet stretches stay quiet, and
 ### The squeeze curve and the works floor
 
 One global curve off the Works' share of the map (`Squeeze`) is both their
-meter stiffness and the war's spawn-difficulty input — the force they land
+meter stiffness and the war's spawn-difficulty input: the force they land
 when a system falls and the caste of every ambient Works spawn on the grid.
 With `start` = the systems authored `null` and `works` = the systems they
 hold now:
@@ -651,14 +651,14 @@ hold now:
 It is 1 while they hold their tick-0 share (or more, after a reclaim) and
 rises exponentially as they are cornered. The floor (`warWorksFloor` = 1
 system, `squeezeFloor` = 0.01) makes their last system's defensive
-stiffness astronomically large while keeping it finite — the charter supply
+stiffness astronomically large while keeping it finite: the charter supply
 needed to take it is unreachable in any realistic session. The *offensive*
 squeeze is capped at `pressureCap`, so a cornered Works hits the front
 harder without ever becoming able to lose its last system.
 
 The charter has **no mirror guard** (the design's explicit choice): its
 resistance is whatever supply the economy delivers. Starve the war and the
-front erodes — that is the bargain, not an oversight.
+front erodes: that is the bargain, not an oversight.
 
 ### Procurement (the sink)
 
@@ -667,21 +667,21 @@ On the same beat every standing war bid is withdrawn and re-posted
 **every charter-held station's book** for the derived materiel set
 (`warMateriel`, pinned in `sim/war_test.go`): every module of a war kind
 (weapons, stasis web, warp scrambler, shield boost/extender, armor
-repairer/plate, resist coating, cap booster/recharger — an unknown kind is
+repairer/plate, resist coating, cap booster/recharger; an unknown kind is
 never bought, so a new kind is a deliberate decision) plus every ammo line
 and charge, in ascending item id. Lot sizes are `warBidQty` = 100 for items
 and `warBidModuleQty` = 5 for modules.
 
-The reservation price is **one tick under the best ask** — or one tick
-above the displayed price (last → best bid → base) when no ask rests — so a
+The reservation price is **one tick under the best ask**, or one tick
+above the displayed price (last → best bid → base) when no ask rests, so a
 fresh bid never crosses the station's own supply and the war is competitive
 on any book (`warBidPrice`). The fresh book's whole exposure is budgeted
 against the treasury at post time, so a fill can never overdraw it.
 
 A fill (`warFill`, called from `settle`) is the player's delivery to the
 front: the seller is paid immediately through the ordinary sell path
-(earnings are the feedback), the treasury pays the same amount — **a
-transfer; the war mints nothing** — the goods are consumed into the war
+(earnings are the feedback), the treasury pays the same amount (**a
+transfer; the war mints nothing**), the goods are consumed into the war
 (the sink the economy was missing), and the value credits the **nearest
 front**: the station's own system when it is on the front, else the closest
 front by starmap distance, ties by id (`warNearestFront`). Works-held
@@ -690,27 +690,27 @@ at once.
 
 The treasury is refilled by the **fee cut** (`routeFee`): a fifth
 (`feeCut` = 0.2) of every broker fee and sales tax is routed into it before
-the rest is burned — about 1.1 % of turnover at the 5.5 % institutional
-load — so money already cycling funds the war instead of vanishing.
+the rest is burned (about 1.1 % of turnover at the 5.5 % institutional
+load), so money already cycling funds the war instead of vanishing.
 Selling into a war bid also emits `EvWar`/`"supply"` naming the goods
 taken.
 
 ### Flips under the player
 
 A flip is structural and instant. Control changes, the news line fires,
-the meter leaves the front, the geography re-derives and — when the player
-is standing in that system — the grid changes with it (`warApplyControl`):
+the meter leaves the front, the geography re-derives and, when the player
+is standing in that system, the grid changes with it (`warApplyControl`):
 
-- **fall** — the charter's ships leave outright (no retreat flight this
+- **fall**: the charter's ships leave outright (no retreat flight this
   wave) and the Works land a holding force at the system's belts and
   anomalies only, never on the docking ring: two hulls per anchor at
   squeeze 1, one more per squeeze step, capped at four
   (`warProfileCount`). The caste comes from the authored Old Works hulls
   ranked by total hit points and stiffens with the squeeze
-  (`warWorksCastes`, `warProfileTier`) — no stat is edited, the war only
+  (`warWorksCastes`, `warProfileTier`): no stat is edited, the war only
   chooses among what content ships. Ambient Works spawns scale with the same
-  curve: every authored rat conjured on the grid — a charter belt, a
-  works-held belt, the Gnazvor anomaly, a respawn replacement — shifts one
+  curve: every authored rat conjured on the grid (a charter belt, a
+  works-held belt, the Gnazvor anomaly, a respawn replacement) shifts one
   caste toward the tougher rats per squeeze step (`squeezeCaste`), so the mix
   is exactly the authored one at the tick-0 share and a fight anywhere
   stiffens as the Works' map shrinks. Counts stay as authored (density is the
@@ -719,22 +719,22 @@ is standing in that system — the grid changes with it (`warApplyControl`):
   re-arms the authored group and the curve never compounds on itself.
   Traffic ambush raiders are spawned by the traffic system, not the spawn
   groups, and are not rescaled.
-- **reclaim** — the authored guard posts respawn (`warSpawnGuards`) and
+- **reclaim**: the authored guard posts respawn (`warSpawnGuards`) and
   Works hulls already on the grid are left to be shot, never silently
   swept.
 
 Nothing evicts the player. A fall while docked keeps the dock: market,
 repair and refining stay live, industry and fitting go dark
 (`stationOffers`), and the charter desk stops handing out new charter work
-(`remnant`). In-flight manufacturing jobs run to completion — they are paid
+(`remnant`). In-flight manufacturing jobs run to completion: they are paid
 work and the job pool is global. A reclaim restores the authored services.
 
 ### Fleets and the grid
 
 The war never simulates an off-grid battle: the meters are the aggregate.
 On the contest beat, when the loaded system is on the front and fewer than
-`warFleetCap` = 2 Corporate Fleets hulls are live, one fleet group lands —
-the toughest authored machine hull, tagged `factionFleets` — over the belt
+`warFleetCap` = 2 Corporate Fleets hulls are live, one fleet group lands
+(the toughest authored machine hull, tagged `factionFleets`) over the belt
 the Works are working, else at the patrol anchor (`warFleets`). The
 hostility table does the rest: the bloc is hostile to the Old Works and
 neutral to everyone else unless provoked, so fleet-vs-Works engagements are
@@ -745,7 +745,7 @@ force and the ambient Works populations both scale with the squeeze
 
 Kills feed the meter too (`warObserveKill`): every Works hull destroyed in
 a loaded front system credits `killAttrition` (2 %) of a flip to that
-system's meter — 5,000 € of supply — and a player kill emits
+system's meter (5,000 € of supply), and a player kill emits
 `EvWar`/`"kill"`. Any death involving a fleets hull emits
 `EvWar`/`"skirmish"`.
 
@@ -763,13 +763,13 @@ mint.
 
 ## 7. Extension guide (descriptive)
 
-How the seams above are extended in practice. Not rules — patterns the
+How the seams above are extended in practice. Not rules: patterns the
 code already follows.
 
 **A new sim system.** Systems are zero-argument methods called from
 `Step` in numbered order. Give the new system the next number (or the
 slot its ordering semantics demand: after everything that feeds it, before
-everything it feeds — traffic before industry before agents is that
+everything it feeds, with traffic before industry before agents as that
 argument), add a numbered comment line in `sim/api.go`, and route its
 commands through a `defer*` bucket the way `deferEcon`/`deferIndustry`
 do. Keep same-Step handoffs inside the Step; never let per-tick working
@@ -778,7 +778,7 @@ state survive a Step boundary (the completeness test enforces it).
 **Save/hash coverage.** Any new persistent state gets a `Save` field in
 canonical order (sorted slices; maps marshal sorted), a classification in
 `sim/save_completeness_test.go` (save-carried / derived / per-Step
-transient / documented exception), and — automatically — hash coverage:
+transient / documented exception), and, automatically, hash coverage:
 `Hash()` digests the whole Save JSON, so a field that serializes is a
 field that hashes. Additive fields ride the current schema with `omitempty`
 (as `Belts`, `Jobs`, `Agents`, `Upkeep`, `TrafficJourneys` did); only a
@@ -796,7 +796,7 @@ over RNG and timers alike.
 adding new ones; new phases are registry constants in `sim/model.go`, not
 ad-hoc strings. Money strings go through `euro()` (`sim/helpers.go`):
 thousands separators, two decimals, trailing `15,000.00 €`, bare `50¢`
-under one euro — the convention `docs/lore/NAMING.md` ("Money strings")
+under one euro: the convention `docs/lore/NAMING.md` ("Money strings")
 binds. Log text is world-facing prose: NAMING.md names, AESTHETIC.md
 voice, zone words (Charter space / the Fringe / Unincorporated) in place
 of `high`/`low`/`null`. Events are capped at 512 at emit time; spammy
@@ -807,13 +807,13 @@ repeats go through the warn-interval pattern.
 and gets its own authoring recipe there. A genuinely new *kind* is a
 schema change: `content/model.go` struct + `content/validate.go`
 cross-checks + the ID registry in ARCHITECTURE.md + a NAMING.md registry
-row — then a showcase checkpoint so `tests/` keeps proving the feature
+row; then a showcase checkpoint so `tests/` keeps proving the feature
 end-to-end.
 
 ## 8. System layout (placement)
 
 What the shipped system geometry in `content/data/systems/*.json` looks
-like. Descriptive — `content/layout_test.go` pins the contract.
+like. Descriptive: `content/layout_test.go` pins the contract.
 
 Scale is real-solar-system: 1 AU = 1.496e11 m (the house conversion hull
 `WarpSpeed` and the distance formatters use), star at the origin with its
@@ -828,7 +828,7 @@ physical radius. Bands, measured from the star:
 
 Separation floors keep landmarks off each other's grids: stations, belts
 and anomalies land at least 2 AU apart (a station may sit near its own
-planet), rim gates at least 5 AU apart. Everything is warp-separated —
+planet), rim gates at least 5 AU apart. Everything is warp-separated:
 sub-light travel between landmarks is scenery, not transport.
 
 The placement is per-system, never cloned: each body keeps its authored
@@ -838,12 +838,12 @@ comes from a band split into one radial slot per body with a seeded
 jitter, driven by a SplitMix64 stream keyed on the FNV-1a hash of the
 system id. Slots violating a separation floor are re-drawn from their
 whole band on the same stream (95% of the band after twelve tries). World
-starts (`content/data/worlds/*.json`) ride their anchor body — Jalvrek,
-the Asteroid Belt I — keeping their authored offset.
+starts (`content/data/worlds/*.json`) ride their anchor body (Jalvrek,
+the Asteroid Belt I), keeping their authored offset.
 
 Consequences the layout deliberately accepts: warp speeds are already
 AU/s, so a system crossing takes tens of seconds at warp (the warp
 timeline's ease over the frozen 386-tick floor still binds short hops),
-and convoy/miner transit legs now dominate their economy cycles — the
+and convoy/miner transit legs now dominate their economy cycles, and the
 cadence knobs (haul fees, wish cadence, agent counts) are meant to be
 balanced live against that, not here.

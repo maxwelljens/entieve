@@ -322,15 +322,15 @@ func (f *Manufacturing) Sync() {
 	// Readouts and gates (visible-but-grayed, never hidden).
 	slots := sim.IndustrySlots()
 	if station != "" {
-		f.craftLbl.Label = "Craft — hulls L" + theme.FormatInt(int64(s.CraftLevel(station, content.FamilyHulls))) +
+		f.craftLbl.Label = "Craft: hulls L" + theme.FormatInt(int64(s.CraftLevel(station, content.FamilyHulls))) +
 			" · modules L" + theme.FormatInt(int64(s.CraftLevel(station, content.FamilyModules))) +
 			" · charges L" + theme.FormatInt(int64(s.CraftLevel(station, content.FamilyCharges))) +
 			" · time −4%/lvl · mats −2%/lvl"
 	} else {
-		f.craftLbl.Label = "Craft — no industry service here"
+		f.craftLbl.Label = "Craft: no industry service here"
 	}
 	slotsUsed := len(all)
-	f.jobsLbl.Label = "Jobs — " + theme.FormatInt(int64(slotsUsed)) + "/" + theme.FormatInt(int64(slots)) + " slots"
+	f.jobsLbl.Label = "Jobs: " + theme.FormatInt(int64(slotsUsed)) + "/" + theme.FormatInt(int64(slots)) + " slots"
 
 	f.collect.GetWidget().Disabled = !f.collectReadyFor(f.sel)
 	f.cancel.GetWidget().Disabled = !f.cancelReadyFor(f.sel)

@@ -384,7 +384,7 @@ func TestContactsRowCaps(t *testing.T) {
 		t.Fatalf("active rows = %d, want %d", len(act), actMaxRows)
 	}
 	// capRows(5, 2) → one row + a note for the other four.
-	if first := activeTitle(t, b, 0); !strings.Contains(first, "—") {
+	if first := activeTitle(t, b, 0); !strings.Contains(first, ": ") {
 		t.Errorf("first active row = %q, want a work row", first)
 	}
 	if got := activeTitle(t, b, 1); got != "+4 more" {
@@ -495,7 +495,7 @@ func TestContactsPanelRendersShippedOffers(t *testing.T) {
 			t.Errorf("supply row = %q, want %q", supply, want)
 		}
 	}
-	if got, want := activeTitle(t, b, 0), "Kerngrit order — 120/400"; got != want {
+	if got, want := activeTitle(t, b, 0), "Kerngrit order: 120/400"; got != want {
 		t.Errorf("active line = %q, want %q", got, want)
 	}
 
@@ -535,13 +535,13 @@ func TestContactsPanelRefreshesOnSync(t *testing.T) {
 	}
 	b, _, ui := boardPanel(t, cv)
 	pumpBoard(t, ui, b)
-	if got, want := activeTitle(t, b, 0), "Kerngrit order — 0/400"; got != want {
+	if got, want := activeTitle(t, b, 0), "Kerngrit order: 0/400"; got != want {
 		t.Fatalf("active row = %q, want %q", got, want)
 	}
 
 	cv.contacts.Active = []sim.MissionState{{ID: "offer-jalvrek-kerngrit", Progress: 120, Def: def}}
 	b.Sync()
-	if got, want := activeTitle(t, b, 0), "Kerngrit order — 120/400"; got != want {
+	if got, want := activeTitle(t, b, 0), "Kerngrit order: 120/400"; got != want {
 		t.Fatalf("row after Sync = %q, want %q", got, want)
 	}
 }

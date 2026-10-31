@@ -91,7 +91,7 @@ func TestContactDetailsRendersOffer(t *testing.T) {
 	if got := w.speech.Label; got != o.Prose {
 		t.Errorf("speech = %q, want the offer's filled prose %q", got, o.Prose)
 	}
-	if got, want := w.attr.Label, "— "+o.ContactName; got != want {
+	if got, want := w.attr.Label, "By "+o.ContactName; got != want {
 		t.Errorf("attribution = %q, want %q", got, want)
 	}
 	if got := w.objective.Label; !strings.Contains(got, "Shield Booster") || !strings.Contains(got, "4") {
@@ -224,7 +224,7 @@ func TestContactDetailsGate(t *testing.T) {
 	if !w.accept.GetWidget().Disabled {
 		t.Error("accepted verb is enabled")
 	}
-	if got := w.gateText.Label; !strings.HasPrefix(got, "Accepted —") {
+	if got := w.gateText.Label; !strings.HasPrefix(got, "Accepted:") {
 		t.Errorf("accepted standing line = %q, want the claim note", got)
 	}
 }

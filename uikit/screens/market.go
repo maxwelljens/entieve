@@ -1247,9 +1247,9 @@ func (m *Market) syncMine(gated bool) {
 		m.mineBox.AddChild(r.Root)
 	}
 	if len(orders) == 0 {
-		m.mineLbl.Label = "My orders — none"
+		m.mineLbl.Label = "My orders: none"
 	} else {
-		m.mineLbl.Label = "My orders — " + theme.FormatInt(int64(len(orders)))
+		m.mineLbl.Label = "My orders: " + theme.FormatInt(int64(len(orders)))
 	}
 }
 

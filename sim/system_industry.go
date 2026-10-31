@@ -391,7 +391,7 @@ func (s *Sim) StartJob(station StationID, recipe content.RecipeID, runs int, own
 		if fee := s.JobFee(recipe, runs); fee > 0 {
 			s.wallet -= fee
 			s.recordLedger(LedgerEntry{
-				What:   "Industry fee — " + itoaN(runs) + " x " + s.itemName(rec.Product),
+				What:   "Industry fee: " + itoaN(runs) + " x " + s.itemName(rec.Product),
 				Where:  s.stationName(station),
 				Amount: -fee,
 			})
@@ -472,7 +472,7 @@ func (s *Sim) CancelJob(station StationID, id uint64, owner string) bool {
 			return false
 		}
 		if j.State != JobRunning {
-			s.industryRefusal("Job is ready — collect it at " + s.stationName(station))
+			s.industryRefusal("Job is ready: collect it at " + s.stationName(station))
 			return false
 		}
 		agent := s.agentByOwner(owner)
@@ -486,7 +486,7 @@ func (s *Sim) CancelJob(station StationID, id uint64, owner string) bool {
 		s.jobs = append(s.jobs[:i], s.jobs[i+1:]...)
 		s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: s.player, Item: rec.Product,
 			Text: "Industry: " + s.itemName(rec.Product) + " cancelled at " +
-				s.stationName(station) + " — materials returned"})
+				s.stationName(station) + "; materials returned"})
 		return true
 	}
 	return false

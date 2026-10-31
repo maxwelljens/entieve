@@ -56,7 +56,7 @@ func TestInfoWindowCaptureFrame(t *testing.T) {
 	m := k.Menu()
 	m.Open([]widgets.MenuEntry{
 		{Label: "Show Info", Bold: true, Action: func() {}},
-		{Label: "Show Info — Fusion Charge", Action: func() {}},
+		{Label: "Show Info: Fusion Charge", Action: func() {}},
 		widgets.MenuSep,
 		{Label: "Cycle charge", Disabled: true, Action: func() {}},
 	}, image.Pt(760, 140))

@@ -474,21 +474,21 @@ func (m *MapView) cardLines(cur content.SystemID) []mapCardLine {
 	if len(stations) == 0 {
 		stations = []string{"none"}
 	}
-	lines = append(lines, mapCardLine{text: "Stations — " + strings.Join(stations, " · "), col: p.Text})
+	lines = append(lines, mapCardLine{text: "Stations: " + strings.Join(stations, " · "), col: p.Text})
 	for i := range def.Celestials {
 		g := def.Celestials[i].Gate
 		if g == nil {
 			continue
 		}
-		lines = append(lines, mapCardLine{text: "Gate — " + m.systemName(g.ToSystem), col: p.Dim})
+		lines = append(lines, mapCardLine{text: "Gate: " + m.systemName(g.ToSystem), col: p.Dim})
 	}
 	switch jumps := len(m.route(cur, m.sel)) - 1; {
 	case m.dest != def.ID:
 		lines = append(lines, mapCardLine{text: "Click again to set destination", tiny: true, col: p.Dim})
 	case jumps > 0:
-		lines = append(lines, mapCardLine{text: "Route — " + strconv.Itoa(jumps) + " jumps", tiny: true, col: p.Accent})
+		lines = append(lines, mapCardLine{text: "Route: " + strconv.Itoa(jumps) + " jumps", tiny: true, col: p.Accent})
 	default:
-		lines = append(lines, mapCardLine{text: "Route — no gate path", tiny: true, col: p.Danger})
+		lines = append(lines, mapCardLine{text: "Route: no gate path", tiny: true, col: p.Danger})
 	}
 	return lines
 }
@@ -497,9 +497,9 @@ func (m *MapView) cardLines(cur content.SystemID) []mapCardLine {
 // the other side's progress toward the flip.
 func contestLine(worksHeld bool, meter float64) string {
 	if worksHeld {
-		return "Front — the charter pushes at " + theme.PctLabel(meter)
+		return "Front: the charter pushes at " + theme.PctLabel(meter)
 	}
-	return "Front — the Works press at " + theme.PctLabel(meter)
+	return "Front: the Works press at " + theme.PctLabel(meter)
 }
 
 // warKeyMark is one war-legend marker shape: the node vocabulary the key
@@ -531,7 +531,7 @@ func warKeyRows(p theme.Palette, w widgets.WarView) []warKey {
 		{mark: warMarkCharter, text: "Charter-held", col: p.Text},
 		{mark: warMarkWorks, text: "Works-held", col: p.Text},
 		{mark: warMarkFront, text: "Front", col: p.Info},
-		{text: "War treasury — " + theme.FormatCredits(w.Treasury), col: p.Dim},
+		{text: "War treasury: " + theme.FormatCredits(w.Treasury), col: p.Dim},
 	}
 }
 
@@ -691,10 +691,10 @@ func starmapTitle(region, constellation string) string {
 	case region == "" && constellation == "":
 		return "Starmap"
 	case region == "":
-		return "Starmap — " + constellation
+		return "Starmap: " + constellation
 	case constellation == "" || region == constellation:
-		return "Starmap — " + region
+		return "Starmap: " + region
 	default:
-		return "Starmap — " + region + " / " + constellation
+		return "Starmap: " + region + " / " + constellation
 	}
 }

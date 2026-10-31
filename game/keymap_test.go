@@ -90,7 +90,7 @@ func TestKeyMapScreenRowsDeriveFromSpec(t *testing.T) {
 	help := helpRowsFor(nil)
 	for _, b := range derived {
 		key, desc := chordOf(b.Key, b.Shift, b.Ctrl), descOf(b.Action)
-		if strings.Contains(desc, " — ") {
+		if strings.Contains(desc, ": ") {
 			t.Errorf("spec description %q carries a chord", desc)
 		}
 		if !slices.Contains(help, uikit.KeyRow{Key: key, Desc: desc}) {

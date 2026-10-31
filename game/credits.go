@@ -29,9 +29,9 @@ var creditSections = []creditSection{
 	{
 		Title: "Iconography",
 		Rows: []creditRow{
-			{Role: "Glyph set", Text: "game-icons.net — monochrome silhouettes, CC BY 3.0."},
+			{Role: "Glyph set", Text: "game-icons.net: monochrome silhouettes, CC BY 3.0."},
 			{Role: "Icons", Text: "Delapouite, Skoll, Lorc, sbed, Cathelineau and Quoting."},
-			{Role: "Credits", Text: "Available on https://game-icons.net — see uikit/icons/CREDITS.md for the per-icon credits."},
+			{Role: "Credits", Text: "Available on https://game-icons.net; see uikit/icons/CREDITS.md for the per-icon credits."},
 		},
 	},
 	{
@@ -50,7 +50,7 @@ var creditSections = []creditSection{
 	{
 		Title: "Interface form",
 		Rows: []creditRow{
-			{Role: "Form", Text: "Chrome shapes and structure follow the Cyber Terminal UI Kit (kit by Kerem Bolek, 2026; form vocabulary only — no kit file is shipped, and no kit colour is used)."},
+			{Role: "Form", Text: "Chrome shapes and structure follow the Cyber Terminal UI Kit (kit by Kerem Bolek, 2026; form vocabulary only: no kit file is shipped, and no kit colour is used)."},
 		},
 	},
 	{

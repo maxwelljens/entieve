@@ -137,7 +137,7 @@ func TestRebindRefreshesEveryHint(t *testing.T) {
 	g.host.services.Keys.Begin("market")
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyU}})
 	pump(t, g, 1280, 720)
-	if got, want := entryByTitle(t, g, "Market").Hint(), "U — toggle market window (trade while docked)"; got != want {
+	if got, want := entryByTitle(t, g, "Market").Hint(), "U: toggle market window (trade while docked)"; got != want {
 		t.Errorf("rail tooltip hint after G→U = %q, want %q", got, want)
 	}
 }

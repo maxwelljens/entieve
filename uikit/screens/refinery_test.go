@@ -138,10 +138,10 @@ func TestRefineryWindow(t *testing.T) {
 	if got := len(q.Slider().TickPositions()); got != 0 {
 		t.Errorf("ladder ticks = %d, want the empty ladder below one batch", got)
 	}
-	if got := q.DetailText(); !strings.Contains(got, "One batch needs 100 ore — you hold 50 Kerngrit Ore.") {
+	if got := q.DetailText(); !strings.Contains(got, "One batch needs 100 ore; you hold 50 Kerngrit Ore.") {
 		t.Errorf("preview = %q, want the one-batch message", got)
 	}
-	if !strings.Contains(r.status.Label, "One batch needs 100 ore — you hold 50 Kerngrit Ore.") {
+	if !strings.Contains(r.status.Label, "One batch needs 100 ore; you hold 50 Kerngrit Ore.") {
 		t.Errorf("status = %q, want the one-batch message", r.status.Label)
 	}
 	uitest.FireButton(ui, q.Confirm())

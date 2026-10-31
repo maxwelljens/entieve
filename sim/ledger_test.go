@@ -62,7 +62,7 @@ func TestLedgerMarketBuyAndSell(t *testing.T) {
 		drain(s)
 	})
 	e := got[0]
-	if !strings.Contains(e.What, "Market buy — 10 x EMP Charge") {
+	if !strings.Contains(e.What, "Market buy: 10 x EMP Charge") {
 		t.Errorf("buy row = %q, want the market buy", e.What)
 	}
 	if e.Where != "Haven Rest" {
@@ -85,7 +85,7 @@ func TestLedgerMarketBuyAndSell(t *testing.T) {
 		drain(s)
 	})
 	e = got[0]
-	if !strings.Contains(e.What, "Market sell — 10 x EMP Charge") {
+	if !strings.Contains(e.What, "Market sell: 10 x EMP Charge") {
 		t.Errorf("sell row = %q, want the market sell", e.What)
 	}
 	if want := 10*4.0 - MarketSalesTax*10*4 - MarketBrokerFee*10*4; math.Abs(e.Amount-want) > 1e-9 {
@@ -121,7 +121,7 @@ func TestLedgerRestingOrderFillAndPlacement(t *testing.T) {
 		s.PlaceOrder("cel-station-a", OrderBuy, "ammo-emp-s", 5, 6, OwnerSystem)
 	})
 	e := got[0]
-	if !strings.Contains(e.What, "Market sell — 5 x EMP Charge") {
+	if !strings.Contains(e.What, "Market sell: 5 x EMP Charge") {
 		t.Errorf("fill row = %q, want the resting ask's sale", e.What)
 	}
 	if want := 5 * 6.0 * MarketSalesTax; math.Abs(e.Tax-want) > 1e-9 {
@@ -162,7 +162,7 @@ func TestLedgerBuyOrderEscrowAndRelease(t *testing.T) {
 			t.Fatal("cancel refused")
 		}
 	})
-	if !strings.Contains(got[0].What, "Escrow released — 10 x Ferrite") {
+	if !strings.Contains(got[0].What, "Escrow released: 10 x Ferrite") {
 		t.Errorf("cancel row = %q, want the escrow release", got[0].What)
 	}
 	if math.Abs(got[0].Amount-escrow) > 1e-9 {
@@ -190,7 +190,7 @@ func TestLedgerOrderCommandsRideTheSameSeats(t *testing.T) {
 		s.Step()
 		drain(s)
 	})
-	if !strings.Contains(got[0].What, "Buy order — 10 x Ferrite") || got[0].Fee <= 0 {
+	if !strings.Contains(got[0].What, "Buy order: 10 x Ferrite") || got[0].Fee <= 0 {
 		t.Errorf("placement row = %+v, want the escrow row with the fee itemized", got[0])
 	}
 	for _, o := range s.BookOrders("cel-station-a") {
@@ -209,7 +209,7 @@ func TestLedgerOrderCommandsRideTheSameSeats(t *testing.T) {
 		s.Step()
 		drain(s)
 	})
-	if !strings.Contains(got[0].What, "Escrow released — 10 x Ferrite") {
+	if !strings.Contains(got[0].What, "Escrow released: 10 x Ferrite") {
 		t.Errorf("cancel row = %+v, want the escrow release", got[0])
 	}
 	if d := s.Deployed(); d != 0 {
@@ -289,7 +289,7 @@ func TestLedgerRepairsAndBountiesAndContracts(t *testing.T) {
 		s.Step()
 		drain(s)
 	})
-	if !strings.Contains(got[0].What, "Repairs — 200.0 HP") || math.Abs(got[0].Amount+400) > 1e-9 {
+	if !strings.Contains(got[0].What, "Repairs: 200.0 HP") || math.Abs(got[0].Amount+400) > 1e-9 {
 		t.Errorf("repair row = %+v, want -400 for 200 HP", got[0])
 	}
 	if got[0].Where != "Haven Rest" {
@@ -300,7 +300,7 @@ func TestLedgerRepairsAndBountiesAndContracts(t *testing.T) {
 	// the system they happened in.
 	s = newMissionSim(t)
 	got = runRecorded(t, s, 1, func() { killOne(t, s, "npc-rat-scuttler") })
-	if !strings.Contains(got[0].What, "Bounty — Rat Scuttler") || got[0].Amount != 15000 {
+	if !strings.Contains(got[0].What, "Bounty: Rat Scuttler") || got[0].Amount != 15000 {
 		t.Errorf("bounty row = %+v, want 15,000.00 €", got[0])
 	}
 	if got[0].Where != "Fixture Prime" {
@@ -316,7 +316,7 @@ func TestLedgerRepairsAndBountiesAndContracts(t *testing.T) {
 		killOne(t, s, "npc-rat-scuttler")
 	}
 	got = runRecorded(t, s, 1, func() { dockNamed(t, s, "Haven Rest") })
-	if !strings.Contains(got[0].What, "Contact — Test Cleanup") || got[0].Amount != 30000 {
+	if !strings.Contains(got[0].What, "Contact: Test Cleanup") || got[0].Amount != 30000 {
 		t.Errorf("payout row = %+v, want 30,000.00 €", got[0])
 	}
 	if got[0].Where != "Haven Rest" {
@@ -385,14 +385,14 @@ func TestLedgerRingCapsAtTwohundredAndEvictsOldest(t *testing.T) {
 	}
 	// The newest 200 survive: the ring opens on movement 101 (the escrow
 	// debit of placement 51) and closes on the release of placement 150.
-	if !strings.Contains(s.ledger[0].What, "Buy order — 51 x EMP Charge") {
+	if !strings.Contains(s.ledger[0].What, "Buy order: 51 x EMP Charge") {
 		t.Errorf("oldest kept = %q, want placement 51", s.ledger[0].What)
 	}
 	last := s.ledger[len(s.ledger)-1]
-	if !strings.Contains(last.What, "Escrow released — 150 x EMP Charge") {
+	if !strings.Contains(last.What, "Escrow released: 150 x EMP Charge") {
 		t.Errorf("newest = %q, want the release of placement 150", last.What)
 	}
-	if hasLedger(s.Ledger(), "Buy order — 50 x EMP Charge") {
+	if hasLedger(s.Ledger(), "Buy order: 50 x EMP Charge") {
 		t.Error("the evicted placement 50 is still in the ring")
 	}
 	// The ring is a record, not a movement: the wallet lost exactly the

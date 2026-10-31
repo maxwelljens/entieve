@@ -1,13 +1,13 @@
 # Entieve Content Authoring
 
-The cookbook for adding game content — written for humans and AI agents.
+The cookbook for adding game content, written for humans and AI agents.
 Everything in Entieve is data-driven: you add JSON files under
 `content/data/`, the loader (`content/load.go`) parses them, and the
 validator (`content/validate.go`) cross-checks the whole graph. You never
 need to touch engine code to add a system, ship, module, NPC, item, or world.
 
 The schema structs in `content/model.go` (and `content/model_npc.go`) are
-**authoritative** — when this doc and the structs disagree, the structs win.
+**authoritative**: when this doc and the structs disagree, the structs win.
 
 **Naming and voice are binding.** Every display name, faction string,
 description and log line you author MUST follow `docs/lore/AESTHETIC.md`
@@ -15,7 +15,7 @@ description and log line you author MUST follow `docs/lore/AESTHETIC.md`
 the `1,234.56 €` / `50¢` money strings, and the zone words Charter space /
 the Fringe / Unincorporated). That covers the structured lore fields too:
 hull `origin` tags are copied from NAMING.md's registry, and NPC
-`description` prose MUST read in AESTHETIC's voice — see
+`description` prose MUST read in AESTHETIC's voice: see
 [Lore fields](#lore-fields-hull-origin-maker-and-npc-description) below. Ids are
 frozen implementation slugs and stay as they are even when the slug embeds
 a retired name.
@@ -60,7 +60,7 @@ All IDs are kebab-case strings, cross-referenced everywhere:
 | Round (ammo) | `ammo-` (artillery: `ammo-art-`) | `ammo-emp-s`, `ammo-art-emp-s` | global; `ammo_class` = round family (`small-autocannon` … `large-artillery`): a calibre AND a gun family. Every round of a family shares one volume |
 | Corporation | `corp-`     | `corp-ferrum`        | global (the ten-firm maker roster, `content.AllCorps`; a registered extension of the frozen id list) |
 | Ship        | `ship-`     | `ship-sloop`         | global                 |
-| Module      | `mod-`      | `mod-autocannon-s`   | global (weapon families: autocannon, artillery — three calibres each) |
+| Module      | `mod-`      | `mod-autocannon-s`   | global (weapon families: autocannon, artillery, three calibres each) |
 | NPC (rat)   | `npc-rat-`  | `npc-rat-scuttler`   | global                 |
 | NPC (guard) | `npc-guard-` | `npc-guard-patrol`  | global (non-rat NPC loadouts: zero bounty, no loot; traffic patrols) |
 | System      | `sys-`      | `sys-solace`         | global                 |
@@ -89,14 +89,14 @@ object or an array of objects**:
 
 Use one object for "one thing per file" (systems, ships, worlds) and arrays
 for themed collections (minerals, rats). `universe.json` is the exception:
-exactly **one object**, and its `systems` field must be **empty or omitted** —
+exactly **one object**, and its `systems` field must be **empty or omitted**:
 systems come only from `systems/*.json`.
 
 ## Units and conventions
 
 | Quantity        | Unit            | Example                        |
 |-----------------|-----------------|--------------------------------|
-| Distance (grid) | meters          | station at `{ "X": 830000000000, "Y": 490000000000 }` (AU-scale — see below) |
+| Distance (grid) | meters          | station at `{ "X": 830000000000, "Y": 490000000000 }` (AU-scale: see below) |
 | Distance (starmap) | light-years   | `"position": { "X": 6.2, "Y": -1.8 }` |
 | Volume          | m³              | `"volume": 0.01`, cargo `400`  |
 | Energy          | GJ              | `"capacitor": 420`, `"activation_cost": 15` |
@@ -111,7 +111,7 @@ Positions are `core.Vec2` JSON: `{"X": ..., "Y": ...}` (Y grows downward).
 System bodies are placed at real-solar-system scale (1 AU = 1.496e11 m):
 planets 0.4–2 AU from the star, belts/belt-like anomalies 2–10 AU, stations
 1–10 AU, gates 20–40 AU, with separation floors keeping landmarks off each
-other's grids — the scheme is described in [../SIM.md](../SIM.md) §8 and
+other's grids: the scheme is described in [../SIM.md](../SIM.md) §8 and
 pinned by `content/layout_test.go`, which a system outside the bands fails.
 
 ## Lore fields: hull `origin`, `maker` and NPC `description`
@@ -121,8 +121,8 @@ string on one line each, next to `name`:
 
 | Field | Struct | Shape | Source of truth |
 |-------|--------|-------|-----------------|
-| `origin` | `ShipDef` (`ships/*.json`) | one lowercase tag: `moravian` \| `polish` \| `nordic` \| `latinate` \| `old-works` | the `origin` column of `docs/lore/NAMING.md` — copy it, never invent |
-| `maker` | `ShipDef`, `ModuleDef`, ammo/charge `ItemDef` | one `corp-*` slug (the ten-firm roster) | [NAMING.md — Corporations](../docs/lore/NAMING.md#corporations--manufacturers) / `content.AllCorps` — copy it, never invent |
+| `origin` | `ShipDef` (`ships/*.json`) | one lowercase tag: `moravian` \| `polish` \| `nordic` \| `latinate` \| `old-works` | the `origin` column of `docs/lore/NAMING.md`: copy it, never invent |
+| `maker` | `ShipDef`, `ModuleDef`, ammo/charge `ItemDef` | one `corp-*` slug (the ten-firm roster) | [NAMING.md: Corporations](../docs/lore/NAMING.md#corporations-manufacturers) / `content.AllCorps`: copy it, never invent |
 | `description` | `NpcDef` (`npcs/*.json`) | one plain single-line string, 1–2 sentences | `docs/lore/AESTHETIC.md` voice; caste framing per `docs/lore/FACTIONS.md` |
 
 **`origin`** is the hull's heritage tag from AESTHETIC's naming layers and
@@ -134,7 +134,7 @@ worlds stay small, but the validator rejects any tag outside the vocabulary
 (`content/validate.go`) and `TestShippedHullsCarryOrigin` requires every
 shipped hull to carry one.
 
-**`maker`** is the manufacturer — the corporation that builds the def (the
+**`maker`** is the manufacturer: the corporation that builds the def (the
 "Corporation" concept of `CONTEXT.md`). It is required on every manufactured
 product: ships, modules and ammo/charge items. Rat hulls (`ship-rat-*`),
 ores, minerals and loot stay **unattributed** (no `maker`). The value must
@@ -151,12 +151,12 @@ cd tools/emblemraster && go run . -svg ../../uikit/emblems/svg -out ../../uikit/
 ```
 
 **`description`** on an NPC is dossier prose: what the machine is and does
-from the frontier's working perspective — how it behaves, what it does to a
+from the frontier's working perspective: how it behaves, what it does to a
 hull, when it shows up. NOT stat recitation (the UI shows stats
 separately), NOT human corsairs: machine castes are framed as equipment,
 per AESTHETIC's voice rules, with no epic language and no retired
 placeholder names (Solace, Penumbra, Gloam, Haven Rest, Thevek Reach,
-Loomfall, Mire Corsairs, Gloam Hierarchy — nor any name the time-depth drift
+Loomfall, Mire Corsairs, Gloam Hierarchy, nor any name the time-depth drift
 retired, see [NAMING.md](lore/NAMING.md#time-depth-drift)). One or two
 sentences, same shape as a ship/module `description`. Shipped NPCs must all
 have one (`TestShippedNpcsCarryDescription`, enforced the same way as the
@@ -168,7 +168,7 @@ offer prose/description rule).
 this order:
 
 1. an **ItemID** (`min-ferrite`, `ammo-emp-s`, ...),
-2. else a **ShipID cast to ItemID** (`ship-sloop`) — ships are listed on the
+2. else a **ShipID cast to ItemID** (`ship-sloop`): ships are listed on the
    market this way; a founding ask's price lives on the order, and the
    hull's own `base_price` is the price ladder's last rung when its book
    has no trade and no order,
@@ -192,7 +192,7 @@ so the whole catalog is navigable without touching engine code.
 Rules (`content/validate.go`): required on every item, module and hull;
 missing, empty, a leading/trailing/doubled slash, or more than three
 segments is a validation error. The shipped paths are frozen in
-`content/groups_test.go` (`TestShippedMarketTree`) — moving a def between
+`content/groups_test.go` (`TestShippedMarketTree`): moving a def between
 branches is a deliberate edit of that table, never a free re-home. Current
 top-level branches: `Ships`, `Modules`, `Ammunition`, `Materials`, `Loot`
 (plus the window's own `All` root). Every hull also carries **`base_price`**
@@ -211,7 +211,7 @@ content package stays free of the UI layer).
 
 ## Recipe 1: add a star system
 
-**1. Create `content/data/systems/<shortname>.json`** (full example — a
+**1. Create `content/data/systems/<shortname>.json`** (full example: a
 complete, valid two-celestial system with a gate back to Struvok):
 
 ```json
@@ -288,7 +288,7 @@ Rules enforced by the validator: `to_system` must exist; `to_cel` must exist
 **Spawn cadences (`respawn_sec`).** A group's timer re-arms the whole group
 after a member dies, so the number is a *zone* statement, not a per-hull
 one: an Old Works belt re-forms in 1800 s in Charter space (the Fringe 600,
-Unincorporated 300 — the Works' home turf is the fastest), guards respawn in
+Unincorporated 300; the Works' home turf is the fastest), guards respawn in
 300 s where they post, and a civilian miner's claim repopulates in 600 s
 wherever it works. Anomaly groups follow their system's tier.
 
@@ -310,14 +310,14 @@ Both must be clean. Typical failures and their fixes:
 |-------------------------------------------------------|-----|
 | `systems/sys-cinder: gate destination celestial ...`  | typo in `to_cel`, or the destination file doesn't define it |
 | `no reciprocal gate in ... pointing back to ...`      | add/fix the return gate in the other system |
-| `systems/sys-x: unreachable from start system ...`    | no gate path from `sys-solace` — chain gates from a reachable system |
+| `systems/sys-x: unreachable from start system ...`    | no gate path from `sys-solace`: chain gates from a reachable system |
 | `system-level market block is not allowed ...`        | founding orders belong on the station's own `"station": {"market": [...]}` block |
 | `market orders on a station without the market service` | add `"market"` to that station's `"services"` |
 
 ## Recipe 2: add a ship
 
 Create `content/data/ships/ship-<name>.json` (one file per hull). Populate
-**every** field — zeros are only for `ore_hold` (0 = ore goes to cargo):
+**every** field; zeros are only for `ore_hold` (0 = ore goes to cargo):
 
 ```json
 {
@@ -366,7 +366,7 @@ market order around it); resists each in `[0,1)`; align time = `agility * 10` s,
 slot unless it is an industrial/hauler.
 
 **Fitting limits are the hull's identity** (`content/fit.go`). `high_mounts`
-declares one mount per high slot, in slot order — `kind` `turret|launcher`,
+declares one mount per high slot, in slot order: `kind` `turret|launcher`,
 `size` `s|m|l`; a mounted module needs a free mount of its own kind at or
 above its size (guns and the mining laser are turrets, rockets/missiles are
 launchers). Sizes are a design decision, not a function of hull mass: the
@@ -380,7 +380,7 @@ spare class is the normal budget: the frigate's `{ "i": 5, "ii": 3 }` grid is
 exactly its showcase fit.
 
 `origin` must be one of `moravian | polish | nordic | latinate | old-works`
-(Old Works machine hulls are `old-works`) — register the hull in
+(Old Works machine hulls are `old-works`); register the hull in
 `docs/lore/NAMING.md` and copy the row's origin column, per
 [Lore fields](#lore-fields-hull-origin-maker-and-npc-description). The validator
 rejects unknown tags; shipped hulls may not omit the field. `maker` must be
@@ -436,7 +436,7 @@ same round than an autocannon); `price` 10k–400k for standard mods.
 `weapon.bay_m3` is the gun's round bay (required for every gun with an ammo
 class, forbidden on an ammo-less one) and must hold at least one whole round
 of its family. Calibrate it as `rounds × round volume` for a sustained-fire
-reload near 120 s — the shipped table: small autocannon 0.2 m³ / 40 rounds,
+reload near 120 s. The shipped table: small autocannon 0.2 m³ / 40 rounds,
 small artillery 0.104 / 13, medium autocannon 0.33 / 33, medium artillery
 0.275 / 11, large autocannon 0.594 / 27, large artillery 0.297 / 9; the cap
 booster's `boost.bay_m3` is 0.25 m³ (25 cells). Validation rejects a family
@@ -452,14 +452,14 @@ against a hull's class quota. The shipped mapping is the convention:
 
 | family | `mount` / `size` | `grid_class` | `cpu_class` |
 |---|---|---|---|
-| autocannon / artillery (s, m, l) | turret / s, m, l | i, ii, iii | — |
-| rocket pod | launcher / s | i | — |
+| autocannon / artillery (s, m, l) | turret / s, m, l | i, ii, iii | none |
+| rocket pod | launcher / s | i | none |
 | mining laser | turret / s | i | ii |
-| shield boost, armor rep (active tank) | — | ii | — |
-| shield extender, armor plate, resist coat (passive tank) | — | i | — |
-| afterburner | — | ii | — |
-| stasis web, warp scrambler (ewar) | — | i | ii |
-| cap booster, cap recharger | — | i | — |
+| shield boost, armor rep (active tank) | none | ii | none |
+| shield extender, armor plate, resist coat (passive tank) | none | i | none |
+| afterburner | none | ii | none |
+| stasis web, warp scrambler (ewar) | none | i | ii |
+| cap booster, cap recharger | none | i | none |
 
 ## Recipe 4: add an NPC (and its loot)
 
@@ -486,18 +486,18 @@ Append to `content/data/npcs/rats.json`:
 
 Rules: `ship` must exist; the `fit` must exist module-by-module and fit the
 hull's slot counts (list high-slot modules first, then mid, then low) **and
-the hull's fitting limits** (mount kind/size and class quotas — the validator
+the hull's fitting limits** (mount kind/size and class quotas; the validator
 says which rule broke);
 `aggro_range`/`orbit_range` in meters; `flee_threshold` is a structure
 fraction in [0,1] (0 = never flees); `bounty` in euro (rats: 5k–250k);
 each loot row: existing item, `chance` in [0,1], `1 <= min_qty <= max_qty`.
 `description` is required on shipped NPCs: 1–2 sentences of dossier prose
-about the machine — what it does and how it behaves, no stat recitation,
+about the machine: what it does and how it behaves, no stat recitation,
 AESTHETIC's voice, no retired placeholder names (see
 [Lore fields](#lore-fields-hull-origin-maker-and-npc-description)).
 Machine classes take an Old Works caste name (Scuttler above) while the id
-keeps its slug — ids are frozen (`docs/lore/NAMING.md`).
-Then reference it from a belt spawn or anomaly spawn (Recipe 1) — NPCs only
+keeps its slug; ids are frozen (`docs/lore/NAMING.md`).
+Then reference it from a belt spawn or anomaly spawn (Recipe 1): NPCs only
 exist where spawned.
 
 ## Recipe 5: add an item / ore
@@ -517,7 +517,7 @@ Append to the matching `content/data/items/*.json`:
 
 Ore (note `refine_yield`: each value in `(0,1]`, **sum ≤ 1**). Refining
 runs in whole 100-ore batches, so a batch yields exactly
-`floor(refine_yield × 100)` of each mineral — author yields that give whole
+`floor(refine_yield × 100)` of each mineral; author yields that give whole
 minerals per batch:
 
 ```json
@@ -533,9 +533,9 @@ minerals per batch:
 ```
 
 Ammo (needs `damage` + `ammo_class`; ammo items are category `ammo`, and
-`ammo_class` is the **round family** — `small-autocannon`, `small-artillery`,
+`ammo_class` is the **round family**: `small-autocannon`, `small-artillery`,
 `medium-autocannon`, `medium-artillery`, `large-autocannon`,
-`large-artillery` — which is both the calibre and the gun family that loads
+`large-artillery`, which is both the calibre and the gun family that loads
 it. Every round of one family must carry the same `volume`, because a bay's
 whole-round count is family-wide. Shipped volumes: small-autocannon 0.005,
 small-artillery 0.008, medium-autocannon 0.01, medium-artillery 0.025,
@@ -562,7 +562,7 @@ autocannon families; artillery uses `ammo-art-<profile>-<size>`):
 ## Recipe 6: add a market listing
 
 Founding orders live on the **station** (the station celestial's `station`
-block → `market`) — one order book per station, so list them where the
+block → `market`): one order book per station, so list them where the
 trade should happen (the system must have ≥ 1 station):
 
 ```json
@@ -575,31 +575,31 @@ trade should happen (the system must have ≥ 1 station):
 ```
 
 - `item`: ItemID, **ShipID cast to ItemID** (e.g. `"ship-kestrel"`), or
-  ModuleID — see "Market orders" above.
+  ModuleID: see "Market orders" above.
 - `services`: `content.Services` ids only (`repair | market | refine |
   fitting | industry`); that table (`content/services.go`) owns each id's
   display label, icon and the window its services-row button toggles.
   `just validate` rejects anything else.
 - `qty`: finite stock, ≥ 1; `price`: euro per unit, ≥ 0.
-- `side`: `"sell"` (an ask — the default when omitted) or `"buy"` (a bid).
+- `side`: `"sell"` (an ask, the default when omitted) or `"buy"` (a bid).
 - Put hull orders at their balance price (frigate 200k–400k) and module
   orders at the module's `price`.
 
 These are the book's **founding** endowment: finite, depleting with trades
-(no infinite restock). Ongoing flow — convoy deliveries, agent orders,
-respawn requisitions — is never conjured from data; it comes through the
+(no infinite restock). Ongoing flow (convoy deliveries, agent orders,
+respawn requisitions) is never conjured from data; it comes through the
 economy (see `docs/SIM.md`).
 
 ### Material seeds: both sides at every market station
 
 Every station that offers the `market` service seeds **both sides of every
-ore and mineral** — one ask and one bid per item (`min-*`, `ore-*`). The
+ore and mineral**: one ask and one bid per item (`min-*`, `ore-*`). The
 market window's item tree lists each of those items as a row whatever the
 book holds, so a single missing side reads as a dead market to the player:
 a mined hold must be sellable and materials must be buyable at every port.
 
 - Prices stay anchored to `base_price`: the bid sits just under it
-  (sideron 5 vs base 6), the ask just over it (sideron 7) — the existing
+  (sideron 5 vs base 6), the ask just over it (sideron 7): the existing
   style, and the reason a founding book never opens crossed.
 - Quantities follow value: tens of thousands for cheap minerals
   (sideron 25,000 bid / 12,000 ask), thousands for ore and the dear
@@ -609,7 +609,7 @@ a mined hold must be sellable and materials must be buyable at every port.
   pass: its freeport now carries the same materials set plus the rounds its
   own raiders need (`TestRespawnAmmoIsOnTheLocalBook`).
 - The materials rows live at the end of each station's `market` array in
-  two blocks — asks first, then bids, each ascending by item id. The
+  two blocks: asks first, then bids, each ascending by item id. The
   validator (`TestMarketStationsSeedBothMaterialSides`) keeps every
   market-service station complete.
 - These are **seeds only**: nothing replenishes them. Industrialist agents'
@@ -646,8 +646,8 @@ listed **high slots first, then mid, then low**, each class within the hull's
 slot counts **and its fitting limits** (mounts, class quotas); cargo items
 must exist with `qty >= 1`; wallet ≥ 0;
 `scenario` checkpoints need `name` + `feature` (kebab-case).
-`world-showcase` must always exist with **≥ 10 checkpoints** — it drives
-`tests/showcase_test.go` — so when adding a feature, add a checkpoint there
+`world-showcase` must always exist with **≥ 10 checkpoints**: it drives
+`tests/showcase_test.go`, so when adding a feature, add a checkpoint there
 too with a `detail` that says how to observe it (event names, commands).
 
 ---
@@ -702,22 +702,22 @@ Offer fields (the task fields are the old contract def's, unchanged):
 | `reward.credits` | paid to wallet on claim (must be `>= 0`); scaled with a derived count |
 | `reward.item` / `reward.qty` | optional material reward (a rare module, loot, a requisition right) to the station hangar |
 | `reward.standing_gain` | career standing credited on claim |
-| `description` | the contact's own words, with slots: `{count}` `{system}` `{station}` `{item}` `{caste}` `{urgency}` — rendered as the contact's spoken line in the **Details** dialog (the offer row shows only the title, the mission type and the payout, so write this as one person talking, not as a briefing) |
+| `description` | the contact's own words, with slots: `{count}` `{system}` `{station}` `{item}` `{caste}` `{urgency}`; rendered as the contact's spoken line in the **Details** dialog (the offer row shows only the title, the mission type and the payout, so write this as one person talking, not as a briefing) |
 | `source` | how the sim derives the live parameters (below) |
 
 Objective per kind (the validator rejects anything else):
 
-- `kill`: `{"target": "<npc-id>", "count": N}` — N rats of that exact class
+- `kill`: `{"target": "<npc-id>", "count": N}`: N rats of that exact class
   killed **by the player**; kills of other classes never count.
-- `deliver`: `{"item": "<item-id>", "count": <m³>, "destination": "<station cel-id>"}` —
+- `deliver`: `{"item": "<item-id>", "count": <m³>, "destination": "<station cel-id>"}`:
   dock at the destination carrying at least `count` m³ of `item` in the hold
   (count must be a whole number of units: `count / volume` is an integer);
   the cargo is consumed on claim and **lands on the destination's book as
   requisition stock**. Destination must exist and differ from `station`.
-- `mine`: `{"item": "<ore-id>", "count": <m³>}` — `count` m³ of that ore
+- `mine`: `{"item": "<ore-id>", "count": <m³>}`: `count` m³ of that ore
   mined into the hold while the offer is accepted (transfers don't count).
 
-Derivation sources — the offer's parameters, its expiry rule and its prose
+Derivation sources: the offer's parameters, its expiry rule and its prose
 slots all come from ONE sim read, recomputed on every evaluation (no RNG,
 no wall-clock, no persistence):
 
@@ -729,16 +729,16 @@ no wall-clock, no persistence):
 | `war-clear` | a charter-held front at or past half its meter (overrun) | meter ≥ half | count = the works' holding profile, clamped `base..max`; caste re-drawn by the squeeze; `{system}` names the front |
 
 `{urgency}` is `critical` / `urgent` / `standing` from the gap's fraction.
-A closed gap simply stops producing the offer — nothing is persisted before
+A closed gap simply stops producing the offer: nothing is persisted before
 accept, so there is no timer and no penalty. Accepted work materializes the
 derived def into the save, so it survives the gap closing and still pays.
 
 Lifecycle: `offered` (derived) → `accepted` (`CmdAcceptMission`, docked at
 the contact's station, standing ≥ `min_standing`) → `progress` → `ready` →
-`completed` — auto-claimed the moment you dock at the **claim station**
+`completed`, auto-claimed the moment you dock at the **claim station**
 (the contact's station for kill/mine work, `objective.destination` for a
 delivery), which pays `reward.credits`, grants standing and consumes the
-delivered cargo — or `abandoned` (`CmdAbandonMission`, again from the
+delivered cargo, or `abandoned` (`CmdAbandonMission`, again from the
 contact's station). Refusals emit `EvMission` phase `refused`.
 
 ### Payout ratio table (the calibration contract)
@@ -764,7 +764,7 @@ table.
 
 Convoy routes, security patrols and rat ambushes are data-driven per
 system. Create `content/data/traffic/<system>.json` (a single object or an
-array, like every other dir — the def is **keyed by its `system` field**,
+array, like every other dir; the def is **keyed by its `system` field**,
 no separate id):
 
 ```json
@@ -794,9 +794,9 @@ Fields:
 | `routes[].from` / `to` | celestials (of this system when the leg is in-system), kind `station`\|`gate`\|`belt`, and different from each other |
 | `routes[].to_system` | optional: the destination system of a **cross-system lane** (empty = this def's own system). `to` must then exist in that system, and the validator checks there is a **gate path** between the two. Cross-system hauls hop the gate and continue from the journey ledger (they survive save/restore and grid rebuilds) |
 | `routes[].hull` | an existing hull (civilian haulers: `ship-npc-hauler`); cargo `qty × volume` must fit its `cargo` |
-| `routes[].cargo` | `{ "item": ..., "qty": ... }` — existing item, `qty >= 1` |
+| `routes[].cargo` | `{ "item": ..., "qty": ... }`: existing item, `qty >= 1` |
 | `routes[].interval_ticks` | authored cadence **in ticks** (60 ticks = 1 s), `>= 1`; security scales it (table below) |
-| `patrol` | optional wing config: `hulls` (each needs an `npc-guard-*` def — `Content.GuardFor`), `interval_ticks >= 1`, security-scaled |
+| `patrol` | optional wing config: `hulls` (each needs an `npc-guard-*` def, `Content.GuardFor`), `interval_ticks >= 1`, security-scaled |
 | `raider` | the local ambush rat class. **Required when `security` is `low`/`null`**; must be an NPC that actually spawns in this system (belt/anomaly spawn groups). Leave unset in high security (ambush chance is 0) |
 
 Lifecycle: spawn at `from` (EvTraffic `departed`) → per-leg ambush roll at
@@ -830,7 +830,7 @@ inside them. The single derived quantity is the **security status σ**:
 | `low`  | 0.5 |
 | `null` | 0.0 |
 
-**Spawn cadence** — effective interval = `round(authored × 4^(1-σ))`:
+**Spawn cadence.** Effective interval = `round(authored × 4^(1-σ))`:
 
 | security | multiplier | authored 5400 | authored 1800 | authored 9000 (patrol) |
 |----------|-----------|----------------|----------------|------------------------|
@@ -842,7 +842,7 @@ Schedules are stateless hashes (due when `(ticks + phase(key)) mod
 interval == 0`); a skipped attempt (live cap: 6 haulers, 4 patrols) never
 reschedules anything.
 
-**Ambush probability per transit leg** — `p = (1-σ)/3`:
+**Ambush probability per transit leg.** `p = (1-σ)/3`:
 
 | security | p | shipped example |
 |----------|---|-----------------|
@@ -852,10 +852,10 @@ reschedules anything.
 
 Raiders: `1 + Intn(3)` ships of the def's `raider` class, spawned within
 3 km of the ambushed hauler. Flee math: the hauler burns 20 s before its
-warp-out, while a raider locks a sig-100 hauler in ≈15 s (scan 440) — so
+warp-out, while a raider locks a sig-100 hauler in ≈15 s (scan 440), so
 scramblers/webs bite before the escape attempt and pin it.
 
-**Patrol response** — cadence `round(authored / σ)` (none at σ = 0);
+**Patrol response**: cadence `round(authored / σ)` (none at σ = 0);
 ambush response delay `1800×(1-σ)` ticks, wing `floor(3σ)`:
 
 | security | response delay | wing |
@@ -864,12 +864,12 @@ ambush response delay `1800×(1-σ)` ticks, wing `floor(3σ)`:
 | low  | 900 t (15 s) | 1 ship |
 | null | never | 0 |
 
-**Delivery pricing** — the per-station order book is the price former (the
+**Delivery pricing**: the per-station order book is the price former (the
 old per-system price band / decay model is **deleted**; there is no drift
 to calibrate). A delivered shipment posts as an ask on the destination
-station's book at **one tick under `min(cost basis, best ask)`** — cost
-basis being the weighted price the origin's asks were withdrawn at, or the
-item's `base_price` for belt/gate (import) shipments — so arriving supply
+station's book at **one tick under `min(cost basis, best ask)`**; cost
+basis is the weighted price the origin's asks were withdrawn at, or the
+item's `base_price` for belt/gate (import) shipments, so arriving supply
 always improves the displayed price, and a posting that crosses the
 destination's bids executes immediately at the resting bid (never-crossed
 invariant). Stock changes are always exact integers (units), never floats.
@@ -883,7 +883,7 @@ of this are documented in [SIM.md](SIM.md).
 ## Recipe 10: author war content
 
 The war (docs/GAMEPLAY.md *The Long Attrition*, docs/SIM.md §6) is
-mostly **derived from content you already author** — there is no war
+mostly **derived from content you already author**: there is no war
 registry, no spawn table and no control map to fill in. Authoring it well
 means knowing which knobs are data and which are sim.
 
@@ -903,7 +903,7 @@ leads the Corporate Fleets groups, the weakest lands first when the Works
 take a system, and squeeze steps the choice toward the tough end. Two
 consequences for authors: a new Old Works hull immediately enters the war
 palette (no wiring), and the *combat numbers* you author are the war's
-difficulty curve — there is no separate war stat file. Fleets themselves
+difficulty curve: there is no separate war stat file. Fleets themselves
 carry no authored NPC: `warSpawn` tags the toughest Works hull
 `factionFleets` at spawn (relations, aggro and kill credit; the hull's
 definition, name and loot stay as authored). A dedicated fleet hull (own
@@ -918,12 +918,12 @@ flavour text may cite the Commission (attribution only). Two limits to
 author around:
 
 - a **kill** objective counts kills of its exact `target` NPC class
-  anywhere, not "at the front" — the objective model has no system
+  anywhere, not "at the front": the objective model has no system
   predicate, so the front is prose, the squeeze-derived caste and the
   count, not a gate;
 - a **deliver** objective needs a real station at the destination, and a
   system that falls turns its stations into remnants whose charter desk
-  stops accepting new work — a war offer at a front contact can therefore
+  stops accepting new work: a war offer at a front contact can therefore
   go dark mid-campaign, which is intended, but do not make it the only
   path to a reward (a works-held front destinations the contact's own
   station, so the haul still lands).
@@ -932,14 +932,14 @@ Procurement is not an offer: the war's standing bids rest on **every**
 charter-held station book (so a military-good sell anywhere in charter space
 sells into the war), they are withdrawn and re-priced every sim hour, and
 fills are consumed. An offer that asks the player to *supply* the war
-should therefore haul materiel to a front station or sell into a bid —
+should therefore haul materiel to a front station or sell into a bid;
 never rely on a resting war order surviving between beats.
 
 **Showcase checkpoints.** The showcase must prove the war mechanically if
 its world carries it (`warWorlds` is sim-owned: adding `world-showcase`
 there is a code change, not a content one). War checkpoints should name the
-event they resolve on — `EvWar` phases `flip`, `contest`, `supply`, `kill`,
-`skirmish` — and cite the observable in `detail` ("sell 100 x ammo into
+event they resolve on: `EvWar` phases `flip`, `contest`, `supply`, `kill`,
+`skirmish`, and cite the observable in `detail` ("sell 100 x ammo into
 Hauvnok's bid, advance to the next war beat, expect `EvWar` supply and a
 contest move"). A tick-0 checkpoint (control + four idle meters) and a
 flip checkpoint (both directions) are the two the design asks for; the
@@ -956,7 +956,7 @@ player-visible path.
 
 ## Recipes (manufacturing)
 
-Manufacturing is the **second tier of a two-step economy** — the two-tier
+Manufacturing is the **second tier of a two-step economy**: the two-tier
 rule, enforced by the validator:
 
 | Tier | Input | Mechanism |
@@ -965,9 +965,9 @@ rule, enforced by the validator:
 | 2. Manufacturing | `min-*` minerals | `recipes/*.json` turns minerals into products at an `industry` station |
 
 Ore never goes straight into a product (recipes take minerals only), and
-`loot-*` is never a product — salvage stays salvage. Products are exactly:
-ships, modules, and `ammo`/`charge` items. Everything else — ores, minerals,
-loot — has no recipe.
+`loot-*` is never a product; salvage stays salvage. Products are exactly:
+ships, modules, and `ammo`/`charge` items. Everything else (ores, minerals,
+loot) has no recipe.
 
 Recipes live in `content/data/recipes/` (arrays of objects, like every other
 dir; one themed file per product family):
@@ -987,23 +987,23 @@ dir; one themed file per product family):
 
 | Field | Meaning |
 |-------|---------|
-| `id` | `rec-` prefix + the product id — **frozen once shipped**, like every ID in the registry table above |
+| `id` | `rec-` prefix + the product id: **frozen once shipped**, like every ID in the registry table above |
 | `product` | the ItemID / ShipID / ModuleID produced. Resolves like a market order: item first, then ship, then module. Unknown product, or a product in category `ore`/`mineral`/`loot`, is a validation error |
-| `qty` | units produced per run (1 for hulls and modules; charge runs are batched — shipped batches are 100) |
+| `qty` | units produced per run (1 for hulls and modules; charge runs are batched: shipped batches are 100) |
 | `inputs` | minerals only (`min-*` ids, category `mineral`), each `item` + `qty` in whole units |
 | `time` | seconds per run at the craft-L1 baseline (each craft level above L1 cuts 4 %): **~30 s** for charges, **~3 min** for modules, **~10 min** for hulls (the approved per-family ladder; runs multiply linearly) |
 | `family` | the station craft-growth key (`CraftLevel` in `sim`): `hulls` \| `modules` \| `charges` |
 
 v1 ships **exactly one recipe per product**, but the schema is a list:
 extra `rec-*` rows for the same product are legal data when the crafting
-sim grows multi-recipe support. Recipe iteration is canonical — always
+sim grows multi-recipe support. Recipe iteration is canonical: always
 `Content.RecipesInOrder()`, sorted by ID (pinned by
 `content.TestRecipeIterationIsCanonical`).
 
 ### The envelope (binding)
 
-Material cost per produced unit — `Σ(inputs.qty × mineral base_price) ÷ qty`
-— must land inside **55–75 % of the product's reference price**:
+Material cost per produced unit (`Σ(inputs.qty × mineral base_price) ÷ qty`)
+must land inside **55–75 % of the product's reference price**:
 
 - item products: `ItemDef.base_price`;
 - modules: `ModuleDef.price`;
@@ -1020,12 +1020,12 @@ Rounding: whole mineral units for charges/modules, hundreds/thousands for
 hull inputs. Two monotonicity rules complete the envelope, both test-pinned:
 every **hull** recipe costs more mineral value than every **module** recipe
 (`TestHullRecipesCostMoreThanModules`), and the hull ladder is strictly
-increasing — a barge burns more minerals than a sloop
+increasing: a barge burns more minerals than a sloop
 (`TestHullRecipeMaterialLadder`).
 
 ### `family` vocabulary
 
-`hulls` | `modules` | `charges` — deliberately tiny. The family is the
+`hulls` | `modules` | `charges`: deliberately tiny. The family is the
 craft-growth key a station's `CraftLevel` hangs off (`docs/SIM.md`,
 "world metabolism"), so it groups by how the product is built, not by what
 it does. Adding a family is a schema
@@ -1034,7 +1034,7 @@ the validator rejects anything outside the three.
 
 ### Binding voice
 
-Recipes carry **no display name of their own** — the UI shows the
+Recipes carry **no display name of their own**: the UI shows the
 product's registered name (`ShipDef`/`ModuleDef`/`ItemDef` `name`, all in
 `docs/lore/NAMING.md`'s registry). If a recipe label, log line or progress
 string is ever authored for a recipe, it falls under the same binding rules
@@ -1062,7 +1062,7 @@ weapon ids are not stable targets for them.
 
 ## Checklist before you finish
 
-1. **`go test ./content/...` is green** — the embedded real data must load
+1. **`go test ./content/...` is green**: the embedded real data must load
    *and* validate with zero problems.
 2. **`go run ./cmd/entieve validate` passes** (CLI wrapper over
    `Content.Validate()`).
@@ -1087,12 +1087,12 @@ weapon ids are not stable targets for them.
    Recipe 9 calibration tables; recipe material cost inside the 55–75 %
    envelope with hull recipes costing more than module recipes
    [Recipes (manufacturing)](#recipes-manufacturing).
-7. **Every field filled** — no silent zeros where a real value belongs
+7. **Every field filled**: no silent zeros where a real value belongs
    (only legitimate zeros: passive `activation_*`, `ore_hold: 0` on
    non-barges, ammo-less `ammo_class: ""`, guard NPCs' `bounty: 0`).
    Every shipped hull carries an `origin` from the vocabulary and every
-   shipped NPC a `description` (both test-enforced — see
+   shipped NPC a `description` (both test-enforced; see
    [Lore fields](#lore-fields-hull-origin-maker-and-npc-description)), and
    every manufactured def (ships, modules, ammo/charge items) a `maker`
    from the ten-firm roster (rat hulls, ores, minerals and loot stay
-   unattributed — `content/maker_test.go`).
+   unattributed; `content/maker_test.go`).

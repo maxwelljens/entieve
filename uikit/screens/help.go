@@ -98,7 +98,7 @@ func NewHelp(d theme.Theme, rows []KeyRow) *HelpPanel {
 			"Entieve has no omniscience: the client only shows what your ship could perceive. "+
 				"Ships, asteroids and wrecks are visible only within the 250 km sensor radius; "+
 				"system landmarks are always visible. The scanner (C) sweeps to 3 × sensor range "+
-				"(750 km) and reports anonymous counts only — no names, no distances. "+
+				"(750 km) and reports anonymous counts only: no names, no distances. "+
 				"Warp-to-within (Z) picks the landing range; travel still means flying to the gate.",
 			faceTiny, theme.Solid(p.Dim)),
 		widget.TextOpts.MaxWidth(float64(theme.Px(helpW-2*theme.ContentsPad))),
@@ -118,7 +118,7 @@ func NewHelp(d theme.Theme, rows []KeyRow) *HelpPanel {
 	}
 	body.AddChild(heading, blurb)
 
-	titleBar, _ := theme.NewTitleBar(d, "Help — Entieve key map", "svc_help")
+	titleBar, _ := theme.NewTitleBar(d, "Help: Entieve key map", "svc_help")
 
 	// Size the window to the content so a short key map never leaves the
 	// blurb floating in dead space (bw/bh arrive already scaled; the

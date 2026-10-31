@@ -1,7 +1,7 @@
 # The Wild Fields
 
 The binding lore rulebook for Entieve's setting. Everything under
-`docs/lore/` applies to all content — hand-written or AI-authored — and
+`docs/lore/` applies to all content, hand-written or AI-authored, and
 nothing may contradict it. Companions: [FACTIONS.md](FACTIONS.md) (who lives
 here), [AESTHETIC.md](AESTHETIC.md) (how everything sounds and looks),
 [NAMING.md](NAMING.md) (every entity's name). Mechanics stay in
@@ -10,7 +10,7 @@ here), [AESTHETIC.md](AESTHETIC.md) (how everything sounds and looks),
 ## The Wild Fields
 
 **The Wild Fields** is the region Entieve is set in, and the name of its
-constellation too — one frontier gold-rush district: small, industrial, and a
+constellation too, one frontier gold-rush district: small, industrial, and a
 long way from anywhere that matters. The playable map is one district of it,
 seven systems on the ring of stargates:
 
@@ -21,11 +21,11 @@ seven systems on the ring of stargates:
 | **Kvonice** | the Fringe | the junction of the rush: yards, richer ore, a freeport |
 | **Młondan** | the Fringe | the refinery step of the chain |
 | **Kamžal** | the Fringe | shipyard country; the depot at the ring's edge |
-| **Pušťov** | Unincorporated | the dead-end frontier — Old Works country |
+| **Pušťov** | Unincorporated | the dead-end frontier: Old Works country |
 | **Glůšan** | Unincorporated | the hush: one freeport and not much else |
 
 Everything else in the Wild Fields is off the map: other districts, other
-constellations, other rushes. Mention them if you must; name nothing — the
+constellations, other rushes. Mention them if you must; name nothing: the
 Svaz's other cantons ([the old worlds](#the-old-worlds)) are the only named
 places that stay unmapped, and staying unmapped is what they are for.
 
@@ -35,7 +35,7 @@ never move.
 
 **Binding rules**
 
-- MUST keep the Wild Fields a working frontier district — mines, refineries,
+- MUST keep the Wild Fields a working frontier district: mines, refineries,
   freeports, hazard tape, invoices.
 - MUST keep every named system, constellation and region registered in
   [NAMING.md](NAMING.md); unregistered geography does not exist.
@@ -45,7 +45,7 @@ never move.
 ## The rush and the ore
 
 The rush is about ore. The Wild Fields' belts carry exotic ores that turned out
-to be the feedstock for a manufacturing breakthrough in the old worlds — and
+to be the feedstock for a manufacturing breakthrough in the old worlds, and
 that was enough. Capital, contractors and pilots arrived to cut rock, and
 they have not stopped arriving.
 
@@ -73,16 +73,16 @@ Two waves of people live in the Wild Fields, one on top of the other.
 
 **The first wave** arrived generations ago: European settlers of Moravian,
 Polish and Nordic heritage, in numbers large enough to found towns. Those towns
-are still here and still working — the region's infrastructure: sturdy,
+are still here and still working, the region's infrastructure: sturdy,
 patched, and older than everyone using them.
 
 **The second wave** is now: corporates under charter, independents, and
-pilots — the player among them — chasing the ore rush. They sleep in the
+pilots, the player among them, chasing the ore rush. They sleep in the
 first wave's berths, weld onto the first wave's hulls, and pay in a currency
 the first wave carried with it.
 
 The waves did not stay separate. The second wave moved into the first wave's
-buildings, started working, and — under the Commission — started a war:
+buildings, started working, and, under the Commission, started a war:
 corporate fleets against the Old Works, fought over the old towns' berths and
 belts. The first wave's people are not a side in it. They are the
 infrastructure it happens to.
@@ -102,16 +102,16 @@ infrastructure it happens to.
 ## The Predecessors
 
 Nobody in the Wild Fields built the Old Works. They were built by the
-**Predecessors** — the civilisation that held this country before the first
+**Predecessors**, the civilisation that held this country before the first
 wave landed, and that survives in the record only as leftovers: works, seams, a
 word or two of place-name, and what people still say out loud.
 
 They built to finish. The plan was machine worlds: strip a system, plant it,
-run it, hand back a machine world — and **Gnazvor**, out in Kvonice, is the
+run it, hand back a machine world, and **Gnazvor**, out in Kvonice, is the
 model everyone points at. Then the oversight decayed. Tradition says that much
 and stops: the supervisors stopped supervising, the knots came untied, and the
 works went on working. Why it happened is not preserved and not guessed at. The
-fall ate the record — presses, archives, the people who could have explained it
+fall ate the record: presses, archives, the people who could have explained it
 in a sentence.
 
 What is left is oral, plus a scholarly fringe: artefact collections,
@@ -123,8 +123,8 @@ Three fragments survive well enough to quote:
 
 - The oldest, a line about the Predecessors' crews, recited rather than told:
   *The crews stopped coming. The Works did not stop working.*
-- One place-name older than the heritages — a Predecessor word wearing a Slavic
-  coat — and nobody can say which layer settled first.
+- One place-name older than the heritages (a Predecessor word wearing a Slavic
+  coat), and nobody can say which layer settled first.
 - A work-song warning, still sung on hauling shifts and older than the language
   it is sung in: *Cut the rock, count the frames, leave the deep seam alone.*
 
@@ -141,7 +141,7 @@ is a form, and the form gets filed.
 - MUST keep the fall unexplained: the oversight decayed, the why is dark, and no
   text ever supplies it.
 - MUST keep the Predecessors known only through oral tradition, the fringe's
-  collections and the machines — never a witness, a recovered archive or a
+  collections and the machines, never a witness, a recovered archive or a
   survivor.
 - MUST keep the ban absolute and dull: enforced by paperwork, held by a name.
   The Wild Fields has never been inspected.
@@ -152,23 +152,23 @@ is a form, and the form gets filed.
 
 ## The old worlds
 
-The homelands the settlers left are **the old worlds** — plural, distant, and
+The homelands the settlers left are **the old worlds**: plural, distant, and
 deliberately unnamed. "Moravian", "Polish", "Nordic" and "Latinate" are
 heritages: language, work songs, building styles, and the formal register the
 charter institutions still write in. They are not states, not governments,
 not flags. The manufacturers take their names from these heritages (see
-[FACTIONS.md — Corporate members](FACTIONS.md#corporate-members)) — the
+[FACTIONS.md: Corporate members](FACTIONS.md#corporate-members)): the
 heritage shapes the house, never the other way round.
 
 Nobody in the Wild Fields sends mail home and gets an answer. It is a year each
 way on a freight cycle, and the far end is a canton office that has never had
-this district on a list. **The Svaz** — the confederation — is a few million
+this district on a list. **The Svaz**, the confederation, is a few million
 people spread across the old worlds and the cantons that hang off them, and the
 Wild Fields is the part nobody answers for: a dues line in a ledger, on a desk,
 on a world no pilot here has seen.
 
 The Svaz's heart is the old worlds themselves, where the treaty is kept and the
-dues are spent. The rest is cantons, and the Wild Fields is one — alongside
+dues are spent. The rest is cantons, and the Wild Fields is one, alongside
 **the Žemdan**, **the Lešvok** and **the Můstvan**, districts with their own
 trades, named on the same paperwork and no more mapped than the far side of the
 ring. They appear in invoices.
@@ -181,7 +181,7 @@ and the least able to act like one. It sends warrants and invoices, not mail.
 **Binding rules**
 
 - MUST refer to origins as heritage cultures, never as countries or powers.
-- MUST keep the Svaz's reach bureaucratic — dues, a warrant, a form, a ledger.
+- MUST keep the Svaz's reach bureaucratic: dues, a warrant, a form, a ledger.
   The neglect is the whole relationship: nobody is coming.
 - NEVER name Earth, Terra, Sol, or any homeworld or star of origin.
 - NEVER use the old worlds as a plot lever: no embassies, no reinforcements,
@@ -191,7 +191,7 @@ and the least able to act like one. It sends warrants and invoices, not mail.
 
 ## Zones: charter reach
 
-Security status is **charter reach** — how far the colonial authority's
+Security status is **charter reach**: how far the colonial authority's
 patrols, courts and insurers actually function. The Wild Fields speaks of three
 zones:
 
@@ -211,7 +211,7 @@ zones:
 | Pušťov | Unincorporated |
 | Glůšan | Unincorporated |
 
-UI copy uses the zone words with a complementary status label — "Charter ·
+UI copy uses the zone words with a complementary status label: "Charter ·
 secure", "Fringe · contested", "Unincorporated · no charter". The values
 `high` / `low` / `null` survive only in code and JSON (`"security"` in
 `content/data/systems/*.json`) as implementation; they are never
@@ -219,8 +219,8 @@ world-facing words.
 
 Charter reach is not a fixed map any more. Since the **Long Attrition** the war
 moves it: a system the charter loses drops to Unincorporated, a system it takes
-back returns to its authored tier, and the **front** — the systems where the
-two answers meet across a gate — is where that happens. The zones are the war's
+back returns to its authored tier, and the **front**, the systems where the
+two answers meet across a gate, is where that happens. The zones are the war's
 scoreboard, not its constitution.
 
 The starmap carries the war as a second layer over the zone words. These are
@@ -230,10 +230,10 @@ the words for it:
 |---|---|
 | **Charter-held** | a system the charter answers in today: its authored zone word is live |
 | **Works-held** | a system the Old Works hold: Unincorporated in practice, belts hostile, its stations remnants |
-| **Front** | a system gated to the other side, carrying a contest meter — the war's moving edge |
+| **Front** | a system gated to the other side, carrying a contest meter: the war's moving edge |
 
-A front that moves reports as "Contested — Kvonice holds at 28%"; a flip is
-"Fall — Kvonice lost to the Old Works" or "Reclaimed — Kvonice returns to the
+A front that moves reports as "Contested: Kvonice holds at 28%"; a flip is
+"Fall: Kvonice lost to the Old Works" or "Reclaimed: Kvonice returns to the
 charter". The overlay never replaces the zone word: a Works-held system is
 Unincorporated and says so.
 
@@ -256,14 +256,14 @@ schedules, contract boards, berthing fees. Charter space is orderly and slow.
 The Fringe is loud and priced accordingly. Pušťov is quiet in the wrong
 way.
 
-The player is an **ordinary pilot**: skilled, mortal, insured. Licensed work —
-culling pests, hauling cargo, mining ore, running the odd delivery into worse
-places — plus whatever the Fringe lets you get away with. Pilots buy their
+The player is an **ordinary pilot**: skilled, mortal, insured. Licensed work
+(culling pests, hauling cargo, mining ore, running the odd delivery into worse
+places) plus whatever the Fringe lets you get away with. Pilots buy their
 hulls, fit their racks and pay their fines like everyone else. Freeports take
 anyone who pays the fee.
 
 The around is thicker than the biography. A pilot is a licence number, a hull on
-a registry, and a premium somebody argues about once a year — licences renew,
+a registry, and a premium somebody argues about once a year: licences renew,
 fines arrive by form, and the berth allocation is the one item on the clipboard
 with the name spelled right. Insurers are institutions you argue with, not
 charities you call. Nobody asks where a pilot is from: it is not a secret, it is
@@ -274,7 +274,7 @@ not a question with a use.
 - MUST keep the player ordinary: a working pilot with a wallet, a hull and a
   to-do list.
 - MUST keep the player's biography empty: no home, no family, no history. The
-  texture around the pilot is paperwork — licences, fines, premiums, rosters —
+  texture around the pilot is paperwork (licences, fines, premiums, rosters),
   never a backstory.
 - MUST ground day-to-day texture in work: shifts, holds, cycles, invoices,
   schedules.
@@ -286,8 +286,8 @@ not a question with a use.
 Ships die; pilots mostly do not. Losing a hull ends with the escape pod
 getting clear and being picked up. The pickup is routine: the sweep is on a
 contract, so a boat comes out for the pod, and the insurer's agent meets it at
-the berth with a statement to sign. The hull insurer — the charter authority
-or the charter the pilot flies under — then issues a replacement: a fresh
+the berth with a statement to sign. The hull insurer (the charter authority
+or the charter the pilot flies under) then issues a replacement: a fresh
 hull of the insured class, handed over where the pilot wakes up.
 
 Death in Entieve is paperwork. The log line `Respawned at <station> in a
@@ -304,7 +304,7 @@ minds and resurrection technology do not exist here.
 
 ## The euro
 
-The currency is the **euro**, counted in euros and eurocents (`€` / `¢`) —
+The currency is the **euro**, counted in euros and eurocents (`€` / `¢`),
 an old-world remnant that came with the settlement waves and never left.
 Notes, price tags and accounting software all crossed over with the first
 wave; the second wave inherited the habit and kept it, because everyone
@@ -312,7 +312,7 @@ prices in euro and converting on the frontier is worse.
 
 Amounts read `1,234.56 €` (the sign trails the amount); amounts under one
 euro read `50¢`. In prose use
-"euro(s)" and "cent(s)" — "forty thousand euro", "fifty cents". The full
+"euro(s)" and "cent(s)": "forty thousand euro", "fifty cents". The full
 string convention, including what replaces today's placeholder "credits" /
 "cr" text, is specified in [NAMING.md](NAMING.md#money-strings).
 

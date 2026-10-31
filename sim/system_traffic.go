@@ -1168,7 +1168,7 @@ func (s *Sim) trafficHop(sys *content.SystemDef, e ecs.Entity, tc *Traffic, gate
 		})
 		s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: e,
 			System: sys.ID, Cel: gate.ID, Item: tc.Item, Value: float64(tc.Qty),
-			Text: "Convoy hauler holds at " + gate.Name + " — " + nextDef.Name +
+			Text: "Convoy hauler holds at " + gate.Name + ": " + nextDef.Name +
 				" gate queue full, shipment waits in " + sys.Name})
 		s.destroy(e)
 		return
@@ -1415,7 +1415,7 @@ func (s *Sim) trafficJourneyLost(sys *content.SystemDef, j TrafficJourney, destS
 	}
 	s.emit(Event{Kind: EvMarket, Severity: SevWarning, System: sys.ID, Item: j.Item,
 		Value: float64(j.Qty),
-		Text: "Risk premium — " + s.itemName(j.Item) +
+		Text: "Risk premium: " + s.itemName(j.Item) +
 			" shipment lost en route to " + destName})
 	s.trafficLoseJourney(j)
 }
@@ -1530,7 +1530,7 @@ func (s *Sim) trafficDeliver(sys *content.SystemDef, e ecs.Entity, tc *Traffic, 
 	}
 	s.emit(Event{Kind: EvTraffic, Phase: TrafficDelivered, Severity: SevGood, Actor: e,
 		System: sys.ID, Cel: tc.Dest, Item: tc.Item, Value: float64(tc.Qty),
-		Text: "Convoy delivery — " + volStr + " m³ " + s.itemName(tc.Item) +
+		Text: "Convoy delivery: " + volStr + " m³ " + s.itemName(tc.Item) +
 			" received at " + dest.Name})
 	s.marketVoice(book, item, before, dest.Name)
 	if agent != nil {
@@ -1578,7 +1578,7 @@ func (s *Sim) trafficHaulerDestroyed(e ecs.Entity, tc *Traffic) {
 	if destName != "" && !delivered {
 		s.emit(Event{Kind: EvMarket, Severity: SevWarning, System: s.systemID, Item: tc.Item,
 			Value: float64(tc.Qty),
-			Text: "Risk premium — " + s.itemName(tc.Item) +
+			Text: "Risk premium: " + s.itemName(tc.Item) +
 				" shipment lost en route to " + destName})
 	}
 

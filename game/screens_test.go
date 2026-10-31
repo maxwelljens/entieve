@@ -77,7 +77,7 @@ func TestScreenSpecRejectsMalformedRows(t *testing.T) {
 		{"key without an action id", func(r []Screen) { r[0].Action = "" }, "without an action id"},
 		{"duplicate action id", func(r []Screen) { r[1].Action = "inventory" }, "already used by"},
 		{"help text without a key", func(r []Screen) { r[0].Key = keyNone }, "help text without a key binding"},
-		{"desc with a baked key", func(r []Screen) { r[0].Desc = "I — toggle inventory" }, "carries a chord"},
+		{"desc with a baked key", func(r []Screen) { r[0].Desc = "I: toggle inventory" }, "carries a chord"},
 		{"missing rail group", func(r []Screen) { r[0].Group = "" }, "missing rail group"},
 		{"unknown rail group", func(r []Screen) { r[0].Group = "Cargo Bay" }, "unknown rail group"},
 		{"transient row claiming a group", func(r []Screen) { r[screenIndex(idMenu)].Group = "Ship" }, "transient screen must not carry"},

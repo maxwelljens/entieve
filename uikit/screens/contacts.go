@@ -337,7 +337,7 @@ func (b *ContactsPanel) build() contactsModel {
 		}
 		m.Active = append(m.Active, contactRowModel{
 			ID:     a.ms.ID,
-			Title:  a.def.Title + " — " + fmt.Sprintf("%d/%d", int(math.Round(have)), a.def.Objective.Count),
+			Title:  a.def.Title + ": " + fmt.Sprintf("%d/%d", int(math.Round(have)), a.def.Objective.Count),
 			Icon:   theme.ContractIcon(a.def.Kind),
 			Action: "Abandon",
 		})

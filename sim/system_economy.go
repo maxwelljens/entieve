@@ -122,7 +122,7 @@ func (s *Sim) stationAccess(svc string) (ecs.Entity, bool) {
 	// A remnant still runs market, repair and refinery; its charter services
 	// (industry, fitting) are dark until the system is reclaimed.
 	if !s.stationOffers(s.dockedStationID(), svc) {
-		s.log(SevWarning, s.player, "This station is a remnant — no "+svc+" here")
+		s.log(SevWarning, s.player, "This station is a remnant: no "+svc+" here")
 		return 0, false
 	}
 	return st, true
@@ -205,7 +205,7 @@ func (s *Sim) marketVoice(book *MarketBook, item content.ItemID, before float64,
 		verb, direction = "Demand", "rises to"
 	}
 	s.emit(Event{Kind: EvMarket, Severity: SevInfo, System: book.System, Item: item, Value: after,
-		Text: verb + " — " + s.itemName(item) + " price " + direction + " " +
+		Text: verb + ": " + s.itemName(item) + " price " + direction + " " +
 			euro(after) + " at " + where})
 }
 
@@ -257,7 +257,7 @@ func (s *Sim) settle(book *MarketBook, ms []match) (int, float64) {
 		received := v - tax
 		s.wallet += received
 		s.recordLedger(LedgerEntry{
-			What:   "Market sell — " + itoaN(m.qty) + " x " + s.itemName(m.order.Item),
+			What:   "Market sell: " + itoaN(m.qty) + " x " + s.itemName(m.order.Item),
 			Where:  s.stationName(m.order.Station),
 			Amount: received, Tax: tax,
 		})
@@ -384,7 +384,7 @@ func (s *Sim) execBuy(c CmdBuy) {
 	s.wallet -= cost + fee
 	s.routeFee(fee)
 	s.recordLedger(LedgerEntry{
-		What:   "Market buy — " + itoaN(qty) + " x " + s.itemName(c.Item),
+		What:   "Market buy: " + itoaN(qty) + " x " + s.itemName(c.Item),
 		Where:  s.stationName(station),
 		Amount: -(cost + fee), Fee: fee,
 	})
@@ -456,14 +456,14 @@ func (s *Sim) execSell(c CmdSell) {
 			s.emit(Event{Kind: EvWar, Phase: WarSupply, Severity: SevGood, Actor: s.player,
 				Item: m.order.Item, System: s.systemID,
 				Value: m.order.Price * float64(m.qty),
-				Text: "Supply — " + itoaN(m.qty) + " x " + s.itemName(m.order.Item) +
+				Text: "Supply: " + itoaN(m.qty) + " x " + s.itemName(m.order.Item) +
 					" to " + to + " (" + euro(m.order.Price*float64(m.qty)) + ")"})
 		}
 	}
 	received := proceeds - tax - fee
 	s.wallet += received
 	s.recordLedger(LedgerEntry{
-		What:   "Market sell — " + itoaN(qty) + " x " + s.itemName(c.Item),
+		What:   "Market sell: " + itoaN(qty) + " x " + s.itemName(c.Item),
 		Where:  s.stationName(station),
 		Amount: received, Fee: fee, Tax: tax,
 	})
@@ -639,7 +639,7 @@ func (s *Sim) PlaceOrder(station StationID, side OrderSide, item content.ItemID,
 			// The escrow debit and its price-improvement refund are one
 			// transaction: one row, net, broker fee itemized.
 			s.recordLedger(LedgerEntry{
-				What:   "Buy order — " + itoaN(qty) + " x " + s.itemName(item),
+				What:   "Buy order: " + itoaN(qty) + " x " + s.itemName(item),
 				Where:  s.stationName(station),
 				Amount: res.Refund - (escrow + fee), Fee: fee,
 			})
@@ -692,7 +692,7 @@ func (s *Sim) PlaceOrder(station StationID, side OrderSide, item content.ItemID,
 		// the proceeds net of the broker fee charged at placement and the
 		// sales tax, or the fee alone when nothing traded.
 		s.recordLedger(LedgerEntry{
-			What:   "Sell order — " + itoaN(qty) + " x " + s.itemName(item),
+			What:   "Sell order: " + itoaN(qty) + " x " + s.itemName(item),
 			Where:  s.stationName(station),
 			Amount: fillNet - res.Fee, Fee: res.Fee, Tax: fillTax,
 		})
@@ -744,7 +744,7 @@ func (s *Sim) CancelOrder(station StationID, id uint64, owner string) bool {
 			// The escrow comes back whole: the broker fee charged at
 			// placement was kept (EVE's rule) and is not refunded.
 			s.recordLedger(LedgerEntry{
-				What:   "Escrow released — " + itoaN(o.Qty) + " x " + s.itemName(o.Item),
+				What:   "Escrow released: " + itoaN(o.Qty) + " x " + s.itemName(o.Item),
 				Where:  s.stationName(station),
 				Amount: o.Price * float64(o.Qty),
 			})
@@ -791,7 +791,7 @@ func (s *Sim) execRefine(c CmdRefine) {
 	}
 	if qty%RefineBatch != 0 {
 		s.emit(Event{Kind: EvLog, Severity: SevWarning, Actor: s.player, Item: c.Item,
-			Text:  "Refining runs in whole batches of 100 ore — " + itoaN(qty) + " x " + def.Name + " is a partial batch",
+			Text:  "Refining runs in whole batches of 100 ore: " + itoaN(qty) + " x " + def.Name + " is a partial batch",
 			Value: float64(qty)})
 		return
 	}
@@ -868,7 +868,7 @@ func (s *Sim) execRepair() {
 	}
 	s.wallet -= cost
 	s.recordLedger(LedgerEntry{
-		What:   "Repairs — " + num(missing) + " HP",
+		What:   "Repairs: " + num(missing) + " HP",
 		Where:  s.stationName(s.dockedStationID()),
 		Amount: -cost,
 	})

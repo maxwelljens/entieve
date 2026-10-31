@@ -138,7 +138,7 @@ func TestMapWarCard(t *testing.T) {
 	if !hasCardLine(lines, "Charter-held") {
 		t.Errorf("charter card lacks the holder line: %q", cardTexts(lines))
 	}
-	if !hasCardLine(lines, "Front — the Works press at 42%") {
+	if !hasCardLine(lines, "Front: the Works press at 42%") {
 		t.Errorf("charter front lacks its meter line: %q", cardTexts(lines))
 	}
 
@@ -147,7 +147,7 @@ func TestMapWarCard(t *testing.T) {
 	if !hasCardLine(lines, "Works-held") {
 		t.Errorf("works card lacks the holder line: %q", cardTexts(lines))
 	}
-	if !hasCardLine(lines, "Front — the charter pushes at 17%") {
+	if !hasCardLine(lines, "Front: the charter pushes at 17%") {
 		t.Errorf("works front lacks its meter line: %q", cardTexts(lines))
 	}
 
@@ -194,7 +194,7 @@ func TestMapWarKey(t *testing.T) {
 	})
 	want := []string{
 		"Charter-held", "Works-held", "Front",
-		"War treasury — 96,500,000.00 €",
+		"War treasury: 96,500,000.00 €",
 	}
 	if len(rows) != len(want) {
 		t.Fatalf("war key rows = %d, want %d: %v", len(rows), len(want), rows)

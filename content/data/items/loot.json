@@ -30,7 +30,7 @@
     "id": "loot-hierarch-crest",
     "group": "Loot",
     "name": "Hierarch's Crest",
-    "description": "Salvage from a Pušťov hierarch: a polished identification crest worth a fortune. What it identifies is a question with an invoice attached — the Kanžar Inspectorate buys crests and does not say why.",
+    "description": "Salvage from a Pušťov hierarch: a polished identification crest worth a fortune. What it identifies is a question with an invoice attached: the Kanžar Inspectorate buys crests and does not say why.",
     "category": "loot",
     "volume": 0.5,
     "base_price": 450000

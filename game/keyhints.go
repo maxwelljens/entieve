@@ -46,7 +46,7 @@ func (h keyHints) Hint(action string) string {
 	case c == "":
 		return desc + " · unbound"
 	default:
-		return c + " — " + desc
+		return c + ": " + desc
 	}
 }
 

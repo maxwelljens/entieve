@@ -1,7 +1,7 @@
 # assets/
 
 Drop-in art. PNGs placed here replace the game's procedural vector art for
-the matching content ID — no config needed. Anything missing falls back to
+the matching content ID: no config needed. Anything missing falls back to
 the built-in art. `artwork/` holds the full-window plates and `portraits/`
 the contact faces (both JPEG allowed).
 
@@ -31,20 +31,20 @@ so a name that is a display string ("kerngrit.png") is embedded and never
 drawn; `assets/icons/icons_test.go` fails the build until it parses as a real
 ID. The set embeds through `icons.go` (`//go:embed *.png`) and registers
 itself in the icon registry (`uikit/icons`) as **art-mode** art keyed by the
-content ID — full-colour, drawn as-is, never tinted — so the drop-in wins
+content ID (full-colour, drawn as-is, never tinted), so the drop-in wins
 every slot that content ID reaches:
 
 | Family | IDs | Slots the art reaches |
 |---|---|---|
 | modules | `mod-autocannon-s/-m`, `mod-artillery-s/-m/-l`, `mod-shield-boost`, `mod-shield-extender`, `mod-armor-rep`, `mod-armor-plate`, `mod-cap-recharger`, `mod-afterburner`, `mod-mining-laser`, `mod-stasis-web`, `mod-warp-scram` | fitting tiles, module rack, market rows, manufacturing/refining rows, module tooltip, Show Info hero |
-| corporations | `corp-aldemar`, `corp-burza`, `corp-borealis`, `corp-celeritas`, `corp-druzstvo`, `corp-iskald`, `corp-ferrum`, `corp-nordvakt`, `corp-praetor`, `corp-vantera` | the corporation mark on the Show Info maker (Sub) line and the fitting window's maker block (40 px) — the hull decals stay vector |
+| corporations | `corp-aldemar`, `corp-burza`, `corp-borealis`, `corp-celeritas`, `corp-druzstvo`, `corp-iskald`, `corp-ferrum`, `corp-nordvakt`, `corp-praetor`, `corp-vantera` | the corporation mark on the Show Info maker (Sub) line and the fitting window's maker block (40 px); the hull decals stay vector |
 | minerals | `min-ferrite`, `min-nickel`, `min-cobalt`, `min-silex`, `min-glacite`, `min-argon` | market rows, manufacturing/refining rows, Show Info hero |
 | ores | `ore-sterngrit`, `ore-cordite`, `ore-lucidite`, `ore-glacierite` | same |
 | loot | `loot-alloy-scrap`, `loot-iced-core`, `loot-navdata`, `loot-hierarch-crest` | same |
 
 Anything without a file falls back exactly as before (a module's class glyph,
 an item's category silhouette, the corporation's vector emblem). `_alt/`
-holds three alternate renders the owner set aside: **ignored by decision** —
+holds three alternate renders the owner set aside: **ignored by decision**:
 `go:embed` only reaches `*.png` in this directory, so nothing under `_alt/`
 is embedded or drawn. A dropped PNG is 720²/512² RGBA and may be any size;
 the registry scales it into the square icon box.
@@ -54,7 +54,7 @@ the registry scales it into the square icon box.
 The six space-ambient tracks live here as tracked `.ogg` files
 (`astro_reverie`, `celestial_echoes`, `galactic_odyssey`, `lunar_serenity`,
 `orbital_echoes`, `stellar_drift`; all 44.1 kHz stereo). They are embedded
-into the binary by `audio.go` in this directory (`//go:embed *.ogg` — the
+into the binary by `audio.go` in this directory (`//go:embed *.ogg`; the
 shim has to sit beside the files because `go:embed` cannot reach a parent
 directory), then played as one shuffled pool everywhere by
 `game.NewMusic`. Dropping more `.ogg` files here adds them to the pool at
@@ -78,7 +78,7 @@ seam's cue names:
 
 The pack's originals are 24-bit/48 kHz PCM; ebiten's wav decoder reads only
 8- and 16-bit PCM, so each copy is transcoded to 16-bit/44.1 kHz stereo
-(the audio context's rate) — a byte-identical copy would not decode. The
+(the audio context's rate); a byte-identical copy would not decode. The
 two Air FX files also ship ~30 dB under the rest of the pack (they peak at
 −44 dBFS against the click's −14), which made them inaudible at any sane
 volume: `open.wav` and `close.wav` carry +30 and +27.6 dB of gain so every

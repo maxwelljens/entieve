@@ -21,7 +21,7 @@
           "item": null,
           "standing_gain": 0.15
         },
-        "description": "The Commission buys guns at the front. {count} Medium Artillery to {station} — {urgency}: the {system} front needs them.",
+        "description": "The Commission buys guns at the front. {count} Medium Artillery to {station} ({urgency}); the {system} front needs them.",
         "source": {
           "kind": "war-supply",
           "base": 1,

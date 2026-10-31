@@ -355,10 +355,10 @@ func (s *Sim) warFlip(id content.SystemID) {
 	name := s.warSystemName(id)
 	if to == controlWorks {
 		s.emit(Event{Kind: EvWar, Phase: WarFlip, Severity: SevDanger, System: id,
-			Text: "Fall — " + name + " lost to the Old Works"})
+			Text: "Fall: " + name + " lost to the Old Works"})
 	} else {
 		s.emit(Event{Kind: EvWar, Phase: WarFlip, Severity: SevGood, System: id,
-			Text: "Reclaimed — " + name + " returns to the charter"})
+			Text: "Reclaimed: " + name + " returns to the charter"})
 	}
 	if id == s.systemID {
 		s.warApplyControl(id)
@@ -369,7 +369,7 @@ func (s *Sim) warFlip(id content.SystemID) {
 // more are reported, so quiet stretches stay quiet.
 func (s *Sim) warNewsContest(id content.SystemID, meter float64) {
 	s.emit(Event{Kind: EvWar, Phase: WarContest, Severity: SevInfo, System: id,
-		Value: meter, Text: "Contested — " + s.warSystemName(id) + " holds at " +
+		Value: meter, Text: "Contested: " + s.warSystemName(id) + " holds at " +
 			itoaN(int(math.Round(meter*100))) + "%"})
 }
 
@@ -650,14 +650,14 @@ func (s *Sim) warObserveKill(e, src ecs.Entity, def *content.NpcDef) {
 			if src == s.player {
 				s.emit(Event{Kind: EvWar, Phase: WarKill, Severity: SevGood, Actor: src,
 					Target: e, System: s.systemID,
-					Text: "Kill — Old Works " + def.Name + " destroyed at the front"})
+					Text: "Kill: Old Works " + def.Name + " destroyed at the front"})
 			}
 		}
 	}
 	if side == factionFleets || s.factionOf(src) == factionFleets {
 		s.emit(Event{Kind: EvWar, Phase: WarSkirmish, Severity: SevInfo, Actor: e,
 			Target: src, System: s.systemID,
-			Text: "Skirmish — " + s.nameOf(e) + " destroyed at the front"})
+			Text: "Skirmish: " + s.nameOf(e) + " destroyed at the front"})
 	}
 }
 

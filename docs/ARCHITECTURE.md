@@ -1,4 +1,4 @@
-# Entieve — Architecture
+# Entieve Architecture
 
 > *Entieve* is a single-player 2D space sandbox: a love letter to EVE Online.
 > Top-down star systems, EVE-style ship fitting (high/mid/low slots), shield /
@@ -29,9 +29,9 @@ library. **Unit tests use only the standard `testing` package.**
 | `docstore/`   | Leaf document store (stdlib only, no game imports): the one tolerant reader (`ErrMissing` / `ErrFormat` / `ErrVersion`, versioned or plain documents) and atomic writer (exact `MarshalIndent` bytes → dot-hidden `.<doc>.<random>.tmp` in the same directory, chmod 0644, fsync, rename) for the JSON documents beside a save. Paths, version numbers and migrations stay in `game`. |
 | `format/`     | Leaf display formatters (stdlib only, no game imports): money (`Credits`, the NAMING.md `12,345.67 €` / `50¢` rule), distance (`Dist`, plus the one `AU` constant), thousands grouping (`GroupInt`, `GroupFloat`) and percent (`Pct`). `sim`, `render` and `uikit/theme` all read it; `theme` keeps its exported names as one-line delegates. |
 | `content/`    | Data schema (`model.go`), the station service vocabulary (`services.go`: ids, labels, icons, windows), JSON loading (`load.go`), cross-reference validation (`validate.go`), embedded game data (`data/`). |
-| `sim/`        | The deterministic game simulation: components, commands, events, systems. Headless — never imports Ebitengine. |
+| `sim/`        | The deterministic game simulation: components, commands, events, systems. Headless: never imports Ebitengine. |
 | `render/`     | Draws `sim` state: starfield, grid, ships (vector art), brackets, effects. |
-| `uikit/`      | The UI platform (ebitenui v0.7.3): EVE-style windows — overview, HUD, module rack, selected item, inventory, fitting, manufacturing, refinery, contacts view, starmap, log — plus the Show Info window (`infowin.go`), the flat context menu (`menu.go`) and the icon set (`icons/`). The legacy hand-drawn `ui/` package is retired. |
+| `uikit/`      | The UI platform (ebitenui v0.7.3): EVE-style windows (overview, HUD, module rack, selected item, inventory, fitting, manufacturing, refinery, contacts view, starmap, log) plus the Show Info window (`infowin.go`), the flat context menu (`menu.go`) and the icon set (`icons/`). The legacy hand-drawn `ui/` package is retired. |
 | `game/`       | Ebiten `Game` implementation, scene stack (menu / space / station / starmap), input→`sim` commands, camera, time acceleration, save/load wiring, the manufacturing panel wiring. |
 | `cmd/entieve` | CLI entrypoint: `run` (play), `validate` (content lint), `simulate` (headless run with report), `version`. |
 
@@ -54,7 +54,7 @@ controllability seam*.
   exactly one tick (`1/60 s` of sim time).
 - All randomness goes through `*core.RNG` seeded per `Sim`. Two sims built
   from the same content/world/seed and given the same command sequence must
-  produce identical state — verified by `Sim.Hash()` in tests.
+  produce identical state, verified by `Sim.Hash()` in tests.
 - The client accumulates real time and calls `Step` accordingly; time
   acceleration (1×/2×/4×/8×) simply runs more `Step` calls per frame.
 - No floating-point wall-clock reads anywhere inside `sim`.
@@ -77,7 +77,7 @@ See package docs. Key invariants:
 - `ecs.Store[T]` iterates in **component insertion order** (deterministic).
   `Each` iterates a snapshot: creating/destroying entities mid-iteration is
   safe.
-- `core.RNG` (SplitMix64) is **stable API** — golden tests pin its stream.
+- `core.RNG` (SplitMix64) is **stable API**: golden tests pin its stream.
   `Fork(stream)` derives independent streams (e.g. one per NPC).
 
 ## `content` data schema (`content/model.go`)
@@ -90,9 +90,9 @@ names and prose are canon, not free text: `docs/lore/NAMING.md` binds every
 name (ids stay frozen), money and zone words, and `docs/lore/AESTHETIC.md`
 binds the voice.
 
-### ID registry (authoritative — content files MUST use these IDs)
+### ID registry (authoritative: content files MUST use these IDs)
 
-**Damage types** (EVE-style four): `em`, `thermal`, `kinetic`, `explosive` —
+**Damage types** (EVE-style four): `em`, `thermal`, `kinetic`, `explosive`,
 typed as `content.DamageType` with constants `DmgEM, DmgThermal, DmgKinetic,
 DmgExplosive`. `Damage` is a struct `{EM, Thermal, Kinetic, Explosive float64}`;
 `Resists` is four fractions in `[0,1)`.
@@ -106,15 +106,15 @@ DmgExplosive`. `Damage` is a struct `{EM, Thermal, Kinetic, Explosive float64}`;
 `ore-lucidite` (nixium, zaffrite, vetril), `ore-glacierite` (cryolith, helion).
 Ore defs carry `refine_yield: {"min-ferrite": 0.45, ...}` fractions per m³.
 
-**Ammunition** (`content/data/items/ammo.json`) — six **round families**, one
+**Ammunition** (`content/data/items/ammo.json`): six **round families**, one
 `ammo_class` per family-calibre, four damage profiles per family
 (`emp`/ion EM-biased, `fusion`/high-explosive explosive-biased,
 `ap`/armour-piercing kinetic-biased, `plutonium` thermal-biased). The autocannon families (`small-autocannon`,
 `medium-autocannon`, `large-autocannon`) are the original `ammo-*-s/m/l` ids;
 the artillery families are `ammo-art-<profile>-<size>` (e.g.
-`ammo-art-emp-s`). Every round of a family has the same m³ volume —
+`ammo-art-emp-s`). Every round of a family has the same m³ volume (
 small-autocannon 0.005, small-artillery 0.008, medium-autocannon 0.01,
-medium-artillery 0.025, large-autocannon 0.022, large-artillery 0.033 —
+medium-artillery 0.025, large-autocannon 0.022, large-artillery 0.033),
 so a bay's whole-round count is family-wide. `charge-cap-cell` (0.01 m³) is
 the cap booster's fuel, not gun ammo.
 
@@ -141,7 +141,7 @@ the cap booster's fuel, not gun ammo.
   `mod-armor-rep` (active), `mod-armor-plate` (passive raw HP),
   `mod-resist-coat` (passive resist buff);
 - cap: `mod-cap-booster` (active, burns `charge-cap-cell` from a 0.25 m³
-  cell bay — 25 cells),
+  cell bay, 25 cells),
   `mod-cap-recharger` (passive recharge buff);
 - propulsion: `mod-afterburner` (active speed boost, cap cost);
 - mining: `mod-mining-laser`;
@@ -149,77 +149,77 @@ the cap booster's fuel, not gun ammo.
   (active, blocks target warp).
 
 **NPCs** (`content/data/npcs/rats.json`):
-`npc-rat-scuttler`, `npc-rat-marauder`, `npc-rat-hierarch` — each refs a rat
+`npc-rat-scuttler`, `npc-rat-marauder`, `npc-rat-hierarch`: each refs a rat
 hull, fit, behavior (aggro range, orbit range, flee threshold), bounty, loot
 table. Guard loadouts (`content/data/npcs/guards.json`, prefix
 `npc-guard-`) are non-rat NPCs: zero bounty, no loot table, spawned by the
-traffic system or as a celestial's static spawn group — `npc-guard-patrol`
+traffic system or as a celestial's static spawn group: `npc-guard-patrol`
 (hull `ship-npc-patrol`, registered per patrol hull via `Content.GuardFor`).
 That same prefix classifies them as friendly: `NpcDef.IsGuard` gates the
 aggro state machine, so guards never *initiate* on the player (the
-proximity/intrusion/recent-work triggers are rat-only) — only
+proximity/intrusion/recent-work triggers are rat-only); only
 player-sourced damage turns a patrol hostile. In high security they do
 clear the pirate rats anchored at their own celestial (the belt sweep,
 `sim/system_npc.go` / `sim/system_traffic.go`, pinned by
 `sim/patrol_belt_test.go`): free rats are engaged first, but the sweep
-finishes the belt — a player-touched rat is hunted once it is the last one,
+finishes the belt: a player-touched rat is hunted once it is the last one,
 and stragglers are chased off the anchor.
 
 **Systems** (`content/data/systems/*.json`, one file per system; display
-names are registered in `docs/lore/NAMING.md` — the ids below are frozen):
-- `sys-solace` — **Struvok**, starting system (the Wild Fields,
+names are registered in `docs/lore/NAMING.md`: the ids below are frozen):
+- `sys-solace`: **Struvok**, starting system (the Wild Fields,
   Charter space). Star `cel-solace-star`, planet `cel-solace-prime`,
   station `cel-haven-rest` (Jalvrek; services: repair, market, refine,
   fitting), belt `cel-solace-belt` (ore-sterngrit, ore-cordite), gates
   `cel-gate-penumbra` → `sys-penumbra` and `cel-gate-rudnik` → `sys-rudnik`,
   rat spawns (scuttler), founding market orders on `cel-haven-rest`'s book
   (all player ships + core modules + charges).
-- `sys-rudnik` — **Rydnok**, Charter space, the ring's ore anchor. Station
+- `sys-rudnik`: **Rydnok**, Charter space, the ring's ore anchor. Station
   `cel-halda` (Halžek, mining outpost: market, repair), belt
   `cel-rudnik-belt`, gates → `sys-solace` and `sys-mlynow`.
-- `sys-penumbra` — **Kvonice**, the Fringe junction (NPCs aggressive).
+- `sys-penumbra`: **Kvonice**, the Fringe junction (NPCs aggressive).
   Belt `cel-penumbra-belt` (ore-cordite, ore-lucidite), anomaly
   `cel-penumbra-den` (Gnazvor: marauders + boss hierarch, best loot),
   station `cel-penumbra-port` (Hauvnok, freeport: repair, market, refine,
   fitting, industry; hosts the level-2 contract board), gates → `sys-solace`,
   `sys-gloam`, `sys-mlynow`, `sys-kamieniec`.
-- `sys-mlynow` — **Młondan**, the Fringe. Station `cel-huta` (Hovžan, refinery
+- `sys-mlynow`: **Młondan**, the Fringe. Station `cel-huta` (Hovžan, refinery
   platform: market, refine, industry), belt `cel-mlynow-belt`, gates →
   `sys-rudnik` and `sys-penumbra`.
-- `sys-kamieniec` — **Kamžal**, the Fringe. Station `cel-doki` (Dukšan,
+- `sys-kamieniec`: **Kamžal**, the Fringe. Station `cel-doki` (Dukšan,
   shipyard & depot: market, fitting, industry), belt `cel-kamieniec-belt`,
   gates → `sys-penumbra` and `sys-glusza`.
-- `sys-gloam` — **Pušťov**, Unincorporated dead-end frontier, dangerous.
+- `sys-gloam`: **Pušťov**, Unincorporated dead-end frontier, dangerous.
   Belt `cel-gloam-belt` (ore-glacierite), heavy spawns incl.
   `npc-rat-hierarch`; no station; gates → `sys-penumbra` and `sys-glusza`.
-- `sys-glusza` — **Glůšan**, Unincorporated. Station `cel-kantor` (Kanšev,
+- `sys-glusza`: **Glůšan**, Unincorporated. Station `cel-kantor` (Kanšev,
   freeport: market), belt `cel-glusza-belt`, gates → `sys-kamieniec` and
   `sys-gloam`.
 
 **Universe** (`content/data/universe.json`): region/constellation names,
 system list with starmap positions, `start_system: "sys-solace"`.
 
-**Worlds** (`content/data/worlds/*.json`) — playable scenarios:
-- `world-default` — normal game start (a `ship-sloop`, modest fit/cargo/wallet at
+**Worlds** (`content/data/worlds/*.json`): playable scenarios:
+- `world-default`: normal game start (a `ship-sloop`, modest fit/cargo/wallet at
   `sys-solace` near `cel-haven-rest`).
-- `world-showcase` — **the test world**: exercises *every* feature. Starts
+- `world-showcase` (**the test world**): exercises *every* feature. Starts
   with a `ship-sloop` fitted with one of each module kind, full charge
   stocks, ores + loot in cargo, fat wallet, positioned in `sys-solace` near
   the belt. Its `scenario` block lists feature checkpoints (see
   "Showcase world" below).
 
-**Contacts and offers** (`content/data/contacts/*.json`) — the dock-side
+**Contacts and offers** (`content/data/contacts/*.json`): the dock-side
 mission-givers and their offer pools. A contact is a patron's desk at one
 station (`contact-*`, patron `commission`|`charter`|`corporation`, one
 `min_standing` gate, ≥ 1 offers); each offer (`offer-*`) is an authored
 task in the old contract shape (`kill`/`deliver`/`mine`, objective,
 reward, prose) plus a `source` that tells the sim what to derive it from:
 
-- `stock` — the claim station's requisition stock of an item is below the
+- `stock`: the claim station's requisition stock of an item is below the
   target (the manufacturing/supply/mining orders);
-- `rats` — live Old Works hulls of the objective class work the system
+- `rats`: live Old Works hulls of the objective class work the system
   (the belt cleanups);
-- `war-supply` / `war-clear` — a front's supply gap or an overrun front
+- `war-supply` / `war-clear`: a front's supply gap or an overrun front
   (the Commission's materiel and kill orders).
 
 Offers are derived per evaluation (`sim/contacts.go`), never stored; a
@@ -232,7 +232,7 @@ its `system` field): convoy `routes` (station/gate/belt endpoints;
 `to_system` marks a cross-system lane and the validator checks the gate
 path; hull, cargo item+qty, authored
 `interval_ticks`), an optional
-`patrol` wing (hulls + cadence), and — required in low/null security —
+`patrol` wing (hulls + cadence), and, required in low/null security,
 the `raider` rat class that ambushes convoys (must spawn in that system).
 Cadences and probabilities derive from the system's security through the
 calibration tables in `docs/CONTENT_AUTHORING.md`.
@@ -376,12 +376,12 @@ func (c *Content) GuardFor(hull ShipID) (*NpcDef, bool)       // npc-guard-* loa
 modules, ship hulls in NPC defs, gate destinations both ways, market items,
 loot items, ore refine yields, ammo classes used by weapons, contract rat
 classes / cargo items / stations); traffic route endpoints (station/gate/belt
-kinds — `to_system` lanes must have a gate path to the destination),
+kinds; `to_system` lanes must have a gate path to the destination),
 hulls, cargo items (volume must fit the
 hull), intervals >= 1, non-empty route lists, raider presence for low/null
 security (a rat class spawned in that system), patrol hulls with an
 `npc-guard-*` definition; slot overflow
-in world fits and NPC fits; fittings that break the **fitting limits** — a
+in world fits and NPC fits; fittings that break the **fitting limits**: a
 module whose mount kind/size the hull's racks cannot take, and a fit whose
 per-class grid/cpu demand exceeds the hull's class quotas (see the seam
 below); refine yields outside `[0,1]`; resists outside
@@ -392,11 +392,11 @@ present with a non-empty `scenario`.
 
 Fitting legality is one rule function, not arithmetic: `ShipDef.FitProblem(def,
 fitted)` returns the first rule a module would break alongside the modules
-already fitted — `RuleMount` (a high-slot module needs a free mount of its own
+already fitted: `RuleMount` (a high-slot module needs a free mount of its own
 kind at or above its size) or `RuleGrid`/`RuleCPU` (one unit of its class on
 that axis per module, bounded by the hull's `ClassQuota`). It is the only place
 the rules live: `content/validate.go`'s `checkFit` runs it over every authored
-fit (NPC fits, world starts) and `sim` runs it on both equip paths —
+fit (NPC fits, world starts) and `sim` runs it on both equip paths:
 `execFit` (CmdFitModule, refusal logged as a `SevWarning`) and `buildFitting`
 (load/assemble/stored fits, returning an error). Nothing numeric is stored:
 mounts and quotas live on the defs, and a save carries fitted module ids
@@ -431,10 +431,10 @@ Components (plain structs in `Store[T]`):
 | `Wreck` | `Loot []CargoStack`, `BountyFor` |
 | `Traffic` | convoy hauler leg: origin/dest cel, cargo item+qty, phase, per-leg ambush roll consumed, warp retry time, live `Attack` state (raiders, flee/response clocks, outcome) |
 | `Patrol` | security patrol response state: `idle`/`respond`/`return` + incident hauler handle + warp retry time |
-| `Scannable`? | *(not used — reserved)* |
+| `Scannable`? | *(not used, reserved)* |
 | `Name` | display name string |
 
-Commands (`sim/command.go`) — the AI/player control surface. All player
+Commands (`sim/command.go`): the AI/player control surface. All player
 actions are commands consumed at the start of `Step`:
 
 ```go
@@ -456,12 +456,12 @@ CmdCancelJob{ID uint64} // industry (system 18)
 ```
 (`Target ecs.Entity`; module index = flat slot index within its slot class.
 The two mission commands validate against the docked station's contract
-board — docked check, board check, `min_standing` check — and report
+board (docked check, board check, `min_standing` check) and report
 refusals as `EvMission` phase `"refused"`. The three industry commands ride
 `deferIndustry` to `systemIndustry` and report refusals as `SevWarning`
 "Industry: …" log lines.)
 
-Events (`sim/model.go`) — read via `(*Sim).Events() []Event` (drained each
+Events (`sim/model.go`): read via `(*Sim).Events() []Event` (drained each
 call) or `DrainEvents()`. Kinds: `EvLog` (combat/mining/system log lines
 with severity), `EvDestroyed`, `EvWarp{Phase}`, `EvLooted`, `EvDocked`,
 `EvUndocked`, `EvJumped`, `EvMarket`, `EvModule`, `EvTargetLocked`,
@@ -470,7 +470,7 @@ with severity), `EvDestroyed`, `EvWarp{Phase}`, `EvLooted`, `EvDocked`,
 `"accepted" | "progress" | "ready" | "completed" | "abandoned" | "refused"`
 (ID/Name carry the contract ID and title; Value carries the payout).
 `EvWar{Phase, System, Actor, Target, Item, Value}` reports the war with
-phases `"flip" | "contest" | "supply" | "kill" | "skirmish"` — flips
+phases `"flip" | "contest" | "supply" | "kill" | "skirmish"`: flips
 always, meter moves of 5 % or more, the goods a war bid took, the player's
 front kills and any witnessed fleet skirmish (see `docs/SIM.md` §6).
 `EvTraffic{Phase, System, Cel, Item, Value, Text}` reports the
@@ -507,22 +507,22 @@ func (s *Sim) EffectiveSecurity(content.SystemID) string // authored tier, or "n
 ```
 
 Read model: `(*Sim).Grid() []Info` lists on-grid entities (docked excluded)
-in **entity-handle order**, NOT distance order — it is the name-resolution
+in **entity-handle order**, NOT distance order: it is the name-resolution
 surface for commands and scripts, and distance ordering flips as targets
 circle each other (two rats named "Scuttler" would swap places mid-fight).
 Distance sorting is a presentation concern: the overview sorts its own rows.
 `Restore` works on a private deep copy of the save, so several sims may be
 restored from one `Save` without aliasing its data.
 
-Visibility: `Info.Visible` is presentation state for the UI — true for system
-landmarks (star, planet, moon, station, gate, belt/anomaly markers — kinds
+Visibility: `Info.Visible` is presentation state for the UI: true for system
+landmarks (star, planet, moon, station, gate, belt/anomaly markers, kinds
 `KindStar..KindAnomaly` incl. `KindBelt`) and for everything within
 `SensorRange` (250 km) of the player. Ships, asteroids and wrecks beyond
 sensor range stay hidden from the overview (no system-wide omniscience);
 `Grid()` still returns them for command/script name resolution.
 
 NPC life: idle rats patrol deterministically around their spawn anchor
-(handle-hashed phase — no RNG draws). An NPC aggros when the player enters
+(handle-hashed phase: no RNG draws). An NPC aggros when the player enters
 its effective aggro range, damages it, fires or mines within 30 km of its
 home within 20 s, or comes within 8 km of its home. `SystemDef.Security`
 tempers this: high = 0.4× aggro range and flee at ≥35% structure, low =
@@ -549,7 +549,7 @@ anatomy lives in `docs/SIM.md`):
 15. `mission` (contract accept/abandon against the docked station's board,
     folds kill/ore objective observations, auto-claims ready contracts on
     docking at the claim station → wallet + standing),
-16. `respawn` (funded NPC replacement timers — requisitioned through books
+16. `respawn` (funded NPC replacement timers: requisitioned through books
     and ledgers, see "world metabolism" in `docs/SIM.md`),
 17. `traffic` (the living universe: convoy spawn/warp/deliver schedules,
     real-cargo provenance, per-leg ambush rolls, raider and patrol combat,
@@ -559,7 +559,7 @@ anatomy lives in `docs/SIM.md`):
 19. `agents` (the ledger economy: settle resting fills every tick, the
     agent behavior pass on per-agent cooldowns of 60-600 ticks, the station upkeep cycle every
     3600 ticks),
-20. `war` (the Long Attrition: the hourly contest beat — meters settle and
+20. `war` (the Long Attrition: the hourly contest beat; meters settle and
     flip, the standing war bids refresh against the treasury, fleets look
     for the front; `sim/war.go`, anatomy in `docs/SIM.md` §6).
 
@@ -579,17 +579,17 @@ The **living universe** layer (`systemTraffic`, data in
 `content/data/traffic/`) runs the three interlocking systems the contracts
 economy sits on top of:
 
-- **NPC cargo traffic** — per-system convoy routes spawn haulers
+- **NPC cargo traffic**: per-system convoy routes spawn haulers
   (`ship-npc-hauler`) on security-scaled schedules, fly one-way legs
   through the normal warp profile (align → tunnel → land), deliver cargo
   at station endpoints and despawn at same-system gates/belts. Cargo is
   **sourced at spawn, never conjured**: a station origin withdraws the
   units from that station's own asks (weighted price = cost basis), a belt
   origin draws the persistent belt state, a gate origin is the economy's
-  one sanctioned import (the named world boundary — undebited supply at
+  one sanctioned import (the named world boundary: undebited supply at
   the destination). Cross-system legs (`to_system` lanes) hop gates and
-  **multi-hop journeys exist**: a hauler that crossed a gate — or whose
-  grid was rebuilt under it — parks as a journey (`Save.TrafficJourneys`)
+  **multi-hop journeys exist**: a hauler that crossed a gate, or whose
+  grid was rebuilt under it, parks as a journey (`Save.TrafficJourneys`)
   with its provenance and destination intact, and flies again when its
   system loads next. Live haulers are capped at 6 per system, patrols at
   4; schedules are stateless hashes (no timers to persist). Haulers and
@@ -604,10 +604,10 @@ economy sits on top of:
   (`patrolStation`: even angular slots, hash-varied radius, so a wing holds
   a formation instead of stacking every hull on one point) and fight raiders
   through the normal
-  lock/activate/turret/damage pipeline — NPC-vs-NPC combat reuses the
+  lock/activate/turret/damage pipeline: NPC-vs-NPC combat reuses the
   player pipeline with an explicit activation target (`npcActivate(e, ai,
   target)`); only the *aggro* state machine remains player-centric.
-- **Sporadic attacks** — every convoy tunnel entry in the Fringe or
+- **Sporadic attacks**: every convoy tunnel entry in the Fringe or
   Unincorporated rolls `p = (1-σ)/3` (1-in-6 Kvonice, 1-in-3 Pušťov, 0
   in Charter space); on a
   hit, 1–3 raiders of the system's `raider` rat class drop in mid-leg
@@ -621,7 +621,7 @@ economy sits on top of:
   **escaped** (warps clear and delivers anyway), or **saved** (all
   raiders dead while the hauler lives). Raiding NPCs never queue respawn
   timers against nearby spawn groups.
-- **Order-book pricing** — the per-station order books are the only price
+- **Order-book pricing**: the per-station order books are the only price
   former (the old per-system "market memory" band/decay model is gone).
   A delivery posts the exact units as supply on the destination station's
   book at one tick under `min(cost basis, best ask)`, so arriving supply
@@ -632,15 +632,15 @@ economy sits on top of:
 
 **Determinism**: all living-universe randomness (spawn scatter, ambush
 rolls, raider counts, patrol scatter) draws from a dedicated traffic RNG
-stream forked from the master stream at `New` (`Save.TrafficRNGState`) —
+stream forked from the master stream at `New` (`Save.TrafficRNGState`):
 traffic never consumes the player's combat rolls, so existing seed-pinned
 outcomes are untouched. Hauler legs/ambushes persist as `Traffic`/`Patrol`
 components and `Save.TrafficLeaves` (scheduled raider break-offs); prices
 persist in `Save.Market`.
 
 **Save schema v3** (`Save.Schema` = 3, `saveSchemaV3`; `Restore` accepts and
-migrates v2 in place — `migrateSaveV2ToV3` clears every bay and selection,
-and the bay rule then resolves each gun — and rejects anything older, the
+migrates v2 in place: `migrateSaveV2ToV3` clears every bay and selection,
+and the bay rule then resolves each gun, and rejects anything older, the
 clean break of the per-station market tranche, v0.2.0 era). v3 added the
 round-bay state, which rides the existing fitting runtime instead of a new
 Save field: each `ModuleRuntime` carries `Clip` (`{Item, Qty}` loaded rounds)
@@ -652,7 +652,7 @@ The living-economy fields riding the schema: `Market` / `MarketLasts` /
 counters), `Agents` / `Upkeep` (ledger agents and station upkeep
 ledgers), `TrafficJourneys` (shipments parked between grids), `War` (the
 Long Attrition: per-system control, the front's contest meters and the
-Corporate Fleets' treasury — `omitempty`, old saves initialize to the
+Corporate Fleets' treasury, `omitempty`, old saves initialize to the
 tick-0 map in a war world). All lists
 serialize in canonical order and map keys marshal sorted;
 `Sim.Hash()` is FNV-1a over the full canonical Save JSON
@@ -666,7 +666,7 @@ Saves written before a content-id rename are remapped at restore:
 `content.ItemID` / `ModuleID` / `ShipID` / `RecipeID`, through slices,
 arrays, map values and nested structs) and applies the one registry
 (`content.LegacyIDs`), which is also what `content/validate.go` reads to
-reject retired ids — one list, two consumers. An id remap is not a state
+reject retired ids: one list, two consumers. An id remap is not a state
 change, so it needs no schema bump; `sim/save_migration_test.go`'s
 `TestWalkContentIDsCoversEveryField` materializes the whole type graph and
 fails on any id field the walk cannot reach, so a new id-bearing field is
@@ -712,10 +712,10 @@ Peak recharge ≈ 25% of Capacity. Applied per tick.
 Layer order shield → armor → structure. Each layer has the ship's `Resists`
 (single set applied per layer; modules may add `ResistBonus` per layer).
 Overflow damage carries to the next layer at full value (documented
-simplification of EVE's 50% bleed-through between shield/armor is NOT used —
+simplification of EVE's 50% bleed-through between shield/armor is NOT used;
 keep full carry-over, note it in `docs/GAMEPLAY.md`). Structure ≤ 0 → ship
 dies: the player's escape pod gets clear and the insurer issues a
-replacement — a fresh `ship-sloop` handed over at the last docked station,
+replacement: a fresh `ship-sloop` handed over at the last docked station,
 or the home station in the universe's start system when the current system
 has none (insurance paperwork, not clone tech; `EvDestroyed` is
 emitted, cargo is lost, wallet and hangar keep). NPC → `Wreck` with rolled
@@ -742,7 +742,7 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > entries for the contract changes made by the fragility review:
 >
 > - **Events:** `EvTraffic` gains phase `"saved"` (`TrafficSaved` in the
->   `sim/model.go` registry — the same string as `TrafficOutcomeSaved`),
+>   `sim/model.go` registry: the same string as `TrafficOutcomeSaved`),
 >   emitted exactly once when an ambush resolves with every raider gone and
 >   the hauler alive: `System` = current system, `Cel` = nearest landmark of
 >   the incident, `Item`/`Value` = shipment, `SevGood`, text
@@ -753,7 +753,7 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 >   celestial ID and falls back to the `LastStation` handle for saves written
 >   before the field. `SavedNpcAI` gains `last_hit_by` (`NpcAI.LastHitBy`),
 >   the damage source behind NPC aggro trigger (b).
-> - **Hash:** no degraded fallback — `Hash()` panics (`hashFail`) when the
+> - **Hash:** no degraded fallback: `Hash()` panics (`hashFail`) when the
 >   canonical Save cannot be serialized (non-finite float) instead of
 >   returning a partial-state fingerprint, so twin-run comparisons can never
 >   silently agree on two meaningless hashes.
@@ -762,23 +762,23 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 >   longer sit in `align` forever. Player path unchanged: `CmdWarpTo` still
 >   refuses inside `WarpMinRange` (150 km).
 > - **NPC engagement ownership:** aggro trigger (b) is source-checked
->   (`NpcAI.LastHitBy == s.player` — third-party fire never aggroes an NPC
+>   (`NpcAI.LastHitBy == s.player`: third-party fire never aggroes an NPC
 >   onto the player), and a `PatrolRespond` patrol holds station: the
 >   idle-patrol loop skips it and `patrolRespondStep` stamps `IntentStop`
 >   while it works the incident.
 > - **RNG stream roles:** the master stream is documented (api.go) as exactly
->   two roles — player combat rolls and spawn entropy (asteroid/NPC scatter +
+>   two roles: player combat rolls and spawn entropy (asteroid/NPC scatter +
 >   NPC fork seeds); `sim/rng_roles_test.go` pins its draw set.
 > - **Save completeness check:** `sim/save_completeness_test.go` classifies
 >   every `Sim` field as save-carried / derived / per-Step transient / explicit
->   exception (`events`, `ammoPrefs`, `lastPlayerWork` — the last two reset on
+>   exception (`events`, `ammoPrefs`, `lastPlayerWork`: the last two reset on
 >   restore by design, pinned by `TestRestoreResetsDocumentedPreferences`) and
 >   fails on unclassified fields, unclaimed `Save` fields, or a transient that
 >   survives a Step boundary.
 
 ## `render` / `uikit` / `game` contract
 
-> **Note (2026-10 — warp minimum + typeface).** (1) `sim.WarpMinRange =
+> **Note (2026-10, warp minimum + typeface).** (1) `sim.WarpMinRange =
 > 150_000` m is the exported single source of EVE's warp-engage rule:
 > `CmdWarpTo` refuses a target closer than that *at command time*
 > (command-refusal pattern, `SevWarning` "Target within warp minimum range
@@ -797,16 +797,16 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > `uikit.Scale` (design units → live px; identity at scale 1, which is
 > what the baseline suite pins), and `TypeScale` is scaled once at
 > kit/env build so faces, line heights and measures follow. `Game.Layout`
-> returns the outside size × the device factor — the framebuffer is
+> returns the outside size × the device factor: the framebuffer is
 > device-resolution and text rasterizes at its final size (crisp on
-> HiDPI; never rendered small and upscaled) — while `SetWindowSize` stays
+> HiDPI; never rendered small and upscaled); while `SetWindowSize` stays
 > in window px. ebiten reports cursor positions in those same Layout
 > units, so resize grips, menu rows and `overUI` agree with the scaled
 > chrome by construction. The layout sidecar persists **design units**
 > (÷ scale on write, × scale on read): one arrangement restores at any
 > scale, and a live change round-trips through it (`Game.applyUIScale`)
 > while rebuilding the whole interface against the new scale. World zoom
-> (`zoomBase`) carries the device factor only — scaling the UI never
+> (`zoomBase`) carries the device factor only: scaling the UI never
 > zooms the world.
 
 > **Music seam (2026-10).** The soundtrack is a `game.Music` interface
@@ -815,12 +815,12 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > test, `simulate` and `validate` path) and `realMusic`, built only by
 > `cmdRun` (`game.NewAudio`). The six `.ogg` files stay under
 > `assets/audio/` byte-for-byte and are embedded by the shim beside them
-> (`assets/audio/audio.go`, `//go:embed *.ogg`) — `go:embed` cannot reach
+> (`assets/audio/audio.go`, `//go:embed *.ogg`): `go:embed` cannot reach
 > a parent directory, and releases carry no `assets/` folder.
 > `realMusic` decodes one embedded track at a time with
 > `ebiten/v2/audio/vorbis` (`oggvorbis` is already an ebiten dependency;
 > `hajimehoshi/go-vorbis` is cgo and is never used), creates one
-> `NewPlayerF32` per track and polls `IsPlaying()` in `Tick` to advance —
+> `NewPlayerF32` per track and polls `IsPlaying()` in `Tick` to advance:
 > there is no end-of-stream callback. `Game.Update` ticks the seam on the
 > mainline **before** the title branch, so the title, space and a docked
 > station share one shuffled pool; `Current()`, the volumes and the
@@ -837,7 +837,7 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > Ordering is the pure `trackQueue` (injectable seed; tests pin
 > permutations and no-immediate-repeat), and decode failures skip the
 > track and surface through the `warn` callback (`cmdRun` prints them to
-> stderr) — all six failing leaves the game silent, never broken.
+> stderr): all six failing leaves the game silent, never broken.
 >
 > **UI sounds (2026-10).** The five interaction cues are a `game.UISound`
 > interface (`game/uisound.go`) with the same two-implementation rule: a
@@ -845,7 +845,7 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > `realUISound`, built only on the run path. Both real channels come from
 > **one factory**, `game.NewAudio(seed, warn)` in `cmdRun`: it returns the
 > music engine and the cue players over the *same* `audioCtx()`
-> (`sync.Once`) context — two independent factories would risk the
+> (`sync.Once`) context: two independent factories would risk the
 > once-per-process `NewContext` panic the music seam already guards.
 > `realUISound` decodes each `assets/sfx/*.wav` to PCM bytes once
 > (`ebiten/v2/audio/wav`, 16-bit; a differing rate is resampled to the
@@ -856,7 +856,7 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > fires `click` on a press edge that lands on `overUI` (one helper,
 > `Game.uiClick`), the `ScreenHost` fires `open`/`close` from its mount
 > and unmount edges (`onMount`/`onUnmount`, set by `Game.wireUISounds` on
-> both hosts — the game's and the title's), and `Game.Do`'s quantity
+> both hosts, the game's and the title's), and `Game.Do`'s quantity
 > intents plus the verbs that land (save-as, a keybind assignment, the
 > save-manager load/delete, the two resets) fire `confirm`; the
 > keybindings refusals fire `refuse`. Kit-level one-offs that never mount
@@ -866,7 +866,7 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > **ebitenui v0.7.3** (pinned in go.mod); the legacy hand-drawn `ui/` package
 > is retired (golden-value tests pin the EVE-dark palette and type scale).
 > Two upstream gaps shape the layer: `widget.List` cannot do columns,
-> per-row styling, or scroll introspection — so data tables use
+> per-row styling, or scroll introspection: so data tables use
 > `widget.ScrollContainer` + per-row containers (we own the scroll
 > instance); custom graphics (HUD arcs, starmap) render into `*ebiten.Image`
 > shown via `widget.Graphic`. `uikit.Env` + `Panel`/`WindowPanel` are the
@@ -876,22 +876,22 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > `sim`/`content`/`script` and the showcase suite are unaffected by the UI
 > layer.
 
-> **Note (2026-10 — upstream window-remount leak, documented not
+> **Note (2026-10, upstream window-remount leak, documented not
 > "fixed"):** every `Kit.AddWindow` goes through ebitenui v0.7.3's
 > `UI.AddWindowQuietly` (`ui.go`), and `removeWindow` undoes none of what
 > it registers. Two things accumulate per mount cycle (measured in a
 > 20k-cycle kit mount/unmount loop, `HeapInuse` after GC): (1) the four
-> window event handlers `AddWindowQuietly` adds — context menu, focus,
-> tooltip, drag-and-drop — whose `RemoveHandlerFunc`s upstream drops,
+> window event handlers `AddWindowQuietly` adds: context menu, focus,
+> tooltip, drag-and-drop, whose `RemoveHandlerFunc`s upstream drops,
 > ~0.2 KB/cycle; and (2) the big one:
 > `addWindow` calls `Container.Validate()`, which re-runs
-> `Button.initWidget()` for every button in the window on **every mount**
-> — a fresh internal container per button, re-adding the (persistent)
+> `Button.initWidget()` for every button in the window on **every mount**:
+> a fresh internal container per button, re-adding the (persistent)
 > text/graphic children, whose `addChildInit` registers four more child
-> event handlers each time — and those handler closures keep every
+> event handlers each time, and those handler closures keep every
 > generation's container alive. Net: **≈5.3 KB leaked per mount cycle**
 > (~19 MB/hour at one dock/toggle per second; single-digit MB per heavy
-> play-day). The handlers are idempotent, so this is memory only — no
+> play-day). The handlers are idempotent, so this is memory only: no
 > behavioural drift. Not mitigated on purpose: keeping a closed panel
 > mounted-but-hidden would change visible semantics (a hidden window
 > keeps its rect and would keep gating world input in `overUI`, and mount
@@ -901,7 +901,7 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > steady-state heap, not this toggle-paced line.
 
 > **Icon set (2026-10):** `uikit/icons/` embeds the interface's monochrome
-> glyph set — 512×512 transparent renders from
+> glyph set: 512×512 transparent renders from
 > [game-icons.net](https://game-icons.net) (**CC BY 3.0**: every icon keeps
 > its author credit, `uikit/icons/CREDITS.md`, machine-readable in
 > `manifest.json` + `uikit/icons/icons_test.go`). `icons.Get(name, size,
@@ -909,11 +909,11 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > into a fixed square box on the 16/20/24 size grid with the manifest's
 > optional optical `nudge`, tints it from the palette role and caches per
 > name+size+tint; art-mode entries (`"mode":"art"`, the five module renders)
-> are drawn full-colour as-is — no flattening, no tint, cached per name+size —
+> are drawn full-colour as-is (no flattening, no tint, cached per name+size)
 > and are CC0 (the glyph set stays CC BY 3.0); unknown names resolve to the
 > neutral gear (`icons.Fallback`), never a missing-image artifact.
 > `theme.ModuleIconFor(def)` is the module-icon rule: a `content` module's
-> `icon` key when the registry knows it, else its class glyph — every
+> `icon` key when the registry knows it, else its class glyph: every
 > module-specific surface (fitting/rack tiles, hangar rows, Show Info module
 > header, module tooltip, market module rows) goes through it, so a bad key
 > degrades to the glyph. `theme.HullIconFor(def)` is the hull-icon rule: the
@@ -924,7 +924,7 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > manufacturing, refinery, the Show Info link rows and its hull hero all read
 > it, so one id cannot resolve two ways. The widget surface that grew with it:
 > `TableRow.Icons`/`TableRow.IconTint`/`TableRow.IconSize` (icon box + label
-> cells in left-aligned columns — `IconSize` 0 is the 16 px `IconInline`, the
+> cells in left-aligned columns: `IconSize` 0 is the 16 px `IconInline`, the
 > market rows set 20, and the width reservation/ellipsize budget follow it;
 > right-aligned numeric anchors are untouched),
 > `uikit.NewTitleBar(env, label, icon)` (leading 24 px title-bar glyph),
@@ -937,7 +937,7 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > slot/hangar rows, contract board rows, service title bars, module-rack
 > tiles.
 
-> **Window titles (2026-10):** a title bar carries no live state — every
+> **Window titles (2026-10):** a title bar carries no live state: every
 > window passes its base display name (`Market`, `Manufacturing`,
 > `Quantity`, `Order`, `Info`, `Fitting`) and never composes a runtime
 > suffix. The figures the old suffixes repeated live in the bodies (the
@@ -945,9 +945,9 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > deliberate loss is the market's fee schedule, which had no other surface
 > and is documented in GAMEPLAY instead. `theme.NewTitleBar` binds its
 > `theme.ChromeText` to the bar, and `ChromeText.Shown` ellipsizes the
-> drawn form against the bar's safe width — from the label's own start
+> drawn form against the bar's safe width: from the label's own start
 > (clear of the dots and leading icon) to the end-anchored chrome, i.e. the
-> `×` — so even a long or retitled label can never paint under the close
+> `×`; so even a long or retitled label can never paint under the close
 > button or out of the window; the fit case draws verbatim, and
 > `theme.Ellipsize` is the one implementation (`widgets.Ellipsize`
 > delegates). The retitle mechanism stays: setting `Label` still asks for
@@ -960,9 +960,9 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > window (titled `Info`, body headed with the name) with per-kind content builders (hull / module /
 > item / machine caste); item references inside the window are themselves
 > right-clickable (Show Info swaps the window's content). Content schema
-> gains `NpcDef.Description` (dossier prose — the window is its first UI
+> gains `NpcDef.Description` (dossier prose: the window is its first UI
 > consumer) and `ShipDef.Origin` (naming-layer heritage tag). The layout
-> sidecar's `"infowin"` entry is geometry only — the rect is persisted but
+> sidecar's `"infowin"` entry is geometry only: the rect is persisted but
 > the window is never restored open. Its mount, raise and close ride the
 > kit's one dialog lifecycle (`screens/kitdialog.go`, CONTEXT.md "Dialog"),
 > shared with the order mini-window and the quantity picker. The popup is
@@ -971,23 +971,23 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > are `Game.overUI`'s (`Kit.Own`'s popup layer, so a click over the popup can
 > never reach world input, and neither can any click on a frame the popup
 > holds), and the press itself is spent on the popup for the rest of the
-> frame — `Kit.Update` still advances ebitenui's cached input while it skips
+> frame; `Kit.Update` still advances ebitenui's cached input while it skips
 > `ui.Update`, and `Menu.Click`/`Esc` spend the pointer frame's press
-> (`Pointer.Spend`) until the next `Begin` — so no widget, table row,
+> (`Pointer.Spend`) until the next `Begin`, so no widget, table row,
 > starmap node or slider under the popup sees the gesture either.
 >
 > **One hit test (2026-10, wave 5):** every "does the interface own this
 > point?" question now asks `Kit.Own(pt)` (`screens/hittest.go`, CONTEXT.md
 > "Hit test") instead of keeping its own copy of the layering. It answers
-> `Owner{Layer, Window, Control}` — popup latch, popup rect, a visible
+> `Owner{Layer, Window, Control}`: popup latch, popup rect, a visible
 > **modal** window (its input layer is fullscreen, so nothing below it is
 > owned, which is also what stops a raise through it), the rail, the window
 > stack topmost first, the HUD/rack's **descendants only** (their container
 > stretches over the whole screen), and last ebitenui's hover flag (gates,
 > never raises). The world gate (`Game.overUI`) is layer ≠ World, the click
 > cue (`Game.uiClick` → `Kit.PressTarget`) is `Control`, and the window
-> raise is a press edge whose owner is a window that is not the stack top —
-> so paint order, input order and the gate can no longer disagree. A
+> raise is a press edge whose owner is a window that is not the stack top.
+> Paint order, input order and the gate can no longer disagree. A
 > window's table rows join the walk through `Kit.SetWindowRows`, registered
 > by `ScreenHost` at mount (a live closure over `Tables(id)`, so a table
 > swap is seen) and by the Kit for the built-in Overview; the old per-window
@@ -997,24 +997,24 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > a press that just dismisses the popup stays silent.
 
 > **Split panes (2026-10):** a multi-pane window divides its leftover
-> height — or width — by **ratio**, not ebitenui's equal `GridLayout`
+> height, or width, by **ratio**, not ebitenui's equal `GridLayout`
 > shares, which have no weights. `widgets.SplitPane` is a stack
 > (`NewSplitPane`) or a row (`NewSplitPaneRow`) with a draggable seam
 > between each pair: its own `Layouter` (so no upstream change), a
-> recessed 4 px track seam — a dark fill edged with the border color and a
+> recessed 4 px track seam: a dark fill edged with the border color and a
 > centred three-dot sash grip, dim at rest and lit while the pointer is in
-> the band or dragging — with an 8 px grab band classified from the cursor
+> the band or dragging, with an 8 px grab band classified from the cursor
 > every frame (the window chrome's `gripStart` idiom and its topmost-input-layer
 > test, so a seam under another window is inert), an NS-resize cursor over
 > a stack and EW over a row, and a 72 design-px pane floor. The cursor has
 > one writer: ebitenui's cursor management is off (`Kit`), seams and the
-> window grips only claim a shape on the frame (`Pointer.ClaimShape` —
+> window grips only claim a shape on the frame (`Pointer.ClaimShape`:
 > chrome steps last, so a grip outranks a seam; the chrome also re-claims
 > inside Draw) and `Pointer.Apply` at the end of `Kit.Draw` makes the
 > frame's single OS write. A claim belongs to the frame, not the draw: the
 > host's `Begin` on the first line of `Game.Update` takes the frame's one
 > sample, so a draw-only frame (ebiten draws every display frame, updates
-> only ~60/s — on a fast display half the draws have no tick) repeats the
+> only ~60/s; on a fast display half the draws have no tick) repeats the
 > frame's decision instead of falling back to the arrow. A host that never
 > begins a frame (the `uitest` pump) reads no press and repeats the last
 > claim. Two writers per frame
@@ -1022,32 +1022,32 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > names its seams (`Inventory.Splits`, `Fitting.Splits`,
 > `Manufacturing.Splits`, `Market.Splits` → `widgets.Seam`) and the layout
 > sidecar persists them in the version-3 `splits` map (name → the fraction
-> of the stack before that seam — above in a stack, left of it in a row;
+> of the stack before that seam: above in a stack, left of it in a row;
 > equal shares when a seam is absent, or the panel's own opening share when
-> it sets one, as the market does). Version-2 sidecars still load — they
+> it sets one, as the market does). Version-2 sidecars still load: they
 > carry no ratios, so every seam starts at its default and the next write
 > is v3. Wired: Inventory (cargo/ore, ore/hangar), Fitting
 > (slots/hangar), Manufacturing (recipes/jobs), Market (browse tree /
-> catalog / My orders — two seams, `market-tree` and `market-orders`: 176 px
+> catalog / My orders, two seams (`market-tree` and `market-orders`): 176 px
 > of browse and the old fixed 240 px column are their opening shares of the
 > 760×560 landing rect; the pane floor is `SplitMinPane`).
 
-> **Table columns (2026-10 — frozen bases, two layout policies).** Every
+> **Table columns (2026-10, frozen bases, two layout policies).** Every
 > `widgets.Table` runs ONE layout pass (`Table.applyWidths` →
 > `layoutColumns`); the header buttons, grip strips and row cells are all
 > derived from that result (`layoutCells`/`headerLayout` anchor on the same
 > `colOffsets` tiling), so no other site computes a column width. Two
 > policies are kept apart on purpose. **(1) First fit:** the first fit with a
-> width and rows measures the content once and freezes it — the pre-freeze
+> width and rows measures the content once and freezes it: the pre-freeze
 > elastic fit, unchanged (content widths, surplus to the lowest-Priority grow
-> column, Priority shrink toward the header floors) — so every default frame
+> column, Priority shrink toward the header floors), so every default frame
 > stays byte-identical and the result IS each column's base; the bases never
 > re-measure, so a cell growing mid-warp or the sort arrow moving only
 > ellipsizes. **(2) Every later layout** (table resize, visibility change,
 > stored pref): the table's width is distributed over the frozen bases
-> **proportionally** — the ratios hold, so a column the player made smaller
+> **proportionally**: the ratios hold, so a column the player made smaller
 > stays smaller and freed width spreads over the others, the rows still
-> tiling exactly — and a table narrower than the bases gives width back in
+> tiling exactly; and a table narrower than the bases gives width back in
 > Priority order toward the floors, unchanged. A table resize adopts the new
 > tiling as the base, and a grip press does the same (`adoptWidths`): a drag
 > must edit the widths the player sees, or the surplus/shrink lives outside
@@ -1055,10 +1055,10 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > content changes and visibility toggles never adopt, so a hidden column
 > keeps its base width and restores it when shown. Header chrome: a 6
 > design-px grip strip (`colGripW`) only on a boundary two visible columns
-> share (the last visible column has no grip — that edge is the table's), and
+> share (the last visible column has no grip: that edge is the table's), and
 > the ⋯ button owns its own 22 px strip (`ColMenuW`) at the header's right
-> end, so no column tiles or paints under it. Per-column state — the width
-> and the hidden flag — persists in the layout sidecar's `tables` map in
+> end, so no column tiles or paints under it. Per-column state (the width
+> and the hidden flag) persists in the layout sidecar's `tables` map in
 > design units (`widgets.ColumnPref`).
 
 > **Market tree and search (2026-10):** the market's browse pane renders
@@ -1071,7 +1071,7 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > Result rows are rich stack rows whose name is split into accent-tinted
 > runs at `Match.MatchedIndexes`; the plain table grew
 > `TableRow.CellRuns` for the dim `· N more` cross-station Qty suffix
-> (read through the existing `BookOrders`/`StationName`/`Defs` seams — no
+> (read through the existing `BookOrders`/`StationName`/`Defs` seams: no
 > new seam). The search `TextInput` is the second typing surface:
 > `game.handleKeys` yields world keys while `Market.SearchFocused()` and
 > routes the arrows/Enter/two-step Esc through `Market.SearchKey`;
@@ -1081,26 +1081,26 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 
 The chrome is a set of derivations, each with **one owner**; the notes above
 are the change log, this is the index. [ART.md](ART.md) carries the visual
-canon (form language, radii table, dot/depth anatomy, tooltip anatomy) — this
+canon (form language, radii table, dot/depth anatomy, tooltip anatomy): this
 map only says where each thing derives from.
 
 | Concern | Owner | Contract |
 |---|---|---|
-| Generator families | `uikit/theme/round.go` | One rasteriser behind `Bordered` (control, 5 px, flat), `PanelBox` (panel, 8 px, depth), `WindowTitleBox` (top corners only) + `WindowBodyBox` (bottom corners only, depth) — the two window pieces — `BandedBox` (control radii, fill starts under a plate band) and `Rounded` (explicit per-corner radii; square = zero). `SquareBox` is the square strip — no corner arc, flat hairline edge — for thin chrome (the game-built menu body, the title windows' scroll backs, the contacts view's body and row backs); it rides ebitenui's bordered colour so those strips keep their pinned pixels. A screen asks for a **piece**, never a radius outside `Rounded`. |
-| Title bars | `theme.NewTitleBar` (`uikit/theme/iconmap.go`) | The one bar: ring dots, an optional 24 px leading icon, then the tracked `ChromeText` title bound to the bar (a title longer than the window ellipsizes clear of the ×). Every window asks for it — the uikit panels, the Overview and Selected Item core windows, the game's Esc menu and the title phase's save manager (via `Game.titleBar`) — and nothing hand-builds a bar. |
-| Radius / depth / dots / tracking tokens | `theme/round.go`, `theme/dots.go`, `theme/tracked.go` | `RadiusWindow/Panel/Control` are design px through `Px`; `depthRows` is the ramp's source resolution (the nine-slice centre row stretches it); `PanelTop`/`PanelBottom` are the ramp's ends derived from the body colour; `TitleDot*` the ring mark; `trackEm` the 0.12 em chrome tracking. One home each — no call site re-types them. |
+| Generator families | `uikit/theme/round.go` | One rasteriser behind `Bordered` (control, 5 px, flat), `PanelBox` (panel, 8 px, depth), `WindowTitleBox` (top corners only) + `WindowBodyBox` (bottom corners only, depth), the two window pieces, `BandedBox` (control radii, fill starts under a plate band) and `Rounded` (explicit per-corner radii; square = zero). `SquareBox` is the square strip (no corner arc, flat hairline edge) for thin chrome (the game-built menu body, the title windows' scroll backs, the contacts view's body and row backs); it rides ebitenui's bordered colour so those strips keep their pinned pixels. A screen asks for a **piece**, never a radius outside `Rounded`. |
+| Title bars | `theme.NewTitleBar` (`uikit/theme/iconmap.go`) | The one bar: ring dots, an optional 24 px leading icon, then the tracked `ChromeText` title bound to the bar (a title longer than the window ellipsizes clear of the ×). Every window asks for it: the uikit panels, the Overview and Selected Item core windows, the game's Esc menu and the title phase's save manager (via `Game.titleBar`), and nothing hand-builds a bar. |
+| Radius / depth / dots / tracking tokens | `theme/round.go`, `theme/dots.go`, `theme/tracked.go` | `RadiusWindow/Panel/Control` are design px through `Px`; `depthRows` is the ramp's source resolution (the nine-slice centre row stretches it); `PanelTop`/`PanelBottom` are the ramp's ends derived from the body colour; `TitleDot*` the ring mark; `trackEm` the 0.12 em chrome tracking. One home each: no call site re-types them. |
 | Tracked chrome labels | `theme/tracked.go` | `ChromeText` (widget), `DrawTracked` (hand-drawn) and `MeasureTracked` are the only tracking path; body/row text stays untracked Sans. A tracked label measures with the same step it draws. |
 | Table columns | `widgets/columns.go` + `table.go` | One layout pass (`applyWidths` → `layoutColumns`) owns every width; header buttons, grips, the ⋯ strip (`ColMenuW`) and row cells all derive from `colOffsets`. Frozen bases + proportional later layouts (the "Table columns" note above). |
 | Plate band | `screens/winheader.go` + `widgets.PlateBand` | Two halves of one boundary: the window wrapper paints panel → plate → body (draw order), and the table's viewport drops its fill under the band (`plateFillTop`). Both are paint-only: no width, rect or scroll offset moves. |
-| Slider family | `widgets/slider.go` | One widget, two value models: **freeflow** (a min/max range quantised only by its Step — the settings Master/Music volumes, 1% steps) and **notched** (a snap-to ladder with one dim tick per rung and the handle resting exactly on them — the six-rung UI scale). The widget is a `PreferredSizeLocateableWidget` painted with palette roles and theme tokens (rounded track with accent fill, dim ticks, handle), so it needs no ebitenui theme images. Input is the pane-seam discipline: the panel's `Sync` calls `Poll(p)`, which reads the host's pointer frame; a press grabs only inside the 24 design-px hit band on the widget's own active input layer (a covered slider is inert), a held grab follows the absolute cursor x with a 24 px band even where the track is thinner, and release drops it. `OnChange` streams the live value (the settings volumes apply it at the music seam; the scale host applies a rung and rebuilds the interface, after which the replacement slider starts idle); `OnRelease` is the single persist point. |
+| Slider family | `widgets/slider.go` | One widget, two value models: **freeflow** (a min/max range quantised only by its Step: the settings Master/Music volumes, 1% steps) and **notched** (a snap-to ladder with one dim tick per rung and the handle resting exactly on them: the six-rung UI scale). The widget is a `PreferredSizeLocateableWidget` painted with palette roles and theme tokens (rounded track with accent fill, dim ticks, handle), so it needs no ebitenui theme images. Input is the pane-seam discipline: the panel's `Sync` calls `Poll(p)`, which reads the host's pointer frame; a press grabs only inside the 24 design-px hit band on the widget's own active input layer (a covered slider is inert), a held grab follows the absolute cursor x with a 24 px band even where the track is thinner, and release drops it. `OnChange` streams the live value (the settings volumes apply it at the music seam; the scale host applies a rung and rebuilds the interface, after which the replacement slider starts idle); `OnRelease` is the single persist point. |
 
-| Button / cell states | `theme/theme.go` (`HouseButton`, `CellImage`) | One five-state recipe for house controls (`HouseButton`: theme buttons/tabs/combo buttons, the table header — which swaps in its own idle and, when sorted, its accent states — and the slider handle keeps its own two states) and one for cells (`CellImage(p, highlighted)`: the lit idle is the rack's running module, the rail's open entry and the fitting grid's fitted slot; the quiet one is the services strip and a closed rail entry). A caller names the state set, never a `widget.ButtonImage` recipe of its own. |
+| Button / cell states | `theme/theme.go` (`HouseButton`, `CellImage`) | One five-state recipe for house controls (`HouseButton`: theme buttons/tabs/combo buttons, the table header, which swaps in its own idle and, when sorted, its accent states, and the slider handle keeps its own two states) and one for cells (`CellImage(p, highlighted)`: the lit idle is the rack's running module, the rail's open entry and the fitting grid's fitted slot; the quiet one is the services strip and a closed rail entry). A caller names the state set, never a `widget.ButtonImage` recipe of its own. |
 | Rack badge / ready marker | `screens/rack.go` | The waiting dot is one of `rackBadgePhases` pre-rendered images, swapped by pointer once per `rackBadgeTicks` (deterministic frame count, no per-frame Clear); the ready marker is a static overlay in the tile's other corner; the cycle ring is drawn under both. Both overlays are visibility-flipped, never rebuilt. |
-| Quantity picker | `screens/qtypicker.go` + `screens/env.go` + `screens/kit.go` | The one replacement for every −/+ ticker. The popup is a session **service** (like the menu and Show Info), so a bare `NewEnv` and a `Kit` share one instance and one per-mode memory of the last confirmed value; panels never hold it — they emit the host-owned `widgets.QtyPick{Mode, Item, Recipe, From, To}` intent through the sink, which the Kit's `RunIntent` (or a bare session's wrapped sink) turns into `Session.OpenQty`. `Kit.OpenQty` mounts the window on first open, centres it on the root overlay and raises it; `Kit.CloseQty` unmounts and hides, so Cancel, Esc, `×` and Confirm all end in the same idempotent place. That is the kit's one **dialog** lifecycle (`screens/kitdialog.go`, Kit-internal): Show Info, the order mini-window and the picker all go through `newDialog` (the single `×` registration) + `showDialog` (re-target, optional `place`, then remove + re-add on top with `animate=false` — a launch on the open window never restarts the fade, and a launch during a close fade drops the pending unmount) + `closeDialog` (idempotent unmount + hide). Only the picker sets `place` (it centres on every show); a re-target of Show Info or the order window never moves it. The window is **modal** (ebitenui's fullscreen input layer: a click outside cannot reach the window beneath) and its slider is the house `widgets.Slider` polled from `Kit.Sync` — the refinery's notched whole-batch ladder, everything else freeflow 1..100. Esc is the one key it consumes, read in `Kit.MenuInput`/`Kit.Update` (`pickPoll`) ahead of any window close, so the host's Esc-menu latch already owns that frame. Confirm emits the surface's existing intent (`Refine`, `StartJob`, `Buy`, `Sell`, `Transfer`) — no new sim command, no new payload |
+| Quantity picker | `screens/qtypicker.go` + `screens/env.go` + `screens/kit.go` | The one replacement for every −/+ ticker. The popup is a session **service** (like the menu and Show Info), so a bare `NewEnv` and a `Kit` share one instance and one per-mode memory of the last confirmed value; panels never hold it: they emit the host-owned `widgets.QtyPick{Mode, Item, Recipe, From, To}` intent through the sink, which the Kit's `RunIntent` (or a bare session's wrapped sink) turns into `Session.OpenQty`. `Kit.OpenQty` mounts the window on first open, centres it on the root overlay and raises it; `Kit.CloseQty` unmounts and hides, so Cancel, Esc, `×` and Confirm all end in the same idempotent place. That is the kit's one **dialog** lifecycle (`screens/kitdialog.go`, Kit-internal): Show Info, the order mini-window and the picker all go through `newDialog` (the single `×` registration) + `showDialog` (re-target, optional `place`, then remove + re-add on top with `animate=false`: a launch on the open window never restarts the fade, and a launch during a close fade drops the pending unmount) + `closeDialog` (idempotent unmount + hide). Only the picker sets `place` (it centres on every show); a re-target of Show Info or the order window never moves it. The window is **modal** (ebitenui's fullscreen input layer: a click outside cannot reach the window beneath) and its slider is the house `widgets.Slider` polled from `Kit.Sync`: the refinery's notched whole-batch ladder, everything else freeflow 1..100. Esc is the one key it consumes, read in `Kit.MenuInput`/`Kit.Update` (`pickPoll`) ahead of any window close, so the host's Esc-menu latch already owns that frame. Confirm emits the surface's existing intent (`Refine`, `StartJob`, `Buy`, `Sell`, `Transfer`): no new sim command, no new payload |
 | Menu latch | `widgets/menu.go` + `screens/kit.go` | The **consumed-gesture latch**: `Menu.Click/Esc` set it, `Menu.Poll` reads it (one gesture, one action per frame), `Kit.Update` clears it via `Menu.TakeBlocked` and skips `ui.Update` that frame. Contract documented on `Menu`. |
-| Clip seam | `sim/api.go` (`ClipState`) | The bay as the UI reads it: loaded rounds, capacity for the reference shell, selection/options, `Loading`, plus the derived bay spec `BayM3`/`CycleSeconds` (recomputed per call from `sim/clips.go`'s privates — never persisted). The rack's waiting dot, ready marker and tooltip bay row read this one state; the cycle ring reads the module runtime. |
-| Screen host | `game/screenhost.go` + `game/screens.go` | One row (frozen id = the layout-sidecar key), one built panel. The host owns the mount order (spec order), the same-frame mount Sync, the × `Dismissed` hook — committed chrome close only, so a hotkey unmount keeps session folds — and the layout entry (geometry always; splits/tables only when the panel implements the facet). A panel implementing `Fitted` (`FitSize() (w, h)` in DESIGN units) is fitted after every mount Sync and every frame Sync: the host mirrors the floor onto the window's `MinSize` and composes the row's declared column through `Place`, never `SetLocation` — a player-moved window keeps its position (the **Contacts view** is the one fitted row). Two instances: the game host and the title host (lazy, exclusive, fresh on reopen, never persisted). The owner's close hook (`screenServices.Close`) rides only the game host — its modals close through their scene; the title host's rows close by a plain toggle on its own flag. |
-| Title phase | `game/title.go` + `Options.StartInTitle` | The boot menu (wordmark, New game / Continue / Save manager / Settings / Keybindings / Credits / Quit) and its **scene-owned** window set: one Screen host over one title table (`titleRows` — the transient save manager, the `InTitle` rows (Settings, Keybindings) and the transient credits), so the menu rows, the live key bindings and every × drive the same open flags; the title-only rows are transient, modal and unkeyed, and never enter the game table, the KeyMap, the layout sidecar or the rail. The phase freezes the sim, applies one chrome rule (HUD/rack/core follow space, rail follows gameplay; panels unmounted) and leaves through one reconcile (`leaveTitle`, which never touches the player's open flags). Save plumbing (`SaveAs`, the save list, the active save path) lives here; the sim format is untouched. |
+| Clip seam | `sim/api.go` (`ClipState`) | The bay as the UI reads it: loaded rounds, capacity for the reference shell, selection/options, `Loading`, plus the derived bay spec `BayM3`/`CycleSeconds` (recomputed per call from `sim/clips.go`'s privates; never persisted). The rack's waiting dot, ready marker and tooltip bay row read this one state; the cycle ring reads the module runtime. |
+| Screen host | `game/screenhost.go` + `game/screens.go` | One row (frozen id = the layout-sidecar key), one built panel. The host owns the mount order (spec order), the same-frame mount Sync, the × `Dismissed` hook (committed chrome close only, so a hotkey unmount keeps session folds) and the layout entry (geometry always; splits/tables only when the panel implements the facet). A panel implementing `Fitted` (`FitSize() (w, h)` in DESIGN units) is fitted after every mount Sync and every frame Sync: the host mirrors the floor onto the window's `MinSize` and composes the row's declared column through `Place`, never `SetLocation`: a player-moved window keeps its position (the **Contacts view** is the one fitted row). Two instances: the game host and the title host (lazy, exclusive, fresh on reopen, never persisted). The owner's close hook (`screenServices.Close`) rides only the game host: its modals close through their scene; the title host's rows close by a plain toggle on its own flag. |
+| Title phase | `game/title.go` + `Options.StartInTitle` | The boot menu (wordmark, New game / Continue / Save manager / Settings / Keybindings / Credits / Quit) and its **scene-owned** window set: one Screen host over one title table (`titleRows`: the transient save manager, the `InTitle` rows (Settings, Keybindings) and the transient credits), so the menu rows, the live key bindings and every × drive the same open flags; the title-only rows are transient, modal and unkeyed, and never enter the game table, the KeyMap, the layout sidecar or the rail. The phase freezes the sim, applies one chrome rule (HUD/rack/core follow space, rail follows gameplay; panels unmounted) and leaves through one reconcile (`leaveTitle`, which never touches the player's open flags). Save plumbing (`SaveAs`, the save list, the active save path) lives here; the sim format is untouched. |
 
 Rules that keep it one system: a screen names a piece or a token, never a
 literal radius/alpha of its own; anything measured is measured by the same
@@ -1117,7 +1117,7 @@ through `sim`'s read side rather than re-derived in `uikit`.
   muzzle→target beam), wreck icons.
 - `uikit` widgets are pure layout+input over `*sim.Sim` state; window chrome
   EVE-dark (near-black panels, amber/white text, mono-ish gofont).
-  Windows: Overview (table: icon, name, distance, velocity — sortable),
+  Windows: Overview (table: icon, name, distance, velocity, sortable),
   Selected Item (actions: approach/orbit/warp/lock/dock/jump/loot), HUD
   (shield/armor/structure arcs, capacitor bar, speed, targeting list),
   Module rack (high/mid/low rows, F1–F8 activates high, deactivated state
@@ -1127,7 +1127,7 @@ through `sim`'s read side rather than re-derived in `uikit`.
   Manufacturing (jobs, fees, three global slots, craft levels and material
   counts at a docked `industry` station), Refinery (whole 100-ore batch
   ore→mineral yield preview at a `refine` station), Station services (repair/market/refine/
-  fitting tabs), Starmap (system graph, current system highlighted —
+  fitting tabs), Starmap (system graph, current system highlighted:
   click selects, gates are used in-system), Log (event feed).
 - `game`: scene stack. Space scene is the hub. `Options.StartInTitle`
   (set by `entieve run` when `--load` is absent) opens a **title phase**
@@ -1141,15 +1141,15 @@ through `sim`'s read side rather than re-derived in `uikit`.
   rows are composed, not written: the declaration tables (`worldKeyMap`,
   the Screen spec's `Key`/`Shift`/`Desc`) hold the description only and
   `keyMapRow` puts the chord in front with the one `chordOf` formatter, so
-  no hint string can go stale on its own — the rendered chord comes from
+  no hint string can go stale on its own: the rendered chord comes from
   the session's live bindings through `game/keyhints.go` (`Chord`/`Desc`/
   `Hint`), which the rail tooltip (`RailEntry.Hint`), the keybindings chips
   and the settings footer (`SettingsActions.CloseHint`) also read. The
   input seam has two layers: the **fixed chord layer** (Esc menu, `Ctrl+S`,
   `Ctrl+F`, `F9`, `[` `]` `-` `=`) is matched literally in
   `handleKeys` and answered literally by `keyHints`, and the **data
-  layer** — the Screen rows' toggles and the
-  world commands — resolves `(key, shift)` through the session's live
+  layer**, the Screen rows' toggles and the
+  world commands, resolves `(key, shift)` through the session's live
   bindings (`Game.actionFor`, `game/keys.go`: defaults overlaid with the
   `<save>.keys.json` overrides, replace policy). A resolved world command
   runs the one **World verb** table (`uikit/screens/worldverbs.go`): the
@@ -1158,9 +1158,9 @@ through `sim`'s read side rather than re-derived in `uikit`.
   intents, so their gating and fallbacks cannot drift. The panel's
   buttons are one declared slice (`selectedPanel.verbs`): the build
   appends each button and its verb id, `syncSelected` gates that same
-  slice, and the tests walk it — no second gating list. World clicks are
-  intents too — left double-click `Approach`, `Ctrl`+click `Lock`,
-  right-click `Orbit` — and the right-click spells its range out
+  slice, and the tests walk it: no second gating list. World clicks are
+  intents too: left double-click `Approach`, `Ctrl`+click `Lock`,
+  right-click `Orbit`, and the right-click spells its range out
   (`uikit.OrbitRanges[0]`) instead of letting the Orbit intent follow the
   Selected Item selector.
 - Save/load: `game` writes `Save` JSON to
@@ -1170,10 +1170,10 @@ through `sim`'s read side rather than re-derived in `uikit`.
 ## Testing policy
 
 - Unit tests per package (stdlib `testing`, table-driven). `sim` tests build
-  small in-memory `content.Content` fixtures — no JSON needed.
+  small in-memory `content.Content` fixtures; no JSON needed.
 - `content` tests load the **real embedded data** (must always validate) plus
   broken fixtures under `content/testdata/` for error paths.
-- `tests/` package: integration — `showcase_test.go` runs `world-showcase`
+- `tests/` package: integration: `showcase_test.go` runs `world-showcase`
   headlessly through scripted commands covering the feature checklist;
   `determinism_test.go` runs twin sims and compares `Hash()`.
 - `go test ./...` must be green with no display server required.

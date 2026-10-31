@@ -389,7 +389,7 @@ func TestRackRightClickCyclesAmmo(t *testing.T) {
 	r.ammoPref[slot] = "ammo-fusion-s"
 	r.Sync()
 	rightClick(c, t, gun.btn)
-	if ents := env.Menu().Entries(); len(ents) != 8 || ents[1].Label != "Show Info — "+r.ammoName("ammo-fusion-s") {
+	if ents := env.Menu().Entries(); len(ents) != 8 || ents[1].Label != "Show Info: "+r.ammoName("ammo-fusion-s") {
 		t.Fatalf("menu with a preferred charge = %+v", ents)
 	}
 	env.Menu().Esc()

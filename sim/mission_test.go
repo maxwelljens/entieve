@@ -203,7 +203,7 @@ func TestKillContractReadyEvent(t *testing.T) {
 		evs = append(evs, killOne(t, s, "npc-rat-scuttler")...)
 	}
 	ready := findMission(evs, MissionReady)
-	if ready == nil || !strings.Contains(ready.Text, "dock at Haven Rest to claim") {
+	if ready == nil || !strings.Contains(ready.Text, "Dock at Haven Rest to claim") {
 		t.Fatalf("missing ready event: %v", evs)
 	}
 	if ready.ID != "contract-test-kill" || ready.Name != "Test Cleanup" {

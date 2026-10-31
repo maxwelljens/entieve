@@ -589,7 +589,7 @@ func TestRespawnRequeuesWhenGuardCannotAfford(t *testing.T) {
 
 	stepN(s, 60*61)
 	evs := drain(s)
-	const delayed = "Charter Authority requisition delayed — no Ore Barge at Haven Rest"
+	const delayed = "Charter Authority requisition delayed: no Ore Barge at Haven Rest"
 	late := findEvent(evs, EvLog, delayed)
 	if late == nil {
 		t.Fatalf("missing delay event, want %q: %v", delayed, evs)
@@ -732,7 +732,7 @@ func TestRespawnRatRequeuesWhenNoOreAnywhere(t *testing.T) {
 	before := s.AIs.Len()
 	s.Step()
 	evs := drain(s)
-	const delayed = "Old Works requisition delayed — no ore for Rat Hull at Haven Rest"
+	const delayed = "Old Works requisition delayed: no ore for Rat Hull at Haven Rest"
 	late := findEvent(evs, EvLog, delayed)
 	if late == nil {
 		t.Fatalf("missing delay event, want %q: %v", delayed, evs)

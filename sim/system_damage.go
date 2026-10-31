@@ -227,7 +227,7 @@ func (s *Sim) handleDeath(e, src ecs.Entity) {
 	if def != nil && def.Bounty > 0 && src == s.player {
 		s.wallet += def.Bounty
 		s.recordLedger(LedgerEntry{
-			What:   "Bounty — " + name,
+			What:   "Bounty: " + name,
 			Where:  s.systemName(),
 			Amount: def.Bounty,
 		})

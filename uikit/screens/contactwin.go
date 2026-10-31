@@ -419,7 +419,7 @@ func (w *ContactWin) render(o sim.Offer) {
 	w.sub.Label = theme.PatronLabel(o.Patron)
 	w.place.Label = w.office()
 	w.speech.Label = o.Prose
-	w.attr.Label = "— " + o.ContactName
+	w.attr.Label = "By " + o.ContactName
 	w.refresh(o)
 }
 
@@ -451,7 +451,7 @@ func (w *ContactWin) refresh(o sim.Offer) {
 		w.gateText.Label = gateText(o.MinStanding)
 		w.setAccept("Accept work", true)
 	default:
-		w.gateText.Label = fmt.Sprintf("Requires standing %.2f — you have it", o.MinStanding)
+		w.gateText.Label = fmt.Sprintf("Requires standing %.2f; you have it", o.MinStanding)
 		w.setAccept("Accept work", false)
 	}
 	w.setInspect(def)
@@ -460,9 +460,9 @@ func (w *ContactWin) refresh(o sim.Offer) {
 // claimLine is the accepted offer's standing row: where the work is claimed.
 func (w *ContactWin) claimLine(def *content.ContractDef) string {
 	if def.Kind == content.ContractDeliver {
-		return "Accepted — deliver it to " + w.cv.StationName(sim.StationID(def.Objective.Destination))
+		return "Accepted: deliver it to " + w.cv.StationName(sim.StationID(def.Objective.Destination))
 	}
-	return "Accepted — claim it at " + w.cv.StationName(sim.StationID(def.Station))
+	return "Accepted: claim it at " + w.cv.StationName(sim.StationID(def.Station))
 }
 
 // setAccept sets the accept verb's label and gate.

@@ -71,7 +71,7 @@ func TestCreditsPinSources(t *testing.T) {
 	}
 
 	// The Cyber Terminal form-language clause is quoted from AESTHETIC.md.
-	clause := "Cyber Terminal UI Kit (kit by Kerem Bolek, 2026; form vocabulary only — no kit file is shipped, and no kit colour is used)"
+	clause := "Cyber Terminal UI Kit (kit by Kerem Bolek, 2026; form vocabulary only: no kit file is shipped, and no kit colour is used)"
 	doc := strings.Join(strings.Fields(strings.ReplaceAll(read("../docs/lore/AESTHETIC.md"), "**", "")), " ")
 	if !strings.Contains(doc, clause) {
 		t.Fatalf("AESTHETIC.md lost the form-language clause")

@@ -1,7 +1,7 @@
 # Custom art
 
 Entieve ships with procedural vector art for everything on grid. Drop a PNG
-into `assets/` and that sprite is drawn instead — no config, no manifest, no
+into `assets/` and that sprite is drawn instead: no config, no manifest, no
 code. Anything you don't provide (or a file the game can't read) falls back
 to the built-in art, so an empty `assets/` directory plays exactly like the
 stock game.
@@ -23,15 +23,15 @@ it decorates. IDs are the same kebab-case strings the content JSON uses
 | Directory | ID source | Example filename | Rotation |
 |---|---|---|---|
 | `assets/hulls/` | hull ID = ship content ID (`content/data/ships/*.json`) | `ship-sloop.png`, `ship-rat-marauder.png` | rotated to heading |
-| `assets/stations/` | celestial ID (`CelestialDef.id` in `content/data/systems/*.json`) — stations, gates, belts, other structures | `cel-haven-rest.png`, `cel-gate-penumbra.png` | unrotated |
+| `assets/stations/` | celestial ID (`CelestialDef.id` in `content/data/systems/*.json`): stations, gates, belts, other structures | `cel-haven-rest.png`, `cel-gate-penumbra.png` | unrotated |
 | `assets/asteroids/` | ore ID the belt's asteroids carry (`items/ores.json`) | `ore-cordite.png` | unrotated |
 | `assets/backgrounds/` | system ID (`sys-*.json`) or `default` | `default.png` | unrotated |
 | `assets/artwork/` | fixed names (no content id) | `spaceship_hangar.jpg`, `title_background.jpg` | unrotated, cover-fit |
-| `assets/icons/` | the content ID (module, `corp-*`, ore, mineral, loot) | `mod-autocannon-s.png`, `corp-burza.png` | n/a — UI icons, drawn in a square box |
-| `assets/portraits/` | contact ID (`ContactDef.id` in `content/data/contacts/*.json`) | `contact-commission-liaison.jpg` | 2:3 face, unrotated (JPEG preferred) — cover-fit into the offer row's thumb and the Details dialog's frame |
+| `assets/icons/` | the content ID (module, `corp-*`, ore, mineral, loot) | `mod-autocannon-s.png`, `corp-burza.png` | n/a: UI icons, drawn in a square box |
+| `assets/portraits/` | contact ID (`ContactDef.id` in `content/data/contacts/*.json`) | `contact-commission-liaison.jpg` | 2:3 face, unrotated (JPEG preferred), cover-fit into the offer row's thumb and the Details dialog's frame |
 
-Sub-JSON lookup is exactly `<directory>/<id>.png` — or `.jpg`/`.jpeg` for
-`assets/portraits/` and `assets/artwork/` — other files and directories are
+Sub-JSON lookup is exactly `<directory>/<id>.png` (or `.jpg`/`.jpeg` for
+`assets/portraits/` and `assets/artwork/`); other files and directories are
 ignored. Those two kinds accept JPEG (the docked-station plate and contact
 faces, which compress far better as `.jpg`); every other sprite stays
 PNG-only.
@@ -39,7 +39,7 @@ One file there is embedded rather than walked: `title_background.jpg` ships
 inside the binary through the `assets/artwork/artwork.go` shim (see
 [Title background](#title-background)). `assets/icons/` is embedded the same
 way (`assets/icons/icons.go`, `//go:embed *.png`) and registers itself as
-full-colour art in the icon registry — the walk skips it, so those renders
+full-colour art in the icon registry; the walk skips it, so those renders
 never enter the world sprite cache.
 
 ## Docked backdrop
@@ -58,7 +58,7 @@ before. The caption's format string is registered in
 
 `assets/artwork/title_background.jpg` (2736×1536, 16:9) is the boot title
 screen's backdrop: the phase draws it *cover-fit* over the whole window under
-a light black veil (96/255 — enough to keep the wordmark's dim captions
+a light black veil (96/255, enough to keep the wordmark's dim captions
 legible over the bright parts of the plate, the artwork still reads), with the
 wordmark and menu over it. Unlike every other file here it is **embedded**:
 `assets/artwork/artwork.go` carries it (`//go:embed title_background.jpg`), so
@@ -70,7 +70,7 @@ never steps either way.
 ## Window headers
 
 The **Refinery** and **Manufacturing** windows carry a plate of their own, in
-a band directly under the title bar — part of the window background, drawn
+a band directly under the title bar, part of the window background, drawn
 behind the content, so the first rows of the list sit on the image:
 
 | Window | File | Band |
@@ -84,22 +84,22 @@ to fully transparent at the band's bottom edge, so the list further down reads
 on the plain panel. It fades in over the house 12 frames when the window
 opens, and the band is pinned under the title while the lists scroll over it
 (the body is drawn whole above it). No `assets/` directory (released binaries)
-or no plate: no band, the plain window body, exactly as before — the plate is
+or no plate: no band, the plain window body, exactly as before. The plate is
 just another `assets/artwork/` file, decoded eagerly with the rest.
 
 Because the band is behind the content, the list's viewport leaves its own
 body fill off under the band: the plate reads at full strength through the
-first rows and in the body's padding, and the fill returns — unchanged — at the
+first rows and in the body's padding, and the fill returns, unchanged, at the
 band's bottom edge, so the rows further down sit on the plain panel.
 
 ## PNG requirements
 
-- **Format**: PNG with an alpha channel, straight (non-premultiplied) alpha —
+- **Format**: PNG with an alpha channel, straight (non-premultiplied) alpha,
   what every PNG encoder writes by default. Transparent background for
   sprites; the game composites them exactly like the vector art. The one
   exception is `assets/artwork/`, whose full-window plates may be JPEG (no
   alpha; the plate is opaque).
-- **Size**: any pixel size — sprites are scaled at draw time, so **bigger is
+- **Size**: any pixel size. Sprites are scaled at draw time, so **bigger is
   always safe**. Author at ≥2× the largest size the game will draw at for
   crispness: 512×512 works for every kind, 256×256 is the practical floor.
 - **Hull sprites point right (+X)**, the nose direction, matching the
@@ -108,18 +108,18 @@ band's bottom edge, so the rows further down sit on the plain panel.
 - **Backgrounds are starfield plates, in layers, with a cluster-wide
   default.** Per layer the lookup is `assets/backgrounds/<system-id>.png`
   (layer 0, near, bright), `<system-id>-01.png` (layer 1, far, faint),
-  `<system-id>-02.png` (optional layer 2) — falling back to `default.png` /
+  `<system-id>-02.png` (optional layer 2), falling back to `default.png` /
   `default-01.png` / `default-02.png`, which serve every system. Each plate
   replaces the procedural star layer of the same number: it draws at its
   native size on that layer's camera-parallax rate and wrap, over the nebula
-  washes. **The resolved star-plate set is the sky** — layers without a plate
+  washes. **The resolved star-plate set is the sky**: layers without a plate
   draw nothing once any star plate resolves, so no stock procedural dots
   bleed through next to author art; only a system with no plates at all keeps
   the untouched procedural starfield.
 - **Give plate skies real transparency** (dots opaque, sky transparent) and
   author them to tile edge-to-edge: each plate is pixel-probed once at load
   and a transparent sky commits it to its starfield layer, while an
-  opaque-black sky draws it as the *bottom* layer instead — scaled to *cover*
+  opaque-black sky draws it as the *bottom* layer instead, scaled to *cover*
   the screen (aspect preserved, cropped at the edges), above the flat
   background fill and below the nebula washes. Shared defaults stay decoded
   across system switches (~52 MB for the two shipped default layers);
@@ -129,7 +129,7 @@ band's bottom edge, so the rows further down sit on the plain panel.
 ## Sizing (what "fits" means)
 
 A sprite is scaled to fit inside the same square footprint the procedural
-art uses for that object — side `2 × logicalRadius` in screen pixels — with
+art uses for that object (side `2 × logicalRadius` in screen pixels) with
 the aspect ratio preserved. World spacing, warp landings and overview scale
 therefore never change. The logical radii come from the existing art
 constants:
@@ -145,7 +145,7 @@ constants:
 ## Fallback rules
 
 - Missing `assets/` directory (or a missing file for an ID): no error, no
-  log — the procedural vector art draws, exactly as before.
+  log; the procedural vector art draws, exactly as before.
 - Corrupt / non-PNG file: skipped silently, that ID falls back (the
   `artwork/` kind also reads JPEG; a corrupt one falls back to the veil).
 - Search order for the root: `./assets` (working directory) first, then
@@ -161,7 +161,7 @@ The full sprite draw path and its tests live in `render/assets.go` and
 ## Interface icons
 
 The chrome carries a monochrome glyph set from
-[game-icons.net](https://game-icons.net) — kind markers in the overview and
+[game-icons.net](https://game-icons.net): kind markers in the overview and
 HUD, action glyphs on the Selected Item buttons, module classes on the rack
 tiles, objective kinds on contract rows, and a leading glyph on every service
 window title.
@@ -169,19 +169,19 @@ window title.
 - **Where**: `uikit/icons/*.png` (512×512 transparent renders) + the runtime
   registry `uikit/icons/manifest.json`; loaded by `uikit/icons` via
   `//go:embed`.
-- **License — CC BY 3.0**: each icon is credited to its author. The full
+- **License (CC BY 3.0)**: each icon is credited to its author. The full
   table (name, slug, author, source URL, license) is
   [`uikit/icons/CREDITS.md`](../uikit/icons/CREDITS.md); a test pins every PNG
   to a manifest entry *and* a credits line, so no art ships uncredited.
   Required wording: *Icons made by {author}. Available on
   https://game-icons.net*.
 - **Rendering**: a PNG becomes a white silhouette at load (RGB → white, alpha
-  preserved exactly), drawn into a fixed square box on the type grid —
-  16 px inline (table rows, target cards), 20 px buttons, 24 px title bars —
+  preserved exactly), drawn into a fixed square box on the type grid:
+  16 px inline (table rows, target cards), 20 px buttons, 24 px title bars;
   then tinted from the palette role at draw (ColText / ColDim / ColAccent /
   ColDanger / ColInfo; disabled controls 40 % alpha) and cached per
   name+size+tint. Glyphs are never multicolour and no icon ever stretches.
-- **Art sub-mode**: manifest entries with `"mode": "art"` are the exception —
+- **Art sub-mode**: manifest entries with `"mode": "art"` are the exception,
   full-colour renders drawn as-is (no silhouette flattening, no tint), cached
   per name+size. The weapon modules (autocannon s/m/l, artillery s/m/l) use
   256×256 LANCZOS downscales of the project's own renders from
@@ -191,7 +191,7 @@ window title.
   (`license`/`license_url` on the entry; the set-level CC BY 3.0 still covers
   the game-icons glyphs) and draw at **56 px** in the fitting window's slot
   tiles and the HUD rack's cells (both **62×62**: the icon plus a 3 px ring,
-  the HUD pair's and the window's frozen budgets) — `theme.IconTile` — and
+  the HUD pair's and the window's frozen budgets; `theme.IconTile`) and
   **24 px** in module tooltips (`theme.IconTitle`). Inside Show Info the
   panel doubles its own graphics
   instead: the body hero at **128 px** (`theme.IconHero`) on its own dark
@@ -200,7 +200,7 @@ window title.
   `theme.IconCorp`) in the name column beside it. Inline/button/title glyphs
   (16/20/24) are unchanged.
 - **Drop-in art**: the player's own icons live in `assets/icons/`, one PNG per
-  content id (modules, `corp-*`, ores, minerals, loot) — see
+  content id (modules, `corp-*`, ores, minerals, loot); see
   [`assets/README.md`](../assets/README.md#drop-in-icons-icons). The set
   embeds through `assets/icons/icons.go` and registers itself as full-colour
   art under the content id, so a dropped file wins every icon slot for that id
@@ -217,7 +217,7 @@ window title.
 ## Hull portraits
 
 The HUD and Show Info carry a top-down portrait of the selected hull beside
-its name — the fleet's nine hulls, drawn to be told apart by silhouette at
+its name: the fleet's nine hulls, drawn to be told apart by silhouette at
 72 px.
 
 - **Where**: `uikit/hulls/svg/<hull-id>.svg` (sources) → `uikit/hulls/<hull-id>-120.png`
@@ -237,7 +237,7 @@ its name — the fleet's nine hulls, drawn to be told apart by silhouette at
   acid green, ember orange, violet).
 - **Pipeline**: build-time only. `tools/hullraster` is a separate module (the
   game never links a rasterizer) that rasterizes the SVG sources through
-  `srwiley/rasterx`. It accepts the filled subset — `rect`, `circle`,
+  `srwiley/rasterx`. It accepts the filled subset: `rect`, `circle`,
   `ellipse`, `polygon`, `path` (`M/L/H/V/C/Q/Z`, absolute and relative) with a
   flat hex fill; no strokes, transforms, gradients or text. Output is
   deterministic (same bytes on a rerun), which the manifest hashes pin.
@@ -266,10 +266,10 @@ did (`uikit.DefaultTypeScale`).
 | Weight | Role |
 |---|---|
 | Regular | body text: log lines, labels, tooltip rows and values, text input, table cells (outside the mono tables below) |
-| Medium | emphasis: window titles, table header sort buttons, buttons, HUD readouts, tooltip titles (`render.FaceBold` / `Env.FaceBold` — the constant name is historical) |
+| Medium | emphasis: window titles, table header sort buttons, buttons, HUD readouts, tooltip titles (`render.FaceBold` / `Env.FaceBold`; the constant name is historical) |
 | Light, Bold | shipped with the family in `render/fonts/`, not used by the UI |
 
-- **License — IBM Plex Sans, SIL Open Font License 1.1**: `Copyright ©
+- **License (IBM Plex Sans, SIL Open Font License 1.1)**: `Copyright ©
   2017 IBM Corp. with Reserved Font Name "Plex"`. The full
   `IBMPlexSans_LICENCE.txt` travels in the same directory as the TTFs (and
   is embedded with them), so any redistribution of the binary carries the
@@ -280,20 +280,20 @@ did (`uikit.DefaultTypeScale`).
   both at the 16 px button size: Medium sits too close to Regular to read
   as emphasis.
 
-**IBM Plex Mono** is the second family — the **tabular contents** face.
+**IBM Plex Mono** is the second family: the **tabular contents** face.
 The inventory window's three hold tables and the market window's order
 book draw every row cell in it: item names, quantities, volumes and
 prices alike (`render.MonoFace` / `Env.FaceMono`, opted into per table
 with the `uikit.ContentsFace` table option). It ships as a single static
-Regular TTF, drawn as-is — monospace is the point, digits and listed
+Regular TTF, drawn as-is: monospace is the point, digits and listed
 entries line the columns up. Everything around the rows stays IBM Plex
 Sans: window titles, section labels, the table header sort buttons,
 buttons and the stepper readouts.
 
-- **Rule of thumb**: display font (IBM Plex Sans) for chrome and prose —
-  titles, labels, buttons, tooltips, logs; mono (IBM Plex Mono) for
-  tabular data — numbers and listed entries in tables.
-- **License — IBM Plex Mono, SIL Open Font License 1.1**: `Copyright ©
+- **Rule of thumb**: display font (IBM Plex Sans) for chrome and prose
+  (titles, labels, buttons, tooltips, logs); mono (IBM Plex Mono) for
+  tabular data (numbers and listed entries in tables).
+- **License (IBM Plex Mono, SIL Open Font License 1.1)**: `Copyright ©
   2017 IBM Corp. with Reserved Font Name "Plex"`. The full
   `IBMPlexMono_LICENCE.txt` travels in `render/fonts/` beside its TTF
   (embedded with it), so any redistribution of the binary carries the
@@ -301,7 +301,7 @@ buttons and the stepper readouts.
 - **Glyph coverage**: digits, `€`/`¢`, `×`/`³` and the Polish/Czech
   diacritics the listed names carry are probed over the embedded TTF in
   `render/fonts_test.go` (`TestMonoFaceResolvesAndCovers`); the sort
-  indicators stay IBM Plex Sans's ↑/↓ — only the row cells change face.
+  indicators stay IBM Plex Sans's ↑/↓; only the row cells change face.
 
 ## Table chrome
 
@@ -309,18 +309,18 @@ The table header's own furniture is **drawn, not set**: there is no font
 glyph for any of it, so nothing depends on a cmap probe.
 
 - **Resize grips**: a 6 design-px strip at each column's right edge, inside
-  the 40 px header — a 1 px column boundary line at rest (palette `Border` at 160)
+  the 40 px header, a 1 px column boundary line at rest (palette `Border` at 160)
   that lights accent under the pointer and while dragged, with the split
   row's EW-resize cursor. Each strip is its own blocking input layer over the
   sort buttons, so a press there resizes and never sorts.
 - **Column menu**: three 2 px dots, 2 px apart (the split pane's sash-grip
   dot language) centred in a 22 px button at the header's right end, dim at
-  rest and lit on hover. Its popup marks the visible columns with a tick —
+  rest and lit on hover. Its popup marks the visible columns with a tick:
   two 1 px strokes, accent at rest and grayed for the row that only reports
   (the last visible column). The tick gutter is reserved per menu, so every
   label in a column menu starts on one x.
 - **Frozen bases**: the columns are measured once on the first fit and that
-  tiling becomes each column's base — a wider value ellipsizes inside its
+  tiling becomes each column's base. A wider value ellipsizes inside its
   column rather than re-fitting the row (docs/GAMEPLAY.md, Overview). A later
   table width scales the bases proportionally and a grip edits them, so what
   the player sees is always the base (CONTEXT.md, Column prefs).
@@ -329,23 +329,23 @@ glyph for any of it, so nothing depends on a cmap probe.
 
 Hover tips are structured panels, not text blobs. One content model
 (`uikit.TooltipModel` in `uikit/tooltip.go`) and one pure layout function
-turn data into fixed rects, and the panel draws exactly those rects — so
+turn data into fixed rects, and the panel draws exactly those rects, so
 what the layout tests pin is what ships. The same module builder feeds the
 rack cells, the Fitting window's module rows and the Warp gate hint.
 
 | Piece | Treatment |
 |---|---|
-| Icon | 20 px (`icons.Button`) — the module's own icon (drop-in art, else the class glyph), manifest `nudge` applied, tinted ColText |
-| Title | **Bold** at the base step — the only bold line in a tooltip |
-| Sub line | Regular small, ColDim — `High slot 1 · Weapon` (slot · class) |
+| Icon | 20 px (`icons.Button`): the module's own icon (drop-in art, else the class glyph), manifest `nudge` applied, tinted ColText |
+| Title | **Bold** at the base step, the only bold line in a tooltip |
+| Sub line | Regular small, ColDim: `High slot 1 · Weapon` (slot · class) |
 | Hairline | 2 px ColAccent at low alpha (80), full content width |
 | Section label | Regular small, ColHead, stored uppercase (`DAMAGE`, `CHARGE`, `ACTIVATION`) |
 | Row | label ColDim left · value right-anchored on one shared x, ColText (or ColGood/ColDanger for a signed modifier) |
-| Hint footer | Regular tiny, ColDim — `Right-click: module menu`, `Click: activate` |
+| Hint footer | Regular tiny, ColDim: `Right-click: module menu`, `Click: activate` |
 | Surface | the existing panel treatment: opaque `BGHard` fill, 1 px Border edge at 220, 8/5 px padding |
 
 Rules: content-sized up to 320 px wide; rows tile exactly; values never
-ellipsis (labels give way first); absent data never becomes a row — no
+ellipsis (labels give way first); absent data never becomes a row, no
 "N/A" placeholders; hover keeps the shared 300 ms delay
 (`rackTipDelay`), the cursor-sticky position and a 12 px offset, and the
 drawn panel is clamped inside the window at all four edges.
@@ -358,9 +358,9 @@ Geometry is pinned by `TestTipLayoutTilesAtBothWidths`,
 ## Chrome and form
 
 Chrome shapes follow the **Cyber Terminal UI Kit**'s form vocabulary (kit
-by Kerem Bolek; borrowed shapes only — the palette stays the house's amber
+by Kerem Bolek; borrowed shapes only: the palette stays the house's amber
 on black, and no kit file or colour is used). The canon is
-[AESTHETIC.md — Form language](lore/AESTHETIC.md#form-language-cyber-terminal-inspired);
+[AESTHETIC.md: Form language](lore/AESTHETIC.md#form-language-cyber-terminal-inspired);
 this section is the implementation substrate.
 
 **Radius tokens** (`uikit/theme/round.go`, design px, all through
@@ -379,18 +379,18 @@ panels.
 two corners only, the body rounds its bottom two only; the seam between
 them stays square (`theme.TopRadii(RadiusWindow)` /
 `theme.BottomRadii(RadiusWindow)`). Panels and controls round all four.
-A box smaller than twice its radius is out of the scale — thin chrome
+A box smaller than twice its radius is out of the scale: thin chrome
 (4 px split seams, meter bars, scroll viewport masks) keeps a square or
 1 px corner. The generator pads each side by its own corner cell
 (`max(radius, border)`), so a nine-slice never leaks past its own rect.
 
 **Dots anatomy** (`uikit/theme/dots.go`). Three hollow rings, 9 px outside
 diameter, 1 px stroke, 7 px apart (41 px block), drawn in the bar's border
-role at alpha 200 — nothing filled. They sit `SpMd` from the bar's left
+role at alpha 200; nothing filled. They sit `SpMd` from the bar's left
 edge; the icon starts after the block plus `SpMd`, the tracked title after
-the icon plus `IconGap`. Every window bar is `theme.NewTitleBar` — the
+the icon plus `IconGap`. Every window bar is `theme.NewTitleBar` (the
 uikit panels, the Overview and Selected Item core windows, the game's Esc
-menu and the title phase's save manager — so they all carry them; the bar
+menu and the title phase's save manager), so they all carry them; the bar
 adds `theme.TitleDotsWidget`'s rings first. Two headers deliberately lead
 with their own mark instead: the fitting window's hull-portrait header and
 the HUD rack's "Modules" panel head.
@@ -416,5 +416,5 @@ loop needed) and, under `ENTIEVE_CAPTURE=1`,
 `TestMapCaptureFrame` (28 px lattice) and `TestHeaderCaptureFrame`.
 
 Which generator a screen asks for, and what each piece derives from, is the
-map in [ARCHITECTURE.md — UI chrome architecture](ARCHITECTURE.md#ui-chrome-architecture-map);
+map in [ARCHITECTURE.md: UI chrome architecture](ARCHITECTURE.md#ui-chrome-architecture-map);
 this section is the visual canon.

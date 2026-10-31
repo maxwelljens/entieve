@@ -883,7 +883,7 @@ func TestIndustryJobFee(t *testing.T) {
 	}
 	led := s.Ledger()
 	last := led[len(led)-1]
-	if last.What != "Industry fee — 2 x EMP Charge" || math.Abs(last.Amount+5.46) > 1e-9 ||
+	if last.What != "Industry fee: 2 x EMP Charge" || math.Abs(last.Amount+5.46) > 1e-9 ||
 		last.Where != "Haven Rest" {
 		t.Errorf("fee ledger = %+v", last)
 	}
@@ -957,7 +957,7 @@ func TestIndustryCancelRefundsMaterials(t *testing.T) {
 	if s.CancelJob("cel-station-a", done, OwnerPlayer) {
 		t.Fatal("finished job cancelled")
 	}
-	if evs := drain(s); !hasEvent(evs, EvLog, "Industry: Job is ready — collect it at Haven Rest") {
+	if evs := drain(s); !hasEvent(evs, EvLog, "Industry: Job is ready: collect it at Haven Rest") {
 		t.Fatalf("missing ready refusal: %v", evs)
 	}
 	if s.CancelJob("cel-station-a", done, OwnerSystem) {

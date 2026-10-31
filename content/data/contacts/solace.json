@@ -32,7 +32,7 @@
         "level": 1,
         "objective": { "item": "ammo-emp-s", "count": 1, "destination": "cel-penumbra-port" },
         "reward": { "credits": 86000, "item": null, "standing_gain": 0.1 },
-        "description": "Hauvnok is short on ion rounds: {count} m³ of them. Buy them on the Jalvrek market and carry them to {station} — the cargo is the delivery, so do not spend it on the way.",
+        "description": "Hauvnok is short on ion rounds: {count} m³ of them. Buy them on the Jalvrek market and carry them to {station}; the cargo is the delivery, so do not spend it on the way.",
         "source": { "kind": "stock", "item": "ammo-emp-s", "target": 20, "base": 1, "max": 10 }
       },
       {

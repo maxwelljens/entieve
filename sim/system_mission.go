@@ -65,7 +65,7 @@ func (s *Sim) systemMission() {
 			if triggered && s.missionObjectivesMet(def, &s.missions[i]) {
 				if def.Kind == content.ContractDeliver {
 					s.emitMissionEvent(MissionReady, def, SevInfo,
-						"Offer ready: "+def.Title+" — delivered at "+s.stationName(claim), 0)
+						"Offer ready: "+def.Title+", delivered at "+s.stationName(claim), 0)
 				}
 				s.completeMission(i, def)
 				justReady = append(justReady[:i], justReady[i+1:]...)
@@ -130,11 +130,11 @@ func (s *Sim) missionNpcKilled(npc content.NpcID, justReady []bool) {
 		}
 		m.Progress++
 		s.emitMissionEvent(MissionProgress, def, SevInfo,
-			"Offer progress: "+def.Title+" — "+itoaN(int(m.Progress))+"/"+itoaN(def.Objective.Count), 0)
+			"Offer progress: "+def.Title+", "+itoaN(int(m.Progress))+"/"+itoaN(def.Objective.Count), 0)
 		if m.Progress >= count {
 			justReady[i] = true
 			s.emitMissionEvent(MissionReady, def, SevGood,
-				"Offer ready: "+def.Title+" — dock at "+s.stationName(claimStation(def))+" to claim", 0)
+				"Offer ready: "+def.Title+". Dock at "+s.stationName(claimStation(def))+" to claim", 0)
 		}
 	}
 }
@@ -161,11 +161,11 @@ func (s *Sim) missionOreMined(item content.ItemID, vol float64, justReady []bool
 			m.Progress = count
 		}
 		s.emitMissionEvent(MissionProgress, def, SevInfo,
-			"Offer progress: "+def.Title+" — "+formatM3(m.Progress)+"/"+formatM3(count)+" m³", 0)
+			"Offer progress: "+def.Title+", "+formatM3(m.Progress)+"/"+formatM3(count)+" m³", 0)
 		if m.Progress >= count {
 			justReady[i] = true
 			s.emitMissionEvent(MissionReady, def, SevGood,
-				"Offer ready: "+def.Title+" — dock at "+s.stationName(claimStation(def))+" to claim", 0)
+				"Offer ready: "+def.Title+". Dock at "+s.stationName(claimStation(def))+" to claim", 0)
 		}
 	}
 }
@@ -219,7 +219,7 @@ func (s *Sim) completeMission(i int, def *content.ContractDef) {
 	}
 	s.wallet += def.Reward.Credits
 	s.recordLedger(LedgerEntry{
-		What:   "Contact — " + def.Title,
+		What:   "Contact: " + def.Title,
 		Where:  s.stationName(s.dockedStationID()),
 		Amount: def.Reward.Credits,
 	})
@@ -229,7 +229,7 @@ func (s *Sim) completeMission(i int, def *content.ContractDef) {
 	s.standing += def.Reward.StandingGain
 	s.missions = append(s.missions[:i], s.missions[i+1:]...)
 
-	text := "Offer complete: " + def.Title + " — " +
+	text := "Offer complete: " + def.Title + ", " +
 		euro(def.Reward.Credits) + " transferred"
 	if def.Reward.StandingGain > 0 {
 		text += ", standing +" + strconv.FormatFloat(def.Reward.StandingGain, 'f', 2, 64)
@@ -272,7 +272,7 @@ func (s *Sim) execAcceptMission(c CmdAcceptMission) {
 	}
 	// A remnant's charter desk is dark: no new work until a reclaim.
 	if s.remnant(at.At) {
-		s.missionRefused(def.ID, def.Title, "This station is a remnant — its charter desk is dark")
+		s.missionRefused(def.ID, def.Title, "This station is a remnant: its charter desk is dark")
 		return
 	}
 	if s.standing+1e-9 < def.MinStanding {

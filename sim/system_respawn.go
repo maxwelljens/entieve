@@ -149,7 +149,7 @@ func (s *Sim) respawnTimer(t RespawnTimer) bool {
 func (s *Sim) emitRequisitionDelayed(def *content.NpcDef, hull *content.ShipDef,
 	station StationID, cel *content.CelestialDef, rat bool) {
 	place := s.requisitionPlace(station, cel)
-	text := def.Faction + " requisition delayed — no "
+	text := def.Faction + " requisition delayed: no "
 	if rat {
 		text += "ore for "
 	}

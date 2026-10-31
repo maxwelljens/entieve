@@ -196,7 +196,7 @@ func outputsText(cv widgets.ContentView, outs []content.CargoStack) string {
 // oneBatchLine is the sub-batch wording the window and the picker share: a
 // stock under one whole batch has no valid refine quantity.
 func oneBatchLine(cv widgets.ContentView, ore content.ItemID, stock int) string {
-	return "One batch needs " + theme.FormatInt(int64(sim.RefineBatch)) + " ore — you hold " +
+	return "One batch needs " + theme.FormatInt(int64(sim.RefineBatch)) + " ore; you hold " +
 		theme.FormatInt(int64(stock)) + " " + cv.TradeableName(ore) + "."
 }
 
@@ -245,7 +245,7 @@ func (r *Refinery) Sync() {
 		r.status.Label = oneBatchLine(r.cv, r.sel.ore, r.stockOf(r.sel.ore))
 	} else {
 		r.status.Label = "Whole " + theme.FormatInt(int64(sim.RefineBatch)) +
-			"-ore batches only — Refine opens the quantity picker."
+			"-ore batches only; Refine opens the quantity picker."
 	}
 }
 
