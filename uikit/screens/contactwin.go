@@ -48,7 +48,7 @@ const (
 )
 
 // portraitBox is one 2:3 contact portrait: the dropped bust
-// (assets/contacts/<contact-id>.png) cover-fit into the box, else the
+// (assets/portraits/<contact-id>, png or jpg) cover-fit into the box, else the
 // contract glyph on the same box — no person silhouette ships, so the
 // office's own mark stands in.
 type portraitBox struct {

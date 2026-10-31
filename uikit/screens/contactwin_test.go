@@ -2,7 +2,7 @@ package screens
 
 import (
 	"image"
-	"image/png"
+	"image/jpeg"
 	"os"
 	"path/filepath"
 	"slices"
@@ -119,23 +119,24 @@ func TestContactDetailsRendersOffer(t *testing.T) {
 	}
 }
 
-// TestContactDetailsDroppedPortrait: a PNG dropped at
-// assets/contacts/<contact-id>.png replaces the glyph in the same 2:3 box.
+// TestContactDetailsDroppedPortrait: a JPEG dropped at
+// assets/portraits/<contact-id>.jpg replaces the glyph in the same 2:3 box —
+// kind, directory and shipped extension pinned to the owner's drop-in set.
 func TestContactDetailsDroppedPortrait(t *testing.T) {
 	dir := t.TempDir()
 	const id = content.ContactID("contact-duksan-yard")
-	if err := os.MkdirAll(filepath.Join(dir, "contacts"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "portraits"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	img := image.NewNRGBA(image.Rect(0, 0, 60, 90)) // 2:3
 	for i := range img.Pix {
 		img.Pix[i] = 0xC0
 	}
-	f, err := os.Create(filepath.Join(dir, "contacts", string(id)+".png"))
+	f, err := os.Create(filepath.Join(dir, "portraits", string(id)+".jpg"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := png.Encode(f, img); err != nil {
+	if err := jpeg.Encode(f, img, nil); err != nil {
 		t.Fatal(err)
 	}
 	f.Close()

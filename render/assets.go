@@ -135,9 +135,9 @@ func RefiningHeader() *ebiten.Image { return spriteFor(artworkRefiningHeader) }
 // when the asset root ships none.
 func ManufacturingHeader() *ebiten.Image { return spriteFor(artworkManufacturingHeader) }
 
-// Contact portraits: assets/contacts/<contact-id>.png — a 2:3 bust the
+// Contact portraits: assets/portraits/<contact-id> (png or jpg) — a 2:3 bust the
 // dock view draws beside the contact's offer rows and large in Details.
-const contactPortraitRoot = "contacts/"
+const contactPortraitRoot = portraitsRoot
 
 // ContactPortrait returns the drop-in portrait of a contact, or nil when
 // none is dropped — the caller then draws its fallback glyph (the same
