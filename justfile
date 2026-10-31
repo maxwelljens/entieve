@@ -19,7 +19,7 @@ default:
 
 # Play the game (flags pass through: --world, --seed, --load, --save).
 run *ARGS:
-    go run ./cmd/entieve run {{ ARGS }}
+    go run -ldflags "-X main.version={{ version }}" ./cmd/entieve run {{ ARGS }}
 
 # ---- verify ---------------------------------------------------------------
 

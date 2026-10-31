@@ -105,6 +105,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   both the ambush and the miner-distress wings, and the wing still engages
   inside `trafficPatrolEngageRange`.
 
+- **The title screen shows the actual version** (`cmd`, `justfile`) —
+  source runs (`just run`, `go run`) passed no `-ldflags`, so the wordmark's
+  version line and `entieve version` reported the `0.1.0-dev` placeholder;
+  only `just build` and the release binaries were ever stamped. `just run`
+  now stamps `git describe` like the build recipes, and an unstamped run
+  reports `git describe --tags --always --dirty` itself, keeping the
+  placeholder only where neither the build nor the checkout can say.
+
 ## [0.11.0] - 2026-10-29
 
 ### Added
