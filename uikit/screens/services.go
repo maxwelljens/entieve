@@ -146,6 +146,15 @@ func NewServices(env widgets.Seams, innerWidth int) *Services {
 // Container returns the view's row for the host window body.
 func (s *Services) Container() *widget.Container { return s.row }
 
+// SetWidth re-targets the identity line's ellipsis room when the hosting
+// window is resized: the board re-derives its columns from the live width
+// and hands the row the same one.
+func (s *Services) SetWidth(inner int) {
+	if inner > 0 {
+		s.innerWidth = inner
+	}
+}
+
 // Button returns one button by handle name — "undock" (nil when there is
 // no such button) — the handle tests click and captures pin.
 func (s *Services) Button(name string) *widget.Button {

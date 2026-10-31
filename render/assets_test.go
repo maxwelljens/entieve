@@ -21,8 +21,8 @@ import (
 // is process state too, so it stashes with the sprites).
 func stashAssets(t *testing.T, dir string) {
 	t.Helper()
-	prev, prevTried, prevPlates := sprites, spritesTried, platePaths
-	t.Cleanup(func() { sprites, spritesTried, platePaths = prev, prevTried, prevPlates })
+	prev, prevTried, prevPlates, prevMips := sprites, spritesTried, platePaths, mips
+	t.Cleanup(func() { sprites, spritesTried, platePaths, mips = prev, prevTried, prevPlates, prevMips })
 	LoadAssets(dir)
 }
 
@@ -227,8 +227,8 @@ func TestSpriteForSelectsProceduralWhenAbsent(t *testing.T) {
 // the first lookup scans ./assets (here: a temp working dir), and a directory
 // appearing later is never picked up, so a missing root never re-scans/logs.
 func TestAutoLoadProbesWorkingDirOnce(t *testing.T) {
-	prev, prevTried := sprites, spritesTried
-	t.Cleanup(func() { sprites, spritesTried = prev, prevTried })
+	prev, prevTried, prevMips := sprites, spritesTried, mips
+	t.Cleanup(func() { sprites, spritesTried, mips = prev, prevTried, prevMips })
 
 	wd, err := os.Getwd()
 	if err != nil {

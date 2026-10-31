@@ -276,7 +276,9 @@ finances and settings), and a genuinely
 new window type with no declared position opens centred. While docked the
 Contacts window (the station column) takes the top-left column
 (overview and selected item step aside); the service windows open at
-those same per-type defaults, not tiled into a docked band.
+those same per-type defaults, not tiled into a docked band. The board is
+the one window that reflows with its own width: drag its side grip and
+every row's columns (and the **Details** button on them) follow.
 
 **Resizing never stomps your arrangement.** Those defaults only
 ever apply to windows you have never touched: drag any window somewhere
@@ -604,7 +606,8 @@ delivery in that front's system; a station short of requisition stock
 posts a manufacturing or hauling order; an Old Works hull working the
 local belt posts a kill order; a station short of ore posts a mining
 order. Each row is a summary, not a paragraph: the contact's **portrait**
-thumb, the title with its **mission type** (`Delivery`, `Kill order`,
+(the row's full height, 2:3), the title with its **mission type**
+(`Delivery`, `Kill order`,
 `Mining`) and the payout (`430,000.00 €`), with the standing gain, a
 delivery's destination **requisition stock** and, when you are below the
 gate, `Requires standing 0.20` on the line under it. Press **Details** to

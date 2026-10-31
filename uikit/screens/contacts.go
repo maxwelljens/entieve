@@ -30,46 +30,78 @@ import (
 //
 // Geometry (docs/GAMEPLAY.md, "Contacts & standing"): the station column
 // while docked: x ∈ [StationX, StationX+StationWinW) starts clear of the
-// navigation rail's gutter and keeps its right edge at 404. The
-// content-driven height (row caps included) keeps the bottom above the log,
-// whose top sits at screen-height-250 — i.e. y=450 at the 1024×700 minimum.
-// Both are pinned by tests at 1280×720, 1024×700 and at the window minimum.
+// navigation rail's gutter and keeps its right edge at 452. The board's
+// content height (row caps included) is the window's floor; the column is
+// at least StationMinH tall. Both are pinned by tests at 1280×720,
+// 1024×700 and at the window minimum.
+//
+// Width is live, height is content: the window's resize grips change the
+// column's width, and Sync re-derives every row's columns from the body's
+// laid-out width (columnWidths), so Details lands on the row's right edge at
+// any width. A taller window keeps the board top-anchored — the extra height
+// stays empty rather than stretching the rows.
 const (
 	StationX     = 10 + RailInset // window left edge: rail gutter first
 	StationY     = 8
-	StationWinW  = 394 - RailInset // window width; right edge still 404
-	StationMinW  = 394 - RailInset // window MinSize — the "minimum window" pin
+	StationWinW  = 442 - RailInset // window width: 355, right edge 452 (the content floor)
+	StationMinW  = StationWinW     // window MinSize — the "minimum window" pin
 	StationMinH  = 200
-	boardPad     = 6 // body padding
-	boardSpacing = 5 // vertical gap between body children
-	boardRowGap  = 4 // gap between two board rows
+	boardPad     = 9 // body padding
+	boardSpacing = 7 // vertical gap between body children
+	boardRowGap  = 5 // gap between two board rows
 
 	// The rows themselves are rich rows of the table module, which owns
-	// their metrics (widgets.Rich*): the board's column budgets below
+	// their internals (widgets.Rich*): the board's column budgets below
 	// derive from them, so a rendered row and its ellipsis budgets can
 	// never drift apart.
-	boardRowPad  = widgets.RichPad  // horizontal padding inside a row
 	boardBtnGap  = widgets.RichGap  // gap between a row's cells
 	boardBtnW    = widgets.RichBtnW // action button width (fits the widest label, "Accepted", set in the emphasis face)
 	availMaxRows = 3                // visible offer rows ("+N more" beyond)
 	actMaxRows   = 2                // visible active rows ("+N more" beyond)
 
-	// An offer row leads with the contact's 2:3 portrait thumb, then the
-	// rich row, whose lines are the title and the type chip beside the
-	// payout. boardTextW/boardRewardW are the two lines' text columns: the
-	// stack's own padding and the icon box included, so a title and a
-	// reward never drift from the row they sit in.
-	boardThumbW  = 28
-	boardThumbH  = 42 // 2:3
-	boardKindW   = 60 // the type chip's column: every reward starts on the same x
-	stackPad     = 2 * widgets.RichPad
-	boardRowW    = boardContentW - boardRowPad - boardThumbW - boardBtnGap - stackPad // the offer row's line width
-	boardTextW   = boardRowW - theme.IconInline - theme.IconGap - boardBtnGap - boardBtnW
-	boardRewardW = boardRowW - boardKindW - boardBtnGap
+	// An offer row leads with the contact's 2:3 portrait, then the rich
+	// row, whose lines are the title and the type chip beside the payout.
+	// The row height is the driver: boardRowH is every row's floor and the
+	// portrait spans it whole, so its width is two thirds of the height.
+	// shortcut: a row taller than boardRowH (more aside lines than a
+	// shipped offer has) would leave its portrait short of the row;
+	// upgrade when a richer offer row ships.
+	boardRowH     = 84
+	boardRowInset = 6  // between the row's edge and the portrait
+	boardThumbGap = 10 // between the portrait and the text stack
+	boardThumbH   = boardRowH
+	boardThumbW   = boardRowH * 2 / 3 // 2:3
+	boardKindW    = 60                // the type chip's column: every reward starts on the same x
+	stackPad      = 2 * widgets.RichPad
 
-	boardInnerW   = StationWinW - 2*boardPad // body inner width: 382
-	boardContentW = boardInnerW - 2*boardRowPad
+	boardInnerW = StationWinW - 2*boardPad // body content width at the floor: 337
 )
+
+// boardCols are one rebuild's row column budgets, in live pixels, derived
+// from the body's content width and the portrait's width. A rich row's
+// cells are single-line and ellipsized by the caller, so the columns are
+// pure arithmetic — nothing here has to be measured first.
+type boardCols struct {
+	line   int // the rich stack's line width (portrait rows)
+	text   int // line 1's title column, icon box included
+	reward int // line 2's payout column
+	title  int // active work's one-line title (no portrait)
+}
+
+// columnWidths is the whole row budget: the portrait row's stack width
+// (row inset, portrait, gap and the stack's own padding reserved), then the
+// title and payout columns inside it, and active work's title across the
+// full body width. Every term is at least one pixel — a degenerate width
+// ellipsizes rather than producing negative text boxes.
+func columnWidths(inner, thumbW int) boardCols {
+	line := max(1, inner-boardRowInset-thumbW-boardThumbGap-stackPad)
+	return boardCols{
+		line:   line,
+		text:   max(1, line-theme.IconInline-theme.IconGap-boardBtnGap-boardBtnW),
+		reward: max(1, line-boardKindW-boardBtnGap),
+		title:  max(1, inner-stackPad-boardBtnGap-boardBtnW),
+	}
+}
 
 // StationRect is the contacts window's rect in live px: the left column,
 // clear of the navigation rail's gutter, at the board's content height (never
@@ -84,7 +116,8 @@ func StationRect(stationH int) image.Rectangle {
 // ContactsPanel is the docked station's contact view: the service row
 // (identity / Undock / Cargo / this station's services), the live contact
 // offers and the accepted work. Sync re-reads the derived offers every
-// mounted frame and rebuilds the rows only when the model moves.
+// mounted frame and rebuilds the rows when the model moves or the window's
+// width does.
 type ContactsPanel struct {
 	env widgets.Seams
 	cv  widgets.ContentView
@@ -99,6 +132,11 @@ type ContactsPanel struct {
 	offerRows []ContactRow
 	actRows   []ContactRow
 
+	// inner is the body's content width in DESIGN units, re-read from its
+	// laid-out rect every Sync; cols are the row budgets it produces.
+	inner int
+	cols  boardCols
+
 	// fit is the content floor in DESIGN units, cached at the last
 	// rebuild (FitSize's answer — never a per-frame PreferredSize).
 	fit int
@@ -109,7 +147,10 @@ type ContactsPanel struct {
 // mounts it, runs Sync and then applies FitSize.
 func NewContacts(env widgets.Seams) *ContactsPanel {
 	p := env.Pal()
-	b := &ContactsPanel{env: env, cv: env, fit: StationMinH}
+	b := &ContactsPanel{
+		env: env, cv: env, fit: StationMinH,
+		inner: boardInnerW, cols: columnWidths(boardInnerW, boardThumbW),
+	}
 	b.svc = NewServices(env, boardInnerW)
 	b.offers = newBoardSection()
 	b.active = newBoardSection()
@@ -157,18 +198,39 @@ func (b *ContactsPanel) Services() *Services { return b.svc }
 func (b *ContactsPanel) FitSize() (w, h int) { return StationWinW, b.fit }
 
 // Sync refreshes the service row every frame and rebuilds the contact rows
-// when the model moves — the one refresh path (the host syncs mounted
-// panels).
+// when the model moves or the window's width does — the one refresh path
+// (the host syncs mounted panels). The width read is what makes a grip drag
+// reach the rows: the body is laid out at the window's new width, and the
+// next Sync re-derives every column from it. A frame where neither moved
+// rebuilds nothing.
 func (b *ContactsPanel) Sync() {
 	if b.cv == nil {
 		return
 	}
+	resized := false
+	if w := b.liveWidth(); w != b.inner {
+		b.inner = w
+		b.svc.SetWidth(w)
+		resized = true
+	}
 	b.svc.Sync()
 	m := b.build()
-	if !m.same(b.model) {
+	if resized || !m.same(b.model) {
 		b.model = m
 		b.rebuild(m)
 	}
+}
+
+// liveWidth is the body's content width in DESIGN units, read from its
+// laid-out rect — the window's chrome resizes the rect, and everything the
+// board draws derives from this width. A body not laid out yet (the mount
+// frame) answers the column width it was built at.
+func (b *ContactsPanel) liveWidth() int {
+	d := b.body.GetWidget().Rect.Dx()
+	if d <= 0 {
+		return b.inner
+	}
+	return max(1, int(math.Round(float64(d)/theme.Scale()))-2*boardPad)
 }
 
 // newBoardSection builds one row section: a bare container whose rows are
@@ -352,12 +414,12 @@ func (b *ContactsPanel) build() contactsModel {
 }
 
 // rebuild replaces both sections' row widgets from the model and caches the
-// body's content height (the row caps in the model bound it well above the
-// log at the minimum screen size).
+// body's content height (the row caps in the model bound the board's height).
 func (b *ContactsPanel) rebuild(m contactsModel) {
 	b.offers.RemoveChildren()
 	b.active.RemoveChildren()
 	b.offerRows, b.actRows = nil, nil
+	b.cols = columnWidths(b.inner, boardThumbW)
 	for _, r := range m.Offers {
 		root, btn := b.buildRow(r, false)
 		b.offers.AddChild(root)
@@ -374,8 +436,8 @@ func (b *ContactsPanel) rebuild(m contactsModel) {
 	b.fit = max(int(math.Round(float64(h)/theme.Scale())), StationMinH)
 }
 
-// buildRow renders one row: an offer is the contact's portrait thumb beside
-// a rich row of the table module (widgets.NewStackRow) — the title with the
+// buildRow renders one row: an offer is the contact's portrait beside a
+// rich row of the table module (widgets.NewStackRow) — the title with the
 // kind icon leading it, the mission-type chip and the payout under it and
 // the row's own RowSpec.Action drawn as its trailing buttons (Details) —
 // while active work keeps its one-line title/progress and Abandon. The row's
@@ -398,7 +460,7 @@ func (b *ContactsPanel) buildRow(r contactRowModel, active bool) (*widget.Contai
 		row.Stack = b.rowStack(r, active)
 	} else {
 		row.Stack = []widgets.RowLine{{Segs: []widgets.RowSeg{{
-			Text: b.ellip(r.Title, theme.StepTiny, float64(theme.Px(boardContentW))),
+			Text: b.ellip(r.Title, theme.StepTiny, float64(theme.Px(b.cols.line))),
 			Tint: p.Dim,
 			Step: theme.StepTiny,
 		}}}}
@@ -422,19 +484,24 @@ func (b *ContactsPanel) buildRow(r contactRowModel, active bool) (*widget.Contai
 	return root, sr.Buttons[0]
 }
 
-// offerRow wraps one offer's rich row beside the contact's portrait thumb:
-// [face] [title · kind · payout · Details].
+// offerRow wraps one offer's rich row beside the contact's portrait:
+// [face] [title · kind · payout · Details]. The row's floor is boardRowH and
+// the portrait spans it whole; both are centred, so the text floats in the
+// portrait's height.
 func (b *ContactsPanel) offerRow(r contactRowModel, stack *widget.Container) *widget.Container {
 	port := newPortraitBox(b.env, boardThumbW, boardThumbH, theme.IconInline)
 	port.Set(r.Contact)
 	outer := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(boardBtnGap)),
-			widget.RowLayoutOpts.Padding(&widget.Insets{Left: theme.Px(boardRowPad)}),
+			widget.RowLayoutOpts.Spacing(theme.Px(boardThumbGap)),
+			widget.RowLayoutOpts.Padding(&widget.Insets{Left: theme.Px(boardRowInset)}),
 		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(0, theme.Px(boardRowH))),
 	)
-	stack.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+	for _, c := range []widget.PreferredSizeLocateableWidget{port.Widget(), stack} {
+		c.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+	}
 	outer.AddChild(port.Widget(), stack)
 	return outer
 }
@@ -447,7 +514,7 @@ func (b *ContactsPanel) offerRow(r contactRowModel, stack *widget.Container) *wi
 func (b *ContactsPanel) rowStack(r contactRowModel, active bool) []widgets.RowLine {
 	p := b.env.Pal()
 	if active {
-		titleW := theme.Px(boardContentW - boardBtnW - boardBtnGap)
+		titleW := theme.Px(b.cols.title)
 		if r.Icon != "" {
 			titleW -= theme.Px(theme.IconInline) + theme.Px(theme.IconGap)
 		}
@@ -459,16 +526,16 @@ func (b *ContactsPanel) rowStack(r contactRowModel, active bool) []widgets.RowLi
 		}}}}
 	}
 	lines := []widgets.RowLine{{Segs: []widgets.RowSeg{{
-		Text: b.ellip(r.Title, theme.StepSmall, float64(theme.Px(boardTextW))),
+		Text: b.ellip(r.Title, theme.StepSmall, float64(theme.Px(b.cols.text))),
 		Tint: p.Accent,
 		Step: theme.StepSmall,
-		MinW: theme.Px(boardTextW),
+		MinW: theme.Px(b.cols.text),
 	}}}}
 
 	// Line 2: the type chip, then the payout.
 	lines = append(lines, widgets.RowLine{Segs: []widgets.RowSeg{
 		{Text: r.Kind, Tint: p.Head, Step: theme.StepTiny, MinW: theme.Px(boardKindW)},
-		{Text: b.ellip(r.Reward, theme.StepTiny, float64(theme.Px(boardRewardW))), Tint: p.Good, Step: theme.StepTiny},
+		{Text: b.ellip(r.Reward, theme.StepTiny, float64(theme.Px(b.cols.reward))), Tint: p.Good, Step: theme.StepTiny},
 	}})
 
 	// Line 3: the asides a summary row still owes the player — why the

@@ -15,10 +15,10 @@ import (
 // the inventory/fitting bottom row) is gone; stationRect is the only
 // docked rect left, and it is just the services view's column.
 
-// stationBoardWorstCaseH is the docked contract board's content height
+// stationBoardWorstCaseH is the docked contacts board's content height
 // with every section at its row cap: the services column then reads
-// (73,8)-(404,434), its worst case (73 = 10 + the rail gutter).
-const stationBoardWorstCaseH = 426
+// (97,8)-(452,483), its worst case (97 = 10 + the rail gutter).
+const stationBoardWorstCaseH = 475
 
 // serviceDefaults are the three service windows' per-type defaults (their
 // Screen rows), in design units == px at the identity scale: the market's

@@ -36,6 +36,8 @@ var (
 	sprites      map[string]*ebiten.Image
 	spritesTried bool
 	platePaths   map[string]string
+	// mips is the per-sprite halving chain MipFor samples (mip.go).
+	mips map[string][]*ebiten.Image
 )
 
 // LoadAssets loads every PNG sprite under dir into the sprite registry —
@@ -46,6 +48,7 @@ var (
 // for tests and callers that keep art somewhere specific.
 func LoadAssets(dir string) {
 	sprites = map[string]*ebiten.Image{}
+	mips = map[string][]*ebiten.Image{}
 	platePaths = map[string]string{}
 	spritesTried = true
 	if dir == "" {
@@ -72,20 +75,32 @@ func LoadAssets(dir string) {
 				platePaths[key] = path // indexed, decoded on demand per system
 				return nil
 			}
-			if img := loadPNG(path); img != nil {
-				sprites[key] = img
+			if img, ok := decodePNG(path); ok {
+				addSprite(key, img)
 			}
 		// JPEG is the artwork kind's format (the docked plate ships as a
 		// JPG) and the portraits kind's (contact faces compress far better
 		// as JPEG); every other sprite stays PNG.
 		case (strings.HasPrefix(key, artworkRoot) || strings.HasPrefix(key, portraitsRoot)) &&
 			(strings.EqualFold(ext, ".jpg") || strings.EqualFold(ext, ".jpeg")):
-			if img := loadJPEG(path); img != nil {
-				sprites[key] = img
+			if img, ok := decodeJPEG(path); ok {
+				addSprite(key, img)
 			}
 		}
 		return nil
 	})
+}
+
+// addSprite registers one decoded sprite and its mip chain (level 0 of the
+// chain is the sprite's own image, so a chain costs only its halvings). The
+// artwork kind is the exclusion: its plates are drawn at window size and no
+// site samples them through MipFor yet (see mip.go).
+func addSprite(key string, img image.Image) {
+	sp := ebiten.NewImageFromImage(img)
+	sprites[key] = sp
+	if !strings.HasPrefix(key, artworkRoot) {
+		mips[key] = mipChain(img, sp)
+	}
 }
 
 // spriteFor returns the art sprite registered under key — a convention path
@@ -199,18 +214,6 @@ func assetRoots() []string {
 	return roots
 }
 
-// loadPNG decodes one PNG into a GPU image. nil for anything unreadable,
-// empty or not a PNG — a corrupt drop-in must never crash the game.
-// image/png yields straight alpha, the same convention as colorScale, so
-// DrawImage composites it exactly like the procedural sprites.
-func loadPNG(path string) *ebiten.Image {
-	img, ok := decodePNG(path)
-	if !ok {
-		return nil
-	}
-	return ebiten.NewImageFromImage(img)
-}
-
 // decodePNG reads one PNG file. ok is false for anything unreadable, empty
 // or not a PNG — a corrupt drop-in must never crash the game.
 func decodePNG(path string) (image.Image, bool) {
@@ -230,20 +233,20 @@ func decodePNG(path string) (image.Image, bool) {
 	return img, true
 }
 
-// loadJPEG decodes one JPEG into a GPU image — the artwork kind's loader. The
-// same contract as loadPNG: nil for anything unreadable or not a JPEG, a
-// corrupt drop-in must never crash the game.
-func loadJPEG(path string) *ebiten.Image {
+// decodeJPEG reads one JPEG file — the artwork and portrait loader. The
+// same contract as decodePNG: false for anything unreadable or not a JPEG,
+// a corrupt drop-in must never crash the game.
+func decodeJPEG(path string) (image.Image, bool) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil
+		return nil, false
 	}
 	defer f.Close()
 	img, err := jpeg.Decode(f)
 	if err != nil {
-		return nil
+		return nil, false
 	}
-	return ebiten.NewImageFromImage(img)
+	return img, true
 }
 
 // plateSky samples a sparse pixel grid of a decoded plate and reports whether

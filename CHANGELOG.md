@@ -38,6 +38,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as requisition stock on the destination station's book (the goods its
   guard posts buy replacements from), and a materiel run credits the war
   front it served. A delivery's live stock is stated in its Details page.
+- **Mip chains for dropped-in art** (`render`) — every sprite the asset walk
+  registers now carries a halving chain of its own pixels (a CPU 2×2 box
+  filter down to a 32 px floor), and `render.MipFor` answers a draw frame
+  with the smallest level that still covers it, so a texture is never
+  squeezed more than 2× by the sampler. Contact portraits adopt it now (the
+  dock row's portrait and the Details dialog); hull, station and asteroid
+  sprites keep their full-resolution draw, the icon set never enters the
+  sprite registry, and the background and artwork plates carry no chain.
+  A chain costs a third of the sprite's texture memory (the owner's seven
+  592×880 portraits: 14.6 → 19.2 MiB) and ~5 ms each at load. `ART.md`
+  documents the convention under **Mipmaps**.
 
 - **Target cards are clickable**: a left click on a locked target's card in
   the top-centre row selects that target, exactly as a world click does (the
@@ -65,7 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   contact's portrait thumb, the title with its mission-type chip (Delivery,
   Kill order, Mining), the payout and the standing gain, and one **Details**
   button. The authored prose moved out of the row (it was too much to read
-  at once on a 394 px column) and into the Details dialog, where the contact
+  at once on the narrow column) and into the Details dialog, where the contact
   speaks it. A standing-gated row states its requirement on the row and
   keeps Details open. The disabled accept and its reason live in the
   dialog.
@@ -92,6 +103,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as the face the offers list and the Details dialog draw (photos compress
   far better as JPEG). Artwork kept its JPEG, every other sprite stays
   PNG-only; the convention is documented in `ART.md` and `assets/README.md`.
+- **Contact rows are roomier and the portrait spans them** — an offer row is
+  now a full-height entry: the contact's 2:3 portrait fills the row (56×84 at
+  the floor, four times the old 28×42 thumb's area) and the title, chip and
+  payout sit centred beside it. At the row cap the board's content floor is
+  475 design px (was 440).
+- **The Contacts view follows its window's width** — the panel re-reads the
+  body's laid-out width every Sync (a grip resize) and re-derives every
+  column from it: the **Details** button stays on the row's right edge, the
+  title and payout columns grow, and the Undock identity line re-ellipsizes.
+  A frame at an unchanged width rebuilds nothing. The column itself is wider
+  (307 → 355 design px, right edge 404 → 452) with more padding throughout
+  (body 6 → 9, block spacing 5 → 7, row gap 4 → 5, row inset 6, portrait gap
+  10).
+- **The dock view's height grew with it** — at a station posting the full
+  three offers while you carry active work the board's bottom reaches into
+  the log pocket's title band at 1280×720 (and further at the 1024×700
+  minimum); the log raises on a click, as the market window already owns that
+  strip at the minimum size.
 
 ## [0.12.0] - 2026-10-31
 
