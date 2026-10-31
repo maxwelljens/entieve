@@ -67,12 +67,12 @@ func TestWorldClickSelection(t *testing.T) {
 	}
 }
 
-// TestChromeOnRootOverlay: the HUD (status + rack pair) and the navigation
-// rail mount directly on the kit's root overlay (no full-screen wrapper
-// windows), the rack and rail track hover, and their exact rects gate the
-// world while empty space does not. The rack rides the HUD's pair, not the
-// root. The log moved off the root — it is a window now (see
-// TestLogWindowGate).
+// TestChromeOnRootOverlay: the HUD (status + rack pair), the target-card
+// row and the navigation rail mount directly on the kit's root overlay (no
+// full-screen wrapper windows), the rack and rail track hover, and their
+// exact rects gate the world while empty space does not. The rack rides the
+// HUD's pair, not the root; the cards ride their own top-chrome column. The
+// log moved off the root — it is a window now (see TestLogWindowGate).
 func TestChromeOnRootOverlay(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
@@ -87,11 +87,11 @@ func TestChromeOnRootOverlay(t *testing.T) {
 		}
 		mounted[c] = true
 	}
-	if len(kids) != 2 {
-		t.Errorf("root overlay has %d children, want exactly the HUD and rail", len(kids))
+	if len(kids) != 3 {
+		t.Errorf("root overlay has %d children, want exactly the HUD, the target cards and the rail", len(kids))
 	}
 	for name, c := range map[string]*widget.Container{
-		"hud": g.hud.Container(), "rail": g.rail.Container(),
+		"hud": g.hud.Container(), "cards": g.hud.Cards().Container(), "rail": g.rail.Container(),
 	} {
 		if !mounted[c] {
 			t.Errorf("%s is not mounted on the root overlay", name)

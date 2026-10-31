@@ -3,13 +3,16 @@ package screens
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"strings"
 	"testing"
 
+	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/internal/capture"
 	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -36,7 +39,8 @@ func TestHudCaptureFrame(t *testing.T) {
 	h.MountRack(r.Container())
 	c := newChromeUI(env)
 	c.AddPanel(h.Container(), h)
-	c.panels = append(c.panels, r) // the rack rides the HUD pair; Sync it as the game does
+	c.root.AddChild(h.Cards().Container()) // the game mounts it as top chrome
+	c.panels = append(c.panels, r)         // the rack rides the HUD pair; Sync it as the game does
 
 	// --- Scenario: a damaged player, two locks (damaged ship + rock), one
 	// active module. Everything mutates the sim's read surface directly,
@@ -189,4 +193,121 @@ func TestHudCaptureFrame(t *testing.T) {
 		},
 		Out: out,
 	}).Run(t)
+}
+
+// hudCardsCaptureFrames is how many drawn frames settle each phase of
+// TestHudCardsPixelsDrawAboveWindows (anchors and layout settle on the
+// first frames; the overview's fade is 12).
+const hudCardsCaptureFrames = 13
+
+// TestHudCardsPixelsDrawAboveWindows is the target-card twin of
+// TestRailPixelsDrawAboveWindows: the Overview's default body covers the
+// card band, and the cards must be the pixels there. Pixel readback panics
+// before the game starts, so this rides the gated real-loop harness
+// (ENTIEVE_CAPTURE=1).
+//
+// Method: sample four card-interior points over the window, then clear the
+// locks (cards gone, window unchanged) and sample the same points: the
+// card frame must differ at every point. If the window painted over the
+// row, both frames would carry identical window pixels and every comparison
+// would come back equal. Samples run INSIDE Draw, on the frame just
+// rendered.
+func TestHudCardsPixelsDrawAboveWindows(t *testing.T) {
+	k, _ := newTestKit(t)
+	h := NewHud(k.Env())
+	k.AddContainer(h.Container(), widget.AnchorLayoutData{
+		StretchHorizontal: true, StretchVertical: true,
+	})
+	k.AddTopContainer(h.Cards(), widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionCenter,
+		VerticalPosition:   widget.AnchorLayoutPositionStart,
+		Padding:            &widget.Insets{Top: theme.Px(10)},
+	})
+	s := k.Sim
+	var target ecs.Entity
+	for _, inf := range s.Grid() {
+		if inf.Entity != s.Player() {
+			target = inf.Entity
+			break
+		}
+	}
+	tg, ok := s.Targetings.Get(s.Player())
+	if !ok {
+		t.Fatal("player has no targeting component")
+	}
+	tg.Locks = []sim.Lock{{Target: target, Progress: 1}}
+	h.Sync()
+	pumpKit(t, k, 1024, 700)
+	pumpKit(t, k, 1024, 700)
+
+	box := h.boxes[0].root.GetWidget().Rect
+	ovRect := k.OverviewWindow().GetContainer().GetWidget().Rect
+	if box.Empty() || !box.In(ovRect) {
+		t.Fatalf("fixture: card %v not under the overview %v", box, ovRect)
+	}
+	w, hgt := theme.Px(hudBoxW), theme.Px(hudBoxH)
+	points := []image.Point{
+		{box.Min.X + w/2, box.Min.Y + 4},
+		{box.Min.X + 4, box.Min.Y + hgt/2},
+		{box.Min.X + w/2, box.Min.Y + hgt - 5},
+		{box.Min.X + w - 5, box.Min.Y + hgt/2},
+	}
+	sample := func(img *ebiten.Image) []color.RGBA {
+		out := make([]color.RGBA, len(points))
+		for i, p := range points {
+			r, gr, b, a := img.At(p.X, p.Y).RGBA()
+			out[i] = color.RGBA{R: uint8(r >> 8), G: uint8(gr >> 8), B: uint8(b >> 8), A: uint8(a >> 8)}
+		}
+		return out
+	}
+
+	var withCards *ebiten.Image // screenshot evidence: the cards-over-window frame
+	var above, without []color.RGBA
+	out := capture.Out("hud_cards_top.png")
+	var cap *capture.Capture
+	cap = &capture.Capture{
+		Name: "Entieve target cards over window capture",
+		Size: image.Pt(1024, 700),
+		Update: func(int) error {
+			h.Sync()
+			k.Sync()
+			return k.Update()
+		},
+		Draw: func(n int, img *ebiten.Image) error {
+			k.Draw(img)
+			switch {
+			case n <= hudCardsCaptureFrames:
+			case n == hudCardsCaptureFrames+1:
+				above = sample(img)
+				withCards = img
+				tg.Locks = nil // the cards vanish from the next frame on
+			case n <= 2*hudCardsCaptureFrames+2:
+			default:
+				without = sample(img)
+				if err := capture.Save(out, withCards); err != nil {
+					return err
+				}
+				cap.Stop()
+			}
+			return nil
+		},
+		Verify: func(*ebiten.Image) error {
+			var errs []string
+			for i, p := range points {
+				if above[i] == without[i] {
+					errs = append(errs, fmt.Sprintf("point %v identical with and without the cards (%s) — "+
+						"the cards are not painting over the window", p, formatRGBA(above[i])))
+				}
+			}
+			if len(errs) == 0 {
+				return nil
+			}
+			for i, p := range points {
+				t.Logf("point %v: cards above = %v, without = %v",
+					p, formatRGBA(above[i]), formatRGBA(without[i]))
+			}
+			return fmt.Errorf("capture %s: %s", out, strings.Join(errs, "; "))
+		},
+	}
+	cap.Run(t)
 }

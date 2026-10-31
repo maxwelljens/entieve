@@ -722,14 +722,21 @@ func (g *Game) buildKit() error {
 
 	// Always-on chrome mounts straight onto the kit's root overlay — no
 	// full-screen wrapper windows: the HUD stretches across the root and
-	// anchors its own pair (status + rack) and target row, the navigation
-	// rail the left edge. The rack itself rides the HUD's pair
-	// (MountRack), so it is not a root child. (The log used to anchor
-	// here too; it is a window now and mounts through syncMounts like
-	// the other panels.)
+	// anchors its own pair (status + rack), the navigation rail the left
+	// edge. The rack itself rides the HUD's pair (MountRack), so it is
+	// not a root child. (The log used to anchor here too; it is a window
+	// now and mounts through syncMounts like the other panels.)
 	kit.AddContainer(g.hud.Container(), widget.AnchorLayoutData{
 		StretchHorizontal: true,
 		StretchVertical:   true,
+	})
+	// The locked-target cards are TOP chrome: the doubled Overview's
+	// default body covers their top-centre band, so they mount above the
+	// window stack (under the context menu) with the row's own anchor.
+	kit.AddTopContainer(g.hud.Cards(), widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionCenter,
+		VerticalPosition:   widget.AnchorLayoutPositionStart,
+		Padding:            &widget.Insets{Top: theme.Px(10)},
 	})
 	// The rail is derived from the spec in one pass (game/rail.go) and
 	// pinned to the left edge, top-flush with the window row below the

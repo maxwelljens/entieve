@@ -219,16 +219,17 @@ func TestHudVelocityWedge(t *testing.T) {
 
 // TestHudTargetBoxes covers the top-center lock row: hidden with no locks,
 // one card per lock with name, distance, lock progress and layer fractions,
-// hidden again when the locks drop. The card state is the render input, so
-// pinning it pins what gets drawn.
+// hidden again when the locks drop (the row itself stays mounted: all cards
+// hidden lays it out 0×0, the top chrome's empty state). The card state is
+// the render input, so pinning it pins what gets drawn.
 func TestHudTargetBoxes(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	h := NewHud(env)
 	s := env.Sim
 	player := s.Player()
 	h.Sync()
-	if vis := h.targetRow.GetWidget().GetVisibility(); vis != widget.Visibility_Hide {
-		t.Fatalf("no locks but target row visibility = %d", vis)
+	if vis := h.boxes[0].root.GetWidget().GetVisibility(); vis != widget.Visibility_Hide {
+		t.Fatalf("no locks but card 0 visibility = %d", vis)
 	}
 
 	// Find a ship and a non-ship on the grid (the showcase starts with
@@ -258,8 +259,8 @@ func TestHudTargetBoxes(t *testing.T) {
 		{Target: rock.Entity, Progress: 1},
 	}
 	h.Sync()
-	if vis := h.targetRow.GetWidget().GetVisibility(); vis != widget.Visibility_Show {
-		t.Fatalf("locked targets hide the target row (visibility %d)", vis)
+	if vis := h.boxes[0].root.GetWidget().GetVisibility(); vis != widget.Visibility_Show {
+		t.Fatalf("locked targets hide card 0 (visibility %d)", vis)
 	}
 	b0, b1, b2 := h.boxes[0], h.boxes[1], h.boxes[2]
 
@@ -328,8 +329,8 @@ func TestHudTargetBoxes(t *testing.T) {
 
 	tg.Locks = nil
 	h.Sync()
-	if vis := h.targetRow.GetWidget().GetVisibility(); vis != widget.Visibility_Hide {
-		t.Errorf("unlocked targets keep the row visible (visibility %d)", vis)
+	if vis := h.boxes[0].root.GetWidget().GetVisibility(); vis != widget.Visibility_Hide {
+		t.Errorf("unlocked targets keep card 0 visible (visibility %d)", vis)
 	}
 }
 
@@ -343,6 +344,7 @@ func TestHudDrawSmoke(t *testing.T) {
 	h.MountRack(NewRack(env).Container())
 	c := newChromeUI(env)
 	c.AddPanel(h.Container(), h)
+	c.root.AddChild(h.Cards().Container()) // the game mounts it as top chrome
 	c.Frame(t, 1280, 720)
 
 	// One lock so the target row is laid out, then re-anchor both halves.
@@ -698,6 +700,7 @@ func TestHudTargetCardClickSelects(t *testing.T) {
 	h := NewHud(env)
 	c := newChromeUI(env)
 	c.AddPanel(h.Container(), h)
+	c.root.AddChild(h.Cards().Container()) // the game mounts it as top chrome
 
 	var picked []ecs.Entity
 	h.SetSelector(func(e ecs.Entity) { picked = append(picked, e) })
@@ -752,6 +755,172 @@ func TestHudTargetCardClickSelects(t *testing.T) {
 	click(pt)
 	if len(picked) != 1 {
 		t.Errorf("a click on the hidden target row selected %v", picked[1:])
+	}
+}
+
+// TestHudTargetCardsOverOverview pins the locked-target row as TOP chrome.
+// The default Overview covers the top-centre band (its 760×409 default lands
+// at 95,8..855,417 at 1024, the one-lock row 446..578 × 10..93 inside it),
+// so a row mounted with the HUD's under-window container is dead there: the
+// window owns the band and eats the press. Through Kit.AddTopContainer the
+// card's centre answers LayerTopChrome and the click selects.
+//
+// Three more rules ride along: the gap between two cards is claimed by the
+// column (top layer, no control — the overview under it keeps its clicks),
+// an overview row outside the band selects as always, and with no locks the
+// row lays out empty so the band falls back to the window.
+func TestHudTargetCardsOverOverview(t *testing.T) {
+	fm := useFakeMouse(t)
+	k, _ := newTestKitWith(t, widgets.NewPointer(fm))
+	h := NewHud(k.Env())
+	k.AddContainer(h.Container(), widget.AnchorLayoutData{
+		StretchHorizontal: true, StretchVertical: true,
+	})
+	k.AddTopContainer(h.Cards(), widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionCenter,
+		VerticalPosition:   widget.AnchorLayoutPositionStart,
+		Padding:            &widget.Insets{Top: theme.Px(10)},
+	})
+	var picked []ecs.Entity
+	h.SetSelector(func(e ecs.Entity) { picked = append(picked, e) })
+
+	s := k.Sim
+	p := s.Player()
+	var target ecs.Entity
+	for _, inf := range s.Grid() {
+		if inf.Entity != p {
+			target = inf.Entity
+			break
+		}
+	}
+	if target == 0 {
+		t.Fatal("fixture: no entity to lock")
+	}
+	tg, ok := s.Targetings.Get(p)
+	if !ok {
+		t.Fatal("player has no targeting component")
+	}
+	tg.Locks = []sim.Lock{{Target: target, Progress: 1}}
+	frame := func() {
+		h.Sync()
+		pumpKit(t, k, 1024, 700)
+	}
+	frame()
+
+	box := h.boxes[0].root.GetWidget().Rect
+	if box.Empty() {
+		t.Fatal("fixture: card never laid out")
+	}
+	pt := mid(box)
+	ov := k.OverviewWindow().GetContainer().GetWidget().Rect
+	if !pt.In(ov) {
+		t.Fatalf("fixture: card centre %v is not under the overview %v", pt, ov)
+	}
+	if o := k.Own(pt); o.Layer != LayerTopChrome {
+		t.Errorf("card centre %v = layer %d (window %v), want layer %d (top chrome)",
+			pt, o.Layer, o.Window, LayerTopChrome)
+	}
+
+	click := func(at image.Point) {
+		fm.at(at.X, at.Y)
+		frame() // hover settles
+		fm.down()
+		frame()
+		fm.up()
+		frame() // the click fires on the release
+	}
+	click(pt)
+	if len(picked) != 1 || picked[0] != target {
+		t.Fatalf("card click over the overview reported %v, want [%v]", picked, target)
+	}
+
+	// Two cards: the gap between them is the column's — the top layer owns
+	// it with no control, and the overview row underneath never sees the
+	// press (BlockLower). Disclosed limit: while locks exist the overview
+	// keeps no clicks on the row's band, gaps included.
+	var others []ecs.Entity
+	for _, inf := range s.Grid() {
+		if inf.Entity != p && inf.Entity != target {
+			others = append(others, inf.Entity)
+		}
+		if len(others) == 1 {
+			break
+		}
+	}
+	if len(others) == 0 {
+		t.Fatal("fixture: no second entity to lock")
+	}
+	tg.Locks = []sim.Lock{{Target: target, Progress: 1}, {Target: others[0], Progress: 1}}
+	frame()
+	// The row re-centres on two cards: read both fresh.
+	c0, c1 := h.boxes[0].root.GetWidget().Rect, h.boxes[1].root.GetWidget().Rect
+	gap := image.Pt((c0.Max.X+c1.Min.X)/2, mid(c1).Y)
+	if gap.X <= c0.Max.X || gap.X >= c1.Min.X {
+		t.Fatalf("fixture: gap %v is not between the cards %v and %v", gap, c0, c1)
+	}
+	if o := k.Own(gap); o.Layer != LayerTopChrome || o.Control {
+		t.Errorf("gap %v = layer %d control %v, want the card column (layer %d), no control",
+			gap, o.Layer, o.Control, LayerTopChrome)
+	}
+	click(gap)
+	if len(picked) != 1 {
+		t.Errorf("a gap click selected cards %v", picked[1:])
+	}
+	if got := k.Selected(); got != 0 {
+		t.Errorf("a gap click reached the overview underneath: selection = %v", got)
+	}
+
+	// An overview row below the band is the window's, as always.
+	row := image.Rectangle{}
+	for i, n := 0, len(k.OverviewTable().RowsForTest()); i < n; i++ {
+		if r := k.OverviewTable().RowWidgetForTest(i).Rect; r.Min.Y > box.Max.Y+4 && !r.Empty() {
+			row = r
+			break
+		}
+	}
+	if row.Empty() {
+		t.Fatal("fixture: no overview row below the card band")
+	}
+	rowPt := mid(row)
+	if o := k.Own(rowPt); o.Layer != LayerWindow || o.Window != k.OverviewWindow() {
+		t.Errorf("overview row below the band %v = layer %d window %v, want the overview (layer %d)",
+			rowPt, o.Layer, o.Window, LayerWindow)
+	}
+	click(rowPt)
+	if k.Selected() == 0 {
+		t.Error("a click on an overview row below the band selected nothing")
+	}
+
+	// No locks: the row lays out empty, so the band is the overview's again —
+	// in the walk AND in the real input path (the parked top layer blocks
+	// nothing there).
+	tg.Locks = nil
+	frame()
+	if o := k.Own(pt); o.Layer != LayerWindow || o.Window != k.OverviewWindow() {
+		t.Errorf("no locks: card band %v = layer %d window %v, want the overview (layer %d)",
+			pt, o.Layer, o.Window, LayerWindow)
+	}
+	// ... and in the real input path: a window control sitting where the cards
+	// were takes the click (the parked top layer blocks nothing).
+	clicked := 0
+	btn := widget.NewButton(widget.ButtonOpts.TextLabel("x"),
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MouseButtonClickedHandler(
+			func(*widget.WidgetMouseButtonClickedEventArgs) { clicked++ })))
+	body := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
+	body.AddChild(btn)
+	k.AddWindow(widget.NewWindow(
+		widget.WindowOpts.Contents(body),
+		widget.WindowOpts.MinSize(theme.Px(240), theme.Px(120)),
+		widget.WindowOpts.Location(box),
+	))
+	frame()
+	bp := mid(btn.GetWidget().Rect)
+	if !bp.In(box) {
+		t.Fatalf("fixture: window button %v is not inside the old card band %v", bp, box)
+	}
+	click(bp)
+	if clicked != 1 {
+		t.Errorf("no locks: a click on a window control at %v inside the band fired %d times, want 1", bp, clicked)
 	}
 }
 
