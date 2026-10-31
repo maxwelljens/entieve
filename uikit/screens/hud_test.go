@@ -5,10 +5,13 @@ import (
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/core"
+	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/hulls"
 	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
 )
 
 // TestHudConstruction checks the panel builds and Sync fills it from the
@@ -262,7 +265,7 @@ func TestHudTargetBoxes(t *testing.T) {
 
 	// Card 0: the ship target — name, distance, lock progress and the
 	// three real layer fractions.
-	wantName, wantDist := h.boxLabels(ship.Name, theme.FormatDistance(ship.Distance))
+	wantName, wantDist := h.boxLabels(ship.Name, theme.FormatDistance(ship.Distance), 0)
 	if b0.card.name != wantName {
 		t.Errorf("box 0 name = %q, want %q", b0.card.name, wantName)
 	}
@@ -519,5 +522,303 @@ func TestBarFill(t *testing.T) {
 	cardBar := image.Rect(4, 46, 128, 54)
 	if got := barFill(cardBar, 0.25); got != image.Rect(4, 46, 35, 54) {
 		t.Errorf("barFill(card, 0.25) = %v, want (4,46)-(35,54)", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// The owner's HUD tranche: WARP in the speed figure, click-to-select target
+// cards, the modules cycling on a card, and the EWAR effect boxes.
+// ---------------------------------------------------------------------------
+
+// TestHudSpeedFigureReadsWARP: while a WarpDrive is live the speed figure is
+// the literal WARP (any phase); the wedge keeps its clamped gauge, and with
+// the drive gone the numeric figure comes back.
+func TestHudSpeedFigureReadsWARP(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	h := NewHud(env)
+	s := env.Sim
+	p := s.Player()
+	h.Sync()
+	if h.speedLbl.Label != theme.FormatSpeed(0) {
+		t.Fatalf("at rest the figure = %q, want the numeric %q", h.speedLbl.Label, theme.FormatSpeed(0))
+	}
+	tr, ok := s.Transforms.Get(p)
+	if !ok {
+		t.Fatal("player has no transform")
+	}
+	s.Warps.Set(p, sim.WarpDrive{Phase: "align", To: tr.Pos.Add(core.V(1e7, 0))})
+	h.Sync()
+	if h.speedLbl.Label != "WARP" {
+		t.Errorf("aligning figure = %q, want WARP", h.speedLbl.Label)
+	}
+	wd, _ := s.Warps.Get(p)
+	wd.Phase = "warp"
+	h.Sync()
+	if h.speedLbl.Label != "WARP" {
+		t.Errorf("warping figure = %q, want WARP", h.speedLbl.Label)
+	}
+	// The wedge keeps the clamped current/max gauge (not redesigned).
+	m, ok := s.Motions.Get(p)
+	if !ok {
+		t.Fatal("player has no motion")
+	}
+	if m.MaxSpeed > 0 && h.wedgeFrac != hudFrac01(m.Vel.Len()/m.MaxSpeed) {
+		t.Errorf("wedge = %v, want the clamped gauge %v", h.wedgeFrac, hudFrac01(m.Vel.Len()/m.MaxSpeed))
+	}
+	s.Warps.Remove(p)
+	h.Sync()
+	if h.speedLbl.Label != theme.FormatSpeed(m.Vel.Len()) {
+		t.Errorf("after landing the figure = %q, want the numeric %q",
+			h.speedLbl.Label, theme.FormatSpeed(m.Vel.Len()))
+	}
+}
+
+// modView overrides the two module reads the target cards make (the fitting
+// and each slot's activation target) over the real session's view: the sim
+// still supplies the grid, the locks and every other read.
+type modView struct {
+	widgets.ContentView
+	player  ecs.Entity
+	fit     sim.Fitting
+	targets map[sim.SlotRef]ecs.Entity
+}
+
+func (v *modView) Fitting(e ecs.Entity) (sim.Fitting, bool) {
+	if e == v.player {
+		return v.fit, true
+	}
+	return v.ContentView.Fitting(e)
+}
+
+func (v *modView) ModuleTarget(e ecs.Entity, slot sim.SlotRef) (ecs.Entity, bool) {
+	if e == v.player {
+		if tgt, ok := v.targets[slot]; ok {
+			return tgt, true
+		}
+		return 0, false
+	}
+	return v.ContentView.ModuleTarget(e, slot)
+}
+
+// modEnv is the HUD's constructor param (Theme + ContentView) over that view.
+type modEnv struct {
+	theme.Theme
+	widgets.ContentView
+}
+
+// TestHudTargetCardShowsCyclingModules: a card names the player's active
+// modules whose activation target is that card's entity — module A only on
+// card 1, module B only on card 2, nothing while they are off.
+func TestHudTargetCardShowsCyclingModules(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	s := env.Sim
+	p := s.Player()
+	h := NewHud(env)
+
+	var one, two ecs.Entity
+	for _, inf := range s.Grid() {
+		if inf.Entity == p {
+			continue
+		}
+		if one == 0 {
+			one = inf.Entity
+		} else if two == 0 {
+			two = inf.Entity
+			break
+		}
+	}
+	if one == 0 || two == 0 {
+		t.Fatal("fixture: showcase grid has no two entities to lock")
+	}
+	tg, ok := s.Targetings.Get(p)
+	if !ok {
+		t.Fatal("player has no targeting component")
+	}
+	tg.Locks = []sim.Lock{{Target: one, Progress: 1}, {Target: two, Progress: 1}}
+
+	// The player's two EWAR modules, both cycling, one per target.
+	view := widgets.ContentView(env)
+	mv := &modView{
+		ContentView: view,
+		player:      p,
+		fit: sim.Fitting{
+			Mid:   []content.ModuleID{"mod-stasis-web", "mod-warp-scram"},
+			MidRT: []sim.ModuleRuntime{{Def: "mod-stasis-web", Active: true}, {Def: "mod-warp-scram", Active: true}},
+		},
+		targets: map[sim.SlotRef]ecs.Entity{
+			{Class: content.SlotMid, Index: 0}: one,
+			{Class: content.SlotMid, Index: 1}: two,
+		},
+	}
+	h2 := NewHud(modEnv{Theme: env, ContentView: mv})
+	h2.Sync()
+
+	if h2.boxes[0].card.nmods != 1 || h2.boxes[0].card.mods[0] != "mod-stasis-web" {
+		t.Errorf("card 1 mods = %v (n=%d), want the web module's own glyph only",
+			h2.boxes[0].card.mods, h2.boxes[0].card.nmods)
+	}
+	if h2.boxes[1].card.nmods != 1 || h2.boxes[1].card.mods[0] != "mod-warp-scram" {
+		t.Errorf("card 2 mods = %v (n=%d), want the scram module's own glyph only",
+			h2.boxes[1].card.mods, h2.boxes[1].card.nmods)
+	}
+	// Idle modules carry no glyph.
+	for i := range mv.fit.MidRT {
+		mv.fit.MidRT[i].Active = false
+	}
+	h2.Sync()
+	for i := 0; i < 2; i++ {
+		if n := h2.boxes[i].card.nmods; n != 0 {
+			t.Errorf("idle card %d mods n = %d, want none", i, n)
+		}
+	}
+	// The glyphs sit on the distance line, inside the card, and clear of
+	// the distance text's ellipsis reserve.
+	card := image.Rect(0, 0, hudBoxW, hudBoxH)
+	for i := 0; i < hudBoxMods; i++ {
+		box := targetCardMod(card, i)
+		if !box.In(targetCardDist(card)) {
+			t.Errorf("mod box %d = %v, want it on the distance line %v", i, box, targetCardDist(card))
+		}
+	}
+	if got, want := cardModsWidth(2), 2*theme.IconInline+theme.IconGap; got != want {
+		t.Errorf("cardModsWidth(2) = %d, want %d", got, want)
+	}
+	if h.boxes[0].card.nmods != 0 {
+		t.Error("the un-wired HUD grew module glyphs")
+	}
+}
+
+// TestHudTargetCardClickSelects drives a real press/release on a laid-out
+// card through the widget pipeline: the card's entity is reported to the
+// selector (the game wires Kit.Select). Empty chrome between cards and a
+// hidden target row select nothing.
+func TestHudTargetCardClickSelects(t *testing.T) {
+	fm := useFakeMouse(t)
+	env, _ := newChromeEnv(t)
+	h := NewHud(env)
+	c := newChromeUI(env)
+	c.AddPanel(h.Container(), h)
+
+	var picked []ecs.Entity
+	h.SetSelector(func(e ecs.Entity) { picked = append(picked, e) })
+
+	s := env.Sim
+	p := s.Player()
+	var target ecs.Entity
+	for _, inf := range s.Grid() {
+		if inf.Entity != p {
+			target = inf.Entity
+			break
+		}
+	}
+	if target == 0 {
+		t.Fatal("fixture: no entity to lock")
+	}
+	tg, ok := s.Targetings.Get(p)
+	if !ok {
+		t.Fatal("player has no targeting component")
+	}
+	tg.Locks = []sim.Lock{{Target: target, Progress: 1}}
+	c.Frame(t, 1280, 720)
+
+	box := h.boxes[0].root.GetWidget().Rect
+	if box.Empty() {
+		t.Fatal("fixture: card never laid out")
+	}
+	pt := image.Pt((box.Min.X+box.Max.X)/2, (box.Min.Y+box.Max.Y)/2)
+	click := func(at image.Point) {
+		fm.at(at.X, at.Y)
+		c.Frame(t, 1280, 720) // hover settles
+		fm.down()
+		c.Frame(t, 1280, 720)
+		fm.up()
+		c.Frame(t, 1280, 720) // the click fires on the release
+	}
+
+	click(pt)
+	if len(picked) != 1 || picked[0] != target {
+		t.Fatalf("card click reported %v, want [%v]", picked, target)
+	}
+
+	// Empty chrome: left of the centred card row, inside nothing.
+	click(image.Pt(box.Min.X-20, pt.Y))
+	if len(picked) != 1 {
+		t.Errorf("a click on empty chrome selected %v", picked[1:])
+	}
+
+	// Hidden row: no card, no selection.
+	tg.Locks = nil
+	c.Frame(t, 1280, 720)
+	click(pt)
+	if len(picked) != 1 {
+		t.Errorf("a click on the hidden target row selected %v", picked[1:])
+	}
+}
+
+// TestHudEffectBoxes: web and scram each get a box above the ship status
+// while their sim expiry is ahead, with the time left; both vanish at expiry
+// and the row hides.
+func TestHudEffectBoxes(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	h := NewHud(env)
+	s := env.Sim
+	p := s.Player()
+
+	h.Sync()
+	if vis := h.effects.GetWidget().GetVisibility(); vis != widget.Visibility_Hide {
+		t.Fatalf("no effects but the effect row is visible (visibility %d)", vis)
+	}
+	for i, e := range h.eff {
+		if vis := e.root.GetWidget().GetVisibility(); vis != widget.Visibility_Hide {
+			t.Fatalf("effect box %d visible with no effect", i)
+		}
+	}
+
+	m, ok := s.Motions.Get(p)
+	if !ok {
+		t.Fatal("player has no motion")
+	}
+	sh, ok := s.Ships.Get(p)
+	if !ok {
+		t.Fatal("player has no ship")
+	}
+	now := s.Time()
+	m.WebFactor, m.WebbedUntil = 0.55, now+7
+	sh.ScrambledUntil = now + 3
+	h.Sync()
+
+	if vis := h.effects.GetWidget().GetVisibility(); vis != widget.Visibility_Show {
+		t.Fatalf("effects live but the row is hidden")
+	}
+	for i, want := range []string{"7.0 s", "3.0 s"} {
+		if vis := h.eff[i].root.GetWidget().GetVisibility(); vis != widget.Visibility_Show {
+			t.Errorf("effect box %d hidden while its effect is live", i)
+		}
+		if got := h.eff[i].lbl.Label; got != want {
+			t.Errorf("effect box %d remaining = %q, want %q", i, got, want)
+		}
+	}
+
+	// The row sits directly above the ship status (strip, effects, status).
+	c := newChromeUI(env)
+	c.AddPanel(h.Container(), h)
+	c.Frame(t, 1280, 720)
+	strip, effs, status := h.strip.GetWidget().Rect, h.effects.GetWidget().Rect, h.status.GetWidget().Rect
+	if effs.Max.Y > status.Min.Y || effs.Min.Y < strip.Max.Y {
+		t.Errorf("effects %v not between the strip %v and the status %v", effs, strip, status)
+	}
+
+	// Expiry clears both boxes and hides the row again.
+	s.Step()
+	m.WebbedUntil = s.Time() - 1
+	sh.ScrambledUntil = s.Time() - 1
+	h.Sync()
+	for i, e := range h.eff {
+		if vis := e.root.GetWidget().GetVisibility(); vis != widget.Visibility_Hide {
+			t.Errorf("effect box %d still visible after expiry", i)
+		}
+	}
+	if vis := h.effects.GetWidget().GetVisibility(); vis != widget.Visibility_Hide {
+		t.Errorf("the effect row stays visible after expiry")
 	}
 }

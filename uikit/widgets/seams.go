@@ -83,6 +83,11 @@ type ContentView interface {
 	// canonical order. "" = dry, or not a weapon slot.
 	PredictedAmmo(sim.SlotRef) content.ItemID
 
+	// ModuleTarget is the entity one active module slot is bound to (the
+	// sim's own activation target); ok is false when nothing is bound. The
+	// target cards read it to name the modules cycling on them.
+	ModuleTarget(ecs.Entity, sim.SlotRef) (ecs.Entity, bool)
+
 	// Clip is one fitted slot's shell bay as the rack reads it — loaded
 	// rounds, the bay's whole-round capacity for that round, the selected
 	// type and every compatible type in cargo (sorted). ok is false when
@@ -360,6 +365,11 @@ func (v *view) HangarShips() []sim.StoredShip {
 // Clip reads one fitted slot's shell bay from the sim, for the player.
 func (v *view) Clip(slot sim.SlotRef) (sim.ClipState, bool) {
 	return v.s.Clip(v.s.Player(), slot)
+}
+
+// ModuleTarget reads one of the player's slots' activation target.
+func (v *view) ModuleTarget(e ecs.Entity, slot sim.SlotRef) (ecs.Entity, bool) {
+	return v.s.ModuleTarget(e, slot)
 }
 
 // PredictedAmmo mirrors the sim's findCharge once, over the player's

@@ -254,6 +254,12 @@ func TestApplyUIScaleLiveRelayout(t *testing.T) {
 		int(math.Round(float64(before.Min.X)*1.5)), int(math.Round(float64(before.Min.Y)*1.5)),
 		int(math.Round(float64(before.Max.X)*1.5)), int(math.Round(float64(before.Max.Y)*1.5))),
 		*g.kit.OverviewWindow().MinSize, image.Rect(0, 0, g.w, g.h))
+	// The restore then floors the left edge clear of the rail gutter
+	// (layout.go applyLayout: the rail beats the right edge) — with the
+	// wider overview at 1.5× that floor now actually bites.
+	if floor := railClearX(); want.Min.X < floor {
+		want = want.Add(image.Pt(floor-want.Min.X, 0))
+	}
 	if after != want {
 		t.Errorf("overview rect after change = %v, want %v (design units ×1.5, clamped on screen)", after, want)
 	}

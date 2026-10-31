@@ -458,6 +458,7 @@ func (s *Sim) Info(e ecs.Entity) (Info, bool) {
 	}
 	tr, _ := s.Transforms.Get(e)
 	info := Info{Entity: e, Name: s.nameOf(e), Pos: tr.Pos, Health: 1}
+	info.Warping = s.Warps.Has(e)
 	if v, ok := s.Motions.Get(e); ok {
 		info.Vel = v.Vel
 	}

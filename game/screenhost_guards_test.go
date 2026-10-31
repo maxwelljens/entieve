@@ -197,21 +197,21 @@ const layoutBytesGolden = `{
       }
     },
     "overview": {
-      "x": 890,
+      "x": 510,
       "y": 8,
-      "w": 380,
+      "w": 760,
       "h": 409,
       "open": true,
       "tables": {
         "overview": {
           "Distance": {
-            "width": 97.203125
+            "width": 108.46875
           },
           "Kind": {
-            "width": 49.546875
+            "width": 87.109375
           },
           "Name": {
-            "width": 96.859375
+            "width": 428.03125
           },
           "Velocity": {
             "width": 74.390625

@@ -808,7 +808,10 @@ type Info struct {
 	CanLoot  bool
 	CanMine  bool
 	CanWarp  bool
-	Visible  bool // landmark celestial, or within SensorRange of the player
+	// Warping is the warp drive engaged (a live WarpDrive, any phase):
+	// the HUD and the overview print "WARP" instead of the grid speed.
+	Warping bool
+	Visible bool // landmark celestial, or within SensorRange of the player
 }
 
 // ---------------------------------------------------------------------------

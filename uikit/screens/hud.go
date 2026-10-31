@@ -8,6 +8,8 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/ecs"
+	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/hulls"
 	"github.com/entieve/entieve/uikit/icons"
@@ -39,6 +41,14 @@ const (
 	hudBoxW      = 132  // one target box width (px)
 	hudBoxH      = 83   // one target box height (px, fixed)
 	hudBoxGap    = 5    // gap between target boxes
+	hudBoxMods   = 3    // module glyphs a card shows on its distance line
+	// The EWAR effect boxes above the ship status: a rack cell scaled down —
+	// a tile with the effect glyph and a depleting cycle ring, its
+	// remaining-time line under it (the rack's tile + name layout).
+	hudEffW     = 44 // box width: the tile plus air for the countdown line (px)
+	hudEffTile  = 34 // tile size (px)
+	hudEffNameH = 19 // countdown line height (px, fits StepTiny)
+	hudEffRingW = 2  // depletion ring stroke (px)
 )
 
 // The velocity wedge shares the health block's band: it is exactly as tall
@@ -126,6 +136,26 @@ func targetCardBars(card image.Rectangle) image.Rectangle {
 	return image.Rect(b.Min.X, y, b.Max.X, b.Max.Y)
 }
 
+// targetCardMod returns the box of the i-th module glyph counted from the
+// distance line's right edge (i = 0 is the outermost), so the glyphs hug the
+// card's edge however many there are.
+func targetCardMod(card image.Rectangle, i int) image.Rectangle {
+	dl := targetCardDist(card)
+	size := theme.Px(theme.IconInline)
+	y := dl.Min.Y + (dl.Dy()-size)/2
+	x2 := dl.Max.X - i*(size+theme.Px(theme.IconGap))
+	return image.Rect(x2-size, y, x2, y+size)
+}
+
+// cardModsWidth is the room n module glyphs take on the distance line (0 for
+// none) — what the distance text is ellipsized clear of.
+func cardModsWidth(n int) int {
+	if n <= 0 {
+		return 0
+	}
+	return n*theme.Px(theme.IconInline) + (n-1)*theme.Px(theme.IconGap)
+}
+
 // layerBars tiles r with exactly three stacked bars separated by
 // hudBoxBarGap. Heights divide evenly; any division remainder lands on
 // the last bar, so the three rects cover r with no gaps and no overlaps.
@@ -171,8 +201,14 @@ type Hud struct {
 	targetRow *widget.Container
 	pair      *widget.Container // bottom-center: status column + rack slot
 	strip     *widget.Container
+	effects   *widget.Container // EWAR icons above the status (hidden when none)
+	eff       [2]*hudEffect     // stasis web, warp scram
 	status    *widget.Container
 	boxes     [hudBoxPool]*hudBox
+
+	// selectFn is where a target-card click reports the card's entity: the
+	// game wires Kit.Select, the same door a world click uses.
+	selectFn func(ecs.Entity)
 
 	portrait      *ebiten.Image
 	portraitGfx   *widget.Graphic
@@ -218,13 +254,30 @@ type hudBox struct {
 // targetCard is one card's rendered state. It is deliberately comparable:
 // Sync skips the repaint when nothing moved.
 type targetCard struct {
+	entity ecs.Entity // the locked entity a click selects
 	name   string
 	dist   string
 	kind   string // semantic icon name for the target's kind ("" = none)
 	tint   color.RGBA
-	lock   float64    // 0..1 lock progress
-	layers [3]float64 // shield / armor / hull fractions (ships); health in [0] otherwise
-	ships  bool       // three layers (true) vs a single health fraction
+	lock   float64            // 0..1 lock progress
+	layers [3]float64         // shield / armor / hull fractions (ships); health in [0] otherwise
+	ships  bool               // three layers (true) vs a single health fraction
+	mods   [hudBoxMods]string // my active modules cycling on this target
+	nmods  int
+}
+
+// hudEffect is one live EWAR effect on the player: a rack-cell miniature —
+// the effect's glyph on a tile with a depleting cycle ring, its remaining
+// time on the line under it. One box per effect kind, hidden while off.
+type hudEffect struct {
+	glyph string // manifest key
+	tint  color.RGBA
+	root  *widget.Container
+	img   *ebiten.Image
+	gfx   *widget.Graphic
+	lbl   *widget.Text
+	peak  float64 // longest remaining seen this spell: the ring's full circle
+	drawn float64 // ring fraction at the last paint (-1 = never painted)
 }
 
 // NewHud builds the ship HUD over the given environment. Add the returned
@@ -393,8 +446,24 @@ func NewHud(env interface {
 	)
 	h.strip.AddChild(clock, coin, h.timeLbl, h.walletLbl)
 
+	// The EWAR effect boxes: one per effect kind, above the ship status and
+	// hidden while the effect is off (the target row's visibility pattern).
+	// Their glyphs are the module class icons — the same keys the rack
+	// draws for the modules that project them.
+	h.effects = widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(theme.Px(hudColGap)),
+		)),
+	)
+	h.eff[0] = h.newEffect(theme.ModuleIcon(content.KindStasisWeb), p.Warn)
+	h.eff[1] = h.newEffect(theme.ModuleIcon(content.KindWarpScram), p.Danger)
+	h.effects.AddChild(h.eff[0].root, h.eff[1].root)
+	h.effects.GetWidget().SetVisibility(widget.Visibility_Hide)
+
 	// The left column: strip over status, bottom-aligned in the pair (the
-	// rack is taller, so the pair's own bottom is the shared baseline).
+	// rack is taller, so the pair's own bottom is the shared baseline). The
+	// effects row sits directly above the status, under the strip.
 	left := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
@@ -404,7 +473,7 @@ func NewHud(env interface {
 			Position: widget.RowLayoutPositionEnd,
 		})),
 	)
-	left.AddChild(h.strip, h.status)
+	left.AddChild(h.strip, h.effects, h.status)
 
 	h.pair = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -454,6 +523,118 @@ func NewHud(env interface {
 func (h *Hud) MountRack(c *widget.Container) {
 	c.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionEnd}
 	h.pair.AddChild(c)
+}
+
+// SetSelector installs where a target-card click reports its entity — the
+// game passes Kit.Select, so a card click is exactly a world click (the
+// Selected Item panel and the overview highlight follow).
+func (h *Hud) SetSelector(fn func(ecs.Entity)) { h.selectFn = fn }
+
+// newEffect builds one effect box: a tile (glyph + cycle ring) over its
+// remaining-time line, the rack cell's tile-and-name layout in miniature.
+func (h *Hud) newEffect(glyph string, tint color.RGBA) *hudEffect {
+	e := &hudEffect{glyph: glyph, tint: tint, drawn: -1}
+	size := theme.Px(hudEffTile)
+	e.img = ebiten.NewImage(size, size)
+	e.gfx = widget.NewGraphic(
+		widget.GraphicOpts.Image(e.img),
+		widget.GraphicOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(size, size),
+			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionCenter,
+				VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			}),
+		),
+	)
+	tile := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(hudEffW), size)),
+	)
+	tile.AddChild(e.gfx)
+	e.lbl = widget.NewText(
+		widget.TextOpts.Text("", h.th.Face(theme.StepTiny), theme.Solid(h.th.Pal().Dim)),
+		widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionCenter),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(hudEffW), theme.Px(hudEffNameH))),
+	)
+	e.root = widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+		)),
+	)
+	e.root.AddChild(tile, e.lbl)
+	theme.ShowWidget(e.root.GetWidget(), false)
+	return e
+}
+
+// setEffect stages one effect's remaining time (until = its sim-time expiry;
+// until <= now = off) and repaints the tile only when the ring moved. The
+// ring's full circle is the longest remaining time seen this spell (the
+// effect is refreshed every cycle, so the ring refills on each one and
+// depletes after the last — the rack's cycle ring, read from the sim's
+// expiry rather than a module's cycle clock).
+func (h *Hud) setEffect(e *hudEffect, now, until float64) {
+	rem := until - now
+	if rem <= 0 {
+		if e.peak != 0 || e.drawn != -1 {
+			e.peak, e.drawn, e.lbl.Label = 0, -1, ""
+		}
+		theme.ShowWidget(e.root.GetWidget(), false)
+		return
+	}
+	theme.ShowWidget(e.root.GetWidget(), true)
+	e.lbl.Label = theme.GroupFloat(rem, 1) + " s"
+	if rem > e.peak {
+		e.peak = rem
+	}
+	frac := math.Round(hudFrac01(rem/e.peak)*1000) / 1000
+	if frac != e.drawn {
+		h.paintEffect(e, frac)
+	}
+}
+
+// paintEffect paints one effect tile: the palette cell with the effect's
+// glyph and the depletion ring over it (the rack's ring geometry, scaled to
+// the tile), tinted by the effect's own colour.
+func (h *Hud) paintEffect(e *hudEffect, frac float64) {
+	e.drawn = frac
+	p := h.th.Pal()
+	e.img.Clear()
+	box := e.img.Bounds()
+	s := float32(theme.Scale())
+	theme.FillRect(e.img, box, theme.Solid(p.Cell))
+	vector.StrokeRect(e.img,
+		s/2, s/2, float32(box.Dx())-s, float32(box.Dy())-s,
+		s, theme.NRGBA(p.Border, 160), false)
+	glyph := icons.Get(e.glyph, theme.Px(theme.IconButton), e.tint)
+	opts := &ebiten.DrawImageOptions{}
+	opts.GeoM.Translate(
+		float64((box.Dx()-glyph.Bounds().Dx())/2),
+		float64((box.Dy()-glyph.Bounds().Dy())/2))
+	e.img.DrawImage(glyph, opts)
+
+	// The ring: a full dim track, the remaining fraction drawn over it from
+	// the top, clockwise (syncRing's treatment).
+	cx, cy := float64(box.Dx())/2, float64(box.Dy())/2
+	rad := float64(theme.Px(hudEffTile)-2*hudEffRingW) / 2
+	const start = -math.Pi / 2
+	render.Arc(e.img, float32(cx), float32(cy), float32(rad),
+		start, start+2*math.Pi, float32(hudEffRingW*theme.Scale()), iconColor(e.tint, 60))
+	if frac > 0 {
+		render.Arc(e.img, float32(cx), float32(cy), float32(rad),
+			start, start+float32(hudFrac01(frac)*2*math.Pi), float32(hudEffRingW*theme.Scale()), e.tint)
+	}
+}
+
+// clickCard is the card's click seam: a left click selects the card's locked
+// entity through the host's selector — the same selection a world click or an
+// overview row sets, never a lock or a camera move.
+func (h *Hud) clickCard(b *hudBox, a *widget.WidgetMouseButtonClickedEventArgs) {
+	if a.Button != ebiten.MouseButtonLeft || h.selectFn == nil {
+		return
+	}
+	if e := b.card.entity; e != 0 {
+		h.selectFn(e)
+	}
 }
 
 // hudHealth is one staged health bar: its fraction and its "current / max"
@@ -531,12 +712,18 @@ func drawBarGlyph(dst *ebiten.Image, name string, bar image.Rectangle, tint, dar
 }
 
 // newBox builds one target card from the fixed widget pool: a container
-// holding a single Graphic that displays the card image.
+// holding a single Graphic that displays the card image. The graphic also
+// carries the card's click (a press/release on the card selects its target).
 func (h *Hud) newBox(env theme.Theme) *hudBox {
 	b := &hudBox{img: ebiten.NewImage(theme.Px(hudBoxW), theme.Px(hudBoxH))}
 	g := widget.NewGraphic(
 		widget.GraphicOpts.Image(b.img),
-		widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+		widget.GraphicOpts.WidgetOpts(
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+			widget.WidgetOpts.MouseButtonClickedHandler(func(a *widget.WidgetMouseButtonClickedEventArgs) {
+				h.clickCard(b, a)
+			}),
+		),
 	)
 	b.root = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -568,16 +755,17 @@ func (h *Hud) paintBox(b *hudBox) {
 }
 
 // boxLabels fits a card's text: the name to the room right of the kind
-// glyph, the distance to its own line.
-func (h *Hud) boxLabels(name, dist string) (string, string) {
+// glyph, the distance to its own line less the module glyphs it carries.
+func (h *Hud) boxLabels(name, dist string, mods int) (string, string) {
 	card := image.Rect(0, 0, theme.Px(hudBoxW), theme.Px(hudBoxH))
 	room := float64(targetCardName(card).Dx())
 	if room < float64(theme.Px(hudBoxMinNameW)) {
 		room = float64(theme.Px(hudBoxMinNameW))
 	}
 	name = widgets.Ellipsize(name, room, h.measure)
-	if w := h.measureTiny(dist); w > float64(targetCardDist(card).Dx()) {
-		dist = widgets.Ellipsize(dist, float64(targetCardDist(card).Dx()), h.measureTiny)
+	distRoom := targetCardDist(card).Dx() - cardModsWidth(mods)
+	if w := h.measureTiny(dist); w > float64(distRoom) {
+		dist = widgets.Ellipsize(dist, float64(distRoom), h.measureTiny)
 	}
 	return name, dist
 }
@@ -607,6 +795,17 @@ func drawTargetCard(dst *ebiten.Image, c targetCard, env theme.Theme) {
 	theme.DrawCardText(dst, c.name, env.FaceBold(theme.StepSmall), line.Min.X, line.Min.Y, theme.Solid(p.Text))
 	dl := targetCardDist(card)
 	theme.DrawCardText(dst, c.dist, env.Face(theme.StepTiny), dl.Min.X, dl.Min.Y, theme.Solid(p.Dim))
+	// The modules cycling on this target, right-aligned on the distance
+	// line (drawn after the text, which is already ellipsized clear of them).
+	for i := 0; i < c.nmods && i < hudBoxMods; i++ {
+		if c.mods[i] == "" {
+			continue
+		}
+		box := targetCardMod(card, i)
+		opts := &ebiten.DrawImageOptions{}
+		opts.GeoM.Translate(float64(box.Min.X), float64(box.Min.Y))
+		dst.DrawImage(icons.Get(c.mods[i], box.Dx(), p.Text), opts)
+	}
 
 	// Lock-progress strip under the line.
 	lk := targetCardLock(card)
@@ -701,7 +900,14 @@ func (h *Hud) Sync() {
 	if wedge != h.wedgeFrac {
 		h.paintWedge(wedge)
 	}
-	h.speedLbl.Label = theme.FormatSpeed(speed)
+	// An engaged warp drive has no useful grid speed to print: the figure
+	// reads WARP while any phase of the drive is live (the wedge keeps its
+	// clamped gauge).
+	if info, ok := s.Info(player); ok && info.Warping {
+		h.speedLbl.Label = "WARP"
+	} else {
+		h.speedLbl.Label = theme.FormatSpeed(speed)
+	}
 	h.timeLbl.Label = "×" + strconv.Itoa(h.timeScale) + " time"
 	h.walletLbl.Label = theme.FormatCredits(s.Wallet())
 	if h.walletIcon != nil && h.walletFace != nil {
@@ -719,7 +925,23 @@ func (h *Hud) Sync() {
 		}
 	}
 
-	// 4 — locked-target cards (name, distance, lock strip, layer bars).
+	// 4 — the EWAR effects on the player (stasis web, warp scramble): each
+	// live expiry shows its box with the time left, nothing else has an
+	// icon.
+	now := s.Time()
+	webUntil, scramUntil := 0.0, 0.0
+	if m, ok := s.Motion(player); ok {
+		webUntil = m.WebbedUntil
+	}
+	if sh, ok := s.ShipState(player); ok {
+		scramUntil = sh.ScrambledUntil
+	}
+	h.setEffect(h.eff[0], now, webUntil)
+	h.setEffect(h.eff[1], now, scramUntil)
+	theme.ShowWidget(h.effects.GetWidget(), webUntil > now || scramUntil > now)
+
+	// 5 — locked-target cards (name, distance, lock strip, layer bars, the
+	// modules cycling on the target).
 	var locks []sim.Lock
 	if tg, ok := s.Targeting(player); ok {
 		locks = tg.Locks
@@ -737,7 +959,7 @@ func (h *Hud) Sync() {
 		theme.ShowWidget(box.root.GetWidget(), true)
 		l := locks[i]
 		info, hasInfo := s.Info(l.Target)
-		card := targetCard{lock: hudFrac01(l.Progress), name: "…", tint: h.th.Pal().Text}
+		card := targetCard{entity: l.Target, lock: hudFrac01(l.Progress), name: "…", tint: h.th.Pal().Text}
 		if hasInfo {
 			card.dist = theme.FormatDistance(info.Distance)
 			// The kind glyph leads the name line; hostiles wear
@@ -764,9 +986,44 @@ func (h *Hud) Sync() {
 				card.name = info.Name
 			}
 		}
-		card.name, card.dist = h.boxLabels(card.name, card.dist)
+		card.mods, card.nmods = h.cardMods(player, l.Target)
+		card.name, card.dist = h.boxLabels(card.name, card.dist, card.nmods)
 		h.setCard(box, card)
 	}
+}
+
+// cardMods lists the glyphs of my modules cycling on one target (the target
+// card's module strip): active slots whose activation target is that entity,
+// in slot order, capped at the room a card has.
+func (h *Hud) cardMods(player, tgt ecs.Entity) ([hudBoxMods]string, int) {
+	var out [hudBoxMods]string
+	fit, ok := h.cv.Fitting(player)
+	if !ok || tgt == 0 {
+		return out, 0
+	}
+	n := 0
+	for _, class := range []string{content.SlotHigh, content.SlotMid, content.SlotLow} {
+		if n >= hudBoxMods {
+			break
+		}
+		rts := fit.Runtimes(class)
+		for i := range rts {
+			if n >= hudBoxMods {
+				break
+			}
+			if !rts[i].Active {
+				continue
+			}
+			if e, ok := h.cv.ModuleTarget(player, sim.SlotRef{Class: class, Index: i}); !ok || e != tgt {
+				continue
+			}
+			if def, ok := h.cv.Defs().Module(rts[i].Def); ok {
+				out[n] = theme.ModuleIconFor(def)
+				n++
+			}
+		}
+	}
+	return out, n
 }
 
 // paintPortrait repaints the hull portrait: the hull's raster scaled into

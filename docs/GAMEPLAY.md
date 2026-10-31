@@ -230,7 +230,12 @@ beneath) and the **module rack**
 module's name under it and a cycle ring that depletes clockwise over the
 tile while the module runs). A small strip above the status carries the
 time multiplier and the wallet, and the **target-box row** sits at top
-center. The **log** is a normal window now —
+center — a click on a card selects that target (exactly like a world
+click); the speed figure reads `WARP` while the drive is engaged, a card
+carries the glyphs of your modules cycling on it, and a stasis web or warp
+scramble on your hull puts a box per effect directly above the ship status
+(its glyph, a depleting cycle ring and the seconds left) until it expires.
+The **log** is a normal window now —
 bottom left by default, toggle with `Shift+L`, draggable and resizable
 like the rest. The **Overview** (top right) and **Selected Item** window
 (top left) are open by default (the rail's Ship entries close and
@@ -353,7 +358,9 @@ saved with the window layout (see **Your layout persists**), so they come
 back on the next session.
 
 Rows tint **red for hostiles** and **blue for your own ship**; the Kind
-column names the rest (Ship, Asteroid, Wreck, Station, Gate, …).
+column names the rest (Ship, Asteroid, Wreck, Station, Gate, …). The
+Velocity cell reads `WARP` while that entity's drive is engaged; the
+column keeps sorting on the real figure.
 
 ## Inspecting items (Show Info)
 

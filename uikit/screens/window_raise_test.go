@@ -108,7 +108,7 @@ func TestPressInsideWindowRaisesIt(t *testing.T) {
 	assertTop(t, k, sp, "fixture")
 
 	ovRect := ov.GetContainer().GetWidget().Rect
-	spOnly := overlap.Add(image.Pt(240, 0)) // inside Selected Item only (past the overview's right edge)
+	spOnly := image.Pt(ovRect.Max.X+20, overlap.Y) // inside Selected Item only (past the overview's right edge)
 
 	// The body: this is the defect — ebitenui's own relayering never saw
 	// presses here (the body's scroll layer covers the window's).

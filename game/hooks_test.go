@@ -35,7 +35,7 @@ func TestWorldClickSelection(t *testing.T) {
 	if target.Entity.IsZero() {
 		t.Fatal("no visible entity to click")
 	}
-	const clickX, clickY = 640.0, 300.0 // a clear off-panel point (above the bottom pair)
+	const clickX, clickY = 200.0, 300.0 // a clear off-panel point (left of the overview, under Selected Item)
 	cam := sc.Camera(1280, 720)
 	// Pan the camera so the target lands on that point: the camera
 	// center is player + pan, and screen = (world − center)·zoom + size/2.
@@ -151,9 +151,10 @@ func TestChromeOnRootOverlay(t *testing.T) {
 	}
 
 	// Empty space stays free: a full-screen wrapper window around the
-	// chrome would gate the whole screen. (640,300) sits above the
-	// bottom-center pair, between the top windows.
-	if g.overUI(640, 300) {
+	// chrome would gate the whole screen. (200,300) sits clear of the
+	// Selected Item window, the twice-as-wide overview and the bottom
+	// pair.
+	if g.overUI(200, 300) {
 		t.Error("empty space is gated (a full-screen chrome wrapper window is back)")
 	}
 }

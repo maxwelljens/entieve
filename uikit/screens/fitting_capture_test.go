@@ -54,8 +54,10 @@ func TestFittingCaptureFrame(t *testing.T) {
 				errs = append(errs, fmt.Sprintf(format, args...))
 			}
 			// The window body fill is the reference every placeholder read
-			// compares against: the gutter between the stat column and the split.
-			body := img.At(606, 300)
+			// compares against: a plain gutter pixel in the fitting
+			// window's right half — the stat column at x 606 is now under
+			// the twice-as-wide Overview at the default layout.
+			body := img.At(900, 300)
 			same := func(pt image.Point) bool {
 				r0, g0, b0, _ := body.RGBA()
 				r, g, b, _ := img.At(pt.X, pt.Y).RGBA()

@@ -324,9 +324,9 @@ func TestWorldInputGating(t *testing.T) {
 		}
 	}
 
-	// Off-panel: a clear point on empty space above the bottom chrome —
+	// Off-panel: a clear point on empty space left of the overview —
 	// the handlers run.
-	const cx, cy = 640.0, 300.0
+	const cx, cy = 200.0, 300.0
 	if g.overUI(cx, cy) {
 		t.Fatalf("overUI(%v, %v) = true on empty space", cx, cy)
 	}

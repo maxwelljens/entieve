@@ -211,11 +211,12 @@ var panelNames = func() map[ScreenID]string {
 
 // defaultOverviewRect is the Overview's default placement for a w-wide
 // viewport at the identity scale: the upper-right corner (placeDefaults),
-// at the window's 380×409 design default size (uikit's overview
+// at the window's 760×409 design default size (uikit's overview
 // constructor; the height clears the module rack at the 1024×700
-// minimum).
+// minimum, the width is twice the original table and reaches under the
+// Selected Item default at the minimum — documented in assertNoOverlap).
 func defaultOverviewRect(w int) image.Rectangle {
-	return image.Rect(w-10-380, 8, w-10, 8+409)
+	return image.Rect(w-10-760, 8, w-10, 8+409)
 }
 
 // assertInBounds fails the test if any mounted window sticks out of the
@@ -238,17 +239,25 @@ func assertInBounds(t *testing.T, g *Game, w, h int) {
 // design sizes (toggling extra windows on top of each other is allowed —
 // they are modal overlays or user-dragged).
 //
-// One documented exception: at the 1024×700 minimum the log's content
-// floor (logMinW = 260 design px) is wider than the pocket left of the
-// bottom-center pair, so the two overlap there — pre-existing (the old
-// bottom bar did the same once its labels filled in) and pinned by
-// TestVirginPlacementTable's comment. At 1280×720 the pair clears it.
+// Two documented exceptions:
+//   - at the 1024×700 minimum the log's content floor (logMinW = 260
+//     design px) is wider than the pocket left of the bottom-center pair,
+//     so the two overlap there — pre-existing (the old bottom bar did the
+//     same once its labels filled in) and pinned by
+//     TestVirginPlacementTable's comment. At 1280×720 the pair clears it.
+//   - the twice-as-wide overview (760 px) covers the Selected Item
+//     window's right edge at both sizes: the owner asked for the larger
+//     table and the left/top anchors stay put, so the two corner windows
+//     can no longer be the 380 + 464 px pair the 1024 minimum needs.
 func assertNoOverlap(t *testing.T, g *Game, w, h int) {
 	t.Helper()
 	rects := mountedRects(g)
 	for i := range rects {
 		for j := i + 1; j < len(rects); j++ {
 			if w < 1280 && pairPair(rects[i].name, rects[j].name) {
+				continue
+			}
+			if bothPair(rects[i].name, rects[j].name, "overview", "selected") {
 				continue
 			}
 			if rects[i].rect.Overlaps(rects[j].rect) {
@@ -262,6 +271,9 @@ func assertNoOverlap(t *testing.T, g *Game, w, h int) {
 // pairPair reports the log / bottom-pair overlap allowed at the 1024
 // minimum only (see assertNoOverlap).
 func pairPair(a, b string) bool { return (a == "log" && b == "hud.1") || (a == "hud.1" && b == "log") }
+
+// bothPair reports whether {a, b} is the pair {x, y} in either order.
+func bothPair(a, b, x, y string) bool { return (a == x && b == y) || (a == y && b == x) }
 
 // TestSceneDrawSmoke draws every scene (space world + interface, help
 // overlay, starmap window over it, Esc menu, station view) at the design
