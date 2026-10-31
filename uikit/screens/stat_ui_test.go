@@ -57,7 +57,6 @@ func TestShipPagePairsRows(t *testing.T) {
 // blocks.
 func TestSectionBarsCarryGlyphs(t *testing.T) {
 	env, _ := newTestEnv(t)
-	w := NewInfoWin(env)
 	for _, tc := range []struct {
 		label string
 		icon  string
@@ -67,7 +66,7 @@ func TestSectionBarsCarryGlyphs(t *testing.T) {
 		{"CARGO", "stat_cargo"},
 		{"CONSTRUCTION", ""},
 	} {
-		bar := w.sectionBar(tc.label)
+		bar := sectionBar(env, tc.label)
 		if n := len(bar.Children()); n != 3 {
 			t.Fatalf("%s bar has %d cells, want mark/label/rule", tc.label, n)
 		}

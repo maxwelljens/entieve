@@ -170,6 +170,8 @@ var sectionStyles = map[string]statStyle{
 	"USED IN":           {cat: StatNone},
 	"PROPERTIES":        {cat: StatNone},
 	"DOSSIER":           {cat: StatNone},
+	"BRIEFING":          {icon: "svc_contracts", cat: StatUtility},
+	"CONTRACT":          {icon: "stat_cash", cat: StatEconomy},
 }
 
 // StatIcon is label's glyph key ("" for an identity row or an unknown label).

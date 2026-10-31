@@ -37,8 +37,8 @@ const stationVeilAlpha = 150
 
 // StationScene shows the station view: the docked hangar artwork fades in
 // over the world (or, with no artwork, the legacy veil dims it) and the
-// services view (identity / Undock / Cargo / services, over the contract
-// board) rides the uikit window stack. World input is off while it is on
+// contacts view (identity / Undock over the contacts and their offers)
+// rides the uikit window stack. World input is off while it is on
 // top.
 type StationScene struct {
 	g    *Game

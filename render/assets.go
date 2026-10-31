@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/entieve/entieve/content"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -128,6 +129,20 @@ func RefiningHeader() *ebiten.Image { return spriteFor(artworkRefiningHeader) }
 // ManufacturingHeader returns the Manufacturing window's header plate, or nil
 // when the asset root ships none.
 func ManufacturingHeader() *ebiten.Image { return spriteFor(artworkManufacturingHeader) }
+
+// Contact portraits: assets/contacts/<contact-id>.png — a 2:3 bust the
+// dock view draws beside the contact's offer rows and large in Details.
+const contactPortraitRoot = "contacts/"
+
+// ContactPortrait returns the drop-in portrait of a contact, or nil when
+// none is dropped — the caller then draws its fallback glyph (the same
+// nil-means-fallback contract as spriteFor).
+func ContactPortrait(id content.ContactID) *ebiten.Image {
+	if id == "" {
+		return nil
+	}
+	return spriteFor(contactPortraitRoot + string(id))
+}
 
 // defaultPlateID is the pseudo-system whose plates serve every star system:
 // `backgrounds/default.png` (layer 0), `backgrounds/default-01.png` (layer 1),

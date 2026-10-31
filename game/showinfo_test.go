@@ -3,6 +3,7 @@ package game
 import (
 	"image"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
@@ -61,34 +62,34 @@ func pressMenuEntry(t *testing.T, g *Game, label string) {
 }
 
 // TestContractRowContextMenu: an offer row's right-click opens the row
-// menu — Accept on an available row, Abandon on an active one — through
-// the same command and gating as the buttons; a standing-gated row
-// carries a disabled entry that enqueues nothing, note rows carry no
-// menu at all, and the objective label opens its own Show Info menu.
+// menu — Details on a live offer (the dialog carries the accept, and a
+// standing gate never disables the way in), Abandon on an active one
+// through the same command the button emits; note rows carry no menu.
 func TestContractRowContextMenu(t *testing.T) {
 	g := dockedShowcaseGame(t, 1280, 720)
 	var got []sim.Command
 	g.enqueue = func(c sim.Command) { got = append(got, c) }
 
-	// Ungated available row: one enabled Accept entry.
+	// Ungated available row: one enabled Details entry.
 	row := findRow(t, stationBoard(t, g).Rows(false), "offer-jalvrek-kerngrit")
 	rightClick(t, g, row.Root.GetWidget())
-	if e := menuEntry(t, g, "Accept"); e.Disabled {
-		t.Fatal("ungated Accept entry is disabled")
+	if e := menuEntry(t, g, "Details"); e.Disabled {
+		t.Fatal("ungated Details entry is disabled")
 	}
 	if len(g.kit.Menu().Entries()) != 1 {
-		t.Errorf("row menu = %+v, want the single Accept entry", g.kit.Menu().Entries())
+		t.Errorf("row menu = %+v, want the single Details entry", g.kit.Menu().Entries())
 	}
-	pressMenuEntry(t, g, "Accept")
-	if len(got) != 1 {
-		t.Fatalf("menu Accept enqueued %d commands, want 1", len(got))
+	pressMenuEntry(t, g, "Details")
+	if !g.kit.ContactOpen() {
+		t.Fatal("menu Details did not open the contact dialog")
 	}
-	if c, ok := got[0].(sim.CmdAcceptMission); !ok || c.ID != "offer-jalvrek-kerngrit" {
-		t.Fatalf("cmd = %#v, want CmdAcceptMission{offer-jalvrek-kerngrit}", got[0])
+	if o := g.kit.ContactWin().Offer(); o != "offer-jalvrek-kerngrit" {
+		t.Errorf("dialog offer = %q, want the row's offer", o)
 	}
+	g.kit.CloseContact()
 
-	// A standing-gated row: the entry is visible but disabled, and
-	// pressing it (the widget-level click lands anyway) enqueues nothing.
+	// A standing-gated row: Details stays the way in — the dialog is where
+	// the requirement and the disabled accept live.
 	g.s.Docked.Set(g.s.Player(), sim.Docked{At: "cel-penumbra-port"})
 	g.syncScenes()
 	g.syncMounts()
@@ -96,18 +97,20 @@ func TestContractRowContextMenu(t *testing.T) {
 	got = nil
 	gated := findRow(t, stationBoard(t, g).Rows(false), "offer-hauvnok-lucidite")
 	rightClick(t, g, gated.Root.GetWidget())
-	if e := menuEntry(t, g, "Accept"); !e.Disabled {
-		t.Fatal("gated Accept entry is enabled")
+	if e := menuEntry(t, g, "Details"); e.Disabled {
+		t.Fatal("gated Details entry is disabled")
 	}
-	m := g.kit.Menu()
-	for i, e := range m.Entries() {
-		if e.Label == "Accept" {
-			m.Click(m.RowRect(i).Min.Add(image.Pt(1, 1)))
-		}
+	pressMenuEntry(t, g, "Details")
+	if !g.kit.ContactOpen() {
+		t.Fatal("gated Details did not open the contact dialog")
+	}
+	if got := g.kit.ContactWin().GateText(); !strings.HasPrefix(got, "Requires standing") {
+		t.Errorf("dialog gate line = %q, want the standing requirement", got)
 	}
 	if len(got) != 0 {
-		t.Fatalf("gated menu Accept enqueued %v, want nothing", got)
+		t.Fatalf("Details enqueued %v, want nothing (it opens a window)", got)
 	}
+	g.kit.CloseContact()
 
 	// Back at the offering station: an active row offers Abandon.
 	g.s.Docked.Set(g.s.Player(), sim.Docked{At: "cel-haven-rest"})
@@ -130,33 +133,27 @@ func TestContractRowContextMenu(t *testing.T) {
 	}
 }
 
-// TestContractObjectiveShowInfo: the objective label (line 2 of an
-// available row) is its own gesture target — right-click opens the
-// Show Info menu for the objective's def, double-click swaps the window —
-// and its menu replaces the row's Accept menu when the click lands there.
-func TestContractObjectiveShowInfo(t *testing.T) {
+// TestContractDetailsInspectOpensInfo: the objective's Show Info lives in
+// the Details dialog now — its Inspect verb opens the objective's def
+// (the caste a kill asks for, the item a haul wants) through the same
+// seam the row's old line-2 gesture used.
+func TestContractDetailsInspectOpensInfo(t *testing.T) {
 	g := dockedShowcaseGame(t, 1280, 720)
 	var got []sim.Command
 	g.enqueue = func(c sim.Command) { got = append(got, c) }
 
-	row := findRow(t, stationBoard(t, g).Rows(false), "offer-jalvrek-kerngrit")
-	if len(row.Root.Children()) < 2 {
-		t.Fatalf("available row has %d lines, want title/summary/reward", len(row.Root.Children()))
-	}
-	objective := row.Root.Children()[1].GetWidget() // line 2: the summary
 	def, ok := g.opts.Content.Contract("offer-jalvrek-kerngrit")
 	if !ok {
 		t.Fatal("fixture: contract missing from content")
 	}
-
-	rightClick(t, g, objective)
-	entries := g.kit.Menu().Entries()
-	if len(entries) != 1 || entries[0].Label != "Show Info" || !entries[0].Bold {
-		t.Fatalf("objective menu = %+v, want the single Show Info entry", entries)
+	row := findRow(t, stationBoard(t, g).Rows(false), "offer-jalvrek-kerngrit")
+	click(t, g, row.Btn)
+	if !g.kit.ContactOpen() {
+		t.Fatal("Details did not open the contact dialog")
 	}
-	pressMenuEntry(t, g, "Show Info")
+	click(t, g, g.kit.ContactWin().InspectButton())
 	if !g.kit.InfoOpen() {
-		t.Fatal("objective Show Info did not open the window")
+		t.Fatal("Inspect did not open the objective's Show Info")
 	}
 	switch def.Kind {
 	case content.ContractKill:
@@ -168,27 +165,9 @@ func TestContractObjectiveShowInfo(t *testing.T) {
 			t.Errorf("info ref = %v, want the objective item %s", got, def.Objective.Item)
 		}
 	}
-	// The row's Accept never fired: the child's menu replaced it.
+	// Inspecting is a window, never a command.
 	if len(got) != 0 {
-		t.Fatalf("objective right-click enqueued %v, want nothing", got)
-	}
-
-	// Double-click swaps the window the same way.
-	g.kit.CloseInfo()
-	objective.MouseButtonClickedEvent.Fire(&widget.WidgetMouseButtonClickedEventArgs{
-		Widget: objective, Button: ebiten.MouseButtonLeft,
-	})
-	if err := g.kit.Update(); err != nil {
-		t.Fatalf("kit.Update: %v", err)
-	}
-	objective.MouseButtonClickedEvent.Fire(&widget.WidgetMouseButtonClickedEventArgs{
-		Widget: objective, Button: ebiten.MouseButtonLeft,
-	})
-	if err := g.kit.Update(); err != nil {
-		t.Fatalf("kit.Update: %v", err)
-	}
-	if !g.kit.InfoOpen() {
-		t.Fatal("double-click on the objective label did not open Show Info")
+		t.Fatalf("Inspect enqueued %v, want nothing", got)
 	}
 }
 

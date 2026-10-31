@@ -38,9 +38,10 @@ Controls and concepts: [docs/GAMEPLAY.md](docs/GAMEPLAY.md).
 
 ## Trade and build
 
-Docking opens the station services view: Undock, Cargo, and one button per
-service *this* station actually offers — over its contract board. Contracts
-give you specific work (kill, mine, deliver) and pay money and standing.
+Docking opens the station's contacts view: your docked-at identity and
+Undock over the contacts posted here and their live offers. Offers give you
+specific work (kill, mine, deliver) and pay money and standing; each row's
+Details opens the contact's own page.
 
 The market is a real order book: broker fees, sales tax, and prices that
 move only when real goods change hands — yours, the agents', or a convoy's

@@ -10,11 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Contacts replace the contract board** — the dock screen is now the
-  **Contacts** view: the station services row (Undock, Cargo, and one button
-  per service window — Market, Fitting, Industry, Refinery — so no door was
-  lost) over the contacts posted there and their live offers, then your
-  active work. A contact represents the Charter, the Commission or a
+  **Contacts** view: the station services strip (the docked-at identity and
+  Undock — every window it used to open is a navigation rail row already)
+  over the contacts posted there and their live offers, then your active
+  work. A contact represents the Charter, the Commission or a
   corporation, answers to one standing gate, and owns a pool of offers.
+- **A rich Details screen behind every offer** — an offer row's **Details**
+  button (or its right-click menu) opens one single-instance dialog: the
+  contact's 2:3 portrait (drop-in `assets/contacts/<contact-id>.png`, else
+  the contract glyph), their own words with the sim's numbers filled in and
+  attributed, the contract at a glance (mission type, objective,
+  destination with its live requisition stock, payout, standing gate) and
+  three functional options — **Accept work** (the same accept command the
+  board always emitted, disabled with its reason while you are below the
+  gate and reading Accepted once taken), **Inspect item/target** (the
+  objective's Show Info page) and **Decline**.
 - **Offers are derived from the world, not rolled** — a front short of
   materiel posts a delivery naming that front system and count, an overrun
   front posts a kill order, a station short of requisition stock posts a
@@ -27,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Deliveries land in the world** — completed deliveries post their cargo
   as requisition stock on the destination station's book (the goods its
   guard posts buy replacements from), and a materiel run credits the war
-  front it served. Delivery offer rows show the destination's live stock.
+  front it served. A delivery's live stock is stated in its Details page.
 
 - **Target cards are clickable** — a left click on a locked target's card in
   the top-centre row selects that target, exactly as a world click does (the
@@ -46,6 +56,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Offer rows are a summary, not a paragraph** — each row now carries the
+  contact's portrait thumb, the title with its mission-type chip (Delivery,
+  Kill order, Mining), the payout and the standing gain, and one **Details**
+  button. The authored prose moved out of the row (it was too much to read
+  at once on a 394 px column) and into the Details dialog, where the contact
+  speaks it. A standing-gated row states its requirement on the row and
+  keeps Details open — the disabled accept and its reason live in the
+  dialog.
+- **The dock strip carries no window buttons** — Undock stays; Cargo and the
+  per-service buttons (Market, Fitting, Manufacturing, Refinery) are gone
+  because the navigation rail already lists every one of those windows.
 - **The contract board is gone** — `StationBoard` and the `contract-*`
   content are replaced by contacts and offers (`contact-*`, `offer-*` under
   `content/data/contacts/`); the accepted-work save surface now carries the

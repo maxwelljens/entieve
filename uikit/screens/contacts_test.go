@@ -117,36 +117,41 @@ func rowTitleText(w widget.PreferredSizeLocateableWidget) *widget.Text {
 	return nil
 }
 
-// availLine returns one text line of an offer row: 0 = title, 1 = prose,
-// 2 = reward.
-func availLine(t *testing.T, b *ContactsPanel, id content.ContractID, line int) string {
+// offerRowTexts is every text an offer row renders, in tree order — the
+// title, the mission-type chip and the payout line (the portrait and the
+// action button carry no text).
+func offerRowTexts(t *testing.T, b *ContactsPanel, id content.ContractID) []string {
 	t.Helper()
-	var row *widget.Container
 	for _, r := range b.offerRows {
 		if r.ID == id {
-			row = r.Root
-			break
+			var out []string
+			collectTexts(r.Root, &out)
+			return out
 		}
 	}
-	if row == nil {
-		t.Fatalf("no offer row for %s", id)
+	t.Fatalf("no offer row for %s", id)
+	return nil
+}
+
+// rowHas reports whether any text the row renders contains want.
+func rowHas(texts []string, want string) bool {
+	for _, s := range texts {
+		if strings.Contains(s, want) {
+			return true
+		}
 	}
-	switch line {
-	case 0:
-		title := rowTitleText(row.Children()[0])
-		if title == nil {
-			t.Fatalf("%s: no title text in the row", id)
+	return false
+}
+
+// collectTexts walks a widget tree and appends every text label.
+func collectTexts(w widget.PreferredSizeLocateableWidget, out *[]string) {
+	switch v := w.(type) {
+	case *widget.Text:
+		*out = append(*out, v.Label)
+	case *widget.Container:
+		for _, k := range v.Children() {
+			collectTexts(k, out)
 		}
-		return title.Label
-	case 1:
-		// Prose: a bare text on open rows, a prose|requirement container on
-		// gated ones.
-		if ctr, ok := row.Children()[1].(*widget.Container); ok {
-			return ctr.Children()[0].(*widget.Text).Label
-		}
-		return row.Children()[1].(*widget.Text).Label
-	default:
-		return row.Children()[2].(*widget.Text).Label
 	}
 }
 
@@ -167,10 +172,10 @@ func activeTitle(t *testing.T, b *ContactsPanel, i int) string {
 
 // TestContactsPanelOnStubView: the panel builds, syncs and emits from the
 // stub view alone — the capped list renders its visible rows and a
-// "+N more" note, a standing-gated row carries "Requires standing" beside a
-// disabled Accept, accepted work wears "Accepted", and Accept/Abandon reach
-// the recording sink as typed intents. FitSize answers the rebuilt content
-// floor (above the static StationMinH).
+// "+N more" note, a standing-gated row carries "Requires standing" beside
+// its payout while its Details button stays live, accepted work wears
+// "Accepted", and Details/Abandon reach the recording sink as typed intents.
+// FitSize answers the rebuilt content floor (above the static StationMinH).
 func TestContactsPanelOnStubView(t *testing.T) {
 	c, defs := contactContent()
 	all := offersFor(defs, "ct-a-open", "ct-b-open", "ct-c-gated", "ct-d-spare", "ct-e-spare", "ct-f-spare")
@@ -195,8 +200,8 @@ func TestContactsPanelOnStubView(t *testing.T) {
 	if got := len(b.actRows); got != 2 {
 		t.Fatalf("active rows = %d, want the accepted row + its note", got)
 	}
-	if got := availLine(t, b, "ct-a-open", 0); got != "a-open" {
-		t.Errorf("accepted row title = %q", got)
+	if texts := offerRowTexts(t, b, "ct-a-open"); !rowHas(texts, "a-open") {
+		t.Errorf("accepted row texts = %q, want the title", texts)
 	}
 	if got := findRow(t, b.offerRows, "ct-a-open").Btn.Text().Label; got != "Accepted" {
 		t.Errorf("accepted row button = %q, want Accepted", got)
@@ -222,20 +227,26 @@ func TestContactsPanelOnStubView(t *testing.T) {
 		t.Errorf("FitSize height = %d, want above the static %d", h, StationMinH)
 	}
 
-	// The ungated row is the one live verb: press it (Accept).
+	// The ungated row's one verb is Details: the accept lives in the dialog.
 	open := findRow(t, b.offerRows, "ct-b-open")
 	if open.Btn.GetWidget().Disabled {
-		t.Fatal("ungated Accept button is disabled")
+		t.Fatal("ungated Details button is disabled")
 	}
-	if got := open.Btn.Text().Label; got != "Accept" {
-		t.Errorf("open row button = %q, want Accept", got)
+	if got := open.Btn.Text().Label; got != "Details" {
+		t.Errorf("open row button = %q, want Details", got)
+	}
+	// The row leads with the contact's 2:3 portrait box (the fallback glyph
+	// here — the stub content ships no dropped art).
+	thumb := open.Root.Children()[0].GetWidget().Rect
+	if thumb.Empty() || thumb.Dx()*3 != thumb.Dy()*2 {
+		t.Errorf("row portrait box = %v, want a laid-out 2:3 rect", thumb)
 	}
 	pressButton(t, ui, open.Btn)
 	if len(rec.got) != 1 {
-		t.Fatalf("Accept emitted %#v, want one intent", rec.got)
+		t.Fatalf("Details emitted %#v, want one intent", rec.got)
 	}
-	if a, ok := rec.got[0].(widgets.Accept); !ok || a.Contract != "ct-b-open" {
-		t.Fatalf("intent = %#v, want Accept{ct-b-open}", rec.got[0])
+	if v, ok := rec.got[0].(widgets.ShowContact); !ok || v.Offer != "ct-b-open" {
+		t.Fatalf("intent = %#v, want ShowContact{ct-b-open}", rec.got[0])
 	}
 
 	// Abandon rides the accepted row.
@@ -247,8 +258,9 @@ func TestContactsPanelOnStubView(t *testing.T) {
 		t.Fatalf("intent = %#v, want Abandon{ct-a-open}", rec.got[1])
 	}
 
-	// The gated list (three offers, all visible): the requirement rides
-	// line 2 beside the prose and Accept is grayed and silent.
+	// The gated list (three offers, all visible): the standing requirement
+	// rides the payout line, and the row's Details button stays live — the
+	// dialog is where the reason and the disabled Accept live.
 	cv.contacts.Offers = all[:3]
 	cv.contacts.Active = []sim.MissionState{{ID: "ct-a-open", Def: defs["ct-a-open"]}}
 	pumpBoard(t, ui, b)
@@ -256,22 +268,16 @@ func TestContactsPanelOnStubView(t *testing.T) {
 		t.Fatalf("gated offer rows = %d, want 3", got)
 	}
 	gated := findRow(t, b.offerRows, "ct-c-gated")
-	if !gated.Btn.GetWidget().Disabled {
-		t.Fatal("gated Accept button is enabled")
+	if gated.Btn.GetWidget().Disabled {
+		t.Fatal("gated Details button is disabled — the gate is explained inside the dialog")
 	}
-	line2 := gated.Root.Children()[1].(*widget.Container)
-	if got := line2.Children()[1].(*widget.Text).Label; got != "Requires standing 0.50" {
-		t.Errorf("gated requirement = %q, want \"Requires standing 0.50\"", got)
+	if texts := offerRowTexts(t, b, "ct-c-gated"); !rowHas(texts, "Requires standing 0.50") {
+		t.Errorf("gated row texts = %q, want the standing requirement", texts)
 	}
 	before := len(rec.got)
-	gated.Btn.ClickedEvent.Fire(&widget.ButtonClickedEventArgs{Button: gated.Btn})
-	ui.Update()
-	if len(rec.got) != before {
-		t.Fatalf("gated row emitted %#v, want nothing", rec.got[before:])
-	}
-	// The reward owns line 3, so the payout never truncates.
-	if got := availLine(t, b, "ct-c-gated", 2); strings.Contains(got, "…") {
-		t.Errorf("gated reward ellipsized: %q", got)
+	pressButton(t, ui, gated.Btn)
+	if len(rec.got) != before+1 {
+		t.Fatalf("gated Details emitted %#v, want the ShowContact intent", rec.got[before:])
 	}
 }
 
@@ -443,10 +449,10 @@ func TestStationWindowGeometry(t *testing.T) {
 	}
 }
 
-// TestContactsPanelRendersShippedProse pins the rendered lines of the shipped
-// offers: the authored prose with its slots filled verbatim (no ellipsis on
-// the short fixtures), the reward, and the requisition stock readout.
-func TestContactsPanelRendersShippedProse(t *testing.T) {
+// TestContactsPanelRendersShippedOffers pins what an offer row renders now
+// that the words moved into Details: the title, the mission-type chip, the
+// payout and the requisition stock — and no prose line at all.
+func TestContactsPanelRendersShippedOffers(t *testing.T) {
 	c, err := content.Load(content.FS())
 	if err != nil {
 		t.Fatalf("content.Load: %v", err)
@@ -474,18 +480,20 @@ func TestContactsPanelRendersShippedProse(t *testing.T) {
 	b, _, ui := boardPanel(t, cv)
 	pumpBoard(t, ui, b)
 
-	if got, want := availLine(t, b, "offer-jalvrek-kerngrit", 0), "Kerngrit order"; got != want {
-		t.Errorf("kerngrit title = %q, want %q", got, want)
+	kerngrit := offerRowTexts(t, b, "offer-jalvrek-kerngrit")
+	for _, want := range []string{"Kerngrit order", "Mining", "38,400.00 €", "+0.10 standing"} {
+		if !rowHas(kerngrit, want) {
+			t.Errorf("kerngrit row = %q, want %q", kerngrit, want)
+		}
 	}
-	if got, want := availLine(t, b, "offer-jalvrek-kerngrit", 1),
-		"Stub Office · Kerngrit for the refinery."; got != want {
-		t.Errorf("kerngrit prose = %q, want %q", got, want)
+	if rowHas(kerngrit, "Kerngrit for the refinery.") {
+		t.Errorf("kerngrit row still renders its prose: %q", kerngrit)
 	}
-	if got, want := availLine(t, b, "offer-jalvrek-kerngrit", 2), "38,400.00 € · +0.10 standing"; got != want {
-		t.Errorf("kerngrit reward = %q, want %q", got, want)
-	}
-	if got, want := availLine(t, b, "offer-jalvrek-supply", 2), "86,000.00 € · +0.10 standing · in stock 15"; got != want {
-		t.Errorf("supply reward = %q, want %q", got, want)
+	supply := offerRowTexts(t, b, "offer-jalvrek-supply")
+	for _, want := range []string{"Delivery", "86,000.00 €", "in stock 15"} {
+		if !rowHas(supply, want) {
+			t.Errorf("supply row = %q, want %q", supply, want)
+		}
 	}
 	if got, want := activeTitle(t, b, 0), "Kerngrit order — 120/400"; got != want {
 		t.Errorf("active line = %q, want %q", got, want)
@@ -503,14 +511,12 @@ func TestContactsPanelRendersShippedProse(t *testing.T) {
 		t.Fatalf("Hauvnok rows = %d, want 2", len(b.offerRows))
 	}
 	for _, r := range b.offerRows {
-		if !r.Btn.GetWidget().Disabled {
-			t.Errorf("%s: gated Accept button is enabled", r.ID)
+		if r.Btn.GetWidget().Disabled {
+			t.Errorf("%s: gated Details button is disabled — the dialog explains the gate", r.ID)
 		}
-	}
-	row := b.offers.Children()[0].(*widget.Container)
-	line2 := row.Children()[1].(*widget.Container)
-	if got := line2.Children()[1].(*widget.Text).Label; got != "Requires standing 0.20" {
-		t.Errorf("gated requirement = %q", got)
+		if texts := offerRowTexts(t, b, r.ID); !rowHas(texts, "Requires standing 0.20") {
+			t.Errorf("%s: row %q, want the standing requirement on it", r.ID, texts)
+		}
 	}
 }
 
@@ -552,10 +558,10 @@ func TestBoardRewardUsesCanonicalCredits(t *testing.T) {
 	}
 }
 
-// TestStationAcceptEmitsCommand: pressing Accept emits exactly
-// widgets.Accept{Contract}; a standing-gated row emits nothing even when its
-// click event is forced past the disabled widget.
-func TestStationAcceptEmitsCommand(t *testing.T) {
+// TestStationDetailsEmitsOpen: pressing Details emits exactly
+// widgets.ShowContact{Offer} — the accept is the dialog's verb — and a
+// standing-gated row's Details stays pressable (the gate is explained there).
+func TestStationDetailsEmitsOpen(t *testing.T) {
 	c, defs := contactContent()
 	cv := &stubView{c: c, docked: true}
 	cv.contacts = widgets.Contacts{Station: "cel-stub", Offers: offersFor(defs, "ct-a-open", "ct-b-open", "ct-c-gated")}
@@ -564,25 +570,28 @@ func TestStationAcceptEmitsCommand(t *testing.T) {
 
 	row := findRow(t, b.offerRows, "ct-a-open")
 	if row.Btn.GetWidget().Disabled {
-		t.Fatal("ungated Accept button is disabled")
+		t.Fatal("ungated Details button is disabled")
 	}
 	pressButton(t, ui, row.Btn)
 	if len(rec.got) != 1 {
-		t.Fatalf("Accept emitted %d intents, want 1", len(rec.got))
+		t.Fatalf("Details emitted %d intents, want 1", len(rec.got))
 	}
-	if a, ok := rec.got[0].(widgets.Accept); !ok || a.Contract != "ct-a-open" {
-		t.Fatalf("intent = %#v, want Accept{ct-a-open}", rec.got[0])
+	if v, ok := rec.got[0].(widgets.ShowContact); !ok || v.Offer != "ct-a-open" {
+		t.Fatalf("intent = %#v, want ShowContact{ct-a-open}", rec.got[0])
 	}
 
-	// Gated row: disabled and silent, even when the event is forced.
+	// A standing-gated row's Details is live too: the dialog is the place
+	// that states the requirement and disables the accept.
 	gated := findRow(t, b.offerRows, "ct-c-gated")
-	if !gated.Btn.GetWidget().Disabled {
-		t.Fatal("gated Accept button is enabled")
+	if gated.Btn.GetWidget().Disabled {
+		t.Fatal("gated Details button is disabled")
 	}
-	gated.Btn.ClickedEvent.Fire(&widget.ButtonClickedEventArgs{Button: gated.Btn})
-	ui.Update()
-	if len(rec.got) != 1 {
-		t.Fatalf("gated row emitted %#v, want nothing", rec.got[1:])
+	pressButton(t, ui, gated.Btn)
+	if len(rec.got) != 2 {
+		t.Fatalf("gated Details emitted %#v, want the second intent", rec.got[1:])
+	}
+	if v, ok := rec.got[1].(widgets.ShowContact); !ok || v.Offer != "ct-c-gated" {
+		t.Fatalf("intent = %#v, want ShowContact{ct-c-gated}", rec.got[1])
 	}
 }
 
@@ -609,9 +618,9 @@ func TestStationAbandonEmitsCommand(t *testing.T) {
 }
 
 // TestContactRowSpecData pins the rows' declared data (the RowSpec the seam
-// derives the menu from): one action — Accept on a live offer, Abandon on
-// active work — carrying the model's gate, no Ref, and the prose line's Ref
-// pointing at the objective's def.
+// derives the menu from): one action — Details on a live offer (the dialog
+// carries the accept), Abandon on active work — carrying the model's gate
+// and no Ref.
 func TestContactRowSpecData(t *testing.T) {
 	c, defs := contactContent()
 	all := offersFor(defs, "ct-a-open", "ct-c-gated")
@@ -625,21 +634,25 @@ func TestContactRowSpecData(t *testing.T) {
 	if spec.Ref != nil || spec.SecRef != nil {
 		t.Errorf("offer row declares refs %v/%v, want none (nothing to show)", spec.Ref, spec.SecRef)
 	}
-	if len(spec.Actions) != 1 || spec.Actions[0].Label != "Accept" || spec.Actions[0].Disabled {
-		t.Fatalf("ungated offer row = %+v, want one enabled Accept", spec.Actions)
+	if len(spec.Actions) != 1 || spec.Actions[0].Label != "Details" || spec.Actions[0].Disabled {
+		t.Fatalf("ungated offer row = %+v, want one enabled Details", spec.Actions)
 	}
-	gated := contactRowModel{ID: "ct-c-gated", Disabled: true}
-	if a := b.contactRowSpec(gated, false).Actions[0]; !a.Disabled {
-		t.Error("standing-gated row's Accept is not grayed")
+	if v, ok := b.contactRowSpec(contactRowModel{ID: "ct-a-open"}, false).Actions[0].Intent.(widgets.ShowContact); !ok || v.Offer != "ct-a-open" {
+		t.Errorf("Details intent = %#v, want ShowContact{ct-a-open}",
+			b.contactRowSpec(contactRowModel{ID: "ct-a-open"}, false).Actions[0].Intent)
+	}
+	// A standing gate does not disable Details: the dialog explains it.
+	if a := b.contactRowSpec(contactRowModel{ID: "ct-c-gated"}, false).Actions[0]; a.Disabled {
+		t.Error("standing-gated row's Details is grayed")
 	}
 	active := b.contactRowSpec(avail, true)
 	if len(active.Actions) != 1 || active.Actions[0].Label != "Abandon" || active.Actions[0].Disabled {
 		t.Errorf("active row = %+v, want one enabled Abandon", active.Actions)
 	}
 
-	// The prose line (line 2) declares the objective's def as its Ref —
-	// Show Info, strictly, through the installer.
-	ref, ok := b.objectiveRef("ct-a-open")
+	// The objective's Show Info ref is the Details dialog's Inspect verb —
+	// resolved through the same seam, from the def the row belongs to.
+	ref, ok := objectiveRef(b.cv, defs["ct-a-open"])
 	if !ok || !ref.Valid() {
 		t.Fatalf("objective ref = %v (%v), want a valid ref", ref, ok)
 	}

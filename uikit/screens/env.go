@@ -25,6 +25,9 @@ type services struct {
 	// qty is the quantity picker every ± ticker was replaced by: one
 	// instance, re-targeted on every open (its per-mode memory lives in it).
 	qty *QtyWin
+	// contact is the Details dialog of a contact offer: one instance,
+	// re-targeted on every open (CONTEXT.md "Dialog").
+	contact *ContactWin
 	// show/close are the Kit-hosted Show Info lifecycle (mount + raise /
 	// unmount). A bare NewEnv leaves them nil and Show falls back to the
 	// window's own show/hide — a test harness mounts it by hand.
@@ -33,6 +36,9 @@ type services struct {
 	// qtyShow is the picker's Kit-hosted open (mount + centre + raise); a
 	// bare NewEnv leaves it nil and the picker only shows.
 	qtyShow func(widgets.QtyPick)
+	// contactShow is the Details dialog's Kit-hosted open (mount + raise);
+	// nil falls back to the window's own show.
+	contactShow func(content.ContractID)
 }
 
 // Session is one host's environment: the three seams plus the services a
@@ -58,6 +64,14 @@ type Session interface {
 	// exactly what Do(QtyPick{…}) executes. With a Kit hosting the window
 	// this mounts it; in a bare session it only fills and reveals it.
 	OpenQty(req widgets.QtyPick)
+
+	// ContactWindow is the session's one contact Details dialog
+	// (CONTEXT.md "Dialog"). Like the picker it is opened through the sink.
+	ContactWindow() *ContactWin
+
+	// ShowContact opens (or re-targets) the Details dialog on one live
+	// offer — exactly what Do(ShowContact{…}) executes.
+	ShowContact(offer content.ContractID)
 
 	// ShowInfo opens (or swaps) the session's Show Info window on ref —
 	// exactly what Do(ShowInfo{ref}) executes. With a Kit hosting the
@@ -112,6 +126,27 @@ func (s *session) OpenQty(req widgets.QtyPick) {
 	s.svc.qty.Show(req)
 }
 
+// ContactWindow is the session's Details dialog (nil before NewEnv finishes).
+func (s *session) ContactWindow() *ContactWin {
+	if s.svc == nil {
+		return nil
+	}
+	return s.svc.contact
+}
+
+// ShowContact runs the Details dialog's open: the Kit-hosted mount when
+// there is one, else the window's own show.
+func (s *session) ShowContact(offer content.ContractID) {
+	if s.svc == nil || s.svc.contact == nil {
+		return
+	}
+	if s.svc.contactShow != nil {
+		s.svc.contactShow(offer)
+		return
+	}
+	s.svc.contact.Show(offer)
+}
+
 func (s *session) ShowInfo(ref widgets.InfoRef) {
 	if s.svc == nil {
 		return
@@ -146,11 +181,16 @@ func NewEnv(c *content.Content, s *sim.Sim, enqueue EnqueueFunc, p *widgets.Poin
 	sess.Seams = widgets.NewSeams(
 		theme.NewSeam(theme.DefaultPalette(), theme.ScaleTypeScale(theme.DefaultTypeScale())),
 		widgets.NewView(c, s),
-		// The picker's open is a session intent the built-in executor does
-		// not know: the sink intercepts it here, everything else rides exec.
+		// The picker's and the Details dialog's opens are session intents
+		// the built-in executor does not know: the sink intercepts them
+		// here, everything else rides exec.
 		widgets.SinkFunc(func(i widgets.Intent) {
-			if req, ok := i.(widgets.QtyPick); ok {
-				sess.OpenQty(req)
+			switch v := i.(type) {
+			case widgets.QtyPick:
+				sess.OpenQty(v)
+				return
+			case widgets.ShowContact:
+				sess.ShowContact(v.Offer)
 				return
 			}
 			exec.Do(i)
@@ -163,5 +203,6 @@ func NewEnv(c *content.Content, s *sim.Sim, enqueue EnqueueFunc, p *widgets.Poin
 	sess.svc.menu = widgets.NewMenu(sess, sess.Pointer())
 	sess.svc.info = NewInfoWin(sess)
 	sess.svc.qty = NewQtyWin(sess)
+	sess.svc.contact = NewContactWin(sess)
 	return sess
 }

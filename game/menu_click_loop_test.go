@@ -179,8 +179,8 @@ func useLoopMouse(t *testing.T) *loopMouse {
 // way a player does: right-click a wired row through the real widget
 // input path inside Game.Update (menu opens), move onto an entry,
 // left-click it — and the entry's action must fire. The action surface
-// is the contract board's objective label: its menu leads with a bold
-// Show Info whose Action opens the item-details window (Kit.InfoOpen).
+// is a contract board row: its menu's one entry is Details, whose Action
+// opens the contact dialog (Kit.ContactOpen).
 //
 // Red condition this pins: the menu is open, a left-press edge is
 // delivered on the entry's row rect through the production poll, and the
@@ -198,14 +198,14 @@ func TestMenuClickDispatchesThroughUpdateLoop(t *testing.T) {
 		g.Draw(img)
 	}
 
-	// 1. Cursor onto the objective label of a wired row.
+	// 1. Cursor onto a wired offer row.
 	row := findRow(t, stationBoard(t, g).Rows(false), "offer-jalvrek-kerngrit")
-	objective := row.Root.Children()[1].GetWidget()
-	if objective.Rect.Empty() {
-		t.Fatal("fixture: objective label never laid out")
+	label := row.Root.Children()[1].GetWidget() // the rich-row stack inside the row
+	if label.Rect.Empty() {
+		t.Fatal("fixture: row never laid out")
 	}
-	mm.moveTo(objective.Rect.Min.X+objective.Rect.Dx()/2,
-		objective.Rect.Min.Y+objective.Rect.Dy()/2)
+	mm.moveTo(label.Rect.Min.X+label.Rect.Dx()/2,
+		label.Rect.Min.Y+label.Rect.Dy()/2)
 
 	// 2. Right-press, right-release: the production open path
 	//    (widget fireEvents inside Kit.Update → OpenMenu). The press
@@ -219,8 +219,8 @@ func TestMenuClickDispatchesThroughUpdateLoop(t *testing.T) {
 		t.Fatal("right-click did not open the context menu through Game.Update")
 	}
 	entries := g.kit.Menu().Entries()
-	if len(entries) != 1 || entries[0].Label != "Show Info" || entries[0].Disabled {
-		t.Fatalf("menu after right-click = %+v, want the single enabled Show Info", entries)
+	if len(entries) != 1 || entries[0].Label != "Details" || entries[0].Disabled {
+		t.Fatalf("menu after right-click = %+v, want the single enabled Details", entries)
 	}
 
 	// 3. Move onto entry 0 (the scripted raw cursor — Menu.poll reads
@@ -249,9 +249,9 @@ func TestMenuClickDispatchesThroughUpdateLoop(t *testing.T) {
 	frame()
 
 	// 4. The entry's action must have run.
-	if !g.kit.InfoOpen() {
+	if !g.kit.ContactOpen() {
 		t.Errorf("menu entry click did not dispatch: menu was open with %q at %v, "+
-			"left-press edge delivered at RowRect(0)=%v, but Kit.InfoOpen()=false "+
+			"left-press edge delivered at RowRect(0)=%v, but Kit.ContactOpen()=false "+
 			"(menu open after click: %v)",
 			entries[0].Label, openRect, rr, g.kit.Menu().IsOpen())
 	}

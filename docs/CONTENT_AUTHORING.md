@@ -702,7 +702,7 @@ Offer fields (the task fields are the old contract def's, unchanged):
 | `reward.credits` | paid to wallet on claim (must be `>= 0`); scaled with a derived count |
 | `reward.item` / `reward.qty` | optional material reward (a rare module, loot, a requisition right) to the station hangar |
 | `reward.standing_gain` | career standing credited on claim |
-| `description` | the contact's own words, with slots: `{count}` `{system}` `{station}` `{item}` `{caste}` `{urgency}` |
+| `description` | the contact's own words, with slots: `{count}` `{system}` `{station}` `{item}` `{caste}` `{urgency}` — rendered as the contact's spoken line in the **Details** dialog (the offer row shows only the title, the mission type and the payout, so write this as one person talking, not as a briefing) |
 | `source` | how the sim derives the live parameters (below) |
 
 Objective per kind (the validator rejects anything else):

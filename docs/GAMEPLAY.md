@@ -319,8 +319,9 @@ at all) over the **contacts** posted here and their live offers, then your
 active work (see [Contacts & standing](#contacts--standing)) — and hides
 the space chrome (ship status, module rack, scanner) together with the
 **Overview** and **Selected Item** windows. Nothing else auto-opens:
-the market, fitting, inventory and manufacturing are ordinary windows you
-open from the services view, their keys, or the rail, and they open at
+the market, fitting, inventory, manufacturing and refinery are ordinary
+windows you open from their keys or the rail (the dock strip carries no
+second door to them), and they open at
 their own per-type defaults exactly as they do in space — the services
 view keeps the station's left column. Any arrangement you saved or
 dragged wins over the defaults (see **Your layout persists**).
@@ -602,15 +603,25 @@ exactly while there is a gap to fill. A front short of materiel posts a
 delivery in that front's system; a station short of requisition stock
 posts a manufacturing or hauling order; an Old Works hull working the
 local belt posts a kill order; a station short of ore posts a mining
-order. Each row shows the title, the contact's office name and its own words
-with the numbers filled in (the count, station, system or caste — every prose line
-right-clicks to **Show Info** on the objective it names) and the reward
-(`40,000.00 € · +0.10 standing`), with a delivery also naming its
-destination's **requisition stock**. Press **Accept** to take it; an offer
-above your standing shows its requirement (`Requires standing 0.20`) with
-the button disabled, and an already-accepted one is marked **Accepted**.
-An offer whose gap closes simply stops being listed — no timer, no
-penalty, nothing to lose.
+order. Each row is a summary, not a paragraph: the contact's **portrait**
+thumb, the title with its **mission type** (`Delivery`, `Kill order`,
+`Mining`) and the payout (`430,000.00 €`), with the standing gain, a
+delivery's destination **requisition stock** and — when you are below the
+gate — `Requires standing 0.20` on the line under it. Press **Details** to
+open the offer.
+
+**Details** is the conversation behind the row: the contact's 2:3 portrait
+(drop-in art, else the office's mark), their own words with the sim's
+numbers filled in and attributed to them, and the contract at a glance —
+mission type, objective (what, how many, and the destination for a
+delivery), payout and standing gate. Three options, all of them real:
+**Accept work** takes the offer (the same command the button always sent;
+greyed with its reason while your standing is short, and reading
+**Accepted** once taken), **Inspect item** / **Inspect target** opens the
+objective's Show Info page, and **Decline** closes the dialog. One offer
+at a time: a second Details click re-targets the same window. An offer
+whose gap closes simply stops being listed — no timer, no penalty,
+nothing to lose.
 
 **Active work** — everything you have accepted, anywhere, with live
 progress (`Belt cleanup — 1/3`) and an **Abandon** button. Accepting and
@@ -705,8 +716,7 @@ first — the two-tier chain.
 
 ## The refinery
 
-The **Refinery** window (its button on the services view, or the rail's
-Industry section) lists every ore stack in your cargo and ore hold and
+The **Refinery** window (the rail's Industry section) lists every ore stack in your cargo and ore hold and
 previews exactly what **Refine** would yield — `floor(refine_yield × qty)`
 per mineral. Selecting an ore opens the **quantity picker** with a notched
 ladder of whole **100-ore batches** — 100, 200, 300, … capped at that

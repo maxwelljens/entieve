@@ -63,6 +63,10 @@ func (v *stubView) DockedStation() (widgets.StationInfo, bool) {
 
 func (v *stubView) DockedMarket() sim.StationID { return "cel-stub" }
 
+// StationName resolves a station id to the stub's own spelling: the Details
+// dialog's destination and claim lines read it.
+func (v *stubView) StationName(st sim.StationID) string { return string(st) }
+
 // PlayerStock is the player's holdings read the market row uses for the
 // order window's sell default (a fixed 5 in the stub).
 func (v *stubView) PlayerStock(content.ItemID) int { return 5 }

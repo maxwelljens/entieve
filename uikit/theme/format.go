@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/format"
 )
 
@@ -62,6 +63,34 @@ func KindLabel(kind string) string {
 		return ""
 	}
 	return strings.ToUpper(string(r[0])) + string(r[1:])
+}
+
+// ContractLabel names an offer's task kind as the board's own words; an
+// unknown kind falls back to the title-cased value.
+func ContractLabel(kind string) string {
+	switch kind {
+	case content.ContractDeliver:
+		return "Delivery"
+	case content.ContractKill:
+		return "Kill order"
+	case content.ContractMine:
+		return "Mining"
+	}
+	return KindLabel(kind)
+}
+
+// PatronLabel names a contact's patron; an unknown patron falls back to the
+// title-cased id.
+func PatronLabel(patron string) string {
+	switch patron {
+	case content.PatronCommission:
+		return "Commission"
+	case content.PatronCharter:
+		return "Charter"
+	case content.PatronCorporation:
+		return "Corporation"
+	}
+	return KindLabel(patron)
 }
 
 // FormatInt formats n with thousands separators: 12345 → "12,345".

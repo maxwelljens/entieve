@@ -128,13 +128,15 @@ type Kit struct {
 	// kit's Env reaches: the context menu and the Show Info window.
 	svc *services
 
-	// The three dialogs (kitdialog.go): Show Info, the order mini-window
-	// and the quantity picker. Each is one instance, re-targeted and
-	// raised on every launch, mounted on first open and unmounted by its
-	// close — one lifecycle, one × registration site.
-	info  *dialog
-	order *dialog
-	qty   *dialog
+	// The four dialogs (kitdialog.go): Show Info, the order mini-window,
+	// the quantity picker and the contact Details page. Each is one
+	// instance, re-targeted and raised on every launch, mounted on first
+	// open and unmounted by its close — one lifecycle, one × registration
+	// site.
+	info    *dialog
+	order   *dialog
+	qty     *dialog
+	contact *dialog
 	// ovFilt is the overview's filter window (the title bar's cog): one
 	// instance, transient, never in the layout sidecar — its STATE rides
 	// the overview's sidecar row instead.
@@ -156,6 +158,10 @@ type Kit struct {
 	// replacement for every retired ± ticker), also deliberately out of
 	// the layout sidecar: a transient dialog, never restored.
 	qtyWin *QtyWin
+
+	// contactWin is the contact Details dialog's panel (services.contact):
+	// transient like the picker, never restored.
+	contactWin *ContactWin
 
 	// core visibility (hidden e.g. while docked in a station) and the
 	// player's own close of a core window (the rail's Overview /
@@ -265,6 +271,11 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command), opts ...K
 	k.qtyWin.onClose = k.CloseQty
 	k.svc.qtyShow = k.OpenQty
 	k.qty = k.newDialog(k.qtyWin.Win(), k.qtyWin.hide, k.qtyWin.IsOpen, k.centerQty, k.CloseQty)
+
+	// The Details dialog is built on first open (the overview filter's
+	// rule): most sessions never open one, and its page is re-rendered on
+	// every Show anyway. Only the open hook is wired now.
+	k.svc.contactShow = k.OpenContact
 
 	// Root container: transparent overlay over the world render; windows
 	// float above it. The theme rides the widget parent chain.
@@ -483,7 +494,10 @@ func (k *Kit) Sync() {
 	k.ov.sync(k)
 	k.syncSelected()
 	k.svc.info.Sync()
-	k.svc.qty.Sync()        // the picker's slider input + live preview
+	k.svc.qty.Sync()          // the picker's slider input + live preview
+	if k.svc.contact != nil { // built on first open
+		k.svc.contact.Sync() // the Details page follows the offer it shows
+	}
 	if k.ovFiltWin != nil { // built on first open
 		k.ovFiltWin.Sync()
 	}
@@ -518,6 +532,9 @@ func (k *Kit) RunIntent(i widgets.Intent) {
 		return
 	case widgets.QtyPick:
 		k.OpenQty(v)
+		return
+	case widgets.ShowContact:
+		k.OpenContact(v.Offer)
 		return
 	}
 	k.exec.Do(i)
@@ -737,6 +754,44 @@ func (k *Kit) QtyWindow() *widget.Window {
 // QtyWin returns the quantity picker panel (tests reach its slider and
 // Confirm through it).
 func (k *Kit) QtyWin() *QtyWin { return k.qtyWin }
+
+// OpenContact opens (or re-targets) the contact Details dialog on one live
+// offer: Show-Info-style, one instance — a second launch swaps the offer in
+// place and raises the window, a first open fades it in. An offer that is no
+// longer live opens nothing.
+func (k *Kit) OpenContact(offer content.ContractID) {
+	if k.contactWin == nil {
+		k.contactWin = NewContactWin(k.seams())
+		k.contactWin.onClose = k.CloseContact
+		k.svc.contact = k.contactWin
+		k.contact = k.newDialog(k.contactWin.Win(), k.contactWin.hide, k.contactWin.IsOpen, nil, k.CloseContact)
+	}
+	k.showDialog(k.contact, func() bool { return k.contactWin.Show(offer) })
+}
+
+// CloseContact closes the Details dialog: unmount and hide (its rect is
+// transient and never persisted). Idempotent — safe to call every frame,
+// e.g. while the player is undocked, and before the dialog was ever built.
+func (k *Kit) CloseContact() {
+	if k.contact != nil {
+		k.closeDialog(k.contact)
+	}
+}
+
+// ContactOpen reports whether the Details dialog is up.
+func (k *Kit) ContactOpen() bool { return k.contact != nil && k.contact.isOpen() }
+
+// ContactWindow returns the Details window (the world-input gate hit-tests
+// it, like InfoWindow). nil only before NewKit finishes.
+func (k *Kit) ContactWindow() *widget.Window {
+	if k.contact == nil {
+		return nil
+	}
+	return k.contact.win
+}
+
+// ContactWin returns the Details panel (tests reach its page through it).
+func (k *Kit) ContactWin() *ContactWin { return k.contactWin }
 
 // centerQty puts the picker in the middle of the viewport: the root
 // overlay is laid out to it, so its rect is the screen. The construction

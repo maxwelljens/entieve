@@ -28,6 +28,7 @@ it decorates. IDs are the same kebab-case strings the content JSON uses
 | `assets/backgrounds/` | system ID (`sys-*.json`) or `default` | `default.png` | unrotated |
 | `assets/artwork/` | fixed names (no content id) | `spaceship_hangar.jpg`, `title_background.jpg` | unrotated, cover-fit |
 | `assets/icons/` | the content ID (module, `corp-*`, ore, mineral, loot) | `mod-autocannon-s.png`, `corp-burza.png` | n/a — UI icons, drawn in a square box |
+| `assets/contacts/` | contact ID (`ContactDef.id` in `content/data/contacts/*.json`) | `contact-duksan-yard.png` | unrotated, **2:3 portrait** — cover-fit into the offer row's thumb and the Details dialog's frame |
 
 Sub-JSON lookup is exactly `<directory>/<id>.png`; other files and
 directories are ignored. `assets/artwork/` is the one kind that also accepts
