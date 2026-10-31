@@ -61,6 +61,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   overview still sorts on the real velocity, and the velocity wedge keeps its
   current/max gauge.
 
+- **Contact portraits accept JPEG drop-ins** (`render`, `assets`) — the
+  convention's second JPEG kind: `assets/portraits/<contact-id>.jpg` loads
+  as the face the offers list and the Details dialog draw (photos compress
+  far better as JPEG). Artwork kept its JPEG, every other sprite stays
+  PNG-only; the convention is documented in `ART.md` and `assets/README.md`.
+
 ## [0.12.0] - 2026-10-31
 
 ### Changed

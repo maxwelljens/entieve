@@ -107,12 +107,14 @@ func writeJPEG(t *testing.T, path string, w, h int) {
 	}
 }
 
-// TestDockedArtworkAcceptsJPEGOnlyUnderArtwork: the artwork kind loads JPEG
-// (the docked backdrop ships as spaceship_hangar.jpg) and nothing else does —
-// sprite kinds stay PNG-only. No plate = nil, the game's veil fallback.
-func TestDockedArtworkAcceptsJPEGOnlyUnderArtwork(t *testing.T) {
+// TestJPEGLoadsOnlyForArtworkAndPortraits: the artwork kind (the docked
+// backdrop ships as spaceship_hangar.jpg) and the contact-portrait kind
+// accept JPEG — photos compress far better — and every other sprite stays
+// PNG-only. No plate = nil, the game's veil fallback.
+func TestJPEGLoadsOnlyForArtworkAndPortraits(t *testing.T) {
 	dir := t.TempDir()
 	writeJPEG(t, filepath.Join(dir, "artwork", "spaceship_hangar.jpg"), 32, 18)
+	writeJPEG(t, filepath.Join(dir, "portraits", "contact-test.jpg"), 32, 48)
 	writeJPEG(t, filepath.Join(dir, "hulls", "ship-sloop.jpg"), 32, 18)
 	stashAssets(t, dir)
 
@@ -122,6 +124,9 @@ func TestDockedArtworkAcceptsJPEGOnlyUnderArtwork(t *testing.T) {
 	}
 	if b := art.Bounds(); b.Dx() != 32 || b.Dy() != 18 {
 		t.Errorf("artwork plate = %dx%d, want 32x18", b.Dx(), b.Dy())
+	}
+	if p := spriteFor("portraits/contact-test"); p == nil {
+		t.Error("portraits/*.jpg must load (contact faces compress as JPEG)")
 	}
 	if spriteFor("hulls/ship-sloop") != nil {
 		t.Error("a hull .jpg must not load (sprite kinds are PNG-only)")

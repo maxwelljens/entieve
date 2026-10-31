@@ -14,7 +14,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// Zero-config art pipeline: a PNG dropped under assets/<kind>/<id>.png
+// Zero-config art pipeline: art dropped under assets/<kind>/<id>.(png|jpg)
 // replaces the procedural vector art for that content ID (convention table
 // in docs/ART.md). Nothing is configured — a missing file simply means
 // "draw the vector art", so an empty assets/ directory plays identically.
@@ -74,9 +74,10 @@ func LoadAssets(dir string) {
 			if img := loadPNG(path); img != nil {
 				sprites[key] = img
 			}
-		// JPEG is the artwork kind's format only (the docked plate ships as
-		// a JPG); sprites stay PNG.
-		case strings.HasPrefix(key, artworkRoot) &&
+		// JPEG is the artwork kind's format (the docked plate ships as a
+		// JPG) and the portraits kind's (contact faces compress far better
+		// as JPEG); every other sprite stays PNG.
+		case (strings.HasPrefix(key, artworkRoot) || strings.HasPrefix(key, portraitsRoot)) &&
 			(strings.EqualFold(ext, ".jpg") || strings.EqualFold(ext, ".jpeg")):
 			if img := loadJPEG(path); img != nil {
 				sprites[key] = img
@@ -97,6 +98,10 @@ func spriteFor(key string) *ebiten.Image {
 
 // artworkRoot is the full-window plate kind: assets/artwork/<name>.(png|jpg).
 const artworkRoot = "artwork/"
+
+// portraitsRoot is the contact-portrait kind: assets/portraits/<contact-id>
+// (png or jpg), the 2:3 faces the offers list and the Details dialog draw.
+const portraitsRoot = "portraits/"
 
 // dropinIconsRoot is the UI icon set (assets/icons/<content-id>.png): the
 // walk skips it — the set embeds itself in the assets/icons package and never

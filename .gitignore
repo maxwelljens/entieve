@@ -20,6 +20,7 @@
 .vscode/
 # User-dropped art is local content (docs/ART.md). Force-add to track.
 assets/**/*.png
+assets/**/*.jpg
 # Font source archives are local material (TTFs ship in render/fonts/).
 assets/*.zip
 # Serena MCP project metadata (local tooling state).

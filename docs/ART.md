@@ -28,10 +28,13 @@ it decorates. IDs are the same kebab-case strings the content JSON uses
 | `assets/backgrounds/` | system ID (`sys-*.json`) or `default` | `default.png` | unrotated |
 | `assets/artwork/` | fixed names (no content id) | `spaceship_hangar.jpg`, `title_background.jpg` | unrotated, cover-fit |
 | `assets/icons/` | the content ID (module, `corp-*`, ore, mineral, loot) | `mod-autocannon-s.png`, `corp-burza.png` | n/a — UI icons, drawn in a square box |
+| `assets/portraits/` | contact ID (`contact-*`, `content/data/contacts/*.json`) | `contact-commission-liaison.jpg` | 2:3 face, unrotated (JPEG preferred) |
 
-Sub-JSON lookup is exactly `<directory>/<id>.png`; other files and
-directories are ignored. `assets/artwork/` is the one kind that also accepts
-JPEG (the docked-station plate ships as a `.jpg`); sprites stay PNG-only.
+Sub-JSON lookup is exactly `<directory>/<id>.png` — or `.jpg`/`.jpeg` for
+`assets/portraits/` and `assets/artwork/` — other files and directories are
+ignored. Those two kinds accept JPEG (the docked-station plate and contact
+faces, which compress far better as `.jpg`); every other sprite stays
+PNG-only.
 One file there is embedded rather than walked: `title_background.jpg` ships
 inside the binary through the `assets/artwork/artwork.go` shim (see
 [Title background](#title-background)). `assets/icons/` is embedded the same
