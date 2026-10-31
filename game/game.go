@@ -709,6 +709,9 @@ func (g *Game) buildKit() error {
 
 	g.hud = uikit.NewHud(env)
 	g.rack = uikit.NewRack(env)
+	// A target-card click selects the card's entity exactly as a world
+	// click does (same door, so the Selected Item panel follows).
+	g.hud.SetSelector(kit.Select)
 	// The rack is the right half of the HUD's bottom-center pair: the HUD
 	// owns the slot, the rack keeps its own container (Sync, hover, rects).
 	g.hud.MountRack(g.rack.Container())

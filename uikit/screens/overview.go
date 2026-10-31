@@ -282,8 +282,12 @@ func (k *Kit) buildOverview() {
 		// (placeDefaults reads the same constant) and moves it to the
 		// viewport's upper-right corner. Its height stops 8 px above the
 		// module rack's top edge at the 1024×700 minimum (425 − 8 − 8 =
-		// 409), so the corner placement never overlaps the rack.
-		widget.WindowOpts.Location(image.Rect(theme.Px(8+RailInset), theme.Px(8), theme.Px(388+RailInset), theme.Px(8+409))),
+		// 409), so the corner placement never overlaps the rack. The width
+		// is twice the original table (380 → 760): it now covers the
+		// top-centre target-card row at both design sizes (windows paint
+		// above root chrome) — accepted, the height is what keeps the rack
+		// clear.
+		widget.WindowOpts.Location(image.Rect(theme.Px(8+RailInset), theme.Px(8), theme.Px(768+RailInset), theme.Px(8+409))),
 	)
 }
 
@@ -379,12 +383,17 @@ func (o *overview) sync(k *Kit) {
 			}
 		}
 		row := o.rowFor(info)
+		vel := theme.FormatSpeed(info.Vel.Len())
+		if info.Warping {
+			// An engaged warp drive has no useful grid speed to show.
+			vel = "WARP"
+		}
 		order = append(order, widgets.TableRow{
 			Cells: []string{
 				info.Name,
 				theme.FormatDistance(info.Distance),
 				theme.KindLabel(info.Kind),
-				theme.FormatSpeed(info.Vel.Len()),
+				vel,
 			},
 			Icons:    []string{"", "", theme.KindIcon(info.Kind), ""},
 			IconTint: iconTint,

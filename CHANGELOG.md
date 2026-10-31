@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Target cards are clickable** — a left click on a locked target's card in
+  the top-centre row selects that target, exactly as a world click does (the
+  Selected Item panel and the overview row highlight follow it). It does not
+  lock, warp or move the camera.
+- **A target card names the modules cycling on it** — up to three of the
+  player's active modules bound to that target draw their own glyphs on the
+  card's distance line.
+- **EWAR effect boxes above the ship status** — while a stasis web or a warp
+  scramble is on the player, a box per effect shows its glyph and a depleting
+  cycle ring (the rack's slot idiom) with the seconds left; the row hides
+  when nothing is active. No other effect gets an icon.
+
+### Changed
+
+- **The Overview opens twice as wide** (380 → 760 design px, same height and
+  top-right corner). At the 1024×700 minimum its right edge now reaches the
+  top-centre target cards and the Selected Item window's body — committed,
+  since the height is what keeps the module rack clear.
+- **WARP replaces the live speed figure** — while the player's warp drive is
+  engaged (any phase) the HUD shows `WARP` instead of the grid speed, and an
+  overview row of a warping entity prints `WARP` in its Velocity cell. The
+  overview still sorts on the real velocity, and the velocity wedge keeps its
+  current/max gauge.
+
 ## [0.12.0] - 2026-10-31
 
 ### Changed

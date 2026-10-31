@@ -191,7 +191,13 @@ func TestVirginPlacementTable(t *testing.T) {
 					check(s.Title, g.host.Window(s.ID).GetContainer().GetWidget().Rect)
 				}
 
-				// The boot set is pairwise disjoint…
+				// The boot set is pairwise disjoint — except the overview
+				// and Selected Item: the owner asked for a twice-as-wide
+				// overview (760 px) and the left/top anchors stay put, so
+				// at 1024 the two corner windows cannot both fit (the old
+				// pair was 380 + 464 px). The overlap is the overview's
+				// right edge over the Selected Item body; both stay on
+				// screen and the overview keeps its corner.
 				ov := g.kit.OverviewWindow().GetContainer().GetWidget().Rect
 				sp := g.kit.SelectedWindow().GetContainer().GetWidget().Rect
 				lg := bodyOf[*uikit.LogPanel](g.host, idLog).Win().GetContainer().GetWidget().Rect
@@ -199,7 +205,6 @@ func TestVirginPlacementTable(t *testing.T) {
 					a, b   string
 					ra, rb image.Rectangle
 				}{
-					{"overview", "selected item", ov, sp},
 					{"overview", "log", ov, lg},
 					{"selected item", "log", sp, lg},
 				} {
@@ -209,6 +214,10 @@ func TestVirginPlacementTable(t *testing.T) {
 					}
 				}
 				// …and each holds its corner of the user's default.
+				if ov.Dx() != theme.Px(760) || ov.Dy() != theme.Px(409) {
+					t.Errorf("%dx%d @%v: overview default size = %dx%d, want the twice-as-wide 760×409 design size",
+						w, h, tc.dev, ov.Dx(), ov.Dy())
+				}
 				if want := image.Rect(g.w-theme.Px(10)-ov.Dx(), theme.Px(8),
 					g.w-theme.Px(10), theme.Px(8)+ov.Dy()); ov != want {
 					t.Errorf("%dx%d @%v: overview %v, want the upper-right corner %v", w, h, tc.dev, ov, want)

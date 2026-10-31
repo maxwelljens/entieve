@@ -14,7 +14,7 @@ import (
 // screen point.
 func panUnderCursor(g *Game, pos core.Vec2) (float64, float64) {
 	sc := g.space
-	const clickX, clickY = 640.0, 300.0
+	const clickX, clickY = 200.0, 300.0 // clear off-panel: left of the overview, under Selected Item
 	cam := sc.Camera(1280, 720)
 	// The camera center is player + pan, and
 	// screen = (world − center)·zoom + size/2.

@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -441,5 +442,70 @@ func TestDrawSmoke(t *testing.T) {
 		if img == nil {
 			t.Fatal("no image")
 		}
+	}
+}
+
+// TestOverviewWarpVelocityCell: a row whose entity has an engaged warp drive
+// prints WARP in the Velocity cell, and the column still sorts on the real
+// velocity (the typed row data, not the cell text).
+func TestOverviewWarpVelocityCell(t *testing.T) {
+	k, _ := newTestKit(t)
+	s := k.Sim
+	var slow, fast ecs.Entity
+	for _, inf := range s.Grid() {
+		if !inf.Visible || inf.Entity == s.Player() {
+			continue
+		}
+		if slow == 0 {
+			slow = inf.Entity
+		} else if fast == 0 {
+			fast = inf.Entity
+			break
+		}
+	}
+	if slow == 0 || fast == 0 {
+		t.Fatal("fixture: the showcase grid has no two visible entities")
+	}
+	// Both read as movers (the overview's cells and its sort read these),
+	// the slow one under a live warp drive.
+	s.Motions.Set(slow, sim.Motion{Vel: core.V(10, 0), MaxSpeed: 300})
+	s.Motions.Set(fast, sim.Motion{Vel: core.V(500, 0), MaxSpeed: 300})
+	// The SLOW one warps: WARP must not become the sort key (that would
+	// move it behind the faster row).
+	s.Warps.Set(slow, sim.WarpDrive{Phase: "warp"})
+
+	pumpKit(t, k, 1280, 720)
+	pumpKit(t, k, 1280, 720)
+
+	var order []ecs.Entity
+	cell := map[ecs.Entity]string{}
+	for _, r := range k.ov.tbl.RowsForTest() {
+		row, ok := r.Data.(*ovRow)
+		if !ok {
+			continue
+		}
+		order = append(order, row.info.Entity)
+		cell[row.info.Entity] = r.Cells[3]
+	}
+	if cell[slow] != "WARP" {
+		t.Errorf("warping row velocity cell = %q, want WARP", cell[slow])
+	}
+	if got, want := cell[fast], theme.FormatSpeed(500); got != want {
+		t.Errorf("cruising row velocity cell = %q, want %q", got, want)
+	}
+	si, fi := -1, -1
+	for i, e := range order {
+		switch e {
+		case slow:
+			si = i
+		case fast:
+			fi = i
+		}
+	}
+	if si < 0 || fi < 0 {
+		t.Fatalf("rows missing from the table (warp row %d, cruise row %d)", si, fi)
+	}
+	if si > fi {
+		t.Errorf("sorted by real velocity: the 10 m/s warping row must sort before the 500 m/s one (got %d > %d)", si, fi)
 	}
 }
