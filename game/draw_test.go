@@ -177,12 +177,20 @@ func mountedRects(g *Game) []struct {
 			add(panelNames[p], g.host.Window(p).GetContainer().GetWidget())
 		}
 	}
-	// Root-overlay chrome: the HUD's visible children (the target-box row
-	// is hidden until something is locked; hud.1 is the bottom-center pair,
-	// which carries the rack) and the navigation rail.
+	// Root-overlay chrome: the HUD's visible children (hud.0 is the
+	// bottom-center pair, which carries the rack — the target-card row is
+	// top chrome of its own now, "cards": empty, so 0×0, with no locks) and
+	// the navigation rail.
 	if g.hud != nil && isVisible(g.hud.Container().GetWidget()) {
 		for i, ch := range g.hud.Container().Children() {
 			add("hud."+strconv.Itoa(i), ch.GetWidget())
+		}
+	}
+	if g.hud != nil {
+		// The card row is 0×0 with nothing locked: top chrome's empty
+		// state claims no band (no rect to bound or overlap).
+		if c := g.hud.Cards().Container().GetWidget(); !c.Rect.Empty() {
+			add("cards", c)
 		}
 	}
 	if g.rail != nil {
@@ -269,8 +277,9 @@ func assertNoOverlap(t *testing.T, g *Game, w, h int) {
 }
 
 // pairPair reports the log / bottom-pair overlap allowed at the 1024
-// minimum only (see assertNoOverlap).
-func pairPair(a, b string) bool { return (a == "log" && b == "hud.1") || (a == "hud.1" && b == "log") }
+// minimum only (see assertNoOverlap). hud.0 is the pair now that the
+// target row is its own top chrome.
+func pairPair(a, b string) bool { return (a == "log" && b == "hud.0") || (a == "hud.0" && b == "log") }
 
 // bothPair reports whether {a, b} is the pair {x, y} in either order.
 func bothPair(a, b, x, y string) bool { return (a == x && b == y) || (a == y && b == x) }

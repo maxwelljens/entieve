@@ -101,10 +101,11 @@ type Kit struct {
 	stack []*kitMount
 
 	// tops is the root-overlay chrome that lives ABOVE the window stack
-	// (the navigation rail — AddTopContainer): Kit.Draw parks it out of
-	// ui.Draw and paints it after every window, under the menu, and lifts
-	// its input layer to the top of the layer stack each frame. The HUD
-	// and module rack keep their under-window position (AddContainer).
+	// (the navigation rail and the HUD's target-card row —
+	// AddTopContainer): Kit.Draw parks it out of ui.Draw and paints it
+	// after every window, under the menu, and lifts its input layer to the
+	// top of the layer stack each frame. The rest of the HUD (status pair,
+	// rack) keeps its under-window position (AddContainer).
 	tops []TopChrome
 
 	// rows is each mounted window's registered row surface (SetWindowRows):
@@ -543,19 +544,21 @@ func (k *Kit) Root() widget.Containerer { return k.root }
 // AddContainer mounts an always-on panel container into the root overlay
 // with the given anchor layout data (widget.AnchorLayoutData). Root
 // chrome mounted here keeps its ordinary position: windows paint and
-// take input above it (the HUD and module rack — permanent ship chrome
-// that no default window overlaps).
+// take input above it (the HUD's status pair and the module rack — ship
+// chrome at the screen's bottom, where no default window sits).
 func (k *Kit) AddContainer(c widget.Containerer, layoutData any) {
 	c.GetWidget().LayoutData = layoutData
 	k.root.AddChild(c)
 }
 
 // TopChrome is root-overlay chrome mounted ABOVE the window stack — the
-// navigation rail (Kit.AddTopContainer). Its left gutter is what
-// default windows keep clear (uikit.RailInset); when a window is
-// dragged over the column anyway, this is the contract that keeps the
-// rail on top: paint in Kit's own pass, input in its own topmost layer,
-// tooltips following it, the context menu still last of all.
+// navigation rail and the HUD's target-card row (Kit.AddTopContainer).
+// The rail's left gutter is what default windows keep clear
+// (uikit.RailInset); the cards sit where the doubled Overview's body
+// now lands. When a window covers either anyway, this is the contract
+// that keeps the chrome on top: paint in Kit's own pass, input in its
+// own topmost layer, tooltips following it, the context menu still last
+// of all.
 type TopChrome interface {
 	// Container is the laid-out column: the root anchor layout positions
 	// it, the topmost input layer claims it, the raise gate reads it.

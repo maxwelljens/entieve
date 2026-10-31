@@ -23,6 +23,7 @@ captures() {
 ./uikit/screens TestFittingCaptureFrame
 ./uikit/screens TestHeaderCaptureFrame
 ./uikit/screens TestHudCaptureFrame
+./uikit/screens TestHudCardsPixelsDrawAboveWindows
 ./uikit/screens TestIconsCaptureFrame
 ./uikit/screens TestInfoWindowCaptureFrame
 ./uikit/screens TestLogWindowCapture

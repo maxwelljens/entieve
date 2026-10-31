@@ -12,7 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Target cards are clickable** — a left click on a locked target's card in
   the top-centre row selects that target, exactly as a world click does (the
   Selected Item panel and the overview row highlight follow it). It does not
-  lock, warp or move the camera.
+  lock, warp or move the camera. The row is top chrome: it paints and takes
+  clicks above the windows, so the twice-as-wide Overview's body — which
+  covers its band at the default placement — never hides it or eats its
+  clicks.
 - **A target card names the modules cycling on it** — up to three of the
   player's active modules bound to that target draw their own glyphs on the
   card's distance line.

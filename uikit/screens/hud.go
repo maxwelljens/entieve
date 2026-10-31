@@ -190,15 +190,17 @@ func barFill(bar image.Rectangle, frac float64) image.Rectangle {
 
 // Hud is the always-on ship HUD: the bottom-center pair (ship status beside
 // the module rack), the time/wallet strip above the status, and the
-// top-center target-box row. One root container holds them all, so the
-// integrator adds a single stretched child to the interface root; the game
-// slots the rack into the pair through MountRack.
+// top-center target-box row. The HUD container holds the pair (added as a
+// stretched root child); the cards mount separately as TOP chrome (Cards),
+// because the doubled Overview's body covers their band. The game slots the
+// rack into the pair through MountRack.
 type Hud struct {
 	th theme.Theme
 	cv widgets.ContentView
 
 	container *widget.Container
 	targetRow *widget.Container
+	cards     *hudCards         // targetRow as TOP chrome (Cards)
 	pair      *widget.Container // bottom-center: status column + rack slot
 	strip     *widget.Container
 	effects   *widget.Container // EWAR icons above the status (hidden when none)
@@ -488,7 +490,9 @@ func NewHud(env interface {
 	)
 	h.pair.AddChild(left)
 
-	// Target boxes: a top-center row, hidden while nothing is locked.
+	// Target boxes: a top-center row, hidden while nothing is locked. It
+	// mounts as its own TOP chrome column (h.cards, see Cards) because the
+	// doubled Overview now covers the band at its default placement.
 	h.targetRow = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
@@ -502,9 +506,12 @@ func NewHud(env interface {
 	)
 	for i := range h.boxes {
 		h.boxes[i] = h.newBox(env)
+		// Hidden until Sync sees a lock: an all-hidden row lays out 0×0 and
+		// so claims no band (the top chrome's empty state).
+		h.boxes[i].root.GetWidget().SetVisibility(widget.Visibility_Hide)
 		h.targetRow.AddChild(h.boxes[i].root)
 	}
-	h.targetRow.GetWidget().SetVisibility(widget.Visibility_Hide)
+	h.cards = &hudCards{row: h.targetRow}
 
 	h.container = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
@@ -513,9 +520,39 @@ func NewHud(env interface {
 			StretchVertical:   true,
 		})),
 	)
-	h.container.AddChild(h.targetRow, h.pair)
+	h.container.AddChild(h.pair)
 	return h
 }
+
+// hudCards is the locked-target card row as TOP chrome (Kit.AddTopContainer):
+// the cards sit at the screen's top centre, over the Overview's body, so
+// they paint above every window and their clicks win over it — the rail's
+// contract (see TopChrome), while the rest of the HUD stays under the
+// windows. With no locks every box is hidden and the row lays out 0×0: an
+// empty rect claims nothing, so the band falls back to the window.
+type hudCards struct{ row *widget.Container }
+
+// Container is the card row: the root anchor layout positions it (top
+// centre, 10 px down), the topmost input layer claims it.
+func (c *hudCards) Container() *widget.Container { return c.row }
+
+// SetWindowPass parks the row out of ui.Draw's window pass and brings it
+// back for Kit.Draw's top pass — the rail's parking verbatim: the root
+// layout still lays the row out, only the paint stops.
+func (c *hudCards) SetWindowPass(on bool) {
+	vis := widget.Visibility_Show
+	if !on {
+		vis = widget.Visibility_Hide_Blocking
+	}
+	c.row.GetWidget().SetVisibility(vis)
+}
+
+// Draw paints the row — Kit.Draw's top pass, after every window.
+func (c *hudCards) Draw(screen *ebiten.Image) { c.row.Render(screen) }
+
+// Cards returns the target-card row's TOP chrome column for
+// Kit.AddTopContainer (the game mounts it with the row's own anchor data).
+func (h *Hud) Cards() TopChrome { return h.cards }
 
 // MountRack slots the module rack into the bottom-center pair, immediately
 // right of the status column. The rack keeps its own container (Sync, hover,
@@ -946,11 +983,6 @@ func (h *Hud) Sync() {
 	if tg, ok := s.Targeting(player); ok {
 		locks = tg.Locks
 	}
-	if len(locks) == 0 {
-		theme.ShowWidget(h.targetRow.GetWidget(), false)
-		return
-	}
-	theme.ShowWidget(h.targetRow.GetWidget(), true)
 	for i, box := range h.boxes {
 		if i >= len(locks) {
 			theme.ShowWidget(box.root.GetWidget(), false)
