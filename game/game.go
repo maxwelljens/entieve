@@ -406,6 +406,9 @@ func (g *Game) Update() error {
 	g.kit.MenuInput()
 
 	in := g.buildInput()
+	// The interface reads the frame's Ctrl for its ctrl+clicks (an overview
+	// row or a stack icon locks like the world does).
+	g.kit.SetCtrl(held(in.KeysDown, ebiten.KeyControl))
 
 	// UI sounds ride the frame's own input: one click cue per press edge
 	// that lands on the interface (title or game — the kit's windows are

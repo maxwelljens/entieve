@@ -85,11 +85,12 @@ type MouseBinding struct {
 var MouseMap = []MouseBinding{
 	{Button: "Left click", Desc: "Select entity / press UI buttons; drag a title bar to move a window"},
 	{Button: "Left click", Mod: "on column header", Desc: "sort the overview (click again flips direction)"},
-	{Button: "Left click", Mod: "Ctrl", Desc: "Lock target under cursor"},
+	{Button: "Left click", Mod: "Ctrl", Desc: "Lock target under the cursor (world or Overview row)"},
 	{Button: "Left double-click", Desc: "Show Info on an overview or table row; approach an entity under the cursor; on empty space, fly straight toward the point"},
 	{Button: "Right click", Desc: "Orbit target under cursor (" + theme.FormatInt(int64(orbitDefaultRange)) + " m)"},
 	{Button: "Right click", Mod: "on a UI row or rack cell", Desc: "open the context menu (Show Info, plus the row's actions)"},
 	{Button: "Right click", Mod: "on weapon slot", Desc: "open the module menu (Cycle charge walks Auto → cargo ammo)"},
+	{Button: "Hover", Mod: "a stack of entities", Desc: "open the stack picker: click an icon to select, Ctrl+click to lock, right-click for the entity's menu"},
 	{Button: "Middle drag", Desc: "Pan camera"},
 	{Button: "Wheel", Desc: "Zoom (0.05x – 4x); over the overview, scroll the list"},
 }

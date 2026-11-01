@@ -94,6 +94,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   died, warped off or was unlocked) its card blinks at two cycles a second
   for a second and a half before it goes, instead of vanishing between
   frames. A blinking card answers no clicks.
+- **The stack picker lists what one click cannot reach**: a cluster of
+  overlapping entities (two or more under the cursor within the pick radius)
+  is a single pick in the world, so resting the cursor on the pile for about
+  two hundred milliseconds opens a vertical column of their kind icons,
+  tinted with the world bracket colours and ordered as the world paints them
+  (the entity on top leads; ties fall to the canonical handle order). An icon
+  click selects, `Ctrl` + click locks (the world chord), a right-click opens
+  the entity's menu, and hovering an icon names it with its distance. The
+  column lists up to twelve icons, the tail stays in the Overview by design,
+  and it closes itself after the cursor leaves both the column and the pile
+  for about a hundred and fifty milliseconds. It is transient top chrome: no
+  keybinding, no Screen row, nothing persisted, and a plain world click still
+  resolves the nearest entity exactly as before.
 
 ### Changed
 
@@ -151,6 +164,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the log pocket's title band at 1280×720 (and further at the 1024×700
   minimum); the log raises on a click, as the market window already owns that
   strip at the minimum size.
+- **Labels follow the zoom direction**: entity name and distance labels now
+  draw when you zoom in (the grid-scale framing where you read them) and stay
+  off in the far system view, where the brackets alone carry the identity.
+  They used to do the opposite: crowding the wide view and vanishing as you
+  zoomed in to a ship.
+- **`Ctrl` + click locks from an Overview row**: the chord the world already
+  read now also applies to the overview list, which selects the row's entity
+  and locks it in one press (the same command the world click queues). A
+  plain row click still only selects.
 
 ### Fixed
 

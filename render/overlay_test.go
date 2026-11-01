@@ -13,6 +13,42 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+// TestLabelsShowWhenZoomedIn pins the label threshold's direction: the near
+// framing draws name/distance labels, the far system view does not (it used
+// to be the other way round — labels crowded the far view and vanished as
+// you zoomed in to read them).
+func TestLabelsShowWhenZoomedIn(t *testing.T) {
+	if !labelsVisible(labelZoomMin * 2) {
+		t.Error("near zoom draws no name/distance labels")
+	}
+	if labelsVisible(labelZoomMin / 2) {
+		t.Error("far zoom still draws name/distance labels")
+	}
+}
+
+// TestStackLayerFollowsPaintOrder pins the stack picker's depth key to the
+// overlay's bucket order: a ship paints over a wreck, a wreck over a rock, a
+// rock over a station, a station over a celestial.
+func TestStackLayerFollowsPaintOrder(t *testing.T) {
+	order := []string{sim.KindStar, sim.KindPlanet, sim.KindAnomaly,
+		sim.KindStation, sim.KindAsteroid, sim.KindWreck, sim.KindShip}
+	for i := 1; i < len(order); i++ {
+		if StackLayer(order[i]) <= StackLayer(order[i-1]) {
+			t.Errorf("StackLayer(%s) = %d does not paint over StackLayer(%s) = %d",
+				order[i], StackLayer(order[i]), order[i-1], StackLayer(order[i-1]))
+		}
+	}
+	// Kinds sharing a bucket tie: the picker breaks those canonically.
+	for _, pair := range [][2]string{
+		{sim.KindPlanet, sim.KindMoon}, {sim.KindStation, sim.KindGate}, {sim.KindShip, sim.KindPlayer},
+	} {
+		if StackLayer(pair[0]) != StackLayer(pair[1]) {
+			t.Errorf("StackLayer(%s)=%d and StackLayer(%s)=%d share a paint bucket, want one layer",
+				pair[0], StackLayer(pair[0]), pair[1], StackLayer(pair[1]))
+		}
+	}
+}
+
 // TestShotAgeFollowsCycleClock pins the shot-timing seam: the renderer reads
 // the shot moment off the runtime's cycle clock, so a gun whose CycleEnds is
 // one period ahead of the shot reports age 0 at the shot and one period just

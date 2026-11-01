@@ -15,9 +15,10 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-// labelZoomMax is the zoom (px/m) at or below which name/distance labels
-// draw; zoomed in past it the sprites are big enough to identify directly.
-const labelZoomMax = 0.02
+// labelZoomMin is the zoom (px/m) at or above which name/distance labels
+// draw: near framing shows names, the far system view stays clean (brackets
+// alone identify what is out there).
+const labelZoomMin = 0.02
 
 // FontScale is the UI typography scale: ui.FontBase (21) is 1.75× the
 // legacy 12 px base, i.e. text everywhere is ~75% larger. render cannot
