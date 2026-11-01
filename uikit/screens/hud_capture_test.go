@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/internal/capture"
 	"github.com/entieve/entieve/internal/uitest"
@@ -75,13 +77,37 @@ func TestHudCaptureFrame(t *testing.T) {
 		tgt.Structure = tgt.MaxStructure * 0.3
 	}
 	tg, _ := s.Targetings.Get(player)
+	tg.Locks = []sim.Lock{{Target: shipEnt, Progress: 1}}
+	if fit, ok := s.Fittings.Get(player); ok && len(fit.HighRT) > 0 {
+		// A real activation on the locked ship target: the card's module
+		// mini-cell (glyph + cycle ring) reads the sim's own binding, so the
+		// fixture fires the high gun at it rather than faking a runtime.
+		if pt, ok := s.Transforms.Get(player); ok {
+			if tt, ok := s.Transforms.Get(shipEnt); ok {
+				tt.Pos = pt.Pos.Add(core.V(2000, 0))
+			}
+		}
+		s.Queue(sim.CmdActivate{Slot: sim.SlotRef{Class: content.SlotHigh, Index: 0}, Target: shipEnt, Confirm: true})
+		s.Step()
+		// The binding is the sim's own (above); the cycle clock is staged so
+		// the frame catches the ring mid-cycle (the live bay is empty here).
+		if rt := &fit.HighRT[0]; rt.Active || rt.CycleEnds == 0 {
+			rt.Active = true
+			if def, ok := s.Content.Module(rt.Def); ok && def.ActivationTime > 0 {
+				rt.CycleEnds = s.Time() + 0.75*def.ActivationTime
+			}
+		}
+		// The tick may have pruned the far rock's lock or landed the shot on
+		// the target: re-stage the frame's numbers.
+		if tgt, ok := s.Ships.Get(shipEnt); ok {
+			tgt.Shield = tgt.MaxShield * 0.6
+			tgt.Armor = tgt.MaxArmor * 1.0
+			tgt.Structure = tgt.MaxStructure * 0.3
+		}
+	}
 	tg.Locks = []sim.Lock{
 		{Target: shipEnt, Progress: 1},
 		{Target: rockEnt, Progress: 1},
-	}
-	if fit, ok := s.Fittings.Get(player); ok && len(fit.HighRT) > 0 {
-		fit.HighRT[0].Active = true
-		fit.HighRT[0].CycleEnds = s.Time() + 1.5
 	}
 
 	out := capture.Out("hud_capture.png")
@@ -158,6 +184,7 @@ func TestHudCaptureFrame(t *testing.T) {
 
 			// --- 2. Target card: glyph pixels on the text line, a 60 % shield
 			// fill in bar 0 and a dim track in the empty tail of bar 2.
+
 			boxRect := h.boxes[0].root.GetWidget().Rect
 			card := image.Rect(0, 0, hudBoxW, hudBoxH)
 			textRow := targetCardText(card)
@@ -184,6 +211,19 @@ func TestHudCaptureFrame(t *testing.T) {
 			}
 			if tr>>8 > 80 {
 				fail("bar2 empty tail red = %d, want dim track (<= 80)", tr>>8)
+			}
+
+			// --- 3. The card's module mini-cell: the active gun's glyph and
+			// its cycle ring (palette Accent) in the first cell box.
+			if n := h.boxes[0].card.nmods; n != 1 {
+				fail("card module cells = %d, want the one gun cycling on it", n)
+			}
+			cell := targetCardMod(card, 0)
+			ring := countTint(img, image.Rect(
+				boxRect.Min.X+cell.Min.X, boxRect.Min.Y+cell.Min.Y,
+				boxRect.Min.X+cell.Max.X, boxRect.Min.Y+cell.Max.Y), theme.DefaultPalette().Accent)
+			if ring < 10 {
+				fail("module cell %v carries %d ring pixels, want a drawn cycle ring", cell, ring)
 			}
 
 			if len(errs) > 0 {
@@ -292,7 +332,10 @@ func TestHudCardsPixelsDrawAboveWindows(t *testing.T) {
 				br, bg, bb, _ := img.At(border.X, border.Y).RGBA()
 				borderRGB = [3]int{int(br >> 8), int(bg >> 8), int(bb >> 8)}
 				tg.Locks = nil // the cards vanish from the next frame on
-			case n <= 2*hudCardsCaptureFrames+2:
+			case n <= hudCardsCaptureFrames+2+hudGhostFrames:
+				// The blink window: a cleared lock keeps its card as a ghost
+				// for hudGhostFrames before it disappears, so the "without"
+				// sample waits for the blink to finish.
 			default:
 				without = sample(img)
 				if err := capture.Save(out, withCards); err != nil {

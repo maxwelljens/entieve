@@ -175,8 +175,13 @@ func (s *Sim) applyActiveEffect(e ecs.Entity, def *content.ModuleDef, slot SlotR
 		}
 		if tgt, ok := s.modTarget(e, slot); ok {
 			if m, ok := s.Motions.Get(tgt); ok {
+				fresh := now >= m.WebbedUntil
 				m.WebFactor = 1 - clamp(b.WebStrength, 0, 0.99)
 				m.WebbedUntil = now + def.ActivationTime + warpScramGrace
+				if fresh {
+					s.emit(Event{Kind: EvCombat, Phase: CombatWeb, Actor: e, Target: tgt,
+						Name: s.nameOf(e)})
+				}
 			}
 		}
 	case content.KindWarpScram:
@@ -185,7 +190,12 @@ func (s *Sim) applyActiveEffect(e ecs.Entity, def *content.ModuleDef, slot SlotR
 		}
 		if tgt, ok := s.modTarget(e, slot); ok {
 			if sh, ok := s.Ships.Get(tgt); ok {
+				fresh := now >= sh.ScrambledUntil
 				sh.ScrambledUntil = now + def.ActivationTime + warpScramGrace
+				if fresh {
+					s.emit(Event{Kind: EvCombat, Phase: CombatScram, Actor: e, Target: tgt,
+						Name: s.nameOf(e)})
+				}
 			}
 		}
 	}

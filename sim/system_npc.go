@@ -531,7 +531,13 @@ func leafMinerMine(c *btCtx) btStatus {
 // --- patrol tree leaves (traffic dispatch owns the assignment) ---
 
 func leafPatrolAggroed(c *btCtx) btStatus {
-	if c.ai.State == NpcIdle {
+	// A disengaged AI (NpcReturn) hands the tick back to the patrol's own
+	// dispatch: its return-to-post is patrolReturnStep's warp, not
+	// leafReturn's sublight walk home. A dispatched wing fights thousands of
+	// km from its post, so the Home-relative leash breaks on the first tick
+	// of any aggro there; claiming the tick anyway left the patrol stuck in
+	// PatrolRespond, burning home and never firing at the outlaw it locked.
+	if c.ai.State == NpcIdle || c.ai.State == NpcReturn {
 		return btFailure
 	}
 	if c.ai.Target == c.s.player && (c.ai.State == NpcApproach || c.ai.State == NpcOrbit) {

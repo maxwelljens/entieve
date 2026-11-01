@@ -272,6 +272,84 @@ func TestWingEngagesPlayerAggressor(t *testing.T) {
 	}
 }
 
+// TestWingFiresOnLandedOutlaw pins the reported bug: security forces warp
+// in, lock the pilot and then turn for the station instead of shooting. With
+// the warrant live the landed wing aggros the outlaw through the ordinary
+// threat machine, whose leash is measured from the wing's POST (14,000 km
+// away here): the very next tick breaks the engagement off into NpcReturn,
+// and the patrol tree's "aggroed" leaf then claimed every tick because the
+// AI was not idle — so patrolRespondStep never ran again. The hull burned
+// home at sublight speed with its lock on the pilot and its guns cold.
+// Landed security must hold and fire at the outlaw (the hold-and-fire shape
+// patrolMinerStep already uses for its aggressor).
+func TestWingFiresOnLandedOutlaw(t *testing.T) {
+	s := newTrafficSim(t)
+	beltPos := mustPos(s, s.celEntity("cel-belt-a"))
+	miner := spawnMiner(t, s, beltPos)
+	setPlayerPos(s, beltPos.Add(v(2000, 0)))
+	// A tanky pilot: the wing must land hits, not end the fixture early.
+	if sh, ok := s.Ships.Get(s.player); ok {
+		sh.MaxShield, sh.Shield = 1e9, 1e9
+		sh.MaxArmor, sh.Armor = 1e9, 1e9
+		sh.MaxStructure, sh.Structure = 1e9, 1e9
+	}
+	drain(s)
+	damageNPC(s, s.player, miner, content.Damage{EM: 5}, false)
+	s.Step()
+	drain(s)
+	// The run of confirmed acts has persisted: the pilot is an outlaw.
+	s.aggression = playerAggression{first: s.time - aggressionPersistSec - 1, until: s.time + aggressionWindowSec}
+	shield := mustShield(t, s, s.player)
+
+	landed, fired := false, false
+	var stalled ecs.Entity // a responder that has landed and is not firing
+	for i := 0; i < 3600 && !(landed && fired); i++ {
+		s.Step()
+		drain(s)
+		s.Patrols.Each(func(pe ecs.Entity, p *Patrol) {
+			if p.State != PatrolRespond || p.Incident != miner {
+				return
+			}
+			tr, ok := s.Transforms.Get(pe)
+			if !ok || tr.Pos.Dist(playerPos(s)) > trafficPatrolEngageRange {
+				return
+			}
+			landed = true
+			if rt, ok := responderModule(s, pe); ok && rt.Active {
+				fired = true
+			}
+			if stalled.IsZero() {
+				stalled = pe
+			}
+		})
+		if mustShield(t, s, s.player) < shield {
+			fired = true
+		}
+	}
+	if !landed {
+		t.Fatal("fixture: no responder reached the belt")
+	}
+	if !fired {
+		p, _ := s.Patrols.Get(stalled)
+		ai, _ := s.AIs.Get(stalled)
+		t.Fatalf("the landed wing never fired on the outlaw (patrol state=%q incident=%v ai=%q target=%v): "+
+			"security holds a lock and turns for home instead of shooting", p.State, p.Incident, ai.State, ai.Target)
+	}
+}
+
+// responderModule is one patrol hull's first high-slot runtime (the cutter's
+// turret): the module a landed wing fires the outlaw with.
+func responderModule(s *Sim, e ecs.Entity) (ModuleRuntime, bool) {
+	fit, ok := s.Fittings.Get(e)
+	if !ok {
+		return ModuleRuntime{}, false
+	}
+	if rts := fit.Runtimes(content.SlotHigh); len(rts) > 0 {
+		return rts[0], true
+	}
+	return ModuleRuntime{}, false
+}
+
 // countKind counts events of one kind (event phases are not events here).
 func countKind(evs []Event, kind EventKind) int {
 	n := 0

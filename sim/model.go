@@ -705,6 +705,19 @@ const (
 	// EvWar is war news (see the EvWar phases below): flips, front movement,
 	// fleet skirmishes and the player's own kills/deliveries at the front.
 	EvWar EventKind = "war"
+	// EvCombat is the structured twin of a combat log line: Actor is the
+	// source, Target the victim, Value the damage, Name the source's display
+	// name. It carries no Text (the log already prints the EvLog line), so
+	// the HUD's combat feed can colour the parts a line hides.
+	EvCombat EventKind = "combat"
+)
+
+// EvCombat phases: "damage" (Actor hit Target for Value) | "web" | "scram"
+// (Actor applied the EWAR effect to Target, on the effect's first cycle).
+const (
+	CombatDamage = "damage"
+	CombatWeb    = "web"
+	CombatScram  = "scram"
 )
 
 // EvTraffic phases: "departed" | "jumped" | "delivered" | "attacked" |
@@ -771,9 +784,9 @@ type Event struct {
 	Value    float64 // euro, damage, volume... context-dependent
 	Item     content.ItemID
 	Slot     SlotRef          // EvFriendlyFire: the module slot the player tried to fire
-	Phase    string           // EvWarp phases: "start" | "land" | "scrammed"; EvMission/EvTraffic phases above
+	Phase    string           // EvWarp phases: "start" | "land" | "scrammed"; EvMission/EvTraffic/EvCombat phases above
 	ID       string           // EvMission: contract ID
-	Name     string           // EvMission: contract title
+	Name     string           // EvMission: contract title; EvCombat: the source's display name
 	System   content.SystemID // EvTraffic/EvMarket: the system the move happened in
 	Cel      content.CelID    // EvTraffic: route endpoint / incident celestial
 }

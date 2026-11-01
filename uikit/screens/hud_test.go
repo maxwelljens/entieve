@@ -2,6 +2,7 @@ package screens
 
 import (
 	"image"
+	"math"
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
@@ -327,10 +328,38 @@ func TestHudTargetBoxes(t *testing.T) {
 		t.Errorf("repainted layer = %v, want 0.5", b0.drawn.layers[0])
 	}
 
+	// A target that is gone blinks before it disappears: the ghost keeps the
+	// last card, alternates on the frame count and is gone after the window.
+	// A click never lands on it (live stays false).
 	tg.Locks = nil
 	h.Sync()
-	if vis := h.boxes[0].root.GetWidget().GetVisibility(); vis != widget.Visibility_Hide {
-		t.Errorf("unlocked targets keep card 0 visible (visibility %d)", vis)
+	if b0.live {
+		t.Error("the ghost card still answers clicks (live)")
+	}
+	if vis := b0.root.GetWidget().GetVisibility(); vis != widget.Visibility_Show {
+		t.Fatalf("the lost lock left no ghost (visibility %d)", vis)
+	}
+	flips, dark := 0, false
+	wasOn := true
+	for i := 0; i < hudGhostFrames; i++ {
+		h.Sync()
+		on := b0.root.GetWidget().GetVisibility() == widget.Visibility_Show
+		if on != wasOn {
+			flips++
+		}
+		if !on {
+			dark = true
+		}
+		wasOn = on
+	}
+	if flips < 2 || !dark {
+		t.Errorf("the ghost blinked %d times (dark phase seen: %v), want an alternating blink", flips, dark)
+	}
+	if vis := b0.root.GetWidget().GetVisibility(); vis != widget.Visibility_Hide {
+		t.Errorf("the ghost outlived its window (visibility %d)", vis)
+	}
+	if !b0.live && b0.ghost != 0 {
+		t.Errorf("the blink counter = %d after the window, want 0", b0.ghost)
 	}
 }
 
@@ -575,14 +604,17 @@ func TestHudSpeedFigureReadsWARP(t *testing.T) {
 	}
 }
 
-// modView overrides the two module reads the target cards make (the fitting
-// and each slot's activation target) over the real session's view: the sim
-// still supplies the grid, the locks and every other read.
+// modView overrides the module reads the target cards make (the fitting, each
+// slot's activation target, the sim clock the rings are read against and the
+// bay a loading ring needs) over the real session's view: the sim still
+// supplies the grid, the locks and every other read.
 type modView struct {
 	widgets.ContentView
 	player  ecs.Entity
 	fit     sim.Fitting
 	targets map[sim.SlotRef]ecs.Entity
+	now     float64                       // clock override (0 = the sim's own)
+	clips   map[sim.SlotRef]sim.ClipState // bay override
 }
 
 func (v *modView) Fitting(e ecs.Entity) (sim.Fitting, bool) {
@@ -590,6 +622,20 @@ func (v *modView) Fitting(e ecs.Entity) (sim.Fitting, bool) {
 		return v.fit, true
 	}
 	return v.ContentView.Fitting(e)
+}
+
+func (v *modView) Time() float64 {
+	if v.now != 0 {
+		return v.now
+	}
+	return v.ContentView.Time()
+}
+
+func (v *modView) Clip(slot sim.SlotRef) (sim.ClipState, bool) {
+	if c, ok := v.clips[slot]; ok {
+		return c, true
+	}
+	return v.ContentView.Clip(slot)
 }
 
 func (v *modView) ModuleTarget(e ecs.Entity, slot sim.SlotRef) (ecs.Entity, bool) {
@@ -655,11 +701,11 @@ func TestHudTargetCardShowsCyclingModules(t *testing.T) {
 	h2 := NewHud(modEnv{Theme: env, ContentView: mv})
 	h2.Sync()
 
-	if h2.boxes[0].card.nmods != 1 || h2.boxes[0].card.mods[0] != "mod-stasis-web" {
+	if h2.boxes[0].card.nmods != 1 || h2.boxes[0].card.mods[0].glyph != "mod-stasis-web" {
 		t.Errorf("card 1 mods = %v (n=%d), want the web module's own glyph only",
 			h2.boxes[0].card.mods, h2.boxes[0].card.nmods)
 	}
-	if h2.boxes[1].card.nmods != 1 || h2.boxes[1].card.mods[0] != "mod-warp-scram" {
+	if h2.boxes[1].card.nmods != 1 || h2.boxes[1].card.mods[0].glyph != "mod-warp-scram" {
 		t.Errorf("card 2 mods = %v (n=%d), want the scram module's own glyph only",
 			h2.boxes[1].card.mods, h2.boxes[1].card.nmods)
 	}
@@ -682,11 +728,113 @@ func TestHudTargetCardShowsCyclingModules(t *testing.T) {
 			t.Errorf("mod box %d = %v, want it on the distance line %v", i, box, targetCardDist(card))
 		}
 	}
-	if got, want := cardModsWidth(2), 2*theme.IconInline+theme.IconGap; got != want {
+	if got, want := cardModsWidth(2), 2*theme.Px(hudBoxModCell)+theme.Px(theme.IconGap); got != want {
 		t.Errorf("cardModsWidth(2) = %d, want %d", got, want)
 	}
 	if h.boxes[0].card.nmods != 0 {
 		t.Error("the un-wired HUD grew module glyphs")
+	}
+}
+
+// TestHudTargetCardModuleRing is the card mini-cell pin: an active module on
+// a locked target draws the rack's cycle ring, depleting with the sim clock
+// (two pumps at different times differ), greyed while a cancelled cycle runs
+// out, lit while a bay loads and gone once the clock is spent. The cap and
+// the distance text's clearance rule are unchanged.
+func TestHudTargetCardModuleRing(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	s := env.Sim
+	p := s.Player()
+	var tgt ecs.Entity
+	for _, inf := range s.Grid() {
+		if inf.Entity != p {
+			tgt = inf.Entity
+			break
+		}
+	}
+	if tgt == 0 {
+		t.Fatal("fixture: no entity to lock")
+	}
+	tg, _ := s.Targetings.Get(p)
+	tg.Locks = []sim.Lock{{Target: tgt, Progress: 1}}
+
+	def, ok := env.Defs().Module("mod-stasis-web")
+	if !ok || def.ActivationTime <= 0 {
+		t.Fatal("fixture: the stasis web has no activation time")
+	}
+	web := sim.SlotRef{Class: content.SlotMid, Index: 0}
+	mv := &modView{
+		ContentView: env, player: p, now: 100,
+		fit: sim.Fitting{
+			Mid: []content.ModuleID{"mod-stasis-web"},
+			MidRT: []sim.ModuleRuntime{{Def: "mod-stasis-web", Active: true,
+				CycleEnds: 100 + 0.75*def.ActivationTime}},
+		},
+		targets: map[sim.SlotRef]ecs.Entity{web: tgt},
+	}
+	h := NewHud(modEnv{Theme: env, ContentView: mv})
+	h.Sync()
+
+	cell := h.boxes[0].card.mods[0]
+	if cell.glyph != "mod-stasis-web" {
+		t.Fatalf("card cell glyph = %q, want the web module's", cell.glyph)
+	}
+	if math.Abs(cell.ring-0.75) > 0.01 {
+		t.Errorf("ring remaining = %v, want 0.75 (three quarters of the cycle left)", cell.ring)
+	}
+	if !cell.lit {
+		t.Error("an active module's ring is not lit")
+	}
+
+	// The same cycle one second later: the ring has depleted.
+	mv.now = 101
+	h.Sync()
+	next := h.boxes[0].card.mods[0].ring
+	if next >= cell.ring {
+		t.Errorf("ring at t+1 s = %v, want less than %v (it must advance with CycleEnds)", next, cell.ring)
+	}
+
+	// Cancelled mid-cycle: the ring still shows, greyed (the rack's rule).
+	mv.fit.MidRT[0].Active = false
+	mv.fit.MidRT[0].CycleEnds = mv.now + 2
+	h.Sync()
+	cell = h.boxes[0].card.mods[0]
+	if cell.ring < 0 || cell.lit {
+		t.Errorf("cancelled cell = %+v, want a greyed ring (ring >= 0, lit false)", cell)
+	}
+	// Spent clock, not loading: no cell at all.
+	mv.now += 3
+	h.Sync()
+	if n := h.boxes[0].card.nmods; n != 0 {
+		t.Errorf("a spent cycle still draws %d cell(s), want none", n)
+	}
+
+	// A loading bay draws a lit ring (activity, not a cancellation).
+	mv.fit.MidRT[0].CycleEnds = mv.now + 1
+	mv.clips = map[sim.SlotRef]sim.ClipState{web: {Loading: true}}
+	h.Sync()
+	cell = h.boxes[0].card.mods[0]
+	if cell.ring < 0 || !cell.lit {
+		t.Errorf("loading cell = %+v, want a lit ring", cell)
+	}
+
+	// Cap: four bound slots show only hudBoxMods cells, and the distance
+	// text stays clear of the room they take.
+	mv.fit.Mid = []content.ModuleID{"mod-stasis-web", "mod-stasis-web", "mod-stasis-web", "mod-stasis-web"}
+	mv.fit.MidRT = make([]sim.ModuleRuntime, 4)
+	for i := range mv.fit.MidRT {
+		mv.fit.MidRT[i] = sim.ModuleRuntime{Def: "mod-stasis-web", Active: true, CycleEnds: mv.now + 1}
+		mv.targets[sim.SlotRef{Class: content.SlotMid, Index: i}] = tgt
+	}
+	h.Sync()
+	if n := h.boxes[0].card.nmods; n != hudBoxMods {
+		t.Errorf("card cells = %d, want the cap of %d", n, hudBoxMods)
+	}
+	card := image.Rect(0, 0, hudBoxW, hudBoxH)
+	room := float64(targetCardDist(card).Dx() - cardModsWidth(hudBoxMods))
+	_, dist := h.boxLabels("", theme.FormatDistance(9_999_999), hudBoxMods)
+	if w := h.measureTiny(dist); w > room {
+		t.Errorf("distance text %q is %v px wide, want it ellipsized to %v", dist, w, room)
 	}
 }
 
@@ -891,11 +1039,13 @@ func TestHudTargetCardsOverOverview(t *testing.T) {
 		t.Error("a click on an overview row below the band selected nothing")
 	}
 
-	// No locks: the row lays out empty, so the band is the overview's again —
-	// in the walk AND in the real input path (the parked top layer blocks
-	// nothing there).
+	// No locks: the ghost blinks out (1.5 s, frame-counted), then the row
+	// lays out empty and the band is the overview's again — in the walk AND
+	// in the real input path (the parked top layer blocks nothing there).
 	tg.Locks = nil
-	frame()
+	for i := 0; i <= hudGhostFrames; i++ {
+		frame()
+	}
 	if o := k.Own(pt); o.Layer != LayerWindow || o.Window != k.OverviewWindow() {
 		t.Errorf("no locks: card band %v = layer %d window %v, want the overview (layer %d)",
 			pt, o.Layer, o.Window, LayerWindow)

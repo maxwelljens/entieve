@@ -232,9 +232,19 @@ tile while the module runs). A small strip above the status carries the
 time multiplier and the wallet, and the **target-box row** sits at top
 center: a click on a card selects that target (exactly like a world
 click); the speed figure reads `WARP` while the drive is engaged, a card
-carries the glyphs of your modules cycling on it, and a stasis web or warp
+carries miniature rack cells of your modules cycling on it (the class glyph
+with a depleting cycle ring, lit while the module runs or its bay loads and
+greyed while a cancelled cycle runs out, three a card), a card whose target
+is gone blinks out at two cycles a second for a second and a half before it
+disappears (and answers no click meantime), and a stasis web or warp
 scramble on your hull puts a box per effect directly above the ship status
 (its glyph, a depleting cycle ring and the seconds left) until it expires.
+The **combat feed** is an overlay above the ship status: one brief line per
+thing the pilot deals or takes (a hit with its amount, an applied web or
+scramble, a kill), the important span in red when it lands on you and blue
+when you land it, four lines at most, each gone five seconds after it
+happens, and it paints over whatever window sits under it without taking
+any room from the HUD column below.
 The **log** is a normal window now:
 bottom left by default, toggle with `Shift+L`, draggable and resizable
 like the rest. The **Overview** (top right) and **Selected Item** window

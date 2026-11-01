@@ -103,6 +103,10 @@ func (s *Sim) systemDamage() {
 		}
 		s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: d.src, Target: d.dst,
 			Text: text, Value: pen})
+		// The structured twin (no Text: the log line above already prints):
+		// the HUD's combat feed colours the amount by who was hit.
+		s.emit(Event{Kind: EvCombat, Phase: CombatDamage, Actor: d.src, Target: d.dst,
+			Value: pen, Name: s.nameOf(d.src)})
 		if ship.Structure <= 0 {
 			ship.Structure = 0
 			deadSeen[d.dst] = true
@@ -265,7 +269,7 @@ func (s *Sim) handleDeath(e, src ecs.Entity) {
 	}
 
 	s.emit(Event{Kind: EvDestroyed, Severity: SevInfo, Actor: e, Target: src,
-		Text: name + " destroyed"})
+		Name: name, Text: name + " destroyed"})
 
 	if hasAI {
 		s.recordRespawn(e, ai)

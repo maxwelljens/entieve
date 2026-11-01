@@ -23,6 +23,7 @@ captures() {
 ./render TestAlphaCompositeGroundTruth
 ./uikit/screens TestFittingCaptureFrame
 ./uikit/screens TestFriendlyFireConfirmCapture
+./uikit/screens TestCombatFeedCaptureFrame
 ./uikit/screens TestHeaderCaptureFrame
 ./uikit/screens TestHudCaptureFrame
 ./uikit/screens TestHudCardsPixelsDrawAboveWindows
