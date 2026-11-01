@@ -132,6 +132,12 @@ type Sim struct {
 		at  float64
 	}
 
+	// aggression is the player's confirmed friendly-fire record (see
+	// friendlyfire.go): the first act of the current run and the expiry of
+	// the live window. Transient like lastPlayerWork — outside the Save, so
+	// a restore starts with a clean slate.
+	aggression playerAggression
+
 	// npcTrace is the harness-only per-tick decision observer behind
 	// `entieve simulate --trace-npc` (system_npc.go TraceNpc): read-only,
 	// nil unless requested, and never part of the sim state.

@@ -142,6 +142,11 @@ type Kit struct {
 	// the overview's sidecar row instead.
 	ovFilt    *dialog
 	ovFiltWin *OvFilterWin
+	// friendlyFire is the friendly-fire confirmation (built on first open,
+	// like the Details page): one instance, transient, opened by the sim's
+	// EvFriendlyFire and closed by Confirm, Cancel or ×.
+	friendlyFire    *dialog
+	friendlyFireWin *FriendlyFireWin
 	// ovCog is the overview title bar's filter button (the dialog's only
 	// door), kept for the tests that press it; ovCogGlyph is the glyph box
 	// its cell centres, kept for the alignment pin.
@@ -270,7 +275,7 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command), opts ...K
 	k.svc.qty = k.qtyWin
 	k.qtyWin.onClose = k.CloseQty
 	k.svc.qtyShow = k.OpenQty
-	k.qty = k.newDialog(k.qtyWin.Win(), k.qtyWin.hide, k.qtyWin.IsOpen, k.centerQty, k.CloseQty)
+	k.qty = k.newDialog(k.qtyWin.Win(), k.qtyWin.hide, k.qtyWin.IsOpen, k.centerDialog, k.CloseQty)
 
 	// The Details dialog is built on first open (the overview filter's
 	// rule): most sessions never open one, and its page is re-rendered on
@@ -667,6 +672,51 @@ func (k *Kit) CloseOverviewFilter() {
 // OverviewFilterOpen reports whether the filter window is up.
 func (k *Kit) OverviewFilterOpen() bool { return k.ovFilt != nil && k.ovFilt.isOpen() }
 
+// OpenFriendlyFire opens the confirmation for one aggressive activation the
+// sim refused (EvFriendlyFire carries the slot, the target and the module
+// name): the primary button re-dispatches that same CmdActivate with Confirm
+// set, Cancel and × decline. The panel is built on first open, like the
+// Details page, so no session that never fires on a friend pays for it.
+func (k *Kit) OpenFriendlyFire(slot sim.SlotRef, target ecs.Entity, module string) {
+	f := k.friendlyFireDialog()
+	name := ""
+	if info, ok := k.cv.Info(target); ok {
+		name = info.Name
+	}
+	k.showDialog(k.friendlyFire, func() bool {
+		f.Show(module, name, func() {
+			k.enqueue(sim.CmdActivate{Slot: slot, Target: target, Confirm: true})
+			k.CloseFriendlyFire()
+		})
+		return true
+	})
+}
+
+// friendlyFireDialog builds the confirm dialog on first use (one instance,
+// like every dialog).
+func (k *Kit) friendlyFireDialog() *FriendlyFireWin {
+	if k.friendlyFireWin == nil {
+		k.friendlyFireWin = NewFriendlyFireWin(k.seams())
+		k.friendlyFireWin.onClose = k.CloseFriendlyFire
+		k.friendlyFire = k.newDialog(k.friendlyFireWin.Win(), k.friendlyFireWin.hide,
+			k.friendlyFireWin.IsOpen, k.centerDialog, k.CloseFriendlyFire)
+	}
+	return k.friendlyFireWin
+}
+
+// CloseFriendlyFire closes the confirm dialog (declining: no command is
+// sent). Idempotent.
+func (k *Kit) CloseFriendlyFire() {
+	if k.friendlyFire != nil {
+		k.closeDialog(k.friendlyFire)
+	}
+}
+
+// FriendlyFireOpen reports whether the confirm dialog is up.
+func (k *Kit) FriendlyFireOpen() bool {
+	return k.friendlyFire != nil && k.friendlyFire.isOpen()
+}
+
 // InfoOpen reports whether the Show Info window is up.
 func (k *Kit) InfoOpen() bool { return k.info.isOpen() }
 
@@ -793,11 +843,12 @@ func (k *Kit) ContactWindow() *widget.Window {
 // ContactWin returns the Details panel (tests reach its page through it).
 func (k *Kit) ContactWin() *ContactWin { return k.contactWin }
 
-// centerQty puts the picker in the middle of the viewport: the root
+// centerDialog puts a dialog in the middle of the viewport: the root
 // overlay is laid out to it, so its rect is the screen. The construction
-// rect is the fallback before the first frame. It is the picker dialog's
-// place hook — the other dialogs are never re-placed on show.
-func (k *Kit) centerQty(win *widget.Window) {
+// rect is the fallback before the first frame. It is the place hook of the
+// dialogs that re-place on every show (the picker, the friendly-fire
+// confirm) — the others are never re-placed.
+func (k *Kit) centerDialog(win *widget.Window) {
 	root := k.root.GetWidget().Rect
 	w := win.GetContainer().GetWidget().Rect
 	if root.Empty() || w.Empty() {

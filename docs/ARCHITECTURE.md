@@ -430,7 +430,7 @@ Components (plain structs in `Store[T]`):
 | `WarpDrive` | warp state machine (align → warp → land) |
 | `Wreck` | `Loot []CargoStack`, `BountyFor` |
 | `Traffic` | convoy hauler leg: origin/dest cel, cargo item+qty, phase, per-leg ambush roll consumed, warp retry time, live `Attack` state (raiders, flee/response clocks, outcome) |
-| `Patrol` | security patrol response state: `idle`/`respond`/`return` + incident hauler handle + warp retry time |
+| `Patrol` | security patrol response state: `idle`/`respond`/`return` + incident handle (hauler, miner or belt) + recorded aggressor handle (`omitempty`: none before a distress dispatch) + warp retry time |
 | `Scannable`? | *(not used, reserved)* |
 | `Name` | display name string |
 
@@ -771,8 +771,9 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 >   NPC fork seeds); `sim/rng_roles_test.go` pins its draw set.
 > - **Save completeness check:** `sim/save_completeness_test.go` classifies
 >   every `Sim` field as save-carried / derived / per-Step transient / explicit
->   exception (`events`, `ammoPrefs`, `lastPlayerWork`: the last two reset on
->   restore by design, pinned by `TestRestoreResetsDocumentedPreferences`) and
+>   exception (`events`, `ammoPrefs`, `lastPlayerWork`, `aggression`: the last
+>   three reset on restore by design, pinned by
+>   `TestRestoreResetsDocumentedPreferences` / `TestOutlawResetsOnRestore`) and
 >   fails on unclassified fields, unclaimed `Save` fields, or a transient that
 >   survives a Step boundary.
 

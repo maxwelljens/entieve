@@ -341,9 +341,10 @@ func (s *Sim) restore(save *Save) error {
 	s.dockedThisTick = ""
 	s.free = nil
 	s.modTargets = make(map[modKey]ecs.Entity)
-	// The recent-player-work marker lives outside the Save schema: a restored
-	// sim starts with no record.
+	// The recent-player-work marker and the friendly-fire record live outside
+	// the Save schema: a restored sim starts with no record and no warrant.
 	s.lastPlayerWork.pos, s.lastPlayerWork.at = core.Vec2{}, playerWorkNever
+	s.aggression = playerAggression{}
 
 	// Slot table extent.
 	maxIdx := -1

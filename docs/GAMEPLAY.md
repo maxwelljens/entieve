@@ -938,7 +938,8 @@ lock one, shoot it, or just watch it work.
 
 **Guard patrols respond to incidents, never the player.** Patrols are
 friendly: they do not fire on you no matter how close you fly; they only
-defend themselves if you attack them first. Charter patrols (overview name
+defend themselves if you attack them first, and hunt you on sight once the
+Charter has you down as an outlaw (below). Charter patrols (overview name
 **Kuštor**) circle their anchor station and warp to a convoy ambush when
 one breaks out, scaled by zone: a ten-ship wing of medium-gun cutters lands
 on the spot in Charter space, a single responder arrives after about 15
@@ -948,10 +949,11 @@ carries a four-cutter static post (Rydnok's belt has one too, and the
 Struvok belt is the one authored exception: the Authority posts at the
 station there and sweeps the belt), and a high-sec patrol schedule comes
 round every minute instead of every two and a half. A miner under fire in
-Charter space calls the same answer: the wing holds on the barge it was
-sent to, clears the rats around it (only ever rats: a guard never turns on
-you unprovoked), and flies home when none are left; a second call waits
-until the first wing has left or died. Inside Works control, no one
+Charter space calls the same answer: the wing records whoever opened fire,
+holds on the barge it was sent to, clears that attacker (a pilot included)
+and the rats around it, and flies home when there is nothing left; an
+innocent pilot is never a target, and a second call waits until the first
+wing has left or died. Inside Works control, no one
 answers. In Charter
 space they also work the belts: a static guard takes on the pirate rats
 anchored at its own celestial, and a patrol sweeps an occupied belt once a
@@ -960,6 +962,17 @@ rats come first (a belt you are working stays yours while there are others
 to shoot), but security finishes the job: if yours is the last rat left, the
 sweep takes it too. A rat they kill leaves the same lootable wreck as any
 other kill; the bounty is paid only when the kill is yours.
+
+**Friendly fire is a decision, and persistence makes you an outlaw.**
+An aggressive module (a gun, a stasis web, a warp scrambler) aimed at a
+friendly ship does not fire on the first press: the game names the target
+and the module and asks, and only **Confirm foolishness** sends the shot
+(Cancel, or the window's ×, sends nothing and records nothing). Rats,
+raiders and unpiloted hulls never ask. Fire on friendly hulls and keep
+firing: once the confirmed hits span ten seconds, every Charter hull treats
+you as an outlaw, hunting you on sight at guard posts, on the patrol lanes,
+in responding wings and on belt sweeps. Stop for a quiet minute and the
+warrant lapses, though the record of what you did does not go away.
 
 **Rats ambush convoys in the Fringe and Unincorporated.** Every convoy
 transit in Kvonice has roughly a 1-in-6 chance of being jumped, Pušťov

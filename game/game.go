@@ -584,6 +584,10 @@ func (g *Game) onEvents(evs []sim.Event) {
 			g.space.ResetView()
 		case sim.EvDocked, sim.EvUndocked:
 			g.space.ResetView()
+		case sim.EvFriendlyFire:
+			// The sim refused an aggressive activation on a friendly hull:
+			// ask before firing, then re-send the same command confirmed.
+			g.kit.OpenFriendlyFire(e.Slot, e.Target, e.Name)
 		}
 	}
 }
@@ -721,6 +725,10 @@ func (g *Game) buildKit() error {
 	// same source the F-key module toggles use — before falling back to
 	// the first suitable lock.
 	g.rack.SetTargetPicker(func() ecs.Entity { return kit.Selected() })
+	// The HUD's target cards read the same selection: the locked target's
+	// card carries the selection border, whatever set it (overview row,
+	// world click or a card click).
+	g.hud.SetTargetPicker(func() ecs.Entity { return kit.Selected() })
 
 	// Always-on chrome mounts straight onto the kit's root overlay — no
 	// full-screen wrapper windows: the HUD stretches across the root and

@@ -180,7 +180,7 @@ func TestShotSeamLandsOnRealFire(t *testing.T) {
 	// The showcase fit carries four shell types, so its bay starts in the
 	// waiting state: select one before firing (flag: bay tranche).
 	s.Queue(sim.CmdSetAmmo{Slot: sim.SlotRef{Class: content.SlotHigh, Index: idx}, Item: "ammo-emp-s"})
-	s.Queue(sim.CmdActivate{Slot: sim.SlotRef{Class: content.SlotHigh, Index: idx}, Target: npc})
+	s.Queue(sim.CmdActivate{Slot: sim.SlotRef{Class: content.SlotHigh, Index: idx}, Target: npc, Confirm: true})
 	for i := 0; i < 10*sim.TickRate; i++ {
 		s.Step()
 		fit, _ := s.Fittings.Get(s.Player())
@@ -304,7 +304,7 @@ func TestFireFXAimsAtTheGunsOwnTarget(t *testing.T) {
 		t.Fatal("start fit has no high-slot weapon")
 	}
 	s.Queue(sim.CmdSetAmmo{Slot: sim.SlotRef{Class: content.SlotHigh, Index: idx}, Item: "ammo-emp-s"})
-	s.Queue(sim.CmdActivate{Slot: sim.SlotRef{Class: content.SlotHigh, Index: idx}, Target: second})
+	s.Queue(sim.CmdActivate{Slot: sim.SlotRef{Class: content.SlotHigh, Index: idx}, Target: second, Confirm: true})
 	for i := 0; i < 10*sim.TickRate; i++ {
 		s.Step()
 	}

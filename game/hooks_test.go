@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/core"
+	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
 )
 
@@ -247,5 +249,32 @@ func TestLogHistorySurvivesLoad(t *testing.T) {
 		if after[i] != before[i] {
 			t.Errorf("line %d after load = %q, want %q", i, after[i], before[i])
 		}
+	}
+}
+
+// TestFriendlyFireEventOpensConfirm: the game's one event switch turns the
+// sim's refusal into the single confirm dialog, carrying the slot, the
+// target and the module name the confirmation re-sends.
+func TestFriendlyFireEventOpensConfirm(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	var target ecs.Entity
+	for _, inf := range g.s.Grid() {
+		if inf.Kind == sim.KindShip && inf.Entity != g.s.Player() {
+			target = inf.Entity
+			break
+		}
+	}
+	if target.IsZero() {
+		t.Fatal("fixture: no NPC ship on the grid")
+	}
+	g.onEvents([]sim.Event{{
+		Kind:   sim.EvFriendlyFire,
+		Target: target,
+		Slot:   sim.SlotRef{Class: content.SlotHigh, Index: 0},
+		Name:   "250mm Auto Cannon",
+	}})
+	if !g.kit.FriendlyFireOpen() {
+		t.Fatal("EvFriendlyFire did not open the confirm dialog")
 	}
 }

@@ -117,11 +117,14 @@ last so the rebuilt grid is never observed mid-Step.
   delayed in low space by holding the wing at its anchor (`Patrol.Next`)
   before it warps. `patrolMinerStep` then warps each ship to its own station
   on a ring around the miner (`patrolStation`: even angular slots,
-  hash-varied radius, nothing persisted) and holds there, shoots
-  the rats within `trafficPatrolEngageRange` of it (the ambush engagement
-  range: rats only, never the player) and takes the ordinary
-  `patrolReturnStep` home when none are left. No new save field: the
-  incident rides `Patrol.Incident` like an ambush.
+  hash-varied radius, nothing persisted) and holds there. The dispatch
+  carries the attacker (`Patrol.Aggressor`, one omitempty save field: an
+  ordinary patrol serializes exactly as before), so the wing shoots that
+  hull first (a player who opened fire included) and then the rats within
+  `trafficPatrolEngageRange` of the barge (the ambush engagement range),
+  and takes the ordinary `patrolReturnStep` home when nothing is left. An
+  innocent pilot is still never a target: only the recorded aggressor and
+  an **outlaw** player are.
 - **Twin-run tests.** `sim/determinism_test.go`, `sim/world_metabolism_test.go`,
   `sim/traffic_test.go` and friends drive two sims through the same
   commands and compare `Hash()`.
@@ -322,7 +325,8 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    nothing; same-faction and unknown factions are neutral (fail closed). A
    content pin fails if a shipped NPC def names a faction with no relations
    row. Role passivity stacks on top: guards never initiate (they only
-   self-defend against you and clear high-sec rats at their celestial), and
+   self-defend against you, clear high-sec rats at their celestial, and hunt
+   the **outlaw** pilot inside their authored aggro range), and
    miners never initiate, but a miner does flee once its structure drops
    under the threshold, so a rat that corners a working barge drives it off
    the belt instead of killing it where it cuts. The chosen target is the

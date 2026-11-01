@@ -236,6 +236,13 @@ func TestHudCardsPixelsDrawAboveWindows(t *testing.T) {
 		t.Fatal("player has no targeting component")
 	}
 	tg.Locks = []sim.Lock{{Target: target, Progress: 1}}
+	// The player's selection sits on the card too: the selected card's
+	// border takes the palette Accent (2 px) over the plain hairline the
+	// unselected row keeps. The pixel pin below reads that ring back. (The
+	// picker returns the locked target directly so the frame shows the
+	// border alone; the game's picker returns Kit.Selected, pinned in
+	// TestHudTargetCardSelectionBorder.)
+	h.SetTargetPicker(func() ecs.Entity { return target })
 	h.Sync()
 	pumpKit(t, k, 1024, 700)
 	pumpKit(t, k, 1024, 700)
@@ -246,6 +253,7 @@ func TestHudCardsPixelsDrawAboveWindows(t *testing.T) {
 		t.Fatalf("fixture: card %v not under the overview %v", box, ovRect)
 	}
 	w, hgt := theme.Px(hudBoxW), theme.Px(hudBoxH)
+	border := image.Point{X: box.Min.X + 1, Y: box.Min.Y + hgt/2}
 	points := []image.Point{
 		{box.Min.X + w/2, box.Min.Y + 4},
 		{box.Min.X + 4, box.Min.Y + hgt/2},
@@ -263,6 +271,7 @@ func TestHudCardsPixelsDrawAboveWindows(t *testing.T) {
 
 	var withCards *ebiten.Image // screenshot evidence: the cards-over-window frame
 	var above, without []color.RGBA
+	var borderRGB [3]int // the selected card's border pixel
 	out := capture.Out("hud_cards_top.png")
 	var cap *capture.Capture
 	cap = &capture.Capture{
@@ -280,6 +289,8 @@ func TestHudCardsPixelsDrawAboveWindows(t *testing.T) {
 			case n == hudCardsCaptureFrames+1:
 				above = sample(img)
 				withCards = img
+				br, bg, bb, _ := img.At(border.X, border.Y).RGBA()
+				borderRGB = [3]int{int(br >> 8), int(bg >> 8), int(bb >> 8)}
 				tg.Locks = nil // the cards vanish from the next frame on
 			case n <= 2*hudCardsCaptureFrames+2:
 			default:
@@ -298,6 +309,11 @@ func TestHudCardsPixelsDrawAboveWindows(t *testing.T) {
 					errs = append(errs, fmt.Sprintf("point %v identical with and without the cards (%s) — "+
 						"the cards are not painting over the window", p, formatRGBA(above[i])))
 				}
+			}
+			// The selected card's border is the palette Accent (amber), not
+			// the faint grey hairline: red leads blue by a wide margin.
+			if borderRGB[0] < 150 || borderRGB[0] < borderRGB[2]+40 {
+				errs = append(errs, fmt.Sprintf("selected-card border at %v = %v, want the Accent amber ring", border, borderRGB))
 			}
 			if len(errs) == 0 {
 				return nil

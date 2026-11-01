@@ -440,11 +440,14 @@ const (
 // Patrol is the living-universe state of a security patrol ship: idling
 // around its anchor (driven by the NPC state machine), warping to an
 // incident to break up an ambush, or returning home. Incident is the
-// ambushed hauler's entity handle.
+// ambushed hauler's (or miner's) entity handle, Aggressor the hull reported
+// to have opened fire on it (0 = none; the ambush's raiders ride its own
+// record).
 type Patrol struct {
-	State    string     `json:"state"`
-	Incident ecs.Entity `json:"incident,omitempty"`
-	Next     float64    `json:"next"` // warp retry cooldown (sim time)
+	State     string     `json:"state"`
+	Incident  ecs.Entity `json:"incident,omitempty"`
+	Aggressor ecs.Entity `json:"aggressor,omitempty"`
+	Next      float64    `json:"next"` // warp retry cooldown (sim time)
 }
 
 // ---------------------------------------------------------------------------
@@ -490,10 +493,13 @@ type (
 	// CmdUnlock drops the target lock.
 	CmdUnlock struct{ Target ecs.Entity }
 
-	// CmdActivate runs a module cycle (target zero = self).
+	// CmdActivate runs a module cycle (target zero = self). Confirm is the
+	// player's answer to the friendly-fire prompt: without it, an aggressive
+	// module aimed at a peaceful hull does nothing (see friendlyFire).
 	CmdActivate struct {
-		Slot   SlotRef
-		Target ecs.Entity
+		Slot    SlotRef
+		Target  ecs.Entity
+		Confirm bool
 	}
 
 	// CmdDeactivate stops a module after the current cycle.
@@ -690,6 +696,12 @@ const (
 	EvAnomalyCleared EventKind = "anomaly_cleared"
 	EvMission        EventKind = "mission"
 	EvTraffic        EventKind = "traffic"
+	// EvFriendlyFire asks the player to confirm an aggressive activation on a
+	// friendly hull (Target, Slot and Name carry the attempt).
+	EvFriendlyFire EventKind = "friendly_fire"
+	// EvOutlaw announces the escalation: the player's confirmed fire on
+	// friendly hulls has persisted long enough that security hunts on sight.
+	EvOutlaw EventKind = "outlaw"
 	// EvWar is war news (see the EvWar phases below): flips, front movement,
 	// fleet skirmishes and the player's own kills/deliveries at the front.
 	EvWar EventKind = "war"
@@ -758,6 +770,7 @@ type Event struct {
 	Text     string  // human-readable log line
 	Value    float64 // euro, damage, volume... context-dependent
 	Item     content.ItemID
+	Slot     SlotRef          // EvFriendlyFire: the module slot the player tried to fire
 	Phase    string           // EvWarp phases: "start" | "land" | "scrammed"; EvMission/EvTraffic phases above
 	ID       string           // EvMission: contract ID
 	Name     string           // EvMission: contract title
