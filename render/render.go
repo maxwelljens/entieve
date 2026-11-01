@@ -75,7 +75,8 @@ type Renderer struct {
 	plateSys content.SystemID
 
 	selected ecs.Entity
-	hover    ecs.Entity // the entity under the cursor: the only labelled one
+	hover    ecs.Entity   // the entity under the cursor: the only labelled one
+	hidden   []ecs.Entity // the open stack column's entries: drawn there, not here
 
 	// Per-frame buckets, reused to avoid allocations in Draw.
 	bStar, bPlanet, bAnomaly, bStatic, bRock, bWreck, bShip []gridObj
@@ -113,6 +114,23 @@ func (r *Renderer) SetSelected(e ecs.Entity) { r.selected = e }
 // so the world names what the cursor rests on and nothing more. The Game
 // resolves the pick each frame and syncs it before Draw.
 func (r *Renderer) SetHover(e ecs.Entity) { r.hover = e }
+
+// SetHidden marks the entities the open stack column represents: the grid
+// stops drawing their body art, bracket, label and selection ring while the
+// column is up (the column is where they are), and dismissing it brings them
+// straight back. Lock lines and lock rings stay: they show your lock on the
+// entity, not the entity's presence.
+func (r *Renderer) SetHidden(es []ecs.Entity) { r.hidden = append(r.hidden[:0], es...) }
+
+// hiddenOn reports whether e is represented in the open stack column.
+func (r *Renderer) hiddenOn(e ecs.Entity) bool {
+	for _, h := range r.hidden {
+		if h == e {
+			return true
+		}
+	}
+	return false
+}
 
 // BodiesDrawnForTest is the number of body primitives the last Draw
 // submitted — the off-screen culling pin's counter (see keepBody). Tests
@@ -322,9 +340,13 @@ func (r *Renderer) Draw(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 
 	r.bucket(s, sys)
 	// The bucket order IS the paint order (ships on top); drawBody dispatches
-	// each entity to its own art.
+	// each entity to its own art. The picker's column replaces its entries in
+	// space: while it is up they draw there, not here.
 	for _, bucket := range [][]gridObj{r.bStar, r.bPlanet, r.bAnomaly, r.bStatic, r.bRock, r.bWreck, r.bShip} {
 		for _, o := range bucket {
+			if r.hiddenOn(o.info.Entity) {
+				continue
+			}
 			r.drawBody(dst, cam, o, sys, now)
 		}
 	}
@@ -335,7 +357,7 @@ func (r *Renderer) Draw(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 
 // drawBody paints one grid entity's own body art: the star, planet, anomaly,
 // static, rock, wreck and ship passes in Draw. The stack picker's cells call
-// it too (see DrawEntityBracket), so a cell shows the same art the world does.
+// it too (see DrawEntityBody), so a cell shows the same art the world does.
 func (r *Renderer) drawBody(dst *ebiten.Image, cam Camera, o gridObj, sys *content.SystemDef, now float64) {
 	switch o.info.Kind {
 	case sim.KindStar:
@@ -353,6 +375,56 @@ func (r *Renderer) drawBody(dst *ebiten.Image, cam Camera, o gridObj, sys *conte
 	default: // station, gate, belt, unknown celestials
 		r.drawStatic(dst, cam, o)
 	}
+}
+
+// bodyPx is a body's primary extent (its radius) in pixels at this camera: the
+// one clamp every body pass applies. The caps read the camera's reference
+// viewport (see Camera.CapDim), so a picker cell caps exactly as the world
+// does and the cell is the grid's own pixels, never a scaled miniature.
+func bodyPx(o gridObj, cam Camera) float64 {
+	long := cam.capDim()
+	switch o.info.Kind {
+	case sim.KindStar:
+		return clamp(orDef(o.radius, 3e8)*cam.Zoom, 80, 0.45*long)
+	case sim.KindPlanet, sim.KindMoon:
+		return clamp(orDef(o.radius, 3e7)*cam.Zoom, 6, 0.4*long)
+	case sim.KindAnomaly:
+		return clamp(2e4*cam.Zoom, 40, 0.3*long)
+	case sim.KindStation:
+		return clamp(orDef(o.radius, 2500)*cam.Zoom, 14, 0.25*long)
+	case sim.KindGate:
+		return clamp(orDef(o.radius, 1500)*cam.Zoom, 16, 0.3*long)
+	case sim.KindAsteroid:
+		return clamp(70*cam.Zoom, 4, 60)
+	case sim.KindWreck:
+		return clamp(55*cam.Zoom, 5, 40)
+	case sim.KindShip, sim.KindPlayer:
+		return clamp(hullSize(o.hull)*cam.Zoom, 7, 160)
+	default: // belts, unknown celestials
+		return clamp(orDef(o.radius, 4e4)*cam.Zoom, 20, 0.4*long)
+	}
+}
+
+// bodyArtHalfPx is how far a body's art reaches from its centre in pixels:
+// bodyPx plus the satellites each pass draws beyond it (a gate's glow at 1.2×,
+// a rock's specks at 2.3×+7, a ship's afterburner flame at 1.9×). The picker
+// sizes an entry's art box from it, so nothing the world draws is clipped.
+func bodyArtHalfPx(o gridObj, px float64) float64 {
+	switch o.info.Kind {
+	case sim.KindGate:
+		return 1.2*px + 1
+	case sim.KindAsteroid:
+		if spriteFor("asteroids/"+o.ore) != nil {
+			return px + 1 // the drop-in sprite fits the procedural footprint
+		}
+		return 2.3*px + 8
+	case sim.KindShip, sim.KindPlayer:
+		if o.speedMult > 1 {
+			return 1.95 * px
+		}
+		return 1.15 * px
+	}
+	return px + 1 // antialiasing and the 1 px strokes
 }
 
 // obj resolves one grid entity's render lookups (the per-frame bucket's work,
@@ -551,10 +623,7 @@ func drawGlowCentered(dst *ebiten.Image, img *ebiten.Image, cx, cy, size float64
 func (r *Renderer) drawStar(dst *ebiten.Image, cam Camera, o gridObj, sys *content.SystemDef) {
 	sx, sy := cam.WorldToScreen(o.info.Pos)
 	col := palette(sys, "star", "#ffd28a")
-	if o.radius <= 0 {
-		o.radius = 3e8
-	}
-	glowR := clamp(o.radius*cam.Zoom, 80, 0.45*math.Max(cam.ScreenW, cam.ScreenH))
+	glowR := bodyPx(o, cam)
 	if !r.keepBody(cam, sx, sy, glowR) {
 		return
 	}
@@ -578,11 +647,7 @@ func (r *Renderer) drawPlanet(dst *ebiten.Image, cam Camera, o gridObj, sys *con
 	}
 	col := palette(&content.SystemDef{Palette: map[string]string{"c": colName}}, "c", fallback)
 	col.A = 255
-	if o.radius <= 0 {
-		o.radius = 3e7
-	}
-	maxDim := math.Max(cam.ScreenW, cam.ScreenH)
-	px := clamp(o.radius*cam.Zoom, 6, 0.4*maxDim)
+	px := bodyPx(o, cam)
 	if !r.keepBody(cam, sx, sy, px) {
 		return
 	}
@@ -594,7 +659,7 @@ func (r *Renderer) drawAnomaly(dst *ebiten.Image, cam Camera, o gridObj, now flo
 	sx, sy := cam.WorldToScreen(o.info.Pos)
 	col := color.RGBA{208, 128, 255, 90}
 	img := r.glow(128, col)
-	px := clamp(2e4*cam.Zoom, 40, 0.3*math.Max(cam.ScreenW, cam.ScreenH))
+	px := bodyPx(o, cam)
 	if !r.keepBody(cam, sx, sy, px) {
 		return
 	}
@@ -636,10 +701,9 @@ func drawCelSprite(dst *ebiten.Image, sx, sy, px float64, cel content.CelID) boo
 // drawStatic renders stations, stargates and other static celestials.
 func (r *Renderer) drawStatic(dst *ebiten.Image, cam Camera, o gridObj) {
 	sx, sy := cam.WorldToScreen(o.info.Pos)
-	maxDim := math.Max(cam.ScreenW, cam.ScreenH)
+	px := bodyPx(o, cam)
 	switch o.info.Kind {
 	case sim.KindStation:
-		px := clamp(orDef(o.radius, 2500)*cam.Zoom, 14, 0.25*maxDim)
 		if !r.keepBody(cam, sx, sy, px) {
 			return
 		}
@@ -675,7 +739,6 @@ func (r *Renderer) drawStatic(dst *ebiten.Image, cam Camera, o gridObj) {
 				float32(math.Max(1.2, px*0.05)), color.RGBA{255, 180, 84, 255}, true)
 		}
 	case sim.KindGate:
-		px := clamp(orDef(o.radius, 1500)*cam.Zoom, 16, 0.3*maxDim)
 		if !r.keepBody(cam, sx, sy, px) {
 			return
 		}
@@ -695,7 +758,6 @@ func (r *Renderer) drawStatic(dst *ebiten.Image, cam Camera, o gridObj) {
 				color.RGBA{200, 255, 215, 255}, true)
 		}
 	default: // belts, unknown celestials: faint dust circle
-		px := clamp(orDef(o.radius, 4e4)*cam.Zoom, 20, 0.4*maxDim)
 		if !r.keepBody(cam, sx, sy, px) {
 			return
 		}
@@ -714,7 +776,7 @@ func (r *Renderer) drawStatic(dst *ebiten.Image, cam Camera, o gridObj) {
 // drawRock renders one asteroid as a jagged rock with scattered specks.
 func (r *Renderer) drawRock(dst *ebiten.Image, cam Camera, o gridObj) {
 	sx, sy := cam.WorldToScreen(o.info.Pos)
-	px := clamp(70*cam.Zoom, 4, 60)
+	px := bodyPx(o, cam)
 	if !r.keepBody(cam, sx, sy, px) {
 		return
 	}
@@ -741,7 +803,7 @@ func (r *Renderer) drawRock(dst *ebiten.Image, cam Camera, o gridObj) {
 // drawWreck renders a broken hull: jagged dark shape.
 func (r *Renderer) drawWreck(dst *ebiten.Image, cam Camera, o gridObj) {
 	sx, sy := cam.WorldToScreen(o.info.Pos)
-	px := clamp(55*cam.Zoom, 5, 40)
+	px := bodyPx(o, cam)
 	if !r.keepBody(cam, sx, sy, px) {
 		return
 	}
@@ -762,7 +824,7 @@ func (r *Renderer) drawWreck(dst *ebiten.Image, cam Camera, o gridObj) {
 // plus afterburner flame when SpeedMultiplier > 1.
 func (r *Renderer) drawShip(dst *ebiten.Image, cam Camera, o gridObj, now float64) {
 	sx, sy := cam.WorldToScreen(o.info.Pos)
-	sizePx := clamp(hullSize(o.hull)*cam.Zoom, 7, 160)
+	sizePx := bodyPx(o, cam)
 	if !r.keepBody(cam, sx, sy, sizePx) {
 		return
 	}

@@ -1,10 +1,11 @@
 package screens
 
 import (
-	"fmt"
 	"image"
+	"math"
 
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/theme"
@@ -14,112 +15,109 @@ import (
 
 // Stack picker: a cluster of stacked entities is unreachable by the world's
 // one-entity pick, so hovering one opens a vertical column of the entities
-// themselves — each cell draws the entity as the world does (its own body art
-// inside its own bracket, see render.DrawEntityBracket), the entity under the
-// cursor, and everything the cursor also covers.
+// themselves. An entry is the entity as the grid draws it, at the grid's own
+// zoom (its real pixels, never scaled to fit), with its name beside the art;
+// there is no frame around an entry and no panel behind the column, so the
+// entries float over the world. While the column is up the entities it lists
+// stop drawing in space: the column is where they are (render.SetHidden), and
+// the tail past the cap was never listed, so it stays in the grid.
 //
 // The column is transient TOP chrome (the rail's contract: above every
 // window, under the context menu) and nothing else: no Screen row, no
 // keybinding, no sidecar, no RNG. Its order is the pick's own (the paint
 // order, nearest to the camera first), so the column leads with what the
-// world draws on top; the cap leaves the tail unaddressable by design — the
-// Overview stays the full list. A click selects, a ctrl+click locks (the
-// world's chord), a right-click opens the entity's menu, and hovering a cell
-// names the entity and its distance (identical kinds stay tellable).
+// world draws on top. A click selects, a ctrl+click locks (the world's
+// chord), a right-click opens the entity's menu.
 const (
 	// Both are frames, never wall clock (the hudFeedFrames precedent): ~200 ms
 	// and ~150 ms at 60 fps, whatever the time acceleration.
 	stackDwellFrames = 12 // the cursor must rest on a cluster this long
 	stackGraceFrames = 9  // off both the column and the cluster this long: it drops
 
-	stackCap     = 12 // cells listed; the tail is unaddressable via the column by design
-	stackCellPx  = 32 // design px per cell: room for the bracket frame around the body art
-	stackGap     = theme.SpSm
-	stackCellPad = theme.SpSm
-	stackEdge    = 16 // column offset from the cursor (px)
+	stackCap  = 12         // entries listed; the tail stays in space and in the Overview
+	stackGap  = theme.SpSm // between entries, and between an entry's art and its name
+	stackEdge = 16         // column offset from the cursor (px)
 )
 
-// stackPicker is the column itself: a fixed pool of cells (no text rows, no
+// stackPicker is the column itself: a fixed pool of entries (no text rows, no
 // scrolling, no expander), refreshed from the hovered cluster every frame.
-// Zero entries costs nothing: the panel hides and the column lays out
-// nothing, so the layer below keeps its presses.
+// Zero entries costs nothing: the column hides and lays out nothing, so the
+// layer below keeps its presses.
 type stackPicker struct {
 	hudChrome
 	k     *Kit
-	ren   *render.Renderer // draws the cells' entity art (built with the panel)
+	ren   *render.Renderer // draws the entries' art (built with the column)
 	root  *widget.Container
-	panel *widget.Container
+	rows  *widget.Container // the stack of entries: no background, no padding
 	cells [stackCap]stackCell
 
-	entries []sim.Info // the hovered cluster, depth-ordered by the pick
+	view    render.Camera // the world's framing: entries draw at its zoom and cap
+	entries []sim.Info    // the hovered cluster, depth-ordered by the pick
+	hiding  []ecs.Entity  // the displayed entries, the grid's hidden set
 	seat    image.Point
 	shown   bool
-	n       int // cells shown (0 when hidden)
-	dwell   int // frames the cursor has rested on a cluster
-	grace   int // frames it has been off both column and cluster
+	n       int  // entries shown (0 when hidden)
+	dirty   bool // an entry's size moved: the column re-seats
+	dwell   int  // frames the cursor has rested on a cluster
+	grace   int  // frames it has been off both column and cluster
 }
 
-// stackCell is one cell: the entity as the world draws it, in its own image
-// (never a slot in the shared icon atlas), plus its hover tooltip.
+// stackCell is one entry: the entity's art at the grid's own size with its
+// name to the right, both painted into the cell's own image (never a slot in
+// the shared icon atlas).
 type stackCell struct {
 	g   *widget.Graphic
 	img *ebiten.Image
-	tip widgets.RowTip
-	art string // the entity the art was drawn for: re-drawn only when it changes
-	key string // the tooltip state key: re-set only when it moves
+	art int // the art box's width; the name follows it
+	w   int
+	h   int
 }
 
-// newStackPicker builds the chrome column only: the panel and its twelve-cell
+// newStackPicker builds the column shell only: the rows and their twelve-cell
 // pool come on the first open (see build), so a session that never hovers a
 // cluster never spends an image on it.
 func newStackPicker(k *Kit, root *widget.Container) *stackPicker {
 	p := &stackPicker{k: k, root: root}
 	p.col = widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
+	p.rows = widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
+		widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+		widget.RowLayoutOpts.Spacing(theme.Px(stackGap)),
+	)))
+	p.col.AddChild(p.rows)
 	return p
 }
 
-// build makes the panel and its cell pool on the first open — the overview
-// filter's rule: a boot-time build would rasterize into the shared icon atlas
+// build makes the row stack and its cells on the first open — the overview
+// filter's rule: a boot-time build would rasterize into the shared glyph atlas
 // and shift the title phase's text anti-aliasing (a capture baseline no
 // feature should move).
 func (p *stackPicker) build() {
-	if p.panel != nil {
+	if p.ren != nil {
 		return
 	}
-	pal := p.k.th.Pal()
 	// The picker draws the world's own art, so it keeps a renderer of its
 	// own: the kit has no handle on the world's, and every sprite it needs
 	// (procedural art, drop-in hulls and rocks) is package-level state.
 	p.ren = render.New(p.k.Content)
-	p.panel = widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(theme.PanelBox(pal, theme.Solid(pal.BG), theme.NRGBA(pal.Border, 160))),
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(theme.Px(stackGap)),
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(stackCellPad))),
-		)),
-	)
 	for i := range p.cells {
 		c := &p.cells[i]
-		size := theme.Px(stackCellPx)
-		c.img = ebiten.NewImage(size, size)
-		c.g = widget.NewGraphic(
-			widget.GraphicOpts.Image(c.img),
-			widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
-				Position: widget.RowLayoutPositionCenter,
-			})),
-		)
+		c.img = ebiten.NewImage(1, 1)
+		c.g = widget.NewGraphic(widget.GraphicOpts.Image(c.img))
 		c.g.GetWidget().MouseButtonClickedEvent.AddHandler(func(args any) {
 			if a, ok := args.(*widget.WidgetMouseButtonClickedEventArgs); ok {
 				p.click(i, a)
 			}
 		})
-		p.panel.AddChild(c.g)
+		p.rows.AddChild(c.g)
 		theme.ShowWidget(c.g.GetWidget(), false)
 	}
-	theme.ShowWidget(p.panel.GetWidget(), false)
-	p.col.AddChild(p.panel)
+	theme.ShowWidget(p.rows.GetWidget(), false)
 }
+
+// StackView is the scene's per-frame report of the world's framing: every
+// entry draws at the grid's own zoom, capped against the grid's own screen, so
+// an entry is the entity's pixels and nothing is scaled to fit.
+func (p *stackPicker) SetView(cam render.Camera) { p.view = cam }
 
 // Hover is the scene's per-frame report: the cursor rests on a cluster of
 // entries (depth order, as pick resolved it) at the screen point x, y. A
@@ -140,7 +138,7 @@ func (p *stackPicker) Hover(entries []sim.Info, x, y float64) {
 	p.build()
 	p.seat = image.Pt(int(x), int(y))
 	p.shown = true
-	theme.ShowWidget(p.panel.GetWidget(), true)
+	theme.ShowWidget(p.rows.GetWidget(), true)
 	p.sync()
 }
 
@@ -164,8 +162,9 @@ func (p *stackPicker) Dismiss() {
 	p.dwell, p.grace, p.n = 0, 0, 0
 	p.shown = false
 	p.entries = p.entries[:0]
-	if p.panel != nil {
-		theme.ShowWidget(p.panel.GetWidget(), false)
+	p.hiding = p.hiding[:0]
+	if p.rows != nil {
+		theme.ShowWidget(p.rows.GetWidget(), false)
 	}
 	// An empty rect claims no press, and the seat anchor is cleared so a
 	// later root layout cannot re-place the hidden column over the world.
@@ -178,12 +177,28 @@ func (p *stackPicker) Dismiss() {
 	p.col.RequestRelayout()
 }
 
+// Hidden is the entities the open column displays: the grid stops drawing them
+// while it is up, so the column replaces them in space. Exactly the listed
+// ones: the tail past the cap never left the grid.
+func (p *stackPicker) Hidden() []ecs.Entity {
+	if !p.shown {
+		return nil
+	}
+	p.hiding = p.hiding[:0]
+	for _, inf := range p.entries[:min(len(p.entries), stackCap)] {
+		if !inf.Entity.IsZero() {
+			p.hiding = append(p.hiding, inf.Entity)
+		}
+	}
+	return p.hiding
+}
+
 // owns reports whether pt sits on the open column.
 func (p *stackPicker) owns(pt image.Point) bool {
 	return p.shown && hitRect(p.col.GetWidget(), pt)
 }
 
-// click runs one cell's press: right opens the entity's menu (the same spec
+// click runs one entry's press: right opens the entity's menu (the same spec
 // an Overview row declares), left selects and, with Ctrl held, locks.
 func (p *stackPicker) click(i int, a *widget.WidgetMouseButtonClickedEventArgs) {
 	if !p.shown || i >= len(p.entries) {
@@ -203,15 +218,21 @@ func (p *stackPicker) click(i int, a *widget.WidgetMouseButtonClickedEventArgs) 
 	}
 }
 
-// sync refreshes the cells from the entries: the entity drawn as the world
-// draws it (its body art in its bracket, re-drawn only when the entry moves),
-// the hover tooltip naming the entity and its distance, and the column's
-// geometry (it is exactly as tall as its cells).
+// sync paints the entries from the cluster: each one's art at the grid's own
+// zoom, its name beside it, and the column's geometry (exactly as tall and
+// wide as its entries). Every frame: the art is the entity's live pixels (a
+// ship turns, a glow breathes), and a zoom change resizes an entry the frame
+// it lands, so no cached miniature can go stale.
 func (p *stackPicker) sync() {
 	if !p.shown {
 		return
 	}
 	n := min(len(p.entries), stackCap)
+	zoom := p.view.Zoom
+	capDim := math.Max(p.view.ScreenW, p.view.ScreenH)
+	name := render.LabelSize * theme.Scale()
+	gap := theme.Px(stackGap)
+	nameH := int(math.Ceil(name))
 	for i := range p.cells {
 		c := &p.cells[i]
 		theme.ShowWidget(c.g.GetWidget(), i < n)
@@ -219,36 +240,33 @@ func (p *stackPicker) sync() {
 			continue
 		}
 		inf := p.entries[i]
-		// The art is the entity's own (drawn once per entry: a moving cluster
-		// must not re-render twelve miniatures a frame), the tooltip follows
-		// its distance.
-		art := fmt.Sprintf("%d/%s", inf.Entity, inf.Kind)
-		if art != c.art {
-			c.art = art
-			c.img.Clear()
-			p.ren.DrawEntityBracket(c.img, p.k.Sim, inf)
+		art := p.ren.EntityArtSize(p.k.Sim, inf, zoom, capDim)
+		w := art + gap + int(math.Ceil(render.Measure(inf.Name, name)))
+		h := max(art, nameH)
+		if h%2 == 1 {
+			h++ // an even box keeps the art centred on whole pixels
 		}
-		key := fmt.Sprintf("%s/%s/%t/%s", art, inf.Name, inf.Hostile,
-			theme.FormatDistance(inf.Distance))
-		if key != c.key {
-			c.key = key
-			glyph := theme.KindIcon(inf.Kind)
-			tint := render.BracketColor(inf.Kind, inf.Hostile)
-			if inf.Entity == p.k.cv.Player() {
-				tint = p.k.th.Pal().Player
-			}
-			c.tip.Set(p.k.th, c.g.GetWidget(), key, func() widgets.TooltipModel {
-				return widgets.TooltipModel{
-					Icon: glyph, IconTint: tint,
-					Title: inf.Name,
-					Sub:   theme.FormatDistance(inf.Distance) + " · " + theme.KindLabel(inf.Kind),
-				}
-			})
+		if c.img.Bounds().Dx() != w || c.img.Bounds().Dy() != h {
+			c.img = ebiten.NewImage(w, h)
+			c.g.Image = c.img
+			c.art, c.w, c.h = art, w, h
+			p.dirty = true
 		}
+		c.img.Clear()
+		p.ren.DrawEntityBody(c.img, p.k.Sim, inf, render.Camera{
+			Center: inf.Pos, Zoom: zoom,
+			ScreenW: float64(art), ScreenH: float64(h), CapDim: capDim,
+		})
+		render.Text(c.img, inf.Name, float64(art+gap), float64((h-nameH)/2), name, p.k.th.Pal().Text)
 	}
 	if n != p.n {
 		p.n = n
+		p.dirty = true
+	}
+	if p.dirty {
+		p.dirty = false
 		p.place()
+		p.col.RequestRelayout() // the entries re-measure at their new sizes
 	}
 }
 
@@ -259,9 +277,12 @@ func (p *stackPicker) place() {
 	if !p.shown || p.n == 0 {
 		return
 	}
-	cell, gap, pad := theme.Px(stackCellPx), theme.Px(stackGap), theme.Px(stackCellPad)
-	cw := cell + 2*pad
-	ch := p.n*cell + (p.n-1)*gap + 2*pad
+	cw, ch := 0, 0
+	for i := 0; i < p.n; i++ {
+		cw = max(cw, p.cells[i].w)
+		ch += p.cells[i].h
+	}
+	ch += (p.n - 1) * theme.Px(stackGap)
 	root := p.root.GetWidget().Rect
 	x0 := p.seat.X + theme.Px(stackEdge)
 	if !root.Empty() && x0+cw > root.Max.X {
