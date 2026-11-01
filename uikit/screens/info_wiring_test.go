@@ -177,7 +177,7 @@ func TestOverviewEntityMenu(t *testing.T) {
 			t.Errorf("overview row %v declares no Ref", r.Cells)
 		}
 	}
-	celSpec := k.overviewSpec(&ovRow{info: celestial})
+	celSpec := k.overviewSpec(celestial)
 	if celSpec.Ref == nil {
 		t.Fatal("celestial row declares no Ref (its Show Info entry must exist, grayed)")
 	}
@@ -218,7 +218,7 @@ func TestOverviewEntityMenu(t *testing.T) {
 	if ship.Entity.IsZero() {
 		t.Skip("showcase grid has no visible ship")
 	}
-	shipSpec := k.overviewSpec(&ovRow{info: ship})
+	shipSpec := k.overviewSpec(ship)
 	widgets.OpenRowMenu(env, env, shipSpec, image.Point{X: 100, Y: 100})
 	if e := entry(t, env, "Warp to"); !e.Disabled {
 		t.Error("Warp to enabled for a non-warpable ship")

@@ -64,7 +64,7 @@ rebindable (see **Keybindings** below); the global chords (`Esc`, `Ctrl+S`,
 | Left drag | On any window **edge or corner** (≈8 px grip): resize from all four sides, the opposite edge stays fixed, the window never shrinks past its minimum |
 | Left click | On a table column header: sort (click again flips direction); on the **⋯ button** at the header's end: the column menu (hide/show a column) |
 | Left drag | On a column's right edge in a table header (the 6 px strip): widen or narrow that column, the change trades with the next column, the header title is the floor, and the cursor is the left/right arrow |
-| `Ctrl` + left click | Lock target under cursor |
+| `Ctrl` + left click | Lock target under the cursor (world or Overview row) |
 | Left double-click | Show Info: open the item's details window directly, anywhere the item appears (rack, fitting slots and hangar modules, market, inventory, overview, offer rows); on a **hangar module** it fits that module into the first empty slot of its class; on empty space, fly straight toward that point |
 | Right click | Orbit target under cursor (2,500 m) in the world; unchanged |
 | Right click | On an item anywhere it appears: flat context menu, **Show Info** first (always bold), then the surface's actions (grayed-but-visible when impossible); on a charge-fed cell in the module rack: Show Info / Show Info: `<charge>` / ─ / **Load** `<round>` per round type in cargo / **Cycle charge** |
@@ -374,6 +374,23 @@ Rows tint **red for hostiles** and **blue for your own ship**; the Kind
 column names the rest (Ship, Asteroid, Wreck, Station, Gate, …). The
 Velocity cell reads `WARP` while that entity's drive is engaged; the
 column keeps sorting on the real figure.
+
+`Ctrl` + a left click on a row locks the row's entity: the same chord the
+world uses under the cursor, so the row selects and locks in one press.
+
+### Stacked entities (the stack picker)
+
+Where several things sit on top of each other, the world's click can only
+reach the nearest one. Rest the cursor on the pile (about a fifth of a
+second, no click) and a vertical column of their kind icons opens beside it,
+tinted like the world brackets and ordered as the world paints them: the
+entity on top leads. Hover an icon for its name and distance. A click
+selects that entity (the Overview highlight and the Selected Item window
+follow), `Ctrl` + click locks it, a right-click opens the entity's own menu.
+The column lists up to twelve icons; anything deeper stays in the Overview.
+It closes by itself once the cursor leaves both the column and the pile
+(about 150 ms of grace), and it never changes what a plain world click
+selects.
 
 ## Inspecting items (Show Info)
 

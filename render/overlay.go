@@ -314,6 +314,33 @@ func (r *Renderer) miningBeam(dst *ebiten.Image, nose, rock core.Vec2) {
 // Overlay: brackets, labels, selection, lock lines
 // ---------------------------------------------------------------------------
 
+// labelsVisible reports whether name/distance labels draw at zoom (px/m):
+// the near framing shows them, the far system view does not.
+func labelsVisible(zoom float64) bool { return zoom >= labelZoomMin }
+
+// StackLayer is an entity kind's layer in the world's paint order — the
+// drawOverlay bucket order, ships on top. The stack picker lists a cluster
+// from the highest layer down, so the column leads with what paints over
+// the rest.
+func StackLayer(kind string) int {
+	switch kind {
+	case sim.KindShip, sim.KindPlayer:
+		return 6
+	case sim.KindWreck:
+		return 5
+	case sim.KindAsteroid:
+		return 4
+	case sim.KindAnomaly:
+		return 2
+	case sim.KindStar:
+		return 0
+	case sim.KindPlanet, sim.KindMoon:
+		return 1
+	default: // static: stations, gates, belts, unknown
+		return 3
+	}
+}
+
 // drawOverlay draws brackets, name/distance labels, selection highlight and
 // the player's target lock lines (topmost world layers).
 func (r *Renderer) drawOverlay(dst *ebiten.Image, cam Camera, s *sim.Sim) {
@@ -323,7 +350,7 @@ func (r *Renderer) drawOverlay(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 	if tr, ok := s.Transforms.Get(player); ok {
 		ppos, havePlayer = tr.Pos, true
 	}
-	showLabels := cam.Zoom <= labelZoomMax
+	showLabels := labelsVisible(cam.Zoom)
 
 	for _, bucket := range [][]gridObj{r.bStar, r.bPlanet, r.bAnomaly, r.bStatic, r.bRock, r.bWreck, r.bShip} {
 		for _, o := range bucket {

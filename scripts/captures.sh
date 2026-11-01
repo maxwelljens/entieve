@@ -15,6 +15,7 @@ captures() {
 	cat <<'EOF'
 ./game TestContactDetailsCapture
 ./game TestDockedBackdropCapture
+./game TestStackPickerCapture
 ./game TestTitleCaptureFrame
 ./game TestTitleKeybindingsCapture
 ./game TestTitleCreditsCapture

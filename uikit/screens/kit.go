@@ -124,6 +124,11 @@ type Kit struct {
 	popupControl bool
 	polled       bool // the host's MenuInput already polled this frame
 
+	// ctrl is the frame's Ctrl key, set by the host from its Input snapshot
+	// (SetCtrl): a row or stack-icon click reads it for the world's
+	// ctrl+click lock.
+	ctrl bool
+
 	// svc is the shared interaction state every panel built from this
 	// kit's Env reaches: the context menu and the Show Info window.
 	svc *services
@@ -180,6 +185,11 @@ type Kit struct {
 	// draws no gameplay chrome): drawTops parks the rail instead of
 	// re-showing it every frame.
 	topsHidden bool
+
+	// column is the stack picker: the transient column of kind icons a
+	// hovered cluster opens, mounted as TOP chrome at construction and
+	// driven by the world scene's hover report (StackHover/Keep/Leave).
+	column *stackPicker
 }
 
 // KitOption adjusts a Kit at construction (the host's pointer frame).
@@ -305,6 +315,16 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command), opts ...K
 	// every host window's is (SetWindowRows).
 	k.SetWindowRows(k.ov.win, func(pt image.Point) bool {
 		return k.ov.tbl != nil && k.ov.tbl.RowAt(pt)
+	})
+
+	// The stack picker: the transient icon column a hovered cluster opens,
+	// TOP chrome (the rail's contract) so its presses win over any window
+	// under it. Built here, not lazily: it is a twelve-cell icon pool with
+	// no text, so nothing of the title phase's glyph atlas is spent on it.
+	k.column = newStackPicker(k, root)
+	k.AddTopContainer(k.column, widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionStart,
 	})
 
 	k.Sync()
@@ -500,6 +520,7 @@ func (k *Kit) Sync() {
 	k.syncSelected()
 	k.svc.info.Sync()
 	k.svc.qty.Sync()          // the picker's slider input + live preview
+	k.column.sync()           // the stack column follows its hovered cluster
 	if k.svc.contact != nil { // built on first open
 		k.svc.contact.Sync() // the Details page follows the offer it shows
 	}
@@ -547,6 +568,37 @@ func (k *Kit) RunIntent(i widgets.Intent) {
 
 // Selected returns the entity selected in the overview (zero if none).
 func (k *Kit) Selected() ecs.Entity { return k.selected }
+
+// SetCtrl records this frame's Ctrl key (the host's Input snapshot): a
+// ctrl+click on a row or a stack icon locks, exactly as ctrl+click in the
+// world does.
+func (k *Kit) SetCtrl(on bool) { k.ctrl = on }
+
+// StackHover reports one frame of the cursor resting on a cluster: entries
+// are the pick's cluster in depth order, x/y the cursor's screen point. The
+// picker opens the column once the cursor has rested for its dwell and
+// refreshes the cells from there; fewer than two entries is no cluster.
+func (k *Kit) StackHover(entries []sim.Info, x, y float64) { k.column.Hover(entries, x, y) }
+
+// StackKeep holds the open column: the cursor sits on it.
+func (k *Kit) StackKeep() { k.column.Keep() }
+
+// StackLeave reports the cursor on neither the column nor a cluster: the
+// column drops once the picker's grace is spent.
+func (k *Kit) StackLeave() { k.column.Leave() }
+
+// StackDismiss drops the column at once (leaving the world scene).
+func (k *Kit) StackDismiss() { k.column.Dismiss() }
+
+// StackOwns reports whether the point sits on the open column.
+func (k *Kit) StackOwns(x, y float64) bool { return k.column.owns(image.Pt(int(x), int(y))) }
+
+// StackShown reports whether the column is up (tests and captures).
+func (k *Kit) StackShown() bool { return k.column.shown }
+
+// StackColumn returns the stack picker's top-chrome column — the band the
+// hit test claims while it is up.
+func (k *Kit) StackColumn() widget.Containerer { return k.column.col }
 
 // Select sets the selected entity from outside the overview (a world click,
 // a keyboard cycle) so the Selected Item panel and the overview highlight

@@ -118,6 +118,60 @@ func TestNewKitConstruction(t *testing.T) {
 	}
 }
 
+// TestOverviewCtrlClickLocks: a ctrl+click on an overview row mirrors the
+// world's ctrl+click (game/scene.go): select the entity, then lock it
+// through the one command seam. A plain click still only selects.
+func TestOverviewCtrlClickLocks(t *testing.T) {
+	k, cmds := newTestKit(t)
+	k.Sync()
+	// A ship parked on the player's point: visible (within sensor range) and
+	// lockable, the row a player would ctrl+click.
+	var ship sim.Info
+	for _, inf := range k.Sim.Grid() {
+		if inf.Kind == sim.KindShip {
+			ship = inf
+			break
+		}
+	}
+	if ship.Entity.IsZero() {
+		t.Skip("showcase grid has no ship")
+	}
+	ply, _ := k.Sim.Transforms.Get(k.Sim.Player())
+	k.Sim.Transforms.Set(ship.Entity, sim.Transform{Pos: ply.Pos})
+	fresh, ok := k.Sim.Info(ship.Entity)
+	if !ok {
+		t.Fatalf("fixture: %v left the grid", ship.Entity)
+	}
+	ship = fresh
+	// Find the entity's row index (the table sorts by distance).
+	row := &ovRow{info: ship}
+	k.ov.tbl.SetRows([]widgets.TableRow{
+		{Cells: []string{ship.Name, "1 m", theme.KindLabel(ship.Kind), "0 m/s"}, Data: row, Spec: k.overviewSpec(ship)},
+	})
+
+	// Plain click: selection only.
+	k.ov.tbl.RowClickedForTest(0)
+	if k.Selected() != ship.Entity {
+		t.Fatalf("Selected() = %v, want %v", k.Selected(), ship.Entity)
+	}
+	if len(*cmds) != 0 {
+		t.Fatalf("plain row click enqueued %d commands, want none", len(*cmds))
+	}
+
+	// Ctrl+click: selection and the lock command the world dispatches.
+	k.SetCtrl(true)
+	k.ov.tbl.RowClickedForTest(0)
+	if k.Selected() != ship.Entity {
+		t.Errorf("Selected() = %v after ctrl+click, want %v", k.Selected(), ship.Entity)
+	}
+	if len(*cmds) != 1 {
+		t.Fatalf("ctrl+click enqueued %d commands, want 1", len(*cmds))
+	}
+	if c, ok := (*cmds)[0].(sim.CmdLock); !ok || c.Target != ship.Entity {
+		t.Errorf("cmd = %#v, want CmdLock{%v}", (*cmds)[0], ship.Entity)
+	}
+}
+
 // TestOverviewRowClickSelectsThenShowsInfo: the overview Table's first
 // click selects; a repeat click inside the double-click window opens
 // Show Info on the row's definition — the old approach-on-activate moved
@@ -127,7 +181,7 @@ func TestOverviewRowClickSelectsThenShowsInfo(t *testing.T) {
 	k, cmds := newTestKit(t)
 	row := &ovRow{info: sim.Info{Entity: ecs.Entity(777), Name: "Scuttler"}}
 	k.ov.tbl.SetRows([]widgets.TableRow{
-		{Cells: []string{"Scuttler", "10 m", "Ship", "0 m/s"}, Data: row, Spec: k.overviewSpec(row)},
+		{Cells: []string{"Scuttler", "10 m", "Ship", "0 m/s"}, Data: row, Spec: k.overviewSpec(row.info)},
 	})
 
 	k.ov.tbl.RowClickedForTest(0)
@@ -166,7 +220,7 @@ func TestOverviewRowClickSelectsThenShowsInfo(t *testing.T) {
 	}
 	trow := &ovRow{info: target}
 	k.ov.tbl.SetRows([]widgets.TableRow{
-		{Cells: []string{target.Name}, Data: trow, Spec: k.overviewSpec(trow)},
+		{Cells: []string{target.Name}, Data: trow, Spec: k.overviewSpec(trow.info)},
 	})
 	k.ov.tbl.RowClickedForTest(0)
 	k.ov.tbl.RowClickedForTest(0)

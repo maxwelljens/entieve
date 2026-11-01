@@ -226,9 +226,17 @@ func (k *Kit) buildOverview() {
 	// Typed sort: string cells would order "1.2 AU" before "42 m".
 	tbl.SetSortFunc(sortOverview)
 	tbl.SetSort("Distance", true)
+	// A row click selects its entity; with Ctrl held it also locks, the
+	// world's ctrl+click (game/scene.go: select, then the Lock intent) so
+	// both surfaces share one dispatch.
 	tbl.OnSelect(func(r widgets.TableRow) {
-		if row, ok := r.Data.(*ovRow); ok {
-			k.selected = row.info.Entity
+		row, ok := r.Data.(*ovRow)
+		if !ok {
+			return
+		}
+		k.selected = row.info.Entity
+		if k.ctrl {
+			k.RunIntent(widgets.Lock{Entity: row.info.Entity})
 		}
 	})
 	// Double-click shows the row's definition (an NPC caste, a hull, an
@@ -335,10 +343,12 @@ func (k *Kit) overviewCog() (*widget.Button, *widget.Graphic) {
 // answer for that entity (VerbReady), never a second gating rule; the
 // self-check stays because a row never offers to fly to itself. The
 // installer turns this data into the menu; a right-click never moves the
-// selection.
-func (k *Kit) overviewSpec(row *ovRow) widgets.RowSpec {
-	e := row.info.Entity
-	spec := widgets.RowSpec{Ref: widgets.RowRef(k.cv, row)}
+// selection. The stack picker's icons carry the same spec, so an entity's
+// menu is identical wherever it is listed.
+func (k *Kit) overviewSpec(info sim.Info) widgets.RowSpec {
+	e := info.Entity
+	ref, _ := widgets.InfoRefFor(k.cv, e)
+	spec := widgets.RowSpec{Ref: widgets.PtrRef(ref)}
 	if _, hasInfo := k.cv.Info(e); hasInfo {
 		self := e == k.cv.Player()
 		warp, _ := k.verbReadyFor("warp", e)
@@ -399,7 +409,7 @@ func (o *overview) sync(k *Kit) {
 			IconTint: iconTint,
 			Tint:     tint,
 			Data:     row,
-			Spec:     k.overviewSpec(row),
+			Spec:     k.overviewSpec(row.info),
 		})
 	}
 	// Prune row objects of entities that left the grid (selection
