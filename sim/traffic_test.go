@@ -941,7 +941,7 @@ func TestTrafficPlayerCanEngageConvoy(t *testing.T) {
 		teleport(s, s.player, mustPos(s, e))
 		s.Queue(CmdLock{Target: e})
 		forceLock(s, e) // the queued CmdLock lands next Step; pre-force progress
-		s.Queue(CmdActivate{Slot: SlotRef{Class: content.SlotHigh, Index: 0}, Target: e})
+		s.Queue(CmdActivate{Slot: SlotRef{Class: content.SlotHigh, Index: 0}, Target: e, Confirm: true})
 		s.Step()
 		evs = append(evs, drain(s)...)
 		for _, ev := range evs {

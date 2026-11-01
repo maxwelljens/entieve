@@ -209,8 +209,10 @@ type Hud struct {
 	boxes     [hudBoxPool]*hudBox
 
 	// selectFn is where a target-card click reports the card's entity: the
-	// game wires Kit.Select, the same door a world click uses.
+	// game wires Kit.Select, the same door a world click uses. pick reads
+	// the selection back, so the selected target's card draws the border.
 	selectFn func(ecs.Entity)
+	pick     func() ecs.Entity
 
 	portrait      *ebiten.Image
 	portraitGfx   *widget.Graphic
@@ -256,16 +258,17 @@ type hudBox struct {
 // targetCard is one card's rendered state. It is deliberately comparable:
 // Sync skips the repaint when nothing moved.
 type targetCard struct {
-	entity ecs.Entity // the locked entity a click selects
-	name   string
-	dist   string
-	kind   string // semantic icon name for the target's kind ("" = none)
-	tint   color.RGBA
-	lock   float64            // 0..1 lock progress
-	layers [3]float64         // shield / armor / hull fractions (ships); health in [0] otherwise
-	ships  bool               // three layers (true) vs a single health fraction
-	mods   [hudBoxMods]string // my active modules cycling on this target
-	nmods  int
+	entity   ecs.Entity // the locked entity a click selects
+	selected bool       // the player's current selection: draw the border
+	name     string
+	dist     string
+	kind     string // semantic icon name for the target's kind ("" = none)
+	tint     color.RGBA
+	lock     float64            // 0..1 lock progress
+	layers   [3]float64         // shield / armor / hull fractions (ships); health in [0] otherwise
+	ships    bool               // three layers (true) vs a single health fraction
+	mods     [hudBoxMods]string // my active modules cycling on this target
+	nmods    int
 }
 
 // hudEffect is one live EWAR effect on the player: a rack-cell miniature —
@@ -567,6 +570,11 @@ func (h *Hud) MountRack(c *widget.Container) {
 // Selected Item panel and the overview highlight follow).
 func (h *Hud) SetSelector(fn func(ecs.Entity)) { h.selectFn = fn }
 
+// SetTargetPicker installs the source of the player's current selection
+// (the game passes Kit.Selected): the locked target's card then carries the
+// selection border, the same selection the overview row and world click set.
+func (h *Hud) SetTargetPicker(fn func() ecs.Entity) { h.pick = fn }
+
 // newEffect builds one effect box: a tile (glyph + cycle ring) over its
 // remaining-time line, the rack cell's tile-and-name layout in miniature.
 func (h *Hud) newEffect(glyph string, tint color.RGBA) *hudEffect {
@@ -817,7 +825,14 @@ func drawTargetCard(dst *ebiten.Image, c targetCard, env theme.Theme) {
 	// s-pixel inset edge.
 	s := float32(theme.Scale())
 	dst.Clear()
-	theme.DrawRoundBox(dst, card, theme.Solid(p.BG), theme.NRGBA(p.Border, 200), 1,
+	// The selection border: the palette's Accent at double weight, the one
+	// token that already means "chosen" in the Windows and the lock strip.
+	// Unselected cards keep the faint hairline they always had.
+	edge, w := theme.NRGBA(p.Border, 200), 1
+	if c.selected {
+		edge, w = theme.NRGBA(p.Accent, 235), 2
+	}
+	theme.DrawRoundBox(dst, card, theme.Solid(p.BG), edge, w,
 		theme.AllRadii(theme.RadiusPanel))
 
 	// Kind glyph leads the name line, then the name — the two rects come
@@ -978,10 +993,14 @@ func (h *Hud) Sync() {
 	theme.ShowWidget(h.effects.GetWidget(), webUntil > now || scramUntil > now)
 
 	// 5 — locked-target cards (name, distance, lock strip, layer bars, the
-	// modules cycling on the target).
+	// modules cycling on the target, and the selection border).
 	var locks []sim.Lock
 	if tg, ok := s.Targeting(player); ok {
 		locks = tg.Locks
+	}
+	var selected ecs.Entity
+	if h.pick != nil {
+		selected = h.pick()
 	}
 	for i, box := range h.boxes {
 		if i >= len(locks) {
@@ -991,7 +1010,8 @@ func (h *Hud) Sync() {
 		theme.ShowWidget(box.root.GetWidget(), true)
 		l := locks[i]
 		info, hasInfo := s.Info(l.Target)
-		card := targetCard{entity: l.Target, lock: hudFrac01(l.Progress), name: "…", tint: h.th.Pal().Text}
+		card := targetCard{entity: l.Target, selected: selected != 0 && l.Target == selected,
+			lock: hudFrac01(l.Progress), name: "…", tint: h.th.Pal().Text}
 		if hasInfo {
 			card.dist = theme.FormatDistance(info.Distance)
 			// The kind glyph leads the name line; hostiles wear

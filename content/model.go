@@ -282,6 +282,17 @@ type ModuleDef struct {
 	Price          float64       `json:"price"` // credits, for market seeding
 }
 
+// IsAggressive reports whether the module is aimed at a hull — the kinds the
+// friendly-fire gate watches: weapons, stasis webs and warp scramblers. It is
+// the one truth for "aggressive kind"; no other kind targets a ship.
+func (m *ModuleDef) IsAggressive() bool {
+	switch m.Kind {
+	case KindWeapon, KindStasisWeb, KindWarpScram:
+		return true
+	}
+	return false
+}
+
 // BayRounds is how many whole rounds of a shell of the given m³ volume the
 // module's bay holds: the floor arithmetic the bay calibration pins (the
 // epsilon absorbs the binary rounding of decimal m³ volumes). 0 = no bay

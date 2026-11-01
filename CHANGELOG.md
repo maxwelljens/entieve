@@ -64,6 +64,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   scramble is on the player, a box per effect shows its glyph and a depleting
   cycle ring (the rack's slot idiom) with the seconds left; the row hides
   when nothing is active. No other effect gets an icon.
+- **Friendly fire asks first**: an aggressive module (a weapon, a stasis
+  web, a warp scrambler) aimed at a friendly ship no longer fires on the
+  first press. The game names the target and the module in one dialog and
+  only **Confirm foolishness** sends the activation; Cancel and the × send
+  nothing. Rats, raiders and unpiloted hulls never ask, and a hull that is
+  already fighting you is fair game.
+- **Persistent friendly fire makes you an outlaw**: confirmed hits on
+  friendly hulls slide a sixty-second record; once the run spans ten seconds
+  every Charter hull hunts you on sight (guard posts, standing patrols,
+  response wings, belt sweeps), announced in the log. Stop for a quiet
+  minute and the warrant lapses. The record is transient: a reload starts
+  clean.
+- **The selected target's card is outlined**: a locked target's card in the
+  top-centre row draws an amber border as thick as the selection, so the
+  overview row, a world click and a card click all show which target the
+  Selected Item panel is on.
 
 ### Changed
 
@@ -121,6 +137,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the log pocket's title band at 1280×720 (and further at the 1024×700
   minimum); the log raises on a click, as the market window already owns that
   strip at the minimum size.
+
+### Fixed
+
+- **Security answers a miner's attacker**: a distress wing dispatched to a
+  miner under fire now records whoever opened fire and engages that hull on
+  arrival (a player included), then the rats around the barge. It used to
+  look for rats only, so a pilot shooting a miner watched the wing arrive
+  and immediately warp away. The recorded aggressor rides the patrol state
+  (one omitempty save field; old saves read none).
 
 ## [0.12.0] - 2026-10-31
 

@@ -705,7 +705,9 @@ const (
 // damage source of another faction (b), else for non-guards an ambient
 // trigger — proximity (a), the player's frozen work marker or an NPC mining
 // op (c), intrusion (d) — inside maxHomeDist of Home (the leash; MaxFloat64
-// for a fresh aggro). Guards only ever self-defend against the player.
+// for a fresh aggro). Guards only ever self-defend against the player, plus
+// the one initiation the hostile side of that rule earns: the outlaw pilot
+// inside their authored aggro range.
 func (s *Sim) npcTriggered(ai *NpcAI, def *content.NpcDef, damaged bool, c npcCandidate, selfPos core.Vec2, mine string, effAggro, maxHomeDist float64, playerOnly bool) npcTrigger {
 	if playerOnly && c.e != s.player {
 		return npcTriggerNone
@@ -722,7 +724,17 @@ func (s *Sim) npcTriggered(ai *NpcAI, def *content.NpcDef, damaged bool, c npcCa
 	if hit {
 		return npcTriggerHit
 	}
-	if def.IsGuard() || !hostile(mine, c.faction) {
+	if def.IsGuard() {
+		// A guard's one permitted initiation is the outlaw pilot: inside the
+		// hull's AUTHORED aggro range (the content's sight), never scaled by
+		// the zone's temperament — a warrant is not a skittish thing.
+		if c.e == s.player && s.playerOutlaw() && def.AggroRange > 0 &&
+			selfPos.Dist(c.pos) <= def.AggroRange {
+			return npcTriggerAmbient
+		}
+		return npcTriggerNone
+	}
+	if !hostile(mine, c.faction) {
 		return npcTriggerNone
 	}
 	switch {

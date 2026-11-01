@@ -89,7 +89,7 @@ func (s *Sim) applyCommand(cmd Command) {
 		}
 
 	case CmdActivate:
-		s.activate(p, c.Slot, c.Target, false)
+		s.execActivate(c)
 
 	case CmdDeactivate:
 		s.deactivate(p, c.Slot, "", SevInfo)

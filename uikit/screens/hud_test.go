@@ -991,3 +991,62 @@ func TestHudEffectBoxes(t *testing.T) {
 		t.Errorf("the effect row stays visible after expiry")
 	}
 }
+
+// TestHudTargetCardSelectionBorder: the locked card of the player's current
+// selection stages selected=true and repaints when the selection moves, so
+// the same border follows an overview-row selection, a world click and a
+// card click (all three land on Kit.Selected, the picker's source).
+func TestHudTargetCardSelectionBorder(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	h := NewHud(env)
+	c := newChromeUI(env)
+	c.AddPanel(h.Container(), h)
+	c.root.AddChild(h.Cards().Container())
+
+	s := env.Sim
+	p := s.Player()
+	var ship, rock ecs.Entity
+	for _, inf := range s.Grid() {
+		if inf.Entity == p {
+			continue
+		}
+		if inf.Kind == sim.KindShip && ship == 0 {
+			ship = inf.Entity
+		} else if inf.Kind == sim.KindAsteroid && rock == 0 {
+			rock = inf.Entity
+		}
+	}
+	if ship == 0 || rock == 0 {
+		t.Fatalf("showcase grid missing ship/rock (ship=%v rock=%v)", ship, rock)
+	}
+	tg, _ := s.Targetings.Get(p)
+	tg.Locks = []sim.Lock{{Target: ship, Progress: 1}, {Target: rock, Progress: 1}}
+
+	var selected ecs.Entity
+	h.SetTargetPicker(func() ecs.Entity { return selected })
+	c.Frame(t, 1280, 720)
+	if h.boxes[0].card.selected || h.boxes[1].card.selected {
+		t.Fatal("an empty selection lit a card border")
+	}
+
+	before := h.boxes[1].draws
+	selected = rock
+	c.Frame(t, 1280, 720)
+	if h.boxes[0].card.selected {
+		t.Fatal("the unselected card lit its border")
+	}
+	if !h.boxes[1].card.selected {
+		t.Fatal("the selected target's card did not stage its border")
+	}
+	if h.boxes[1].drawn != h.boxes[1].card || h.boxes[1].draws != before+1 {
+		t.Fatalf("selected card repaints = %d -> %d, want one repaint carrying selected=true",
+			before, h.boxes[1].draws)
+	}
+
+	// Deselecting returns the card to the plain hairline.
+	selected = 0
+	c.Frame(t, 1280, 720)
+	if h.boxes[1].card.selected {
+		t.Fatal("deselecting left the selection border on")
+	}
+}

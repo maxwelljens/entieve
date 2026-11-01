@@ -22,6 +22,7 @@ captures() {
 ./internal/capture TestCaptureWritesEvidenceOnVerifyFailure
 ./render TestAlphaCompositeGroundTruth
 ./uikit/screens TestFittingCaptureFrame
+./uikit/screens TestFriendlyFireConfirmCapture
 ./uikit/screens TestHeaderCaptureFrame
 ./uikit/screens TestHudCaptureFrame
 ./uikit/screens TestHudCardsPixelsDrawAboveWindows

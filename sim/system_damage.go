@@ -78,11 +78,18 @@ func (s *Sim) systemDamage() {
 		if ai, ok := s.AIs.Get(d.dst); ok {
 			ai.LastHitBy = d.src
 			// A miner under fire in charter space calls the authority: the
-			// first damaging hit dispatches the wing (minerDistress).
+			// first damaging hit dispatches the wing (minerDistress), which
+			// carries the attacker so the wing can answer it.
 			if def, ok := s.Content.Npc(ai.Npc); ok && def.IsMiner() &&
 				d.src != 0 && s.factionOf(d.src) != def.Faction {
-				s.minerDistress(d.dst)
+				s.minerDistress(d.dst, d.src)
 			}
+		}
+		// Every hit the player lands on a peaceful hull is a confirmed
+		// friendly-fire act: it slides the escalation window (the escalating
+		// act after the dialog's confirm).
+		if d.src == s.player && s.peacefulShip(d.dst) {
+			s.stampAggression()
 		}
 		pen := applyDamageToShip(ship, d.dmg)
 		// The switch rule's evidence: every damage event lands in the

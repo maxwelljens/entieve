@@ -648,3 +648,25 @@ func TestBaseContentIsValid(t *testing.T) {
 		t.Fatalf("baseContent must validate clean:\n%v", err)
 	}
 }
+
+// TestModuleKindAggression pins the friendly-fire gate's one truth: exactly
+// the kinds that aim at a hull are aggressive (weapons, stasis webs, warp
+// scramblers); every defensive, propulsion and mining kind is not.
+func TestModuleKindAggression(t *testing.T) {
+	aggressive := []string{KindWeapon, KindStasisWeb, KindWarpScram}
+	peaceful := []string{
+		KindShieldBoost, KindShieldExtender, KindArmorRep, KindArmorPlate,
+		KindResistCoat, KindCapBooster, KindCapRecharger, KindAfterburner,
+		KindMiningLaser,
+	}
+	for _, kind := range aggressive {
+		if !(&ModuleDef{Kind: kind}).IsAggressive() {
+			t.Errorf("%s reads passive, want aggressive", kind)
+		}
+	}
+	for _, kind := range peaceful {
+		if (&ModuleDef{Kind: kind}).IsAggressive() {
+			t.Errorf("%s reads aggressive, want passive", kind)
+		}
+	}
+}
