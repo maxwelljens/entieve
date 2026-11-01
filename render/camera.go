@@ -5,7 +5,11 @@
 // with ebiten/vector primitives and cached procedural sprites.
 package render
 
-import "github.com/entieve/entieve/core"
+import (
+	"math"
+
+	"github.com/entieve/entieve/core"
+)
 
 // Camera maps world space (meters) to screen space (pixels). Zoom is pixels
 // per meter; a valid projection requires Zoom > 0. All methods are pure.
@@ -14,6 +18,19 @@ type Camera struct {
 	Zoom    float64   // pixels per meter
 	ScreenW float64
 	ScreenH float64
+
+	// CapDim is the viewport long edge a body's art caps against (0: this
+	// camera's own). A picker cell projects its own small screen but sets
+	// CapDim to the world's, so the cell draws the pixels the grid draws.
+	CapDim float64
+}
+
+// capDim is the long edge the body passes cap their art against.
+func (c Camera) capDim() float64 {
+	if c.CapDim > 0 {
+		return c.CapDim
+	}
+	return math.Max(c.ScreenW, c.ScreenH)
 }
 
 // WorldToScreen projects a world position to screen pixels.
