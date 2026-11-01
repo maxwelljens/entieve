@@ -15,11 +15,6 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-// labelZoomMin is the zoom (px/m) at or above which name/distance labels
-// draw: near framing shows names, the far system view stays clean (brackets
-// alone identify what is out there).
-const labelZoomMin = 0.02
-
 // FontScale is the UI typography scale: ui.FontBase (21) is 1.75× the
 // legacy 12 px base, i.e. text everywhere is ~75% larger. render cannot
 // import ui (ui imports render), so the scale is mirrored here for the
@@ -80,6 +75,7 @@ type Renderer struct {
 	plateSys content.SystemID
 
 	selected ecs.Entity
+	hover    ecs.Entity // the entity under the cursor: the only labelled one
 
 	// Per-frame buckets, reused to avoid allocations in Draw.
 	bStar, bPlanet, bAnomaly, bStatic, bRock, bWreck, bShip []gridObj
@@ -112,6 +108,11 @@ func New(c *content.Content) *Renderer {
 // SetSelected marks an entity for the amber selection highlight. The Game
 // syncs this from the UI each frame before Draw.
 func (r *Renderer) SetSelected(e ecs.Entity) { r.selected = e }
+
+// SetHover marks the entity under the cursor: labels are off everywhere else,
+// so the world names what the cursor rests on and nothing more. The Game
+// resolves the pick each frame and syncs it before Draw.
+func (r *Renderer) SetHover(e ecs.Entity) { r.hover = e }
 
 // BodiesDrawnForTest is the number of body primitives the last Draw
 // submitted — the off-screen culling pin's counter (see keepBody). Tests
@@ -320,30 +321,63 @@ func (r *Renderer) Draw(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 	r.drawGrid(dst, cam)
 
 	r.bucket(s, sys)
-	for _, o := range r.bStar {
-		r.drawStar(dst, cam, o, sys)
-	}
-	for _, o := range r.bPlanet {
-		r.drawPlanet(dst, cam, o, sys)
-	}
-	for _, o := range r.bAnomaly {
-		r.drawAnomaly(dst, cam, o, now)
-	}
-	for _, o := range r.bStatic {
-		r.drawStatic(dst, cam, o)
-	}
-	for _, o := range r.bRock {
-		r.drawRock(dst, cam, o)
-	}
-	for _, o := range r.bWreck {
-		r.drawWreck(dst, cam, o)
-	}
-	for _, o := range r.bShip {
-		r.drawShip(dst, cam, o, now)
+	// The bucket order IS the paint order (ships on top); drawBody dispatches
+	// each entity to its own art.
+	for _, bucket := range [][]gridObj{r.bStar, r.bPlanet, r.bAnomaly, r.bStatic, r.bRock, r.bWreck, r.bShip} {
+		for _, o := range bucket {
+			r.drawBody(dst, cam, o, sys, now)
+		}
 	}
 	r.drawEffects(dst, cam, s, now)
 	r.drawOverlay(dst, cam, s)
 	r.drawWarpTunnel(dst, cam, s, now)
+}
+
+// drawBody paints one grid entity's own body art: the star, planet, anomaly,
+// static, rock, wreck and ship passes in Draw. The stack picker's cells call
+// it too (see DrawEntityBracket), so a cell shows the same art the world does.
+func (r *Renderer) drawBody(dst *ebiten.Image, cam Camera, o gridObj, sys *content.SystemDef, now float64) {
+	switch o.info.Kind {
+	case sim.KindStar:
+		r.drawStar(dst, cam, o, sys)
+	case sim.KindPlanet, sim.KindMoon:
+		r.drawPlanet(dst, cam, o, sys)
+	case sim.KindAnomaly:
+		r.drawAnomaly(dst, cam, o, now)
+	case sim.KindAsteroid:
+		r.drawRock(dst, cam, o)
+	case sim.KindWreck:
+		r.drawWreck(dst, cam, o)
+	case sim.KindShip, sim.KindPlayer:
+		r.drawShip(dst, cam, o, now)
+	default: // station, gate, belt, unknown celestials
+		r.drawStatic(dst, cam, o)
+	}
+}
+
+// obj resolves one grid entity's render lookups (the per-frame bucket's work,
+// shared with the cell draw).
+func (r *Renderer) obj(s *sim.Sim, inf sim.Info) gridObj {
+	o := gridObj{info: inf, speedMult: 1}
+	if cel, ok := s.Celestials.Get(inf.Entity); ok {
+		o.radius = cel.Radius
+	}
+	if tr, ok := s.Transforms.Get(inf.Entity); ok {
+		o.facing = tr.Facing
+	}
+	if sh, ok := s.Ships.Get(inf.Entity); ok {
+		o.shipID = string(sh.Hull)
+		if def, ok := r.c.Ship(sh.Hull); ok {
+			o.hull = def.Class
+		}
+	}
+	if a, ok := s.Asteroids.Get(inf.Entity); ok {
+		o.ore = string(a.Ore)
+	}
+	if m, ok := s.Motions.Get(inf.Entity); ok && m.SpeedMultiplier != 0 {
+		o.speedMult = m.SpeedMultiplier
+	}
+	return o
 }
 
 // bucket classifies every perceivable grid entity into per-layer slices.
@@ -362,25 +396,7 @@ func (r *Renderer) bucket(s *sim.Sim, sys *content.SystemDef) {
 		if !inf.Visible {
 			continue
 		}
-		o := gridObj{info: inf, speedMult: 1}
-		if cel, ok := s.Celestials.Get(inf.Entity); ok {
-			o.radius = cel.Radius
-		}
-		if tr, ok := s.Transforms.Get(inf.Entity); ok {
-			o.facing = tr.Facing
-		}
-		if sh, ok := s.Ships.Get(inf.Entity); ok {
-			o.shipID = string(sh.Hull)
-			if def, ok := r.c.Ship(sh.Hull); ok {
-				o.hull = def.Class
-			}
-		}
-		if a, ok := s.Asteroids.Get(inf.Entity); ok {
-			o.ore = string(a.Ore)
-		}
-		if m, ok := s.Motions.Get(inf.Entity); ok && m.SpeedMultiplier != 0 {
-			o.speedMult = m.SpeedMultiplier
-		}
+		o := r.obj(s, inf)
 		switch inf.Kind {
 		case sim.KindStar:
 			r.bStar = append(r.bStar, o)

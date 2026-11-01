@@ -13,8 +13,10 @@ import (
 )
 
 // Stack picker: a cluster of stacked entities is unreachable by the world's
-// one-entity pick, so hovering one opens a vertical column of its kind icons
-// — the entity under the cursor, and everything the cursor also covers.
+// one-entity pick, so hovering one opens a vertical column of the entities
+// themselves — each cell draws the entity as the world does (its own body art
+// inside its own bracket, see render.DrawEntityBracket), the entity under the
+// cursor, and everything the cursor also covers.
 //
 // The column is transient TOP chrome (the rail's contract: above every
 // window, under the context menu) and nothing else: no Screen row, no
@@ -22,28 +24,29 @@ import (
 // order, nearest to the camera first), so the column leads with what the
 // world draws on top; the cap leaves the tail unaddressable by design — the
 // Overview stays the full list. A click selects, a ctrl+click locks (the
-// world's chord), a right-click opens the entity's menu, and hovering an
-// icon names the entity and its distance (identical kinds stay tellable).
+// world's chord), a right-click opens the entity's menu, and hovering a cell
+// names the entity and its distance (identical kinds stay tellable).
 const (
 	// Both are frames, never wall clock (the hudFeedFrames precedent): ~200 ms
 	// and ~150 ms at 60 fps, whatever the time acceleration.
 	stackDwellFrames = 12 // the cursor must rest on a cluster this long
 	stackGraceFrames = 9  // off both the column and the cluster this long: it drops
 
-	stackCap     = 12 // icons listed; the tail is unaddressable via the column by design
-	stackIcon    = theme.IconButton
+	stackCap     = 12 // cells listed; the tail is unaddressable via the column by design
+	stackCellPx  = 32 // design px per cell: room for the bracket frame around the body art
 	stackGap     = theme.SpSm
 	stackCellPad = theme.SpSm
 	stackEdge    = 16 // column offset from the cursor (px)
 )
 
-// stackPicker is the column itself: a fixed pool of icon cells (no text
-// rows, no scrolling, no expander), refreshed from the hovered cluster every
-// frame. Zero entries costs nothing: the panel hides and the column lays out
+// stackPicker is the column itself: a fixed pool of cells (no text rows, no
+// scrolling, no expander), refreshed from the hovered cluster every frame.
+// Zero entries costs nothing: the panel hides and the column lays out
 // nothing, so the layer below keeps its presses.
 type stackPicker struct {
 	hudChrome
 	k     *Kit
+	ren   *render.Renderer // draws the cells' entity art (built with the panel)
 	root  *widget.Container
 	panel *widget.Container
 	cells [stackCap]stackCell
@@ -56,33 +59,38 @@ type stackPicker struct {
 	grace   int // frames it has been off both column and cluster
 }
 
-// stackCell is one icon: the kind glyph tinted by the world bracket's colour
-// and its hover tooltip.
+// stackCell is one cell: the entity as the world draws it, in its own image
+// (never a slot in the shared icon atlas), plus its hover tooltip.
 type stackCell struct {
 	g   *widget.Graphic
-	box *theme.IconBox
+	img *ebiten.Image
 	tip widgets.RowTip
-	key string // the tooltip/icon state key: re-set only when it moves
+	art string // the entity the art was drawn for: re-drawn only when it changes
+	key string // the tooltip state key: re-set only when it moves
 }
 
 // newStackPicker builds the chrome column only: the panel and its twelve-cell
 // pool come on the first open (see build), so a session that never hovers a
-// cluster never spends an icon on it.
+// cluster never spends an image on it.
 func newStackPicker(k *Kit, root *widget.Container) *stackPicker {
 	p := &stackPicker{k: k, root: root}
 	p.col = widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
 	return p
 }
 
-// build makes the panel and its icon pool on the first open — the overview
-// filter's rule: a boot-time build would rasterize its glyphs into the shared
-// icon atlas and shift the title phase's text anti-aliasing (a capture
-// baseline no feature should move).
+// build makes the panel and its cell pool on the first open — the overview
+// filter's rule: a boot-time build would rasterize into the shared icon atlas
+// and shift the title phase's text anti-aliasing (a capture baseline no
+// feature should move).
 func (p *stackPicker) build() {
 	if p.panel != nil {
 		return
 	}
 	pal := p.k.th.Pal()
+	// The picker draws the world's own art, so it keeps a renderer of its
+	// own: the kit has no handle on the world's, and every sprite it needs
+	// (procedural art, drop-in hulls and rocks) is package-level state.
+	p.ren = render.New(p.k.Content)
 	p.panel = widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.PanelBox(pal, theme.Solid(pal.BG), theme.NRGBA(pal.Border, 160))),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -93,8 +101,14 @@ func (p *stackPicker) build() {
 	)
 	for i := range p.cells {
 		c := &p.cells[i]
-		c.box = theme.NewIconBox(stackIcon)
-		c.g = c.box.Widget()
+		size := theme.Px(stackCellPx)
+		c.img = ebiten.NewImage(size, size)
+		c.g = widget.NewGraphic(
+			widget.GraphicOpts.Image(c.img),
+			widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+				Position: widget.RowLayoutPositionCenter,
+			})),
+		)
 		c.g.GetWidget().MouseButtonClickedEvent.AddHandler(func(args any) {
 			if a, ok := args.(*widget.WidgetMouseButtonClickedEventArgs); ok {
 				p.click(i, a)
@@ -189,9 +203,10 @@ func (p *stackPicker) click(i int, a *widget.WidgetMouseButtonClickedEventArgs) 
 	}
 }
 
-// sync refreshes the cells from the entries: the kind glyph tinted with the
-// world bracket's colour, the hover tooltip naming the entity and its
-// distance, and the column's geometry (it is exactly as tall as its icons).
+// sync refreshes the cells from the entries: the entity drawn as the world
+// draws it (its body art in its bracket, re-drawn only when the entry moves),
+// the hover tooltip naming the entity and its distance, and the column's
+// geometry (it is exactly as tall as its cells).
 func (p *stackPicker) sync() {
 	if !p.shown {
 		return
@@ -204,16 +219,24 @@ func (p *stackPicker) sync() {
 			continue
 		}
 		inf := p.entries[i]
-		tint := render.BracketColor(inf.Kind, inf.Hostile)
-		if inf.Entity == p.k.cv.Player() {
-			tint = p.k.th.Pal().Player
+		// The art is the entity's own (drawn once per entry: a moving cluster
+		// must not re-render twelve miniatures a frame), the tooltip follows
+		// its distance.
+		art := fmt.Sprintf("%d/%s", inf.Entity, inf.Kind)
+		if art != c.art {
+			c.art = art
+			c.img.Clear()
+			p.ren.DrawEntityBracket(c.img, p.k.Sim, inf)
 		}
-		key := fmt.Sprintf("%d/%s/%s/%t/%s", inf.Entity, inf.Kind, inf.Name, inf.Hostile,
+		key := fmt.Sprintf("%s/%s/%t/%s", art, inf.Name, inf.Hostile,
 			theme.FormatDistance(inf.Distance))
 		if key != c.key {
 			c.key = key
 			glyph := theme.KindIcon(inf.Kind)
-			c.box.Set(glyph, tint)
+			tint := render.BracketColor(inf.Kind, inf.Hostile)
+			if inf.Entity == p.k.cv.Player() {
+				tint = p.k.th.Pal().Player
+			}
 			c.tip.Set(p.k.th, c.g.GetWidget(), key, func() widgets.TooltipModel {
 				return widgets.TooltipModel{
 					Icon: glyph, IconTint: tint,
@@ -236,7 +259,7 @@ func (p *stackPicker) place() {
 	if !p.shown || p.n == 0 {
 		return
 	}
-	cell, gap, pad := theme.Px(stackIcon), theme.Px(stackGap), theme.Px(stackCellPad)
+	cell, gap, pad := theme.Px(stackCellPx), theme.Px(stackGap), theme.Px(stackCellPad)
 	cw := cell + 2*pad
 	ch := p.n*cell + (p.n-1)*gap + 2*pad
 	root := p.root.GetWidget().Rect

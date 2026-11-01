@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/entieve/entieve/core"
+	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	uikit "github.com/entieve/entieve/uikit/screens"
@@ -79,6 +80,11 @@ type SpaceScene struct {
 	// picks is the stack picker's scratch: the cluster under the cursor, in
 	// depth order (pickAll). Reused every frame the pointer hovers a cluster.
 	picks []sim.Info
+
+	// hover is the entity under the cursor, re-resolved every update: the
+	// overlay labels that one and no other. Zero when the cursor rests on
+	// empty space.
+	hover ecs.Entity
 }
 
 // OnEnter implements Scene.
@@ -173,6 +179,11 @@ func (sc *SpaceScene) Update(in Input) error {
 	// picker's hover runs first, because the column itself is interface and
 	// hovering it must keep it up.
 	cam := sc.Camera(float64(g.w), float64(g.h))
+	// The overlay's one label belongs to the entity under the cursor, panels
+	// or no panels: a cursor on the open column still names the entity it
+	// covers (the column seats beside the cluster).
+	inf, _ := sc.pick(cam, in.MouseX, in.MouseY)
+	sc.hover = inf.Entity
 	sc.stackStep(in, cam, over)
 	if over {
 		return nil
@@ -304,6 +315,7 @@ func (sc *SpaceScene) Draw(dst *ebiten.Image) {
 	g := sc.g
 	cam := sc.Camera(float64(g.w), float64(g.h))
 	g.ren.SetSelected(g.kit.Selected())
+	g.ren.SetHover(sc.hover)
 	g.ren.Draw(dst, cam, g.s)
 }
 

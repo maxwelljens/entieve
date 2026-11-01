@@ -2,6 +2,7 @@ package screens
 
 import (
 	"image"
+	"os"
 	"strings"
 	"testing"
 
@@ -280,5 +281,33 @@ func TestStackColumnRightClickOpensEntityMenu(t *testing.T) {
 	entries := m.Entries()
 	if len(entries) == 0 || entries[0].Label != "Show Info" || !entries[0].Bold {
 		t.Fatalf("menu entries = %+v, want a bold Show Info first", entries)
+	}
+}
+
+// TestStackCellsDrawTheWorldNotIcons: a cell is the entity as the world draws
+// it (render.DrawEntityBracket: its body art inside its own bracket), never a
+// kind glyph from the UI icon set, and each cell paints into an image of its
+// own (the shared icon atlas stays untouched).
+func TestStackCellsDrawTheWorldNotIcons(t *testing.T) {
+	src, err := os.ReadFile("stack.go")
+	if err != nil {
+		t.Skipf("source not available: %v", err)
+	}
+	if strings.Contains(string(src), "NewIconBox(") {
+		t.Error("a cell is an icon box: cells must draw the entity, not a UI glyph")
+	}
+	if !strings.Contains(string(src), "DrawEntityBracket(") {
+		t.Error("no cell draws through render.DrawEntityBracket (the world's own art)")
+	}
+	k, _ := newTestKit(t)
+	openStack(t, k, stackInfos(2))
+	for i := 0; i < 2; i++ {
+		c := &k.column.cells[i]
+		if c.img == nil || c.g.Image != c.img {
+			t.Errorf("cell %d does not paint into its own image", i)
+		}
+		if b := c.img.Bounds(); b.Dx() != theme.Px(stackCellPx) || b.Dy() != theme.Px(stackCellPx) {
+			t.Errorf("cell %d image = %v, want a %d px square", i, b, theme.Px(stackCellPx))
+		}
 	}
 }

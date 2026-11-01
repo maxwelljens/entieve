@@ -13,16 +13,26 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// TestLabelsShowWhenZoomedIn pins the label threshold's direction: the near
-// framing draws name/distance labels, the far system view does not (it used
-// to be the other way round — labels crowded the far view and vanished as
-// you zoomed in to read them).
-func TestLabelsShowWhenZoomedIn(t *testing.T) {
-	if !labelsVisible(labelZoomMin * 2) {
-		t.Error("near zoom draws no name/distance labels")
+// TestLabelsFollowTheHover pins the owner's rule at the source: a name and
+// distance label belongs to the one entity under the cursor, at every zoom
+// (zoom is not part of the decision), and to nothing else.
+func TestLabelsFollowTheHover(t *testing.T) {
+	r := New(nil)
+	ship := gridObj{info: sim.Info{Entity: 7, Kind: sim.KindShip}}
+	rock := gridObj{info: sim.Info{Entity: 8, Kind: sim.KindAsteroid}}
+	if r.labelsOn(ship) {
+		t.Error("no hover: a label drew anyway")
 	}
-	if labelsVisible(labelZoomMin / 2) {
-		t.Error("far zoom still draws name/distance labels")
+	r.SetHover(ship.info.Entity)
+	if !r.labelsOn(ship) {
+		t.Error("the hovered entity drew no label")
+	}
+	if r.labelsOn(rock) {
+		t.Error("an entity the cursor is not on drew a label")
+	}
+	r.SetHover(0)
+	if r.labelsOn(ship) {
+		t.Error("the label survived the hover leaving the entity")
 	}
 }
 
@@ -358,5 +368,50 @@ func TestFireFXAimsAtTheGunsOwnTarget(t *testing.T) {
 	if aim != core.V(sx, sy) {
 		t.Fatalf("shot aims at (%.1f,%.1f): the first lock sits at (%.1f,%.1f), "+
 			"the gun's own target at (%.1f,%.1f)", aim.X, aim.Y, fx, fy, sx, sy)
+	}
+}
+
+// TestCellDrawsTheWorldsBodyArt pins the stack picker's cells to the world's
+// own drawing: a cell submits the entity through drawBody, the same pass Draw
+// runs over its buckets, for every kind the picker can list. An icon cell would
+// submit no body primitive at all.
+func TestCellDrawsTheWorldsBracketArt(t *testing.T) {
+	c, err := content.Load(content.FS())
+	if err != nil {
+		t.Fatalf("content.Load: %v", err)
+	}
+	wd, ok := c.World("world-showcase")
+	if !ok {
+		t.Fatal("world-showcase missing")
+	}
+	s, err := sim.New(c, wd, 42)
+	if err != nil {
+		t.Fatalf("sim.New: %v", err)
+	}
+	r := New(c)
+	dst := ebiten.NewImage(32, 32)
+	kinds := map[string]bool{}
+	for _, inf := range s.Grid() {
+		if !inf.Visible || kinds[inf.Kind] {
+			continue
+		}
+		kinds[inf.Kind] = true
+		r.bodyPrims = 0
+		r.DrawEntityBracket(dst, s, inf)
+		if r.bodyPrims == 0 {
+			t.Errorf("cell for %s (%v) drew no body art: the cell must be the entity as the world draws it",
+				inf.Kind, inf.Name)
+		}
+	}
+	if len(kinds) < 3 {
+		t.Fatalf("fixture covered %d kinds, want the showcase's spread", len(kinds))
+	}
+
+	// A synthetic entry (an entity the sim does not know) still gets art: the
+	// picker's own tests feed hand-built infos.
+	r.bodyPrims = 0
+	r.DrawEntityBracket(dst, s, sim.Info{Entity: ecs.Entity(9999), Kind: sim.KindShip, Visible: true})
+	if r.bodyPrims == 0 {
+		t.Error("a cell drew nothing for an entity outside the sim")
 	}
 }
