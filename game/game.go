@@ -436,6 +436,7 @@ func (g *Game) Update() error {
 
 	if evs := g.s.Events(); len(evs) > 0 {
 		g.onEvents(evs)
+		g.hud.Push(evs)
 		bodyOf[*uikit.LogPanel](g.host, idLog).Push(evs)
 	}
 
@@ -747,6 +748,13 @@ func (g *Game) buildKit() error {
 		HorizontalPosition: widget.AnchorLayoutPositionCenter,
 		VerticalPosition:   widget.AnchorLayoutPositionStart,
 		Padding:            &widget.Insets{Top: theme.Px(10)},
+	})
+	// The combat feed is TOP chrome too: brief lines above the ship status.
+	// The seat only seeds the anchor (bottom-left of the root); the HUD
+	// re-anchors it above the status column every Sync.
+	kit.AddTopContainer(g.hud.Feed(), widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionEnd,
 	})
 	// The rail is derived from the spec in one pass (game/rail.go) and
 	// pinned to the left edge, top-flush with the window row below the

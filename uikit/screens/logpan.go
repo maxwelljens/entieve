@@ -151,8 +151,13 @@ func (l *LogPanel) SetLines(lines []string) {
 
 // Push appends sim events as colored lines, each stamped with the event's
 // own sim time.
+// Push records one line per event; events with no human-readable text (the
+// structured combat twins) print nothing.
 func (l *LogPanel) Push(evs []sim.Event) {
 	for _, ev := range evs {
+		if ev.Text == "" {
+			continue
+		}
 		l.append(l.compose(ev.Severity, l.stamp(ev.Time), ev.Text))
 	}
 	if len(evs) > 0 {

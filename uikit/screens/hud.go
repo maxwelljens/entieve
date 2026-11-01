@@ -41,7 +41,13 @@ const (
 	hudBoxW      = 132  // one target box width (px)
 	hudBoxH      = 83   // one target box height (px, fixed)
 	hudBoxGap    = 5    // gap between target boxes
-	hudBoxMods   = 3    // module glyphs a card shows on its distance line
+	hudBoxMods   = 3    // module mini-cells a card shows on its distance line
+	// A card's module mini-cell is the rack's cell at a third of the scale:
+	// the module's glyph with its depleting cycle ring. It fits the 19 px
+	// distance line, so the cap and the distance text's clearance rule hold.
+	hudBoxModCell  = 18 // mini-cell size: the glyph plus its ring (px)
+	hudBoxModGlyph = 14 // module glyph inside a mini-cell (px)
+	hudBoxModRingW = 1  // cycle-ring stroke (px)
 	// The EWAR effect boxes above the ship status: a rack cell scaled down —
 	// a tile with the effect glyph and a depleting cycle ring, its
 	// remaining-time line under it (the rack's tile + name layout).
@@ -49,6 +55,15 @@ const (
 	hudEffTile  = 34 // tile size (px)
 	hudEffNameH = 19 // countdown line height (px, fits StepTiny)
 	hudEffRingW = 2  // depletion ring stroke (px)
+
+	// The combat feed above the ship status: hudFeedLines brief lines, in the
+	// status column's own width. It is an overlay (TOP chrome), so it never
+	// grows the bottom column the virgin-placement pins measure.
+	hudFeedLines  = 4
+	hudFeedW      = 264 // line width: the log's / status column's own (px)
+	hudFeedLineH  = 19  // one line (fits StepTiny, like the effect box's name)
+	hudFeedFrames = 300 // frames a line stays up: ~5 s of watching, whatever the time scale
+	hudFeedGap    = 4   // gap between the strip's top edge and the feed (px)
 )
 
 // The velocity wedge shares the health block's band: it is exactly as tall
@@ -80,6 +95,13 @@ const (
 	hudBoxBarsGap  = 2  // gap between lock strip and bars (px)
 	hudBoxBarGap   = 2  // gap between layer bars (px)
 	hudBoxMinNameW = 8  // minimum room left for the name (px)
+
+	// A card whose target is gone blinks before it disappears (destroyed,
+	// warped off, lock dropped): frame-counted, so the cadence is the same at
+	// every time acceleration. 90 frames alternating every 15 is 1.5 s of
+	// two on/off cycles a second.
+	hudGhostFrames = 90
+	hudBlinkFrames = 15
 )
 
 // targetCardBody returns the content area of a target card: the card rect
@@ -136,24 +158,24 @@ func targetCardBars(card image.Rectangle) image.Rectangle {
 	return image.Rect(b.Min.X, y, b.Max.X, b.Max.Y)
 }
 
-// targetCardMod returns the box of the i-th module glyph counted from the
-// distance line's right edge (i = 0 is the outermost), so the glyphs hug the
-// card's edge however many there are.
+// targetCardMod returns the box of the i-th module mini-cell counted from
+// the distance line's right edge (i = 0 is the outermost), so the cells hug
+// the card's edge however many there are.
 func targetCardMod(card image.Rectangle, i int) image.Rectangle {
 	dl := targetCardDist(card)
-	size := theme.Px(theme.IconInline)
+	size := theme.Px(hudBoxModCell)
 	y := dl.Min.Y + (dl.Dy()-size)/2
 	x2 := dl.Max.X - i*(size+theme.Px(theme.IconGap))
 	return image.Rect(x2-size, y, x2, y+size)
 }
 
-// cardModsWidth is the room n module glyphs take on the distance line (0 for
-// none) — what the distance text is ellipsized clear of.
+// cardModsWidth is the room n module mini-cells take on the distance line (0
+// for none): what the distance text is ellipsized clear of.
 func cardModsWidth(n int) int {
 	if n <= 0 {
 		return 0
 	}
-	return n*theme.Px(theme.IconInline) + (n-1)*theme.Px(theme.IconGap)
+	return n*theme.Px(hudBoxModCell) + (n-1)*theme.Px(theme.IconGap)
 }
 
 // layerBars tiles r with exactly three stacked bars separated by
@@ -200,7 +222,8 @@ type Hud struct {
 
 	container *widget.Container
 	targetRow *widget.Container
-	cards     *hudCards         // targetRow as TOP chrome (Cards)
+	cards     *hudChrome        // targetRow as TOP chrome (Cards)
+	feed      *hudFeed          // the combat feed as TOP chrome (Feed)
 	pair      *widget.Container // bottom-center: status column + rack slot
 	strip     *widget.Container
 	effects   *widget.Container // EWAR icons above the status (hidden when none)
@@ -243,6 +266,36 @@ type Hud struct {
 	timeScale   int
 }
 
+// hudFeed is the combat feed: brief lines scrolling up above the ship status,
+// the important span of each in red (what hit or scrambled you) or blue (what
+// you dealt). It is TOP chrome, so it paints over whatever window sits there
+// and never joins the HUD's bottom column — the pair's top edge is a pinned
+// clearance. With no live line the rows hide, the column collapses and claims
+// nothing.
+type hudFeed struct {
+	hudChrome
+	rows   *widget.Container // the panel: hidden when no line is live
+	lines  []hudFeedLine     // staged, oldest first
+	rowsAt [hudFeedLines]hudFeedRow
+}
+
+// hudFeedLine is one staged feed line: plain text around the important span
+// (loss red / gain blue) and the frames it has left on screen.
+type hudFeedLine struct {
+	pre, key, post string
+	loss           bool
+	left           int
+}
+
+// hudFeedRow is one line's three text runs: the log colours whole lines, so
+// the key span needs its own widget to carry the palette's colour.
+type hudFeedRow struct {
+	box            *widget.Container // the line's row (hidden while unused)
+	pre, key, post *widget.Text
+	staged         hudFeedLine
+	painted        bool
+}
+
 // hudBox is one locked-target readout: a self-drawn card image rendered
 // from a targetCard state (name, distance, lock progress, layer fractions)
 // through the pure geometry above. Sync repaints only on a state change.
@@ -252,7 +305,10 @@ type hudBox struct {
 	card    targetCard // staged state (Sync writes)
 	drawn   targetCard // last painted state
 	painted bool
-	draws   int // image repaint count (tests watch it)
+	draws   int  // image repaint count (tests watch it)
+	live    bool // this frame's card is a real lock: a click may select it
+	ghost   int  // blink frames left after the lock went away (0 = none)
+	ghostOn bool
 }
 
 // targetCard is one card's rendered state. It is deliberately comparable:
@@ -264,11 +320,22 @@ type targetCard struct {
 	dist     string
 	kind     string // semantic icon name for the target's kind ("" = none)
 	tint     color.RGBA
-	lock     float64            // 0..1 lock progress
-	layers   [3]float64         // shield / armor / hull fractions (ships); health in [0] otherwise
-	ships    bool               // three layers (true) vs a single health fraction
-	mods     [hudBoxMods]string // my active modules cycling on this target
+	lock     float64               // 0..1 lock progress
+	layers   [3]float64            // shield / armor / hull fractions (ships); health in [0] otherwise
+	ships    bool                  // three layers (true) vs a single health fraction
+	mods     [hudBoxMods]hudBoxMod // my active modules cycling on this target
 	nmods    int
+}
+
+// hudBoxMod is one module mini-cell on a card's distance line: the module's
+// class glyph and the cycle ring the rack draws on its cell. ring is the
+// remaining fraction (0..1) and -1 when no cycle is in flight; lit is the
+// rack's rule (on for an active module or a loading bay, greyed while a
+// cancelled cycle runs out).
+type hudBoxMod struct {
+	glyph string
+	ring  float64
+	lit   bool
 }
 
 // hudEffect is one live EWAR effect on the player: a rack-cell miniature —
@@ -514,7 +581,8 @@ func NewHud(env interface {
 		h.boxes[i].root.GetWidget().SetVisibility(widget.Visibility_Hide)
 		h.targetRow.AddChild(h.boxes[i].root)
 	}
-	h.cards = &hudCards{row: h.targetRow}
+	h.cards = &hudChrome{col: h.targetRow}
+	h.feed = h.newFeed()
 
 	h.container = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
@@ -527,35 +595,210 @@ func NewHud(env interface {
 	return h
 }
 
-// hudCards is the locked-target card row as TOP chrome (Kit.AddTopContainer):
-// the cards sit at the screen's top centre, over the Overview's body, so
-// they paint above every window and their clicks win over it — the rail's
-// contract (see TopChrome), while the rest of the HUD stays under the
-// windows. With no locks every box is hidden and the row lays out 0×0: an
-// empty rect claims nothing, so the band falls back to the window.
-type hudCards struct{ row *widget.Container }
+// hudChrome is one TOP-chrome column of the HUD (the target-card row, the
+// combat feed): mounted through Kit.AddTopContainer, so it paints after every
+// window and its presses win over a window underneath — the rail's contract.
+// With nothing to show its content collapses, the column lays out 0×0 and
+// claims no band, so the layer below keeps its clicks.
+type hudChrome struct{ col *widget.Container }
 
-// Container is the card row: the root anchor layout positions it (top
-// centre, 10 px down), the topmost input layer claims it.
-func (c *hudCards) Container() *widget.Container { return c.row }
+// Container is the column: the root anchor layout positions it, the topmost
+// input layer claims it.
+func (c *hudChrome) Container() *widget.Container { return c.col }
 
-// SetWindowPass parks the row out of ui.Draw's window pass and brings it
+// SetWindowPass parks the column out of ui.Draw's window pass and brings it
 // back for Kit.Draw's top pass — the rail's parking verbatim: the root
-// layout still lays the row out, only the paint stops.
-func (c *hudCards) SetWindowPass(on bool) {
+// layout still lays it out, only the paint stops.
+func (c *hudChrome) SetWindowPass(on bool) {
 	vis := widget.Visibility_Show
 	if !on {
 		vis = widget.Visibility_Hide_Blocking
 	}
-	c.row.GetWidget().SetVisibility(vis)
+	c.col.GetWidget().SetVisibility(vis)
 }
 
-// Draw paints the row — Kit.Draw's top pass, after every window.
-func (c *hudCards) Draw(screen *ebiten.Image) { c.row.Render(screen) }
+// Draw paints the column — Kit.Draw's top pass, after every window.
+func (c *hudChrome) Draw(screen *ebiten.Image) { c.col.Render(screen) }
 
 // Cards returns the target-card row's TOP chrome column for
 // Kit.AddTopContainer (the game mounts it with the row's own anchor data).
 func (h *Hud) Cards() TopChrome { return h.cards }
+
+// Feed returns the combat feed's TOP chrome column for Kit.AddTopContainer.
+// The HUD re-anchors it above the ship status every Sync (the strip's top
+// edge and left edge), so the mount only has to seed a bottom-centre seat.
+func (h *Hud) Feed() TopChrome { return &h.feed.hudChrome }
+
+// newFeed builds the combat feed column: one panel of preallocated line rows,
+// each three text runs (plain, the important span, plain). It starts hidden.
+func (h *Hud) newFeed() *hudFeed {
+	p := h.th.Pal()
+	f := &hudFeed{}
+	f.rows = widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(theme.PanelBox(p, theme.Solid(p.BG), theme.NRGBA(p.Border, 160))),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.SpSm))),
+		)),
+	)
+	for i := range f.rowsAt {
+		row := &f.rowsAt[i]
+		box := widget.NewContainer(
+			widget.ContainerOpts.Layout(widget.NewRowLayout(
+				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			)),
+			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(hudFeedW), theme.Px(hudFeedLineH))),
+		)
+		run := func() *widget.Text {
+			return widget.NewText(
+				widget.TextOpts.Text("", h.th.Face(theme.StepTiny), theme.Solid(p.Text)),
+				widget.TextOpts.Position(widget.TextPositionStart, widget.TextPositionCenter),
+			)
+		}
+		row.pre, row.key, row.post = run(), run(), run()
+		box.AddChild(row.pre, row.key, row.post)
+		row.box = box
+		f.rows.AddChild(box)
+		theme.ShowWidget(box.GetWidget(), false)
+	}
+	theme.ShowWidget(f.rows.GetWidget(), false)
+	f.col = widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
+	f.col.AddChild(f.rows)
+	return f
+}
+
+// Push forwards a frame's sim events into the combat feed: only the
+// player-relevant exchange becomes a line (the log keeps every line it
+// already prints). Lines ride hudFeedFrames and the oldest drop past the cap,
+// so the feed scrolls up.
+func (h *Hud) Push(evs []sim.Event) {
+	if h.cv == nil {
+		return
+	}
+	player := h.cv.Player()
+	for _, ev := range evs {
+		l, ok := h.feedLine(ev, player)
+		if !ok {
+			continue
+		}
+		l.left = hudFeedFrames
+		h.feed.lines = append(h.feed.lines, l)
+	}
+	if over := len(h.feed.lines) - hudFeedLines; over > 0 {
+		h.feed.lines = append(h.feed.lines[:0], h.feed.lines[over:]...)
+	}
+}
+
+// feedLine turns one sim event into a feed line, or reports false for events
+// the feed does not speak for. The key span is the number dealt or taken,
+// else the effect verb or the kill; a loss (the player was hit) is red, a
+// gain (the player dealt it) blue.
+func (h *Hud) feedLine(ev sim.Event, player ecs.Entity) (hudFeedLine, bool) {
+	switch ev.Kind {
+	case sim.EvCombat:
+		switch ev.Phase {
+		case sim.CombatDamage:
+			if ev.Value <= 0 {
+				return hudFeedLine{}, false
+			}
+			amt := hudHP(ev.Value)
+			if ev.Target == player {
+				return hudFeedLine{pre: ev.Name + " hits you for ", key: amt, loss: true}, true
+			}
+			if ev.Actor == player {
+				if tgt, ok := h.cv.Info(ev.Target); ok {
+					return hudFeedLine{pre: "You hit " + tgt.Name + " for ", key: amt}, true
+				}
+			}
+		case sim.CombatWeb, sim.CombatScram:
+			verb, hit := "web", "Webbed"
+			if ev.Phase == sim.CombatScram {
+				verb, hit = "scramble", "Scrambled"
+			}
+			if ev.Target == player {
+				return hudFeedLine{key: hit, post: " by " + ev.Name, loss: true}, true
+			}
+			if ev.Actor == player {
+				if tgt, ok := h.cv.Info(ev.Target); ok {
+					return hudFeedLine{pre: "You ", key: verb + " " + tgt.Name}, true
+				}
+			}
+		}
+	case sim.EvDestroyed:
+		if ev.Actor == player {
+			return hudFeedLine{key: "You were destroyed", loss: true}, true
+		}
+		if ev.Target == player && ev.Name != "" {
+			return hudFeedLine{key: ev.Name + " destroyed"}, true
+		}
+	}
+	return hudFeedLine{}, false
+}
+
+// syncFeed stages the feed: a line's frames run out onto the floor, the newest
+// hudFeedLines show newest-at-the-bottom (a fresh line pushes the rest up),
+// rows are rewritten only when their line changed, and the column sits above
+// the ship status.
+func (h *Hud) syncFeed() {
+	live := h.feed.lines[:0]
+	for _, l := range h.feed.lines {
+		if l.left--; l.left > 0 {
+			live = append(live, l)
+		}
+	}
+	h.feed.lines = live
+	p := h.th.Pal()
+	off := len(h.feed.rowsAt) - len(h.feed.lines) // spare rows stay hidden on top
+	for i := range h.feed.rowsAt {
+		row := &h.feed.rowsAt[i]
+		src := i - off
+		var staged hudFeedLine
+		shown := src >= 0 && src < len(h.feed.lines)
+		if shown {
+			staged = h.feed.lines[src]
+		}
+		staged.left = 0 // the countdown is not the row's content: never a repaint
+		if row.painted && row.staged == staged {
+			continue
+		}
+		row.painted, row.staged = true, staged
+		theme.ShowWidget(row.pre.GetWidget(), shown && staged.pre != "")
+		theme.ShowWidget(row.key.GetWidget(), shown && staged.key != "")
+		theme.ShowWidget(row.post.GetWidget(), shown && staged.post != "")
+		row.pre.Label, row.key.Label, row.post.Label = staged.pre, staged.key, staged.post
+		col := p.Info
+		if staged.loss {
+			col = p.Danger
+		}
+		row.key.SetColor(col)
+		theme.ShowWidget(row.box.GetWidget(), shown)
+	}
+	theme.ShowWidget(h.feed.rows.GetWidget(), len(h.feed.lines) > 0)
+	// Seat it above the strip (the top of the ship-info column) with its left
+	// edge on that column's: a live read, because the rack's height and the UI
+	// scale both move the pair. The anchor data keeps a later root layout on
+	// the same seat; the location applies it now, because a layout only runs
+	// when something changed size.
+	if root, strip := h.container.GetWidget().Rect, h.strip.GetWidget().Rect; !root.Empty() && !strip.Empty() {
+		pw, ph := h.feed.rows.PreferredSize()
+		pad := &widget.Insets{Left: strip.Min.X, Bottom: root.Max.Y + theme.Px(hudFeedGap) - strip.Min.Y}
+		h.feed.col.GetWidget().LayoutData = widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionStart,
+			VerticalPosition:   widget.AnchorLayoutPositionEnd,
+			Padding:            pad,
+		}
+		bottom := pad.Apply(root).Max.Y
+		// Moving the column does not dirty its own layout: re-lay its rows out
+		// at the new origin (the root's layout only places the column). Both
+		// only when the seat actually moved.
+		w := h.feed.col.GetWidget()
+		rect := image.Rect(strip.Min.X, bottom-ph, strip.Min.X+pw, bottom)
+		if w.Rect != rect {
+			w.SetLocation(rect)
+			h.feed.col.RequestRelayout()
+		}
+	}
+}
 
 // MountRack slots the module rack into the bottom-center pair, immediately
 // right of the status column. The rack keeps its own container (Sync, hover,
@@ -672,9 +915,10 @@ func (h *Hud) paintEffect(e *hudEffect, frac float64) {
 
 // clickCard is the card's click seam: a left click selects the card's locked
 // entity through the host's selector — the same selection a world click or an
-// overview row sets, never a lock or a camera move.
+// overview row sets, never a lock or a camera move. A ghost (a card blinking
+// out) answers nothing.
 func (h *Hud) clickCard(b *hudBox, a *widget.WidgetMouseButtonClickedEventArgs) {
-	if a.Button != ebiten.MouseButtonLeft || h.selectFn == nil {
+	if a.Button != ebiten.MouseButtonLeft || h.selectFn == nil || !b.live {
 		return
 	}
 	if e := b.card.entity; e != 0 {
@@ -848,15 +1092,23 @@ func drawTargetCard(dst *ebiten.Image, c targetCard, env theme.Theme) {
 	dl := targetCardDist(card)
 	theme.DrawCardText(dst, c.dist, env.Face(theme.StepTiny), dl.Min.X, dl.Min.Y, theme.Solid(p.Dim))
 	// The modules cycling on this target, right-aligned on the distance
-	// line (drawn after the text, which is already ellipsized clear of them).
+	// line (drawn after the text, which is already ellipsized clear of
+	// them): each is the rack cell in miniature — glyph, depleting ring.
 	for i := 0; i < c.nmods && i < hudBoxMods; i++ {
-		if c.mods[i] == "" {
+		m := c.mods[i]
+		if m.glyph == "" {
 			continue
 		}
 		box := targetCardMod(card, i)
+		if m.ring >= 0 {
+			drawModRing(dst, box, m.ring, m.lit, p)
+		}
+		size := theme.Px(hudBoxModGlyph)
+		x := box.Min.X + (box.Dx()-size)/2
+		y := box.Min.Y + (box.Dy()-size)/2
 		opts := &ebiten.DrawImageOptions{}
-		opts.GeoM.Translate(float64(box.Min.X), float64(box.Min.Y))
-		dst.DrawImage(icons.Get(c.mods[i], box.Dx(), p.Text), opts)
+		opts.GeoM.Translate(float64(x), float64(y))
+		dst.DrawImage(icons.Get(m.glyph, size, p.Text), opts)
 	}
 
 	// Lock-progress strip under the line.
@@ -888,6 +1140,27 @@ func drawTargetCard(dst *ebiten.Image, c targetCard, env theme.Theme) {
 			float32(bar.Min.X)+s/2, float32(bar.Min.Y)+s/2,
 			float32(bar.Dx())-s, float32(bar.Dy())-s,
 			s, theme.NRGBA(p.Border, 160), false)
+	}
+}
+
+// drawModRing paints one module mini-cell's cycle ring over its box: a full
+// dim track and the remaining fraction from the top, clockwise — the rack's
+// ring (syncRing) scaled to the cell, in the same palette tokens.
+func drawModRing(dst *ebiten.Image, box image.Rectangle, remaining float64, lit bool, p theme.Palette) {
+	s := theme.Scale()
+	cx, cy := float64(box.Min.X)+float64(box.Dx())/2, float64(box.Min.Y)+float64(box.Dy())/2
+	rad := float64(theme.Px(hudBoxModCell)-2*hudBoxModRingW) / 2
+	const start = -math.Pi / 2
+	track, fill := iconColor(p.Accent, 60), p.Accent
+	if !lit {
+		// Cancelled: the cycle still runs out, visibly greyed.
+		track, fill = iconColor(p.Dim, 60), p.Dim
+	}
+	render.Arc(dst, float32(cx), float32(cy), float32(rad),
+		start, start+2*math.Pi, float32(hudBoxModRingW*s), track)
+	if remaining > 0 {
+		render.Arc(dst, float32(cx), float32(cy), float32(rad),
+			start, start+float32(hudFrac01(remaining)*2*math.Pi), float32(hudBoxModRingW*s), fill)
 	}
 }
 
@@ -1002,12 +1275,22 @@ func (h *Hud) Sync() {
 	if h.pick != nil {
 		selected = h.pick()
 	}
+	// The locks the boxes are about to show: a card that left the row only
+	// blinks when its target is gone from the whole row (a lock list that
+	// simply shifted down keeps every card live).
+	var locked [hudBoxPool]ecs.Entity
+	for i := range locked {
+		if i < len(locks) {
+			locked[i] = locks[i].Target
+		}
+	}
 	for i, box := range h.boxes {
 		if i >= len(locks) {
-			theme.ShowWidget(box.root.GetWidget(), false)
+			h.blinkBox(box, locked)
 			continue
 		}
 		theme.ShowWidget(box.root.GetWidget(), true)
+		box.live, box.ghost, box.ghostOn = true, 0, false
 		l := locks[i]
 		info, hasInfo := s.Info(l.Target)
 		card := targetCard{entity: l.Target, selected: selected != 0 && l.Target == selected,
@@ -1042,17 +1325,58 @@ func (h *Hud) Sync() {
 		card.name, card.dist = h.boxLabels(card.name, card.dist, card.nmods)
 		h.setCard(box, card)
 	}
+
+	// 6 — the combat feed: spent lines drop and the column re-seats above the
+	// ship status (Sync refreshes it; Push stages the lines from events).
+	h.syncFeed()
 }
 
-// cardMods lists the glyphs of my modules cycling on one target (the target
-// card's module strip): active slots whose activation target is that entity,
-// in slot order, capped at the room a card has.
-func (h *Hud) cardMods(player, tgt ecs.Entity) ([hudBoxMods]string, int) {
-	var out [hudBoxMods]string
+// blinkBox handles a card slot with no lock this frame. A card whose target
+// left the row (destroyed, warped off-grid, unlocked) stays as a ghost for
+// hudGhostFrames, alternating visibility every hudBlinkFrames — the "target
+// gone" tell — then disappears. The ghost keeps the last painted image, is
+// never repainted and never answers a click (live stays false in Sync's card
+// branch only). A target that merely moved to another slot is still locked:
+// nothing blinks.
+func (h *Hud) blinkBox(b *hudBox, locked [hudBoxPool]ecs.Entity) {
+	b.live = false
+	still := false
+	for _, e := range locked {
+		if e != 0 && e == b.card.entity {
+			still = true
+			break
+		}
+	}
+	if b.card.entity == 0 || still {
+		b.ghost, b.ghostOn = 0, false
+		theme.ShowWidget(b.root.GetWidget(), false)
+		return
+	}
+	if b.ghost == 0 && b.root.GetWidget().GetVisibility() == widget.Visibility_Show {
+		b.ghost = hudGhostFrames // the falling edge: the lock just went away
+	}
+	if b.ghost == 0 {
+		theme.ShowWidget(b.root.GetWidget(), false)
+		return
+	}
+	b.ghost--
+	b.ghostOn = b.ghost > 0 && (b.ghost/hudBlinkFrames)%2 == 1
+	theme.ShowWidget(b.root.GetWidget(), b.ghostOn)
+}
+
+// cardMods stages the mini-cells of my modules cycling on one target (the
+// target card's module strip): every slot whose activation target is that
+// entity, in slot order, capped at the room a card has. Each cell carries the
+// rack's cycle ring state (syncCell's rule): a cycle in flight depletes its
+// ring — lit while the module is active or its bay loads, greyed while a
+// cancelled cycle runs out; an idle module keeps the bare glyph.
+func (h *Hud) cardMods(player, tgt ecs.Entity) ([hudBoxMods]hudBoxMod, int) {
+	var out [hudBoxMods]hudBoxMod
 	fit, ok := h.cv.Fitting(player)
 	if !ok || tgt == 0 {
 		return out, 0
 	}
+	now := h.cv.Time()
 	n := 0
 	for _, class := range []string{content.SlotHigh, content.SlotMid, content.SlotLow} {
 		if n >= hudBoxMods {
@@ -1063,16 +1387,38 @@ func (h *Hud) cardMods(player, tgt ecs.Entity) ([hudBoxMods]string, int) {
 			if n >= hudBoxMods {
 				break
 			}
-			if !rts[i].Active {
+			slot := sim.SlotRef{Class: class, Index: i}
+			if e, ok := h.cv.ModuleTarget(player, slot); !ok || e != tgt {
 				continue
 			}
-			if e, ok := h.cv.ModuleTarget(player, sim.SlotRef{Class: class, Index: i}); !ok || e != tgt {
+			active := rts[i].Active
+			clip, hasClip := h.cv.Clip(slot)
+			loading := hasClip && clip.Loading
+			pending := !active && !loading && rts[i].CycleEnds > 0 && rts[i].CycleEnds > now
+			// The activation binding outlives the cycle: an idle module keeps
+			// its slot's target, so only a live cycle draws a cell (the rack
+			// greys a cancelled one until its clock runs out).
+			if !active && !pending && !loading {
 				continue
 			}
-			if def, ok := h.cv.Defs().Module(rts[i].Def); ok {
-				out[n] = theme.ModuleIconFor(def)
-				n++
+			def, ok := h.cv.Defs().Module(rts[i].Def)
+			if !ok {
+				continue
 			}
+			m := hudBoxMod{glyph: theme.ModuleIconFor(def), ring: -1}
+			if rts[i].CycleEnds > 0 && (active || pending || loading) {
+				period := def.ActivationTime
+				if loading && def.Weapon != nil && def.Weapon.ShotTime > 0 {
+					period = def.Weapon.ShotTime
+				}
+				if period > 0 {
+					progress := hudFrac01((now - (rts[i].CycleEnds - period)) / period)
+					m.ring = math.Round(hudFrac01(1-progress)*rackCycleMax) / rackCycleMax
+					m.lit = active || loading
+				}
+			}
+			out[n] = m
+			n++
 		}
 	}
 	return out, n

@@ -80,6 +80,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   top-centre row draws an amber border as thick as the selection, so the
   overview row, a world click and a card click all show which target the
   Selected Item panel is on.
+- **A card's module glyphs cycle**: the modules bound to a locked target now
+  draw as miniatures of the rack's cells: the class glyph with a depleting
+  cycle ring, lit while the module runs (or its bay loads) and greyed while a
+  cancelled cycle runs out. Three cells a card, and the distance text stays
+  ellipsized clear of them.
+- **The combat feed**: brief lines scroll up above the ship status for what
+  the pilot deals and takes: hits (the amount in red when it lands on you,
+  blue when you land it), applied webs and scrambles, and kills. Five
+  seconds a line, four lines, hidden when empty. It paints over whatever
+  window sits there and never joins the bottom HUD column.
+- **A departed target's card blinks out**: when a lock goes away (the target
+  died, warped off or was unlocked) its card blinks at two cycles a second
+  for a second and a half before it goes, instead of vanishing between
+  frames. A blinking card answers no clicks.
 
 ### Changed
 
@@ -140,6 +154,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Landed security fights the outlaw it locked**: a response wing that
+  warped in for an incident and aggroed the pilot through the threat machine
+  broke the engagement off on its first tick (the pursuit leash is measured
+  from the wing's post, thousands of km away), and the patrol's own dispatch
+  then never ran again: the hulls turned for the station at sublight speed
+  with their lock still on the pilot and their guns cold. A patrol whose AI
+  disengages now hands the tick back to its dispatch, which holds station on
+  the incident and fires at the outlaw inside engagement range.
 - **Security answers a miner's attacker**: a distress wing dispatched to a
   miner under fire now records whoever opened fire and engages that hull on
   arrival (a player included), then the rats around the barge. It used to
