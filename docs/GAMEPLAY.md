@@ -382,12 +382,14 @@ world uses under the cursor, so the row selects and locks in one press.
 
 Where several things sit on top of each other, the world's click can only
 reach the nearest one. Rest the cursor on the pile (about a fifth of a
-second, no click) and a vertical column of their kind icons opens beside it,
-tinted like the world brackets and ordered as the world paints them: the
-entity on top leads. Hover an icon for its name and distance. A click
-selects that entity (the Overview highlight and the Selected Item window
-follow), `Ctrl` + click locks it, a right-click opens the entity's own menu.
-The column lists up to twelve icons; anything deeper stays in the Overview.
+second, no click) and a vertical column opens beside it: each cell is the
+entity as the world draws it, its own body art inside its own bracket, so a
+cell reads as a miniature of what sits on screen. The column is ordered as
+the world paints them, so the entity on top leads. Hover a cell for its name
+and distance. A click selects that entity (the Overview highlight and the
+Selected Item window follow), `Ctrl` + click locks it, a right-click opens
+the entity's own menu. The column lists up to twelve entities; anything
+deeper stays in the Overview.
 It closes by itself once the cursor leaves both the column and the pile
 (about 150 ms of grace), and it never changes what a plain world click
 selects.
@@ -567,6 +569,11 @@ omniscience), enforced in the sim's read model and the renderer alike.
 - **Grid / landmark visibility.** System landmarks (the star, planets,
   moons, station, gates, belt markers and anomalies) are always `Visible`;
   they appear in the overview, on the starmap, and get in-world brackets.
+- **Labels are hover-only.** Brackets alone identify what is out there; the
+  name and distance of an entity draw while the cursor rests on it (the
+  pick radius the click uses) and nowhere else, at any zoom. That includes a
+  locked target: its lock line, ring and bracket show, its figure lives in
+  the Overview and the HUD card.
 - **Sensor range.** Ships, asteroids and wrecks are `Visible` only within
   **`sim.SensorRange` = 250 km** of your ship. Anything farther is off-grid:
   it does not appear in the overview, cannot be picked by clicking, is not

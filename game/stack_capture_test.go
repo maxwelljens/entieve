@@ -9,6 +9,7 @@ import (
 	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/internal/capture"
+	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -80,15 +81,30 @@ func TestStackPickerCapture(t *testing.T) {
 			if band.Empty() {
 				return fmt.Errorf("capture %s: the open column owns no band around (%v, %v)", out, atX, atY)
 			}
-			// Three icons: 20 px cells, 4 px gaps and 4 px padding
+			// Three cells: 32 px each, 4 px gaps and 4 px padding
 			// (uikit/screens stack.go) at the design scale.
-			want := image.Pt(28, 76)
+			want := image.Pt(40, 112)
 			if band.Dx() != want.X || band.Dy() != want.Y {
 				return fmt.Errorf("capture %s: column band %v, want %dx%d", out, band, want.X, want.Y)
 			}
 			for i := 0; i < 3; i++ {
 				if !cellChanged(dst, plain, band, i) {
 					return fmt.Errorf("capture %s: icon %d painted nothing in %v", out, i, band)
+				}
+			}
+			// Each cell wears its entity's own bracket: the world's corner
+			// arms sit at the cell's corners, in the world's bracket colour
+			// for that kind (a UI glyph would leave them empty).
+			cam := g.space.Camera(1280, 720)
+			cells := g.space.pickAll(cam, atX, atY)
+			if len(cells) < 3 {
+				return fmt.Errorf("capture %s: cluster resolved %d entries, want 3", out, len(cells))
+			}
+			for i := 0; i < 3; i++ {
+				cell := cellRect(band, i)
+				if col := render.BracketColor(cells[i].Kind, cells[i].Hostile); !cornerInk(dst, cell, col) {
+					return fmt.Errorf("capture %s: cell %d (%s) draws no %v bracket arms at its corners in %v",
+						out, i, cells[i].Kind, col, cell)
 				}
 			}
 			return nil
@@ -137,4 +153,37 @@ func sameColor(a, b color.Color) bool {
 	ar, ag, ab, _ := a.RGBA()
 	br, bg, bb, _ := b.RGBA()
 	return ar == br && ag == bg && ab == bb
+}
+
+// cellRect is cell i's rect inside the open column's band: 4 px of padding,
+// 32 px cells and 4 px gaps (uikit/screens stack.go).
+func cellRect(band image.Rectangle, i int) image.Rectangle {
+	const pad, cell, gap = 4, 32, 4
+	y := band.Min.Y + pad + i*(cell+gap)
+	return image.Rect(band.Min.X+pad, y, band.Min.X+pad+cell, y+cell)
+}
+
+// cornerInk reports whether any of the cell's four corner squares carries col:
+// the bracket's corner arms, which the body art never reaches.
+func cornerInk(dst *ebiten.Image, cell image.Rectangle, col color.RGBA) bool {
+	const sq = 7
+	for _, c := range []image.Point{
+		{cell.Min.X + 1, cell.Min.Y + 1},
+		{cell.Max.X - sq - 1, cell.Min.Y + 1},
+		{cell.Min.X + 1, cell.Max.Y - sq - 1},
+		{cell.Max.X - sq - 1, cell.Max.Y - sq - 1},
+	} {
+		sq := image.Rect(c.X, c.Y, c.X+sq, c.Y+sq)
+		for y := sq.Min.Y; y < sq.Max.Y; y++ {
+			for x := sq.Min.X; x < sq.Max.X; x++ {
+				r, g, b, _ := dst.At(x, y).RGBA()
+				if absDiff(r>>8, uint32(col.R)) <= 20 &&
+					absDiff(g>>8, uint32(col.G)) <= 20 &&
+					absDiff(b>>8, uint32(col.B)) <= 20 {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

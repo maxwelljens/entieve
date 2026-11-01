@@ -97,16 +97,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The stack picker lists what one click cannot reach**: a cluster of
   overlapping entities (two or more under the cursor within the pick radius)
   is a single pick in the world, so resting the cursor on the pile for about
-  two hundred milliseconds opens a vertical column of their kind icons,
-  tinted with the world bracket colours and ordered as the world paints them
-  (the entity on top leads; ties fall to the canonical handle order). An icon
-  click selects, `Ctrl` + click locks (the world chord), a right-click opens
-  the entity's menu, and hovering an icon names it with its distance. The
-  column lists up to twelve icons, the tail stays in the Overview by design,
-  and it closes itself after the cursor leaves both the column and the pile
-  for about a hundred and fifty milliseconds. It is transient top chrome: no
-  keybinding, no Screen row, nothing persisted, and a plain world click still
-  resolves the nearest entity exactly as before.
+  two hundred milliseconds opens a vertical column of the entities
+  themselves, ordered as the world paints them (the entity on top leads; ties
+  fall to the canonical handle order). Each cell is drawn as the entity is
+  drawn in space, its own hull art, rock, station or celestial inside its own
+  world bracket, so a cell reads as a miniature of what sits on screen
+  instead of an icon of its kind. A cell click selects, `Ctrl` + click locks
+  (the world chord), a right-click opens the entity's menu, and hovering a
+  cell names it with its distance. The column lists up to twelve entities,
+  the tail stays in the Overview by design, and it closes itself after the
+  cursor leaves both the column and the pile for about a hundred and fifty
+  milliseconds. It is transient top chrome: no keybinding, no Screen row,
+  nothing persisted, and a plain world click still resolves the nearest
+  entity exactly as before.
 
 ### Changed
 
@@ -164,11 +167,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the log pocket's title band at 1280×720 (and further at the 1024×700
   minimum); the log raises on a click, as the market window already owns that
   strip at the minimum size.
-- **Labels follow the zoom direction**: entity name and distance labels now
-  draw when you zoom in (the grid-scale framing where you read them) and stay
-  off in the far system view, where the brackets alone carry the identity.
-  They used to do the opposite: crowding the wide view and vanishing as you
-  zoomed in to a ship.
+- **Entity labels are hover-only**: the world draws no name and distance
+  labels by default; the one on screen belongs to the entity under the cursor
+  and disappears when the cursor leaves it, at every zoom. The brackets alone
+  identify what is out there, and the cursor asks for the one name you want
+  (the stack picker's column opens on a cluster, so the nearest entity's
+  label draws behind it). A locked target's label follows the same rule; its
+  figure stays on the Overview row and the HUD target card. Entity labels
+  used to gate on zoom instead, crowding the framing the rule left open.
 - **`Ctrl` + click locks from an Overview row**: the chord the world already
   read now also applies to the overview list, which selects the row's entity
   and locks it in one press (the same command the world click queues). A
