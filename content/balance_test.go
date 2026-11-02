@@ -180,13 +180,13 @@ const (
 // base_price is the market ladder's last rung, not the balance reference:
 // the envelope keeps measuring the order/pinned prices it was calibrated on.
 var hullReferencePrices = map[ShipID]float64{
-	"ship-rat-scuttler": 330000,
-	"ship-npc-patrol":   400000,
-	"ship-rat-marauder": 520000,
-	"ship-npc-hauler":   600000,
-	"ship-npc-miner":    380000,
-	"ship-rat-hierarch": 900000,
-	"ship-npc-fleet":    2200000,
+	"ship-scuttler": 330000,
+	"ship-kustor":   400000,
+	"ship-marauder": 520000,
+	"ship-tobrek":   600000,
+	"ship-kutrek":   380000,
+	"ship-hierarch": 900000,
+	"ship-clastor":  2200000,
 }
 
 // recipeReferencePrice resolves the product's reference price: item
@@ -291,9 +291,9 @@ func TestHullRecipesCostMoreThanModules(t *testing.T) {
 func TestHullRecipeMaterialLadder(t *testing.T) {
 	c := MustLoad()
 	ladder := []ShipID{
-		"ship-rat-scuttler", "ship-sloop", "ship-npc-miner", "ship-npc-patrol", "ship-cutlass",
-		"ship-rat-marauder", "ship-npc-hauler", "ship-hauler", "ship-barge",
-		"ship-rat-hierarch", "ship-npc-fleet",
+		"ship-scuttler", "ship-vastrek", "ship-kutrek", "ship-kustor", "ship-zdanek",
+		"ship-marauder", "ship-tobrek", "ship-furdzan", "ship-husnek",
+		"ship-hierarch", "ship-clastor",
 	}
 	if len(ladder) != len(c.Ships) {
 		inLadder := map[ShipID]bool{}

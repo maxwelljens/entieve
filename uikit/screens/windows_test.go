@@ -417,7 +417,7 @@ func TestFittingActions(t *testing.T) {
 
 	// Assemble an owned ship from the hangar.
 	env.Sim.Hangar.Ships = append(env.Sim.Hangar.Ships,
-		sim.StoredShip{Hull: "ship-sloop"})
+		sim.StoredShip{Hull: "ship-vastrek"})
 	frame()
 	shipRow := -1
 	for i, r := range f.hangar.Rows {
@@ -438,8 +438,8 @@ func TestFittingActions(t *testing.T) {
 	if len(*cmds) != 3 {
 		t.Fatalf("assemble enqueued %d commands total, want 3", len(*cmds))
 	}
-	if c, ok := (*cmds)[2].(sim.CmdAssemble); !ok || c.Ship != "ship-sloop" {
-		t.Errorf("cmd = %#v, want CmdAssemble{ship-sloop}", (*cmds)[2])
+	if c, ok := (*cmds)[2].(sim.CmdAssemble); !ok || c.Ship != "ship-vastrek" {
+		t.Errorf("cmd = %#v, want CmdAssemble{ship-vastrek}", (*cmds)[2])
 	}
 }
 

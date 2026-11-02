@@ -25,7 +25,7 @@ import (
 // plates (JPEG allowed) decoded eagerly and held — see DockedArtwork.
 
 // sprites holds the loaded art keyed by convention path relative to the
-// asset root ("hulls/ship-sloop"). spritesTried records that the lazy root
+// asset root ("hulls/ship-vastrek"). spritesTried records that the lazy root
 // probe happened, so a missing assets/ dir is never re-scanned or logged.
 // Background plates are the exception: platePaths indexes their convention
 // key to the on-disk path without decoding them — a 2560² plate is ~26 MB
@@ -104,7 +104,7 @@ func addSprite(key string, img image.Image) {
 }
 
 // spriteFor returns the art sprite registered under key — a convention path
-// such as "hulls/ship-sloop" (i.e. assets/hulls/ship-sloop.png) — or nil
+// such as "hulls/ship-vastrek" (i.e. assets/hulls/ship-vastrek.png) — or nil
 // when no file exists. Nil is the fallback signal: every draw site then
 // takes the untouched procedural path.
 func spriteFor(key string) *ebiten.Image {
@@ -153,6 +153,16 @@ func ManufacturingHeader() *ebiten.Image { return spriteFor(artworkManufacturing
 // Contact portraits: assets/portraits/<contact-id> (png or jpg) — a 2:3 bust the
 // dock view draws beside the contact's offer rows and large in Details.
 const contactPortraitRoot = portraitsRoot
+
+// HullSprite returns the drop-in art of a hull (assets/hulls/<ship-id>.png),
+// or nil when none is dropped — the world draws its vector silhouette and the
+// HUD/fitting portrait falls back to the embedded raster (uikit/hulls).
+func HullSprite(id content.ShipID) *ebiten.Image {
+	if id == "" {
+		return nil
+	}
+	return spriteFor("hulls/" + string(id))
+}
 
 // ContactPortrait returns the drop-in portrait of a contact, or nil when
 // none is dropped — the caller then draws its fallback glyph (the same

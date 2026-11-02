@@ -140,6 +140,6 @@ names the *modules and seams* we build that vocabulary into.
 
 ## Vocabulary rules
 
-- Display names follow `docs/lore/NAMING.md`; ids (`sys-*`, `mod-*`, …) are frozen artifacts.
+- Display names follow `docs/lore/NAMING.md`; ids (`sys-*`, `mod-*`, …) are frozen artifacts (the one exception is an owner-ordered rename, which lands in `content.LegacyIDs` with its retired ids rejected by validation and remapped in old saves).
 - Money renders trailing-euro (`12,345.67 €`, `50¢`); zones are Charter space / the Fringe / Unincorporated.
 - New concepts get named here before they get built.

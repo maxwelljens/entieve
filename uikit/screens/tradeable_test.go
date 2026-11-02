@@ -23,7 +23,7 @@ func TestTradeableAcrossSurfaces(t *testing.T) {
 	fui := newQtyUI(t, env, f.Win())
 	pumpQty(t, fui, env, f.Sync, 1024, 700)
 
-	for _, id := range []content.ItemID{"mod-autocannon-s", "ship-sloop"} {
+	for _, id := range []content.ItemID{"mod-autocannon-s", "ship-vastrek"} {
 		tr := widgets.ResolveTradeable(env.Defs(), id)
 		if !tr.Found {
 			t.Fatalf("%s: not in content", id)

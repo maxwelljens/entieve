@@ -37,11 +37,11 @@ func TestViewTradeableName(t *testing.T) {
 	cv, c := newViewTest(t)
 	item, _ := c.Item("ore-cordite")
 	mod, _ := c.Module("mod-autocannon-s")
-	hull, _ := c.Ship("ship-sloop")
+	hull, _ := c.Ship("ship-vastrek")
 	for _, tc := range []struct{ id, want string }{
 		{"ore-cordite", item.Name},
 		{"mod-autocannon-s", mod.Name},
-		{"ship-sloop", hull.Name}, // the hull branch the old board helper missed
+		{"ship-vastrek", hull.Name}, // the hull branch the old board helper missed
 		{"not-a-thing", "not-a-thing"},
 	} {
 		if got := cv.TradeableName(content.ItemID(tc.id)); got != tc.want {

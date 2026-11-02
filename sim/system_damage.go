@@ -454,7 +454,7 @@ func (s *Sim) respawnPlayer() {
 	}
 
 	// Choose the hull: the canonical starter sloop, else the world start ship.
-	hullID := content.ShipID("ship-sloop")
+	hullID := content.ShipID("ship-vastrek")
 	hull, ok := s.Content.Ship(hullID)
 	if !ok {
 		if w, ok := s.Content.World(s.worldID); ok {

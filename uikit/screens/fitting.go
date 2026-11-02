@@ -11,7 +11,6 @@ import (
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit/hulls"
 	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
@@ -377,7 +376,7 @@ func (f *Fitting) newIdentity() *widget.Container {
 func (f *Fitting) paintPortrait(hull content.ShipID) {
 	f.portraitDraws++
 	f.portrait.Clear()
-	src := hulls.Get(hull, theme.Px(fitPortrait))
+	src := hullArt(hull, theme.Px(fitPortrait))
 	if src == nil {
 		return
 	}

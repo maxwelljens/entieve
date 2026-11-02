@@ -134,11 +134,11 @@ func TestAgentImputationFixpoint(t *testing.T) {
 
 	cands := []content.ItemID{
 		"ammo-emp-s", "min-ferrite", "min-nickel", "mod-autocannon-s",
-		"ore-sterngrit", "ship-sloop",
+		"ore-sterngrit", "ship-vastrek",
 	} // already sorted
 	a.Beliefs["ammo-emp-s"] = 100
 	a.Beliefs["mod-autocannon-s"] = 1000
-	a.Beliefs["ship-sloop"] = 350_000
+	a.Beliefs["ship-vastrek"] = 350_000
 
 	V := s.agentValues(a, cands)
 	if V["min-ferrite"] <= 0 {

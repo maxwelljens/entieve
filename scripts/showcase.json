@@ -248,7 +248,7 @@
   {
     "at_tick": 76680,
     "action": "buy",
-    "item": "ship-barge",
+    "item": "ship-husnek",
     "qty": 1
   },
   {
@@ -427,13 +427,13 @@
   {
     "at_tick": 107920,
     "action": "assemble",
-    "ship": "ship-barge",
+    "ship": "ship-husnek",
     "note": "hull swap: the barge is assembled out of the hangar and flown out of the sloop (ship-assembly); the sloop goes back in"
   },
   {
     "at_tick": 107980,
     "action": "assemble",
-    "ship": "ship-sloop",
+    "ship": "ship-vastrek",
     "note": "and back into the sloop: the barge swap is the demonstration, the sloop flies the Fringe"
   },
   {

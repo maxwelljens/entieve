@@ -103,7 +103,7 @@ func TestJumpRebuildsSystem(t *testing.T) {
 	}
 	// Player identity, ship and wallet survive the jump.
 	ship, _ := s.Ships.Get(s.player)
-	if ship.Hull != "ship-sloop" {
+	if ship.Hull != "ship-vastrek" {
 		t.Fatal("player ship lost on jump")
 	}
 	if s.Wallet() != 100000 {

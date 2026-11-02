@@ -26,7 +26,7 @@ func TestInfoPageMakerShipped(t *testing.T) {
 		sub       string
 		makerName string
 	}{
-		{"hull", widgets.ShipRef("ship-sloop"), "Frigate · Bůral", "Bůral"},
+		{"hull", widgets.ShipRef("ship-vastrek"), "Frigate · Bůral", "Bůral"},
 		{"module", widgets.ModuleRef("mod-autocannon-s"), "Weapon · Noldvar Guard", "Noldvar Guard"},
 		{"charge", widgets.ItemRef("ammo-emp-s"), "Ammo · Bríždan Factory", "Bríždan Factory"},
 		{"charge-cap-cell", widgets.ItemRef("charge-cap-cell"), "Charge · Iškoven", "Iškoven"},
@@ -59,7 +59,7 @@ func TestInfoPageMakerShipped(t *testing.T) {
 // and no emblem.
 func TestInfoPageMakerRatHullUnchanged(t *testing.T) {
 	env, _ := newChromeEnv(t)
-	page, ok := infoPageFor(env, widgets.ShipRef("ship-rat-scuttler"))
+	page, ok := infoPageFor(env, widgets.ShipRef("ship-scuttler"))
 	if !ok {
 		t.Fatal("rat hull did not resolve")
 	}
@@ -105,8 +105,8 @@ func TestInfoWindowEmblemRenders(t *testing.T) {
 	ui := newWindowUI(t, env, w.Win())
 	uitest.PumpWindow(t, ui, w.Sync, 1024, 700)
 
-	if !w.Show(widgets.ShipRef("ship-sloop")) {
-		t.Fatal("ship-sloop did not resolve")
+	if !w.Show(widgets.ShipRef("ship-vastrek")) {
+		t.Fatal("ship-vastrek did not resolve")
 	}
 	g := w.Emblem()
 	if g == nil {
@@ -116,7 +116,7 @@ func TestInfoWindowEmblemRenders(t *testing.T) {
 		t.Errorf("emblem image = %v, want a block of at least 32 px", img)
 	}
 
-	if !w.Show(widgets.ShipRef("ship-rat-marauder")) {
+	if !w.Show(widgets.ShipRef("ship-marauder")) {
 		t.Fatal("rat hull did not resolve")
 	}
 	if w.Emblem() != nil {
@@ -150,14 +150,14 @@ func TestEveryCorpEmblemShows(t *testing.T) {
 
 	// One shipped manufactured def per corp.
 	refs := map[string]widgets.InfoRef{
-		"corp-borealis":  widgets.ShipRef("ship-sloop"),
+		"corp-borealis":  widgets.ShipRef("ship-vastrek"),
 		"corp-nordvakt":  widgets.ModuleRef("mod-rocket-pod"),
 		"corp-iskald":    widgets.ModuleRef("mod-cap-recharger"),
-		"corp-ferrum":    widgets.ShipRef("ship-hauler"),
-		"corp-druzstvo":  widgets.ShipRef("ship-barge"),
+		"corp-ferrum":    widgets.ShipRef("ship-furdzan"),
+		"corp-druzstvo":  widgets.ShipRef("ship-husnek"),
 		"corp-burza":     widgets.ItemRef("ammo-plutonium-s"),
 		"corp-celeritas": widgets.ModuleRef("mod-afterburner"),
-		"corp-praetor":   widgets.ShipRef("ship-npc-patrol"),
+		"corp-praetor":   widgets.ShipRef("ship-kustor"),
 		"corp-aldemar":   widgets.ModuleRef("mod-armor-rep"),
 		"corp-vantera":   widgets.ModuleRef("mod-shield-extender"),
 	}

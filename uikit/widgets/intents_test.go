@@ -32,7 +32,7 @@ func TestCommandForMapsEveryCommandIntent(t *testing.T) {
 		{"fit", Fit{Module: "mod-autocannon-s", Slot: slot},
 			sim.CmdFitModule{Item: "mod-autocannon-s", Slot: slot}},
 		{"unequip", Unequip{Slot: slot}, sim.CmdUnfitModule{Slot: slot}},
-		{"assemble", Assemble{Ship: "ship-sloop"}, sim.CmdAssemble{Ship: "ship-sloop"}},
+		{"assemble", Assemble{Ship: "ship-vastrek"}, sim.CmdAssemble{Ship: "ship-vastrek"}},
 		{"start job", StartJob{Recipe: "rec-ammo-emp-s", Runs: 2},
 			sim.CmdStartJob{Recipe: "rec-ammo-emp-s", Runs: 2}},
 		{"collect job", CollectJob{Job: 9}, sim.CmdCollectJob{ID: 9}},

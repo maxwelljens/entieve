@@ -90,7 +90,7 @@ func TestShieldRechargeTimeIsTo98Percent(t *testing.T) {
 // capacity rises, recharge TIME is unchanged, so HP/s rises.
 func TestShieldExtenderKeepsTauRaisesRegen(t *testing.T) {
 	s := newTestSim(t)
-	s.Content.Ships["ship-sloop"].ShieldRecharge = 100
+	s.Content.Ships["ship-vastrek"].ShieldRecharge = 100
 	s.recomputeFit(s.player)
 	sh, _ := s.Ships.Get(s.player)
 	if sh.ShieldTau != 100 {
@@ -151,7 +151,7 @@ func TestShieldAndBoosterStack(t *testing.T) {
 // carried across snapshot/restore, and re-derived for a pre-field save.
 func TestShieldRechargeSurvivesSaveRoundTrip(t *testing.T) {
 	c := testContent()
-	c.Ships["ship-sloop"].ShieldRecharge = 120
+	c.Ships["ship-vastrek"].ShieldRecharge = 120
 	s, err := New(c, testWorld(), testSeed)
 	if err != nil {
 		t.Fatalf("New: %v", err)

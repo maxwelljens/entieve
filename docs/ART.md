@@ -10,7 +10,7 @@ stock game.
 
 ```sh
 mkdir -p assets/hulls
-cp my-sloop.png assets/hulls/ship-sloop.png   # file name = the content ID
+cp my-sloop.png assets/hulls/ship-vastrek.png   # file name = the content ID
 go run ./cmd/entieve run                      # the sloop now draws your PNG
 ```
 
@@ -22,7 +22,7 @@ it decorates. IDs are the same kebab-case strings the content JSON uses
 
 | Directory | ID source | Example filename | Rotation |
 |---|---|---|---|
-| `assets/hulls/` | hull ID = ship content ID (`content/data/ships/*.json`) | `ship-sloop.png`, `ship-rat-marauder.png` | rotated to heading |
+| `assets/hulls/` | hull ID = ship content ID (`content/data/ships/*.json`) | `ship-vastrek.png`, `ship-marauder.png` | rotated to heading in the world; unrotated as the HUD/fitting portrait |
 | `assets/stations/` | celestial ID (`CelestialDef.id` in `content/data/systems/*.json`): stations, gates, belts, other structures | `cel-haven-rest.png`, `cel-gate-penumbra.png` | unrotated |
 | `assets/asteroids/` | ore ID the belt's asteroids carry (`items/ores.json`) | `ore-cordite.png` | unrotated |
 | `assets/backgrounds/` | system ID (`sys-*.json`) or `default` | `default.png` | unrotated |
@@ -238,10 +238,17 @@ window title.
 
 ## Hull portraits
 
-The HUD and Show Info carry a top-down portrait of the selected hull beside
-its name: the fleet's nine hulls, drawn to be told apart by silhouette at
-72 px.
+The HUD's ship-status panel and the fitting window's identity block carry a
+top-down portrait of the hull beside its name: the fleet's nine built-in
+rasters, drawn to be told apart by silhouette at 72 px.
 
+- **Drop-in wins**: a PNG at `assets/hulls/<ship-id>.png` is that hull's
+  portrait on both surfaces (and its world sprite), through the same
+  convention root as every other drop-in; the embedded raster below is the
+  fallback. `render.HullSprite` answers the file, `uikit/screens.hullArt`
+  prefers it over `hulls.Get`, so an empty `assets/` draws exactly the stock
+  art. A dropped portrait fills the square box (aspect preserved, centred),
+  so author it landscape or square.
 - **Where**: `uikit/hulls/svg/<hull-id>.svg` (sources) → `uikit/hulls/<hull-id>-120.png`
   and `-240.png` (committed rasters) + `manifest.json` (hashes). The package
   embeds all three via `//go:embed`; any hull id in `content/data/ships`

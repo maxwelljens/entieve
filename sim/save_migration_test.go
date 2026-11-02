@@ -36,6 +36,25 @@ func legacyOfModule(id content.ModuleID) content.ModuleID {
 	return id
 }
 
+func legacyOfRecipe(id content.RecipeID) content.RecipeID {
+	for old, cur := range content.LegacyIDs.Recipes {
+		if cur == id {
+			return old
+		}
+	}
+	return id
+}
+
+// legacyOfShip maps a current hull id back to the id the hull rename retired.
+func legacyOfShip(id content.ShipID) content.ShipID {
+	for old, cur := range content.LegacyIDs.Ships {
+		if cur == id {
+			return old
+		}
+	}
+	return id
+}
+
 // TestMigrateLegacyIDsEveryField is the field-level pin: every place a Save
 // carries a content id is remapped, and a second pass changes nothing (so a
 // restore is idempotent like the rest of the load path).
@@ -47,13 +66,17 @@ func TestMigrateLegacyIDsEveryField(t *testing.T) {
 		Hangar: Hangar{
 			Items: []content.CargoStack{old("ammo-emp-s")},
 			Ships: []StoredShip{{
-				Hull:  "ship-sloop",
+				Hull:  legacyOfShip("ship-vastrek"),
 				Fit:   []content.ModuleID{legacyOfModule("mod-autocannon-s")},
 				Cargo: []content.CargoStack{old("ammo-ap-s")},
 			}},
 		},
 		Market: map[content.SystemID][]MarketStock{
-			"sys-a": {{Station: "cel-station-a", Item: legacyOfItem("ammo-emp-s"), Qty: 1, Price: 5, Side: OrderSell, ID: 1}},
+			"sys-a": {
+				{Station: "cel-station-a", Item: legacyOfItem("ammo-emp-s"), Qty: 1, Price: 5, Side: OrderSell, ID: 1},
+				// A hull is stock too: the item id is the ship id.
+				{Station: "cel-station-a", Item: content.ItemID(legacyOfShip("ship-zdanek")), Qty: 1, Price: 900, Side: OrderSell, ID: 2},
+			},
 		},
 		MarketLasts: []SavedLastTrade{{System: "sys-a", Station: "cel-station-a", Item: legacyOfItem("ammo-ap-s"), Price: 4}},
 		Entities: []SavedEntity{{
@@ -75,14 +98,17 @@ func TestMigrateLegacyIDsEveryField(t *testing.T) {
 		// Belt state carries its own ore per rock.
 		Belts: []BeltState{{System: "sys-a", Cel: "cel-belt-a",
 			Rocks: []BeltRock{{Ore: legacyOfItem("ammo-ap-s")}}}},
-		Jobs: []Job{{ID: 1, Station: "cel-station-a", Recipe: "rec-charge-emp", Runs: 1}},
+		Jobs: []Job{
+			{ID: 1, Station: "cel-station-a", Recipe: legacyOfRecipe("rec-ammo-emp-s"), Runs: 1},
+			{ID: 2, Station: "cel-station-a", Recipe: legacyOfRecipe("rec-ship-kustor"), Runs: 1},
+		},
 		Agents: []SavedAgent{{
 			ID:        "agent-1",
 			Inventory: []content.CargoStack{old("ammo-fusion-s")},
 			Beliefs:   []SavedAgentVal{{Item: legacyOfItem("ammo-emp-s"), Val: 5}},
 			Wishes:    []HaulWish{{Owner: "agent-1", Item: legacyOfItem("ammo-ap-s")}},
 		}},
-		TrafficJourneys: []TrafficJourney{{Item: legacyOfItem("ammo-fusion-s"), Hull: "ship-sloop"}},
+		TrafficJourneys: []TrafficJourney{{Item: legacyOfItem("ammo-fusion-s"), Hull: legacyOfShip("ship-vastrek")}},
 	}
 	migrateLegacyIDs(save)
 
@@ -91,6 +117,12 @@ func TestMigrateLegacyIDsEveryField(t *testing.T) {
 	}
 	if save.Hangar.Ships[0].Fit[0] != "mod-autocannon-s" || save.Hangar.Ships[0].Cargo[0].Item != "ammo-ap-s" {
 		t.Errorf("stored ship = %+v, want the shell-era fit and cargo", save.Hangar.Ships[0])
+	}
+	if save.Hangar.Ships[0].Hull != "ship-vastrek" {
+		t.Errorf("stored hull = %s, want ship-vastrek (the hull rename's item space)", save.Hangar.Ships[0].Hull)
+	}
+	if save.Market["sys-a"][1].Item != "ship-zdanek" {
+		t.Errorf("hull stock item = %s, want ship-zdanek", save.Market["sys-a"][1].Item)
 	}
 	if save.Market["sys-a"][0].Item != "ammo-emp-s" {
 		t.Errorf("market order item = %s, want ammo-emp-s", save.Market["sys-a"][0].Item)
@@ -118,8 +150,8 @@ func TestMigrateLegacyIDsEveryField(t *testing.T) {
 	if se.Traffic.Item != "ammo-fusion-s" {
 		t.Errorf("convoy shipment = %s, want ammo-fusion-s", se.Traffic.Item)
 	}
-	if save.Jobs[0].Recipe != "rec-ammo-emp-s" {
-		t.Errorf("job recipe = %s, want rec-ammo-emp-s", save.Jobs[0].Recipe)
+	if save.Jobs[0].Recipe != "rec-ammo-emp-s" || save.Jobs[1].Recipe != "rec-ship-kustor" {
+		t.Errorf("job recipes = %s/%s, want rec-ammo-emp-s/rec-ship-kustor", save.Jobs[0].Recipe, save.Jobs[1].Recipe)
 	}
 	a := save.Agents[0]
 	if a.Inventory[0].Item != "ammo-fusion-s" || a.Beliefs[0].Item != "ammo-emp-s" || a.Wishes[0].Item != "ammo-ap-s" {
@@ -128,16 +160,16 @@ func TestMigrateLegacyIDsEveryField(t *testing.T) {
 	if save.TrafficJourneys[0].Item != "ammo-fusion-s" {
 		t.Errorf("journey item = %s, want ammo-fusion-s", save.TrafficJourneys[0].Item)
 	}
-	// No hull has been renamed, so a ship id passes through verbatim — the
-	// walk covers ShipID regardless (TestWalkContentIDsCoversEveryField).
-	if save.TrafficJourneys[0].Hull != "ship-sloop" {
-		t.Errorf("journey hull = %s, want ship-sloop (no ship id is retired)", save.TrafficJourneys[0].Hull)
+	// The hull rename: a ShipID field remaps exactly like an item id.
+	if save.TrafficJourneys[0].Hull != "ship-vastrek" {
+		t.Errorf("journey hull = %s, want ship-vastrek", save.TrafficJourneys[0].Hull)
 	}
 
 	// Idempotent: the mapping is one-way and current ids are not keys.
 	again := *save
 	migrateLegacyIDs(&again)
-	if again.Hangar.Items[0].Item != "ammo-emp-s" || again.Entities[0].Fitting.High[0] != "mod-artillery-s" {
+	if again.Hangar.Items[0].Item != "ammo-emp-s" || again.Entities[0].Fitting.High[0] != "mod-artillery-s" ||
+		again.Hangar.Ships[0].Hull != "ship-vastrek" {
 		t.Error("second migration pass changed state")
 	}
 }
@@ -162,6 +194,9 @@ func TestRestoreMigratesLegacySave(t *testing.T) {
 	// preferred shells and the hangar stack.
 	for i := range save.Entities {
 		se := &save.Entities[i]
+		if se.Ship != nil {
+			se.Ship.Hull = legacyOfShip(se.Ship.Hull)
+		}
 		if se.Fitting != nil {
 			for j := range se.Fitting.High {
 				se.Fitting.High[j] = legacyOfModule(se.Fitting.High[j])
@@ -342,7 +377,7 @@ func TestRestoreMigratesOreAndHullIDs(t *testing.T) {
 		t.Fatal("fixture: no belt state")
 	}
 	save.Belts[0].Rocks[0].Ore = legacyOre
-	save.TrafficJourneys = []TrafficJourney{{System: save.System, Item: legacyOre, Qty: 1, Hull: "ship-sloop"}}
+	save.TrafficJourneys = []TrafficJourney{{System: save.System, Item: legacyOre, Qty: 1, Hull: "ship-vastrek"}}
 
 	restored := newTestSim(t)
 	if err := restored.Restore(save); err != nil {
@@ -369,7 +404,7 @@ func TestRestoreMigratesOreAndHullIDs(t *testing.T) {
 	if ore := got.Belts[0].Rocks[0].Ore; ore != "ammo-emp-s" {
 		t.Errorf("belt rock ore = %s, want ammo-emp-s", ore)
 	}
-	if j := got.TrafficJourneys[0]; j.Item != "ammo-emp-s" || j.Hull != "ship-sloop" {
+	if j := got.TrafficJourneys[0]; j.Item != "ammo-emp-s" || j.Hull != "ship-vastrek" {
 		t.Errorf("journey = %+v, want the migrated item and the hull verbatim", j)
 	}
 }

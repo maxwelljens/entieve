@@ -74,7 +74,7 @@ too, if you let them. Combat anomalies hide the boss rats and the best loot.
 ## Yours to change
 
 Drop a PNG named after a content ID into `assets/` and the game draws it
-instead of the built-in art: `assets/hulls/ship-sloop.png`,
+instead of the built-in art: `assets/hulls/ship-vastrek.png`,
 `assets/stations/cel-haven-rest.png`. Any size works, missing files fall
 back to the procedural art, and an empty `assets/` plays exactly like the
 stock game. Sizing and fallback rules: [docs/ART.md](docs/ART.md).

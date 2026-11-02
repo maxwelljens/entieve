@@ -11,17 +11,17 @@ import (
 // deliberate edit here — never a silent re-sort of the tree.
 var marketGroups = map[string]string{
 	// Ships
-	"ship-barge":        "Ships/Barges",
-	"ship-cutlass":      "Ships/Destroyers",
-	"ship-hauler":       "Ships/Industrials",
-	"ship-npc-fleet":    "Ships/Destroyers",
-	"ship-npc-hauler":   "Ships/Industrials",
-	"ship-npc-miner":    "Ships/Industrials",
-	"ship-npc-patrol":   "Ships/Frigates",
-	"ship-rat-hierarch": "Ships/Rat hulls",
-	"ship-rat-marauder": "Ships/Rat hulls",
-	"ship-rat-scuttler": "Ships/Rat hulls",
-	"ship-sloop":        "Ships/Frigates",
+	"ship-husnek":   "Ships/Barges",
+	"ship-zdanek":   "Ships/Destroyers",
+	"ship-furdzan":  "Ships/Industrials",
+	"ship-clastor":  "Ships/Destroyers",
+	"ship-tobrek":   "Ships/Industrials",
+	"ship-kutrek":   "Ships/Industrials",
+	"ship-kustor":   "Ships/Frigates",
+	"ship-hierarch": "Ships/Rat hulls",
+	"ship-marauder": "Ships/Rat hulls",
+	"ship-scuttler": "Ships/Rat hulls",
+	"ship-vastrek":  "Ships/Frigates",
 	// Modules
 	"mod-afterburner":     "Modules/Mid/Propulsion",
 	"mod-armor-plate":     "Modules/Low/Armor",

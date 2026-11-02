@@ -73,7 +73,7 @@ func TestShippedMakersComplete(t *testing.T) {
 	for _, id := range keys(c.Ships) {
 		s := c.Ships[id]
 		ctx := "ships/" + string(id)
-		if strings.HasPrefix(string(id), "ship-rat-") {
+		if s.Class == "rat" {
 			if s.Maker != "" {
 				t.Errorf("%s: rat hull carries maker %q (the Old Works are unattributed)", ctx, s.Maker)
 			}

@@ -8,7 +8,7 @@
       "X": -1054908828540,
       "Y": 767292784393
     },
-    "ship": "ship-sloop",
+    "ship": "ship-vastrek",
     "fit": [
       "mod-autocannon-s",
       "mod-mining-laser",
@@ -207,7 +207,7 @@
     {
       "name": "Ore hold vs cargo",
       "feature": "ore-hold",
-      "detail": "On the Vaštrek (ore_hold 0) mined ore lands in cargo (400 m³); on ship-barge the same ore fills the dedicated 16,500 m³ ore hold instead - compare the Inventory window's two tabs."
+      "detail": "On the Vaštrek (ore_hold 0) mined ore lands in cargo (400 m³); on ship-husnek the same ore fills the dedicated 16,500 m³ ore hold instead - compare the Inventory window's two tabs."
     },
     {
       "name": "Cargo transfer",
@@ -237,7 +237,7 @@
     {
       "name": "Market buy",
       "feature": "market-buy",
-      "detail": "CmdBuy for a hull order (ship-sloop, cast to ItemID) or a module order (mod-artillery-s): EvtMarket fires, wallet decreases by price x qty, the item appears in station inventory."
+      "detail": "CmdBuy for a hull order (ship-vastrek, cast to ItemID) or a module order (mod-artillery-s): EvtMarket fires, wallet decreases by price x qty, the item appears in station inventory."
     },
     {
       "name": "Market sell",
@@ -252,7 +252,7 @@
     {
       "name": "Ship assembly",
       "feature": "ship-assembly",
-      "detail": "Buy the ship-hauler hull order at the market, CmdAssemble(ship-hauler): the hull is assembled into your hangar and can be swapped into."
+      "detail": "Buy the ship-furdzan hull order at the market, CmdAssemble(ship-furdzan): the hull is assembled into your hangar and can be swapped into."
     },
     {
       "name": "Module fitting",

@@ -73,8 +73,8 @@ func TestMarketSellsWhatThePilotCannotFit(t *testing.T) {
 // hull gated above the player's class level cannot leave the station.
 func TestUndockRefusedBelowHullGate(t *testing.T) {
 	c := testContent()
-	c.Ships["ship-sloop"].Family = "frigate"
-	c.Ships["ship-sloop"].Gate = 1
+	c.Ships["ship-vastrek"].Family = "frigate"
+	c.Ships["ship-vastrek"].Gate = 1
 	s, err := New(c, testWorld(), testSeed)
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func TestMiningPracticeScalesWithOreRarity(t *testing.T) {
 		c := testContent()
 		c.Items["ore-sterngrit"].Rarity = rarity
 		c.Modules["mod-mining-laser"].Family = "mining"
-		c.Ships["ship-sloop"].Family = "frigate"
+		c.Ships["ship-vastrek"].Family = "frigate"
 		s, err := New(c, testWorld(), testSeed)
 		if err != nil {
 			t.Fatal(err)
@@ -395,7 +395,7 @@ func TestFitRefusedByMissingPrerequisite(t *testing.T) {
 // destroyer-family hull needs Frigate II even at its own gate 0.
 func TestUndockRefusedByMissingPrerequisite(t *testing.T) {
 	c := testContent()
-	c.Ships["ship-sloop"].Family = "destroyer"
+	c.Ships["ship-vastrek"].Family = "destroyer"
 	s, err := New(c, testWorld(), testSeed)
 	if err != nil {
 		t.Fatal(err)
@@ -452,7 +452,7 @@ func TestCombatPracticeScalesWithDamage(t *testing.T) {
 	hit := func(dmg float64) (weapon, hull float64) {
 		c := testContent()
 		c.Modules["mod-autocannon-s"].Family = "autocannon"
-		c.Ships["ship-sloop"].Family = "frigate"
+		c.Ships["ship-vastrek"].Family = "frigate"
 		s, err := New(c, testWorld(), testSeed)
 		if err != nil {
 			t.Fatal(err)
@@ -482,7 +482,7 @@ func TestCombatPracticeScalesWithDamage(t *testing.T) {
 // visible but a single warp cannot flood the hull ladder.
 func TestFlightHopPractice(t *testing.T) {
 	s := newTestSim(t)
-	s.Content.Ships["ship-sloop"].Family = "frigate"
+	s.Content.Ships["ship-vastrek"].Family = "frigate"
 	s.awardFlightHop(s.player, 25*format.AU)
 	if got := s.proficiencyXP("frigate"); math.Abs(got-0.25) > 1e-9 {
 		t.Fatalf("25 AU paid %v flight practice, want 0.25", got)
@@ -537,7 +537,7 @@ func TestProficiencyStopsAtMax(t *testing.T) {
 func TestSupportCyclePractice(t *testing.T) {
 	run := func(setup func(c *content.Content)) (xp, hull float64) {
 		c := testContent()
-		c.Ships["ship-sloop"].Family = "frigate"
+		c.Ships["ship-vastrek"].Family = "frigate"
 		setup(c)
 		s, err := New(c, testWorld(), testSeed)
 		if err != nil {
@@ -553,7 +553,7 @@ func TestSupportCyclePractice(t *testing.T) {
 	}
 
 	armor := testContent()
-	armor.Ships["ship-sloop"].Family = "frigate"
+	armor.Ships["ship-vastrek"].Family = "frigate"
 	armor.Modules["mod-armor-rep"].Family = "armor"
 	sa, err := New(armor, testWorld(), testSeed)
 	if err != nil {
@@ -566,7 +566,7 @@ func TestSupportCyclePractice(t *testing.T) {
 	}
 
 	prop := testContent()
-	prop.Ships["ship-sloop"].Family = "frigate"
+	prop.Ships["ship-vastrek"].Family = "frigate"
 	prop.Modules["mod-afterburner"].Family = "propulsion"
 	sp, err := New(prop, testWorld(), testSeed)
 	if err != nil {
@@ -579,7 +579,7 @@ func TestSupportCyclePractice(t *testing.T) {
 	}
 
 	capb := testContent()
-	capb.Ships["ship-sloop"].Family = "frigate"
+	capb.Ships["ship-vastrek"].Family = "frigate"
 	capb.Modules["mod-cap-booster"].Family = "capacitor"
 	sc, err := New(capb, testWorld(), testSeed)
 	if err != nil {
@@ -595,7 +595,7 @@ func TestSupportCyclePractice(t *testing.T) {
 	// A fitted cap recharger turns any capacitor spend into capacitor
 	// practice, even without a booster cycle.
 	rech := testContent()
-	rech.Ships["ship-sloop"].Family = "frigate"
+	rech.Ships["ship-vastrek"].Family = "frigate"
 	rech.Modules["mod-cap-recharger"].Family = "capacitor"
 	rech.Modules["mod-shield-boost"].Family = "shield"
 	sr, err := New(rech, testWorld(), testSeed)
@@ -612,7 +612,7 @@ func TestSupportCyclePractice(t *testing.T) {
 	// Ewar: the cycle award is the same switch; exercise it directly since a
 	// web needs a live locked target.
 	ew := testContent()
-	ew.Ships["ship-sloop"].Family = "frigate"
+	ew.Ships["ship-vastrek"].Family = "frigate"
 	ew.Modules["mod-stasis-web"].Family = "ewar"
 	se, err := New(ew, testWorld(), testSeed)
 	if err != nil {

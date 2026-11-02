@@ -38,7 +38,7 @@
       "station": {
         "services": ["market", "repair"],
         "market": [
-          { "item": "ship-npc-patrol", "qty": 8, "price": 400000 },
+          { "item": "ship-kustor", "qty": 8, "price": 400000 },
           { "item": "mod-artillery-s", "qty": 12, "price": 320000 },
           { "item": "mod-autocannon-m", "qty": 12, "price": 275000 },
           { "item": "mod-shield-boost", "qty": 8, "price": 230000 },

@@ -422,9 +422,9 @@ func TestPlayerSellEscrowAndCancel(t *testing.T) {
 		t.Fatalf("cargo = %d, want 0 (returned goods go to the hangar)", cargoCount(s, "min-nickel"))
 	}
 	// Fitted hulls cannot ride in an order (their fit would be lost).
-	s.Hangar.Ships = append(s.Hangar.Ships, StoredShip{Hull: "ship-sloop",
+	s.Hangar.Ships = append(s.Hangar.Ships, StoredShip{Hull: "ship-vastrek",
 		Fit: []content.ModuleID{"mod-autocannon-s"}})
-	if _, ok := s.PlaceOrder(station, OrderSell, "ship-sloop", 1, 1000, OwnerPlayer); ok {
+	if _, ok := s.PlaceOrder(station, OrderSell, "ship-vastrek", 1, 1000, OwnerPlayer); ok {
 		t.Fatal("a hull was accepted into a sell order (fit would be lost)")
 	}
 	if len(s.Hangar.Ships) != 1 {

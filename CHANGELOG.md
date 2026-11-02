@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Hull portraits**: eight owner-supplied portrait PNGs at
+  `assets/hulls/<hull-id>.png` (one per hull art id) are drawn where hull art
+  appears: the HUD status panel and the fitting window's identity block, and
+  as the hull's world sprite. Drop-in art wins over the embedded
+  `uikit/hulls` raster, which stays the fallback, so an empty `assets/`
+  renders exactly the stock art (two of the eight had no built-in portrait
+  and were blank before). The same move takes ~3.6 MiB of dead bytes out of
+  the `assets/icons` embed, which swallowed them by directory.
+
 - **Proficiency**: practice with a fitted family (damage landed, mining
   cycles, support cycles, deliveries, warps) builds a persisted counter;
   levels gate advanced modules and hulls through own-level plus authored
@@ -117,6 +126,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Hull ids are display-name slugs**: the machinery prefixes the name
+  already said are gone (`ship-rat-hierarch` → `ship-hierarch`,
+  `ship-npc-miner` → `ship-kutrek`, `ship-npc-patrol` → `ship-kustor`,
+  `ship-sloop` → `ship-vastrek`, `ship-cutlass` → `ship-zdanek`,
+  `ship-hauler` → `ship-furdzan`, `ship-barge` → `ship-husnek`, and the
+  remaining two rat/npc hulls likewise), with their production runs
+  (`rec-ship-*`). Owner-ordered: ids are otherwise frozen. The retired ids
+  live in `content.LegacyIDs` / `content.RetiredIDs`, so validation rejects
+  them in shipped content and an old save remaps its hulls on restore; a
+  ship's save hash moves once, legitimately, because the id is state.
 - **Log and ledger lines read `Label: detail`**: the sim's player-facing
   lines (market, ledger, war, industry, contracts, requisitions) drop the
   em dash for a colon, comma, semicolon or period chosen by meaning:
@@ -348,7 +367,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   war's scoreboard, with the starmap's **Charter-held / Works-held / Front**
   words authored for the UI wave.
 
-- **Commissioned fleet cutters** (`npc-fleet-cutter`, `ship-npc-fleet`): the
+- **Commissioned fleet cutters** (`npc-fleet-cutter`, `ship-clastor`): the
   **Clastor** (a Preštor-built destroyer, three medium mounts and a web, no
   mining gear) flies for the Corporate Fleets over contested systems. It
   lands on the Works hull it came for and fights it through the ordinary
@@ -479,7 +498,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Civilian belt miners** (`npc-miner-barge`, `ship-npc-miner`, sim): the
+- **Civilian belt miners** (`npc-miner-barge`, `ship-kutrek`, sim): the
   belts are worked. A Dvužek cooperative barge (the `Kutřek` hull, one
   mining laser, no guns) cuts the nearest rock with volume left, moves on
   when it depletes, and when its ore hold fills it warps to the nearest

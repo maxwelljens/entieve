@@ -180,7 +180,7 @@ func TestRunCommandMapping(t *testing.T) {
 		{AtTick: 0, Action: "sell", Item: "min-ferrite", Qty: 5},
 		{AtTick: 0, Action: "refine", Item: "ore-sterngrit", Qty: 10},
 		{AtTick: 0, Action: "repair"},
-		{AtTick: 0, Action: "assemble", Ship: "ship-barge"},
+		{AtTick: 0, Action: "assemble", Ship: "ship-husnek"},
 		{AtTick: 0, Action: "fit", Item: "mod-mining-laser", Slot: "high0"},
 		{AtTick: 0, Action: "unfit", Slot: "low1"},
 		{AtTick: 0, Action: "manual", DirX: 1, DirY: 0, Speed: 0.5},

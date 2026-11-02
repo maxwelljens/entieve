@@ -18,7 +18,9 @@ hull `origin` tags are copied from NAMING.md's registry, and NPC
 `description` prose MUST read in AESTHETIC's voice: see
 [Lore fields](#lore-fields-hull-origin-maker-and-npc-description) below. Ids are
 frozen implementation slugs and stay as they are even when the slug embeds
-a retired name.
+a retired name — the one exception is an owner-ordered rename, which lands
+in `content.LegacyIDs` and `RetiredIDs` in the same change (as the hull
+ids did: see [Hull ids](#hull-ids-are-display-name-slugs)).
 
 ## Where things live
 
@@ -59,7 +61,7 @@ All IDs are kebab-case strings, cross-referenced everywhere:
 | Item        | `min-`, `ore-`, `ammo-`, `charge-`, `loot-` | `min-ferrite` | global (all items share one map) |
 | Round (ammo) | `ammo-` (artillery: `ammo-art-`) | `ammo-emp-s`, `ammo-art-emp-s` | global; `ammo_class` = round family (`small-autocannon` … `large-artillery`): a calibre AND a gun family. Every round of a family shares one volume |
 | Corporation | `corp-`     | `corp-ferrum`        | global (the ten-firm maker roster, `content.AllCorps`; a registered extension of the frozen id list) |
-| Ship        | `ship-`     | `ship-sloop`         | global                 |
+| Ship        | `ship-`     | `ship-vastrek`         | global (the display name's slug: [Hull ids](#hull-ids-are-display-name-slugs)) |
 | Module      | `mod-`      | `mod-autocannon-s`   | global (weapon families: autocannon, artillery, three calibres each) |
 | NPC (rat)   | `npc-rat-`  | `npc-rat-scuttler`   | global                 |
 | NPC (guard) | `npc-guard-` | `npc-guard-patrol`  | global (non-rat NPC loadouts: zero bounty, no loot; traffic patrols) |
@@ -68,11 +70,29 @@ All IDs are kebab-case strings, cross-referenced everywhere:
 | Contact     | `contact-`  | `contact-jalvrek-charter` | global (a registered extension of the frozen id list) |
 | Offer       | `offer-`    | `offer-jalvrek-kerngrit`  | global (a contact's offer template; also the engine's flattened def) |
 | Traffic     | *(no id)*   | keyed by `system`    | one def per system (`traffic/*.json`) |
-| Recipe      | `rec-`      | `rec-ship-sloop`     | global (frozen once shipped) |
+| Recipe      | `rec-`      | `rec-ship-vastrek`     | global (frozen once shipped) |
 | World       | `world-`    | `world-showcase`     | global                 |
 
 Never invent new IDs for things listed in `docs/ARCHITECTURE.md`'s registry;
 extend around them.
+
+### Hull ids are display-name slugs
+
+A hull id is the slug of its `name`; machinery prefixes that only repeat what
+the name already says are dropped. The Hierarch is `ship-hierarch`, Kutřek's
+cooperative barge `ship-kutrek`, the Charter Authority cutter `ship-kustor` —
+not `ship-rat-hierarch`, `ship-npc-miner`, `ship-npc-patrol`. Nothing keys on
+a ship-id prefix (`class` and `family` carry the taxonomy), so the rule is
+engine-free; the owner-ordered rename that introduced it is registered in
+`content.LegacyIDs.Ships` (hull ids double as item ids, so restore applies the
+same table in both spaces) with its production runs in
+`content.LegacyIDs.Recipes`. Validation rejects every retired id in shipped
+content (`content.RetiredIDs`), and a save written before the rename restores
+by remap (`sim/save.go`).
+
+NPC ids are exempt: `npc-rat-`, `npc-guard-` and `npc-miner-` are the family
+markers the engine classifies on (`NpcDef.IsGuard`, `NpcDef.IsMiner`,
+`ratNpcPrefix`), so the prefix is not machinery repeating the display name.
 
 ## File format
 
@@ -127,8 +147,8 @@ string on one line each, next to `name`:
 
 **`origin`** is the hull's heritage tag from AESTHETIC's naming layers and
 trait matrix: exactly one origin per hull, and the Old Works machine hulls
-(`ship-rat-*`) are always `old-works` (their castes predate the heritage
-tags). Register the hull's row in `docs/lore/NAMING.md` first and copy its
+(rat-class, `"class": "rat"`) are always `old-works` (their castes predate
+the heritage tags). Register the hull's row in `docs/lore/NAMING.md` first and copy its
 `origin` value. The schema accepts an omitted origin so fixtures and test
 worlds stay small, but the validator rejects any tag outside the vocabulary
 (`content/validate.go`) and `TestShippedHullsCarryOrigin` requires every
@@ -136,8 +156,8 @@ shipped hull to carry one.
 
 **`maker`** is the manufacturer: the corporation that builds the def (the
 "Corporation" concept of `CONTEXT.md`). It is required on every manufactured
-product: ships, modules and ammo/charge items. Rat hulls (`ship-rat-*`),
-ores, minerals and loot stay **unattributed** (no `maker`). The value must
+product: ships, modules and ammo/charge items. Rat-class hulls (`"class":
+"rat"`), ores, minerals and loot stay **unattributed** (no `maker`). The value must
 be one of the ten registered slugs; the validator rejects anything else
 (`content/validate.go`) and `content/maker_test.go` enforces completeness.
 Show Info renders the maker's display name with its emblem
@@ -168,7 +188,7 @@ offer prose/description rule).
 this order:
 
 1. an **ItemID** (`min-ferrite`, `ammo-emp-s`, ...),
-2. else a **ShipID cast to ItemID** (`ship-sloop`): ships are listed on the
+2. else a **ShipID cast to ItemID** (`ship-vastrek`): ships are listed on the
    market this way; a founding ask's price lives on the order, and the
    hull's own `base_price` is the price ladder's last rung when its book
    has no trade and no order,
@@ -186,7 +206,7 @@ so the whole catalog is navigable without touching engine code.
 ```json
 { "id": "mod-autocannon-s", "group": "Modules/High/Turrets", ... }
 { "id": "ore-cordite",      "group": "Materials/Ore", ... }
-{ "id": "ship-sloop",       "group": "Ships/Frigates", ... }
+{ "id": "ship-vastrek",       "group": "Ships/Frigates", ... }
 ```
 
 Rules (`content/validate.go`): required on every item, module and hull;
@@ -500,7 +520,7 @@ Append to `content/data/npcs/rats.json`:
   "name": "Scuttler",
   "description": "Old Works worker frame: it strips what the swarm can carry off, and it does not care who is standing in the way.",
   "faction": "Old Works",
-  "ship": "ship-rat-scuttler",
+  "ship": "ship-scuttler",
   "fit": ["mod-autocannon-s", "mod-autocannon-s", "mod-afterburner"],
   "aggro_range": 25000,
   "orbit_range": 5000,
@@ -655,7 +675,7 @@ a mined hold must be sellable and materials must be buyable at every port.
   "start": {
     "system": "sys-penumbra",
     "position": { "X": 530000000000, "Y": -300000000000 },
-    "ship": "ship-sloop",
+    "ship": "ship-vastrek",
     "fit": ["mod-autocannon-s", "mod-afterburner", "mod-armor-rep"],
     "cargo": [{ "item": "ammo-emp-s", "qty": 100 }],
     "wallet": 750000
@@ -801,15 +821,15 @@ no separate id):
   "system": "sys-solace",
   "routes": [
     { "from": "cel-haven-rest", "to": "cel-gate-penumbra",
-      "hull": "ship-npc-hauler",
+      "hull": "ship-tobrek",
       "cargo": { "item": "ammo-emp-s", "qty": 600 },
       "interval_ticks": 5400 },
     { "from": "cel-gate-penumbra", "to": "cel-haven-rest",
-      "hull": "ship-npc-hauler",
+      "hull": "ship-tobrek",
       "cargo": { "item": "ore-cordite", "qty": 120 },
       "interval_ticks": 5400 }
   ],
-  "patrol": { "hulls": ["ship-npc-patrol"], "interval_ticks": 9000 },
+  "patrol": { "hulls": ["ship-kustor"], "interval_ticks": 9000 },
   "raider": "npc-rat-marauder"
 }
 ```
@@ -822,7 +842,7 @@ Fields:
 | `routes` | ≥ 1 one-way convoy legs. A hauler spawns at `from`, warps the leg through the normal align/cruise/decel profile, **delivers** `cargo` at `to` when `to` is a station, and despawns when `to` is a gate (leaves the system) or belt |
 | `routes[].from` / `to` | celestials (of this system when the leg is in-system), kind `station`\|`gate`\|`belt`, and different from each other |
 | `routes[].to_system` | optional: the destination system of a **cross-system lane** (empty = this def's own system). `to` must then exist in that system, and the validator checks there is a **gate path** between the two. Cross-system hauls hop the gate and continue from the journey ledger (they survive save/restore and grid rebuilds) |
-| `routes[].hull` | an existing hull (civilian haulers: `ship-npc-hauler`); cargo `qty × volume` must fit its `cargo` |
+| `routes[].hull` | an existing hull (civilian haulers: `ship-tobrek`); cargo `qty × volume` must fit its `cargo` |
 | `routes[].cargo` | `{ "item": ..., "qty": ... }`: existing item, `qty >= 1` |
 | `routes[].interval_ticks` | authored cadence **in ticks** (60 ticks = 1 s), `>= 1`; security scales it (table below) |
 | `patrol` | optional wing config: `hulls` (each needs an `npc-guard-*` def, `Content.GuardFor`), `interval_ticks >= 1`, security-scaled |
@@ -1004,8 +1024,8 @@ dir; one themed file per product family):
 ```json
 [
   {
-    "id": "rec-ship-sloop",
-    "product": "ship-sloop",
+    "id": "rec-ship-vastrek",
+    "product": "ship-vastrek",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 20800 }, { "item": "min-nickel", "qty": 3700 }, { "item": "min-silex", "qty": 1500 }],
     "time": 600,
@@ -1040,8 +1060,8 @@ must land inside **55–75 % of the product's reference price**:
   that ship no order use the pinned reference table in
   `content/balance_test.go`.
 
-Worked example (the `rec-ship-sloop` above): `20800 × 6 + 3700 × 14 +
-1500 × 34 = 227,600` against `ship-sloop`'s order price `350,000` →
+Worked example (the `rec-ship-vastrek` above): `20800 × 6 + 3700 × 14 +
+1500 × 34 = 227,600` against `ship-vastrek`'s order price `350,000` →
 **65.0 %**, inside the band. `content.TestRecipeMaterialCostEnvelope` fails
 with the actual percentage when a recipe drifts out.
 

@@ -11,7 +11,6 @@ import (
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit/hulls"
 	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
@@ -1431,7 +1430,7 @@ func (h *Hud) paintPortrait(hull content.ShipID) {
 	h.portraitHull = hull
 	h.portraitDraws++
 	h.portrait.Clear()
-	src := hulls.Get(hull, theme.Px(hudPortrait))
+	src := hullArt(hull, theme.Px(hudPortrait))
 	if src == nil {
 		return
 	}

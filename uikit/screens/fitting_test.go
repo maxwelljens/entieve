@@ -119,7 +119,7 @@ func TestFittingRowTooltips(t *testing.T) {
 	// Hangar: fit-able modules get the slotless panel, stored hulls none.
 	env.Sim.Hangar.Items = append(env.Sim.Hangar.Items,
 		content.CargoStack{Item: "mod-artillery-s", Qty: 1})
-	env.Sim.Hangar.Ships = append(env.Sim.Hangar.Ships, sim.StoredShip{Hull: "ship-sloop"})
+	env.Sim.Hangar.Ships = append(env.Sim.Hangar.Ships, sim.StoredShip{Hull: "ship-vastrek"})
 	frame()
 	if len(f.hangar.Rows) == 0 {
 		t.Fatal("hangar table is empty after seeding it")
@@ -165,9 +165,9 @@ func TestFittingSlotGrid(t *testing.T) {
 	uitest.PumpWindow(t, ui, f.Sync, 1024, 700)
 	uitest.PumpWindow(t, ui, f.Sync, 1024, 700)
 
-	hull, ok := env.Content.Ship("ship-sloop")
+	hull, ok := env.Content.Ship("ship-vastrek")
 	if !ok {
-		t.Fatal("fixture: ship-sloop missing")
+		t.Fatal("fixture: ship-vastrek missing")
 	}
 	counts := []int{hull.Slots.High, hull.Slots.Mid, hull.Slots.Low}
 	fit, _ := env.Sim.Fittings.Get(env.Sim.Player())
@@ -325,7 +325,7 @@ func TestFittingHangarDoubleClickFits(t *testing.T) {
 
 	// A stored hull keeps the Show Info gesture (its row menu still has
 	// the entry too).
-	env.Sim.Hangar.Ships = append(env.Sim.Hangar.Ships, sim.StoredShip{Hull: "ship-sloop"})
+	env.Sim.Hangar.Ships = append(env.Sim.Hangar.Ships, sim.StoredShip{Hull: "ship-vastrek"})
 	frame()
 	shipRow := -1
 	for i, r := range f.hangar.Rows {
@@ -525,12 +525,12 @@ func TestFittingIdentityBlock(t *testing.T) {
 	uitest.PumpWindow(t, ui, f.Sync, 1024, 700)
 	uitest.PumpWindow(t, ui, f.Sync, 1024, 700)
 
-	shell, ok := env.Content.Ship("ship-sloop")
+	shell, ok := env.Content.Ship("ship-vastrek")
 	if !ok {
-		t.Fatal("fixture: ship-sloop missing")
+		t.Fatal("fixture: ship-vastrek missing")
 	}
-	if f.portraitHull != "ship-sloop" {
-		t.Errorf("portrait hull = %q, want ship-sloop", f.portraitHull)
+	if f.portraitHull != "ship-vastrek" {
+		t.Errorf("portrait hull = %q, want ship-vastrek", f.portraitHull)
 	}
 	if f.portraitDraws != 1 {
 		t.Errorf("portrait painted %d times for one hull, want the hull-change repaint only", f.portraitDraws)
@@ -573,9 +573,9 @@ func TestFittingMakerLogoIsCorpArt(t *testing.T) {
 	ui := newWindowUI(t, env, f.Win())
 	uitest.PumpWindow(t, ui, f.Sync, 1024, 700)
 
-	shell, ok := env.Content.Ship("ship-sloop")
+	shell, ok := env.Content.Ship("ship-vastrek")
 	if !ok {
-		t.Fatal("fixture: ship-sloop missing")
+		t.Fatal("fixture: ship-vastrek missing")
 	}
 	kids := f.idRow.Children()
 	if len(kids) != 2 {
