@@ -324,15 +324,16 @@ func infoPageFor(cv widgets.ContentView, ref widgets.InfoRef) (infoPage, bool) {
 }
 
 // proficiencyRows is the PROFICIENCY block of a hull or module page: the
-// practice line, the level fitting/flying requires and the player's current
-// level. Empty for a fixture def with no family.
+// practice line, the gate fitting/flying must clear (the sim's own sentence,
+// prerequisites included) and the player's current level. Empty for a
+// fixture def with no family.
 func proficiencyRows(cv widgets.ContentView, family string, gate int) []infoRow {
 	if family == "" {
 		return nil
 	}
-	req := "None"
-	if gate > 0 {
-		req = content.FamilyLabel(family) + " " + content.LevelLabel(gate)
+	req := cv.ProficiencyRequirement(family, gate)
+	if req == "" {
+		req = "None"
 	}
 	return []infoRow{
 		{Label: "Family", Value: content.FamilyLabel(family)},

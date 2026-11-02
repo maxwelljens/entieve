@@ -45,9 +45,10 @@ const (
 	fitSlotShare = 0.6
 	fitBarW      = 160 // capacitor verdict bar width
 	fitBarH      = 8   // capacitor verdict bar height
-	// capacitor endurance integration: the mirror of the sim's recharge
-	// curve, stepped at a fixed second; past the horizon an unstable cap
-	// reads as the horizon (a fit that lasts an hour is stable in play).
+	// capacitor endurance readout: the sim's curve (Capacitor.Endure) is
+	// stepped at a fixed second for the display; past the horizon an
+	// unstable cap reads as the horizon (a fit that lasts an hour is stable
+	// in play).
 	fitCapStep    = 1.0
 	fitCapHorizon = 3600.0
 )
@@ -812,7 +813,7 @@ func (f *Fitting) statValues(player ecs.Entity, ship sim.ShipState, hasShip bool
 	}
 	if m, ok := s.Motion(player); ok {
 		v["Speed"] = theme.FormatSpeed(m.MaxSpeed)
-		v["Align"] = theme.GroupFloat(m.Agility*10, 1) + " s"
+		v["Align"] = theme.GroupFloat(m.AlignTime(), 1) + " s"
 		v["Signature"] = theme.GroupFloat(m.SigRadius, 0) + " m"
 	}
 	if cg, ok := s.Cargo(player); ok {
@@ -853,7 +854,7 @@ func (f *Fitting) syncStats(player ecs.Entity, ship sim.ShipState, hasShip bool)
 		}
 		r.label.Label = fitEHPLabels[i] + " " +
 			theme.FormatPct(ship.Resists.Of(t))
-		r.value.Label = theme.FormatInt(int64(fitEHP(ship, t) + 0.5))
+		r.value.Label = theme.FormatInt(int64(ship.EHP(t) + 0.5))
 	}
 }
 
@@ -928,7 +929,7 @@ func (f *Fitting) syncSummary(player ecs.Entity, ship sim.ShipState, hasShip boo
 	cap, hasCap := f.cv.Capacitor(player)
 	peak := 0.0
 	if hasCap {
-		peak = capRechargePeak(cap)
+		peak = cap.RechargePeak()
 	}
 	f.sum[0].value.Label = theme.GroupFloat(dps, 1)
 	f.sum[1].value.Label = theme.GroupFloat(drain, 1) + " GJ/s"
@@ -1014,46 +1015,6 @@ func (f *Fitting) capDrain(fit sim.Fitting, hasFit bool) float64 {
 	return drain
 }
 
-// fitEHP is the effective HP against one damage type: the three layer
-// maxima over the penetrating share the resistance leaves — the sim's own
-// damage rule (applyDamageToShip applies the same resist multiplier).
-func fitEHP(ship sim.ShipState, t content.DamageType) float64 {
-	mult := ship.Resists.Multiplier(t)
-	if mult <= 0 {
-		return 0
-	}
-	return (ship.MaxShield + ship.MaxArmor + ship.MaxStructure) / mult
-}
-
-// capRechargePeak is the sim's recharge curve's maximum rate in GJ/s:
-// dC/dt = (2.5*Capacity/Tau)*sqrt(c)*(1-sqrt(c)) peaks at c = 0.25
-// (sim/system_cap.go), where sqrt(c)*(1-sqrt(c)) = 0.25.
-func capRechargePeak(c sim.Capacitor) float64 {
-	if c.Capacity <= 0 || c.Tau <= 0 {
-		return 0
-	}
-	return 2.5 * c.Capacity / c.Tau * 0.25
-}
-
-// capEndure is how long the capacitor lasts under a constant drain: the
-// sim's recharge curve integrated at a fixed step from the current charge
-// (sim/system_cap.go), capped at the horizon.
-func capEndure(c sim.Capacitor, drain float64) float64 {
-	if drain <= 0 || c.Capacity <= 0 || c.Tau <= 0 {
-		return 0
-	}
-	cur := math.Min(math.Max(c.Current, 0), c.Capacity)
-	for t := 0.0; t < fitCapHorizon; t += fitCapStep {
-		r := math.Sqrt(cur / c.Capacity)
-		cur += (2.5*c.Capacity/c.Tau)*r*(1-r)*fitCapStep - drain*fitCapStep
-		if cur <= 0 {
-			return t + fitCapStep
-		}
-		cur = math.Min(cur, c.Capacity)
-	}
-	return fitCapHorizon
-}
-
 // fitCapVerdict is the summary's capacitor verdict: the registered string
 // and whether the fit is sustainable.
 type fitCapVerdict struct {
@@ -1067,7 +1028,7 @@ func capVerdict(c sim.Capacitor, hasCap bool, drain, peak float64) fitCapVerdict
 	if !hasCap || drain <= peak {
 		return fitCapVerdict{"Cap stable", true}
 	}
-	secs := capEndure(c, drain)
+	secs := c.Endure(drain, fitCapStep, fitCapHorizon)
 	return fitCapVerdict{"Cap unstable (~" + theme.FormatInt(int64(math.Ceil(secs))) + " s)", false}
 }
 

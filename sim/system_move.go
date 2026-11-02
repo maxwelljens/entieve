@@ -42,10 +42,7 @@ func (s *Sim) systemMovement() {
 			}
 		}
 
-		alignTime := m.Agility * 10
-		if alignTime <= 0 {
-			alignTime = 1
-		}
+		alignTime := m.AlignTime()
 		maxDeltaV := m.MaxSpeed * DT / alignTime
 		maxEff := m.EffectiveMaxSpeed(now)
 

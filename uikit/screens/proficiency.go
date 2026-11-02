@@ -28,8 +28,10 @@ type ProfPrereq struct {
 
 // ProfFamily is one proficiency family as the pilot sees it: the level
 // granted, the XP banked toward the next (XP/XPNext, 0 at the cap), the
-// authored prerequisites and whether the gate is satisfied. It is the
-// panel's whole model; the sim maps its own family type onto it.
+// authored prerequisites and whether the gate is satisfied. Gate is the
+// first unmet requirement's sentence, straight from the sim's one walk
+// ("Requires Autocannon II", "" while Meets): the tree and the family card
+// print it and never word a gate themselves.
 type ProfFamily struct {
 	Family   string // stable family id
 	Name     string // display name
@@ -39,6 +41,7 @@ type ProfFamily struct {
 	MaxLevel int
 	Prereqs  []ProfPrereq // authored dependency edges
 	Meets    bool         // gate satisfied: own level + every prereq
+	Gate     string       // the unmet requirement's sentence ("" while Meets)
 	Starter  bool         // starter essential (gate 0)
 }
 
@@ -359,7 +362,7 @@ type profNode struct {
 
 	LevelText string // "2/5"
 	XPText    string // "40/160 XP", "max" or "no levels"
-	GateText  string // "needs Autocannons 2" while locked, else ""
+	GateText  string // "Requires Autocannon II" while locked, else ""
 }
 
 // profEdge is one prerequisite arrow, by node index.
@@ -483,7 +486,7 @@ func proficiencyLayout(fams []ProfFamily, canvas image.Rectangle) ([]profNode, [
 				XP: fam.XP, XPNext: fam.XPNext,
 				Starter: fam.Starter, Locked: !fam.Meets,
 				LevelText: profLevelText(fam), XPText: profXPText(fam),
-				GateText: profGateText(fam, fams),
+				GateText: fam.Gate,
 			})
 		}
 	}
@@ -589,25 +592,6 @@ func profXPText(f ProfFamily) string {
 	default:
 		return fmt.Sprintf("%d/%d XP", f.XP, f.XPNext)
 	}
-}
-
-// profGateText names the first unmet prerequisite, by its display name
-// and level ("needs Autocannons 2"); empty while the family is open.
-func profGateText(f ProfFamily, fams []ProfFamily) string {
-	if f.Meets {
-		return ""
-	}
-	for _, p := range f.Prereqs {
-		pf := famAt(fams, p.Family)
-		name := p.Family
-		if pf != nil && pf.Name != "" {
-			name = pf.Name
-		}
-		if pf == nil || pf.Level < p.Level {
-			return fmt.Sprintf("needs %s %d", name, p.Level)
-		}
-	}
-	return "locked"
 }
 
 // ---------------------------------------------------------------------------

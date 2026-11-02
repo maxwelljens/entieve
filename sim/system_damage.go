@@ -152,6 +152,17 @@ func applyDamageToShip(ship *ShipState, dmg content.Damage) float64 {
 	return pen
 }
 
+// EHP is the ship's effective HP against one damage type: the three layer
+// maxima over the share that penetrates that resist (the same multiplier
+// applyDamageToShip applies). The Fitting window prints this figure.
+func (ship ShipState) EHP(t content.DamageType) float64 {
+	mult := ship.Resists.Multiplier(t)
+	if mult <= 0 {
+		return 0
+	}
+	return (ship.MaxShield + ship.MaxArmor + ship.MaxStructure) / mult
+}
+
 // handleDeath resolves a destroyed ship: NPC deaths roll loot into a wreck,
 // pay the bounty to the player (player kills only), record respawn timers
 // and possibly clear an anomaly; the player respawns in a fresh starter

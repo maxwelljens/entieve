@@ -74,6 +74,17 @@ func (m *Motion) EffectiveMaxSpeed(now float64) float64 {
 	return sp
 }
 
+// AlignTime is the hull's align time in seconds: agility * 10, floored at 1.
+// It is the movement rule (systemMovement) and the Fitting window's displayed
+// figure, so the two can never disagree.
+func (m *Motion) AlignTime() float64 {
+	t := m.Agility * 10
+	if t <= 0 {
+		return 1
+	}
+	return t
+}
+
 // ShipState is hull identity and the three EVE damage layers.
 type ShipState struct {
 	Hull                              content.ShipID

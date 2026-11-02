@@ -380,7 +380,7 @@ func TestFittingTileDoubleClickShowsInfo(t *testing.T) {
 }
 
 // TestFitEHP pins the per-type effective HP: the three layer maxima over
-// the penetrating share each resistance leaves.
+// the penetrating share each resistance leaves (the sim's rule, read raw).
 func TestFitEHP(t *testing.T) {
 	ship := sim.ShipState{
 		MaxShield: 500, MaxArmor: 400, MaxStructure: 300,
@@ -395,7 +395,7 @@ func TestFitEHP(t *testing.T) {
 		{content.DmgKinetic, 1200},
 		{content.DmgExplosive, 1200 / 0.25},
 	} {
-		if got := fitEHP(ship, tc.typ); math.Abs(got-tc.want) > 1e-9 {
+		if got := ship.EHP(tc.typ); math.Abs(got-tc.want) > 1e-9 {
 			t.Errorf("EHP %s = %v, want %v", tc.typ, got, tc.want)
 		}
 	}
@@ -467,7 +467,7 @@ func TestFittingSummaryFigures(t *testing.T) {
 	if got, want := f.sum[1].value.Label, theme.GroupFloat(wantDrain, 1)+" GJ/s"; got != want {
 		t.Errorf("drain row = %q, want %q", got, want)
 	}
-	if got, want := f.sum[2].value.Label, theme.GroupFloat(capRechargePeak(*cap), 1)+" GJ/s"; got != want {
+	if got, want := f.sum[2].value.Label, theme.GroupFloat(cap.RechargePeak(), 1)+" GJ/s"; got != want {
 		t.Errorf("recharge row = %q, want %q", got, want)
 	}
 	if !strings.HasPrefix(f.verdict.Label, "Cap unstable (~") {
@@ -480,7 +480,7 @@ func TestFittingSummaryFigures(t *testing.T) {
 
 // TestFittingCapRechargeMirrorsSim: the window's peak-recharge figure is
 // the sim's own curve — at 25 % capacity the sim recharges exactly
-// capRechargePeak(cap)·DT in one tick.
+// Capacitor.RechargePeak()·DT in one tick.
 func TestFittingCapRechargeMirrorsSim(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	player := env.Sim.Player()
@@ -490,7 +490,7 @@ func TestFittingCapRechargeMirrorsSim(t *testing.T) {
 	}
 	c.Current = 0.25 * c.Capacity
 	before := c.Current
-	peak := capRechargePeak(*c)
+	peak := c.RechargePeak()
 	if peak <= 0 {
 		t.Fatal("peak recharge reads zero")
 	}
@@ -502,11 +502,11 @@ func TestFittingCapRechargeMirrorsSim(t *testing.T) {
 
 	// And the endurance mirror: a drain under the peak never empties, a
 	// drain over it does.
-	if secs := capEndure(*c, peak*0.9); secs != fitCapHorizon {
-		t.Errorf("capEndure under the peak = %v s, want the horizon", secs)
+	if secs := c.Endure(peak*0.9, fitCapStep, fitCapHorizon); secs != fitCapHorizon {
+		t.Errorf("Endure under the peak = %v s, want the horizon", secs)
 	}
-	if secs := capEndure(*c, peak*1.5); secs <= 0 || secs >= fitCapHorizon {
-		t.Errorf("capEndure over the peak = %v s, want a finite run-out", secs)
+	if secs := c.Endure(peak*1.5, fitCapStep, fitCapHorizon); secs <= 0 || secs >= fitCapHorizon {
+		t.Errorf("Endure over the peak = %v s, want a finite run-out", secs)
 	}
 	if v := capVerdict(*c, true, peak*0.5, peak); v.text != "Cap stable" || !v.stable {
 		t.Errorf("verdict under the peak = %+v, want Cap stable", v)

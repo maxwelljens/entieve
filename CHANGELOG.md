@@ -146,6 +146,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One owner for the proficiency gate and the standing gate**: the sim's one
+  prerequisite walk now feeds the fit/fly refusal, the tech-tree node, the
+  family card and Show Info's requirement row, so the four cannot disagree;
+  the tree and Show Info adopt the refusal's wording (`Requires Autocannon
+  II`, was `needs Autocannon 2` in the tree and a bare `Autocannon II` in
+  Show Info). The contact row and the Details dialog read the sim's
+  `MeetsStanding`, so the disabled Accept and the accept refusal flip at the
+  same standing, epsilon included. The fitting window prints the sim's align
+  time, recharge peak, capacitor endurance and per-type EHP (the same
+  formulas, one owner) instead of recomputing them.
 - **Hull ids are display-name slugs**: the machinery prefixes the name
   already said are gone (`ship-rat-hierarch` → `ship-hierarch`,
   `ship-npc-miner` → `ship-kutrek`, `ship-npc-patrol` → `ship-kustor`,
