@@ -131,8 +131,8 @@ func TestHudStatusOnDamage(t *testing.T) {
 	if !hulls.Has(sh.Hull) {
 		t.Errorf("hulls.Has(%q) = false for the fitted hull", sh.Hull)
 	}
-	if b := h.portrait.Bounds(); b.Dx() != hudPortrait || b.Dy() != hudPortrait {
-		t.Fatalf("portrait image %v, want %dx%d", b, hudPortrait, hudPortrait)
+	if b := h.portrait.Bounds(); b.Dx() != hudPortraitW || b.Dy() != hudPortraitH {
+		t.Fatalf("portrait image %v, want %dx%d", b, hudPortraitW, hudPortraitH)
 	}
 
 	h.Sync() // nothing changed → no portrait repaint
@@ -406,6 +406,14 @@ func TestHudDrawSmoke(t *testing.T) {
 	}
 	if status.Max.Y != pair.Max.Y {
 		t.Errorf("status bottom = %d, want the pair baseline %d", status.Max.Y, pair.Max.Y)
+	}
+	// The portrait is the owner's 2:1 box: half its width tall, so it reads
+	// as a ship and not an icon, and it never widens the pair (the 1280 log
+	// pocket caps the pair at 558 px; rack.go).
+	if p := h.portraitGfx.GetWidget().Rect; p.Dx() != theme.Px(hudPortraitW) || p.Dy() != theme.Px(hudPortraitH) {
+		t.Errorf("portrait box = %v, want the %d×%d 2:1 box", p, theme.Px(hudPortraitW), theme.Px(hudPortraitH))
+	} else if p.Dx() != 2*p.Dy() {
+		t.Errorf("portrait box %v is not 2:1 wide", p)
 	}
 	if rack.Max.Y != pair.Max.Y || rack.Min.X != status.Max.X+theme.Px(hudPairGap) {
 		t.Errorf("rack %v, want bottom-aligned right of the status %v", rack, status)
