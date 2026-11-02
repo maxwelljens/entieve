@@ -3,7 +3,6 @@ package game
 import (
 	"image/color"
 	"math"
-	"sort"
 	"time"
 
 	"github.com/entieve/entieve/core"
@@ -77,10 +76,6 @@ type SpaceScene struct {
 	middle     bool
 	midX, midY float64
 
-	// picks is the stack picker's scratch: the cluster under the cursor, in
-	// depth order (pickAll). Reused every frame the pointer hovers a cluster.
-	picks []sim.Info
-
 	// hover is the entity under the cursor, re-resolved every update: the
 	// overlay labels that one and no other. Zero when the cursor rests on
 	// empty space.
@@ -90,9 +85,8 @@ type SpaceScene struct {
 // OnEnter implements Scene.
 func (sc *SpaceScene) OnEnter() {}
 
-// OnLeave implements Scene. The stack picker is a hover: leaving the world
-// (docking, the menu) drops its column.
-func (sc *SpaceScene) OnLeave() { sc.g.kit.StackDismiss() }
+// OnLeave implements Scene.
+func (sc *SpaceScene) OnLeave() {}
 
 // ResetView centers the camera on the player (used after travel/restore).
 func (sc *SpaceScene) ResetView() { sc.pan = core.Vec2{} }
@@ -175,16 +169,12 @@ func (sc *SpaceScene) Update(in Input) error {
 		sc.middle = false
 	}
 
-	// The interface owns every click that lands on a panel; the stack
-	// picker's hover runs first, because the column itself is interface and
-	// hovering it must keep it up.
+	// The interface owns every click that lands on a panel.
 	cam := sc.Camera(float64(g.w), float64(g.h))
 	// The overlay's one label belongs to the entity under the cursor, panels
-	// or no panels: a cursor on the open column still names the entity it
-	// covers (the column seats beside the cluster).
+	// or no panels: the hover resolves before the interface gate.
 	inf, _ := sc.pick(cam, in.MouseX, in.MouseY)
 	sc.hover = inf.Entity
-	sc.stackStep(in, cam, over)
 	if over {
 		return nil
 	}
@@ -229,54 +219,6 @@ func (sc *SpaceScene) doubleClick(x, y float64) bool {
 	tol := 6 * sc.g.deviceScale() // click pair tolerance in screen px
 	return time.Since(sc.lastClickAt) <= doubleClickWindow &&
 		math.Abs(x-sc.lastClickX) < tol && math.Abs(y-sc.lastClickY) < tol
-}
-
-// pickAll returns every perceivable grid entity within pickRadiusPx of the
-// cursor, in the world's paint order — the render layer (ships over rocks
-// over stations over celestials: what the camera sees nearest) then the
-// canonical handle order, so the result is deterministic with no RNG. The
-// stack picker's column is this list; pick (one click's resolution) is
-// untouched.
-func (sc *SpaceScene) pickAll(cam render.Camera, x, y float64) []sim.Info {
-	r := pickRadiusPx * sc.g.deviceScale() // screen px: Layout units
-	out := sc.picks[:0]
-	for _, inf := range sc.g.s.Grid() {
-		if !inf.Visible {
-			continue
-		}
-		sx, sy := cam.WorldToScreen(inf.Pos)
-		dx, dy := sx-x, sy-y
-		if dx*dx+dy*dy < r*r {
-			out = append(out, inf)
-		}
-	}
-	sort.Slice(out, func(i, j int) bool {
-		li, lj := render.StackLayer(out[i].Kind), render.StackLayer(out[j].Kind)
-		if li != lj {
-			return li > lj
-		}
-		return out[i].Entity < out[j].Entity
-	})
-	sc.picks = out
-	return out
-}
-
-// stackStep reports the frame's hover to the stack picker, which owns the
-// dwell and grace frames: on the column it holds, on a cluster it opens or
-// refreshes, anywhere else it starts its countdown.
-func (sc *SpaceScene) stackStep(in Input, cam render.Camera, over bool) {
-	switch {
-	case sc.g.kit.StackOwns(in.MouseX, in.MouseY):
-		sc.g.kit.StackKeep()
-	case over:
-		sc.g.kit.StackLeave()
-	default:
-		if cluster := sc.pickAll(cam, in.MouseX, in.MouseY); len(cluster) > 1 {
-			sc.g.kit.StackHover(cluster, in.MouseX, in.MouseY)
-		} else {
-			sc.g.kit.StackLeave()
-		}
-	}
 }
 
 // pick returns the perceivable grid entity nearest the cursor within

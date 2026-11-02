@@ -110,62 +110,6 @@ func (r *Renderer) bracket(dst *ebiten.Image, x, y, size float64, col color.Colo
 		&vector.DrawPathOptions{AntiAlias: true, ColorScale: colorScale(col)})
 }
 
-// DrawEntityBracket draws one grid entity the way the world draws it: its body
-// art (drawBody) inside its own EVE-style bracket, centred in dst, which the
-// stack picker sizes as one cell. A cell is therefore a miniature of the
-// on-screen bracket, never a UI glyph; the world's own pass is untouched.
-func (r *Renderer) DrawEntityBracket(dst *ebiten.Image, s *sim.Sim, inf sim.Info) {
-	b := dst.Bounds()
-	size := math.Min(float64(b.Dx()), float64(b.Dy()))
-	if size < 8 {
-		return
-	}
-	cx, cy := float64(b.Dx())/2, float64(b.Dy())/2
-	o := r.obj(s, inf)
-	// The camera puts the entity at the cell's centre (the projection centres
-	// on Center) and zooms so its body spans the cell, so the very art the
-	// world draws fills the cell at cell scale.
-	cam := Camera{
-		Center:  inf.Pos,
-		Zoom:    (size - 4) / entityCellMeters(o),
-		ScreenW: float64(b.Dx()),
-		ScreenH: float64(b.Dy()),
-	}
-	r.drawBody(dst, cam, o, s.System(), s.Time())
-	r.bracket(dst, cx, cy, size/2-2,
-		bracketColor(inf.Kind, inf.Hostile, inf.Entity == s.Player()), 1.6)
-}
-
-// entityCellMeters is the world-space width a kind's body art spans at 1 px/m:
-// each body helper's own scale constant (the hull radius, the rock and wreck
-// templates, a celestial's radius, the static and glow fallbacks). The cell
-// divides its width by it, so every kind fills its cell alike.
-// shortcut: a body whose art has a world minimum bigger than the cell (a
-// star's 80 px glow, an anomaly's wash) fills the cell and clips at its edge;
-// draw such kinds through a downscaled scratch when a cell must show falloff.
-func entityCellMeters(o gridObj) float64 {
-	switch o.info.Kind {
-	case sim.KindShip, sim.KindPlayer:
-		return 2 * hullSize(o.hull)
-	case sim.KindAsteroid:
-		return 140
-	case sim.KindWreck:
-		return 110
-	case sim.KindAnomaly:
-		return 4e4 // the wash is drawn at twice the glow radius
-	case sim.KindStar:
-		return 2 * orDef(o.radius, 3e8)
-	case sim.KindPlanet, sim.KindMoon:
-		return 2 * orDef(o.radius, 3e7)
-	case sim.KindStation:
-		return 2 * orDef(o.radius, 2500)
-	case sim.KindGate:
-		return 2 * orDef(o.radius, 1500)
-	default: // belt, unknown celestials
-		return 2 * orDef(o.radius, 4e4)
-	}
-}
-
 // bracketHalfSize returns the bracket half-size in px for a grid object.
 func bracketHalfSize(o gridObj, cam Camera) float64 {
 	var radiusPx float64
@@ -375,29 +319,6 @@ func (r *Renderer) miningBeam(dst *ebiten.Image, nose, rock core.Vec2) {
 // under the cursor does, at every zoom (the rule reads the cursor, never the
 // framing).
 func (r *Renderer) labelsOn(o gridObj) bool { return o.info.Entity == r.hover }
-
-// StackLayer is an entity kind's layer in the world's paint order — the
-// drawOverlay bucket order, ships on top. The stack picker lists a cluster
-// from the highest layer down, so the column leads with what paints over
-// the rest.
-func StackLayer(kind string) int {
-	switch kind {
-	case sim.KindShip, sim.KindPlayer:
-		return 6
-	case sim.KindWreck:
-		return 5
-	case sim.KindAsteroid:
-		return 4
-	case sim.KindAnomaly:
-		return 2
-	case sim.KindStar:
-		return 0
-	case sim.KindPlanet, sim.KindMoon:
-		return 1
-	default: // static: stations, gates, belts, unknown
-		return 3
-	}
-}
 
 // drawOverlay draws brackets, the hovered entity's name/distance label,
 // selection highlight and the player's target lock lines (topmost world

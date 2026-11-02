@@ -16,7 +16,6 @@ captures() {
 ./game TestContactDetailsCapture
 ./game TestDockedBackdropCapture
 ./game TestHoverLabelCapture
-./game TestStackPickerCapture
 ./game TestTitleCaptureFrame
 ./game TestTitleKeybindingsCapture
 ./game TestTitleCreditsCapture

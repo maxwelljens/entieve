@@ -36,29 +36,6 @@ func TestLabelsFollowTheHover(t *testing.T) {
 	}
 }
 
-// TestStackLayerFollowsPaintOrder pins the stack picker's depth key to the
-// overlay's bucket order: a ship paints over a wreck, a wreck over a rock, a
-// rock over a station, a station over a celestial.
-func TestStackLayerFollowsPaintOrder(t *testing.T) {
-	order := []string{sim.KindStar, sim.KindPlanet, sim.KindAnomaly,
-		sim.KindStation, sim.KindAsteroid, sim.KindWreck, sim.KindShip}
-	for i := 1; i < len(order); i++ {
-		if StackLayer(order[i]) <= StackLayer(order[i-1]) {
-			t.Errorf("StackLayer(%s) = %d does not paint over StackLayer(%s) = %d",
-				order[i], StackLayer(order[i]), order[i-1], StackLayer(order[i-1]))
-		}
-	}
-	// Kinds sharing a bucket tie: the picker breaks those canonically.
-	for _, pair := range [][2]string{
-		{sim.KindPlanet, sim.KindMoon}, {sim.KindStation, sim.KindGate}, {sim.KindShip, sim.KindPlayer},
-	} {
-		if StackLayer(pair[0]) != StackLayer(pair[1]) {
-			t.Errorf("StackLayer(%s)=%d and StackLayer(%s)=%d share a paint bucket, want one layer",
-				pair[0], StackLayer(pair[0]), pair[1], StackLayer(pair[1]))
-		}
-	}
-}
-
 // TestShotAgeFollowsCycleClock pins the shot-timing seam: the renderer reads
 // the shot moment off the runtime's cycle clock, so a gun whose CycleEnds is
 // one period ahead of the shot reports age 0 at the shot and one period just
@@ -368,50 +345,5 @@ func TestFireFXAimsAtTheGunsOwnTarget(t *testing.T) {
 	if aim != core.V(sx, sy) {
 		t.Fatalf("shot aims at (%.1f,%.1f): the first lock sits at (%.1f,%.1f), "+
 			"the gun's own target at (%.1f,%.1f)", aim.X, aim.Y, fx, fy, sx, sy)
-	}
-}
-
-// TestCellDrawsTheWorldsBodyArt pins the stack picker's cells to the world's
-// own drawing: a cell submits the entity through drawBody, the same pass Draw
-// runs over its buckets, for every kind the picker can list. An icon cell would
-// submit no body primitive at all.
-func TestCellDrawsTheWorldsBracketArt(t *testing.T) {
-	c, err := content.Load(content.FS())
-	if err != nil {
-		t.Fatalf("content.Load: %v", err)
-	}
-	wd, ok := c.World("world-showcase")
-	if !ok {
-		t.Fatal("world-showcase missing")
-	}
-	s, err := sim.New(c, wd, 42)
-	if err != nil {
-		t.Fatalf("sim.New: %v", err)
-	}
-	r := New(c)
-	dst := ebiten.NewImage(32, 32)
-	kinds := map[string]bool{}
-	for _, inf := range s.Grid() {
-		if !inf.Visible || kinds[inf.Kind] {
-			continue
-		}
-		kinds[inf.Kind] = true
-		r.bodyPrims = 0
-		r.DrawEntityBracket(dst, s, inf)
-		if r.bodyPrims == 0 {
-			t.Errorf("cell for %s (%v) drew no body art: the cell must be the entity as the world draws it",
-				inf.Kind, inf.Name)
-		}
-	}
-	if len(kinds) < 3 {
-		t.Fatalf("fixture covered %d kinds, want the showcase's spread", len(kinds))
-	}
-
-	// A synthetic entry (an entity the sim does not know) still gets art: the
-	// picker's own tests feed hand-built infos.
-	r.bodyPrims = 0
-	r.DrawEntityBracket(dst, s, sim.Info{Entity: ecs.Entity(9999), Kind: sim.KindShip, Visible: true})
-	if r.bodyPrims == 0 {
-		t.Error("a cell drew nothing for an entity outside the sim")
 	}
 }
