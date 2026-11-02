@@ -189,6 +189,34 @@ and the least able to act like one. It sends warrants and invoices, not mail.
 - NEVER map the other cantons: they are names on paperwork, not places on the
   starmap.
 
+## Knowledge and the net
+
+There is an internet of sorts in the Wild Fields, but it is mostly local.
+Interstellar communication has limited throughput, and nobody has found a
+good solution for moving information quickly: only matter moves fast, and
+matter moves by spaceship. Within reach the net answers at the speed of
+light; away from it the net thins into couriers and freight, and home is
+the year each way already stated, with no answer at the far end.
+
+The culture dates from the fall. People gather as much knowledge as they
+can, in the older ways, and put it out on the net: bulletins, manuals,
+transcriptions of what the old people recite, work notes passed along the
+lanes. What goes up is not exhaustive and by no means complete, just like
+ours. The record the fall ate is not on it, and the net did not make
+personal skill obsolete: people here build knowledge and ability out of
+personal experience the same way anyone does.
+
+**Binding rules**
+
+- MUST keep the net local: information moves at light speed within reach
+  and by freight beyond it, never instantly between systems.
+- MUST keep what is posted incomplete: no exhaustive manual, and never the
+  record the fall ate.
+- MUST keep the ban standing on it: no machine mind answers on the net, no
+  assistant, no oracle.
+- NEVER use the net as a plot lever: no message from home, no broadcast
+  that decides the war.
+
 ## Zones: charter reach
 
 Security status is **charter reach**: how far the colonial authority's
