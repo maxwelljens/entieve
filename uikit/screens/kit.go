@@ -108,6 +108,13 @@ type Kit struct {
 	// rack) keeps its under-window position (AddContainer).
 	tops []TopChrome
 
+	// backdrop is the one full-viewport layer below every window
+	// (AddBackdropWindow, the proficiency tree): Kit.Draw paints it over
+	// the world before ui.Draw and parks it for the window pass, Own
+	// resolves its space after the window stack and the root chrome, and
+	// it carries no window chrome of its own.
+	backdrop *widget.Window
+
 	// rows is each mounted window's registered row surface (SetWindowRows):
 	// the hit test consults it after the window's widget walk fails, because
 	// a table's rows sit in a scroll viewport the walk cannot descend into.
@@ -358,9 +365,10 @@ func (k *Kit) Update() error {
 
 // Draw renders the interface onto screen. Call it AFTER the world render.
 //
-// Draw order (the stacking contract, bottom → top): the animating
-// windows parked out of the window pass and the top chrome parked with
-// them → ui.Draw (root overlay, then every settled window, then
+// Draw order (the stacking contract, bottom → top): the backdrop layer,
+// painted straight over the world and parked again for the window pass →
+// the animating windows parked out of the window pass and the top chrome
+// parked with them → ui.Draw (root overlay, then every settled window, then
 // ebitenui's deferred popups) → the animations unparked and the chrome
 // recompute → the fade composite (above the settled windows, below the
 // rail: it paints windows, so windows are its place in the order) → the
@@ -368,10 +376,21 @@ func (k *Kit) Update() error {
 // lifts with it in drawTops) → the context menu, always the last pixels.
 func (k *Kit) Draw(screen *ebiten.Image) {
 	k.parkAnims()
+	// The backdrop paints first and is parked for ui.Draw: ebitenui would
+	// otherwise paint it with the window pass, above the root chrome and
+	// possibly over windows opened before it.
+	if b := k.backdrop; b != nil {
+		b.Render(screen)
+		b.GetContainer().GetWidget().SetVisibility(widget.Visibility_Hide_Blocking)
+	}
 	for _, t := range k.tops {
 		t.SetWindowPass(false) // parked: ui.Draw must not paint it
 	}
 	k.ui.Draw(screen)
+	// Shown again at once: the hit test and the next frame read it.
+	if b := k.backdrop; b != nil {
+		b.GetContainer().GetWidget().SetVisibility(widget.Visibility_Show)
+	}
 	// Back to shown before the chrome pass: a dragging press must arm
 	// against live geometry (see unparkAnims).
 	k.unparkAnims()
@@ -610,6 +629,31 @@ func (k *Kit) AddTopContainer(t TopChrome, layoutData any) {
 	t.Container().GetWidget().LayoutData = layoutData
 	k.root.AddChild(t.Container())
 	k.tops = append(k.tops, t)
+}
+
+// AddBackdropWindow mounts a full-viewport layer: it paints above the
+// world and BELOW the root chrome and every window (Kit.Draw's first
+// pass), takes no window chrome (no grips, no drag, no fade: the layer is
+// the viewport, and its panel re-fits it), and never raises. Own resolves
+// its space after the window stack, so a window above it keeps its
+// presses while bare layer space never reaches the world. One layer at a
+// time; the returned func unmounts it.
+func (k *Kit) AddBackdropWindow(w *widget.Window) widget.RemoveWindowFunc {
+	if w == nil {
+		return func() {}
+	}
+	k.backdrop = w
+	remove := k.addWindow(w, false) // no fade: a layer is not an open window
+	if ch, ok := k.chromes[w]; ok {
+		ch.cancel()
+		delete(k.chromes, w)
+	}
+	return func() {
+		if k.backdrop == w {
+			k.backdrop = nil
+		}
+		remove()
+	}
 }
 
 // SetTopsVisible shows or hides the top chrome wholesale. It exists for

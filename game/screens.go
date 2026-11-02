@@ -68,6 +68,10 @@ const (
 	AnchorFixed                    // Min = absolute design position
 	AnchorBottomLeft               // Min.X = left inset, defaultH-Max.Y = bottom inset
 	AnchorTopCenter                // Min.Y = top inset, width centred
+	// AnchorViewport is the full-viewport layer (the proficiency tree):
+	// the rect IS the viewport. The rail-gutter floor below does not apply,
+	// because the layer paints underneath the rail by construction.
+	AnchorViewport
 )
 
 // keyNone marks a screen with no key binding. It cannot be 0: ebiten's
@@ -93,6 +97,7 @@ const (
 	idServices      ScreenID = "services"
 	idRefinery      ScreenID = "refinery"
 	idFinances      ScreenID = "finances"
+	idProficiency   ScreenID = "proficiency"
 	idKeybindings   ScreenID = "keybindings"
 	idMenu          ScreenID = "menu"
 )
@@ -342,6 +347,24 @@ var screens = []Screen{
 		Build:       func(h *ScreenHost) widgets.WindowPanel { return uikit.NewFinances(h.services.Env) },
 	},
 	{
+		// The proficiency tree: the house's one full-viewport layer. It is
+		// an ordinary Screen row (key, rail entry, sidecar entry) whose
+		// panel answers Backdrop(), so the host mounts it through
+		// Kit.AddBackdropWindow: painted over the world and below every
+		// window and all chrome, with its own space inert but blocking the
+		// world. It has no title bar (a layer takes no window chrome: Esc
+		// and its key close it) and re-fits itself to the viewport.
+		ID: idProficiency, Title: "Proficiency", Icon: "stat_tracking",
+		Key: ebiten.KeyT, Action: "proficiency", Desc: "toggle proficiency tree (families, levels and prerequisites)",
+		DefaultRect: uikit.ProficiencyRect(),
+		Anchor:      AnchorViewport,
+		DockPolicy:  DockFloating,
+		Group:       "Ship",
+		Build: func(h *ScreenHost) widgets.WindowPanel {
+			return uikit.NewProficiency(h.services.Env, h.services.Proficiency, h.services.Viewport)
+		},
+	},
+	{
 		// The rebinding window: one row per rebindable action (the screen
 		// toggles and the world commands), a click arms capture and the
 		// next key assigns. The fixed chord layer is not listed (it never
@@ -453,6 +476,9 @@ func (g *Game) pressScreen(action string) bool {
 func anchorRect(d image.Rectangle, a Anchor, dw, dh, w, h int) image.Rectangle {
 	var x, y int
 	switch a {
+	case AnchorViewport:
+		// The layer is the viewport: no gutter floor, no declared size.
+		return image.Rect(0, 0, w, h)
 	case AnchorFixed:
 		x, y = theme.Px(d.Min.X), theme.Px(d.Min.Y)
 	case AnchorBottomLeft:
@@ -534,7 +560,7 @@ func screenSpecErrors(rows []Screen) []string {
 		if s.SpaceOnly && s.DockedOnly {
 			add("row %d (%s): SpaceOnly and DockedOnly together never mounts", i, s.Title)
 		}
-		if s.Anchor > AnchorTopCenter {
+		if s.Anchor > AnchorViewport {
 			add("row %d (%s): unknown anchor %d", i, s.Title, s.Anchor)
 		}
 		if s.DockPolicy > DockTransient {

@@ -33,6 +33,7 @@ captures() {
 ./uikit/screens TestLogWindowCapture
 ./uikit/screens TestMapCaptureFrame
 ./uikit/screens TestOrderWindowCaptureFrame
+./uikit/screens TestProficiencyCaptureFrame
 ./uikit/screens TestRefineryPickerCapture
 ./uikit/screens TestRailPixelsDrawAboveWindows
 ./uikit/screens TestSettingsCaptureFrame

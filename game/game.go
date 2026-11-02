@@ -853,8 +853,12 @@ func (g *Game) gameServices() screenServices {
 		},
 		HelpRows: func() []uikit.KeyRow { return helpRowsFor(g) },
 		Menu:     func() widgets.WindowPanel { return winPanel{win: g.buildMenuWindow()} },
-		Close:    g.toggleScreenID,
-		Cancel:   g.cancelCapture,
+		// The proficiency tree's model and the viewport it fills. The model
+		// is the stub until the sim side lands (see proficiencyModel).
+		Proficiency: g.proficiencyModel,
+		Viewport:    func() image.Rectangle { return image.Rect(0, 0, g.w, g.h) },
+		Close:       g.toggleScreenID,
+		Cancel:      g.cancelCapture,
 	}
 }
 
@@ -992,6 +996,12 @@ func (g *Game) removeScene(match func(Scene) bool) {
 
 // onEscape implements the Esc menu toggle.
 func (g *Game) onEscape() error {
+	// The proficiency layer is modal over the world: Esc closes it before
+	// anything behind it (the Esc menu included).
+	if g.host != nil && g.host.IsOpen(idProficiency) {
+		g.host.SetOpen(idProficiency, false)
+		return nil
+	}
 	switch g.top().(type) {
 	case *MenuScene:
 		g.closeMenu()

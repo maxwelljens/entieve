@@ -48,6 +48,7 @@ rebindable (see **Keybindings** below); the global chords (`Esc`, `Ctrl+S`,
 | `H` | Toggle help window |
 | `P` | Toggle settings (UI scale, display, rail, layout) |
 | `K` | Toggle finances window (holdings and transactions) |
+| `T` | Toggle the proficiency tree (families, levels and prerequisites) |
 | `Esc` | Menu: Resume / Save / Save as… / Load / Settings / Quit |
 | `[` or `-` | Time acceleration down (8 → 4 → 2 → 1×) |
 | `]` or `=` | Time acceleration up (1 → 2 → 4 → 8×) |
@@ -138,9 +139,9 @@ without those plates (every release ships no `assets/`) draws the plain panel,
 exactly as before.
 
 Toggle keys open and close their window (`I`, `F`, `G`, `B`, `C`, `N`, `H`,
-`P`, `K`, `Shift+L`); windows have no separate close button. The same
+`P`, `K`, `T`, `Shift+L`); windows have no separate close button. The same
 toggles live on the **left navigation rail**: one glyph per window in
-six sections: **Ship** (Overview, Selected Item, Fitting), **Trade**
+six sections: **Ship** (Overview, Selected Item, Fitting, Proficiency), **Trade**
 (Market, Inventory, Finances), **Industry** (Manufacturing, Refinery), **Station** (Station
 Services), **World** (Scanner, Starmap, Log) and **Help & System**
 (Help). Hover an entry for its tooltip (icon, name and hotkey
@@ -416,6 +417,33 @@ picker); inventory rows: Show Info; overview rows: Show Info / Warp to / Orbit /
 (the entity's hull or caste info plus the usual commands); offer
 rows: Accept / Abandon (grayed when gated); offer objective labels:
 Show Info.
+
+## Proficiency
+
+`T` (or the rail's **Proficiency** entry under **Ship**) opens the
+**proficiency tree**: a full-screen layer over the world that maps every
+proficiency family as a node and every authored prerequisite as an arrow,
+prerequisite to dependent. It is a graph, not a list, so a branch reads at
+a glance: the starter essentials line up in the leftmost rank, and each
+family that needs another sits one rank further right. Because it paints over the world and under
+your windows, an open window stays visible and clickable on top of it;
+presses on the bare tree do nothing to the world, and `Esc` (or `T`, or
+the rail entry) closes it.
+
+Each node carries the family's name, its **level pips** (one box per
+level you can reach, filled up to the level you have), the level readout
+(`3/5`), and the XP banked toward the next level (`40/160 XP`, or `max` at
+the cap). Starter essentials wear a `starter` tag. A family whose
+prerequisites are not met is dimmed and names what it waits for
+(`needs <family> <level>`). An arrow lights when the prerequisite actually
+covers the level the dependent needs, and stays grey otherwise, so a shut
+branch reads as a grey chain. The header counts what you have reached
+(families open, levels earned), so the window answers "how far am I"
+without reading node by node.
+
+The tree is drawn fit to your screen: no scrolling, no zoom. A dozen
+families land in a few ranks with room to spare; a much larger graph would
+shrink the boxes to keep the whole shape on one page.
 
 ## EVE concepts primer
 
