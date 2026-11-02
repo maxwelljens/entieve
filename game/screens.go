@@ -356,15 +356,18 @@ var screens = []Screen{
 		// Kit.AddBackdropWindow: painted over the world and below every
 		// window and all chrome, with its own space inert but blocking the
 		// world. It has no title bar (a layer takes no window chrome: Esc
-		// and its key close it) and re-fits itself to the viewport.
-		ID: idProficiency, Title: "Proficiency", Icon: "stat_tracking",
+		// and its key close it) and re-fits itself to the viewport. The
+		// name distinguishes the row from its summary window, which is the
+		// one titled "Proficiency".
+		ID: idProficiency, Title: "Proficiency tree", Icon: "stat_tracking",
 		Key: ebiten.KeyT, Action: "proficiency", Desc: "toggle proficiency tree (families, levels and prerequisites)",
 		DefaultRect: uikit.ProficiencyRect(),
 		Anchor:      AnchorViewport,
 		DockPolicy:  DockFloating,
 		Group:       "Ship",
 		Build: func(h *ScreenHost) widgets.WindowPanel {
-			return uikit.NewProficiency(h.services.Env, h.services.Proficiency, h.services.Viewport)
+			return uikit.NewProficiency(h.services.Env, h.services.Proficiency,
+				h.services.Viewport, h.services.ProfFamily)
 		},
 	},
 	{
@@ -372,10 +375,12 @@ var screens = []Screen{
 		// header that used to be printed on the layer. It is a plain
 		// floating window (title bar, ×, drag) with no rail entry and no
 		// key: the game opens it with the tree and closes it with the
-		// tree, so its only door is the tree itself. Anchored top-left
-		// (the layer's own corner); its placement persists like every
-		// other window's.
-		ID: idProficiencyOverview, Title: "Proficiency overview", Icon: "stat_tracking",
+		// tree, so its only door is the tree itself. It is titled
+		// "Proficiency" (the row's own name lives in the tree's title).
+		// It lands in the left column just under the Selected Item window,
+		// the one spot the tree's first open leaves free; its placement
+		// persists like every other window's.
+		ID: idProficiencyOverview, Title: "Proficiency", Icon: "stat_tracking",
 		Key:         keyNone,
 		DefaultRect: uikit.ProficiencyOverviewRect(),
 		Anchor:      AnchorFixed,

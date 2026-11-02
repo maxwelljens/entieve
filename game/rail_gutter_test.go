@@ -240,6 +240,19 @@ func TestVirginPlacementTable(t *testing.T) {
 					t.Errorf("%dx%d @%v: selected item at %v, want the top-left corner (%d,%d)",
 						w, h, tc.dev, sp.Min, theme.Px(8+uikit.RailInset), theme.Px(8))
 				}
+				// The proficiency tree's summary window lands BELOW the
+				// Selected Item default (the tree's first open must not
+				// cover the selection's verbs), on screen and in the same
+				// left column.
+				po := g.host.Window(idProficiencyOverview).GetContainer().GetWidget().Rect
+				if po.Min.Y < sp.Max.Y {
+					t.Errorf("%dx%d @%v: proficiency overview %v starts above the selected item's bottom %d",
+						w, h, tc.dev, po, sp.Max.Y)
+				}
+				if po.Min.X < sp.Min.X {
+					t.Errorf("%dx%d @%v: proficiency overview x %d, left of the selected item's column %d",
+						w, h, tc.dev, po.Min.X, sp.Min.X)
+				}
 				if lg.Min.X != theme.Px(10+uikit.RailInset) || lg.Max.Y != g.h-theme.Px(10) {
 					t.Errorf("%dx%d @%v: log %v, want the bottom-left pocket (x %d, bottom %d)",
 						w, h, tc.dev, lg, theme.Px(10+uikit.RailInset), g.h-theme.Px(10))

@@ -7,8 +7,10 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
+	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
@@ -21,6 +23,14 @@ import (
 const (
 	profCardW = 470
 	profCardH = 270
+
+	// profCardPipsH is the level line's height: the pips plus the tiny
+	// face's line box. The line carries the tree node's own three level
+	// reads (the pips, the "2/5" readout and the sim's gate sentence), so
+	// the card and the node it was opened from cannot word a level
+	// differently: the pips come from drawProfPips, the readout from
+	// profLevelText, the gate from the sim.
+	profCardPipsH = 20
 )
 
 // ProfInfoWin is the family card. It holds the family id it was last
@@ -33,9 +43,15 @@ type ProfInfoWin struct {
 	title *theme.ChromeText
 
 	family   string
-	status   *widget.Text
+	gate     string
+	level    *widget.Graphic
+	levelImg *ebiten.Image
 	desc     *widget.Text
 	practice *widget.Text
+
+	// The level line's last spec (the tests compare it with the node's).
+	pipLevel, pipMax int
+	pipLocked        bool
 }
 
 // NewProfInfoWin builds the closed family card over the shared environment.
@@ -57,6 +73,10 @@ func NewProfInfoWin(env widgets.Seams) *ProfInfoWin {
 		)
 	}
 
+	c.levelImg = ebiten.NewImage(theme.Px(profCardW-2*theme.ContentsPad), theme.Px(profCardPipsH))
+	c.level = widget.NewGraphic(widget.GraphicOpts.Image(c.levelImg),
+		widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.MinSize(c.levelImg.Bounds().Dx(), c.levelImg.Bounds().Dy())))
+
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.WindowBodyBox(p, theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
@@ -66,14 +86,13 @@ func NewProfInfoWin(env widgets.Seams) *ProfInfoWin {
 			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	c.status = wrapped(env.Face(theme.StepSmall), p.Text)
 	c.desc = wrapped(env.Face(theme.StepSmall), p.Text)
 	c.practice = wrapped(env.Face(theme.StepTiny), p.Dim)
 	hint := widget.NewText(
 		widget.TextOpts.Text("Esc or × closes. Click another family to switch.", env.Face(theme.StepTiny), theme.Solid(p.Head)),
 		widget.TextOpts.MaxWidth(maxW),
 	)
-	body.AddChild(c.status, head("WHAT IT IS FOR"), c.desc, head("PRACTICE"), c.practice, hint)
+	body.AddChild(c.level, head("WHAT IT IS FOR"), c.desc, head("PRACTICE"), c.practice, hint)
 
 	bar, title := theme.NewTitleBar(env, "Proficiency", "stat_tracking")
 	c.title = title
@@ -96,14 +115,26 @@ func (c *ProfInfoWin) Win() *widget.Window { return c.win }
 // show); the tests read it to prove a click retargeted the one window.
 func (c *ProfInfoWin) Family() string { return c.family }
 
+// Gate is the gate sentence the level line carries ("" while the family is
+// open): the tests pin it against the sim's and the tree node's wording.
+func (c *ProfInfoWin) Gate() string { return c.gate }
+
+// Level is the card's painted level line (the tests read the pips off it).
+func (c *ProfInfoWin) Level() *ebiten.Image { return c.levelImg }
+
+// Pips is the level line's last spec: the level, the cap and whether the
+// branch is shut, the same three values the tree's node hands the painter.
+func (c *ProfInfoWin) Pips() (level, max int, locked bool) { return c.pipLevel, c.pipMax, c.pipLocked }
+
 // Show points the card at one family and reveals it. level and gate are the
 // tree node's own readouts, so the card can never disagree with the node it
-// was opened from.
+// was opened from: the same pips, the same level readout, the same gate
+// sentence.
 func (c *ProfInfoWin) Show(family string, level int, gate string) {
 	card := content.FamilyInfo(family)
-	c.family = family
+	c.family, c.gate = family, gate
 	c.title.Label = content.FamilyLabel(family)
-	c.status.Label = profCardStatus(level, gate)
+	c.paintLevel(level, gate)
 	c.desc.Label = card.Desc
 	lines := make([]string, 0, len(card.Practice))
 	for _, line := range card.Practice {
@@ -113,15 +144,23 @@ func (c *ProfInfoWin) Show(family string, level int, gate string) {
 	theme.ShowWidget(c.win.GetContainer().GetWidget(), true)
 }
 
-// profCardStatus is the card's first line: the node's level, then the node's
-// unmet-prerequisite text ("Level II of V · needs Autocannons II").
-func profCardStatus(level int, gate string) string {
-	line := "Untrained (0 of " + content.LevelLabel(content.ProficiencyMax) + ")"
-	if level > 0 {
-		line = "Level " + content.LevelLabel(level) + " of " + content.LevelLabel(content.ProficiencyMax)
-	}
+// paintLevel draws the card's level line the way the tree draws its node:
+// the pips (filled to the level, dim on a shut branch), the level readout
+// beside them ("2/5", the node's own words) and the sim's gate sentence.
+// One line carries all three, so the card keeps its fixed height (the
+// words it replaces took a line of their own).
+func (c *ProfInfoWin) paintLevel(level int, gate string) {
+	c.pipLevel, c.pipMax, c.pipLocked = level, content.ProficiencyMax, gate != ""
+	c.levelImg.Clear()
+	pal := c.th.Pal()
+	step, size := theme.Px(profPipW+profPipGap), theme.Px(profPipW)
+	y := theme.Px(profCardPipsH)/2 - size/2
+	drawProfPips(c.levelImg, 0, y, level, c.pipMax, step, size, c.pipLocked, pal)
+	lv := profLevelText(ProfFamily{Level: level, MaxLevel: c.pipMax})
+	x := profPipRowW(c.pipMax, step, size) + theme.Px(theme.SpMd)
+	theme.DrawCardText(c.levelImg, lv, c.th.Face(theme.StepTiny), x, 0, pal.Dim)
 	if gate != "" {
-		line += " · " + gate
+		x += theme.Px(int(render.Measure(lv, c.th.TS().Tiny))) + theme.Px(theme.SpMd)
+		theme.DrawCardText(c.levelImg, "· "+gate, c.th.Face(theme.StepTiny), x, 0, pal.Dim)
 	}
-	return line
 }

@@ -229,7 +229,7 @@ const layoutBytesGolden = `{
     },
     "proficiency-overview": {
       "x": 97,
-      "y": 8,
+      "y": 276,
       "w": 402,
       "h": 244,
       "open": false

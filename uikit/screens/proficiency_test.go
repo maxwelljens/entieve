@@ -144,7 +144,7 @@ func TestProficiencyLayerMountsBelowWindowsAndOwnsBareSpace(t *testing.T) {
 		t.Fatalf("fixture: world point already owned by layer %d", l)
 	}
 
-	p := NewProficiency(k.Env(), proficiencyChain, nil)
+	p := NewProficiency(k.Env(), proficiencyChain, nil, nil)
 	p.Sync()
 	remove := k.AddBackdropWindow(p.Win())
 	pumpKit(t, k, 1280, 720)
@@ -175,7 +175,7 @@ func TestProficiencyLayerMountsBelowWindowsAndOwnsBareSpace(t *testing.T) {
 func TestProficiencyReopenRestoresTheSameLayout(t *testing.T) {
 	uitest.UseScale(t, 1)
 	k, _ := newTestKit(t)
-	p := NewProficiency(k.Env(), proficiencyChain, nil)
+	p := NewProficiency(k.Env(), proficiencyChain, nil, nil)
 	p.Sync()
 	pumpKit(t, k, 1280, 720)
 	firstNodes, firstEdges := p.nodes, p.edges

@@ -141,7 +141,7 @@ exactly as before.
 Toggle keys open and close their window (`I`, `F`, `G`, `B`, `C`, `N`, `H`,
 `P`, `K`, `T`, `Shift+L`); windows have no separate close button. The same
 toggles live on the **left navigation rail**: one glyph per window in
-six sections: **Ship** (Overview, Selected Item, Fitting, Proficiency), **Trade**
+six sections: **Ship** (Overview, Selected Item, Fitting, Proficiency tree), **Trade**
 (Market, Inventory, Finances), **Industry** (Manufacturing, Refinery), **Station** (Station
 Services), **World** (Scanner, Starmap, Log) and **Help & System**
 (Help). Hover an entry for its tooltip (icon, name and hotkey
@@ -443,7 +443,7 @@ while the family is in use (weapon damage, mining yield, hull speed). Show
 Info lists a def's requirement and your level under PROFICIENCY, and every
 level-up prints one line in the log (`Proficiency: Autocannon II`). Nothing
 decays: practice you earned stays.
-`T` (or the rail's **Proficiency** entry under **Ship**) opens the
+`T` (or the rail's **Proficiency tree** entry under **Ship**) opens the
 **proficiency tree**: a full-screen layer over the world that maps every
 proficiency family as a node and every authored prerequisite as an arrow,
 prerequisite to dependent. It is a graph, not a list, so a branch reads at
@@ -462,10 +462,16 @@ prerequisites are not met is dimmed and names what it waits for
 family it feeds and lights when the prerequisite actually covers the level
 the dependent needs, so a shut branch reads as a grey chain. A node under
 the pointer takes an accent edge and the pointer cursor, and a family at
-the cap writes its readout in the accent. A rank with more families than
-one column can hold wraps into adjacent columns instead of shrinking the
-whole graph, so the first rank of ten roots reads as two columns side by
-side.
+the cap writes its readout in the accent. One rank is one column: the roots
+line up down the leftmost column and every arrow runs rightwards to the
+next rank, so the graph reads as a tree. The whole graph takes one fit
+factor, so ten roots in one column make the boxes smaller instead of
+splitting that column in two; drag and zoom are how you read a crowded
+graph.
+
+The family whose card is open keeps the accent edge, so the tree always
+says which family the dialog belongs to; clicking another node moves it,
+and closing the card clears it.
 
 The tree **navigates**: drag anywhere on the bare graph to pan it, and
 roll the wheel to zoom around the cursor (0.5x to 2x; the type zooms with
@@ -475,14 +481,15 @@ The pan is clamped so a graph edge never leaves the screen, and both pan
 and zoom are session state: nothing is saved, and a reopened tree starts
 fitted and centred.
 
-The tree's **overview window** opens with it at the top left: families
+The tree's **overview window** opens with it, landed under the Selected
+Item window so it covers none of that panel's verbs: families
 open, levels earned against the possible total over a progress bar,
 families at the cap, and every family's level in two columns (dimmed while
 gated, accent at the cap), with the navigation hint and `Esc closes`. Its
 × closes only the window; the tree keeps running, and the next open brings
-the summary back. The graph is fitted below the window's default place, so
-the summary never covers a node on first open; if you move or close it,
-the graph stays where it was (drag the graph to reclaim the space).
+the summary back. The graph takes one fit factor for the whole layer and is
+not re-fitted around the summary, so when the window sits over a node,
+drag the graph out from under it.
 
 Click a node for its **family card**: one window, re-targeted by the next
 click and placed beside it, stating your level in the family and the

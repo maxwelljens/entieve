@@ -887,8 +887,16 @@ func (g *Game) gameServices() screenServices {
 		// is the sim's families (see proficiencyModel), gate sentence and all.
 		Proficiency: g.proficiencyModel,
 		Viewport:    func() image.Rectangle { return image.Rect(0, 0, g.w, g.h) },
-		Close:       g.toggleScreenID,
-		Cancel:      g.cancelCapture,
+		// The family card is the kit's dialog: the tree asks it which family
+		// is open so its node can wear the selected state.
+		ProfFamily: func() string {
+			if g.kit == nil {
+				return ""
+			}
+			return g.kit.ProfFamily()
+		},
+		Close:  g.toggleScreenID,
+		Cancel: g.cancelCapture,
 	}
 }
 

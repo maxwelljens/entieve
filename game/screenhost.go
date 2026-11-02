@@ -44,6 +44,10 @@ type screenServices struct {
 	// Viewport is the live screen rect in device pixels: the full-viewport
 	// layer sizes itself to it (nil keeps its design rect).
 	Viewport func() image.Rectangle
+	// ProfFamily is the family the open proficiency family card names ("").
+	// The tree paints that node in the selected state, so the highlight
+	// follows a re-target and clears when the card closes.
+	ProfFamily func() string
 	// Close is the owner's close semantics for a row's ×: the game routes
 	// modal rows to their scene, the title host leaves it nil (plain
 	// toggle).

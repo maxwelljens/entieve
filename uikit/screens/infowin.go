@@ -57,12 +57,19 @@ const (
 // plus the optional link. Ref marks the row as clickable (right-click
 // menu, double-click swap); RefOnValue puts the linked name in the value
 // (the caste's hull) instead of the label (loot drops, charges, yields).
+// Pips draws the value as level pip boxes instead of text (the PROFICIENCY
+// block's level, the same painter the proficiency tree's nodes read):
+// PipLevel boxes are filled out of PipMax, PipLocked dims an earned pip on
+// a shut branch, and PipMax 0 is a plain text row.
 type infoRow struct {
 	Label      string
 	Value      string
 	Tint       color.RGBA
 	Ref        *widgets.InfoRef
 	RefOnValue bool
+	PipLevel   int
+	PipMax     int
+	PipLocked  bool
 }
 
 // infoSection is a labelled group of rows ("DAMAGE", "LOOT"). Lines group
@@ -325,20 +332,21 @@ func infoPageFor(cv widgets.ContentView, ref widgets.InfoRef) (infoPage, bool) {
 
 // proficiencyRows is the PROFICIENCY block of a hull or module page: the
 // practice line, the gate fitting/flying must clear (the sim's own sentence,
-// prerequisites included) and the player's current level. Empty for a
-// fixture def with no family.
+// prerequisites included) and the player's current level as the tree's own
+// pip boxes. Empty for a fixture def with no family.
 func proficiencyRows(cv widgets.ContentView, family string, gate int) []infoRow {
 	if family == "" {
 		return nil
 	}
 	req := cv.ProficiencyRequirement(family, gate)
-	if req == "" {
+	locked := req != ""
+	if !locked {
 		req = "None"
 	}
 	return []infoRow{
 		{Label: "Family", Value: content.FamilyLabel(family)},
 		{Label: "Requirement", Value: req},
-		{Label: "Level", Value: content.LevelLabel(cv.Proficiency(family))},
+		{Label: "Level", PipLevel: cv.Proficiency(family), PipMax: content.ProficiencyMax, PipLocked: locked},
 	}
 }
 
@@ -1228,6 +1236,16 @@ func (w *InfoWin) rowWidget(row infoRow, maxW float64) widget.PreferredSizeLocat
 		widget.TextOpts.Position(widget.TextPositionStart, widget.TextPositionCenter),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(labelData)),
 	))
+	if row.PipMax > 0 {
+		step, size := theme.Px(profPipW+profPipGap), theme.Px(profPipW)
+		img := ebiten.NewImage(profPipRowW(row.PipMax, step, size), size)
+		drawProfPips(img, 0, 0, row.PipLevel, row.PipMax, step, size, row.PipLocked, pal)
+		ctr.AddChild(widget.NewGraphic(widget.GraphicOpts.Image(img),
+			widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionEnd,
+				VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			}))))
+	}
 	if row.Value != "" {
 		ctr.AddChild(widget.NewText(
 			widget.TextOpts.Text(row.Value, face, valueCol),
