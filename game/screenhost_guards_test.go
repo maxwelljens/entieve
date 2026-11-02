@@ -13,7 +13,7 @@ func TestWindowNamesFrozen(t *testing.T) {
 	want := []string{
 		"inventory", "fitting", "market", "manufacturing", "scanner",
 		"map", "help", "log", "settings", "services", "refinery",
-		"finances", "keybindings", "menu",
+		"finances", "proficiency", "keybindings", "menu",
 	}
 	var got []string
 	for _, s := range screens {
@@ -30,7 +30,7 @@ func TestSidecarKeyShape(t *testing.T) {
 	want := []string{
 		"inventory", "fitting", "market", "manufacturing", "scanner",
 		"map", "help", "log", "settings", "services", "refinery",
-		"finances", "keybindings",
+		"finances", "proficiency", "keybindings",
 	}
 	if got := sidecarNames(screens); !slices.Equal(got, want) {
 		t.Fatalf("sidecar names = %v, want %v", got, want)
@@ -99,7 +99,7 @@ const layoutBytesGolden = `{
       "x": 190,
       "y": 24,
       "w": 900,
-      "h": 595,
+      "h": 631,
       "open": false
     },
     "infowin": {
@@ -218,6 +218,13 @@ const layoutBytesGolden = `{
           }
         }
       }
+    },
+    "proficiency": {
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 720,
+      "open": false
     },
     "refinery": {
       "x": 430,

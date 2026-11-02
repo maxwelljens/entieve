@@ -37,6 +37,14 @@ type screenServices struct {
 	Keys     uikit.KeybindActions
 	HelpRows func() []uikit.KeyRow
 	Menu     func() widgets.WindowPanel
+	// Proficiency is the pilot's proficiency model (the tree's nodes and
+	// prereq edges). TODO(integration): the proficiency wave's sim model
+	// maps onto uikit.ProfFamily here; Game.proficiencyModel is the
+	// fixture until that branch merges.
+	Proficiency func() []uikit.ProfFamily
+	// Viewport is the live screen rect in device pixels: the full-viewport
+	// layer sizes itself to it (nil keeps its design rect).
+	Viewport func() image.Rectangle
 	// Close is the owner's close semantics for a row's ×: the game routes
 	// modal rows to their scene, the title host leaves it nil (plain
 	// toggle).
@@ -231,7 +239,7 @@ func (h *ScreenHost) setMounted(s *screenSlot, want, quiet bool) {
 	if want {
 		h.build(s)
 		win := s.panel.Win()
-		s.mount = h.sink.AddWindow(win)
+		s.mount = h.mountWindow(s, win)
 		// The window's table rows are its hit-test row surface: one live
 		// closure per mount, over the row's tables, so a table swapped
 		// inside the panel is seen.
@@ -255,6 +263,22 @@ func (h *ScreenHost) setMounted(s *screenSlot, want, quiet bool) {
 	if h.scope == titleScope {
 		s.panel = nil
 	}
+}
+
+// mountWindow mounts a row's window: a panel that paints the full-viewport
+// backdrop (the proficiency tree) goes through the kit's layer path, so it
+// paints below every window; every other panel is an ordinary window. The
+// capability is asked by type on the panel, and the sink answers by type
+// too, so a recorder sink simply mounts it like any window.
+func (h *ScreenHost) mountWindow(s *screenSlot, win *widget.Window) widget.RemoveWindowFunc {
+	if b, ok := s.panel.(interface{ Backdrop() bool }); ok && b.Backdrop() {
+		if ab, ok := h.sink.(interface {
+			AddBackdropWindow(*widget.Window) widget.RemoveWindowFunc
+		}); ok {
+			return ab.AddBackdropWindow(win)
+		}
+	}
+	return h.sink.AddWindow(win)
 }
 
 // Sync refreshes the mounted panels. A committed chrome close (the ×)

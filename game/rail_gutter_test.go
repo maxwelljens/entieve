@@ -45,6 +45,9 @@ func TestPlacedDefaultRectsClearTheRailGutter(t *testing.T) {
 					{"station services", g.host.Window(idServices)},
 				}
 				for _, s := range screens {
+					if s.Anchor == AnchorViewport {
+						continue // the full-viewport layer: see TestVirginPlacementTable
+					}
 					cases = append(cases, struct {
 						name string
 						win  *widget.Window
@@ -188,6 +191,17 @@ func TestVirginPlacementTable(t *testing.T) {
 				check("show info", g.kit.InfoWindow().GetContainer().GetWidget().Rect)
 				check("station services", g.host.Window(idServices).GetContainer().GetWidget().Rect)
 				for _, s := range screens {
+					if s.Anchor == AnchorViewport {
+						// The full-viewport layer is the viewport by
+						// design: it paints beneath the rail, which keeps
+						// its input precedence, so the gutter floor (a
+						// window rule) does not apply to it.
+						if r := g.host.Window(s.ID).GetContainer().GetWidget().Rect; r != screen {
+							t.Errorf("%dx%d @%v: %s layer %v, want the whole viewport %v",
+								w, h, tc.dev, s.Title, r, screen)
+						}
+						continue
+					}
 					check(s.Title, g.host.Window(s.ID).GetContainer().GetWidget().Rect)
 				}
 

@@ -20,6 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lists requirement and level; a plain-data `ProficiencyFamilies` read feeds
   the tech-tree screen.
 
+- **The proficiency tree**: `T` (or the rail's **Proficiency** entry) opens a
+  full-screen layer over the world showing every proficiency family as a
+  node and every prerequisite as an arrow, prerequisite to dependent:
+  level pips, the level and XP readout toward the next level, a `starter`
+  tag on the essentials, and dimmed nodes naming the prerequisite they
+  wait for. It paints under your windows, so an open window stays visible
+  and clickable on top of it, it blocks the world while it is up, and
+  `Esc` closes it. The graph is laid out by rank (topological, ties by
+  family id) and fitted to the screen, so it never scrolls.
 - **Contacts replace the contract board**: the dock screen is now the
   **Contacts** view: the station services strip (the docked-at identity and
   Undock; every window it used to open is a navigation rail row already)

@@ -18,8 +18,8 @@ import (
 // The walk's order is the precedence, top of the interface first: the
 // popup latch, the popup's own rect, a modal window's fullscreen layer, the
 // top chrome, the window stack (topmost first), the root chrome's
-// descendants, and last ebitenui's hover flag — which gates but never
-// raises.
+// descendants, the full-viewport backdrop layer, and last ebitenui's hover
+// flag — which gates but never raises.
 
 // Layer is where a point lands in the interface's stacking order. The
 // values run in the hit test's precedence order, not in paint order.
@@ -30,7 +30,7 @@ const (
 	LayerPopup                   // the context menu and the quantity picker
 	LayerTopChrome               // the navigation rail, above every window
 	LayerWindow                  // one mounted window (the topmost under pt)
-	LayerRootChrome              // HUD and rack — descendants only
+	LayerRootChrome              // HUD and rack descendants, and the backdrop layer
 	LayerHovered                 // ebitenui's hover flag: the backstop
 )
 
@@ -75,9 +75,14 @@ func (k *Kit) Own(pt image.Point) Owner {
 		}
 	}
 	// 5. The window stack, topmost first: the first visible window holding
-	// pt owns it — its widgets, then its registered row surface.
+	// pt owns it — its widgets, then its registered row surface. The
+	// backdrop layer is skipped: it is mounted as a window but paints
+	// below every other one (step 7).
 	for i := len(k.stack) - 1; i >= 0; i-- {
 		win := k.stack[i].win
+		if win == k.backdrop {
+			continue
+		}
 		if hitRect(win.GetContainer().GetWidget(), pt) {
 			return Owner{Layer: LayerWindow, Window: win, Control: k.windowControl(win, pt)}
 		}
@@ -89,7 +94,13 @@ func (k *Kit) Own(pt image.Point) Owner {
 			return Owner{Layer: LayerRootChrome, Control: pressLoud(c, pt)}
 		}
 	}
-	// 7. ebitenui's hover flag, last: it covers what the rects cannot
+	// 7. The backdrop layer: painted above the world, below the root chrome
+	// and the windows, so it answers where none of them paint. Its own
+	// space is inert (no control) but the world never sees the press.
+	if b := k.backdrop; b != nil && hitRect(b.GetContainer().GetWidget(), pt) {
+		return Owner{Layer: LayerRootChrome}
+	}
+	// 8. ebitenui's hover flag, last: it covers what the rects cannot
 	// measure (tooltips, ephemeral widgets) and lags a frame behind.
 	if input.UIHovered {
 		return Owner{Layer: LayerHovered}
