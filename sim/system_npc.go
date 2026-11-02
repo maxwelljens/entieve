@@ -1129,7 +1129,7 @@ func (s *Sim) minerAttackerPos(ai *NpcAI) core.Vec2 {
 }
 
 // minerMine cuts the nearest rock with volume left. The mining laser needs no
-// lock (targetRock, see checkCycle): the miner binds it straight to the rock.
+// lock (TargetRock, see checkCycle): the miner binds it straight to the rock.
 func (s *Sim) minerMine(e ecs.Entity, ai *NpcAI, tr *Transform, def *content.NpcDef) {
 	if s.minerHoldFull(e) {
 		st := s.nearestStation(tr.Pos)

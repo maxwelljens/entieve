@@ -76,20 +76,10 @@ func NewInventory(env widgets.Seams) *Inventory {
 	inv.oreLbl = newLabel("Ore hold")
 	inv.hangLbl = newLabel("Station hangar")
 
-	newBtn := func(label string, clicked func()) *widget.Button {
-		return widget.NewButton(
-			widget.ButtonOpts.TextLabel(label),
-			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(theme.Px(40), theme.Px(40)),
-				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-			),
-			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
-		)
-	}
-	inv.toCargo = newBtn("To Cargo", func() { inv.transfer("cargo") })
-	inv.toOre = newBtn("To Ore", func() { inv.transfer("ore") })
-	inv.toHangar = newBtn("To Hangar", func() { inv.transfer("hangar") })
-	inv.sell = newBtn("Sell", inv.sellClicked)
+	inv.toCargo = theme.ActionButton("To Cargo", func() { inv.transfer("cargo") })
+	inv.toOre = theme.ActionButton("To Ore", func() { inv.transfer("ore") })
+	inv.toHangar = theme.ActionButton("To Hangar", func() { inv.transfer("hangar") })
+	inv.sell = theme.ActionButton("Sell", inv.sellClicked)
 
 	// One toolbar: every verb acts on the selected stack and asks for its
 	// quantity in the picker.

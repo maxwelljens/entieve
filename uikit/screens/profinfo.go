@@ -29,15 +29,13 @@ const (
 type ProfInfoWin struct {
 	th theme.Theme
 
-	win   *widget.Window
+	dialogShell
 	title *theme.ChromeText
 
 	family   string
 	status   *widget.Text
 	desc     *widget.Text
 	practice *widget.Text
-
-	onClose func()
 }
 
 // NewProfInfoWin builds the closed family card over the shared environment.
@@ -126,22 +124,4 @@ func profCardStatus(level int, gate string) string {
 		line += " · " + gate
 	}
 	return line
-}
-
-// Close closes the card: through the Kit it also unmounts; in a bare
-// environment it just hides.
-func (c *ProfInfoWin) Close() {
-	if c.onClose != nil {
-		c.onClose()
-		return
-	}
-	c.hide()
-}
-
-// hide flips the container invisible (the kit's unmount path).
-func (c *ProfInfoWin) hide() { theme.ShowWidget(c.win.GetContainer().GetWidget(), false) }
-
-// IsOpen reports whether the window is revealed.
-func (c *ProfInfoWin) IsOpen() bool {
-	return c.win != nil && c.win.GetContainer().GetWidget().IsVisible()
 }

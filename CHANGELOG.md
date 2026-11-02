@@ -146,6 +146,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Shared uikit internals, no visible change**: the rack cell, the HUD
+  effect tile and the target card's mini-cell paint the cycle ring through
+  one helper; a module's target class (ship, any locked target, asteroid,
+  self) is one `ModuleDef` answer that both the sim's activation gate and the
+  rack's pick read; the on-demand dialogs share one `dialogShell` for
+  Close/hide/IsOpen and the six identical action buttons come from one
+  constructor. Pixels and behaviour are unchanged.
 - **One owner for the proficiency gate and the standing gate**: the sim's one
   prerequisite walk now feeds the fit/fly refusal, the tech-tree node, the
   family card and Show Info's requirement row, so the four cannot disagree;

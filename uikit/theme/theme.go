@@ -237,6 +237,20 @@ func buttonImage(s [5]buttonState) *widget.ButtonImage {
 // combo buttons and the table header's shared states).
 func HouseButton(p Palette) *widget.ButtonImage { return buttonImage(houseStates(p)) }
 
+// ActionButton is the dialog row's standard action button: label only, a
+// 40x40 floor, stretched across its row cell. The fitting window's slot verbs
+// keep their own text-width floor (0 wide), so they do not use this.
+func ActionButton(label string, clicked func()) *widget.Button {
+	return widget.NewButton(
+		widget.ButtonOpts.TextLabel(label),
+		widget.ButtonOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(Px(40), Px(40)),
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+		),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
+	)
+}
+
 // CellImage is the cell chrome shared by the rack, rail, services strip and
 // fitting grid: highlight sets the accent-glow idle, else it is a quiet cell.
 func CellImage(p Palette, highlighted bool) *widget.ButtonImage {

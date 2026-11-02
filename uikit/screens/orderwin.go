@@ -43,7 +43,7 @@ type OrderWin struct {
 	cv widgets.ContentView
 	as widgets.ActionSink
 
-	win   *widget.Window
+	dialogShell
 	title *theme.ChromeText
 	body  *widget.Container
 
@@ -61,8 +61,6 @@ type OrderWin struct {
 	priceVal float64
 	qtyVal   int
 	valid    bool
-
-	onClose func() // Kit-hosted: unmount (a bare env only hides)
 }
 
 // NewOrderWin builds the closed mini-window over the given environment.
@@ -70,6 +68,7 @@ type OrderWin struct {
 func NewOrderWin(env widgets.Seams) *OrderWin {
 	p := env.Pal()
 	o := &OrderWin{th: env, cv: env, as: env}
+	o.onHide = o.Blur
 
 	field := func() *widget.TextInput {
 		return widget.NewTextInput(
@@ -96,19 +95,9 @@ func NewOrderWin(env widgets.Seams) *OrderWin {
 		widget.TextOpts.Text("", env.FaceMono(theme.StepTiny), theme.Solid(p.Dim)),
 	)
 
-	newBtn := func(text string, clicked func()) *widget.Button {
-		return widget.NewButton(
-			widget.ButtonOpts.TextLabel(text),
-			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(theme.Px(40), theme.Px(40)),
-				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-			),
-			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
-		)
-	}
-	o.modeBtn = newBtn("Sell", o.toggleMode)
-	o.accept = newBtn("Accept", o.submit)
-	o.cancel = newBtn("Cancel", o.Close)
+	o.modeBtn = theme.ActionButton("Sell", o.toggleMode)
+	o.accept = theme.ActionButton("Accept", o.submit)
+	o.cancel = theme.ActionButton("Cancel", o.Close)
 
 	row := func(children ...widget.PreferredSizeLocateableWidget) *widget.Container {
 		c := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -178,28 +167,6 @@ func (o *OrderWin) Show(item content.ItemID, side sim.OrderSide, qty int) bool {
 	o.Blur()
 	theme.ShowWidget(o.win.GetContainer().GetWidget(), true)
 	return true
-}
-
-// Close closes the window: through the Kit it also unmounts (so a closed
-// window stops gating world input); in a bare environment it just hides.
-func (o *OrderWin) Close() {
-	if o.onClose != nil {
-		o.onClose()
-		return
-	}
-	o.hide()
-}
-
-// hide flips the container invisible (the kit's unmount path).
-func (o *OrderWin) hide() {
-	o.Blur()
-	theme.ShowWidget(o.win.GetContainer().GetWidget(), false)
-}
-
-// IsOpen reports whether the window is revealed (shown, and mounted when
-// a Kit hosts it).
-func (o *OrderWin) IsOpen() bool {
-	return o.win != nil && o.win.GetContainer().GetWidget().IsVisible()
 }
 
 // TitleText is the title-bar label (the base display name).

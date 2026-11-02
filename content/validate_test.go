@@ -671,6 +671,30 @@ func TestModuleKindAggression(t *testing.T) {
 	}
 }
 
+// TestModuleTargetClass pins the target-class table for every valid kind:
+// the sim's activation gate and the rack's pick both read it, so a new kind
+// must be classified here (and a kind that quietly defaults to no target
+// fails this coverage check).
+func TestModuleTargetClass(t *testing.T) {
+	want := map[string]TargetClass{
+		KindWeapon:      TargetShip,
+		KindStasisWeb:   TargetAny,
+		KindWarpScram:   TargetAny,
+		KindMiningLaser: TargetRock,
+		KindShieldBoost: TargetNone, KindShieldExtender: TargetNone,
+		KindArmorRep: TargetNone, KindArmorPlate: TargetNone, KindResistCoat: TargetNone,
+		KindCapBooster: TargetNone, KindCapRecharger: TargetNone, KindAfterburner: TargetNone,
+	}
+	if len(want) != len(validKinds) {
+		t.Fatalf("table covers %d kinds, validKinds has %d", len(want), len(validKinds))
+	}
+	for kind := range validKinds {
+		if got := (&ModuleDef{Kind: kind}).TargetClass(); got != want[kind] {
+			t.Errorf("%s targets %q, want %q", kind, got, want[kind])
+		}
+	}
+}
+
 // TestProficiencyCards pins the family pages: every family has a
 // description and at least one practice line, the shipped table is clean,
 // and the validator rejects a missing or empty page (a blank dialog can

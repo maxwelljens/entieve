@@ -723,7 +723,7 @@ type InfoWin struct {
 	cv widgets.ContentView
 	as widgets.ActionSink
 
-	win       *widget.Window
+	dialogShell
 	title     *theme.ChromeText
 	page      *widget.Container
 	scroll    *widget.ScrollContainer
@@ -741,7 +741,6 @@ type InfoWin struct {
 	ref     widgets.InfoRef
 	hasRef  bool
 	dbl     widgets.RowDouble // ref-row double-click bookkeeping (the installer's half)
-	onClose func()            // Kit-hosted: unmount (a bare env only hides)
 }
 
 // NewInfoWin builds the closed window over the given environment. It
@@ -824,12 +823,6 @@ func (w *InfoWin) Sync() {
 	w.rail.Sync()
 }
 
-// IsOpen reports whether the window is revealed (shown, and mounted when
-// a Kit hosts it).
-func (w *InfoWin) IsOpen() bool {
-	return w.win != nil && w.win.GetContainer().GetWidget().IsVisible()
-}
-
 // Ref is what the window currently shows (ok = a page was ever built).
 func (w *InfoWin) Ref() (widgets.InfoRef, bool) { return w.ref, w.hasRef }
 
@@ -879,18 +872,6 @@ func (w *InfoWin) Show(ref widgets.InfoRef) bool {
 
 // Close hides the window: through the Kit it also unmounts (so a closed
 // window stops gating world input); in a bare environment it just hides.
-func (w *InfoWin) Close() {
-	if w.onClose != nil {
-		w.onClose()
-		return
-	}
-	w.hide()
-}
-
-// hide flips the container invisible (the kit's unmount path).
-func (w *InfoWin) hide() {
-	theme.ShowWidget(w.win.GetContainer().GetWidget(), false)
-}
 
 // scrollBy turns wheel notches into rows of scroll offset over the page
 // overflow — the table's convention (positive notch scrolls up).

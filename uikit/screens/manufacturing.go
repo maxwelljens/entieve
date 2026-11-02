@@ -123,18 +123,8 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 		widget.TextOpts.Text("Jobs", env.Face(theme.StepTiny), theme.Solid(p.Accent)),
 	)
 
-	newBtn := func(label string, clicked func()) *widget.Button {
-		return widget.NewButton(
-			widget.ButtonOpts.TextLabel(label),
-			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(theme.Px(40), theme.Px(40)),
-				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-			),
-			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
-		)
-	}
-	f.collect = newBtn("Collect", f.collectClicked)
-	f.cancel = newBtn("Cancel", f.cancelClicked)
+	f.collect = theme.ActionButton("Collect", f.collectClicked)
+	f.cancel = theme.ActionButton("Cancel", f.cancelClicked)
 
 	collectBar := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(

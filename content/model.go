@@ -298,6 +298,45 @@ func (m *ModuleDef) IsAggressive() bool {
 	return false
 }
 
+// TargetClass is what a module's activation takes as a target. The sim's
+// activation gate enforces it and every surface that offers a target reads
+// it, so a new kind cannot pass one and fail the other.
+type TargetClass string
+
+const (
+	TargetNone TargetClass = ""         // self: no target
+	TargetShip TargetClass = "ship"     // a locked hull
+	TargetAny  TargetClass = "locked"   // any locked entity (ewar)
+	TargetRock TargetClass = "asteroid" // a live asteroid (miner)
+)
+
+// TargetClass returns the module kind's target requirement.
+func (m *ModuleDef) TargetClass() TargetClass {
+	switch m.Kind {
+	case KindWeapon:
+		return TargetShip
+	case KindStasisWeb, KindWarpScram:
+		return TargetAny
+	case KindMiningLaser:
+		return TargetRock
+	}
+	return TargetNone
+}
+
+// Suits reports whether a candidate entity of the given classes answers c:
+// the rack's pick reads it with the view's own ship/asteroid reads.
+func (c TargetClass) Suits(ship, rock bool) bool {
+	switch c {
+	case TargetShip:
+		return ship
+	case TargetRock:
+		return rock
+	case TargetAny:
+		return true
+	}
+	return false
+}
+
 // BayRounds is how many whole rounds of a shell of the given m³ volume the
 // module's bay holds: the floor arithmetic the bay calibration pins (the
 // epsilon absorbs the binary rounding of decimal m³ volumes). 0 = no bay

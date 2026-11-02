@@ -47,7 +47,7 @@ type ovFilterRow struct {
 // the other kinds is a no-op until those kinds gain one.
 type OvFilterWin struct {
 	ptr *widgets.Pointer
-	win *widget.Window
+	dialogShell
 
 	rows []ovFilterRow
 
@@ -161,14 +161,6 @@ func (f *OvFilterWin) Show() {
 		r.col.SetChecked(colour)
 	}
 	theme.ShowWidget(f.win.GetContainer().GetWidget(), true)
-}
-
-// hide flips the container invisible (the kit's unmount path).
-func (f *OvFilterWin) hide() { theme.ShowWidget(f.win.GetContainer().GetWidget(), false) }
-
-// IsOpen reports whether the window is revealed.
-func (f *OvFilterWin) IsOpen() bool {
-	return f.win != nil && f.win.GetContainer().GetWidget().IsVisible()
 }
 
 // Sync runs one frame of the window's input: every tick box polls the

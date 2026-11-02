@@ -702,18 +702,8 @@ func NewMarket(env widgets.Seams) *Market {
 		}
 	})
 
-	newBtn := func(label string, clicked func()) *widget.Button {
-		return widget.NewButton(
-			widget.ButtonOpts.TextLabel(label),
-			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(theme.Px(40), theme.Px(40)),
-				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-			),
-			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
-		)
-	}
-	m.buy = newBtn("Buy", m.buyClicked)
-	m.sell = newBtn("Sell", m.sellClicked)
+	m.buy = theme.ActionButton("Buy", m.buyClicked)
+	m.sell = theme.ActionButton("Sell", m.sellClicked)
 	tradeBar := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),

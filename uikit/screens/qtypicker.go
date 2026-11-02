@@ -49,7 +49,7 @@ type QtyWin struct {
 	as  widgets.ActionSink
 	ptr *widgets.Pointer
 
-	win   *widget.Window
+	dialogShell
 	title *theme.ChromeText
 	info  *widget.Text
 
@@ -69,7 +69,6 @@ type QtyWin struct {
 	last    map[widgets.QtyMode]int // per-mode memory of the confirmed value
 	// shortcut: Sell is one mode, so the market and the inventory share its
 	// seed; split the key per panel if the two must remember separately.
-	onClose func() // Kit-hosted: unmount (a bare env only hides)
 }
 
 // NewQtyWin builds the closed picker over the given environment.
@@ -117,18 +116,8 @@ func NewQtyWin(env widgets.Seams) *QtyWin {
 		widget.TextOpts.Text("", env.FaceMono(theme.StepTiny), theme.Solid(p.Dim)),
 	)
 
-	newBtn := func(label string, clicked func()) *widget.Button {
-		return widget.NewButton(
-			widget.ButtonOpts.TextLabel(label),
-			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(theme.Px(40), theme.Px(40)),
-				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-			),
-			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
-		)
-	}
-	o.confirm = newBtn("Confirm", o.submit)
-	o.cancel = newBtn("Cancel", o.Close)
+	o.confirm = theme.ActionButton("Confirm", o.submit)
+	o.cancel = theme.ActionButton("Cancel", o.Close)
 
 	row := func(children ...widget.PreferredSizeLocateableWidget) *widget.Container {
 		c := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -192,25 +181,6 @@ func (o *QtyWin) Show(req widgets.QtyPick) bool {
 	o.refresh()
 	theme.ShowWidget(o.win.GetContainer().GetWidget(), true)
 	return true
-}
-
-// Close closes the picker: through the Kit it also unmounts (so a closed
-// picker stops gating world input); in a bare environment it just hides.
-func (o *QtyWin) Close() {
-	if o.onClose != nil {
-		o.onClose()
-		return
-	}
-	o.hide()
-}
-
-// hide flips the container invisible (the kit's unmount path).
-func (o *QtyWin) hide() { theme.ShowWidget(o.win.GetContainer().GetWidget(), false) }
-
-// IsOpen reports whether the picker is revealed (shown, and mounted when a
-// Kit hosts it).
-func (o *QtyWin) IsOpen() bool {
-	return o.win != nil && o.win.GetContainer().GetWidget().IsVisible()
 }
 
 // TitleText is the title-bar label (the base display name).
