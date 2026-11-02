@@ -1,6 +1,7 @@
 [
   {
     "id": "mod-shield-boost",
+    "family": "shield",
     "group": "Modules/Mid/Shield",
     "maker": "corp-aldemar",
     "name": "Shield Booster",
@@ -17,6 +18,7 @@
   },
   {
     "id": "mod-shield-extender",
+    "family": "shield",
     "group": "Modules/Mid/Shield",
     "maker": "corp-vantera",
     "name": "Shield Extender",
@@ -33,6 +35,7 @@
   },
   {
     "id": "mod-armor-rep",
+    "family": "armor",
     "group": "Modules/Low/Armor",
     "maker": "corp-aldemar",
     "name": "Armor Repairer",
@@ -49,6 +52,7 @@
   },
   {
     "id": "mod-armor-plate",
+    "family": "armor",
     "group": "Modules/Low/Armor",
     "maker": "corp-ferrum",
     "name": "Armor Plate",
@@ -65,6 +69,7 @@
   },
   {
     "id": "mod-resist-coat",
+    "family": "armor",
     "group": "Modules/Low/Armor",
     "maker": "corp-praetor",
     "name": "Resist Coat",

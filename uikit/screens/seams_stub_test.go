@@ -87,6 +87,9 @@ func (v *stubView) TradeableName(id content.ItemID) string {
 
 func (v *stubView) Wallet() float64 { return v.wallet }
 
+// Proficiency is the stub's fixed level (the Show Info requirement rows).
+func (v *stubView) Proficiency(string) int { return 0 }
+
 func (v *stubView) InfoRefOf(data any) (widgets.InfoRef, bool) {
 	switch d := data.(type) {
 	case content.ItemID:

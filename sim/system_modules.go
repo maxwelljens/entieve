@@ -56,6 +56,7 @@ func (s *Sim) systemModules() {
 				}
 				s.payCap(e, def.ActivationCost)
 				s.applyActiveEffect(e, def, slot, now)
+				s.awardSupportCycle(e, def)
 				period := def.ActivationTime
 				if period <= 0 {
 					period = 1
@@ -132,6 +133,9 @@ func (s *Sim) checkCycle(e ecs.Entity, def *content.ModuleDef, slot SlotRef) (st
 }
 
 // payCap deducts an activation cost from the entity's capacitor (floored at 0).
+// A fitted cap recharger turns the player's actual capacitor spend into
+// capacitor practice (its passive support is the act; there is no recharger
+// cycle to hook).
 func (s *Sim) payCap(e ecs.Entity, cost float64) {
 	if cost <= 0 {
 		return
@@ -141,6 +145,9 @@ func (s *Sim) payCap(e ecs.Entity, cost float64) {
 		if c.Current < 0 {
 			c.Current = 0
 		}
+	}
+	if e == s.player && s.hasFittedKind(e, content.KindCapRecharger) {
+		s.awardJob("capacitor", supportXPPerCycle)
 	}
 }
 

@@ -794,3 +794,34 @@ func TestInfoWindowProseWraps(t *testing.T) {
 			w.prose.MaxWidth, wide, w.scroll.ViewRect().Dx())
 	}
 }
+
+// TestInfoPageProficiencyRows pins the Show Info surface: a gated module and
+// a gated hull both carry the practice family, the required level and the
+// pilot's current level.
+func TestInfoPageProficiencyRows(t *testing.T) {
+	env, _ := newTestEnv(t)
+
+	mod := fixtureModule(t, env, "mod-proficiency-test", &content.ModuleDef{
+		Name: "Test Gun", Family: "autocannon", Gate: 2, Slot: content.SlotHigh, Kind: content.KindWeapon,
+		Weapon: &content.WeaponAttrs{Damage: content.Damage{EM: 1}, Optimal: 1000, Falloff: 1000, Tracking: 1},
+	})
+	sec := sectionOf(modulePage(env, mod), "PROFICIENCY")
+	if req, ok := rowOf(sec, "Requirement"); !ok || req.Value != "Autocannon II" {
+		t.Fatalf("module requirement = %+v, want Autocannon II", req)
+	}
+	if lvl, ok := rowOf(sec, "Level"); !ok || lvl.Value != "0" {
+		t.Fatalf("module level = %+v, want 0 (untrained)", lvl)
+	}
+
+	hull := fixtureShip(t, env, "ship-proficiency-test", &content.ShipDef{
+		Name: "Test Hull", Class: "frigate", Family: "frigate", Gate: 1,
+		Slots: content.Slots{High: 1}, Shield: 100,
+	})
+	sec = sectionOf(shipPage(env, hull), "PROFICIENCY")
+	if req, ok := rowOf(sec, "Requirement"); !ok || req.Value != "Frigate I" {
+		t.Fatalf("hull requirement = %+v, want Frigate I", req)
+	}
+	if lvl, ok := rowOf(sec, "Level"); !ok || lvl.Value != "0" {
+		t.Fatalf("hull level = %+v, want 0 (untrained)", lvl)
+	}
+}

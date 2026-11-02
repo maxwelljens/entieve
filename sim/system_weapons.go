@@ -92,6 +92,11 @@ func (s *Sim) fireWeapon(e ecs.Entity, def *content.ModuleDef, slot SlotRef, rt 
 
 	s.payCap(e, def.ActivationCost)
 
+	// Practice edge: the player's level in this weapon family adds its
+	// percent to the volley (NPCs carry no practice).
+	if e == s.player && def.Family != "" {
+		volley = volley.Scale(s.proficiencyEdge(def.Family))
+	}
 	tgt, _ := s.modTarget(e, slot)
 	tr, _ := s.Transforms.Get(e)
 	ttr, ok := s.Transforms.Get(tgt)
@@ -132,7 +137,7 @@ func (s *Sim) fireWeapon(e ecs.Entity, def *content.ModuleDef, slot SlotRef, rt 
 			Text: s.nameOf(e) + " misses " + s.nounOf(tgt)})
 	} else {
 		s.damage = append(s.damage, pendingDamage{
-			src: e, dst: tgt, dmg: volley.Scale(mult), wrecking: wrecking,
+			src: e, dst: tgt, dmg: volley.Scale(mult), family: def.Family, wrecking: wrecking,
 		})
 	}
 
@@ -196,5 +201,6 @@ func rollShot(rng *core.RNG, chance float64) (hit bool, mult float64, wrecking b
 type pendingDamage struct {
 	src, dst ecs.Entity
 	dmg      content.Damage
+	family   string // the firing module's practice family ("" = no credit)
 	wrecking bool
 }

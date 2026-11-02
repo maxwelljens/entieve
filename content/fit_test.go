@@ -246,3 +246,40 @@ func TestValidateRejectsFittingLimits(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateRejectsProficiency pins the new content checks: every def
+// declares a known family, gates stay in 0..5, ore rarity is 1..4, and a
+// world start (hull and fit) must be legal at tick 0.
+func TestValidateRejectsProficiency(t *testing.T) {
+	cases := []struct {
+		name   string
+		mutate func(c *Content)
+		want   string
+	}{
+		{"unknown family", func(c *Content) {
+			c.Modules["mod-autocannon-s"].Family = "cannons"
+		}, `unknown proficiency family "cannons"`},
+		{"gate out of range", func(c *Content) {
+			c.Modules["mod-autocannon-m"].Gate = 6
+		}, "proficiency gate 6, must be in 0..5"},
+		{"ore rarity missing", func(c *Content) {
+			c.Items["ore-sterngrit"].Rarity = 0
+		}, "ore rarity 0, must be in 1..5"},
+		{"gated start fit", func(c *Content) {
+			c.Worlds["world-default"].Start.Fit = []ModuleID{"mod-autocannon-m"}
+		}, "requires Autocannon II (a start fit must be legal at tick 0)"},
+		{"gated start hull", func(c *Content) {
+			c.Ships["ship-sloop"].Gate = 1
+		}, "requires Frigate I (a start hull must be legal at tick 0)"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := MustLoad()
+			tc.mutate(c)
+			err := c.Validate()
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("validation missing %q, got:\n%v", tc.want, err)
+			}
+		})
+	}
+}

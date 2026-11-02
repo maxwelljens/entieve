@@ -1,6 +1,7 @@
 [
   {
     "id": "mod-afterburner",
+    "family": "propulsion",
     "group": "Modules/Mid/Propulsion",
     "maker": "corp-celeritas",
     "name": "Afterburner",

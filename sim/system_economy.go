@@ -920,6 +920,10 @@ func (s *Sim) execFit(c CmdFitModule) {
 		s.log(SevWarning, s.player, content.FitIssueText(def.Name, issue))
 		return
 	}
+	if req, ok := s.proficiencyCheck(def.Family, def.Gate); !ok {
+		s.log(SevWarning, s.player, req+" to fit "+def.Name)
+		return
+	}
 	hangar, n := takeStacks(s.Hangar.Items, content.ItemID(c.Item), 1)
 	if n < 1 {
 		s.log(SevWarning, s.player, def.Name+" is not in the hangar")
@@ -1026,6 +1030,10 @@ func (s *Sim) execAssemble(c CmdAssemble) {
 	newHull, ok := s.Content.Ship(c.Ship)
 	if !ok {
 		s.log(SevWarning, s.player, "Unknown ship "+string(c.Ship))
+		return
+	}
+	if req, ok := s.proficiencyCheck(newHull.Family, newHull.Gate); !ok {
+		s.log(SevWarning, s.player, req+" to fly "+newHull.Name)
 		return
 	}
 	ship, ok := s.Ships.Get(s.player)

@@ -275,6 +275,78 @@ before the war existed restores into the tick-0 map derived from authored
 security whenever the world carries the war; every other world restores
 war-free (see [§6](#6-the-war-the-long-attrition)).
 
+### Proficiency
+
+`Sim.prof` is a list of `{family, xp}` saved as `Save.Proficiency`
+(`omitempty`, ascending family). Counters never decay; that is deliberate,
+because levels are legality gates and a gate that expires would retract
+content (Craft level's idle decay is a station efficiency bonus, a different
+thing). The level is `min(5, floor(sqrt(xp/10)))`: 10 xp for I, 40 for II,
+90 for III, 160 for IV and 250 for V.
+
+Practice is paid by acts and scaled by content state, never by RNG or wall
+clock:
+
+| Act | Family | XP |
+|---|---|---|
+| Mining cycle completed | mining | `2^(rarity-1)`: 1, 2, 4 or 8 |
+| Weapon damage landed | the weapon's family | `0.04 x` applied damage |
+| NPC kill credited | the flown hull's family | `2 x` caste weight |
+| Delivery offer completed | the flown hull's family | `4 x (1 + offer level)` |
+| Shield boost cycle | shield | 0.1 |
+| Armor repair cycle | armor | 0.1 |
+| Cap booster cycle | capacitor | 0.1 |
+| Capacitor spend with a cap recharger fitted | capacitor | 0.1 |
+| Afterburner cycle (active time) | propulsion | 0.1 |
+| Web or scram cycle applied | ewar | 0.1 |
+| Completed warp | the flown hull's family | `distance / 100 AU`, capped at 50 AU per hop (0.5) |
+
+Every act except the hull-only ones also credits the flown hull at 10% of
+its XP (mining, weapon damage, support cycles). Kills and deliveries credit
+the hull at full rate. The share is deliberately small: hull practice comes
+from every act, so a larger share would let the hull ladder outrun the tool
+ladder and, in the tour, move a hull before its scripted anchors. A family
+at level V clamps at 250 XP and banks nothing further.
+
+Combat XP is damage-scaled by the owner's decision: a Scuttler (~300 applied)
+pays about 12 to the gun (level I), a Hierarch (~1,400) about 56, so a single
+small fight opens the first level and sustained fights against real
+opposition carry a line to V. Bigger guns pay more because they deal more
+damage; the gates tier the guns. The kill bonus keeps its flat caste weight
+(Scuttler 2, Marauder 4, Hierarch 12) so a kill is always worth finishing.
+
+Gates are checked at the fit seam (`execFit`, after the mount/quota rules so
+existing refusals keep priority), at `execAssemble` (the hull swap) and at
+`execUndock` (the fly seam). A gate is the def's own family level **plus**
+every authored prerequisite edge, in that order, and a refusal names the
+first missing line and level ("Requires Autocannon II to fit Small
+Artillery"). The market, contracts and docking are never gated. Each level
+adds 2% while the family is in use: damage for a weapon family, mining
+volume per cycle for the mining family and max speed for a hull family
+(level 0 is exactly 1x).
+
+Prerequisite edges (`content/proficiency.go`, code table like the family
+vocabulary):
+
+| Family | Requires |
+|---|---|
+| artillery | autocannon II |
+| destroyer | frigate II |
+| industrial | frigate I |
+| barge | industrial 0 (trivial: the showcase tour must fly it) |
+| all other families | none |
+
+Every family has a table entry; validation rejects unknown families,
+levels outside 0..5, cycles and any nonzero prerequisite on a world-start
+family. Calibre steps inside a gun line stay gates on the same family
+(medium 2, large 4), not cross-family edges, because the line is one family.
+
+The read API for the tech-tree screen is `Sim.ProficiencyFamilies()`: one
+`ProfFamily` per family in ascending id order, with `Level`, total banked
+`XP` (clamped at 250) and `XPNext` (the next level's total threshold, 0 at
+`MaxLevel`), the prerequisite edges, `Meets` (own entry gate plus every
+edge) and `Starter` (the current world's start). Plain data, fresh slices.
+
 ## 3. World metabolism
 
 Seven rules keep goods real: nothing is conjured, nothing disappears

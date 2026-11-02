@@ -1,5 +1,6 @@
 {
   "id": "ship-cutlass",
+  "family": "destroyer",
   "group": "Ships/Destroyers",
   "base_price": 1250000,
   "name": "Ždanek",

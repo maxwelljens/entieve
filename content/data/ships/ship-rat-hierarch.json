@@ -1,5 +1,6 @@
 {
   "id": "ship-rat-hierarch",
+  "family": "rat",
   "group": "Ships/Rat hulls",
   "base_price": 1600000,
   "name": "Hierarch",

@@ -1,5 +1,6 @@
 {
   "id": "ship-npc-fleet",
+  "family": "destroyer",
   "group": "Ships/Destroyers",
   "base_price": 2200000,
   "name": "Clastor",

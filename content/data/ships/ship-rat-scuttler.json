@@ -1,5 +1,6 @@
 {
   "id": "ship-rat-scuttler",
+  "family": "rat",
   "group": "Ships/Rat hulls",
   "base_price": 180000,
   "name": "Scuttler",

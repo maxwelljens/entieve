@@ -47,6 +47,10 @@ type ContentView interface {
 	// Wallet is the player's euro balance.
 	Wallet() float64
 
+	// Proficiency is the player's level in a practice family (0 =
+	// untrained). Show Info renders a def's requirement and this level.
+	Proficiency(family string) int
+
 	// PlayerDocked reports whether the player is docked somewhere.
 	PlayerDocked() bool
 
@@ -240,6 +244,8 @@ func (v *view) System() *content.SystemDef { return v.s.System() }
 func (v *view) Time() float64 { return v.s.Time() }
 
 func (v *view) Wallet() float64 { return v.s.Wallet() }
+
+func (v *view) Proficiency(family string) int { return v.s.Proficiency(family) }
 
 func (v *view) PlayerDocked() bool {
 	return v.s.Docked.Has(v.s.Player())

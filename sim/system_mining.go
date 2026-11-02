@@ -119,7 +119,11 @@ func (s *Sim) mineCycle(e ecs.Entity, def *content.ModuleDef, slot SlotRef) {
 		return
 	}
 
-	volWant := math.Min(m.VolumePerCycle, ast.Remaining)
+	volWant := m.VolumePerCycle
+	if e == s.player && def.Family != "" {
+		volWant *= s.proficiencyEdge(def.Family)
+	}
+	volWant = math.Min(volWant, ast.Remaining)
 	if volWant <= 0 {
 		reason := "asteroid depleted"
 		if quiet {
@@ -158,6 +162,10 @@ func (s *Sim) mineCycle(e ecs.Entity, def *content.ModuleDef, slot SlotRef) {
 		}
 		if vol > 0 {
 			s.pendingOre = append(s.pendingOre, pendingOreYield{item: ast.Ore, vol: vol})
+			// One completed cycle is one practice act; the ore's rarity is
+			// the quality multiplier (1, 2, 4 or 8) and the hull takes its
+			// job share.
+			s.awardJob(def.Family, s.oreRarity(ast.Ore))
 		}
 		s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: e, Target: tgt,
 			Text:  "Mined " + formatM3(vol) + " m³ " + s.oreName(ast.Ore),

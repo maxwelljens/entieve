@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Proficiency**: practice with a fitted family (damage landed, mining
+  cycles, support cycles, deliveries, warps) builds a persisted counter;
+  levels gate advanced modules and hulls through own-level plus authored
+  prerequisite edges and add a small edge while the family is in use.
+  Quality is content state (ore rarity pays 1/2/4/8, combat pays by applied
+  damage, deliveries by offer level), never RNG or wall clock; the flown
+  hull takes a share, starter hulls and the world-start fit gate at 0, the
+  market stays free, nothing decays and level V clamps at 250. Show Info
+  lists requirement and level; a plain-data `ProficiencyFamilies` read feeds
+  the tech-tree screen.
+
 - **Contacts replace the contract board**: the dock screen is now the
   **Contacts** view: the station services strip (the docked-at identity and
   Undock; every window it used to open is a navigation rail row already)

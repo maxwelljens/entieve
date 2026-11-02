@@ -209,6 +209,35 @@ content package stays free of the UI layer).
 
 ---
 
+## Proficiency fields (`family`, `gate`, ore `rarity`)
+
+Every module and hull declares a `family` from the fixed vocabulary in
+`content/proficiency.go` (`autocannon`, `artillery`, `rocket`, `mining`,
+`shield`, `armor`, `capacitor`, `propulsion`, `ewar`, and the hull classes
+`frigate`, `destroyer`, `industrial`, `barge`, `rat`). The family is a
+practice line, not a per-def tag: the small, medium and large autocannons
+share one line, so practicing the small tier opens the next.
+
+`gate` (0..5, default 0) is the family level needed to fit the module or fly
+the hull. Gate 0 is always legal. Author the entry def of each line at 0 and
+raise the gate on its advanced tiers; a line with no gate-0 entry is
+unreachable, because practice is only earned by using the family. The
+validator also requires every world's start hull and start fit to gate at 0.
+
+Ores carry `rarity` (1..4): the practice paid by one mining cycle is
+`2^(rarity-1)`, so 1/2/4/8. Rarity is the anti-farm curve, so basic rock
+should sit at 1 and only rare or specialised rock at 3..4. Non-ore items must
+leave it unset.
+
+Prerequisite edges live in the same code table (`proficiencyPrereqs` in
+`content/proficiency.go`): `family -> []{family, level}`. Every family needs
+an entry, even an empty one. The validator rejects an unknown family, a
+level outside 0..5, a cycle, and any nonzero edge on a family used by a
+world start (starter essentials must stay legal at tick 0). A family's use
+gate checks its own def level first, then these edges in order, and refuses
+with the first missing requirement. A gate-0 edge is allowed and renders as
+a dependency the tech tree can show, but it asks for nothing.
+
 ## Recipe 1: add a star system
 
 **1. Create `content/data/systems/<shortname>.json`** (full example: a

@@ -1,5 +1,6 @@
 {
   "id": "ship-hauler",
+  "family": "industrial",
   "group": "Ships/Industrials",
   "base_price": 480000,
   "name": "Furdžan",

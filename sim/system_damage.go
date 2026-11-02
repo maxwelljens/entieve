@@ -91,7 +91,15 @@ func (s *Sim) systemDamage() {
 		if d.src == s.player && s.peacefulShip(d.dst) {
 			s.stampAggression()
 		}
+		before := ship.Shield + ship.Armor + ship.Structure
 		pen := applyDamageToShip(ship, d.dmg)
+		dealt := before - (ship.Shield + ship.Armor + ship.Structure)
+		// Combat practice is damage-scaled: the player's weapon family pays
+		// k per point actually removed, and the flown hull takes its job
+		// share.
+		if d.src == s.player && d.family != "" && dealt > 0 {
+			s.awardJob(d.family, combatXPPerDamage*dealt)
+		}
 		// The switch rule's evidence: every damage event lands in the
 		// victim NPC's rolling per-source window (systemNpc).
 		if ai, ok := s.AIs.Get(d.dst); ok {
@@ -169,6 +177,13 @@ func (s *Sim) handleDeath(e, src ecs.Entity) {
 	// systemMission later in this Step.
 	if hasAI && src == s.player {
 		s.pendingKills = append(s.pendingKills, ai.Npc)
+		// A kill is hull practice: flying the hull into a fight is the act,
+		// scaled by the caste's difficulty.
+		if ship, ok := s.Ships.Get(s.player); ok {
+			if hull, ok := s.Content.Ship(ship.Hull); ok {
+				s.awardProficiency(hull.Family, 2*s.casteWeight(e))
+			}
+		}
 	}
 
 	var def *content.NpcDef

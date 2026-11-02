@@ -211,6 +211,13 @@ func (s *Sim) completeMission(i int, def *content.ContractDef) {
 			}
 		}
 		s.landStock(def.Objective.Destination, def.Objective.Item, units)
+		// A completed delivery is hull practice, scaled by the offer's
+		// authored level (the content state's risk rung).
+		if ship, ok := s.Ships.Get(s.player); ok {
+			if hull, ok := s.Content.Ship(ship.Hull); ok {
+				s.awardProficiency(hull.Family, 4*float64(1+def.Level))
+			}
+		}
 		if m.Front != "" {
 			// Delivered materiel is charter push at the front: the goods'
 			// value, the same euro-equivalent procurement credits.

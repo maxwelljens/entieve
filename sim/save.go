@@ -2,6 +2,7 @@ package sim
 
 import (
 	"encoding/json"
+	"math"
 	"reflect"
 	"sort"
 
@@ -227,6 +228,12 @@ func (s *Sim) buildSave() (*Save, error) {
 				return a.Station < b.Station
 			}
 			return a.Family < b.Family
+		})
+	}
+	if len(s.prof) > 0 {
+		save.Proficiency = append([]SavedProficiency(nil), s.prof...)
+		sort.Slice(save.Proficiency, func(i, j int) bool {
+			return save.Proficiency[i].Family < save.Proficiency[j].Family
 		})
 	}
 
@@ -560,6 +567,12 @@ func (s *Sim) restore(save *Save) error {
 		}
 	}
 	s.craft = append([]SavedCraft(nil), save.Craft...)
+	s.prof = append([]SavedProficiency(nil), save.Proficiency...)
+	sort.Slice(s.prof, func(i, j int) bool { return s.prof[i].Family < s.prof[j].Family })
+	maxXP := proficiencyThreshold(content.ProficiencyMax)
+	for i := range s.prof {
+		s.prof[i].XP = math.Min(maxXP, s.prof[i].XP)
+	}
 	sort.Slice(s.craft, func(i, j int) bool {
 		a, b := s.craft[i], s.craft[j]
 		if a.Station != b.Station {

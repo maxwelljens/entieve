@@ -25,6 +25,7 @@ func (v *verbView) Player() ecs.Entity                     { return v.player }
 func (v *verbView) Grid() []sim.Info                       { return v.grid }
 func (v *verbView) Defs() *content.Content                 { return v.defs }
 func (v *verbView) Fitting(ecs.Entity) (sim.Fitting, bool) { return v.fit, true }
+func (v *verbView) Proficiency(string) int                 { return 0 }
 
 func (v *verbView) Info(e ecs.Entity) (sim.Info, bool) {
 	for _, info := range v.grid {
