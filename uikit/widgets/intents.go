@@ -120,6 +120,18 @@ type (
 	// dialog, so this carries no command).
 	ShowContact struct{ Offer content.ContractID }
 
+	// ShowProfFamily opens the proficiency family card: the tree's node
+	// click asks for one family's page (what it is for, what pays it
+	// practice) and hands the click point so the card opens beside the
+	// node instead of over the graph's middle. Host-owned like
+	// ShowContact — the card reads the level itself and carries no command.
+	ShowProfFamily struct {
+		Family string
+		At     image.Point // the click that opened it
+		Level  int         // the tree node's live level
+		Gate   string      // the node's unmet-prerequisite line ("" = open)
+	}
+
 	// Activate/Deactivate/CycleCharge are the module rack's three verbs:
 	// click (toggle), and the cell menu's charge cycle.
 	Activate struct {
@@ -179,43 +191,44 @@ const (
 	QtyTransfer                // hold transfer
 )
 
-func (ShowInfo) isIntent()    {}
-func (QtyPick) isIntent()     {}
-func (OpenMenu) isIntent()    {}
-func (OpenOrder) isIntent()   {}
-func (Buy) isIntent()         {}
-func (Sell) isIntent()        {}
-func (PlaceOrder) isIntent()  {}
-func (CancelOrder) isIntent() {}
-func (Transfer) isIntent()    {}
-func (Fit) isIntent()         {}
-func (Unequip) isIntent()     {}
-func (Assemble) isIntent()    {}
-func (StartJob) isIntent()    {}
-func (CollectJob) isIntent()  {}
-func (CancelJob) isIntent()   {}
-func (Refine) isIntent()      {}
-func (Accept) isIntent()      {}
-func (Abandon) isIntent()     {}
-func (ShowContact) isIntent() {}
-func (Activate) isIntent()    {}
-func (Deactivate) isIntent()  {}
-func (CycleCharge) isIntent() {}
-func (WarpTo) isIntent()      {}
-func (Orbit) isIntent()       {}
-func (Approach) isIntent()    {}
-func (Lock) isIntent()        {}
-func (Stop) isIntent()        {}
-func (Dock) isIntent()        {}
-func (Jump) isIntent()        {}
-func (Loot) isIntent()        {}
-func (Align) isIntent()       {}
-func (Mine) isIntent()        {}
-func (Toggle) isIntent()      {}
-func (Undock) isIntent()      {}
-func (Save) isIntent()        {}
-func (Load) isIntent()        {}
-func (Quit) isIntent()        {}
+func (ShowInfo) isIntent()       {}
+func (QtyPick) isIntent()        {}
+func (OpenMenu) isIntent()       {}
+func (OpenOrder) isIntent()      {}
+func (Buy) isIntent()            {}
+func (Sell) isIntent()           {}
+func (PlaceOrder) isIntent()     {}
+func (CancelOrder) isIntent()    {}
+func (Transfer) isIntent()       {}
+func (Fit) isIntent()            {}
+func (Unequip) isIntent()        {}
+func (Assemble) isIntent()       {}
+func (StartJob) isIntent()       {}
+func (CollectJob) isIntent()     {}
+func (CancelJob) isIntent()      {}
+func (Refine) isIntent()         {}
+func (Accept) isIntent()         {}
+func (Abandon) isIntent()        {}
+func (ShowContact) isIntent()    {}
+func (ShowProfFamily) isIntent() {}
+func (Activate) isIntent()       {}
+func (Deactivate) isIntent()     {}
+func (CycleCharge) isIntent()    {}
+func (WarpTo) isIntent()         {}
+func (Orbit) isIntent()          {}
+func (Approach) isIntent()       {}
+func (Lock) isIntent()           {}
+func (Stop) isIntent()           {}
+func (Dock) isIntent()           {}
+func (Jump) isIntent()           {}
+func (Loot) isIntent()           {}
+func (Align) isIntent()          {}
+func (Mine) isIntent()           {}
+func (Toggle) isIntent()         {}
+func (Undock) isIntent()         {}
+func (Save) isIntent()           {}
+func (Load) isIntent()           {}
+func (Quit) isIntent()           {}
 
 // commandFor maps an intent onto the sim command its handler queues —
 // the ONE intent→command table, shared by uikit's built-in executor and
@@ -226,7 +239,7 @@ func (Quit) isIntent()        {}
 // QtyPick, ShowContact, Toggle, Save, Load, Quit.
 func commandFor(i Intent, warpRange, orbitRange float64) (sim.Command, bool) {
 	switch v := i.(type) {
-	case ShowInfo, OpenMenu, OpenOrder, QtyPick, ShowContact, Toggle, Save, Load, Quit:
+	case ShowInfo, OpenMenu, OpenOrder, QtyPick, ShowContact, ShowProfFamily, Toggle, Save, Load, Quit:
 		return nil, false
 	case Buy:
 		return sim.CmdBuy{Item: v.Item, Qty: v.Qty}, true

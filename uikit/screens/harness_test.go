@@ -36,6 +36,7 @@ type scriptPointer struct {
 	x, y   int
 	down   [3]bool
 	edge   [3]bool
+	wheel  float64
 	shape  ebiten.CursorShapeType
 	writes int
 }
@@ -43,6 +44,7 @@ type scriptPointer struct {
 func (s *scriptPointer) Cursor() (int, int)                { return s.x, s.y }
 func (s *scriptPointer) Down(b widgets.Button) bool        { return s.down[b] }
 func (s *scriptPointer) JustPressed(b widgets.Button) bool { return s.edge[b] }
+func (s *scriptPointer) Wheel() float64                    { return s.wheel }
 func (s *scriptPointer) SetShape(sh ebiten.CursorShapeType) {
 	s.shape, s.writes = sh, s.writes+1
 }

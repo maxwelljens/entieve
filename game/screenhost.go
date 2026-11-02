@@ -37,10 +37,9 @@ type screenServices struct {
 	Keys     uikit.KeybindActions
 	HelpRows func() []uikit.KeyRow
 	Menu     func() widgets.WindowPanel
-	// Proficiency is the pilot's proficiency model (the tree's nodes and
-	// prereq edges). TODO(integration): the proficiency wave's sim model
-	// maps onto uikit.ProfFamily here; Game.proficiencyModel is the
-	// fixture until that branch merges.
+	// Proficiency is the pilot's proficiency model (the tree's nodes, the
+	// overview's sums and the family card's level). Game.proficiencyModel
+	// maps the sim's families onto it; the tree re-reads it every Sync.
 	Proficiency func() []uikit.ProfFamily
 	// Viewport is the live screen rect in device pixels: the full-viewport
 	// layer sizes itself to it (nil keeps its design rect).

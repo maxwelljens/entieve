@@ -114,8 +114,17 @@ type tipLayout struct {
 	Sub      image.Rectangle    // dim class line (empty when Sub == "")
 	Rules    []image.Rectangle  // ColAccent hairlines, 2 px
 	Sections []tipSectionLayout // section label + its row rects
-	Hints    []image.Rectangle  // footer lines
+	Hints    []tipHint          // footer lines, wrapped to the content box
 	ValueX   int                // right edge shared by every value rect
+}
+
+// tipHint is one wrapped footer line: a slice of a model hint and its box.
+// A hint longer than the panel's width cap is broken on spaces, so footer
+// text can never spill past the panel's own edge (the rail's long hotkey
+// line did exactly that).
+type tipHint struct {
+	Text string
+	Rect image.Rectangle
 }
 
 // tipSectionLayout is one section's rects: the label line over its rows.
@@ -282,7 +291,9 @@ func tipLayoutAt(t theme.Theme, m TooltipModel, iw int) tipLayout {
 		}
 	}
 
-	// Footer: a second hairline after the sections, then the hints.
+	// Footer: a second hairline after the sections, then the hints. Each
+	// hint wraps to the content box, so a long hint's lines all sit inside
+	// the panel instead of running past its edge.
 	if len(m.Hints) > 0 {
 		if len(m.Sections) > 0 {
 			y += ruleGap
@@ -291,12 +302,14 @@ func tipLayoutAt(t theme.Theme, m TooltipModel, iw int) tipLayout {
 		} else {
 			y += ruleGap
 		}
-		for i := range m.Hints {
+		for i, hint := range m.Hints {
 			if i > 0 {
 				y += hintGap
 			}
-			l.Hints = append(l.Hints, image.Rect(x0, y, x1, y+tinyH))
-			y += tinyH
+			for _, line := range tipWrap(hint, t.Face(theme.StepTiny), iw) {
+				l.Hints = append(l.Hints, tipHint{Text: line, Rect: image.Rect(x0, y, x1, y+tinyH)})
+				y += tinyH
+			}
 		}
 	}
 
@@ -311,6 +324,38 @@ func tipLayoutAt(t theme.Theme, m TooltipModel, iw int) tipLayout {
 // tipSize is the panel size a model wants at its content width.
 func TipSize(t theme.Theme, m TooltipModel) image.Point {
 	return tipLayoutAt(t, m, tipInnerWidth(t, m)).Size
+}
+
+// tipWrap breaks one footer line into the lines the content box can hold,
+// on spaces. A line that already fits is returned whole (the +1 px guards
+// the float measure against a one-pixel rounding loss), so a short hint is
+// never reflowed.
+//
+// shortcut: a single unhyphenated token wider than the box stays whole and
+// still overflows; wrap per glyph if a hint ever carries a path or a URL.
+func tipWrap(s string, face *text.Face, iw int) []string {
+	if s == "" {
+		return nil
+	}
+	if iw <= 0 || TipMeasure(s, face) <= float64(iw)+1 {
+		return []string{s}
+	}
+	words := strings.Fields(s)
+	if len(words) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(words)/4+1)
+	line := words[0]
+	for _, w := range words[1:] {
+		cand := line + " " + w
+		if TipMeasure(cand, face) <= float64(iw) {
+			line = cand
+			continue
+		}
+		out = append(out, line)
+		line = w
+	}
+	return append(out, line)
 }
 
 // ---------------------------------------------------------------------------
@@ -401,9 +446,9 @@ func drawTooltip(dst *ebiten.Image, m TooltipModel, l tipLayout, t theme.Theme, 
 			drawValue(dst, row.Value, t.Face(theme.StepSmall), at(rr.Value).Max.X, at(rr.Value).Min.Y, theme.Solid(col))
 		}
 	}
-	for i, h := range m.Hints {
-		r := at(l.Hints[i])
-		theme.DrawCardText(dst, h, t.Face(theme.StepTiny), r.Min.X, r.Min.Y, theme.Solid(p.Dim))
+	for _, h := range l.Hints {
+		r := at(h.Rect)
+		theme.DrawCardText(dst, h.Text, t.Face(theme.StepTiny), r.Min.X, r.Min.Y, theme.Solid(p.Dim))
 	}
 }
 

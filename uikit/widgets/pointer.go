@@ -41,6 +41,7 @@ type Pointer struct {
 	down    [3]bool // held this frame
 	pressed [3]bool // an edge this frame
 	spent   [3]bool // the frame's gesture was consumed
+	wheel   float64 // this frame's wheel notch (0 = still)
 
 	shape   ebiten.CursorShapeType
 	claimed bool
@@ -76,6 +77,11 @@ type Source interface {
 	SetShape(ebiten.CursorShapeType)
 }
 
+// WheelSource is the optional half of a Source: the frame's wheel notch. A
+// source without it reads as a still wheel, so scripted pointers that never
+// zoom need no method.
+type WheelSource interface{ Wheel() float64 }
+
 // OSInput is the real pointer: ebiten's live cursor, buttons and shape.
 // It is deliberately not ebitenui's input cache, which freezes while the
 // kit skips ui.Update (a menu is up), so every hit test would land at the
@@ -88,6 +94,7 @@ func (OSInput) JustPressed(b Button) bool {
 	return inpututil.IsMouseButtonJustPressed(b.mouse())
 }
 func (OSInput) SetShape(s ebiten.CursorShapeType) { ebiten.SetCursorShape(s) }
+func (OSInput) Wheel() float64                    { _, y := ebiten.Wheel(); return y }
 
 // NewPointer builds a frame over src; nil means the real OS pointer.
 func NewPointer(src Source) *Pointer {
@@ -108,7 +115,20 @@ func (p *Pointer) Begin() {
 	for b := Left; b <= Middle; b++ {
 		p.down[b], p.pressed[b], p.spent[b] = p.src.Down(b), p.src.JustPressed(b), false
 	}
+	p.wheel = 0
+	if ws, ok := p.src.(WheelSource); ok {
+		p.wheel = ws.Wheel()
+	}
 	p.shape, p.claimed = ebiten.CursorShapeDefault, false
+}
+
+// Wheel is this frame's wheel notch (positive scrolls up — ebiten's
+// convention, which the tables read too).
+func (p *Pointer) Wheel() float64 {
+	if p == nil {
+		return 0
+	}
+	return p.wheel
 }
 
 // At is the frame's pointer position (the one point every hit test uses).
