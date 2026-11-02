@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"math"
 	"testing"
 
 	"github.com/entieve/entieve/core"
@@ -12,23 +11,20 @@ import (
 	"github.com/entieve/entieve/internal/capture"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // TestStackPickerCapture: the stack picker's column over a stacked fixture —
-// three static entities (a gate, a station and an asteroid: three kinds) parked
-// on one point, the cursor resting on them through the dwell. Pixel readback
-// needs a running ebiten loop, so this is the gated capture (ENTIEVE_CAPTURE=1,
-// one loop per process — run it on its own); the PNG lands in
-// $ENTIEVE_CAPTURE_DIR (default /tmp/opencode).
+// three static entities (a gate, a station and an asteroid: three bracket
+// tints) parked on one point, the cursor resting on them through the dwell.
+// Pixel readback needs a running ebiten loop, so this is the gated capture
+// (ENTIEVE_CAPTURE=1, one loop per process — run it on its own); the PNG
+// lands in $ENTIEVE_CAPTURE_DIR (default /tmp/opencode).
 //
 // Method: park the fixture, take one reference frame before the dwell opens
-// the column, pump the dwell, then verify the last frame: every entry's art
-// region is byte-identical to the grid's own body art at the same zoom (no
-// frame, no scaled miniature), the name sits right of the art, nothing paints
-// behind the column (the world shows between the entries), and the three
-// listed entities have stopped drawing in space — the column replaces them.
+// the column, pump the dwell, then verify the last frame: the column's band
+// (found through Kit.StackOwns, not a hardcoded rect) paints over the world
+// and every icon cell changed against the reference.
 func TestStackPickerCapture(t *testing.T) {
 	mm := useLoopMouse(t)
 	g := newShowcaseGame(t, mm.pointer())
@@ -62,10 +58,9 @@ func TestStackPickerCapture(t *testing.T) {
 	var plain *ebiten.Image
 	var band image.Rectangle
 	out := capture.Out("stack_picker_capture.png")
-	frames := dwellFrames + 4 // the dwell, then a few frames of the open column
 	(&capture.Capture{
 		Name:   "Entieve stack picker capture",
-		Frames: frames,
+		Frames: dwellFrames + 4, // the dwell, then a few frames of the open column
 		Update: func(int) error { return g.Update() },
 		Draw: func(n int, dst *ebiten.Image) error {
 			g.Draw(dst)
@@ -73,11 +68,7 @@ func TestStackPickerCapture(t *testing.T) {
 				plain = ebiten.NewImage(1280, 720)
 				plain.DrawImage(dst, nil)
 			}
-			// The probe walks the screen, so it runs once: a per-frame scan
-			// would spend the frame budget this capture is evidence for.
-			if n == frames {
-				band = stackBand(g, atX, atY)
-			}
+			band = stackBand(g, atX, atY)
 			return nil
 		},
 		Verify: func(dst *ebiten.Image) error {
@@ -90,98 +81,30 @@ func TestStackPickerCapture(t *testing.T) {
 			if band.Empty() {
 				return fmt.Errorf("capture %s: the open column owns no band around (%v, %v)", out, atX, atY)
 			}
+			// Three cells: 32 px each, 4 px gaps and 4 px padding
+			// (uikit/screens stack.go) at the design scale.
+			want := image.Pt(40, 112)
+			if band.Dx() != want.X || band.Dy() != want.Y {
+				return fmt.Errorf("capture %s: column band %v, want %dx%d", out, band, want.X, want.Y)
+			}
+			for i := 0; i < 3; i++ {
+				if !cellChanged(dst, plain, band, i) {
+					return fmt.Errorf("capture %s: icon %d painted nothing in %v", out, i, band)
+				}
+			}
+			// Each cell wears its entity's own bracket: the world's corner
+			// arms sit at the cell's corners, in the world's bracket colour
+			// for that kind (a UI glyph would leave them empty).
 			cam := g.space.Camera(1280, 720)
 			cells := g.space.pickAll(cam, atX, atY)
 			if len(cells) < 3 {
 				return fmt.Errorf("capture %s: cluster resolved %d entries, want 3", out, len(cells))
 			}
-
-			// The band is exactly the entries: no padding, no panel.
-			gap := theme.Px(theme.SpSm)
-			w, h := 0, -gap
-			imgs := make([]*ebiten.Image, 3)
 			for i := 0; i < 3; i++ {
-				imgs[i] = g.kit.StackCellImageForTest(i)
-				if imgs[i] == nil {
-					return fmt.Errorf("capture %s: entry %d has no image", out, i)
-				}
-				b := imgs[i].Bounds()
-				w = max(w, b.Dx())
-				h += b.Dy() + gap
-			}
-			if band.Dx() != w || band.Dy() != h {
-				return fmt.Errorf("capture %s: column band %v for entries %dx%d, want the entries' own size",
-					out, band, w, h)
-			}
-
-			for i := 0; i < 3; i++ {
-				img := imgs[i]
-				art := g.ren.EntityArtSize(g.s, cells[i], cam.Zoom, math.Max(1280, 720))
-				b := img.Bounds()
-				if b.Dx() <= art {
-					return fmt.Errorf("capture %s: entry %d is %d px wide for %d px of art: no name beside it",
-						out, i, b.Dx(), art)
-				}
-				// The art is the grid's own, byte for byte: the same body
-				// pass drawn at the entry's own camera into a same-size
-				// image, so any frame, panel or glyph ink would show.
-				ref := ebiten.NewImage(art, b.Dy())
-				g.ren.DrawEntityBody(ref, g.s, cells[i], render.Camera{
-					Center: cells[i].Pos, Zoom: cam.Zoom,
-					ScreenW: float64(art), ScreenH: float64(b.Dy()), CapDim: math.Max(1280, 720),
-				})
-				artBox := image.Rect(0, 0, art, b.Dy())
-				if n, at := diffPixels(img, artBox, ref, image.Pt(0, 0), 0); n != 0 {
-					return fmt.Errorf("capture %s: entry %d (%s) paints more than the body art at its own camera "+
-						"(%d px differ, first %v)", out, i, cells[i].Kind, n, at)
-				}
-
-				// And that box is the grid's size, at the grid's zoom: the same
-				// body drawn with the world camera (its screen, its caps, the
-				// entity at the screen centre) is the same picture. ebiten's
-				// vector antialiasing is not exactly translation-invariant, so
-				// a handful of boundary pixels may differ.
-				world := ebiten.NewImage(1280, 720)
-				g.ren.DrawEntityBody(world, g.s, cells[i], render.Camera{
-					Center: cells[i].Pos, Zoom: cam.Zoom, ScreenW: 1280, ScreenH: 720,
-				})
-				// ebiten samples a scaled additive sprite with ties broken by
-				// the destination, so a few boundary pixels bend: 5 in this
-				// fixture, never a frame's worth.
-				if n, at := diffPixels(img, artBox, world, image.Pt(640-art/2, 360-b.Dy()/2), 64); n > artTiePx {
-					return fmt.Errorf("capture %s: entry %d (%s) is not the grid's art at zoom %v "+
-						"(art box %d px, %d px differ, first %v)", out, i, cells[i].Kind, cam.Zoom, art, n, at)
-				}
-				if n := inkOf(img, image.Rect(art, 0, b.Dx(), b.Dy()), theme.DefaultPalette().Text, 24); n == 0 {
-					return fmt.Errorf("capture %s: entry %d draws no name right of its %d px of art", out, i, art)
-				}
-			}
-
-			// No panel behind the column: the band is exactly the entries
-			// (the check above), and entry 0's art box corner is empty, so
-			// whatever the world draws there shows through untouched.
-			for y := 0; y < 8; y++ {
-				for x := 0; x < 8; x++ {
-					if _, _, _, a := imgs[0].At(x, y).RGBA(); a != 0 {
-						return fmt.Errorf("capture %s: entry 0's corner (%d,%d) is not empty", out, x, y)
-					}
-				}
-			}
-
-			// The listed entities left the grid: their bracket ink is in the
-			// reference frame and gone from the last one.
-			left := image.Rect(int(atX)-70, int(atY)-70, int(atX)+12, int(atY)+70)
-			for i := 0; i < 3; i++ {
-				col := render.BracketColor(cells[i].Kind, cells[i].Hostile)
-				// A bracket's corner arms are dozens of pixels; the grid may
-				// keep a stray background pixel within the tolerance.
-				if n := inkOf(plain, left, col, 16); n < bracketInkMin {
-					return fmt.Errorf("capture %s: the reference frame draws no %v bracket for entry %d (%d px)",
-						out, col, i, n)
-				}
-				if n := inkOf(dst, left, col, 16); n >= bracketInkMin {
-					return fmt.Errorf("capture %s: entry %d (%s) still draws %d px of its %v bracket in the world",
-						out, i, cells[i].Kind, n, col)
+				cell := cellRect(band, i)
+				if col := render.BracketColor(cells[i].Kind, cells[i].Hostile); !cornerInk(dst, cell, col) {
+					return fmt.Errorf("capture %s: cell %d (%s) draws no %v bracket arms at its corners in %v",
+						out, i, cells[i].Kind, col, cell)
 				}
 			}
 			return nil
@@ -191,19 +114,11 @@ func TestStackPickerCapture(t *testing.T) {
 	t.Logf("capture written to %s (band %v at cursor %v,%v)", out, band, atX, atY)
 }
 
-// bracketInkMin is the ink a bracket's corner arms leave in the probe box;
-// a few stray background pixels stay well under it.
-const bracketInkMin = 8
-
-// artTiePx is how many pixels a scaled additive sprite may lose to ebiten's
-// destination-dependent sampling ties; a wrong zoom or cap moves thousands.
-const artTiePx = 32
-
 // stackBand is the rect the open column owns, found by probing StackOwns.
 func stackBand(g *Game, x, y float64) image.Rectangle {
 	var band image.Rectangle
-	for py := int(y) - 400; py <= int(y)+400; py++ {
-		for px := int(x) - 100; px <= int(x)+1000; px++ {
+	for py := int(y) - 120; py <= int(y)+120; py++ {
+		for px := int(x); px <= int(x)+120; px++ {
 			if !g.kit.StackOwns(float64(px), float64(py)) {
 				continue
 			}
@@ -218,45 +133,57 @@ func stackBand(g *Game, x, y float64) image.Rectangle {
 	return band
 }
 
-// diffPixels counts the pixels where a's rect r differs from b's rect at
-// origin o by more than slack on any channel, and returns the first one (in
-// a's coordinates).
-func diffPixels(a *ebiten.Image, r image.Rectangle, b *ebiten.Image, o image.Point, slack uint32) (int, image.Point) {
-	n, first := 0, image.Point{}
-	for y := 0; y < r.Dy(); y++ {
-		for x := 0; x < r.Dx(); x++ {
-			if !nearColor(a.At(r.Min.X+x, r.Min.Y+y), b.At(o.X+x, o.Y+y), slack) {
-				if n == 0 {
-					first = image.Pt(r.Min.X+x, r.Min.Y+y)
+// cellChanged reports whether icon i's cell paints anything new: a small
+// probe grid inside the cell must differ from the reference frame.
+func cellChanged(dst, plain *ebiten.Image, band image.Rectangle, i int) bool {
+	top := band.Min.Y + band.Dy()*i/3
+	bot := band.Min.Y + band.Dy()*(i+1)/3
+	for py := top + 3; py < bot-3; py++ {
+		for px := band.Min.X + 3; px < band.Max.X-3; px++ {
+			if !sameColor(dst.At(px, py), plain.At(px, py)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// sameColor reports two sampled pixels equal on every channel.
+func sameColor(a, b color.Color) bool {
+	ar, ag, ab, _ := a.RGBA()
+	br, bg, bb, _ := b.RGBA()
+	return ar == br && ag == bg && ab == bb
+}
+
+// cellRect is cell i's rect inside the open column's band: 4 px of padding,
+// 32 px cells and 4 px gaps (uikit/screens stack.go).
+func cellRect(band image.Rectangle, i int) image.Rectangle {
+	const pad, cell, gap = 4, 32, 4
+	y := band.Min.Y + pad + i*(cell+gap)
+	return image.Rect(band.Min.X+pad, y, band.Min.X+pad+cell, y+cell)
+}
+
+// cornerInk reports whether any of the cell's four corner squares carries col:
+// the bracket's corner arms, which the body art never reaches.
+func cornerInk(dst *ebiten.Image, cell image.Rectangle, col color.RGBA) bool {
+	const sq = 7
+	for _, c := range []image.Point{
+		{cell.Min.X + 1, cell.Min.Y + 1},
+		{cell.Max.X - sq - 1, cell.Min.Y + 1},
+		{cell.Min.X + 1, cell.Max.Y - sq - 1},
+		{cell.Max.X - sq - 1, cell.Max.Y - sq - 1},
+	} {
+		sq := image.Rect(c.X, c.Y, c.X+sq, c.Y+sq)
+		for y := sq.Min.Y; y < sq.Max.Y; y++ {
+			for x := sq.Min.X; x < sq.Max.X; x++ {
+				r, g, b, _ := dst.At(x, y).RGBA()
+				if absDiff(r>>8, uint32(col.R)) <= 20 &&
+					absDiff(g>>8, uint32(col.G)) <= 20 &&
+					absDiff(b>>8, uint32(col.B)) <= 20 {
+					return true
 				}
-				n++
 			}
 		}
 	}
-	return n, first
-}
-
-// nearColor reports whether two sampled pixels agree on every channel within
-// slack (0 = exactly equal).
-func nearColor(a, b color.Color, slack uint32) bool {
-	ar, ag, ab, aa := a.RGBA()
-	br, bg, bb, ba := b.RGBA()
-	return absDiff(ar>>8, br>>8) <= slack && absDiff(ag>>8, bg>>8) <= slack &&
-		absDiff(ab>>8, bb>>8) <= slack && absDiff(aa>>8, ba>>8) <= slack
-}
-
-// inkOf counts the pixels of r within tol of col on every channel.
-func inkOf(img *ebiten.Image, r image.Rectangle, col color.RGBA, tol uint32) int {
-	r = r.Intersect(img.Bounds())
-	n := 0
-	for y := r.Min.Y; y < r.Max.Y; y++ {
-		for x := r.Min.X; x < r.Max.X; x++ {
-			cr, cg, cb, ca := img.At(x, y).RGBA()
-			if absDiff(cr>>8, uint32(col.R)) <= tol && absDiff(cg>>8, uint32(col.G)) <= tol &&
-				absDiff(cb>>8, uint32(col.B)) <= tol && absDiff(ca>>8, uint32(col.A)) <= tol {
-				n++
-			}
-		}
-	}
-	return n
+	return false
 }

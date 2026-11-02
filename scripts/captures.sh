@@ -23,7 +23,6 @@ captures() {
 ./internal/capture TestCaptureLoopStaysHidden
 ./internal/capture TestCaptureWritesEvidenceOnVerifyFailure
 ./render TestAlphaCompositeGroundTruth
-./render TestHiddenEntitiesKeepTheirLockRing
 ./uikit/screens TestFittingCaptureFrame
 ./uikit/screens TestFriendlyFireConfirmCapture
 ./uikit/screens TestCombatFeedCaptureFrame

@@ -30,7 +30,6 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
-	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
@@ -318,11 +317,10 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command), opts ...K
 		return k.ov.tbl != nil && k.ov.tbl.RowAt(pt)
 	})
 
-	// The stack picker: the transient entry column a hovered cluster opens,
+	// The stack picker: the transient icon column a hovered cluster opens,
 	// TOP chrome (the rail's contract) so its presses win over any window
-	// under it. Its cells are built lazily on the first open (see build):
-	// they rasterize text, and a boot-time build would shift the title
-	// phase's glyph anti-aliasing.
+	// under it. Built here, not lazily: it is a twelve-cell icon pool with
+	// no text, so nothing of the title phase's glyph atlas is spent on it.
 	k.column = newStackPicker(k, root)
 	k.AddTopContainer(k.column, widget.AnchorLayoutData{
 		HorizontalPosition: widget.AnchorLayoutPositionStart,
@@ -575,25 +573,6 @@ func (k *Kit) Selected() ecs.Entity { return k.selected }
 // ctrl+click on a row or a stack icon locks, exactly as ctrl+click in the
 // world does.
 func (k *Kit) SetCtrl(on bool) { k.ctrl = on }
-
-// StackView reports the world's framing: every entry in the open column draws
-// at the grid's own zoom and screen cap, so an entry is the entity's pixels.
-// The scene reports it every frame, before the hover.
-func (k *Kit) StackView(cam render.Camera) { k.column.SetView(cam) }
-
-// StackHidden is the entities the open column represents: the grid stops
-// drawing them while it is up (their art, bracket, label and selection ring),
-// and the tail past the cap is not in the list, so it stays in space.
-func (k *Kit) StackHidden() []ecs.Entity { return k.column.Hidden() }
-
-// StackCellImageForTest is entry i's own image (the art with the name beside
-// it): the column's pixels, for the capture that compares them with the grid.
-func (k *Kit) StackCellImageForTest(i int) *ebiten.Image {
-	if i < 0 || i >= len(k.column.cells) {
-		return nil
-	}
-	return k.column.cells[i].img
-}
 
 // StackHover reports one frame of the cursor resting on a cluster: entries
 // are the pick's cluster in depth order, x/y the cursor's screen point. The

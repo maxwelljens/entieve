@@ -265,9 +265,6 @@ func (sc *SpaceScene) pickAll(cam render.Camera, x, y float64) []sim.Info {
 // dwell and grace frames: on the column it holds, on a cluster it opens or
 // refreshes, anywhere else it starts its countdown.
 func (sc *SpaceScene) stackStep(in Input, cam render.Camera, over bool) {
-	// The column draws its entries at the grid's own zoom: report the framing
-	// before the hover, so a zoom change resizes the entries the same frame.
-	sc.g.kit.StackView(cam)
 	switch {
 	case sc.g.kit.StackOwns(in.MouseX, in.MouseY):
 		sc.g.kit.StackKeep()
@@ -319,10 +316,6 @@ func (sc *SpaceScene) Draw(dst *ebiten.Image) {
 	cam := sc.Camera(float64(g.w), float64(g.h))
 	g.ren.SetSelected(g.kit.Selected())
 	g.ren.SetHover(sc.hover)
-	// While the column is up, the entities it lists draw there, not in the
-	// grid (their art, bracket, label and selection ring): the column
-	// replaces them in space, and dismissing it brings them back at once.
-	g.ren.SetHidden(g.kit.StackHidden())
 	g.ren.Draw(dst, cam, g.s)
 }
 

@@ -1,20 +1,14 @@
 package render
 
 import (
-	"errors"
-	"fmt"
-	"image"
 	"math"
 	"os"
 	"strings"
 	"testing"
 
-	"image/color"
-
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/ecs"
-	"github.com/entieve/entieve/internal/capture"
 	"github.com/entieve/entieve/sim"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -379,10 +373,9 @@ func TestFireFXAimsAtTheGunsOwnTarget(t *testing.T) {
 
 // TestCellDrawsTheWorldsBodyArt pins the stack picker's cells to the world's
 // own drawing: a cell submits the entity through drawBody, the same pass Draw
-// runs over its buckets, for every kind the picker can list — and the box
-// EntityArtSize reserves holds the whole art, no pixel cut at the border. An
-// icon cell would submit no body primitive at all.
-func TestCellDrawsTheWorldsBodyArt(t *testing.T) {
+// runs over its buckets, for every kind the picker can list. An icon cell would
+// submit no body primitive at all.
+func TestCellDrawsTheWorldsBracketArt(t *testing.T) {
 	c, err := content.Load(content.FS())
 	if err != nil {
 		t.Fatalf("content.Load: %v", err)
@@ -396,24 +389,15 @@ func TestCellDrawsTheWorldsBodyArt(t *testing.T) {
 		t.Fatalf("sim.New: %v", err)
 	}
 	r := New(c)
-	// The default framing: 1280×720 at zoom 1 (zoomBase px/m).
-	const zoom, capDim = 0.02, 720.0
+	dst := ebiten.NewImage(32, 32)
 	kinds := map[string]bool{}
 	for _, inf := range s.Grid() {
 		if !inf.Visible || kinds[inf.Kind] {
 			continue
 		}
 		kinds[inf.Kind] = true
-		size := r.EntityArtSize(s, inf, zoom, capDim)
-		if size < 2 {
-			t.Fatalf("cell for %s (%v) is %d px", inf.Kind, inf.Name, size)
-		}
-		dst := ebiten.NewImage(size, size)
 		r.bodyPrims = 0
-		r.DrawEntityBody(dst, s, inf, Camera{
-			Center: inf.Pos, Zoom: zoom,
-			ScreenW: float64(size), ScreenH: float64(size), CapDim: capDim,
-		})
+		r.DrawEntityBracket(dst, s, inf)
 		if r.bodyPrims == 0 {
 			t.Errorf("cell for %s (%v) drew no body art: the cell must be the entity as the world draws it",
 				inf.Kind, inf.Name)
@@ -425,218 +409,9 @@ func TestCellDrawsTheWorldsBodyArt(t *testing.T) {
 
 	// A synthetic entry (an entity the sim does not know) still gets art: the
 	// picker's own tests feed hand-built infos.
-	inf := sim.Info{Entity: ecs.Entity(9999), Kind: sim.KindShip, Visible: true}
-	size := r.EntityArtSize(s, inf, zoom, capDim)
 	r.bodyPrims = 0
-	r.DrawEntityBody(ebiten.NewImage(size, size), s, inf, Camera{
-		Center: inf.Pos, Zoom: zoom,
-		ScreenW: float64(size), ScreenH: float64(size), CapDim: capDim,
-	})
+	r.DrawEntityBracket(dst, s, sim.Info{Entity: ecs.Entity(9999), Kind: sim.KindShip, Visible: true})
 	if r.bodyPrims == 0 {
 		t.Error("a cell drew nothing for an entity outside the sim")
 	}
-}
-
-// TestEntityArtSizeFollowsZoom pins the cell to the world's size: the art box
-// grows with the zoom (a station is 102 px at the default framing, 202 px one
-// notch in), and a star's box stops at the world's own screen cap rather than
-// at whatever cell it fills.
-func TestEntityArtSizeFollowsZoom(t *testing.T) {
-	c, err := content.Load(content.FS())
-	if err != nil {
-		t.Fatalf("content.Load: %v", err)
-	}
-	wd, _ := c.World("world-showcase")
-	s, err := sim.New(c, wd, 42)
-	if err != nil {
-		t.Fatalf("sim.New: %v", err)
-	}
-	r := New(c)
-	var station, star sim.Info
-	for _, inf := range s.Grid() {
-		switch inf.Kind {
-		case sim.KindStation:
-			station = inf
-		case sim.KindStar:
-			star = inf
-		}
-	}
-	if station.Entity.IsZero() || star.Entity.IsZero() {
-		t.Fatal("fixture: the showcase needs a station and a star")
-	}
-	// The cell takes the art's own pixels: one zoom notch in doubles the
-	// station's box (its body is uncapped at this framing).
-	small := r.EntityArtSize(s, station, 0.02, 720)
-	big := r.EntityArtSize(s, station, 0.04, 720)
-	if ratio := float64(big) / float64(small); math.Abs(ratio-2) > 0.1 {
-		t.Errorf("station art %d px at zoom 0.02, %d px at 0.04 (ratio %.2f), want the art to double with the zoom",
-			small, big, ratio)
-	}
-	// The star's glow caps at 45% of the world's long screen edge (324 px),
-	// not at whatever cell it fills: the box is the grid's at every zoom.
-	if got, want := r.EntityArtSize(s, star, 0.02, 720), 650; got != want {
-		t.Errorf("star art = %d px, want the world cap %d", got, want)
-	}
-	if got, want := r.EntityArtSize(s, star, 0.04, 720), 650; got != want {
-		t.Errorf("star art = %d px one zoom notch in, want the same world cap %d", got, want)
-	}
-	if got := r.EntityArtSize(s, star, 0.02, 320); got == 650 {
-		t.Errorf("star art ignored the reference viewport: %d px at a 320 px cap", got)
-	}
-}
-
-// TestHiddenEntitiesLeaveTheGrid pins the stack picker's disappearance to the
-// body pass: while the column is up the entities it displays submit no body
-// primitive, every entity it does not list keeps drawing, the player is hidden
-// like anything else, and a dismissed column (SetHidden(nil)) restores them.
-// What the world would still paint around a hidden entity (bracket, hover
-// label, selection ring, the lock ring that stays) is pinned by the stack
-// picker capture, where pixel readback is available.
-func TestHiddenEntitiesLeaveTheGrid(t *testing.T) {
-	c, err := content.Load(content.FS())
-	if err != nil {
-		t.Fatalf("content.Load: %v", err)
-	}
-	wd, _ := c.World("world-showcase")
-	s, err := sim.New(c, wd, 42)
-	if err != nil {
-		t.Fatalf("sim.New: %v", err)
-	}
-	var station ecs.Entity
-	for _, inf := range s.Grid() {
-		if inf.Kind == sim.KindStation && inf.Visible {
-			station = inf.Entity
-			break
-		}
-	}
-	if station.IsZero() {
-		t.Fatal("fixture: no visible station")
-	}
-	tr, _ := s.Transforms.Get(station)
-	cam := Camera{Center: tr.Pos, Zoom: 0.02, ScreenW: 1280, ScreenH: 720}
-	r := New(c)
-	count := func(hide []ecs.Entity, cam Camera) int {
-		r.SetHidden(hide)
-		r.Draw(ebiten.NewImage(1280, 720), cam, s)
-		return r.bodyPrims
-	}
-	full := count(nil, cam)
-	if full == 0 {
-		t.Fatal("fixture: nothing draws")
-	}
-	if got := count([]ecs.Entity{station}, cam); got != full-1 {
-		t.Errorf("hidden station: %d bodies drawn, want %d (the station draws in the column, nowhere else)",
-			got, full-1)
-	}
-	if got := count([]ecs.Entity{s.Player()}, cam); got != full {
-		t.Errorf("hiding an entity outside the column dropped a body: %d, want %d", got, full)
-	}
-	if got := count(nil, cam); got != full {
-		t.Errorf("a dismissed column left %d of %d bodies hidden", full-got, full)
-	}
-
-	// The player is an entity like any other: listed, it leaves the grid.
-	ptr, _ := s.Transforms.Get(s.Player())
-	pcam := Camera{Center: ptr.Pos, Zoom: 0.02, ScreenW: 1280, ScreenH: 720}
-	withPlayer := count(nil, pcam)
-	if got := count([]ecs.Entity{s.Player()}, pcam); got != withPlayer-1 {
-		t.Errorf("listed player: %d bodies drawn, want %d", got, withPlayer-1)
-	}
-}
-
-// TestHiddenEntitiesKeepTheirLockRing pins what the stack column's
-// disappearance leaves alone: a hidden target still draws the player's lock
-// ring, because the ring marks your lock, not the target's presence. Pixel
-// readback needs a running ebiten loop, so this is the gated probe (no PNG);
-// the reads happen inside the loop, where ebiten's vector paths are resolved.
-func TestHiddenEntitiesKeepTheirLockRing(t *testing.T) {
-	var got []string
-	ran := false
-	(&capture.Capture{
-		Name:   "Entieve hidden lock ring probe",
-		Frames: 1,
-		Draw: func(_ int, _ *ebiten.Image) error {
-			ran = true
-			c, err := content.Load(content.FS())
-			if err != nil {
-				return err
-			}
-			wd, ok := c.World("world-showcase")
-			if !ok {
-				return errors.New("world-showcase missing")
-			}
-			s, err := sim.New(c, wd, 42)
-			if err != nil {
-				return err
-			}
-			var station ecs.Entity
-			for _, inf := range s.Grid() {
-				if inf.Kind == sim.KindStation && inf.Visible {
-					station = inf.Entity
-					break
-				}
-			}
-			if station.IsZero() {
-				return errors.New("fixture: no visible station")
-			}
-			tg, ok := s.Targetings.Get(s.Player())
-			if !ok {
-				return errors.New("fixture: the player cannot lock")
-			}
-			tr, _ := s.Transforms.Get(station)
-			cam := Camera{Center: tr.Pos, Zoom: 0.02, ScreenW: 1280, ScreenH: 720}
-			r := New(c)
-			r.SetSelected(station)
-			r.SetHover(station)
-			r.SetHidden([]ecs.Entity{station})
-			shoot := func() *ebiten.Image {
-				img := ebiten.NewImage(1280, 720)
-				r.Draw(img, cam, s)
-				return img
-			}
-			box := image.Rect(600, 320, 680, 400)
-			tg.Locks = []sim.Lock{{Target: station, Progress: 1}}
-			s.Targetings.Set(s.Player(), *tg)
-			withLock := inkNear(shoot(), box, colLock)
-			tg.Locks = nil
-			s.Targetings.Set(s.Player(), *tg)
-			without := inkNear(shoot(), box, colLock)
-			if withLock == 0 {
-				got = append(got, "a hidden, locked target lost its lock ring: the ring marks the lock, not the presence")
-			}
-			if without != 0 {
-				got = append(got, fmt.Sprintf("%d lock-coloured pixels drew with no lock", without))
-			}
-			return nil
-		},
-	}).Run(t)
-	if !ran {
-		t.Skip("the capture loop did not run")
-	}
-	for _, g := range got {
-		t.Error(g)
-	}
-}
-
-// inkNear counts the pixels of r within 20 of col on every colour channel.
-func inkNear(img *ebiten.Image, r image.Rectangle, col color.RGBA) int {
-	n := 0
-	for y := r.Min.Y; y < r.Max.Y; y++ {
-		for x := r.Min.X; x < r.Max.X; x++ {
-			cr, cg, cb, _ := img.At(x, y).RGBA()
-			if absDiff8(cr>>8, uint32(col.R)) <= 20 && absDiff8(cg>>8, uint32(col.G)) <= 20 &&
-				absDiff8(cb>>8, uint32(col.B)) <= 20 {
-				n++
-			}
-		}
-	}
-	return n
-}
-
-// absDiff8 is |a-b| on 8-bit channels.
-func absDiff8(a, b uint32) uint32 {
-	if a > b {
-		return a - b
-	}
-	return b - a
 }

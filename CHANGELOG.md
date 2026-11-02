@@ -99,20 +99,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is a single pick in the world, so resting the cursor on the pile for about
   two hundred milliseconds opens a vertical column of the entities
   themselves, ordered as the world paints them (the entity on top leads; ties
-  fall to the canonical handle order). An entry is the entity as the grid
-  draws it at the current zoom (its art's own pixels, never scaled to fit)
-  with its name beside it: no frame around an entry, no panel behind the
-  column and no tooltip, so the entries float over the world. While the
-  column is up the entities it lists stop drawing in space (their art,
-  bracket, hover label and selection ring; the player's own hull is treated
-  like any other), because the column is where they are, and dismissing it
-  brings them straight back. The tail past the twelve listed never left the
-  grid, so nothing is invisible and unlisted. A click selects, `Ctrl` + click
-  locks (the world chord), a right-click opens the entity's menu, and it
-  closes itself after the cursor leaves both the column and the pile for
-  about a hundred and fifty milliseconds. It is transient top chrome: no
-  keybinding, no Screen row, nothing persisted, and a plain world click still
-  resolves the nearest entity exactly as before.
+  fall to the canonical handle order). Each cell is drawn as the entity is
+  drawn in space, its own hull art, rock, station or celestial inside its own
+  world bracket, so a cell reads as a miniature of what sits on screen
+  instead of an icon of its kind. A cell click selects, `Ctrl` + click locks
+  (the world chord), a right-click opens the entity's menu, and hovering a
+  cell names it with its distance. The column lists up to twelve entities,
+  the tail stays in the Overview by design, and it closes itself after the
+  cursor leaves both the column and the pile for about a hundred and fifty
+  milliseconds. It is transient top chrome: no keybinding, no Screen row,
+  nothing persisted, and a plain world click still resolves the nearest
+  entity exactly as before.
 
 ### Changed
 

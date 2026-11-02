@@ -382,17 +382,14 @@ world uses under the cursor, so the row selects and locks in one press.
 
 Where several things sit on top of each other, the world's click can only
 reach the nearest one. Rest the cursor on the pile (about a fifth of a
-second, no click) and a vertical column opens beside it: each entry is the
-entity as the grid draws it at the current zoom, its own art at its own size
-(nothing is scaled down to fit) with its name beside it. No frame surrounds
-an entry and no panel sits behind the column, so the entries float over the
-world, and while the column is up the entities it lists stop drawing in
-space: the column is where they are, and closing it brings them straight
-back. The column is ordered as the world paints them, so the entity on top
-leads. A click selects that entity (the Overview highlight and the Selected
-Item window follow), `Ctrl` + click locks it, a right-click opens the
-entity's own menu. The column lists up to twelve entities, and something
-deeper stays in the grid and in the Overview, since it was never listed.
+second, no click) and a vertical column opens beside it: each cell is the
+entity as the world draws it, its own body art inside its own bracket, so a
+cell reads as a miniature of what sits on screen. The column is ordered as
+the world paints them, so the entity on top leads. Hover a cell for its name
+and distance. A click selects that entity (the Overview highlight and the
+Selected Item window follow), `Ctrl` + click locks it, a right-click opens
+the entity's own menu. The column lists up to twelve entities; anything
+deeper stays in the Overview.
 It closes by itself once the cursor leaves both the column and the pile
 (about 150 ms of grace), and it never changes what a plain world click
 selects.
