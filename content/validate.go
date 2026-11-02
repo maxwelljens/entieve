@@ -1409,6 +1409,9 @@ func (v *validator) proficiencyGraph() {
 	for _, problem := range proficiencyGraphProblems(proficiencyPrereqs, proficiencyFamilies) {
 		v.addf("%s", problem)
 	}
+	for _, problem := range proficiencyCardProblems(proficiencyInfo, proficiencyFamilies) {
+		v.addf("%s", problem)
+	}
 	// Starter essentials must be legal at tick 0: a family used by a world
 	// start may not carry a nonzero prerequisite edge.
 	for _, id := range keys(v.c.Worlds) {

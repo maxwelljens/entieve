@@ -671,6 +671,47 @@ func TestModuleKindAggression(t *testing.T) {
 	}
 }
 
+// TestProficiencyCards pins the family pages: every family has a
+// description and at least one practice line, the shipped table is clean,
+// and the validator rejects a missing or empty page (a blank dialog can
+// never ship).
+func TestProficiencyCards(t *testing.T) {
+	if problems := proficiencyCardProblems(proficiencyInfo, proficiencyFamilies); len(problems) != 0 {
+		t.Fatalf("shipped family cards have problems: %v", problems)
+	}
+	for _, id := range ProficiencyFamilyIDs() {
+		card := FamilyInfo(id)
+		if strings.TrimSpace(card.Desc) == "" {
+			t.Errorf("%s: no description", id)
+		}
+		if len(card.Practice) == 0 {
+			t.Errorf("%s: no practice lines", id)
+		}
+		if strings.Contains(card.Desc, "\u2014") || strings.Contains(strings.Join(card.Practice, " "), "\u2014") {
+			t.Errorf("%s: em dash in the prose", id)
+		}
+	}
+	fams := map[string]string{"a": "A", "b": "B"}
+	cases := []struct {
+		name  string
+		cards map[string]ProfInfo
+		want  string
+	}{
+		{"missing card", map[string]ProfInfo{"a": {Desc: "d", Practice: []string{"p"}}}, `family "b" has no card`},
+		{"empty desc", map[string]ProfInfo{"a": {Practice: []string{"p"}}, "b": {Desc: "d", Practice: []string{"p"}}}, `family "a" has no description`},
+		{"empty practice", map[string]ProfInfo{"a": {Desc: "d"}, "b": {Desc: "d", Practice: []string{"p"}}}, `family "a" lists no practice`},
+		{"blank line", map[string]ProfInfo{"a": {Desc: "d", Practice: []string{" "}}, "b": {Desc: "d", Practice: []string{"p"}}}, "practice line 0 is blank"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			problems := proficiencyCardProblems(tc.cards, fams)
+			if len(problems) == 0 || !strings.Contains(strings.Join(problems, "\n"), tc.want) {
+				t.Fatalf("problems = %v, want %q", problems, tc.want)
+			}
+		})
+	}
+}
+
 // TestProficiencyPrereqGraph pins the authored dependency graph: every family
 // has an entry, every edge resolves and stays in 0..5, and no cycle exists.
 func TestProficiencyPrereqGraph(t *testing.T) {

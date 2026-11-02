@@ -14,6 +14,7 @@ type scriptInput struct {
 	x, y   int
 	down   [3]bool
 	edge   [3]bool
+	wheel  float64
 	shape  ebiten.CursorShapeType
 	writes int
 }
@@ -21,8 +22,53 @@ type scriptInput struct {
 func (s *scriptInput) Cursor() (int, int)        { return s.x, s.y }
 func (s *scriptInput) Down(b Button) bool        { return s.down[b] }
 func (s *scriptInput) JustPressed(b Button) bool { return s.edge[b] }
+func (s *scriptInput) Wheel() float64            { return s.wheel }
 func (s *scriptInput) SetShape(sh ebiten.CursorShapeType) {
 	s.shape, s.writes = sh, s.writes+1
+}
+
+// TestPointerWheelIsOneSample: the wheel rides the frame like the cursor —
+// sampled once at Begin, still when the source never reports one, and the
+// host's second OS read cannot change it.
+func TestPointerWheelIsOneSample(t *testing.T) {
+	src := &scriptInput{wheel: 1.5}
+	p := NewPointer(src)
+	p.Begin()
+	if got := p.Wheel(); got != 1.5 {
+		t.Errorf("Wheel() = %v, want the frame's sample 1.5", got)
+	}
+	src.wheel = -2
+	if got := p.Wheel(); got != 1.5 {
+		t.Errorf("Wheel() re-sampled: %v, want 1.5", got)
+	}
+	src.wheel = 0
+	p.Begin()
+	if got := p.Wheel(); got != 0 {
+		t.Errorf("Wheel() = %v, want a still wheel", got)
+	}
+	// A source without a wheel reads as still (the scripted pointers that
+	// never zoom keep their old interface).
+	if got := NewPointer(nil).Wheel(); got != 0 {
+		t.Errorf("nil frame Wheel() = %v, want 0", got)
+	}
+}
+
+// vastInput is a Source without WheelSource: the interface must stay
+// optional, or every scripted pointer in the suite would need a method.
+type vastInput struct{}
+
+func (vastInput) Cursor() (int, int)              { return 0, 0 }
+func (vastInput) Down(Button) bool                { return false }
+func (vastInput) JustPressed(Button) bool         { return false }
+func (vastInput) SetShape(ebiten.CursorShapeType) {}
+
+// TestPointerSourceWithoutWheelStaysStill pins the optional half.
+func TestPointerSourceWithoutWheelStaysStill(t *testing.T) {
+	p := NewPointer(vastInput{})
+	p.Begin()
+	if got := p.Wheel(); got != 0 {
+		t.Errorf("Wheel() = %v on a source without one, want 0", got)
+	}
 }
 
 // TestPointerSpendHidesThePressNotTheEdge pins the gesture vocabulary:

@@ -458,15 +458,40 @@ level you can reach, filled up to the level you have), the level readout
 (`3/5`), and the XP banked toward the next level (`40/160 XP`, or `max` at
 the cap). Starter essentials wear a `starter` tag. A family whose
 prerequisites are not met is dimmed and names what it waits for
-(`needs <family> <level>`). An arrow lights when the prerequisite actually
-covers the level the dependent needs, and stays grey otherwise, so a shut
-branch reads as a grey chain. The header counts what you have reached
-(families open, levels earned), so the window answers "how far am I"
-without reading node by node.
+(`needs <family> <level>`). An arrow curves from a prerequisite to the
+family it feeds and lights when the prerequisite actually covers the level
+the dependent needs, so a shut branch reads as a grey chain. A node under
+the pointer takes an accent edge and the pointer cursor, and a family at
+the cap writes its readout in the accent. A rank with more families than
+one column can hold wraps into adjacent columns instead of shrinking the
+whole graph, so the first rank of ten roots reads as two columns side by
+side.
 
-The tree is drawn fit to your screen: no scrolling, no zoom. A dozen
-families land in a few ranks with room to spare; a much larger graph would
-shrink the boxes to keep the whole shape on one page.
+The tree **navigates**: drag anywhere on the bare graph to pan it, and
+roll the wheel to zoom around the cursor (0.5x to 2x; the type zooms with
+the boxes, so a magnified node stays sharp). A press that moves less than
+about four pixels is a click, not a drag, so a steady hand still selects.
+The pan is clamped so a graph edge never leaves the screen, and both pan
+and zoom are session state: nothing is saved, and a reopened tree starts
+fitted and centred.
+
+The tree's **overview window** opens with it at the top left: families
+open, levels earned against the possible total over a progress bar,
+families at the cap, and every family's level in two columns (dimmed while
+gated, accent at the cap), with the navigation hint and `Esc closes`. Its
+× closes only the window; the tree keeps running, and the next open brings
+the summary back. The graph is fitted below the window's default place, so
+the summary never covers a node on first open; if you move or close it,
+the graph stays where it was (drag the graph to reclaim the space).
+
+Click a node for its **family card**: one window, re-targeted by the next
+click and placed beside it, stating your level in the family and the
+prerequisite it waits for, **what it is for** and **practice**, the acts
+that pay it (mining pays by ore rarity, a gun pays by damage landed,
+support modules pay per cycle, hulls pay a share of every job act plus
+kills, deliveries and warp distance, and the Old Works line states plainly
+that the machines never train you). `Esc` closes the card first, then the
+tree; `×` closes either.
 
 ## EVE concepts primer
 

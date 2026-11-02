@@ -1,8 +1,10 @@
 package sim
 
 import (
+	"fmt"
 	"math"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/entieve/entieve/format"
@@ -131,6 +133,89 @@ func TestMiningPracticeScalesWithOreRarity(t *testing.T) {
 	}
 	if basicHull != basic*hullPracticeShare || rareHull != rare*hullPracticeShare {
 		t.Fatalf("hull credit = %v/%v, want 50%% of %v/%v", basicHull, rareHull, basic, rare)
+	}
+}
+
+// TestProficiencyPracticeMatchesTheActs pins every family card's practice
+// list against the sim's own award constants: the rarity ladder comes from
+// oreRarity, the hull cut from hullPracticeShare, the warp rate from
+// flightXPMetres and the hop cap from flightHopCap, so changing an award
+// without the card (or the card without the award) fails here. The machine
+// line (rat) is the one family with no player act: the card must say so.
+func TestProficiencyPracticeMatchesTheActs(t *testing.T) {
+	c := testContent()
+	s, err := New(c, testWorld(), testSeed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The rarity ladder exactly as oreRarity pays it.
+	ore := c.Items["ore-sterngrit"]
+	pay := make([]int, 4)
+	old := ore.Rarity
+	for r := 1; r <= 4; r++ {
+		ore.Rarity = r
+		pay[r-1] = int(s.oreRarity("ore-sterngrit"))
+	}
+	ore.Rarity = old
+	wantRarity := fmt.Sprintf("rarity 1 pays %d, 2 pays %d, 3 pays %d and 4 pays %d",
+		pay[0], pay[1], pay[2], pay[3])
+	wantCut := fmt.Sprintf("%d%%", int(hullPracticeShare*100))
+	wantWarp := fmt.Sprintf("%d point per %d AU", 1, int(flightXPMetres/format.AU))
+	wantHop := fmt.Sprintf("half a point a hop")
+	if flightHopCap/flightXPMetres != 0.5 {
+		t.Fatalf("fixture: one hop pays %v of a point, want half", flightHopCap/flightXPMetres)
+	}
+
+	text := func(family string) string {
+		return strings.Join(content.FamilyInfo(family).Practice, " ")
+	}
+	modules := map[string]string{
+		"autocannon": "autocannon",
+		"artillery":  "artillery",
+		"rocket":     "rocket",
+		"mining":     "mining cycle",
+		"shield":     "shield booster",
+		"armor":      "armor repairer",
+		"capacitor":  "cap booster",
+		"propulsion": "afterburner",
+		"ewar":       "web",
+	}
+	for family, act := range modules {
+		got := text(family)
+		if !strings.Contains(got, act) {
+			t.Errorf("%s: practice does not name its act %q: %q", family, act, got)
+		}
+		if !strings.Contains(got, wantCut) {
+			t.Errorf("%s: practice misses the hull cut %q", family, wantCut)
+		}
+	}
+	if got := text("mining"); !strings.Contains(got, wantRarity) {
+		t.Errorf("mining: practice %q does not match the rarity ladder %q", got, wantRarity)
+	}
+	if got := text("capacitor"); !strings.Contains(got, "recharger") {
+		t.Errorf("capacitor: practice misses the recharger spend: %q", got)
+	}
+	for _, family := range []string{"frigate", "destroyer", "industrial", "barge"} {
+		got := text(family)
+		for _, want := range []string{wantCut, "kill", "delivery", wantWarp, wantHop} {
+			if !strings.Contains(got, want) {
+				t.Errorf("%s: practice %q misses %q", family, got, want)
+			}
+		}
+	}
+	// The machine line: no player act, and the card says exactly that.
+	if got := text("rat"); !strings.Contains(got, "None") {
+		t.Errorf("rat: practice %q should state there is none", got)
+	}
+	for _, hull := range c.Ships {
+		if hull.Family == "rat" && hull.Class != "rat" {
+			t.Errorf("rat is a machine line, but player hull %s is in it", hull.ID)
+		}
+	}
+	// Every shipped family is covered by one of the two groups above.
+	covered := len(modules) + 4 + 1
+	if got := len(content.ProficiencyFamilyIDs()); got != covered {
+		t.Errorf("%d families ship, the practice pin covers %d: teach it the new act", got, covered)
 	}
 }
 

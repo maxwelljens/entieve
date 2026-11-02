@@ -3,6 +3,7 @@ package content
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // Proficiency family vocabulary (CONTEXT.md: Proficiency). A family is a
@@ -58,6 +59,133 @@ var proficiencyPrereqs = map[string][]Prereq{
 
 // ProficiencyMax is the house cap (Craft level's five).
 const ProficiencyMax = 5
+
+// ProfInfo is one family's page in the tree's family card: what the family
+// is for and which acts pay it practice. It is authored content (CONTEXT.md:
+// Proficiency), kept beside the family vocabulary because a family is code,
+// and a new family is a schema change: the validator rejects a family with
+// no page and the sim's test pins each practice list against the act
+// constants, so prose cannot drift from the awards.
+type ProfInfo struct {
+	Desc     string   // what the family is for (a paragraph, no em dashes)
+	Practice []string // the acts that award practice, one line each
+}
+
+// proficiencyInfo is the family card table. Every shipped family has a page
+// (validate.go's proficiencyCard); a family with no page is a validator
+// problem, never a blank dialog.
+var proficiencyInfo = map[string]ProfInfo{
+	"autocannon": {
+		Desc: "Short-ranged, fast-cycling guns: the starter weapon line, quick to track and light on grid. The line covers every calibre, so practice with a small autocannon carries to the large one.",
+		Practice: []string{
+			"Every point of damage an autocannon lands.",
+			"The hull you fly takes a 10% cut of that damage.",
+		},
+	},
+	"artillery": {
+		Desc: "Long-ranged, heavy-hitting guns that cycle slowly and punish a target that holds still. Opens once Autocannons reaches II; the line then climbs its calibres without another gate.",
+		Practice: []string{
+			"Every point of damage artillery lands.",
+			"The hull you fly takes a 10% cut of that damage.",
+		},
+	},
+	"rocket": {
+		Desc: "Launcher-mounted rockets: short-range volleys that arrive in a burst. The family covers the launchers, and its levels gate the larger bays.",
+		Practice: []string{
+			"Every point of damage a rocket volley lands.",
+			"The hull you fly takes a 10% cut of that damage.",
+		},
+	},
+	"mining": {
+		Desc: "The mining laser: ore yield per cycle, and the gate on the larger lasers. Rarer ore pays more practice for the same cycle, so a rich belt trains faster than a common one.",
+		Practice: []string{
+			"Each completed mining cycle, by ore rarity: rarity 1 pays 1, 2 pays 2, 3 pays 4 and 4 pays 8.",
+			"The hull you fly takes a 10% cut of that practice.",
+		},
+	},
+	"shield": {
+		Desc: "Shield boosters and shield hardeners: the recharge that keeps a hull in a fight. The family's levels gate the stronger boosters.",
+		Practice: []string{
+			"Each completed shield booster cycle.",
+			"The hull you fly takes a 10% cut of that practice.",
+		},
+	},
+	"armor": {
+		Desc: "Armor repairers and plating: the second layer that holds after the shield is gone. Levels gate the stronger repairers and the heavier plates.",
+		Practice: []string{
+			"Each completed armor repairer cycle.",
+			"The hull you fly takes a 10% cut of that practice.",
+		},
+	},
+	"capacitor": {
+		Desc: "The capacitor: the energy every active module spends. Boosters refill it in a burst, rechargers refill it continuously, and this family gates the larger of both.",
+		Practice: []string{
+			"Each completed cap booster cycle.",
+			"Every activation cost paid while a cap recharger is fitted.",
+			"The hull you fly takes a 10% cut of that practice.",
+		},
+	},
+	"propulsion": {
+		Desc: "Afterburners and the hull's speed edge: the line that closes and opens range. Levels gate the stronger afterburners.",
+		Practice: []string{
+			"Each completed afterburner cycle.",
+			"The hull you fly takes a 10% cut of that practice.",
+		},
+	},
+	"ewar": {
+		Desc: "Electronic warfare: stasis webs that slow a target and warp scramblers that hold it. Levels gate the stronger webs and the longer scrams.",
+		Practice: []string{
+			"Each completed web or scrambler cycle.",
+			"The hull you fly takes a 10% cut of that practice.",
+		},
+	},
+	"frigate": {
+		Desc: "The frigate class: small, fast hulls that fly the starter line. Levels gate the frigate hulls you may assemble and undock.",
+		Practice: []string{
+			"10% of every mining, combat damage and support cycle act you fly in a frigate.",
+			"Each kill, at full rate, scaled by the target's caste.",
+			"Each completed delivery, at full rate, by the offer's level.",
+			"Each completed warp, 1 point per 100 AU (half a point a hop at most).",
+		},
+	},
+	"destroyer": {
+		Desc: "The destroyer class: a battery of small turrets on a frigate hull. Opens once Frigates reaches II; levels gate the destroyer hulls.",
+		Practice: []string{
+			"10% of every mining, combat damage and support cycle act you fly in a destroyer.",
+			"Each kill, at full rate, scaled by the target's caste.",
+			"Each completed delivery, at full rate, by the offer's level.",
+			"Each completed warp, 1 point per 100 AU (half a point a hop at most).",
+		},
+	},
+	"industrial": {
+		Desc: "The industrial class: the hauler line, built to carry rather than fight. Opens once Frigates reaches I; levels gate the industrial hulls.",
+		Practice: []string{
+			"10% of every mining, combat damage and support cycle act you fly in an industrial.",
+			"Each kill, at full rate, scaled by the target's caste.",
+			"Each completed delivery, at full rate, by the offer's level.",
+			"Each completed warp, 1 point per 100 AU (half a point a hop at most).",
+		},
+	},
+	"barge": {
+		Desc: "The barge class: the dedicated mining hull, an ore hold in place of guns. Opens once Industrials reaches I; levels gate the barge hulls.",
+		Practice: []string{
+			"10% of every mining, combat damage and support cycle act you fly in a barge.",
+			"Each kill, at full rate, scaled by the target's caste.",
+			"Each completed delivery, at full rate, by the offer's level.",
+			"Each completed warp, 1 point per 100 AU (half a point a hop at most).",
+		},
+	},
+	"rat": {
+		Desc: "The Old Works hulls: the machine line flown against you, never by you. The family names the enemy castes (Scuttler, Marauder, Hierarch) and carries no practice of its own.",
+		Practice: []string{
+			"None: the machines are flown against the pilot, so no act awards this family.",
+		},
+	},
+}
+
+// FamilyInfo returns a family's card (the zero value for an unknown family;
+// Validate refuses a family without one).
+func FamilyInfo(family string) ProfInfo { return proficiencyInfo[family] }
 
 // ValidProficiencyFamily reports whether family is in the vocabulary.
 func ValidProficiencyFamily(family string) bool {
@@ -152,7 +280,43 @@ func proficiencyGraphProblems(table map[string][]Prereq, families map[string]str
 	return problems
 }
 
-// LevelLabel is a proficiency level as the interface and refusals print it:
+// proficiencyCardProblems validates the family cards: every known family
+// has a page, every page has a description and at least one practice line,
+// no line is blank, and the prose carries no em dash (the house rule).
+func proficiencyCardProblems(cards map[string]ProfInfo, families map[string]string) []string {
+	var problems []string
+	ids := make([]string, 0, len(families))
+	for id := range families {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		card, ok := cards[id]
+		if !ok {
+			problems = append(problems, fmt.Sprintf("proficiency: family %q has no card (description and practice)", id))
+			continue
+		}
+		if strings.TrimSpace(card.Desc) == "" {
+			problems = append(problems, fmt.Sprintf("proficiency: family %q has no description", id))
+		}
+		if strings.Contains(card.Desc, "\u2014") {
+			problems = append(problems, fmt.Sprintf("proficiency: family %q description carries an em dash", id))
+		}
+		if len(card.Practice) == 0 {
+			problems = append(problems, fmt.Sprintf("proficiency: family %q lists no practice", id))
+		}
+		for i, line := range card.Practice {
+			if strings.TrimSpace(line) == "" {
+				problems = append(problems, fmt.Sprintf("proficiency: family %q practice line %d is blank", id, i))
+			}
+			if strings.Contains(line, "\u2014") {
+				problems = append(problems, fmt.Sprintf("proficiency: family %q practice line %d carries an em dash", id, i))
+			}
+		}
+	}
+	return problems
+}
+
 // 0 → "0", 1..5 → roman numerals (the cap is five).
 func LevelLabel(level int) string {
 	switch level {

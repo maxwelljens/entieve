@@ -37,7 +37,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wait for. It paints under your windows, so an open window stays visible
   and clickable on top of it, it blocks the world while it is up, and
   `Esc` closes it. The graph is laid out by rank (topological, ties by
-  family id) and fitted to the screen, so it never scrolls.
+  family id); a rank wider than the fit wraps into adjacent columns
+  instead of shrinking every box, and the graph is fitted to the band
+  under its overview window.
+- **Tree navigation**: drag the bare graph to pan it and roll the wheel to
+  zoom around the cursor (0.5x to 2x, type included). A press that moves
+  under ~4 px is a click, so selecting a node survives a jittery hand. The
+  pan is clamped to keep a graph edge on screen, and pan/zoom are session
+  state only: nothing is saved and a reopened tree starts fitted.
+- **A family card behind every node**: clicking a family opens one dialog
+  (re-targeted by the next click, placed beside it) stating your level and
+  the prerequisite it waits for, what the family is for and the acts that
+  practise it. The prose is content (`content.ProfInfo`): the validator
+  rejects a family without a description or practice list, and a sim test
+  pins each list against the award constants. `Esc` closes the card first,
+  then the tree.
+- **A proficiency overview window**: the tree's old header is now a
+  floating window at the top left with families open, levels earned
+  against the possible total over a progress bar, families at the cap and
+  every family's level in two columns, opening and closing with the tree
+  (its × closes just itself for that visit). It leaves a filter row seam
+  for a future category filter; no filter ships yet.
 - **Contacts replace the contract board**: the dock screen is now the
   **Contacts** view: the station services strip (the docked-at identity and
   Undock; every window it used to open is a navigation rail row already)
@@ -203,6 +223,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   plain row click still only selects.
 
 ### Fixed
+
+- **Rail tooltips no longer spill past their panel**: a tooltip footer line
+  longer than the panel's width cap is now wrapped on word boundaries (and
+  measured line by line), so the rail's long hotkey line stays inside the
+  tooltip instead of running past its own edge. The wrap is a footer rule,
+  so module and item tooltips keep their pinned geometry.
 
 - **Landed security fights the outlaw it locked**: a response wing that
   warped in for an incident and aggroed the pilot through the threat machine

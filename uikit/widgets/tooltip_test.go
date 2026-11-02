@@ -2,14 +2,15 @@ package widgets
 
 import (
 	"fmt"
-	"github.com/entieve/entieve/uikit/theme"
 	"image"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/theme"
 )
 
 // tipTestEnv is a Theme with just what the tooltip maths needs (palette
@@ -77,8 +78,8 @@ func checkTipLayout(t *testing.T, l tipLayout) {
 			t.Errorf("Rule[%d] = %v, want full content width", i, r)
 		}
 	}
-	for _, r := range l.Hints {
-		inside("Hint", r)
+	for _, h := range l.Hints {
+		inside("Hint", h.Rect)
 	}
 	for si, sl := range l.Sections {
 		inside("Section label", sl.Label)
@@ -134,6 +135,48 @@ func TestTipIconSize(t *testing.T) {
 	m.IconSize = 0
 	if got := tipLayoutAt(env, m, tipInnerWidth(env, m)).Icon.Dx(); got != TipIcon {
 		t.Errorf("default icon box = %d, want %d", got, TipIcon)
+	}
+}
+
+// TestTipHintWrapsInsideThePanel is the rail tooltip's regression pin: the
+// rail feeds the tooltip one long hotkey line ("T: toggle proficiency tree
+// (families, levels and prerequisites)"), it measures wider than the panel's
+// width cap, and before the wrap it was drawn whole from the hint's left
+// edge — past the panel's own boundary. Now every hint line sits inside the
+// content box and fits it.
+func TestTipHintWrapsInsideThePanel(t *testing.T) {
+	env := tipTestEnv()
+	const hint = "T: toggle proficiency tree (families, levels and prerequisites)"
+	m := TooltipModel{Icon: "stat_tracking", Title: "Proficiency", Hints: []string{hint}}
+
+	// The bug's precondition: the line is wider than the widest panel.
+	natural := TipMeasure(hint, env.Face(theme.StepTiny))
+	if natural <= float64(tipMaxInner) {
+		t.Fatalf("fixture hint measures %.1f px, inside the %d px cap: it no longer reproduces the wrap", natural, tipMaxInner)
+	}
+	l := tipLayoutAt(env, m, tipInnerWidth(env, m))
+	if l.Size.X != tipMaxW {
+		t.Fatalf("panel width = %d, want the %d px cap", l.Size.X, tipMaxW)
+	}
+	if len(l.Hints) < 2 {
+		t.Fatalf("long hint stayed on %d line(s): it is not wrapped", len(l.Hints))
+	}
+	var joined []string
+	for i, h := range l.Hints {
+		joined = append(joined, h.Text)
+		if !h.Rect.In(l.Inner) {
+			t.Errorf("hint line %d %v escapes the content box %v", i, h.Rect, l.Inner)
+		}
+		if w := TipMeasure(h.Text, env.Face(theme.StepTiny)); w > float64(l.Inner.Dx())+1 {
+			t.Errorf("hint line %d measures %.1f px, wider than the box %d: it would spill", i, w, l.Inner.Dx())
+		}
+	}
+	if got := strings.Join(joined, " "); got != hint {
+		t.Errorf("wrapped hint joined = %q, want the original %q", got, hint)
+	}
+	// Wrapping costs height, never width: the panel still ends at the cap.
+	if l.Hints[len(l.Hints)-1].Rect.Max.Y > l.Inner.Max.Y {
+		t.Errorf("last hint line ends at %d, past the content box %d", l.Hints[len(l.Hints)-1].Rect.Max.Y, l.Inner.Max.Y)
 	}
 }
 
@@ -208,8 +251,8 @@ func TestTipLayoutTilesAtBothWidths(t *testing.T) {
 		if want := l.Sections[1].Rows[len(l.Sections[1].Rows)-1].Value.Max.Y + tipRuleGap; l.Rules[1].Min.Y != want {
 			t.Errorf("%s: footer rule at %d, want %d", tc.name, l.Rules[1].Min.Y, want)
 		}
-		if want := l.Rules[1].Max.Y + tipRuleGap; l.Hints[0].Min.Y != want {
-			t.Errorf("%s: hint at %d, want %d", tc.name, l.Hints[0].Min.Y, want)
+		if want := l.Rules[1].Max.Y + tipRuleGap; l.Hints[0].Rect.Min.Y != want {
+			t.Errorf("%s: hint at %d, want %d", tc.name, l.Hints[0].Rect.Min.Y, want)
 		}
 	}
 
@@ -653,8 +696,8 @@ func TestTipPanelDrawSmoke(t *testing.T) {
 	for i, r := range l.Rules {
 		inPanel(fmt.Sprintf("rule %d", i), r)
 	}
-	for i, r := range l.Hints {
-		inPanel(fmt.Sprintf("hint %d", i), r)
+	for i, h := range l.Hints {
+		inPanel(fmt.Sprintf("hint %d", i), h.Rect)
 	}
 	// The clamp is a no-op here: an on-screen panel never moves.
 	if got := ClampTipRect(vr, image.Rect(0, 0, 1280, 720)); got != vr {

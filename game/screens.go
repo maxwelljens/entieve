@@ -98,8 +98,11 @@ const (
 	idRefinery      ScreenID = "refinery"
 	idFinances      ScreenID = "finances"
 	idProficiency   ScreenID = "proficiency"
-	idKeybindings   ScreenID = "keybindings"
-	idMenu          ScreenID = "menu"
+	// idProficiencyOverview is the tree's summary window: it opens and
+	// closes with the layer and is never a rail entry or a key of its own.
+	idProficiencyOverview ScreenID = "proficiency-overview"
+	idKeybindings         ScreenID = "keybindings"
+	idMenu                ScreenID = "menu"
 )
 
 // Screen is one window the player can open — the spec row the host and
@@ -362,6 +365,25 @@ var screens = []Screen{
 		Group:       "Ship",
 		Build: func(h *ScreenHost) widgets.WindowPanel {
 			return uikit.NewProficiency(h.services.Env, h.services.Proficiency, h.services.Viewport)
+		},
+	},
+	{
+		// The proficiency tree's summary window: the house answer to the
+		// header that used to be printed on the layer. It is a plain
+		// floating window (title bar, ×, drag) with no rail entry and no
+		// key: the game opens it with the tree and closes it with the
+		// tree, so its only door is the tree itself. Anchored top-left
+		// (the layer's own corner); its placement persists like every
+		// other window's.
+		ID: idProficiencyOverview, Title: "Proficiency overview", Icon: "stat_tracking",
+		Key:         keyNone,
+		DefaultRect: uikit.ProficiencyOverviewRect(),
+		Anchor:      AnchorFixed,
+		DockPolicy:  DockFloating,
+		Group:       "Ship",
+		Unlisted:    true,
+		Build: func(h *ScreenHost) widgets.WindowPanel {
+			return uikit.NewProficiencyOverview(h.services.Env, h.services.Proficiency)
 		},
 	},
 	{

@@ -180,6 +180,12 @@ type Game struct {
 	// gesture whose landing the click cue already reports.
 	menuWasOpen bool
 
+	// profOverviewOpen is this visit's flag for the tree's summary window:
+	// it opens with the layer, its × keeps it closed until the layer is
+	// reopened (no auto-reopen against the player), and closing the layer
+	// clears it. Session state only.
+	profOverviewOpen bool
+
 	scenes []Scene
 	space  *SpaceScene
 	w, h   int // logical screen size (Layout), in device pixels
@@ -643,6 +649,7 @@ func (g *Game) syncRail() {
 func (g *Game) syncMounts() {
 	docked := g.s.Docked.Has(g.s.Player())
 	g.host.Reconcile(Room{Title: g.title, Docked: docked})
+	g.syncProficiencyCompanions()
 	// Space chrome (HUD, rack, the kit's core windows) follows the room;
 	// top chrome (the rail) follows gameplay — the title shows neither.
 	g.applyChrome(!docked && !g.title, !g.title)
@@ -654,6 +661,29 @@ func (g *Game) syncMounts() {
 	if !docked && !g.title {
 		g.kit.CloseOrder()
 		g.kit.CloseContact()
+	}
+}
+
+// syncProficiencyCompanions keeps the tree's two companions in step with
+// the layer: the overview window opens with it and closes with it (its ×
+// keeps it closed for this visit), and the family card never outlives the
+// tree. The layer's own camera resets on unmount (Proficiency.Unmounted),
+// so a reopened tree starts fitted.
+func (g *Game) syncProficiencyCompanions() {
+	if g.host == nil {
+		return
+	}
+	if !g.host.IsOpen(idProficiency) {
+		if g.profOverviewOpen {
+			g.profOverviewOpen = false
+			g.host.SetOpen(idProficiencyOverview, false)
+		}
+		g.kit.CloseProfFamily()
+		return
+	}
+	if !g.profOverviewOpen {
+		g.profOverviewOpen = true
+		g.host.SetOpen(idProficiencyOverview, true)
 	}
 }
 
@@ -996,8 +1026,13 @@ func (g *Game) removeScene(match func(Scene) bool) {
 
 // onEscape implements the Esc menu toggle.
 func (g *Game) onEscape() error {
-	// The proficiency layer is modal over the world: Esc closes it before
-	// anything behind it (the Esc menu included).
+	// The proficiency tree is modal over the world: Esc closes it before
+	// anything behind it (the Esc menu included). An open family card is
+	// one step above the tree: Esc backs out of the card first.
+	if g.kit != nil && g.kit.ProfFamilyOpen() {
+		g.kit.CloseProfFamily()
+		return nil
+	}
 	if g.host != nil && g.host.IsOpen(idProficiency) {
 		g.host.SetOpen(idProficiency, false)
 		return nil

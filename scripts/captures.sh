@@ -34,6 +34,7 @@ captures() {
 ./uikit/screens TestMapCaptureFrame
 ./uikit/screens TestOrderWindowCaptureFrame
 ./uikit/screens TestProficiencyCaptureFrame
+./uikit/screens TestProficiencyFamilyCardCapture
 ./uikit/screens TestRefineryPickerCapture
 ./uikit/screens TestRailPixelsDrawAboveWindows
 ./uikit/screens TestSettingsCaptureFrame

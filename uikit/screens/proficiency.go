@@ -3,15 +3,18 @@ package screens
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"math"
 	"reflect"
 	"sort"
 
+	"github.com/ebitenui/ebitenui/input"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
@@ -40,23 +43,39 @@ type ProfFamily struct {
 }
 
 // Proficiency geometry, in design units through the Px funnel. The graph
-// is fit into the layer, never scrolled: a dozen families land in a few
-// ranks and the fit factor stays 1.
+// is fitted into the layer and then panned/zoomed as one camera: zoom
+// scales the whole drawing (type included), so a node's internal offsets
+// stay proportional at any zoom.
 const (
 	profNodeW  = 240
 	profNodeH  = 92
 	profColGap = 64
 	profRowGap = 18
 	profPad    = 28
-	profHeader = 86 // the title band above the graph
 	profPipW   = 8
 	profPipGap = 4
+
+	// profZoomStep is the house wheel-notch factor (the world camera's
+	// zoomStep); the band keeps a node readable at one end and lets a
+	// sprawling graph be inspected at the other.
+	profZoomStep = 1.15
+	profZoomMin  = 0.5
+	profZoomMax  = 2.0
+
+	// profSlop is how far a press may travel and still count as a click
+	// (design px): a jittery hand still opens the family card, a drag pans.
+	profSlop = 4
+
+	// profGridStep is the backdrop's faint blueprint grid.
+	profGridStep = 48
 )
 
 // Proficiency is the proficiency graph (the owner's "tech tree"): every
-// proficiency family as a node, its prerequisite edges as arrows
-// (prerequisite → dependent), the pilot's level pips and XP readout on
-// each node, and the gated families dimmed.
+// proficiency family as a node, its prerequisite edges as curved arrows
+// (prerequisite → dependent), the pilot's level pips and XP readout on each
+// node, and the gated families dimmed. Click a node for its family card
+// (what it is for and what pays it practice), drag the bare layer to pan,
+// wheel to zoom.
 //
 // It is the house's one full-viewport layer: mounted through
 // Kit.AddBackdropWindow, it paints over the world and BELOW every window
@@ -64,9 +83,12 @@ const (
 // window stack and the root chrome, so a click on a window above still
 // reaches it while the world stays blocked. The layer re-fits itself to
 // the viewport on every Sync: it is not a movable window (no title bar,
-// no grips), and Esc / the Screen row's key close it.
+// no grips), and Esc / the Screen row's key close it. The pan/zoom camera
+// is session state only: never persisted, reset when the layer unmounts.
 type Proficiency struct {
 	th       theme.Theme
+	as       widgets.ActionSink
+	ptr      *widgets.Pointer
 	model    func() []ProfFamily
 	viewport func() image.Rectangle
 
@@ -80,13 +102,38 @@ type Proficiency struct {
 	nodes  []profNode
 	edges  []profEdge
 	redraw int // repaint count (the determinism pin watches the model)
+
+	// The camera: session-only, reset on unmount. pan is in screen px,
+	// zoom around 1.
+	zoom  float64
+	pan   image.Point
+	state profViewState // the last painted view/hover, for repaint gating
+
+	// The gesture: a press arms a pan; a release under profSlop on a node
+	// opens its card.
+	armed      bool
+	active     bool
+	dragFrom   image.Point
+	panFrom    image.Point
+	pressNode  int
+	hover      int
+	lastLayout image.Rectangle // the canvas the current nodes were laid out for
+}
+
+// profViewState is what a repaint depends on besides the model.
+type profViewState struct {
+	zoom   float64
+	pan    image.Point
+	hover  int
+	press  int
+	locked bool
 }
 
 // NewProficiency builds the proficiency layer over the pilot's model (nil
 // reads as no families) and the live viewport (nil keeps the design
 // viewport). Mount it with Kit.AddBackdropWindow and call Sync every frame.
 func NewProficiency(env widgets.Seams, model func() []ProfFamily, viewport func() image.Rectangle) *Proficiency {
-	p := &Proficiency{th: env, model: model, viewport: viewport}
+	p := &Proficiency{th: env, as: env, ptr: env.Pointer(), model: model, viewport: viewport, zoom: 1, hover: -1, pressNode: -1}
 	p.rect = pxRect(ProficiencyRect())
 	p.img = ebiten.NewImage(p.rect.Dx(), p.rect.Dy())
 	p.gfx = widget.NewGraphic(widget.GraphicOpts.Image(p.img))
@@ -122,25 +169,54 @@ func (p *Proficiency) Win() *widget.Window { return p.win }
 // host mounts it through AddBackdropWindow).
 func (p *Proficiency) Backdrop() bool { return true }
 
-// Sync fits the layer to the viewport and repaints when the model changed.
+// Unmounted resets the camera and the gesture: pan and zoom are session
+// state, so a reopened tree starts fitted and centred. Nothing is painted
+// here (the layer is leaving); the next mounted Sync sees the moved state
+// and repaints once.
+func (p *Proficiency) Unmounted() {
+	p.armed, p.active = false, false
+	p.hover, p.pressNode = -1, -1
+	p.zoom, p.pan = 1, image.Point{}
+}
+
+// Sync fits the layer to the viewport, polls the frame's gesture, and
+// repaints when the model, the camera or the hover moved.
 func (p *Proficiency) Sync() {
 	p.fit()
 	fams := []ProfFamily(nil)
 	if p.model != nil {
 		fams = p.model()
 	}
-	if p.drawn && reflect.DeepEqual(fams, p.shown) {
-		return
+	model := !p.drawn || !reflect.DeepEqual(fams, p.shown) || p.rect != p.lastLayout
+	if model {
+		p.shown = fams
+		p.lastLayout = p.rect
+		p.nodes, p.edges = proficiencyLayout(fams, p.rect)
 	}
-	p.shown = fams
-	p.nodes, p.edges = proficiencyLayout(fams, p.rect)
-	p.redraw++
-	p.draw(fams)
-	p.drawn = true
+	p.poll()
+	st := profViewState{zoom: p.zoom, pan: p.pan, hover: p.hover, press: p.press(), locked: p.armed && !p.active}
+	if model || st != p.state {
+		p.state = st
+		p.redraw++
+		p.draw()
+		p.drawn = true
+	}
+}
+
+// press is the node index the press is still hovering over during an armed
+// click (-1 once the press became a pan or left the node).
+func (p *Proficiency) press() int {
+	if !p.armed || p.active {
+		return -1
+	}
+	return p.pressNode
 }
 
 // Canvas is the painted layer (the reopen pin compares it byte for byte).
 func (p *Proficiency) Canvas() *ebiten.Image { return p.img }
+
+// View returns the camera (zoom, pan) for the tests and the game.
+func (p *Proficiency) View() (float64, image.Point) { return p.zoom, p.pan }
 
 // fit resizes the window and the canvas to the live viewport (nil keeps
 // the design rect). It is the layer's only placement: the layer is the
@@ -162,12 +238,120 @@ func (p *Proficiency) fit() {
 	p.drawn = false
 }
 
+// poll reads the frame's gesture. Only the layer's own pixels answer (a
+// window above keeps its wheel and its press): OwnsAt asks whether this
+// widget's input layer is on top at the point.
+func (p *Proficiency) poll() {
+	p.hover = -1
+	if p.ptr == nil || p.gfx == nil {
+		return
+	}
+	pt := p.ptr.At()
+	over := widgets.OwnsAt(p.gfx.GetWidget(), pt, input.LayerEventTypeMouseButton)
+
+	if over && p.ptr.Wheel() != 0 {
+		p.zoomTo(pt, p.zoom*math.Pow(profZoomStep, p.ptr.Wheel()))
+	}
+	if over && p.ptr.Press(widgets.Left) {
+		p.armed, p.active = true, false
+		p.dragFrom, p.panFrom = pt, p.pan
+		p.pressNode = p.nodeAt(pt)
+	}
+	if p.armed && p.ptr.Down(widgets.Left) {
+		if !p.active {
+			dx, dy := pt.X-p.dragFrom.X, pt.Y-p.dragFrom.Y
+			p.active = dx*dx+dy*dy > theme.Px(profSlop)*theme.Px(profSlop)
+		}
+		if p.active {
+			p.pan = image.Pt(p.panFrom.X+pt.X-p.dragFrom.X, p.panFrom.Y+pt.Y-p.dragFrom.Y)
+			p.clampPan()
+		}
+	}
+	if p.armed && !p.ptr.Down(widgets.Left) {
+		// The release is the click: under the slop, on a node, it opens
+		// that family's card. A drag never opens anything.
+		if !p.active && p.pressNode >= 0 && p.pressNode < len(p.nodes) {
+			if p.as != nil {
+				n := p.nodes[p.pressNode]
+				p.as.Do(widgets.ShowProfFamily{Family: n.Family, At: pt, Level: n.Level, Gate: n.GateText})
+			}
+			p.hover = p.pressNode
+		}
+		p.armed, p.active, p.pressNode = false, false, -1
+	}
+	if over {
+		if n := p.nodeAt(pt); n >= 0 {
+			p.hover = n
+			p.ptr.ClaimShape(ebiten.CursorShapePointer)
+		}
+	}
+}
+
+// nodeAt is the family node under a screen point (-1 for bare layer
+// space), through the pan/zoom camera.
+func (p *Proficiency) nodeAt(pt image.Point) int {
+	gx := float64(pt.X-p.pan.X) / p.zoom
+	gy := float64(pt.Y-p.pan.Y) / p.zoom
+	for i, n := range p.nodes {
+		if float64(n.Rect.Min.X) <= gx && gx <= float64(n.Rect.Max.X) &&
+			float64(n.Rect.Min.Y) <= gy && gy <= float64(n.Rect.Max.Y) {
+			return i
+		}
+	}
+	return -1
+}
+
+// zoomTo applies a new zoom, keeping the graph point under pt in place, and
+// re-clamps the pan.
+func (p *Proficiency) zoomTo(pt image.Point, z float64) {
+	z = math.Max(profZoomMin, math.Min(profZoomMax, z))
+	if z == p.zoom {
+		return
+	}
+	fx := float64(pt.X-p.pan.X) / p.zoom
+	fy := float64(pt.Y-p.pan.Y) / p.zoom
+	p.zoom = z
+	p.pan = image.Pt(
+		pt.X-int(math.Round(fx*z)),
+		pt.Y-int(math.Round(fy*z)))
+	p.clampPan()
+}
+
+// clampPan keeps the graph reachable: the content's own bounds may not
+// leave the viewport. A graph bigger than the viewport may be scrolled to
+// its edges; a smaller one may be moved only inside.
+func (p *Proficiency) clampPan() {
+	b := p.contentBounds()
+	r := p.rect
+	axis := func(pos, lo, hi int) int {
+		if lo > hi {
+			lo, hi = hi, lo
+		}
+		return max(lo, min(hi, pos))
+	}
+	p.pan.X = axis(p.pan.X, -int(math.Round(float64(b.Min.X)*p.zoom)), r.Max.X-int(math.Round(float64(b.Max.X)*p.zoom)))
+	p.pan.Y = axis(p.pan.Y, -int(math.Round(float64(b.Min.Y)*p.zoom)), r.Max.Y-int(math.Round(float64(b.Max.Y)*p.zoom)))
+}
+
+// contentBounds is the union of the node rects (empty without a graph).
+func (p *Proficiency) contentBounds() image.Rectangle {
+	if len(p.nodes) == 0 {
+		return image.Rect(0, 0, p.rect.Dx(), p.rect.Dy())
+	}
+	b := p.nodes[0].Rect
+	for _, n := range p.nodes[1:] {
+		b = b.Union(n.Rect)
+	}
+	return b
+}
+
 // profNode is one family's laid-out node: its rect, its readouts and its
 // gate state, all derived from the model (never authored).
 type profNode struct {
 	Family, Name string
 	Rect         image.Rectangle
 	Rank         int
+	Scale        float64 // the fit factor its internals were spaced for
 
 	Level, MaxLevel int
 	XP, XPNext      int
@@ -188,6 +372,12 @@ type profEdge struct {
 // (rank then family id) and the edges. Pure and deterministic: the model
 // and the canvas are the only inputs, ties break on the family id, and no
 // RNG or clock is read anywhere.
+//
+// A rank with more families than the fit can stack in one column is wrapped
+// into extra adjacent columns (the rank still starts left of the next one,
+// so every arrow points rightwards). The wrap is chosen by the fit factor:
+// the split that makes the nodes biggest wins, ties kept closest to the
+// declared rank shape.
 func proficiencyLayout(fams []ProfFamily, canvas image.Rectangle) ([]profNode, []profEdge) {
 	if len(fams) == 0 {
 		return nil, nil
@@ -200,7 +390,6 @@ func proficiencyLayout(fams []ProfFamily, canvas image.Rectangle) ([]profNode, [
 		byRank[rank[i]] = append(byRank[rank[i]], i)
 		maxRank = max(maxRank, rank[i])
 	}
-	cols := maxRank + 1
 	for _, g := range byRank {
 		sort.Slice(g, func(a, b int) bool { return fams[g[a]].Family < fams[g[b]].Family })
 	}
@@ -209,44 +398,88 @@ func proficiencyLayout(fams []ProfFamily, canvas image.Rectangle) ([]profNode, [
 		maxRows = max(maxRows, len(g))
 	}
 
-	// The graph's natural size, then the one fit factor into the band the
-	// header leaves. Geometry shrinks with the fit; the type does not:
-	// shortcut: a graph far wider than the layer would crowd its labels,
-	// add pan/zoom if the family count ever outgrows one screen.
+	// The graph's natural size, then the one fit factor into the canvas.
+	// Geometry shrinks with the fit; the type does not (the internals of a
+	// node are spaced by the fit so the lines stay inside the box).
+	//
+	// shortcut: a graph far wider than the layer crowds its labels; pan and
+	// zoom are the way out, not a smaller fit.
 	nodeW, nodeH := float64(theme.Px(profNodeW)), float64(theme.Px(profNodeH))
 	colGap, rowGap := float64(theme.Px(profColGap)), float64(theme.Px(profRowGap))
-	naturalW := float64(cols)*nodeW + float64(cols-1)*colGap
-	naturalH := float64(maxRows)*nodeH + float64(maxRows-1)*rowGap
 
 	pad := float64(theme.Px(profPad))
-	avail := image.Rect(canvas.Min.X+int(pad), canvas.Min.Y+theme.Px(profHeader),
+	// The graph is fitted below the layer's top band, which the overview
+	// window's default footprint owns (profOvBand).
+	avail := image.Rect(canvas.Min.X+int(pad), canvas.Min.Y+theme.Px(profOvBand),
 		canvas.Max.X-int(pad), canvas.Max.Y-int(pad))
 	if avail.Dx() <= 0 || avail.Dy() <= 0 {
 		avail = canvas
 	}
-	f := 1.0
-	if naturalW > 0 && naturalH > 0 {
-		f = math.Min(1, math.Min(float64(avail.Dx())/naturalW, float64(avail.Dy())/naturalH))
+
+	fit := func(rowsCap int) (f float64, cols, rows int) {
+		cols, rows = 0, 0
+		for r := 0; r <= maxRank; r++ {
+			n := len(byRank[r])
+			if n == 0 {
+				continue
+			}
+			c := (n + rowsCap - 1) / rowsCap
+			cols += c
+			rows = max(rows, min(rowsCap, n))
+		}
+		if cols == 0 || rows == 0 {
+			return 0, 0, 0
+		}
+		wantW := float64(cols)*nodeW + float64(cols-1)*colGap
+		wantH := float64(rows)*nodeH + float64(rows-1)*rowGap
+		f = 1
+		if wantW > 0 && wantH > 0 {
+			f = math.Min(1, math.Min(float64(avail.Dx())/wantW, float64(avail.Dy())/wantH))
+		}
+		return f, cols, rows
 	}
+	rowsCap, best, cols, rows := 1, 0.0, 0, 0
+	for cap := 1; cap <= maxRows; cap++ {
+		f, c, r := fit(cap)
+		if f > best+1e-9 {
+			rowsCap, best, cols, rows = cap, f, c, r
+		}
+	}
+	f := best
+	if f <= 0 {
+		f = 1
+	}
+
 	nodeW, nodeH, colGap, rowGap = nodeW*f, nodeH*f, colGap*f, rowGap*f
 	totalW := float64(cols)*nodeW + float64(cols-1)*colGap
-	totalH := float64(maxRows)*nodeH + float64(maxRows-1)*rowGap
+	totalH := float64(rows)*nodeH + float64(rows-1)*rowGap
 	x0 := float64(avail.Min.X) + (float64(avail.Dx())-totalW)/2
 	y0 := float64(avail.Min.Y) + (float64(avail.Dy())-totalH)/2
 
+	// Column starts: each rank's chunks follow the previous rank's.
+	start := make([]int, maxRank+1)
+	col := 0
+	for r := 0; r <= maxRank; r++ {
+		start[r] = col
+		if n := len(byRank[r]); n > 0 {
+			col += (n + rowsCap - 1) / rowsCap
+		}
+	}
+
 	nodes := make([]profNode, 0, len(fams))
 	nodeOf := make([]int, len(fams)) // model index → node index
-	for r := 0; r < cols; r++ {
-		for row, i := range byRank[r] {
-			nodeOf[i] = len(nodes)
-			fam := fams[i]
-			x := x0 + float64(r)*(nodeW+colGap)
+	for r := 0; r <= maxRank; r++ {
+		for i, mi := range byRank[r] {
+			nodeOf[mi] = len(nodes)
+			fam := fams[mi]
+			c, row := start[r]+i/rowsCap, i%rowsCap
+			x := x0 + float64(c)*(nodeW+colGap)
 			y := y0 + float64(row)*(nodeH+rowGap)
 			nodes = append(nodes, profNode{
 				Family: fam.Family, Name: fam.Name,
 				Rect: image.Rect(int(math.Round(x)), int(math.Round(y)),
 					int(math.Round(x))+int(math.Round(nodeW)), int(math.Round(y))+int(math.Round(nodeH))),
-				Rank: r, Level: fam.Level, MaxLevel: fam.MaxLevel,
+				Rank: r, Scale: f, Level: fam.Level, MaxLevel: fam.MaxLevel,
 				XP: fam.XP, XPNext: fam.XPNext,
 				Starter: fam.Starter, Locked: !fam.Meets,
 				LevelText: profLevelText(fam), XPText: profXPText(fam),
@@ -377,66 +610,132 @@ func profGateText(f ProfFamily, fams []ProfFamily) string {
 	return "locked"
 }
 
-// draw paints the whole layer: the opaque backdrop, the header band, the
-// arrows and every node.
-func (p *Proficiency) draw(fams []ProfFamily) {
+// ---------------------------------------------------------------------------
+// Drawing (through the pan/zoom camera)
+// ---------------------------------------------------------------------------
+
+// sx/sy map graph coordinates to screen pixels through the camera.
+func (p *Proficiency) sx(x int) float32 { return float32(float64(x)*p.zoom) + float32(p.pan.X) }
+func (p *Proficiency) sy(y int) float32 { return float32(float64(y)*p.zoom) + float32(p.pan.Y) }
+
+// srect maps a graph rect to the screen.
+func (p *Proficiency) srect(r image.Rectangle) image.Rectangle {
+	return image.Rect(int(p.sx(r.Min.X)), int(p.sy(r.Min.Y)), int(p.sx(r.Max.X)), int(p.sy(r.Max.Y)))
+}
+
+// text draws s at a graph position, scaled with the camera (type zooms with
+// the graph: a magnified node keeps its proportions).
+func (p *Proficiency) text(s string, face *text.Face, x, y int, col color.Color) {
+	if s == "" || face == nil {
+		return
+	}
+	opts := &text.DrawOptions{}
+	opts.GeoM.Translate(float64(x), float64(y))
+	opts.GeoM.Scale(p.zoom, p.zoom)
+	opts.GeoM.Translate(float64(p.pan.X), float64(p.pan.Y))
+	opts.ColorScale.ScaleWithColor(col)
+	text.Draw(p.img, s, *face, opts)
+}
+
+// draw paints the whole layer: the opaque backdrop, the graph and every
+// node.
+func (p *Proficiency) draw() {
 	pal := p.th.Pal()
 	b := p.img.Bounds()
 	p.img.Clear()
 	// The layer is opaque: it covers the world, not the windows above it.
 	vector.DrawFilledRect(p.img, 0, 0, float32(b.Dx()), float32(b.Dy()), theme.Solid(pal.BGHard), false)
-
-	p.drawHeader(fams)
+	p.drawGrid()
 
 	for _, e := range p.edges {
 		a, z := p.nodes[e.From], p.nodes[e.To]
-		x0, y0 := float64(a.Rect.Max.X), float64(a.Rect.Min.Y)+float64(a.Rect.Dy())/2
-		x1, y1 := float64(z.Rect.Min.X), float64(z.Rect.Min.Y)+float64(z.Rect.Dy())/2
+		x0, y0 := float64(p.sx(a.Rect.Max.X)), float64((p.sy(a.Rect.Min.Y)+p.sy(a.Rect.Max.Y))/2)
+		x1, y1 := float64(p.sx(z.Rect.Min.X)), float64((p.sy(z.Rect.Min.Y)+p.sy(z.Rect.Max.Y))/2)
 		col := theme.NRGBA(pal.Border, 150)
 		if e.Met {
 			col = theme.NRGBA(pal.Accent, 150)
 		}
-		w := float32(theme.Px(1))
-		vector.StrokeLine(p.img, float32(x0), float32(y0), float32(x1), float32(y1), w, col, true)
-		// Arrowhead: two short strokes back from the dependent's edge.
-		wing := float32(theme.Px(7))
-		vector.StrokeLine(p.img, float32(x1), float32(y1), float32(x1)-wing, float32(y1)-wing/2, w, col, true)
-		vector.StrokeLine(p.img, float32(x1), float32(y1), float32(x1)-wing, float32(y1)+wing/2, w, col, true)
+		p.curve(x0, y0, x1, y1, max(float32(1), float32(p.zoom)), col)
+		// Arrowhead at the dependent's left edge: the curve arrives
+		// horizontally, so the wings open vertically.
+		wing := float32(theme.Px(7)) * float32(p.zoom)
+		vector.StrokeLine(p.img, float32(x1), float32(y1), float32(x1)-wing, float32(y1)-wing/2, max(float32(1), float32(p.zoom)), col, true)
+		vector.StrokeLine(p.img, float32(x1), float32(y1), float32(x1)-wing, float32(y1)+wing/2, max(float32(1), float32(p.zoom)), col, true)
 	}
 
-	for _, n := range p.nodes {
-		p.drawNode(n)
+	for i, n := range p.nodes {
+		p.drawNode(i, n)
 	}
 }
 
-// drawNode paints one family: the box (lit for an open family, unlit for
-// a gated one), the name, the starter tag, the level pips, the level and
-// XP readouts and the unmet prerequisite's line.
-func (p *Proficiency) drawNode(n profNode) {
+// drawGrid is the backdrop's faint blueprint: a deterministic set of
+// hairlines in the border role, far below any node.
+func (p *Proficiency) drawGrid() {
 	pal := p.th.Pal()
-	pad := theme.Px(12)
+	col := theme.NRGBA(pal.Border, 12)
+	step := float32(theme.Px(profGridStep))
+	b := p.img.Bounds()
+	for x := float32(0); x < float32(b.Dx()); x += step {
+		vector.StrokeLine(p.img, x, 0, x, float32(b.Dy()), 1, col, false)
+	}
+	for y := float32(0); y < float32(b.Dy()); y += step {
+		vector.StrokeLine(p.img, 0, y, float32(b.Dx()), y, 1, col, false)
+	}
+}
+
+// curve strokes one prerequisite arrow as a smooth S from (x0,y0) to
+// (x1,y1): the control points sit at the horizontal midpoint, so the line
+// leaves and arrives flat and the arrowhead reads.
+func (p *Proficiency) curve(x0, y0, x1, y1 float64, w float32, col color.Color) {
+	mid := (x0 + x1) / 2
+	var path vector.Path
+	path.MoveTo(float32(x0), float32(y0))
+	path.CubicTo(float32(mid), float32(y0), float32(mid), float32(y1), float32(x1), float32(y1))
+	var cs ebiten.ColorScale
+	cs.ScaleWithColor(col)
+	vector.StrokePath(p.img, &path, &vector.StrokeOptions{Width: w, LineJoin: vector.LineJoinRound},
+		&vector.DrawPathOptions{AntiAlias: true, ColorScale: cs})
+}
+
+// drawNode paints one family: the box (lit for an open family, unlit for
+// a gated one, highlighted under the pointer or a press), the name, the
+// starter tag, the level pips, the level and XP readouts and the unmet
+// prerequisite's line. Internals are spaced by the layout's fit, so they
+// stay inside a shrunk node.
+func (p *Proficiency) drawNode(i int, n profNode) {
+	pal := p.th.Pal()
+	sc := func(v int) int { return int(math.Round(float64(v) * n.Scale)) }
+	pad := sc(12)
 	name, edge := pal.Text, theme.NRGBA(pal.Border, 220)
 	body := theme.Solid(pal.Cell)
-	if n.Locked {
+	switch {
+	case p.press() == i:
+		name, edge = pal.Text, theme.Solid(pal.Accent)
+		body = theme.Solid(pal.BGHard)
+	case p.hover == i:
+		name, edge = pal.Text, theme.Solid(pal.Accent)
+		body = theme.NRGBA(pal.Hover, 26)
+	case n.Locked:
 		name, edge = pal.Dim, theme.NRGBA(pal.Border, 110)
 		body = theme.Solid(pal.BGHard)
 	}
-	theme.DrawRoundBox(p.img, n.Rect, body, edge, theme.Px(1), theme.AllRadii(theme.RadiusPanel))
+	maxed := n.MaxLevel > 0 && n.Level >= n.MaxLevel
+	if maxed && !n.Locked {
+		edge = theme.NRGBA(pal.Accent, 180)
+	}
+	theme.DrawRoundBox(p.img, p.srect(n.Rect), body, edge, theme.Px(1), theme.AllRadii(theme.RadiusPanel))
 
 	x := n.Rect.Min.X + pad
 	y := n.Rect.Min.Y
-	theme.DrawCardText(p.img, n.Name, p.th.FaceBold(theme.StepSmall), x, y+theme.Px(8), name)
-	if n.Starter {
-		theme.DrawCardText(p.img, "starter", p.th.Face(theme.StepTiny),
-			n.Rect.Max.X-pad-theme.Px(44), y+theme.Px(10), pal.Head)
-	}
+	p.text(n.Name, p.th.FaceBold(theme.StepSmall), x, y+sc(8), name)
 
 	// Level pips: one box per level, filled up to the granted level.
 	pips := max(n.MaxLevel, 0)
-	for i := 0; i < pips; i++ {
-		r := image.Rect(x+i*theme.Px(profPipW+profPipGap), y+theme.Px(38),
-			x+i*theme.Px(profPipW+profPipGap)+theme.Px(profPipW), y+theme.Px(38)+theme.Px(profPipW))
-		lit := i < n.Level
+	for k := 0; k < pips; k++ {
+		px := x + sc(k*(profPipW+profPipGap))
+		py := y + sc(38)
+		r := p.srect(image.Rect(px, py, px+sc(profPipW), py+sc(profPipW)))
+		lit := k < n.Level
 		col := theme.NRGBA(pal.Border, 200)
 		if lit && !n.Locked {
 			col = theme.Solid(pal.Accent)
@@ -446,38 +745,22 @@ func (p *Proficiency) drawNode(n profNode) {
 		vector.DrawFilledRect(p.img, float32(r.Min.X), float32(r.Min.Y), float32(r.Dx()), float32(r.Dy()), col, false)
 	}
 	lv := n.LevelText
-	theme.DrawCardText(p.img, lv, p.th.Face(theme.StepTiny),
-		n.Rect.Max.X-pad-theme.Px(int(render.Measure(lv, p.th.TS().Tiny))), y+theme.Px(34),
+	p.text(lv, p.th.Face(theme.StepTiny),
+		n.Rect.Max.X-pad-theme.Px(int(render.Measure(lv, p.th.TS().Tiny))), y+sc(34),
 		pal.Dim)
 
-	theme.DrawCardText(p.img, n.XPText, p.th.Face(theme.StepTiny), x, y+theme.Px(52), pal.Dim)
+	xpCol := color.RGBA(pal.Dim)
+	if maxed && !n.Locked {
+		xpCol = pal.Accent
+	}
+	p.text(n.XPText, p.th.Face(theme.StepTiny), x, y+sc(52), xpCol)
+	if n.Starter {
+		// The tag shares the XP line, right-aligned: the name row is the
+		// name's, and a long family name would run into a corner tag.
+		p.text("starter", p.th.Face(theme.StepTiny),
+			n.Rect.Max.X-pad-sc(int(render.Measure("starter", p.th.TS().Tiny))), y+sc(52), pal.Head)
+	}
 	if n.GateText != "" {
-		theme.DrawCardText(p.img, n.GateText, p.th.Face(theme.StepTiny), x, y+theme.Px(70), pal.Dim)
+		p.text(n.GateText, p.th.Face(theme.StepTiny), x, y+sc(70), pal.Dim)
 	}
-}
-
-// drawHeader paints the band above the graph: the layer's name, the case
-// count and the fixed way out. The toggle's own chord is never printed
-// (it is rebindable); Esc is the fixed layer and always closes.
-func (p *Proficiency) drawHeader(fams []ProfFamily) {
-	pal := p.th.Pal()
-	pad := theme.Px(profPad)
-	open, levels, maxLevels := 0, 0, 0
-	for _, f := range fams {
-		if f.Meets {
-			open++
-		}
-		levels += f.Level
-		maxLevels += f.MaxLevel
-	}
-	theme.DrawCardText(p.img, "Proficiency", p.th.FaceBold(theme.StepLarge), pad, theme.Px(18), pal.Text)
-	line := fmt.Sprintf("%d of %d families open · %d of %d levels earned", open, len(fams), levels, maxLevels)
-	if open < len(fams) {
-		line += " · dimmed families await a prerequisite"
-	}
-	theme.DrawCardText(p.img, line, p.th.Face(theme.StepTiny), pad, theme.Px(56), pal.Dim)
-	hint := "Esc closes"
-	theme.DrawCardText(p.img, hint, p.th.Face(theme.StepTiny),
-		p.img.Bounds().Dx()-pad-theme.Px(int(render.Measure(hint, p.th.TS().Tiny))),
-		theme.Px(56), pal.Head)
 }

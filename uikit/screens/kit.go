@@ -158,6 +158,13 @@ type Kit struct {
 	// EvFriendlyFire and closed by Confirm, Cancel or ×.
 	friendlyFire    *dialog
 	friendlyFireWin *FriendlyFireWin
+	// profCard is the proficiency family card (built on first open): one
+	// instance, transient, re-targeted by every node click and closed by
+	// Esc, the × or the tree's own close. profCardAt is the click point
+	// the card opens beside.
+	profCard    *dialog
+	profCardWin *ProfInfoWin
+	profCardAt  image.Point
 	// ovCog is the overview title bar's filter button (the dialog's only
 	// door), kept for the tests that press it; ovCogGlyph is the glyph box
 	// its cell centres, kept for the alignment pin.
@@ -564,6 +571,9 @@ func (k *Kit) RunIntent(i widgets.Intent) {
 	case widgets.ShowContact:
 		k.OpenContact(v.Offer)
 		return
+	case widgets.ShowProfFamily:
+		k.OpenProfFamily(v)
+		return
 	}
 	k.exec.Do(i)
 }
@@ -767,6 +777,76 @@ func (k *Kit) CloseFriendlyFire() {
 // FriendlyFireOpen reports whether the confirm dialog is up.
 func (k *Kit) FriendlyFireOpen() bool {
 	return k.friendlyFire != nil && k.friendlyFire.isOpen()
+}
+
+// OpenProfFamily opens (or re-targets) the proficiency family card on one
+// family id, beside the click that asked for it — the tree's node click
+// (widgets.ShowProfFamily). One instance, transient like the Details page:
+// a click on another node swaps the page, re-places the card beside that
+// click and raises the same window.
+func (k *Kit) OpenProfFamily(req widgets.ShowProfFamily) {
+	if req.Family == "" {
+		return
+	}
+	if k.profCardWin == nil {
+		k.profCardWin = NewProfInfoWin(k.seams())
+		k.profCardWin.onClose = k.CloseProfFamily
+		k.profCard = k.newDialog(k.profCardWin.Win(), k.profCardWin.hide,
+			k.profCardWin.IsOpen, k.placeProfCard, k.CloseProfFamily)
+	}
+	k.profCardAt = req.At
+	k.showDialog(k.profCard, func() bool {
+		k.profCardWin.Show(req.Family, req.Level, req.Gate)
+		return true
+	})
+}
+
+// placeProfCard puts the card just right and below the click that opened
+// it, clamped fully on screen (the tooltip's rule): an info card that opened
+// over the graph's middle would hide the nodes the player is picking from.
+// The click point is the intent's; a zero point (a bare-session or test
+// open) centres it.
+func (k *Kit) placeProfCard(win *widget.Window) {
+	root := k.root.GetWidget().Rect
+	w := win.GetContainer().GetWidget().Rect
+	if root.Empty() {
+		return
+	}
+	if w.Empty() {
+		// The first mount has not been laid out yet: the panel's floor is
+		// its design size.
+		w = image.Rect(0, 0, theme.Px(profCardW+2*theme.ContentsPad),
+			theme.Px(profCardH+2*theme.ContentsPad+theme.TitleBarH))
+	}
+	at := k.profCardAt
+	if at == (image.Point{}) {
+		k.centerDialog(win)
+		return
+	}
+	r := image.Rect(at.X+theme.Px(16), at.Y-theme.Px(12), at.X+theme.Px(16)+w.Dx(), at.Y-theme.Px(12)+w.Dy())
+	win.SetLocation(widgets.ClampTipRect(r, root))
+}
+
+// CloseProfFamily closes the family card. Idempotent (the tree's close and
+// Esc both call it).
+func (k *Kit) CloseProfFamily() {
+	if k.profCard != nil {
+		k.closeDialog(k.profCard)
+	}
+}
+
+// ProfFamilyOpen reports whether a family card is up (the game's Esc
+// cascade backs out of it before the tree).
+func (k *Kit) ProfFamilyOpen() bool {
+	return k.profCard != nil && k.profCard.isOpen()
+}
+
+// ProfFamily returns the family the open card names ("" while closed).
+func (k *Kit) ProfFamily() string {
+	if k.profCardWin == nil || !k.profCard.isOpen() {
+		return ""
+	}
+	return k.profCardWin.Family()
 }
 
 // InfoOpen reports whether the Show Info window is up.
