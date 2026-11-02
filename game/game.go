@@ -884,7 +884,7 @@ func (g *Game) gameServices() screenServices {
 		HelpRows: func() []uikit.KeyRow { return helpRowsFor(g) },
 		Menu:     func() widgets.WindowPanel { return winPanel{win: g.buildMenuWindow()} },
 		// The proficiency tree's model and the viewport it fills. The model
-		// is the stub until the sim side lands (see proficiencyModel).
+		// is the sim's families (see proficiencyModel), gate sentence and all.
 		Proficiency: g.proficiencyModel,
 		Viewport:    func() image.Rectangle { return image.Rect(0, 0, g.w, g.h) },
 		Close:       g.toggleScreenID,

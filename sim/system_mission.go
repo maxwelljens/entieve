@@ -282,7 +282,7 @@ func (s *Sim) execAcceptMission(c CmdAcceptMission) {
 		s.missionRefused(def.ID, def.Title, "This station is a remnant: its charter desk is dark")
 		return
 	}
-	if s.standing+1e-9 < def.MinStanding {
+	if !s.MeetsStanding(def.MinStanding) {
 		s.missionRefused(def.ID, def.Title,
 			"Requires standing "+strconv.FormatFloat(def.MinStanding, 'f', 2, 64))
 		return

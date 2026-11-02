@@ -51,6 +51,12 @@ type ContentView interface {
 	// untrained). Show Info renders a def's requirement and this level.
 	Proficiency(family string) int
 
+	// ProficiencyRequirement is a def's proficiency gate as the sim would
+	// refuse it ("Requires Autocannon II"; "" when it clears). The one walk
+	// over family level and prerequisite edges is the sim's; Show Info
+	// prints what it is handed.
+	ProficiencyRequirement(family string, gate int) string
+
 	// PlayerDocked reports whether the player is docked somewhere.
 	PlayerDocked() bool
 
@@ -246,6 +252,10 @@ func (v *view) Time() float64 { return v.s.Time() }
 func (v *view) Wallet() float64 { return v.s.Wallet() }
 
 func (v *view) Proficiency(family string) int { return v.s.Proficiency(family) }
+
+func (v *view) ProficiencyRequirement(family string, gate int) string {
+	return v.s.ProficiencyRequirement(family, gate)
+}
 
 func (v *view) PlayerDocked() bool {
 	return v.s.Docked.Has(v.s.Player())
@@ -564,11 +574,13 @@ func (v *view) DeliverProgress(def *content.ContractDef) float64 {
 	return have
 }
 
-func (v *view) MeetsStanding(min float64) bool { return v.s.Standing()+1e-9 >= min }
+// MeetsStanding reads the sim's accept gate; the contact row and the
+// dialog both call it, so neither re-derives the epsilon.
+func (v *view) MeetsStanding(min float64) bool { return v.s.MeetsStanding(min) }
 
 // Contacts is the contact view read once: the docked celestial, the standing
-// (the sim's own epsilon gate is MeetsStanding's), the station's derived
-// offers and the accepted missions. Undocked → the zero value.
+// (a plain read; the gate itself is sim.MeetsStanding), the station's
+// derived offers and the accepted missions. Undocked → the zero value.
 func (v *view) Contacts() Contacts {
 	at, ok := v.s.Docked.Get(v.s.Player())
 	if !ok {

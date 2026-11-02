@@ -24,6 +24,7 @@ func (g *Game) proficiencyModel() []uikit.ProfFamily {
 			MaxLevel: f.MaxLevel,
 			Prereqs:  prereqs,
 			Meets:    f.Meets,
+			Gate:     f.Gate,
 			Starter:  f.Starter,
 		})
 	}

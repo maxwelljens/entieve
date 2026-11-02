@@ -10,14 +10,15 @@ import (
 )
 
 // proficiencyChain is the three-node fixture the layout pins read: A <- B
-// <- C, with C's gate unmet (B is level 2, C wants 3).
+// <- C, with C's gate unmet (B is level 2, C wants 3). Gate is the sim's
+// sentence, so the fixture hands it in exactly as the sim would.
 func proficiencyChain() []ProfFamily {
 	return []ProfFamily{
 		{Family: "fam-a", Name: "Alpha", Level: 2, MaxLevel: 5, XP: 40, XPNext: 160, Meets: true, Starter: true},
 		{Family: "fam-b", Name: "Bravo", Level: 2, MaxLevel: 5, XP: 40, XPNext: 160, Meets: true,
 			Prereqs: []ProfPrereq{{Family: "fam-a", Level: 2}}},
 		{Family: "fam-c", Name: "Charlie", Level: 0, MaxLevel: 5, XP: 0, XPNext: 80, Meets: false,
-			Prereqs: []ProfPrereq{{Family: "fam-b", Level: 3}}},
+			Gate: "Requires Bravo III", Prereqs: []ProfPrereq{{Family: "fam-b", Level: 3}}},
 	}
 }
 
@@ -74,8 +75,8 @@ func TestProficiencyChainLayout(t *testing.T) {
 	if b.Locked || !c.Locked {
 		t.Fatalf("locked = b:%v c:%v, want false and true (C needs B 3, B is 2)", b.Locked, c.Locked)
 	}
-	if c.GateText != "needs Bravo 3" {
-		t.Errorf("C gate = %q, want %q", c.GateText, "needs Bravo 3")
+	if c.GateText != "Requires Bravo III" {
+		t.Errorf("C gate = %q, want %q", c.GateText, "Requires Bravo III")
 	}
 	if b.GateText != "" {
 		t.Errorf("B gate = %q, want none", b.GateText)

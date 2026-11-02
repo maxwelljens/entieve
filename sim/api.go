@@ -417,6 +417,13 @@ func (s *Sim) Wallet() float64 { return s.wallet }
 // completion, gated by contract min_standing on acceptance).
 func (s *Sim) Standing() float64 { return s.standing }
 
+// MeetsStanding is the contract accept gate: whether the pilot's standing
+// clears min. The refusal in execAcceptMission and every UI mirror (the
+// contact row's gate line, the dialog's disabled Accept) read this one
+// comparison, so the screen and the command can never flip at different
+// standings. The 1e-9 absorbs the binary rounding of decimal standing.
+func (s *Sim) MeetsStanding(min float64) bool { return s.standing+1e-9 >= min }
+
 // Missions returns a copy of the player's accepted contracts and progress.
 func (s *Sim) Missions() []MissionState {
 	return append([]MissionState(nil), s.missions...)

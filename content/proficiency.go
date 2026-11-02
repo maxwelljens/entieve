@@ -212,6 +212,14 @@ func ProficiencyFamilyIDs() []string {
 	return ids
 }
 
+// ProficiencyRequirement is the one sentence a proficiency gate prints: the
+// family's display name and the level it needs ("Requires Autocannon II").
+// The sim's fit/fly refusal, the tech-tree node, the family card and Show
+// Info all read it, so no two surfaces can word the same gate differently.
+func ProficiencyRequirement(family string, gate int) string {
+	return "Requires " + FamilyLabel(family) + " " + LevelLabel(gate)
+}
+
 // Prerequisites returns a family's authored prerequisite edges as a copy
 // (authored order; empty for a root family).
 func Prerequisites(family string) []Prereq {

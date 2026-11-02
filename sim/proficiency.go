@@ -82,13 +82,30 @@ type ProfPrereq struct {
 	Level  int
 }
 
+// ProficiencyGate is the proficiency gate's answer for one use: the pilot
+// either clears it or is short one family level.
+type ProficiencyGate struct {
+	Met    bool
+	Family string // the family the pilot is short of ("" when met)
+	Level  int    // the level it needs
+}
+
+// Requirement is the gate's refusal sentence ("" when met).
+func (g ProficiencyGate) Requirement() string {
+	if g.Met {
+		return ""
+	}
+	return content.ProficiencyRequirement(g.Family, g.Level)
+}
+
 // ProfFamily is one practice family as the tech-tree screen reads it. Plain
 // data, canonical order, copies only: no UI types and no live handles.
 //
 // XP is the total banked toward the next level (clamped at 250 at MaxLevel)
 // and XPNext is the total the next level needs (0 at MaxLevel). Meets means
 // the player's own level clears the family's entry gate and every
-// prerequisite edge is satisfied.
+// prerequisite edge is satisfied; Gate is the first unmet requirement's
+// sentence ("Requires Autocannon II", "" while Meets).
 type ProfFamily struct {
 	Family   string
 	Name     string
@@ -98,6 +115,7 @@ type ProfFamily struct {
 	MaxLevel int
 	Prereqs  []ProfPrereq
 	Meets    bool
+	Gate     string
 	Starter  bool
 }
 
@@ -116,13 +134,10 @@ func (s *Sim) ProficiencyFamilies() []ProfFamily {
 		}
 		edges := content.Prerequisites(id)
 		prereqs := make([]ProfPrereq, 0, len(edges))
-		meets := s.Proficiency(id) >= s.familyEntryGate(id)
 		for _, p := range edges {
 			prereqs = append(prereqs, ProfPrereq{Family: p.Family, Level: p.Level})
-			if s.Proficiency(p.Family) < p.Level {
-				meets = false
-			}
 		}
+		gate := s.proficiencyGate(id, s.familyEntryGate(id))
 		out = append(out, ProfFamily{
 			Family:   id,
 			Name:     content.FamilyLabel(id),
@@ -131,7 +146,8 @@ func (s *Sim) ProficiencyFamilies() []ProfFamily {
 			XPNext:   next,
 			MaxLevel: content.ProficiencyMax,
 			Prereqs:  prereqs,
-			Meets:    meets,
+			Meets:    gate.Met,
+			Gate:     gate.Requirement(),
 			Starter:  s.starterFamily(id),
 		})
 	}
@@ -182,19 +198,36 @@ func (s *Sim) starterFamily(family string) bool {
 	return false
 }
 
+// ProficiencyRequirement is a gate's refusal sentence as the sim would say
+// it: the one walk (family level, then prerequisite edges), worded once.
+// "" means the gate is open. Show Info reads it, so a def's requirement row
+// cannot disagree with the refusal the fit or fly command would print.
+func (s *Sim) ProficiencyRequirement(family string, gate int) string {
+	return s.proficiencyGate(family, gate).Requirement()
+}
+
 // proficiencyCheck is the one use gate: the def's own family level first,
 // then every authored prerequisite edge in order. It returns the first missing
 // requirement ("Requires Autocannon II") and false.
 func (s *Sim) proficiencyCheck(family string, gate int) (string, bool) {
+	g := s.proficiencyGate(family, gate)
+	return g.Requirement(), g.Met
+}
+
+// proficiencyGate is the one walk over a proficiency gate: the family's own
+// level against gate, then every authored prerequisite edge in order. The
+// use refusals, the tech tree and everything that words the gate read this
+// answer; no caller walks the edges itself.
+func (s *Sim) proficiencyGate(family string, gate int) ProficiencyGate {
 	if s.Proficiency(family) < gate {
-		return proficiencyRequirement(family, gate), false
+		return ProficiencyGate{Family: family, Level: gate}
 	}
 	for _, p := range content.Prerequisites(family) {
 		if s.Proficiency(p.Family) < p.Level {
-			return proficiencyRequirement(p.Family, p.Level), false
+			return ProficiencyGate{Family: p.Family, Level: p.Level}
 		}
 	}
-	return "", true
+	return ProficiencyGate{Met: true}
 }
 
 // proficiencyXP returns a family's counter (0 = no entry).
@@ -250,12 +283,6 @@ func (s *Sim) announceProficiency(family string, before int) {
 			s.recomputeFit(s.player)
 		}
 	}
-}
-
-// proficiencyRequirement is the refusal text a gate prints: the family's
-// display name and the missing level ("Requires Autocannon II").
-func proficiencyRequirement(family string, gate int) string {
-	return "Requires " + content.FamilyLabel(family) + " " + content.LevelLabel(gate)
 }
 
 // oreRarity is the practice paid by one mining cycle: 2^(rarity-1), so the

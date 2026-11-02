@@ -50,11 +50,16 @@ func proficiencyCaptureFixture() []ProfFamily {
 	out := make([]ProfFamily, 0, len(ids))
 	for _, id := range ids {
 		var pre []ProfPrereq
-		meets := true
+		meets, gate := true, ""
 		for _, p := range content.Prerequisites(id) {
 			pre = append(pre, ProfPrereq{Family: p.Family, Level: p.Level})
 			if levels[p.Family] < p.Level {
 				meets = false
+				if gate == "" {
+					// The sim's sentence for the first unmet edge (the
+					// fixture's entry gates are 0).
+					gate = content.ProficiencyRequirement(p.Family, p.Level)
+				}
 			}
 		}
 		lvl := levels[id]
@@ -69,7 +74,7 @@ func proficiencyCaptureFixture() []ProfFamily {
 		out = append(out, ProfFamily{
 			Family: id, Name: content.FamilyLabel(id),
 			Level: lvl, XP: xp, XPNext: next, MaxLevel: content.ProficiencyMax,
-			Prereqs: pre, Meets: meets, Starter: starters[id],
+			Prereqs: pre, Meets: meets, Gate: gate, Starter: starters[id],
 		})
 	}
 	return out
