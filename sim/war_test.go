@@ -42,7 +42,7 @@ func warContent() *content.Content {
 	}
 	c.NPCs["npc-guard-test"] = &content.NpcDef{
 		ID: "npc-guard-test", Name: "Fixture Guard", Faction: factionCharter,
-		Ship: "ship-sloop", AggroRange: 0, OrbitRange: 1500,
+		Ship: "ship-vastrek", AggroRange: 0, OrbitRange: 1500,
 	}
 	// A contract on the Haven Rest board: the charter desk a remnant loses.
 	c.Contracts = map[content.ContractID]*content.ContractDef{

@@ -44,8 +44,8 @@ func testContent() *content.Content {
 
 	res05 := content.Resists{EM: 0.1, Thermal: 0.1, Kinetic: 0.1, Explosive: 0.1}
 	ships := map[content.ShipID]*content.ShipDef{
-		"ship-sloop": {
-			ID: "ship-sloop", Name: "Sloop", Class: "frigate",
+		"ship-vastrek": {
+			ID: "ship-vastrek", Name: "Sloop", Class: "frigate",
 			Slots:  content.Slots{High: 4, Mid: 4, Low: 6},
 			Shield: 500, Armor: 500, Structure: 400, Resists: res05,
 			Capacitor: 400, Recharge: 200,
@@ -54,8 +54,8 @@ func testContent() *content.Content {
 			WarpSpeed:      2,
 			MaxTargetRange: 12000, MaxTargets: 2, ScanResolution: 500,
 		},
-		"ship-barge": {
-			ID: "ship-barge", Name: "Ore Barge", Class: "barge",
+		"ship-husnek": {
+			ID: "ship-husnek", Name: "Ore Barge", Class: "barge",
 			Slots:  content.Slots{High: 2, Mid: 2, Low: 2},
 			Shield: 300, Armor: 300, Structure: 200, Resists: content.Resists{EM: 0.05, Thermal: 0.05, Kinetic: 0.05, Explosive: 0.05},
 			Capacitor: 200, Recharge: 150,
@@ -153,7 +153,7 @@ func testContent() *content.Content {
 	npcs := map[content.NpcID]*content.NpcDef{
 		"npc-miner-test": {
 			ID: "npc-miner-test", Name: "Fixture Miner", Faction: "Dvužek",
-			Ship: "ship-barge", Fit: []content.ModuleID{"mod-mining-laser"},
+			Ship: "ship-husnek", Fit: []content.ModuleID{"mod-mining-laser"},
 			AggroRange: 0, OrbitRange: 1500, FleeThreshold: 0,
 		},
 		"npc-rat-scuttler": {
@@ -184,7 +184,7 @@ func testContent() *content.Content {
 		{Item: "charge-cap-cell", Qty: 50, Price: 10},
 		{Item: "min-ferrite", Qty: 500, Price: 10},
 		{Item: "mod-armor-plate", Qty: 10, Price: 1000},
-		{Item: "ship-barge", Qty: 3, Price: 50000},
+		{Item: "ship-husnek", Qty: 3, Price: 50000},
 		{Item: "ammo-emp-s", Qty: 40, Price: 4, Side: "buy"},
 		{Item: "min-ferrite", Qty: 200, Price: 9, Side: "buy"},
 	}
@@ -253,7 +253,7 @@ func testWorld() *content.WorldDef {
 		Start: content.StartDef{
 			System:   "sys-a",
 			Position: core.Vec2{X: 1e7, Y: 500},
-			Ship:     "ship-sloop",
+			Ship:     "ship-vastrek",
 			Fit:      []content.ModuleID{"mod-autocannon-s"},
 			Cargo: []content.CargoStack{
 				{Item: "ammo-emp-s", Qty: 20},

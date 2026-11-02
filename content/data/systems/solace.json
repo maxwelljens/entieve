@@ -38,11 +38,11 @@
       "station": {
         "services": ["repair", "market", "refine", "fitting", "industry"],
         "market": [
-          { "item": "ship-sloop", "qty": 10, "price": 350000 },
-          { "item": "ship-cutlass", "qty": 8, "price": 480000 },
-          { "item": "ship-barge", "qty": 6, "price": 750000 },
-          { "item": "ship-hauler", "qty": 6, "price": 650000 },
-          { "item": "ship-npc-patrol", "qty": 8, "price": 400000 },
+          { "item": "ship-vastrek", "qty": 10, "price": 350000 },
+          { "item": "ship-zdanek", "qty": 8, "price": 480000 },
+          { "item": "ship-husnek", "qty": 6, "price": 750000 },
+          { "item": "ship-furdzan", "qty": 6, "price": 650000 },
+          { "item": "ship-kustor", "qty": 8, "price": 400000 },
           { "item": "mod-autocannon-s", "qty": 25, "price": 250000 },
           { "item": "mod-autocannon-m", "qty": 12, "price": 275000 },
           { "item": "mod-artillery-s", "qty": 25, "price": 320000 },

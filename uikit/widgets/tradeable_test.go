@@ -13,7 +13,7 @@ import (
 // glyph otherwise); an id no def backs reads as itself with no ref.
 func TestResolveTradeable(t *testing.T) {
 	cv, c := newViewTest(t)
-	hull, _ := c.Ship("ship-sloop")
+	hull, _ := c.Ship("ship-vastrek")
 	for _, tc := range []struct {
 		id    content.ItemID
 		kind  InfoKind
@@ -24,7 +24,7 @@ func TestResolveTradeable(t *testing.T) {
 		{"mod-autocannon-s", InfoModule, "Small Autocannon", "mod-autocannon-s", true},
 		{"ore-sterngrit", InfoItem, "Sterngrit Ore", "ore-sterngrit", true},
 		{"min-ferrite", InfoItem, "Sideron", "min-ferrite", true},
-		{"ship-sloop", InfoShip, hull.Name, theme.HullIcon, true},
+		{"ship-vastrek", InfoShip, hull.Name, theme.HullIcon, true},
 		{"npc-rat-scuttler", 0, "npc-rat-scuttler", "", false},
 	} {
 		tr := ResolveTradeable(c, tc.id)
@@ -41,11 +41,11 @@ func TestResolveTradeable(t *testing.T) {
 			t.Errorf("%s: Ref = %v, want the loaded %v ref", tc.id, ref, tc.kind)
 		}
 	}
-	if got := TradeableName(c, "ship-sloop"); got != hull.Name {
-		t.Errorf("TradeableName(ship-sloop) = %q, want %q", got, hull.Name)
+	if got := TradeableName(c, "ship-vastrek"); got != hull.Name {
+		t.Errorf("TradeableName(ship-vastrek) = %q, want %q", got, hull.Name)
 	}
-	if got := TradeableIcon(c, "ship-sloop"); got != theme.HullIcon {
-		t.Errorf("TradeableIcon(ship-sloop) = %q, want %q", got, theme.HullIcon)
+	if got := TradeableIcon(c, "ship-vastrek"); got != theme.HullIcon {
+		t.Errorf("TradeableIcon(ship-vastrek) = %q, want %q", got, theme.HullIcon)
 	}
 	if got := TradeableIcon(c, "npc-rat-scuttler"); got != "" {
 		t.Errorf("TradeableIcon(unknown) = %q, want no icon", got)

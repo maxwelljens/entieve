@@ -49,13 +49,13 @@ func writePNG(t *testing.T, path string, w, h int) {
 // keeps its pixel dimensions for the sizing math.
 func TestLoadAssetsLoadsPNGByConvention(t *testing.T) {
 	dir := t.TempDir()
-	writePNG(t, filepath.Join(dir, "hulls", "ship-sloop.png"), 64, 32)
+	writePNG(t, filepath.Join(dir, "hulls", "ship-vastrek.png"), 64, 32)
 	writePNG(t, filepath.Join(dir, "stations", "cel-haven-rest.png"), 48, 96)
 	stashAssets(t, dir)
 
-	hull := spriteFor("hulls/ship-sloop")
+	hull := spriteFor("hulls/ship-vastrek")
 	if hull == nil {
-		t.Fatal("hulls/ship-sloop.png did not resolve via convention lookup")
+		t.Fatal("hulls/ship-vastrek.png did not resolve via convention lookup")
 	}
 	if b := hull.Bounds(); b.Dx() != 64 || b.Dy() != 32 {
 		t.Errorf("hull sprite = %dx%d, want 64x32", b.Dx(), b.Dy())
@@ -75,13 +75,13 @@ func TestLoadAssetsLoadsPNGByConvention(t *testing.T) {
 func TestDropinIconsStayOutOfTheSpriteCache(t *testing.T) {
 	dir := t.TempDir()
 	writePNG(t, filepath.Join(dir, "icons", "mod-autocannon-s.png"), 720, 720)
-	writePNG(t, filepath.Join(dir, "hulls", "ship-sloop.png"), 64, 32)
+	writePNG(t, filepath.Join(dir, "hulls", "ship-vastrek.png"), 64, 32)
 	stashAssets(t, dir)
 
 	if sp := spriteFor("icons/mod-autocannon-s"); sp != nil {
 		t.Error("the drop-in icon set landed in the world sprite cache")
 	}
-	if spriteFor("hulls/ship-sloop") == nil {
+	if spriteFor("hulls/ship-vastrek") == nil {
 		t.Error("the exclusion swallowed the world sprites too")
 	}
 	if _, indexed := platePaths["icons/mod-autocannon-s"]; indexed {
@@ -115,7 +115,7 @@ func TestJPEGLoadsOnlyForArtworkAndPortraits(t *testing.T) {
 	dir := t.TempDir()
 	writeJPEG(t, filepath.Join(dir, "artwork", "spaceship_hangar.jpg"), 32, 18)
 	writeJPEG(t, filepath.Join(dir, "portraits", "contact-test.jpg"), 32, 48)
-	writeJPEG(t, filepath.Join(dir, "hulls", "ship-sloop.jpg"), 32, 18)
+	writeJPEG(t, filepath.Join(dir, "hulls", "ship-vastrek.jpg"), 32, 18)
 	stashAssets(t, dir)
 
 	art := DockedArtwork()
@@ -128,7 +128,7 @@ func TestJPEGLoadsOnlyForArtworkAndPortraits(t *testing.T) {
 	if p := spriteFor("portraits/contact-test"); p == nil {
 		t.Error("portraits/*.jpg must load (contact faces compress as JPEG)")
 	}
-	if spriteFor("hulls/ship-sloop") != nil {
+	if spriteFor("hulls/ship-vastrek") != nil {
 		t.Error("a hull .jpg must not load (sprite kinds are PNG-only)")
 	}
 	stashAssets(t, "")
@@ -163,14 +163,14 @@ func TestWindowHeaderPlatesResolveByName(t *testing.T) {
 // absent root dir all yield nil (procedural fallback) and never panic.
 func TestLoadAssetsMissingAndGarbageAreNil(t *testing.T) {
 	dir := t.TempDir()
-	writePNG(t, filepath.Join(dir, "hulls", "ship-sloop.png"), 16, 16)
+	writePNG(t, filepath.Join(dir, "hulls", "ship-vastrek.png"), 16, 16)
 	if err := os.WriteFile(filepath.Join(dir, "hulls", "broken.png"),
 		[]byte("this is not a png"), 0o644); err != nil {
 		t.Fatalf("write garbage: %v", err)
 	}
 	stashAssets(t, dir)
 
-	if spriteFor("hulls/ship-sloop") == nil {
+	if spriteFor("hulls/ship-vastrek") == nil {
 		t.Error("valid PNG must load")
 	}
 	if spriteFor("hulls/broken") != nil {
@@ -182,12 +182,12 @@ func TestLoadAssetsMissingAndGarbageAreNil(t *testing.T) {
 
 	// A missing root dir is an empty set, not an error.
 	stashAssets(t, filepath.Join(t.TempDir(), "no-such-dir"))
-	if spriteFor("hulls/ship-sloop") != nil {
+	if spriteFor("hulls/ship-vastrek") != nil {
 		t.Error("missing root dir must yield an empty set")
 	}
 	// Explicit empty load clears the registry (the test-facing "no art").
 	stashAssets(t, "")
-	if spriteFor("hulls/ship-sloop") != nil {
+	if spriteFor("hulls/ship-vastrek") != nil {
 		t.Error("LoadAssets(\"\") must clear the registry")
 	}
 }
@@ -197,16 +197,16 @@ func TestLoadAssetsMissingAndGarbageAreNil(t *testing.T) {
 // at all) picks the procedural path.
 func TestSpriteForSelectsProceduralWhenAbsent(t *testing.T) {
 	dir := t.TempDir()
-	writePNG(t, filepath.Join(dir, "hulls", "ship-cutlass.png"), 64, 32)
+	writePNG(t, filepath.Join(dir, "hulls", "ship-zdanek.png"), 64, 32)
 	stashAssets(t, dir)
 
 	all := []string{
-		"hulls/ship-sloop",
+		"hulls/ship-vastrek",
 		"stations/cel-haven-rest",
 		"asteroids/ore-cordite",
 		"backgrounds/sys-solace",
 	}
-	if spriteFor("hulls/ship-cutlass") == nil {
+	if spriteFor("hulls/ship-zdanek") == nil {
 		t.Error("present asset must be selected")
 	}
 	for _, key := range all {
@@ -216,7 +216,7 @@ func TestSpriteForSelectsProceduralWhenAbsent(t *testing.T) {
 	}
 
 	stashAssets(t, "") // no assets at all: every site falls back
-	for _, key := range append(all, "hulls/ship-cutlass") {
+	for _, key := range append(all, "hulls/ship-zdanek") {
 		if spriteFor(key) != nil {
 			t.Errorf("%s: with no assets the procedural path must be chosen", key)
 		}
@@ -241,15 +241,15 @@ func TestAutoLoadProbesWorkingDirOnce(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chdir(wd) })
 
 	sprites, spritesTried = nil, false
-	if spriteFor("hulls/ship-sloop") != nil {
+	if spriteFor("hulls/ship-vastrek") != nil {
 		t.Error("no asset root must yield nil")
 	}
 	if !spritesTried {
 		t.Fatal("first lookup must trigger the one-shot root probe")
 	}
 
-	writePNG(t, filepath.Join(tmp, "assets", "hulls", "ship-sloop.png"), 8, 8)
-	if spriteFor("hulls/ship-sloop") != nil {
+	writePNG(t, filepath.Join(tmp, "assets", "hulls", "ship-vastrek.png"), 8, 8)
+	if spriteFor("hulls/ship-vastrek") != nil {
 		t.Error("root probe must run only once; later assets/ must be ignored")
 	}
 }
@@ -336,7 +336,7 @@ func TestDrawSmokeWithAndWithoutAssets(t *testing.T) {
 
 	t.Run("with assets", func(t *testing.T) {
 		dir := t.TempDir()
-		writePNG(t, filepath.Join(dir, "hulls", "ship-sloop.png"), 64, 32)
+		writePNG(t, filepath.Join(dir, "hulls", "ship-vastrek.png"), 64, 32)
 		writePNG(t, filepath.Join(dir, "stations", "cel-haven-rest.png"), 48, 48)
 		writePNG(t, filepath.Join(dir, "backgrounds", "sys-solace.png"), 320, 180)
 		stashAssets(t, dir)

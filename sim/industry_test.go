@@ -32,8 +32,8 @@ func recipeContent() *content.Content {
 			Inputs: []content.RecipeInput{{Item: "min-ferrite", Qty: 1}},
 			Time:   30, Family: content.FamilyModules,
 		},
-		"rec-ship-sloop": {
-			ID: "rec-ship-sloop", Product: "ship-sloop", Qty: 1,
+		"rec-ship-vastrek": {
+			ID: "rec-ship-vastrek", Product: "ship-vastrek", Qty: 1,
 			Inputs: []content.RecipeInput{{Item: "min-ferrite", Qty: 300}},
 			Time:   120, Family: content.FamilyHulls,
 		},
@@ -639,12 +639,12 @@ func industryScripted(t *testing.T, seed int64, ticks int, checkpoints map[int]b
 		case 6:
 			s.Queue(CmdStartJob{Recipe: "rec-mod-autocannon-s", Runs: 2}) // 60 s
 		case 7:
-			s.Queue(CmdStartJob{Recipe: "rec-ship-sloop", Runs: 1}) // over the cap: refused
+			s.Queue(CmdStartJob{Recipe: "rec-ship-vastrek", Runs: 1}) // over the cap: refused
 		case 1815: // module job done (~1806)
 			s.Queue(CmdCollectJob{ID: 2})
 		case 2715: // charge job done (~2706)
 			s.Queue(CmdCollectJob{ID: 1})
-			s.Queue(CmdStartJob{Recipe: "rec-ship-sloop", Runs: 1}) // 120 s, 2 free slots... 1 free
+			s.Queue(CmdStartJob{Recipe: "rec-ship-vastrek", Runs: 1}) // 120 s, 2 free slots... 1 free
 		case 9930: // hull job done (~9916)
 			s.Queue(CmdCollectJob{ID: 3})
 		case 5000:

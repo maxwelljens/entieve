@@ -339,7 +339,7 @@ func TestWreckReclaimYieldsFromHullRecipe(t *testing.T) {
 		t.Fatal("no wreck spawned")
 	}
 	wr, _ := s.Wrecks.Get(w)
-	rec := hullRecipe(c, "ship-rat-scuttler")
+	rec := hullRecipe(c, "ship-scuttler")
 	if rec == nil {
 		t.Fatal("fixture: scuttler has no recipe")
 	}
@@ -439,7 +439,7 @@ func guardContent() *content.Content {
 	c := testContent()
 	c.NPCs["npc-guard-test"] = &content.NpcDef{
 		ID: "npc-guard-test", Name: "Fixture Guard", Faction: "Charter Authority",
-		Ship: "ship-barge", Fit: []content.ModuleID{"mod-armor-plate", "mod-autocannon-s"},
+		Ship: "ship-husnek", Fit: []content.ModuleID{"mod-armor-plate", "mod-autocannon-s"},
 		OrbitRange: 1500, FleeThreshold: 0.25,
 	}
 	sysA := c.Systems["sys-a"]
@@ -497,8 +497,8 @@ func TestRespawnGuardBuysHullFitAndCharges(t *testing.T) {
 		t.Fatal(err)
 	}
 	const station = StationID("cel-station-a")
-	if bookAskQty(s, station, "ship-barge") != 3 {
-		t.Fatalf("fixture asks = %d, want 3", bookAskQty(s, station, "ship-barge"))
+	if bookAskQty(s, station, "ship-husnek") != 3 {
+		t.Fatalf("fixture asks = %d, want 3", bookAskQty(s, station, "ship-husnek"))
 	}
 
 	guard := entityByName(s, "Fixture Guard")
@@ -515,7 +515,7 @@ func TestRespawnGuardBuysHullFitAndCharges(t *testing.T) {
 	evs := drain(s)
 
 	// Stock drained, exactly one of each bought.
-	if got := bookAskQty(s, station, "ship-barge"); got != 2 {
+	if got := bookAskQty(s, station, "ship-husnek"); got != 2 {
 		t.Errorf("hull asks = %d, want 2", got)
 	}
 	if got := bookAskQty(s, station, "mod-armor-plate"); got != 9 {
@@ -605,7 +605,7 @@ func TestRespawnRequeuesWhenGuardCannotAfford(t *testing.T) {
 		t.Fatalf("requeue At = %v, want %v (600 ticks after the attempt at %v)", s.respawns[0].At, want, late.Time)
 	}
 	// Nothing was spent: stock and balance unchanged.
-	if bookAskQty(s, station, "ship-barge") != 3 || bookAskQty(s, station, "mod-armor-plate") != 10 {
+	if bookAskQty(s, station, "ship-husnek") != 3 || bookAskQty(s, station, "mod-armor-plate") != 10 {
 		t.Fatal("failed requisition drained stock")
 	}
 	if s.factionLedger["Charter Authority"] != 1000 {
@@ -619,8 +619,8 @@ func TestRespawnRequeuesWhenGuardCannotAfford(t *testing.T) {
 	if findEvent(evs, EvLog, "Fixture Guard respawned near Haven Rest") == nil {
 		t.Fatalf("retry did not spawn: %v", evs)
 	}
-	if bookAskQty(s, station, "ship-barge") != 2 {
-		t.Fatalf("hull asks = %d after funded retry, want 2", bookAskQty(s, station, "ship-barge"))
+	if bookAskQty(s, station, "ship-husnek") != 2 {
+		t.Fatalf("hull asks = %d after funded retry, want 2", bookAskQty(s, station, "ship-husnek"))
 	}
 	if len(s.respawns) != 0 {
 		t.Fatalf("timer not consumed: %+v", s.respawns)

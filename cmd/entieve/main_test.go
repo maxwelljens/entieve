@@ -84,7 +84,7 @@ func TestValidateMissingDir(t *testing.T) {
 
 func TestDescribeKnownIDs(t *testing.T) {
 	cases := map[string]string{
-		"ship-sloop":       `"class"`,
+		"ship-vastrek":     `"class"`,
 		"mod-autocannon-s": `"tracking"`,
 		"min-ferrite":      `"category"`,
 		"npc-rat-scuttler": `"aggro_range"`,

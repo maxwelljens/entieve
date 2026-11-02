@@ -4,34 +4,34 @@
     {
       "from": "cel-penumbra-belt",
       "to": "cel-gate-solace",
-      "hull": "ship-npc-hauler",
+      "hull": "ship-tobrek",
       "cargo": { "item": "ore-lucidite", "qty": 200 },
       "interval_ticks": 1800
     },
     {
       "from": "cel-gate-solace",
       "to": "cel-penumbra-port",
-      "hull": "ship-npc-hauler",
+      "hull": "ship-tobrek",
       "cargo": { "item": "ore-cordite", "qty": 150 },
       "interval_ticks": 1800
     },
     {
       "from": "cel-gate-kamieniec",
       "to": "cel-gate-gloam",
-      "hull": "ship-npc-hauler",
+      "hull": "ship-tobrek",
       "cargo": { "item": "ammo-emp-s", "qty": 400 },
       "interval_ticks": 1800
     },
     {
       "from": "cel-gate-gloam",
       "to": "cel-penumbra-port",
-      "hull": "ship-npc-hauler",
+      "hull": "ship-tobrek",
       "cargo": { "item": "ore-lucidite", "qty": 120 },
       "interval_ticks": 1800
     }
   ],
   "patrol": {
-    "hulls": ["ship-npc-patrol"],
+    "hulls": ["ship-kustor"],
     "interval_ticks": 9000
   },
   "raider": "npc-rat-marauder"

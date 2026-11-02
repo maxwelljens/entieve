@@ -5,7 +5,7 @@
   "start": {
     "system": "sys-solace",
     "position": { "X": 843007620248, "Y": 502580312071 },
-    "ship": "ship-sloop",
+    "ship": "ship-vastrek",
     "fit": ["mod-autocannon-s", "mod-afterburner", "mod-armor-rep"],
     "cargo": [
       { "item": "ammo-emp-s", "qty": 80 },

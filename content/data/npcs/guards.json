@@ -4,7 +4,7 @@
     "name": "Kuštor",
     "description": "Charter Authority patrol cutter: it answers incidents inside Charter space, escorts the lanes it is chartered to hold, and writes up whatever it finds shooting at registered traffic. The further out you call, the later it comes.",
     "faction": "Charter Authority",
-    "ship": "ship-npc-patrol",
+    "ship": "ship-kustor",
     "fit": [
       "mod-autocannon-m",
       "mod-autocannon-m",

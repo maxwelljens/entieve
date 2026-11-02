@@ -155,7 +155,7 @@ func (v *validator) items() {
 		}
 		ctx := "items/" + string(id)
 		if RetiredIDs[string(id)] {
-			v.addf("%s: id is retired (replaced in the shell-weapons rename)", ctx)
+			v.addf("%s: id is retired (see content/legacy.go)", ctx)
 		}
 		if it.Name == "" {
 			v.addf("%s: missing name", ctx)
@@ -240,6 +240,9 @@ func (v *validator) ships() {
 			continue
 		}
 		ctx := "ships/" + string(id)
+		if RetiredIDs[string(id)] {
+			v.addf("%s: id is retired (see content/legacy.go)", ctx)
+		}
 		if s.Name == "" {
 			v.addf("%s: missing name", ctx)
 		}
@@ -375,7 +378,7 @@ func (v *validator) modules() {
 		}
 		ctx := "modules/" + string(id)
 		if RetiredIDs[string(id)] {
-			v.addf("%s: id is retired (replaced in the shell-weapons rename)", ctx)
+			v.addf("%s: id is retired (see content/legacy.go)", ctx)
 		}
 		if m.Name == "" {
 			v.addf("%s: missing name", ctx)

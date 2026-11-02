@@ -376,12 +376,12 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 	}
 	// The hull recipe consuming the same mineral is listed too (the
 	// shipped barge hull is named Hušnek).
-	if r := rowIn(t, ui, "Hušnek"); r.Ref == nil || *r.Ref != widgets.ShipRef("ship-barge") {
-		t.Errorf("USED IN hull row = %+v, want a ship-barge link", r)
+	if r := rowIn(t, ui, "Hušnek"); r.Ref == nil || *r.Ref != widgets.ShipRef("ship-husnek") {
+		t.Errorf("USED IN hull row = %+v, want a ship-husnek link", r)
 	}
 
 	// Hull page: family + base time above the input links.
-	page, ok = infoPageFor(env, widgets.ShipRef("ship-barge"))
+	page, ok = infoPageFor(env, widgets.ShipRef("ship-husnek"))
 	if !ok {
 		t.Fatal("hull page did not resolve")
 	}

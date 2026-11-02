@@ -5,7 +5,7 @@
       "from": "cel-glusza-belt",
       "to": "cel-doki",
       "to_system": "sys-kamieniec",
-      "hull": "ship-npc-hauler",
+      "hull": "ship-tobrek",
       "cargo": { "item": "ore-lucidite", "qty": 300 },
       "interval_ticks": 7200
     }

@@ -50,15 +50,15 @@ func TestLoadEmbedded(t *testing.T) {
 		t.Errorf("len(Items) = %d, want >= 19", len(c.Items))
 	}
 
-	sloop, ok := c.Ships["ship-sloop"]
+	sloop, ok := c.Ships["ship-vastrek"]
 	if !ok {
-		t.Fatal("Ships missing ship-sloop")
+		t.Fatal("Ships missing ship-vastrek")
 	}
 	if sloop.Slots.High != 3 || sloop.Slots.Mid != 3 || sloop.Slots.Low != 2 {
-		t.Errorf("ship-sloop slots = %+v, want 3/3/2", sloop.Slots)
+		t.Errorf("ship-vastrek slots = %+v, want 3/3/2", sloop.Slots)
 	}
-	for _, id := range []ShipID{"ship-cutlass", "ship-barge", "ship-hauler",
-		"ship-rat-scuttler", "ship-rat-marauder", "ship-rat-hierarch"} {
+	for _, id := range []ShipID{"ship-zdanek", "ship-husnek", "ship-furdzan",
+		"ship-scuttler", "ship-marauder", "ship-hierarch"} {
 		if _, ok := c.Ships[id]; !ok {
 			t.Errorf("Ships missing %q", id)
 		}
@@ -127,8 +127,8 @@ func TestLoadDir(t *testing.T) {
 	if len(c.Systems) == 0 || c.Universe == nil {
 		t.Fatalf("LoadDir(data) incomplete: %d systems, universe nil=%v", len(c.Systems), c.Universe == nil)
 	}
-	if _, ok := c.Ships["ship-sloop"]; !ok {
-		t.Error("LoadDir(data) missing ship-sloop")
+	if _, ok := c.Ships["ship-vastrek"]; !ok {
+		t.Error("LoadDir(data) missing ship-vastrek")
 	}
 }
 

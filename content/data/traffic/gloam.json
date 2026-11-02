@@ -4,14 +4,14 @@
     {
       "from": "cel-gloam-belt",
       "to": "cel-gate-penumbra",
-      "hull": "ship-npc-hauler",
+      "hull": "ship-tobrek",
       "cargo": { "item": "ore-glacierite", "qty": 400 },
       "interval_ticks": 2400
     },
     {
       "from": "cel-gate-penumbra",
       "to": "cel-gloam-belt",
-      "hull": "ship-npc-hauler",
+      "hull": "ship-tobrek",
       "cargo": { "item": "charge-cap-cell", "qty": 200 },
       "interval_ticks": 2400
     }

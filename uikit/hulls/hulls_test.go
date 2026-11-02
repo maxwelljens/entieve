@@ -15,15 +15,15 @@ import (
 
 // fleet is the portrait set: exactly the nine hulls in content/data/ships.
 var fleet = []content.ShipID{
-	"ship-sloop",
-	"ship-cutlass",
-	"ship-barge",
-	"ship-hauler",
-	"ship-npc-patrol",
-	"ship-npc-hauler",
-	"ship-rat-scuttler",
-	"ship-rat-marauder",
-	"ship-rat-hierarch",
+	"ship-vastrek",
+	"ship-zdanek",
+	"ship-husnek",
+	"ship-furdzan",
+	"ship-kustor",
+	"ship-tobrek",
+	"ship-scuttler",
+	"ship-marauder",
+	"ship-hierarch",
 }
 
 // TestManifestPinsRegeneration is the SVG↔PNG pin: the committed PNGs must

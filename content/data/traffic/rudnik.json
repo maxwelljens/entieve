@@ -5,7 +5,7 @@
       "from": "cel-rudnik-belt",
       "to": "cel-huta",
       "to_system": "sys-mlynow",
-      "hull": "ship-npc-hauler",
+      "hull": "ship-tobrek",
       "cargo": { "item": "ore-sterngrit", "qty": 500 },
       "interval_ticks": 7200
     },
@@ -13,10 +13,10 @@
       "from": "cel-rudnik-belt",
       "to": "cel-haven-rest",
       "to_system": "sys-solace",
-      "hull": "ship-npc-hauler",
+      "hull": "ship-tobrek",
       "cargo": { "item": "ore-cordite", "qty": 400 },
       "interval_ticks": 7200
     }
   ],
-  "patrol": { "hulls": ["ship-npc-patrol"], "interval_ticks": 3600 }
+  "patrol": { "hulls": ["ship-kustor"], "interval_ticks": 3600 }
 }

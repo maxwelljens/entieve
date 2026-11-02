@@ -122,13 +122,13 @@ the cap booster's fuel, not gun ammo.
 `loot-navdata`, `loot-alloy-scrap`, `loot-iced-core`, `loot-hierarch-crest`.
 
 **Ships** (`content/data/ships/*.json`, one file per hull):
-`ship-sloop` (fast combat frigate: 3 high, 3 mid, 2 low),
-`ship-cutlass` (brawler: 4 high, 3 mid, 4 low),
-`ship-barge` (mining: 2 high, 2 mid, 3 low, big ore hold),
-`ship-hauler` (industrial: 1 high, 2 mid, 4 low, huge cargo),
-`ship-rat-scuttler`, `ship-rat-marauder`, `ship-rat-hierarch` (NPC hulls),
-`ship-npc-hauler` (civilian convoy freighter, unarmed),
-`ship-npc-patrol` (system security interceptor).
+`ship-vastrek` (fast combat frigate: 3 high, 3 mid, 2 low),
+`ship-zdanek` (brawler: 4 high, 3 mid, 4 low),
+`ship-husnek` (mining: 2 high, 2 mid, 3 low, big ore hold),
+`ship-furdzan` (industrial: 1 high, 2 mid, 4 low, huge cargo),
+`ship-scuttler`, `ship-marauder`, `ship-hierarch` (NPC hulls),
+`ship-tobrek` (civilian convoy freighter, unarmed),
+`ship-kustor` (system security interceptor).
 
 **Modules** (`content/data/modules/*.json`, grouped by category):
 - weapons: `mod-autocannon-s/m/l` (fast cycle, high tracking, short reach)
@@ -154,7 +154,7 @@ hull, fit, behavior (aggro range, orbit range, flee threshold), bounty, loot
 table. Guard loadouts (`content/data/npcs/guards.json`, prefix
 `npc-guard-`) are non-rat NPCs: zero bounty, no loot table, spawned by the
 traffic system or as a celestial's static spawn group: `npc-guard-patrol`
-(hull `ship-npc-patrol`, registered per patrol hull via `Content.GuardFor`).
+(hull `ship-kustor`, registered per patrol hull via `Content.GuardFor`).
 That same prefix classifies them as friendly: `NpcDef.IsGuard` gates the
 aggro state machine, so guards never *initiate* on the player (the
 proximity/intrusion/recent-work triggers are rat-only); only
@@ -200,10 +200,10 @@ names are registered in `docs/lore/NAMING.md`: the ids below are frozen):
 system list with starmap positions, `start_system: "sys-solace"`.
 
 **Worlds** (`content/data/worlds/*.json`): playable scenarios:
-- `world-default`: normal game start (a `ship-sloop`, modest fit/cargo/wallet at
+- `world-default`: normal game start (a `ship-vastrek`, modest fit/cargo/wallet at
   `sys-solace` near `cel-haven-rest`).
 - `world-showcase` (**the test world**): exercises *every* feature. Starts
-  with a `ship-sloop` fitted with one of each module kind, full charge
+  with a `ship-vastrek` fitted with one of each module kind, full charge
   stocks, ores + loot in cargo, fat wallet, positioned in `sys-solace` near
   the belt. Its `scenario` block lists feature checkpoints (see
   "Showcase world" below).
@@ -580,7 +580,7 @@ The **living universe** layer (`systemTraffic`, data in
 economy sits on top of:
 
 - **NPC cargo traffic**: per-system convoy routes spawn haulers
-  (`ship-npc-hauler`) on security-scaled schedules, fly one-way legs
+  (`ship-tobrek`) on security-scaled schedules, fly one-way legs
   through the normal warp profile (align → tunnel → land), deliver cargo
   at station endpoints and despawn at same-system gates/belts. Cargo is
   **sourced at spawn, never conjured**: a station origin withdraws the
@@ -595,7 +595,7 @@ economy sits on top of:
   4; schedules are stateless hashes (no timers to persist). Haulers and
   patrols are ordinary entities: the player can lock, shoot and loot them
   like anything else.
-- **Security patrols** (`npc-guard-*` loadouts on `ship-npc-patrol`) idle
+- **Security patrols** (`npc-guard-*` loadouts on `ship-kustor`) idle
   on a guard circle 20–30 km east of the anchor station (outside the
   8 km NPC guard radius so station traffic never trips them), and respond
   to convoy ambushes: instant 3-ship wings in high security, a single
@@ -715,7 +715,7 @@ Overflow damage carries to the next layer at full value (documented
 simplification of EVE's 50% bleed-through between shield/armor is NOT used;
 keep full carry-over, note it in `docs/GAMEPLAY.md`). Structure ≤ 0 → ship
 dies: the player's escape pod gets clear and the insurer issues a
-replacement: a fresh `ship-sloop` handed over at the last docked station,
+replacement: a fresh `ship-vastrek` handed over at the last docked station,
 or the home station in the universe's start system when the current system
 has none (insurance paperwork, not clone tech; `EvDestroyed` is
 emitted, cargo is lost, wallet and hangar keep). NPC → `Wreck` with rolled

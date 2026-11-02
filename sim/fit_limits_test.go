@@ -182,12 +182,12 @@ func TestBuildFittingRejectsIllegalFit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	sloop := c.Ships["ship-sloop"]
+	sloop := c.Ships["ship-vastrek"]
 	if _, err := s.buildFitting([]content.ModuleID{"mod-autocannon-l"}, sloop); err == nil ||
 		!strings.Contains(err.Error(), "oversize") {
 		t.Errorf("large autocannon on the frigate: err=%v", err)
 	}
-	cutlass := c.Ships["ship-cutlass"]
+	cutlass := c.Ships["ship-zdanek"]
 	heavy := []content.ModuleID{"mod-armor-rep", "mod-armor-rep", "mod-armor-rep", "mod-armor-rep"}
 	if _, err := s.buildFitting(heavy, cutlass); err == nil ||
 		!strings.Contains(err.Error(), "Class II quota") {

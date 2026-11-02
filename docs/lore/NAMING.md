@@ -125,17 +125,17 @@ Rat hulls, ores, minerals and loot stay unattributed.
 
 | id | current name | proposed name | origin | notes |
 |---|---|---|---|---|
-| `ship-sloop` | Vaktr | **Vaštrek** | Nordic | watchman, weathered past Swedish *väktare*; precise electronics-heavy frigate |
-| `ship-cutlass` | Kosar | **Ždanek** | Polish | scythe-worker, weathered past *kosa*; close-in yard-built brawler |
-| `ship-barge` | Havřek | **Hušnek** | Moravian | miner, weathered past Czech *havíř*; the mining barge |
-| `ship-hauler` | Furmek | **Furdžan** | Polish | carter, weathered past *furman*; the workhorse hauler |
-| `ship-npc-hauler` | Taborek | **Tobřek** | Polish | wagon train, weathered past *tabor*; civilian convoy freighter. Overview role labels documented in [../GAMEPLAY.md](../GAMEPLAY.md) ride along in the content pass |
-| `ship-npc-patrol` | Custor | **Kuštor** | Latinate | guardian, weathered past Latin *custos* (classical *-or* shape kept); charter patrol cutter. Same caveat as `ship-npc-hauler` |
-| `ship-npc-miner` | — | **Kutřek** | Moravian | digging barge, weathered past Czech *kutat* "to dig"; civilian belt miner hull, shipped 2026-10-28 with `npc-miner-barge` |
-| `ship-npc-fleet` | — | **Clastor** | Latinate | fleet, weathered past Latin *classis* (classical *-or* shape kept); the commissioned corporate fleet cutter, shipped 2026-10-28 with `npc-fleet-cutter` (FA `Corporate Fleets`) |
-| `ship-rat-scuttler` | Scuttler | Scuttler | Old Works | caste name retained (canon); description says "corsair skiff"; machine framing in the content pass |
-| `ship-rat-marauder` | Marauder | Marauder | Old Works | caste name retained (canon); description says "corsair gunship"; same pass |
-| `ship-rat-hierarch` | Hierarch | Hierarch | Old Works | caste name retained (canon); description implies a human "crew"; same pass |
+| `ship-vastrek` | Vaktr | **Vaštrek** | Nordic | watchman, weathered past Swedish *väktare*; precise electronics-heavy frigate |
+| `ship-zdanek` | Kosar | **Ždanek** | Polish | scythe-worker, weathered past *kosa*; close-in yard-built brawler |
+| `ship-husnek` | Havřek | **Hušnek** | Moravian | miner, weathered past Czech *havíř*; the mining barge |
+| `ship-furdzan` | Furmek | **Furdžan** | Polish | carter, weathered past *furman*; the workhorse hauler |
+| `ship-tobrek` | Taborek | **Tobřek** | Polish | wagon train, weathered past *tabor*; civilian convoy freighter. Overview role labels documented in [../GAMEPLAY.md](../GAMEPLAY.md) ride along in the content pass |
+| `ship-kustor` | Custor | **Kuštor** | Latinate | guardian, weathered past Latin *custos* (classical *-or* shape kept); charter patrol cutter. Same caveat as `ship-tobrek` |
+| `ship-kutrek` | — | **Kutřek** | Moravian | digging barge, weathered past Czech *kutat* "to dig"; civilian belt miner hull, shipped 2026-10-28 with `npc-miner-barge` |
+| `ship-clastor` | — | **Clastor** | Latinate | fleet, weathered past Latin *classis* (classical *-or* shape kept); the commissioned corporate fleet cutter, shipped 2026-10-28 with `npc-fleet-cutter` (FA `Corporate Fleets`) |
+| `ship-scuttler` | Scuttler | Scuttler | Old Works | caste name retained (canon); description says "corsair skiff"; machine framing in the content pass |
+| `ship-marauder` | Marauder | Marauder | Old Works | caste name retained (canon); description says "corsair gunship"; same pass |
+| `ship-hierarch` | Hierarch | Hierarch | Old Works | caste name retained (canon); description implies a human "crew"; same pass |
 
 ### Modules
 
@@ -225,7 +225,7 @@ Rat hulls, ores, minerals and loot stay unattributed.
 |---|---|---|---|---|
 | `npc-guard-patrol` | Patrol | keep | trade | role label; its `faction` string is renamed below |
 | `npc-miner-barge` | — | **Kutřek** | Moravian | digging barge, weathered past Czech *kutat* "to dig"; civilian belt miner (Dvužek), shipped 2026-10-28 |
-| `npc-fleet-cutter` | — | **Clastor** | Latinate | the commissioned fleet cutter (Preštor hull, FA `Corporate Fleets`), shipped 2026-10-28 with `ship-npc-fleet`; shares the hull's name, the Kutřek precedent |
+| `npc-fleet-cutter` | — | **Clastor** | Latinate | the commissioned fleet cutter (Preštor hull, FA `Corporate Fleets`), shipped 2026-10-28 with `ship-clastor`; shares the hull's name, the Kutřek precedent |
 | `npc-rat-scuttler` | Scuttler | Scuttler | Old Works | caste name retained (canon) |
 | `npc-rat-marauder` | Marauder | Marauder | Old Works | caste name retained (canon) |
 | `npc-rat-hierarch` | Hierarch | Hierarch | Old Works | caste name retained (canon) |

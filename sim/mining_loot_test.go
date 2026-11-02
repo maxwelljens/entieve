@@ -87,7 +87,7 @@ func TestMiningUsesOreHoldWhenPresent(t *testing.T) {
 	s := newTestSim(t)
 	// Swap the hull to the barge (1000 m³ ore hold) the way assembly would.
 	ship, _ := s.Ships.Get(s.player)
-	ship.Hull = "ship-barge"
+	ship.Hull = "ship-husnek"
 	s.recomputeFit(s.player)
 	rock := firstAsteroid(t, s)
 	rp, _ := s.posOf(rock)

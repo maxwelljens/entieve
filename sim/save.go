@@ -794,11 +794,12 @@ var (
 	itemIDType     = reflect.TypeOf(content.ItemID(""))
 	moduleIDType   = reflect.TypeOf(content.ModuleID(""))
 	recipeIDType   = reflect.TypeOf(content.RecipeID(""))
+	shipIDType     = reflect.TypeOf(content.ShipID(""))
 	contentIDTypes = map[reflect.Type]bool{
-		itemIDType:                         true,
-		moduleIDType:                       true,
-		recipeIDType:                       true,
-		reflect.TypeOf(content.ShipID("")): true,
+		itemIDType:   true,
+		moduleIDType: true,
+		recipeIDType: true,
+		shipIDType:   true,
 	}
 )
 
@@ -859,10 +860,14 @@ func migrateLegacyIDs(save *Save) {
 		switch id.Type() {
 		case itemIDType:
 			remapLegacy(id, content.LegacyIDs.Items)
+			// A hull id is also an item id (shipyard stock, hangar slots).
+			remapLegacy(id, content.LegacyIDs.Ships)
 		case moduleIDType:
 			remapLegacy(id, content.LegacyIDs.Modules)
 		case recipeIDType:
 			remapLegacy(id, content.LegacyIDs.Recipes)
+		case shipIDType:
+			remapLegacy(id, content.LegacyIDs.Ships)
 		}
 	})
 }

@@ -5,7 +5,7 @@
       "from": "cel-doki",
       "to": "cel-kantor",
       "to_system": "sys-glusza",
-      "hull": "ship-npc-hauler",
+      "hull": "ship-tobrek",
       "cargo": { "item": "ammo-emp-s", "qty": 500 },
       "interval_ticks": 7200
     },
@@ -13,7 +13,7 @@
       "from": "cel-doki",
       "to": "cel-kantor",
       "to_system": "sys-glusza",
-      "hull": "ship-npc-hauler",
+      "hull": "ship-tobrek",
       "cargo": { "item": "ammo-fusion-s", "qty": 500 },
       "interval_ticks": 7200
     },
@@ -21,13 +21,13 @@
       "from": "cel-doki",
       "to": "cel-penumbra-port",
       "to_system": "sys-penumbra",
-      "hull": "ship-npc-hauler",
+      "hull": "ship-tobrek",
       "cargo": { "item": "ammo-emp-s", "qty": 500 },
       "interval_ticks": 7200
     }
   ],
   "patrol": {
-    "hulls": ["ship-npc-patrol"],
+    "hulls": ["ship-kustor"],
     "interval_ticks": 9000
   },
   "raider": "npc-rat-marauder"

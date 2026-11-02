@@ -433,7 +433,7 @@ func TestPlayerDeathRespawnsInSloop(t *testing.T) {
 		t.Fatalf("missing respawn log: %v", evs)
 	}
 	ship, _ := s.Ships.Get(s.player)
-	if ship.Hull != "ship-sloop" {
+	if ship.Hull != "ship-vastrek" {
 		t.Fatalf("hull=%s", ship.Hull)
 	}
 	if ship.Shield != ship.MaxShield || ship.Armor != ship.MaxArmor ||

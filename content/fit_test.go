@@ -42,17 +42,17 @@ var hullFittingTable = []struct {
 	grid   ClassQuota
 	cpu    ClassQuota
 }{
-	{"ship-sloop", "turret s, turret s, launcher s", ClassQuota{I: 5, II: 3}, ClassQuota{II: 2}},
-	{"ship-cutlass", "turret s, turret s, turret s, turret s", ClassQuota{I: 6, II: 3}, ClassQuota{I: 2, II: 1}},
-	{"ship-barge", "turret s, turret s", ClassQuota{I: 4, II: 1}, ClassQuota{II: 2}},
-	{"ship-hauler", "turret s", ClassQuota{I: 2, II: 1}, ClassQuota{I: 1}},
-	{"ship-npc-hauler", "turret s", ClassQuota{I: 2, II: 1}, ClassQuota{I: 1}},
-	{"ship-npc-miner", "turret s", ClassQuota{I: 1}, ClassQuota{II: 1}},
-	{"ship-npc-patrol", "turret m, turret m, turret m", ClassQuota{I: 3, II: 4}, ClassQuota{I: 1}},
-	{"ship-npc-fleet", "turret m, turret m, turret m", ClassQuota{I: 3, II: 4}, ClassQuota{II: 1}},
-	{"ship-rat-scuttler", "turret s, turret s", ClassQuota{I: 3, II: 1}, ClassQuota{}},
-	{"ship-rat-marauder", "turret m, turret m, turret m", ClassQuota{I: 3, II: 4}, ClassQuota{II: 1}},
-	{"ship-rat-hierarch", "turret l, turret l, turret l, turret l", ClassQuota{I: 5, II: 1, III: 4}, ClassQuota{II: 1}},
+	{"ship-vastrek", "turret s, turret s, launcher s", ClassQuota{I: 5, II: 3}, ClassQuota{II: 2}},
+	{"ship-zdanek", "turret s, turret s, turret s, turret s", ClassQuota{I: 6, II: 3}, ClassQuota{I: 2, II: 1}},
+	{"ship-husnek", "turret s, turret s", ClassQuota{I: 4, II: 1}, ClassQuota{II: 2}},
+	{"ship-furdzan", "turret s", ClassQuota{I: 2, II: 1}, ClassQuota{I: 1}},
+	{"ship-tobrek", "turret s", ClassQuota{I: 2, II: 1}, ClassQuota{I: 1}},
+	{"ship-kutrek", "turret s", ClassQuota{I: 1}, ClassQuota{II: 1}},
+	{"ship-kustor", "turret m, turret m, turret m", ClassQuota{I: 3, II: 4}, ClassQuota{I: 1}},
+	{"ship-clastor", "turret m, turret m, turret m", ClassQuota{I: 3, II: 4}, ClassQuota{II: 1}},
+	{"ship-scuttler", "turret s, turret s", ClassQuota{I: 3, II: 1}, ClassQuota{}},
+	{"ship-marauder", "turret m, turret m, turret m", ClassQuota{I: 3, II: 4}, ClassQuota{II: 1}},
+	{"ship-hierarch", "turret l, turret l, turret l, turret l", ClassQuota{I: 5, II: 1, III: 4}, ClassQuota{II: 1}},
 }
 
 // TestShippedHullMountTable pins every hull's high mounts and class quotas.
@@ -211,17 +211,17 @@ func TestValidateRejectsFittingLimits(t *testing.T) {
 	}{
 		{"oversize", func(c *Content) {
 			c.Worlds["world-default"].Start.Fit = []ModuleID{"mod-autocannon-m"}
-		}, "is oversize for the turret mounts on hull ship-sloop"},
+		}, "is oversize for the turret mounts on hull ship-vastrek"},
 		{"missing mount kind", func(c *Content) {
-			c.Worlds["world-default"].Start.Ship = "ship-cutlass"
+			c.Worlds["world-default"].Start.Ship = "ship-zdanek"
 			c.Worlds["world-default"].Start.Fit = []ModuleID{"mod-rocket-pod"}
-		}, "needs a launcher mount and hull ship-cutlass has none free"},
+		}, "needs a launcher mount and hull ship-zdanek has none free"},
 		{"class quota", func(c *Content) {
-			c.Worlds["world-default"].Start.Ship = "ship-cutlass"
+			c.Worlds["world-default"].Start.Ship = "ship-zdanek"
 			c.Worlds["world-default"].Start.Fit = []ModuleID{
 				"mod-armor-rep", "mod-armor-rep", "mod-armor-rep", "mod-armor-rep",
 			}
-		}, "exceeds hull ship-cutlass's grid Class II quota (4 modules, quota 3)"},
+		}, "exceeds hull ship-zdanek's grid Class II quota (4 modules, quota 3)"},
 		{"mount kind vocabulary", func(c *Content) {
 			c.Modules["mod-mining-laser"].Mount = "beam"
 		}, `modules/mod-mining-laser: unknown mount kind "beam"`},
@@ -232,7 +232,7 @@ func TestValidateRejectsFittingLimits(t *testing.T) {
 			c.Modules["mod-afterburner"].Mount = MountTurret
 		}, `modules/mod-afterburner: mount kind "turret" on a mid-slot module`},
 		{"mount count", func(c *Content) {
-			c.Ships["ship-sloop"].Mounts = c.Ships["ship-sloop"].Mounts[:2]
+			c.Ships["ship-vastrek"].Mounts = c.Ships["ship-vastrek"].Mounts[:2]
 		}, "high_mounts declares 2 mounts for 3 high slots"},
 	}
 	for _, tc := range cases {
@@ -269,7 +269,7 @@ func TestValidateRejectsProficiency(t *testing.T) {
 			c.Worlds["world-default"].Start.Fit = []ModuleID{"mod-autocannon-m"}
 		}, "requires Autocannon II (a start fit must be legal at tick 0)"},
 		{"gated start hull", func(c *Content) {
-			c.Ships["ship-sloop"].Gate = 1
+			c.Ships["ship-vastrek"].Gate = 1
 		}, "requires Frigate I (a start hull must be legal at tick 0)"},
 	}
 	for _, tc := range cases {
