@@ -9,7 +9,6 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
-	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
@@ -899,17 +898,11 @@ func (h *Hud) paintEffect(e *hudEffect, frac float64) {
 		float64((box.Dy()-glyph.Bounds().Dy())/2))
 	e.img.DrawImage(glyph, opts)
 
-	// The ring: a full dim track, the remaining fraction drawn over it from
-	// the top, clockwise (syncRing's treatment).
+	// The ring over the glyph: the rack's ring geometry, scaled to the tile.
 	cx, cy := float64(box.Dx())/2, float64(box.Dy())/2
 	rad := float64(theme.Px(hudEffTile)-2*hudEffRingW) / 2
-	const start = -math.Pi / 2
-	render.Arc(e.img, float32(cx), float32(cy), float32(rad),
-		start, start+2*math.Pi, float32(hudEffRingW*theme.Scale()), iconColor(e.tint, 60))
-	if frac > 0 {
-		render.Arc(e.img, float32(cx), float32(cy), float32(rad),
-			start, start+float32(hudFrac01(frac)*2*math.Pi), float32(hudEffRingW*theme.Scale()), e.tint)
-	}
+	drawCycleRing(e.img, float32(cx), float32(cy), float32(rad),
+		float32(hudEffRingW*theme.Scale()), frac, true, e.tint, p)
 }
 
 // clickCard is the card's click seam: a left click selects the card's locked
@@ -1149,18 +1142,8 @@ func drawModRing(dst *ebiten.Image, box image.Rectangle, remaining float64, lit 
 	s := theme.Scale()
 	cx, cy := float64(box.Min.X)+float64(box.Dx())/2, float64(box.Min.Y)+float64(box.Dy())/2
 	rad := float64(theme.Px(hudBoxModCell)-2*hudBoxModRingW) / 2
-	const start = -math.Pi / 2
-	track, fill := iconColor(p.Accent, 60), p.Accent
-	if !lit {
-		// Cancelled: the cycle still runs out, visibly greyed.
-		track, fill = iconColor(p.Dim, 60), p.Dim
-	}
-	render.Arc(dst, float32(cx), float32(cy), float32(rad),
-		start, start+2*math.Pi, float32(hudBoxModRingW*s), track)
-	if remaining > 0 {
-		render.Arc(dst, float32(cx), float32(cy), float32(rad),
-			start, start+float32(hudFrac01(remaining)*2*math.Pi), float32(hudBoxModRingW*s), fill)
-	}
+	drawCycleRing(dst, float32(cx), float32(cy), float32(rad),
+		float32(hudBoxModRingW*s), remaining, lit, p.Accent, p)
 }
 
 // Container returns the HUD's root widget for the interface root (anchor

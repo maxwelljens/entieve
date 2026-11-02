@@ -23,7 +23,7 @@ const (
 // the pending command's labels: the sim owns the gate, so the window only
 // asks and hands the confirmation back.
 type FriendlyFireWin struct {
-	win   *widget.Window
+	dialogShell
 	title *theme.ChromeText
 
 	target *widget.Text
@@ -33,7 +33,6 @@ type FriendlyFireWin struct {
 	cancel  *widget.Button
 
 	onConfirm func()
-	onClose   func()
 }
 
 // NewFriendlyFireWin builds the closed confirm window over the given
@@ -50,22 +49,12 @@ func NewFriendlyFireWin(env widgets.Seams) *FriendlyFireWin {
 			})),
 		)
 	}
-	newBtn := func(text string, clicked func()) *widget.Button {
-		return widget.NewButton(
-			widget.ButtonOpts.TextLabel(text),
-			widget.ButtonOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(theme.Px(40), theme.Px(40)),
-				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-			),
-			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
-		)
-	}
-	f.confirm = newBtn("Confirm foolishness", func() {
+	f.confirm = theme.ActionButton("Confirm foolishness", func() {
 		if f.onConfirm != nil {
 			f.onConfirm()
 		}
 	})
-	f.cancel = newBtn("Cancel", f.Close)
+	f.cancel = theme.ActionButton("Cancel", f.Close)
 	f.target = widget.NewText(
 		widget.TextOpts.Text("", env.Face(theme.StepSmall), theme.Solid(p.Text)),
 	)
@@ -120,24 +109,6 @@ func (f *FriendlyFireWin) Show(module, target string, confirm func()) {
 	f.target.Label = target
 	f.onConfirm = confirm
 	theme.ShowWidget(f.win.GetContainer().GetWidget(), true)
-}
-
-// Close closes the dialog: through the Kit it also unmounts; in a bare
-// environment it just hides. It declines the attack (no command is sent).
-func (f *FriendlyFireWin) Close() {
-	if f.onClose != nil {
-		f.onClose()
-		return
-	}
-	f.hide()
-}
-
-// hide flips the container invisible (the kit's unmount path).
-func (f *FriendlyFireWin) hide() { theme.ShowWidget(f.win.GetContainer().GetWidget(), false) }
-
-// IsOpen reports whether the window is revealed.
-func (f *FriendlyFireWin) IsOpen() bool {
-	return f.win != nil && f.win.GetContainer().GetWidget().IsVisible()
 }
 
 // Confirm is the primary button (tests press it).

@@ -67,36 +67,19 @@ func (s *Sim) systemModules() {
 	}
 }
 
-// targetRequirement describes how a module kind obtains its target.
-const (
-	targetNone   = ""
-	targetLocked = "locked"   // weapon, stasis web, warp scram: locked ship
-	targetRock   = "asteroid" // mining laser: live asteroid
-)
-
-// reqForKind returns the target requirement of a module kind.
-func reqForKind(kind string) string {
-	switch kind {
-	case content.KindWeapon, content.KindStasisWeb, content.KindWarpScram:
-		return targetLocked
-	case content.KindMiningLaser:
-		return targetRock
-	}
-	return targetNone
-}
-
 // checkCycle validates one cycle of an active module: target presence,
 // lock state, range, capacitor, and booster charges. It returns the failure
 // reason when invalid.
 func (s *Sim) checkCycle(e ecs.Entity, def *content.ModuleDef, slot SlotRef) (string, bool) {
 	tg, _ := s.Targetings.Get(e)
-	switch reqForKind(def.Kind) {
-	case targetLocked:
+	cls := def.TargetClass()
+	switch cls {
+	case content.TargetShip, content.TargetAny:
 		tgt, ok := s.modTarget(e, slot)
 		if !ok || !s.World.Alive(tgt) {
 			return "no target", false
 		}
-		if def.Kind == content.KindWeapon && !s.Ships.Has(tgt) {
+		if cls == content.TargetShip && !s.Ships.Has(tgt) {
 			return "target gone", false
 		}
 		if tg == nil || !tg.Locked(tgt) {
@@ -105,7 +88,7 @@ func (s *Sim) checkCycle(e ecs.Entity, def *content.ModuleDef, slot SlotRef) (st
 		if tg != nil && s.distBetween(e, tgt) > tg.MaxRange {
 			return "target out of range", false
 		}
-	case targetRock:
+	case content.TargetRock:
 		tgt, ok := s.modTarget(e, slot)
 		if !ok || !s.World.Alive(tgt) {
 			return "asteroid gone", false
@@ -234,13 +217,14 @@ func (s *Sim) activate(e ecs.Entity, slot SlotRef, target ecs.Entity, quiet bool
 
 	// Target requirements at activation time.
 	tg, _ := s.Targetings.Get(e)
-	switch reqForKind(def.Kind) {
-	case targetLocked:
+	cls := def.TargetClass()
+	switch cls {
+	case content.TargetShip, content.TargetAny:
 		switch {
 		case target.IsZero() || !s.World.Alive(target):
 			s.warnOnce(e, rt, def.Name+" requires a target", quiet)
 			return false
-		case def.Kind == content.KindWeapon && !s.Ships.Has(target):
+		case cls == content.TargetShip && !s.Ships.Has(target):
 			s.warnOnce(e, rt, def.Name+" cannot target that", quiet)
 			return false
 		case tg == nil || !tg.Locked(target):
@@ -250,7 +234,7 @@ func (s *Sim) activate(e ecs.Entity, slot SlotRef, target ecs.Entity, quiet bool
 			s.warnOnce(e, rt, "Target out of range for "+def.Name, quiet)
 			return false
 		}
-	case targetRock:
+	case content.TargetRock:
 		switch {
 		case target.IsZero() || !s.World.Alive(target):
 			s.warnOnce(e, rt, def.Name+" requires an asteroid", quiet)
@@ -291,7 +275,7 @@ func (s *Sim) activate(e ecs.Entity, slot SlotRef, target ecs.Entity, quiet bool
 	}
 
 	text := def.Name + " activated"
-	if reqForKind(def.Kind) != targetNone && !target.IsZero() {
+	if def.TargetClass() != content.TargetNone && !target.IsZero() {
 		text += " on " + s.nameOf(target)
 	}
 	// A civilian miner's laser cycling is ambient, not news: no module

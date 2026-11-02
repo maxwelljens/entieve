@@ -2,6 +2,7 @@ package screens
 
 import (
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/uikit/theme"
 )
 
 // One lifecycle for the kit's on-demand windows (CONTEXT.md "Dialog"):
@@ -9,8 +10,44 @@ import (
 // single-instance dialogs — a launch re-targets the one window in place
 // and raises it to the top of the stack, a close unmounts it, and a
 // launch landing while the × close still fades re-opens it. The rules
-// live here once; each panel keeps its own Show/hide/IsOpen and the Kit
-// keeps addWindow's fade/settle/stack work, raise() and Over untouched.
+// live here once; each panel embeds dialogShell for the Close/hide/IsOpen
+// trio and the Kit keeps addWindow's fade/settle/stack work, raise() and
+// Over untouched.
+
+// dialogShell is the lifecycle every on-demand dialog shares: its window,
+// the Kit's close hook, and an optional extra hide hook for the panel's own
+// state. Embedding it gives the panel the trio and keeps its win field
+// reachable; content, placement and semantics stay in the panel.
+type dialogShell struct {
+	win     *widget.Window
+	onClose func()
+	onHide  func()
+}
+
+// Close closes the dialog: through the Kit it also unmounts (so a closed
+// dialog stops gating world input); in a bare environment it just hides.
+func (d *dialogShell) Close() {
+	if d.onClose != nil {
+		d.onClose()
+		return
+	}
+	d.hide()
+}
+
+// hide flips the container invisible, after the panel's own hide hook (the
+// kit's unmount path).
+func (d *dialogShell) hide() {
+	if d.onHide != nil {
+		d.onHide()
+	}
+	theme.ShowWidget(d.win.GetContainer().GetWidget(), false)
+}
+
+// IsOpen reports whether the dialog is revealed (shown, and mounted when a
+// Kit hosts it).
+func (d *dialogShell) IsOpen() bool {
+	return d.win != nil && d.win.GetContainer().GetWidget().IsVisible()
+}
 
 // dialog is one kit-hosted on-demand window's lifecycle state. remove is
 // the live mount handle returned by addWindow — nil while closed, and

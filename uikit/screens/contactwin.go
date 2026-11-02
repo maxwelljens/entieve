@@ -139,7 +139,7 @@ type ContactWin struct {
 	cv widgets.ContentView
 	as widgets.ActionSink
 
-	win   *widget.Window
+	dialogShell
 	title *theme.ChromeText
 	body  *widget.Container
 
@@ -172,14 +172,13 @@ type ContactWin struct {
 	offer content.ContractID
 	last  sim.Offer // the last page rendered (the offer copy Sync falls back to)
 	open  bool
-
-	onClose func() // Kit-hosted: unmount (a bare env only hides)
 }
 
 // NewContactWin builds the closed dialog over the given environment.
 func NewContactWin(env widgets.Seams) *ContactWin {
 	p := env.Pal()
 	w := &ContactWin{th: env, cv: env, as: env}
+	w.onHide = func() { w.open = false }
 
 	text := func(face *text.Face, col color.RGBA, maxW int) *widget.Text {
 		return widget.NewText(
@@ -370,27 +369,6 @@ func (w *ContactWin) Sync() {
 	} else {
 		w.setAccept("Accept work", true) // no longer offered: nothing to accept
 	}
-}
-
-// Close closes the dialog: through the Kit it also unmounts; in a bare
-// environment it just hides.
-func (w *ContactWin) Close() {
-	if w.onClose != nil {
-		w.onClose()
-		return
-	}
-	w.hide()
-}
-
-// hide flips the container invisible (the kit's unmount path).
-func (w *ContactWin) hide() {
-	w.open = false
-	theme.ShowWidget(w.win.GetContainer().GetWidget(), false)
-}
-
-// IsOpen reports whether the dialog is revealed.
-func (w *ContactWin) IsOpen() bool {
-	return w.win != nil && w.win.GetContainer().GetWidget().IsVisible()
 }
 
 // Offer is the offer the dialog currently shows ("" before the first Show).

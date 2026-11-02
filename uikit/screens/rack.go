@@ -9,7 +9,6 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
-	"github.com/entieve/entieve/render"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
@@ -518,20 +517,8 @@ func (r *Rack) syncRing(cell *rackCell, show, lit bool, remaining float64) {
 	cell.ring.Clear()
 	s := theme.Scale()
 	cx, cy := float64(theme.Px(rackCellW))/2, float64(theme.Px(rackCellH))/2
-	rad := float64(rackRingR) * s
-	const start = -math.Pi / 2
-	p := r.th.Pal()
-	track, fill := iconColor(p.Accent, 60), p.Accent
-	if !lit {
-		// Cancelled: the cycle still runs out, visibly greyed.
-		track, fill = iconColor(p.Dim, 60), p.Dim
-	}
-	render.Arc(cell.ring, float32(cx), float32(cy), float32(rad),
-		start, start+2*math.Pi, float32(rackRingW*s), track)
-	if remaining > 0 {
-		render.Arc(cell.ring, float32(cx), float32(cy), float32(rad),
-			start, start+float32(hudFrac01(remaining)*2*math.Pi), float32(rackRingW*s), fill)
-	}
+	drawCycleRing(cell.ring, float32(cx), float32(cy), float32(float64(rackRingR)*s),
+		float32(rackRingW*s), remaining, lit, r.th.Pal().Accent, r.th.Pal())
 }
 
 // shortName is the label drawn in a cell: the module's first word, ellipsized
@@ -714,42 +701,19 @@ func (r *Rack) clickTarget(def *content.ModuleDef) ecs.Entity {
 		}
 	}
 	for _, l := range tg.Locks {
-		if l.Progress < 1 {
-			continue
-		}
-		switch {
-		case def.Weapon != nil:
-			if _, ok := s.ShipState(l.Target); ok {
-				return l.Target
-			}
-		case def.Mining != nil:
-			if _, ok := s.Asteroid(l.Target); ok {
-				return l.Target
-			}
-		case def.Kind == content.KindStasisWeb || def.Kind == content.KindWarpScram:
+		if l.Progress >= 1 && targetSuits(s, def, l.Target) {
 			return l.Target
-		default:
-			return ecs.Entity(0) // self-targeted modules take no target
 		}
 	}
 	return ecs.Entity(0)
 }
 
-// targetSuits reports whether entity e is a valid target class for def
-// (weapon→ship, mining→asteroid, ewar→anything, else self).
+// targetSuits reports whether entity e is a valid target class for def (the
+// sim's TargetClass rule, read through the view's ship/asteroid reads).
 func targetSuits(s widgets.ContentView, def *content.ModuleDef, e ecs.Entity) bool {
-	switch {
-	case def.Weapon != nil:
-		_, ok := s.ShipState(e)
-		return ok
-	case def.Mining != nil:
-		_, ok := s.Asteroid(e)
-		return ok
-	case def.Kind == content.KindStasisWeb || def.Kind == content.KindWarpScram:
-		return true
-	default:
-		return false
-	}
+	_, ship := s.ShipState(e)
+	_, rock := s.Asteroid(e)
+	return def.TargetClass().Suits(ship, rock)
 }
 
 // cycleNext is the next charge a "Cycle charge" press loads: the entry
