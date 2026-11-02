@@ -378,22 +378,6 @@ column keeps sorting on the real figure.
 `Ctrl` + a left click on a row locks the row's entity: the same chord the
 world uses under the cursor, so the row selects and locks in one press.
 
-### Stacked entities (the stack picker)
-
-Where several things sit on top of each other, the world's click can only
-reach the nearest one. Rest the cursor on the pile (about a fifth of a
-second, no click) and a vertical column opens beside it: each cell is the
-entity as the world draws it, its own body art inside its own bracket, so a
-cell reads as a miniature of what sits on screen. The column is ordered as
-the world paints them, so the entity on top leads. Hover a cell for its name
-and distance. A click selects that entity (the Overview highlight and the
-Selected Item window follow), `Ctrl` + click locks it, a right-click opens
-the entity's own menu. The column lists up to twelve entities; anything
-deeper stays in the Overview.
-It closes by itself once the cursor leaves both the column and the pile
-(about 150 ms of grace), and it never changes what a plain world click
-selects.
-
 ## Inspecting items (Show Info)
 
 Anything you can see is inspectable. **Right-click** an item anywhere it

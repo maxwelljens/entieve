@@ -94,22 +94,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   died, warped off or was unlocked) its card blinks at two cycles a second
   for a second and a half before it goes, instead of vanishing between
   frames. A blinking card answers no clicks.
-- **The stack picker lists what one click cannot reach**: a cluster of
-  overlapping entities (two or more under the cursor within the pick radius)
-  is a single pick in the world, so resting the cursor on the pile for about
-  two hundred milliseconds opens a vertical column of the entities
-  themselves, ordered as the world paints them (the entity on top leads; ties
-  fall to the canonical handle order). Each cell is drawn as the entity is
-  drawn in space, its own hull art, rock, station or celestial inside its own
-  world bracket, so a cell reads as a miniature of what sits on screen
-  instead of an icon of its kind. A cell click selects, `Ctrl` + click locks
-  (the world chord), a right-click opens the entity's menu, and hovering a
-  cell names it with its distance. The column lists up to twelve entities,
-  the tail stays in the Overview by design, and it closes itself after the
-  cursor leaves both the column and the pile for about a hundred and fifty
-  milliseconds. It is transient top chrome: no keybinding, no Screen row,
-  nothing persisted, and a plain world click still resolves the nearest
-  entity exactly as before.
 
 ### Changed
 
@@ -170,9 +154,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Entity labels are hover-only**: the world draws no name and distance
   labels by default; the one on screen belongs to the entity under the cursor
   and disappears when the cursor leaves it, at every zoom. The brackets alone
-  identify what is out there, and the cursor asks for the one name you want
-  (the stack picker's column opens on a cluster, so the nearest entity's
-  label draws behind it). A locked target's label follows the same rule; its
+  identify what is out there, and the cursor asks for the one name you want.
+  A locked target's label follows the same rule; its
   figure stays on the Overview row and the HUD target card. Entity labels
   used to gate on zoom instead, crowding the framing the rule left open.
 - **`Ctrl` + click locks from an Overview row**: the chord the world already

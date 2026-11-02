@@ -343,8 +343,7 @@ func (k *Kit) overviewCog() (*widget.Button, *widget.Graphic) {
 // answer for that entity (VerbReady), never a second gating rule; the
 // self-check stays because a row never offers to fly to itself. The
 // installer turns this data into the menu; a right-click never moves the
-// selection. The stack picker's icons carry the same spec, so an entity's
-// menu is identical wherever it is listed.
+// selection.
 func (k *Kit) overviewSpec(info sim.Info) widgets.RowSpec {
 	e := info.Entity
 	ref, _ := widgets.InfoRefFor(k.cv, e)

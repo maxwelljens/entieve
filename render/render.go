@@ -334,8 +334,7 @@ func (r *Renderer) Draw(dst *ebiten.Image, cam Camera, s *sim.Sim) {
 }
 
 // drawBody paints one grid entity's own body art: the star, planet, anomaly,
-// static, rock, wreck and ship passes in Draw. The stack picker's cells call
-// it too (see DrawEntityBracket), so a cell shows the same art the world does.
+// static, rock, wreck and ship passes in Draw.
 func (r *Renderer) drawBody(dst *ebiten.Image, cam Camera, o gridObj, sys *content.SystemDef, now float64) {
 	switch o.info.Kind {
 	case sim.KindStar:
@@ -355,8 +354,7 @@ func (r *Renderer) drawBody(dst *ebiten.Image, cam Camera, o gridObj, sys *conte
 	}
 }
 
-// obj resolves one grid entity's render lookups (the per-frame bucket's work,
-// shared with the cell draw).
+// obj resolves one grid entity's render lookups (the per-frame bucket's work).
 func (r *Renderer) obj(s *sim.Sim, inf sim.Info) gridObj {
 	o := gridObj{info: inf, speedMult: 1}
 	if cel, ok := s.Celestials.Get(inf.Entity); ok {

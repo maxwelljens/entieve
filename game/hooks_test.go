@@ -89,13 +89,12 @@ func TestChromeOnRootOverlay(t *testing.T) {
 		}
 		mounted[c] = true
 	}
-	if len(kids) != 5 {
-		t.Errorf("root overlay has %d children, want exactly the HUD, the target cards, the combat feed, the rail and the stack picker column", len(kids))
+	if len(kids) != 4 {
+		t.Errorf("root overlay has %d children, want exactly the HUD, the target cards, the combat feed and the rail", len(kids))
 	}
 	for name, c := range map[string]*widget.Container{
 		"hud": g.hud.Container(), "cards": g.hud.Cards().Container(),
 		"feed": g.hud.Feed().Container(), "rail": g.rail.Container(),
-		"stack": g.kit.StackColumn().(*widget.Container),
 	} {
 		if !mounted[c] {
 			t.Errorf("%s is not mounted on the root overlay", name)

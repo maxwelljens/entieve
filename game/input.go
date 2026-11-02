@@ -90,7 +90,6 @@ var MouseMap = []MouseBinding{
 	{Button: "Right click", Desc: "Orbit target under cursor (" + theme.FormatInt(int64(orbitDefaultRange)) + " m)"},
 	{Button: "Right click", Mod: "on a UI row or rack cell", Desc: "open the context menu (Show Info, plus the row's actions)"},
 	{Button: "Right click", Mod: "on weapon slot", Desc: "open the module menu (Cycle charge walks Auto → cargo ammo)"},
-	{Button: "Hover", Mod: "a stack of entities", Desc: "open the stack picker: click an icon to select, Ctrl+click to lock, right-click for the entity's menu"},
 	{Button: "Middle drag", Desc: "Pan camera"},
 	{Button: "Wheel", Desc: "Zoom (0.05x – 4x); over the overview, scroll the list"},
 }
