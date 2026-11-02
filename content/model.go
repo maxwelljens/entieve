@@ -146,6 +146,7 @@ type ItemDef struct {
 	RefineYield map[ItemID]float64 `json:"refine_yield,omitempty"` // ore: fraction of one unit refining into minerals, sums <= 1
 	Damage      *Damage            `json:"damage,omitempty"`       // ammo: damage per shot
 	AmmoClass   string             `json:"ammo_class,omitempty"`   // ammo: the calibre ("small"/"medium"/"large"); "" for non-ammo
+	Rarity      int                `json:"rarity,omitempty"`       // ore: practice quality 1..4 (Proficiency)
 }
 
 // Ship slots.
@@ -164,6 +165,8 @@ type ShipDef struct {
 	Origin         string     `json:"origin,omitempty"` // naming-layer heritage: "moravian"|"polish"|"nordic"|"latinate"|"old-works"
 	Maker          string     `json:"maker,omitempty"`  // manufacturer: a corp-* slug (Corp.ID); empty on the unattributed rat hulls
 	Group          string     `json:"group"`            // market tree path, e.g. "Ships/Frigates"
+	Family         string     `json:"family"`           // proficiency line (content.ValidProficiencyFamily)
+	Gate           int        `json:"gate,omitempty"`   // minimum family level to fly the hull (0 = always legal)
 	BasePrice      float64    `json:"base_price"`       // credits: the price ladder's last rung when a book has no trade
 	Slots          Slots      `json:"slots"`
 	Mounts         []Mount    `json:"high_mounts,omitempty"`  // one mount per high slot: a mounted module needs its kind at or above its size
@@ -266,6 +269,8 @@ type ModuleDef struct {
 	Description    string        `json:"description,omitempty"`
 	Maker          string        `json:"maker,omitempty"` // manufacturer: a corp-* slug (Corp.ID)
 	Group          string        `json:"group"`           // market tree path, e.g. "Modules/High/Turrets"
+	Family         string        `json:"family"`          // proficiency line (content.ValidProficiencyFamily)
+	Gate           int           `json:"gate,omitempty"`  // minimum family level to fit (0 = always legal)
 	Slot           string        `json:"slot"`            // "high" | "mid" | "low"
 	Kind           string        `json:"kind"`
 	Icon           string        `json:"icon,omitempty"`       // icon-manifest key: market/tile art ("" = the class glyph)

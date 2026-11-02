@@ -1,5 +1,6 @@
 {
   "id": "ship-barge",
+  "family": "barge",
   "group": "Ships/Barges",
   "base_price": 900000,
   "name": "Hušnek",

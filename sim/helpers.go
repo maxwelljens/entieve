@@ -555,6 +555,11 @@ func (s *Sim) recomputeFit(e ecs.Entity) {
 			cap.Current = capCap
 		}
 	}
+	// Hull practice edge: flying a class you have practiced adds its percent
+	// to base speed (the family is "fitted" while that hull is flown).
+	if e == s.player && hull.Family != "" {
+		speed *= s.proficiencyEdge(hull.Family)
+	}
 	if m, ok := s.Motions.Get(e); ok {
 		m.MaxSpeed = speed
 		m.Mass = hull.Mass

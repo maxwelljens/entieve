@@ -399,8 +399,8 @@ Only fields that exist are shown, grouped per kind:
 
 | Kind | Sections |
 |---|---|
-| Hull | CONSTRUCTION (class · origin) / SLOTS / SURVIVAL / CAPACITOR / PROPULSION / SENSORS / CARGO |
-| Module | ACTIVATION / kind stat sections / CHARGES (compatible charges) / MARKET |
+| Hull | CONSTRUCTION (class · origin) / SLOTS / PROFICIENCY / SURVIVAL / CAPACITOR / PROPULSION / SENSORS / CARGO |
+| Module | ACTIVATION / CONSTRUCTION / PROFICIENCY / kind stat sections / CHARGES (compatible charges) / MARKET |
 | Item | PROPERTIES / MARKET / REFINES TO / DAMAGE |
 | Machine caste | dossier prose / DOSSIER (faction, hull, bounty) / BEHAVIOR / LOOT |
 
@@ -416,6 +416,32 @@ picker); inventory rows: Show Info; overview rows: Show Info / Warp to / Orbit /
 (the entity's hull or caste info plus the usual commands); offer
 rows: Accept / Abandon (grayed when gated); offer objective labels:
 Show Info.
+
+## Proficiency
+
+Every hull and module belongs to a **practice family** (autocannon,
+artillery, rocket, mining, shield, armor, capacitor, propulsion, electronic
+warfare, and the hull classes). You learn a family by using it: every point
+of damage you land pays its weapon family, every mining cycle pays the
+mining family (rarity 1/2/3/4 pays 1/2/4/8), shield and armor reps, cap
+boosters and rechargers, afterburner time and web/scram cycles pay their
+support family, every kill pays the hull you fly, every completed delivery
+pays that hull by the offer's level, and every completed warp pays the hull
+by distance (1 point per 100 AU, half a point per hop at most). Mining and
+combat hits also give the flown hull a 10% cut; kills and deliveries pay it
+in full. Levels run 0 to V; the first level costs 10 practice, the fifth 250,
+and a family at V banks nothing more.
+
+A level buys two things. It **gates** advanced defs of the family: fitting a
+module and flying (assembling, undocking) a hull need the family's level
+named on the def, plus the level named by its prerequisite edges (artillery
+after autocannon II, destroyer after frigate II, industrial after frigate I).
+Your starter hull and world-start fit are always legal; the market is never
+gated, so you may buy what you cannot yet run. It also adds 2% per level
+while the family is in use (weapon damage, mining yield, hull speed). Show
+Info lists a def's requirement and your level under PROFICIENCY, and every
+level-up prints one line in the log (`Proficiency: Autocannon II`). Nothing
+decays: practice you earned stays.
 
 ## EVE concepts primer
 

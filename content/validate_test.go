@@ -40,14 +40,14 @@ func baseContent() *Content {
 	return &Content{
 		Items: map[ItemID]*ItemDef{
 			"min-fer":     {ID: "min-fer", Name: "Sideron", Group: "Materials/Minerals", Category: CatMineral, Volume: 0.01, BasePrice: 6},
-			"ore-rock":    {ID: "ore-rock", Name: "Test Rock", Group: "Materials/Ore", Category: CatOre, Volume: 1, BasePrice: 20, RefineYield: map[ItemID]float64{"min-fer": 0.5}},
+			"ore-rock":    {ID: "ore-rock", Name: "Test Rock", Group: "Materials/Ore", Category: CatOre, Volume: 1, BasePrice: 20, Rarity: 1, RefineYield: map[ItemID]float64{"min-fer": 0.5}},
 			"charge-cell": {ID: "charge-cell", Name: "Cell", Group: "Ammunition/Cap cells", Category: CatCharge, Volume: 0.01, BasePrice: 100},
 			"charge-bolt": {ID: "charge-bolt", Name: "Bolt", Group: "Ammunition/Autocannon shells", Category: CatAmmo, Volume: 0.01, BasePrice: 10, Damage: &Damage{EM: 10}, AmmoClass: "light"},
 			"loot-bit":    {ID: "loot-bit", Name: "Bit", Group: "Loot", Category: CatLoot, Volume: 0.1, BasePrice: 1000},
 		},
 		Ships: map[ShipID]*ShipDef{
 			"ship-hull": {
-				ID: "ship-hull", Name: "Hull", Class: "frigate", Group: "Ships/Frigates",
+				ID: "ship-hull", Name: "Hull", Class: "frigate", Group: "Ships/Frigates", Family: "frigate",
 				Slots:  Slots{High: 2, Mid: 2, Low: 2},
 				Shield: 100, Armor: 100, Structure: 100,
 				Resists:   Resists{EM: 0.2, Thermal: 0.2, Kinetic: 0.2, Explosive: 0.2},
@@ -58,18 +58,18 @@ func baseContent() *Content {
 		},
 		Modules: map[ModuleID]*ModuleDef{
 			"mod-gun": {
-				ID: "mod-gun", Name: "Gun", Group: "Modules/High/Turrets", Slot: SlotHigh, Kind: KindWeapon,
+				ID: "mod-gun", Name: "Gun", Group: "Modules/High/Turrets", Family: "autocannon", Slot: SlotHigh, Kind: KindWeapon,
 				ActivationCost: 10, ActivationTime: 2, Price: 10000,
 				Weapon: &WeaponAttrs{Damage: Damage{EM: 10}, Optimal: 8000, Falloff: 4000,
 					Tracking: 0.4, AmmoClass: "light", ShotTime: 2, BayM3: 0.1},
 			},
 			"mod-engine": {
-				ID: "mod-engine", Name: "Engine", Group: "Modules/Mid/Propulsion", Slot: SlotMid, Kind: KindAfterburner,
+				ID: "mod-engine", Name: "Engine", Group: "Modules/Mid/Propulsion", Family: "propulsion", Slot: SlotMid, Kind: KindAfterburner,
 				ActivationCost: 20, ActivationTime: 5, Price: 20000,
 				Boost: &BoostAttrs{SpeedMultiplier: 1.5},
 			},
 			"mod-plate": {
-				ID: "mod-plate", Name: "Plate", Group: "Modules/Low/Armor", Slot: SlotLow, Kind: KindArmorPlate,
+				ID: "mod-plate", Name: "Plate", Group: "Modules/Low/Armor", Family: "armor", Slot: SlotLow, Kind: KindArmorPlate,
 				Price: 15000, Passive: &PassiveAttrs{ArmorHP: 200},
 			},
 		},
@@ -668,5 +668,55 @@ func TestModuleKindAggression(t *testing.T) {
 		if (&ModuleDef{Kind: kind}).IsAggressive() {
 			t.Errorf("%s reads aggressive, want passive", kind)
 		}
+	}
+}
+
+// TestProficiencyPrereqGraph pins the authored dependency graph: every family
+// has an entry, every edge resolves and stays in 0..5, and no cycle exists.
+func TestProficiencyPrereqGraph(t *testing.T) {
+	if problems := proficiencyGraphProblems(proficiencyPrereqs, proficiencyFamilies); len(problems) != 0 {
+		t.Fatalf("shipped prerequisite graph has problems: %v", problems)
+	}
+	fams := map[string]string{"a": "A", "b": "B", "c": "C"}
+	cases := []struct {
+		name  string
+		table map[string][]Prereq
+		want  string
+	}{
+		{"missing entry", map[string][]Prereq{"a": nil, "b": nil}, `family "c" has no prerequisite entry`},
+		{"unknown family", map[string][]Prereq{
+			"a": nil, "b": {{Family: "ghost", Level: 1}}, "c": nil,
+		}, `requires unknown family "ghost"`},
+		{"level out of range", map[string][]Prereq{
+			"a": nil, "b": {{Family: "a", Level: 6}}, "c": nil,
+		}, `requires "a" at level 6, must be 0..5`},
+		{"cycle", map[string][]Prereq{
+			"a": {{Family: "b", Level: 1}}, "b": {{Family: "a", Level: 1}}, "c": nil,
+		}, "prerequisite cycle"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			problems := proficiencyGraphProblems(tc.table, fams)
+			if len(problems) == 0 || !strings.Contains(strings.Join(problems, "\n"), tc.want) {
+				t.Fatalf("problems = %v, want %q", problems, tc.want)
+			}
+		})
+	}
+}
+
+// TestValidateRejectsStarterPrerequisite: a world-start family may not carry
+// a nonzero prerequisite (the loadout must stay legal at tick 0).
+func TestValidateRejectsStarterPrerequisite(t *testing.T) {
+	old := proficiencyPrereqs
+	proficiencyPrereqs = map[string][]Prereq{}
+	for id := range proficiencyFamilies {
+		proficiencyPrereqs[id] = nil
+	}
+	proficiencyPrereqs["autocannon"] = []Prereq{{Family: "frigate", Level: 1}}
+	defer func() { proficiencyPrereqs = old }()
+
+	err := MustLoad().Validate()
+	if err == nil || !strings.Contains(err.Error(), "starter family \"autocannon\" requires Frigate I") {
+		t.Fatalf("validation missing starter prerequisite, got:\n%v", err)
 	}
 }

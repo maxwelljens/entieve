@@ -207,6 +207,7 @@ func (s *Sim) systemWarp() {
 			if in, ok := s.Intents.Get(e); !ok || in.Kind == IntentAlign {
 				s.Intents.Set(e, Intent{Kind: IntentStop})
 			}
+			s.awardFlightHop(e, wd.Dist)
 			s.Warps.Remove(e)
 			s.emit(Event{Kind: EvWarp, Phase: "land", Actor: e, Text: "Warp complete"})
 		}

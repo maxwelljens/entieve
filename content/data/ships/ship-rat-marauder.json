@@ -1,5 +1,6 @@
 {
   "id": "ship-rat-marauder",
+  "family": "rat",
   "group": "Ships/Rat hulls",
   "base_price": 750000,
   "name": "Marauder",

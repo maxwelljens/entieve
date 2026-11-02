@@ -137,6 +137,7 @@ func (c *Content) Validate(opts ...ValidateOption) error {
 	v.contracts()
 	v.traffic()
 	v.worlds()
+	v.proficiencyGraph()
 	v.universe()
 	if len(v.errs) == 0 {
 		return nil
@@ -172,6 +173,11 @@ func (v *validator) items() {
 		}
 		if it.Category == CatOre {
 			v.oreYields(ctx, it)
+			if it.Rarity < 1 || it.Rarity > ProficiencyMax {
+				v.addf("%s: ore rarity %d, must be in 1..%d", ctx, it.Rarity, ProficiencyMax)
+			}
+		} else if it.Rarity != 0 {
+			v.addf("%s: rarity %d on a non-ore item", ctx, it.Rarity)
 		}
 		if it.Damage != nil && (it.Damage.EM < 0 || it.Damage.Thermal < 0 || it.Damage.Kinetic < 0 || it.Damage.Explosive < 0) {
 			v.addf("%s: negative damage component", ctx)
@@ -214,6 +220,18 @@ func (v *validator) oreYields(ctx string, it *ItemDef) {
 	}
 }
 
+// proficiency validates a def's practice line and its use gate.
+func (v *validator) proficiency(ctx, family string, gate int) {
+	if family == "" {
+		v.addf("%s: missing proficiency family", ctx)
+	} else if !ValidProficiencyFamily(family) {
+		v.addf("%s: unknown proficiency family %q", ctx, family)
+	}
+	if gate < 0 || gate > ProficiencyMax {
+		v.addf("%s: proficiency gate %d, must be in 0..%d", ctx, gate, ProficiencyMax)
+	}
+}
+
 func (v *validator) ships() {
 	for _, id := range keys(v.c.Ships) {
 		s := v.c.Ships[id]
@@ -230,6 +248,7 @@ func (v *validator) ships() {
 		}
 		v.maker(ctx, s.Maker)
 		v.group(ctx, s.Group)
+		v.proficiency(ctx, s.Family, s.Gate)
 		if s.BasePrice < 0 {
 			v.addf("%s: negative base price %v", ctx, s.BasePrice)
 		}
@@ -390,6 +409,7 @@ func (v *validator) modules() {
 		}
 		v.maker(ctx, m.Maker)
 		v.group(ctx, m.Group)
+		v.proficiency(ctx, m.Family, m.Gate)
 		if m.ActivationCost < 0 {
 			v.addf("%s: negative activation cost %v", ctx, m.ActivationCost)
 		}
@@ -1343,6 +1363,16 @@ func (v *validator) worlds() {
 			v.addf("%s: unknown start ship %q", ctx, w.Start.Ship)
 		} else {
 			v.checkFit(ctx+"/start.fit", w.Start.Fit, hull)
+			if hull.Gate > 0 {
+				v.addf("%s: start ship %q requires %s %s (a start hull must be legal at tick 0)",
+					ctx, hull.ID, FamilyLabel(hull.Family), LevelLabel(hull.Gate))
+			}
+			for i, mid := range w.Start.Fit {
+				if m, ok := v.c.Modules[mid]; ok && m.Gate > 0 {
+					v.addf("%s/start.fit[%d]: %q requires %s %s (a start fit must be legal at tick 0)",
+						ctx, i, mid, FamilyLabel(m.Family), LevelLabel(m.Gate))
+				}
+			}
 		}
 		if w.Start.Wallet < 0 {
 			v.addf("%s: negative wallet %v", ctx, w.Start.Wallet)
@@ -1369,6 +1399,34 @@ func (v *validator) worlds() {
 		v.addf("worlds: missing required world %q", "world-showcase")
 	} else if len(sc.Scenario) < 10 {
 		v.addf("worlds/world-showcase: %d scenario checkpoints, need at least 10", len(sc.Scenario))
+	}
+}
+
+func (v *validator) proficiencyGraph() {
+	for _, problem := range proficiencyGraphProblems(proficiencyPrereqs, proficiencyFamilies) {
+		v.addf("%s", problem)
+	}
+	// Starter essentials must be legal at tick 0: a family used by a world
+	// start may not carry a nonzero prerequisite edge.
+	for _, id := range keys(v.c.Worlds) {
+		w := v.c.Worlds[id]
+		starter := map[string]bool{}
+		if hull, ok := v.c.Ships[w.Start.Ship]; ok && hull.Family != "" {
+			starter[hull.Family] = true
+		}
+		for _, mid := range w.Start.Fit {
+			if m, ok := v.c.Modules[mid]; ok && m.Family != "" {
+				starter[m.Family] = true
+			}
+		}
+		for family := range starter {
+			for _, p := range proficiencyPrereqs[family] {
+				if p.Level > 0 {
+					v.addf("worlds/%s: starter family %q requires %s %s (a start must be legal at tick 0)",
+						id, family, FamilyLabel(p.Family), LevelLabel(p.Level))
+				}
+			}
+		}
 	}
 }
 

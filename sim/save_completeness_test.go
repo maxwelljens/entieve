@@ -103,6 +103,7 @@ var simFieldClasses = map[string]fieldClass{
 	"jobs":          {save: []string{"Jobs"}},
 	"jobSeq":        {save: []string{"JobSeq"}},
 	"craft":         {save: []string{"Craft"}},
+	"prof":          {save: []string{"Proficiency"}},
 	"deferIndustry": {transient: true},
 
 	// --- ledger agents (system 19: roster + station upkeep ledgers) ---

@@ -71,6 +71,17 @@ func (s *Sim) execUndock() {
 		s.log(SevWarning, p, "You are not docked")
 		return
 	}
+	// Flying a hull requires its class proficiency gate (and any prerequisite
+	// edge). Refuse before the dock state is touched, so the pilot stays in
+	// the station.
+	if ship, ok := s.Ships.Get(p); ok {
+		if hull, ok := s.Content.Ship(ship.Hull); ok {
+			if req, ok := s.proficiencyCheck(hull.Family, hull.Gate); !ok {
+				s.log(SevWarning, p, req+" to fly "+hull.Name)
+				return
+			}
+		}
+	}
 	station := s.stationAt(d.At)
 	s.Docked.Remove(p)
 	// Undock leaves everything off: a module switched on inside the station

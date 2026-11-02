@@ -39,6 +39,8 @@ func TestInfoWindowCaptureFrame(t *testing.T) {
 	fixtureShip(t, env, "ship-capture-hull", &content.ShipDef{
 		Name:        "Kestrel Prime",
 		Class:       "frigate",
+		Family:      "frigate",
+		Gate:        1,
 		Maker:       "corp-borealis",
 		Origin:      "moravian",
 		Description: "A heritage frigate restored from the old works: light, fast and stubbornly analogue where it counts.",

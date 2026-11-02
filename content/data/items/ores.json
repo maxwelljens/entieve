@@ -1,6 +1,7 @@
 [
   {
     "id": "ore-sterngrit",
+    "rarity": 1,
     "group": "Materials/Ore",
     "name": "Sterngrit Ore",
     "description": "Gritty iron-rich rock from inner belts; refines mostly into sideron. The grit gets into the laser housing and the yard charges to clean it out.",
@@ -13,6 +14,7 @@
   },
   {
     "id": "ore-cordite",
+    "rarity": 2,
     "group": "Materials/Ore",
     "name": "Kerngrit Ore",
     "description": "Dense metallic ore with a nixium seam; a reliable mid-tier refinery feed. Cutters do not fight over it. Cutters fight over the belt that has it.",
@@ -26,6 +28,7 @@
   },
   {
     "id": "ore-lucidite",
+    "rarity": 3,
     "group": "Materials/Ore",
     "name": "Lucidite Ore",
     "description": "Glassy blue-black ore laced with zaffrite and vetril; a Fringe favourite. It prices by the load and the load is never as big as the survey said.",
@@ -40,6 +43,7 @@
   },
   {
     "id": "ore-glacierite",
+    "rarity": 4,
     "group": "Materials/Ore",
     "name": "Borealite Ore",
     "description": "Frozen frontier ore that yields cryolith crystals and trapped helion. It comes out of the belt cold enough to frost a hold, and the refinery pays for the ice the same as the rock.",

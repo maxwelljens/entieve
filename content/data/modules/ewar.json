@@ -1,6 +1,7 @@
 [
   {
     "id": "mod-stasis-web",
+    "family": "ewar",
     "group": "Modules/Mid/EWAR",
     "maker": "corp-borealis",
     "name": "Stasis Web",
@@ -18,6 +19,7 @@
   },
   {
     "id": "mod-warp-scram",
+    "family": "ewar",
     "group": "Modules/Mid/EWAR",
     "maker": "corp-borealis",
     "name": "Warp Scrambler",

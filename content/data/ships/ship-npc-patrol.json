@@ -1,5 +1,6 @@
 {
   "id": "ship-npc-patrol",
+  "family": "frigate",
   "group": "Ships/Frigates",
   "base_price": 420000,
   "name": "Kuštor",

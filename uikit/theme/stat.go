@@ -121,6 +121,9 @@ var statStyles = map[string]statStyle{
 	"In cargo":    {icon: "stat_cargo", cat: StatFitting},
 	"Grid quotas": {icon: "stat_grid", cat: StatFitting},
 	"CPU quotas":  {icon: "stat_cpu", cat: StatFitting},
+	// Proficiency: the gate a def needs and the pilot's traded level.
+	"Requirement": {icon: "act_lock", cat: StatFitting},
+	"Level":       {icon: "stat_burst", cat: StatFitting},
 
 	// Damage sub-system: one glyph per type, shared by damage, EHP and
 	// resist rows.
@@ -145,6 +148,7 @@ var statIdentity = map[string]bool{
 // sectionStyles is the section-bar map: the bar's glyph and tint.
 var sectionStyles = map[string]statStyle{
 	"FITTING":           {icon: "row_module", cat: StatFitting},
+	"PROFICIENCY":       {icon: "row_module", cat: StatFitting},
 	"SLOTS":             {icon: "row_module", cat: StatFitting},
 	"SURVIVAL":          {icon: "mod_defense", cat: StatDefence},
 	"CAPACITOR":         {icon: "stat_capacitor", cat: StatCapacitor},

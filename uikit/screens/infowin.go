@@ -323,6 +323,24 @@ func infoPageFor(cv widgets.ContentView, ref widgets.InfoRef) (infoPage, bool) {
 	return infoPage{}, false
 }
 
+// proficiencyRows is the PROFICIENCY block of a hull or module page: the
+// practice line, the level fitting/flying requires and the player's current
+// level. Empty for a fixture def with no family.
+func proficiencyRows(cv widgets.ContentView, family string, gate int) []infoRow {
+	if family == "" {
+		return nil
+	}
+	req := "None"
+	if gate > 0 {
+		req = content.FamilyLabel(family) + " " + content.LevelLabel(gate)
+	}
+	return []infoRow{
+		{Label: "Family", Value: content.FamilyLabel(family)},
+		{Label: "Requirement", Value: req},
+		{Label: "Level", Value: content.LevelLabel(cv.Proficiency(family))},
+	}
+}
+
 // mountsText renders a hull's high mounts as one human line, grouped by kind
 // and size in authored order ("2 turrets (S) · 1 launcher (M)"; "" = none).
 func mountsText(mounts []content.Mount) string {
@@ -417,6 +435,8 @@ func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
 		}
 	}
 	addLines(&p, "SLOTS", slots)
+
+	addSection(&p, "PROFICIENCY", proficiencyRows(cv, def.Family, def.Gate))
 
 	var surv []infoRow
 	for _, l := range []struct {
@@ -524,6 +544,7 @@ func modulePage(cv widgets.ContentView, def *content.ModuleDef) infoPage {
 	// The maker block follows the activation lead (ACTIVATION stays the
 	// module page's first section).
 	addSection(&p, "CONSTRUCTION", makerRows(def.Maker))
+	addSection(&p, "PROFICIENCY", proficiencyRows(cv, def.Family, def.Gate))
 
 	// The rack/fitting tooltip's stat sections, shared verbatim (charge
 	// context is an instance concern the def-only window has none of).

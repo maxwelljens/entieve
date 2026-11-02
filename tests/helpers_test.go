@@ -276,7 +276,10 @@ func resistCeiling(c *content.Content, hull *content.ShipDef, fit []content.Modu
 			best = pen
 		}
 	}
-	return best
+	// Proficiency adds up to 2% per level to the player's weapon volley
+	// (CONTEXT.md: Proficiency); the ceiling carries the level-5 cap so the
+	// invariant still pins resists rather than the practice edge.
+	return best * (1 + 0.02*float64(content.ProficiencyMax))
 }
 
 // hullForTarget maps a rat display name to its hull via its NPC definition.

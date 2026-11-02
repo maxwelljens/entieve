@@ -113,6 +113,11 @@ type Sim struct {
 	jobSeq uint64
 	craft  []SavedCraft
 
+	// prof is the player's per-family practice counter (Save.Proficiency),
+	// kept in ascending family order: the canonical iteration for save/hash.
+	// Counters never decay; gates must stay durable (docs/SIM.md).
+	prof []SavedProficiency
+
 	// --- ledger agents (system 19; see agent.go) ---
 	// agents is the deterministic roster in ascending id order (canonical
 	// iteration — maps never reach behavior). Empty outside agentWorlds
@@ -236,9 +241,7 @@ func New(c *content.Content, w *content.WorldDef, seed int64) (*Sim, error) {
 	if warWorlds[w.ID] {
 		s.newWarState()
 	}
-	// Fresh fits pre-load: every bay fills from cargo before the first Step,
-	// settled at once — no UI exists yet to show a load cycle (all later loads
-	// are clocked; see preloadBays).
+	// preloadBays fills the fresh fit before the first Step.
 	s.preloadBays()
 	return s, nil
 }

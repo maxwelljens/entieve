@@ -1,6 +1,7 @@
 [
   {
     "id": "mod-cap-booster",
+    "family": "capacitor",
     "group": "Modules/Mid/Capacitor",
     "maker": "corp-iskald",
     "name": "Cap Booster",
@@ -18,6 +19,7 @@
   },
   {
     "id": "mod-cap-recharger",
+    "family": "capacitor",
     "group": "Modules/Low/Capacitor",
     "maker": "corp-iskald",
     "name": "Cap Recharger",

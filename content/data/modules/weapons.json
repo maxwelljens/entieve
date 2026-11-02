@@ -1,6 +1,7 @@
 [
   {
     "id": "mod-autocannon-s",
+    "family": "autocannon",
     "icon": "mod_autocannon_s",
     "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
@@ -32,6 +33,8 @@
   },
   {
     "id": "mod-autocannon-m",
+    "family": "autocannon",
+    "gate": 2,
     "icon": "mod_autocannon_m",
     "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
@@ -63,6 +66,8 @@
   },
   {
     "id": "mod-autocannon-l",
+    "family": "autocannon",
+    "gate": 4,
     "icon": "mod_autocannon_m",
     "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
@@ -94,6 +99,7 @@
   },
   {
     "id": "mod-artillery-s",
+    "family": "artillery",
     "icon": "mod_artillery_s",
     "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
@@ -125,6 +131,8 @@
   },
   {
     "id": "mod-artillery-m",
+    "family": "artillery",
+    "gate": 2,
     "icon": "mod_artillery_m",
     "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
@@ -156,6 +164,8 @@
   },
   {
     "id": "mod-artillery-l",
+    "family": "artillery",
+    "gate": 4,
     "icon": "mod_artillery_l",
     "group": "Modules/High/Turrets",
     "maker": "corp-nordvakt",
@@ -187,6 +197,7 @@
   },
   {
     "id": "mod-rocket-pod",
+    "family": "rocket",
     "group": "Modules/High/Launchers",
     "maker": "corp-nordvakt",
     "name": "Rocket Pod",

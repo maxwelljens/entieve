@@ -1235,6 +1235,10 @@ type Save struct {
 	// idle ticks), sorted by (station, family) — the CraftLevel input.
 	Craft []SavedCraft `json:"craft,omitempty"`
 
+	// Proficiency is the player's per-family practice counter, sorted by
+	// family — the proficiency level's input. Counters never decay.
+	Proficiency []SavedProficiency `json:"proficiency,omitempty"`
+
 	// ---- ledger agents (system 19) ----
 
 	// Agents is the roster in ascending id order: capital, inventory,

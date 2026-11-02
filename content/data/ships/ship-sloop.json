@@ -1,5 +1,6 @@
 {
   "id": "ship-sloop",
+  "family": "frigate",
   "group": "Ships/Frigates",
   "base_price": 360000,
   "name": "Vaštrek",

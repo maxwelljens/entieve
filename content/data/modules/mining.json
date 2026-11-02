@@ -1,6 +1,7 @@
 [
   {
     "id": "mod-mining-laser",
+    "family": "mining",
     "group": "Modules/High/Turrets",
     "maker": "corp-druzstvo",
     "name": "Mining Laser",
