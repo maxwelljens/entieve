@@ -797,7 +797,8 @@ func TestInfoWindowProseWraps(t *testing.T) {
 
 // TestInfoPageProficiencyRows pins the Show Info surface: a gated module and
 // a gated hull both carry the practice family, the required level and the
-// pilot's current level.
+// pilot's current level as the tree's pip boxes (filled to the level, dim on
+// a shut branch), never a worded level.
 func TestInfoPageProficiencyRows(t *testing.T) {
 	env, _ := newTestEnv(t)
 
@@ -809,8 +810,8 @@ func TestInfoPageProficiencyRows(t *testing.T) {
 	if req, ok := rowOf(sec, "Requirement"); !ok || req.Value != "Requires Autocannon II" {
 		t.Fatalf("module requirement = %+v, want Requires Autocannon II", req)
 	}
-	if lvl, ok := rowOf(sec, "Level"); !ok || lvl.Value != "0" {
-		t.Fatalf("module level = %+v, want 0 (untrained)", lvl)
+	if lvl, ok := rowOf(sec, "Level"); !ok || lvl.Value != "" || lvl.PipMax != content.ProficiencyMax || lvl.PipLevel != 0 {
+		t.Fatalf("module level = %+v, want a %d-box pip row at 0 (untrained)", lvl, content.ProficiencyMax)
 	}
 
 	hull := fixtureShip(t, env, "ship-proficiency-test", &content.ShipDef{
@@ -821,7 +822,7 @@ func TestInfoPageProficiencyRows(t *testing.T) {
 	if req, ok := rowOf(sec, "Requirement"); !ok || req.Value != "Requires Frigate I" {
 		t.Fatalf("hull requirement = %+v, want Requires Frigate I", req)
 	}
-	if lvl, ok := rowOf(sec, "Level"); !ok || lvl.Value != "0" {
-		t.Fatalf("hull level = %+v, want 0 (untrained)", lvl)
+	if lvl, ok := rowOf(sec, "Level"); !ok || lvl.Value != "" || lvl.PipMax != content.ProficiencyMax {
+		t.Fatalf("hull level = %+v, want a pip row", lvl)
 	}
 }

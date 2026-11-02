@@ -49,8 +49,10 @@ func TestProficiencyGateWordingHasOneOwner(t *testing.T) {
 	if node.GateText != want {
 		t.Fatalf("tree node gate = %q, want %q", node.GateText, want)
 	}
-	if got := profCardStatus(node.Level, node.GateText); !strings.HasSuffix(got, " · "+want) {
-		t.Fatalf("family card status = %q, want it to end with %q", got, want)
+	card := NewProfInfoWin(env)
+	card.Show("artillery", node.Level, node.GateText)
+	if card.Gate() != want {
+		t.Fatalf("family card gate line = %q, want %q", card.Gate(), want)
 	}
 	req := ""
 	for _, row := range proficiencyRows(env.Session, "artillery", 0) {

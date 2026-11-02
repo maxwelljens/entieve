@@ -16,11 +16,12 @@ import (
 )
 
 // The proficiency overview: the tree's own floating window (CONTEXT.md
-// "Proficiency overview"). It replaces the old header printed on the layer
-// — a title and one dim line on a busy graph read poorly — with a house
-// window that says how far the pilot has come and lists every family's
-// level at a glance. It opens and closes with the layer; the game keeps the
-// pair in step, and its × closes only itself until the tree is reopened.
+// "Proficiency overview", titled simply Proficiency). It replaces the old
+// header printed on the layer — a title and one dim line on a busy graph
+// read poorly — with a house window that says how far the pilot has come
+// and lists every family's level at a glance. It opens and closes with the
+// layer; the game keeps the pair in step, and its × closes only itself
+// until the tree is reopened.
 //
 // Growth seam: the filter row the owner wants later (show only some
 // categories) lands between the totals block and the SKILLS list. The
@@ -36,24 +37,28 @@ const (
 	profOvCols = 2
 	profOvBarH = 6
 
-	// profOvBand is the layer's top band, in design units: the summary
-	// window's default footprint (its top inset, title bar, body and a
-	// gap). The graph is fitted below it, so the window never covers a
-	// node on first open. The band is a fixed composition like the header
-	// it replaces: moving or closing the window does not re-fit the graph
-	// (the graph is pannable and zoomable now, so a deliberate move is a
-	// player choice, not a relayout).
-	profOvBand = 8 + profOvH + 2*theme.ContentsPad + theme.TitleBarH + 12
 	// profOvFilterRow is the empty band a filter control will occupy: the
 	// seam is here, no filter ships yet.
 	profOvFilterRow = 0
+
+	// profOvY is the window's landing y in design units: just under the
+	// Selected Item window's default rect, so opening the tree does not
+	// cover the verbs of the current selection. That rect is the top-left
+	// corner (8+RailInset, 8) at its 464×260 floor (uikit's selectedPanel:
+	// MinSize 464×240 plus the measured body), i.e. 268 tall, and the gap
+	// is one SpMd.
+	//
+	// shortcut: the number is the Selected Item's composed default, not a
+	// live read (the tree has no handle on the kit's windows); a test pins
+	// the two rects apart, so a moved Selected Item default fails loudly.
+	profOvY = 268 + theme.SpMd
 )
 
-// ProficiencyOverviewRect is the window's landing rect in design units: a
-// fixed top-left anchor, the house placement for a window that belongs to
-// the screen's top-left corner. The Screen row shares this rect.
+// ProficiencyOverviewRect is the window's landing rect in design units:
+// below the Selected Item window, in the left column clear of the rail
+// gutter. The Screen row shares this rect.
 func ProficiencyOverviewRect() image.Rectangle {
-	return image.Rect(10, 8, 10+profOvW, 8+profOvH+theme.TitleBarH)
+	return image.Rect(10, profOvY, 10+profOvW, profOvY+profOvH+theme.TitleBarH)
 }
 
 // profTotals is the overview's arithmetic: how many families are open,
@@ -118,7 +123,7 @@ func NewProficiencyOverview(env widgets.Seams, model func() []ProfFamily) *Profi
 		)),
 	)
 	body.AddChild(o.gfx)
-	bar, _ := theme.NewTitleBar(env, "Proficiency overview", "stat_tracking")
+	bar, _ := theme.NewTitleBar(env, "Proficiency", "stat_tracking")
 	o.win = widget.NewWindow(
 		widget.WindowOpts.Contents(body),
 		widget.WindowOpts.TitleBar(bar, theme.Px(theme.TitleBarH)),

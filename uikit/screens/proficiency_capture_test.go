@@ -110,11 +110,11 @@ func TestProficiencyCaptureFrame(t *testing.T) {
 	// overview and one floating window above it (Finances) as the stacking
 	// proof.
 	k.SetCoreVisible(false)
-	p := NewProficiency(k.Env(), proficiencyCaptureFixture, nil)
+	p := NewProficiency(k.Env(), proficiencyCaptureFixture, nil, k.ProfFamily)
 	ov := NewProficiencyOverview(k.Env(), proficiencyCaptureFixture)
 	// The second paint of the same model, never mounted: its canvas is the
 	// determinism evidence.
-	twin := NewProficiency(k.Env(), proficiencyCaptureFixture, nil)
+	twin := NewProficiency(k.Env(), proficiencyCaptureFixture, nil, nil)
 	pumpKit(t, k, 1280, 720)
 	pumpKit(t, k, 1280, 720)
 	ov.Sync()
@@ -248,7 +248,7 @@ func TestProficiencyFamilyCardCapture(t *testing.T) {
 	in := &scriptPointer{}
 	k, _ := newTestKitWith(t, widgets.NewPointer(in))
 	k.SetCoreVisible(false)
-	p := NewProficiency(k.Env(), proficiencyCaptureFixture, nil)
+	p := NewProficiency(k.Env(), proficiencyCaptureFixture, nil, k.ProfFamily)
 	p.Sync()
 	k.AddBackdropWindow(p.Win())
 	pumpKit(t, k, 1280, 720)
@@ -298,6 +298,32 @@ func TestProficiencyFamilyCardCapture(t *testing.T) {
 			}
 			if win.title.Label != "Mining" {
 				errs = append(errs, fmt.Sprintf("title bar reads %q", win.title.Label))
+			}
+			// Item 4: the family with its card open is the tree's selected
+			// node (the painter argument drawNode's highlight reads).
+			if p.sel < 0 || p.nodes[p.sel].Family != "mining" {
+				errs = append(errs, fmt.Sprintf("selected node = %d, want the mining node that has the card", p.sel))
+			}
+			// Item 3: the card's level line is the tree's pip row, filled to
+			// the family's level (mining is at the cap here).
+			if lvl := win.Level(); lvl == nil {
+				errs = append(errs, "the card has no level line")
+			} else {
+				step, size := theme.Px(profPipW+profPipGap), theme.Px(profPipW)
+				var first [4]uint32
+				for i := 0; i < content.ProficiencyMax; i++ {
+					r, g, b, a := lvl.At(i*step+size/2, lvl.Bounds().Dy()/2).RGBA()
+					if i == 0 {
+						first = [4]uint32{r, g, b, a}
+						if a == 0 {
+							errs = append(errs, "the level line's first pip is empty ink")
+						}
+						continue
+					}
+					if got := [4]uint32{r, g, b, a}; got != first {
+						errs = append(errs, fmt.Sprintf("level pip %d = %v, want pip 0's fill %v (mining is at the cap)", i, got, first))
+					}
+				}
 			}
 			// The body bands: the description and the practice list.
 			for name, w := range map[string]*widget.Text{

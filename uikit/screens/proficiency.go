@@ -77,8 +77,9 @@ const (
 // proficiency family as a node, its prerequisite edges as curved arrows
 // (prerequisite → dependent), the pilot's level pips and XP readout on each
 // node, and the gated families dimmed. Click a node for its family card
-// (what it is for and what pays it practice), drag the bare layer to pan,
-// wheel to zoom.
+// (what it is for and what pays it practice); the node keeps the hover look
+// while its card is open, so the tree says which family you are reading.
+// Drag the bare layer to pan, wheel to zoom.
 //
 // It is the house's one full-viewport layer: mounted through
 // Kit.AddBackdropWindow, it paints over the world and BELOW every window
@@ -94,6 +95,10 @@ type Proficiency struct {
 	ptr      *widgets.Pointer
 	model    func() []ProfFamily
 	viewport func() image.Rectangle
+	// openFamily is the family the open card names ("" while closed): its
+	// node wears the selected state. The card is the kit's, so the tree
+	// asks instead of remembering (Esc and the × close it there).
+	openFamily func() string
 
 	win  *widget.Window
 	gfx  *widget.Graphic
@@ -120,6 +125,7 @@ type Proficiency struct {
 	panFrom    image.Point
 	pressNode  int
 	hover      int
+	sel        int             // node index of the open card's family (-1: none)
 	lastLayout image.Rectangle // the canvas the current nodes were laid out for
 }
 
@@ -129,14 +135,17 @@ type profViewState struct {
 	pan    image.Point
 	hover  int
 	press  int
+	sel    int
 	locked bool
 }
 
 // NewProficiency builds the proficiency layer over the pilot's model (nil
-// reads as no families) and the live viewport (nil keeps the design
-// viewport). Mount it with Kit.AddBackdropWindow and call Sync every frame.
-func NewProficiency(env widgets.Seams, model func() []ProfFamily, viewport func() image.Rectangle) *Proficiency {
-	p := &Proficiency{th: env, as: env, ptr: env.Pointer(), model: model, viewport: viewport, zoom: 1, hover: -1, pressNode: -1}
+// reads as no families), the live viewport (nil keeps the design viewport)
+// and the open family card's family (nil reads as no card). Mount it with
+// Kit.AddBackdropWindow and call Sync every frame.
+func NewProficiency(env widgets.Seams, model func() []ProfFamily, viewport func() image.Rectangle, openFamily func() string) *Proficiency {
+	p := &Proficiency{th: env, as: env, ptr: env.Pointer(), model: model, viewport: viewport,
+		openFamily: openFamily, zoom: 1, hover: -1, pressNode: -1, sel: -1}
 	p.rect = pxRect(ProficiencyRect())
 	p.img = ebiten.NewImage(p.rect.Dx(), p.rect.Dy())
 	p.gfx = widget.NewGraphic(widget.GraphicOpts.Image(p.img))
@@ -178,12 +187,13 @@ func (p *Proficiency) Backdrop() bool { return true }
 // and repaints once.
 func (p *Proficiency) Unmounted() {
 	p.armed, p.active = false, false
-	p.hover, p.pressNode = -1, -1
+	p.hover, p.pressNode, p.sel = -1, -1, -1
 	p.zoom, p.pan = 1, image.Point{}
 }
 
 // Sync fits the layer to the viewport, polls the frame's gesture, and
-// repaints when the model, the camera or the hover moved.
+// repaints when the model, the camera, the hover or the open family card
+// moved.
 func (p *Proficiency) Sync() {
 	p.fit()
 	fams := []ProfFamily(nil)
@@ -196,8 +206,19 @@ func (p *Proficiency) Sync() {
 		p.lastLayout = p.rect
 		p.nodes, p.edges = proficiencyLayout(fams, p.rect)
 	}
+	p.sel = -1
+	if p.openFamily != nil {
+		if fam := p.openFamily(); fam != "" {
+			for i, n := range p.nodes {
+				if n.Family == fam {
+					p.sel = i
+					break
+				}
+			}
+		}
+	}
 	p.poll()
-	st := profViewState{zoom: p.zoom, pan: p.pan, hover: p.hover, press: p.press(), locked: p.armed && !p.active}
+	st := profViewState{zoom: p.zoom, pan: p.pan, hover: p.hover, press: p.press(), sel: p.sel, locked: p.armed && !p.active}
 	if model || st != p.state {
 		p.state = st
 		p.redraw++
@@ -354,7 +375,6 @@ type profNode struct {
 	Family, Name string
 	Rect         image.Rectangle
 	Rank         int
-	Scale        float64 // the fit factor its internals were spaced for
 
 	Level, MaxLevel int
 	XP, XPNext      int
@@ -376,11 +396,11 @@ type profEdge struct {
 // and the canvas are the only inputs, ties break on the family id, and no
 // RNG or clock is read anywhere.
 //
-// A rank with more families than the fit can stack in one column is wrapped
-// into extra adjacent columns (the rank still starts left of the next one,
-// so every arrow points rightwards). The wrap is chosen by the fit factor:
-// the split that makes the nodes biggest wins, ties kept closest to the
-// declared rank shape.
+// One rank is one column, its members stacked top to bottom, and the whole
+// graph takes ONE fit factor into the canvas. A rank never wraps into a
+// second column: the roots stay aligned in the leftmost column and every
+// arrow runs rightwards to the next rank, so the graph reads as a tree
+// rather than a jumble of columns.
 func proficiencyLayout(fams []ProfFamily, canvas image.Rectangle) ([]profNode, []profEdge) {
 	if len(fams) == 0 {
 		return nil, nil
@@ -393,6 +413,7 @@ func proficiencyLayout(fams []ProfFamily, canvas image.Rectangle) ([]profNode, [
 		byRank[rank[i]] = append(byRank[rank[i]], i)
 		maxRank = max(maxRank, rank[i])
 	}
+	cols := maxRank + 1
 	for _, g := range byRank {
 		sort.Slice(g, func(a, b int) bool { return fams[g[a]].Family < fams[g[b]].Family })
 	}
@@ -402,87 +423,45 @@ func proficiencyLayout(fams []ProfFamily, canvas image.Rectangle) ([]profNode, [
 	}
 
 	// The graph's natural size, then the one fit factor into the canvas.
-	// Geometry shrinks with the fit; the type does not (the internals of a
-	// node are spaced by the fit so the lines stay inside the box).
+	// Geometry shrinks with the fit; the type does not (a node's internals
+	// keep their design offsets, so a shrunk box holds a full-size card).
 	//
-	// shortcut: a graph far wider than the layer crowds its labels; pan and
-	// zoom are the way out, not a smaller fit.
+	// shortcut: a graph far taller or wider than the layer crowds its
+	// labels; pan and zoom are the way out, not a smaller fit.
 	nodeW, nodeH := float64(theme.Px(profNodeW)), float64(theme.Px(profNodeH))
 	colGap, rowGap := float64(theme.Px(profColGap)), float64(theme.Px(profRowGap))
+	naturalW := float64(cols)*nodeW + float64(cols-1)*colGap
+	naturalH := float64(maxRows)*nodeH + float64(maxRows-1)*rowGap
 
 	pad := float64(theme.Px(profPad))
-	// The graph is fitted below the layer's top band, which the overview
-	// window's default footprint owns (profOvBand).
-	avail := image.Rect(canvas.Min.X+int(pad), canvas.Min.Y+theme.Px(profOvBand),
+	avail := image.Rect(canvas.Min.X+int(pad), canvas.Min.Y+int(pad),
 		canvas.Max.X-int(pad), canvas.Max.Y-int(pad))
 	if avail.Dx() <= 0 || avail.Dy() <= 0 {
 		avail = canvas
 	}
-
-	fit := func(rowsCap int) (f float64, cols, rows int) {
-		cols, rows = 0, 0
-		for r := 0; r <= maxRank; r++ {
-			n := len(byRank[r])
-			if n == 0 {
-				continue
-			}
-			c := (n + rowsCap - 1) / rowsCap
-			cols += c
-			rows = max(rows, min(rowsCap, n))
-		}
-		if cols == 0 || rows == 0 {
-			return 0, 0, 0
-		}
-		wantW := float64(cols)*nodeW + float64(cols-1)*colGap
-		wantH := float64(rows)*nodeH + float64(rows-1)*rowGap
-		f = 1
-		if wantW > 0 && wantH > 0 {
-			f = math.Min(1, math.Min(float64(avail.Dx())/wantW, float64(avail.Dy())/wantH))
-		}
-		return f, cols, rows
+	f := 1.0
+	if naturalW > 0 && naturalH > 0 {
+		f = math.Min(1, math.Min(float64(avail.Dx())/naturalW, float64(avail.Dy())/naturalH))
 	}
-	rowsCap, best, cols, rows := 1, 0.0, 0, 0
-	for cap := 1; cap <= maxRows; cap++ {
-		f, c, r := fit(cap)
-		if f > best+1e-9 {
-			rowsCap, best, cols, rows = cap, f, c, r
-		}
-	}
-	f := best
-	if f <= 0 {
-		f = 1
-	}
-
 	nodeW, nodeH, colGap, rowGap = nodeW*f, nodeH*f, colGap*f, rowGap*f
 	totalW := float64(cols)*nodeW + float64(cols-1)*colGap
-	totalH := float64(rows)*nodeH + float64(rows-1)*rowGap
+	totalH := float64(maxRows)*nodeH + float64(maxRows-1)*rowGap
 	x0 := float64(avail.Min.X) + (float64(avail.Dx())-totalW)/2
 	y0 := float64(avail.Min.Y) + (float64(avail.Dy())-totalH)/2
 
-	// Column starts: each rank's chunks follow the previous rank's.
-	start := make([]int, maxRank+1)
-	col := 0
-	for r := 0; r <= maxRank; r++ {
-		start[r] = col
-		if n := len(byRank[r]); n > 0 {
-			col += (n + rowsCap - 1) / rowsCap
-		}
-	}
-
 	nodes := make([]profNode, 0, len(fams))
 	nodeOf := make([]int, len(fams)) // model index → node index
-	for r := 0; r <= maxRank; r++ {
-		for i, mi := range byRank[r] {
-			nodeOf[mi] = len(nodes)
-			fam := fams[mi]
-			c, row := start[r]+i/rowsCap, i%rowsCap
-			x := x0 + float64(c)*(nodeW+colGap)
+	for r := 0; r < cols; r++ {
+		for row, i := range byRank[r] {
+			nodeOf[i] = len(nodes)
+			fam := fams[i]
+			x := x0 + float64(r)*(nodeW+colGap)
 			y := y0 + float64(row)*(nodeH+rowGap)
 			nodes = append(nodes, profNode{
 				Family: fam.Family, Name: fam.Name,
 				Rect: image.Rect(int(math.Round(x)), int(math.Round(y)),
 					int(math.Round(x))+int(math.Round(nodeW)), int(math.Round(y))+int(math.Round(nodeH))),
-				Rank: r, Scale: f, Level: fam.Level, MaxLevel: fam.MaxLevel,
+				Rank: r, Level: fam.Level, MaxLevel: fam.MaxLevel,
 				XP: fam.XP, XPNext: fam.XPNext,
 				Starter: fam.Starter, Locked: !fam.Meets,
 				LevelText: profLevelText(fam), XPText: profXPText(fam),
@@ -682,13 +661,16 @@ func (p *Proficiency) curve(x0, y0, x1, y1 float64, w float32, col color.Color) 
 }
 
 // drawNode paints one family: the box (lit for an open family, unlit for
-// a gated one, highlighted under the pointer or a press), the name, the
-// starter tag, the level pips, the level and XP readouts and the unmet
-// prerequisite's line. Internals are spaced by the layout's fit, so they
-// stay inside a shrunk node.
+// a gated one, highlighted under the pointer, under a press or while its
+// card is open), the name, the starter tag, the level pips, the level and
+// XP readouts and the unmet prerequisite's line. Internals are spaced by
+// the layout's fit, so they stay inside a shrunk node.
 func (p *Proficiency) drawNode(i int, n profNode) {
 	pal := p.th.Pal()
-	sc := func(v int) int { return int(math.Round(float64(v) * n.Scale)) }
+	// The internals sit at their design offsets: the type keeps its size
+	// (zoom, not the fit, is what grows a node), so a shrunk box holds a
+	// full-size card.
+	sc := func(v int) int { return theme.Px(v) }
 	pad := sc(12)
 	name, edge := pal.Text, theme.NRGBA(pal.Border, 220)
 	body := theme.Solid(pal.Cell)
@@ -696,6 +678,11 @@ func (p *Proficiency) drawNode(i int, n profNode) {
 	case p.press() == i:
 		name, edge = pal.Text, theme.Solid(pal.Accent)
 		body = theme.Solid(pal.BGHard)
+	case p.sel == i:
+		// The family whose card is open wears the hover look: the pointer
+		// is on the card, so the node itself cannot show it.
+		name, edge = pal.Text, theme.Solid(pal.Accent)
+		body = theme.NRGBA(pal.Hover, 26)
 	case p.hover == i:
 		name, edge = pal.Text, theme.Solid(pal.Accent)
 		body = theme.NRGBA(pal.Hover, 26)
@@ -713,21 +700,12 @@ func (p *Proficiency) drawNode(i int, n profNode) {
 	y := n.Rect.Min.Y
 	p.text(n.Name, p.th.FaceBold(theme.StepSmall), x, y+sc(8), name)
 
-	// Level pips: one box per level, filled up to the granted level.
-	pips := max(n.MaxLevel, 0)
-	for k := 0; k < pips; k++ {
-		px := x + sc(k*(profPipW+profPipGap))
-		py := y + sc(38)
-		r := p.srect(image.Rect(px, py, px+sc(profPipW), py+sc(profPipW)))
-		lit := k < n.Level
-		col := theme.NRGBA(pal.Border, 200)
-		if lit && !n.Locked {
-			col = theme.Solid(pal.Accent)
-		} else if lit {
-			col = theme.NRGBA(pal.Accent, 120) // earned, but the branch is shut
-		}
-		vector.DrawFilledRect(p.img, float32(r.Min.X), float32(r.Min.Y), float32(r.Dx()), float32(r.Dy()), col, false)
-	}
+	// Level pips: one box per reachable level, filled up to the granted
+	// level (the card's line reads the same painter).
+	step := int(math.Round(float64(sc(profPipW+profPipGap)) * p.zoom))
+	size := int(math.Round(float64(sc(profPipW)) * p.zoom))
+	drawProfPips(p.img, int(p.sx(x)), int(p.sy(y+sc(38))), n.Level, n.MaxLevel,
+		step, size, n.Locked, pal)
 	lv := n.LevelText
 	p.text(lv, p.th.Face(theme.StepTiny),
 		n.Rect.Max.X-pad-theme.Px(int(render.Measure(lv, p.th.TS().Tiny))), y+sc(34),

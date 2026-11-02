@@ -2,6 +2,7 @@ package screens
 
 import (
 	"image"
+	"image/color"
 	"strings"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/internal/uitest"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -21,7 +23,7 @@ func profNavFixture(t *testing.T) (*Kit, *Proficiency, *scriptPointer, func()) {
 	in := &scriptPointer{}
 	k, _ := newTestKitWith(t, widgets.NewPointer(in))
 	k.SetCoreVisible(false)
-	p := NewProficiency(k.Env(), proficiencyChain, nil)
+	p := NewProficiency(k.Env(), proficiencyChain, nil, k.ProfFamily)
 	p.Sync()
 	k.AddBackdropWindow(p.Win())
 	// frame is one whole frame: the host's pointer sample, the panels'
@@ -206,24 +208,40 @@ func realProfModel(t *testing.T) []ProfFamily {
 	return out
 }
 
-// TestProficiencyLayoutWrapsTheBigRank: the shipped graph has ten root
-// families in rank 0 and only three ranks, so without wrapping it shrinks
-// to about half size. The layout splits that rank into adjacent columns,
-// keeps the graph above 0.8 (the old one-column rank fit about 0.56), and
-// no two nodes overlap or leave the canvas.
-func TestProficiencyLayoutWrapsTheBigRank(t *testing.T) {
+// TestProficiencyLayoutOneColumnPerRank: the shipped graph has ten root
+// families and three ranks, so it lands as three columns with every root in
+// the leftmost one, and the ONE fit factor shrinks the graph to the canvas
+// (a rank never wraps into a second column). No two nodes overlap and every
+// node stays on the canvas.
+func TestProficiencyLayoutOneColumnPerRank(t *testing.T) {
 	uitest.UseScale(t, 1)
 	canvas := image.Rect(0, 0, 1280, 720)
 	nodes, _ := proficiencyLayout(realProfModel(t), canvas)
 	if len(nodes) != len(content.ProficiencyFamilyIDs()) {
 		t.Fatalf("layout has %d nodes, want every family", len(nodes))
 	}
+	colOf := map[int]int{}
+	box := image.Point{}
 	for _, n := range nodes {
-		if n.Scale < 0.8 {
-			t.Fatalf("%s scaled to %.2f: the wrap did not lift the fit above 0.8", n.Family, n.Scale)
+		if box == (image.Point{}) {
+			box = n.Rect.Size()
+		}
+		if n.Rect.Size() != box {
+			t.Fatalf("%s is %v, want every node at the one fit's %v", n.Family, n.Rect.Size(), box)
 		}
 		if !n.Rect.In(canvas) {
 			t.Errorf("%s node %v is off the canvas %v", n.Family, n.Rect, canvas)
+		}
+		// One column per rank: every node of a rank shares its left edge,
+		// and a deeper rank starts right of the previous one.
+		if x, ok := colOf[n.Rank]; ok && x != n.Rect.Min.X {
+			t.Errorf("%s starts at x %d, its rank's column starts at %d", n.Family, n.Rect.Min.X, x)
+		}
+		colOf[n.Rank] = n.Rect.Min.X
+	}
+	for r := 1; r < len(colOf); r++ {
+		if colOf[r-1] >= colOf[r] {
+			t.Errorf("rank %d starts at x %d, not right of rank %d's %d", r, colOf[r], r-1, colOf[r-1])
 		}
 	}
 	for i := range nodes {
@@ -235,9 +253,10 @@ func TestProficiencyLayoutWrapsTheBigRank(t *testing.T) {
 	}
 }
 
-// TestProficiencyCardPages pins the family card's page: the title, the live
-// level line, the description and every practice line come from the
-// content's card table; a level meets the prerequisite edge naming.
+// TestProficiencyCardPages pins the family card's page: the title, the
+// description and every practice line come from the content's card table; a
+// level meets the prerequisite edge naming. The level itself is the pips
+// TestProficiencyPipsMatchTheTree compares against the tree.
 func TestProficiencyCardPages(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	c := NewProfInfoWin(env)
@@ -245,8 +264,8 @@ func TestProficiencyCardPages(t *testing.T) {
 	if c.title.Label != "Mining" {
 		t.Errorf("title = %q, want Mining", c.title.Label)
 	}
-	if got := c.status.Label; got != "Untrained (0 of V)" {
-		t.Errorf("status at level 0 = %q", got)
+	if got := c.Gate(); got != "" {
+		t.Errorf("open family gate line = %q, want none", got)
 	}
 	card := content.FamilyInfo("mining")
 	if c.desc.Label != card.Desc || c.desc.Label == "" {
@@ -271,15 +290,18 @@ func TestProficiencyCardPages(t *testing.T) {
 	}
 }
 
-// TestProficiencyCardStatusNamesUnmetPrereq: the card's first line carries
-// the first unmet authored edge ("Level 0 of V · needs Autocannons II").
-func TestProficiencyCardStatusNamesUnmetPrereq(t *testing.T) {
-	got := profCardStatus(1, "needs Autocannon II")
-	if want := "Level I of V · needs Autocannon II"; got != want {
-		t.Fatalf("status = %q, want %q", got, want)
+// TestProficiencyCardGateLine: the card's gate line is the sim's own
+// sentence, printed under the level pips; an open family has none.
+func TestProficiencyCardGateLine(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	c := NewProfInfoWin(env)
+	c.Show("artillery", 1, "Requires Autocannon II")
+	if got, want := c.Gate(), "Requires Autocannon II"; got != want {
+		t.Fatalf("gate line = %q, want %q", got, want)
 	}
-	if got := profCardStatus(3, ""); strings.Contains(got, "needs") {
-		t.Errorf("open family status = %q, want no gate", got)
+	c.Show("artillery", 2, "")
+	if got := c.Gate(); got != "" {
+		t.Errorf("open family gate line = %q, want none", got)
 	}
 }
 
@@ -334,5 +356,95 @@ func TestProficiencyHoverRepaintsOncePerMovedNode(t *testing.T) {
 	frame()
 	if p.redraw != first+1 {
 		t.Errorf("leaving the node painted %d times, want one", p.redraw-first)
+	}
+}
+
+// TestProficiencyPipStateHasOneOwner: the tree's node, the family card and
+// Show Info's level row fill a pip through one rule and hand it the same
+// three values for the same family, so a level cannot read two ways. The
+// rule's table is pinned here; the shared painter is drawProfPips.
+func TestProficiencyPipStateHasOneOwner(t *testing.T) {
+	uitest.UseScale(t, 1)
+	env, _ := newChromeEnv(t)
+	pal := env.Pal()
+	for _, tc := range []struct {
+		name     string
+		k, level int
+		locked   bool
+		want     color.Color
+	}{
+		{"empty pip", 2, 2, false, theme.NRGBA(pal.Border, 200)},
+		{"earned pip", 1, 2, false, theme.Solid(pal.Accent)},
+		{"earned pip on a shut branch", 1, 2, true, theme.NRGBA(pal.Accent, 120)},
+		{"empty pip, shut branch", 4, 2, true, theme.NRGBA(pal.Border, 200)},
+	} {
+		if got := profPipColor(tc.k, tc.level, tc.locked, pal); got != tc.want {
+			t.Errorf("%s: pip %d = %v, want %v", tc.name, tc.k, got, tc.want)
+		}
+	}
+
+	// The two surfaces that show a whole family: the node and the card.
+	model := []ProfFamily{
+		{Family: "mining", Name: "Mining", Level: 2, MaxLevel: content.ProficiencyMax, XP: 1, XPNext: 4, Meets: true},
+		{Family: "artillery", Name: "Artillery", Level: 2, MaxLevel: content.ProficiencyMax, Meets: false, Gate: "Requires Autocannon II"},
+	}
+	k, _ := newTestKit(t)
+	p := NewProficiency(k.Env(), func() []ProfFamily { return model }, nil, nil)
+	p.Sync()
+	c := NewProfInfoWin(k.Env())
+	for _, n := range p.nodes {
+		c.Show(n.Family, n.Level, n.GateText)
+		level, max, locked := c.Pips()
+		if level != n.Level || max != n.MaxLevel || locked != n.Locked {
+			t.Errorf("%s: card pips %d/%d locked=%v, node %d/%d locked=%v",
+				n.Family, level, max, locked, n.Level, n.MaxLevel, n.Locked)
+		}
+	}
+}
+
+// TestProficiencyOpenCardHighlightsItsNode: the family whose card is open
+// is the tree's selected node (the painter argument drawNode's highlight
+// reads), the selection follows a re-target and clears when the card
+// closes, each move repainting the layer.
+func TestProficiencyOpenCardHighlightsItsNode(t *testing.T) {
+	k, p, in, frame := profNavFixture(t)
+	in.x, in.y = 2, 2 // the pointer never sits on a node here
+	famAt := func(fam string) int {
+		for i, n := range p.nodes {
+			if n.Family == fam {
+				return i
+			}
+		}
+		t.Fatalf("no %q node", fam)
+		return -1
+	}
+	famA, famB := famAt("fam-a"), famAt("fam-b")
+	if p.sel != -1 {
+		t.Fatalf("a node is selected with no card open (%d)", p.sel)
+	}
+
+	k.OpenProfFamily(widgets.ShowProfFamily{Family: "fam-a", At: image.Pt(600, 200), Level: 2})
+	frame()
+	if p.sel != famA {
+		t.Fatalf("selected node %d, want fam-a (%d)", p.sel, famA)
+	}
+	painted := p.redraw
+
+	k.OpenProfFamily(widgets.ShowProfFamily{Family: "fam-b", At: image.Pt(600, 200), Level: 2})
+	frame()
+	if p.sel != famB {
+		t.Fatalf("after the re-target the selected node is %d, want fam-b (%d)", p.sel, famB)
+	}
+	if p.redraw == painted {
+		t.Error("the re-target moved the selection without repainting")
+	}
+
+	k.CloseProfFamily()
+	frame()
+	if p.sel != -1 {
+		t.Fatalf("after the close the selected node is %d, want none", p.sel)
+	}
+	if p.redraw == painted+1 {
+		t.Error("closing the card cleared the selection without repainting")
 	}
 }
