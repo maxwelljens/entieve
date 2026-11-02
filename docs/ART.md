@@ -22,7 +22,7 @@ it decorates. IDs are the same kebab-case strings the content JSON uses
 
 | Directory | ID source | Example filename | Rotation |
 |---|---|---|---|
-| `assets/hulls/` | hull ID = ship content ID (`content/data/ships/*.json`) | `ship-vastrek.png`, `ship-marauder.png` | rotated to heading in the world; unrotated as the HUD/fitting portrait |
+| `assets/hulls/` | hull ID = ship content ID (`content/data/ships/*.json`) | `ship-vastrek.png`, `ship-marauder.png` | rotated to heading in the world; unrotated in the HUD, Show Info and fitting portraits |
 | `assets/stations/` | celestial ID (`CelestialDef.id` in `content/data/systems/*.json`): stations, gates, belts, other structures | `cel-haven-rest.png`, `cel-gate-penumbra.png` | unrotated |
 | `assets/asteroids/` | ore ID the belt's asteroids carry (`items/ores.json`) | `ore-cordite.png` | unrotated |
 | `assets/backgrounds/` | system ID (`sys-*.json`) or `default` | `default.png` | unrotated |
@@ -173,12 +173,15 @@ covers** a `w×h` draw frame, so a sampled texel is never stretched past 2×
 and a photo shrunk into a thumb no longer shimmers. Sites adopt it
 deliberately, one at a time: today the **contact portraits** do (the dock
 row's full-height thumb and the Details dialog's frame, via
-`ContactPortraitFor`). Hull, station and asteroid sprites still draw their
-full-resolution image, and the icon set is not part of the sprite registry at
-all. Backgrounds are only indexed (their plates decode per system, on demand)
-and `assets/artwork/` plates are window-sized — neither carries a chain
-until a draw site asks for one (`MipFor` answers those keys with the full
-image).
+`ContactPortraitFor`) and so do the **hull portraits** (the HUD's 2:1 status
+box, the Show Info hull hero and the fitting window's square block, all
+through `uikit/screens.hullArt` → `render.HullSpriteFor`, which asks for the
+level covering the frame the art is contained into). Station and asteroid
+sprites still draw their full-resolution image, and the icon set is not part
+of the sprite registry at all. Backgrounds are only indexed (their plates
+decode per system, on demand) and `assets/artwork/` plates are window-sized —
+neither carries a chain until a draw site asks for one (`MipFor` answers
+those keys with the full image).
 
 ## Interface icons
 
@@ -243,12 +246,17 @@ top-down portrait of the hull beside its name: the fleet's nine built-in
 rasters, drawn to be told apart by silhouette at 72 px.
 
 - **Drop-in wins**: a PNG at `assets/hulls/<ship-id>.png` is that hull's
-  portrait on both surfaces (and its world sprite), through the same
+  portrait on every surface (and its world sprite), through the same
   convention root as every other drop-in; the embedded raster below is the
   fallback. `render.HullSprite` answers the file, `uikit/screens.hullArt`
   prefers it over `hulls.Get`, so an empty `assets/` draws exactly the stock
-  art. A dropped portrait fills the square box (aspect preserved, centred),
-  so author it landscape or square.
+  art. The file is *contained* in the block it fills (aspect preserved,
+  centred, never cropped) and sampled through its mip chain
+  (`render.HullSpriteFor`), so author it landscape: the drop-in canvases are
+  authored 1376×768 side views and the blocks are 2:1 wide (the HUD's 120×60
+  and the Show Info hero's 200×100) or square (the fitting block's 120). The
+  transparent margin of a wide canvas pads the 2:1 box and stays invisible on
+  its plate.
 - **Where**: `uikit/hulls/svg/<hull-id>.svg` (sources) → `uikit/hulls/<hull-id>-120.png`
   and `-240.png` (committed rasters) + `manifest.json` (hashes). The package
   embeds all three via `//go:embed`; any hull id in `content/data/ships`

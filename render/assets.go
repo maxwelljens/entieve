@@ -154,14 +154,27 @@ func ManufacturingHeader() *ebiten.Image { return spriteFor(artworkManufacturing
 // dock view draws beside the contact's offer rows and large in Details.
 const contactPortraitRoot = portraitsRoot
 
-// HullSprite returns the drop-in art of a hull (assets/hulls/<ship-id>.png),
-// or nil when none is dropped — the world draws its vector silhouette and the
-// HUD/fitting portrait falls back to the embedded raster (uikit/hulls).
+// HullSprite returns the drop-in art of a hull (assets/hulls/<ship-id>.png)
+// at full resolution, or nil when none is dropped — the world draws its vector
+// silhouette and the portrait surfaces fall back to the embedded raster
+// (uikit/hulls). Portrait blocks sample HullSpriteFor instead.
 func HullSprite(id content.ShipID) *ebiten.Image {
 	if id == "" {
 		return nil
 	}
 	return spriteFor("hulls/" + string(id))
+}
+
+// HullSpriteFor returns the same dropped art sampled for a w×h draw frame —
+// the mip level that covers it (the chain is built with the sprite, mip.go),
+// so a 1376×768 canvas in a 120 px icon samples a level built for it instead
+// of asking the GPU to skip eleven texels per pixel. Fallback signal as
+// HullSprite: nil when nothing is dropped.
+func HullSpriteFor(id content.ShipID, w, h int) *ebiten.Image {
+	if id == "" {
+		return nil
+	}
+	return MipFor("hulls/"+string(id), w, h)
 }
 
 // ContactPortrait returns the drop-in portrait of a contact, or nil when

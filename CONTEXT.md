@@ -10,7 +10,7 @@ names the *modules and seams* we build that vocabulary into.
 |---|---|
 | **Corporation** | a named manufacturing house (`corp-*`, `content.AllCorps`): the maker of a hull, module or charge, carrying a display name and an emblem; a supplier layer, never a power bloc |
 | **Hull** | a ship chassis (`ship-*`); flyable or machine |
-| **Hull portrait** | top-down full-colour art of a hull for the HUD/Show Info (`uikit/hulls`): a flat SVG source in `svg/` rasterized at build time to committed 120/240 px PNGs, keyed by hull id (`Get`/`Has`) |
+| **Hull portrait** | side-view full-colour art of a hull, nose to the right (`uikit/hulls`): a flat SVG source in `svg/` rasterized at build time to committed 120/240 px PNGs, keyed by hull id (`Get`/`Has`); a drop-in at `assets/hulls/<id>.png` wins and is mip-sampled for the box it fills. Two surfaces draw it as a **2:1 wide block** with the art contained (never cropped): the HUD status panel (120×60 design px) and the Show Info hull page's hero (200×100). The fitting window's identity block stays square (120) |
 | **Module** | a fitted component (`mod-*`); slot-classed high/mid/low |
 | **Mount** | a hull's high slot, declared as a kind and a size (`high_mounts`); a mounted module needs a mount of its own kind at or above its size, so a large gun never sits on a frigate |
 | **Turret mount / launcher mount** | the two mount kinds: guns and the mining laser are turret-mounted, rockets and missiles launcher-mounted |

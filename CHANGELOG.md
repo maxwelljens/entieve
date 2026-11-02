@@ -151,6 +151,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The ship picture is a ship, not an icon**: the HUD's status panel and
+  Show Info's hull page now lead with a 2:1 wide block of the hull's own art
+  (120×60 design px in the HUD, a 200×100 hero on the hull page) instead of a
+  square icon, so a ship page reads apart from a module or item page at a
+  glance. The art is contained, never cropped (a wide canvas pads, a square
+  raster sits centred); a hull with no drop-in and no embedded raster keeps
+  the square icon. The fitting window's identity block stays square.
+- **Hull portraits are mip-sampled**: the dropped 1376×768 canvases were
+  minified into 60–200 px blocks straight from the full file, which shimmered
+  at every edge. They now answer the chain level that covers the drawn frame
+  (`render.HullSpriteFor`, the same 32 px-floor chains the contact portraits
+  use), so the HUD portrait, the Show Info hero and the fitting block sample a
+  level built for their size. The committed 120/240 rasters are small enough
+  to draw whole and are unchanged.
 - **Shared uikit internals, no visible change**: the rack cell, the HUD
   effect tile and the target card's mini-cell paint the cycle ring through
   one helper; a module's target class (ship, any locked target, asteroid,

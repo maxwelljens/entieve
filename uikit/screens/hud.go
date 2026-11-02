@@ -24,7 +24,8 @@ import (
 // the pair is 556 design px, which keeps its left edge right of the log's
 // 361 px pocket at 1280 wide.
 const (
-	hudPortrait  = 120  // hull portrait box (design px)
+	hudPortraitW = 120  // hull portrait box width (design px): the pair's width budget (see rack.go)
+	hudPortraitH = 60   // half the width: 2:1, the owner's ships are side views (contained, padded)
 	hudBarH      = 18   // one health/capacitor bar height (px)
 	hudBarMin    = 128  // capacitor bar width: fits the "1,800.0/1,800.0 GJ" value (px)
 	hudHpGap     = 2    // gap between the three health bars (px)
@@ -448,13 +449,14 @@ func NewHud(env interface {
 	)
 	readouts.AddChild(speedRow, h.speedLbl, capStack, rechargeRow)
 
-	// Hull portrait: the left slot of the status panel, drawn from the
-	// hulls package into a self-drawn image (repainted on hull change).
-	h.portrait = ebiten.NewImage(theme.Px(hudPortrait), theme.Px(hudPortrait))
+	// Hull portrait: the left slot of the status panel, a 2:1 box painted
+	// from the hulls art (repainted on hull change). Half the width tall, so
+	// the pair never grows into the log pocket at 1280 (rack.go's budget).
+	h.portrait = ebiten.NewImage(theme.Px(hudPortraitW), theme.Px(hudPortraitH))
 	h.portraitGfx = widget.NewGraphic(
 		widget.GraphicOpts.Image(h.portrait),
 		widget.GraphicOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(theme.Px(hudPortrait), theme.Px(hudPortrait)),
+			widget.WidgetOpts.MinSize(theme.Px(hudPortraitW), theme.Px(hudPortraitH)),
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}),
 		),
 	)
@@ -1406,24 +1408,13 @@ func (h *Hud) cardMods(player, tgt ecs.Entity) ([hudBoxMods]hudBoxMod, int) {
 	return out, n
 }
 
-// paintPortrait repaints the hull portrait: the hull's raster scaled into
-// the design-square box (the image is built at Px(hudPortrait), so a scale
-// change rebuilds the kit and the portrait with it).
+// paintPortrait repaints the hull portrait: the hull's art contained in the
+// 2:1 design box — the image is built at Px(hudPortraitW)×Px(hudPortraitH),
+// so a scale change rebuilds the kit and the portrait with it.
 func (h *Hud) paintPortrait(hull content.ShipID) {
 	h.portraitHull = hull
 	h.portraitDraws++
-	h.portrait.Clear()
-	src := hullArt(hull, theme.Px(hudPortrait))
-	if src == nil {
-		return
-	}
-	b := src.Bounds()
-	box := float64(theme.Px(hudPortrait))
-	scale := math.Min(box/float64(b.Dx()), box/float64(b.Dy()))
-	var opts ebiten.DrawImageOptions
-	opts.GeoM.Scale(scale, scale)
-	opts.GeoM.Translate((box-float64(b.Dx())*scale)/2, (box-float64(b.Dy())*scale)/2)
-	h.portrait.DrawImage(ebiten.NewImageFromImage(src), &opts)
+	paintHullPortrait(h.portrait, hull)
 }
 
 // hudColorScale converts a straight-alpha palette color for vector fills.

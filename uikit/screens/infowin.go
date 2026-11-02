@@ -47,6 +47,14 @@ const (
 	// infoPlatePad is the dark plate's padding around the header hero icon
 	// (all four sides): the icon keeps its token size, the plate grows.
 	infoPlatePad = 10
+	// infoHullW/H are the hull page's hero block: a 2:1 wide box holding the
+	// hull's own art, contained so a wide canvas pads and a square raster
+	// sits centred. The hull page is the one page whose hero is a picture of
+	// the thing, not its icon. 200 px keeps the plate (220) inside the
+	// viewport infoMinW leaves (260), so the ship block is never clipped at
+	// the window floor.
+	infoHullW = 200
+	infoHullH = 100
 )
 
 // ---------------------------------------------------------------------------
@@ -82,7 +90,8 @@ type infoSection struct {
 
 // infoPage is one windowful of content: header, prose and sections.
 type infoPage struct {
-	Hero     string // the body hero icon, drawn at theme.IconHero
+	Hero     string         // the body hero icon, drawn at theme.IconHero
+	Hull     content.ShipID // hull page: the 2:1 ship block's art ("" on other pages)
 	Title    string
 	Sub      string // category/maker line under the title
 	Prose    string // wrapped description ("" = no prose block at all)
@@ -390,7 +399,7 @@ func quotaText(q content.ClassQuota) string {
 // for the unattributed rat hulls), slots, the survival block with resists,
 // capacitor, propulsion, sensors and cargo.
 func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
-	p := infoPage{Hero: theme.HullIconFor(def), Title: def.Name, Prose: def.Description, Emblem: def.Maker}
+	p := infoPage{Hero: theme.HullIconFor(def), Hull: def.ID, Title: def.Name, Prose: def.Description, Emblem: def.Maker}
 	if def.Class != "" {
 		p.Sub = spacedKind(def.Class)
 	}
@@ -738,8 +747,9 @@ type InfoWin struct {
 	rail      *widgets.ScrollRail
 	prose     *widget.Text
 	emblem    *widget.Graphic   // Sub line corporation mark (nil when the def has none)
-	hero      *widget.Graphic   // body hero icon (nil when the page has none)
-	plate     *widget.Container // the dark plate the hero icon sits on (same nil)
+	hero      *widget.Graphic   // body hero (nil when the page has none)
+	plate     *widget.Container // the dark plate the hero sits on (same nil)
+	plateW    int               // the plate's boxed width (the icon's or the hull block's)
 	titleText *widget.Text      // header column title, wrapped to colW
 	subText   *widget.Text      // header column Sub line text, wrapped beside the mark
 
@@ -851,12 +861,13 @@ func (w *InfoWin) RefRows() []InfoRefRow { return w.refRows }
 // when the def has no maker.
 func (w *InfoWin) Emblem() *widget.Graphic { return w.emblem }
 
-// Hero is the body's big icon graphic of the current page (theme.IconHero),
-// or nil when the page has no hero.
+// Hero is the body's big graphic of the current page — the hull page's 2:1
+// ship block (`infoHullW`×`infoHullH`), every other page's entity icon at
+// theme.IconHero — or nil when the page has no hero.
 func (w *InfoWin) Hero() *widget.Graphic { return w.hero }
 
-// HeroPlate is the dark plate the hero icon is drawn on (nil when the page
-// has no hero).
+// HeroPlate is the dark plate the hero is drawn on (nil when the page has no
+// hero).
 func (w *InfoWin) HeroPlate() *widget.Container { return w.plate }
 
 // Show swaps the window's whole page to ref's details and reveals the
@@ -916,7 +927,7 @@ func (w *InfoWin) rewrap() {
 	if w.titleText != nil || w.subText != nil {
 		col := want - float64(theme.Px(infoGap))
 		if w.plate != nil {
-			col -= float64(infoPlateW())
+			col -= float64(w.plateW)
 		}
 		if col > 0 && col != w.colW {
 			w.colW = col
@@ -939,8 +950,9 @@ func (w *InfoWin) rewrap() {
 	}
 }
 
-// infoPlateW is the header plate's side: the hero icon plus its padding on
-// both sides.
+// infoPlateW is the icon page's plate side: the hero icon plus its padding
+// on both sides. The hull page's plate is wider (infoHullW); render records
+// whichever applies on the page (InfoWin.plateW).
 func infoPlateW() int { return theme.Px(theme.IconHero) + 2*theme.Px(infoPlatePad) }
 
 // corpMark builds the corporation graphic a panel shows at the given token
@@ -968,15 +980,16 @@ func (w *InfoWin) render(p infoPage) {
 	w.emblem = nil
 	w.hero = nil
 	w.plate = nil
+	w.plateW = 0
 	w.titleText, w.subText = nil, nil
 	w.colW = 0
 
-	// Header: ONE row — the entity's icon on a dark plate, then the
-	// title/Sub column. The plate keeps the icon apart from the name and
-	// the corporation mark (theme.WellBox); the icon keeps its hero size
-	// and the plate grows around it. theme.IconHero stays strictly bigger
-	// than theme.IconCorp (TestHeroOutgrowsCorpLogo), and a panel never
-	// shows the mark twice: the mark rides the Sub line, never the plate.
+	// Header: ONE row — the entity's hero on a dark plate, then the
+	// title/Sub column. The plate keeps the hero apart from the name and
+	// the corporation mark (theme.WellBox). theme.IconHero stays strictly
+	// bigger than theme.IconCorp (TestHeroOutgrowsCorpLogo), and a panel
+	// never shows the mark twice: the mark rides the Sub line, never the
+	// plate.
 	head := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
@@ -984,7 +997,25 @@ func (w *InfoWin) render(p infoPage) {
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
-	if p.Hero != "" {
+	// The header hero. The hull page leads with the hull ITSELF: a 2:1 wide
+	// block of the ship's art (drop-in wins, the embedded raster falls back),
+	// which is what makes a ship page read apart from a module or item page
+	// at a glance. Every other page, and a hull with no art at all, keeps the
+	// square hero icon. One plate frame either way (theme.WellBox): the icon
+	// keeps its token size and the plate grows; the ship block IS its own
+	// size and the plate pads it.
+	heroW := theme.Px(theme.IconHero)
+	var g *widget.Graphic
+	if p.Hull != "" {
+		if img := ebiten.NewImage(theme.Px(infoHullW), theme.Px(infoHullH)); paintHullPortrait(img, p.Hull) {
+			g = widget.NewGraphic(widget.GraphicOpts.Image(img))
+			heroW = theme.Px(infoHullW)
+		}
+	}
+	if g == nil && p.Hero != "" {
+		g = theme.NewIcon(p.Hero, theme.IconHero, pal.Text)
+	}
+	if g != nil {
 		plate := widget.NewContainer(
 			widget.ContainerOpts.BackgroundImage(theme.WellBox(pal, theme.NRGBA(pal.Border, 200))),
 			widget.ContainerOpts.Layout(widget.NewGridLayout(
@@ -994,9 +1025,8 @@ func (w *InfoWin) render(p infoPage) {
 			)),
 			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Position: widget.RowLayoutPositionCenter})),
 		)
-		g := theme.NewIcon(p.Hero, theme.IconHero, pal.Text)
 		plate.AddChild(g)
-		w.hero, w.plate = g, plate
+		w.hero, w.plate, w.plateW = g, plate, heroW+2*theme.Px(infoPlatePad)
 		head.AddChild(plate)
 	}
 

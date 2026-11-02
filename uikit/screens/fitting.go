@@ -377,7 +377,7 @@ func (f *Fitting) newIdentity() *widget.Container {
 func (f *Fitting) paintPortrait(hull content.ShipID) {
 	f.portraitDraws++
 	f.portrait.Clear()
-	src := hullArt(hull, theme.Px(fitPortrait))
+	src := hullArt(hull, theme.Px(fitPortrait), theme.Px(fitPortrait))
 	if src == nil {
 		return
 	}

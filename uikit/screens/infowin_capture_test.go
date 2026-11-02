@@ -35,8 +35,9 @@ func TestInfoWindowCaptureFrame(t *testing.T) {
 	fm := useFakeMouse(t)
 
 	// A hull page with every block (the content stream authors the
-	// description/origin fields — the fixture carries them).
-	fixtureShip(t, env, "ship-capture-hull", &content.ShipDef{
+	// description/origin fields — the fixture carries them). The id is a
+	// fleet hull's, so the page's 2:1 hero draws the committed hull art.
+	fixtureShip(t, env, "ship-vastrek", &content.ShipDef{
 		Name:        "Kestrel Prime",
 		Class:       "frigate",
 		Family:      "frigate",
@@ -52,7 +53,7 @@ func TestInfoWindowCaptureFrame(t *testing.T) {
 		SigRadius: 42, ScanResolution: 450, MaxTargetRange: 60000, MaxTargets: 7,
 		Cargo: 450, OreHold: 150,
 	})
-	k.ShowInfo(widgets.ShipRef("ship-capture-hull"))
+	k.ShowInfo(widgets.ShipRef("ship-vastrek"))
 
 	// A rack-shaped menu open beside the window.
 	m := k.Menu()
