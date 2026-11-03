@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Fitting limits read as boxes**: the Show Info hull page's FITTING block
+  and the fitting window's HULL LIMITS block draw a hull's limits instead of
+  quoting them. The mounts line stays words; the high/mid/low slots are one
+  filled box per slot on a strip line (the separate SLOTS section is gone),
+  and the grid and cpu class quotas are one table: a column per axis the
+  hull carries a quota on, one row per class it allows any of, one filled box
+  per allowance, and a dim dash where a present row has none. A hull with no
+  cpu quota has no CPU column. The worded "Grid quotas" and "CPU quotas" rows
+  are gone from both surfaces.
+
 - **The HUD names your hull**: the status panel prints the hull's display
   name ("Vaštrek") centred under the portrait, on the portrait's own repaint
   seam, trimmed to the portrait's width. The portrait gains a real inset on

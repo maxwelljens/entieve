@@ -24,7 +24,7 @@ var statCensus = []string{
 	"Total", "Cargo",
 	"High", "Mid", "Low", "Slot", "Grid class", "CPU class", "Mount", "Size",
 	"Volume", "Cycle", "Base time", "Clip", "Loaded", "In cargo",
-	"Grid quotas", "CPU quotas", "Mounts", "Requirement", "Level",
+	"Mounts", "Requirement", "Level",
 	"EM", "Electro-magnetic", "EM resist", "Thermal", "Thermal resist",
 	"Kinetic", "Kinetic resist", "Explosive", "Explosive resist",
 }
@@ -61,7 +61,7 @@ func TestStatTaxonomyCoversCensus(t *testing.T) {
 func TestSectionBarGlyphs(t *testing.T) {
 	p := DefaultPalette()
 	for _, label := range []string{
-		"CONSTRUCTION", "FITTING", "SLOTS", "SURVIVAL", "CAPACITOR", "PROPULSION",
+		"CONSTRUCTION", "FITTING", "SURVIVAL", "CAPACITOR", "PROPULSION",
 		"SENSORS", "CARGO", "MANUFACTURED FROM", "USED IN", "PROPERTIES",
 		"ACTIVATION", "DAMAGE", "RANGE", "FIRING", "CHARGE", "YIELD", "REPAIR",
 		"EFFECT", "BONUSES", "CHARGES", "MARKET", "REFINES TO", "DOSSIER",

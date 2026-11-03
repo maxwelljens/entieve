@@ -69,6 +69,8 @@ const (
 // block's required level, the same painter the proficiency tree's nodes
 // read): PipLevel boxes are filled out of PipMax, PipLocked dims them while
 // the pilot does not meet the requirement, and PipMax 0 is a plain text row.
+// A count that is a capacity rather than a level (the hull's slot strips)
+// passes level == max, which fills every box.
 type infoRow struct {
 	Label      string
 	Value      string
@@ -82,10 +84,12 @@ type infoRow struct {
 
 // infoSection is a labelled group of rows ("DAMAGE", "LOOT"). Lines group
 // rows into one tiled line: a single entry is full-width, two or three share
-// the line equally (the ship page's paired stat blocks).
+// the line equally (the ship page's paired stat blocks). Table is an optional
+// aligned block after the lines: the hull's class quotas (FITTING).
 type infoSection struct {
 	Label string
 	Lines [][]infoRow
+	Table *infoQuota
 }
 
 // infoPage is one windowful of content: header, prose and sections.
@@ -159,6 +163,20 @@ func addLines(p *infoPage, label string, lines ...[]infoRow) {
 		return
 	}
 	p.Sections = append(p.Sections, infoSection{Label: label, Lines: kept})
+}
+
+// addTable appends the table under the section label: attached to the section
+// just added when it carries rows, else a table-only section. Nil adds
+// nothing (the section then stands on its rows alone).
+func addTable(p *infoPage, label string, t *infoQuota) {
+	if t == nil {
+		return
+	}
+	if n := len(p.Sections); n > 0 && p.Sections[n-1].Label == label {
+		p.Sections[n-1].Table = t
+		return
+	}
+	p.Sections = append(p.Sections, infoSection{Label: label, Table: t})
 }
 
 // refRow builds a link row whose LABEL carries the linked name.
@@ -382,20 +400,9 @@ func mountsText(mounts []content.Mount) string {
 	return strings.Join(parts, " · ")
 }
 
-// quotaText renders one axis's class allowance, zero classes skipped
-// ("4× I, 2× II"; "" = no allowance).
-func quotaText(q content.ClassQuota) string {
-	var parts []string
-	for _, class := range []string{content.ClassI, content.ClassII, content.ClassIII} {
-		if n := q.Count(class); n > 0 {
-			parts = append(parts, theme.FormatInt(int64(n))+"× "+strings.TrimPrefix(content.ClassLabel(class), "Class "))
-		}
-	}
-	return strings.Join(parts, ", ")
-}
-
 // shipPage renders a hull: construction (class · maker, or class · origin
-// for the unattributed rat hulls), slots, the survival block with resists,
+// for the unattributed rat hulls), the fitting block (mounts, the slot strips
+// and the class-quota box table), the survival block with resists,
 // capacitor, propulsion, sensors and cargo.
 func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
 	p := infoPage{Hero: theme.HullIconFor(def), Hull: def.ID, Title: def.Name, Prose: def.Description, Emblem: def.Maker}
@@ -424,34 +431,29 @@ func shipPage(cv widgets.ContentView, def *content.ShipDef) infoPage {
 	}
 	addSection(&p, "CONSTRUCTION", cons)
 
-	// Fitting limits: what the hull can mount and how many modules of each
-	// class it allows, in the same words the fitting window uses.
+	// Fitting limits: what the hull can mount, its slots as box strips and
+	// its class quotas as the box table — one section, in the fitting
+	// window's own visual language (a quota is a capacity, so its boxes are
+	// all filled and its zero cells are dim dashes).
 	var fitLines [][]infoRow
 	if m := mountsText(def.Mounts); m != "" {
 		fitLines = append(fitLines, []infoRow{{Label: "Mounts", Value: m}})
 	}
-	var quotas []infoRow
-	if q := quotaText(def.GridClasses); q != "" {
-		quotas = append(quotas, infoRow{Label: "Grid quotas", Value: q})
-	}
-	if q := quotaText(def.CPUClasses); q != "" {
-		quotas = append(quotas, infoRow{Label: "CPU quotas", Value: q})
-	}
-	if len(quotas) > 0 {
-		fitLines = append(fitLines, quotas)
-	}
-	addLines(&p, "FITTING", fitLines...)
-
 	var slots []infoRow
 	for _, s := range []struct {
 		label string
 		n     int
 	}{{"High", def.Slots.High}, {"Mid", def.Slots.Mid}, {"Low", def.Slots.Low}} {
 		if s.n > 0 {
-			slots = append(slots, infoRow{Label: s.label, Value: theme.FormatInt(int64(s.n))})
+			// One filled box per slot: level == max fills the pip painter.
+			slots = append(slots, infoRow{Label: s.label, PipLevel: s.n, PipMax: s.n})
 		}
 	}
-	addLines(&p, "SLOTS", slots)
+	if len(slots) > 0 {
+		fitLines = append(fitLines, slots)
+	}
+	addLines(&p, "FITTING", fitLines...)
+	addTable(&p, "FITTING", shipQuota(def.GridClasses, def.CPUClasses))
 
 	addSection(&p, "PROFICIENCY", proficiencyRows(cv, def.Family, def.Gate))
 
@@ -751,6 +753,7 @@ type InfoWin struct {
 	plateW    int               // the plate's boxed width (the icon's or the hull block's)
 	titleText *widget.Text      // header column title, wrapped to colW
 	subText   *widget.Text      // header column Sub line text, wrapped beside the mark
+	quota     *widget.Container // the page's class-quota table (nil when nothing on the page has one)
 
 	proseW  float64 // inner width the prose is wrapped to
 	colW    float64 // width the header column is wrapped to
@@ -1095,10 +1098,15 @@ func (w *InfoWin) render(p infoPage) {
 		))
 	}
 	inner := infoInnerW()
+	w.quota = nil
 	for _, sec := range p.Sections {
 		w.page.AddChild(sectionBar(w.th, sec.Label))
 		for _, line := range sec.Lines {
 			w.page.AddChild(w.lineWidget(line, inner))
+		}
+		if sec.Table != nil {
+			w.quota = quotaTableWidget(w.th, theme.StepSmall, *sec.Table)
+			w.page.AddChild(w.quota)
 		}
 	}
 	w.rewrap()
