@@ -203,8 +203,10 @@ func TestProficiencyPracticeMatchesTheActs(t *testing.T) {
 			}
 		}
 	}
-	// The machine line: no player act, and the card says exactly that.
-	if got := text("rat"); !strings.Contains(got, "None") {
+	// The machine line: no player act, and the card says exactly that. The
+	// owner's catalogue copy spells it "N/A" (registry voice); either marker
+	// states the absence, an act list does not.
+	if got := text("rat"); !strings.Contains(got, "None") && !strings.Contains(got, "N/A") {
 		t.Errorf("rat: practice %q should state there is none", got)
 	}
 	for _, hull := range c.Ships {

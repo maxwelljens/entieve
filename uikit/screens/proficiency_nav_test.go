@@ -283,9 +283,11 @@ func TestProficiencyCardPages(t *testing.T) {
 	if c.IsOpen() {
 		t.Error("Close left the card open")
 	}
-	// The machine line says plainly that nothing trains it.
+	// The machine line says plainly that nothing trains it: the owner's
+	// catalogue copy marks that with "N/A" (registry voice), the older
+	// wording with "None"; both are accepted, an act list is not.
 	c.Show("rat", 0, "")
-	if !strings.Contains(c.practice.Label, "None") {
+	if !strings.Contains(c.practice.Label, "None") && !strings.Contains(c.practice.Label, "N/A") {
 		t.Errorf("rat page = %q, want the no-practice line", c.practice.Label)
 	}
 }
