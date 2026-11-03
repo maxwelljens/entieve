@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The market's right pane carries the order book**: selecting an item fills
+  the rightmost pane with that item's full resting book, asks (price
+  ascending) above bids (price descending) in the book's own price, quantity
+  and side form, with your own orders in the owned green. My orders stacks
+  below it as its own labelled section, both in the pane's one scroll column
+  with the house rail; with nothing selected the book section shows a short
+  hint. The catalog's per-item dropdown is gone: it lists items only, so the
+  window needs no expanding to read a book.
+
 - **Fitting limits read as boxes**: the Show Info hull page's FITTING block
   and the fitting window's HULL LIMITS block draw a hull's limits instead of
   quoting them. The mounts line stays words; the high/mid/low slots are one

@@ -176,7 +176,7 @@ func TestMarketMyOrdersListsEveryOrder(t *testing.T) {
 
 	// The list outgrows the column: the rail is up and a wheel notch
 	// scrolls the rows inside the viewport (the list stays usable).
-	view := m.mineScroll.ViewRect()
+	view := m.sideScroll.ViewRect()
 	union := m.mineRows[0].Root.GetWidget().Rect
 	for _, r := range m.mineRows[1:] {
 		union = union.Union(r.Root.GetWidget().Rect)
@@ -184,42 +184,45 @@ func TestMarketMyOrdersListsEveryOrder(t *testing.T) {
 	if union.Dy() <= view.Dy() {
 		t.Fatalf("list content %d px does not overflow the %d px viewport", union.Dy(), view.Dy())
 	}
-	if !m.mineRail.Bar().GetWidget().IsVisible() {
+	if !m.sideRail.Bar().GetWidget().IsVisible() {
 		t.Error("rail hidden over an overflowing list")
 	}
 	row0 := m.mineRows[0].Root.GetWidget().Rect
-	m.mineScroll.GetWidget().ScrolledEvent.Fire(&widget.WidgetScrolledEventArgs{Y: -3})
+	m.sideScroll.GetWidget().ScrolledEvent.Fire(&widget.WidgetScrolledEventArgs{Y: -3})
 	frame()
 	frame()
-	if m.mineScroll.ScrollTop <= 0 {
-		t.Fatalf("wheel: ScrollTop = %v, want > 0", m.mineScroll.ScrollTop)
+	if m.sideScroll.ScrollTop <= 0 {
+		t.Fatalf("wheel: ScrollTop = %v, want > 0", m.sideScroll.ScrollTop)
 	}
 	if got := m.mineRows[0].Root.GetWidget().Rect; got.Min.Y >= row0.Min.Y {
 		t.Errorf("wheel: row 0 at %d, want above %d (list moved)", got.Min.Y, row0.Min.Y)
 	}
 
-	// Ownership highlight inside the fold: the 20 player orders wear the
-	// owned green, the one NPC ask keeps the plain background (and the
-	// item's own parent row carries no tint at all).
+	// Ownership highlight in the right pane's book: the 20 player orders
+	// wear the owned green, the one NPC ask keeps its side colour (and the
+	// catalog's item row carries no tint at all).
 	clickRow(ui, m.tbl, 0)
 	frame()
-	if got, want := len(m.tbl.Rows), 22; got != want {
-		t.Fatalf("expanded rows = %d, want the parent + 21 orders (%d)", got, want)
+	if got, want := len(m.tbl.Rows), 1; got != want {
+		t.Fatalf("catalog rows = %d, want the plain one item row (%d)", got, want)
+	}
+	if got, want := len(m.book), 21; got != want {
+		t.Fatalf("book rows = %d, want the item's %d resting orders", got, want)
 	}
 	want := theme.OwnedRowTint(theme.DefaultPalette())
 	owned, plain := 0, 0
-	for _, r := range m.tbl.Rows {
-		switch {
-		case r.Tint == want:
+	for _, r := range m.book {
+		switch r.Stack[0].Segs[0].Tint {
+		case want:
 			owned++
-		case r.Tint.A == 0:
+		case theme.DefaultPalette().Warn, theme.DefaultPalette().Info:
 			plain++
 		default:
-			t.Errorf("book row tint = %#v, want the owned green or none", r.Tint)
+			t.Errorf("book row tint = %#v, want the owned green or a side colour", r.Stack[0].Segs[0].Tint)
 		}
 	}
-	if owned != 20 || plain != 2 {
-		t.Errorf("book tints: %d owned, %d plain, want 20/2 (parent + NPC ask)", owned, plain)
+	if owned != 20 || plain != 1 {
+		t.Errorf("book tints: %d owned, %d plain, want 20/1 (the player bids and the NPC ask)", owned, plain)
 	}
 }
 
@@ -293,7 +296,7 @@ func TestMarketMyOrdersAfterOrderDialog(t *testing.T) {
 	}
 
 	// Every OwnerPlayer book row is green, and there is at least one —
-	// the order the dialog placed. It sits in its item's fold.
+	// the order the dialog placed. It sits in the item's right-pane book.
 	clickRow(mui, m.tbl, mktParentRow(t, m, item))
 	frame()
 	ownedOrders := 0
@@ -304,8 +307,8 @@ func TestMarketMyOrdersAfterOrderDialog(t *testing.T) {
 	}
 	want := theme.OwnedRowTint(theme.DefaultPalette())
 	green := 0
-	for _, r := range m.tbl.Rows {
-		if r.Tint == want {
+	for _, r := range m.book {
+		if r.Stack[0].Segs[0].Tint == want {
 			green++
 		}
 	}

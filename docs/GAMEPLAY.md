@@ -849,8 +849,9 @@ job already running is never re-timed by a mid-job level-up.
 ### The market window
 
 The market is three panes: a **browse tree** on the left, the **catalog**
-in the middle and **My orders** on the right, with a draggable seam between
-each pair (both proportions persist with the layout). The tree is the
+in the middle and the **right pane** on the right (the selected item's
+order book over **My orders**), with a draggable seam between each pair
+(both proportions persist with the layout). The tree is the
 content's own category path: `All` at the root, then `Ships`, `Modules`,
 `Ammunition`, `Materials` and `Loot` with their children (hull classes,
 slot/role groups, round families). Clicking a branch expands it and scopes
@@ -858,6 +859,15 @@ the catalog to its subtree; clicking an item highlights its branch. Every
 item is listed, including the hulls and wares no one sells here: a dim row
 whose **Buy** is grayed until some local order offers it (**Request on
 Market** stays live, and placing the first order is how a market wakes up).
+
+**The right pane.** Selecting an item fills the pane's book section with
+that item's full resting book, asks (price ascending) above bids (price
+descending), one compact row per order with its price, quantity and side;
+your own orders wear the owned green. There is no per-item dropdown: the
+catalog is a plain list, and the book is always one click away. **My
+orders** stacks below it as its own labelled section, both sections
+scrolling together on the pane's one rail; with nothing selected the book
+section reads "Order book: select an item".
 
 **Search.** The field above the tree filters the selected branch live as
 you type (name, group path and maker all match, case-insensitive and

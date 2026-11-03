@@ -121,7 +121,7 @@ func TestMarketRunsOnStubView(t *testing.T) {
 	m.Sync() // reads the stub everywhere; a sim in the path would panic
 
 	if len(m.tbl.Rows) != 1 {
-		t.Fatalf("rows = %d, want the stub catalog's one item row (folds start collapsed)", len(m.tbl.Rows))
+		t.Fatalf("rows = %d, want the stub catalog's one item row", len(m.tbl.Rows))
 	}
 	if got := m.tbl.Rows[0].Cells[0]; got != "Stub Ore" {
 		t.Errorf("item cell = %q, want the stub def's name", got)

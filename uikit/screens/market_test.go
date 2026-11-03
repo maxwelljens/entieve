@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/theme"
+	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
@@ -33,10 +33,11 @@ func parseCredits(t *testing.T, s string) float64 {
 	return v
 }
 
-// TestMarketRowIcons pins the market's row glyphs: every item row (catalog
-// parent, expanded order, search hit) carries a 20 px icon — a module's own
-// icon, else the item's icon (drop-in art, else its category silhouette) —
-// while the browse-tree branch rows stay text-only.
+// TestMarketRowIcons pins the market's row glyphs: every catalog item row
+// (branch view or search hit) carries a 20 px icon — a module's own icon,
+// else the item's icon (drop-in art, else its category silhouette) — while
+// the browse-tree branch rows and the right pane's compact book rows stay
+// text-only.
 func TestMarketRowIcons(t *testing.T) {
 	env, _ := newTestEnv(t)
 	m := NewMarket(env)
@@ -70,42 +71,26 @@ func TestMarketRowIcons(t *testing.T) {
 		}
 	}
 
-	// An expanded item's order rows inherit its glyph (same 20 px box).
-	expanded := false
-	for _, r := range m.tbl.Rows {
-		it, ok := r.Data.(mktItemRow)
-		if !ok || expanded {
-			continue
-		}
-		if r.Cells[2] == "0" {
-			continue // no resting orders to fold out
-		}
-		m.open[it.Item] = true
-		expanded = true
-	}
-	if !expanded {
-		t.Fatal("fixture: no item with resting orders")
-	}
+	// The right pane's book rows are compact text rows: the section bar
+	// already names the item, so repeating its glyph down every order is
+	// noise.
+	clickRow(ui, m.tbl, 0)
 	uitest.PumpWindow(t, ui, m.Sync, 1024, 700)
-	books := 0
-	for _, r := range m.tbl.Rows {
-		if o, ok := r.Data.(mktOrderRow); ok {
-			books++
-			if r.IconSize != mktRowIcon || len(r.Icons) != 1 || r.Icons[0] != m.itemIcon(o.Item) {
-				t.Errorf("order row icon = %v/%d, want the item glyph at %d", r.Icons, r.IconSize, mktRowIcon)
-			}
-		}
+	if len(m.bookRows) == 0 {
+		t.Fatal("fixture: no book rows for the first selected item")
 	}
-	if books == 0 {
-		t.Error("fixture: no expanded order rows")
+	for i, r := range m.book {
+		if len(r.Icons) != 0 || r.IconSize != 0 {
+			t.Errorf("book row %d carries an icon (%v)", i, r.Icons)
+		}
 	}
 }
 
-// TestMarketOrderBookRows pins the order-book tree: one parent row per
-// item of the tradeable catalog (canonical order, always listed), its
-// resting orders folded out beneath it on a click — asks (price
-// ascending) above the bids (price descending) — and every order of the
-// station's book present exactly once, expanded.
+// TestMarketOrderBookRows pins the catalog and the whole station book: one
+// row per item of the tradeable catalog (canonical order, always listed),
+// and every order of the station's book present exactly once across the
+// items' right-pane books — asks (price ascending) above the bids (price
+// descending) inside each item.
 func TestMarketOrderBookRows(t *testing.T) {
 	env, _ := newTestEnv(t)
 	m := NewMarket(env)
@@ -116,7 +101,7 @@ func TestMarketOrderBookRows(t *testing.T) {
 
 	want := marketCatalog(env)
 	if len(m.tbl.Rows) != len(want) {
-		t.Fatalf("rows = %d, want one parent per catalog item (%d)", len(m.tbl.Rows), len(want))
+		t.Fatalf("rows = %d, want one row per catalog item (%d)", len(m.tbl.Rows), len(want))
 	}
 	for i, r := range m.tbl.Rows {
 		if len(r.Cells) != 4 {
@@ -124,7 +109,7 @@ func TestMarketOrderBookRows(t *testing.T) {
 		}
 		row, ok := r.Data.(mktItemRow)
 		if !ok {
-			t.Fatalf("row %d payload is %#v, want an item (parent) row", i, r.Data)
+			t.Fatalf("row %d payload is %#v, want an item row", i, r.Data)
 		}
 		if row.Item != want[i] {
 			t.Fatalf("row %d item = %q, want %q (canonical catalog order)", i, row.Item, want[i])
@@ -134,8 +119,8 @@ func TestMarketOrderBookRows(t *testing.T) {
 		}
 	}
 
-	// Expanding every item shows the station's whole book, in book order
-	// inside each item: asks ascending, then bids descending.
+	// Selecting each item in turn shows the station's whole book, in book
+	// order inside the item: asks ascending, then bids descending.
 	sys := env.Sim.System()
 	if sys == nil {
 		t.Fatal("no current system")
@@ -144,90 +129,78 @@ func TestMarketOrderBookRows(t *testing.T) {
 	if len(orders) == 0 {
 		t.Fatal("fixture: empty book")
 	}
-	for _, item := range want {
-		m.open[item] = true
-	}
-	frame()
-	if got, wantN := len(m.tbl.Rows), len(want)+len(orders); got != wantN {
-		t.Fatalf("expanded rows = %d, want %d (catalog + every order)", got, wantN)
-	}
 	seen := 0
-	var (
-		curItem  content.ItemID
-		askPhase = true // within an item: asks may not follow bids
-		lastAsk  = -1.0
-		lastBid  = -1.0
-		done     = map[content.ItemID]bool{}
-	)
-	for i, r := range m.tbl.Rows {
-		if parent, isParent := r.Data.(mktItemRow); isParent {
-			if done[curItem] && i > 0 {
-				t.Fatalf("row %d: item %q left the board and came back (items must group)", i, curItem)
-			}
-			if i > 0 {
-				done[curItem] = true
-			}
-			curItem, askPhase, lastAsk, lastBid = parent.Item, true, -1, -1
-			continue
+	for _, item := range want {
+		m.selectItem(item)
+		frame()
+		if got := len(m.tbl.Rows); got != len(want) {
+			t.Fatalf("%q: catalog rows = %d, want the plain %d", item, got, len(want))
 		}
-		row, isOrder := r.Data.(mktOrderRow)
-		if !isOrder {
-			t.Fatalf("row %d payload = %#v, want an item or an order row", i, r.Data)
-		}
-		seen++
-		if row.Item != curItem {
-			t.Fatalf("row %d: order row for %q under parent %q", i, row.Item, curItem)
-		}
-		if r.Cells[0] != "" {
-			t.Errorf("row %d: child item cell = %q, want blank (the parent names it)", i, r.Cells[0])
-		}
-		side := r.Cells[3]
-		price := parseCredits(t, r.Cells[1])
-		switch side {
-		case "Ask":
-			if !askPhase {
-				t.Fatalf("row %d: ask after bids for %q (book out of order)", i, row.Item)
+		var ords []sim.MarketStock
+		for _, o := range orders {
+			if o.Item == item {
+				ords = append(ords, o)
 			}
-			if price < lastAsk {
-				t.Fatalf("row %d: ask %v below a previous ask %v for %q", i, price, lastAsk, row.Item)
+		}
+		if len(m.book) != len(ords) {
+			t.Fatalf("%q: book rows = %d, want the item's %d resting orders", item, len(m.book), len(ords))
+		}
+		askPhase, lastAsk, lastBid := true, -1.0, -1.0
+		for i, r := range m.book {
+			seen++
+			if r.Cells[0] != "" {
+				t.Errorf("%q row %d: item cell = %q, want blank (the section bar names it)", item, i, r.Cells[0])
 			}
-			lastAsk = price
-		case "Bid":
-			askPhase = false
-			if lastBid >= 0 && price > lastBid {
-				t.Fatalf("row %d: bid %v above a previous bid %v for %q", i, price, lastBid, row.Item)
+			side := r.Cells[3]
+			price := parseCredits(t, r.Cells[1])
+			switch side {
+			case "Ask":
+				if !askPhase {
+					t.Fatalf("%q row %d: ask after bids (book out of order)", item, i)
+				}
+				if price < lastAsk {
+					t.Fatalf("%q row %d: ask %v below a previous ask %v", item, i, price, lastAsk)
+				}
+				lastAsk = price
+			case "Bid":
+				askPhase = false
+				if lastBid >= 0 && price > lastBid {
+					t.Fatalf("%q row %d: bid %v above a previous bid %v", item, i, price, lastBid)
+				}
+				lastBid = price
+			default:
+				t.Fatalf("%q row %d side = %q, want Ask or Bid", item, i, side)
 			}
-			lastBid = price
-		default:
-			t.Fatalf("row %d side = %q, want Ask or Bid", i, side)
 		}
 	}
 	if seen != len(orders) {
-		t.Fatalf("child rows = %d, want every resting order (%d) listed once", seen, len(orders))
+		t.Fatalf("book rows = %d, want every resting order (%d) listed once", seen, len(orders))
 	}
 
 	// The founding books carry both sides: the showcase station seeds asks
 	// (hulls, modules, charges, materials) and standing bids (loot and the
 	// raw materials its industry buys).
 	sides := map[string]bool{}
-	for _, r := range m.tbl.Rows {
-		if r.Cells[3] != mktNoSide {
+	for _, item := range want {
+		m.selectItem(item)
+		frame()
+		for _, r := range m.book {
 			sides[r.Cells[3]] = true
 		}
 	}
 	if !sides["Ask"] || !sides["Bid"] {
-		t.Fatalf("board shows %v, want both Ask and Bid rows", sides)
+		t.Fatalf("books show %v, want both Ask and Bid rows", sides)
 	}
 }
 
-// TestMarketOrderBookScrolls pins the order book's scrollability
-// (playtest: "the marketplace window does not have a scrollbar"), in the
-// pattern the table scroll tests use: the book rides the standard
-// ScrollContainer with real overflow at the window's own size, a wheel
-// notch moves the offset and the rows with it, and the scrollbar rail
-// beside the viewport mirrors the offset — and writes drags back — while
-// the title line and the Buy/Sell row keep their place above the book.
-func TestMarketOrderBookScrolls(t *testing.T) {
+// TestMarketCatalogScrolls pins the catalog's scrollability (playtest: "the
+// marketplace window does not have a scrollbar"), in the pattern the table
+// scroll tests use: the list rides the standard ScrollContainer with real
+// overflow at the window's own size, a wheel notch moves the offset and the
+// rows with it, and the scrollbar rail beside the viewport mirrors the
+// offset — and writes drags back — while the title line and the Buy/Sell
+// row keep their place above the list.
+func TestMarketCatalogScrolls(t *testing.T) {
 	env, _ := newTestEnv(t)
 	m := NewMarket(env)
 	ui := newWindowUI(t, env, m.Win())
@@ -245,17 +218,18 @@ func TestMarketOrderBookScrolls(t *testing.T) {
 	}
 	rows := m.tbl.RowCts
 	if len(rows) < 3 {
-		t.Fatalf("rows = %d, want a book long enough to overflow", len(rows))
+		t.Fatalf("rows = %d, want a catalog long enough to overflow", len(rows))
 	}
 	union := rows[0].GetWidget().Rect
 	for _, r := range rows[1:] {
 		union = union.Union(r.GetWidget().Rect)
 	}
 	if union.Dy() <= view.Dy() {
-		t.Fatalf("book content %d px does not overflow the %d px viewport", union.Dy(), view.Dy())
+		t.Fatalf("catalog content %d px does not overflow the %d px viewport", union.Dy(), view.Dy())
 	}
-	if !m.bar.GetWidget().IsVisible() {
-		t.Error("scrollbar hidden over an overflowing book")
+	rail := m.tbl.Rail()
+	if !rail.GetWidget().IsVisible() {
+		t.Error("scrollbar hidden over an overflowing catalog")
 	}
 
 	// Wheel: the table's scroll handler moves the offset and the rows.
@@ -270,31 +244,31 @@ func TestMarketOrderBookScrolls(t *testing.T) {
 		t.Errorf("wheel: row 0 at %d, want above %d (content moved)", got.Min.Y, row0.Min.Y)
 	}
 	// The rail mirrors the offset the wheel set.
-	if want := int(math.Round(sc.ScrollTop * mktBarSteps)); m.bar.Current != want {
-		t.Errorf("rail position = %d, want the mirrored ScrollTop %d", m.bar.Current, want)
+	if want := int(math.Round(sc.ScrollTop * widgets.RailSteps)); rail.Current != want {
+		t.Errorf("rail position = %d, want the mirrored ScrollTop %d", rail.Current, want)
 	}
 
 	// Drag: the rail writes the offset back through its changed event
 	// (what a handle drag fires mid-frame), and the mirror re-converges.
 	sc.ScrollTop = 0
-	m.bar.ChangedEvent.Fire(&widget.SliderChangedEventArgs{Slider: m.bar, Current: 500, Dragging: true})
+	rail.ChangedEvent.Fire(&widget.SliderChangedEventArgs{Slider: rail, Current: 500, Dragging: true})
 	ui.Update() // dispatch the deferred event before the next frame's mirror
 	frame()
 	frame()
 	if got := sc.ScrollTop; math.Abs(got-0.5) > 1e-9 {
 		t.Errorf("rail drag: ScrollTop = %v, want 0.5", got)
 	}
-	if m.bar.Current != 500 {
-		t.Errorf("rail position = %d, want 500 (mirror of ScrollTop 0.5)", m.bar.Current)
+	if rail.Current != 500 {
+		t.Errorf("rail position = %d, want 500 (mirror of ScrollTop 0.5)", rail.Current)
 	}
 
 	// The window's own rows are untouched: title line, the Buy/Sell row,
-	// then the book under them.
+	// then the catalog under them.
 	title := m.title.GetWidget().Rect
 	trade := m.buy.GetWidget().Rect.Union(m.sell.GetWidget().Rect)
 	table := m.tbl.Container().GetWidget().Rect
 	if !(title.Max.Y <= trade.Min.Y && trade.Max.Y <= table.Min.Y) {
-		t.Errorf("stacking changed: title %v, trade row %v, book %v (want stacked top to bottom)",
+		t.Errorf("stacking changed: title %v, trade row %v, catalog %v (want stacked top to bottom)",
 			title, trade, table)
 	}
 	for name, b := range map[string]*widget.Button{"Buy": m.buy, "Sell": m.sell} {
@@ -302,24 +276,22 @@ func TestMarketOrderBookScrolls(t *testing.T) {
 			t.Errorf("%s button %v outside the trade row %v", name, r, trade)
 		}
 		if r := b.GetWidget().Rect; r.Max.Y > table.Min.Y {
-			t.Errorf("%s button %v overlaps the book %v", name, r, table)
+			t.Errorf("%s button %v overlaps the catalog %v", name, r, table)
 		}
 	}
 }
 
-// TestMarketBookWheelSettles: a fast flick on the order book lands and
+// TestMarketCatalogWheelSettles: a fast flick on the catalog lands and
 // stays. Two notches on consecutive frames, then silence: the offset may
 // not reverse and the rows may not jump — the rail's mirror and its
-// Changed write-back locked two frames apart and the book oscillated one
+// Changed write-back locked two frames apart and the list oscillated one
 // wheel step every frame.
-func TestMarketBookWheelSettles(t *testing.T) {
+func TestMarketCatalogWheelSettles(t *testing.T) {
 	env, _ := newTestEnv(t)
 	m := NewMarket(env)
 	ui := newWindowUI(t, env, m.Win())
 	frame := func() { uitest.PumpWindow(t, ui, m.Sync, 1024, 700) }
 	frame()
-	frame()
-	clickRow(ui, m.tbl, 0) // fold the first item open: a book long enough to scroll
 	frame()
 
 	sc := m.tbl.ScrollForTest()
@@ -348,7 +320,7 @@ func TestMarketBookWheelSettles(t *testing.T) {
 		frame()
 		y := sc.ContentRect().Min.Y
 		if y != last {
-			t.Fatalf("book content jumped from y=%d to y=%d with no input", last, y)
+			t.Fatalf("catalog content jumped from y=%d to y=%d with no input", last, y)
 		}
 	}
 }
