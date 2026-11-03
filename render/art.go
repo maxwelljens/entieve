@@ -75,38 +75,44 @@ func bodySprite(col color.RGBA) *ebiten.Image {
 }
 
 // ---------------------------------------------------------------------------
-// Shape templates (unit space: nose along +X, y down like screen space)
+// Class icons (unit space: nose up, y down like screen space, never rotated)
 // ---------------------------------------------------------------------------
 
+// One flat glyph per hull class, the way a fleet chart or a NATO map marks a
+// unit: the outer silhouette says what the thing IS, the tint says whose it
+// is. Upright and heading-blind by construction: a ship's icon never turns,
+// so the same silhouette reads at every heading.
 var (
+	// Frigate: a wide dart, the picket's chevron.
 	frigatePoly = []core.Vec2{
-		{X: 1.0, Y: 0}, {X: 0.15, Y: 0.35}, {X: -0.6, Y: 0.42}, {X: -0.9, Y: 0.15},
-		{X: -0.9, Y: -0.15}, {X: -0.6, Y: -0.42}, {X: 0.15, Y: -0.35},
+		{X: 0, Y: -1.0}, {X: 0.66, Y: 0.68}, {X: 0, Y: 0.30}, {X: -0.66, Y: 0.68},
 	}
+	// Destroyer: the long dagger, a narrow blade with a swallow tail.
 	destroyerPoly = []core.Vec2{
-		{X: 1.1, Y: 0}, {X: 0.5, Y: 0.12}, {X: 0.2, Y: 0.3}, {X: -0.5, Y: 0.36},
-		{X: -0.8, Y: 0.5}, {X: -1.0, Y: 0.2}, {X: -1.0, Y: -0.2}, {X: -0.8, Y: -0.5},
-		{X: -0.5, Y: -0.36}, {X: 0.2, Y: -0.3}, {X: 0.5, Y: -0.12},
+		{X: 0, Y: -1.15}, {X: 0.34, Y: 0.30}, {X: 0.34, Y: 0.68},
+		{X: 0, Y: 0.38}, {X: -0.34, Y: 0.68}, {X: -0.34, Y: 0.30},
 	}
+	// Barge: the hopper, a flared bed with a V cut into its base.
 	bargePoly = []core.Vec2{
-		{X: 0.8, Y: 0.25}, {X: 0.95, Y: 0}, {X: 0.8, Y: -0.25}, {X: 0.2, Y: -0.5},
-		{X: -0.7, Y: -0.55}, {X: -0.9, Y: -0.3}, {X: -0.9, Y: 0.3}, {X: -0.7, Y: 0.55},
-		{X: 0.2, Y: 0.5},
+		{X: 0, Y: -0.95}, {X: 0.9, Y: -0.35}, {X: 0.9, Y: 0.82}, {X: 0.34, Y: 0.82},
+		{X: 0, Y: 0.42}, {X: -0.34, Y: 0.82}, {X: -0.9, Y: 0.82}, {X: -0.9, Y: -0.35},
 	}
+	// Industrial: the blunt slab, chamfered bow, square stern.
 	industrialPoly = []core.Vec2{
-		{X: 0.7, Y: 0.3}, {X: 1.0, Y: 0.12}, {X: 1.0, Y: -0.12}, {X: 0.7, Y: -0.3},
-		{X: 0.2, Y: -0.45}, {X: -0.8, Y: -0.45}, {X: -1.0, Y: -0.2}, {X: -1.0, Y: 0.2},
-		{X: -0.8, Y: 0.45}, {X: 0.2, Y: 0.45},
+		{X: 0.52, Y: -1.0}, {X: 0.86, Y: -0.62}, {X: 0.86, Y: 0.86},
+		{X: -0.86, Y: 0.86}, {X: -0.86, Y: -0.62}, {X: -0.52, Y: -1.0},
 	}
+	// Rat: a jagged, asymmetric claw, machine scrap rather than a yard build.
 	ratPoly = []core.Vec2{
-		{X: 1.05, Y: 0}, {X: 0.4, Y: 0.28}, {X: 0.0, Y: 0.18}, {X: -0.3, Y: 0.5},
-		{X: -0.9, Y: 0.35}, {X: -0.7, Y: 0}, {X: -0.9, Y: -0.35}, {X: -0.3, Y: -0.5},
-		{X: 0.0, Y: -0.18}, {X: 0.4, Y: -0.28},
+		{X: 0.12, Y: -1.05}, {X: 0.5, Y: -0.32}, {X: 0.95, Y: -0.12}, {X: 0.38, Y: 0.18},
+		{X: 0.62, Y: 0.9}, {X: 0.06, Y: 0.44}, {X: -0.34, Y: 1.0}, {X: -0.3, Y: 0.34},
+		{X: -0.98, Y: 0.22}, {X: -0.42, Y: -0.14}, {X: -0.62, Y: -0.82},
 	}
 )
 
-// hullPoly returns the unit silhouette of a hull class.
-func hullPoly(class string) []core.Vec2 {
+// classGlyph returns the unit icon of a hull class. The default is the
+// frigate glyph, the smallest hull, so an unknown class still draws a mark.
+func classGlyph(class string) []core.Vec2 {
 	switch class {
 	case "destroyer":
 		return destroyerPoly

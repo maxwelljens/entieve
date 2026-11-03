@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Hull portraits**: eight owner-supplied portrait PNGs at
   `assets/hulls/<hull-id>.png` (one per hull art id) are drawn where hull art
-  appears: the HUD status panel and the fitting window's identity block, and
-  as the hull's world sprite. Drop-in art wins over the embedded
+  appears: the HUD status panel, the Show Info hull hero and the fitting
+  window's identity block. Drop-in art wins over the embedded
   `uikit/hulls` raster, which stays the fallback, so an empty `assets/`
   renders exactly the stock art (two of the eight had no built-in portrait
   and were blank before). The same move takes ~3.6 MiB of dead bytes out of
@@ -151,6 +151,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Class icons in space, not hull portraits**: a ship on the world grid now
+  draws one flat, upright glyph naming its class (frigate dart, destroyer
+  dagger, industrial slab, barge hopper, rat claw) instead of its hull art
+  turned to the heading, laid out like a fleet chart's unit mark. The glyph
+  never rotates and never changes with the hull: every ship of a class shares
+  it, and the tint comes from the bracket rule (player cyan, hostile red,
+  neutral orange). Hull art stays portrait material for the HUD, Show Info and
+  fitting, so a dropped `assets/hulls/<id>.png` no longer changes a world
+  pixel. The afterburner is now an amber halo rather than a directional flame.
 - **The ship picture is a ship, not an icon**: the HUD's status panel and
   Show Info's hull page now lead with a 2:1 wide block of the hull's own art
   (120×60 design px in the HUD, a 200×100 hero on the hull page) instead of a

@@ -7,7 +7,7 @@ the contact faces (both JPEG allowed).
 
 ```
 assets/
-├── hulls/<hull-id>.png            e.g. ship-vastrek.png       (world sprite, rotated; HUD/fitting portrait, not)
+├── hulls/<hull-id>.png            e.g. ship-vastrek.png       (HUD/fitting/Show Info portrait, not the world: a ship in space is a class icon)
 ├── stations/<celestial-id>.png    e.g. cel-haven-rest.png    (unrotated)
 ├── asteroids/<ore-id>.png         e.g. ore-cordite.png       (unrotated)
 ├── icons/<content-id>.png         e.g. mod-autocannon-s.png  (UI icon, square box)

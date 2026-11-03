@@ -22,6 +22,7 @@ captures() {
 ./internal/capture TestCaptureLoopStaysHidden
 ./internal/capture TestCaptureWritesEvidenceOnVerifyFailure
 ./render TestAlphaCompositeGroundTruth
+./render TestShipIconPixelProbe
 ./uikit/screens TestFittingCaptureFrame
 ./uikit/screens TestFriendlyFireConfirmCapture
 ./uikit/screens TestCombatFeedCaptureFrame

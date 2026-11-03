@@ -11,7 +11,7 @@ stock game.
 ```sh
 mkdir -p assets/hulls
 cp my-sloop.png assets/hulls/ship-vastrek.png   # file name = the content ID
-go run ./cmd/entieve run                      # the sloop now draws your PNG
+go run ./cmd/entieve run                    # the sloop's portrait is your PNG
 ```
 
 ## Convention
@@ -22,7 +22,7 @@ it decorates. IDs are the same kebab-case strings the content JSON uses
 
 | Directory | ID source | Example filename | Rotation |
 |---|---|---|---|
-| `assets/hulls/` | hull ID = ship content ID (`content/data/ships/*.json`) | `ship-vastrek.png`, `ship-marauder.png` | rotated to heading in the world; unrotated in the HUD, Show Info and fitting portraits |
+| `assets/hulls/` | hull ID = ship content ID (`content/data/ships/*.json`) | `ship-vastrek.png`, `ship-marauder.png` | portrait only: HUD, Show Info and fitting, unrotated. **Never the world grid**, which draws a class icon |
 | `assets/stations/` | celestial ID (`CelestialDef.id` in `content/data/systems/*.json`): stations, gates, belts, other structures | `cel-haven-rest.png`, `cel-gate-penumbra.png` | unrotated |
 | `assets/asteroids/` | ore ID the belt's asteroids carry (`items/ores.json`) | `ore-cordite.png` | unrotated |
 | `assets/backgrounds/` | system ID (`sys-*.json`) or `default` | `default.png` | unrotated |
@@ -102,9 +102,11 @@ band's bottom edge, so the rows further down sit on the plain panel.
 - **Size**: any pixel size. Sprites are scaled at draw time, so **bigger is
   always safe**. Author at ≥2× the largest size the game will draw at for
   crispness: 512×512 works for every kind, 256×256 is the practical floor.
-- **Hull sprites point right (+X)**, the nose direction, matching the
-  built-in silhouettes; the engine rotates them to the ship's heading.
-  Celestials, asteroids and backgrounds are never rotated.
+- **Hull sprites point right (+X)**, the nose direction: they are portrait
+  art for the HUD, Show Info and fitting, drawn as authored and never
+  rotated. The world grid draws a class icon instead (see
+  [Class icons](#class-icons-the-world-grid)), so a hull drop-in changes no
+  world pixel. Celestials, asteroids and backgrounds are never rotated.
 - **Backgrounds are starfield plates, in layers, with a cluster-wide
   default.** Per layer the lookup is `assets/backgrounds/<system-id>.png`
   (layer 0, near, bright), `<system-id>-01.png` (layer 1, far, faint),
@@ -136,7 +138,7 @@ constants:
 
 | Kind | Logical radius (draw pixels) |
 |---|---|
-| ship | hull class: 26 m (frigate) / 36 (destroyer) / 42 (barge, industrial) / 28 (rat), × zoom, clamped to 7–160 px |
+| ship | hull class, the class icon's slot: 26 m (frigate) / 36 (destroyer) / 42 (barge, industrial) / 28 (rat), × zoom, clamped to 7–160 px |
 | station | `radius` or 2500 m, × zoom, clamped to 14–25% of the screen |
 | gate | `radius` or 1500 m, × zoom, clamped to 16–30% of the screen |
 | belt / structure | `radius` or 40000 m, × zoom, clamped to 20–40% of the screen |
@@ -239,6 +241,28 @@ window title.
 - **Fallback**: an unknown name renders the neutral gear, so a new kind can
   never show a missing-image artifact.
 
+## Class icons (the world grid)
+
+A ship in space is a **class icon**: one flat glyph, upright, drawn in the
+bracket's slot, never rotated and never the hull's portrait. The silhouette
+names the class at a glance, the way a fleet chart or a NATO map marks a unit;
+the tint names the affiliation, through the same `bracketColor` rule as the
+bracket around it (player cyan, hostile red, neutral orange). There is no art
+file: the glyphs are procedural polygons (`render/art.go`, `classGlyph`), so
+nothing to drop in, no manifest, no credit.
+
+| `class` (`content/data/ships`) | Glyph | Reads as |
+|---|---|---|
+| `frigate` | wide dart with a deep tail notch | the picket's chevron |
+| `destroyer` | long narrow blade with a swallow tail | the gun platform |
+| `industrial` | chamfered slab, square stern | the blunt hauler |
+| `barge` | flared bed, V cut into the base | the mining hopper |
+| `rat` | jagged, asymmetric claw | machine scrap (Scuttler, Marauder, Hierarch) |
+
+Every hull of a class shares its glyph, so the player's hull reads exactly
+like an NPC of the same class. The afterburner is an amber halo, not a flame:
+a non-rotating icon has no stern to point one out of.
+
 ## Hull portraits
 
 The HUD's ship-status panel and the fitting window's identity block carry a
@@ -246,7 +270,7 @@ top-down portrait of the hull beside its name: the fleet's nine built-in
 rasters, drawn to be told apart by silhouette at 72 px.
 
 - **Drop-in wins**: a PNG at `assets/hulls/<ship-id>.png` is that hull's
-  portrait on every surface (and its world sprite), through the same
+  portrait on every portrait surface, through the same
   convention root as every other drop-in; the embedded raster below is the
   fallback. `render.HullSprite` answers the file, `uikit/screens.hullArt`
   prefers it over `hulls.Get`, so an empty `assets/` draws exactly the stock
@@ -262,12 +286,11 @@ rasters, drawn to be told apart by silhouette at 72 px.
   embeds all three via `//go:embed`; any hull id in `content/data/ships`
   resolves, and `uikit/hulls.Get` returns the smallest committed raster at or
   above the requested size (else the largest), `nil` for another id.
-- **Look**: flat vector, nose to the right (+X, like the world sprites),
-  mirrored about the hull's centreline, filling the frame with a slight
+- **Look**: flat vector, nose to the right (+X), mirrored about the hull's
+  centreline, filling the frame with a slight
   margin. Steel/hull greys (`#8fa3bd` family, matching the world fill) plus
   **one restrained accent light per hull** (engine glow / running lights /
-  core), 3–6 flat fills, no gradients. Class silhouettes follow the world
-  render: sloop sleek frigate, patrol blunt cutter, cutlass long destroyer,
+  core), 3–6 flat fills, no gradients. Class silhouettes: sloop sleek frigate, patrol blunt cutter, cutlass long destroyer,
   barge drill-and-gantry miner, hauler refined box, npc-hauler caged crate
   ship, scuttler spindly worker, marauder clawed heavy, hierarch layered
   overseer (accents: ice, amber, ember, safety orange, pale cyan, rust,
