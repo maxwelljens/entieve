@@ -666,7 +666,7 @@ func (g *Game) syncMounts() {
 
 // syncProficiencyCompanions keeps the tree's two companions in step with
 // the layer: the overview window opens with it and closes with it (its ×
-// keeps it closed for this visit), and the family card never outlives the
+// keeps it closed for this visit), and the proficiency card never outlives the
 // tree. The layer's own camera resets on unmount (Proficiency.Unmounted),
 // so a reopened tree starts fitted.
 func (g *Game) syncProficiencyCompanions() {
@@ -887,7 +887,7 @@ func (g *Game) gameServices() screenServices {
 		// is the sim's families (see proficiencyModel), gate sentence and all.
 		Proficiency: g.proficiencyModel,
 		Viewport:    func() image.Rectangle { return image.Rect(0, 0, g.w, g.h) },
-		// The family card is the kit's dialog: the tree asks it which family
+		// The proficiency card is the kit's dialog: the tree asks it which family
 		// is open so its node can wear the selected state.
 		ProfFamily: func() string {
 			if g.kit == nil {
@@ -1035,7 +1035,7 @@ func (g *Game) removeScene(match func(Scene) bool) {
 // onEscape implements the Esc menu toggle.
 func (g *Game) onEscape() error {
 	// The proficiency tree is modal over the world: Esc closes it before
-	// anything behind it (the Esc menu included). An open family card is
+	// anything behind it (the Esc menu included). An open proficiency card is
 	// one step above the tree: Esc backs out of the card first.
 	if g.kit != nil && g.kit.ProfFamilyOpen() {
 		g.kit.CloseProfFamily()

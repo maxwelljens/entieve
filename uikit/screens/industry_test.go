@@ -380,13 +380,14 @@ func TestInfoPagesCarryManufacturingChain(t *testing.T) {
 		t.Errorf("USED IN hull row = %+v, want a ship-husnek link", r)
 	}
 
-	// Hull page: family + base time above the input links.
+	// Hull page: craft line + base time above the input links (the craft
+	// line is the manufacturing window's key, never a proficiency).
 	page, ok = infoPageFor(env, widgets.ShipRef("ship-husnek"))
 	if !ok {
 		t.Fatal("hull page did not resolve")
 	}
-	if r := mustRow(t, page, "MANUFACTURED FROM", "Family"); r.Value != "Hulls" {
-		t.Errorf("family row = %+v, want Hulls", r)
+	if r := mustRow(t, page, "MANUFACTURED FROM", "Craft"); r.Value != "Hulls" {
+		t.Errorf("craft row = %+v, want Hulls", r)
 	}
 	if r := mustRow(t, page, "MANUFACTURED FROM", "Base time"); r.Value != "600.0 s" {
 		t.Errorf("base time row = %+v, want 600.0 s", r)

@@ -100,7 +100,7 @@ const layoutBytesGolden = `{
       "x": 190,
       "y": 24,
       "w": 900,
-      "h": 631,
+      "h": 613,
       "open": false
     },
     "infowin": {
@@ -231,7 +231,7 @@ const layoutBytesGolden = `{
       "x": 97,
       "y": 276,
       "w": 402,
-      "h": 244,
+      "h": 226,
       "open": false
     },
     "refinery": {

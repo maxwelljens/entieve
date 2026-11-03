@@ -90,7 +90,7 @@ var proficiencyInfo = map[string]ProfInfo{
 		},
 	},
 	"rocket": {
-		Desc: "Launcher-mounted rockets; short-range volleys that arrive in a burst. The family covers the launchers.",
+		Desc: "Launcher-mounted rockets; short-range volleys that arrive in a burst. This proficiency covers the launchers.",
 		Practice: []string{
 			"Every point of damage a rocket volley lands.",
 			"The hull you fly takes a 10% cut of that damage.",

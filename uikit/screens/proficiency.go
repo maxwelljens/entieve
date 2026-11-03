@@ -26,11 +26,11 @@ type ProfPrereq struct {
 	Level  int
 }
 
-// ProfFamily is one proficiency family as the pilot sees it: the level
+// ProfFamily is one proficiency as the pilot sees it: the level
 // granted, the XP banked toward the next (XP/XPNext, 0 at the cap), the
 // authored prerequisites and whether the gate is satisfied. Gate is the
 // first unmet requirement's sentence, straight from the sim's one walk
-// ("Requires Autocannon II", "" while Meets): the tree and the family card
+// ("Requires Autocannon II", "" while Meets): the tree and the proficiency card
 // print it and never word a gate themselves.
 type ProfFamily struct {
 	Family   string // stable family id
@@ -66,7 +66,7 @@ const (
 	profZoomMax  = 2.0
 
 	// profSlop is how far a press may travel and still count as a click
-	// (design px): a jittery hand still opens the family card, a drag pans.
+	// (design px): a jittery hand still opens the proficiency card, a drag pans.
 	profSlop = 4
 
 	// profGridStep is the backdrop's faint blueprint grid.
@@ -74,9 +74,9 @@ const (
 )
 
 // Proficiency is the proficiency graph (the owner's "tech tree"): every
-// proficiency family as a node, its prerequisite edges as curved arrows
+// proficiency as a node, its prerequisite edges as curved arrows
 // (prerequisite → dependent), the pilot's level pips and XP readout on each
-// node, and the gated families dimmed. Click a node for its family card
+// node, and the gated proficiencies dimmed. Click a node for its proficiency card
 // (what it is for and what pays it practice); the node keeps the hover look
 // while its card is open, so the tree says which family you are reading.
 // Drag the bare layer to pan, wheel to zoom.
@@ -141,7 +141,7 @@ type profViewState struct {
 
 // NewProficiency builds the proficiency layer over the pilot's model (nil
 // reads as no families), the live viewport (nil keeps the design viewport)
-// and the open family card's family (nil reads as no card). Mount it with
+// and the open proficiency card's family (nil reads as no card). Mount it with
 // Kit.AddBackdropWindow and call Sync every frame.
 func NewProficiency(env widgets.Seams, model func() []ProfFamily, viewport func() image.Rectangle, openFamily func() string) *Proficiency {
 	p := &Proficiency{th: env, as: env, ptr: env.Pointer(), model: model, viewport: viewport,
@@ -192,7 +192,7 @@ func (p *Proficiency) Unmounted() {
 }
 
 // Sync fits the layer to the viewport, polls the frame's gesture, and
-// repaints when the model, the camera, the hover or the open family card
+// repaints when the model, the camera, the hover or the open proficiency card
 // moved.
 func (p *Proficiency) Sync() {
 	p.fit()

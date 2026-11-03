@@ -360,7 +360,7 @@ var screens = []Screen{
 		// name distinguishes the row from its summary window, which is the
 		// one titled "Proficiency".
 		ID: idProficiency, Title: "Proficiency tree", Icon: "stat_tracking",
-		Key: ebiten.KeyT, Action: "proficiency", Desc: "toggle proficiency tree (families, levels and prerequisites)",
+		Key: ebiten.KeyT, Action: "proficiency", Desc: "toggle proficiency tree (levels and prerequisites)",
 		DefaultRect: uikit.ProficiencyRect(),
 		Anchor:      AnchorViewport,
 		DockPolicy:  DockFloating,

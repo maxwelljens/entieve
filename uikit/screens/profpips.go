@@ -8,10 +8,10 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-// profPipColor is one level pip's fill: an empty pip is the border role at
-// 200, an earned one the accent solid, and an earned pip on a shut branch
-// (a locked family) the accent at 120, because the practice is banked but
-// the branch stays closed.
+// profPipColor is one level pip's fill: a pip past the level is the border
+// role at 200, a filled one the accent solid, and a filled pip on a shut
+// branch the accent at 120: a banked level behind a closed gate, or a
+// required level the pilot does not meet yet (Show Info's row).
 func profPipColor(k, level int, locked bool, pal theme.Palette) color.Color {
 	switch {
 	case k >= level:
@@ -24,9 +24,10 @@ func profPipColor(k, level int, locked bool, pal theme.Palette) color.Color {
 }
 
 // drawProfPips paints the level pips from (x, y): one box per reachable
-// level, filled up to the granted level, step apart. The tree's node, the
-// family card's level line and Show Info's PROFICIENCY level row all read
-// this painter, so one family's pips cannot say two things in two places.
+// level, filled up to the given level, step apart. The tree's node and the
+// proficiency card's level line pass the pilot's level, and Show Info's
+// PROFICIENCY row passes the def's required level; one painter means a level
+// cannot read two ways on one surface set.
 func drawProfPips(dst *ebiten.Image, x, y, level, max, step, size int, locked bool, pal theme.Palette) {
 	for k := 0; k < max; k++ {
 		col := profPipColor(k, level, locked, pal)

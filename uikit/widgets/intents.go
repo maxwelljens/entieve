@@ -120,7 +120,7 @@ type (
 	// dialog, so this carries no command).
 	ShowContact struct{ Offer content.ContractID }
 
-	// ShowProfFamily opens the proficiency family card: the tree's node
+	// ShowProfFamily opens the proficiency card: the tree's node
 	// click asks for one family's page (what it is for, what pays it
 	// practice) and hands the click point so the card opens beside the
 	// node instead of over the graph's middle. Host-owned like
