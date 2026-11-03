@@ -222,9 +222,10 @@ two resets) and a **refuse** when the keybindings window rejects a chord
 (a fixed shortcut or a Ctrl chord). They are mixed at `master × UI` and
 play at 80% on a fresh install. Two panels are
 **always-on chrome** and cannot be closed or moved: the **ship status**
-panel (bottom center left half: the hull portrait, then a readout
-column: shield / armor / structure bars with their current/max values
-inside, the velocity wedge and its m/s figure immediately right of them
+panel (bottom center left half: the hull portrait with the hull's name
+under it, then a readout column: shield / armor / structure bars with
+their current/max values inside, the velocity wedge and its m/s figure
+immediately right of them
 on the same band, and the capacitor bar spanning the full column
 beneath) and the **module rack**
 (bottom center right half; each cell is a class-glyph tile with the

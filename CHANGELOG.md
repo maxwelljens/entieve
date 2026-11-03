@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The HUD names your hull**: the status panel prints the hull's display
+  name ("Vaštrek") centred under the portrait, on the portrait's own repaint
+  seam, trimmed to the portrait's width. The portrait gains a real inset on
+  top of the panel's margin (8 -> 16 px from the panel edge, 6 -> 14 px to
+  the readouts), so the status panel is 16 px wider and the pair 616 px at
+  1280x720 (464..1080, 103 px clear of the log's 361 right edge). Its height
+  is unchanged: the readouts column still sets the 150 px panel.
+
 - **Wider ship portraits**: the HUD status portrait and the fitting window's
   identity portrait double in width, 120x60 -> 240x60 (a 4:1 frame; Show
   Info's 200x100 hero is unchanged). The HUD's status+rack pair grows with

@@ -138,7 +138,13 @@ func TestHudCaptureFrame(t *testing.T) {
 					box, uitest.InkIn(img, box))
 			}
 
-			// --- 2. Health bars deplete at 50/75/90 %: the layer colour inside the
+			// --- 2. The hull name under the portrait: inked in its box.
+			if nb := h.hullName.GetWidget().Rect; uitest.InkIn(img, nb) < 40 {
+				fail("hull name box %v has %d ink pixels, want the hull's name",
+					nb, uitest.InkIn(img, nb))
+			}
+
+			// --- 3. Health bars deplete at 50/75/90 %: the layer colour inside the
 			// fill (sampled left of the printed value), the dark panel in the tail.
 			rgb := func(x, y int) (int, int, int) {
 				r, gch, b, _ := img.At(x, y).RGBA()
@@ -168,7 +174,7 @@ func TestHudCaptureFrame(t *testing.T) {
 				}
 			}
 
-			// --- 3. Strip: above the status panel, clock icon inked, wallet at the
+			// --- 4. Strip: above the status panel, clock icon inked, wallet at the
 			// right edge.
 			strip := h.strip.GetWidget().Rect
 			status := h.status.GetWidget().Rect
