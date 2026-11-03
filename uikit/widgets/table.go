@@ -130,11 +130,42 @@ const (
 // step ("" = the row's default face), colour (zero = the palette's text
 // colour) and minimum width in LIVE pixels (0 = the text's own width,
 // already scaled by the caller like every widget minimum here).
+//
+// Icon names a manifest glyph drawn in the inline icon box before the text
+// ("" = none), tinted like the text. HasBar makes the cell a progress strip
+// instead of a text run: MinW wide, Bar (0..1) filled in Tint over the
+// house bar track — the state readouts' meter, never a text stand-in.
 type RowSeg struct {
-	Text string
-	Tint color.RGBA
-	Step string
-	MinW int
+	Text   string
+	Tint   color.RGBA
+	Step   string
+	MinW   int
+	Icon   string
+	Bar    float64
+	HasBar bool
+}
+
+// RowBarH is a rich row's progress strip height (design px): thin chrome on
+// the row's line box, square-cornered like every meter (docs/ART.md).
+const RowBarH = 6
+
+// PaintBar paints a progress strip into dst: the house track (the palette's
+// cell role at 160) over the full width, then fill up to frac (clamped 0..1,
+// whole pixels). The fitting window's capacitor bar and the HUD's meters
+// paint the same two rects; a rich row's strip is the same meter at line
+// height.
+func PaintBar(dst *ebiten.Image, frac float64, p theme.Palette, fill color.RGBA) {
+	b := dst.Bounds()
+	theme.FillRect(dst, b, theme.NRGBA(p.Cell, 160))
+	if fw := BarFillW(b.Dx(), frac); fw > 0 {
+		theme.FillRect(dst, image.Rect(b.Min.X, b.Min.Y, b.Min.X+fw, b.Max.Y), fill)
+	}
+}
+
+// BarFillW is the filled width of a w-px progress strip at frac, clamped to
+// 0..1 and rounded to whole pixels.
+func BarFillW(w int, frac float64) int {
+	return int(math.Round(math.Max(0, math.Min(1, frac)) * float64(w)))
 }
 
 // RowLine is one line of a rich row's stack: a run of cells drawn left to
@@ -190,10 +221,21 @@ func NewStackRow(env Seams, row TableRow, face *text.Face) *StackRow {
 		}
 		return env.Face(step)
 	}
-	seg := func(s RowSeg) *widget.Text {
+	seg := func(s RowSeg) widget.PreferredSizeLocateableWidget {
 		col := s.Tint
 		if col.A == 0 {
 			col = p.Text
+		}
+		if s.HasBar {
+			img := ebiten.NewImage(max(1, s.MinW), theme.Px(RowBarH))
+			PaintBar(img, s.Bar, p, col)
+			return widget.NewGraphic(
+				widget.GraphicOpts.Image(img),
+				widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.MinSize(
+					max(1, s.MinW), theme.Px(RowBarH)),
+					widget.WidgetOpts.LayoutData(widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}),
+				),
+			)
 		}
 		opts := []widget.TextOpt{
 			widget.TextOpts.Text(s.Text, cellFace(s.Step), theme.Solid(col)),
@@ -201,7 +243,21 @@ func NewStackRow(env Seams, row TableRow, face *text.Face) *StackRow {
 		if s.MinW > 0 {
 			opts = append(opts, widget.TextOpts.WidgetOpts(widget.WidgetOpts.MinSize(s.MinW, 0)))
 		}
-		return widget.NewText(opts...)
+		txt := widget.NewText(opts...)
+		if s.Icon == "" {
+			return txt
+		}
+		box := theme.NewIconBox(theme.IconInline)
+		box.Set(s.Icon, col)
+		c := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(theme.Px(theme.IconGap)),
+		)))
+		for _, k := range []widget.PreferredSizeLocateableWidget{box.Widget(), txt} {
+			k.GetWidget().LayoutData = widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
+			c.AddChild(k)
+		}
+		return c
 	}
 	// A ref'd line is its own gesture target (the installer's line half).
 	// The double-click state is per line: like every surface, one build's

@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -30,9 +31,11 @@ func TestStandingGateFlipsWithTheSim(t *testing.T) {
 		t.Fatal("fixture: no standing-gated offer at the port")
 	}
 	min := offer.MinStanding
-	want := gateText(min)
+	// The screen states the gate as a meter now; the sim still refuses in
+	// words, and that sentence is the drift pin (min, two decimals).
+	want := "Requires standing " + strconv.FormatFloat(min, 'f', 2, 64)
 	if want != "Requires standing 0.20" {
-		t.Fatalf("the gated offer states %q, want the sim's own sentence", want)
+		t.Fatalf("the gated offer wants %q, want the sim's own sentence", want)
 	}
 
 	setStanding := func(v float64) {

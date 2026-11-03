@@ -176,7 +176,7 @@ and a photo shrunk into a thumb no longer shimmers. Sites adopt it
 deliberately, one at a time: today the **contact portraits** do (the dock
 row's full-height thumb and the Details dialog's frame, via
 `ContactPortraitFor`) and so do the **hull portraits** (the HUD's 2:1 status
-box, the Show Info hull hero and the fitting window's square block, all
+box, the Show Info hull hero and the fitting window's 2:1 block, all
 through `uikit/screens.hullArt` → `render.HullSpriteFor`, which asks for the
 level covering the frame the art is contained into). Station and asteroid
 sprites still draw their full-resolution image, and the icon set is not part
@@ -274,13 +274,16 @@ rasters, drawn to be told apart by silhouette at 72 px.
   convention root as every other drop-in; the embedded raster below is the
   fallback. `render.HullSprite` answers the file, `uikit/screens.hullArt`
   prefers it over `hulls.Get`, so an empty `assets/` draws exactly the stock
-  art. The file is *contained* in the block it fills (aspect preserved,
-  centred, never cropped) and sampled through its mip chain
-  (`render.HullSpriteFor`), so author it landscape: the drop-in canvases are
-  authored 1376×768 side views and the blocks are 2:1 wide (the HUD's 120×60
-  and the Show Info hero's 200×100) or square (the fitting block's 120). The
-  transparent margin of a wide canvas pads the 2:1 box and stays invisible on
-  its plate.
+  art. The load crops the file to its **ink** (`render.InkCrop`): the
+  canvas is mostly transparent margin, so the portrait fits the ship, not
+  the empty space around it. The art is then *contained* in the block it
+  fills (aspect preserved, centred, never cropped) and sampled through its
+  mip chain (`render.HullSpriteFor`), so author it landscape: the drop-in
+  canvases are authored 1376×768 side views, the shipped ships sit in a
+  4–5:1 band, and every block is 2:1 wide (the HUD's 120×60, the fitting
+  window's 120×60 and the Show Info hero's 200×100). A ship wider than 2:1
+  fills the block's full width; a squarer one (the committed rasters' ink is
+  ~1.8:1) fills its height. Either way nothing is cropped.
 - **Where**: `uikit/hulls/svg/<hull-id>.svg` (sources) → `uikit/hulls/<hull-id>-120.png`
   and `-240.png` (committed rasters) + `manifest.json` (hashes). The package
   embeds all three via `//go:embed`; any hull id in `content/data/ships`

@@ -72,6 +72,7 @@ const (
 	boardThumbH   = boardRowH
 	boardThumbW   = boardRowH * 2 / 3 // 2:3
 	boardKindW    = 60                // the type chip's column: every reward starts on the same x
+	boardGateBarW = 90                // the standing gate's progress strip (a row's third line)
 	stackPad      = 2 * widgets.RichPad
 
 	boardInnerW = StationWinW - 2*boardPad // body content width at the floor: 337
@@ -290,7 +291,9 @@ type contactRowModel struct {
 	Title    string            // line 1
 	Kind     string            // the mission-type chip, offers only
 	Reward   string            // line 2, offers only (the money and the item)
-	Require  string            // the standing gate, gated offers only
+	Gate     float64           // line 3's gate bar: standing / the requirement, clamped 0..1
+	Gated    bool              // the offer names a standing requirement (a bar, never text)
+	Met      bool              // ... and the sim clears it (a full, accent bar)
 	Gain     string            // the standing gain, offers only
 	Stock    string            // the destination's requisition stock, deliveries only
 	Icon     string            // uikit icon name for the objective kind ("" = none)
@@ -361,8 +364,10 @@ func (b *ContactsPanel) build() contactsModel {
 		}
 		if accepted[o.Def.ID] {
 			r.Action, r.Disabled = "Accepted", true
-		} else if !b.cv.MeetsStanding(o.MinStanding) { // the sim's accept gate, epsilon included
-			r.Require = gateText(o.MinStanding)
+		}
+		if o.MinStanding > 0 {
+			r.Gated, r.Met = true, b.cv.MeetsStanding(o.MinStanding) // the sim's gate, epsilon included
+			r.Gate = gateFrac(at.Standing, o.MinStanding)
 		}
 		m.Offers = append(m.Offers, r)
 	}
@@ -532,21 +537,26 @@ func (b *ContactsPanel) rowStack(r contactRowModel, active bool) []widgets.RowLi
 		MinW: theme.Px(b.cols.text),
 	}}}}
 
-	// Line 2: the type chip, then the payout.
+	// Line 2: the type chip, then the payout under the coins mark.
 	lines = append(lines, widgets.RowLine{Segs: []widgets.RowSeg{
 		{Text: r.Kind, Tint: p.Head, Step: theme.StepTiny, MinW: theme.Px(boardKindW)},
-		{Text: b.ellip(r.Reward, theme.StepTiny, float64(theme.Px(b.cols.reward))), Tint: p.Good, Step: theme.StepTiny},
+		{Text: b.ellip(r.Reward, theme.StepTiny, float64(theme.Px(b.cols.reward))), Icon: rewardMoneyIcon, Tint: p.Good, Step: theme.StepTiny},
 	}})
 
 	// Line 3: the asides a summary row still owes the player — why the
 	// accept inside Details is gated, the standing the work pays and a
-	// delivery's live stock.
+	// delivery's live stock. The gate is a meter, not a sentence: the same
+	// standing / requirement fraction the Details page draws.
 	var aside []widgets.RowSeg
-	if r.Require != "" {
-		aside = append(aside, widgets.RowSeg{Text: r.Require, Tint: p.Warn, Step: theme.StepTiny})
+	if r.Gated {
+		fill := p.Warn // short of the gate
+		if r.Met {
+			fill = p.Accent
+		}
+		aside = append(aside, widgets.RowSeg{Bar: r.Gate, HasBar: true, Tint: fill, MinW: theme.Px(boardGateBarW)})
 	}
 	if r.Gain != "" {
-		aside = append(aside, widgets.RowSeg{Text: r.Gain, Tint: p.Dim, Step: theme.StepTiny})
+		aside = append(aside, widgets.RowSeg{Text: r.Gain, Icon: rewardStandingIcon, Tint: p.Dim, Step: theme.StepTiny})
 	}
 	if r.Stock != "" {
 		aside = append(aside, widgets.RowSeg{Text: r.Stock, Tint: p.Dim, Step: theme.StepTiny})
@@ -576,19 +586,22 @@ func (b *ContactsPanel) contactRowSpec(r contactRowModel, active bool) widgets.R
 // objectiveRef moved to contactwin.go: the Details dialog resolves the
 // objective for its Inspect verb.
 
-// gateText is the standing gate stated the same way on the row and in the
-// Details dialog.
-func gateText(min float64) string { return fmt.Sprintf("Requires standing %.2f", min) }
+// The reward glyphs: the manifest's coins for a payout and the contracts
+// office's scroll for standing (the closest mark the set carries — no badge,
+// medal or reputation glyph ships). Both screens draw the same pair.
+const (
+	rewardMoneyIcon    = "coins"
+	rewardStandingIcon = "svc_contracts"
+)
 
-// rewardText renders the offer's reward line, e.g.
-// "40,000.00 € · +0.10 standing" — the shared money presentation
-// (theme.FormatCredits), the one every readout uses.
-func rewardText(def *content.ContractDef) string {
-	s := theme.FormatCredits(def.Reward.Credits)
-	if def.Reward.StandingGain != 0 {
-		s += fmt.Sprintf(" · %+.2f standing", def.Reward.StandingGain)
+// gateFrac is the standing gate as a bar fraction: the player's standing over
+// the offer's requirement, clamped to 0..1 (a cleared gate reads full). Both
+// the row's strip and the Details page's bar draw this one number.
+func gateFrac(have, need float64) float64 {
+	if need <= 0 {
+		return 1
 	}
-	return s
+	return math.Max(0, math.Min(1, have/need))
 }
 
 // ellip truncates s with "…" so it measures at most w in the given

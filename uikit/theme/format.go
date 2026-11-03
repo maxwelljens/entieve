@@ -79,20 +79,6 @@ func ContractLabel(kind string) string {
 	return KindLabel(kind)
 }
 
-// PatronLabel names a contact's patron; an unknown patron falls back to the
-// title-cased id.
-func PatronLabel(patron string) string {
-	switch patron {
-	case content.PatronCommission:
-		return "Commission"
-	case content.PatronCharter:
-		return "Charter"
-	case content.PatronCorporation:
-		return "Corporation"
-	}
-	return KindLabel(patron)
-}
-
 // FormatInt formats n with thousands separators: 12345 → "12,345".
 func FormatInt(n int64) string { return format.GroupInt(n) }
 
