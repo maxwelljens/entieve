@@ -715,7 +715,7 @@ func TestSettingsPPathStaysPlain(t *testing.T) {
 	if w := g.host.Window(idSettings); w == nil || w.Modal {
 		t.Error("P opened settings modal, want the ordinary floating window")
 	}
-	if g.overUI(1000, 500) {
+	if g.overUI(1150, 500) {
 		t.Error("P put a modal layer over the world")
 	}
 }

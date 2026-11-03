@@ -106,12 +106,19 @@ func addSprite(key string, img image.Image) {
 	}
 }
 
-// InkCrop returns src cropped to the bounds of its non-transparent pixels,
-// without copying them. Hull portrait canvases are mostly transparent margin
-// (the owner's are 1376×768 with a 4–5:1 ship band) and the portrait blocks
-// fit the ART, so the load drops the margin instead of padding every frame
-// with it (uikit/screens.hullArt). A fully transparent source, or a decoded
-// type that cannot be sub-imaged (a paletted PNG), comes back unchanged.
+// InkCrop returns src cropped to the bounds of its visible ink, without
+// copying them. Hull portrait canvases are mostly transparent margin (the
+// owner's are 1376×768 with a 4–5:1 ship band) and the portrait blocks fit
+// the ART, so the load drops the margin instead of padding every frame with
+// it (uikit/screens.hullArt). A fully transparent source, or a decoded type
+// that cannot be sub-imaged (a paletted PNG), comes back unchanged.
+//
+// "Visible" is the inkAlphaFloor line: a dropped hull PNG carries a soft
+// outer glow at alpha ≤ 16/255 that reaches its canvas edge, and cropping to
+// the first non-zero pixel left every drop-in fitting ~1.8–2.5:1 — the small
+// ship with wide empty bands the ink-fit wave removed, and the reason a 4:1
+// portrait frame (240×60) could not fill its width. The embedded rasters are
+// hard-edged, so the floor only moves the drop-ins.
 func InkCrop(src image.Image) image.Image {
 	if src == nil {
 		return nil
@@ -120,7 +127,7 @@ func InkCrop(src image.Image) image.Image {
 	minX, minY, maxX, maxY := b.Max.X, b.Max.Y, b.Min.X, b.Min.Y
 	for y := b.Min.Y; y < b.Max.Y; y++ {
 		for x := b.Min.X; x < b.Max.X; x++ {
-			if _, _, _, a := src.At(x, y).RGBA(); a == 0 {
+			if _, _, _, a := src.At(x, y).RGBA(); a <= inkAlphaFloor {
 				continue
 			}
 			minX, minY = min(minX, x), min(minY, y)
@@ -139,6 +146,13 @@ func InkCrop(src image.Image) image.Image {
 	}
 	return src
 }
+
+// inkAlphaFloor is the 16-bit alpha under which a dropped canvas pixel is
+// margin, not art: the owner's hull PNGs carry a soft glow at ≤ 16/255 out
+// to the canvas edge (invisible against a panel) and the portraits must fit
+// the ship, not its haze. 0x1010 is 16/255 in image.Image.RGBA's 16-bit
+// scale; the drop-ins' glow and their ship bodies leave a wide gap there.
+const inkAlphaFloor = 0x1010
 
 // spriteFor returns the art sprite registered under key — a convention path
 // such as "hulls/ship-vastrek" (i.e. assets/hulls/ship-vastrek.png) — or nil

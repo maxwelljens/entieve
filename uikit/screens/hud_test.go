@@ -391,6 +391,9 @@ func TestHudDrawSmoke(t *testing.T) {
 	tg.Locks = []sim.Lock{{Target: target.Entity, Progress: 1}}
 	c.Frame(t, 1280, 720)
 
+	// The pair centres in the band the log's pocket leaves free (the
+	// left padding carries the log's 264 px width), not on the viewport: a
+	// viewport-centred 600 px pair would start at 340, 21 px inside the log.
 	pair := h.pair.GetWidget().Rect
 	status := h.status.GetWidget().Rect
 	strip := h.strip.GetWidget().Rect
@@ -398,8 +401,9 @@ func TestHudDrawSmoke(t *testing.T) {
 	if pair.Max.Y < 709 || pair.Max.Y > 711 {
 		t.Errorf("pair bottom = %d, want 710 (bottom-centred)", pair.Max.Y)
 	}
-	if want := (1280 - pair.Dx()) / 2; pair.Min.X < want-1 || pair.Min.X > want+1 {
-		t.Errorf("pair x = %d, want %d (centred)", pair.Min.X, want)
+	band := theme.Px(10 + LogDefaultW)
+	if want := band + (1280-band-theme.Px(10)-pair.Dx())/2; pair.Min.X < want-1 || pair.Min.X > want+1 {
+		t.Errorf("pair x = %d, want %d (centred right of the log pocket)", pair.Min.X, want)
 	}
 	if pair.Min.X <= 361 {
 		t.Errorf("pair left = %d, want clear of the log pocket (right edge 361)", pair.Min.X)
@@ -407,13 +411,13 @@ func TestHudDrawSmoke(t *testing.T) {
 	if status.Max.Y != pair.Max.Y {
 		t.Errorf("status bottom = %d, want the pair baseline %d", status.Max.Y, pair.Max.Y)
 	}
-	// The portrait is the owner's 2:1 box: half its width tall, so it reads
-	// as a ship and not an icon, and it never widens the pair (the 1280 log
-	// pocket caps the pair at 558 px; rack.go).
+	// The portrait is the owner's 240×60 box: a quarter of its width tall,
+	// the frame its drop-in art (~4.8:1 ink) fills width-bound without
+	// distortion (contain, hullart.go).
 	if p := h.portraitGfx.GetWidget().Rect; p.Dx() != theme.Px(hudPortraitW) || p.Dy() != theme.Px(hudPortraitH) {
-		t.Errorf("portrait box = %v, want the %d×%d 2:1 box", p, theme.Px(hudPortraitW), theme.Px(hudPortraitH))
-	} else if p.Dx() != 2*p.Dy() {
-		t.Errorf("portrait box %v is not 2:1 wide", p)
+		t.Errorf("portrait box = %v, want the %d×%d box", p, theme.Px(hudPortraitW), theme.Px(hudPortraitH))
+	} else if p.Dx() != 4*p.Dy() {
+		t.Errorf("portrait box %v is not 4:1 wide", p)
 	}
 	if rack.Max.Y != pair.Max.Y || rack.Min.X != status.Max.X+theme.Px(hudPairGap) {
 		t.Errorf("rack %v, want bottom-aligned right of the status %v", rack, status)

@@ -276,14 +276,19 @@ rasters, drawn to be told apart by silhouette at 72 px.
   prefers it over `hulls.Get`, so an empty `assets/` draws exactly the stock
   art. The load crops the file to its **ink** (`render.InkCrop`): the
   canvas is mostly transparent margin, so the portrait fits the ship, not
-  the empty space around it. The art is then *contained* in the block it
-  fills (aspect preserved, centred, never cropped) and sampled through its
-  mip chain (`render.HullSpriteFor`), so author it landscape: the drop-in
+  the empty space around it, and the crop ignores the soft glow the
+  canvases carry below ~6 % alpha (`inkAlphaFloor`): that haze reaches the
+  canvas edge and would otherwise make every drop-in fit ~1.8–2.5:1. The
+  art is then *contained* in the block it fills (aspect preserved, centred,
+  never cropped) and sampled through its mip chain
+  (`render.HullSpriteFor`), so author it landscape: the drop-in
   canvases are authored 1376×768 side views, the shipped ships sit in a
-  4–5:1 band, and every block is 2:1 wide (the HUD's 120×60, the fitting
-  window's 120×60 and the Show Info hero's 200×100). A ship wider than 2:1
-  fills the block's full width; a squarer one (the committed rasters' ink is
-  ~1.8:1) fills its height. Either way nothing is cropped.
+  4–5:1 band, and the portrait blocks are 4:1 wide (the HUD's and the
+  fitting window's 240×60; the Show Info hero is the 2:1 200×100). A ship
+  wider than the block's 4:1 fills its full width (the player's starting
+  hull fills the 240 px frame side to side); a squarer one (the
+  committed rasters' ink is ~1.8:1) fills its height. Either way nothing is
+  cropped.
 - **Where**: `uikit/hulls/svg/<hull-id>.svg` (sources) → `uikit/hulls/<hull-id>-120.png`
   and `-240.png` (committed rasters) + `manifest.json` (hashes). The package
   embeds all three via `//go:embed`; any hull id in `content/data/ships`

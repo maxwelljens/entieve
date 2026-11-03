@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Wider ship portraits**: the HUD status portrait and the fitting window's
+  identity portrait double in width, 120x60 -> 240x60 (a 4:1 frame; Show
+  Info's 200x100 hero is unchanged). The HUD's status+rack pair grows with
+  it, so it now centres in the band the log's pocket leaves free rather than
+  on the viewport: 472..1072 on the player's hull at 1280x720, clear of the
+  log's 361 right edge. The portrait crop also ignores the soft glow a
+  dropped canvas carries below ~6 % alpha out to its edge, which had kept
+  every drop-in fitting ~2.5:1; the player's starting hull now fills the
+  new frame's width (240x50 of ink, was 112x24).
+
 - **Ship portraits fill their frame**: the HUD status portrait, the fitting
   window's identity portrait (now 2:1, it was square) and Show Info's hull
   hero are fitted to the hull ART instead of its transparent canvas. A

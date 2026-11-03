@@ -28,8 +28,9 @@ func iconColor(c color.RGBA, a uint8) color.RGBA {
 // slots is the widest in the hull roster) fits the 1024×700 minimum window
 // beside the centered HUD. A cell is the tile icon plus a 3 px ring
 // (theme.IconTile + 6), the fitting window's grid's twin. The HUD pair is
-// centered as a whole, so the 1280 log pocket (the pair may not pass 558 px)
-// caps the cell width and the game's virgin placement table caps its height:
+// centered in the band the log's pocket leaves free (hud.go's pair anchor),
+// so the 1280 log pocket caps the pair's growth and the game's virgin
+// placement table caps its height:
 // the rows carry no High/Mid/Low label column and the panel no title bar.
 // The row order is the fitting window's; the cell tooltips name the module.
 const (

@@ -27,8 +27,8 @@ import (
 // business) with a StepTiny name line under each.
 const (
 	fitColW       = 300 + theme.ScrollGutter // identity + stats column, its scroll rail included
-	fitPortraitW  = 120                      // hull portrait box width: hudPortraitW's twin
-	fitPortraitH  = 60                       // half the width: 2:1, the hull art's own frame
+	fitPortraitW  = 240                      // hull portrait box width: hudPortraitW's twin
+	fitPortraitH  = 60                       // a quarter of the width: the hull art's own frame
 	fitTileW      = 62                       // slot tile width (rackCellW's twin: IconTile + 6)
 	fitTileH      = 62                       // slot tile height (theme.IconTile + 6)
 	fitTileNameH  = 19                       // name line under a filled tile (StepTiny line box)
@@ -373,7 +373,7 @@ func (f *Fitting) newIdentity() *widget.Container {
 }
 
 // paintPortrait repaints the hull portrait: the hull's art painted into the
-// 2:1 design box by the shared seam (the HUD's portrait and the Show Info
+// 4:1 design box by the shared seam (the HUD's portrait and the Show Info
 // hero); Sync calls it on a hull change only.
 func (f *Fitting) paintPortrait(hull content.ShipID) {
 	f.portraitDraws++

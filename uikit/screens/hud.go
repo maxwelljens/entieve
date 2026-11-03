@@ -21,11 +21,12 @@ import (
 // HUD geometry. The ship-status panel and the module rack form one
 // bottom-center pair (status left, rack right); the time/wallet strip sits
 // above the status. Widths are the 1280×720 / 1024×700 no-overlap contract:
-// the pair is 556 design px, which keeps its left edge right of the log's
-// 361 px pocket at 1280 wide.
+// the pair is 666 design px on a four-slot hull (600 on a three-slot one),
+// which no longer fits a viewport-centred seat, so the pair centres in the
+// band the log's 264 px pocket leaves free (see the pair's anchor).
 const (
-	hudPortraitW = 120  // hull portrait box width (design px): the pair's width budget (see rack.go)
-	hudPortraitH = 60   // half the width: 2:1, the owner's ships are side views (contained, padded)
+	hudPortraitW = 240  // hull portrait box width (design px): the owner's twofold frame, 4:1
+	hudPortraitH = 60   // a quarter of the width: the owner's ships are side views (contained, padded)
 	hudBarH      = 18   // one health/capacitor bar height (px)
 	hudBarMin    = 128  // capacitor bar width: fits the "1,800.0/1,800.0 GJ" value (px)
 	hudHpGap     = 2    // gap between the three health bars (px)
@@ -449,9 +450,9 @@ func NewHud(env interface {
 	)
 	readouts.AddChild(speedRow, h.speedLbl, capStack, rechargeRow)
 
-	// Hull portrait: the left slot of the status panel, a 2:1 box painted
-	// from the hulls art (repainted on hull change). Half the width tall, so
-	// the pair never grows into the log pocket at 1280 (rack.go's budget).
+	// Hull portrait: the left slot of the status panel, the owner's 4:1 box
+	// painted from the hulls art (repainted on hull change). A quarter of the
+	// width tall: the pair's seat carries the growth (see the pair's anchor).
 	h.portrait = ebiten.NewImage(theme.Px(hudPortraitW), theme.Px(hudPortraitH))
 	h.portraitGfx = widget.NewGraphic(
 		widget.GraphicOpts.Image(h.portrait),
@@ -555,7 +556,15 @@ func NewHud(env interface {
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionCenter,
 			VerticalPosition:   widget.AnchorLayoutPositionEnd,
-			Padding:            &widget.Insets{Left: theme.Px(10), Right: theme.Px(10), Bottom: theme.Px(10)},
+			// The 240 px portrait makes the pair 666 px on a four-slot hull
+			// (600 on the player's three): a viewport-centred seat would put
+			// its left edge 54 px inside the log's pocket at 1280×720 (21 px
+			// on a three-slot hull). The left padding carries the log's own
+			// width, so the pair centres in the band the pocket leaves free —
+			// 439..1105 at 1280 (log right edge 361) and still fully on
+			// screen at the 1024×700 minimum (311..977), where the pocket
+			// overlap is the log's documented one.
+			Padding: &widget.Insets{Left: theme.Px(10 + LogDefaultW), Right: theme.Px(10), Bottom: theme.Px(10)},
 		})),
 	)
 	h.pair.AddChild(left)
@@ -1409,7 +1418,7 @@ func (h *Hud) cardMods(player, tgt ecs.Entity) ([hudBoxMods]hudBoxMod, int) {
 }
 
 // paintPortrait repaints the hull portrait: the hull's art contained in the
-// 2:1 design box — the image is built at Px(hudPortraitW)×Px(hudPortraitH),
+// 4:1 design box — the image is built at Px(hudPortraitW)×Px(hudPortraitH),
 // so a scale change rebuilds the kit and the portrait with it.
 func (h *Hud) paintPortrait(hull content.ShipID) {
 	h.portraitHull = hull

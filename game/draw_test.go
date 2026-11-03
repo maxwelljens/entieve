@@ -252,7 +252,9 @@ func assertInBounds(t *testing.T, g *Game, w, h int) {
 //     design px) is wider than the pocket left of the bottom-center pair,
 //     so the two overlap there — pre-existing (the old bottom bar did the
 //     same once its labels filled in) and pinned by
-//     TestVirginPlacementTable's comment. At 1280×720 the pair clears it.
+//     TestVirginPlacementTable's comment. At 1280×720 the pair clears it
+//     (its seat centres in the band the pocket leaves free, so the 240 px
+//     portrait's extra 120 px went into that band).
 //   - the twice-as-wide overview (760 px) covers the Selected Item
 //     window's right edge at both sizes: the owner asked for the larger
 //     table and the left/top anchors stay put, so the two corner windows

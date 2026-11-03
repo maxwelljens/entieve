@@ -19,7 +19,7 @@ import (
 // resizable window docked bottom-left: with the rail gutter (RailInset)
 // on its left, 264 keeps its right edge at the historical 361. That edge
 // is clear of the HUD pair (ship status + rack) at 1280×720 but NOT at the
-// 1024×700 minimum (the pair starts at 263 there, 234 on a four-slot
+// 1024×700 minimum (the pair starts at 344 there, 311 on a four-slot
 // hull): the window's content floor (logMinW = 260) is wider than the
 // pocket left of the pair, so the two overlap there — inherent, and
 // pinned by game's TestVirginPlacementTable.

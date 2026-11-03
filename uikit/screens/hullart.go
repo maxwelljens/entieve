@@ -38,8 +38,8 @@ func hullArt(hull content.ShipID, w, h int) image.Image {
 
 // paintHullPortrait paints hull's portrait contained and centred in dst's own
 // box, and reports false (leaving dst untouched) when the hull has no art.
-// One seam for the HUD's 2:1 status portrait, the Show Info hull page's 2:1
-// hero and the fitting window's 2:1 portrait: the ART (never its transparent
+// One seam for the HUD's 4:1 status portrait, the fitting window's 4:1
+// portrait and the Show Info hull page's 2:1 hero: the ART (never its transparent
 // canvas) is contained, never covered, so the frame fills edge to edge on the
 // art's own long axis and no mast, antenna or wingtip is ever cropped.
 func paintHullPortrait(dst *ebiten.Image, hull content.ShipID) bool {
@@ -68,8 +68,9 @@ func paintHullPortrait(dst *ebiten.Image, hull content.ShipID) bool {
 // hullFit is the contain fit of a sw×sh source into a bw×bh box: the drawn
 // size, aspect preserved and never larger than the box. Contain, never
 // cover, is the policy for these blocks: the source is the art's own ink, so
-// a ship wider than 2:1 fills the width and pads above and below, a squarer
-// one fills the height, and no mast or antenna is cropped. Degenerate input
+// a ship wider than the box (4:1 on the portraits, 2:1 on the hero) fills
+// the width and pads above and below, a squarer one fills the height, and no
+// mast or antenna is cropped. Degenerate input
 // returns 0,0 so the caller skips the draw.
 func hullFit(sw, sh, bw, bh int) (dw, dh float64) {
 	if sw <= 0 || sh <= 0 || bw <= 0 || bh <= 0 {
