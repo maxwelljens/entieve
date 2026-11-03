@@ -239,6 +239,7 @@ type Hud struct {
 
 	portrait      *ebiten.Image
 	portraitGfx   *widget.Graphic
+	hullName      *widget.Text
 	portraitHull  content.ShipID
 	portraitDraws int // portrait repaint count (hull changes only)
 
@@ -462,6 +463,28 @@ func NewHud(env interface {
 		),
 	)
 
+	// The portrait's hull name, centred under the box: the fitting window's
+	// hull identity line at the status panel's smaller step. It is
+	// ellipsized to the box width, so a name never runs into the readouts.
+	h.hullName = widget.NewText(
+		widget.TextOpts.Text("", env.Face(theme.StepSmall), theme.Solid(p.Text)),
+		widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionCenter),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+	)
+	// The portrait column carries its own SpMd inset on top of the panel's
+	// ContentsPad (16 px of air from the panel edge, 14 to the readouts),
+	// horizontally only: the column is shorter than the readouts, so the
+	// vertical air is already the taller column's (the status stays 150 px).
+	portraitCol := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Spacing(theme.Px(theme.SpSm)),
+			widget.RowLayoutOpts.Padding(&widget.Insets{Left: theme.Px(theme.SpMd), Right: theme.Px(theme.SpMd)}),
+		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Position: widget.RowLayoutPositionCenter})),
+	)
+	portraitCol.AddChild(h.portraitGfx, h.hullName)
+
 	h.status = widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.PanelBox(p, theme.Solid(p.BG), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -470,7 +493,7 @@ func NewHud(env interface {
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	h.status.AddChild(h.portraitGfx, readouts)
+	h.status.AddChild(portraitCol, readouts)
 
 	// Time/wallet strip above the status: clock + multiplier left, the
 	// wallet right. No sim clock (the multiplier is the settled readout).
@@ -1419,11 +1442,15 @@ func (h *Hud) cardMods(player, tgt ecs.Entity) ([hudBoxMods]hudBoxMod, int) {
 
 // paintPortrait repaints the hull portrait: the hull's art contained in the
 // 4:1 design box — the image is built at Px(hudPortraitW)×Px(hudPortraitH),
-// so a scale change rebuilds the kit and the portrait with it.
+// so a scale change rebuilds the kit and the portrait with it. The hull's
+// name rides the same seam: same box width, same change trigger.
 func (h *Hud) paintPortrait(hull content.ShipID) {
 	h.portraitHull = hull
 	h.portraitDraws++
 	paintHullPortrait(h.portrait, hull)
+	if def, ok := h.cv.Defs().Ship(hull); ok {
+		h.hullName.Label = widgets.Ellipsize(def.Name, float64(theme.Px(hudPortraitW)), h.measure)
+	}
 }
 
 // hudColorScale converts a straight-alpha palette color for vector fills.

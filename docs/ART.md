@@ -266,8 +266,8 @@ a non-rotating icon has no stern to point one out of.
 ## Hull portraits
 
 The HUD's ship-status panel and the fitting window's identity block carry a
-top-down portrait of the hull beside its name: the fleet's nine built-in
-rasters, drawn to be told apart by silhouette at 72 px.
+top-down portrait of the hull with its name under it: the fleet's nine
+built-in rasters, drawn to be told apart by silhouette at 72 px.
 
 - **Drop-in wins**: a PNG at `assets/hulls/<ship-id>.png` is that hull's
   portrait on every portrait surface, through the same

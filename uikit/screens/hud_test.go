@@ -165,6 +165,54 @@ func TestHudStatusOnDamage(t *testing.T) {
 	}
 }
 
+// TestHudHullName pins the hull's name under the portrait: the fitted
+// hull's display name in the panel's text step, sized to the portrait's
+// box and repainted on the same seam as the art.
+func TestHudHullName(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	h := NewHud(env)
+	h.Sync()
+	sh, ok := env.Sim.Ships.Get(env.Sim.Player())
+	if !ok {
+		t.Fatal("player has no ship")
+	}
+	if def, ok := env.Content.Ship(sh.Hull); !ok {
+		t.Fatalf("content has no hull %q", sh.Hull)
+	} else if h.hullName.Label != def.Name {
+		t.Errorf("hull name = %q, want %q", h.hullName.Label, def.Name)
+	}
+
+	// The name follows a hull change (the portrait's repaint seam).
+	next := content.ShipID("ship-zdanek")
+	if next == sh.Hull {
+		next = "ship-vastrek"
+	}
+	sh.Hull = next
+	h.Sync()
+	if want := env.Content.Ships[next].Name; h.hullName.Label != want {
+		t.Errorf("name after hull change = %q, want %q", h.hullName.Label, want)
+	}
+
+	// Every shipped name fits the portrait box, so none is ever trimmed;
+	// a name that would not fit is ellipsized to it.
+	room := float64(theme.Px(hudPortraitW))
+	longest := ""
+	for _, d := range env.Content.Ships {
+		if h.measure(d.Name) > h.measure(longest) {
+			longest = d.Name
+		}
+	}
+	if w := h.measure(longest); w > room {
+		t.Errorf("longest hull name %q measures %v, wider than the %v portrait box", longest, w, room)
+	}
+	if got := widgets.Ellipsize(longest, room, h.measure); got != longest {
+		t.Errorf("longest hull name %q is trimmed to %q at the %v box", longest, got, room)
+	}
+	if got := widgets.Ellipsize("Extraordinarily Long Hull Chassis", room, h.measure); h.measure(got) > room {
+		t.Errorf("an over-long name trims to %q (%v), want ≤ the %v box", got, h.measure(got), room)
+	}
+}
+
 // TestWedgeGlyphFits pins the speed glyph inside the wedge image at the
 // doubled stat size: the bottom-left placement is clamped, never clipped.
 func TestWedgeGlyphFits(t *testing.T) {
@@ -418,6 +466,28 @@ func TestHudDrawSmoke(t *testing.T) {
 		t.Errorf("portrait box = %v, want the %d×%d box", p, theme.Px(hudPortraitW), theme.Px(hudPortraitH))
 	} else if p.Dx() != 4*p.Dy() {
 		t.Errorf("portrait box %v is not 4:1 wide", p)
+	} else {
+		// The portrait column's own air: SpMd on each side on top of the
+		// panel's ContentsPad, so the art sits 16 px from the panel edge
+		// and 14 px off the readouts (SpMd + hudStatusGap).
+		if want := status.Min.X + theme.Px(theme.ContentsPad+theme.SpMd); p.Min.X != want {
+			t.Errorf("portrait x = %d, want %d (ContentsPad + the column's SpMd)", p.Min.X, want)
+		}
+		if ro := h.status.Children()[1].GetWidget().Rect; ro.Min.X != p.Max.X+theme.Px(theme.SpMd+hudStatusGap) {
+			t.Errorf("readouts x = %d, want %d (SpMd + hudStatusGap right of the portrait)", ro.Min.X, p.Max.X+theme.Px(theme.SpMd+hudStatusGap))
+		}
+		// The hull name is the box's width directly under it (SpSm gap):
+		// no width of its own, so it never widens the pair.
+		if n := h.hullName.GetWidget().Rect; n.Min.Y != p.Max.Y+theme.Px(theme.SpSm) || n.Min.X != p.Min.X || n.Dx() != p.Dx() {
+			t.Errorf("hull name %v, want %d..%d directly under the portrait (SpSm gap)", n, p.Min.X, p.Max.X)
+		}
+	}
+	// Status width = 2×ContentsPad + portrait 240 + 2×SpMd + the name
+	// column's SpMd-into-hudStatusGap + the 128 readouts column: the
+	// portrait padding is 16 px of width, and the status height stays the
+	// readouts' 150 (the portrait column is 85 with the name).
+	if status.Dx() != 406 {
+		t.Errorf("status width = %d, want 406 (the padded portrait column + readouts)", status.Dx())
 	}
 	if rack.Max.Y != pair.Max.Y || rack.Min.X != status.Max.X+theme.Px(hudPairGap) {
 		t.Errorf("rack %v, want bottom-aligned right of the status %v", rack, status)
