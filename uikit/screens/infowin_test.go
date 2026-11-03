@@ -796,22 +796,43 @@ func TestInfoWindowProseWraps(t *testing.T) {
 }
 
 // TestInfoPageProficiencyRows pins the Show Info surface: a gated module and
-// a gated hull both carry the practice family, the required level and the
-// pilot's current level as the tree's pip boxes (filled to the level, dim on
-// a shut branch), never a worded level.
+// a gated hull each carry ONE PROFICIENCY row, naming the proficiency and
+// drawing the level fitting/flying REQUIRES as the tree's pip boxes filled to
+// the def's gate (dim while the pilot does not meet it), never a worded level
+// and never a "Family" row.
 func TestInfoPageProficiencyRows(t *testing.T) {
 	env, _ := newTestEnv(t)
 
 	mod := fixtureModule(t, env, "mod-proficiency-test", &content.ModuleDef{
-		Name: "Test Gun", Family: "autocannon", Gate: 2, Slot: content.SlotHigh, Kind: content.KindWeapon,
+		Name: "Test Gun", Family: "autocannon", Gate: 3, Slot: content.SlotHigh, Kind: content.KindWeapon,
 		Weapon: &content.WeaponAttrs{Damage: content.Damage{EM: 1}, Optimal: 1000, Falloff: 1000, Tracking: 1},
 	})
 	sec := sectionOf(modulePage(env, mod), "PROFICIENCY")
-	if req, ok := rowOf(sec, "Requirement"); !ok || req.Value != "Requires Autocannon II" {
-		t.Fatalf("module requirement = %+v, want Requires Autocannon II", req)
+	if sec == nil || len(sec.Lines) != 1 || len(sec.Lines[0]) != 1 {
+		t.Fatalf("module PROFICIENCY = %+v, want exactly one row", sec)
 	}
-	if lvl, ok := rowOf(sec, "Level"); !ok || lvl.Value != "" || lvl.PipMax != content.ProficiencyMax || lvl.PipLevel != 0 {
-		t.Fatalf("module level = %+v, want a %d-box pip row at 0 (untrained)", lvl, content.ProficiencyMax)
+	row := sec.Lines[0][0]
+	if row.Label != "Autocannon" || row.Value != "" {
+		t.Fatalf("module row = %+v, want the Autocannon name and no worded value", row)
+	}
+	if row.PipLevel != 3 || row.PipMax != content.ProficiencyMax {
+		t.Fatalf("required bars = %d of %d, want the gate's 3 of %d", row.PipLevel, row.PipMax, content.ProficiencyMax)
+	}
+	if !row.PipLocked {
+		t.Error("an untrained gate reads lit, want the dim shut-branch bars")
+	}
+
+	// Gate 0: no box filled and no "None" text, the bars say it alone.
+	open := fixtureModule(t, env, "mod-proficiency-open", &content.ModuleDef{
+		Name: "Free Gun", Family: "autocannon", Slot: content.SlotHigh, Kind: content.KindWeapon,
+		Weapon: &content.WeaponAttrs{Damage: content.Damage{EM: 1}, Optimal: 1000, Falloff: 1000, Tracking: 1},
+	})
+	sec = sectionOf(modulePage(env, open), "PROFICIENCY")
+	if sec == nil || len(sec.Lines) != 1 || len(sec.Lines[0]) != 1 {
+		t.Fatalf("open module PROFICIENCY = %+v, want one row", sec)
+	}
+	if row := sec.Lines[0][0]; row.PipLevel != 0 || row.PipMax != content.ProficiencyMax || row.PipLocked {
+		t.Errorf("gate 0 row = %+v, want %d empty lit boxes and no words", row, content.ProficiencyMax)
 	}
 
 	hull := fixtureShip(t, env, "ship-proficiency-test", &content.ShipDef{
@@ -819,10 +840,51 @@ func TestInfoPageProficiencyRows(t *testing.T) {
 		Slots: content.Slots{High: 1}, Shield: 100,
 	})
 	sec = sectionOf(shipPage(env, hull), "PROFICIENCY")
-	if req, ok := rowOf(sec, "Requirement"); !ok || req.Value != "Requires Frigate I" {
-		t.Fatalf("hull requirement = %+v, want Requires Frigate I", req)
+	if sec == nil || len(sec.Lines) != 1 || len(sec.Lines[0]) != 1 {
+		t.Fatalf("hull PROFICIENCY = %+v, want one row", sec)
 	}
-	if lvl, ok := rowOf(sec, "Level"); !ok || lvl.Value != "" || lvl.PipMax != content.ProficiencyMax {
-		t.Fatalf("hull level = %+v, want a pip row", lvl)
+	if row := sec.Lines[0][0]; row.Label != "Frigate" || row.PipLevel != 1 || row.PipMax != content.ProficiencyMax {
+		t.Errorf("hull row = %+v, want Frigate with one required box of %d", row, content.ProficiencyMax)
+	}
+}
+
+// TestInfoPagesCarryNoFamilyLabel: the proficiency vocabulary is gone from
+// every page, not just the fixtures: no shipped def's page draws a "Family",
+// "Requirement" or "Level" row any more (the three the PROFICIENCY block used
+// to own).
+func TestInfoPagesCarryNoFamilyLabel(t *testing.T) {
+	env, _ := newTestEnv(t)
+	defs := env.Defs()
+	refs := make([]widgets.InfoRef, 0, len(defs.Ships)+len(defs.Modules)+len(defs.Items)+len(defs.NPCs))
+	for id := range defs.Ships {
+		refs = append(refs, widgets.ShipRef(id))
+	}
+	for id := range defs.Modules {
+		refs = append(refs, widgets.ModuleRef(id))
+	}
+	for id := range defs.Items {
+		refs = append(refs, widgets.ItemRef(id))
+	}
+	for id := range defs.NPCs {
+		refs = append(refs, widgets.NpcRef(id))
+	}
+	if len(refs) == 0 {
+		t.Fatal("fixture: no shipped defs")
+	}
+	for _, ref := range refs {
+		page, ok := infoPageFor(env, ref)
+		if !ok {
+			t.Fatalf("%v did not resolve", ref)
+		}
+		for _, sec := range page.Sections {
+			for _, line := range sec.Lines {
+				for _, row := range line {
+					switch row.Label {
+					case "Family", "Requirement", "Level":
+						t.Errorf("%v: %s still carries a %q row", ref, sec.Label, row.Label)
+					}
+				}
+			}
+		}
 	}
 }

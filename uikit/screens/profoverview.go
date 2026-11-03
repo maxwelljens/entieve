@@ -19,7 +19,7 @@ import (
 // "Proficiency overview", titled simply Proficiency). It replaces the old
 // header printed on the layer — a title and one dim line on a busy graph
 // read poorly — with a house window that says how far the pilot has come
-// and lists every family's level at a glance. It opens and closes with the
+// and lists every proficiency's level at a glance. It opens and closes with the
 // layer; the game keeps the pair in step, and its × closes only itself
 // until the tree is reopened.
 //
@@ -29,9 +29,12 @@ import (
 // it today; adding the control means filling that strip, not re-laying the
 // window.
 const (
-	profOvW    = 386
-	profOvH    = 200
-	profOvRows = 7 // skill rows per column (two columns fill today's 14 families)
+	profOvW = 386
+	// profOvH is the painted body's height: the totals, the bar and the two
+	// skill columns, with no hint line under them (the tree says its own
+	// controls; the owner had the line removed).
+	profOvH    = 182
+	profOvRows = 7 // skill rows per column (two columns fill today's 14 proficiencies)
 
 	profOvLine = 13 // one skill row's height
 	profOvCols = 2
@@ -61,7 +64,7 @@ func ProficiencyOverviewRect() image.Rectangle {
 	return image.Rect(10, profOvY, 10+profOvW, profOvY+profOvH+theme.TitleBarH)
 }
 
-// profTotals is the overview's arithmetic: how many families are open,
+// profTotals is the overview's arithmetic: how many proficiencies are open,
 // mastered at the cap, and how many levels of the possible total are
 // earned.
 type profTotals struct {
@@ -88,9 +91,9 @@ func proficiencyTotals(fams []ProfFamily) profTotals {
 	return t
 }
 
-// ProficiencyOverview is the summary window: families open, levels earned
-// against the possible total over a progress bar, and the family list with
-// each level. It paints into its own canvas (the layer's idiom) and
+// ProficiencyOverview is the summary window: proficiencies open, levels
+// earned against the possible total over a progress bar, and the proficiency
+// list with each level. It paints into its own canvas (the layer's idiom) and
 // repaints only when the model moves.
 type ProficiencyOverview struct {
 	th    theme.Theme
@@ -106,7 +109,7 @@ type ProficiencyOverview struct {
 }
 
 // NewProficiencyOverview builds the summary window over the pilot's model
-// (nil reads as no families). Mount it with Kit.AddWindow and call Sync
+// (nil reads as no proficiencies). Mount it with Kit.AddWindow and call Sync
 // every frame.
 func NewProficiencyOverview(env widgets.Seams, model func() []ProfFamily) *ProficiencyOverview {
 	o := &ProficiencyOverview{th: env, model: model}
@@ -154,7 +157,7 @@ func (o *ProficiencyOverview) Sync() {
 }
 
 // draw paints the summary: the totals, the progress bar, the (empty) filter
-// band, the skill list in two columns and the navigation hint.
+// band and the skill list in two columns.
 func (o *ProficiencyOverview) draw(fams []ProfFamily) {
 	pal := o.th.Pal()
 	o.img.Clear()
@@ -167,7 +170,7 @@ func (o *ProficiencyOverview) draw(fams []ProfFamily) {
 	t := proficiencyTotals(fams)
 	y := 2
 
-	o.text(fmt.Sprintf("%d of %d families open", t.Open, t.Families),
+	o.text(fmt.Sprintf("%d of %d proficiencies open", t.Open, t.Families),
 		o.th.FaceBold(theme.StepSmall), pad, y, pal.Text)
 	y += 21
 	o.text(fmt.Sprintf("%d of %d levels earned · %d at the cap", t.Levels, t.MaxLevels, t.Maxed),
@@ -214,9 +217,6 @@ func (o *ProficiencyOverview) draw(fams []ProfFamily) {
 		o.text(lv, o.th.Face(theme.StepTiny),
 			x+colW-theme.Px(int(render.Measure(lv, o.th.TS().Tiny))), ry, level)
 	}
-	y += profOvRows * rowH
-	o.text("drag to pan · wheel to zoom · click a family · Esc closes",
-		o.th.Face(theme.StepTiny), pad, y, pal.Head)
 }
 
 // text draws one line on the summary canvas.

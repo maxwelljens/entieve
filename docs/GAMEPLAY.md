@@ -48,7 +48,7 @@ rebindable (see **Keybindings** below); the global chords (`Esc`, `Ctrl+S`,
 | `H` | Toggle help window |
 | `P` | Toggle settings (UI scale, display, rail, layout) |
 | `K` | Toggle finances window (holdings and transactions) |
-| `T` | Toggle the proficiency tree (families, levels and prerequisites) |
+| `T` | Toggle the proficiency tree (levels and prerequisites) |
 | `Esc` | Menu: Resume / Save / Save as… / Load / Settings / Quit |
 | `[` or `-` | Time acceleration down (8 → 4 → 2 → 1×) |
 | `]` or `=` | Time acceleration up (1 → 2 → 4 → 8×) |
@@ -420,58 +420,59 @@ Show Info.
 
 ## Proficiency
 
-Every hull and module belongs to a **practice family** (autocannon,
+Every hull and module belongs to one **proficiency** (autocannon,
 artillery, rocket, mining, shield, armor, capacitor, propulsion, electronic
-warfare, and the hull classes). You learn a family by using it: every point
-of damage you land pays its weapon family, every mining cycle pays the
-mining family (rarity 1/2/3/4 pays 1/2/4/8), shield and armor reps, cap
-boosters and rechargers, afterburner time and web/scram cycles pay their
-support family, every kill pays the hull you fly, every completed delivery
-pays that hull by the offer's level, and every completed warp pays the hull
-by distance (1 point per 100 AU, half a point per hop at most). Mining and
-combat hits also give the flown hull a 10% cut; kills and deliveries pay it
-in full. Levels run 0 to V; the first level costs 10 practice, the fifth 250,
-and a family at V banks nothing more.
+warfare, and the hull classes). You learn a proficiency by using it: every
+point of damage you land pays its weapon proficiency, every mining cycle pays
+the mining proficiency (rarity 1/2/3/4 pays 1/2/4/8), shield and armor reps,
+cap boosters and rechargers, afterburner time and web/scram cycles pay their
+support proficiency, every kill pays the hull you fly, every completed
+delivery pays that hull by the offer's level, and every completed warp pays
+the hull by distance (1 point per 100 AU, half a point per hop at most).
+Mining and combat hits also give the flown hull a 10% cut; kills and
+deliveries pay it in full. Levels run 0 to V; the first level costs 10
+practice, the fifth 250, and a proficiency at V banks nothing more.
 
-A level buys two things. It **gates** advanced defs of the family: fitting a
-module and flying (assembling, undocking) a hull need the family's level
+A level buys two things. It **gates** advanced defs of that proficiency:
+fitting a module and flying (assembling, undocking) a hull need the level
 named on the def, plus the level named by its prerequisite edges (artillery
 after autocannon II, destroyer after frigate II, industrial after frigate I).
 Your starter hull and world-start fit are always legal; the market is never
 gated, so you may buy what you cannot yet run. It also adds 2% per level
-while the family is in use (weapon damage, mining yield, hull speed). Show
-Info lists a def's requirement and your level under PROFICIENCY, and every
-level-up prints one line in the log (`Proficiency: Autocannon II`). Nothing
-decays: practice you earned stays.
+while that proficiency is in use (weapon damage, mining yield, hull speed).
+Show Info draws the level a def requires under PROFICIENCY as the tree's own
+level bars, lit while you meet it, and every level-up prints one line in the
+log (`Proficiency: Autocannon II`). Nothing decays: practice you earned
+stays.
 `T` (or the rail's **Proficiency tree** entry under **Ship**) opens the
 **proficiency tree**: a full-screen layer over the world that maps every
-proficiency family as a node and every authored prerequisite as an arrow,
+proficiency as a node and every authored prerequisite as an arrow,
 prerequisite to dependent. It is a graph, not a list, so a branch reads at
 a glance: the starter essentials line up in the leftmost rank, and each
-family that needs another sits one rank further right. Because it paints over the world and under
+proficiency that needs another sits one rank further right. Because it paints over the world and under
 your windows, an open window stays visible and clickable on top of it;
 presses on the bare tree do nothing to the world, and `Esc` (or `T`, or
 the rail entry) closes it.
 
-Each node carries the family's name, its **level pips** (one box per
+Each node carries the proficiency's name, its **level pips** (one box per
 level you can reach, filled up to the level you have), the level readout
 (`3/5`), and the XP banked toward the next level (`40/160 XP`, or `max` at
-the cap). Starter essentials wear a `starter` tag. A family whose
+the cap). Starter essentials wear a `starter` tag. A proficiency whose
 prerequisites are not met is dimmed and names what it waits for
-(`needs <family> <level>`). An arrow curves from a prerequisite to the
-family it feeds and lights when the prerequisite actually covers the level
-the dependent needs, so a shut branch reads as a grey chain. A node under
-the pointer takes an accent edge and the pointer cursor, and a family at
-the cap writes its readout in the accent. One rank is one column: the roots
+(`Requires Autocannon II`). An arrow curves from a prerequisite to the
+proficiency it feeds and lights when the prerequisite actually covers the
+level the dependent needs, so a shut branch reads as a grey chain. A node
+under the pointer takes an accent edge and the pointer cursor, and a
+proficiency at the cap writes its readout in the accent. One rank is one column: the roots
 line up down the leftmost column and every arrow runs rightwards to the
 next rank, so the graph reads as a tree. The whole graph takes one fit
 factor, so ten roots in one column make the boxes smaller instead of
 splitting that column in two; drag and zoom are how you read a crowded
 graph.
 
-The family whose card is open keeps the accent edge, so the tree always
-says which family the dialog belongs to; clicking another node moves it,
-and closing the card clears it.
+The proficiency whose card is open keeps the accent edge, so the tree
+always says which proficiency the dialog belongs to; clicking another node
+moves it, and closing the card clears it.
 
 The tree **navigates**: drag anywhere on the bare graph to pan it, and
 roll the wheel to zoom around the cursor (0.5x to 2x; the type zooms with
@@ -482,18 +483,17 @@ and zoom are session state: nothing is saved, and a reopened tree starts
 fitted and centred.
 
 The tree's **overview window** opens with it, landed under the Selected
-Item window so it covers none of that panel's verbs: families
-open, levels earned against the possible total over a progress bar,
-families at the cap, and every family's level in two columns (dimmed while
-gated, accent at the cap), with the navigation hint and `Esc closes`. Its
-× closes only the window; the tree keeps running, and the next open brings
-the summary back. The graph takes one fit factor for the whole layer and is
+Item window so it covers none of that panel's verbs: proficiencies open,
+levels earned against the possible total over a progress bar, proficiencies
+at the cap, and every proficiency's level in two columns (dimmed while
+gated, accent at the cap). Its × closes only the window; the tree keeps
+running, and the next open brings the summary back. The graph takes one fit factor for the whole layer and is
 not re-fitted around the summary, so when the window sits over a node,
 drag the graph out from under it.
 
-Click a node for its **family card**: one window, re-targeted by the next
-click and placed beside it, stating your level in the family and the
-prerequisite it waits for, **what it is for** and **practice**, the acts
+Click a node for its **proficiency card**: one window, re-targeted by the
+next click and placed beside it, stating your level in that proficiency and
+the prerequisite it waits for, **what it is for** and **practice**, the acts
 that pay it (mining pays by ore rarity, a gun pays by damage landed,
 support modules pay per cycle, hulls pay a share of every job act plus
 kills, deliveries and warp distance, and the Old Works line states plainly

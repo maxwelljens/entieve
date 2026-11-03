@@ -38,13 +38,13 @@ type screenServices struct {
 	HelpRows func() []uikit.KeyRow
 	Menu     func() widgets.WindowPanel
 	// Proficiency is the pilot's proficiency model (the tree's nodes, the
-	// overview's sums and the family card's level). Game.proficiencyModel
+	// overview's sums and the proficiency card's level). Game.proficiencyModel
 	// maps the sim's families onto it; the tree re-reads it every Sync.
 	Proficiency func() []uikit.ProfFamily
 	// Viewport is the live screen rect in device pixels: the full-viewport
 	// layer sizes itself to it (nil keeps its design rect).
 	Viewport func() image.Rectangle
-	// ProfFamily is the family the open proficiency family card names ("").
+	// ProfFamily is the family the open proficiency card names ("").
 	// The tree paints that node in the selected state, so the highlight
 	// follows a re-target and clears when the card closes.
 	ProfFamily func() string

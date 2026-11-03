@@ -66,9 +66,9 @@ const (
 // menu, double-click swap); RefOnValue puts the linked name in the value
 // (the caste's hull) instead of the label (loot drops, charges, yields).
 // Pips draws the value as level pip boxes instead of text (the PROFICIENCY
-// block's level, the same painter the proficiency tree's nodes read):
-// PipLevel boxes are filled out of PipMax, PipLocked dims an earned pip on
-// a shut branch, and PipMax 0 is a plain text row.
+// block's required level, the same painter the proficiency tree's nodes
+// read): PipLevel boxes are filled out of PipMax, PipLocked dims them while
+// the pilot does not meet the requirement, and PipMax 0 is a plain text row.
 type infoRow struct {
 	Label      string
 	Value      string
@@ -223,9 +223,10 @@ func chainVal(qty float64) string {
 
 // manufacturedRows builds the MANUFACTURED FROM rows: this product's
 // recipe inputs as label-side link rows carrying their per-run quantity
-// ("Sideron ×720"). A hull's recipe also reports its family and base time
-// (the craft curve the sim applies lives in the sim — this is the raw
-// recipe figure).
+// ("Sideron ×720"). A hull's recipe also reports its craft line and base
+// time (the craft curve the sim applies lives in the sim; this is the raw
+// recipe figure). The line is the manufacturing window's craft key
+// ("hulls"), never a proficiency: CONTEXT.md keeps them apart.
 func manufacturedRows(cv widgets.ContentView, id string) []infoRow {
 	r := recipeFor(cv, id)
 	if r == nil {
@@ -234,7 +235,7 @@ func manufacturedRows(cv widgets.ContentView, id string) []infoRow {
 	var rows []infoRow
 	if _, isShip := cv.Defs().Ship(content.ShipID(id)); isShip {
 		rows = append(rows,
-			infoRow{Label: "Family", Value: spacedKind(r.Family)},
+			infoRow{Label: "Craft", Value: spacedKind(r.Family)},
 			infoRow{Label: "Base time", Value: theme.GroupFloat(r.Time, 1) + " s"})
 	}
 	for _, in := range r.Inputs {
@@ -339,24 +340,22 @@ func infoPageFor(cv widgets.ContentView, ref widgets.InfoRef) (infoPage, bool) {
 	return infoPage{}, false
 }
 
-// proficiencyRows is the PROFICIENCY block of a hull or module page: the
-// practice line, the gate fitting/flying must clear (the sim's own sentence,
-// prerequisites included) and the player's current level as the tree's own
-// pip boxes. Empty for a fixture def with no family.
+// proficiencyRows is the PROFICIENCY block of a hull or module page: one
+// row naming the proficiency and drawing the level fitting/flying requires
+// as the tree's own pip boxes. The boxes dim while the pilot does not meet
+// it (own level plus prerequisite edges, the sim's read), so a shut branch
+// reads the same here as on the tree's node. Empty for a fixture def with no
+// family.
 func proficiencyRows(cv widgets.ContentView, family string, gate int) []infoRow {
 	if family == "" {
 		return nil
 	}
-	req := cv.ProficiencyRequirement(family, gate)
-	locked := req != ""
-	if !locked {
-		req = "None"
-	}
-	return []infoRow{
-		{Label: "Family", Value: content.FamilyLabel(family)},
-		{Label: "Requirement", Value: req},
-		{Label: "Level", PipLevel: cv.Proficiency(family), PipMax: content.ProficiencyMax, PipLocked: locked},
-	}
+	return []infoRow{{
+		Label:     content.FamilyLabel(family),
+		PipLevel:  gate,
+		PipMax:    content.ProficiencyMax,
+		PipLocked: cv.ProficiencyRequirement(family, gate) != "",
+	}}
 }
 
 // mountsText renders a hull's high mounts as one human line, grouped by kind

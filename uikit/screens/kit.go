@@ -158,7 +158,7 @@ type Kit struct {
 	// EvFriendlyFire and closed by Confirm, Cancel or ×.
 	friendlyFire    *dialog
 	friendlyFireWin *FriendlyFireWin
-	// profCard is the proficiency family card (built on first open): one
+	// profCard is the proficiency card (built on first open): one
 	// instance, transient, re-targeted by every node click and closed by
 	// Esc, the × or the tree's own close. profCardAt is the click point
 	// the card opens beside.
@@ -536,6 +536,9 @@ func (k *Kit) Sync() {
 	if k.ovFiltWin != nil { // built on first open
 		k.ovFiltWin.Sync()
 	}
+	if k.profCardWin != nil { // built on first open: the page's rail follows its scroll
+		k.profCardWin.Sync()
+	}
 }
 
 // seams packages the kit's three seams for the panels it builds: the
@@ -779,7 +782,7 @@ func (k *Kit) FriendlyFireOpen() bool {
 	return k.friendlyFire != nil && k.friendlyFire.isOpen()
 }
 
-// OpenProfFamily opens (or re-targets) the proficiency family card on one
+// OpenProfFamily opens (or re-targets) the proficiency card on one
 // family id, beside the click that asked for it — the tree's node click
 // (widgets.ShowProfFamily). One instance, transient like the Details page:
 // a click on another node swaps the page, re-places the card beside that
@@ -827,7 +830,7 @@ func (k *Kit) placeProfCard(win *widget.Window) {
 	win.SetLocation(widgets.ClampTipRect(r, root))
 }
 
-// CloseProfFamily closes the family card. Idempotent (the tree's close and
+// CloseProfFamily closes the proficiency card. Idempotent (the tree's close and
 // Esc both call it).
 func (k *Kit) CloseProfFamily() {
 	if k.profCard != nil {
@@ -835,7 +838,7 @@ func (k *Kit) CloseProfFamily() {
 	}
 }
 
-// ProfFamilyOpen reports whether a family card is up (the game's Esc
+// ProfFamilyOpen reports whether a proficiency card is up (the game's Esc
 // cascade backs out of it before the tree).
 func (k *Kit) ProfFamilyOpen() bool {
 	return k.profCard != nil && k.profCard.isOpen()

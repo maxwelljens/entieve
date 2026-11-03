@@ -448,3 +448,52 @@ func TestProficiencyOpenCardHighlightsItsNode(t *testing.T) {
 		t.Error("closing the card cleared the selection without repainting")
 	}
 }
+
+// TestProficiencyCardHugsOrScrolls: the card never clips its page. A shipped
+// page fits the frame (the frame hugs it under the cap, the rail stays
+// hidden); a page taller than profCardMaxH stops growing at the cap and
+// scrolls, the rail's handle present in the reserved gutter so the rest is
+// reachable.
+func TestProficiencyCardHugsOrScrolls(t *testing.T) {
+	uitest.UseScale(t, 1)
+	env, _ := newChromeEnv(t)
+	c := NewProfInfoWin(env)
+	cui := newChromeUI(env)
+	cui.AddWindow(c)
+
+	c.Show("frigate", 2, "")
+	cui.Frame(t, 1280, 720) // the first frame lays the viewport out
+	cui.Frame(t, 1280, 720) // the rail reads it on the next Sync
+	win := c.Win().GetContainer().GetWidget().Rect
+	if win.Dy() >= theme.Px(profCardMaxH) {
+		t.Errorf("shipped page card = %v, want it under the %d cap", win, theme.Px(profCardMaxH))
+	}
+	if over := c.rail.Overflow(); over > 0 {
+		t.Errorf("shipped page overflows by %v px, want the frame to hug it", over)
+	}
+	if c.rail.Bar().GetWidget().IsVisible() {
+		t.Error("the rail shows while the page fits")
+	}
+
+	// A page far past the cap: the frame stops at profCardMaxH and the page
+	// scrolls (the rail takes over from the frame).
+	c.Show("mining", 2, "")
+	c.desc.Label = strings.Repeat("The mining laser cuts the rock and pays by rarity. ", 12)
+	c.practice.Label = strings.Repeat("· Each completed mining cycle.\n", 24)
+	c.fit()
+	cui.Frame(t, 1280, 720)
+	cui.Frame(t, 1280, 720)
+	win = c.Win().GetContainer().GetWidget().Rect
+	if want := theme.Px(profCardMaxH); win.Dy() != want {
+		t.Errorf("long page card height = %d, want the cap %d", win.Dy(), want)
+	}
+	if over := c.rail.Overflow(); over <= 0 {
+		t.Errorf("long page overflow = %v, want a scroll range over the %d cap", over, theme.Px(profCardMaxH))
+	}
+	if !c.rail.Bar().GetWidget().IsVisible() {
+		t.Error("the rail is hidden while the page overflows: the rest is unreachable")
+	}
+	if r := c.rail.Bar().GetWidget().Rect; r.Dx() != theme.Px(theme.ScrollGutter) || r.Empty() {
+		t.Errorf("rail handle %v, want it in the %d px gutter column", r, theme.Px(theme.ScrollGutter))
+	}
+}

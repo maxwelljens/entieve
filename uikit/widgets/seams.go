@@ -47,7 +47,7 @@ type ContentView interface {
 	// Wallet is the player's euro balance.
 	Wallet() float64
 
-	// Proficiency is the player's level in a practice family (0 =
+	// Proficiency is the player's level in a proficiency (0 =
 	// untrained). Show Info renders a def's requirement and this level.
 	Proficiency(family string) int
 

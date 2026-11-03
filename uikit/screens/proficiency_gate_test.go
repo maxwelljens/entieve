@@ -10,12 +10,13 @@ import (
 	"github.com/entieve/entieve/sim"
 )
 
-// TestProficiencyGateWordingHasOneOwner is the drift pin for candidate C1:
-// one state (the pilot untrained, the artillery family gated on its
-// autocannon prerequisite) must read the same sentence on every surface —
-// the sim's refusal, the tech tree node, the family card and Show Info's
-// requirement row. Any surface that starts walking the edges or wording the
-// gate itself fails here.
+// TestProficiencyGateWordingHasOneOwner is the drift pin: one state (the
+// pilot untrained, the artillery family gated on its autocannon
+// prerequisite) must read the same sentence on every surface that words it:
+// the sim's refusal, the tech tree node and the family card. Show Info prints
+// no sentence: its one PROFICIENCY row draws the required level as the tree's
+// bars, dimmed while the gate is shut (the row below). Any surface that
+// starts walking the edges or wording the gate itself fails here.
 func TestProficiencyGateWordingHasOneOwner(t *testing.T) {
 	uitest.UseScale(t, 1)
 	env, _ := newChromeEnv(t)
@@ -54,14 +55,9 @@ func TestProficiencyGateWordingHasOneOwner(t *testing.T) {
 	if card.Gate() != want {
 		t.Fatalf("family card gate line = %q, want %q", card.Gate(), want)
 	}
-	req := ""
-	for _, row := range proficiencyRows(env.Session, "artillery", 0) {
-		if row.Label == "Requirement" {
-			req = row.Value
-		}
-	}
-	if req != want {
-		t.Fatalf("Show Info requirement = %q, want %q", req, want)
+	req := proficiencyRows(env.Session, "artillery", 0)
+	if len(req) != 1 || req[0].Label != "Artillery" || req[0].PipLevel != 0 || !req[0].PipLocked {
+		t.Fatalf("Show Info requirement row = %+v, want one dim Artillery bar row (the gate is 0, the branch is shut)", req)
 	}
 
 	// The refusal the fit command actually prints: free a high slot, then

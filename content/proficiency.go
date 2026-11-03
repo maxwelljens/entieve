@@ -90,7 +90,7 @@ var proficiencyInfo = map[string]ProfInfo{
 		},
 	},
 	"rocket": {
-		Desc: "Launcher-mounted rockets: short-range volleys that arrive in a burst. The family covers the launchers, and its levels gate the larger bays.",
+		Desc: "Launcher-mounted rockets: short-range volleys that arrive in a burst. This proficiency covers the launchers, and its levels gate the larger bays.",
 		Practice: []string{
 			"Every point of damage a rocket volley lands.",
 			"The hull you fly takes a 10% cut of that damage.",
@@ -104,7 +104,7 @@ var proficiencyInfo = map[string]ProfInfo{
 		},
 	},
 	"shield": {
-		Desc: "Shield boosters and shield hardeners: the recharge that keeps a hull in a fight. The family's levels gate the stronger boosters.",
+		Desc: "Shield boosters and shield hardeners: the recharge that keeps a hull in a fight. Its levels gate the stronger boosters.",
 		Practice: []string{
 			"Each completed shield booster cycle.",
 			"The hull you fly takes a 10% cut of that practice.",
@@ -118,7 +118,7 @@ var proficiencyInfo = map[string]ProfInfo{
 		},
 	},
 	"capacitor": {
-		Desc: "The capacitor: the energy every active module spends. Boosters refill it in a burst, rechargers refill it continuously, and this family gates the larger of both.",
+		Desc: "The capacitor: the energy every active module spends. Boosters refill it in a burst, rechargers refill it continuously, and this proficiency gates the larger of both.",
 		Practice: []string{
 			"Each completed cap booster cycle.",
 			"Every activation cost paid while a cap recharger is fitted.",
@@ -176,9 +176,9 @@ var proficiencyInfo = map[string]ProfInfo{
 		},
 	},
 	"rat": {
-		Desc: "The Old Works hulls: the machine line flown against you, never by you. The family names the enemy castes (Scuttler, Marauder, Hierarch) and carries no practice of its own.",
+		Desc: "The Old Works hulls: the machine line flown against you, never by you. This proficiency names the enemy castes (Scuttler, Marauder, Hierarch) and carries no practice of its own.",
 		Practice: []string{
-			"None: the machines are flown against the pilot, so no act awards this family.",
+			"None: the machines are flown against the pilot, so no act awards this proficiency.",
 		},
 	},
 }
