@@ -27,10 +27,11 @@ func splitSeam(s *widgets.SplitPane, i int) image.Rectangle {
 }
 
 // TestWindowSplitsEqualByDefault pins the multi-pane windows' opening
-// shares with nothing stored: Inventory thirds, Manufacturing halves, and
-// every split tiling its body exactly (no gap, no overflow). Fitting is the
-// one exception — its tile grid needs the taller slots pane at the window's
-// frozen height, so it opens at fitSlotShare.
+// shares with nothing stored: Inventory thirds, Manufacturing's board over
+// its job strip at the panel's own share, and every split tiling its body
+// exactly (no gap, no overflow). Fitting is the other exception — its tile
+// grid needs the taller slots pane at the window's frozen height, so it
+// opens at fitSlotShare.
 func TestWindowSplitsEqualByDefault(t *testing.T) {
 	env, _ := newTestEnv(t)
 
@@ -51,7 +52,7 @@ func TestWindowSplitsEqualByDefault(t *testing.T) {
 		{"manufacturing", func() (*widget.Window, *widgets.SplitPane) {
 			p := NewManufacturing(env)
 			return p.Win(), p.split
-		}, 2, 0},
+		}, 2, mfgBoardShare},
 	}
 	for _, c := range cases {
 		win, split := c.build()

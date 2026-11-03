@@ -239,9 +239,15 @@ func TestQtyPickerTitleIsStatic(t *testing.T) {
 	env2, _ := factoryEnv(t)
 	f := NewManufacturing(env2)
 	env2.Sim.Docked.Set(env2.Sim.Player(), sim.Docked{At: factoryStation})
+	// Start is the picker's gesture and it stays greyed with a short bill,
+	// so the fixture stocks the recipe first (the qtypicker's own test).
+	for _, m := range env2.Sim.JobMaterials(factoryStation, "rec-ammo-emp-s", 1) {
+		giveItem(env2.Sim, m.Item, m.Qty)
+	}
 	ui2 := newQtyUI(t, env2, f.Win())
 	f.Sync()
 	clickRow(ui2, f.recipes, recipeRowFor(f, "ammo-emp-s"))
+	uitest.FireButton(ui2, f.startBtn)
 	env2.QtyWindow().Sync()
 	if got := env2.QtyWindow().qtyLbl.Label; got != "Runs" {
 		t.Errorf("runs row label = %q, want Runs", got)
@@ -419,6 +425,8 @@ func TestQtyPickerEverySurfaceIntent(t *testing.T) {
 		}
 		pumpQty(t, ui, env, f.Sync, 1024, 700)
 		clickRow(ui, f.recipes, recipeRowFor(f, "ammo-emp-s"))
+		pumpQty(t, ui, env, f.Sync, 1024, 700)
+		uitest.FireButton(ui, f.startBtn)
 		pumpQty(t, ui, env, f.Sync, 1024, 700)
 		uitest.FireButton(ui, env.QtyWindow().Confirm())
 		if len(*cmds) != 1 {

@@ -186,7 +186,7 @@ func TestLayoutMigratesFactoryToManufacturing(t *testing.T) {
 	g.applySize(1280, 720)
 
 	old := layoutFile{Version: layoutVersion, Windows: map[string]winLayout{
-		"factory": {X: 140, Y: 120, W: 420, H: 440, Open: true},
+		"factory": {X: 140, Y: 120, W: 700, H: 520, Open: true},
 	}}
 	data, err := json.Marshal(old)
 	if err != nil {
@@ -200,15 +200,15 @@ func TestLayoutMigratesFactoryToManufacturing(t *testing.T) {
 	if _, ok := wins["factory"]; ok {
 		t.Fatal("old factory key survived the read")
 	}
-	if got, ok := wins["manufacturing"]; !ok || got.W != 420 || got.H != 440 {
-		t.Fatalf("migrated entry = %+v (%v), want the saved 420×440", got, ok)
+	if got, ok := wins["manufacturing"]; !ok || got.W != 700 || got.H != 520 {
+		t.Fatalf("migrated entry = %+v (%v), want the saved 700×520", got, ok)
 	}
 
 	g.applyLayout(1280, 720)
 	r := bodyOf[*uikit.Manufacturing](g.host, idManufacturing).Win().GetContainer().GetWidget().Rect
 	if r.Min != image.Pt(theme.Px(140), theme.Px(120)) ||
-		r.Dx() != theme.Px(420) || r.Dy() != theme.Px(440) {
-		t.Fatalf("restored manufacturing rect = %v, want the saved 140,120 420×440", r)
+		r.Dx() != theme.Px(700) || r.Dy() != theme.Px(520) {
+		t.Fatalf("restored manufacturing rect = %v, want the saved 140,120 700×520", r)
 	}
 	if !g.host.IsOpen(idManufacturing) {
 		t.Fatal("saved open flag not restored under the new key")

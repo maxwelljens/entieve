@@ -17,6 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the house rail; with nothing selected the book section shows a short
   hint. The catalog's per-item dropdown is gone: it lists items only, so the
   window needs no expanding to read a book.
+- **The manufacturing window is a recipe board**: the flat five-column board
+  (product, family, time, fee, one text line of inputs) is now the market
+  window's idiom over recipes. A browse tree of the recipe products' own
+  groups with a live search that also matches a recipe's inputs (type
+  "vetril" and every recipe that eats it answers), a narrow recipe list where
+  each row carries its verdict (`● ready` / `× short 2`, glyph and word, not
+  colour alone) over a cost strip split per mineral by its share of the run's
+  material value, and an inspector card for the selected recipe: the mineral
+  bill one row per mineral with its art, its share and a have/need bar, the
+  cost driver first, then Start job with the refusal named under it
+  ("Start: short Vetril, Helion"). Start is the picker's gesture now; a row
+  click opens the recipe in the inspector. The job list stays in the bottom
+  seam, and the new panes' proportions persist with the window's layout.
 
 - **Fitting limits read as boxes**: the Show Info hull page's FITTING block
   and the fitting window's HULL LIMITS block draw a hull's limits instead of

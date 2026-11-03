@@ -18,34 +18,35 @@ import (
 // open fade is 12 frames, so 13 is the first fully painted frame.
 const splitCaptureFrames = 14
 
-// TestSplitPaneSeamCapture draws the three split windows side by side
-// through a real ebiten loop and pins the seams' PIXELS, not only their
-// rects: each seam is a recessed 4 px track (a Border line around the
-// near-black fill) with a dotted sash grip in its middle — the grip's dots
-// brighter than the track's fill — and the tracks sit at the split's
-// proportions: inventory's two seams at its thirds, fitting's and
-// manufacturing's at their halves. Pixel reads need a running loop, so
+// TestSplitPaneSeamCapture draws the split windows side by side through a
+// real ebiten loop and pins the seams' PIXELS, not only their rects: each
+// seam is a recessed 4 px track (a Border line around the near-black fill)
+// with a dotted sash grip in its middle, the grip's dots brighter than the
+// track's fill, and the tracks sit at the split's proportions: inventory's
+// two seams at its thirds, the manufacturing board's at the fraction of the
+// stack before it (the board over its job strip). Two windows, because at
+// their content floors (320 and 640 px wide) a third would have to overlap
+// them and the pixel reads would sample the window on top; fitting's own
+// window is covered by its capture. Pixel reads need a running loop, so
 // this is gated like the other captures; the PNG lands in
 // $ENTIEVE_CAPTURE_DIR (default /tmp/opencode).
 func TestSplitPaneSeamCapture(t *testing.T) {
 	k, _ := newTestKit(t)
 	inv := NewInventory(k.Env())
-	fit := NewFitting(k.Env())
 	manu := NewManufacturing(k.Env())
 	for _, c := range []struct {
 		win *widget.Window
 		at  image.Rectangle
 	}{
-		{inv.Win(), image.Rect(60, 8, 440, 448)},
-		{fit.Win(), image.Rect(446, 8, 826, 448)},
-		{manu.Win(), image.Rect(832, 8, 1252, 448)},
+		{inv.Win(), image.Rect(0, 8, 320, 428)},
+		{manu.Win(), image.Rect(328, 8, 968, 488)},
 	} {
 		k.AddWindow(c.win)
 		c.win.SetLocation(c.at)
 	}
 	// The core Selected Item window would cover the inventory's lower
 	// panes: park it below, out of the sweep.
-	k.SelectedWindow().SetLocation(image.Rect(60, 460, 510, 716))
+	k.SelectedWindow().SetLocation(image.Rect(20, 440, 470, 696))
 
 	out := capture.Out("splitpanes_capture.png")
 	(&capture.Capture{
@@ -53,7 +54,6 @@ func TestSplitPaneSeamCapture(t *testing.T) {
 		Frames: splitCaptureFrames,
 		Update: func(int) error {
 			inv.Sync()
-			fit.Sync()
 			manu.Sync()
 			return k.Update()
 		},
@@ -108,11 +108,11 @@ func TestSplitPaneSeamCapture(t *testing.T) {
 			} else {
 				fail("inventory: %d seams found, want 2", len(rows))
 			}
-			// Fitting and manufacturing: one seam, at the panes' boundary.
+			// Manufacturing: one seam, at the panes' boundary.
 			for _, c := range []struct {
 				name  string
 				split *widgets.SplitPane
-			}{{"fitting", fit.split}, {"manufacturing", manu.split}} {
+			}{{"manufacturing", manu.split}} {
 				rows := check(c.name, c.split)
 				panes := splitPanes(c.split)
 				if len(rows) != 1 || len(panes) != 2 {
