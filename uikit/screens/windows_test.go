@@ -8,6 +8,7 @@ import (
 	"github.com/entieve/entieve/uikit/widgets"
 	"image"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/ebitenui/ebitenui"
@@ -219,10 +220,9 @@ func TestInventoryTransferAndSell(t *testing.T) {
 	}
 }
 
-// TestMarketSelectionRevalidatesOnSync: a selected order row that leaves
+// TestMarketSelectionRevalidatesOnSync: a selected item whose row leaves
 // the board stops reading as selected — the click-time cache alone would
-// keep Buy/Sell armed on an order the market no longer offers (its item's
-// own row stays: an orderless item is still listed).
+// keep Buy/Sell armed on a row the market no longer shows.
 func TestMarketSelectionRevalidatesOnSync(t *testing.T) {
 	env, cmds := newTestEnv(t)
 	m := NewMarket(env)
@@ -231,38 +231,27 @@ func TestMarketSelectionRevalidatesOnSync(t *testing.T) {
 	frame()
 	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
 	frame()
-	// Row 0 is the first catalog item's parent, row 1 its first order.
 	clickRow(ui, m.tbl, 0)
-	frame()
-	if _, isOrder := m.tbl.Rows[1].Data.(mktOrderRow); !isOrder {
-		t.Fatalf("row 1 payload = %#v, want an order row (the fixture book is empty)", m.tbl.Rows[1].Data)
-	}
-	clickRow(ui, m.tbl, 1)
 	frame()
 	if !m.hasSel {
 		t.Fatal("fixture: selection did not take")
 	}
 	item := m.sel
+	group := m.group[item]
 
-	// Drop that order from the board (save surgery) and sync.
-	sv, err := env.Sim.Snapshot()
-	if err != nil {
-		t.Fatalf("Snapshot: %v", err)
-	}
-	sys := env.Sim.System().ID
-	var kept []sim.MarketStock
-	for _, st := range sv.Market[sys] {
-		if st.Item != item {
-			kept = append(kept, st)
+	// Scope the catalog to a real branch the selected item is not under:
+	// its row leaves the table, so the cached selection must go.
+	branch := ""
+	for _, n := range m.nodes {
+		if n.Path != group && !strings.HasPrefix(group, n.Path+"/") {
+			branch = n.Path
+			break
 		}
 	}
-	if len(kept) == len(sv.Market[sys]) {
-		t.Fatalf("fixture: selected item %s is not on the board", item)
+	if branch == "" {
+		t.Fatalf("fixture: no branch excludes %q (group %q)", item, group)
 	}
-	sv.Market[sys] = kept
-	if err := env.Sim.Restore(sv); err != nil {
-		t.Fatalf("Restore: %v", err)
-	}
+	m.branch = branch
 	frame()
 
 	if m.hasSel {

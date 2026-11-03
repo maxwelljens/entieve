@@ -19,19 +19,13 @@ import (
 )
 
 const (
-	// mktBarSteps is the order-book rail's resolution: the table's ScrollTop
-	// is a 0..1 fraction of the overflow, the slider an integer over it. The
-	// rail itself is widgets.Table's (ScrollRail) — the reserved-gutter
-	// scrollbar every table now carries.
-	mktBarSteps = widgets.RailSteps
-
 	// mktTreeW is the browse pane's opening width in design px at the
 	// landing rect: the split's opening share, not a fixed width — the
 	// tree seam trades it with the catalog.
 	mktTreeW = 176
 
-	// mktSideW is the My-orders pane's opening width: the old fixed 240 px
-	// column, now the split's right pane.
+	// mktSideW is the right pane's opening width: the old fixed 240 px
+	// column, now the split's right pane (the order book over My orders).
 	mktSideW = 240
 
 	// mktDefaultW/H are the window's landing rect (see the Location
@@ -50,10 +44,10 @@ const (
 	// mktSearchH is the search field's design-px height above the tree.
 	mktSearchH = 28
 
-	// mineWheelRows is how many My-orders rows one wheel notch scrolls.
-	// The list is uncapped (every standing order the player has is
-	// listed), so it rides a scroll viewport in the standing-order
-	// column with the rail's reserved gutter beside it.
+	// mineWheelRows is how many rows of the right pane's column one wheel
+	// notch scrolls. Neither section is capped (the selected item's whole
+	// book, every standing order the player has), so both ride the one
+	// scroll viewport with the rail's reserved gutter beside it.
 	mineWheelRows = 3
 )
 
@@ -71,17 +65,20 @@ func setStepperValue(bar *widget.Container, lbl *widget.Text, s string) {
 }
 
 // Market is the station market window: a browse tree (the content's
-// group paths), the catalog list and My orders in one row of panes.
+// group paths), the catalog list and the right pane, which carries the
+// selected item's order book over My orders.
 //
-// The catalog is the docked station's order book as a per-item tree — one
-// parent row per item of the tradeable catalog (canonical order), its
-// resting orders folded out beneath it on a click: asks (price ascending)
-// above bids (price descending), each order in the book's own [price, qty,
-// side] form. Over it sit the Buy/Sell actions, which execute as market
-// orders against the book: each opens the quantity picker (CONTEXT.md
-// "Quantity picker") on the selected item and Confirm emits Buy/Sell. The
-// title bar stays the base display name (window titles are furniture); the
-// book's own columns carry the price voice.
+// The catalog lists every item of the tradeable catalog once (canonical
+// order) with its ladder quote and two-side quantity. Selecting an item
+// (the same selection the toolbar's Buy/Sell act on) fills the right
+// pane's book section: that item's full resting book, asks (price
+// ascending) above bids (price descending), each order in the book's own
+// [price, qty, side] form — the fold the catalog used to hide now always
+// visible, so the window needs no per-item dropdown. Buy/Sell execute as
+// market orders against the book: each opens the quantity picker
+// (CONTEXT.md "Quantity picker") on the selected item and Confirm emits
+// Buy/Sell. The title bar stays the base display name (window titles are
+// furniture); the book's own columns carry the price voice.
 //
 // The browse tree scopes the catalog to a branch (All is the whole
 // catalog) and the search field filters that branch live, ranked by fuzzy
@@ -96,11 +93,10 @@ func setStepperValue(bar *widget.Container, lbl *widget.Text, s string) {
 // hull rows trade the way they always did. Other stations' books are read
 // read-only for the availability suffix; the columns stay local.
 //
-// Beside the catalog sits the standing-order column: My orders — only
-// THIS station's player orders, each with a Cancel button. It acts on the
-// docked book, exactly like Buy/Sell. Posting a new standing order is the
-// typed order mini-window's job (OrderWin, launched from a row's context
-// menu), not a panel here.
+// Below the book sits My orders: only THIS station's player orders, each
+// with a Cancel button. It acts on the docked book, exactly like
+// Buy/Sell. Posting a new standing order is the typed order mini-window's
+// job (OrderWin, launched from a row's context menu), not a panel here.
 type Market struct {
 	th  theme.Theme
 	cv  widgets.ContentView
@@ -109,25 +105,21 @@ type Market struct {
 	win *widget.Window
 
 	tbl   *widgets.Table
-	bar   *widget.Slider // order-book scrollbar rail (mirrors ScrollTop)
 	title *theme.ChromeText
 	buy   *widget.Button
 	sell  *widget.Button
 
-	// split is the browse | catalog | My-orders row: two seams (tree and
+	// split is the browse | catalog | right pane row: two seams (tree and
 	// orders) trade width with the middle pane (the old fixed 240 px
-	// column is the orders pane's opening share).
+	// column is the right pane's opening share).
 	split *widgets.SplitPane
 
 	// The catalog: items is the tradeable universe (built once — content
-	// never changes under a session), group each item's market tree path
-	// and open is the fold state (item → its orders shown). open is
-	// session-only: it never persists and a closed window forgets it.
+	// never changes under a session), group each item's market tree path.
 	items []content.ItemID
 	group map[content.ItemID]string
 	maker map[content.ItemID]string
 	nodes []mktNode
-	open  map[content.ItemID]bool
 
 	// The browse pane: tree is the branch list, search its live filter,
 	// branch the selected path ("" = All), expanded the session-only
@@ -151,14 +143,23 @@ type Market struct {
 	stations []sim.StationID
 	avail    map[content.ItemID]mktAvail
 
-	// My orders: the station's player orders as rich rows, every one of
-	// them listed, in a scroll viewport with the house rail beside it.
-	mineLbl    *widget.Text
-	mineBox    *widget.Container // the rich rows (the scroll content)
-	mineScroll *widget.ScrollContainer
-	mineRail   *widgets.ScrollRail
-	mineRows   []*widgets.StackRow
-	mineKey    string // change signature of the My orders rows
+	// The right pane: two labelled sections in one scroll column. book is
+	// the selected item's resting orders (row specs, book order) and the
+	// My orders rows are one rich row per player order at the docked
+	// station, every one of them listed. The pane's scroll and its house
+	// rail cover both sections.
+	bookLbl  *widget.Text
+	bookBox  *widget.Container
+	book     []widgets.TableRow
+	bookRows []*widgets.StackRow
+
+	mineLbl  *widget.Text
+	mineBox  *widget.Container
+	mineRows []*widgets.StackRow
+
+	sideScroll *widget.ScrollContainer
+	sideRail   *widgets.ScrollRail
+	sideKey    string // change signature of the right pane's rows
 
 	sel    content.ItemID
 	hasSel bool
@@ -511,28 +512,8 @@ func (m *Market) selectItem(item content.ItemID) {
 	m.tbl.SelectData(mktItemRow{Item: item})
 }
 
-// mktItemRow is an item's parent row payload: the item the row names. A
-// parent row folds its orders out; its child rows carry mktOrderRow.
+// mktItemRow is an item's catalog row payload: the item the row names.
 type mktItemRow struct{ Item content.ItemID }
-
-// mktOrderRow is one resting order's child row payload: the item it trades
-// and the order id (the table's row identity across rebuilds).
-type mktOrderRow struct {
-	Item content.ItemID
-	ID   uint64
-}
-
-// mktItemOf resolves a market row payload to its item (false when the row
-// is not one of the market's).
-func mktItemOf(data any) (content.ItemID, bool) {
-	switch r := data.(type) {
-	case mktItemRow:
-		return r.Item, true
-	case mktOrderRow:
-		return r.Item, true
-	}
-	return "", false
-}
 
 // sortBookOrders puts mixed orders into canonical display order: item
 // ascending, asks before bids, asks by price ascending, bids by price
@@ -564,43 +545,12 @@ func mktCell(row widgets.TableRow, i int) string {
 	return row.Cells[i]
 }
 
-// mktIsParent reports whether a row is an item (parent) row.
-func mktIsParent(row widgets.TableRow) bool {
-	_, ok := row.Data.(mktItemRow)
-	return ok
-}
-
-// mktBlocks splits the tree's flat rows into one block per item row: the
-// parent followed by its folded-out order rows. Rows before the first
-// parent (there are none) would form their own block, so a sort can never
-// drop a row.
-func mktBlocks(rows []widgets.TableRow) [][]widgets.TableRow {
-	var out [][]widgets.TableRow
-	for _, r := range rows {
-		if mktIsParent(r) || len(out) == 0 {
-			out = append(out, nil)
-		}
-		out[len(out)-1] = append(out[len(out)-1], r)
-	}
-	return out
-}
-
-// mktJoin writes the blocks back into rows, block by block: the tree's
-// parent-before-its-orders shape survives any header sort.
-func mktJoin(rows []widgets.TableRow, blocks [][]widgets.TableRow) {
-	at := 0
-	for _, b := range blocks {
-		at += copy(rows[at:], b)
-	}
-}
-
 // NewMarket builds the Market window over the shared environment. Mount
 // it on a Kit with Kit.AddWindow and call Sync every frame.
 func NewMarket(env widgets.Seams) *Market {
 	m := &Market{
 		th: env, cv: env, as: env, ptr: env.Pointer(),
 		items:    marketCatalog(env),
-		open:     map[content.ItemID]bool{},
 		expanded: map[string]bool{"": true},
 		hit:      -1,
 	}
@@ -620,12 +570,11 @@ func NewMarket(env widgets.Seams) *Market {
 	// stay IBM Plex Sans).
 	m.tbl = widgets.NewTable(env, cols, widgets.ContentsFace(env.FaceMono(theme.StepSmall)), widgets.PrefsID("book"))
 	m.tbl.SetSort("Item", true)
-	// Sync builds rows in canonical book order (each item's parent row,
-	// then its orders when the item is open); the Item sort key keeps that
-	// order — reversing the ITEMS on a second click — and any other header
-	// falls back to sorting the items by that column's cell, never tearing
-	// an item's orders away from their parent. While a search query is
-	// active the rows arrive ranked and flat: the header sort yields.
+	// Sync builds one row per catalog item in canonical order; the Item
+	// sort keeps that order — reversing the items on a second click — and
+	// any other header sorts the items by that column's cell. While a
+	// search query is active the rows arrive ranked and flat: the header
+	// sort yields.
 	m.tbl.SetSortFunc(func(key string, asc bool, rows []widgets.TableRow) {
 		if m.query != "" {
 			return
@@ -640,38 +589,35 @@ func NewMarket(env widgets.Seams) *Market {
 		if idx < 0 {
 			return
 		}
-		blocks := mktBlocks(rows)
 		if key == "Item" {
+			// The rows arrive in canonical id order: the Item key keeps
+			// it, reversing on a second click.
 			if !asc {
-				slices.Reverse(blocks)
+				slices.Reverse(rows)
 			}
-		} else {
-			sort.SliceStable(blocks, func(a, b int) bool {
-				x, y := mktCell(blocks[a][0], idx), mktCell(blocks[b][0], idx)
-				if asc {
-					return x < y
-				}
-				return y < x
-			})
+			return
 		}
-		mktJoin(rows, blocks)
+		sort.SliceStable(rows, func(a, b int) bool {
+			x, y := mktCell(rows[a], idx), mktCell(rows[b], idx)
+			if asc {
+				return x < y
+			}
+			return y < x
+		})
 	})
-	// A click selects the row's item (the toolbar reads it, Buy/Sell trade
-	// it) and, on an item row, folds its orders out or away. The row's
-	// declared RowSpec already carries its own item, so the menu never
-	// depends on this selection; a double-click still opens Show Info.
+	// A click selects the row's item: the toolbar reads it, Buy/Sell trade
+	// it and the right pane shows its order book. The row's declared
+	// RowSpec already carries its own item, so the menu never depends on
+	// this selection; a double-click still opens Show Info.
 	m.tbl.OnSelect(func(r widgets.TableRow) {
 		m.search.Focus(false)
-		item, ok := mktItemOf(r.Data)
+		item, ok := r.Data.(mktItemRow)
 		if !ok {
 			return
 		}
-		m.sel, m.hasSel = item, true
-		m.treeSel = m.group[item]
+		m.sel, m.hasSel = item.Item, true
+		m.treeSel = m.group[item.Item]
 		m.highlightTree()
-		if _, isItem := r.Data.(mktItemRow); isItem && m.query == "" {
-			m.open[item] = !m.open[item]
-		}
 	})
 
 	// The browse pane: a live search field over the content tree. The
@@ -712,35 +658,48 @@ func NewMarket(env widgets.Seams) *Market {
 	)
 	tradeBar.AddChild(m.buy, m.sell)
 
-	// The book row: the order table — widgets.Table owns its scroll
+	// The catalog row: the item table — widgets.Table owns its scroll
 	// viewport, its wheel wiring AND the scrollbar rail beside it (the
 	// reserved-gutter chrome, ScrollGutter design px: the handle can never
-	// overhang a row, and the rail hides while the book fits). The title
+	// overhang a row, and the rail hides while the list fits). The title
 	// line and the Buy/Sell row above stay exactly as they are.
-	m.bar = m.tbl.Rail()
-	book := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
+	catalog := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
 	m.tbl.Container().GetWidget().LayoutData = widget.AnchorLayoutData{
 		StretchHorizontal: true,
 		StretchVertical:   true,
 	}
-	book.AddChild(m.tbl.Container())
+	catalog.AddChild(m.tbl.Container())
 
-	// My orders: only THIS station's player orders (station-local, the
-	// docked book), each a rich row — the item beside its Cancel button on
-	// line 1, side/price/remaining on line 2 — tiled by the table module's
-	// StackLayout (the contract board's row form). Every order is listed:
-	// the rows ride the house scroll viewport (the reserved-gutter rail
-	// hides while they fit) once the list outgrows the column.
+	// The right pane: two labelled sections in ONE scroll column — the
+	// selected item's order book over My orders — riding the house rail
+	// (the reserved gutter hides while both sections fit). The rows are
+	// rich rows tiled by the table module's StackLayout (the contract
+	// board's row form); no fold and no tabs, so a selection shows its
+	// book at once.
+	m.bookLbl = widget.NewText(
+		widget.TextOpts.Text("Order book", env.Face(theme.StepTiny), theme.Solid(p.Accent)),
+	)
+	m.bookBox = widget.NewContainer(
+		widget.ContainerOpts.Layout(widgets.StackLayout{Gap: theme.Px(theme.ContentsPad)}),
+	)
 	m.mineLbl = widget.NewText(
 		widget.TextOpts.Text("My orders", env.Face(theme.StepTiny), theme.Solid(p.Accent)),
 	)
 	m.mineBox = widget.NewContainer(
 		widget.ContainerOpts.Layout(widgets.StackLayout{Gap: theme.Px(theme.ContentsPad)}),
 	)
-	m.mineScroll = widget.NewScrollContainer(
-		widget.ScrollContainerOpts.Content(m.mineBox),
+	sideBox := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(1),
+			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, false, false, false}),
+			widget.GridLayoutOpts.Spacing(0, theme.Px(theme.ContentsPad)),
+		)),
+	)
+	sideBox.AddChild(m.bookLbl, m.bookBox, m.mineLbl, m.mineBox)
+	m.sideScroll = widget.NewScrollContainer(
+		widget.ScrollContainerOpts.Content(sideBox),
 		widget.ScrollContainerOpts.StretchContentWidth(),
-		// No chrome of the list's own: an invisible frame, the mask
+		// No chrome of the column's own: an invisible frame, the mask
 		// clipping the rows to the viewport (the tables' own mask).
 		widget.ScrollContainerOpts.Image(&widget.ScrollContainerImage{
 			Idle: theme.NineSlice(color.NRGBA{}),
@@ -750,28 +709,19 @@ func NewMarket(env widgets.Seams) *Market {
 	// Wheel scrolls the column; ScrollTop is a 0..1 fraction of the
 	// overflow, so the step scales by the measured overflow (the tables'
 	// convention). The rail beside it drags the same offset.
-	m.mineScroll.GetWidget().ScrolledEvent.AddHandler(func(args any) {
+	m.sideScroll.GetWidget().ScrolledEvent.AddHandler(func(args any) {
 		if ev, ok := args.(*widget.WidgetScrolledEventArgs); ok {
-			m.scrollMine(ev.Y)
+			m.scrollSide(ev.Y)
 		}
 	})
 	// Same stash as the tables: the window chrome's translate walk carries
 	// the rows with the viewport instead of re-locating them mid-drag.
-	widgets.AttachScrollContent(m.mineScroll, m.mineBox)
-	m.mineRail = widgets.NewScrollRail(env, m.mineScroll, m.mineScroll, m.mineBox)
-	side := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Columns(1),
-			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, true}),
-			widget.GridLayoutOpts.Spacing(0, theme.Px(theme.ContentsPad)),
-		)),
-	)
-	side.AddChild(m.mineLbl, m.mineRail.Container())
+	widgets.AttachScrollContent(m.sideScroll, sideBox)
+	m.sideRail = widgets.NewScrollRail(env, m.sideScroll, m.sideScroll, sideBox)
 
-	// The standing-order column sits beside the catalog column, spanning
-	// the full body height (so the My orders list gets the room the book's
-	// row would otherwise share). The catalog keeps the full row height it
-	// always had, its scrollbar rail included.
+	// The right pane spans the full body height (its one scroll column
+	// carries the book and My orders); the catalog keeps the full row
+	// height it always had, its scrollbar rail included.
 	left := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
 			widget.GridLayoutOpts.Columns(1),
@@ -779,7 +729,7 @@ func NewMarket(env widgets.Seams) *Market {
 			widget.GridLayoutOpts.Spacing(0, theme.Px(4)),
 		)),
 	)
-	left.AddChild(tradeBar, book)
+	left.AddChild(tradeBar, catalog)
 
 	// The browse pane: the search field over the tree, both full height.
 	browse := widget.NewContainer(
@@ -791,11 +741,11 @@ func NewMarket(env widgets.Seams) *Market {
 	)
 	browse.AddChild(m.search, m.tree.Container())
 
-	// Body: browse | seam | catalog | seam | My orders. Two draggable
-	// seams; the tree and orders panes open at their historical widths
+	// Body: browse | seam | catalog | seam | right pane. Two draggable
+	// seams; the tree and right panes open at their historical widths
 	// (176 px of browse, the old 240 px column) and each pane keeps
 	// SplitMinPane.
-	m.split = widgets.NewSplitPaneRow(env, browse, left, side)
+	m.split = widgets.NewSplitPaneRow(env, browse, left, m.sideRail.Container())
 	m.split.SetDefaultRatio(0, mktTreeShare)
 	m.split.SetDefaultRatio(1, 1-mktSideShare)
 	body := widget.NewContainer(
@@ -839,7 +789,7 @@ func MarketRect() image.Rectangle {
 func (m *Market) Win() *widget.Window { return m.win }
 
 // Splits names the window's two draggable seams for the layout sidecar:
-// tree | catalog ("market-tree") and catalog | My orders ("market-orders",
+// tree | catalog ("market-tree") and catalog | right pane ("market-orders",
 // the seam name the old two-pane window carried).
 func (m *Market) Splits() []widgets.Seam {
 	return []widgets.Seam{
@@ -891,14 +841,13 @@ func marketCatalog(cv widgets.ContentView) []content.ItemID {
 	return out
 }
 
-// Dismissed is the committed-chrome-close hook (the ×): the folds, the
-// expanded branches, the tree selection and the query are session-only,
-// so a window closed by its title bar forgets them and reopens on All
-// with everything collapsed. The host runs it once per mount cycle before
+// Dismissed is the committed-chrome-close hook (the ×): the expanded
+// branches, the tree selection and the query are session-only, so a
+// window closed by its title bar forgets them and reopens on All with
+// everything collapsed. The host runs it once per mount cycle before
 // Sync; a hotkey unmount never reports a committed close, so that path
-// keeps the folds.
+// keeps them.
 func (m *Market) Dismissed() {
-	clear(m.open)
 	clear(m.expanded)
 	m.expanded[""] = true
 	m.branch, m.treeSel = "", ""
@@ -962,18 +911,9 @@ func (m *Market) Sync() {
 		}
 	} else {
 		m.results = nil
-		rows = make([]widgets.TableRow, 0, len(scope)+len(orders))
+		rows = make([]widgets.TableRow, 0, len(scope))
 		for _, item := range scope {
-			ords := by[item]
-			rows = append(rows, m.itemRow(item, ords, quote(item), ask(item), gated))
-			if !m.open[item] {
-				continue
-			}
-			// sortBookOrders put the item's orders in book order already:
-			// asks ascending, then bids descending.
-			for _, o := range ords {
-				rows = append(rows, m.bookRow(o, gated))
-			}
+			rows = append(rows, m.itemRow(item, by[item], quote(item), ask(item), gated))
 		}
 	}
 	m.tbl.SetRows(rows)
@@ -985,8 +925,8 @@ func (m *Market) Sync() {
 	// no longer offers.
 	m.hasSel = false
 	if r, ok := m.tbl.Selected(); ok {
-		if item, isRow := mktItemOf(r.Data); isRow {
-			m.sel, m.hasSel = item, true
+		if item, isRow := r.Data.(mktItemRow); isRow {
+			m.sel, m.hasSel = item.Item, true
 		}
 	}
 	// A search result's keyboard highlight follows the table selection.
@@ -1005,15 +945,16 @@ func (m *Market) Sync() {
 	m.tree.SelectData(mktNodeKey{Path: m.treeSel})
 	m.tree.Sync()
 
-	// The station's own standing orders (rebuilt only when they move).
-	m.syncMine(gated)
+	// The right pane: the selected item's book over My orders (rebuilt only
+	// when the selection or either list moves).
+	m.syncSide(gated, by)
 
-	// The list rides the house rail beside it: mirror the offset onto the
-	// handle, and drop a stale offset once the list fits again — the
+	// The column rides the house rail beside it: mirror the offset onto the
+	// handle, and drop a stale offset once the sections fit again — the
 	// tables' clamp rule (ebitenui would otherwise bottom-anchor it).
-	m.mineRail.Sync()
-	if m.mineRail.Overflow() <= 0 {
-		m.mineScroll.ScrollTop = 0
+	m.sideRail.Sync()
+	if m.sideRail.Overflow() <= 0 {
+		m.sideScroll.ScrollTop = 0
 	}
 
 	sys := m.cv.System()
@@ -1028,12 +969,12 @@ func (m *Market) Sync() {
 	// here stays visible and requestable, its Buy grayed.
 	m.buy.GetWidget().Disabled = gated || !m.hasSel || !ask(m.sel)
 	m.sell.GetWidget().Disabled = gated
-	// The scrollbar rail (the table's own) mirrors the table's scroll in
-	// m.tbl.Sync above: hidden while the book fits, thumb at ScrollTop
-	// otherwise; a drag writes the offset back.
+	// The catalog's own rail mirrors the table's scroll in m.tbl.Sync
+	// above: hidden while the list fits, thumb at ScrollTop otherwise; a
+	// drag writes the offset back.
 }
 
-// itemRow is one item's parent row: the item, its displayed price (the
+// itemRow is one item's catalog row: the item, its displayed price (the
 // station's ladder: last trade, best ask, best bid, base), the total
 // quantity resting on both sides (with the dim "· N more" suffix for the
 // other stations that stock it) and the dash an item's side cell reads.
@@ -1132,34 +1073,36 @@ func mktNameSegs(name string, match []int, accent, text color.RGBA) []widgets.Ro
 	return out
 }
 
-// bookRow is one resting order as its item's child row: the book's own
-// [price, qty, side] cells (the item is the parent above it), the
-// player's own orders in the owned-row green — one glance separates them
-// from the NPC/agent rows (the overview's own-ship/hostile tint
-// convention). Selection still wins.
-func (m *Market) bookRow(o sim.MarketStock, gated bool) widgets.TableRow {
-	side := "Ask"
+// bookRow is one resting order as a row of the right pane's book section:
+// the book's own [price, qty, side] cells with a one-line rich-row run
+// (side, price, ×qty - the same form My orders' row line uses). The
+// player's own orders carry the owned-row green — one glance separates
+// them from the NPC/agent rows (the overview's own-ship/hostile tint
+// convention).
+func (m *Market) bookRow(o sim.MarketStock) widgets.TableRow {
+	p := m.th.Pal()
+	side, tint := "Ask", p.Warn
 	if o.Side == sim.OrderBuy {
-		side = "Bid"
+		side, tint = "Bid", p.Info
 	}
-	var tint color.RGBA
 	if o.Owner == sim.OwnerPlayer {
-		tint = theme.OwnedRowTint(m.th.Pal())
+		tint = theme.OwnedRowTint(p)
 	}
+	price := theme.FormatCredits(o.Price)
+	qty := theme.FormatInt(int64(o.Qty))
 	return widgets.TableRow{
-		Cells:    []string{"", theme.FormatCredits(o.Price), theme.FormatInt(int64(o.Qty)), side},
-		Icons:    []string{m.itemIcon(o.Item)},
-		IconSize: mktRowIcon,
-		Tint:     tint,
-		Data:     mktOrderRow{Item: o.Item, ID: o.ID},
-		Spec:     m.rowSpec(o.Item, gated, false),
+		Cells: []string{"", price, qty, side},
+		Stack: []widgets.RowLine{{Segs: []widgets.RowSeg{
+			{Text: side, Tint: tint, Step: theme.StepTiny},
+			{Text: price, Tint: tint, Step: theme.StepTiny},
+			{Text: "×" + qty, Tint: tint, Step: theme.StepTiny},
+		}}},
 	}
 }
 
-// rowSpec is every market row's declared interactions — an item row and
-// its order rows offer the same verbs on the same item (Buy/Sell open the
-// quantity picker on it, the two order-window launches post to its book);
-// only the payload tells the row kinds apart. The menu's actions carry the
+// rowSpec is every market row's declared interactions — an item row offers
+// the trade verbs (Buy/Sell open the quantity picker on it, the two
+// order-window launches post to its book). The menu's actions carry the
 // row's own item, so Buy/Sell always trade the row they were opened on —
 // no click-time selection side effects. buyOff grays Buy while the local
 // book holds no ask to lift (Request on Market stays live).
@@ -1218,17 +1161,40 @@ func (m *Market) mineOrders() []sim.MarketStock {
 	return out
 }
 
-// syncMine rebuilds the My orders rows only when their content (or the
-// docked gate) moved: one rich row per player order at the docked
-// station — every order, no cap — its Cancel button the row's trailing
-// action, the same gate the book's trade actions carry.
-func (m *Market) syncMine(gated bool) {
+// syncSide rebuilds the right pane's two sections only when their content
+// (or the selection, or the docked gate) moved: the selected item's full
+// book — asks ascending, then bids descending, the table's canonical
+// order — over one rich row per player order at the docked station, every
+// order listed, its Cancel button the row's trailing action. Both carry
+// the same docked gate the trade actions do. No selection means the book
+// bar names the gesture and no book rows exist.
+func (m *Market) syncSide(gated bool, by map[content.ItemID][]sim.MarketStock) {
 	orders := m.mineOrders()
-	key := mineKey(orders, gated)
-	if key == m.mineKey {
+	var book []sim.MarketStock
+	if m.hasSel {
+		book = by[m.sel]
+	}
+	key := sideKey(m.sel, m.hasSel, book, orders, gated)
+	if key == m.sideKey {
 		return
 	}
-	m.mineKey = key
+	m.sideKey = key
+
+	m.bookBox.RemoveChildren()
+	m.book, m.bookRows = m.book[:0], m.bookRows[:0]
+	if m.hasSel {
+		m.bookLbl.Label = "Order book: " + m.cv.TradeableName(m.sel)
+		for _, o := range book {
+			r := m.bookRow(o)
+			m.book = append(m.book, r)
+			sr := widgets.NewStackRow(widgets.NewSeams(m.th, m.cv, m.as, m.ptr), r, m.th.FaceMono(theme.StepSmall))
+			m.bookRows = append(m.bookRows, sr)
+			m.bookBox.AddChild(sr.Root)
+		}
+	} else {
+		m.bookLbl.Label = "Order book: select an item"
+	}
+
 	m.mineBox.RemoveChildren()
 	m.mineRows = m.mineRows[:0]
 	for _, o := range orders {
@@ -1270,47 +1236,61 @@ func (m *Market) orderRow(o sim.MarketStock, gated bool) *widgets.StackRow {
 	return widgets.NewStackRow(widgets.NewSeams(m.th, m.cv, m.as, m.ptr), row, m.th.Face(theme.StepSmall))
 }
 
-// scrollMine turns wheel notches into the My orders viewport's offset:
+// scrollSide turns wheel notches into the right pane's offset:
 // mineWheelRows rows of the measured row height per notch, the same
 // 0..1-fraction-of-overflow convention the tables use (a positive notch
-// is wheel up, scrolling towards the top of the list).
-func (m *Market) scrollMine(notches float64) {
-	over := m.mineRail.Overflow()
+// is wheel up, scrolling towards the top of the column). The step uses
+// the taller of the two sections' rows, so either section scrolls at the
+// same pace.
+func (m *Market) scrollSide(notches float64) {
+	over := m.sideRail.Overflow()
 	if over <= 0 {
-		m.mineScroll.ScrollTop = 0
+		m.sideScroll.ScrollTop = 0
 		return
 	}
 	rowH := 0
-	if len(m.mineRows) > 0 {
-		_, rowH = m.mineRows[0].Root.PreferredSize()
+	for _, rows := range [][]*widgets.StackRow{m.bookRows, m.mineRows} {
+		if len(rows) == 0 {
+			continue
+		}
+		if _, h := rows[0].Root.PreferredSize(); h > rowH {
+			rowH = h
+		}
 	}
 	if rowH <= 0 {
 		return
 	}
-	top := m.mineScroll.ScrollTop - notches*mineWheelRows*float64(rowH)/over
-	m.mineScroll.ScrollTop = math.Max(0, math.Min(1, top))
+	top := m.sideScroll.ScrollTop - notches*mineWheelRows*float64(rowH)/over
+	m.sideScroll.ScrollTop = math.Max(0, math.Min(1, top))
 }
 
-// mineKey is the My orders section's change signature: the docked gate
-// plus every order's id/side/price/remaining (the book is canonical, so
-// the signature is stable across equal states).
-func mineKey(orders []sim.MarketStock, gated bool) string {
+// sideKey is the right pane's change signature: the selection, the docked
+// gate and the book's and My orders' every order id/side/price/remaining
+// (the book is canonical, so the signature is stable across equal states).
+func sideKey(sel content.ItemID, hasSel bool, book, mine []sim.MarketStock, gated bool) string {
 	var b strings.Builder
-	// Non-empty even with no orders, so the first Sync always builds (the
+	// Non-empty even with no rows, so the first Sync always builds (the
 	// zero-value key must never read as "unchanged").
-	b.WriteString("m;")
+	b.WriteString("s;")
+	if hasSel {
+		b.WriteString(string(sel))
+	}
+	b.WriteByte(';')
 	if gated {
 		b.WriteString("g;")
 	}
-	for _, o := range orders {
-		b.WriteString(strconv.FormatUint(o.ID, 10))
-		b.WriteByte(':')
-		b.WriteString(string(o.Side))
-		b.WriteByte(':')
-		b.WriteString(strconv.FormatFloat(o.Price, 'g', -1, 64))
-		b.WriteByte(':')
-		b.WriteString(strconv.Itoa(o.Qty))
-		b.WriteByte(';')
+	for _, orders := range [][]sim.MarketStock{book, mine} {
+		b.WriteByte('|')
+		for _, o := range orders {
+			b.WriteString(strconv.FormatUint(o.ID, 10))
+			b.WriteByte(':')
+			b.WriteString(string(o.Side))
+			b.WriteByte(':')
+			b.WriteString(strconv.FormatFloat(o.Price, 'g', -1, 64))
+			b.WriteByte(':')
+			b.WriteString(strconv.Itoa(o.Qty))
+			b.WriteByte(';')
+		}
 	}
 	return b.String()
 }

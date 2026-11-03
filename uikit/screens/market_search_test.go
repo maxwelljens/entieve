@@ -174,10 +174,10 @@ func TestMarketSearchScopesAndRanks(t *testing.T) {
 		}
 	}
 
-	// Flat: no order child rows in the result list.
+	// Flat: the results are item rows only.
 	for _, r := range m.tbl.Rows {
-		if _, ok := r.Data.(mktOrderRow); ok {
-			t.Fatal("search results fold orders — they must be flat")
+		if _, ok := r.Data.(mktItemRow); !ok {
+			t.Fatalf("search result row payload = %#v, want an item row", r.Data)
 		}
 	}
 
