@@ -12,40 +12,64 @@ matches the game's amber-on-black look.
 
 ## Prose
 
-- Plain and hard-edged. Short sentences. Concrete nouns: welds, berths,
-  holds, cycles, invoices, fine print, shift rosters.
-- Dry wit over jokes. Understatement over emphasis. The funny line is the
-  true one ("everyone prices in euro because converting on the frontier is
-  worse").
-- Money, paperwork and downtime are the drama. Bounties pay, premiums rise,
-  forms arrive.
-- Machines are equipment. Write the Old Works like weather or heavy plant:
-  present, hungry, uninterested, never like monsters or villains.
-- Beauty where it occurs: the precision of machinery, the scale of the void.
-  Show it in a detail; never announce it.
-- Never epic, mythic or destiny language. No legends, no prophecies, no
-  "ancient", no "unleash", no "chosen", no "glory". See the anti-examples.
+Content prose (descriptions, dossiers, briefings, flavour text) is
+catalogue copy: it reads like an entry in a ship registry or a corporate
+brochure, stating what a thing is, what it does, and what its institution
+says of it.
+
+- Declarative sentences, one fact each. A specification may stand as its
+  own fragment ("Heavy plating, three rail mounts."). No punchlines, no
+  wry closers, no aphorisms. Concrete nouns stay: welds, berths, holds,
+  cycles, invoices, fine print, shift rosters.
+- Facts earn their history. A slot count, a hold size or a mount layout
+  is stated first, then tied to what it achieved and what it still does.
+- Weight is carried by institutional attribution: what the registry, the
+  yard or the officials credit a thing with ("A favourite of corporations
+  across the Wild Fields", "Many a governor have attributed...").
+  Invention is welcome here: a governor, a treasury or an operation
+  beyond the map may be named.
+- Decline and endurance are ordinary: a hull line may be built in smaller
+  numbers than it once was, or still power infrastructure after all this
+  time. State it plainly.
+- Money, paperwork and downtime remain the drama. Bounties pay, premiums
+  rise, forms arrive.
+- Machines take the register like any hull. The Old Works are Predecessor
+  engineering: material-driven and lethal, written as weather or heavy
+  plant, never as personalities, monsters or villains. Their behaviour is
+  programming.
+- Beauty is announced where it is real: the precision of machinery, the
+  scale of the void, what a thing made possible. Ordinary things are
+  stated as they are.
+- Mythic and prophetic narration stays out, and destiny never belongs to
+  the player: the pilot is an insured working pilot, never chosen. See the
+  anti-examples.
 
 ### In voice
 
-1. "Jalvrek's dock crew tapes over everything that moves, and half of what
-   doesn't."
-2. "Everyone prices in euro because converting on the frontier is worse."
-3. "Pušťov has no patrols, no courts, and no insurance adjusters."
-4. "A Hierarch's crest buys a hauler. It does not buy you somewhere to spend
-   it."
-5. "Charter patrols answer in three minutes in Struvok. In the Fringe,
-   bring friends."
+1. "One of the first industrial haulers known, from the times of the
+   Predecessors."
+2. "Many view it as a venerable workhorse that defines civilisation
+   itself."
+3. "Its programming suggests pinning whatever it jumps and attack it
+   until it gives off no more heat signature."
+4. "A favourite of corporations across the Wild Fields, it is the
+   mainstay for large and long-distance civilian transport."
+5. "Built as a scalable solution to the vast expansion of mining
+   operations in the Wild Fields and other regions of the galaxy."
 
 ### Not in voice
 
 1. "Ancient and terrible, the Old Works stir from their long slumber to
-   claim the stars." Mythic. Machines here cut rock; they do not slumber.
-2. "You are the chosen pilot, the last hope of the Wild Fields." Destiny. The
-   player is an insured working pilot ([UNIVERSE.md: Daily
+   claim the stars." Personification. Machines here cut rock; they do not
+   slumber.
+2. "You are the chosen pilot, the last hope of the Wild Fields." Destiny.
+   The player is an insured working pilot ([UNIVERSE.md: Daily
    life](UNIVERSE.md#daily-life-and-the-pilots-place)).
 3. "A glorious odyssey awaits among the constellations!" Travel-brochure
-   epic. The rush is a job.
+   copy aimed at the pilot. The catalogue describes what a thing is and
+   has done; the rush is a job.
+4. "It turns like a loaded skip and stops like one; the ore does not." A
+   wry punchline. The register states facts; it does not land jokes.
 
 ## The naming layers
 
@@ -139,7 +163,8 @@ for mechanics (sizes, fallbacks, directories); this section binds the look.
 
 **Binding rules**
 
-- MUST write in the gritty corporate register: plain, hard-edged, dry.
+- MUST write in the catalogue register: declarative sentences, facts tied
+  to their history, weight from institutions (see Prose).
 - MUST place every new name in one layer of the naming matrix and give every
   new hull exactly one origin tag.
 - MUST keep trait skew soft: flavour and stat skew only.
@@ -149,7 +174,9 @@ for mechanics (sizes, fallbacks, directories); this section binds the look.
   panel depth, tracked mono chrome labels (see Form language).
 - MUST write amounts as `1,234.56 €` / `50¢` in UI and logs, "euro(s)" /
   "cent(s)" in prose.
-- NEVER use epic, mythic, destiny or chosen-one language in any content.
+- NEVER use mythic or prophetic narration, and never destiny or
+  chosen-one language about the player; hulls and institutions may carry
+  their age and standing (see Prose).
 - NEVER echo the retired placeholder names (see naming layers) in display
   text.
 - NEVER colour outside the palette roles or introduce a second typeface or

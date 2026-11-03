@@ -97,14 +97,13 @@ infrastructure it happens to.
   precise as lore gets.
 - NEVER write a decline: the towns are not thinning out and the berths are not
   closing. Settlement history is two waves, not a fall.
-- NEVER make the first wave a lost golden age. It was settlers with tools.
 
 ## The Predecessors
 
 Nobody in the Wild Fields built the Old Works. They were built by the
-**Predecessors**, the civilisation that held this country before the first
-wave landed, and that survives in the record only as leftovers: works, seams, a
-word or two of place-name, and what people still say out loud.
+**Predecessors**, the human civilisation that held this country before the
+first wave landed, and that survives in the record only as leftovers: works,
+seams, a word or two of place-name, and what people still say out loud.
 
 They built to finish. The plan was machine worlds: strip a system, plant it,
 run it, hand back a machine world, and **Gnazvor**, out in Kvonice, is the
@@ -138,6 +137,8 @@ is a form, and the form gets filed.
 
 **Binding rules**
 
+- MUST keep the Predecessors human: they were people, and every machine
+  they built is human engineering.
 - MUST keep the fall unexplained: the oversight decayed, the why is dark, and no
   text ever supplies it.
 - MUST keep the Predecessors known only through oral tradition, the fringe's

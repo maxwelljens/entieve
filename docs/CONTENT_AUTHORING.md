@@ -11,7 +11,7 @@ The schema structs in `content/model.go` (and `content/model_npc.go`) are
 
 **Naming and voice are binding.** Every display name, faction string,
 description and log line you author MUST follow `docs/lore/AESTHETIC.md`
-(gritty corporate register) and `docs/lore/NAMING.md` (the name registry,
+(catalogue register) and `docs/lore/NAMING.md` (the name registry,
 the `1,234.56 €` / `50¢` money strings, and the zone words Charter space /
 the Fringe / Unincorporated). That covers the structured lore fields too:
 hull `origin` tags are copied from NAMING.md's registry, and NPC

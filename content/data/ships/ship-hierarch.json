@@ -5,7 +5,7 @@
   "base_price": 1600000,
   "name": "Hierarch",
   "class": "rat",
-  "description": "The Old Works overseer: heavy tank, four turrets, and nothing that can call it off - it fights to the last. It carries the repeater that keeps a nest's frames on the same job; break it and the nest flies the pattern from memory.",
+  "description": "A Predecessor overseer frame, built to direct the swarm on site. Heavy tank, four turrets, a repeater mast. Its programming holds a nest's frames on the same job, and a nest that loses one does not break up: the frames fly the pattern from memory. Nothing can call it off, so it fights to the last. It makes no demands and negotiates nothing, because those were never built into it.",
   "origin": "old-works",
   "slots": {
     "high": 4,

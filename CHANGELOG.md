@@ -151,6 +151,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Ship and module descriptions are catalogue copy** (`content/data/ships`,
+  `content/data/modules`): every hull and module description is rewritten
+  in the in-universe registry voice, with declarative sentences, spec
+  fragments and institutional attribution; the Predecessor hulls are
+  ancient engineering that stays material-driven. `docs/lore/AESTHETIC.md`
+  states the register.
 - **The ship picture is a ship, not an icon**: the HUD's status panel and
   Show Info's hull page now lead with a 2:1 wide block of the hull's own art
   (120×60 design px in the HUD, a 200×100 hero on the hull page) instead of a

@@ -5,7 +5,7 @@
   "base_price": 520000,
   "name": "Tobřek",
   "class": "industrial",
-  "description": "A civilian freighter flying the trade lanes under convoy contract: fat hold, thick industrial tank, no guns. It runs, it does not fight. Convoy work pays by the cycle, which is the whole reason the tank is that thick.",
+  "description": "A modern civilian freighter that flies the Charter lanes under convoy contract, with a significant cargohold and significant bulk. A favourite of corporations across the Wild Fields, it is the mainstay for large and long-distance civilian transport. Many a governor have attributed its design to the ongoing successes of interstellar operations.",
   "maker": "corp-ferrum",
   "origin": "polish",
   "slots": {

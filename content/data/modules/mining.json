@@ -5,7 +5,7 @@
     "group": "Modules/High/Turrets",
     "maker": "corp-druzstvo",
     "name": "Mining Laser",
-    "description": "Strip-mines 100 m³ of asteroid per 30 s cycle straight into the ore hold. The beam does not care what the rock is worth; the refinery will tell you later.",
+    "description": "Strip-mines 100 m³ of asteroid every 30 seconds, straight into the ore hold, for 20 GJ a cycle. The beam takes the rock as it finds it; grading is the refinery's work. Dvužek builds it alongside its barges, and the district's claim crews order the pair together.",
     "slot": "high",
     "kind": "mining_laser",
     "mount": "turret",

@@ -5,7 +5,7 @@
   "base_price": 900000,
   "name": "Hušnek",
   "class": "barge",
-  "description": "A slow, sturdy mining barge with a huge ore hold. Strip belts, warp home, repeat. It turns like a loaded skip and stops like one; the ore does not.",
+  "description": "Dvužek's heavy mining barge, built for the belts a shallow hold cannot clear. Two high slots, the largest hold on the ring, and a hull built to carry it home. It strips a belt, warps home and repeats. It turns like a loaded skip and stops like one because of the hold. Co-op treasurers across the ring attribute Dvužek's expansion to the hold this barge brings home.",
   "maker": "corp-druzstvo",
   "origin": "moravian",
   "slots": {

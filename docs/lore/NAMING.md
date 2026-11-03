@@ -430,8 +430,9 @@ For future (human or AI) authors adding content:
 8. **Money and zones follow the specs**: `1,234.56 €` / `50¢`, and Charter
    space / the Fringe / Unincorporated: never high-sec/low-sec/null-sec in
    display text.
-9. **Prose follows** [AESTHETIC.md](AESTHETIC.md): plain, hard-edged, dry;
-   no epic, mythic or destiny language.
+9. **Prose follows** [AESTHETIC.md](AESTHETIC.md): catalogue register,
+   declarative sentences, facts tied to their history; no mythic or
+   prophetic narration, no destiny language about the player.
 
 ## Binding rules
 

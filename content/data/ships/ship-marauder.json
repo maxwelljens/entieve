@@ -5,7 +5,7 @@
   "base_price": 750000,
   "name": "Marauder",
   "class": "rat",
-  "description": "An Old Works assault frame: heavy plating, three rail mounts, and a habit of pinning whatever it jumps. It does not chase a hull it cannot strip.",
+  "description": "A Predecessor assault frame, built to take hulls apart for their mass. Heavy plating, three rail mounts. Its programming suggests pinning whatever it jumps and attack it until it gives off no more heat signature. It does not chase a hull it cannot strip, and freighters plan their lanes around the ones that do. The design has not changed its method since it was first sighted.",
   "origin": "old-works",
   "slots": {
     "high": 3,

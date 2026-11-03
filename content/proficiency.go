@@ -76,49 +76,49 @@ type ProfInfo struct {
 // problem, never a blank dialog.
 var proficiencyInfo = map[string]ProfInfo{
 	"autocannon": {
-		Desc: "Short-ranged, fast-cycling guns: the starter weapon line, quick to track and light on grid. The line covers every calibre, so practice with a small autocannon carries to the large one.",
+		Desc: "Autocannons are short-ranged, fast-cycling guns. The line covers every calibre, so practice with a small autocannon carries to the large one.",
 		Practice: []string{
 			"Every point of damage an autocannon lands.",
 			"The hull you fly takes a 10% cut of that damage.",
 		},
 	},
 	"artillery": {
-		Desc: "Long-ranged, heavy-hitting guns that cycle slowly and punish a target that holds still. Opens once Autocannons reaches II; the line then climbs its calibres without another gate.",
+		Desc: "Long-ranged, heavy-hitting guns that cycle slowly and strike targets at long distances. Covers every calibre of artillery, so practise with small artillery carries to the larger types.",
 		Practice: []string{
 			"Every point of damage artillery lands.",
 			"The hull you fly takes a 10% cut of that damage.",
 		},
 	},
 	"rocket": {
-		Desc: "Launcher-mounted rockets: short-range volleys that arrive in a burst. The family covers the launchers, and its levels gate the larger bays.",
+		Desc: "Launcher-mounted rockets; short-range volleys that arrive in a burst. The family covers the launchers.",
 		Practice: []string{
 			"Every point of damage a rocket volley lands.",
 			"The hull you fly takes a 10% cut of that damage.",
 		},
 	},
 	"mining": {
-		Desc: "The mining laser: ore yield per cycle, and the gate on the larger lasers. Rarer ore pays more practice for the same cycle, so a rich belt trains faster than a common one.",
+		Desc: "Mining is a proficiency governing the use of mining lasers and other ore-extracting equipment. Rarer ore pays more practice for the same cycle, so a rich belt trains faster than a common one.",
 		Practice: []string{
 			"Each completed mining cycle, by ore rarity: rarity 1 pays 1, 2 pays 2, 3 pays 4 and 4 pays 8.",
 			"The hull you fly takes a 10% cut of that practice.",
 		},
 	},
 	"shield": {
-		Desc: "Shield boosters and shield hardeners: the recharge that keeps a hull in a fight. The family's levels gate the stronger boosters.",
+		Desc: "Proficiency in the usage of shield boosters and shield hardeners, the first layer of a ship's defence.",
 		Practice: []string{
 			"Each completed shield booster cycle.",
 			"The hull you fly takes a 10% cut of that practice.",
 		},
 	},
 	"armor": {
-		Desc: "Armor repairers and plating: the second layer that holds after the shield is gone. Levels gate the stronger repairers and the heavier plates.",
+		Desc: "Armor repairers and plating, the second defence layer that holds after the shield.",
 		Practice: []string{
 			"Each completed armor repairer cycle.",
 			"The hull you fly takes a 10% cut of that practice.",
 		},
 	},
 	"capacitor": {
-		Desc: "The capacitor: the energy every active module spends. Boosters refill it in a burst, rechargers refill it continuously, and this family gates the larger of both.",
+		Desc: "Proficiency in capacitor usage, the energy most active modules spend to operate.",
 		Practice: []string{
 			"Each completed cap booster cycle.",
 			"Every activation cost paid while a cap recharger is fitted.",
@@ -126,21 +126,21 @@ var proficiencyInfo = map[string]ProfInfo{
 		},
 	},
 	"propulsion": {
-		Desc: "Afterburners and the hull's speed edge: the line that closes and opens range. Levels gate the stronger afterburners.",
+		Desc: "Proficiency in using afterburners and other propulsion systems.",
 		Practice: []string{
 			"Each completed afterburner cycle.",
 			"The hull you fly takes a 10% cut of that practice.",
 		},
 	},
 	"ewar": {
-		Desc: "Electronic warfare: stasis webs that slow a target and warp scramblers that hold it. Levels gate the stronger webs and the longer scrams.",
+		Desc: "Electronic warfare, such as stasis webs that slow a target and warp scramblers that bind it in place.",
 		Practice: []string{
 			"Each completed web or scrambler cycle.",
 			"The hull you fly takes a 10% cut of that practice.",
 		},
 	},
 	"frigate": {
-		Desc: "The frigate class: small, fast hulls that fly the starter line. Levels gate the frigate hulls you may assemble and undock.",
+		Desc: "The frigate class: small, fast hulls that fly the starter line. Levels govern the frigate hulls one may pilot.",
 		Practice: []string{
 			"10% of every mining, combat damage and support cycle act you fly in a frigate.",
 			"Each kill, at full rate, scaled by the target's caste.",
@@ -149,7 +149,7 @@ var proficiencyInfo = map[string]ProfInfo{
 		},
 	},
 	"destroyer": {
-		Desc: "The destroyer class: a battery of small turrets on a frigate hull. Opens once Frigates reaches II; levels gate the destroyer hulls.",
+		Desc: "The destroyer class: a large battery of turrets on a frigate hull. Levels govern the destroyer hulls one may pilot.",
 		Practice: []string{
 			"10% of every mining, combat damage and support cycle act you fly in a destroyer.",
 			"Each kill, at full rate, scaled by the target's caste.",
@@ -158,7 +158,7 @@ var proficiencyInfo = map[string]ProfInfo{
 		},
 	},
 	"industrial": {
-		Desc: "The industrial class: the hauler line, built to carry rather than fight. Opens once Frigates reaches I; levels gate the industrial hulls.",
+		Desc: "The industrial class: the hauler line, built primarily for cargo transport. Levels govern the industrial hulls one may pilot.",
 		Practice: []string{
 			"10% of every mining, combat damage and support cycle act you fly in an industrial.",
 			"Each kill, at full rate, scaled by the target's caste.",
@@ -167,7 +167,7 @@ var proficiencyInfo = map[string]ProfInfo{
 		},
 	},
 	"barge": {
-		Desc: "The barge class: the dedicated mining hull, an ore hold in place of guns. Opens once Industrials reaches I; levels gate the barge hulls.",
+		Desc: "The barge class: the dedicated mining hull, usually with a large ore hold in place of regular cargohold. Levels govern the barge hulls one may pilot.",
 		Practice: []string{
 			"10% of every mining, combat damage and support cycle act you fly in a barge.",
 			"Each kill, at full rate, scaled by the target's caste.",
@@ -176,9 +176,9 @@ var proficiencyInfo = map[string]ProfInfo{
 		},
 	},
 	"rat": {
-		Desc: "The Old Works hulls: the machine line flown against you, never by you. The family names the enemy castes (Scuttler, Marauder, Hierarch) and carries no practice of its own.",
+		Desc: "The Old Works hulls, hulls of the rogue machines.",
 		Practice: []string{
-			"None: the machines are flown against the pilot, so no act awards this family.",
+			"N/A",
 		},
 	},
 }

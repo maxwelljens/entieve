@@ -5,7 +5,7 @@
     "group": "Modules/Mid/Propulsion",
     "maker": "corp-celeritas",
     "name": "Afterburner",
-    "description": "Active propulsion module: +75% max speed while it runs, paid for in capacitor.",
+    "description": "Multiplies maximum speed by 75% while it runs, at a cost of 20 GJ every ten seconds. Cylvar builds it for the express couriers, and the house's logistics office credits it with every delivery that arrived on time.",
     "slot": "mid",
     "kind": "afterburner",
     "grid_class": "ii",
