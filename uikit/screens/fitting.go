@@ -97,10 +97,12 @@ type Fitting struct {
 	emblemSlug    string
 
 	// Zone 2 — the structured stats, the per-type EHP rows and the hull's
-	// fitting limits.
-	stats  []fitRow
-	ehp    []fitRow
-	limits []fitRow
+	// fitting limits (its mounts as text, its class quotas as a box table).
+	stats      []fitRow
+	ehp        []fitRow
+	limits     []fitRow
+	quota      *widget.Container // the class-quota table (rebuilt on a hull change)
+	limitsHull content.ShipID    // the hull the table was built for ("" = none yet)
 	// fitDefs is this frame's fitted module defs (the FitProblem input).
 	fitDefs []*content.ModuleDef
 
@@ -420,8 +422,9 @@ func (f *Fitting) newEHP() *widget.Container {
 	return col
 }
 
-// newLimits builds the HULL LIMITS block: the hull's mounts and its per-class
-// grid/CPU allowances, in the words the info page and the sim's refusals use.
+// newLimits builds the HULL LIMITS block: the hull's mounts as one text line
+// and its per-class grid/CPU allowances as the ship page's own box table
+// (syncLimits fills it in, and rebuilds it when the hull changes).
 func (f *Fitting) newLimits() *widget.Container {
 	// No gap under the caption: this block is the last one in the
 	// (scrollable) left column.
@@ -432,9 +435,14 @@ func (f *Fitting) newLimits() *widget.Container {
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 	)
 	col.AddChild(f.caption("HULL LIMITS", f.th.Pal()))
-	// One row per limit: a mount list and a class-quota pair are both too
-	// wide for a 300 px column's half.
-	col.AddChild(f.newPairs([]string{"Mounts", "Grid quotas", "CPU quotas"}, &f.limits, 1))
+	col.AddChild(f.newPairs([]string{"Mounts"}, &f.limits, 1))
+	f.quota = widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+	)
+	col.AddChild(f.quota)
 	return col
 }
 
@@ -735,6 +743,7 @@ func (f *Fitting) Sync() {
 	ship, hasShip := s.ShipState(player)
 	f.syncIdentity(ship, hasShip)
 	f.syncStats(player, ship, hasShip)
+	f.syncLimits(ship, hasShip)
 	f.syncTiles(ship, hasShip)
 	f.syncSummary(player, ship, hasShip)
 
@@ -818,10 +827,33 @@ func (f *Fitting) statValues(player ecs.Entity, ship sim.ShipState, hasShip bool
 	if def, ok := f.cv.Defs().Ship(ship.Hull); ok {
 		v["Warp"] = theme.GroupFloat(def.WarpSpeed, 1) + " AU/s"
 		v["Mounts"] = mountsText(def.Mounts)
-		v["Grid quotas"] = quotaText(def.GridClasses)
-		v["CPU quotas"] = quotaText(def.CPUClasses)
 	}
 	return v
+}
+
+// syncLimits mounts the hull's class-quota table under the mounts row, and
+// rebuilds it when the ship's hull changes (the column count is the hull's
+// own: a hull with no cpu quota has no CPU column).
+func (f *Fitting) syncLimits(ship sim.ShipState, hasShip bool) {
+	hull := content.ShipID("")
+	var q *infoQuota
+	if hasShip {
+		hull = ship.Hull
+		if def, ok := f.cv.Defs().Ship(hull); ok {
+			q = shipQuota(def.GridClasses, def.CPUClasses)
+		}
+	}
+	// The def behind a hull never changes, so the hull id alone says whether
+	// the table is the one on screen (a no-ship frame builds nothing, which is
+	// what an empty table is).
+	if hull == f.limitsHull {
+		return
+	}
+	f.limitsHull = hull
+	f.quota.RemoveChildren()
+	if q != nil {
+		f.quota.AddChild(quotaTableWidget(f.th, theme.StepTiny, *q))
+	}
 }
 
 // syncStats refreshes the stat rows and the per-type EHP rows (each EHP

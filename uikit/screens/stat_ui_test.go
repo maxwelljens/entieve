@@ -43,12 +43,13 @@ func TestShipPagePairsRows(t *testing.T) {
 	if fit == nil {
 		t.Fatal("ship page has no FITTING section")
 	}
-	r, ok := rowOf(fit, "Grid quotas")
-	if !ok || r.Value == "" {
-		t.Fatalf("grid quota row = %+v (ok=%v), want the hull's allowances", r, ok)
+	// The grid and cpu allowances are the box table's two columns now (the
+	// worded quota pair is gone: its numbers are the box counts).
+	if fit.Table == nil || len(fit.Table.Axes) != 2 || len(fit.Table.Rows) == 0 {
+		t.Fatalf("FITTING quota table = %+v, want the grid/cpu box columns", fit.Table)
 	}
-	if len(fit.Lines) < 2 || len(fit.Lines[len(fit.Lines)-1]) != 2 {
-		t.Errorf("FITTING lines = %v, want the quota pair on one line", fit.Lines)
+	if len(fit.Lines) < 2 || len(fit.Lines[len(fit.Lines)-1]) != 3 {
+		t.Errorf("FITTING lines = %v, want the mounts row over the slot strips", fit.Lines)
 	}
 }
 

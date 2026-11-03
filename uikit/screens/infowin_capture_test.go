@@ -46,6 +46,13 @@ func TestInfoWindowCaptureFrame(t *testing.T) {
 		Origin:      "moravian",
 		Description: "A heritage frigate restored from the old works: light, fast and stubbornly analogue where it counts.",
 		Slots:       content.Slots{High: 4, Mid: 4, Low: 2},
+		Mounts: []content.Mount{
+			{Kind: content.MountTurret, Size: content.SizeS},
+			{Kind: content.MountTurret, Size: content.SizeS},
+			{Kind: content.MountLauncher, Size: content.SizeS},
+		},
+		GridClasses: content.ClassQuota{I: 5, II: 3},
+		CPUClasses:  content.ClassQuota{II: 2},
 		Shield:      700, Armor: 600, Structure: 800,
 		Resists:   content.Resists{EM: 0.25, Thermal: 0.4, Kinetic: 0.5, Explosive: 0.1},
 		Capacitor: 1200, Recharge: 320,

@@ -4,6 +4,7 @@ import (
 	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
+	"slices"
 	"strings"
 	"testing"
 
@@ -152,7 +153,7 @@ func TestInfoPageHull(t *testing.T) {
 	if page.Sub != "Frigate · Moravian" {
 		t.Errorf("category/origin line = %q, want %q", page.Sub, "Frigate · Moravian")
 	}
-	for _, want := range []string{"CONSTRUCTION", "SLOTS", "SURVIVAL", "CAPACITOR",
+	for _, want := range []string{"CONSTRUCTION", "FITTING", "SURVIVAL", "CAPACITOR",
 		"PROPULSION", "SENSORS", "CARGO"} {
 		if sectionOf(page, want) == nil {
 			t.Errorf("missing section %s (have %v)", want, sectionLabels(page))
@@ -161,8 +162,8 @@ func TestInfoPageHull(t *testing.T) {
 	if r := mustRow(t, page, "CONSTRUCTION", "Origin"); r.Value != "Moravian" {
 		t.Errorf("origin row = %+v, want Moravian", r)
 	}
-	if r := mustRow(t, page, "SLOTS", "High"); r.Value != "4" {
-		t.Errorf("high slots = %+v, want 4", r)
+	if r := mustRow(t, page, "FITTING", "High"); r.Value != "" || r.PipLevel != 4 || r.PipMax != 4 {
+		t.Errorf("high slots = %+v, want one filled box per slot", r)
 	}
 	if r := mustRow(t, page, "SURVIVAL", "EM resist"); r.Value != "25%" {
 		t.Errorf("EM resist = %+v, want 25%%", r)
@@ -887,4 +888,261 @@ func TestInfoPagesCarryNoFamilyLabel(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestShipFittingBoxes pins the FITTING block's box language: the mounts line
+// stays text, the slots are one filled box per slot on one line, and the class
+// quotas are the shared box table (one column per axis the hull allows, one row
+// per class it allows any of, a zero on a present row the dim dash) — never a
+// worded "Grid quotas"/"CPU quotas" row and never a separate SLOTS section.
+func TestShipFittingBoxes(t *testing.T) {
+	env, _ := newTestEnv(t)
+
+	// Vaštrek: 2 turret + 1 launcher mount, slots 3/3/2, grid 5× I / 3× II,
+	// cpu 2× II.
+	vastrek := fixtureShip(t, env, "ship-vastrek", &content.ShipDef{
+		Name: "Kestrel Prime", Class: "frigate",
+		Slots: content.Slots{High: 3, Mid: 3, Low: 2}, Shield: 100,
+		Mounts: []content.Mount{
+			{Kind: content.MountTurret, Size: content.SizeS},
+			{Kind: content.MountTurret, Size: content.SizeS},
+			{Kind: content.MountLauncher, Size: content.SizeS},
+		},
+		GridClasses: content.ClassQuota{I: 5, II: 3},
+		CPUClasses:  content.ClassQuota{II: 2},
+	})
+	fit := sectionOf(shipPage(env, vastrek), "FITTING")
+	if fit == nil {
+		t.Fatal("hull page has no FITTING section")
+	}
+	if sectionOf(shipPage(env, vastrek), "SLOTS") != nil {
+		t.Error("the SLOTS section survived: its rows fold into FITTING")
+	}
+	if r, ok := rowOf(fit, "Mounts"); !ok || r.Value != "2 turrets (S) · 1 launcher (S)" {
+		t.Errorf("mounts row = %+v (ok=%v), want the unchanged mounts line", r, ok)
+	}
+	slots := slotLine(fit)
+	if len(slots) != 3 {
+		t.Fatalf("slot line = %d cells, want the three strips on one line", len(slots))
+	}
+	for i, want := range []struct {
+		label string
+		n     int
+	}{{"High", 3}, {"Mid", 3}, {"Low", 2}} {
+		got := slots[i]
+		if got.Label != want.label || got.PipMax != want.n || got.PipLevel != want.n || got.PipLocked {
+			t.Errorf("slot strip %d = %+v, want %s with %d filled boxes", i, got, want.label, want.n)
+		}
+	}
+	q := fit.Table
+	if q == nil {
+		t.Fatal("FITTING carries no quota table")
+	}
+	if !slices.Equal(q.Axes, []string{"Grid", "CPU"}) {
+		t.Errorf("quota axes = %v, want Grid and CPU", q.Axes)
+	}
+	if got := quotaCounts(q); !countsEqual(got, [][]int{{5, 0}, {3, 2}}) {
+		t.Errorf("vastrek quota rows = %v, want Class I 5 grid 0 cpu and Class II 3 grid 2 cpu", got)
+	}
+
+	// Ždanek: the roster's widest slot row (4/3/4) and its widest quota (6× I).
+	zdanek := fixtureShip(t, env, "ship-zdanek", &content.ShipDef{
+		Class: "destroyer", Slots: content.Slots{High: 4, Mid: 3, Low: 4}, Shield: 100,
+		GridClasses: content.ClassQuota{I: 6, II: 3},
+		CPUClasses:  content.ClassQuota{I: 2, II: 1},
+	})
+	fit = sectionOf(shipPage(env, zdanek), "FITTING")
+	for i, want := range []int{4, 3, 4} {
+		if got := slotLine(fit)[i].PipMax; got != want {
+			t.Errorf("zdanek slot strip %d = %d boxes, want %d", i, got, want)
+		}
+	}
+	if got := quotaCounts(fit.Table); !countsEqual(got, [][]int{{6, 2}, {3, 1}}) {
+		t.Errorf("zdanek quota rows = %v, want Class I 6 grid 2 cpu and Class II 3 grid 1 cpu", got)
+	}
+
+	// Scuttler: grid only (cpu {}), so the CPU column is no column at all.
+	scuttler := fixtureShip(t, env, "ship-scuttler", &content.ShipDef{
+		Class: "rat", Slots: content.Slots{High: 2, Mid: 1, Low: 1}, Shield: 100,
+		GridClasses: content.ClassQuota{I: 3, II: 1},
+	})
+	q = sectionOf(shipPage(env, scuttler), "FITTING").Table
+	if q == nil || !slices.Equal(q.Axes, []string{"Grid"}) {
+		t.Fatalf("scuttler quota = %+v, want the grid column alone (no cpu quota)", q)
+	}
+	if got := quotaCounts(q); !countsEqual(got, [][]int{{3}, {1}}) {
+		t.Errorf("scuttler quota rows = %v, want Class I 3 and Class II 1", got)
+	}
+
+	// Hierarch: every class has a grid allowance and only Class II has cpu,
+	// so the two cpu zeros are dashes inside present rows.
+	hierarch := fixtureShip(t, env, "ship-hierarch", &content.ShipDef{
+		Class: "rat", Slots: content.Slots{High: 4, Mid: 3, Low: 3}, Shield: 100,
+		GridClasses: content.ClassQuota{I: 5, II: 1, III: 4},
+		CPUClasses:  content.ClassQuota{II: 1},
+	})
+	if got := quotaCounts(sectionOf(shipPage(env, hierarch), "FITTING").Table); !countsEqual(got, [][]int{{5, 0}, {1, 1}, {4, 0}}) {
+		t.Errorf("hierarch quota rows = %v, want Class III present with a dash", got)
+	}
+
+	// A class with nothing on either axis is no row (Class II absent here).
+	sparse := fixtureShip(t, env, "ship-fixture-sparse-quota", &content.ShipDef{
+		Class: "barge", Slots: content.Slots{High: 1}, Shield: 100,
+		GridClasses: content.ClassQuota{I: 1, III: 2},
+	})
+	sec := sectionOf(shipPage(env, sparse), "FITTING")
+	if sec.Table == nil || len(sec.Table.Rows) != 2 ||
+		sec.Table.Rows[0].Label != "Class I" || sec.Table.Rows[1].Label != "Class III" {
+		t.Errorf("sparse quota = %+v, want Class I and Class III only", sec.Table)
+	}
+}
+
+// TestShipPageCarriesNoQuotaWords sweeps every shipped page: the worded quota
+// rows and the old SLOTS bar are gone from the model, not just from the
+// fixtures.
+func TestShipPageCarriesNoQuotaWords(t *testing.T) {
+	env, _ := newTestEnv(t)
+	defs := env.Defs()
+	if len(defs.Ships) == 0 {
+		t.Fatal("fixture: no shipped hulls")
+	}
+	banned := []string{"Grid quotas", "CPU quotas", "SLOTS"}
+	check := func(where, s string) {
+		for _, b := range banned {
+			if strings.Contains(s, b) {
+				t.Errorf("%s still prints %q", where, b)
+			}
+		}
+	}
+	for id := range defs.Ships {
+		page, ok := infoPageFor(env, widgets.ShipRef(id))
+		if !ok {
+			t.Fatalf("%s did not resolve", id)
+		}
+		for _, sec := range page.Sections {
+			check(string(id)+" section", sec.Label)
+			for _, row := range sec.Rows() {
+				check(string(id)+" row label", row.Label)
+				check(string(id)+" row value", row.Value)
+			}
+			if sec.Table == nil {
+				continue
+			}
+			for _, ax := range sec.Table.Axes {
+				check(string(id)+" quota axis", ax)
+			}
+			for _, row := range sec.Table.Rows {
+				check(string(id)+" quota row", row.Label)
+			}
+		}
+	}
+}
+
+// slotLine is a FITTING section's slot strips (the line that opens at High).
+func slotLine(sec *infoSection) []infoRow {
+	for _, line := range sec.Lines {
+		if len(line) > 0 && line[0].Label == "High" {
+			return line
+		}
+	}
+	return nil
+}
+
+// countsEqual compares two tables' row counts.
+func countsEqual(a, b [][]int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !slices.Equal(a[i], b[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// quotaCounts is a table's box counts in row order (the pin's read).
+func quotaCounts(q *infoQuota) [][]int {
+	if q == nil {
+		return nil
+	}
+	out := make([][]int, len(q.Rows))
+	for i, r := range q.Rows {
+		out[i] = r.Counts
+	}
+	return out
+}
+
+// TestInfoQuotaTableFitsThePage pins the FITTING table's layout: on the widest
+// table the roster can draw (three class rows, six boxes on an axis) every
+// cell stays inside the page's content column, at the default width and at the
+// window's content floor (infoMinW), where the label column is narrowest.
+func TestInfoQuotaTableFitsThePage(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	fixtureShip(t, env, "ship-fixture-wide-quota", &content.ShipDef{
+		Name: "Wide Quota", Class: "destroyer",
+		Slots: content.Slots{High: 4, Mid: 3, Low: 4}, Shield: 100,
+		GridClasses: content.ClassQuota{I: 6, II: 5, III: 4},
+		CPUClasses:  content.ClassQuota{I: 2, II: 2, III: 1},
+	})
+	w := env.InfoWindow()
+	ui := newWindowUI(t, env, w.Win())
+	frame := func() { uitest.PumpWindow(t, ui, w.Sync, 1280, 720) }
+	for i := 0; i < 2; i++ {
+		frame()
+	}
+	if !w.Show(widgets.ShipRef("ship-fixture-wide-quota")) {
+		t.Fatal("the wide-quota fixture did not resolve")
+	}
+	for i := 0; i < 2; i++ {
+		frame()
+	}
+
+	step, size := theme.Px(profPipW+profPipGap), theme.Px(profPipW)
+	check := func(tag string) {
+		t.Helper()
+		if w.quota == nil {
+			t.Fatalf("%s: the page has no quota table", tag)
+		}
+		grid := w.quota
+		if got, want := len(grid.Children()), (1+2)*(1+3); got != want {
+			t.Fatalf("%s: table cells = %d, want the header over three class rows on two axes", tag, got)
+		}
+		page := w.page.GetWidget().Rect
+		left, right := page.Min.X+theme.Px(theme.ContentsPad), page.Max.X-theme.Px(theme.ContentsPad)
+		var widest int
+		for i, cell := range grid.Children() {
+			r := cell.GetWidget().Rect
+			if r.Min.X < left || r.Max.X > right {
+				t.Errorf("%s: cell %d %v leaves the content column %d..%d", tag, i, r, left, right)
+			}
+			if c, ok := cell.(*widget.Container); ok {
+				for _, k := range c.Children() {
+					if g, ok := k.(*widget.Graphic); ok && g.Image != nil {
+						widest = max(widest, g.Image.Bounds().Dx())
+					}
+				}
+			}
+		}
+		if want := profPipRowW(6, step, size); widest != want {
+			t.Errorf("%s: widest strip = %d px, want the six-box %d px", tag, widest, want)
+		}
+		// The rendered page prints no worded quota row and no SLOTS bar.
+		for _, text := range windowTexts(w.Win().GetContainer()) {
+			for _, banned := range []string{"Grid quotas", "CPU quotas", "SLOTS"} {
+				if strings.Contains(text, banned) {
+					t.Errorf("%s: the page prints %q (%q)", tag, banned, text)
+				}
+			}
+		}
+	}
+	check("default width")
+
+	win := w.Win().GetContainer().GetWidget().Rect
+	win.Max.X = win.Min.X + theme.Px(infoMinW)
+	w.Win().SetLocation(win)
+	for i := 0; i < 3; i++ {
+		frame()
+	}
+	check("content floor")
 }

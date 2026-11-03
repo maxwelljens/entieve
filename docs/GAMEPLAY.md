@@ -401,7 +401,7 @@ Only fields that exist are shown, grouped per kind:
 
 | Kind | Sections |
 |---|---|
-| Hull | CONSTRUCTION (class · origin) / SLOTS / PROFICIENCY / SURVIVAL / CAPACITOR / PROPULSION / SENSORS / CARGO |
+| Hull | CONSTRUCTION (class · origin) / FITTING (the mounts line, the slot strips, the grid and cpu class box table) / PROFICIENCY / SURVIVAL / CAPACITOR / PROPULSION / SENSORS / CARGO |
 | Module | ACTIVATION / CONSTRUCTION / PROFICIENCY / kind stat sections / CHARGES (compatible charges) / MARKET |
 | Item | PROPERTIES / MARKET / REFINES TO / DAMAGE |
 | Machine caste | dossier prose / DOSSIER (faction, hull, bounty) / BEHAVIOR / LOOT |
@@ -527,7 +527,11 @@ name, class · maker and corporation emblem head the left column, with the
 derived stats beneath it (shield / armor / structure maxima, capacitor
 capacity and recharge, speed / align / signature, warp / targets / scan,
 cargo) as dense label/value rows, plus a per-type **EHP** row (the three
-layer maxima over the penetrating share each of the four resists leaves).
+layer maxima over the penetrating share each of the four resists leaves)
+and a **HULL LIMITS** block under them: the hull's mounts in words, then its
+grid and cpu class quotas as filled boxes, one column per axis the hull
+carries a quota on, one row per class, one box per allowance and a dim dash
+where a present row has none (the same table the Show Info hull page draws).
 The **slot grid** sits right of it: one 50×40 tile per hull slot, the
 module's class glyph and short name on the fitted ones, a dashed
 placeholder where a slot is empty, so the grid always shows the hull's
