@@ -149,13 +149,15 @@ const layoutBytesGolden = `{
       "open": true
     },
     "manufacturing": {
-      "x": 400,
-      "y": 120,
-      "w": 480,
-      "h": 480,
+      "x": 260,
+      "y": 80,
+      "w": 760,
+      "h": 560,
       "open": false,
       "splits": {
-        "manufacturing-jobs": 0.5
+        "manufacturing-inspector": 0.6413043478260869,
+        "manufacturing-jobs": 0.68,
+        "manufacturing-tree": 0.25
       }
     },
     "map": {

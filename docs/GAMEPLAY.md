@@ -121,15 +121,17 @@ its minimum size), and click anywhere on a window to raise it to the
 front.
 
 **Multi-pane windows** (Inventory, Fitting, Manufacturing and the
-Market: browse tree | catalog | My orders) carry
-**draggable seams** between their lists: the seam is a recessed track with
-a dotted grip in its middle (the grip lights up under the pointer) and an
-about 8 px grab band (the cursor turns into the up/down arrow over it),
-and dragging it trades height between the two lists it separates, so a
-long hangar or job list can be given the room. Each pane keeps a minimum
-height, so nothing collapses, and the proportions are saved with the
-window's layout (see **Your layout persists**). The market's two seams
-run left/right and trade width the same way.
+Market) carry **draggable seams** between their lists: the seam is a
+recessed track with a dotted grip in its middle (the grip lights up under
+the pointer) and an about 8 px grab band (the cursor turns into the up/down
+arrow over it), and dragging it trades height between the two lists it
+separates, so a long hangar or job list can be given the room. Each pane
+keeps a minimum height, so nothing collapses, and the proportions are saved
+with the window's layout (see **Your layout persists**). The market's two
+seams (browse | catalog | my orders) and the manufacturing board's two
+(browse | recipes | the selected recipe) run left/right and trade width the
+same way; the manufacturing board's third seam trades its height with the
+job list under it.
 
 The **Refinery** and **Manufacturing** windows carry an artwork **header band**
 under their title bar: `assets/artwork/refining_header.jpg` and
@@ -790,12 +792,13 @@ rebuilt interface starts at 1 again). `Esc` cancels it *before* anything
 else (no window closes behind it and the Esc menu never opens), and a
 cancelled picker commits nothing.
 
-What opens it is the action, not the amount: in the **Refinery** and
-**Manufacturing** windows selecting the row *is* the action (an ore, a
-recipe), so the picker appears on the click; the **Market** and
-**Inventory** windows have several verbs over one selection, so their
-toolbar buttons (Buy, Sell / To Cargo, To Ore, To Hangar) and the rows'
-right-click verbs each open it with their own verb pre-set. The refinery's
+What opens it is the action, not the amount: in the **Refinery** window
+selecting the row *is* the action (an ore), so the picker appears on the
+click, and in the **Manufacturing** window it is the inspector's **Start
+job**; the **Market** and **Inventory** windows have several verbs over one
+selection, so their toolbar buttons (Buy, Sell / To Cargo, To Ore, To
+Hangar) and the rows' right-click verbs each open it with their own verb
+pre-set. The refinery's
 slider is **notched** to whole 100-ore batches (a stock under one batch
 opens it with an empty ladder and Confirm grayed); every other surface is a
 free 1–100 in single steps. Nothing new is clamped: the simulation still
@@ -810,18 +813,43 @@ view); docked at a station with the **industry** service it opens there
 like the other service windows (Hauvnok, Hovžan at Młondan, Dukšan at
 Kamžal), and it only ever mounts while docked.
 
-The window turns **minerals into products**: pick a recipe (a hull, a
-module or a batch of charges) and the quantity picker opens on its
-**runs** (1–100, starting at the run count you last started); Confirm
-starts the job. The materials for every run are committed up front from
-your stock (the have/need column shows exactly what you hold against what
-one run eats, and the picker's preview re-prices it at the picked run
-count), and the job pays a **fee of 3% of the recipe's mineral value** when
-it starts. All stations share **three job slots**, so a yard running a hull
-still leaves room elsewhere. The job list shows every job you own, grouped
-by station; you can collect or cancel only the jobs at the station you are
-docked at. Cancelling a running job returns its materials to the hangar
-and keeps the fee. Collect the output into your hangar when it is done.
+The window turns **minerals into products** and is read the market's way,
+in three panes over one seam:
+
+- **Browse** (left): the recipes' own product groups (`Ships/Frigates`,
+  `Modules/High/Turrets`, `Ammunition/Artillery shells`, …), with `All` at
+  the root. Clicking a branch expands it and scopes the recipe list to its
+  subtree. The search field above it filters that branch live over the
+  product name, its family and **its inputs**, so typing a mineral finds
+  every recipe that eats it.
+- **Recipes** (middle): one row per recipe. The first line is the product
+  and its one-glance verdict, `● ready` or `× short 2` (the count of
+  minerals you are short of; a glyph and a word, never colour alone). The
+  second line is the per-run time and fee beside the **cost strip**: one
+  bar wide, split per mineral by its share of the run's material value in
+  canonical mineral order, each segment green while your stock covers it
+  and red where it falls short. A row that is mostly green is nearly
+  runnable; a wide red segment says the bulk of the bill is missing.
+- **The selected recipe** (right): its icon and name, the verdict, the
+  per-run time, fee and material value, then the bill itself, one row per
+  mineral with **the cost driver first** (each row: the mineral's own art,
+  its share of the run's value and its have/need bar with the exact
+  numbers, green when covered and red when short). Under the bill sit
+  **Start job** and, while it stays grayed, the reason in words: which
+  minerals are short, that no station here offers industry, or that all
+  three slots are busy.
+
+**Start** opens the quantity picker on the job's **runs** (1–100, starting
+at the run count you last started); Confirm starts the job. The materials
+for every run are committed up front from your stock (the bill shows
+exactly what you hold against what one run eats, and the picker's preview
+re-prices it at the picked run count), and the job pays a **fee of 3% of
+the recipe's mineral value** when it starts. All stations share **three
+job slots**, so a yard running a hull still leaves room elsewhere. The job
+strip under the board shows every job you own, grouped by station; you can
+collect or cancel only the jobs at the station you are docked at.
+Cancelling a running job returns its materials to the hangar and keeps the
+fee. Collect the output into your hangar when it is done.
 Ore is not a manufacturing input: it refines into minerals at a refinery
 first; the two-tier chain.
 

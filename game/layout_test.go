@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/entieve/entieve/sim"
 	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
@@ -747,7 +748,7 @@ func seamRatio(name string, seams []widgets.Seam) float64 {
 
 // TestSplitRatiosPersistAcrossRestart: a dragged seam writes its ratio
 // into the version-3 sidecar and a fresh session restores it exactly,
-// while a seam nobody touched keeps its equal share.
+// while a seam nobody touched keeps its panel's opening share.
 func TestSplitRatiosPersistAcrossRestart(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "save.json")
 	g := newShowcaseGameAt(t, path)
@@ -777,8 +778,10 @@ func TestSplitRatiosPersistAcrossRestart(t *testing.T) {
 	if got := doc.Windows["fitting"].Splits["fitting-hangar"]; got != 0.7 {
 		t.Errorf("fitting-hangar = %v, want the dragged 0.7", got)
 	}
-	if got := doc.Windows["manufacturing"].Splits["manufacturing-jobs"]; got != 0.5 {
-		t.Errorf("manufacturing-jobs = %v, want the equal-share default 0.5", got)
+	// The manufacturing board opens over its job strip at the panel's own
+	// share (0.68), not the widget's equal halves.
+	if got := doc.Windows["manufacturing"].Splits["manufacturing-jobs"]; got != 0.68 {
+		t.Errorf("manufacturing-jobs = %v, want the board's opening share 0.68", got)
 	}
 
 	// Next session: the ratios come back exactly, then a viewport change
@@ -830,8 +833,8 @@ func TestSidecarV2MigratesToSplits(t *testing.T) {
 		t.Error("v2 inventory open flag not restored")
 	}
 	// The rename migration still applies to v2 files (the saved 500×400
-	// grows to the window's 420×440 content floor).
-	if got, want := bodyOf[*uikit.Manufacturing](g.host, idManufacturing).Win().GetContainer().GetWidget().Rect, image.Rect(300, 200, 800, 640); got != want {
+	// grows to the window's three-pane content floor, 640×460).
+	if got, want := bodyOf[*uikit.Manufacturing](g.host, idManufacturing).Win().GetContainer().GetWidget().Rect, image.Rect(300, 200, 940, 660); got != want {
 		t.Errorf("v2 factory rect migrated to %v, want %v", got, want)
 	}
 	if g.host.IsOpen(idManufacturing) {
@@ -1013,5 +1016,86 @@ func TestMarketSplitV2Default(t *testing.T) {
 	}
 	if got := doc.Windows["market"].Splits["market-orders"]; math.Abs(got-opening) > 1e-9 {
 		t.Errorf("rewritten market-orders = %v, want the opening share %v", got, opening)
+	}
+}
+
+// TestManufacturingSplitRatioPersists: the manufacturing board's three
+// seams (the board over its job strip and the board row's browse | list |
+// inspector pair) are exposed to the sidecar as manufacturing-jobs,
+// manufacturing-tree and manufacturing-inspector, round-trip their ratios
+// through a version-3 file, restore them on a fresh session, and "Reset
+// window layout" returns each to the panel's own opening shares.
+func TestManufacturingSplitRatioPersists(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	g := newShowcaseGameAt(t, path)
+	g.applySize(1280, 720)
+	// The board is docked-only: dock at the start system's industry station
+	// so the host mounts it.
+	g.s.Docked.Set(g.s.Player(), sim.Docked{At: "cel-haven-rest"})
+	g.host.SetOpen(idManufacturing, true)
+	g.syncMounts()
+	pump(t, g, 1280, 720)
+
+	// The opening shares: 184 px of browse and 264 px of inspector of the
+	// 736 px the split spans at the 760 px landing rect (760 − 2·ContentsPad
+	// − both 4 px seams), and the board's 0.68 over its job strip.
+	const treeOpening = 184.0 / 736
+	const inspOpening = 1 - 264.0/736
+	const jobsOpening = 0.68
+	seams := g.host.Slot(string(idManufacturing)).Splits()
+	if len(seams) != 3 || seams[0].Name != "manufacturing-jobs" ||
+		seams[1].Name != "manufacturing-tree" || seams[2].Name != "manufacturing-inspector" {
+		t.Fatalf("manufacturing seams = %+v, want jobs / tree / inspector", seams)
+	}
+	for _, want := range []struct {
+		name  string
+		ratio float64
+	}{{"manufacturing-jobs", jobsOpening}, {"manufacturing-tree", treeOpening}, {"manufacturing-inspector", inspOpening}} {
+		if got := seamRatio(want.name, seams); math.Abs(got-want.ratio) > 1e-9 {
+			t.Errorf("opening %s = %v, want %v", want.name, got, want.ratio)
+		}
+	}
+
+	seams[1].Split.SetRatio(seams[1].Index, 0.3)
+	seams[2].Split.SetRatio(seams[2].Index, 0.78)
+	if err := g.SaveGame(); err != nil {
+		t.Fatalf("SaveGame: %v", err)
+	}
+	doc := readDoc(t, g.layoutPath())
+	if got := doc.Windows["manufacturing"].Splits["manufacturing-tree"]; math.Abs(got-0.3) > 1e-9 {
+		t.Errorf("manufacturing-tree = %v, want the dragged 0.3", got)
+	}
+	if got := doc.Windows["manufacturing"].Splits["manufacturing-inspector"]; math.Abs(got-0.78) > 1e-9 {
+		t.Errorf("manufacturing-inspector = %v, want the dragged 0.78", got)
+	}
+
+	// Next session: the ratios come back, mounted and laid out, and a
+	// resize still tiles the row.
+	g2 := newShowcaseGameAt(t, path)
+	g2.applySize(1280, 720)
+	g2.s.Docked.Set(g2.s.Player(), sim.Docked{At: "cel-haven-rest"})
+	g2.host.SetOpen(idManufacturing, true)
+	g2.syncMounts()
+	pump(t, g2, 1280, 720)
+	seams = g2.host.Slot(string(idManufacturing)).Splits()
+	if got := seamRatio("manufacturing-tree", seams); math.Abs(got-0.3) > 1e-9 {
+		t.Errorf("restored manufacturing-tree = %v, want 0.3", got)
+	}
+	if got := seamRatio("manufacturing-inspector", seams); math.Abs(got-0.78) > 1e-9 {
+		t.Errorf("restored manufacturing-inspector = %v, want 0.78", got)
+	}
+	assertSplitRowTiled(t, "manufacturing", seams[1].Split)
+	g2.applySize(1024, 700)
+	pump(t, g2, 1024, 700)
+	assertSplitRowTiled(t, "manufacturing", seams[1].Split)
+
+	// Reset window layout: back to the panel's opening shares.
+	g2.resetLayout()
+	seams = g2.host.Slot(string(idManufacturing)).Splits()
+	if got := seamRatio("manufacturing-tree", seams); math.Abs(got-treeOpening) > 1e-9 {
+		t.Errorf("after reset manufacturing-tree = %v, want %v", got, treeOpening)
+	}
+	if got := seamRatio("manufacturing-inspector", seams); math.Abs(got-inspOpening) > 1e-9 {
+		t.Errorf("after reset manufacturing-inspector = %v, want %v", got, inspOpening)
 	}
 }

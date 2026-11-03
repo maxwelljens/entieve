@@ -2,7 +2,6 @@ package screens
 
 import (
 	"github.com/entieve/entieve/internal/uitest"
-	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"strings"
 	"testing"
@@ -81,6 +80,23 @@ func recipeRowFor(f *Manufacturing, product content.ItemID) int {
 	return -1
 }
 
+// recipeVerdict is one recipe row's one-glance verdict: line 1's second run
+// ("● ready" / "× short 2" / "× no station" / "× slots full").
+func recipeVerdict(r widgets.TableRow) string {
+	if len(r.Stack) == 0 || len(r.Stack[0].Segs) < 2 {
+		return ""
+	}
+	return r.Stack[0].Segs[1].Text
+}
+
+// recipeMeta is one recipe row's line 2 first run: the per-run time and fee.
+func recipeMeta(r widgets.TableRow) string {
+	if len(r.Stack) < 2 || len(r.Stack[1].Segs) == 0 {
+		return ""
+	}
+	return r.Stack[1].Segs[0].Text
+}
+
 // TestManufacturingPanelGatingAndEnqueue walks the panel like the market tests
 // walk theirs: rows from the sim, one run's have/need readout on the board,
 // the selection gesture opening the quantity picker whose Confirm is gated
@@ -95,43 +111,43 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 	frame()
 	frame()
 
-	// Recipe board: one row per shipped recipe, in the content's canonical
-	// order, carrying the product name, family, per-run time and inputs.
+	// Recipe list: one row per shipped recipe, in the content's canonical
+	// order, carrying the product and its verdict on line 1 and the per-run
+	// time, fee and cost strip on line 2 (the cells are the fit source only).
 	want := env.Content.RecipesInOrder()
 	if len(f.recipes.Rows) != len(want) {
 		t.Fatalf("recipe rows = %d, want %d", len(f.recipes.Rows), len(want))
 	}
 	for i, r := range f.recipes.Rows {
-		if len(r.Cells) != 5 {
-			t.Fatalf("row %d has %d cells, want 5", i, len(r.Cells))
-		}
-		if r.Cells[0] != env.TradeableName(want[i].Product) {
-			t.Fatalf("row %d = %q, want %q (canonical order)", i, r.Cells[0], want[i].Product)
-		}
-		if r.Cells[1] != want[i].Family {
-			t.Errorf("row %d family = %q, want %q", i, r.Cells[1], want[i].Family)
+		row := r.Data.(manufacturingRow)
+		if got := r.Cells[0]; got != env.TradeableName(want[i].Product) || row.recipe != want[i].ID {
+			t.Fatalf("row %d = %q, want %q (canonical order)", i, got, want[i].Product)
 		}
 		if r.Icons[0] == "" {
 			t.Errorf("row %d carries no product icon", i)
 		}
-		if !strings.HasSuffix(r.Cells[2], " s") {
-			t.Errorf("row %d time = %q, want a per-run figure", i, r.Cells[2])
+		if !strings.Contains(recipeMeta(r), " s · ") {
+			t.Errorf("row %d meta = %q, want a per-run time and fee", i, recipeMeta(r))
+		}
+		if len(r.Stack) < 2 || len(r.Stack[1].Segs) < 2 || len(r.Stack[1].Segs[1].Split) == 0 {
+			t.Errorf("row %d carries no value-share strip", i)
 		}
 	}
-	// The charge row's inputs read have/need for one run (the run count is
-	// the picker's business).
+	// Undocked every row reads the same one-glance refusal (the sim's own
+	// gate is the authority: no industry service here).
 	chargeRow := recipeRowFor(f, "ammo-emp-s")
 	if chargeRow < 0 {
 		t.Fatal("no ammo-emp-s recipe row")
 	}
-	if !strings.Contains(f.recipes.Rows[chargeRow].Cells[4], "Sideron 0/720") {
-		t.Errorf("inputs cell = %q, want the have/need readout", f.recipes.Rows[chargeRow].Cells[4])
+	if got := recipeVerdict(f.recipes.Rows[chargeRow]); got != "× no station" {
+		t.Errorf("undocked verdict = %q, want × no station", got)
 	}
 
-	// Undocked: the row's Start verb is grayed and the selection gesture
-	// opens nothing (no industry service).
-	if act := f.recipes.Rows[chargeRow].Spec.Actions[0]; !act.Disabled {
-		t.Fatal("Start verb enabled while undocked")
+	// Undocked: the row declares no action (a recipe's Start is the
+	// inspector's button) and the selection gesture opens the inspector,
+	// never the picker (no industry service).
+	if acts := f.recipes.Rows[chargeRow].Spec.Actions; len(acts) != 0 {
+		t.Fatalf("recipe row declares %d actions, want none (Start is the inspector's)", len(acts))
 	}
 	clickRow(ui, f.recipes, chargeRow)
 	frame()
@@ -143,8 +159,8 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 	}
 
 	// Docked at the (patched) industry station: the craft line and slot
-	// readout light up; the picker opens on the recipe but Confirm stays
-	// grayed — no materials yet.
+	// readout light up; the recipe opens with the bill short of everything,
+	// its Start greyed and the gate naming what is missing.
 	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: factoryStation})
 	frame()
 	if !strings.Contains(f.craftLbl.Label, "charges L1") ||
@@ -156,18 +172,25 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 	}
 	clickRow(ui, f.recipes, chargeRow)
 	frame()
-	if !q.IsOpen() {
-		t.Fatal("selecting a recipe opened no picker")
+	if !f.hasSel || f.sel.recipe != "rec-ammo-emp-s" {
+		t.Fatalf("selection = %+v (hasSel=%v), want the charge recipe", f.sel, f.hasSel)
 	}
-	if got := q.TitleText(); got != "Quantity" {
-		t.Errorf("picker title = %q, want the base name Quantity", got)
+	if q.IsOpen() {
+		t.Fatal("selecting a recipe opened the picker (Start is its gesture)")
 	}
-	if !q.Confirm().GetWidget().Disabled {
-		t.Fatal("Confirm enabled with an empty hold")
+	if got := recipeVerdict(f.recipes.Rows[chargeRow]); !strings.HasPrefix(got, "× short ") {
+		t.Errorf("empty-hold verdict = %q, want the short count", got)
+	}
+	if f.startBtn.GetWidget().Disabled == false {
+		t.Fatal("Start enabled with an empty hold")
+	}
+	uitest.FireButton(ui, f.startBtn)
+	if q.IsOpen() || len(*cmds) != 0 {
+		t.Fatalf("a greyed Start opened the picker (%v) or enqueued %d commands", q.IsOpen(), len(*cmds))
 	}
 
-	// Stock the charge recipe and pick the row again: Confirm arms and
-	// emits CmdStartJob at the picked runs.
+	// Stock the charge recipe and pick Start: the verdict flips, the gate
+	// clears and the picker opens on one run.
 	rec := env.Content.Recipes["rec-ammo-emp-s"]
 	if rec == nil {
 		t.Fatal("fixture: rec-ammo-emp-s missing")
@@ -179,13 +202,20 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 	for _, m := range mats {
 		giveItem(env.Sim, m.Item, m.Qty)
 	}
-	clickRow(ui, f.recipes, chargeRow)
 	frame()
-	if !f.hasSel || f.sel.recipe != rec.ID {
-		t.Fatalf("selection = %+v (hasSel=%v), want the charge recipe", f.sel, f.hasSel)
+	if got := recipeVerdict(f.recipes.Rows[chargeRow]); got != "● ready" {
+		t.Errorf("stocked verdict = %q, want ● ready", got)
+	}
+	uitest.FireButton(ui, f.startBtn)
+	frame()
+	if !q.IsOpen() {
+		t.Fatal("Start opened no picker")
+	}
+	if got := q.TitleText(); got != "Quantity" {
+		t.Errorf("picker title = %q, want the base name Quantity", got)
 	}
 	if q.Confirm().GetWidget().Disabled {
-		t.Fatal("Confirm still grayed with materials in the hold")
+		t.Fatal("Confirm grayed with materials in the hold")
 	}
 	if got := q.Value(); got != 1 {
 		t.Errorf("picker opens at %d runs, want 1", got)
@@ -201,8 +231,11 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 
 	// Picking 10 runs re-prices the preview and disarms Confirm again: the
 	// hold covers one run, not ten.
-	clickRow(ui, f.recipes, chargeRow)
+	uitest.FireButton(ui, f.startBtn)
 	frame()
+	if !q.IsOpen() {
+		t.Fatal("Start opened no picker the second time")
+	}
 	q.Slider().SetValue(10) // the runs the player picks on the slider
 	frame()
 	if got := q.Value(); got != 10 {
@@ -297,8 +330,8 @@ func TestManufacturingRowsShowInfo(t *testing.T) {
 		t.Errorf("Show Info ref = %v, want %v", got, ref)
 	}
 
-	// Right-click menu: bold Show Info plus the action entry — Start here,
-	// visible but gated (no materials stocked in this test).
+	// Right-click menu: the bold Show Info entry alone (a recipe declares
+	// no action: Start lives in the inspector).
 	f.recipes.RowCts[chargeRow].GetWidget().MouseButtonClickedEvent.Fire(
 		&widget.WidgetMouseButtonClickedEventArgs{Button: ebiten.MouseButtonRight})
 	ui.Update()
@@ -307,10 +340,8 @@ func TestManufacturingRowsShowInfo(t *testing.T) {
 		t.Fatal("right-click opened no menu")
 	}
 	entries := m.Entries()
-	if len(entries) != 3 || entries[0].Label != "Show Info" || !entries[0].Bold ||
-		entries[1].Label != "" || !entries[1].Sep ||
-		entries[2].Label != "Start" || !entries[2].Disabled {
-		t.Fatalf("menu = %+v, want Show Info / sep / gated Start", entries)
+	if len(entries) != 1 || entries[0].Label != "Show Info" || !entries[0].Bold {
+		t.Fatalf("menu = %+v, want the one bold Show Info entry", entries)
 	}
 	if len(*cmds) != 0 {
 		t.Fatalf("menu opened with %d commands queued", len(*cmds))
@@ -583,13 +614,14 @@ func TestManufacturingAllStationJobs(t *testing.T) {
 	if got := f.jobs.Rows[0].Cells[1]; got != env.Sim.StationName("cel-huta") {
 		t.Errorf("station cell = %q, want %q", got, env.Sim.StationName("cel-huta"))
 	}
-	// The fee column quotes the recipe's 3% mineral value at the stepper qty.
+	// The fee rides the row's second line (the list is one column of rich
+	// rows now): it still quotes the recipe's 3% mineral value per run.
 	chargeRow := recipeRowFor(f, "ammo-emp-s")
 	if chargeRow < 0 {
 		t.Fatal("no ammo-emp-s recipe row")
 	}
-	if got, want := f.recipes.Rows[chargeRow].Cells[3], theme.FormatCredits(env.Sim.JobFee(rec.ID, 1)); got != want {
-		t.Errorf("fee cell = %q, want %q", got, want)
+	if got := recipeMeta(f.recipes.Rows[chargeRow]); !strings.HasSuffix(got, " · 234 €") {
+		t.Errorf("row meta = %q, want the compact per-run fee (234 €)", got)
 	}
 
 	// Select the remote job: both local actions stay grayed.

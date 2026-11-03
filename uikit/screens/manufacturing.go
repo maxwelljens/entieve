@@ -2,9 +2,13 @@ package screens
 
 import (
 	"image"
+	"image/color"
+	"math"
 	"slices"
 	"sort"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
@@ -12,24 +16,72 @@ import (
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
+	"github.com/sahilm/fuzzy"
 )
 
-// Manufacturing is the station manufacturing window: the recipe board
-// (product name + icon, family, per-run time at the docked station's
-// current craft level, per-run fee, one run's inputs with have/need) over
-// the GLOBAL job list (every station, grouped by station) with per-job
-// progress and the Collect / Cancel actions — in the market panel's shape
-// (two tables, toolbars, rows wired for Show Info). Selecting a recipe
-// opens the quantity picker on its runs (CONTEXT.md "Quantity picker");
-// Confirm emits StartJob.
+// Manufacturing window metrics in design units.
+const (
+	// mfgTreeW / mfgInspW are the browse and inspector panes' opening
+	// widths at the landing rect: the row split's opening shares, not fixed
+	// widths: the seams trade them with the recipe list.
+	mfgTreeW   = 184
+	mfgInspW   = 264
+	mfgSearchH = 28
+
+	// mfgBoardShare is the vertical seam's opening share: the board (tree,
+	// list, inspector) over the job list: the jobs keep the history strip
+	// at the bottom, the new panes take the room.
+	mfgBoardShare = 0.68
+
+	// mfgNameClip is a recipe row's name budget in runes: the list's 288 px
+	// opening fits 20 runes of the small face beside the row icon and the
+	// verdict, and a rich row never ellipsizes its own text.
+	// shortcut: a rune budget, not a measured fit; upgrade to a face measure
+	// if the list pane or the row's faces change.
+	mfgNameClip = 20
+
+	// mfgStripW is the recipe row's value-share strip width: the segment
+	// widths always sum to exactly this (widgets.ShareWidths).
+	mfgStripW = 128
+	// mfgMatNameW / mfgMatBarW are a material row's name column and have/need
+	// bar widths, so every row's bar shares one left edge and one length.
+	mfgMatNameW = 96
+	mfgMatBarW  = 96
+)
+
+// mfgDefaultW/H are the window's landing rect (see ManufacturingRect):
+// wider than tall for three panes at the market's precedent, still inside
+// the 1024×700 minimum right of the rail gutter.
+const (
+	mfgDefaultW = 760
+	mfgDefaultH = 560
+)
+
+// Manufacturing is the station manufacturing window: the content's recipe
+// products as a browse tree (the market window's idiom over recipe groups)
+// with a live search, a recipe list whose rows carry the one-glance verdict
+// and a value-share strip, and an inspector for the selected recipe (its
+// material bill: one row per mineral, the cost driver first), over the
+// GLOBAL job list (every station, grouped by station) with per-job progress
+// and the Collect / Cancel actions.
+//
+// The browse tree scopes the list to a branch (All is the whole catalog) and
+// the search field filters that branch live, ranked by fuzzy score over the
+// product name, its group, its family and its inputs, so "sideron" finds
+// every recipe that eats Sideron. Selecting a recipe highlights its branch
+// back and opens it in the inspector; Start (the inspector's button or the
+// row's menu action) opens the quantity picker on its runs (CONTEXT.md
+// "Quantity picker"), whose Confirm emits StartJob.
 //
 // Gating follows the game's menu convention: controls stay VISIBLE and
 // gray out (widget Disabled) when the player is undocked, the station
 // offers no industry service, the materials or wallet are short or the
-// slots are full — never hidden. Jobs at another station are listed but
-// only the docked station's own jobs can be collected or cancelled. Every
-// action enqueues a sim.Command (the kit never mutates sim state); the sim
-// logs the refusal line if a gated action still gets through.
+// slots are full, never hidden, and the Start line names the refusal
+// (which minerals are short, no station, slots busy). Jobs at another
+// station are listed but only the docked station's own jobs can be
+// collected or cancelled. Every action enqueues a sim.Command (the kit
+// never mutates sim state); the sim logs the refusal line if a gated action
+// still gets through.
 type Manufacturing struct {
 	th  theme.Theme
 	cv  widgets.ContentView
@@ -39,11 +91,42 @@ type Manufacturing struct {
 
 	recipes *widgets.Table
 	jobs    *widgets.Table
-	split   *widgets.SplitPane
+	split   *widgets.SplitPane // board over jobs (seam manufacturing-jobs)
+	cols    *widgets.SplitPane // browse | list | inspector
 
 	craftLbl *widget.Text
 	jobsLbl  *widget.Text
 	title    *theme.ChromeText
+
+	// The browse pane: tree is the branch list, search its live filter,
+	// branch the selected path ("" = All), treeSel the highlighted branch,
+	// expanded the session-only fold state. nodes is the group tree, group
+	// each recipe's product group path, built once (content never changes
+	// under a session).
+	tree     *widgets.Table
+	search   *widget.TextInput
+	branch   string
+	treeSel  string
+	expanded map[string]bool
+	nodes    []mfgNode
+	group    map[content.RecipeID]string
+	query    string
+
+	// The inspector: one grid rebuilt whenever its key moves (the selected
+	// recipe, the station, the slots or the material bill), the material
+	// rows in a scroll viewport with the house rail beside it.
+	insp        *widget.Container
+	inspKey     string
+	inspName    *widget.Text
+	inspVerdict *widget.Text
+	matsLbl     *widget.Text
+	matsBox     *widget.Container
+	matsScroll  *widget.ScrollContainer
+	matsRail    *widgets.ScrollRail
+	matsRows    []*widgets.StackRow
+	inspValue   *widget.Text
+	startBtn    *widget.Button
+	gateLbl     *widget.Text
 
 	collect, cancel *widget.Button
 
@@ -51,9 +134,31 @@ type Manufacturing struct {
 	hasSel bool
 }
 
-// manufacturingRow is the manufacturing tables' row payload: the recipe id (recipe
-// rows) or job id (job rows) plus the product ref both resolve Show Info
-// through (InfoRefOf handles the type; see infowin.go).
+// mfgNode is one branch of the recipe browse tree: Path is the full product
+// group path ("Ships/Frigates", "Modules/High/Turrets", …), Label its last
+// segment, Depth its indent level (top-level groups are 1).
+type mfgNode struct {
+	Path  string
+	Label string
+	Depth int
+}
+
+// mfgNodeKey is a browse row's payload (the table rows' stable identity).
+type mfgNodeKey struct{ Path string }
+
+// mfgNeed is one mineral of one run's material bill: the sim's committed
+// need, the player's have side and the mineral's cost weight (base price ×
+// need, the number the fee derives from).
+type mfgNeed struct {
+	Item  content.ItemID
+	Need  int
+	Have  int
+	Value float64
+}
+
+// manufacturingRow is the manufacturing tables' row payload: the recipe id
+// (recipe rows) or job id (job rows) plus the product ref both resolve Show
+// Info through (InfoRefOf handles the type; see infowin.go).
 type manufacturingRow struct {
 	recipe content.RecipeID
 	job    uint64
@@ -69,19 +174,31 @@ func (r manufacturingRow) InfoRefOf(cv widgets.ContentView) (widgets.InfoRef, bo
 // NewManufacturing builds the Manufacturing window over the shared environment. Mount
 // it on a Kit with Kit.AddWindow and call Sync every frame.
 func NewManufacturing(env widgets.Seams) *Manufacturing {
-	f := &Manufacturing{th: env, cv: env, as: env, ptr: env.Pointer()}
+	f := &Manufacturing{
+		th: env, cv: env, as: env, ptr: env.Pointer(),
+		expanded: map[string]bool{"": true},
+		group:    map[content.RecipeID]string{},
+	}
 	p := env.Pal()
 
-	recipeCols := []widgets.Column{
-		{Key: "Product", Title: "Product", Priority: 0},
-		{Key: "Family", Title: "Family", Priority: 1},
-		{Key: "Time", Title: "Time", Icon: "hud_time", Priority: 2, AlignRight: true},
-		{Key: "Fee", Title: "Fee", Icon: "stat_cash", Priority: 3, AlignRight: true},
-		{Key: "Inputs", Title: "Inputs", Priority: 4},
+	// The recipe groups, in the content's own canonical recipe order.
+	recipes := env.Defs().RecipesInOrder()
+	ids := make([]content.RecipeID, 0, len(recipes))
+	for _, rec := range recipes {
+		ids = append(ids, rec.ID)
+		f.group[rec.ID] = mfgGroup(env.Defs(), rec.Product)
 	}
-	f.recipes = widgets.NewTable(env, recipeCols, widgets.PrefsID("recipes"), widgets.PlateBand(func() image.Rectangle {
-		return headerPlateBand(f.win)
-	}))
+	f.nodes = mfgNodes(ids, f.group)
+
+	// The recipe list: one column of rich rows (product, verdict, cost strip),
+	// its cells only the fit source. The plate band reads through its first
+	// rows like the old board's.
+	f.recipes = widgets.NewTable(env, []widgets.Column{{Key: "Recipe", Title: "Recipes"}},
+		widgets.PrefsID("recipes"), widgets.PlateBand(func() image.Rectangle {
+			return headerPlateBand(f.win)
+		}))
+	f.recipes.SetSortFunc(func(string, bool, []widgets.TableRow) {})
+
 	jobCols := []widgets.Column{
 		{Key: "Product", Title: "Product", Priority: 0},
 		{Key: "Station", Title: "Station", Priority: 1},
@@ -91,41 +208,71 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	}
 	f.jobs = widgets.NewTable(env, jobCols, widgets.PrefsID("jobs"))
 
-	// Canonical display order: the sim's own RecipesInOrder / job-id
-	// order (reversing on a second header click, any other header click
-	// falls back to plain cell sorting — the market table's rule).
-	f.recipes.SetSort("Product", true)
-	f.recipes.SetSortFunc(canonicalFirst("Product", recipeCols))
+	// Canonical display order: the sim's own job-id order (reversing on a
+	// second header click, any other header click falls back to plain cell
+	// sorting (the market table's rule).
 	f.jobs.SetSort("Product", true)
 	f.jobs.SetSortFunc(canonicalFirst("Product", jobCols))
 
-	attachSelect := func(t *widgets.Table, recipe bool) {
-		t.OnSelect(func(r widgets.TableRow) {
-			row, ok := r.Data.(manufacturingRow)
-			if !ok {
-				return
-			}
+	// The recipe list's selection opens the inspector (the picker is the
+	// Start gesture, not the click). Its declared RowSpec still carries the
+	// gated Start action, so the menu and double-click work per row.
+	f.recipes.OnSelect(func(r widgets.TableRow) {
+		f.search.Focus(false)
+		if row, ok := r.Data.(manufacturingRow); ok && row.recipe != "" {
 			f.sel, f.hasSel = row, true
-			if recipe {
-				f.openPicker(row)
-			}
-		})
-	}
-	attachSelect(f.recipes, true)
-	attachSelect(f.jobs, false)
-	// Show Info, double-click and the Start/Collect action derive from
-	// the rows' RowSpec (rowSpec), built in Sync — no hand wiring.
+			f.treeSel = f.group[row.recipe]
+			f.highlightTree()
+		}
+	})
 
-	f.craftLbl = widget.NewText(
-		widget.TextOpts.Text("Craft", env.Face(theme.StepTiny), theme.Solid(p.Accent)),
+	// The browse pane: a live search field over the content's recipe tree.
+	// The tree is a one-column table (the same wheel, selection and rail the
+	// list has); its header is a fixed grouping label, so the sort callback
+	// is a no-op and the branch order never moves.
+	f.search = widget.NewTextInput(
+		widget.TextInputOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(0, theme.Px(mfgSearchH)),
+		),
+		widget.TextInputOpts.Placeholder("Search recipes or minerals"),
+		widget.TextInputOpts.Face(env.Face(theme.StepSmall)),
+		widget.TextInputOpts.Padding(&widget.Insets{
+			Left: theme.Px(4), Right: theme.Px(4), Top: theme.Px(2), Bottom: theme.Px(2),
+		}),
 	)
+	f.tree = widgets.NewTable(env, []widgets.Column{{Key: "Browse", Title: "Browse"}},
+		widgets.PrefsID("recipe-tree"))
+	f.tree.SetSortFunc(func(string, bool, []widgets.TableRow) {})
+	f.tree.OnSelect(func(r widgets.TableRow) {
+		f.search.Focus(false)
+		n, ok := r.Data.(mfgNodeKey)
+		if !ok {
+			return
+		}
+		f.branch, f.treeSel = n.Path, n.Path
+		if f.hasKids(n.Path) {
+			f.expanded[n.Path] = !f.expanded[n.Path]
+		}
+	})
+	browse := paneStack([]bool{false, true}, f.search, f.tree.Container())
+
+	// The inspector: a fixed seven-row grid (head, verdict, the numbers, the
+	// materials label, the material viewport, Start, gate). Its content is
+	// rebuilt by syncInspector when the bill moves; the grid itself never
+	// changes, so the row split's pane stays one widget.
+	f.insp = widget.NewContainer(widget.ContainerOpts.Layout(widget.NewGridLayout(
+		widget.GridLayoutOpts.Columns(1),
+		widget.GridLayoutOpts.Stretch([]bool{true},
+			[]bool{false, false, false, false, true, false, false, false}),
+		widget.GridLayoutOpts.Spacing(0, theme.Px(theme.SpSm)),
+	)))
+
+	// Job list: the PLAYER's jobs at every station (the global slot pool).
 	f.jobsLbl = widget.NewText(
 		widget.TextOpts.Text("Jobs", env.Face(theme.StepTiny), theme.Solid(p.Accent)),
 	)
-
 	f.collect = theme.ActionButton("Collect", f.collectClicked)
 	f.cancel = theme.ActionButton("Cancel", f.cancelClicked)
-
 	collectBar := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
@@ -134,13 +281,21 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	)
 	collectBar.AddChild(f.collect, f.cancel)
 
-	// Body: the craft readout over two panes — the recipe board (its rows
-	// open the quantity picker, so it needs no toolbar), the job list with
-	// Collect/Cancel — split by a draggable seam (equal halves by default;
-	// a drag persists in the layout sidecar).
+	// Body: the craft readout over the two splits: the board row (browse |
+	// list | inspector, two seams) over the job list (one seam). The board
+	// takes the larger share; every seam is draggable and persists in the
+	// layout sidecar.
+	f.cols = widgets.NewSplitPaneRow(env, browse, f.recipes.Container(), f.insp)
+	f.cols.SetDefaultRatio(0, mfgTreeShare())
+	f.cols.SetDefaultRatio(1, 1-mfgInspShare())
 	f.split = widgets.NewSplitPane(env,
-		paneStack([]bool{true}, f.recipes.Container()),
+		paneStack([]bool{true}, f.cols.Container()),
 		paneStack([]bool{false, true, false}, f.jobsLbl, f.jobs.Container(), collectBar),
+	)
+	f.split.SetDefaultRatio(0, mfgBoardShare)
+
+	f.craftLbl = widget.NewText(
+		widget.TextOpts.Text("Craft", env.Face(theme.StepTiny), theme.Solid(p.Accent)),
 	)
 	body := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
@@ -163,9 +318,9 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	f.win = widget.NewWindow(
 		widget.WindowOpts.Contents(newHeaderBand(body, panel, render.ManufacturingHeader)),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
-		// Content floor: the craft line, a few rows of each table and the
-		// job toolbar.
-		widget.WindowOpts.MinSize(theme.Px(420), theme.Px(440)),
+		// Content floor: the craft line, the board's three panes (the
+		// material bill is scrollable, the rest is not) and the job strip.
+		widget.WindowOpts.MinSize(theme.Px(640), theme.Px(460)),
 		// Construction landing rect: the game centers the window on first
 		// open (placeDefaults, AnchorCenter); the row declares the same
 		// rect (ManufacturingRect) as its size.
@@ -177,21 +332,45 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 // ManufacturingRect is the manufacturing window's landing rect in design
 // units: the one number its Screen row's DefaultRect and its constructor
 // share.
-func ManufacturingRect() image.Rectangle { return image.Rect(312, 120, 792, 600) }
+func ManufacturingRect() image.Rectangle {
+	return image.Rect(140, 60, 140+mfgDefaultW, 60+mfgDefaultH)
+}
+
+// mfgTreeShare / mfgInspShare are the row split's opening ratios at the
+// landing width: the split spans the window minus the body padding and both
+// seam tracks (the market's own seam maths). The seam stores the fraction
+// BEFORE it.
+func mfgTreeShare() float64 {
+	return float64(mfgTreeW) / float64(mfgDefaultW-2*theme.ContentsPad-2*widgets.SplitSeamH)
+}
+
+func mfgInspShare() float64 {
+	return float64(mfgInspW) / float64(mfgDefaultW-2*theme.ContentsPad-2*widgets.SplitSeamH)
+}
 
 // Win returns the manufacturing window for Kit.AddWindow.
 func (f *Manufacturing) Win() *widget.Window { return f.win }
 
-// Splits names the window's draggable seam for the layout sidecar (the
-// job-list pane below it).
-func (f *Manufacturing) Splits() []widgets.Seam {
-	return []widgets.Seam{{Name: "manufacturing-jobs", Split: f.split, Index: 0}}
+// seams repackages the three the window holds as one value, for the widget
+// helpers that take the union (NewStackRow, NewScrollRail).
+func (f *Manufacturing) seams() widgets.Seams {
+	return widgets.NewSeams(f.th, f.cv, f.as, f.ptr)
 }
 
-// Tables are the window's tables for the layout sidecar: the recipe
-// catalog and the job list are separate lists.
+// Splits names the window's seams for the layout sidecar: the board over the
+// job list, and the board row's browse | list | inspector pair.
+func (f *Manufacturing) Splits() []widgets.Seam {
+	return []widgets.Seam{
+		{Name: "manufacturing-jobs", Split: f.split, Index: 0},
+		{Name: "manufacturing-tree", Split: f.cols, Index: 0},
+		{Name: "manufacturing-inspector", Split: f.cols, Index: 1},
+	}
+}
+
+// Tables are the window's tables for the layout sidecar: the recipe list,
+// the job list and the browse tree are separate lists.
 func (f *Manufacturing) Tables() []*widgets.Table {
-	return []*widgets.Table{f.recipes, f.jobs}
+	return []*widgets.Table{f.recipes, f.jobs, f.tree}
 }
 
 // canonicalFirst is the market table's sort rule: the given key keeps the
@@ -225,34 +404,317 @@ func canonicalFirst(key string, cols []widgets.Column) func(string, bool, []widg
 	}
 }
 
-// Sync refreshes the recipe board, the job list and every gate from the
-// simulation. Call it every frame before Kit.Update.
+// ---------------------------------------------------------------------------
+// The browse tree (the market window's idiom over recipe groups)
+// ---------------------------------------------------------------------------
+
+// mfgGroup resolves a product's browse group from whichever def backs it:
+// an item, a module or a hull, the market tree's own ladder.
+func mfgGroup(d *content.Content, product content.ItemID) string {
+	if d == nil {
+		return ""
+	}
+	switch {
+	case d.Items[product] != nil:
+		return d.Items[product].Group
+	case d.Modules[content.ModuleID(product)] != nil:
+		return d.Modules[content.ModuleID(product)].Group
+	case d.Ships[content.ShipID(product)] != nil:
+		return d.Ships[content.ShipID(product)].Group
+	}
+	return ""
+}
+
+// mfgNodes flattens the group tree in depth-first, label-sorted order: a
+// parent always precedes its children.
+func mfgNodes(ids []content.RecipeID, group map[content.RecipeID]string) []mfgNode {
+	type node struct {
+		label string
+		path  string
+		kids  map[string]*node
+	}
+	root := &node{kids: map[string]*node{}}
+	for _, id := range ids {
+		g := group[id]
+		if g == "" {
+			continue
+		}
+		cur := root
+		path := ""
+		for _, seg := range strings.Split(g, "/") {
+			if path == "" {
+				path = seg
+			} else {
+				path += "/" + seg
+			}
+			kid := cur.kids[seg]
+			if kid == nil {
+				kid = &node{label: seg, path: path, kids: map[string]*node{}}
+				cur.kids[seg] = kid
+			}
+			cur = kid
+		}
+	}
+	var out []mfgNode
+	var walk func(n *node, depth int)
+	walk = func(n *node, depth int) {
+		keys := make([]string, 0, len(n.kids))
+		for k := range n.kids {
+			keys = append(keys, k)
+		}
+		slices.Sort(keys)
+		for _, k := range keys {
+			kid := n.kids[k]
+			out = append(out, mfgNode{Path: kid.path, Label: kid.label, Depth: depth})
+			walk(kid, depth+1)
+		}
+	}
+	walk(root, 1)
+	return out
+}
+
+// mfgParent is a group path's parent ("" for a top-level path).
+func mfgParent(path string) string {
+	if i := strings.LastIndexByte(path, '/'); i >= 0 {
+		return path[:i]
+	}
+	return ""
+}
+
+// hasKids reports whether any node hangs below path.
+func (f *Manufacturing) hasKids(path string) bool {
+	for _, n := range f.nodes {
+		if mfgParent(n.Path) == path {
+			return true
+		}
+	}
+	return false
+}
+
+// highlightTree expands the highlighted branch's ancestors so the
+// highlight is visible.
+func (f *Manufacturing) highlightTree() {
+	for p := f.treeSel; p != ""; p = mfgParent(p) {
+		f.expanded[p] = true
+	}
+}
+
+// treeRows renders the visible browse rows: All first (always), then every
+// node whose ancestors are all expanded.
+func (f *Manufacturing) treeRows() []widgets.TableRow {
+	rows := []widgets.TableRow{f.treeRow("", "All", 0)}
+	vis := map[string]bool{"": true}
+	for _, n := range f.nodes {
+		p := mfgParent(n.Path)
+		if !vis[p] || !f.expanded[p] {
+			continue
+		}
+		vis[n.Path] = true
+		rows = append(rows, f.treeRow(n.Path, n.Label, n.Depth))
+	}
+	return rows
+}
+
+// treeRow is one browse row: indent by depth, an expansion marker when the
+// branch has children, then the label.
+func (f *Manufacturing) treeRow(path, label string, depth int) widgets.TableRow {
+	mark := "  "
+	if f.hasKids(path) {
+		if f.expanded[path] {
+			mark = "↓ "
+		} else {
+			mark = "→ "
+		}
+	}
+	return widgets.TableRow{
+		Cells: []string{strings.Repeat("    ", depth) + mark + label},
+		Data:  mfgNodeKey{Path: path},
+	}
+}
+
+// scopeRecipes is the recipe catalog (canonical order) narrowed to the
+// selected branch: All is the whole catalog, any other branch its subtree.
+func (f *Manufacturing) scopeRecipes() []content.RecipeID {
+	all := f.cv.Defs().RecipesInOrder()
+	out := make([]content.RecipeID, 0, len(all))
+	for _, rec := range all {
+		if f.branch != "" {
+			g := f.group[rec.ID]
+			if g != f.branch && !strings.HasPrefix(g, f.branch+"/") {
+				continue
+			}
+		}
+		out = append(out, rec.ID)
+	}
+	return out
+}
+
+// searchHits ranks the branch's recipes over the product name, its group
+// path, its family and its inputs' names, so a mineral query finds every
+// recipe that eats it (search by ingredient, the inverse lookup a
+// six-mineral economy needs). A recipe is a hit when one field contains the
+// query, then the hits are ordered by sahilm/fuzzy's score (a matched
+// subsequence spanning two fields is not a hit: "vetril" cannot match an
+// artillery round through scattered letters). The query and every field are
+// diacritic-folded first (fold.go), so an ASCII keyboard matches accented
+// names.
+func (f *Manufacturing) searchHits(q string, scope []content.RecipeID) []content.RecipeID {
+	fq, _ := foldString(q)
+	lq := strings.ToLower(fq)
+	ids := make([]content.RecipeID, 0, len(scope))
+	hay := make([]string, 0, len(scope))
+	for _, id := range scope {
+		rec, ok := f.cv.Defs().Recipes[id]
+		if !ok || rec == nil {
+			continue
+		}
+		fields := []string{f.cv.TradeableName(rec.Product), f.group[id], rec.Family}
+		for _, in := range rec.Inputs {
+			if def, ok := f.cv.Defs().Item(in.Item); ok {
+				fields = append(fields, def.Name)
+			}
+		}
+		line, hit := "", false
+		for _, fld := range fields {
+			ff, _ := foldString(fld)
+			line += " " + ff
+			if strings.Contains(strings.ToLower(ff), lq) {
+				hit = true
+			}
+		}
+		if !hit {
+			continue
+		}
+		ids = append(ids, id)
+		hay = append(hay, line)
+	}
+	var out []content.RecipeID
+	for _, m := range fuzzy.Find(fq, hay) {
+		out = append(out, ids[m.Index])
+	}
+	return out
+}
+
+// ---------------------------------------------------------------------------
+// The material bill: shares, verdicts and the inspector
+// ---------------------------------------------------------------------------
+
+// needs is one recipe's material bill at runs: the sim's committed need per
+// mineral (craft-discounted, the numbers StartJob takes) with the player's
+// have side and the mineral's cost weight, in canonical mineral-id order so
+// a row's strip never reorders between frames, recipes or authored input
+// order.
+func (f *Manufacturing) needs(rec content.RecipeID, runs int) []mfgNeed {
+	mats := f.cv.JobMaterials(f.cv.DockedIndustry(), rec, runs)
+	out := make([]mfgNeed, 0, len(mats))
+	for _, m := range mats {
+		n := mfgNeed{Item: m.Item, Need: m.Qty, Have: f.cv.PlayerStock(m.Item)}
+		if def, ok := f.cv.Defs().Item(m.Item); ok {
+			n.Value = def.BasePrice * float64(n.Need)
+		}
+		out = append(out, n)
+	}
+	slices.SortFunc(out, func(a, b mfgNeed) int { return strings.Compare(string(a.Item), string(b.Item)) })
+	return out
+}
+
+// shortOf is the bill's short materials (have < need), canonical order.
+func shortOf(needs []mfgNeed) []mfgNeed {
+	var out []mfgNeed
+	for _, n := range needs {
+		if n.Have < n.Need {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// verdictText is the board's one-glance start state: a glyph, the word and
+// (when materials are the block) the count, so the state never rides colour
+// alone (WCAG 1.4.1) and a row answers "can I run this" without a number.
+func verdictText(ready, station, slotsFree bool, short int) string {
+	switch {
+	case ready:
+		return "● ready"
+	case !station:
+		return "× no station"
+	case !slotsFree:
+		return "× slots full"
+	default:
+		return "× short " + theme.FormatInt(int64(short))
+	}
+}
+
+// gateText names why Start is greyed: the sim's own refusals first (no
+// industry service, all slots busy), then the short minerals by name.
+func (f *Manufacturing) gateText(needs []mfgNeed, ready, station, slotsFree bool) string {
+	switch {
+	case ready:
+		return ""
+	case !station:
+		return "Start: no industry service here"
+	case !slotsFree:
+		return "Start: all job slots busy"
+	}
+	names := make([]string, 0, len(needs))
+	for _, n := range shortOf(needs) {
+		name := string(n.Item)
+		if def, ok := f.cv.Defs().Item(n.Item); ok {
+			name = def.Name
+		}
+		names = append(names, name)
+	}
+	if len(names) == 0 {
+		return "Start: the wallet cannot cover the fee"
+	}
+	return "Start: short " + strings.Join(names, ", ")
+}
+
+// stripOf is a recipe row's value-share strip: one segment per mineral in
+// the bill's canonical order, its width the mineral's share of the run's
+// material value and its tint the have/need state: the green part is what
+// the hold already covers, so a row reads "mostly covered, a red tail short"
+// at a glance.
+func stripOf(needs []mfgNeed, p theme.Palette) []widgets.RowSplit {
+	out := make([]widgets.RowSplit, 0, len(needs))
+	for _, n := range needs {
+		tint := p.Good
+		if n.Have < n.Need {
+			tint = p.Danger
+		}
+		out = append(out, widgets.RowSplit{Share: n.Value, Tint: tint})
+	}
+	return out
+}
+
+// Sync refreshes the board, the tree, the inspector, the job list and every
+// gate from the simulation. Call it every frame before Kit.Update.
 func (f *Manufacturing) Sync() {
 	f.split.Poll(f.ptr)
+	f.cols.Poll(f.ptr)
 	s := f.cv
 	station := s.DockedIndustry()
+	slotsFree := len(s.AllJobs()) < sim.IndustrySlots()
 	// The board quotes one run: the chosen run count lives in the quantity
-	// picker (its preview re-prices at the picked value), so the columns stay
-	// a stable per-run reference.
+	// picker (its preview re-prices at the picked value), so the rows stay a
+	// stable per-run reference.
 	runs := 1
 
-	// Recipe board: the content's canonical order, one row per recipe.
-	recRows := make([]widgets.TableRow, 0, len(f.cv.Defs().Recipes))
-	for _, rec := range f.cv.Defs().RecipesInOrder() {
-		mats := s.JobMaterials(station, rec.ID, runs)
-		row := manufacturingRow{recipe: rec.ID, ref: f.productRef(rec.Product)}
-		recRows = append(recRows, widgets.TableRow{
-			Cells: []string{
-				f.cv.TradeableName(rec.Product),
-				rec.Family,
-				theme.GroupFloat(s.JobDuration(station, rec.ID, 1), 1) + " s",
-				theme.FormatCredits(s.JobFee(rec.ID, runs)),
-				inputsText(f.cv, mats),
-			},
-			Icons: []string{widgets.TradeableIcon(f.cv.Defs(), rec.Product), "", "", "", ""},
-			Data:  row,
-			Spec:  f.rowSpec(row),
-		})
+	// The recipe list: the branch (or its ranked search hits), one rich row
+	// per recipe: product and verdict on line 1, time, fee and the
+	// value-share strip on line 2.
+	f.query = strings.TrimSpace(f.search.GetText())
+	scope := f.scopeRecipes()
+	list := scope
+	if f.query != "" {
+		list = f.searchHits(f.query, scope)
+	}
+	recRows := make([]widgets.TableRow, 0, len(list))
+	for _, id := range list {
+		recRows = append(recRows, f.recipeRow(station, slotsFree, id, runs))
+	}
+	if len(recRows) == 0 {
+		recRows = []widgets.TableRow{{Cells: []string{"No matches"}, TextTint: f.th.Pal().Dim}}
 	}
 	f.recipes.SetRows(recRows)
 	f.recipes.Sync()
@@ -309,6 +771,15 @@ func (f *Manufacturing) Sync() {
 		f.sel = manufacturingRow{} // a vanished row must stop gating the actions
 	}
 
+	// The browse pane: the branch rows and the highlighted branch.
+	f.tree.SetRows(f.treeRows())
+	f.tree.SelectData(mfgNodeKey{Path: f.treeSel})
+	f.tree.Sync()
+
+	// The inspector and its start gate.
+	needs := f.needs(f.sel.recipe, runs)
+	f.syncInspector(station, slotsFree, needs)
+
 	// Readouts and gates (visible-but-grayed, never hidden).
 	slots := sim.IndustrySlots()
 	if station != "" {
@@ -319,21 +790,269 @@ func (f *Manufacturing) Sync() {
 	} else {
 		f.craftLbl.Label = "Craft: no industry service here"
 	}
-	slotsUsed := len(all)
-	f.jobsLbl.Label = "Jobs: " + theme.FormatInt(int64(slotsUsed)) + "/" + theme.FormatInt(int64(slots)) + " slots"
+	f.jobsLbl.Label = "Jobs: " + theme.FormatInt(int64(len(all))) + "/" + theme.FormatInt(int64(slots)) + " slots"
 
 	f.collect.GetWidget().Disabled = !f.collectReadyFor(f.sel)
 	f.cancel.GetWidget().Disabled = !f.cancelReadyFor(f.sel)
+	if f.startBtn != nil {
+		f.startBtn.GetWidget().Disabled = !f.startReadyFor(f.sel)
+	}
+
+	// The material viewport rides the house rail beside it (the tables'
+	// clamp rule: a stale offset would bottom-anchor a list that fits).
+	if f.matsRail != nil {
+		f.matsRail.Sync()
+		if f.matsRail.Overflow() <= 0 {
+			f.matsScroll.ScrollTop = 0
+		}
+	}
 
 	// The title is the base display name only (a window title is
-	// furniture): the selected recipe, its duration, fee, craft level and
-	// the job slots are the body's own readouts.
+	// furniture): the selected recipe, its time, fee and material bill are
+	// the inspector's own readouts.
 	f.title.Label = "Manufacturing"
+}
+
+// recipeRow is one recipe as a rich row: the product and its one-glance
+// verdict on line 1, the per-run time, fee and value-share strip on line 2.
+// The cells are only the row's fit source (the list has one column).
+func (f *Manufacturing) recipeRow(station sim.StationID, slotsFree bool, rec content.RecipeID, runs int) widgets.TableRow {
+	p := f.th.Pal()
+	def, _ := f.cv.Defs().Recipes[rec]
+	if def == nil {
+		return widgets.TableRow{Cells: []string{string(rec)}, TextTint: p.Dim}
+	}
+	name := f.cv.TradeableName(def.Product)
+	needs := f.needs(rec, runs)
+	short := len(shortOf(needs))
+	ready := station != "" && f.cv.CanStartJob(station, rec, runs)
+	tint := p.Danger
+	if ready {
+		tint = p.Good
+	}
+	payload := manufacturingRow{recipe: rec, ref: f.productRef(def.Product)}
+	return widgets.TableRow{
+		Cells: []string{name},
+		Icons: []string{widgets.TradeableIcon(f.cv.Defs(), def.Product)},
+		Data:  payload,
+		Spec:  f.rowSpec(payload),
+		Stack: []widgets.RowLine{
+			{Segs: []widgets.RowSeg{
+				{Text: mfgClip(name, mfgNameClip), Tint: p.Accent, Step: theme.StepSmall},
+				{Text: verdictText(ready, station != "", slotsFree, short), Tint: tint, Step: theme.StepTiny},
+			}},
+			{Segs: []widgets.RowSeg{
+				{Text: theme.GroupFloat(f.cv.JobDuration(station, rec, runs), 1) + " s · " +
+					theme.GroupFloat(math.Round(f.cv.JobFee(rec, runs)), 0) + " €", Tint: p.Dim, Step: theme.StepTiny},
+				{Split: stripOf(needs, p), MinW: theme.Px(mfgStripW)},
+			}},
+		},
+	}
+}
+
+// syncInspector rebuilds the inspector when its content moved: the selected
+// recipe, the station, the slot state or the material bill.
+func (f *Manufacturing) syncInspector(station sim.StationID, slotsFree bool, needs []mfgNeed) {
+	key := mfgInspKey(station, slotsFree, f.sel, needs)
+	if key == f.inspKey {
+		return
+	}
+	f.inspKey = key
+	f.insp.RemoveChildren()
+	f.matsRows = f.matsRows[:0]
+	f.startBtn = nil
+
+	p := f.th.Pal()
+	step := func(size string, tint color.RGBA) *widget.Text {
+		return widget.NewText(widget.TextOpts.Text("", f.th.Face(size), theme.Solid(tint)))
+	}
+
+	// Head: the product's own art beside its name, the same icon the list
+	// row leads with, at the header box.
+	def, _ := f.cv.Defs().Recipes[f.sel.recipe]
+	name, icon := "No recipe selected", ""
+	verdict, value, gate := "", "Select a recipe to see what it takes.", ""
+	var ready bool
+	if def != nil && f.hasSel {
+		name = f.cv.TradeableName(def.Product)
+		icon = widgets.TradeableIcon(f.cv.Defs(), def.Product)
+		ready = station != "" && f.cv.CanStartJob(station, f.sel.recipe, 1)
+		verdict = verdictText(ready, station != "", slotsFree, len(shortOf(needs)))
+		total := 0.0
+		for _, n := range needs {
+			total += n.Value
+		}
+		value = theme.GroupFloat(f.cv.JobDuration(station, f.sel.recipe, 1), 1) + " s · fee " +
+			theme.GroupFloat(math.Round(f.cv.JobFee(f.sel.recipe, 1)), 0) + " € · value " +
+			theme.GroupFloat(math.Round(total), 0) + " €"
+		gate = f.gateText(needs, ready, station != "", slotsFree)
+	}
+	head := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(theme.Px(theme.IconGap)),
+		)),
+	)
+	box := theme.NewIconBox(theme.IconButton)
+	box.Set(icon, p.Text)
+	f.inspName = step(theme.StepSmall, p.Accent)
+	f.inspName.Label = name
+	head.AddChild(box.Widget(), f.inspName)
+
+	f.inspVerdict = step(theme.StepTiny, p.Danger)
+	if ready {
+		f.inspVerdict = step(theme.StepTiny, p.Good)
+	}
+	f.inspVerdict.Label = verdict
+	f.inspValue = step(theme.StepTiny, p.Dim)
+	f.inspValue.Label = value
+	f.gateLbl = step(theme.StepTiny, p.Warn)
+	f.gateLbl.Label = gate
+
+	// The bill: one row per mineral, the cost driver first (the acceptance
+	// answer to "which mineral dominates"), each row the mineral's own art,
+	// its share of the run's value and its have/need bar.
+	f.matsLbl = widget.NewText(
+		widget.TextOpts.Text("MATERIALS · most value first", f.th.Face(theme.StepTiny), theme.Solid(p.Accent)),
+	)
+	f.matsBox = widget.NewContainer(
+		widget.ContainerOpts.Layout(widgets.StackLayout{Gap: theme.Px(theme.SpSm)}),
+	)
+	bill := append([]mfgNeed(nil), needs...)
+	total := 0.0
+	for _, n := range bill {
+		total += n.Value
+	}
+	sort.SliceStable(bill, func(i, j int) bool { return bill[i].Value > bill[j].Value })
+	for _, n := range bill {
+		r := f.matRow(n, total, p)
+		f.matsRows = append(f.matsRows, r)
+		f.matsBox.AddChild(r.Root)
+	}
+	f.matsScroll = widget.NewScrollContainer(
+		widget.ScrollContainerOpts.Content(f.matsBox),
+		widget.ScrollContainerOpts.StretchContentWidth(),
+		// No chrome of the list's own: an invisible frame, the mask
+		// clipping the rows to the viewport (the tables' own mask).
+		widget.ScrollContainerOpts.Image(&widget.ScrollContainerImage{
+			Idle: theme.NineSlice(color.NRGBA{}),
+			Mask: theme.NineSlice(theme.WindowBody(p.BG)),
+		}),
+	)
+	f.matsScroll.GetWidget().ScrolledEvent.AddHandler(func(args any) {
+		if ev, ok := args.(*widget.WidgetScrolledEventArgs); ok {
+			f.scrollMats(ev.Y)
+		}
+	})
+	widgets.AttachScrollContent(f.matsScroll, f.matsBox)
+	f.matsRail = widgets.NewScrollRail(f.seams(), f.matsScroll, f.matsScroll, f.matsBox)
+
+	f.startBtn = theme.ActionButton("Start job", f.startClicked)
+	f.startBtn.GetWidget().Disabled = true // armed by Sync's gate
+	startBar := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+		)),
+	)
+	startBar.AddChild(f.startBtn)
+
+	f.insp.AddChild(head, f.inspVerdict, f.inspValue, f.matsLbl, f.matsRail.Container(),
+		startBar, f.gateLbl)
+	f.insp.RequestRelayout()
+}
+
+// matRow is one mineral of the bill as a built rich row.
+func (f *Manufacturing) matRow(n mfgNeed, total float64, p theme.Palette) *widgets.StackRow {
+	return widgets.NewStackRow(f.seams(), f.matRowDef(n, total, p), f.th.Face(theme.StepSmall))
+}
+
+// matRowDef is one mineral of the bill: its own art and name, its share of
+// the run's material value (line 1) and its have/need bar with the exact
+// numbers (line 2). The bar's length is have/need clamped and its tint the
+// state.
+func (f *Manufacturing) matRowDef(n mfgNeed, total float64, p theme.Palette) widgets.TableRow {
+	name := string(n.Item)
+	if def, ok := f.cv.Defs().Item(n.Item); ok {
+		name = def.Name
+	}
+	share := 0.0
+	if total > 0 {
+		share = n.Value / total
+	}
+	frac := 0.0
+	if n.Need > 0 {
+		frac = math.Min(1, float64(n.Have)/float64(n.Need))
+	}
+	state := p.Good
+	if n.Have < n.Need {
+		state = p.Danger
+	}
+	row := widgets.TableRow{
+		Cells: []string{name},
+		Icons: []string{widgets.TradeableIcon(f.cv.Defs(), n.Item)},
+		Stack: []widgets.RowLine{
+			{Segs: []widgets.RowSeg{
+				{Text: name, MinW: theme.Px(mfgMatNameW), Step: theme.StepSmall},
+				{Text: theme.PctLabel(share), MinW: theme.Px(34), Step: theme.StepTiny, Tint: p.Dim},
+			}},
+			{Segs: []widgets.RowSeg{
+				{HasBar: true, Bar: frac, MinW: theme.Px(mfgMatBarW), Tint: state},
+				{Text: theme.FormatInt(int64(n.Have)) + " / " + theme.FormatInt(int64(n.Need)),
+					Step: theme.StepTiny, Tint: state},
+			}},
+		},
+	}
+	return row
+}
+
+// mfgInspKey is the inspector's change signature: the selection, the station
+// gate, the slot state and every material's need/have (the sim is canonical,
+// so equal state yields the same key).
+func mfgInspKey(station sim.StationID, slotsFree bool, row manufacturingRow, needs []mfgNeed) string {
+	var b strings.Builder
+	b.WriteString(string(row.recipe))
+	b.WriteByte(';')
+	b.WriteString(string(station))
+	b.WriteByte(';')
+	if slotsFree {
+		b.WriteByte('s')
+	}
+	for _, n := range needs {
+		b.WriteString(string(n.Item))
+		b.WriteByte(':')
+		b.WriteString(strconv.Itoa(n.Need))
+		b.WriteByte('/')
+		b.WriteString(strconv.Itoa(n.Have))
+		b.WriteByte(';')
+	}
+	return b.String()
+}
+
+// scrollMats turns wheel notches into the material viewport's offset: two
+// rows of the measured row height per notch, the same 0..1-fraction-of-
+// overflow convention the tables use (a positive notch scrolls towards the
+// top of the list).
+func (f *Manufacturing) scrollMats(notches float64) {
+	over := f.matsRail.Overflow()
+	if over <= 0 {
+		f.matsScroll.ScrollTop = 0
+		return
+	}
+	rowH := 0
+	if len(f.matsRows) > 0 {
+		_, rowH = f.matsRows[0].Root.PreferredSize()
+	}
+	if rowH <= 0 {
+		return
+	}
+	top := f.matsScroll.ScrollTop - notches*2*float64(rowH)/over
+	f.matsScroll.ScrollTop = math.Max(0, math.Min(1, top))
 }
 
 // inputsText renders the have/need line of a job's materials: one
 // "Name have/need" pair per input, joined by the table's ellipsis rules.
-// The board and the picker's preview share it.
+// The quantity picker's preview renders it (the board's rows carry the
+// material bill as bars instead).
 func inputsText(cv widgets.ContentView, mats []content.CargoStack) string {
 	if len(mats) == 0 {
 		return "—"
@@ -437,22 +1156,23 @@ func (f *Manufacturing) cancelReadyFor(row manufacturingRow) bool {
 }
 
 // rowSpec is one manufacturing row's declared interactions: the product's
-// Show Info (grayed when the id no longer resolves) plus its one action
-// (Start for a recipe, Collect or Cancel for a job) with the same gate as
-// the toolbar button.
+// Show Info (grayed when the id no longer resolves), plus a job row's
+// Collect / Cancel with the same gate as the toolbar button. A recipe row
+// declares no action: a rich row draws its actions as 92 px trailing
+// buttons, a third of the list pane, and the recipe's Start is the
+// inspector's own button (the row's click opens the recipe there).
 func (f *Manufacturing) rowSpec(row manufacturingRow) widgets.RowSpec {
-	return widgets.RowSpec{Ref: &row.ref, Actions: f.rowActions(row)}
+	spec := widgets.RowSpec{Ref: &row.ref}
+	if row.job != 0 {
+		spec.Actions = f.rowActions(row)
+	}
+	return spec
 }
 
-// rowActions is a row's context-menu action entry (Start for a recipe,
-// Collect for a done job, Cancel for a running one) with the same gate as
-// the selection path: Start opens the quantity picker, never a fixed run
-// count.
+// rowActions is a job row's context-menu action entry (Collect for a done
+// job, Cancel for a running one) with the same gate as the toolbar button.
 func (f *Manufacturing) rowActions(row manufacturingRow) []widgets.RowAction {
 	switch {
-	case row.recipe != "":
-		return []widgets.RowAction{{Label: "Start", Disabled: !f.startReadyFor(row),
-			Intent: widgets.QtyPick{Mode: widgets.QtyStart, Item: f.recipeProduct(row.recipe), Recipe: row.recipe}}}
 	case row.job != 0:
 		if f.collectReadyFor(row) {
 			return []widgets.RowAction{{Label: "Collect",
@@ -461,7 +1181,17 @@ func (f *Manufacturing) rowActions(row manufacturingRow) []widgets.RowAction {
 		return []widgets.RowAction{{Label: "Cancel", Disabled: !f.cancelReadyFor(row),
 			Intent: widgets.CancelJob{Job: row.job}}}
 	}
-	return []widgets.RowAction{{Label: "Start", Disabled: true}}
+	return nil
+}
+
+// mfgClip shortens a name to max runes, marking the cut with an ellipsis
+// (a rich row's own text never ellipsizes, so the owner measures).
+func mfgClip(name string, max int) string {
+	if max < 1 || utf8.RuneCountInString(name) <= max {
+		return name
+	}
+	r := []rune(name)
+	return string(r[:max-1]) + "…"
 }
 
 // recipeProduct is a recipe's product id ("" when the recipe no longer
@@ -473,13 +1203,28 @@ func (f *Manufacturing) recipeProduct(rec content.RecipeID) content.ItemID {
 	return ""
 }
 
-// openPicker opens the quantity picker on a recipe's runs — the selection
-// gesture. Nothing opens away from an industry station.
+// FocusSearch focuses the browse pane's search field (a click on the field
+// does the same).
+func (f *Manufacturing) FocusSearch() { f.search.Focus(true) }
+
+// openPicker opens the quantity picker on a recipe's runs: the Start
+// gesture (the inspector's button). Nothing opens away from an industry
+// station.
 func (f *Manufacturing) openPicker(row manufacturingRow) {
 	if row.recipe == "" || f.cv.DockedIndustry() == "" {
 		return
 	}
 	f.as.Do(widgets.QtyPick{Mode: widgets.QtyStart, Item: f.recipeProduct(row.recipe), Recipe: row.recipe})
+}
+
+// startClicked opens the picker on the inspected recipe (the inspector's own
+// Start button acts on the selection). Grayed is grayed: a disabled button
+// opens nothing, even when a harness fires the click past the gate.
+func (f *Manufacturing) startClicked() {
+	if !f.startReadyFor(f.sel) {
+		return
+	}
+	f.openPicker(f.sel)
 }
 
 // collectClicked emits CollectJob for the selected job.

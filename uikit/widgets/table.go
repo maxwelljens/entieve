@@ -135,6 +135,9 @@ const (
 // ("" = none), tinted like the text. HasBar makes the cell a progress strip
 // instead of a text run: MinW wide, Bar (0..1) filled in Tint over the
 // house bar track — the state readouts' meter, never a text stand-in.
+// Split, when set, draws a stacked strip instead: MinW wide, one segment per
+// entry in order, each width its Share of their sum (ShareWidths) painted in
+// its own Tint over the same track.
 type RowSeg struct {
 	Text   string
 	Tint   color.RGBA
@@ -143,6 +146,14 @@ type RowSeg struct {
 	Icon   string
 	Bar    float64
 	HasBar bool
+	Split  []RowSplit
+}
+
+// RowSplit is one segment of a stacked strip: its weight (any positive
+// scale — ShareWidths normalises) and the palette role it paints.
+type RowSplit struct {
+	Share float64
+	Tint  color.RGBA
 }
 
 // RowBarH is a rich row's progress strip height (design px): thin chrome on
@@ -166,6 +177,66 @@ func PaintBar(dst *ebiten.Image, frac float64, p theme.Palette, fill color.RGBA)
 // 0..1 and rounded to whole pixels.
 func BarFillW(w int, frac float64) int {
 	return int(math.Round(math.Max(0, math.Min(1, frac)) * float64(w)))
+}
+
+// ShareWidths splits w px over shares: every segment takes the floor of its
+// proportional width and the pixels left over go to the largest fractional
+// remainders (ties by index), so the widths always sum to w exactly and the
+// split is deterministic. Non-positive w, no shares, or shares that sum to
+// zero return nil (an empty strip).
+func ShareWidths(w int, shares []float64) []int {
+	if w <= 0 || len(shares) == 0 {
+		return nil
+	}
+	total := 0.0
+	for _, s := range shares {
+		if s > 0 {
+			total += s
+		}
+	}
+	if total <= 0 {
+		return nil
+	}
+	out := make([]int, len(shares))
+	rem := make([]float64, len(shares))
+	used := 0
+	for i, s := range shares {
+		exact := math.Max(0, s) / total * float64(w)
+		out[i] = int(exact)
+		rem[i] = exact - float64(out[i])
+		used += out[i]
+	}
+	for ; used < w; used++ {
+		best := 0
+		for i := 1; i < len(rem); i++ {
+			if rem[i] > rem[best] {
+				best = i
+			}
+		}
+		out[best]++
+		rem[best] = -1 // never the largest again
+	}
+	return out
+}
+
+// PaintSplit paints a stacked share strip into dst: the house bar track over
+// the full width, then each segment's ShareWidths slice left to right in its
+// own tint.
+func PaintSplit(dst *ebiten.Image, shares []RowSplit, p theme.Palette) {
+	b := dst.Bounds()
+	theme.FillRect(dst, b, theme.NRGBA(p.Cell, 160))
+	fracs := make([]float64, len(shares))
+	for i, s := range shares {
+		fracs[i] = s.Share
+	}
+	x := b.Min.X
+	for i, w := range ShareWidths(b.Dx(), fracs) {
+		if w <= 0 {
+			continue
+		}
+		theme.FillRect(dst, image.Rect(x, b.Min.Y, x+w, b.Max.Y), shares[i].Tint)
+		x += w
+	}
 }
 
 // RowLine is one line of a rich row's stack: a run of cells drawn left to
@@ -226,9 +297,13 @@ func NewStackRow(env Seams, row TableRow, face *text.Face) *StackRow {
 		if col.A == 0 {
 			col = p.Text
 		}
-		if s.HasBar {
+		if s.HasBar || len(s.Split) > 0 {
 			img := ebiten.NewImage(max(1, s.MinW), theme.Px(RowBarH))
-			PaintBar(img, s.Bar, p, col)
+			if len(s.Split) > 0 {
+				PaintSplit(img, s.Split, p)
+			} else {
+				PaintBar(img, s.Bar, p, col)
+			}
 			return widget.NewGraphic(
 				widget.GraphicOpts.Image(img),
 				widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.MinSize(
@@ -1058,13 +1133,19 @@ func sameStack(applied, row TableRow) bool {
 	return true
 }
 
-// copyStack deep-copies a row's line stack (segment runs included) so the
-// snapshot can never be edited through the caller's slices.
+// copyStack deep-copies a row's line stack (segment runs and their stacked
+// strips included) so the snapshot can never be edited through the caller's
+// slices.
 func copyStack(s []RowLine) []RowLine {
 	out := make([]RowLine, len(s))
 	for i, l := range s {
 		out[i] = l
 		out[i].Segs = append([]RowSeg(nil), l.Segs...)
+		for j := range out[i].Segs {
+			if n := len(out[i].Segs[j].Split); n > 0 {
+				out[i].Segs[j].Split = append([]RowSplit(nil), out[i].Segs[j].Split...)
+			}
+		}
 	}
 	return out
 }

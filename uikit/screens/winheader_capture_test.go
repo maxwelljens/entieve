@@ -41,7 +41,10 @@ func TestHeaderCaptureFrame(t *testing.T) {
 	k.AddWindow(man.Win())
 	// Side by side, both bodies (and their bands) fully on screen.
 	ref.Win().SetLocation(image.Rect(24, 24, 24+theme.Px(430), 24+theme.Px(430)))
-	man.Win().SetLocation(image.Rect(500, 24, 500+theme.Px(460), 24+theme.Px(520)))
+	// The manufacturing board is the wider three-pane window: it takes its
+	// landing width so its recipe rows (the tables the plate reads through)
+	// keep a real column.
+	man.Win().SetLocation(image.Rect(500, 24, 500+theme.Px(760), 24+theme.Px(520)))
 
 	var plates bool
 	out := capture.Out("window_headers_capture.png")
@@ -147,21 +150,26 @@ func checkHeaderRows(name string, tbl *widgets.Table, band image.Rectangle, shot
 		if rr.Empty() {
 			continue
 		}
-		if inBand < 0 && rr.Max.Y <= band.Max.Y {
+		// A row whose top sits inside the band. The manufacturing board's
+		// rows are two lines tall, so the first one crosses the band's fade
+		// (the probe rides its top padding, where the plate is opaque); the
+		// refinery's single-line rows sit fully inside it.
+		if inBand < 0 && rr.Min.Y >= band.Min.Y && rr.Min.Y < band.Max.Y {
 			inBand = i
+			break
 		}
 	}
 	if inBand < 0 {
-		fail("%s: no table row sits fully inside the band %v — the band misses the rows", name, band)
+		fail("%s: no table row starts inside the band %v — the band misses the rows", name, band)
 		return
 	}
 	rr := tbl.RowWidget(inBand).GetWidget().Rect
-	// The row's top/bottom padding scanlines: background under and over the
-	// text, never a glyph. Measured against the release frame: 106/255
-	// (refinery) and 37/255 (manufacturing) now; with the fill still painted
-	// over the art the same probe moved 9 and 2.
+	// The row's own top padding scanline: background under the text, never a
+	// glyph. Measured against the release frame: 106/255 (refinery) and
+	// 37/255 (manufacturing) now; with the fill still painted over the art
+	// the same probe moved 9 and 2.
 	strongest := 0
-	for _, y := range []int{rr.Min.Y + theme.Px(3), rr.Max.Y - theme.Px(2)} {
+	for y := rr.Min.Y + theme.Px(3); y < rr.Min.Y+theme.Px(5) && y < band.Max.Y; y++ {
 		for x := rr.Min.X + theme.Px(2); x < rr.Max.X-theme.Px(2); x++ {
 			if d := shot.diff(was, x, y); d > strongest {
 				strongest = d

@@ -1045,3 +1045,62 @@ func TestBarFillW(t *testing.T) {
 		}
 	}
 }
+
+// TestShareWidths: the stacked strip's split is exact and deterministic:
+// every segment's width sums back to the strip width, weights carry any
+// scale, ties go by index, and a degenerate set paints nothing.
+func TestShareWidths(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		w      int
+		shares []float64
+		want   []int
+	}{
+		{"half", 40, []float64{1, 1}, []int{20, 20}},
+		{"thirds round down to the lower index", 40, []float64{1, 1, 1}, []int{14, 13, 13}},
+		{"weights normalise", 30, []float64{6, 3, 1}, []int{18, 9, 3}},
+		{"tiny share still splits exactly", 7, []float64{55, 11.2, 11.2, 11.3, 11.3}, []int{4, 1, 0, 1, 1}},
+		{"zero weight gets nothing", 10, []float64{1, 0, 1}, []int{5, 0, 5}},
+		{"nothing to split", 10, nil, nil},
+		{"zero sum", 10, []float64{0, 0}, nil},
+		{"no width", 0, []float64{1, 1}, nil},
+	} {
+		got := ShareWidths(tc.w, tc.shares)
+		if len(got) != len(tc.want) {
+			t.Errorf("%s: %v, want %v", tc.name, got, tc.want)
+			continue
+		}
+		sum := 0
+		for i := range got {
+			if got[i] != tc.want[i] {
+				t.Errorf("%s: %v, want %v", tc.name, got, tc.want)
+				break
+			}
+			sum += got[i]
+		}
+		if len(tc.shares) > 0 && sum != tc.w && tc.want != nil {
+			t.Errorf("%s: widths sum to %d, want the strip width %d", tc.name, sum, tc.w)
+		}
+	}
+}
+
+// TestSplitSegmentBuildsStrip: a RowSeg carrying Split still builds a rich
+// row (the strip is one more cell form), so a stacked strip needs no new row
+// mechanics.
+func TestSplitSegmentBuildsStrip(t *testing.T) {
+	env, _ := newTestEnv(t)
+	rows := []TableRow{{
+		Cells: []string{"rec"},
+		Stack: []RowLine{{Segs: []RowSeg{
+			{Text: "Sideron"},
+			{Split: []RowSplit{{Share: 3}, {Share: 1}}, MinW: 40},
+		}}},
+	}}
+	tbl, _ := newRichTable(t, env, rows)
+	if len(tbl.rich) != 1 || tbl.rich[0] == nil {
+		t.Fatalf("rich rows = %d, want the one stacked-strip row built", len(tbl.rich))
+	}
+	if r := tbl.RowWidget(0).GetWidget().Rect; r.Empty() {
+		t.Fatal("strip row never laid out")
+	}
+}
