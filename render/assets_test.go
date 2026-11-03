@@ -199,6 +199,23 @@ func TestHullSpritesCropToInk(t *testing.T) {
 	if got := InkCrop(full); got.Bounds() != full.Bounds() {
 		t.Errorf("InkCrop(transparent) = %v, want the canvas %v", got.Bounds(), full.Bounds())
 	}
+	// The owner's canvases carry a soft glow out to their edges: alpha below
+	// the floor is margin, so a 20×10 body on a glow-rimmed 40×20 canvas
+	// crops to the body (cropping to the glow made every drop-in fit ~1.8:1
+	// and the 4:1 portrait frame could not fill its width).
+	glow := image.NewNRGBA(image.Rect(0, 0, 40, 20))
+	for y := 5; y < 15; y++ {
+		for x := 10; x < 30; x++ {
+			glow.SetNRGBA(x, y, color.NRGBA{R: 255, A: 255})
+		}
+	}
+	for x := 0; x < 40; x++ {
+		glow.SetNRGBA(x, 0, color.NRGBA{R: 255, A: 4})
+		glow.SetNRGBA(x, 19, color.NRGBA{R: 255, A: 4})
+	}
+	if got := InkCrop(glow).Bounds(); got.Dx() != 20 || got.Dy() != 10 {
+		t.Errorf("InkCrop(glow-rimmed) = %v, want the 20×10 body", got)
+	}
 }
 
 // TestLoadAssetsMissingAndGarbageAreNil: absent file, corrupt file and
