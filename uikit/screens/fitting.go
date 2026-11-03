@@ -27,7 +27,8 @@ import (
 // business) with a StepTiny name line under each.
 const (
 	fitColW       = 300 + theme.ScrollGutter // identity + stats column, its scroll rail included
-	fitPortrait   = 120                      // hull portrait box, hudPortrait's twin
+	fitPortraitW  = 120                      // hull portrait box width: hudPortraitW's twin
+	fitPortraitH  = 60                       // half the width: 2:1, the hull art's own frame
 	fitTileW      = 62                       // slot tile width (rackCellW's twin: IconTile + 6)
 	fitTileH      = 62                       // slot tile height (theme.IconTile + 6)
 	fitTileNameH  = 19                       // name line under a filled tile (StepTiny line box)
@@ -315,11 +316,11 @@ func (f *Fitting) Tables() []*widgets.Table { return []*widgets.Table{f.hangar} 
 // its class · maker line with the corporation's emblem.
 func (f *Fitting) newIdentity() *widget.Container {
 	p := f.th.Pal()
-	f.portrait = ebiten.NewImage(theme.Px(fitPortrait), theme.Px(fitPortrait))
+	f.portrait = ebiten.NewImage(theme.Px(fitPortraitW), theme.Px(fitPortraitH))
 	f.portraitGfx = widget.NewGraphic(
 		widget.GraphicOpts.Image(f.portrait),
 		widget.GraphicOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(theme.Px(fitPortrait), theme.Px(fitPortrait)),
+			widget.WidgetOpts.MinSize(theme.Px(fitPortraitW), theme.Px(fitPortraitH)),
 			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 				HorizontalPosition: widget.AnchorLayoutPositionCenter,
 				VerticalPosition:   widget.AnchorLayoutPositionCenter,
@@ -330,7 +331,7 @@ func (f *Fitting) newIdentity() *widget.Container {
 		widget.ContainerOpts.BackgroundImage(theme.WindowTitleBox(theme.Solid(p.BGHard), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(theme.Px(fitPortrait)+2, theme.Px(fitPortrait)+2),
+			widget.WidgetOpts.MinSize(theme.Px(fitPortraitW)+2, theme.Px(fitPortraitH)+2),
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}),
 		),
 	)
@@ -371,23 +372,13 @@ func (f *Fitting) newIdentity() *widget.Container {
 	return col
 }
 
-// paintPortrait repaints the hull portrait: the hull's raster scaled into
-// the design-square box (the same machinery as the HUD's portrait; Sync
-// calls it on a hull change only).
+// paintPortrait repaints the hull portrait: the hull's art painted into the
+// 2:1 design box by the shared seam (the HUD's portrait and the Show Info
+// hero); Sync calls it on a hull change only.
 func (f *Fitting) paintPortrait(hull content.ShipID) {
 	f.portraitDraws++
 	f.portrait.Clear()
-	src := hullArt(hull, theme.Px(fitPortrait), theme.Px(fitPortrait))
-	if src == nil {
-		return
-	}
-	b := src.Bounds()
-	box := float64(theme.Px(fitPortrait))
-	scale := math.Min(box/float64(b.Dx()), box/float64(b.Dy()))
-	var opts ebiten.DrawImageOptions
-	opts.GeoM.Scale(scale, scale)
-	opts.GeoM.Translate((box-float64(b.Dx())*scale)/2, (box-float64(b.Dy())*scale)/2)
-	f.portrait.DrawImage(ebiten.NewImageFromImage(src), &opts)
+	paintHullPortrait(f.portrait, hull)
 }
 
 // newRule is the hairline under the identity block (the tooltip's rule).

@@ -3,7 +3,6 @@ package game
 import (
 	"image"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/ebitenui/ebitenui/widget"
@@ -104,8 +103,8 @@ func TestContractRowContextMenu(t *testing.T) {
 	if !g.kit.ContactOpen() {
 		t.Fatal("gated Details did not open the contact dialog")
 	}
-	if got := g.kit.ContactWin().GateText(); !strings.HasPrefix(got, "Requires standing") {
-		t.Errorf("dialog gate line = %q, want the standing requirement", got)
+	if frac, shown := g.kit.ContactWin().GateFrac(); !shown || frac != 0 {
+		t.Errorf("dialog gate meter = %v shown=%v, want the empty standing bar", frac, shown)
 	}
 	if len(got) != 0 {
 		t.Fatalf("Details enqueued %v, want nothing (it opens a window)", got)

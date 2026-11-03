@@ -3,6 +3,7 @@ package screens
 import (
 	"image"
 	"image/jpeg"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -84,9 +85,6 @@ func TestContactDetailsRendersOffer(t *testing.T) {
 	}
 	if got, want := w.name.Label, o.ContactName; got != want {
 		t.Errorf("contact name = %q, want %q", got, want)
-	}
-	if got, want := w.sub.Label, "Corporation"; got != want {
-		t.Errorf("patron line = %q, want %q", got, want)
 	}
 	if got := w.speech.Label; got != o.Prose {
 		t.Errorf("speech = %q, want the offer's filled prose %q", got, o.Prose)
@@ -202,8 +200,11 @@ func TestContactDetailsGate(t *testing.T) {
 	if !w.accept.GetWidget().Disabled {
 		t.Fatal("gated offer's accept is enabled")
 	}
-	if got, want := w.gateText.Label, "Requires standing 0.50"; got != want {
-		t.Errorf("gate line = %q, want %q", got, want)
+	if got := w.gateText.Label; got != "" {
+		t.Errorf("gate line = %q, want the meter (no sentence)", got)
+	}
+	if frac, shown := w.GateFrac(); !shown || math.Abs(frac-0.2) > 1e-9 {
+		t.Errorf("gate meter = %v shown=%v, want standing 0.1 / 0.5", frac, shown)
 	}
 	before := len(rec.got)
 	w.accept.ClickedEvent.Fire(&widget.ButtonClickedEventArgs{Button: w.accept})
@@ -340,5 +341,156 @@ func TestContactDetailsFitsContent(t *testing.T) {
 			t.Errorf("%s: body prefers %d px tall, floor %d (window %d minus title %d)",
 				id, bh, theme.Px(contactH)-theme.Px(theme.TitleBarH), theme.Px(contactH), theme.Px(theme.TitleBarH))
 		}
+	}
+}
+
+// TestContactDetailsDropsPatronAndPostedAt: the page's left column is the
+// face and the name. The patron ("Corporation"/"Charter") and the posted-at
+// line are gone from every text the dialog renders, and no other contact
+// surface states them either (the board row never did).
+func TestContactDetailsDropsPatronAndPostedAt(t *testing.T) {
+	c, defs := contactContent()
+	cv := &stubView{c: c, docked: true, station: widgets.StationInfo{Name: "Haven Rest", System: "Solace"}}
+	cv.contacts = widgets.Contacts{Station: "cel-stub", Standing: 0.5, Offers: offersFor(defs, "ct-a-open")}
+	w, _, ui := detailsPanel(t, cv)
+	if !w.Show("ct-a-open") {
+		t.Fatal("Show refused the offer")
+	}
+	pumpDetails(t, ui, w)
+	if got := w.name.Label; got != "Stub Office" {
+		t.Errorf("contact name = %q, want it kept", got)
+	}
+	var texts []string
+	collectTexts(w.win.GetContainer(), &texts)
+	for _, s := range texts {
+		for _, gone := range []string{"Posted at", "Charter", "Corporation"} {
+			if strings.Contains(s, gone) {
+				t.Errorf("dialog still states %q: %q", gone, s)
+			}
+		}
+	}
+}
+
+// TestContactDetailsItemisedRewards: the CONTRACT block itemises the reward —
+// one row and one glyph per reward: coins on the payout, the standing mark on
+// the gain, the material's own icon on the item. Rows vanish with their
+// reward, so a money-only offer shows one.
+func TestContactDetailsItemisedRewards(t *testing.T) {
+	c, defs := contactContent()
+	at := func(reward content.ContractReward) (*ContactWin, *stubView) {
+		t.Helper()
+		def := *defs["ct-a-open"]
+		def.Reward = reward
+		cv := &stubView{c: c, docked: true}
+		cv.contacts = widgets.Contacts{Station: "cel-stub", Standing: 0.5, Offers: []sim.Offer{{
+			Def: &def, ContactName: "Dukšan Yard Office", Patron: content.PatronCharter,
+		}}}
+		w, _, ui := detailsPanel(t, cv)
+		if !w.Show("ct-a-open") {
+			t.Fatal("Show refused the offer")
+		}
+		pumpDetails(t, ui, w)
+		return w, cv
+	}
+
+	// All three rewards: three rows, each with its icon.
+	w, _ := at(content.ContractReward{Credits: 4200, StandingGain: 0.25, Item: "item-stub-ore"})
+	visible := func(c *widget.Container) bool { return c.GetWidget().IsVisible() }
+	if !visible(w.rewardRow) || !visible(w.gainRow) || !visible(w.itemRow) {
+		t.Fatal("an offer paying all three rewards hides one of its rows")
+	}
+	if got, want := w.reward.Label, theme.FormatCredits(4200); got != want {
+		t.Errorf("payout = %q, want %q", got, want)
+	}
+	if got := w.rewardMark.Name(); got != rewardMoneyIcon {
+		t.Errorf("payout icon = %q, want the coins %q", got, rewardMoneyIcon)
+	}
+	if got, want := w.gain.Label, "+0.25 standing"; got != want {
+		t.Errorf("gain = %q, want %q", got, want)
+	}
+	if got := w.gainMark.Name(); got != rewardStandingIcon {
+		t.Errorf("gain icon = %q, want the standing mark %q", got, rewardStandingIcon)
+	}
+	if got, want := w.item.Label, "Stub Ore"; got != want {
+		t.Errorf("material = %q, want %q", got, want)
+	}
+	if got, want := w.itemMark.Name(), widgets.TradeableIcon(c, "item-stub-ore"); got != want || got == "" {
+		t.Errorf("material icon = %q, want the item's own %q", got, want)
+	}
+
+	// Money only: one row.
+	w, _ = at(content.ContractReward{Credits: 4200})
+	if !visible(w.rewardRow) || visible(w.gainRow) || visible(w.itemRow) {
+		t.Error("a money-only offer does not itemise to one reward row")
+	}
+
+	// Money and standing: two rows.
+	w, _ = at(content.ContractReward{Credits: 4200, StandingGain: 0.1})
+	if !visible(w.rewardRow) || !visible(w.gainRow) || visible(w.itemRow) {
+		t.Error("an offer without a material shows both paid rows and no item row")
+	}
+}
+
+// TestContactDetailsGateMeterStates: the Standing row speaks in one meter,
+// never a sentence — locked shows the partial strip in the warn role, met
+// shows it full, an offer with no requirement keeps no row, and an accepted
+// offer swaps the meter for its claim line.
+func TestContactDetailsGateMeterStates(t *testing.T) {
+	c, defs := contactContent()
+	show := func(id content.ContractID, standing float64, active bool) (*ContactWin, *stubView) {
+		t.Helper()
+		cv := &stubView{c: c, docked: true}
+		cv.contacts = widgets.Contacts{Station: "cel-stub", Standing: standing, Offers: offersFor(defs, id)}
+		if active {
+			cv.contacts.Active = []sim.MissionState{{ID: id, Def: defs[id]}}
+		}
+		w, _, ui := detailsPanel(t, cv)
+		if !w.Show(id) {
+			t.Fatalf("Show refused %s", id)
+		}
+		pumpDetails(t, ui, w)
+		return w, cv
+	}
+
+	w, _ := show("ct-c-gated", 0.1, false) // 0.10 of 0.50
+	if frac, shown := w.GateFrac(); !shown || math.Abs(frac-0.2) > 1e-9 {
+		t.Errorf("locked gate = %v shown=%v, want 0.2", frac, shown)
+	}
+	if !w.gateGfx.GetWidget().IsVisible() || w.gateText.GetWidget().IsVisible() {
+		t.Error("locked gate shows text instead of the meter")
+	}
+	if w.accept.GetWidget().Disabled != true {
+		t.Error("locked gate leaves Accept enabled")
+	}
+	var texts []string
+	collectTexts(w.win.GetContainer(), &texts)
+	for _, line := range texts {
+		if strings.Contains(line, "Requires standing") {
+			t.Errorf("the page still states the gate as text: %q", line)
+		}
+	}
+
+	w, _ = show("ct-c-gated", 0.5, false)
+	if frac, shown := w.GateFrac(); !shown || frac != 1 {
+		t.Errorf("met gate = %v shown=%v, want a full meter", frac, shown)
+	}
+	if w.accept.GetWidget().Disabled {
+		t.Error("met gate leaves Accept disabled")
+	}
+
+	w, _ = show("ct-a-open", 0, false) // no requirement
+	if _, shown := w.GateFrac(); shown {
+		t.Error("an offer with no requirement draws a gate meter")
+	}
+	if w.gate.GetWidget().IsVisible() {
+		t.Error("an offer with no requirement keeps its Standing row")
+	}
+
+	w, _ = show("ct-c-gated", 0.5, true)
+	if _, shown := w.GateFrac(); shown {
+		t.Error("an accepted offer still draws the gate meter")
+	}
+	if got := w.GateText(); !strings.HasPrefix(got, "Accepted:") {
+		t.Errorf("accepted standing row = %q, want the claim line", got)
 	}
 }

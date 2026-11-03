@@ -54,8 +54,8 @@ func TestHullArtDropInWins(t *testing.T) {
 	if builtin == nil {
 		t.Fatal("fixture: ship-vastrek has no embedded portrait")
 	}
-	if got := hullArt("ship-vastrek", 120, 120); got.Bounds() != builtin.Bounds() {
-		t.Fatalf("no assets: hullArt bounds = %v, want the embedded raster's %v", got.Bounds(), builtin.Bounds())
+	if got := hullArt("ship-vastrek", 120, 120); got.Bounds() != render.InkCrop(builtin).Bounds() {
+		t.Fatalf("no assets: hullArt bounds = %v, want the embedded raster's ink %v", got.Bounds(), render.InkCrop(builtin).Bounds())
 	}
 	if c := color.NRGBAModel.Convert(builtin.At(0, 0)).(color.NRGBA); c.A != 0 {
 		t.Errorf("built-in corner = %v, want transparent (the 1 px margin)", c)
@@ -65,8 +65,8 @@ func TestHullArtDropInWins(t *testing.T) {
 	if got := hullArt("ship-vastrek", 120, 120); got.Bounds() != image.Rect(0, 0, 8, 8) {
 		t.Errorf("dropped art: hullArt = %v, want the 8×8 drop-in over the %v raster", got.Bounds(), builtin.Bounds())
 	}
-	if got := hullArt("ship-zdanek", 120, 120); got.Bounds() != builtin.Bounds() {
-		t.Errorf("a hull without a file = %v, want the embedded raster", got.Bounds())
+	if got, want := hullArt("ship-zdanek", 120, 120), render.InkCrop(hulls.Get("ship-zdanek", 120)); got.Bounds() != want.Bounds() {
+		t.Errorf("a hull without a file = %v, want the embedded raster's ink %v", got.Bounds(), want.Bounds())
 	}
 	if got := hullArt("ship-kutrek", 120, 120); got != nil {
 		t.Errorf("ship-kutrek (no embedded raster, no file) = %v, want nil", got)
@@ -113,7 +113,7 @@ func TestHullArtSamplesTheFrame(t *testing.T) {
 	for _, box := range [][2]int{
 		{hudPortraitW, hudPortraitH},
 		{infoHullW, infoHullH},
-		{fitPortrait, fitPortrait},
+		{fitPortraitW, fitPortraitH},
 	} {
 		got := hullArt(id, box[0], box[1])
 		if got == nil {
@@ -134,10 +134,11 @@ func TestHullArtSamplesTheFrame(t *testing.T) {
 		}
 	}
 	// The built-in source: no file for ship-zdanek, so the committed raster
-	// answers unchanged (it is already small; nothing to sample).
-	builtin := hulls.Get("ship-zdanek", 120)
+	// answers whole (it is already small; nothing to sample), cropped to its
+	// ink like the dropped art.
+	builtin := render.InkCrop(hulls.Get("ship-zdanek", 120))
 	if got := hullArt("ship-zdanek", hudPortraitW, hudPortraitH); got.Bounds() != builtin.Bounds() {
-		t.Errorf("built-in hull in the HUD box = %v, want the raster %v", got.Bounds(), builtin.Bounds())
+		t.Errorf("built-in hull in the HUD box = %v, want the raster's ink %v", got.Bounds(), builtin.Bounds())
 	}
 }
 
@@ -219,5 +220,61 @@ func TestInfoWindowHullPageLeadsWithTheShip(t *testing.T) {
 	}
 	if got, want := plate.GetWidget().Rect.Dx(), theme.Px(infoPlateW()); got != want {
 		t.Errorf("module plate = %d wide, want the icon plate %d", got, want)
+	}
+}
+
+// TestHullArtFitsTheInkNotTheCanvas: the portrait blocks fit the ART, not the
+// transparent canvas it sits in. A 96×64 canvas with a 60×20 ship band draws
+// the ship 120 px wide in the HUD's 2:1 box (was 72 px wide when the canvas
+// was contained), and the committed rasters do the same: their ink fills the
+// frame's one long axis.
+func TestHullArtFitsTheInkNotTheCanvas(t *testing.T) {
+	const id = content.ShipID("ship-owner-margin")
+	path := filepath.Join(t.TempDir(), "hulls", string(id)+".png")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	img := image.NewNRGBA(image.Rect(0, 0, 96, 64))
+	for y := 22; y < 42; y++ {
+		for x := 18; x < 78; x++ {
+			img.SetNRGBA(x, y, color.NRGBA{R: 255, A: 255})
+		}
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	render.LoadAssets(filepath.Dir(filepath.Dir(path)))
+	t.Cleanup(func() { render.LoadAssets("") })
+
+	got := hullArt(id, hudPortraitW, hudPortraitH)
+	if got == nil {
+		t.Fatal("no art for the dropped canvas")
+	}
+	if b := got.Bounds(); b.Dx() != 60 || b.Dy() != 20 {
+		t.Errorf("dropped art = %v, want its 60×20 ink (the load crops the canvas)", b)
+	}
+	dw, dh := hullFit(60, 20, hudPortraitW, hudPortraitH)
+	if int(dw+0.5) != hudPortraitW {
+		t.Errorf("ink drawn %.1f wide, want the box's %d (a wider-than-2:1 ship fills the width)", dw, hudPortraitW)
+	}
+	if int(dh+0.5) != 40 {
+		t.Errorf("ink drawn %.1f tall, want 40 (aspect preserved, nothing cropped)", dh)
+	}
+
+	// The committed raster: ink 102×56 in the 120×60 box -> 109×60, filling
+	// the height (was 60×60 and 51×28 of ink when the square canvas was
+	// contained).
+	in := render.InkCrop(hulls.Get("ship-vastrek", 120)).Bounds()
+	bw, bh := hullFit(in.Dx(), in.Dy(), hudPortraitW, hudPortraitH)
+	if int(bh+0.5) != hudPortraitH {
+		t.Errorf("raster ink drawn %.1f tall, want the box's %d", bh, hudPortraitH)
+	}
+	if bw < 100 {
+		t.Errorf("raster ink drawn %.1f wide, want it to nearly fill the %d", bw, hudPortraitW)
 	}
 }

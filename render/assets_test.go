@@ -57,8 +57,10 @@ func TestLoadAssetsLoadsPNGByConvention(t *testing.T) {
 	if hull == nil {
 		t.Fatal("hulls/ship-vastrek.png did not resolve via convention lookup")
 	}
-	if b := hull.Bounds(); b.Dx() != 64 || b.Dy() != 32 {
-		t.Errorf("hull sprite = %dx%d, want 64x32", b.Dx(), b.Dy())
+	// The fixture is one opaque pixel on a transparent canvas: a hull
+	// sprite is its ink (InkCrop), so that pixel is the whole sprite.
+	if b := hull.Bounds(); b.Dx() != 1 || b.Dy() != 1 {
+		t.Errorf("hull sprite = %dx%d, want the 1×1 ink of the 64×32 canvas", b.Dx(), b.Dy())
 	}
 	st := spriteFor("stations/cel-haven-rest")
 	if st == nil {
@@ -156,6 +158,46 @@ func TestWindowHeaderPlatesResolveByName(t *testing.T) {
 	stashAssets(t, filepath.Join(t.TempDir(), "no-such-dir"))
 	if RefiningHeader() != nil || ManufacturingHeader() != nil {
 		t.Error("no asset root must mean no header plates (the plain body)")
+	}
+}
+
+// TestHullSpritesCropToInk: a hull portrait is registered as its ART, not its
+// canvas — the owner's ships sit in a 4–5:1 band of a 1376×768 transparent
+// canvas, and the portrait blocks fit the ink, so the load drops the margin
+// (render.InkCrop). Every other kind keeps its whole canvas.
+func TestHullSpritesCropToInk(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "hulls", "ship-vastrek.png")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	img := image.NewNRGBA(image.Rect(0, 0, 40, 20))
+	for y := 5; y < 15; y++ {
+		for x := 10; x < 30; x++ {
+			img.SetNRGBA(x, y, color.NRGBA{R: 255, A: 255})
+		}
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	stashAssets(t, dir)
+
+	hull := spriteFor("hulls/ship-vastrek")
+	if hull == nil {
+		t.Fatal("hull sprite did not load")
+	}
+	if b := hull.Bounds(); b.Dx() != 20 || b.Dy() != 10 {
+		t.Errorf("hull sprite = %v, want the art's 20×10 ink", b)
+	}
+	// A fully transparent canvas keeps its size: nothing to crop to.
+	full := image.NewNRGBA(image.Rect(0, 0, 16, 8))
+	if got := InkCrop(full); got.Bounds() != full.Bounds() {
+		t.Errorf("InkCrop(transparent) = %v, want the canvas %v", got.Bounds(), full.Bounds())
 	}
 }
 

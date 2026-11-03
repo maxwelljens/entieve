@@ -76,6 +76,9 @@ func LoadAssets(dir string) {
 				return nil
 			}
 			if img, ok := decodePNG(path); ok {
+				if strings.HasPrefix(key, "hulls/") {
+					img = InkCrop(img)
+				}
 				addSprite(key, img)
 			}
 		// JPEG is the artwork kind's format (the docked plate ships as a
@@ -101,6 +104,40 @@ func addSprite(key string, img image.Image) {
 	if !strings.HasPrefix(key, artworkRoot) {
 		mips[key] = mipChain(img, sp)
 	}
+}
+
+// InkCrop returns src cropped to the bounds of its non-transparent pixels,
+// without copying them. Hull portrait canvases are mostly transparent margin
+// (the owner's are 1376×768 with a 4–5:1 ship band) and the portrait blocks
+// fit the ART, so the load drops the margin instead of padding every frame
+// with it (uikit/screens.hullArt). A fully transparent source, or a decoded
+// type that cannot be sub-imaged (a paletted PNG), comes back unchanged.
+func InkCrop(src image.Image) image.Image {
+	if src == nil {
+		return nil
+	}
+	b := src.Bounds()
+	minX, minY, maxX, maxY := b.Max.X, b.Max.Y, b.Min.X, b.Min.Y
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			if _, _, _, a := src.At(x, y).RGBA(); a == 0 {
+				continue
+			}
+			minX, minY = min(minX, x), min(minY, y)
+			maxX, maxY = max(maxX, x+1), max(maxY, y+1)
+		}
+	}
+	in := image.Rect(minX, minY, maxX, maxY)
+	if in.Empty() || in == b {
+		return src
+	}
+	switch v := src.(type) {
+	case *image.NRGBA:
+		return v.SubImage(in)
+	case *image.RGBA:
+		return v.SubImage(in)
+	}
+	return src
 }
 
 // spriteFor returns the art sprite registered under key — a convention path
@@ -155,9 +192,10 @@ func ManufacturingHeader() *ebiten.Image { return spriteFor(artworkManufacturing
 const contactPortraitRoot = portraitsRoot
 
 // HullSprite returns the drop-in art of a hull (assets/hulls/<ship-id>.png)
-// at full resolution, or nil when none is dropped — the world draws its vector
-// silhouette and the portrait surfaces fall back to the embedded raster
-// (uikit/hulls). Portrait blocks sample HullSpriteFor instead.
+// at full resolution, cropped to the art's own bounds (InkCrop), or nil when
+// none is dropped — the world draws its vector silhouette and the portrait
+// surfaces fall back to the embedded raster (uikit/hulls). Portrait blocks
+// sample HullSpriteFor instead.
 func HullSprite(id content.ShipID) *ebiten.Image {
 	if id == "" {
 		return nil

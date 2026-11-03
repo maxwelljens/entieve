@@ -1031,3 +1031,17 @@ func TestTableRowDensityPins(t *testing.T) {
 		t.Errorf("headerSpace = %d, want the SpSm furniture token %d", headerSpace, theme.SpSm)
 	}
 }
+
+// TestBarFillW: the house progress strip's fill is the fraction, whole
+// pixels, clamped to 0..1 — the contact gate bars' one number.
+func TestBarFillW(t *testing.T) {
+	for _, tc := range []struct {
+		w    int
+		frac float64
+		want int
+	}{{40, 0, 0}, {40, 0.5, 20}, {40, 1, 40}, {40, 2, 40}, {40, -1, 0}, {1, 0.4, 0}} {
+		if got := BarFillW(tc.w, tc.frac); got != tc.want {
+			t.Errorf("BarFillW(%d, %v) = %d, want %d", tc.w, tc.frac, got, tc.want)
+		}
+	}
+}

@@ -2,6 +2,7 @@ package screens
 
 import (
 	"image"
+	"math"
 	"strings"
 	"testing"
 
@@ -131,6 +132,17 @@ func offerRowTexts(t *testing.T, b *ContactsPanel, id content.ContractID) []stri
 	}
 	t.Fatalf("no offer row for %s", id)
 	return nil
+}
+
+// offerModel is one offer row's model (the bar and gate state a headless
+// test reads instead of pixels).
+func offerModel(b *ContactsPanel, id content.ContractID) (contactRowModel, bool) {
+	for _, o := range b.model.Offers {
+		if o.ID == id {
+			return o, true
+		}
+	}
+	return contactRowModel{}, false
 }
 
 // rowHas reports whether any text the row renders contains want.
@@ -274,8 +286,15 @@ func TestContactsPanelOnStubView(t *testing.T) {
 	if gated.Btn.GetWidget().Disabled {
 		t.Fatal("gated Details button is disabled — the gate is explained inside the dialog")
 	}
-	if texts := offerRowTexts(t, b, "ct-c-gated"); !rowHas(texts, "Requires standing 0.50") {
-		t.Errorf("gated row texts = %q, want the standing requirement", texts)
+	if texts := offerRowTexts(t, b, "ct-c-gated"); rowHas(texts, "Requires standing") {
+		t.Errorf("gated row texts = %q, want no gate sentence (the bar states it)", texts)
+	}
+	gate, ok := offerModel(b, "ct-c-gated")
+	if !ok || !gate.Gated || gate.Met {
+		t.Errorf("gated row model = %+v, want a locked standing gate", gate)
+	}
+	if got := gate.Gate; got != gateFrac(0, 0.5) {
+		t.Errorf("gated row fill = %v, want standing 0 / 0.50", got)
 	}
 	before := len(rec.got)
 	pressButton(t, ui, gated.Btn)
@@ -646,8 +665,8 @@ func TestContactsPanelRendersShippedOffers(t *testing.T) {
 		if r.Btn.GetWidget().Disabled {
 			t.Errorf("%s: gated Details button is disabled — the dialog explains the gate", r.ID)
 		}
-		if texts := offerRowTexts(t, b, r.ID); !rowHas(texts, "Requires standing 0.20") {
-			t.Errorf("%s: row %q, want the standing requirement on it", r.ID, texts)
+		if texts := offerRowTexts(t, b, r.ID); rowHas(texts, "Requires standing") {
+			t.Errorf("%s: row %q, want no gate sentence (the bar states it)", r.ID, texts)
 		}
 	}
 }
@@ -679,14 +698,32 @@ func TestContactsPanelRefreshesOnSync(t *testing.T) {
 }
 
 // TestBoardRewardUsesCanonicalCredits: the payout line renders through the
-// exported formatter every credit readout shares (theme.FormatCredits).
+// exported formatter every credit readout shares (theme.FormatCredits), and
+// both reward fields lead with their glyph: the coins on the payout, the
+// standing mark on the gain.
 func TestBoardRewardUsesCanonicalCredits(t *testing.T) {
 	if got, want := theme.FormatCredits(40000), "40,000.00 €"; got != want {
 		t.Errorf("FormatCredits(40000) = %q, want %q", got, want)
 	}
-	def := content.ContractDef{Reward: content.ContractReward{Credits: 40000, StandingGain: 0.10}}
-	if got, want := rewardText(&def), "40,000.00 € · +0.10 standing"; got != want {
-		t.Errorf("rewardText = %q, want %q", got, want)
+	c, defs := contactContent()
+	def := *defs["ct-a-open"]
+	def.Reward = content.ContractReward{Credits: 40000, StandingGain: 0.10}
+	cv := &stubView{c: c, docked: true}
+	cv.contacts = widgets.Contacts{Station: "cel-stub", Offers: []sim.Offer{{
+		Def: &def, ContactName: "Stub",
+	}}}
+	b, _, ui := boardPanel(t, cv)
+	pumpBoard(t, ui, b)
+	lines := b.rowStack(b.model.Offers[0], false)
+	if got, want := lines[1].Segs[1].Text, "40,000.00 €"; got != want {
+		t.Errorf("payout cell = %q, want %q", got, want)
+	}
+	if got := lines[1].Segs[1].Icon; got != rewardMoneyIcon {
+		t.Errorf("payout icon = %q, want the coins %q", got, rewardMoneyIcon)
+	}
+	last := lines[len(lines)-1]
+	if got := last.Segs[len(last.Segs)-1].Icon; got != rewardStandingIcon {
+		t.Errorf("gain icon = %q, want the standing mark %q", got, rewardStandingIcon)
 	}
 }
 
@@ -787,5 +824,90 @@ func TestContactRowSpecData(t *testing.T) {
 	ref, ok := objectiveRef(b.cv, defs["ct-a-open"])
 	if !ok || !ref.Valid() {
 		t.Fatalf("objective ref = %v (%v), want a valid ref", ref, ok)
+	}
+}
+
+// TestContactsStandingGateBar: the row's standing gate is a meter, never a
+// sentence. Fill = standing / requirement clamped to 0..1, the warn role
+// while the sim refuses and the accent once it clears, no bar at all on an
+// offer with no requirement — and no gate text on the row in any state.
+func TestContactsStandingGateBar(t *testing.T) {
+	c, defs := contactContent()
+	cv := &stubView{c: c, docked: true}
+	b, _, ui := boardPanel(t, cv)
+
+	for _, tc := range []struct {
+		name     string
+		standing float64
+		want     float64
+		met      bool
+	}{
+		{"locked at zero", 0, 0, false},
+		{"halfway", 0.25, 0.5, false},
+		{"at the gate", 0.5, 1, true},
+		{"over the gate", 0.9, 1, true},
+	} {
+		cv.contacts = widgets.Contacts{Station: "cel-stub", Standing: tc.standing, Offers: offersFor(defs, "ct-c-gated")}
+		pumpBoard(t, ui, b)
+		m, ok := offerModel(b, "ct-c-gated")
+		if !ok {
+			t.Fatalf("%s: no row model", tc.name)
+		}
+		if !m.Gated || m.Met != tc.met {
+			t.Errorf("%s: gate = %v met = %v, want gated met = %v", tc.name, m.Gated, m.Met, tc.met)
+		}
+		if math.Abs(m.Gate-tc.want) > 1e-9 {
+			t.Errorf("%s: fill = %v, want %v", tc.name, m.Gate, tc.want)
+		}
+		lines := b.rowStack(m, false)
+		last := lines[len(lines)-1]
+		if !last.Segs[0].HasBar {
+			t.Fatalf("%s: line 3 = %+v, want the gate strip first", tc.name, last.Segs)
+		}
+		if last.Segs[0].Bar != m.Gate {
+			t.Errorf("%s: strip fills %v, want the model's %v", tc.name, last.Segs[0].Bar, m.Gate)
+		}
+		wantFill := theme.DefaultPalette().Warn
+		if tc.met {
+			wantFill = theme.DefaultPalette().Accent
+		}
+		if last.Segs[0].Tint != wantFill {
+			t.Errorf("%s: strip tint = %v, want %v", tc.name, last.Segs[0].Tint, wantFill)
+		}
+		if texts := offerRowTexts(t, b, "ct-c-gated"); rowHas(texts, "Requires standing") {
+			t.Errorf("%s: row still states the gate in words: %q", tc.name, texts)
+		}
+	}
+
+	// No requirement: no strip, no text (the rest of the row is unchanged).
+	cv.contacts = widgets.Contacts{Station: "cel-stub", Standing: 0, Offers: offersFor(defs, "ct-a-open")}
+	pumpBoard(t, ui, b)
+	m, _ := offerModel(b, "ct-a-open")
+	if m.Gated {
+		t.Error("an offer with no requirement is gated")
+	}
+	for _, line := range b.rowStack(m, false) {
+		for _, seg := range line.Segs {
+			if seg.HasBar {
+				t.Errorf("no-gate row draws a strip: %+v", seg)
+			}
+		}
+	}
+}
+
+// TestGateFracClamps: the one fraction both surfaces draw — locked, met and
+// beyond the requirement, never outside 0..1, and 1 for a settled gate.
+func TestGateFracClamps(t *testing.T) {
+	for _, tc := range []struct{ have, need, want float64 }{
+		{0, 0.5, 0},
+		{0.25, 0.5, 0.5},
+		{0.5, 0.5, 1},
+		{5, 0.5, 1},
+		{-1, 0.5, 0},
+		{0.3, 0, 1},
+	} {
+		if got := gateFrac(tc.have, tc.need); math.Abs(got-tc.want) > 1e-9 {
+			t.Errorf("gateFrac(%v, %v) = %v, want %v", tc.have, tc.need, got, tc.want)
+		}
 	}
 }

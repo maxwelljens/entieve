@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Ship portraits fill their frame**: the HUD status portrait, the fitting
+  window's identity portrait (now 2:1, it was square) and Show Info's hull
+  hero are fitted to the hull ART instead of its transparent canvas. A
+  dropped 1376x768 canvas is cropped to its ink on load, so the ship reads
+  as big as the frame allows (the owner's ships fill the full width; the
+  committed rasters fill the height) instead of sitting as a small square in
+  the middle of the box.
+
+- **Contact standing is a meter**: the board row's standing requirement and
+  the Details dialog's Standing line are progress bars (your standing over
+  the requirement, full and accent once the work is unlocked) instead of
+  sentences. The numbers are gone from both surfaces; the standing gain
+  stays as text.
+
+- **Contact details**: the CONTRACT block itemises its reward, one row per
+  reward with its own icon (coins for the payout, the contracts mark for the
+  standing gain, the material's own icon), and the portrait column drops the
+  patron line and the "Posted at" line.
+
 ## [0.13.0] - 2026-11-03
 
 ### Added

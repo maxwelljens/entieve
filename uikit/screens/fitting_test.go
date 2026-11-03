@@ -532,6 +532,16 @@ func TestFittingIdentityBlock(t *testing.T) {
 	if f.portraitHull != "ship-vastrek" {
 		t.Errorf("portrait hull = %q, want ship-vastrek", f.portraitHull)
 	}
+	// The portrait block is the HUD's 2:1 box, painted by the same seam.
+	if b := f.portrait.Bounds(); b.Dx() != theme.Px(fitPortraitW) || b.Dy() != theme.Px(fitPortraitH) {
+		t.Errorf("portrait image = %v, want the %d×%d 2:1 box", b, theme.Px(fitPortraitW), theme.Px(fitPortraitH))
+	}
+	if r := f.portraitGfx.GetWidget().Rect; r.Dx() != theme.Px(fitPortraitW) || r.Dy() != theme.Px(fitPortraitH) {
+		t.Errorf("portrait box = %v, want the %d×%d 2:1 box", r, theme.Px(fitPortraitW), theme.Px(fitPortraitH))
+	}
+	if fitPortraitW != hudPortraitW || fitPortraitH != hudPortraitH {
+		t.Errorf("fitting portrait %d×%d, want the HUD's %d×%d", fitPortraitW, fitPortraitH, hudPortraitW, hudPortraitH)
+	}
 	if f.portraitDraws != 1 {
 		t.Errorf("portrait painted %d times for one hull, want the hull-change repaint only", f.portraitDraws)
 	}

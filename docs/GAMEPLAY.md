@@ -685,8 +685,7 @@ The currency of Entieve is the **euro**, displayed as `12,345.67 €` (the
 sign trails the amount; anything under one euro shows as `50¢`). You earn euros from NPC bounties,
 selling loot and market trades, and spend them on market buys. Every readout
 that quotes money uses that one format (the wallet on the HUD, the market
-title and the contact offers), so a reward line on an offer reads
-`40,000.00 € · +0.10 standing`.
+title and the contact offers), so an offer's payout reads `40,000.00 €`.
 
 ## Contacts & standing
 
@@ -709,16 +708,19 @@ local belt posts a kill order; a station short of ore posts a mining
 order. Each row is a summary, not a paragraph: the contact's **portrait**
 (the row's full height, 2:3), the title with its **mission type**
 (`Delivery`, `Kill order`,
-`Mining`) and the payout (`430,000.00 €`), with the standing gain, a
-delivery's destination **requisition stock** and, when you are below the
-gate, `Requires standing 0.20` on the line under it. Press **Details** to
-open the offer.
+`Mining`) and the payout (`430,000.00 €`, under the coins mark), with the
+standing gain and a delivery's destination **requisition stock**. An offer
+with a standing gate carries a **bar** under it: your standing over the
+requirement, filled to the ratio, full and in the accent role once the work
+is unlocked. Press **Details** to open the offer.
 
 **Details** is the conversation behind the row: the contact's 2:3 portrait
 (drop-in art, else the office's mark), their own words with the sim's
 numbers filled in and attributed to them, and the contract at a glance:
 mission type, objective (what, how many, and the destination for a
-delivery), payout and standing gate. Three options, all of them real:
+delivery), the reward itemised one line per reward (payout, standing gain
+and the material, each under its own mark) and the standing gate as the
+same bar the row carries. Three options, all of them real:
 **Accept work** takes the offer (the same command the button always sent;
 greyed with its reason while your standing is short, and reading
 **Accepted** once taken), **Inspect item** / **Inspect target** opens the

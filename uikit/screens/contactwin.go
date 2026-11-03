@@ -143,10 +143,8 @@ type ContactWin struct {
 	title *theme.ChromeText
 	body  *widget.Container
 
-	port  *portraitBox
-	name  *widget.Text
-	sub   *widget.Text
-	place *widget.Text
+	port *portraitBox
+	name *widget.Text
 
 	speech *widget.Text
 	attr   *widget.Text
@@ -157,9 +155,29 @@ type ContactWin struct {
 	objective *widget.Text
 	dest      *widget.Container // the destination row (deliveries only)
 	destText  *widget.Text
-	reward    *widget.Text
+
+	// The contract's reward lines, itemised one reward per row: the payout
+	// under the coins mark, the standing gain under the standing mark and
+	// the material under its own item icon. Each row hides when its reward
+	// is absent.
+	rewardRow  *widget.Container
+	rewardMark *theme.IconBox
+	reward     *widget.Text
+	gainRow    *widget.Container
+	gainMark   *theme.IconBox
+	gain       *widget.Text
+	itemRow    *widget.Container
+	itemMark   *theme.IconBox
+	item       *widget.Text
+
+	// The standing row: the gate as a meter (spoken as a bar, not a
+	// sentence), or the accepted offer's claim line as text.
 	gate      *widget.Container
+	gateBar   *ebiten.Image
+	gateGfx   *widget.Graphic
 	gateText  *widget.Text
+	gateFrac  float64
+	gateShown bool
 
 	accept  *widget.Button
 	inspect *widget.Button
@@ -187,14 +205,13 @@ func NewContactWin(env widgets.Seams) *ContactWin {
 		)
 	}
 	w.name = text(env.FaceBold(theme.StepSmall), p.Accent, contactLeftW)
-	w.sub = text(env.Face(theme.StepTiny), p.Dim, contactLeftW)
-	w.place = text(env.Face(theme.StepTiny), p.Dim, contactLeftW)
 	w.speech = text(env.Face(theme.StepSmall), p.Text, contactColW)
 	w.attr = text(env.Face(theme.StepTiny), p.Dim, contactColW)
 
 	w.port = newPortraitBox(env, contactPortW, contactPortH, contactGlyph)
 
-	// The identity column: who is talking, who they answer to, where.
+	// The identity column: who is talking. The patron and the posted-at line
+	// are gone (the owner's call): the face and the name carry it.
 	ident := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
@@ -203,7 +220,7 @@ func NewContactWin(env widgets.Seams) *ContactWin {
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(contactLeftW), 0)),
 	)
-	ident.AddChild(w.name, w.sub, w.place)
+	ident.AddChild(w.name)
 	left := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
@@ -225,6 +242,8 @@ func NewContactWin(env widgets.Seams) *ContactWin {
 	w.objective = text(env.Face(theme.StepTiny), p.Text, contactValW)
 	w.destText = text(env.Face(theme.StepTiny), p.Dim, contactValW)
 	w.reward = text(env.Face(theme.StepTiny), p.Good, contactValW)
+	w.gain = text(env.Face(theme.StepTiny), p.Dim, contactValW)
+	w.item = text(env.Face(theme.StepTiny), p.Text, contactValW)
 	w.gateText = text(env.Face(theme.StepTiny), p.Warn, contactValW)
 
 	row := func(label string, cells ...widget.PreferredSizeLocateableWidget) *widget.Container {
@@ -243,7 +262,33 @@ func NewContactWin(env widgets.Seams) *ContactWin {
 	w.kindMark = theme.NewIconBox(theme.IconInline)
 	w.kindRow = row("Type", w.kindMark.Widget(), w.kind)
 	w.dest = row("Destination", w.destText)
-	w.gate = row("Standing", w.gateText)
+
+	// The rewards are itemised: one row per reward, each led by its own
+	// glyph — coins for the payout, the contracts mark for standing and the
+	// material's own icon — so the page never packs three rewards into one
+	// line. The last two appear only when the offer pays them.
+	w.rewardMark = theme.NewIconBox(theme.IconInline)
+	w.rewardMark.Set(rewardMoneyIcon, p.Good)
+	w.rewardRow = row("Reward", w.rewardMark.Widget(), w.reward)
+	w.gainMark = theme.NewIconBox(theme.IconInline)
+	w.gainMark.Set(rewardStandingIcon, p.Dim)
+	w.gainRow = row("", w.gainMark.Widget(), w.gain)
+	w.itemMark = theme.NewIconBox(theme.IconInline)
+	w.itemRow = row("", w.itemMark.Widget(), w.item)
+	theme.ShowWidget(w.gainRow.GetWidget(), false)
+	theme.ShowWidget(w.itemRow.GetWidget(), false)
+
+	// The standing row: the gate as the board's meter (same fraction, same
+	// colours), or the accepted offer's claim line.
+	w.gateBar = ebiten.NewImage(theme.Px(contactValW), theme.Px(widgets.RowBarH))
+	w.gateGfx = widget.NewGraphic(
+		widget.GraphicOpts.Image(w.gateBar),
+		widget.GraphicOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(theme.Px(contactValW), theme.Px(widgets.RowBarH)),
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}),
+		),
+	)
+	w.gate = row("Standing", w.gateGfx, w.gateText)
 
 	// The verbs: every one acts. Accept rides the same intent the board's
 	// old button did; Inspect reuses the Show Info seam; Decline just closes.
@@ -294,7 +339,8 @@ func NewContactWin(env widgets.Seams) *ContactWin {
 	)
 	right.AddChild(
 		sectionBar(env, "BRIEFING"), w.speech, w.attr,
-		sectionBar(env, "CONTRACT"), w.kindRow, row("Objective", w.objective), w.dest, row("Reward", w.reward), w.gate,
+		sectionBar(env, "CONTRACT"), w.kindRow, row("Objective", w.objective), w.dest,
+		w.rewardRow, w.gainRow, w.itemRow, w.gate,
 		verbs,
 	)
 
@@ -363,10 +409,11 @@ func (w *ContactWin) Sync() {
 	}
 	if w.accepted() {
 		if w.last.Def != nil {
-			w.gateText.Label = w.claimLine(w.last.Def)
+			w.setGateRow(true, false, w.claimLine(w.last.Def))
 		}
 		w.setAccept("Accepted", true)
 	} else {
+		w.setGateRow(false, false, "")
 		w.setAccept("Accept work", true) // no longer offered: nothing to accept
 	}
 }
@@ -381,8 +428,13 @@ func (w *ContactWin) AcceptButton() *widget.Button { return w.accept }
 // objective has no definition to open).
 func (w *ContactWin) InspectButton() *widget.Button { return w.inspect }
 
-// GateText is the standing line the page states under the contract.
+// GateText is the standing row's text body: the accepted offer's claim line,
+// and empty while the gate meter stands in for it.
 func (w *ContactWin) GateText() string { return w.gateText.Label }
+
+// GateFrac is the standing gate's meter as drawn: the fill fraction and
+// whether the meter is up (a live offer with a requirement).
+func (w *ContactWin) GateFrac() (float64, bool) { return w.gateFrac, w.gateShown }
 
 // TitleText is the title-bar label (furniture: the page names the contact).
 func (w *ContactWin) TitleText() string {
@@ -397,8 +449,6 @@ func (w *ContactWin) render(o sim.Offer) {
 	w.last = o
 	w.port.Set(w.contact(o))
 	w.name.Label = o.ContactName
-	w.sub.Label = theme.PatronLabel(o.Patron)
-	w.place.Label = w.office()
 	w.speech.Label = o.Prose
 	w.attr.Label = "By " + o.ContactName
 	w.refresh(o)
@@ -411,9 +461,15 @@ func (w *ContactWin) refresh(o sim.Offer) {
 	w.kindMark.Set(theme.ContractIcon(def.Kind), w.th.Pal().Dim)
 	w.kind.Label = theme.ContractLabel(def.Kind) + "  ·  level " + strconv.Itoa(def.Level)
 	w.objective.Label = w.objectiveText(def)
-	w.reward.Label = rewardText(def)
+	w.reward.Label = theme.FormatCredits(def.Reward.Credits)
+	theme.ShowWidget(w.gainRow.GetWidget(), def.Reward.StandingGain != 0)
+	if def.Reward.StandingGain != 0 {
+		w.gain.Label = fmt.Sprintf("%+.2f standing", def.Reward.StandingGain)
+	}
+	theme.ShowWidget(w.itemRow.GetWidget(), def.Reward.Item != "")
 	if def.Reward.Item != "" {
-		w.reward.Label += " · " + w.cv.TradeableName(def.Reward.Item)
+		w.itemMark.Set(widgets.TradeableIcon(w.cv.Defs(), def.Reward.Item), w.th.Pal().Text)
+		w.item.Label = w.cv.TradeableName(def.Reward.Item)
 	}
 	if def.Kind == content.ContractDeliver {
 		theme.ShowWidget(w.dest.GetWidget(), true)
@@ -422,20 +478,45 @@ func (w *ContactWin) refresh(o sim.Offer) {
 	} else {
 		theme.ShowWidget(w.dest.GetWidget(), false)
 	}
-	// The gate is always stated: a gated offer explains its disabled
-	// Accept, a cleared one names the standing the work asks for.
+	// The gate is stated as a meter, the board row's own: your standing over
+	// the requirement, full and accent once the sim clears it. An accepted
+	// offer swaps the meter for its claim line, and an offer with no
+	// requirement keeps no Standing row at all.
 	switch {
 	case w.accepted():
-		w.gateText.Label = w.claimLine(def)
+		w.setGateRow(true, false, w.claimLine(def))
 		w.setAccept("Accepted", true)
-	case !w.cv.MeetsStanding(o.MinStanding):
-		w.gateText.Label = gateText(o.MinStanding)
-		w.setAccept("Accept work", true)
+	case o.MinStanding > 0:
+		met := w.cv.MeetsStanding(o.MinStanding)
+		w.setGateBar(gateFrac(w.cv.Contacts().Standing, o.MinStanding), met)
+		w.setAccept("Accept work", !met)
 	default:
-		w.gateText.Label = fmt.Sprintf("Requires standing %.2f; you have it", o.MinStanding)
+		w.setGateRow(false, false, "")
 		w.setAccept("Accept work", false)
 	}
 	w.setInspect(def)
+}
+
+// setGateBar draws the standing gate's meter and shows it in place of the
+// row's text: the accent once the gate is met, the warn role while short.
+func (w *ContactWin) setGateBar(frac float64, met bool) {
+	fill := w.th.Pal().Warn
+	if met {
+		fill = w.th.Pal().Accent
+	}
+	widgets.PaintBar(w.gateBar, frac, w.th.Pal(), fill)
+	w.setGateRow(true, true, "")
+	w.gateFrac = frac
+}
+
+// setGateRow shows or hides the Standings row and picks its body: the meter
+// or one line of text (the accepted offer's claim line).
+func (w *ContactWin) setGateRow(shown, bar bool, label string) {
+	w.gateFrac, w.gateShown = 0, shown && bar
+	theme.ShowWidget(w.gate.GetWidget(), shown)
+	theme.ShowWidget(w.gateGfx.GetWidget(), bar)
+	theme.ShowWidget(w.gateText.GetWidget(), !bar)
+	w.gateText.Label = label
 }
 
 // claimLine is the accepted offer's standing row: where the work is claimed.
