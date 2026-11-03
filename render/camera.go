@@ -1,5 +1,5 @@
 // Package render draws the Entieve simulation: procedural backgrounds,
-// celestial bodies, vector ship silhouettes, EVE-style brackets and effects.
+// celestial bodies, ship class icons, EVE-style brackets and effects.
 //
 // Render reads sim state read-only and never mutates it. All drawing is done
 // with ebiten/vector primitives and cached procedural sprites.

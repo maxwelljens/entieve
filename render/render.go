@@ -53,8 +53,7 @@ type gridObj struct {
 	info      sim.Info
 	radius    float64 // celestial radius, m (0 if none)
 	facing    float64 // radians
-	hull      string  // hull class of ships
-	shipID    string  // hull content ID (assets/hulls/<shipID>.png)
+	hull      string  // class of ships (classGlyph draws its icon)
 	ore       string  // asteroid ore ID (assets/asteroids/<ore>.png)
 	speedMult float64 // Motion.SpeedMultiplier (1 = none)
 }
@@ -364,7 +363,6 @@ func (r *Renderer) obj(s *sim.Sim, inf sim.Info) gridObj {
 		o.facing = tr.Facing
 	}
 	if sh, ok := s.Ships.Get(inf.Entity); ok {
-		o.shipID = string(sh.Hull)
 		if def, ok := r.c.Ship(sh.Hull); ok {
 			o.hull = def.Class
 		}
@@ -756,8 +754,19 @@ func (r *Renderer) drawWreck(dst *ebiten.Image, cam Camera, o gridObj) {
 	r.strokePoly(dst, r.poly, 1, color.RGBA{140, 130, 90, 255})
 }
 
-// drawShip renders a hull-class vector silhouette pointing along Facing,
-// plus afterburner flame when SpeedMultiplier > 1.
+// shipTint is the icon tint of a grid object: the world's own bracket colour,
+// so a player hull reads player cyan, a hostile red, a neutral orange. No new
+// colour enters: the icon borrows the affiliation rule already drawn around it.
+func shipTint(o gridObj) color.RGBA {
+	return bracketColor(o.info.Kind, o.info.Hostile, o.info.Kind == sim.KindPlayer)
+}
+
+// drawShip renders a ship as its class icon: one flat, non-rotating glyph
+// (classGlyph) tinted by affiliation (shipTint), plus a pulsing amber halo
+// while boosting. The icon is heading-blind on purpose: it says what the hull
+// is (the way a fleet chart marks a unit), never which way it points. Hull art
+// is portrait material, for the HUD, Show Info and fitting; the world does not
+// draw it, so a dropped assets/hulls/<id>.png changes no world pixel.
 func (r *Renderer) drawShip(dst *ebiten.Image, cam Camera, o gridObj, now float64) {
 	sx, sy := cam.WorldToScreen(o.info.Pos)
 	sizePx := clamp(hullSize(o.hull)*cam.Zoom, 7, 160)
@@ -765,30 +774,18 @@ func (r *Renderer) drawShip(dst *ebiten.Image, cam Camera, o gridObj, now float6
 		return
 	}
 
-	// Afterburner flame (behind the ship, opposite the nose).
+	// Afterburner tell: an amber halo breathing with the frame clock, with no
+	// direction of its own (the icon has no heading to point the flame out of).
 	if o.speedMult > 1 {
-		flame := []core.Vec2{
-			{X: -0.85, Y: -0.26}, {X: -1.7 - 0.2*math.Sin(now*30), Y: 0}, {X: -0.85, Y: 0.26},
-		}
-		r.poly = r.poly[:0]
-		for _, p := range flame {
-			q := p.Rotate(o.facing).Scale(sizePx)
-			r.poly = append(r.poly, core.V(sx+q.X, sy+q.Y))
-		}
-		r.fillPoly(dst, r.poly, color.RGBA{255, 180, 84, 170})
+		a := 70 + 70*(0.5+0.5*math.Sin(now*30))
+		drawGlowCentered(dst, r.glow(64, color.RGBA{255, 180, 84, uint8(a)}), sx, sy, sizePx*2.6, true)
 	}
 
-	if img := spriteFor("hulls/" + o.shipID); img != nil {
-		dw, dh := fitSprite(img.Bounds().Dx(), img.Bounds().Dy(), sizePx)
-		drawSprite(dst, img, sx, sy, dw, dh, o.facing)
-		return
-	}
 	r.poly = r.poly[:0]
-	for _, p := range hullPoly(o.hull) {
-		q := p.Rotate(o.facing).Scale(sizePx)
-		r.poly = append(r.poly, core.V(sx+q.X, sy+q.Y))
+	for _, p := range classGlyph(o.hull) {
+		r.poly = append(r.poly, core.V(sx+p.X*sizePx, sy+p.Y*sizePx))
 	}
-	r.fillPoly(dst, r.poly, color.RGBA{143, 163, 189, 255})
+	r.fillPoly(dst, r.poly, shipTint(o))
 	r.strokePoly(dst, r.poly, 1.4, color.RGBA{38, 46, 58, 255})
 }
 
