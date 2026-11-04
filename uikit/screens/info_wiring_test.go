@@ -76,7 +76,7 @@ func TestMarketRowMenu(t *testing.T) {
 	}
 
 	// Docked: the same menu, now armed — data and entries agree.
-	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	dockAtStation(t, env.Sim)
 	frame()
 	for i, a := range m.tbl.Rows[0].Spec.Actions {
 		if a.Disabled {
@@ -290,6 +290,7 @@ func TestInventoryAndFittingMenus(t *testing.T) {
 		t.Fatal("double-click on an inventory row did not open Show Info")
 	}
 
+	dockAtStation(t, env.Sim) // the fitting verbs need the station's service
 	f := NewFitting(env)
 	uiFit := newWindowUI(t, env, f.Win())
 	uitest.PumpWindow(t, uiFit, f.Sync, 1024, 700)

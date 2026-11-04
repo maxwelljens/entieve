@@ -33,6 +33,7 @@ type stubView struct {
 	docked   bool
 	wallet   float64
 	station  widgets.StationInfo // docked-at identity + services (nil = none)
+	svc      map[string]bool     // service access table (nil = every service while docked)
 	contacts widgets.Contacts    // the docked contact view read
 	deliver  float64             // deliver-objective progress the stub reports
 }
@@ -40,6 +41,19 @@ type stubView struct {
 func (v *stubView) Defs() *content.Content { return v.c }
 
 func (v *stubView) PlayerDocked() bool { return v.docked }
+
+// ServiceAvailable is the stub's access table: undocked is nothing, docked
+// with no table is every service, and a named table is exactly what it says
+// (the remnant case: market live, industry and fitting dark).
+func (v *stubView) ServiceAvailable(svc string) bool {
+	if !v.docked {
+		return false
+	}
+	if v.svc == nil {
+		return true
+	}
+	return v.svc[svc]
+}
 
 // Contacts hands the stub's read to the contact panel.
 func (v *stubView) Contacts() widgets.Contacts { return v.contacts }
@@ -61,7 +75,14 @@ func (v *stubView) DockedStation() (widgets.StationInfo, bool) {
 	return v.station, true
 }
 
-func (v *stubView) DockedMarket() sim.StationID { return "cel-stub" }
+// DockedMarket is the stub's market access: a dock that runs the market (an
+// explicit table without "market" is a station that does not).
+func (v *stubView) DockedMarket() sim.StationID {
+	if !v.docked || (v.svc != nil && !v.svc["market"]) {
+		return ""
+	}
+	return "cel-stub"
+}
 
 // StationName resolves a station id to the stub's own spelling: the Details
 // dialog's destination and claim lines read it.

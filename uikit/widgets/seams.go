@@ -60,11 +60,18 @@ type ContentView interface {
 	// PlayerDocked reports whether the player is docked somewhere.
 	PlayerDocked() bool
 
+	// ServiceAvailable reports whether the player can use a station service
+	// HERE: docked, the station offers it and still runs it (a remnant keeps
+	// market, repair and refinery and loses industry and fitting). It is the
+	// sim's own stationAccess rule, log-free: the enablement every surface
+	// gates on, instead of re-deriving it from DockedStation().Services.
+	ServiceAvailable(string) bool
+
 	// DockedStation is the docked-at identity plus the services that
 	// station offers ("market", "fitting", "industry", "repair",
 	// "refine") — the reads behind the station services view's identity
-	// line and per-service buttons, and the rail's gray-out of
-	// station-dependent entries. ok is false while undocked.
+	// line and service list (what the station HAS; what the player can USE
+	// is ServiceAvailable). ok is false while undocked.
 	DockedStation() (StationInfo, bool)
 
 	// Component-store reads (observable state, one per store screens
@@ -464,6 +471,10 @@ func (v *view) MarketPrice(st sim.StationID, item content.ItemID) float64 {
 }
 
 func (v *view) DockedMarket() sim.StationID { return v.s.DockedMarket() }
+
+// ServiceAvailable forwards the sim's one access rule: docked + offered +
+// not masked (a remnant's charter services are dark).
+func (v *view) ServiceAvailable(svc string) bool { return v.s.ServiceAvailable(svc) }
 
 // Quote and CheapestAsk forward the sim's own reads: the walk that prices an
 // amount and the cheapest ask anywhere. No pricing lives here.

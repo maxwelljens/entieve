@@ -165,7 +165,7 @@ func TestInventoryTransferAndSell(t *testing.T) {
 		t.Fatalf("undocked drop enqueued %d commands / opened the picker, want none", len(*cmds))
 	}
 	// A drop on the stack's own hold is a no-op.
-	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	dockAtStation(t, env.Sim)
 	frame()
 	dragStack(t, ui, env, inv, "cargo", 0, "cargo")
 	if q.IsOpen() {
@@ -222,7 +222,7 @@ func TestMarketSelectionRevalidatesOnSync(t *testing.T) {
 	ui := newWindowUI(t, env, m.Win())
 	frame := func() { uitest.PumpWindow(t, ui, m.Sync, 1024, 700) }
 	frame()
-	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	dockAtStation(t, env.Sim)
 	frame()
 	clickRow(ui, m.tbl, 0)
 	frame()
@@ -268,7 +268,7 @@ func TestInventorySelectionRevalidatesOnSync(t *testing.T) {
 	ui := newWindowUI(t, env, inv.Win())
 	frame := func() { uitest.PumpWindow(t, ui, inv.Sync, 1024, 700) }
 	frame()
-	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	dockAtStation(t, env.Sim)
 	frame()
 	clickRow(ui, inv.cargo, 0)
 	frame()
@@ -305,6 +305,7 @@ func TestInventorySelectionRevalidatesOnSync(t *testing.T) {
 // owned ship.
 func TestFittingActions(t *testing.T) {
 	env, cmds := newTestEnv(t)
+	dockAtStation(t, env.Sim) // the actions need the station's fitting service
 	f := NewFitting(env)
 	ui := newWindowUI(t, env, f.Win())
 	frame := func() { uitest.PumpWindow(t, ui, f.Sync, 1024, 700) }

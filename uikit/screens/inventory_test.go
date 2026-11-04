@@ -59,7 +59,7 @@ func withOreHold(env *testEnv, cap float64) {
 func TestInventoryViewToggleSwitchesEverySection(t *testing.T) {
 	env, _ := newTestEnv(t)
 	withOreHold(env, 20)
-	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	dockAtStation(t, env.Sim)
 	inv := NewInventory(env)
 	ui := newWindowUI(t, env, inv.Win())
 	frame := func() { uitest.PumpWindow(t, ui, inv.Sync, 1024, 700) }
@@ -225,7 +225,7 @@ func TestInventoryHangarHatch(t *testing.T) {
 		t.Errorf("hatch text box %v, want the hangar band %v", tr, br)
 	}
 
-	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	dockAtStation(t, env.Sim)
 	frame()
 	if inv.hatchShown() {
 		t.Fatal("docked hangar still shows the hatch")
@@ -242,7 +242,7 @@ func TestInventoryHangarHatch(t *testing.T) {
 	if got := inv.hangBody.Children()[0]; !sameWidget(got, inv.hatch.Container()) {
 		t.Errorf("undocked tile view hangar = %T, want the hatch", got)
 	}
-	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	dockAtStation(t, env.Sim)
 	frame()
 	if got := inv.hangBody.Children()[0]; !sameWidget(got, inv.hangTiles.Container()) {
 		t.Errorf("docked tile view hangar = %T, want the tile grid", got)
@@ -347,7 +347,7 @@ func TestInventoryDragPopup(t *testing.T) {
 	inv := NewInventory(env)
 	ui := newQtyUI(t, env, inv.Win())
 	q := env.QtyWindow()
-	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	dockAtStation(t, env.Sim)
 	pump := func() { env.Pointer().Begin(); pumpQty(t, ui, env, inv.Sync, 1024, 700) }
 	pump()
 	pump()
@@ -430,7 +430,7 @@ func TestInventoryDragGhostFollows(t *testing.T) {
 
 func runDragGhostFollow(t *testing.T) {
 	env, _ := newTestEnv(t)
-	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	dockAtStation(t, env.Sim)
 	inv := NewInventory(env)
 	ui := newWindowUI(t, env, inv.Win())
 	w, h := theme.Px(1024), theme.Px(700)
@@ -503,7 +503,7 @@ func ghostBox(inv *Inventory, p image.Point) image.Rectangle {
 // section (the title bar here) is a no-op, like a release on the source.
 func TestInventoryDropOnEmptySpace(t *testing.T) {
 	env, _ := newTestEnv(t)
-	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	dockAtStation(t, env.Sim)
 	inv := NewInventory(env)
 	ui := newQtyUI(t, env, inv.Win())
 	q := env.QtyWindow()
@@ -549,7 +549,7 @@ func TestInventoryToolbarKeepsOnlySell(t *testing.T) {
 		t.Error("Sell armed with no selection")
 	}
 	clickRow(ui, inv.cargo, 0)
-	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	dockAtStation(t, env.Sim)
 	uitest.PumpWindow(t, ui, inv.Sync, 1024, 700)
 	if inv.sell.GetWidget().Disabled {
 		t.Error("Sell still greyed with a docked selection")

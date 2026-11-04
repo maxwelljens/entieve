@@ -803,11 +803,10 @@ func (r *Refinery) refineReadyFor(row refineryRow) bool {
 	return batchSteps(r.stockOf(row.ore)) > 0
 }
 
-// refineService reports whether the docked station offers refine (in space
-// the sim's own stationAccess gate refuses).
+// refineService reports whether the docked station runs a refinery: the
+// sim's own service access (docked, offers refine, not masked by a remnant).
 func refineService(cv widgets.ContentView) bool {
-	info, ok := cv.DockedStation()
-	return ok && slices.Contains(info.Services, "refine")
+	return cv.ServiceAvailable(content.SvcRefine)
 }
 
 // batchSteps is the number of whole batches an ore holding stock units

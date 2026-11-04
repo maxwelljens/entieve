@@ -908,6 +908,54 @@ func TestWarRemnantServiceMask(t *testing.T) {
 	}
 }
 
+// TestServiceAvailableIsStationAccess is the anti-drift pin: the exported
+// read a UI surface gates on answers exactly what the sim's own refusing gate
+// answers, over the matrix of state (undocked, docked at a charter station,
+// docked at a remnant) and every service. Nothing is logged by the read.
+func TestServiceAvailableIsStationAccess(t *testing.T) {
+	s := newWarSim(t)
+	svcs := []string{content.SvcMarket, content.SvcRepair, content.SvcRefine,
+		content.SvcFitting, content.SvcIndustry, "no-such-service"}
+	check := func(state string) {
+		t.Helper()
+		for _, svc := range svcs {
+			_, accepts := s.stationAccess(svc)
+			drain(s) // the gate's refusal log is its own business
+			if got := s.ServiceAvailable(svc); got != accepts {
+				t.Errorf("%s: ServiceAvailable(%q) = %v, stationAccess = %v", state, svc, got, accepts)
+			}
+		}
+	}
+
+	check("undocked")
+	dockAtHaven(t, s)
+	check("charter dock")
+
+	// The system falls: charter services go dark, lawless ones stay live.
+	s.war.Contest["sys-a"].Meter = meterThreshold
+	stepToWarBeat(s)
+	drain(s)
+	if s.war.Control["sys-a"] != controlWorks {
+		t.Fatalf("sys-a control = %q, want works", s.war.Control["sys-a"])
+	}
+	check("remnant")
+	for _, tc := range []struct {
+		svc  string
+		want bool
+	}{
+		{content.SvcMarket, true}, {content.SvcRepair, true}, {content.SvcRefine, true},
+		{content.SvcIndustry, false}, {content.SvcFitting, false},
+	} {
+		if got := s.ServiceAvailable(tc.svc); got != tc.want {
+			t.Errorf("remnant ServiceAvailable(%q) = %v, want %v", tc.svc, got, tc.want)
+		}
+	}
+	if s.DockedIndustry() != "" || s.DockedMarket() == "" {
+		t.Errorf("remnant accessors: market %q, industry %q, want a live market and dark industry",
+			s.DockedMarket(), s.DockedIndustry())
+	}
+}
+
 // stepUntilJobDone advances until job id reports done (or fails).
 func stepUntilJobDone(t *testing.T, s *Sim, id uint64) {
 	t.Helper()

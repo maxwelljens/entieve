@@ -2,7 +2,6 @@ package screens
 
 import (
 	"image/color"
-	"slices"
 	"strconv"
 
 	"github.com/ebitenui/ebitenui/widget"
@@ -79,8 +78,9 @@ const (
 //	SpaceOnly/DockedOnly    context gating: unavailable while docked /
 //	                        in space (grayed, clicks inert)
 //	Service                 station service the window needs; docked at
-//	                        a station lacking it the entry grays ("" =
-//	                        no service dependency)
+//	                        a station lacking it, or at a remnant that no
+//	                        longer runs it, the entry grays ("" = no
+//	                        service dependency)
 //	Open                    the host's current open state (nil = never
 //	                        open) — drives the entry's accent glow
 type RailEntry struct {
@@ -460,20 +460,18 @@ func (r *Rail) iconCell(btn *widget.Button, glyph *theme.IconBox) *widget.Contai
 }
 
 // Sync refreshes every entry's gating and open-state glow from the view:
-// context (docked/undocked), the docked station's services and the
-// host's open flags. Nothing is rebuilt — state writes only.
+// context (docked/undocked), the effective station access and the host's
+// open flags. Nothing is rebuilt, only state is written.
 func (r *Rail) Sync() {
 	p := r.th.Pal()
 	docked := false
-	var services []string
+	var access func(string) bool
 	if r.cv != nil {
 		docked = r.cv.PlayerDocked()
-		if info, ok := r.cv.DockedStation(); ok {
-			services = info.Services
-		}
+		access = r.cv.ServiceAvailable
 	}
 	for i, e := range r.entries {
-		enabled := entryEnabled(e, docked, services)
+		enabled := entryEnabled(e, docked, access)
 		open := enabled && e.Open != nil && e.Open()
 		r.enabled[i] = enabled
 		btn := r.btns[i]
@@ -512,15 +510,16 @@ func (r *Rail) Sync() {
 // entryEnabled is one entry's context rule (pure — unit-tested): the
 // space/docked gates first, then the station service the window needs
 // (checked only while docked — in space the service windows open exactly
-// as their keys always did).
-func entryEnabled(e RailEntry, docked bool, services []string) bool {
+// as their keys always did). access is the sim's effective verdict, so a
+// remnant's dark industry and fitting gray like a missing service.
+func entryEnabled(e RailEntry, docked bool, access func(string) bool) bool {
 	if e.SpaceOnly && docked {
 		return false
 	}
 	if e.DockedOnly && !docked {
 		return false
 	}
-	if e.Service != "" && docked && !slices.Contains(services, e.Service) {
+	if e.Service != "" && docked && access != nil && !access(e.Service) {
 		return false
 	}
 	return true

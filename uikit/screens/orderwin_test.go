@@ -223,7 +223,7 @@ func TestOrderWindowFieldValidation(t *testing.T) {
 // seam the game's hotkey gate reads.
 func TestOrderWindowSingleInstance(t *testing.T) {
 	k, _ := newTestKit(t)
-	k.Sim.Docked.Set(k.Sim.Player(), sim.Docked{At: "cel-solace"})
+	dockAtStation(t, k.Sim)
 	k.Sync()
 
 	var ids []content.ItemID

@@ -11,7 +11,6 @@ import (
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/internal/capture"
 	"github.com/entieve/entieve/internal/uitest"
-	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -200,7 +199,7 @@ func TestInventoryCaptureFrame(t *testing.T) {
 			// Docking swaps the hatch for the table: the same band's
 			// diagonal lines are gone. Rendered into a scratch frame so the
 			// saved PNG stays the undocked shot.
-			env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+			dockAtStation(t, env.Sim)
 			scratch := ebiten.NewImage(1280, 720)
 			for i := 0; i < 3; i++ {
 				inv.Sync()

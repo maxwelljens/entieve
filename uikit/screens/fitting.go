@@ -752,10 +752,12 @@ func (f *Fitting) Sync() {
 
 	// Action gating: unfit needs a fitted slot, fit needs a hangar
 	// module plus an empty slot of its class, assemble needs a ship —
-	// the same fitReady/unequipReady rules the row menus read.
-	f.unfit.GetWidget().Disabled = !f.hasSlot || !unequipReady(f.selSlot)
-	f.fitMod.GetWidget().Disabled = !f.hasMod || !f.fitReady(f.selMod, f.selSlot)
-	f.assemble.GetWidget().Disabled = !f.hasShip
+	// the same fitReady/unequipReady rules the row menus read, and all
+	// three need the station's fitting service (the sim's own gate: the
+	// window opens anywhere, the verbs gray).
+	f.unfit.GetWidget().Disabled = !f.hasSlot || !unequipReady(f.selSlot) || !f.fitAccess()
+	f.fitMod.GetWidget().Disabled = !f.hasMod || !f.fitReady(f.selMod, f.selSlot) || !f.fitAccess()
+	f.assemble.GetWidget().Disabled = !f.hasShip || !f.fitAccess()
 	f.leftRail.Sync()
 }
 
@@ -1076,6 +1078,11 @@ func (f *Fitting) paintCapBar(frac float64, stable bool) {
 	}
 }
 
+// fitAccess reports whether fitting actions are available HERE: the sim's
+// fitting service (docked at a station that offers it and still runs it, so
+// a remnant's charter services stay dark). The window itself opens anywhere.
+func (f *Fitting) fitAccess() bool { return f.cv.ServiceAvailable(content.SvcFitting) }
+
 // fitReady reports whether mod fits into slot: a real module into a real
 // empty slot of its class that also clears the hull's fitting limits
 // (content.ShipDef.FitProblem — mount kind/size, grid and CPU quotas). The
@@ -1141,9 +1148,9 @@ func (f *Fitting) slotSpec(pick widgets.SlotPick) widgets.RowSpec {
 	spec := widgets.RowSpec{
 		Ref: widgets.RowRef(f.cv, pick),
 		Actions: []widgets.RowAction{
-			{Label: fitLabel, Disabled: !f.hasMod || !f.fitReady(f.selMod, pick),
+			{Label: fitLabel, Disabled: !f.hasMod || !f.fitReady(f.selMod, pick) || !f.fitAccess(),
 				Intent: widgets.Fit{Module: f.selMod, Slot: pick.Ref}},
-			{Label: "Unefit slot", Disabled: !unequipReady(pick),
+			{Label: "Unefit slot", Disabled: !unequipReady(pick) || !f.fitAccess(),
 				Intent: widgets.Unequip{Slot: pick.Ref}},
 		},
 	}
@@ -1209,7 +1216,7 @@ func (f *Fitting) hangarSpec(data any) widgets.RowSpec {
 		fitLabel += " · " + refused
 	}
 	spec.Actions = []widgets.RowAction{
-		{Label: fitLabel, Disabled: !f.fitReady(mod, f.selSlot),
+		{Label: fitLabel, Disabled: !f.fitReady(mod, f.selSlot) || !f.fitAccess(),
 			Intent: widgets.Fit{Module: mod, Slot: f.selSlot.Ref}},
 	}
 	def, ok := f.cv.Defs().Module(mod)

@@ -150,7 +150,7 @@ func (o *OrderWin) Win() *widget.Window { return o.win }
 // open at all: orders rest on the docked station's book, so an undocked
 // player opens nothing (the menu entry is grayed too).
 func (o *OrderWin) Show(item content.ItemID, side sim.OrderSide, qty int) bool {
-	if o.cv == nil || !o.cv.PlayerDocked() {
+	if o.cv == nil || o.cv.DockedMarket() == "" {
 		return false
 	}
 	o.item = item

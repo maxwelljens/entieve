@@ -639,6 +639,13 @@ func (s *Sim) MarketPrice(station StationID, item content.ItemID) float64 {
 // the market service ("" otherwise) — the book a market view shows.
 func (s *Sim) DockedMarket() StationID { return s.dockedStationFor(content.SvcMarket) }
 
+// ServiceAvailable reports whether the player can use svc right now: docked
+// at a station that offers it and still runs it (a remnant keeps market,
+// repair and refinery and loses industry and fitting). The same composition
+// stationAccess enforces, without its refusal log. A UI surface reads it so
+// it never lights a verb the sim would refuse.
+func (s *Sim) ServiceAvailable(svc string) bool { return s.dockedStationFor(svc) != "" }
+
 // dockedStationFor returns the station the player is docked at when it
 // offers svc ("" otherwise) — the service accessor every panel reads.
 func (s *Sim) dockedStationFor(svc string) StationID {
