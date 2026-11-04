@@ -269,6 +269,47 @@ func TestHostRebindKeepsOpenFlags(t *testing.T) {
 	}
 }
 
+// TestHostRebindCarriesTheContract is the fake-kit form of the interface
+// rebuild's carry-over: over a dropped kit the host keeps every open flag
+// and a modal session, drops the built panels and the placement record,
+// and remounts what was open (quietly, so no window speaks).
+func TestHostRebindCarriesTheContract(t *testing.T) {
+	owner := newFixturePanel()
+	child := newFixturePanel()
+	rows := []Screen{
+		fixtureRow("owner", owner, nil),
+		fixtureRow("child", child, func(s *Screen) { s.Modal = Modal{Dim: 170, Session: "owner"} }),
+	}
+	h := newScreenHost(rows, gameScope, newFakeSink(), screenServices{})
+	h.Warm()
+	h.SetOpen("owner", true)
+	h.Toggle("child") // the owner's session: owner closes, child turns modal
+	h.Reconcile(Room{})
+	if !h.Session("child") || h.IsOpen("owner") {
+		t.Fatal("fixture: no session up")
+	}
+	h.MarkRestored(child.win)
+
+	next := newFakeSink()
+	var spoke []ScreenID
+	h.onMount = func(id ScreenID) { spoke = append(spoke, id) }
+	h.Rebind(next, screenServices{})
+	if !h.IsOpen("child") || !h.Session("child") {
+		t.Error("Rebind dropped the session or its flag")
+	}
+	if len(h.placed) != 0 || len(h.restored) != 0 {
+		t.Error("Rebind kept the dropped kit's placement record")
+	}
+	h.Warm()
+	h.Reconcile(Room{})
+	if !h.Mounted("child") {
+		t.Error("Rebind did not remount the open session row")
+	}
+	if len(spoke) != 0 {
+		t.Errorf("the rebuild's remount spoke: %v", spoke)
+	}
+}
+
 func TestHostLayoutFacetsRoundTrip(t *testing.T) {
 	// A fixture Splitter and Tabler: the entry implements the facets, so
 	// the sidecar helpers see them with no name switch (the old silent
