@@ -779,17 +779,62 @@ system's first station otherwise) instead of being shipped back to
 Struvok. Death is paperwork; the log line `Respawned at <station> in a
 <hull>` is the insurer's replacement notice arriving.
 
+## Inventory
+
+Press **`I`** for the **Inventory** window: your ship's holds and the
+station hangar, one section each (Cargo, the ore hold when the hull has
+one, Station hangar). Sections are split by draggable seams, and their
+proportions persist with the layout.
+
+Each hold's header carries its **fullness bar** instead of a used/capacity
+line: the bar fills with the volume used against the hold's capacity and
+the figures sit on it (`12.5 m³ / 40.0 m³`). A hull with no cargo hold has
+no bar (its label says so), and the hangar's capacity is unlimited, so it
+keeps only its stack count.
+
+The toolbar's left button switches the whole window between two views:
+
+- **List** (the default): the three Item/Qty/m³ tables; the columns sort
+  and resize as everywhere.
+- **Tiles**: every section at once becomes a wrapped grid of square item
+  tiles, the item's icon large with its name and count beneath, flowing to
+  the pane's width with its own scroll rail.
+
+The button names the view it switches **to** (the cubes glyph for tiles,
+the row glyph for the list). The choice is session state: it is not saved.
+
+With no ore hold fitted, the ore section and its seam are not there at all
+(the stack reflows to Cargo over Hangar). While you are **undocked**, the
+hangar section is crosshatched with `Not docked` over it: the station's
+hangar is only reachable at a station.
+
+**Moving a stack is drag and drop.** Press a stack (a table row or a tile),
+drag it (a small chip with its icon and name follows the pointer and the
+section under it lights its frame) and release over another hold's
+section. A **transfer popup** opens, the quantity picker on that move: the
+item's icon and name, the destination (`→ Station hangar`) and a slider
+over 1..the stack, starting at the whole stack. Confirm emits the move;
+Cancel (or `Esc`) does nothing. Releasing on the same section or on empty
+space does nothing, and a drop on the undocked hangar is refused. If the
+destination cannot take the whole stack the simulation refuses it with its
+own log line, exactly as before; the popup does not cap the amount.
+
+**Sell** stays in the toolbar and sells the selected stack at a station;
+**Show Info** (double-click) and the rows' right-click menu (Show Info and
+Sell order) are unchanged.
+
 ## Setting a quantity
 
 Every −/+ ticker is gone: whatever needs an amount now asks for it in one
 small popup: the **quantity picker**. It opens from the gesture that
 already names the action and shows what it is working on, a **slider**,
 the current amount and a live preview of what the amount buys or costs,
-then **Confirm** (the action you came from: Refine, Start, Buy, Sell, To
-Hangar…) and **Cancel**. The window is modal and transient: it never persists a rect,
+then **Confirm** (the action you came from: Refine, Start, Buy, Sell,
+Move…) and **Cancel**. The window is modal and transient: it never persists a rect,
 and it remembers the amount you last **confirmed** for that action, so a
 second refine or a second trade opens where the first one left off (a
-rebuilt interface starts at 1 again). `Esc` cancels it *before* anything
+rebuilt interface starts at 1 again); a move is the exception and always
+opens on the whole dragged stack (see **Inventory**). `Esc` cancels it *before* anything
 else (no window closes behind it and the Esc menu never opens), and a
 cancelled picker commits nothing.
 
@@ -797,11 +842,13 @@ What opens it is the action, not the amount: in the **Refinery** window it
 is the inspector's **Refine** and in the **Manufacturing** window the
 inspector's **Start job**, one gesture each on the selected entry; the
 **Market** and **Inventory** windows have several verbs over one selection,
-so their toolbar buttons (Buy, Sell / To Cargo, To Ore, To Hangar) and the
-rows' right-click verbs each open it with their own verb pre-set. The
+so their toolbar buttons (Buy, Sell) and the rows' right-click verbs each
+open it with their own verb pre-set; the inventory's moves open it from the
+**drop** itself (see **Inventory**). The
 refinery's slider is **notched** to whole 100-ore batches, and its Refine is
 grayed until one whole batch sits in the holds, so the ladder always opens
-with a rung; every other surface is a free 1–100 in single steps. Nothing new is clamped: the simulation still
+with a rung; a move opens 1..the dragged stack (see **Inventory**) and
+every other surface is a free 1–100 in single steps. Nothing new is clamped: the simulation still
 refuses an unaffordable, oversold or unfittable amount with its own log
 line, exactly as it did behind the ticker.
 

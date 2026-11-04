@@ -769,11 +769,13 @@ func TestSplitRatiosPersistAcrossRestart(t *testing.T) {
 	if doc.Version != 3 {
 		t.Fatalf("sidecar version = %d, want 3", doc.Version)
 	}
-	if got := doc.Windows["inventory"].Splits["inventory-ore"]; got != 0.42 {
-		t.Errorf("inventory-ore = %v, want the dragged 0.42", got)
+	// The showcase sloop has no ore hold: the inventory's one seam is the
+	// hangar's, and the ore key is not written at all.
+	if got := doc.Windows["inventory"].Splits["inventory-hangar"]; got != 0.42 {
+		t.Errorf("inventory-hangar = %v, want the dragged 0.42", got)
 	}
-	if got := doc.Windows["inventory"].Splits["inventory-hangar"]; got != float64(2)/3 {
-		t.Errorf("inventory-hangar = %v, want the untouched equal share %v", got, float64(2)/3)
+	if _, ok := doc.Windows["inventory"].Splits["inventory-ore"]; ok {
+		t.Error("inventory-ore written for a hull with no ore hold")
 	}
 	if got := doc.Windows["fitting"].Splits["fitting-hangar"]; got != 0.7 {
 		t.Errorf("fitting-hangar = %v, want the dragged 0.7", got)
@@ -794,11 +796,8 @@ func TestSplitRatiosPersistAcrossRestart(t *testing.T) {
 	g2.host.SetOpen(idFitting, true)
 	g2.syncMounts()
 	pump(t, g2, 1280, 720)
-	if got := seamRatio("inventory-ore", g2.host.Slot(string(idInventory)).Splits()); got != 0.42 {
-		t.Errorf("restored inventory-ore = %v, want 0.42", got)
-	}
-	if got := seamRatio("inventory-hangar", g2.host.Slot(string(idInventory)).Splits()); got != float64(2)/3 {
-		t.Errorf("restored inventory-hangar = %v, want the equal share", got)
+	if got := seamRatio("inventory-hangar", g2.host.Slot(string(idInventory)).Splits()); got != 0.42 {
+		t.Errorf("restored inventory-hangar = %v, want 0.42", got)
 	}
 	if got := seamRatio("fitting-hangar", g2.host.Slot(string(idFitting)).Splits()); got != 0.7 {
 		t.Errorf("restored fitting-hangar = %v, want 0.7", got)
@@ -840,8 +839,9 @@ func TestSidecarV2MigratesToSplits(t *testing.T) {
 	if g.host.IsOpen(idManufacturing) {
 		t.Error("v2 manufacturing open flag not restored (want closed)")
 	}
+	// The showcase sloop has no ore hold: one seam, at the halves.
 	for _, sm := range g.host.Slot(string(idInventory)).Splits() {
-		if got, want := sm.Split.Ratio(sm.Index), float64(sm.Index+1)/3; got != want {
+		if got, want := sm.Split.Ratio(sm.Index), float64(sm.Index+1)/2; got != want {
 			t.Errorf("v2 %s = %v, want the equal-share default %v", sm.Name, got, want)
 		}
 	}
@@ -862,8 +862,8 @@ func TestSidecarV2MigratesToSplits(t *testing.T) {
 	if e := doc.Windows["inventory"]; e.X != 120 || e.Y != 140 || e.W != 320 || e.H != 440 || !e.Open {
 		t.Errorf("rewritten inventory = %+v, want the v2 rect and flag kept", e)
 	}
-	if got := doc.Windows["inventory"].Splits["inventory-ore"]; got != float64(1)/3 {
-		t.Errorf("rewritten inventory-ore = %v, want the default %v", got, float64(1)/3)
+	if got := doc.Windows["inventory"].Splits["inventory-hangar"]; got != 0.5 {
+		t.Errorf("rewritten inventory-hangar = %v, want the 2-pane default 0.5", got)
 	}
 	if got := doc.Windows["fitting"].Splits["fitting-hangar"]; got != 0.6 {
 		t.Errorf("rewritten fitting-hangar = %v, want the 0.6 slots share", got)

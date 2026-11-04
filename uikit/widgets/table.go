@@ -1732,15 +1732,22 @@ func (t *Table) RowWidgetForTest(i int) *widget.Widget { return t.RowCts[i].GetW
 // widget walk cannot descend into (a ScrollContainer hides its content),
 // so the press gate asks the table itself.
 func (t *Table) RowAt(pt image.Point) bool {
+	_, ok := t.RowIndexAt(pt)
+	return ok
+}
+
+// RowIndexAt is RowAt's index: the display-order row under pt, for the
+// drag gesture that needs to know which stack is pressed.
+func (t *Table) RowIndexAt(pt image.Point) (int, bool) {
 	if !pt.In(t.scroll.ViewRect()) {
-		return false
+		return -1, false
 	}
-	for _, c := range t.RowCts {
+	for i, c := range t.RowCts {
 		if w := c.GetWidget(); w.IsVisible() && pt.In(w.Rect) {
-			return true
+			return i, true
 		}
 	}
-	return false
+	return -1, false
 }
 
 // RowClickedForTest runs row i's click handling directly (no event

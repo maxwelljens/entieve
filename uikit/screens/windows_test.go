@@ -135,10 +135,11 @@ func TestMarketGatingAndEnqueue(t *testing.T) {
 	}
 }
 
-// TestInventoryTransferAndSell: section selection drives the transfer and
-// sell verbs, each opening the quantity picker with its destination
-// pre-set (both gated by the hold's own rules: cargo present, ore hold
-// fitted, hangar side and selling docked).
+// TestInventoryTransferAndSell: the drag gesture drives the transfer
+// (press a stack, release over the other hold, the picker opens on the
+// whole stack) and Sell keeps acting on the selection (both gated by the
+// hold's own rules: an ore hold for ore, a docked player for the hangar
+// side and for selling).
 func TestInventoryTransferAndSell(t *testing.T) {
 	env, cmds := newTestEnv(t)
 	inv := NewInventory(env)
@@ -151,41 +152,33 @@ func TestInventoryTransferAndSell(t *testing.T) {
 	if len(inv.cargo.Rows) == 0 {
 		t.Fatal("cargo section is empty")
 	}
-	// The showcase sloop has no dedicated ore hold; everything that
-	// needs docking is gated while undocked.
-	if !inv.toOre.GetWidget().Disabled {
-		t.Error("To Ore enabled without an ore hold")
+	// The showcase sloop has no dedicated ore hold: no ore section, no
+	// ore seam, and everything that needs docking is gated while undocked.
+	if inv.oreShown || inv.orePane != nil || len(inv.Splits()) != 1 {
+		t.Fatalf("sloop shows an ore section / seam: shown=%v seams=%d", inv.oreShown, len(inv.Splits()))
 	}
-	if !inv.toHangar.GetWidget().Disabled || !inv.sell.GetWidget().Disabled {
-		t.Fatal("hangar transfer/sell enabled while undocked")
+	if !inv.sell.GetWidget().Disabled {
+		t.Fatal("sell enabled while undocked")
 	}
-	inv.transfer("hangar")
-	inv.sellClicked()
+	dragStack(t, ui, env, inv, "cargo", 0, "hangar")
 	if len(*cmds) != 0 || q.IsOpen() {
-		t.Fatalf("gated actions enqueued %d commands / opened the picker, want none", len(*cmds))
+		t.Fatalf("undocked drop enqueued %d commands / opened the picker, want none", len(*cmds))
 	}
-
-	// Select a cargo row: its own hold is never a destination.
-	clickRow(ui, inv.cargo, 0)
-	frame()
-	if !inv.toCargo.GetWidget().Disabled {
-		t.Error("To Cargo enabled for a cargo selection")
-	}
-
-	// Docked: To Hangar and Sell unlock (the sloop still has no ore hold).
+	// A drop on the stack's own hold is a no-op.
 	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
 	frame()
-	if inv.toHangar.GetWidget().Disabled {
-		t.Fatal("To Hangar still disabled while docked")
+	dragStack(t, ui, env, inv, "cargo", 0, "cargo")
+	if q.IsOpen() {
+		t.Fatal("same-section drop opened the picker")
 	}
-	if inv.sell.GetWidget().Disabled {
-		t.Fatal("Sell still disabled while docked")
-	}
-
-	uitest.FireButton(ui, inv.toHangar)
-	frame()
+	// Docked: a drop across sections opens the picker on the whole stack.
+	wantQty := inv.cargo.Rows[0].Cells[1]
+	dragStack(t, ui, env, inv, "cargo", 0, "hangar")
 	if !q.IsOpen() {
-		t.Fatal("To Hangar opened no picker")
+		t.Fatal("drop on the hangar opened no picker")
+	}
+	if got := q.Value(); "×"+theme.FormatInt(int64(got)) != wantQty {
+		t.Fatalf("picker opened at %d, want the whole stack (%s)", got, wantQty)
 	}
 	if got := q.TitleText(); got != "Quantity" {
 		t.Errorf("picker title = %q, want the base name Quantity", got)
@@ -201,8 +194,8 @@ func TestInventoryTransferAndSell(t *testing.T) {
 	if !ok {
 		t.Fatalf("cmd = %T, want sim.CmdTransfer", (*cmds)[0])
 	}
-	if tr.From != "cargo" || tr.To != "hangar" || tr.Qty != 1 || tr.Item != inv.sel {
-		t.Errorf("CmdTransfer = %+v, want from cargo to hangar, item %s qty 1", tr, inv.sel)
+	if tr.From != "cargo" || tr.To != "hangar" || tr.Item != inv.sel {
+		t.Errorf("CmdTransfer = %+v, want from cargo to hangar, item %s", tr, inv.sel)
 	}
 
 	uitest.FireButton(ui, inv.sell)
@@ -215,8 +208,8 @@ func TestInventoryTransferAndSell(t *testing.T) {
 		t.Fatalf("sell enqueued %d commands total, want 2", len(*cmds))
 	}
 	sl, ok := (*cmds)[1].(sim.CmdSell)
-	if !ok || sl.Item != inv.sel || sl.Qty != 1 {
-		t.Errorf("cmd = %#v, want CmdSell{%s 1}", (*cmds)[1], inv.sel)
+	if !ok || sl.Item != inv.sel {
+		t.Errorf("cmd = %#v, want CmdSell{%s}", (*cmds)[1], inv.sel)
 	}
 }
 
@@ -282,8 +275,8 @@ func TestInventorySelectionRevalidatesOnSync(t *testing.T) {
 	if !inv.hasSel {
 		t.Fatal("fixture: selection did not take")
 	}
-	if inv.toHangar.GetWidget().Disabled {
-		t.Fatal("fixture: To Hangar disabled for a cargo selection while docked")
+	if !inv.hasSel {
+		t.Fatal("fixture: no cargo selection while docked")
 	}
 
 	// Empty the hold: the selected row disappears from its section.
@@ -297,8 +290,8 @@ func TestInventorySelectionRevalidatesOnSync(t *testing.T) {
 	if inv.hasSel {
 		t.Error("selection survived its stack leaving the hold")
 	}
-	if !inv.toHangar.GetWidget().Disabled {
-		t.Error("To Hangar still enabled with no selection")
+	if !inv.sell.GetWidget().Disabled {
+		t.Error("Sell still enabled with no selection")
 	}
 	inv.transfer("hangar")
 	inv.sellClicked()
@@ -478,11 +471,11 @@ func TestStationWindowsDrawSmoke(t *testing.T) {
 			}
 		}
 
+		// Only mounted tables fit: the sloop has no ore section, and the
+		// hangar reads as undocked here (the hatch, not the table).
 		for name, tbl := range map[string]*widgets.Table{
 			"market.cargo":  market.tbl,
 			"inv.cargo":     inventory.cargo,
-			"inv.ore":       inventory.ore,
-			"inv.hangar":    inventory.hangar,
 			"fit.hangar":    fitting.hangar,
 			"overview.rows": k.ov.tbl,
 		} {

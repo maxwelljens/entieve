@@ -42,9 +42,10 @@ func TestWindowSplitsEqualByDefault(t *testing.T) {
 		share float64 // seam 0's opening share; 0 = the equal-share default
 	}{
 		{"inventory", func() (*widget.Window, *widgets.SplitPane) {
+			// The showcase sloop has no ore hold: Cargo over Hangar.
 			p := NewInventory(env)
 			return p.Win(), p.split
-		}, 3, 0},
+		}, 2, 0},
 		{"fitting", func() (*widget.Window, *widgets.SplitPane) {
 			p := NewFitting(env)
 			return p.Win(), p.split
@@ -84,10 +85,9 @@ func TestWindowSplitsEqualByDefault(t *testing.T) {
 }
 
 // TestInventorySplitDragTradesTwoPanes drives the real window input:
-// a press in the cargo/ore seam's grab band, a 15 px downward drag, a
+// a press in the cargo/hangar seam's grab band, a 15 px downward drag, a
 // release. The seam follows the cursor down: cargo's table grows by 15,
-// ore's shrinks by the same, the hangar above/below them is untouched,
-// and the seam's ratio follows.
+// the hangar's shrinks by the same, and the seam's ratio follows.
 func TestInventorySplitDragTradesTwoPanes(t *testing.T) {
 	env, _ := newTestEnv(t)
 	inv := NewInventory(env)
@@ -118,21 +118,18 @@ func TestInventorySplitDragTradesTwoPanes(t *testing.T) {
 		t.Errorf("cargo pane = %d px, want %d (15 px taller: the seam moved down with the cursor)", after[0].Dy(), before[0].Dy()+15)
 	}
 	if d := after[1].Dy() - (before[1].Dy() - 15); d < -1 || d > 1 {
-		t.Errorf("ore pane = %d px, want %d (15 px shorter)", after[1].Dy(), before[1].Dy()-15)
+		t.Errorf("hangar pane = %d px, want %d (15 px shorter)", after[1].Dy(), before[1].Dy()-15)
 	}
 	if after[0].Dy()+after[1].Dy() != before[0].Dy()+before[1].Dy() {
-		t.Errorf("cargo+ore = %d px, want the unchanged pair %d (the pair trades space)",
+		t.Errorf("cargo+hangar = %d px, want the unchanged pair %d (the pair trades space)",
 			after[0].Dy()+after[1].Dy(), before[0].Dy()+before[1].Dy())
-	}
-	if d := after[2].Dy() - before[2].Dy(); d < -1 || d > 1 {
-		t.Errorf("hangar pane = %d px, want %d (a seam moves only its pair)", after[2].Dy(), before[2].Dy())
 	}
 	// Adjacency, not just sizes: the stack still tiles without gaps.
 	root := inv.split.Container().GetWidget().Rect
-	if after[0].Min.Y != root.Min.Y || after[2].Max.Y != root.Max.Y {
+	if after[0].Min.Y != root.Min.Y || after[1].Max.Y != root.Max.Y {
 		t.Errorf("panes %v do not tile the split %v", after, root)
 	}
-	if got := inv.Splits()[0].Split.Ratio(0); got == float64(1)/3 {
+	if got := inv.Splits()[0].Split.Ratio(0); got == float64(1)/2 {
 		t.Error("the drag left the seam ratio at its equal-share default")
 	}
 	// The tables (not only the panes) follow: the drag reaches layout.

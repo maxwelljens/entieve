@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"github.com/entieve/entieve/content"
 	"image"
 	"math"
 	"strings"
@@ -125,10 +126,12 @@ func TestQtyPickerMemorySeedsNextOpen(t *testing.T) {
 	pumpQty(t, ui, env, inv.Sync, 1024, 700)
 	uitest.FireButton(ui, q.Confirm())
 
+	// A transfer never remembers: it opens on the whole dragged stack
+	// (the owner's "defaults to all the items in the stack").
 	inv.transfer("hangar")
 	pumpQty(t, ui, env, inv.Sync, 1024, 700)
-	if got := q.Value(); got != 42 {
-		t.Fatalf("second transfer picker opened at %d, want the confirmed 42", got)
+	if got, want := q.Value(), cargoQty(env, inv.sel); got != want {
+		t.Fatalf("second transfer picker opened at %d, want the stack %d", got, want)
 	}
 	// A different surface starts from its own memory (Sell has none here).
 	uitest.FireButton(ui, q.cancel)
@@ -470,7 +473,7 @@ func TestQtyPickerEverySurfaceIntent(t *testing.T) {
 			open func()
 			want sim.Command
 		}{
-			{func() { inv.transfer("hangar") }, sim.CmdTransfer{Item: item, Qty: 1, From: "cargo", To: "hangar"}},
+			{func() { inv.transfer("hangar") }, sim.CmdTransfer{Item: item, Qty: cargoQty(env, item), From: "cargo", To: "hangar"}},
 			{func() { inv.sellClicked() }, sim.CmdSell{Item: item, Qty: 1}},
 		} {
 			c.open()
@@ -508,4 +511,16 @@ func TestQtyPickIsAHostIntent(t *testing.T) {
 	if env.Menu() == nil || env.InfoWindow() == nil {
 		t.Error("session services lost")
 	}
+}
+
+// cargoQty is one item's units in the player's general hold (the
+// transfer popup's stack default).
+func cargoQty(env *testEnv, item content.ItemID) int {
+	n := 0
+	for _, st := range env.CargoStacks() {
+		if st.Item == item {
+			n += st.Qty
+		}
+	}
+	return n
 }
