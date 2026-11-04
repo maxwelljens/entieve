@@ -704,10 +704,10 @@ func (r *Refinery) refineRows(book []sim.MarketStock, outs []rfOut) []widgets.Pl
 	oreCell, oreTint := mfgMoney(raw), color.RGBA{}
 	mineCell, mineTint := mfgMoney(mine), color.RGBA{}
 	if !hasOre {
-		oreCell, oreTint = "— · no bid", p.Dim
+		oreCell, oreTint = "— · no buy order", p.Dim
 	}
 	if !hasMine {
-		mineCell, mineTint = "— · no bid", p.Dim
+		mineCell, mineTint = "— · no buy order", p.Dim
 	}
 	out := []widgets.PlainRow{
 		row("Ore value", oreCell, oreTint),

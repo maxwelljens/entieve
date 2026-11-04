@@ -754,8 +754,8 @@ closed stays yours until you finish it or abandon it.
 Deliveries now **land in the world**: the delivered cargo posts on the
 destination station's book as requisition stock (the goods its guard
 posts buy replacement hulls, fits and ammunition from). A materiel run to
-a front also credits that front's contest meter (the same rail a war-bid
-sale feeds), so carrying guns actually holds ground, and the **in stock**
+a front also credits that front's contest meter (the same rail a war
+buy order's sale feeds), so carrying guns actually holds ground, and the **in stock**
 figure on a delivery offer is that station's live stock for the item.
 
 **Payouts** are calibrated against the live economy rather than vibes: a
@@ -837,14 +837,14 @@ in three panes over one seam:
   Show Info item size, the product's name carrying the verdict tick/cross,
   and the product's description wrapped to the pane. Under it sits the
   **profit table**, priced off the station's live order book (never a
-  content base price): one run's materials cost at the book's asks (walked
-  cheapest first, the tail at the last ask when the depth runs short; a
-  mineral no one here sells prices at another station's cheapest ask, marked
-  with a dagger and a footnote, and one no book sells at all is left out and
-  named; minerals already in your hold do not discount it, since the figure
-  is what buying the run here would cost), the craft fee, the total, the
-  product's sale value at the book's
-  own bids (dashed `no bid` when nobody here buys it), and the profit and
+  content base price): one run's materials cost at the book's sell orders
+  (walked cheapest first, the tail at the last sell order when the depth
+  runs short; a mineral no one here sells prices at another station's
+  cheapest sell order, marked with a dagger and a footnote, and one no book
+  sells at all is left out and named; minerals already in your hold do not
+  discount it, since the figure is what buying the run here would cost),
+  the craft fee, the total, the product's sale value at the book's own buy
+  orders (dashed `no buy order` when nobody here buys it), and the profit and
   margin (green on a profitable run, red on a loss). Below it sits the bill
   itself, one row per mineral with **the cost driver first** (each row: the
   mineral's own art at three times the row icon size, its share of the run's
@@ -887,10 +887,10 @@ hero icon, the name carrying the same tick or cross, and the ore's
 description wrapped to the pane. Under it sits the **refine math**, the
 question "refine this or sell it raw" answered off the station's live order
 book and never a content base price: **Ore value** is what one 100-ore batch
-fetches if you sell it here (the bids walked best first), **Minerals value**
-is what its minerals fetch at the same book, **Refine delta** is the
-difference (green at zero or above, red below) and **Margin** is that delta
-over the minerals' value. A side nobody here buys dashes `no bid` and the two
+fetches if you sell it here (the buy orders walked best first), **Minerals
+value** is what its minerals fetch at the same book, **Refine delta** is
+the difference (green at zero or above, red below) and **Margin** is that
+delta over the minerals' value. A side nobody here buys dashes `no buy order` and the two
 lines below it dash with it. There is no fee line: refining costs no money.
 Below it the **yield bill** lists one batch's minerals, the most valuable
 first, each with its own art, its share of the batch's mineral value, the
@@ -924,20 +924,22 @@ content's own category path: `All` at the root, then `Ships`, `Modules`,
 slot/role groups, round families). Clicking a branch expands it and scopes
 the catalog to its subtree; clicking an item highlights its branch. Every
 item is listed, including the hulls and wares no one sells here: a dim row
-whose **Buy** is grayed until some local order offers it (**Request on
-Market** stays live, and placing the first order is how a market wakes up).
+whose **Buy** is grayed until some local order offers it (**Buy order**
+stays live, and placing the first order is how a market wakes up).
 
 **The right pane.** Selecting an item leads with its **hero icon** (the
 Show Info item size) and its description, then the **Order book**: that
 item's full resting book as a small table, one aligned row per order with
-its side, price and quantity, asks (price ascending) before bids (price
-descending); your own orders wear the owned green. There is no per-item
+its side, price and quantity, sell orders (price ascending) before buy
+orders (price descending); your own orders wear the owned green. There is no per-item
 dropdown: the catalog is a plain list, and the book is always one click
 away. **My orders** stacks below it, its own section header carrying the
 count, every section scrolling together on the pane's one rail. The pane is
 inset from its edges, and both section headers are the house bar (a glyph,
-the tracked label and a rule). With nothing selected the head shows the
-hint "Select an item to see its book".
+the tracked label and a rule). Buy and Sell sit pinned below the scroll
+column as a two-button bar (green buy, red sell, each with its own glyph),
+acting on the selection. With nothing selected the head shows the hint
+"Select an item to see its book".
 
 **Search.** The field above the tree filters the selected branch live as
 you type (name, group path and maker all match, case-insensitive and
@@ -952,12 +954,6 @@ walk the results, `Enter` selects the highlighted one (the tree follows),
 and `Esc` clears the query first: a second `Esc` on the empty field leaves
 the field and then the window handles the key normally.
 
-**Cross-station availability.** The columns stay local (this station's
-ladder, this station's resting quantity), but when another station's book
-stocks the item the Qty cell carries a dim `· N more` suffix (how many
-other books ask for it); the window title stays the plain **Market**, so
-the exact cheapest ask on the other book is read at that station.
-
 Every station's market is an **order book**: your Buy and Sell are market
 orders that take the best resting prices at that station and fill only
 what the book actually holds: nothing is conjured for you. Both go
@@ -966,7 +962,7 @@ press **Buy** or **Sell**, pick the amount in the popup, confirm. A **broker
 fee** (3 % of the value) rides every buy, a **sales tax** (2.5 %) rides
 every sell; the Finances ledger books each fill with its fee.
 Prices are displayed on a ladder (last
-trade, best ask, best bid, then the item's base price), and they move
+trade, best sell order, best buy order, then the item's base price), and they move
 only when real goods trade hands.
 
 The book is not yours alone. A roster of **economy agents** (traders,
@@ -1085,7 +1081,8 @@ puts the authored services back.
 
 **Selling to the war.** The corporate fleets buy **everything military**
 (guns, EWAR, tank modules, every line of ammo and charges) on **every
-charter station's book**, at a standing bid priced just under the best ask.
+charter station's book**, at a standing buy order priced just under the
+best sell order.
 Sell into it and you are paid immediately, like any other sale: the goods
 are consumed by the war, and the value is credited to the nearest front on
 the next war beat (the haul is abstract: there is no convoy to escort or

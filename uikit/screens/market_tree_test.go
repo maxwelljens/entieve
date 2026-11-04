@@ -196,10 +196,10 @@ func TestMarketTreeOwnedRowsTint(t *testing.T) {
 	}
 }
 
-// TestMarketTreeRequestFromGrayedRow: Request on Market works from an item
+// TestMarketTreeBuyOrderFromGrayedRow: Buy order works from an item
 // with no orders anywhere — the row's menu emits the order-window launch
 // for that item, the way the traded rows do.
-func TestMarketTreeRequestFromGrayedRow(t *testing.T) {
+func TestMarketTreeBuyOrderFromGrayedRow(t *testing.T) {
 	m, cv, rec, frame, _ := mktTreeEnv(t)
 	frame()
 	frame()
@@ -213,23 +213,23 @@ func TestMarketTreeRequestFromGrayedRow(t *testing.T) {
 	menu.Open(entries, image.Pt(10, 10))
 	found := false
 	for i, e := range menu.Entries() {
-		if e.Label != "Request on Market" {
+		if e.Label != "Buy order" {
 			continue
 		}
 		found = true
 		if e.Disabled {
-			t.Fatal("Request on Market grayed on a live item row")
+			t.Fatal("Buy order grayed on a live item row")
 		}
 		menu.Click(menu.RowRect(i).Min.Add(image.Pt(1, 1)))
 	}
 	if !found {
-		t.Fatalf("menu has no Request on Market entry: %+v", menu.Entries())
+		t.Fatalf("menu has no Buy order entry: %+v", menu.Entries())
 	}
 	if len(rec.got) != 1 {
 		t.Fatalf("emitted %#v, want one OpenOrder", rec.got)
 	}
 	if got := rec.got[0]; got != (widgets.OpenOrder{Item: "item-stub-empty", Side: sim.OrderBuy, Qty: 1}) {
-		t.Errorf("Request on Market emitted %#v, want OpenOrder{buy item-stub-empty 1}", got)
+		t.Errorf("Buy order emitted %#v, want OpenOrder{buy item-stub-empty 1}", got)
 	}
 }
 

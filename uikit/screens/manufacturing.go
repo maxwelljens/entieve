@@ -565,10 +565,10 @@ func (f *Manufacturing) profitRows(book []sim.MarketStock, fallback map[content.
 	}
 	var notes []string
 	if marked {
-		notes = append(notes, "no local ask: another station's cheapest ask")
+		notes = append(notes, "no local sell order: another station's cheapest sell order")
 	}
 	if len(unpriced) > 0 {
-		notes = append(notes, "no ask anywhere: "+strings.Join(unpriced, ", ")+" left out")
+		notes = append(notes, "no sell order anywhere: "+strings.Join(unpriced, ", ")+" left out")
 	}
 	matsCell := mfgMoney(mats)
 	if len(notes) > 0 {
@@ -587,7 +587,7 @@ func (f *Manufacturing) profitRows(book []sim.MarketStock, fallback map[content.
 	sale, hasBid := bookValue(book, def.Product, sim.OrderBuy, def.Qty)
 	if !hasBid {
 		return append(out,
-			row("Sale price", "— · no bid", p.Dim),
+			row("Sale price", "— · no buy order", p.Dim),
 			row("Profit", "—", p.Dim),
 			row("Margin", "—", p.Dim)), note
 	}
@@ -904,8 +904,8 @@ func (f *Manufacturing) quotes(station sim.StationID, needs []mfgNeed) ([]sim.Ma
 		return book, nil
 	}
 	fallback := make(map[content.ItemID]float64)
-	for item, a := range crossAvail(f.cv, f.stations, station) {
-		fallback[item] = a.Cheapest
+	for item, price := range crossAvail(f.cv, f.stations, station) {
+		fallback[item] = price
 	}
 	return book, fallback
 }

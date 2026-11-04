@@ -12,6 +12,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -70,27 +71,28 @@ func setStepperValue(bar *widget.Container, lbl *widget.Text, s string) {
 //
 // The catalog lists every item of the tradeable catalog once (canonical
 // order) with its ladder quote and two-side quantity. Selecting an item
-// (the same selection the toolbar's Buy/Sell act on) fills the right
-// pane: the item's hero icon and description lead, then its full resting
-// book as an aligned table (asks price-ascending, then bids
-// price-descending, one row per resting order), then My orders. Buy/Sell
-// execute as market orders against the book: each opens the quantity
-// picker (CONTEXT.md "Quantity picker") on the selected item and Confirm
-// emits Buy/Sell. The title bar stays the base display name (window titles
-// are furniture); the book's own columns carry the price voice.
+// fills the right pane: the item's hero icon and description lead, then
+// its full resting book as an aligned table (sell orders
+// price-ascending, then buy orders price-descending, one row per resting
+// order), then My orders. Buy/Sell execute as market orders against the
+// book: each opens the quantity picker (CONTEXT.md "Quantity picker") on
+// the selected item and Confirm emits Buy/Sell. They sit in a pinned bar
+// at the right pane's bottom, acting on the selection. The title bar stays
+// the base display name (window titles are furniture); the book's own
+// columns carry the price voice.
 //
 // The browse tree scopes the catalog to a branch (All is the whole
 // catalog) and the search field filters that branch live, ranked by fuzzy
 // score with the matched letters highlighted. Selecting an item
 // highlights its branch back. Trade is only possible while the player is
-// docked; Buy also needs a local ask to lift, so both buttons can grey
-// while docked.
+// docked; Buy also needs a local sell order to lift, so both buttons can
+// grey while docked.
 //
 // An item with no orders anywhere still gets its row — dimmed, but live:
-// placing the first order is how a market wakes up (Request on Market
-// works from an empty book). Placing a hull ask is refused by the sim, so
-// hull rows trade the way they always did. Other stations' books are read
-// read-only for the availability suffix; the columns stay local.
+// placing the first order is how a market wakes up (Buy order
+// works from an empty book). Placing a hull sell order is refused by the
+// sim, so hull rows trade the way they always did. The columns stay local
+// to the docked book.
 //
 // Below the book sits My orders: only THIS station's player orders, each
 // with a Cancel button. It acts on the docked book, exactly like
@@ -130,12 +132,6 @@ type Market struct {
 	results []mktHit
 	query   string
 	hit     int
-
-	// Availability: every other market station's asks per item (the Qty
-	// suffix), rebuilt each
-	// Sync while docked. stations is the universe's market roster.
-	stations []sim.StationID
-	avail    map[content.ItemID]mktAvail
 
 	// The right pane: the selected item's head over two labelled sections in
 	// ONE scroll column. bookBar/bookLbl and mineBar/mineLbl are the section
@@ -177,15 +173,6 @@ const mktNoSide = "—"
 type mktHit struct {
 	Item  content.ItemID
 	Match []int
-}
-
-// mktAvail is one item's cross-station availability: the number of OTHER
-// market stations whose books hold an ask, plus the cheapest such ask and
-// its station.
-type mktAvail struct {
-	Stations int
-	Cheapest float64
-	Station  sim.StationID
 }
 
 // marketStations lists every station that offers the market service, in
@@ -305,15 +292,15 @@ func (m *Market) searchHits(q string, scope []content.ItemID) []mktHit {
 }
 
 // crossAvail reads every other market station's asks for the catalog: the
-// count of stations stocking each item and the cheapest of them. It only
-// runs while docked (in space there is no local book to compare against).
-// The market shows the count and the manufacturing profit table prices a
-// bill line with no local ask from its cheapest figure.
-func crossAvail(cv widgets.ContentView, stations []sim.StationID, local sim.StationID) map[content.ItemID]mktAvail {
+// cheapest sell order resting on each item elsewhere. It only runs while
+// docked (in space there is no local book to compare against). The
+// manufacturing profit table prices a bill line with no local ask from
+// this figure; the market's own columns stay station-local.
+func crossAvail(cv widgets.ContentView, stations []sim.StationID, local sim.StationID) map[content.ItemID]float64 {
 	if local == "" {
 		return nil
 	}
-	out := make(map[content.ItemID]mktAvail)
+	out := make(map[content.ItemID]float64)
 	for _, st := range stations {
 		if st == local {
 			continue
@@ -322,12 +309,9 @@ func crossAvail(cv widgets.ContentView, stations []sim.StationID, local sim.Stat
 			if o.Side != sim.OrderSell {
 				continue
 			}
-			a := out[o.Item]
-			a.Stations++
-			if a.Cheapest == 0 || o.Price < a.Cheapest {
-				a.Cheapest, a.Station = o.Price, st
+			if p, ok := out[o.Item]; !ok || o.Price < p {
+				out[o.Item] = o.Price
 			}
-			out[o.Item] = a
 		}
 	}
 	return out
@@ -431,7 +415,6 @@ func NewMarket(env widgets.Seams) *Market {
 	}
 	m.group, m.maker = marketInfo(env.Defs(), m.items)
 	m.browseTree = newBrowseTree(browseNodes(m.items, m.group))
-	m.stations = marketStations(env.Defs())
 	p := env.Pal()
 
 	cols := []widgets.Column{
@@ -483,21 +466,41 @@ func NewMarket(env widgets.Seams) *Market {
 		}
 	})
 
-	m.buy = theme.ActionButton("Buy", m.buyClicked)
-	m.sell = theme.ActionButton("Sell", m.sellClicked)
-	tradeBar := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
-		)),
-	)
-	tradeBar.AddChild(m.buy, m.sell)
+	// The trade actions: side by side in the right pane's pinned bar. Buy
+	// wears the Good role and Sell the Danger role on its label and glyph
+	// (the face stays house chrome); both grey while gated, never hidden.
+	// The glyphs are the closest existing pair: an open chest (acquire) and
+	// a hand-off (put on the book).
+	mkTrade := func(label, icon string, tint color.RGBA, clicked func()) *widget.Button {
+		return widget.NewButton(
+			widget.ButtonOpts.TextLabel(label),
+			widget.ButtonOpts.TextColor(&widget.ButtonTextColor{
+				Idle:     theme.Solid(tint),
+				Hover:    theme.Solid(tint),
+				Pressed:  theme.Solid(tint),
+				Disabled: theme.NRGBA(p.Dim, 160),
+			}),
+			widget.ButtonOpts.Graphic(&widget.GraphicImage{
+				Idle:     icons.Get(icon, theme.Px(theme.IconButton), tint),
+				Hover:    icons.Get(icon, theme.Px(theme.IconButton), tint),
+				Pressed:  icons.Get(icon, theme.Px(theme.IconButton), tint),
+				Disabled: icons.Get(icon, theme.Px(theme.IconButton), p.Dim),
+			}),
+			widget.ButtonOpts.GraphicPadding(widget.Insets{Right: theme.Px(theme.StatIconGap)}),
+			widget.ButtonOpts.WidgetOpts(
+				widget.WidgetOpts.MinSize(theme.Px(40), theme.Px(40)),
+				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+			),
+			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { clicked() }),
+		)
+	}
+	m.buy = mkTrade("Buy", "act_loot", p.Good, m.buyClicked)
+	m.sell = mkTrade("Sell", "ctr_deliver", p.Danger, m.sellClicked)
 
 	// The catalog row: the item table — widgets.Table owns its scroll
 	// viewport, its wheel wiring AND the scrollbar rail beside it (the
 	// reserved-gutter chrome, ScrollGutter design px: the handle can never
-	// overhang a row, and the rail hides while the list fits). The title
-	// line and the Buy/Sell row above stay exactly as they are.
+	// overhang a row, and the rail hides while the list fits).
 	catalog := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
 	m.tbl.Container().GetWidget().LayoutData = widget.AnchorLayoutData{
 		StretchHorizontal: true,
@@ -507,11 +510,11 @@ func NewMarket(env widgets.Seams) *Market {
 
 	// The right pane: the selected item's head (its hero icon and its
 	// description) over two labelled sections in ONE scroll column: the
-	// item's order book (aligned cells, asks then bids) over My orders,
-	// riding the house rail (the reserved gutter hides while everything
-	// fits). No fold and no tabs, so a selection shows its book at once.
-	// The head is the one item head (itemhead.go); with no selection its
-	// hint names the gesture.
+	// item's order book (aligned cells, sell orders then buy orders) over
+	// My orders, riding the house rail (the reserved gutter hides while
+	// everything fits). No fold and no tabs, so a selection shows its book
+	// at once. The head is the one item head (itemhead.go); with no
+	// selection its hint names the gesture.
 	m.itemHead = newItemHead(env, "Select an item to see its book")
 
 	// The section headers are the infowin section bars (glyph, tracked label
@@ -542,18 +545,33 @@ func NewMarket(env widgets.Seams) *Market {
 		}
 	})
 
-	// The right pane spans the full body height (its one scroll column
-	// carries the book and My orders); the catalog keeps the full row
-	// height it always had, its scrollbar rail included. The browse pane
-	// is the search field over the tree, both full height.
-	left := paneStack([]bool{false, true}, tradeBar, catalog)
+	// The pinned trade bar: the pane's full width less the inset and the
+	// rail gutter, so the buttons end on the book's right edge and ride
+	// below the scroll column however far it scrolls.
+	tradeBar := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
+			widget.RowLayoutOpts.Padding(&widget.Insets{
+				Left:   theme.Px(theme.ContentsPad),
+				Right:  theme.Px(theme.ContentsPad + theme.ScrollGutter),
+				Bottom: theme.Px(theme.ContentsPad),
+			}),
+		)),
+	)
+	tradeBar.AddChild(m.buy, m.sell)
+	side := paneStack([]bool{true, false}, m.sideRail.Container(), tradeBar)
+
+	// The catalog keeps the full row height, its scrollbar rail included.
+	// The browse pane is the search field over the tree, both full height.
+	left := paneStack([]bool{true}, catalog)
 	browse := paneStack([]bool{false, true}, m.search, m.tree.Container())
 
 	// Body: browse | seam | catalog | seam | right pane. Two draggable
 	// seams; the tree and right panes open at their historical widths
 	// (176 px of browse, the old 240 px column) and each pane keeps
 	// SplitMinPane.
-	m.split = widgets.NewSplitPaneRow(env, browse, left, m.sideRail.Container())
+	m.split = widgets.NewSplitPaneRow(env, browse, left, side)
 	m.split.SetDefaultRatio(0, mktTreeShare)
 	m.split.SetDefaultRatio(1, 1-mktSideShare)
 	body := widget.NewContainer(
@@ -681,9 +699,8 @@ func (m *Market) Sync() {
 	for _, o := range orders {
 		by[o.Item] = append(by[o.Item], o)
 	}
-	// The other stations' books (dock the availability read): the Qty
-	// suffix counts them.
-	m.avail = crossAvail(m.cv, m.stations, docked)
+	// The other stations' books stay out of the catalog: the columns read
+	// only the docked book.
 	ask := func(item content.ItemID) bool {
 		for _, o := range by[item] {
 			if o.Side == sim.OrderSell {
@@ -713,7 +730,7 @@ func (m *Market) Sync() {
 			for _, o := range ords {
 				total += o.Qty
 			}
-			rows = append(rows, m.resultRow(h, total, quote(h.Item), ask(h.Item)))
+			rows = append(rows, m.resultRow(h, total, quote(h.Item)))
 		}
 	} else {
 		m.results = nil
@@ -771,8 +788,8 @@ func (m *Market) Sync() {
 		m.title.Label = "Market"
 	}
 	// Trades only happen docked at a station (the gate declared above);
-	// Buy additionally needs a local ask to lift — an item no one sells
-	// here stays visible and requestable, its Buy grayed.
+	// Buy additionally needs a local sell order to lift — an item no one
+	// sells here stays visible and requestable, its Buy grayed.
 	m.buy.GetWidget().Disabled = gated || !m.hasSel || !ask(m.sel)
 	m.sell.GetWidget().Disabled = gated
 	// The catalog's own rail mirrors the table's scroll in m.tbl.Sync
@@ -781,36 +798,27 @@ func (m *Market) Sync() {
 }
 
 // itemRow is one item's catalog row: the item, its displayed price (the
-// station's ladder: last trade, best ask, best bid, base), the total
-// quantity resting on both sides (with the dim "· N more" suffix for the
-// other stations that stock it) and the dash an item's side cell reads.
-// An item with no orders anywhere is dimmed but stays actionable —
-// placing its first order is how a market wakes up. Buy greys while no
-// local ask exists to lift; Request on Market stays live.
+// station's ladder: last trade, best sell order, best buy order, base),
+// the total quantity resting on both sides and the dash an item's side
+// cell reads. An item with no orders anywhere is dimmed but stays
+// actionable — placing its first order is how a market wakes up. Buy greys
+// while no local sell order exists to lift; Buy order stays live.
 func (m *Market) itemRow(item content.ItemID, ords []sim.MarketStock, price float64, hasAsk, gated bool) widgets.TableRow {
 	total := 0
 	for _, o := range ords {
 		total += o.Qty
 	}
-	qty := theme.FormatInt(int64(total))
 	row := widgets.TableRow{
 		Cells: []string{
 			m.cv.TradeableName(item),
 			theme.FormatCredits(price),
-			qty,
+			theme.FormatInt(int64(total)),
 			mktNoSide,
 		},
 		Icons:    []string{m.itemIcon(item)},
 		IconSize: mktRowIcon,
 		Data:     mktItemRow{Item: item},
 		Spec:     m.rowSpec(item, gated, !hasAsk),
-	}
-	if a, ok := m.avail[item]; ok && a.Stations > 0 {
-		row.CellRuns = make([][]widgets.RowSeg, 4)
-		row.CellRuns[2] = []widgets.RowSeg{
-			{Text: qty},
-			{Text: " · " + strconv.Itoa(a.Stations) + " more", Tint: m.th.Pal().Dim, Step: theme.StepTiny},
-		}
 	}
 	if len(ords) == 0 {
 		row.TextTint = m.th.Pal().Dim
@@ -820,16 +828,13 @@ func (m *Market) itemRow(item content.ItemID, ords []sim.MarketStock, price floa
 
 // resultRow is one ranked search hit: flat, no folds, its name split into
 // styled runs at the fuzzy-matched character positions (the accent tint),
-// with the price, the qty (and its cross-station suffix) and the group
-// path trailing in the dim step. The row keeps Show Info; trade verbs
-// stay in the branch view the highlight leads to.
-func (m *Market) resultRow(h mktHit, total int, price float64, hasAsk bool) widgets.TableRow {
+// with the price, the qty and the group path trailing in the dim step. The
+// row keeps Show Info; trade verbs stay in the branch view the highlight
+// leads to.
+func (m *Market) resultRow(h mktHit, total int, price float64) widgets.TableRow {
 	name := m.cv.TradeableName(h.Item)
 	segs := mktNameSegs(name, h.Match, m.th.Pal().Accent, m.th.Pal().Text)
 	meta := theme.FormatCredits(price) + " · " + theme.FormatInt(int64(total))
-	if a, ok := m.avail[h.Item]; ok && a.Stations > 0 {
-		meta += " · " + strconv.Itoa(a.Stations) + " more"
-	}
 	meta += "  " + m.group[h.Item]
 	segs = append(segs, widgets.RowSeg{Text: "   " + meta, Tint: m.th.Pal().Dim, Step: theme.StepTiny})
 	return widgets.TableRow{
@@ -881,14 +886,15 @@ func mktNameSegs(name string, match []int, accent, text color.RGBA) []widgets.Ro
 
 // bookRow is one resting order as a row of the right pane's book table: the
 // book's own [side, price, qty] cells (aligned columns, the figures in the
-// tabular face). The player's own orders carry the owned-row green, so one
-// glance separates them from the NPC/agent rows (the overview's
-// own-ship/hostile tint convention).
+// tabular face). The Side cell reads the compact verb, Buy or Sell. The
+// player's own orders carry the owned-row green, so one glance separates
+// them from the NPC/agent rows (the overview's own-ship/hostile tint
+// convention).
 func (m *Market) bookRow(o sim.MarketStock) widgets.PlainRow {
 	p := m.th.Pal()
-	side, tint := "Ask", p.Warn
+	side, tint := "Sell", p.Warn
 	if o.Side == sim.OrderBuy {
-		side, tint = "Bid", p.Info
+		side, tint = "Buy", p.Info
 	}
 	if o.Owner == sim.OwnerPlayer {
 		tint = theme.OwnedRowTint(p)
@@ -904,16 +910,16 @@ func (m *Market) bookRow(o sim.MarketStock) widgets.PlainRow {
 // order-window launches post to its book). The menu's actions carry the
 // row's own item, so Buy/Sell always trade the row they were opened on —
 // no click-time selection side effects. buyOff grays Buy while the local
-// book holds no ask to lift (Request on Market stays live).
+// book holds no sell order to lift (Buy order stays live).
 func (m *Market) rowSpec(item content.ItemID, gated, buyOff bool) widgets.RowSpec {
 	return widgets.RowSpec{
 		Ref: widgets.RowRef(m.cv, item),
 		Actions: []widgets.RowAction{
 			{Label: "Buy", Disabled: gated || buyOff, Intent: widgets.QtyPick{Mode: widgets.QtyBuy, Item: item}},
 			{Label: "Sell", Disabled: gated, Intent: widgets.QtyPick{Mode: widgets.QtySell, Item: item}},
-			{Label: "Sell on Market", Disabled: gated,
+			{Label: "Sell order", Disabled: gated,
 				Intent: widgets.OpenOrder{Item: item, Side: sim.OrderSell, Qty: m.cv.PlayerStock(item)}},
-			{Label: "Request on Market", Disabled: gated,
+			{Label: "Buy order", Disabled: gated,
 				Intent: widgets.OpenOrder{Item: item, Side: sim.OrderBuy, Qty: 1}},
 		},
 	}
@@ -925,7 +931,7 @@ func (m *Market) docked() bool {
 }
 
 // buyClicked opens the quantity picker on the selected item's Buy (the
-// toolbar's own button acts on the left-click selection). The row menu's
+// pane's pinned button acts on the selection). The row menu's
 // trade verbs ride each row's RowSpec intent — same picker, same gate, on
 // the row they were opened on.
 func (m *Market) buyClicked() {
@@ -961,8 +967,9 @@ func (m *Market) mineOrders() []sim.MarketStock {
 }
 
 // syncSide rebuilds the right pane's content only when it moved: the selected
-// item's head (icon, name, description), its full book — asks ascending, then
-// bids descending, the table's canonical order — over one rich row per player
+// item's head (icon, name, description), its full book — sell orders
+// ascending, then buy orders descending, the table's canonical order — over
+// one rich row per player
 // order at the docked station, every order listed, its Cancel button the
 // row's trailing action. Both sections carry the same docked gate the trade
 // actions do. No selection hides the head's art and names the gesture.
@@ -1033,9 +1040,9 @@ func (m *Market) retitle(head *theme.ChromeText, label string) {
 // line 2.
 func (m *Market) orderRow(o sim.MarketStock, gated bool) *widgets.StackRow {
 	p := m.th.Pal()
-	side, tint := "Ask", p.Warn
+	side, tint := "Sell", p.Warn
 	if o.Side == sim.OrderBuy {
-		side, tint = "Bid", p.Info
+		side, tint = "Buy", p.Info
 	}
 	row := widgets.TableRow{
 		Cells: []string{m.cv.TradeableName(o.Item), side, theme.FormatCredits(o.Price), theme.FormatInt(int64(o.Qty))},

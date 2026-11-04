@@ -39,7 +39,7 @@ type (
 
 	// OpenOrder opens the player market-order mini-window on an item,
 	// pre-set to the clicked row's side and its sell default quantity —
-	// the "Sell on Market" / "Request on Market" menu entries a row
+	// the "Sell order" / "Buy order" menu entries a row
 	// declares. A host-owned (Kit) session intent, like ShowInfo: it
 	// carries no command, the window's Accept is what emits PlaceOrder.
 	OpenOrder struct {

@@ -252,7 +252,7 @@ func (inv *Inventory) hangarRows() []content.CargoStack {
 }
 
 // rowsOf converts stacks to Item/Qty/m³ table rows, each declaring the
-// full-stack "Sell on Market" verb (grayed, never hidden, while undocked —
+// full-stack "Sell order" verb (grayed, never hidden, while undocked —
 // orders rest on the docked station's book). The action carries the
 // clicked stack's own quantity as the order window's sell default.
 func (inv *Inventory) rowsOf(stacks []content.CargoStack) []widgets.TableRow {
@@ -270,7 +270,7 @@ func (inv *Inventory) rowsOf(stacks []content.CargoStack) []widgets.TableRow {
 			Spec: widgets.RowSpec{
 				Ref: widgets.RowRef(inv.cv, st.Item),
 				Actions: []widgets.RowAction{
-					{Label: "Sell on Market", Disabled: !docked,
+					{Label: "Sell order", Disabled: !docked,
 						Intent: widgets.OpenOrder{Item: st.Item, Side: sim.OrderSell, Qty: st.Qty}},
 				},
 			},

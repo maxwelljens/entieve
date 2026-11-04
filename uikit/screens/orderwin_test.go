@@ -111,7 +111,7 @@ func TestOrderWindowDefaults(t *testing.T) {
 	if w.side != sim.OrderBuy {
 		t.Fatalf("side = %v, want OrderBuy after one toggle", w.side)
 	}
-	if got, want := w.modeBtn.Text().Label, "Request"; got != want {
+	if got, want := w.modeBtn.Text().Label, "Buy order"; got != want {
 		t.Errorf("mode label = %q, want %q", got, want)
 	}
 	if got, want := w.price.GetText(), "99"; got != want {
@@ -124,7 +124,7 @@ func TestOrderWindowDefaults(t *testing.T) {
 	// Toggling back re-applies Sell's defaults.
 	w.toggleMode()
 	frame()
-	if got, want := w.modeBtn.Text().Label, "Sell"; got != want {
+	if got, want := w.modeBtn.Text().Label, "Sell order"; got != want {
 		t.Errorf("mode label = %q, want %q", got, want)
 	}
 	if got, want := w.price.GetText(), "91"; got != want {
@@ -262,7 +262,7 @@ func TestOrderWindowSingleInstance(t *testing.T) {
 	if got := k.OrderWin().TitleText(); got != "Order" {
 		t.Errorf("retargeted title = %q, want the base name Order (a re-target never retitles)", got)
 	}
-	if got, want := k.OrderWin().modeBtn.Text().Label, "Request"; got != want {
+	if got, want := k.OrderWin().modeBtn.Text().Label, "Buy order"; got != want {
 		t.Errorf("retargeted mode = %q, want %q", got, want)
 	}
 	if got, want := k.OrderWin().qty.GetText(), "1"; got != want {
