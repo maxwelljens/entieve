@@ -71,17 +71,17 @@ func TestMarketRowIcons(t *testing.T) {
 		}
 	}
 
-	// The right pane's book rows are compact text rows: the section bar
-	// already names the item, so repeating its glyph down every order is
+	// The right pane's book rows are aligned table cells: the head above
+	// already carries the item's art, so repeating it down every order is
 	// noise.
 	clickRow(ui, m.tbl, 0)
 	uitest.PumpWindow(t, ui, m.Sync, 1024, 700)
-	if len(m.bookRows) == 0 {
+	if len(m.book) == 0 {
 		t.Fatal("fixture: no book rows for the first selected item")
 	}
 	for i, r := range m.book {
-		if len(r.Icons) != 0 || r.IconSize != 0 {
-			t.Errorf("book row %d carries an icon (%v)", i, r.Icons)
+		if len(r.Cells) != 3 {
+			t.Errorf("book row %d cells = %v, want side/price/qty", i, r.Cells)
 		}
 	}
 }
@@ -148,10 +148,7 @@ func TestMarketOrderBookRows(t *testing.T) {
 		askPhase, lastAsk, lastBid := true, -1.0, -1.0
 		for i, r := range m.book {
 			seen++
-			if r.Cells[0] != "" {
-				t.Errorf("%q row %d: item cell = %q, want blank (the section bar names it)", item, i, r.Cells[0])
-			}
-			side := r.Cells[3]
+			side := r.Cells[0]
 			price := parseCredits(t, r.Cells[1])
 			switch side {
 			case "Ask":
@@ -185,7 +182,7 @@ func TestMarketOrderBookRows(t *testing.T) {
 		m.selectItem(item)
 		frame()
 		for _, r := range m.book {
-			sides[r.Cells[3]] = true
+			sides[r.Cells[0]] = true
 		}
 	}
 	if !sides["Ask"] || !sides["Bid"] {

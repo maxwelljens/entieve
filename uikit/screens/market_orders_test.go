@@ -144,7 +144,7 @@ func TestMarketMyOrdersListsEveryOrder(t *testing.T) {
 	if len(m.mineRows) != 20 {
 		t.Fatalf("mineRows = %d, want all 20 player orders listed", len(m.mineRows))
 	}
-	if want := "My orders: " + theme.FormatInt(20); m.mineLbl.Label != want {
+	if want := "MY ORDERS · " + theme.FormatInt(20); m.mineLbl.Label != want {
 		t.Errorf("label = %q, want %q", m.mineLbl.Label, want)
 	}
 	// The uncapped list must not grow the window: the default rect stands
@@ -212,13 +212,13 @@ func TestMarketMyOrdersListsEveryOrder(t *testing.T) {
 	want := theme.OwnedRowTint(theme.DefaultPalette())
 	owned, plain := 0, 0
 	for _, r := range m.book {
-		switch r.Stack[0].Segs[0].Tint {
+		switch r.Tint {
 		case want:
 			owned++
 		case theme.DefaultPalette().Warn, theme.DefaultPalette().Info:
 			plain++
 		default:
-			t.Errorf("book row tint = %#v, want the owned green or a side colour", r.Stack[0].Segs[0].Tint)
+			t.Errorf("book row tint = %#v, want the owned green or a side colour", r.Tint)
 		}
 	}
 	if owned != 20 || plain != 1 {
@@ -291,7 +291,7 @@ func TestMarketMyOrdersAfterOrderDialog(t *testing.T) {
 	if btn := m.mineRows[0].Buttons; len(btn) != 1 {
 		t.Fatalf("my-orders row has %d verbs, want one Cancel", len(btn))
 	}
-	if want := "My orders: 1"; m.mineLbl.Label != want {
+	if want := "MY ORDERS · 1"; m.mineLbl.Label != want {
 		t.Errorf("label = %q, want %q", m.mineLbl.Label, want)
 	}
 
@@ -308,7 +308,7 @@ func TestMarketMyOrdersAfterOrderDialog(t *testing.T) {
 	want := theme.OwnedRowTint(theme.DefaultPalette())
 	green := 0
 	for _, r := range m.book {
-		if r.Stack[0].Segs[0].Tint == want {
+		if r.Tint == want {
 			green++
 		}
 	}

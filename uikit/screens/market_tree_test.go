@@ -181,7 +181,7 @@ func TestMarketTreeOwnedRowsTint(t *testing.T) {
 	want := theme.OwnedRowTint(m.th.Pal())
 	owned, plain := 0, 0
 	for _, r := range m.book {
-		tint := r.Stack[0].Segs[0].Tint
+		tint := r.Tint
 		switch tint {
 		case want:
 			owned++

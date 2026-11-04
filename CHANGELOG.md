@@ -10,11 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **The market's right pane carries the order book**: selecting an item fills
-  the rightmost pane with that item's full resting book, asks (price
-  ascending) above bids (price descending) in the book's own price, quantity
-  and side form, with your own orders in the owned green. My orders stacks
-  below it as its own labelled section, both in the pane's one scroll column
-  with the house rail; with nothing selected the book section shows a short
+  the rightmost pane with that item's full resting book as a small table
+  (aligned side, price and quantity columns), asks (price ascending) above
+  bids (price descending), with your own orders in the owned green. The pane
+  now leads with the item's hero icon at the Show Info item size and its
+  description, is inset from its edges, and its two sections are proper
+  header bars (glyph, tracked label, rule): ORDER BOOK and MY ORDERS with
+  the count. My orders stacks below the book, both in the pane's one scroll
+  column with the house rail; with nothing selected the head shows a short
   hint. The catalog's per-item dropdown is gone: it lists items only, so the
   window needs no expanding to read a book.
 - **The manufacturing window is a recipe board**: the flat five-column board
@@ -22,14 +25,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   window's idiom over recipes. A browse tree of the recipe products' own
   groups with a live search that also matches a recipe's inputs (type
   "vetril" and every recipe that eats it answers), a narrow recipe list where
-  each row carries its verdict (`● ready` / `× short 2`, glyph and word, not
-  colour alone) over a cost strip split per mineral by its share of the run's
-  material value, and an inspector card for the selected recipe: the mineral
-  bill one row per mineral with its art, its share and a have/need bar, the
-  cost driver first, then Start job with the refusal named under it
-  ("Start: short Vetril, Helion"). Start is the picker's gesture now; a row
-  click opens the recipe in the inspector. The job list stays in the bottom
-  seam, and the new panes' proportions persist with the window's layout.
+  each row carries its verdict as one glyph (a green tick when Start would
+  accept, a red cross when it would refuse, no word and no count) over a cost
+  strip split per mineral by its share of the run's material value, and an
+  inspector card for the selected recipe, inset from the pane's edges: icon,
+  name and verdict on one line, the per-run time / fee / value, a **profit
+  table** (materials cost, craft fee, total cost, sale price at the content
+  base price, profit and margin, the profit tinted by its sign), then the
+  mineral bill with every mineral's art at three times the row icon size, its
+  share and a have/need bar, the cost driver first. Start job closes the
+  pane and is simply grayed when the sim would refuse (the old
+  "Start: short Vetril, Helion" hint line is gone); recipe rows no longer
+  quote the fee, and their product icon now matches the market list's. Start
+  is the picker's gesture; a row click opens the recipe in the inspector. The
+  job list stays in the bottom seam, and the new panes' proportions persist
+  with the window's layout.
 
 - **Fitting limits read as boxes**: the Show Info hull page's FITTING block
   and the fitting window's HULL LIMITS block draw a hull's limits instead of

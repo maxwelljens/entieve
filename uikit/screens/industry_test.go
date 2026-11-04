@@ -3,6 +3,7 @@ package screens
 import (
 	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/uikit/widgets"
+	"image/color"
 	"strings"
 	"testing"
 
@@ -80,8 +81,9 @@ func recipeRowFor(f *Manufacturing, product content.ItemID) int {
 	return -1
 }
 
-// recipeVerdict is one recipe row's one-glance verdict: line 1's second run
-// ("● ready" / "× short 2" / "× no station" / "× slots full").
+// recipeVerdict is one recipe row's one-glance verdict glyph: line 1's
+// second run ("✓" startable, "×" refused).
+
 func recipeVerdict(r widgets.TableRow) string {
 	if len(r.Stack) == 0 || len(r.Stack[0].Segs) < 2 {
 		return ""
@@ -89,7 +91,15 @@ func recipeVerdict(r widgets.TableRow) string {
 	return r.Stack[0].Segs[1].Text
 }
 
-// recipeMeta is one recipe row's line 2 first run: the per-run time and fee.
+// recipeVerdictTint is that glyph's colour (the state).
+func recipeVerdictTint(r widgets.TableRow) color.RGBA {
+	if len(r.Stack) == 0 || len(r.Stack[0].Segs) < 2 {
+		return color.RGBA{}
+	}
+	return r.Stack[0].Segs[1].Tint
+}
+
+// recipeMeta is one recipe row's line 2 first run: the per-run time.
 func recipeMeta(r widgets.TableRow) string {
 	if len(r.Stack) < 2 || len(r.Stack[1].Segs) == 0 {
 		return ""
@@ -126,21 +136,21 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 		if r.Icons[0] == "" {
 			t.Errorf("row %d carries no product icon", i)
 		}
-		if !strings.Contains(recipeMeta(r), " s · ") {
-			t.Errorf("row %d meta = %q, want a per-run time and fee", i, recipeMeta(r))
+		if !strings.HasSuffix(recipeMeta(r), " s") || strings.Contains(recipeMeta(r), "€") {
+			t.Errorf("row %d meta = %q, want the per-run time only", i, recipeMeta(r))
 		}
 		if len(r.Stack) < 2 || len(r.Stack[1].Segs) < 2 || len(r.Stack[1].Segs[1].Split) == 0 {
 			t.Errorf("row %d carries no value-share strip", i)
 		}
 	}
-	// Undocked every row reads the same one-glance refusal (the sim's own
+	// Undocked every row reads the same one-glance cross (the sim's own
 	// gate is the authority: no industry service here).
 	chargeRow := recipeRowFor(f, "ammo-emp-s")
 	if chargeRow < 0 {
 		t.Fatal("no ammo-emp-s recipe row")
 	}
-	if got := recipeVerdict(f.recipes.Rows[chargeRow]); got != "× no station" {
-		t.Errorf("undocked verdict = %q, want × no station", got)
+	if got := recipeVerdict(f.recipes.Rows[chargeRow]); got != "×" {
+		t.Errorf("undocked verdict = %q, want the cross", got)
 	}
 
 	// Undocked: the row declares no action (a recipe's Start is the
@@ -159,8 +169,8 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 	}
 
 	// Docked at the (patched) industry station: the craft line and slot
-	// readout light up; the recipe opens with the bill short of everything,
-	// its Start greyed and the gate naming what is missing.
+	// readout light up; the recipe opens with the bill short of everything
+	// and its Start greyed.
 	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: factoryStation})
 	frame()
 	if !strings.Contains(f.craftLbl.Label, "charges L1") ||
@@ -178,8 +188,8 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 	if q.IsOpen() {
 		t.Fatal("selecting a recipe opened the picker (Start is its gesture)")
 	}
-	if got := recipeVerdict(f.recipes.Rows[chargeRow]); !strings.HasPrefix(got, "× short ") {
-		t.Errorf("empty-hold verdict = %q, want the short count", got)
+	if got := recipeVerdict(f.recipes.Rows[chargeRow]); got != "×" {
+		t.Errorf("empty-hold verdict = %q, want the cross", got)
 	}
 	if f.startBtn.GetWidget().Disabled == false {
 		t.Fatal("Start enabled with an empty hold")
@@ -189,8 +199,8 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 		t.Fatalf("a greyed Start opened the picker (%v) or enqueued %d commands", q.IsOpen(), len(*cmds))
 	}
 
-	// Stock the charge recipe and pick Start: the verdict flips, the gate
-	// clears and the picker opens on one run.
+	// Stock the charge recipe and pick Start: the verdict flips and the
+	// picker opens on one run.
 	rec := env.Content.Recipes["rec-ammo-emp-s"]
 	if rec == nil {
 		t.Fatal("fixture: rec-ammo-emp-s missing")
@@ -203,8 +213,8 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 		giveItem(env.Sim, m.Item, m.Qty)
 	}
 	frame()
-	if got := recipeVerdict(f.recipes.Rows[chargeRow]); got != "● ready" {
-		t.Errorf("stocked verdict = %q, want ● ready", got)
+	if got := recipeVerdict(f.recipes.Rows[chargeRow]); got != "✓" {
+		t.Errorf("stocked verdict = %q, want the tick", got)
 	}
 	uitest.FireButton(ui, f.startBtn)
 	frame()
@@ -614,14 +624,22 @@ func TestManufacturingAllStationJobs(t *testing.T) {
 	if got := f.jobs.Rows[0].Cells[1]; got != env.Sim.StationName("cel-huta") {
 		t.Errorf("station cell = %q, want %q", got, env.Sim.StationName("cel-huta"))
 	}
-	// The fee rides the row's second line (the list is one column of rich
-	// rows now): it still quotes the recipe's 3% mineral value per run.
+	// The recipe rows quote the run time only; the fee lives in the
+	// inspector and its profit table now (the owner's row change).
 	chargeRow := recipeRowFor(f, "ammo-emp-s")
 	if chargeRow < 0 {
 		t.Fatal("no ammo-emp-s recipe row")
 	}
-	if got := recipeMeta(f.recipes.Rows[chargeRow]); !strings.HasSuffix(got, " · 234 €") {
-		t.Errorf("row meta = %q, want the compact per-run fee (234 €)", got)
+	if got := recipeMeta(f.recipes.Rows[chargeRow]); !strings.HasSuffix(got, " s") || strings.Contains(got, "€") {
+		t.Errorf("row meta = %q, want the per-run time with no fee", got)
+	}
+	clickRow(ui, f.recipes, chargeRow)
+	frame()
+	if got := f.inspValue.Label; !strings.Contains(got, "fee 234 €") {
+		t.Errorf("inspector value line = %q, want the recipe's 234 € fee", got)
+	}
+	if got := profitValue(f, "Craft fee"); got != "234 €" {
+		t.Errorf("profit table craft fee = %q, want 234 €", got)
 	}
 
 	// Select the remote job: both local actions stay grayed.

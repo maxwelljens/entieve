@@ -63,9 +63,9 @@ func TestMarketSplitOpensAtTheSideColumn(t *testing.T) {
 	if !m.sideRail.Container().GetWidget().Rect.In(panes[2]) {
 		t.Errorf("right pane's rail %v is outside the pane %v", m.sideRail.Container().GetWidget().Rect, panes[2])
 	}
-	if !m.bookBox.GetWidget().Rect.In(panes[2]) || !m.mineBox.GetWidget().Rect.In(panes[2]) {
+	if !m.bookTbl.Container().GetWidget().Rect.In(panes[2]) || !m.mineBox.GetWidget().Rect.In(panes[2]) {
 		t.Errorf("book %v / My orders %v outside the right pane %v",
-			m.bookBox.GetWidget().Rect, m.mineBox.GetWidget().Rect, panes[2])
+			m.bookTbl.Container().GetWidget().Rect, m.mineBox.GetWidget().Rect, panes[2])
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"github.com/entieve/entieve/internal/capture"
 	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -93,30 +94,38 @@ func TestMarketCaptureFrame(t *testing.T) {
 			if !m.hasSel || item == "" {
 				fail("no item selected (hasSel=%v)", m.hasSel)
 			}
-			if got, want := m.bookLbl.Label, "Order book: "+item; got != want {
+			if got, want := m.bookLbl.Label, "ORDER BOOK"; got != want {
 				fail("book bar = %q, want %q", got, want)
+			}
+			// The head leads the pane: the item's hero icon and its
+			// description above the book.
+			if b := m.headIcon.Widget().Image.Bounds(); b.Dx() != theme.Px(theme.IconHero) {
+				fail("head icon = %v, want the %d px item hero", b, theme.Px(theme.IconHero))
+			}
+			if m.headProse.Label == "" || m.headProse.GetWidget().Rect.Empty() {
+				fail("head description missing at %v", m.headProse.GetWidget().Rect)
 			}
 			asks, bids := 0, 0
 			for _, r := range m.book {
-				switch r.Cells[3] {
+				switch r.Cells[0] {
 				case "Ask":
 					asks++
 				case "Bid":
 					bids++
 				default:
-					fail("book row side = %q, want Ask or Bid", r.Cells[3])
+					fail("book row side = %q, want Ask or Bid", r.Cells[0])
 				}
 			}
 			if asks == 0 || bids == 0 {
 				fail("%s's book shows %d asks / %d bids, want both sides", item, asks, bids)
 			}
-			if len(m.bookRows) != len(m.book) {
-				fail("book rows rendered = %d, want %d", len(m.bookRows), len(m.book))
+			if got, want := len(m.bookTbl.RowsForTest()), len(m.book); got != want {
+				fail("book rows rendered = %d, want %d", got, want)
 			}
 
 			// Both sections in the one scroll column, book first, and the
 			// book's glyphs really on screen.
-			book := m.bookBox.GetWidget().Rect
+			book := m.bookTbl.Container().GetWidget().Rect
 			mine := m.mineBox.GetWidget().Rect
 			if book.Max.Y > mine.Min.Y {
 				fail("book section %v overlaps My orders %v", book, mine)
@@ -125,9 +134,9 @@ func TestMarketCaptureFrame(t *testing.T) {
 			if !pane.In(m.Win().GetContainer().GetWidget().Rect) {
 				fail("right pane %v outside the window", pane)
 			}
-			if len(m.bookRows) > 0 {
-				if n := uitest.InkIn(img, m.bookRows[0].Root.GetWidget().Rect); n == 0 {
-					fail("book row 1 drew no glyph pixels at %v", m.bookRows[0].Root.GetWidget().Rect)
+			if len(m.book) > 0 {
+				if n := uitest.InkIn(img, m.bookTbl.RowWidgetForTest(0).GetWidget().Rect); n == 0 {
+					fail("book row 1 drew no glyph pixels at %v", m.bookTbl.RowWidgetForTest(0).GetWidget().Rect)
 				}
 			}
 			if n := uitest.InkIn(img, m.bookLbl.GetWidget().Rect); n == 0 {

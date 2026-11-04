@@ -44,9 +44,16 @@ const (
 	// widths always sum to exactly this (widgets.ShareWidths).
 	mfgStripW = 128
 	// mfgMatNameW / mfgMatBarW are a material row's name column and have/need
-	// bar widths, so every row's bar shares one left edge and one length.
-	mfgMatNameW = 96
+	// bar widths, so every row's bar shares one left edge and one length. The
+	// name column is sized to keep the 48 px icon's row inside the inspector
+	// at the window's floor (the bill's own scroll viewport).
+	mfgMatNameW = 80
 	mfgMatBarW  = 96
+
+	// mfgMatIcon is the material bill's icon box: three times the inline row
+	// icon (16 design px) the bill opened with, so the mineral's art reads at
+	// a glance (the owner's size; the row height follows the box).
+	mfgMatIcon = 48
 )
 
 // mfgDefaultW/H are the window's landing rect (see ManufacturingRect):
@@ -76,8 +83,9 @@ const (
 // Gating follows the game's menu convention: controls stay VISIBLE and
 // gray out (widget Disabled) when the player is undocked, the station
 // offers no industry service, the materials or wallet are short or the
-// slots are full, never hidden, and the Start line names the refusal
-// (which minerals are short, no station, slots busy). Jobs at another
+// slots are full, never hidden: the row and inspector verdicts carry a tick
+// (Start would accept) or a cross (it would refuse), and the bill's Danger
+// rows name which minerals are short. Jobs at another
 // station are listed but only the docked station's own jobs can be
 // collected or cancelled. Every action enqueues a sim.Command (the kit
 // never mutates sim state); the sim logs the refusal line if a gated action
@@ -114,11 +122,13 @@ type Manufacturing struct {
 
 	// The inspector: one grid rebuilt whenever its key moves (the selected
 	// recipe, the station, the slots or the material bill), the material
-	// rows in a scroll viewport with the house rail beside it.
+	// rows in a scroll viewport with the house rail beside it. The profit
+	// table is built once and re-filled (its header is static).
 	insp        *widget.Container
 	inspKey     string
 	inspName    *widget.Text
 	inspVerdict *widget.Text
+	profit      *widgets.PlainTable
 	matsLbl     *widget.Text
 	matsBox     *widget.Container
 	matsScroll  *widget.ScrollContainer
@@ -126,7 +136,6 @@ type Manufacturing struct {
 	matsRows    []*widgets.StackRow
 	inspValue   *widget.Text
 	startBtn    *widget.Button
-	gateLbl     *widget.Text
 
 	collect, cancel *widget.Button
 
@@ -256,16 +265,24 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	})
 	browse := paneStack([]bool{false, true}, f.search, f.tree.Container())
 
-	// The inspector: a fixed seven-row grid (head, verdict, the numbers, the
-	// materials label, the material viewport, Start, gate). Its content is
+	// The inspector: a fixed four-row grid (head with the verdict glyph, the
+	// numbers, the body viewport, Start), inset ContentsPad all round so the
+	// content never touches the pane's edges. The body viewport scrolls the
+	// profit table and the material bill as one page; Start stays pinned
+	// below it, so a small window never overlaps the two. Its content is
 	// rebuilt by syncInspector when the bill moves; the grid itself never
 	// changes, so the row split's pane stays one widget.
 	f.insp = widget.NewContainer(widget.ContainerOpts.Layout(widget.NewGridLayout(
 		widget.GridLayoutOpts.Columns(1),
 		widget.GridLayoutOpts.Stretch([]bool{true},
-			[]bool{false, false, false, false, true, false, false, false}),
+			[]bool{false, false, true, false}),
 		widget.GridLayoutOpts.Spacing(0, theme.Px(theme.SpSm)),
+		widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 	)))
+	// The profit table: one run's cost math as aligned label/value rows (the
+	// Finances holdings' decorless table; the label column stretches, the
+	// value column ends on the table's right edge like every figure here).
+	f.profit = widgets.NewPlainTable(env, []widgets.PlainColumn{{}, {AlignRight: true}})
 
 	// Job list: the PLAYER's jobs at every station (the global slot pool).
 	f.jobsLbl = widget.NewText(
@@ -618,56 +635,105 @@ func (f *Manufacturing) needs(rec content.RecipeID, runs int) []mfgNeed {
 	return out
 }
 
-// shortOf is the bill's short materials (have < need), canonical order.
-func shortOf(needs []mfgNeed) []mfgNeed {
-	var out []mfgNeed
-	for _, n := range needs {
-		if n.Have < n.Need {
-			out = append(out, n)
-		}
+// verdictGlyph is the board's one-glance start state, a glyph and nothing
+// else: a tick when the sim would accept the recipe now, a cross when it
+// would refuse. The shape carries the state (not colour alone); the greyed
+// Start and the bill's Danger rows say the rest.
+func verdictGlyph(ready bool) string {
+	if ready {
+		return "✓"
 	}
-	return out
+	return "×"
 }
 
-// verdictText is the board's one-glance start state: a glyph, the word and
-// (when materials are the block) the count, so the state never rides colour
-// alone (WCAG 1.4.1) and a row answers "can I run this" without a number.
-func verdictText(ready, station, slotsFree bool, short int) string {
-	switch {
-	case ready:
-		return "● ready"
-	case !station:
-		return "× no station"
-	case !slotsFree:
-		return "× slots full"
-	default:
-		return "× short " + theme.FormatInt(int64(short))
+// profitRows is the inspector's profit table: one run's material bill, craft
+// fee and total cost over the product's sale value, with the profit and its
+// margin. The basis is the content base price (the same deterministic figure
+// the cost strip and the value total read: no live market, sim untouched).
+// A product with no base price shows what it can and dashes the sale side.
+func (f *Manufacturing) profitRows(needs []mfgNeed, def *content.RecipeDef) []widgets.PlainRow {
+	p := f.th.Pal()
+	row := func(label, value string, tint color.RGBA) widgets.PlainRow {
+		return widgets.PlainRow{Cells: []string{label, value}, Tint: tint}
 	}
+	mats, fee := 0.0, 0.0
+	sale, priced := 0.0, false
+	if def != nil && f.hasSel {
+		for _, n := range needs {
+			mats += n.Value
+		}
+		fee = f.cv.JobFee(def.ID, 1)
+		if price := f.productPrice(def.Product); price > 0 {
+			sale, priced = price*float64(def.Qty), true
+		}
+	}
+	total := mats + fee
+	if def == nil || !f.hasSel {
+		out := make([]widgets.PlainRow, 0, 6)
+		for _, label := range []string{"Materials", "Craft fee", "Total cost", "Sale price", "Profit", "Margin"} {
+			out = append(out, row(label, "—", p.Dim))
+		}
+		return out
+	}
+	out := []widgets.PlainRow{
+		row("Materials", mfgMoney(mats), color.RGBA{}),
+		row("Craft fee", mfgMoney(fee), color.RGBA{}),
+		row("Total cost", mfgMoney(total), color.RGBA{}),
+	}
+	if !priced {
+		return append(out,
+			row("Sale price", "—", p.Dim),
+			row("Profit", "—", p.Dim),
+			row("Margin", "—", p.Dim))
+	}
+	profit := sale - total
+	tint := p.Good
+	if profit < 0 {
+		tint = p.Danger
+	}
+	margin := "—"
+	if sale > 0 {
+		margin = theme.PctLabel(profit / sale)
+	}
+	return append(out,
+		row("Sale price", mfgMoney(sale), color.RGBA{}),
+		row("Profit", mfgSigned(profit), tint),
+		row("Margin", margin, tint))
 }
 
-// gateText names why Start is greyed: the sim's own refusals first (no
-// industry service, all slots busy), then the short minerals by name.
-func (f *Manufacturing) gateText(needs []mfgNeed, ready, station, slotsFree bool) string {
-	switch {
-	case ready:
-		return ""
-	case !station:
-		return "Start: no industry service here"
-	case !slotsFree:
-		return "Start: all job slots busy"
+// mfgMoney renders an unsigned amount on the value lines' own scale:
+// "201,680 €".
+func mfgMoney(v float64) string {
+	return theme.GroupFloat(math.Round(v), 0) + " €"
+}
+
+// mfgSigned renders a signed amount with the typographic minus:
+// "+147,270 €" / "−4,200 €" (the owner's sample).
+func mfgSigned(v float64) string {
+	if v < 0 {
+		return "−" + mfgMoney(-v)
 	}
-	names := make([]string, 0, len(needs))
-	for _, n := range shortOf(needs) {
-		name := string(n.Item)
-		if def, ok := f.cv.Defs().Item(n.Item); ok {
-			name = def.Name
-		}
-		names = append(names, name)
+	return "+" + mfgMoney(v)
+}
+
+// productPrice is a recipe product's deterministic base price: an item's
+// base price, a module's seed price or a hull's base price (the sim's
+// marketBasePrice ladder), 0 when the id no longer resolves.
+func (f *Manufacturing) productPrice(product content.ItemID) float64 {
+	d := f.cv.Defs()
+	if d == nil {
+		return 0
 	}
-	if len(names) == 0 {
-		return "Start: the wallet cannot cover the fee"
+	if it, ok := d.Item(product); ok {
+		return it.BasePrice
 	}
-	return "Start: short " + strings.Join(names, ", ")
+	if mo, ok := d.Module(content.ModuleID(product)); ok {
+		return mo.Price
+	}
+	if sh, ok := d.Ship(content.ShipID(product)); ok {
+		return sh.BasePrice
+	}
+	return 0
 }
 
 // stripOf is a recipe row's value-share strip: one segment per mineral in
@@ -701,7 +767,7 @@ func (f *Manufacturing) Sync() {
 	runs := 1
 
 	// The recipe list: the branch (or its ranked search hits), one rich row
-	// per recipe: product and verdict on line 1, time, fee and the
+	// per recipe: product and verdict glyph on line 1, the run time and the
 	// value-share strip on line 2.
 	f.query = strings.TrimSpace(f.search.GetText())
 	scope := f.scopeRecipes()
@@ -711,7 +777,7 @@ func (f *Manufacturing) Sync() {
 	}
 	recRows := make([]widgets.TableRow, 0, len(list))
 	for _, id := range list {
-		recRows = append(recRows, f.recipeRow(station, slotsFree, id, runs))
+		recRows = append(recRows, f.recipeRow(station, id, runs))
 	}
 	if len(recRows) == 0 {
 		recRows = []widgets.TableRow{{Cells: []string{"No matches"}, TextTint: f.th.Pal().Dim}}
@@ -814,9 +880,10 @@ func (f *Manufacturing) Sync() {
 }
 
 // recipeRow is one recipe as a rich row: the product and its one-glance
-// verdict on line 1, the per-run time, fee and value-share strip on line 2.
-// The cells are only the row's fit source (the list has one column).
-func (f *Manufacturing) recipeRow(station sim.StationID, slotsFree bool, rec content.RecipeID, runs int) widgets.TableRow {
+// verdict glyph on line 1, the per-run time and the value-share strip on line
+// 2. The icon is the market list's item icon size (the owner's binding
+// target). The cells are only the row's fit source (the list has one column).
+func (f *Manufacturing) recipeRow(station sim.StationID, rec content.RecipeID, runs int) widgets.TableRow {
 	p := f.th.Pal()
 	def, _ := f.cv.Defs().Recipes[rec]
 	if def == nil {
@@ -824,7 +891,6 @@ func (f *Manufacturing) recipeRow(station sim.StationID, slotsFree bool, rec con
 	}
 	name := f.cv.TradeableName(def.Product)
 	needs := f.needs(rec, runs)
-	short := len(shortOf(needs))
 	ready := station != "" && f.cv.CanStartJob(station, rec, runs)
 	tint := p.Danger
 	if ready {
@@ -832,18 +898,18 @@ func (f *Manufacturing) recipeRow(station sim.StationID, slotsFree bool, rec con
 	}
 	payload := manufacturingRow{recipe: rec, ref: f.productRef(def.Product)}
 	return widgets.TableRow{
-		Cells: []string{name},
-		Icons: []string{widgets.TradeableIcon(f.cv.Defs(), def.Product)},
-		Data:  payload,
-		Spec:  f.rowSpec(payload),
+		Cells:    []string{name},
+		Icons:    []string{widgets.TradeableIcon(f.cv.Defs(), def.Product)},
+		IconSize: mktRowIcon,
+		Data:     payload,
+		Spec:     f.rowSpec(payload),
 		Stack: []widgets.RowLine{
 			{Segs: []widgets.RowSeg{
 				{Text: mfgClip(name, mfgNameClip), Tint: p.Accent, Step: theme.StepSmall},
-				{Text: verdictText(ready, station != "", slotsFree, short), Tint: tint, Step: theme.StepTiny},
+				{Text: verdictGlyph(ready), Tint: tint, Step: theme.StepSmall},
 			}},
 			{Segs: []widgets.RowSeg{
-				{Text: theme.GroupFloat(f.cv.JobDuration(station, rec, runs), 1) + " s · " +
-					theme.GroupFloat(math.Round(f.cv.JobFee(rec, runs)), 0) + " €", Tint: p.Dim, Step: theme.StepTiny},
+				{Text: theme.GroupFloat(f.cv.JobDuration(station, rec, runs), 1) + " s", Tint: p.Dim, Step: theme.StepTiny},
 				{Split: stripOf(needs, p), MinW: theme.Px(mfgStripW)},
 			}},
 		},
@@ -867,17 +933,17 @@ func (f *Manufacturing) syncInspector(station sim.StationID, slotsFree bool, nee
 		return widget.NewText(widget.TextOpts.Text("", f.th.Face(size), theme.Solid(tint)))
 	}
 
-	// Head: the product's own art beside its name, the same icon the list
-	// row leads with, at the header box.
+	// Head: the product's own art, its name and the verdict glyph on one
+	// line (the same icon the list row leads with, at the header box).
 	def, _ := f.cv.Defs().Recipes[f.sel.recipe]
 	name, icon := "No recipe selected", ""
-	verdict, value, gate := "", "Select a recipe to see what it takes.", ""
+	verdict, value := "", "Select a recipe to see what it takes."
 	var ready bool
 	if def != nil && f.hasSel {
 		name = f.cv.TradeableName(def.Product)
 		icon = widgets.TradeableIcon(f.cv.Defs(), def.Product)
 		ready = station != "" && f.cv.CanStartJob(station, f.sel.recipe, 1)
-		verdict = verdictText(ready, station != "", slotsFree, len(shortOf(needs)))
+		verdict = verdictGlyph(ready)
 		total := 0.0
 		for _, n := range needs {
 			total += n.Value
@@ -885,39 +951,47 @@ func (f *Manufacturing) syncInspector(station sim.StationID, slotsFree bool, nee
 		value = theme.GroupFloat(f.cv.JobDuration(station, f.sel.recipe, 1), 1) + " s · fee " +
 			theme.GroupFloat(math.Round(f.cv.JobFee(f.sel.recipe, 1)), 0) + " € · value " +
 			theme.GroupFloat(math.Round(total), 0) + " €"
-		gate = f.gateText(needs, ready, station != "", slotsFree)
 	}
 	head := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(theme.IconGap)),
+		widget.ContainerOpts.Layout(widget.NewGridLayout(
+			widget.GridLayoutOpts.Columns(3),
+			widget.GridLayoutOpts.Stretch([]bool{false, true, false}, nil),
+			widget.GridLayoutOpts.Spacing(theme.Px(theme.IconGap), 0),
 		)),
 	)
 	box := theme.NewIconBox(theme.IconButton)
 	box.Set(icon, p.Text)
+	box.Widget().GetWidget().LayoutData = widget.GridLayoutData{VerticalPosition: widget.GridLayoutPositionCenter}
 	f.inspName = step(theme.StepSmall, p.Accent)
 	f.inspName.Label = name
-	head.AddChild(box.Widget(), f.inspName)
-
+	f.inspName.GetWidget().LayoutData = widget.GridLayoutData{VerticalPosition: widget.GridLayoutPositionCenter}
 	f.inspVerdict = step(theme.StepTiny, p.Danger)
 	if ready {
 		f.inspVerdict = step(theme.StepTiny, p.Good)
 	}
 	f.inspVerdict.Label = verdict
+	f.inspVerdict.GetWidget().LayoutData = widget.GridLayoutData{VerticalPosition: widget.GridLayoutPositionCenter}
+	head.AddChild(box.Widget(), f.inspName, f.inspVerdict)
 	f.inspValue = step(theme.StepTiny, p.Dim)
 	f.inspValue.Label = value
-	f.gateLbl = step(theme.StepTiny, p.Warn)
-	f.gateLbl.Label = gate
+	f.profit.SetRows(f.profitRows(needs, def))
 
-	// The bill: one row per mineral, the cost driver first (the acceptance
-	// answer to "which mineral dominates"), each row the mineral's own art,
-	// its share of the run's value and its have/need bar.
+	// The body page: the profit table's bar and rows, then the materials
+	// label and the bill, one row per mineral, the cost driver first (the
+	// acceptance answer to "which mineral dominates"), each row the
+	// mineral's own art, its share of the run's value and its have/need bar.
 	f.matsLbl = widget.NewText(
 		widget.TextOpts.Text("MATERIALS · most value first", f.th.Face(theme.StepTiny), theme.Solid(p.Accent)),
 	)
+	// The page's children keep their own heights (the table is not a bill
+	// row), so the box is a plain vertical run, not the equal-row stack.
 	f.matsBox = widget.NewContainer(
-		widget.ContainerOpts.Layout(widgets.StackLayout{Gap: theme.Px(theme.SpSm)}),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Spacing(theme.Px(theme.SpSm)),
+		)),
 	)
+	f.matsBox.AddChild(sectionBar(f.th, "PROFIT"), f.profit.Container(), f.matsLbl)
 	bill := append([]mfgNeed(nil), needs...)
 	total := 0.0
 	for _, n := range bill {
@@ -956,8 +1030,7 @@ func (f *Manufacturing) syncInspector(station sim.StationID, slotsFree bool, nee
 	)
 	startBar.AddChild(f.startBtn)
 
-	f.insp.AddChild(head, f.inspVerdict, f.inspValue, f.matsLbl, f.matsRail.Container(),
-		startBar, f.gateLbl)
+	f.insp.AddChild(head, f.inspValue, f.matsRail.Container(), startBar)
 	f.insp.RequestRelayout()
 }
 
@@ -966,10 +1039,10 @@ func (f *Manufacturing) matRow(n mfgNeed, total float64, p theme.Palette) *widge
 	return widgets.NewStackRow(f.seams(), f.matRowDef(n, total, p), f.th.Face(theme.StepSmall))
 }
 
-// matRowDef is one mineral of the bill: its own art and name, its share of
-// the run's material value (line 1) and its have/need bar with the exact
-// numbers (line 2). The bar's length is have/need clamped and its tint the
-// state.
+// matRowDef is one mineral of the bill: its own art at the bill's own icon box
+// and name, its share of the run's material value (line 1) and its have/need
+// bar with the exact numbers (line 2). The bar's length is have/need clamped
+// and its tint the state.
 func (f *Manufacturing) matRowDef(n mfgNeed, total float64, p theme.Palette) widgets.TableRow {
 	name := string(n.Item)
 	if def, ok := f.cv.Defs().Item(n.Item); ok {
@@ -988,8 +1061,9 @@ func (f *Manufacturing) matRowDef(n mfgNeed, total float64, p theme.Palette) wid
 		state = p.Danger
 	}
 	row := widgets.TableRow{
-		Cells: []string{name},
-		Icons: []string{widgets.TradeableIcon(f.cv.Defs(), n.Item)},
+		Cells:    []string{name},
+		Icons:    []string{widgets.TradeableIcon(f.cv.Defs(), n.Item)},
+		IconSize: mfgMatIcon,
 		Stack: []widgets.RowLine{
 			{Segs: []widgets.RowSeg{
 				{Text: name, MinW: theme.Px(mfgMatNameW), Step: theme.StepSmall},

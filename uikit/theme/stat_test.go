@@ -65,7 +65,7 @@ func TestSectionBarGlyphs(t *testing.T) {
 		"SENSORS", "CARGO", "MANUFACTURED FROM", "USED IN", "PROPERTIES",
 		"ACTIVATION", "DAMAGE", "RANGE", "FIRING", "CHARGE", "YIELD", "REPAIR",
 		"EFFECT", "BONUSES", "CHARGES", "MARKET", "REFINES TO", "DOSSIER",
-		"BEHAVIOR", "LOOT", "PROFICIENCY",
+		"BEHAVIOR", "LOOT", "PROFICIENCY", "ORDER BOOK", "MY ORDERS", "PROFIT",
 	} {
 		icon, tint := SectionBar(p, label)
 		if icon != "" && !icons.Has(icon) {
