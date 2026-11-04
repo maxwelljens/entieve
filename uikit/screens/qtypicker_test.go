@@ -160,8 +160,13 @@ func TestQtyPickerRefineLadder(t *testing.T) {
 	}
 	clickRow(ui, r.ores, row)
 	frame()
+	if q.IsOpen() {
+		t.Fatal("the row click opened the picker (Refine is the inspector's button)")
+	}
+	uitest.FireButton(ui, r.refineBtn)
+	frame()
 	if !q.IsOpen() {
-		t.Fatal("selecting an ore opened no picker")
+		t.Fatal("Refine opened no picker")
 	}
 	ticks := q.Slider().TickPositions()
 	if len(ticks) != 3 {
@@ -193,10 +198,16 @@ func TestQtyPickerRefineLadder(t *testing.T) {
 			cargo.Ore[i].Qty = 0
 		}
 	}
-	clickRow(ui, r.ores, row)
+	// The button is the gate and it stops opening below a batch; the picker's
+	// own ladder still reports the empty rung set when it is asked directly.
+	frame()
+	if !r.refineBtn.GetWidget().Disabled {
+		t.Error("Refine enabled below one batch")
+	}
+	env.OpenQty(widgets.QtyPick{Mode: widgets.QtyRefine, Item: "ore-cordite"})
 	frame()
 	if !q.IsOpen() {
-		t.Fatal("the picker must still open below one batch")
+		t.Fatal("the picker must still open below one batch when asked directly")
 	}
 	if got := len(q.Slider().TickPositions()); got != 0 {
 		t.Errorf("ladder ticks = %d, want none below one batch", got)
@@ -325,8 +336,13 @@ func TestQtyPickerOnAKit(t *testing.T) {
 	}
 	clickRow(k.ui, ref.ores, row)
 	kitFrame(t, k, panels, 1024, 700)
+	if k.QtyOpen() {
+		t.Fatal("the row click mounted a picker (Refine is the inspector's button)")
+	}
+	uitest.FireButton(k.ui, ref.refineBtn)
+	kitFrame(t, k, panels, 1024, 700)
 	if !k.QtyOpen() {
-		t.Fatal("the selection gesture mounted no picker on the kit")
+		t.Fatal("Refine mounted no picker on the kit")
 	}
 	win := k.QtyWindow()
 	if _, mounted := k.mountOf(win); !mounted {
@@ -364,10 +380,10 @@ func TestQtyPickerOnAKit(t *testing.T) {
 	}
 
 	// Confirm on the kit emits the picker's intent and unmounts.
-	clickRow(k.ui, ref.ores, row)
+	uitest.FireButton(k.ui, ref.refineBtn)
 	kitFrame(t, k, panels, 1024, 700)
 	if !k.QtyOpen() {
-		t.Fatal("re-select opened no picker")
+		t.Fatal("the second Refine opened no picker")
 	}
 	uitest.FireButton(k.ui, k.QtyWin().Confirm())
 	kitFrame(t, k, panels, 1024, 700)
@@ -404,6 +420,8 @@ func TestQtyPickerEverySurfaceIntent(t *testing.T) {
 			t.Fatalf("no cordite row in %+v", r.ores.Rows)
 		}
 		clickRow(ui, r.ores, row)
+		pumpQty(t, ui, env, r.Sync, 1024, 700)
+		uitest.FireButton(ui, r.refineBtn)
 		pumpQty(t, ui, env, r.Sync, 1024, 700)
 		uitest.FireButton(ui, env.QtyWindow().Confirm())
 		if len(*cmds) != 1 {

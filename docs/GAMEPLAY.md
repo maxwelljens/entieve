@@ -120,7 +120,7 @@ work; the opposite edge stays fixed and the window never shrinks below
 its minimum size), and click anywhere on a window to raise it to the
 front.
 
-**Multi-pane windows** (Inventory, Fitting, Manufacturing and the
+**Multi-pane windows** (Inventory, Fitting, Manufacturing, Refinery and the
 Market) carry **draggable seams** between their lists: the seam is a
 recessed track with a dotted grip in its middle (the grip lights up under
 the pointer) and an about 8 px grab band (the cursor turns into the up/down
@@ -128,10 +128,11 @@ arrow over it), and dragging it trades height between the two lists it
 separates, so a long hangar or job list can be given the room. Each pane
 keeps a minimum height, so nothing collapses, and the proportions are saved
 with the window's layout (see **Your layout persists**). The market's two
-seams (browse | catalog | my orders) and the manufacturing board's two
-(browse | recipes | the selected recipe) run left/right and trade width the
-same way; the manufacturing board's third seam trades its height with the
-job list under it.
+seams (browse | catalog | my orders), the manufacturing board's two
+(browse | recipes | the selected recipe) and the refinery's two
+(browse | ores | the selected ore) run left/right and trade width the same
+way; the manufacturing board's third seam trades its height with the job
+list under it.
 
 The **Refinery** and **Manufacturing** windows carry an artwork **header band**
 under their title bar: `assets/artwork/refining_header.jpg` and
@@ -792,16 +793,15 @@ rebuilt interface starts at 1 again). `Esc` cancels it *before* anything
 else (no window closes behind it and the Esc menu never opens), and a
 cancelled picker commits nothing.
 
-What opens it is the action, not the amount: in the **Refinery** window
-selecting the row *is* the action (an ore), so the picker appears on the
-click, and in the **Manufacturing** window it is the inspector's **Start
-job**; the **Market** and **Inventory** windows have several verbs over one
-selection, so their toolbar buttons (Buy, Sell / To Cargo, To Ore, To
-Hangar) and the rows' right-click verbs each open it with their own verb
-pre-set. The refinery's
-slider is **notched** to whole 100-ore batches (a stock under one batch
-opens it with an empty ladder and Confirm grayed); every other surface is a
-free 1–100 in single steps. Nothing new is clamped: the simulation still
+What opens it is the action, not the amount: in the **Refinery** window it
+is the inspector's **Refine** and in the **Manufacturing** window the
+inspector's **Start job**, one gesture each on the selected entry; the
+**Market** and **Inventory** windows have several verbs over one selection,
+so their toolbar buttons (Buy, Sell / To Cargo, To Ore, To Hangar) and the
+rows' right-click verbs each open it with their own verb pre-set. The
+refinery's slider is **notched** to whole 100-ore batches, and its Refine is
+grayed until one whole batch sits in the holds, so the ladder always opens
+with a rung; every other surface is a free 1–100 in single steps. Nothing new is clamped: the simulation still
 refuses an unaffordable, oversold or unfittable amount with its own log
 line, exactly as it did behind the ticker.
 
@@ -868,16 +868,42 @@ first; the two-tier chain.
 
 ## The refinery
 
-The **Refinery** window (the rail's Industry section) lists every ore stack in your cargo and ore hold and
-previews exactly what **Refine** would yield: `floor(refine_yield × qty)`
-per mineral. Selecting an ore opens the **quantity picker** with a notched
-ladder of whole **100-ore batches** (100, 200, 300, … capped at that
-ore's stock), so 250 ore offers two batches and 50 ore offers none (the
-picker's preview says a batch needs 100 ore and Confirm stays grayed).
-Refined minerals always land in the station hangar (never in your ship's
-hold), and the hangar is unlimited, so a full hold never blocks a refine;
-the picker's preview names the destination (`→ station hangar`). **Hovžan**
-at Młondan and **Jalvrek** run refineries.
+The **Refinery** window (the rail's Industry section) is read the
+manufacturing board's way, in three panes over two draggable seams.
+**Browse** (left) lists the ore groups (`Materials/Ore`) with `All` at the
+root, and the search field above it filters the ore list live over the ore's
+name, its group and the **minerals it yields**: type "Sideron" and every ore
+that refines into it answers. **Ores** (middle) lists every ore stack in your
+cargo and ore hold, one row each: the ore's icon at the market list's size and
+its name with a single verdict glyph, a green tick when Refine would work
+right now (you are at a refinery and hold a whole batch of that ore) and a red
+cross when it would not; under it the held count and a **strip** split per
+output mineral by that mineral's share of the batch's value, so one glance
+says which ore pays and which mineral dominates. Clicking a row opens it in
+the inspector; it does not refine anything.
+
+**The selected ore** (right) leads with the ore's head, the market's own:
+hero icon, the name carrying the same tick or cross, and the ore's
+description wrapped to the pane. Under it sits the **refine math**, the
+question "refine this or sell it raw" answered off the station's live order
+book and never a content base price: **Ore value** is what one 100-ore batch
+fetches if you sell it here (the bids walked best first), **Minerals value**
+is what its minerals fetch at the same book, **Refine delta** is the
+difference (green at zero or above, red below) and **Margin** is that delta
+over the minerals' value. A side nobody here buys dashes `no bid` and the two
+lines below it dash with it. There is no fee line: refining costs no money.
+Below it the **yield bill** lists one batch's minerals, the most valuable
+first, each with its own art, its share of the batch's mineral value, the
+amount `floor(refine_yield × 100)` per batch and its value. **Refine** closes
+the pane; while the sim would refuse it is simply grayed.
+
+Refine opens the **quantity picker** with a notched ladder of whole
+**100-ore batches** (100, 200, 300, … capped at that ore's stock), so 250 ore
+offers two batches and 50 ore offers none (Refine stays grayed under one
+batch). Refined minerals always land in the station hangar (never in your
+ship's hold), and the hangar is unlimited, so a full hold never blocks a
+refine; the picker's preview names the destination (`→ station hangar`).
+**Hovžan** at Młondan and **Jalvrek** run refineries.
 
 Stations get better at their own work: every completed run raises that
 station's **craft** in the recipe's family (hulls, modules, charges), up

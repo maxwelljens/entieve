@@ -237,11 +237,15 @@ const layoutBytesGolden = `{
       "open": false
     },
     "refinery": {
-      "x": 430,
-      "y": 160,
-      "w": 420,
-      "h": 400,
-      "open": false
+      "x": 260,
+      "y": 100,
+      "w": 760,
+      "h": 520,
+      "open": false,
+      "splits": {
+        "refinery-inspector": 0.6413043478260869,
+        "refinery-tree": 0.25
+      }
     },
     "scanner": {
       "x": 483,

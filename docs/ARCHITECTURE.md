@@ -1028,8 +1028,10 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > it sets one, as the market does). Version-2 sidecars still load: they
 > carry no ratios, so every seam starts at its default and the next write
 > is v3. Wired: Inventory (cargo/ore, ore/hangar), Fitting
-> (slots/hangar), Manufacturing (recipes/jobs), Market (browse tree /
-> catalog / My orders, two seams (`market-tree` and `market-orders`): 176 px
+> (slots/hangar), Manufacturing (board/jobs, browse/recipes,
+> recipes/inspector), Refinery (browse/ore list, ore list/inspector), Market
+> (browse tree / catalog / My orders, two seams (`market-tree` and
+> `market-orders`): 176 px
 > of browse and the old fixed 240 px column are their opening shares of the
 > 760×560 landing rect; the pane floor is `SplitMinPane`).
 
@@ -1125,9 +1127,11 @@ through `sim`'s read side rather than re-derived in `uikit`.
   shown), Inventory (cargo + ore hold), Fitting (hull identity + stats
   with per-type EHP, the slot tile grid, the DPS/capacitor summary and the
   hangar),
-  Manufacturing (jobs, fees, three global slots, craft levels and material
-  counts at a docked `industry` station), Refinery (whole 100-ore batch
-  ore→mineral yield preview at a `refine` station), Station services (repair/market/refine/
+  Manufacturing (recipe board: browse tree, recipe list with its verdict and
+  cost strip, the selected recipe's book-priced profit table and material
+  bill, and the global job list), Refinery (ore board: browse tree, ore list
+  with its verdict and value strip, the selected ore's book-priced refine math
+  and yield bill, at a `refine` station), Station services (repair/market/refine/
   fitting tabs), Starmap (system graph, current system highlighted:
   click selects, gates are used in-system), Log (event feed).
 - `game`: scene stack. Space scene is the hub. `Options.StartInTitle`

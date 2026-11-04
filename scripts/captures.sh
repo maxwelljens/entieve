@@ -45,6 +45,7 @@ captures() {
 ./uikit/screens TestWindowClipCapture
 ./uikit/screens TestWindowFadeAndTranslucencyCapture
 ./uikit/screens TestManufacturingCaptureFrame
+./uikit/screens TestRefineryCaptureFrame
 EOF
 }
 

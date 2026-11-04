@@ -9,11 +9,11 @@ import (
 	"github.com/entieve/entieve/sim"
 )
 
-// TestRefineryWindow: the ore list, the per-batch yield column, the
-// selection gesture opening the quantity picker on the whole-batch
-// ladder (100, 200, … capped at the stock), the Confirm's CmdRefine
-// end-to-end, and the hangar destination (a full ship hold never blocks
-// a refine).
+// TestRefineryWindow: the ore list's rich rows (held count and one-batch yield
+// strip), the click that selects and opens the inspector, the inspector's
+// Refine button opening the quantity picker on the whole-batch ladder (100,
+// 200, … capped at the stock), the Confirm's CmdRefine end-to-end, and the
+// hangar destination (a full ship hold never blocks a refine).
 func TestRefineryWindow(t *testing.T) {
 	env, cmds := newChromeEnv(t)
 	r := NewRefinery(env)
@@ -34,33 +34,55 @@ func TestRefineryWindow(t *testing.T) {
 	giveItem(env.Sim, "ore-cordite", 40)
 	frame()
 
-	// Undocked: the ore is listed with its one-batch yield, the row's
-	// Refine verb is grayed, and selecting it opens nothing.
+	// Undocked: the ore is listed with its held count and the batch's value
+	// strip (35 Sideron at 6 € and 30 Nixium at 14 €, canonical order), the
+	// row's verdict is the cross, and neither the click nor a forced press on
+	// the grayed Refine opens the picker.
 	row := corditeRow()
-	if got := r.ores.Rows[row].Cells[1]; got != "100" {
-		t.Errorf("held cell = %q, want 100 (60 shipped + 40 added)", got)
+	if got := r.ores.Rows[row].Cells[0]; got != "Kerngrit Ore" {
+		t.Errorf("ore cell = %q, want the display name", got)
 	}
-	// The column quotes one batch: floor(0.35×100)=35 sideron, floor(0.3×100)=30 nixium.
-	if got := r.ores.Rows[row].Cells[2]; got != "35 Sideron · 30 Nixium" {
-		t.Errorf("yield cell = %q, want 35 Sideron · 30 Nixium", got)
+	if got := r.ores.Rows[row].Stack[1].Segs[0].Text; got != "100 held" {
+		t.Errorf("held line = %q, want 100 held (60 shipped + 40 added)", got)
 	}
-	if act := r.ores.Rows[row].Spec.Actions[0]; !act.Disabled {
-		t.Fatal("Refine verb enabled while undocked")
+	split := r.ores.Rows[row].Stack[1].Segs[1].Split
+	if len(split) != 2 || split[0].Share != 35*6 || split[1].Share != 30*14 {
+		t.Errorf("yield strip = %+v, want 210 € Sideron then 420 € Nixium", split)
 	}
-	clickRow(ui, r.ores, row)
-	frame()
-	if q.IsOpen() {
-		t.Fatal("picker opened away from a refine station")
+	if got := oreVerdictText(r.ores.Rows[row]); got != "×" {
+		t.Errorf("undocked verdict = %q, want the cross", got)
 	}
-
-	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: home})
+	if !r.refineBtn.GetWidget().Disabled {
+		t.Fatal("Refine enabled while undocked")
+	}
 	clickRow(ui, r.ores, row)
 	frame()
 	if !r.hasSel || r.sel.ore != "ore-cordite" {
 		t.Fatalf("selection = %+v (hasSel=%v), want cordite", r.sel, r.hasSel)
 	}
+	if q.IsOpen() {
+		t.Fatal("the row click opened the picker (Refine is the inspector's gesture)")
+	}
+	uitest.FireButton(ui, r.refineBtn)
+	frame()
+	if q.IsOpen() {
+		t.Fatal("picker opened away from a refine station")
+	}
+
+	// Docked: the head names the ore with the tick and the Refine button opens
+	// the picker at the first whole batch.
+	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: home})
+	frame()
+	if got := r.head.headName.Label; got != "Kerngrit Ore  ✓" {
+		t.Errorf("inspector head = %q, want the ore with the tick", got)
+	}
+	if r.refineBtn.GetWidget().Disabled {
+		t.Fatal("Refine still grayed at a refine station with a whole batch")
+	}
+	uitest.FireButton(ui, r.refineBtn)
+	frame()
 	if !q.IsOpen() {
-		t.Fatal("selecting an ore opened no picker")
+		t.Fatal("Refine opened no picker")
 	}
 	if got := q.TitleText(); got != "Quantity" {
 		t.Errorf("picker title = %q, want the base name Quantity", got)
@@ -123,32 +145,21 @@ func TestRefineryWindow(t *testing.T) {
 		t.Errorf("minerals landed in the ship's cargo (%d units)", got)
 	}
 
-	// 50 left is under one batch: the selection still opens the picker, on
-	// an empty ladder with Confirm grayed and the wording a batch needs —
-	// and the window's status line says the same.
+	// 50 left is under one batch: the row's verdict is the cross and the
+	// Refine button is grayed — it opens nothing, even when fired past the
+	// gate.
 	frame()
-	clickRow(ui, r.ores, row)
+	if got := oreVerdictText(r.ores.Rows[corditeRow()]); got != "×" {
+		t.Errorf("sub-batch verdict = %q, want the cross", got)
+	}
+	if !r.refineBtn.GetWidget().Disabled {
+		t.Fatal("Refine enabled with less than one batch")
+	}
+	uitest.FireButton(ui, r.refineBtn)
 	frame()
-	if !q.IsOpen() {
-		t.Fatal("the picker must still open below one batch")
+	if q.IsOpen() {
+		t.Fatal("a grayed Refine opened the picker")
 	}
-	if !q.Confirm().GetWidget().Disabled {
-		t.Fatal("Confirm enabled with less than one batch")
-	}
-	if got := len(q.Slider().TickPositions()); got != 0 {
-		t.Errorf("ladder ticks = %d, want the empty ladder below one batch", got)
-	}
-	if got := q.DetailText(); !strings.Contains(got, "One batch needs 100 ore; you hold 50 Kerngrit Ore.") {
-		t.Errorf("preview = %q, want the one-batch message", got)
-	}
-	if !strings.Contains(r.status.Label, "One batch needs 100 ore; you hold 50 Kerngrit Ore.") {
-		t.Errorf("status = %q, want the one-batch message", r.status.Label)
-	}
-	uitest.FireButton(ui, q.Confirm())
-	if len(*cmds) != 1 {
-		t.Fatalf("grayed Confirm enqueued a command (%d total)", len(*cmds))
-	}
-	q.Close()
 
 	// A packed-to-capacity hold never blocks a refine: the minerals always
 	// land in the station hangar, so the window makes no cargo-full
@@ -164,11 +175,11 @@ func TestRefineryWindow(t *testing.T) {
 	}
 	cargo.Capacity = used // zero free space
 	frame()
-	if strings.Contains(r.status.Label, "cargo full") {
-		t.Errorf("status = %q, want no cargo-full warning", r.status.Label)
-	}
-	clickRow(ui, r.ores, row)
+	uitest.FireButton(ui, r.refineBtn)
 	frame()
+	if !q.IsOpen() {
+		t.Fatal("a full hold blocked the picker")
+	}
 	if !strings.Contains(q.NoteText(), "hangar") {
 		t.Errorf("preview note = %q, want the hangar destination", q.NoteText())
 	}

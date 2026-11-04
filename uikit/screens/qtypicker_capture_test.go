@@ -8,17 +8,18 @@ import (
 	"testing"
 
 	"github.com/entieve/entieve/internal/capture"
+	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
-// TestRefineryPickerCapture renders the refinery with an ore selected and
-// the quantity picker up, through a real ebiten loop, and pins what the
-// headless suite cannot read back: the modal little window over the
-// panel, its notched ladder (one tick per whole 100-ore batch, the handle
-// on the first), the live readout and the preview line. The PNG lands in
-// $ENTIEVE_CAPTURE_DIR (default /tmp/opencode).
+// TestRefineryPickerCapture renders the refinery with an ore selected, its
+// inspector's Refine pressed and the quantity picker up, through a real
+// ebiten loop, and pins what the headless suite cannot read back: the modal
+// little window over the panel, its notched ladder (one tick per whole 100-ore
+// batch, the handle on the first), the live readout and the preview line. The
+// PNG lands in $ENTIEVE_CAPTURE_DIR (default /tmp/opencode).
 //
 // Skipped unless ENTIEVE_CAPTURE=1; one ebiten loop per process — run it
 // on its own:
@@ -29,7 +30,7 @@ func TestRefineryPickerCapture(t *testing.T) {
 	k.SetCoreVisible(false) // the refinery and its picker only
 	ref := NewRefinery(k.Env())
 	k.AddWindow(ref.Win())
-	ref.Win().SetLocation(image.Rect(24, 24, 24+theme.Px(430), 24+theme.Px(430)))
+	ref.Win().SetLocation(image.Rect(24, 24, 24+theme.Px(rfDefaultW), 24+theme.Px(rfDefaultH)))
 	// 250 ore held: a two-rung ladder (100, 200) and the 200-ore preview.
 	giveItem(k.Sim, "ore-cordite", 150)
 	k.Sim.Docked.Set(k.Sim.Player(), sim.Docked{At: "cel-haven-rest"})
@@ -55,14 +56,14 @@ func TestRefineryPickerCapture(t *testing.T) {
 				if row < 0 {
 					return fmt.Errorf("no cordite row in %+v", ref.ores.Rows)
 				}
-				clickRow(k.ui, ref.ores, row) // the selection gesture
+				clickRow(k.ui, ref.ores, row) // the selection gesture (inspector)
+				uitest.FireButton(k.ui, ref.refineBtn)
 				openAt = frames
 				// The kit centres the picker on the mount (inside the click), so
-				// move it after the gesture: beside the panel rather than over its
-				// status line, so the frame shows the whole body next to the list
-				// it came from.
+				// move it after the gesture: beside the panel, so the frame shows
+				// the whole body next to the inspector that opened it.
 				q := k.QtyWin().Win()
-				q.SetLocation(image.Rect(470, 300, 470+theme.Px(qtyMinW), 300+theme.Px(qtyMinH)))
+				q.SetLocation(image.Rect(800, 240, 800+theme.Px(qtyMinW), 240+theme.Px(qtyMinH)))
 			}
 			if err := k.Update(); err != nil {
 				return err
