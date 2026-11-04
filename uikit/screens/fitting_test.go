@@ -347,6 +347,7 @@ func TestFittingHangarDoubleClickFits(t *testing.T) {
 // Info double-click; its right-click menu still offers Fit/Unefit.
 func TestFittingTileDoubleClickShowsInfo(t *testing.T) {
 	env, cmds := newChromeEnv(t)
+	dockAtStation(t, env.Sim) // the actions need the station's fitting service
 	f := NewFitting(env)
 	ui := newWindowUI(t, env, f.Win())
 	uitest.PumpWindow(t, ui, f.Sync, 1024, 700)

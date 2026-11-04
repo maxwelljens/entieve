@@ -397,7 +397,7 @@ func TestPickerReadoutFitsItsValue(t *testing.T) {
 		}
 
 		// Open the picker on the cargo stack and walk its value.
-		env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+		dockAtStation(t, env.Sim)
 		clickRow(ui, inv.cargo, 0)
 		pumpQty(t, ui, env, inv.Sync, 1280, 720)
 		inv.sellClicked()

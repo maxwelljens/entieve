@@ -366,7 +366,9 @@ func TestRailGatingAndToggle(t *testing.T) {
 		t.Error("open entry does not draw the accent glow")
 	}
 	cv.docked = true
-	cv.station = widgets.StationInfo{Name: "Stub", Services: []string{"market"}}
+	// A station that runs market only: the effective access table is the
+	// gate the rail reads.
+	cv.svc = map[string]bool{"market": true}
 	r.Sync()
 	if r.Button("Scanner").GetWidget().Disabled != true {
 		t.Error("SpaceOnly entry is not grayed while docked")
@@ -381,7 +383,7 @@ func TestRailGatingAndToggle(t *testing.T) {
 		t.Error("DockedOnly entry grayed while docked")
 	}
 	// At a station WITH fitting the entry comes back.
-	cv.station.Services = []string{"market", "fitting"}
+	cv.svc = map[string]bool{"market": true, "fitting": true}
 	r.Sync()
 	if r.Button("Fitting").GetWidget().Disabled {
 		t.Error("entry still grayed at a station offering its service")
@@ -459,16 +461,19 @@ func TestRailGroupsAndOrder(t *testing.T) {
 }
 
 // TestEntryEnabledRules pins the pure context rule: SpaceOnly grays
-// docked, DockedOnly grays in space, a station-dependent entry grays
-// only while docked at a station lacking its service, and everything
-// else is available.
+// docked, DockedOnly grays in space, a station-dependent entry follows the
+// sim's effective access only while docked (so a remnant's dark service
+// grays exactly like an unoffered one), and everything else is available.
 func TestEntryEnabledRules(t *testing.T) {
+	offer := func(svc string) func(string) bool {
+		return func(have string) bool { return have == svc }
+	}
 	for _, tc := range []struct {
-		name     string
-		entry    RailEntry
-		docked   bool
-		services []string
-		want     bool
+		name   string
+		entry  RailEntry
+		docked bool
+		access func(string) bool
+		want   bool
 	}{
 		{"plain in space", RailEntry{}, false, nil, true},
 		{"plain docked", RailEntry{}, true, nil, true},
@@ -477,11 +482,12 @@ func TestEntryEnabledRules(t *testing.T) {
 		{"docked-only in space", RailEntry{DockedOnly: true}, false, nil, false},
 		{"docked-only docked", RailEntry{DockedOnly: true}, true, nil, true},
 		{"service undocked", RailEntry{Service: "fitting"}, false, nil, true},
-		{"service present", RailEntry{Service: "fitting"}, true, []string{"market", "fitting"}, true},
-		{"service absent", RailEntry{Service: "fitting"}, true, []string{"market"}, false},
+		{"service present", RailEntry{Service: "fitting"}, true, offer("fitting"), true},
+		{"service absent", RailEntry{Service: "fitting"}, true, offer("market"), false},
+		{"service dark at a remnant", RailEntry{Service: "industry"}, true, offer("market"), false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := entryEnabled(tc.entry, tc.docked, tc.services); got != tc.want {
+			if got := entryEnabled(tc.entry, tc.docked, tc.access); got != tc.want {
 				t.Errorf("entryEnabled = %v, want %v", got, tc.want)
 			}
 		})

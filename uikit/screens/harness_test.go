@@ -88,6 +88,21 @@ func newChromeEnv(t *testing.T) (*testEnv, *[]sim.Command) {
 	return newTestEnv(t)
 }
 
+// dockAtStation docks the fixture player at the start system's first station
+// (world-showcase: Haven Rest, which runs every service): the dock a station
+// service gate actually resolves. A bare celestial id stands for no station,
+// so a test that docked at one used to pass gates it could never reach.
+func dockAtStation(t *testing.T, s *sim.Sim) {
+	t.Helper()
+	for _, cel := range s.System().Celestials {
+		if cel.Station != nil {
+			s.Docked.Set(s.Player(), sim.Docked{At: cel.ID})
+			return
+		}
+	}
+	t.Fatal("fixture: the start system has no station")
+}
+
 // chromeUI is the shared chrome test harness: an interface root (anchor
 // layout) holding the anchored panels plus any windows, driven through
 // Sync → Update → Draw exactly the way the game will drive it.

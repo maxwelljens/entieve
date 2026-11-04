@@ -151,7 +151,8 @@ Services), **World** (Scanner, Starmap, Log) and **Help & System**
 hint); click once to open (a freshly opened window lands on top) and
 again to close it. An entry you cannot use right now is **grayed, never
 hidden** (the services view and manufacturing in space, the scanner while
-docked, fitting at a station without the fitting service); clicking a
+docked, fitting at a station without the fitting service, and industry or
+fitting at a **remnant** that no longer runs them); clicking a
 grayed entry does nothing. A window that is open wears the entry's amber
 glow, and the glyphs are colour-coded by section: **Ship** cyan,
 **Trade** green, **Industry** orange, **Station** gold, **World** blue,
@@ -552,7 +553,10 @@ shape. Click a tile to select it, right-click for **Show Info** /
 **Fit module** / **Unefit slot**, double-click a fitted tile for its
 details. Under the grid sits the **Hangar**: **fit** modules from it into
 their first free slot (double-click a module does exactly that) and
-**unfit** them back, and **assemble** stored hulls. A **Fitting summary**
+**unfit** them back, and **assemble** stored hulls. **Fit**, **Unefit** and
+**Assemble** gray in space and wherever the station does not run fitting (a
+**remnant** included): the window opens anywhere, the verbs follow the sim's
+own refusal. A **Fitting summary**
 strip closes the window: the fit's **Total DPS** (each weapon's loaded or
 selected round over its fire period, exactly the round the bay would fire),
 the **Cap drain** of the running modules against the
@@ -1142,7 +1146,8 @@ supply. **Starve the war and the charter loses ground.**
 **Remnants.** When a system falls under you, nothing evicts you and nothing
 closes your dock. The station becomes a **remnant**: market and repair stay
 open (lawless), while industry, fitting and the charter desk go dark until
-someone reclaims the system. The charter's guards and patrols are gone
+someone reclaims the system. The rail grays those entries and fitting's
+verbs gray with them: a surface never offers what the sim would refuse. The charter's guards and patrols are gone
 outright, the belts are Works ground, and any manufacturing job already
 running finishes and can be collected: paid work is paid work. A reclaim
 puts the authored services back.

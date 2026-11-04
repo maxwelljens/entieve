@@ -210,6 +210,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   would give, nor the 20% that would need a tenth craft step).
 ### Fixed
 
+- **The station windows stop offering what the sim refuses**: every service
+  gate now reads the sim's own answer (`Sim.ServiceAvailable`, forwarded by
+  the seam) instead of re-deriving it from the dock and the raw service list.
+  At a **remnant** the rail's Industry and Fitting entries gray (they stayed
+  lit), **Fit / Unefit / Assemble** gray in space and at a remnant (they
+  armed anywhere and the command refused), and the market's Buy/Sell/order
+  launches, the order window and the inventory's Sell follow the market
+  service rather than the bare dock. The fitting window still opens anywhere:
+  its verbs gray, nothing hides. The sim's refusal semantics are untouched;
+  a new pin walks the seam read against `stationAccess` over docked,
+  undocked and remnant states.
 - **The inventory's drag ghost follows the cursor**: the chip was placed
   only when the drop-target highlight flipped, so it stood still while the
   pointer moved inside a hold. It now re-lays out on every pointer move (the

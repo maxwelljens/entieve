@@ -876,9 +876,11 @@ func (m *Market) rowSpec(item content.ItemID, gated, buyOff bool) widgets.RowSpe
 	}
 }
 
-// docked reports whether the player is docked (the trade precondition).
+// docked reports whether the trade verbs are available: the sim's own
+// market-service access (docked at a station that offers and still runs the
+// market), never a bare "is the player docked".
 func (m *Market) docked() bool {
-	return m.cv.PlayerDocked()
+	return m.cv.DockedMarket() != ""
 }
 
 // buyClicked opens the quantity picker on the selected item's Buy (the

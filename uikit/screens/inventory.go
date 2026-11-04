@@ -577,12 +577,13 @@ func (inv *Inventory) stacksOf(hold string) []content.CargoStack {
 }
 
 // rowsOf converts stacks to Item/Qty/m³ table rows, each declaring the
-// full-stack "Sell order" verb (grayed, never hidden, while undocked —
-// orders rest on the docked station's book). The action carries the
-// clicked stack's own quantity as the order window's sell default.
+// full-stack "Sell order" verb (grayed, never hidden, while the sim's market
+// service is unavailable (orders rest on the docked station's book). The
+// action carries the clicked stack's own quantity as the order window's
+// sell default.
 func (inv *Inventory) rowsOf(stacks []content.CargoStack) []widgets.TableRow {
 	rows := make([]widgets.TableRow, 0, len(stacks))
-	docked := inv.cv.PlayerDocked()
+	market := inv.cv.DockedMarket() != ""
 	for _, st := range stacks {
 		vol, name := 0.0, inv.cv.TradeableName(st.Item)
 		if def, ok := inv.cv.Defs().Item(st.Item); ok {
@@ -595,7 +596,7 @@ func (inv *Inventory) rowsOf(stacks []content.CargoStack) []widgets.TableRow {
 			Spec: widgets.RowSpec{
 				Ref: widgets.RowRef(inv.cv, st.Item),
 				Actions: []widgets.RowAction{
-					{Label: "Sell order", Disabled: !docked,
+					{Label: "Sell order", Disabled: !market,
 						Intent: widgets.OpenOrder{Item: st.Item, Side: sim.OrderSell, Qty: st.Qty}},
 				},
 			},
@@ -778,9 +779,9 @@ func (inv *Inventory) transfer(to string) {
 }
 
 // sellClicked opens the quantity picker on the selected stack's sale
-// (docked only); Confirm emits the sell.
+// (docked at a market station only); Confirm emits the sell.
 func (inv *Inventory) sellClicked() {
-	if !inv.hasSel || !inv.cv.PlayerDocked() {
+	if !inv.hasSel || inv.cv.DockedMarket() == "" {
 		return
 	}
 	inv.as.Do(widgets.QtyPick{Mode: widgets.QtySell, Item: inv.sel})
