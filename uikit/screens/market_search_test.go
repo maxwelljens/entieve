@@ -34,7 +34,7 @@ func mktSearchEnv(t *testing.T) (*Market, *testEnv, *ebitenui.UI, func()) {
 func treeRowIndex(t *testing.T, m *Market, path string) int {
 	t.Helper()
 	for i, r := range m.tree.Rows {
-		if k, ok := r.Data.(mktNodeKey); ok && k.Path == path {
+		if k, ok := r.Data.(browseNodeKey); ok && k.Path == path {
 			return i
 		}
 	}
@@ -50,7 +50,7 @@ func TestMarketTreeBranches(t *testing.T) {
 
 	roots := map[string]bool{}
 	for _, r := range m.tree.Rows {
-		k := r.Data.(mktNodeKey)
+		k := r.Data.(browseNodeKey)
 		if k.Path != "" && !strings.Contains(k.Path, "/") {
 			roots[k.Path] = true
 		}
@@ -65,7 +65,7 @@ func TestMarketTreeBranches(t *testing.T) {
 	}
 	// All is the opening selection and it starts expanded (the five roots
 	// are visible above).
-	if sel, ok := m.tree.Selected(); !ok || sel.Data.(mktNodeKey).Path != "" {
+	if sel, ok := m.tree.Selected(); !ok || sel.Data.(browseNodeKey).Path != "" {
 		t.Fatalf("opening tree selection = %+v, want the All root", sel.Data)
 	}
 

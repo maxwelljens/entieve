@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"image/color"
 	"reflect"
 	"strings"
 	"testing"
@@ -40,7 +41,7 @@ func boardEnv(t *testing.T) (*Manufacturing, *testEnv, *ebitenui.UI, *[]sim.Comm
 func treeRowFor(t *testing.T, f *Manufacturing, path string) int {
 	t.Helper()
 	for i, r := range f.tree.Rows {
-		if k, ok := r.Data.(mfgNodeKey); ok && k.Path == path {
+		if k, ok := r.Data.(browseNodeKey); ok && k.Path == path {
 			return i
 		}
 	}
@@ -58,12 +59,12 @@ func TestManufacturingBrowseTree(t *testing.T) {
 	if got, want := len(f.recipes.Rows), len(env.Content.RecipesInOrder()); got != want {
 		t.Fatalf("All lists %d recipes, want the whole catalog (%d)", got, want)
 	}
-	if sel, ok := f.tree.Selected(); !ok || sel.Data.(mfgNodeKey).Path != "" {
+	if sel, ok := f.tree.Selected(); !ok || sel.Data.(browseNodeKey).Path != "" {
 		t.Fatalf("opening tree selection = %+v, want the All root", sel.Data)
 	}
 	roots := map[string]bool{}
 	for _, r := range f.tree.Rows {
-		k := r.Data.(mfgNodeKey)
+		k := r.Data.(browseNodeKey)
 		if k.Path != "" && !strings.Contains(k.Path, "/") {
 			roots[k.Path] = true
 		}
@@ -207,8 +208,8 @@ func TestManufacturingInspectorBill(t *testing.T) {
 	if got := len(f.matsRows); got != 3 {
 		t.Fatalf("inspector rows = %d, want the recipe's 3 inputs", got)
 	}
-	if got := f.inspName.Label; got != env.TradeableName(rec.Product) {
-		t.Errorf("inspector title = %q, want %q", got, env.TradeableName(rec.Product))
+	if got, want := inspTitle(f), env.TradeableName(rec.Product); !strings.HasPrefix(got, want) {
+		t.Errorf("inspector title = %q, want it to lead with %q", got, want)
 	}
 
 	// Half the bill: every bar is have/need, and the numbers are the sim's
@@ -247,7 +248,7 @@ func TestManufacturingInspectorBill(t *testing.T) {
 	if got := len(f.matsRows); got != 3 {
 		t.Fatalf("inspector rows after stocking = %d, want 3", got)
 	}
-	if got := f.inspVerdict.Label; got != "✓" {
+	if got := inspVerdict(f); got != "✓" {
 		t.Errorf("stocked verdict = %q, want the tick", got)
 	}
 	for _, n := range f.needs(rec.ID, 1) {
@@ -424,7 +425,7 @@ func TestManufacturingStartGateNames(t *testing.T) {
 	if !f.startBtn.GetWidget().Disabled {
 		t.Fatal("Start enabled with an empty hold")
 	}
-	if got := f.inspVerdict.Label; got != "×" {
+	if got := inspVerdict(f); got != "×" {
 		t.Errorf("blocked inspector verdict = %q, want the cross", got)
 	}
 	for _, lbl := range inspectorLabels(f) {
@@ -442,7 +443,7 @@ func TestManufacturingStartGateNames(t *testing.T) {
 		giveItem(env.Sim, n.Item, n.Need)
 	}
 	frame()
-	if got := f.inspVerdict.Label; got != "✓" {
+	if got := inspVerdict(f); got != "✓" {
 		t.Errorf("stocked verdict = %q, want the tick", got)
 	}
 	if f.startBtn.GetWidget().Disabled {
@@ -464,7 +465,7 @@ func TestManufacturingAcceptanceRead(t *testing.T) {
 	art := recipeRowFor(f, "mod-artillery-l")
 	clickRow(ui, f.recipes, art)
 	frame()
-	if got := f.inspVerdict.Label; got != "×" {
+	if got := inspVerdict(f); got != "×" {
 		t.Errorf("(1) verdict = %q, want the cross", got)
 	}
 	short := 0
@@ -498,8 +499,10 @@ func TestManufacturingAcceptanceRead(t *testing.T) {
 	if needs[wide].Item != "min-ferrite" {
 		t.Errorf("(3) widest segment = %q, want Sideron", needs[wide].Item)
 	}
-	if got := f.inspValue.Label; !strings.Contains(got, "201,680") {
-		t.Errorf("value line = %q, want the run's material value", got)
+	// The head leads with the product itself (the old meta line under it is
+	// gone; the profit table is where the money is read now).
+	if got, want := inspTitle(f), env.TradeableName(env.Content.Recipes["rec-mod-artillery-l"].Product); !strings.HasPrefix(got, want) {
+		t.Errorf("inspector title = %q, want the product's name head %q", got, want)
 	}
 
 	// (1)+(2) together: stock the bill and the same row and inspector flip
@@ -511,7 +514,7 @@ func TestManufacturingAcceptanceRead(t *testing.T) {
 	if got := recipeVerdict(f.recipes.Rows[art]); got != "✓" {
 		t.Errorf("(1) stocked row verdict = %q, want the tick", got)
 	}
-	if got := f.inspVerdict.Label; got != "✓" {
+	if got := inspVerdict(f); got != "✓" {
 		t.Errorf("(1) stocked inspector verdict = %q, want the tick", got)
 	}
 }
@@ -526,10 +529,34 @@ func profitValue(f *Manufacturing, label string) string {
 	return ""
 }
 
+// inspTitle is the inspector head's name line: the product's display name
+// with the one-glance verdict glyph the head carries as its trailing run.
+func inspTitle(f *Manufacturing) string {
+	if f.head == nil {
+		return ""
+	}
+	return f.head.headName.Label
+}
+
+// inspVerdict is the inspector head's verdict glyph ("" when it carries
+// none).
+func inspVerdict(f *Manufacturing) string {
+	switch title := inspTitle(f); {
+	case strings.HasSuffix(title, "✓"):
+		return "✓"
+	case strings.HasSuffix(title, "×"):
+		return "×"
+	}
+	return ""
+}
+
 // inspectorLabels is every text the inspector draws (the verdict surfaces a
 // rendered-text sweep reads).
 func inspectorLabels(f *Manufacturing) []string {
-	out := []string{f.inspName.Label, f.inspVerdict.Label, f.inspValue.Label, f.matsLbl.Label}
+	out := []string{inspTitle(f), f.head.headProse.Label, f.matsLbl.Label}
+	if f.profitNote != nil {
+		out = append(out, f.profitNote.Label)
+	}
 	for _, r := range f.profit.RowsForTest() {
 		out = append(out, r.Cells...)
 	}
@@ -537,62 +564,214 @@ func inspectorLabels(f *Manufacturing) []string {
 }
 
 // TestManufacturingProfitTable pins the inspector's profit table to the
-// content's own numbers: one run's material bill and craft fee against the
-// product's base-price sale value, the total, the profit and its margin, and
-// the formulas both ways (a base_price edit must fail here).
+// docked book, never a content base price: one run's bill at the asks (walked
+// to the depth, the tail at the last ask), the sim's craft fee, and the
+// product's revenue at the bid it would meet.
 func TestManufacturingProfitTable(t *testing.T) {
 	f, env, ui, _, frame := boardEnv(t)
 	rec := env.Content.Recipes["rec-mod-artillery-l"]
+	// One standing bid for the product: the sale side is the book's, and this
+	// fixture's book opens with no bid for a heavy module.
+	if _, ok := env.Sim.PlaceOrder(factoryStation, sim.OrderBuy, rec.Product, 2, 250000, sim.OwnerSystem); !ok {
+		t.Fatal("fixture: the product bid was refused")
+	}
 	clickRow(ui, f.recipes, recipeRowFor(f, rec.Product))
 	frame()
 
-	// The fixture's figures, read from the content: 201,680 € of minerals,
-	// a 6,050 € fee, the module's 355,000 € base price at one unit.
+	// The figures both ways, from the book the table reads.
+	book := env.Sim.BookOrders(factoryStation)
 	needs := f.needs(rec.ID, 1)
 	mats := 0.0
 	for _, n := range needs {
-		mats += n.Value
+		cost, ok := bookValue(book, n.Item, sim.OrderSell, n.Need)
+		if !ok {
+			t.Fatalf("fixture: no local ask for %s", n.Item)
+		}
+		mats += cost
 	}
 	fee := env.JobFee(rec.ID, 1)
-	price := env.Content.Modules["mod-artillery-l"].Price
-	sale := price * float64(rec.Qty)
+	sale, ok := bookValue(book, rec.Product, sim.OrderBuy, rec.Qty)
+	if !ok {
+		t.Fatal("fixture: the product bid did not rest")
+	}
 
+	// The fixture's figures: 231,520 € of minerals at the local asks (the
+	// Sideron ask is 12,000 deep, so its tail is priced at the same 7),
+	// 6,050 € of fee, 250,000 € of local bid.
 	for _, c := range []struct{ label, want string }{
-		{"Materials", "201,680 €"},
+		{"Materials", "231,520 €"},
 		{"Craft fee", "6,050 €"},
-		{"Total cost", "207,730 €"},
-		{"Sale price", "355,000 €"},
-		{"Profit", "+147,270 €"},
-		{"Margin", "41%"},
+		{"Total cost", "237,570 €"},
+		{"Sale price", "250,000 €"},
+		{"Profit", "+12,430 €"},
+		{"Margin", "5%"},
 	} {
 		if got := profitValue(f, c.label); got != c.want {
 			t.Errorf("profit row %q = %q, want %q", c.label, got, c.want)
 		}
 	}
-	// The formulas both ways, on the same content read.
+	// The formulas both ways, on the same book read.
+	if got, want := profitValue(f, "Materials"), mfgMoney(mats); got != want {
+		t.Errorf("materials = %q, want the asks' sum %q", got, want)
+	}
 	if got, want := profitValue(f, "Total cost"), mfgMoney(mats+fee); got != want {
 		t.Errorf("total = %q, want materials + fee %q", got, want)
 	}
-	if got, want := profitValue(f, "Sale price"), mfgMoney(price*float64(rec.Qty)); got != want {
-		t.Errorf("sale = %q, want base price × qty %q", got, want)
+	if got, want := profitValue(f, "Sale price"), mfgMoney(sale); got != want {
+		t.Errorf("sale = %q, want the bid's value %q", got, want)
 	}
 	if got, want := profitValue(f, "Profit"), mfgSigned(sale-(mats+fee)); got != want {
 		t.Errorf("profit = %q, want sale - total %q", got, want)
 	}
-	if profit := sale - (mats + fee); profit < 0 {
-		t.Errorf("fixture: profit is negative (%v), want the positive pin", profit)
+	if profit := sale - (mats + fee); profit <= 0 {
+		t.Errorf("fixture: profit is not positive (%v), want the positive pin", profit)
+	}
+	// Every figure came from the local book: no footnote, no dagger.
+	if f.profitNote != nil {
+		t.Errorf("profit note = %q, want none with a complete local book", f.profitNote.Label)
+	}
+	if got := profitValue(f, "Materials"); strings.Contains(got, "†") {
+		t.Errorf("materials = %q, want no footnote mark", got)
 	}
 	// The profit row carries the state tint, not colour alone (the sign is
 	// in the string).
-	var profitRow widgets.PlainRow
+	wantTint(t, f, theme.DefaultPalette().Good)
+}
+
+// wantTint pins the profit row's tint.
+func wantTint(t *testing.T, f *Manufacturing, want color.RGBA) {
+	t.Helper()
 	for _, r := range f.profit.RowsForTest() {
 		if len(r.Cells) == 2 && r.Cells[0] == "Profit" {
-			profitRow = r
+			if r.Tint != want {
+				t.Errorf("profit tint = %v, want %v", r.Tint, want)
+			}
+			return
 		}
 	}
-	if got := profitRow.Tint; got != theme.DefaultPalette().Good {
-		t.Errorf("profit tint = %v, want Good", got)
+	t.Error("no profit row")
+}
+
+// TestManufacturingNoBidDashes: with no local bid for the product the sale,
+// profit and margin lines dash with the marker rather than quoting a content
+// base price.
+func TestManufacturingNoBidDashes(t *testing.T) {
+	f, env, ui, _, frame := boardEnv(t)
+	rec := env.Content.Recipes["rec-mod-artillery-l"]
+	clickRow(ui, f.recipes, recipeRowFor(f, rec.Product))
+	frame()
+	for _, o := range env.Sim.BookOrders(factoryStation) {
+		if o.Item == rec.Product && o.Side == sim.OrderBuy {
+			t.Fatalf("fixture: the product already carries a bid at %v", o.Price)
+		}
 	}
+	for _, c := range []struct{ label, want string }{
+		{"Sale price", "— · no bid"},
+		{"Profit", "—"},
+		{"Margin", "—"},
+	} {
+		if got := profitValue(f, c.label); got != c.want {
+			t.Errorf("profit row %q = %q, want %q", c.label, got, c.want)
+		}
+	}
+	wantTint(t, f, theme.DefaultPalette().Dim)
+	// The materials side still prices: only the revenue dashes.
+	if got := profitValue(f, "Materials"); got != "231,520 €" {
+		t.Errorf("materials = %q, want the local asks' 231,520 €", got)
+	}
+}
+
+// TestBookValue pins the book walk: asks joined cheapest first at their own
+// prices, the tail at the last price seen when the depth runs short, and no
+// figure at all for a side that holds nothing.
+func TestBookValue(t *testing.T) {
+	asks := []sim.MarketStock{
+		{Item: "min-argon", Side: sim.OrderSell, Price: 64, Qty: 800},
+		{Item: "min-argon", Side: sim.OrderSell, Price: 70, Qty: 200},
+		{Item: "min-silex", Side: sim.OrderSell, Price: 38, Qty: 2500},
+	}
+	cases := []struct {
+		name  string
+		item  content.ItemID
+		side  sim.OrderSide
+		qty   int
+		want  float64
+		found bool
+	}{
+		{"vwap across two asks", "min-argon", sim.OrderSell, 1000, 800*64 + 200*70, true},
+		{"within the best ask", "min-argon", sim.OrderSell, 500, 500 * 64, true},
+		{"depth extended at the last ask", "min-argon", sim.OrderSell, 1200, 800*64 + 400*70, true},
+		{"other item untouched", "min-silex", sim.OrderSell, 2500, 2500 * 38, true},
+		{"no side at all", "min-cobalt", sim.OrderSell, 10, 0, false},
+		{"a bid is not an ask", "min-argon", sim.OrderBuy, 10, 0, false},
+		{"nothing needed", "min-cobalt", sim.OrderSell, 0, 0, true},
+	}
+	for _, c := range cases {
+		got, ok := bookValue(asks, c.item, c.side, c.qty)
+		if ok != c.found {
+			t.Errorf("%s: found = %v, want %v", c.name, ok, c.found)
+			continue
+		}
+		if got != c.want {
+			t.Errorf("%s: value = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+// TestManufacturingProfitMarks pins the fallback ladder's marks: a bill line
+// with no local ask prices from another station's cheapest ask (daggered and
+// named in the footnote), and one with no ask anywhere is left out of the
+// total and named.
+func TestManufacturingProfitMarks(t *testing.T) {
+	f, env, ui, _, frame := boardEnv(t)
+	rec := env.Content.Recipes["rec-mod-artillery-l"]
+	clickRow(ui, f.recipes, recipeRowFor(f, rec.Product))
+	frame()
+	needs := f.needs(rec.ID, 1)
+
+	// A local book short of Argon, with a product bid, and the other
+	// stations' cheapest Argon ask supplied by the reader.
+	book := []sim.MarketStock{
+		{Item: "min-ferrite", Side: sim.OrderSell, Price: 7, Qty: 20000},
+		{Item: "min-nickel", Side: sim.OrderSell, Price: 16, Qty: 5000},
+		{Item: "min-cobalt", Side: sim.OrderSell, Price: 25, Qty: 5000},
+		{Item: "min-silex", Side: sim.OrderSell, Price: 38, Qty: 5000},
+		{Item: rec.Product, Side: sim.OrderBuy, Price: 300000, Qty: 5},
+	}
+	local := 0.0
+	for _, n := range needs {
+		if n.Item == "min-argon" {
+			continue
+		}
+		cost, _ := bookValue(book, n.Item, sim.OrderSell, n.Need)
+		local += cost
+	}
+	rows, note := f.profitRows(book, map[content.ItemID]float64{"min-argon": 70}, needs, rec)
+	if got, want := rowValue(rows, "Materials"), mfgMoney(local+70*390)+" †"; got != want {
+		t.Errorf("remote-priced materials = %q, want %q", got, want)
+	}
+	if !strings.Contains(note, "no local ask") || !strings.Contains(note, "†") {
+		t.Errorf("note = %q, want the remote-ask footnote", note)
+	}
+
+	// No ask anywhere: the line is left out of the sum and named.
+	rows, note = f.profitRows(book, nil, needs, rec)
+	if got, want := rowValue(rows, "Materials"), mfgMoney(local)+" †"; got != want {
+		t.Errorf("short materials = %q, want %q", got, want)
+	}
+	if !strings.Contains(note, env.TradeableName("min-argon")) || !strings.Contains(note, "left out") {
+		t.Errorf("note = %q, want the excluded mineral named", note)
+	}
+}
+
+// rowValue is one profit row's value cell in a returned row slice.
+func rowValue(rows []widgets.PlainRow, label string) string {
+	for _, r := range rows {
+		if len(r.Cells) == 2 && r.Cells[0] == label {
+			return r.Cells[1]
+		}
+	}
+	return ""
 }
 
 // TestManufacturingIconSizes pins the owner's icon bindings here: the recipe
@@ -630,6 +809,54 @@ func TestManufacturingIconSizes(t *testing.T) {
 	}
 	if view := f.matsScroll.ViewRect(); bill.Dx() > view.Dx() {
 		t.Errorf("bill row %d px wide overflows the %d px viewport", bill.Dx(), view.Dx())
+	}
+}
+
+// TestManufacturingRemovedHints: the craft-level summary the window used to
+// print under its title ("Craft: hulls L1 · … · mats −2%/lvl") and the meta
+// line the inspector used to print under the recipe name ("180.0 s · fee
+// 6,050 € · value 201,680 €", and its "Select a recipe to see what it takes."
+// empty state) are gone from every text the window draws.
+func TestManufacturingRemovedHints(t *testing.T) {
+	f, _, ui, _, frame := boardEnv(t)
+	sweep := func() []string {
+		texts := inspectorLabels(f)
+		texts = append(texts, f.jobsLbl.Label, f.title.Label, f.matsLbl.Label)
+		for _, tbl := range []*widgets.Table{f.tree, f.recipes, f.jobs} {
+			for _, r := range tbl.Rows {
+				texts = append(texts, r.Cells...)
+				for _, line := range r.Stack {
+					for _, seg := range line.Segs {
+						texts = append(texts, seg.Text)
+					}
+				}
+			}
+		}
+		return texts
+	}
+	check := func(stage string, texts []string) {
+		for _, text := range texts {
+			for _, gone := range []string{"Craft:", "s · fee", "· value", "Select a recipe"} {
+				if strings.Contains(text, gone) {
+					t.Errorf("%s renders %q, want the removed hint line gone", stage, text)
+				}
+			}
+		}
+	}
+	check("the empty window", sweep())
+	clickRow(ui, f.recipes, recipeRowFor(f, "mod-artillery-l"))
+	frame()
+	frame()
+	check("the selected window", sweep())
+
+	// The window title stays the base display name.
+	if f.title.Label != "Manufacturing" {
+		t.Errorf("title = %q, want the base display name", f.title.Label)
+	}
+	// The frame still reads the slot line (the readout the craft summary sat
+	// beside stays).
+	if !strings.HasPrefix(f.jobsLbl.Label, "Jobs: ") {
+		t.Errorf("jobs line = %q, want the slot readout", f.jobsLbl.Label)
 	}
 }
 

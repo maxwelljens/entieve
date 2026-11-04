@@ -168,15 +168,12 @@ func TestManufacturingPanelGatingAndEnqueue(t *testing.T) {
 		t.Fatalf("undocked start enqueued %d commands, want 0", len(*cmds))
 	}
 
-	// Docked at the (patched) industry station: the craft line and slot
-	// readout light up; the recipe opens with the bill short of everything
-	// and its Start greyed.
+	// Docked at the (patched) industry station: the slot readout lights up;
+	// the recipe opens with the bill short of everything and its Start
+	// greyed. The craft-level summary line is gone (the window no longer
+	// prints "Craft: …").
 	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: factoryStation})
 	frame()
-	if !strings.Contains(f.craftLbl.Label, "charges L1") ||
-		!strings.Contains(f.craftLbl.Label, "hulls L1") {
-		t.Errorf("craft line = %q, want per-family levels", f.craftLbl.Label)
-	}
 	if f.jobsLbl.Label != "Jobs: 0/3 slots" {
 		t.Errorf("jobs line = %q, want the 0/3 slot readout", f.jobsLbl.Label)
 	}
@@ -635,9 +632,8 @@ func TestManufacturingAllStationJobs(t *testing.T) {
 	}
 	clickRow(ui, f.recipes, chargeRow)
 	frame()
-	if got := f.inspValue.Label; !strings.Contains(got, "fee 234 €") {
-		t.Errorf("inspector value line = %q, want the recipe's 234 € fee", got)
-	}
+	// The inspector's meta line (per-run time, fee and material value) is
+	// gone: the fee is the profit table's own row.
 	if got := profitValue(f, "Craft fee"); got != "234 €" {
 		t.Errorf("profit table craft fee = %q, want 234 €", got)
 	}

@@ -54,6 +54,11 @@ func TestManufacturingCaptureFrame(t *testing.T) {
 			giveItem(k.Sim, n.Item, n.Need)
 		}
 	}
+	// One standing bid for the selected product: the profit table's sale side
+	// is the book's own, so the capture shows the market basis.
+	if _, ok := k.Sim.PlaceOrder(station, sim.OrderBuy, "mod-artillery-l", 2, 250000, sim.OwnerSystem); !ok {
+		t.Fatal("fixture: the product bid was refused")
+	}
 	// Select the heaviest recipe mid-loop (the list needs one Sync to have
 	// its rows): its bill is the inspector's five rows.
 	var frames, row int
@@ -113,11 +118,28 @@ func TestManufacturingCaptureFrame(t *testing.T) {
 			if got := recipeVerdict(f.recipes.Rows[row]); got != "×" {
 				fail("artillery row verdict = %q, want the cross", got)
 			}
-			if got := f.inspVerdict.Label; got != "×" {
+			if got := inspVerdict(f); got != "×" {
 				fail("inspector verdict = %q, want the cross", got)
 			}
-			if got := profitValue(f, "Profit"); got == "" || got == "—" {
-				fail("profit table profit = %q, want the run's figure", got)
+			// The profit table is priced off the local book: the asks pay for
+			// the bill (231,520 €), the sim's fee is 6,050 € and the product's
+			// bid pays 250,000 €.
+			for _, c := range []struct{ label, want string }{
+				{"Materials", "231,520 €"},
+				{"Craft fee", "6,050 €"},
+				{"Total cost", "237,570 €"},
+				{"Sale price", "250,000 €"},
+				{"Profit", "+12,430 €"},
+			} {
+				if got := profitValue(f, c.label); got != c.want {
+					fail("profit row %q = %q, want %q", c.label, got, c.want)
+				}
+			}
+			if got := f.head.headIcon.Widget().Image.Bounds().Dx(); got != theme.Px(theme.IconHero) {
+				fail("inspector head icon = %d px, want the %d px hero", got, theme.Px(theme.IconHero))
+			}
+			if f.head.headProse.Label == "" || f.head.headProse.GetWidget().Rect.Empty() {
+				fail("inspector description missing at %v", f.head.headProse.GetWidget().Rect)
 			}
 			if got := f.matsRows[0].Icon.Widget().GetWidget().Rect.Dx(); got != theme.Px(mfgMatIcon) {
 				fail("bill icon = %d px, want the %d px box", got, theme.Px(mfgMatIcon))
@@ -139,9 +161,12 @@ func TestManufacturingCaptureFrame(t *testing.T) {
 			if n := captureInk(img, lower, body); n < 30 {
 				fail("recipe row %v strip band carries %d ink pixels, want the value-share strip", lower, n)
 			}
-			bar := f.matsRows[0].Root.GetWidget().Rect
+			// The card's top is what this shot frames: the head and the profit
+			// table (the bill is one wheel below, both in the card's one
+			// viewport). Its first row is not bare panel fill.
+			bar := f.profit.RowWidgetForTest(0).GetWidget().Rect
 			if n := captureInk(img, bar, body); n < 30 {
-				fail("inspector material row %v carries %d ink pixels, want its icon, name and bar", bar, n)
+				fail("profit row %v carries %d ink pixels, want its label and figure", bar, n)
 			}
 
 			if len(errs) > 0 {
