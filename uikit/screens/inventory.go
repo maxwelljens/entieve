@@ -28,10 +28,11 @@ const (
 
 // Inventory is the storage window: Cargo / Ore hold / Station hangar as
 // Item/Qty/m³ tables (or as square item tiles) with a fullness bar per
-// hold and one toolbar (view toggle, Sell). Pressing a stack and dragging
-// it to another hold's section opens the quantity picker on that
-// transfer; the Sell action still opens the picker on a selection. Each
-// section is a split pane, so its height is dragged at the seam.
+// hold, a view toggle in the title bar beside the × and one toolbar verb
+// (Sell). Pressing a stack and dragging it to another hold's section opens
+// the quantity picker on that transfer; the Sell action still opens the
+// picker on a selection. Each section is a split pane, so its height is
+// dragged at the seam.
 //
 // Drag-and-drop is the transfer gesture (CONTEXT.md "Transfer popup"):
 // press on a stack row/tile, a ghost chip follows the pointer, the hold
@@ -61,8 +62,10 @@ type Inventory struct {
 	cargoPane, orePane, hangPane    *widget.Container
 	cargoFrame, oreFrame, hangFrame *widget.Container
 
-	view *widget.Button
-	sell *widget.Button
+	view     *widget.Button
+	viewIcon *theme.IconBox
+	viewTip  *widgets.TipView
+	sell     *widget.Button
 
 	sel    content.ItemID
 	src    string // hold the selected row belongs to
@@ -134,16 +137,17 @@ func NewInventory(env widgets.Seams) *Inventory {
 	inv.oreBody.AddChild(inv.ore.Container())
 	inv.hangBody.AddChild(inv.hangar.Container())
 
-	inv.view = inv.viewToggle()
+	inv.view, inv.viewIcon, inv.viewTip = inv.viewToggle()
 	inv.sell = theme.ActionButton("Sell", inv.sellClicked)
 
-	// One toolbar: the view toggle and the one non-move verb left (Sell
-	// acts on the selected stack). Moves are the drag gesture now.
+	// One toolbar: the one non-move verb left (Sell acts on the selected
+	// stack). The view toggle is title-bar furniture now; moves are the
+	// drag gesture.
 	toolbar := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewRowLayout(
 		widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
 		widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
 	)))
-	toolbar.AddChild(inv.view, inv.sell)
+	toolbar.AddChild(inv.sell)
 	inv.body = widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.WindowBodyBox(p, theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
@@ -166,14 +170,16 @@ func NewInventory(env widgets.Seams) *Inventory {
 	theme.ShowWidget(inv.ghost.container.GetWidget(), false)
 
 	title, _ := theme.NewTitleBar(env, "Inventory", "svc_inventory")
+	// The view switch is the title bar's one action: immediately left of
+	// the ×, the glyph drawn over the button's chrome.
+	TitleBarAction(title, inv.view, inv.viewIcon.Widget())
 
 	inv.win = widget.NewWindow(
 		widget.WindowOpts.Contents(inv.pane),
 		widget.WindowOpts.TitleBar(title, theme.Px(theme.TitleBarH)),
 		// Content floor: every fixed row plus a full row of each hold
 		// section (the sections scroll below that). The width is the
-		// toolbar's (the toggle and Sell on one row) and the window's
-		// landing rect below.
+		// toolbar's (Sell alone) and the window's landing rect below.
 		widget.WindowOpts.MinSize(theme.Px(320), theme.Px(420)),
 		// The landing rect the game's Inventory Screen row also declares
 		// (InventoryRect), so it opens here on first use, docked and in
@@ -317,35 +323,28 @@ func (inv *Inventory) hasOreHold() bool {
 	return ok && cargo.OreCapacity > 0
 }
 
-// viewToggle is the toolbar's two-state view button: it names the view it
-// switches TO, with that view's manifest glyph (cubes for the thumbnail
-// grid, the row glyph for the table list).
-func (inv *Inventory) viewToggle() *widget.Button {
+// viewToggle is the title bar's two-state view switch: an icon-only
+// button naming the view it switches TO, with that view's manifest glyph
+// (cubes for the thumbnail grid, the row glyph for the table list). The
+// tooltip carries the word the toolbar label used to.
+func (inv *Inventory) viewToggle() (*widget.Button, *theme.IconBox, *widgets.TipView) {
 	p := inv.th.Pal()
 	btn := widget.NewButton(
-		widget.ButtonOpts.TextLabel("Tiles"),
-		widget.ButtonOpts.TextColor(&widget.ButtonTextColor{
-			Idle: theme.Solid(p.Text), Hover: theme.Solid(p.Text), Pressed: theme.Solid(p.Text),
-			Disabled: theme.NRGBA(p.Dim, 160),
-		}),
-		widget.ButtonOpts.Graphic(viewGraphic("stat_structure", p.Text, p.Dim)),
-		widget.ButtonOpts.GraphicPadding(widget.Insets{Right: theme.Px(theme.StatIconGap)}),
-		widget.ButtonOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(theme.Px(40), theme.Px(40)),
-			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-		),
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			StretchHorizontal: true,
+			StretchVertical:   true,
+		})),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) { inv.toggleView() }),
 	)
-	return btn
-}
-
-func viewGraphic(icon string, tint, dim color.RGBA) *widget.GraphicImage {
-	return &widget.GraphicImage{
-		Idle:     icons.Get(icon, theme.Px(theme.IconButton), tint),
-		Hover:    icons.Get(icon, theme.Px(theme.IconButton), tint),
-		Pressed:  icons.Get(icon, theme.Px(theme.IconButton), tint),
-		Disabled: icons.Get(icon, theme.Px(theme.IconButton), dim),
+	box := theme.NewIconBox(theme.IconTitle)
+	box.Set("stat_structure", p.Text)
+	box.Widget().GetWidget().LayoutData = widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionCenter,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
 	}
+	tip, view := widgets.NewTip(inv.th, widgets.TooltipModel{Title: "Tiles"})
+	btn.GetWidget().ToolTips = []*widget.ToolTip{tip}
+	return btn, box, view
 }
 
 // toggleView flips the whole inventory between the table list and the
@@ -360,11 +359,11 @@ func (inv *Inventory) toggleView() {
 func (inv *Inventory) applyView() {
 	p := inv.th.Pal()
 	if inv.tiles {
-		inv.view.SetText("List")
-		inv.view.SetGraphicImage(viewGraphic("row_module", p.Text, p.Dim))
+		inv.viewIcon.Set("row_module", p.Text)
+		inv.viewTip.SetModel(widgets.TooltipModel{Title: "List"})
 	} else {
-		inv.view.SetText("Tiles")
-		inv.view.SetGraphicImage(viewGraphic("stat_structure", p.Text, p.Dim))
+		inv.viewIcon.Set("stat_structure", p.Text)
+		inv.viewTip.SetModel(widgets.TooltipModel{Title: "Tiles"})
 	}
 	setBody(inv.cargoBody, inv.viewOf("cargo"))
 	if inv.oreShown {
@@ -627,13 +626,13 @@ func (inv *Inventory) stepDrag() {
 		inv.sel, inv.src, inv.hasSel = item, hold, true
 		inv.tableFor(hold).SelectData(item)
 		inv.ghost.Set(item, inv.th.Pal().Text)
-		inv.ghostAt = pt
+		inv.moveGhost(pt)
 		theme.ShowWidget(inv.ghost.container.GetWidget(), true)
 		inv.highlight("")
 		return
 	}
 	if inv.ptr.Down(widgets.Left) {
-		inv.ghostAt = pt
+		inv.moveGhost(pt)
 		hold, ok := inv.sectionAt(pt)
 		if !ok || hold == inv.dragHold || !inv.transferOK(hold) {
 			inv.highlight("")
@@ -648,6 +647,18 @@ func (inv *Inventory) stepDrag() {
 		inv.transfer(hold)
 	}
 	inv.endDrag()
+}
+
+// moveGhost records the pointer the overlay lays the chip out from and
+// dirties the pane: invOverlay.Layout runs only on a dirty layout, and the
+// highlight flips that used to dirty it are incidental, so setting the
+// field alone left the chip frozen between drop targets.
+func (inv *Inventory) moveGhost(pt image.Point) {
+	if inv.ghostAt == pt {
+		return
+	}
+	inv.ghostAt = pt
+	inv.pane.RequestRelayout()
 }
 
 // endDrag clears the gesture and its chrome.

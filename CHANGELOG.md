@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The inventory's view toggle moved to the title bar**: the Tiles/List
+  switch is now a small icon-only button immediately left of the window's
+  × (its tooltip names the view it switches to), the same title-bar
+  furniture slot the overview's filter cog uses. The bottom toolbar keeps
+  Sell alone.
 - **The inventory moves stacks by drag and drop, and gains a thumbnail
   view**: press a stack (row or tile), drag it to another hold's section
   and release to open the transfer popup (the quantity picker on that
@@ -163,6 +168,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reward with its own icon (coins for the payout, the contracts mark for the
   standing gain, the material's own icon), and the portrait column drops the
   patron line and the "Posted at" line.
+
+### Fixed
+
+- **The inventory's drag ghost follows the cursor**: the chip was placed
+  only when the drop-target highlight flipped, so it stood still while the
+  pointer moved inside a hold. It now re-lays out on every pointer move (the
+  headless pin covers two move frames at scale 1 and 1.5, the capture pin
+  reads its drawn centroid).
 
 ## [0.13.0] - 2026-11-03
 
