@@ -19,9 +19,8 @@ import (
 // guard for free: while the context menu owns the frame, ui.Update is
 // skipped, so a × press can never close through the popup (see
 // window_raise_test.go's menu contract). It fires into startClose, which
-// runs the registered close — the window's EXISTING close path (a Screen
-// row's toggle, the core toggle, CloseInfo) — and commits the close
-// fade.
+// runs the registered close (the window's EXISTING close path: a Screen
+// row's toggle, CloseInfo) and commits the close fade.
 //
 // The animation is purely render-time: no rects move, no layout or
 // simulation state changes, nothing consumes RNG. An animating window is
@@ -42,8 +41,9 @@ import (
 //
 // Unmounting a closing window is deferred to settle: Kit.AddWindow's
 // remove func records itself on the animation instead of running, and
-// the fade's last frame performs it. A core window closes by hiding
-// (no remove is ever called) and simply stays hidden after settle.
+// the fade's last frame performs it. A Persistent Screen row (the
+// Overview, the Selected Item) closes by hiding: its host keeps it
+// mounted and returns no remove, and it stays hidden after settle.
 
 // Animation timing, in frames at 60 TPS — render-only, counted in Draw
 // (deterministic frame counting, never wall-clock). Pinned by
@@ -56,8 +56,8 @@ const (
 
 // winAnim is one window's running animation. frame counts the frames
 // drawn so far in the current phase; remove is the host's deferred
-// unmount for a close fade (nil when the close does not unmount — a
-// core window — or when the host has not called remove yet).
+// unmount for a close fade (nil when the close does not unmount, a
+// Persistent row, or when the host has not called remove yet).
 type winAnim struct {
 	open   bool
 	frame  int
@@ -188,12 +188,12 @@ func (k *Kit) Closing(w *widget.Window) bool {
 func (k *Kit) CloseButtonOf(w *widget.Window) *widget.Button { return k.closeBtns[w] }
 
 // startClose commits win's close: it starts the close fade (the window
-// goes inert this very frame) and runs the registered close semantics —
-// for a Screen row that flips its open flag so the host's own mount
-// reconciliation performs the unmount, for a core window it hides, for
-// Show Info it runs CloseInfo. A close already committed is never run
-// twice (the button cannot fire twice — the window is hidden from this
-// frame on — but the guard makes the seam safe anyway).
+// goes inert this very frame) and runs the registered close semantics:
+// for a Screen row that flips its open flag, so the host's own
+// reconciliation performs the unmount (or, for a Persistent row, the
+// hide), and for Show Info it runs CloseInfo. A close already committed
+// is never run twice (the button cannot fire twice, because the window is
+// hidden from this frame on, but the guard makes the seam safe anyway).
 func (k *Kit) startClose(w *widget.Window) {
 	close := k.closes[w]
 	if close == nil {
@@ -217,20 +217,22 @@ func (k *Kit) startClose(w *widget.Window) {
 	close()
 }
 
-// cancelClose drops a pending close fade without unmounting: the player
-// reopened the window (the core rail toggle, the docked veil lifting
-// with a close still fading) and no unmount is owed — core windows
-// never register one.
-func (k *Kit) cancelClose(w *widget.Window) {
+// CancelClose drops a pending close fade without unmounting: the player
+// reopened the window (the rail's Screen row toggle, the docked veil
+// lifting with a close still fading) and no unmount is owed. It is the
+// Screen host's re-show half of a Persistent row's visibility rule.
+func (k *Kit) CancelClose(w *widget.Window) {
 	if a, ok := k.anims[w]; ok && !a.open {
 		delete(k.anims, w)
 	}
 }
 
-// settleOpen drops a running open animation: the window snaps to the
+// SettleOpen drops a running open animation: the window snaps to the
 // normal paint path (full alpha, no slide) from the next paint on. The
-// chrome calls it when a drag arms.
-func (k *Kit) settleOpen(w *widget.Window) {
+// chrome calls it when a drag arms; the Screen host calls it when it
+// hides a Persistent row, because the fade's unpark pass would otherwise
+// show the window every frame against the rule.
+func (k *Kit) SettleOpen(w *widget.Window) {
 	if a, ok := k.anims[w]; ok && a.open {
 		delete(k.anims, w)
 	}
@@ -269,12 +271,11 @@ func (k *Kit) settleWhere(accept func(*winAnim) bool) {
 }
 
 // finishClose ends a close animation: the deferred unmount runs if the
-// host owed one. When none is owed the close's hide must still be
-// lifted unless a core window owns the visibility itself (applyCore —
-// its rail/dock state already says hidden, or the player reopened it
-// through cancelClose). The no-unmount non-core case is a host whose
-// open flag flip-flopped back to open before its reconciliation ever
-// ran the remove — the window stays mounted and wants to be shown.
+// host owed one. When none is owed the close's hide must still be lifted:
+// a host whose open flag flip-flopped back to open before its
+// reconciliation ever ran the remove leaves the window mounted and wants
+// it shown. A Persistent row's host owns visibility and re-applies the
+// rule on the next reconcile, so the show never reaches a painted frame.
 func (k *Kit) finishClose(w *widget.Window, a *winAnim) {
 	if a.remove != nil {
 		remove := a.remove
@@ -284,9 +285,6 @@ func (k *Kit) finishClose(w *widget.Window, a *winAnim) {
 	}
 	if w == nil {
 		return
-	}
-	if (k.ov != nil && w == k.ov.win) || (k.sp != nil && w == k.sp.win) {
-		return // a core window: applyCore owns its visibility
 	}
 	theme.ShowWidget(w.GetContainer().GetWidget(), true)
 }

@@ -107,8 +107,10 @@ func TestSpecCloseButtonsFollowTheirRow(t *testing.T) {
 			if s.Modal && sceneUp(g, s.ID) {
 				t.Error("× did not pop the row's scene")
 			}
-			if g.host.Mounted(s.ID) {
-				t.Error("row still mounted after its close")
+			// A Persistent row hides on its close and stays mounted (the
+			// two always-on windows); every other row unmounts.
+			if g.host.Mounted(s.ID) != s.Persistent {
+				t.Errorf("row mounted after its close = %v, want %v (Persistent)", g.host.Mounted(s.ID), s.Persistent)
 			}
 			if win.GetContainer().GetWidget().IsVisible() {
 				t.Error("closed row is still visible")
@@ -127,8 +129,8 @@ func TestSpecCloseButtonsFollowTheirRow(t *testing.T) {
 			if s.Modal != sceneUp(g, s.ID) {
 				t.Errorf("reopen: scene on stack = %v, want modal=%v", sceneUp(g, s.ID), s.Modal)
 			}
-			if !g.host.Mounted(s.ID) {
-				t.Error("reopened row did not remount")
+			if !g.host.Mounted(s.ID) || !win.GetContainer().GetWidget().IsVisible() {
+				t.Error("reopened row is not mounted and visible")
 			}
 
 			// Leave the row closed again for the rows that follow —

@@ -56,8 +56,8 @@ func clickAt(t *testing.T, k *Kit, fm *fakeMouse, w, h int, pt image.Point) {
 }
 
 // TestCloseButtonAttachedToEveryClosableWindow: the kit registers the
-// two core windows and Show Info itself, a host registers its panels —
-// each registration attaches exactly one ×, sized to the ~40 px design
+// two always-on windows and Show Info itself, a host registers its
+// panels; each registration attaches exactly one ×, sized to the ~40 px design
 // hit box and sitting inside both the title bar and the chrome's
 // exclusion strip (so the widget the player presses and the strip the
 // drag excludes are the same region). A window without a title bar

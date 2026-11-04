@@ -30,7 +30,7 @@ const rfCaptureFrames = 14
 //	ENTIEVE_CAPTURE=1 go test ./uikit/screens/ -run TestRefineryCaptureFrame
 func TestRefineryCaptureFrame(t *testing.T) {
 	k, _ := newTestKit(t)
-	k.SetCoreVisible(false) // the refinery window only
+	hideCore(k) // the refinery window only
 	f := NewRefinery(k.Env())
 	k.AddWindow(f.Win())
 	// The landing width, grown to the height the whole inspector page needs

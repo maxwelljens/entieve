@@ -105,7 +105,7 @@ func TestOrderWindowOpensCentered(t *testing.T) {
 		t.Errorf("order window %v is smaller than its content %dx%d", r, pw, ph)
 	}
 
-	// Not persisted: the sidecar name list holds only the core windows and
+	// Not persisted: the sidecar name list holds only rows and
 	// the Screen rows — never the transient order dialog.
 	for _, name := range layoutNames {
 		if name == "order" || name == "orderwin" {

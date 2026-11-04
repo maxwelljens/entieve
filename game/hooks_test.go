@@ -162,9 +162,9 @@ func TestChromeOnRootOverlay(t *testing.T) {
 	}
 }
 
-// TestCoreWindowsDockFlow: the Overview/Selected Item rects gate world
-// input in space, SetCoreVisible hides both while docked (station
-// parity) and restores them on undock.
+// TestPersistentWindowsDockFlow: the Overview/Selected Item rects gate
+// world input in space, the host's room rule hides both while docked
+// (station parity, still mounted) and shows them again on undock.
 func TestCoreWindowsDockFlow(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
@@ -173,7 +173,7 @@ func TestCoreWindowsDockFlow(t *testing.T) {
 	ov := g.kit.OverviewWindow().GetContainer().GetWidget()
 	sp := g.kit.SelectedWindow().GetContainer().GetWidget()
 	if !ov.IsVisible() || !sp.IsVisible() {
-		t.Fatal("core windows hidden in space")
+		t.Fatal("always-on windows hidden in space")
 	}
 	for _, p := range []struct {
 		name string
@@ -187,8 +187,9 @@ func TestCoreWindowsDockFlow(t *testing.T) {
 		}
 	}
 
-	// Dock: the station scene flows SetCoreVisible(false) through
-	// syncMounts — both windows hide and stop gating the world. Probe the
+	// Dock: the room flows through syncMounts, both windows hide (the
+	// host's visibility pass, the row flags untouched) and stop gating the
+	// world. Probe the
 	// overview's left margin: the station contract board now covers its
 	// centre while docked (a visible panel that gates correctly), so the
 	// hidden-overview check must run where only the overview itself
@@ -198,7 +199,7 @@ func TestCoreWindowsDockFlow(t *testing.T) {
 	g.syncMounts()
 	pump(t, g, 1280, 720)
 	if ov.IsVisible() || sp.IsVisible() {
-		t.Error("core windows visible while docked")
+		t.Error("always-on windows visible while docked")
 	}
 	_, cy := centerOf(t, ov.Rect)
 	if g.overUI(float64(ov.Rect.Min.X), cy) {
@@ -211,7 +212,7 @@ func TestCoreWindowsDockFlow(t *testing.T) {
 	g.syncMounts()
 	pump(t, g, 1280, 720)
 	if !ov.IsVisible() || !sp.IsVisible() {
-		t.Fatal("core windows not restored after undock")
+		t.Fatal("always-on windows not restored after undock")
 	}
 	if x, y := centerOf(t, ov.Rect); !g.overUI(x, y) {
 		t.Error("overview does not gate the world after undock")

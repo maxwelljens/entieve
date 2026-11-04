@@ -28,7 +28,7 @@ const mfgCaptureFrames = 14
 //	ENTIEVE_CAPTURE=1 go test ./uikit/screens/ -run TestManufacturingCaptureFrame
 func TestManufacturingCaptureFrame(t *testing.T) {
 	k, _ := newTestKit(t)
-	k.SetCoreVisible(false) // the manufacturing window only
+	hideCore(k) // the manufacturing window only
 	f := NewManufacturing(k.Env())
 	k.AddWindow(f.Win())
 	// The landing width, grown to the height the whole bill needs (the

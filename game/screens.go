@@ -72,7 +72,19 @@ const (
 	// the rect IS the viewport. The rail-gutter floor below does not apply,
 	// because the layer paints underneath the rail by construction.
 	AnchorViewport
+	// AnchorTopRight / AnchorTopLeft hang the window on a viewport corner:
+	// Min is the inset pair (from the right and the top / from the left and
+	// the top), the window keeps the size its constructor gave it, and the
+	// rail-gutter floor does not apply. They are the two always-on panels'
+	// historical landing, and the Selected Item window has always sat 2
+	// design px inside the floor railClearX would impose, which every capture
+	// pins it there.
+	AnchorTopRight
+	AnchorTopLeft
 )
+
+// anchorLast is the highest valid Anchor (screenSpecErrors' bound).
+const anchorLast = AnchorTopLeft
 
 // keyNone marks a screen with no key binding. It cannot be 0: ebiten's
 // zero value is ebiten.KeyA.
@@ -85,6 +97,8 @@ const keyNone ebiten.Key = -1
 type ScreenID string
 
 const (
+	idOverview      ScreenID = "overview"
+	idSelected      ScreenID = "selected"
 	idInventory     ScreenID = "inventory"
 	idFitting       ScreenID = "fitting"
 	idMarket        ScreenID = "market"
@@ -153,6 +167,12 @@ const (
 //	              (game/title.go) selects it into the title host's table,
 //	              which mounts it lazily and exclusively there (Settings,
 //	              Keybindings)
+//	Persistent    the host keeps the built panel mounted whenever the room
+//	              is live and the row's flag only HIDES it (hide, don't
+//	              unmount), the Overview and the Selected Item windows,
+//	              built by the kit (uikit's OverviewPanel/SelectedPanel).
+//	              A Persistent row's visibility is the room's rule AND its
+//	              flag (ScreenHost.show)
 //	NoRail        the row is not a navigation-rail launcher, while every
 //	              other entry point stands (its own key, its title-menu
 //	              row) — Settings
@@ -180,6 +200,7 @@ type Screen struct {
 	Modal      bool
 	SpaceOnly  bool
 	DockedOnly bool
+	Persistent bool
 	Group      string
 	Service    string
 	InTitle    bool
@@ -191,6 +212,39 @@ type Screen struct {
 
 // screens is THE table, in mount order (the log lands before the menu).
 var screens = []Screen{
+	{
+		// The Overview: the grid list, always on in space. The kit builds
+		// the panel (its table, the row click's selection wiring) and this
+		// row gives it what every window has: the rail entry, the sidecar
+		// key ("overview", the very key the retired coreLayout wrote, so
+		// existing files restore unchanged) and the corner placement.
+		// Persistent: its flag hides it, never unmounts it, and the room
+		// (space) hides it while docked.
+		ID: idOverview, Title: "Overview", Icon: "kind_ship",
+		Key: keyNone, // the rail entry and its × are its doors
+		// Min is the inset pair AnchorTopRight reads: 10 design px from
+		// the right edge, 8 from the top. The window keeps the size its
+		// constructor gave it (the corner anchors never resize).
+		DefaultRect: image.Rect(10, 8, 10, 8),
+		Anchor:      AnchorTopRight,
+		DockPolicy:  DockFloating, SpaceOnly: true, Persistent: true,
+		Group: "Ship",
+		Build: func(h *ScreenHost) widgets.WindowPanel { return h.services.Overview() },
+	},
+	{
+		// The Selected Item window: the verbs for the current selection,
+		// top-left clear of the rail's gutter (8 + RailInset design px,
+		// 2 inside the generic rail-clear floor, its historical landing).
+		// Same facets as the Overview; no sidecar facet of its own (no
+		// table, no filter).
+		ID: idSelected, Title: "Selected Item", Icon: "act_lock",
+		Key:         keyNone,
+		DefaultRect: image.Rect(8+uikit.RailInset, 8, 8+uikit.RailInset, 8),
+		Anchor:      AnchorTopLeft,
+		DockPolicy:  DockFloating, SpaceOnly: true, Persistent: true,
+		Group: "Ship",
+		Build: func(h *ScreenHost) widgets.WindowPanel { return h.services.SelectedItem() },
+	},
 	{
 		// An ordinary floating window, docked or in space: it opens at its
 		// own declared default (uikit.InventoryRect, the panel's landing
@@ -427,7 +481,7 @@ var screens = []Screen{
 // here reaches session code.
 func init() {
 	KeyMap = keyMapRows(slices.Concat(worldKeyMap, screenBindings(screens)))
-	layoutNames = append(coreLayoutNames(), sidecarNames(screens)...)
+	layoutNames = append(sidecarNames(screens), infoLayoutName)
 }
 
 // keyMapRow composes one KeyMap row from a description-only declaration:
@@ -449,9 +503,10 @@ func keyMapRows(rows []Binding) []Binding {
 	return out
 }
 
-// sidecarNames returns the persisted windows' keys in spec order;
-// layout.go prefixes them with the core windows. A transient screen (the
-// Esc menu) is not among them.
+// sidecarNames returns the persisted windows' keys in spec order: every
+// row but a transient one, the two always-on windows included (their ids
+// are the keys the retired core layout wrote). A transient screen (the Esc
+// menu) is not among them.
 func sidecarNames(rows []Screen) []string {
 	names := make([]string, 0, len(rows))
 	for _, s := range rows {
@@ -506,6 +561,12 @@ func anchorRect(d image.Rectangle, a Anchor, dw, dh, w, h int) image.Rectangle {
 	case AnchorViewport:
 		// The layer is the viewport: no gutter floor, no declared size.
 		return image.Rect(0, 0, w, h)
+	case AnchorTopRight:
+		x, y = w-theme.Px(d.Min.X)-dw, theme.Px(d.Min.Y)
+		return image.Rect(x, y, x+dw, y+dh)
+	case AnchorTopLeft:
+		x, y = theme.Px(d.Min.X), theme.Px(d.Min.Y)
+		return image.Rect(x, y, x+dw, y+dh)
 	case AnchorFixed:
 		x, y = theme.Px(d.Min.X), theme.Px(d.Min.Y)
 	case AnchorBottomLeft:
@@ -587,7 +648,7 @@ func screenSpecErrors(rows []Screen) []string {
 		if s.SpaceOnly && s.DockedOnly {
 			add("row %d (%s): SpaceOnly and DockedOnly together never mounts", i, s.Title)
 		}
-		if s.Anchor > AnchorViewport {
+		if s.Anchor > anchorLast {
 			add("row %d (%s): unknown anchor %d", i, s.Title, s.Anchor)
 		}
 		if s.DockPolicy > DockTransient {

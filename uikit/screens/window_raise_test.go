@@ -57,7 +57,7 @@ func press(t *testing.T, k *Kit, m *raiseMouse, pt image.Point) {
 	}
 }
 
-// raiseFixture builds a kit whose two core windows overlap: the overview
+// raiseFixture builds a kit whose two always-on windows overlap: the overview
 // at its default rect, Selected Item re-parked over its right half —
 // then pumped so every rect and input layer has settled. Returns the kit
 // and the overview-only point, overlap point and title/grip points the

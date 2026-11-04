@@ -879,9 +879,12 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > `widget.ScrollContainer` + per-row containers (we own the scroll
 > instance); custom graphics (HUD arcs, starmap) render into `*ebiten.Image`
 > shown via `widget.Graphic`. `uikit.Env` + `Panel`/`WindowPanel` are the
-> seam every chrome panel implements; `Kit.Select/Root/AddContainer/
-> OverviewWindow/SelectedWindow/SetCoreVisible` are the integration hooks
-> the game shell drives (world-click selection, anchored chrome, dock-hide).
+> seam every chrome panel implements; `Kit.Select/Root/AddContainer` are
+> the integration hooks the game shell drives (world-click selection,
+> anchored chrome), and the two always-on windows are Screen rows like
+> every other window (`Kit.OverviewPanel`/`SelectedPanel` are what their
+> rows build; the host owns their mount, placement, sidecar entry and
+> visibility, the **Persistent** facet).
 > `sim`/`content`/`script` and the showcase suite are unaffected by the UI
 > layer.
 
@@ -1098,7 +1101,7 @@ map only says where each thing derives from.
 | Concern | Owner | Contract |
 |---|---|---|
 | Generator families | `uikit/theme/round.go` | One rasteriser behind `Bordered` (control, 5 px, flat), `PanelBox` (panel, 8 px, depth), `WindowTitleBox` (top corners only) + `WindowBodyBox` (bottom corners only, depth), the two window pieces, `BandedBox` (control radii, fill starts under a plate band) and `Rounded` (explicit per-corner radii; square = zero). `SquareBox` is the square strip (no corner arc, flat hairline edge) for thin chrome (the game-built menu body, the title windows' scroll backs, the contacts view's body and row backs); it rides ebitenui's bordered colour so those strips keep their pinned pixels. A screen asks for a **piece**, never a radius outside `Rounded`. |
-| Title bars | `theme.NewTitleBar` (`uikit/theme/iconmap.go`) | The one bar: ring dots, an optional 24 px leading icon, then the tracked `ChromeText` title bound to the bar (a title longer than the window ellipsizes clear of the ×). Every window asks for it: the uikit panels, the Overview and Selected Item core windows, the game's Esc menu and the title phase's save manager (via `Game.titleBar`), and nothing hand-builds a bar. |
+| Title bars | `theme.NewTitleBar` (`uikit/theme/iconmap.go`) | The one bar: ring dots, an optional 24 px leading icon, then the tracked `ChromeText` title bound to the bar (a title longer than the window ellipsizes clear of the ×). Every window asks for it: the uikit panels, the Overview and Selected Item windows, the game's Esc menu and the title phase's save manager (via `Game.titleBar`), and nothing hand-builds a bar. |
 | Radius / depth / dots / tracking tokens | `theme/round.go`, `theme/dots.go`, `theme/tracked.go` | `RadiusWindow/Panel/Control` are design px through `Px`; `depthRows` is the ramp's source resolution (the nine-slice centre row stretches it); `PanelTop`/`PanelBottom` are the ramp's ends derived from the body colour; `TitleDot*` the ring mark; `trackEm` the 0.12 em chrome tracking. One home each: no call site re-types them. |
 | Tracked chrome labels | `theme/tracked.go` | `ChromeText` (widget), `DrawTracked` (hand-drawn) and `MeasureTracked` are the only tracking path; body/row text stays untracked Sans. A tracked label measures with the same step it draws. |
 | Table columns | `widgets/columns.go` + `table.go` | One layout pass (`applyWidths` → `layoutColumns`) owns every width; header buttons, grips, the ⋯ strip (`ColMenuW`) and row cells all derive from `colOffsets`. Frozen bases + proportional later layouts (the "Table columns" note above). |

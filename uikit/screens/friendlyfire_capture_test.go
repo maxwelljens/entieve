@@ -26,7 +26,7 @@ import (
 //	ENTIEVE_CAPTURE=1 go test ./uikit/screens/ -run TestFriendlyFireConfirmCapture
 func TestFriendlyFireConfirmCapture(t *testing.T) {
 	k, _ := newTestKit(t)
-	k.SetCoreVisible(false) // the grid and the dialog only
+	hideCore(k) // the grid and the dialog only
 
 	var target ecs.Entity
 	for _, inf := range k.Sim.Grid() {

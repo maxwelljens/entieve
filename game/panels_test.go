@@ -4,6 +4,8 @@ import (
 	"errors"
 	"image"
 	"math"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -120,14 +122,12 @@ func TestPanelDefsCoverEnum(t *testing.T) {
 		_ = g.host.Want(s.ID, Room{Docked: true})
 	}
 
-	// layoutNames = the core windows + every non-transient row, in spec
-	// order — the sidecar and the table cannot drift apart.
-	want := coreLayoutNames()
-	for _, s := range screens {
-		if s.DockPolicy != DockTransient {
-			want = append(want, string(s.ID))
-		}
-	}
+	// layoutNames = every non-transient row in spec order, then Show
+	// Info's geometry-only row, so the sidecar and the table cannot drift
+	// apart. The two always-on windows are ordinary rows now, so the old
+	// separate listing is gone (they are in sidecarNames like the rest).
+	want := sidecarNames(screens)
+	want = append(want, infoLayoutName)
 	if len(layoutNames) != len(want) {
 		t.Fatalf("layoutNames = %v, want %v", layoutNames, want)
 	}
@@ -137,14 +137,15 @@ func TestPanelDefsCoverEnum(t *testing.T) {
 		}
 	}
 	// Every named entry resolves to a window; rows keep a live open flag,
-	// the core windows do not (infowin is written closed, never restored).
+	// Show Info does not (written closed, never restored). Both always-on
+	// windows resolve through the host like every other row.
 	for _, name := range layoutNames {
 		e := g.layoutEntry(name)
 		if e == nil || e.Win() == nil {
 			t.Errorf("layoutEntry(%q) resolved no window", name)
 		}
-		if g.host.Slot(name) == nil && name != "overview" && name != "selected" && name != "infowin" {
-			t.Errorf("layoutEntry(%q) is neither core nor a row", name)
+		if g.host.Slot(name) == nil && name != infoLayoutName {
+			t.Errorf("layoutEntry(%q) is neither the Show Info row nor a Screen row", name)
 		}
 	}
 	if g.layoutEntry("no-such-panel") != nil {
@@ -634,4 +635,173 @@ func centerOf(t *testing.T, r image.Rectangle) (float64, float64) {
 		t.Fatalf("zero rect %v (layout never ran)", r)
 	}
 	return float64(r.Min.X + r.Dx()/2), float64(r.Min.Y + r.Dy()/2)
+}
+
+// TestCorePanelsAreRows is the fold's one-path pin: the Overview and the
+// Selected Item window are Screen rows now, and every window system treats
+// them like any other row: the corner placement comes from the spec, the
+// close flips the row flag (hide, never unmount), the room hides them while
+// docked, and the sidecar round-trips their geometry, their flags and the
+// overview's filter.
+func TestCorePanelsAreRows(t *testing.T) {
+	g := newShowcaseGame(t)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+
+	for _, tc := range []struct {
+		id    ScreenID
+		title string
+		rect  image.Rectangle // the composed default at 1280×720, scale 1
+	}{
+		{idOverview, "Overview", defaultOverviewRect(1280)},
+		{idSelected, "Selected Item", image.Rect(8+uikit.RailInset, 8, 8+uikit.RailInset+464, 8+260)},
+	} {
+		row := screens[screenIndex(tc.id)]
+		if !row.Persistent || !row.SpaceOnly || row.Unlisted || row.NoRail {
+			t.Errorf("%s: facets = {persistent %v, spaceOnly %v, unlisted %v, noRail %v}",
+				tc.title, row.Persistent, row.SpaceOnly, row.Unlisted, row.NoRail)
+		}
+		want := g.kit.OverviewWindow()
+		if tc.id == idSelected {
+			want = g.kit.SelectedWindow()
+		}
+		if g.host.Window(tc.id) != want {
+			t.Errorf("%s: the row did not build the kit's window", tc.title)
+		}
+		if !g.host.Mounted(tc.id) || !g.host.IsOpen(tc.id) {
+			t.Fatalf("%s: open and in space the row must be mounted", tc.title)
+		}
+		if r := g.host.Window(tc.id).GetContainer().GetWidget().Rect; r != tc.rect {
+			t.Errorf("%s: placed at %v, want the spec's corner %v", tc.title, r, tc.rect)
+		}
+
+		// The × is the row's own toggle: the flag flips and the window
+		// hides, still mounted (a rail/dock re-show is a visibility write).
+		g.toggleScreen(tc.title)
+		g.syncMounts()
+		if g.host.IsOpen(tc.id) {
+			t.Errorf("%s: × did not flip the row flag", tc.title)
+		}
+		if !g.host.Mounted(tc.id) {
+			t.Errorf("%s: closing unmounted a Persistent row", tc.title)
+		}
+		if g.host.Window(tc.id).GetContainer().GetWidget().IsVisible() {
+			t.Errorf("%s: closed row still visible", tc.title)
+		}
+		g.toggleScreen(tc.title)
+		g.syncMounts()
+		if !g.host.IsOpen(tc.id) || !g.host.Window(tc.id).GetContainer().GetWidget().IsVisible() {
+			t.Errorf("%s: reopening did not show the row", tc.title)
+		}
+	}
+
+	// The room: docking hides both (the station's board takes the screen)
+	// without unmounting them; undocking shows them again.
+	dockAt(t, g)
+	g.syncScenes()
+	g.syncMounts()
+	pump(t, g, 1280, 720)
+	for _, id := range []ScreenID{idOverview, idSelected} {
+		if !g.host.Mounted(id) {
+			t.Errorf("%s: docked unmounted a Persistent row", panelNames[id])
+		}
+		if g.host.Window(id).GetContainer().GetWidget().IsVisible() {
+			t.Errorf("%s: docked row is visible (the room hides it)", panelNames[id])
+		}
+	}
+	g.s.Docked.Remove(g.s.Player())
+	g.syncScenes()
+	g.syncMounts()
+	pump(t, g, 1280, 720)
+	for _, id := range []ScreenID{idOverview, idSelected} {
+		if !g.host.Window(id).GetContainer().GetWidget().IsVisible() {
+			t.Errorf("%s: undocked row is hidden", panelNames[id])
+		}
+	}
+
+	// The sidecar round trip: close the overview (a Persistent row's flag
+	// is player state now), write, and read it back into a fresh session.
+	moved := image.Rect(200, 100, 600, 400)
+	g.host.Window(idOverview).SetLocation(moved)
+	g.host.MarkRestored(g.host.Window(idOverview))
+	g.kit.SetOverviewFilter(uikit.OvFilter{"station": {Hidden: true}})
+	g.host.SetOpen(idOverview, false)
+	if err := g.writeLayout(); err != nil {
+		t.Fatalf("writeLayout: %v", err)
+	}
+	e := readDoc(t, g.layoutPath()).Windows["overview"]
+	if e.X != 200 || e.Y != 100 || e.W != 400 || e.H != 300 || e.Open {
+		t.Errorf("overview persisted as %+v, want x200 y100 400×300 closed", e)
+	}
+
+	g2 := newShowcaseGameAt(t, g.SavePath())
+	g2.applySize(1280, 720)
+	pump(t, g2, 1280, 720)
+	if r := g2.host.Window(idOverview).GetContainer().GetWidget().Rect; r != moved {
+		t.Errorf("overview restored to %v, want %v", r, moved)
+	}
+	if g2.host.IsOpen(idOverview) {
+		t.Error("overview's closed flag did not survive the sidecar")
+	}
+	if !g2.host.Mounted(idOverview) || g2.host.Window(idOverview).GetContainer().GetWidget().IsVisible() {
+		t.Error("a restored-closed overview must stay mounted and hidden")
+	}
+	if got := g2.kit.OverviewFilter()["station"]; !got.Hidden {
+		t.Errorf("overview filter restored as %+v, want station hidden", got)
+	}
+}
+
+// TestLayoutLegacyCoreEntries: a sidecar written before the fold carries
+// the two always-on windows under the very keys the rows now use
+// ("overview", "selected", plus Show Info's "infowin") and the overview's
+// filter on the same entry. The reader takes them as they are (no
+// rename, no dropped state), which is why the fold needs no migration
+// function: the row id IS the legacy key.
+func TestLayoutLegacyCoreEntries(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	legacy := `{"version":3,"windows":{
+		"overview":{"x":200,"y":100,"w":400,"h":300,"open":true,
+			"filter":{"station":{"hidden":true}}},
+		"selected":{"x":300,"y":300,"w":464,"h":260,"open":false},
+		"infowin":{"x":325,"y":130,"w":630,"h":460,"open":false}}}`
+	if err := os.WriteFile(path+".layout.json", []byte(legacy), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g := newShowcaseGameAt(t, path)
+	g.applySize(1280, 720)
+	pump(t, g, 1280, 720)
+
+	if r := g.host.Window(idOverview).GetContainer().GetWidget().Rect; r != image.Rect(200, 100, 600, 400) {
+		t.Errorf("legacy overview restored to %v, want (200,100)-(600,400)", r)
+	}
+	if !g.host.IsOpen(idOverview) || !g.host.Window(idOverview).GetContainer().GetWidget().IsVisible() {
+		t.Error("legacy overview open=true must show the row")
+	}
+	if r := g.host.Window(idSelected).GetContainer().GetWidget().Rect; r != image.Rect(300, 300, 764, 560) {
+		t.Errorf("legacy selected restored to %v, want (300,300)-(764,560)", r)
+	}
+	if g.host.IsOpen(idSelected) || g.host.Window(idSelected).GetContainer().GetWidget().IsVisible() {
+		t.Error("legacy selected open=false must hide the row")
+	}
+	if !g.host.Mounted(idSelected) {
+		t.Error("a hidden Persistent row must stay mounted")
+	}
+	if r := g.kit.InfoWindow().GetContainer().GetWidget().Rect; r != image.Rect(325, 130, 955, 590) {
+		t.Errorf("legacy infowin restored to %v, want (325,130)-(955,590)", r)
+	}
+	if got := g.kit.OverviewFilter()["station"]; !got.Hidden {
+		t.Errorf("legacy overview filter restored as %+v, want station hidden", got)
+	}
+	assertInBounds(t, g, 1280, 720)
+
+	// The next write puts the same state back under the same keys.
+	if err := g.writeLayout(); err != nil {
+		t.Fatalf("writeLayout: %v", err)
+	}
+	doc := readDoc(t, g.layoutPath())
+	for _, name := range []string{"overview", "selected", "infowin"} {
+		if _, ok := doc.Windows[name]; !ok {
+			t.Errorf("legacy key %q dropped by the write", name)
+		}
+	}
 }

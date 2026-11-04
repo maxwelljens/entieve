@@ -2,10 +2,10 @@ package game
 
 // The Screen host: the Game-free state machine between a Screen spec row
 // and its built panel. It owns the open flag, the mount, the committed
-// close and the placement record; the panel owns Sync. Two instances run
-// per session — the game host (every row) and the title host (the
-// title-scoped rows, game/title.go) — so the title's Settings and
-// Keybindings are the same rows mounted through the same seam.
+// close, the placement record and a Persistent row's visibility; the panel
+// owns Sync. Two instances run per session: the game host (every row) and
+// the title host (the title-scoped rows, game/title.go), so the title's
+// Settings and Keybindings are the same rows mounted through the same seam.
 
 import (
 	"image"
@@ -18,14 +18,18 @@ import (
 )
 
 // hostSink is what the host needs from the interface kit: mount/remove a
-// window, register its × and its row surface, and read whether a committed
-// close fade is running. *uikit.Kit implements it; tests substitute a
-// recorder.
+// window, register its × and its row surface, read whether a committed
+// close fade is running, and drive the two fade handshakes a Persistent
+// row's visibility needs (cancel a close the player reopened, settle an
+// open fade the host is hiding). *uikit.Kit implements it; tests
+// substitute a recorder.
 type hostSink interface {
 	AddWindow(*widget.Window) widget.RemoveWindowFunc
 	SetWindowClose(*widget.Window, func())
 	SetWindowRows(*widget.Window, func(image.Point) bool)
 	Closing(*widget.Window) bool
+	CancelClose(*widget.Window)
+	SettleOpen(*widget.Window)
 }
 
 // screenServices is the game-backed bundle a row's Build may reach
@@ -49,6 +53,11 @@ type screenServices struct {
 	// The tree paints that node in the selected state, so the highlight
 	// follows a re-target and clears when the card closes.
 	ProfFamily func() string
+	// Overview / SelectedItem are the kit's two always-on panels: the kit
+	// builds them (construction and selection wiring), and the Persistent
+	// Screen rows hand them to the host to mount, place, persist and hide.
+	Overview     func() widgets.WindowPanel
+	SelectedItem func() widgets.WindowPanel
 	// Close is the owner's close semantics for a row's ×: the game routes
 	// modal rows to their scene, the title host leaves it nil (plain
 	// toggle).
@@ -181,30 +190,77 @@ func (h *ScreenHost) closeRow(id ScreenID) {
 	h.Toggle(id)
 }
 
-// want is the per-row mount rule. A title host's table IS the title set
-// (game/title.go: titleRows), so its rows follow their flag inside the
-// title room — the room, not a per-row marker, gates the host.
-func (h *ScreenHost) want(s *screenSlot, room Room) bool {
+// roomAllows is the room's half of a row's rule: a space-only row has no
+// place docked, a docked-only row none in space, and the title room holds
+// the title host's rows alone (game/title.go: titleRows). It gates a
+// normal row's mount and a Persistent row's visibility.
+func (h *ScreenHost) roomAllows(s *screenSlot, room Room) bool {
 	if h.scope == titleScope {
-		return room.Title && s.open
+		return room.Title
 	}
 	if room.Title {
 		return false
 	}
-	return s.open &&
-		(!s.row.SpaceOnly || !room.Docked) &&
-		(!s.row.DockedOnly || room.Docked)
+	return (!s.row.SpaceOnly || !room.Docked) && (!s.row.DockedOnly || room.Docked)
+}
+
+// live reports whether this host's table is the live one in the room: the
+// game host outside the title, the title host inside it.
+func (h *ScreenHost) live(room Room) bool {
+	if h.scope == titleScope {
+		return room.Title
+	}
+	return !room.Title
+}
+
+// want is the per-row mount rule: the room's rule and the row's flag. A
+// Persistent row is mounted for as long as its host is live: the room
+// hides it (show), never unmounts it, while every other row mounts on the
+// room rule and its flag.
+func (h *ScreenHost) want(s *screenSlot, room Room) bool {
+	if !h.live(room) {
+		return false
+	}
+	if s.row.Persistent {
+		return true
+	}
+	return h.roomAllows(s, room) && s.open
 }
 
 // Reconcile mounts and unmounts the rows to match the room. The pass after
 // a Rebind (and the boot one) is quiet: those mounts are windows coming
-// back, not the player opening them.
+// back, not the player opening them. The visibility pass then resolves a
+// Persistent row's show/hide from the same room.
 func (h *ScreenHost) Reconcile(room Room) {
 	quiet := h.quiet
 	h.quiet = false
 	for _, s := range h.slots {
 		h.setMounted(s, h.want(s, room), quiet)
+		h.show(s, room)
 	}
+}
+
+// show applies a Persistent row's visibility: the room's rule AND the
+// player's flag, resolved as a visibility write (the window stays mounted,
+// so a re-show keeps its rect, its stack slot and its table state). A show
+// cancels a close fade still running (the player reopened it); a hide
+// settles an open fade, because the fade's park/unpark pass would
+// otherwise show the window every frame against this rule.
+func (h *ScreenHost) show(s *screenSlot, room Room) {
+	if !s.row.Persistent || s.mount == nil {
+		return
+	}
+	win := s.panel.Win()
+	if win == nil || win.GetContainer() == nil {
+		return
+	}
+	show := s.open && h.roomAllows(s, room)
+	if show {
+		h.sink.CancelClose(win)
+	} else {
+		h.sink.SettleOpen(win)
+	}
+	theme.ShowWidget(win.GetContainer().GetWidget(), show)
 }
 
 // Fitted is the Screen panel capability a content-hugging window answers:
@@ -478,6 +534,28 @@ func (s *screenSlot) Tables() []*widgets.Table {
 	return nil
 }
 
+// Filter/SetFilter are the filterEntry facet, resolved on the panel by
+// type: the Overview's panel answers them, every other row's panel does
+// not and its zero state persists nothing.
+func (s *screenSlot) Filter() uikit.OvFilter {
+	if s.panel == nil {
+		return nil
+	}
+	if p, ok := s.panel.(filterEntry); ok {
+		return p.Filter()
+	}
+	return nil
+}
+
+func (s *screenSlot) SetFilter(f uikit.OvFilter) {
+	if s.panel == nil {
+		return
+	}
+	if p, ok := s.panel.(filterEntry); ok {
+		p.SetFilter(f)
+	}
+}
+
 // Place moves win to rect unless the player owns its position (restored
 // or moved away from the last composed rect).
 func (h *ScreenHost) Place(win *widget.Window, rect image.Rectangle) {
@@ -505,8 +583,8 @@ func (h *ScreenHost) ResetPlacement() {
 	h.quiet = true // the rebuilt kit remounts what was already open
 }
 
-// PlaceDefaults re-places every row's window from its declared rect +
-// anchor (the virgin rules of Place apply).
+// PlaceDefaults re-places every row's window from its declared rect and
+// placement rule (the virgin rules of Place apply).
 func (h *ScreenHost) PlaceDefaults(w, height int) {
 	for _, s := range h.slots {
 		win := s.Win()

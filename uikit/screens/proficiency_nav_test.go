@@ -22,7 +22,7 @@ func profNavFixture(t *testing.T) (*Kit, *Proficiency, *scriptPointer, func()) {
 	uitest.UseScale(t, 1)
 	in := &scriptPointer{}
 	k, _ := newTestKitWith(t, widgets.NewPointer(in))
-	k.SetCoreVisible(false)
+	hideCore(k)
 	p := NewProficiency(k.Env(), proficiencyChain, nil, k.ProfFamily)
 	p.Sync()
 	k.AddBackdropWindow(p.Win())

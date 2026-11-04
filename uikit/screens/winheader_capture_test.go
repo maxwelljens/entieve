@@ -35,7 +35,7 @@ func TestHeaderCaptureFrame(t *testing.T) {
 	defer render.LoadAssets("")
 
 	k, _ := newTestKit(t)
-	k.SetCoreVisible(false) // the two service windows only: a clean band frame
+	hideCore(k) // the two service windows only: a clean band frame
 	ref, man := NewRefinery(k.Env()), NewManufacturing(k.Env())
 	k.AddWindow(ref.Win())
 	k.AddWindow(man.Win())

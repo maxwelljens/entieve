@@ -35,6 +35,8 @@ func (f *fakeSink) SetWindowClose(w *widget.Window, close func()) {
 	f.closes[w] = close
 }
 func (f *fakeSink) Closing(w *widget.Window) bool { return f.closing[w] }
+func (f *fakeSink) CancelClose(w *widget.Window)  {}
+func (f *fakeSink) SettleOpen(w *widget.Window)   {}
 func (f *fakeSink) SetWindowRows(w *widget.Window, hit func(image.Point) bool) {
 	if f.rows == nil {
 		f.rows = map[*widget.Window]func(image.Point) bool{}

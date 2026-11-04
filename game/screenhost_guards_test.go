@@ -11,6 +11,7 @@ import (
 // literal list and its order are pinned here.
 func TestWindowNamesFrozen(t *testing.T) {
 	want := []string{
+		"overview", "selected",
 		"inventory", "fitting", "market", "manufacturing", "scanner",
 		"map", "help", "log", "settings", "services", "refinery",
 		"finances", "proficiency", "proficiency-overview", "keybindings",
@@ -29,6 +30,7 @@ func TestWindowNamesFrozen(t *testing.T) {
 // the identity collapse: the sidecar's window keys are user data.
 func TestSidecarKeyShape(t *testing.T) {
 	want := []string{
+		"overview", "selected",
 		"inventory", "fitting", "market", "manufacturing", "scanner",
 		"map", "help", "log", "settings", "services", "refinery",
 		"finances", "proficiency", "proficiency-overview", "keybindings",

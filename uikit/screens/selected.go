@@ -69,6 +69,13 @@ type panelVerb struct {
 	btn    *widget.Button
 }
 
+// selectedSurface adapts the Selected Item window to the Screen panel seam
+// (see overviewPanel): kit-built and kit-synced, host-mounted.
+type selectedSurface struct{ k *Kit }
+
+func (p selectedSurface) Win() *widget.Window { return p.k.SelectedWindow() }
+func (p selectedSurface) Sync()               {}
+
 // buildSelected constructs the Selected Item window and its handlers.
 func (k *Kit) buildSelected() {
 	p := k.th.Pal()

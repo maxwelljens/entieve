@@ -113,11 +113,13 @@ func TestTitleSuppressesGameplayChrome(t *testing.T) {
 	if g.rack.Container().GetWidget().IsVisible() {
 		t.Error("module rack visible at the title")
 	}
-	if g.kit.OverviewWindow().GetContainer().GetWidget().IsVisible() {
-		t.Error("Overview visible at the title")
-	}
-	if g.kit.SelectedWindow().GetContainer().GetWidget().IsVisible() {
-		t.Error("Selected Item visible at the title")
+	// The two always-on windows are Screen rows: the title room unmounts
+	// them (the game host is not live there), so neither is in the window
+	// stack to paint.
+	for _, id := range []ScreenID{idOverview, idSelected} {
+		if g.host.Mounted(id) {
+			t.Errorf("%s mounted at the title", panelNames[id])
+		}
 	}
 	if g.rail.Container().GetWidget().IsVisible() {
 		t.Error("navigation rail visible at the title")

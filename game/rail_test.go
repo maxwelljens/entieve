@@ -22,25 +22,27 @@ import (
 
 // TestRailDerivesFromScreenSpec: every non-transient, listed spec row is
 // exactly one rail entry — its icon, live hint and group — in section
-// order, next to the two core windows; the Esc menu, the HUD and the
-// rack have no entries (the pause menu keeps its key, the ship chrome has
-// no window to open), the two secondary windows (Settings, Keybindings)
-// are not launchers, and every entry names a manifest icon.
+// order, the two always-on windows included (they are rows now, and they
+// still lead the Ship section); the Esc menu, the HUD and the rack have no
+// entries (the pause menu keeps its key, the ship chrome has no window to
+// open), the two secondary windows (Settings, Keybindings) are not
+// launchers, and every entry names a manifest icon.
 func TestRailDerivesFromScreenSpec(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)
 	entries := g.rail.Entries()
 
-	// One entry per openable, listed spec row + the two core windows.
+	// One entry per openable, listed spec row (the always-on windows
+	// included: they are rows).
 	wantRows := 0
 	for _, s := range screens {
 		if s.DockPolicy != DockTransient && !s.NoRail && !s.Unlisted {
 			wantRows++
 		}
 	}
-	if len(entries) != wantRows+2 {
-		t.Fatalf("rail has %d entries, want %d spec rows + 2 core windows", len(entries), wantRows+2)
+	if len(entries) != wantRows {
+		t.Fatalf("rail has %d entries, want %d listed spec rows", len(entries), wantRows)
 	}
 
 	byTitle := map[string]int{}
@@ -87,14 +89,10 @@ func TestRailDerivesFromScreenSpec(t *testing.T) {
 			t.Errorf("%s: entry has no open-state closure", s.Title)
 		}
 	}
-	// The core windows: Ship section, host-owned open state.
-	for _, title := range []string{"Overview", "Selected Item"} {
-		if byTitle[title] != 1 {
-			t.Fatalf("core window %q appears %d times, want 1", title, byTitle[title])
-		}
-	}
+	// Rail order, pinned: the always-on windows still lead the Ship section
+	// (they are the table's first rows, so their entries derive first).
 	if entries[0].Title != "Overview" || entries[1].Title != "Selected Item" || entries[2].Title != "Fitting" {
-		t.Errorf("Ship section = %q/%q/%q, want Overview, Selected Item, Fitting (core first)",
+		t.Errorf("Ship section = %q/%q/%q, want Overview, Selected Item, Fitting (unchanged)",
 			entries[0].Title, entries[1].Title, entries[2].Title)
 	}
 
@@ -200,23 +198,27 @@ func TestRailClicksToggleWindows(t *testing.T) {
 		t.Fatal("closed market stayed mounted")
 	}
 
-	// The core windows toggle the same way through Kit.ToggleCore: the
-	// rail closes the always-on overview and brings it back.
+	// The two always-on windows toggle through their Screen rows like every
+	// other entry: the rail HIDES the overview (it stays mounted) and shows
+	// it again.
 	ov := g.kit.OverviewWindow().GetContainer().GetWidget()
 	if !ov.IsVisible() {
 		t.Fatal("fixture: overview hidden in space")
 	}
 	click(t, g, g.rail.Button("Overview"))
 	g.syncMounts()
-	if g.kit.CoreOpen("Overview") || ov.IsVisible() {
+	if g.host.IsOpen(idOverview) || ov.IsVisible() {
 		t.Error("rail did not close the overview")
+	}
+	if !g.host.Mounted(idOverview) {
+		t.Error("closing the overview unmounted it: a Persistent row hides, it does not unmount")
 	}
 	if entryByTitle(t, g, "Overview").Open() {
 		t.Error("overview entry still glows after closing")
 	}
 	click(t, g, g.rail.Button("Overview"))
 	g.syncMounts()
-	if !g.kit.CoreOpen("Overview") || !ov.IsVisible() {
+	if !g.host.IsOpen(idOverview) || !ov.IsVisible() {
 		t.Error("rail did not reopen the overview")
 	}
 }
@@ -248,11 +250,11 @@ func TestRailGrayedClicksDoNothing(t *testing.T) {
 	if g.rail.Button("Contacts").GetWidget().Disabled {
 		t.Error("services entry grayed while docked")
 	}
-	// The core windows are space chrome too: their entries gray with
-	// them while docked (and the station-dependent fitting grays at a
+	// The always-on windows are space chrome too: their entries gray
+	// while docked (and the station-dependent fitting grays at a
 	// station without the fitting service — the start station has it).
 	if !g.rail.Button("Overview").GetWidget().Disabled {
-		t.Error("core window entry not grayed while docked")
+		t.Error("always-on window entry not grayed while docked")
 	}
 	if g.rail.Button("Fitting").GetWidget().Disabled {
 		t.Error("fitting entry grayed at a station offering the service")

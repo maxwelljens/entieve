@@ -68,16 +68,17 @@ func TestScreenSpecRejectsMalformedRows(t *testing.T) {
 		want   string
 	}{
 		{"missing builder", func(r []Screen) { r[0].Build = nil }, "missing builder"},
+		{"persistent row without a builder", func(r []Screen) { r[screenIndex(idOverview)].Build = nil }, "missing builder"},
 		{"duplicate id", func(r []Screen) { r[1].ID = idInventory }, "already used by"},
 		{"zero id", func(r []Screen) { r[0].ID = "" }, "zero id"},
 		{"upper-case id", func(r []Screen) { r[0].ID = "Inventory" }, "lowercase sidecar key"},
-		{"duplicate key", func(r []Screen) { r[1].Key = ebiten.KeyI }, "already bound by"},
+		{"duplicate key", func(r []Screen) { r[screenIndex(idFitting)].Key = ebiten.KeyI }, "already bound by"},
 		{"zero title", func(r []Screen) { r[0].Title = "" }, "zero title"},
 		{"unknown icon", func(r []Screen) { r[0].Icon = "svc_nope" }, "unknown icon"},
-		{"key without an action id", func(r []Screen) { r[0].Action = "" }, "without an action id"},
-		{"duplicate action id", func(r []Screen) { r[1].Action = "inventory" }, "already used by"},
-		{"help text without a key", func(r []Screen) { r[0].Key = keyNone }, "help text without a key binding"},
-		{"desc with a baked key", func(r []Screen) { r[0].Desc = "I: toggle inventory" }, "carries a chord"},
+		{"key without an action id", func(r []Screen) { r[screenIndex(idInventory)].Action = "" }, "without an action id"},
+		{"duplicate action id", func(r []Screen) { r[screenIndex(idFitting)].Action = "inventory" }, "already used by"},
+		{"help text without a key", func(r []Screen) { r[screenIndex(idInventory)].Key = keyNone }, "help text without a key binding"},
+		{"desc with a baked key", func(r []Screen) { r[screenIndex(idInventory)].Desc = "I: toggle inventory" }, "carries a chord"},
 		{"missing rail group", func(r []Screen) { r[0].Group = "" }, "missing rail group"},
 		{"unknown rail group", func(r []Screen) { r[0].Group = "Cargo Bay" }, "unknown rail group"},
 		{"transient row claiming a group", func(r []Screen) { r[screenIndex(idMenu)].Group = "Ship" }, "transient screen must not carry"},
@@ -120,9 +121,16 @@ func TestScreenSpecMatchesRegistries(t *testing.T) {
 		}
 		// Mount rule in both views, read back as behaviour: a SpaceOnly
 		// screen never mounts docked, a DockedOnly screen never mounts in
-		// space, everything else follows its flag.
+		// space, everything else follows its flag. A Persistent row mounts
+		// in every room its host is live in; the room hides it instead
+		// (ScreenHost.show), so its mount rule never names the dock.
 		g.host.SetOpen(s.ID, true)
 		switch {
+		case s.Persistent:
+			if !g.host.Want(s.ID, Room{}) || !g.host.Want(s.ID, Room{Docked: true}) {
+				t.Errorf("%s: Persistent want(space, docked) = (%v, %v), want (true, true)",
+					screenLabel(s), g.host.Want(s.ID, Room{}), g.host.Want(s.ID, Room{Docked: true}))
+			}
 		case s.SpaceOnly:
 			if !g.host.Want(s.ID, Room{}) || g.host.Want(s.ID, Room{Docked: true}) {
 				t.Errorf("%s: SpaceOnly want(space, docked) = (%v, %v), want (true, false)",
@@ -142,8 +150,9 @@ func TestScreenSpecMatchesRegistries(t *testing.T) {
 		g.host.SetOpen(s.ID, false)
 	}
 
-	// Sidecar: the core windows plus every persisted row, in spec order.
-	wantNames := append(coreLayoutNames(), sidecarNames(screens)...)
+	// Sidecar: every persisted row in spec order, then Show Info's
+	// geometry-only row (the two always-on windows are rows now).
+	wantNames := append(sidecarNames(screens), infoLayoutName)
 	if !slices.Equal(layoutNames, wantNames) {
 		t.Errorf("layoutNames = %v, want %v", layoutNames, wantNames)
 	}

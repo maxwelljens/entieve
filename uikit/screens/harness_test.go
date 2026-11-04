@@ -9,6 +9,7 @@ import (
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -246,7 +247,54 @@ func newTestKitWith(t *testing.T, p *widgets.Pointer) (*Kit, *[]sim.Command) {
 	if err != nil {
 		t.Fatalf("NewKit: %v", err)
 	}
+	mountCore(k)
 	return k, &cmds
+}
+
+// mountCore mounts the kit's two always-on panels the way the game's Screen
+// host does (that host lives in package game, so a bare kit has none): both
+// mount first, in Screen spec order, each × hides its window (the host's
+// row flag in production, the visible result here) and the panel's tables
+// become its row surface (what SetWindowRows buys a mounted row).
+func mountCore(k *Kit) {
+	for _, p := range []widgets.WindowPanel{k.OverviewPanel(), k.SelectedPanel()} {
+		win := p.Win()
+		k.AddWindow(win)
+		k.SetWindowClose(win, func() {
+			// The host's row flag hides the window and every reconcile
+			// keeps it hidden; a bare kit has no reconcile, so the fade is
+			// dropped here and finishClose cannot lift the hide at settle.
+			k.CancelClose(win)
+			hideWindow(win)
+		})
+		if tp, ok := p.(interface{ Tables() []*widgets.Table }); ok {
+			tbls := tp.Tables()
+			k.SetWindowRows(win, func(pt image.Point) bool {
+				for _, tbl := range tbls {
+					if tbl.RowAt(pt) {
+						return true
+					}
+				}
+				return false
+			})
+		}
+	}
+}
+
+// hideCore hides the two always-on windows for a capture or a test that
+// isolates another surface (the game's room rule and row flag do this in
+// production).
+func hideCore(k *Kit) {
+	for _, p := range []widgets.WindowPanel{k.OverviewPanel(), k.SelectedPanel()} {
+		k.SettleOpen(p.Win())
+		hideWindow(p.Win())
+	}
+}
+
+// hideWindow is one window's hide: the visible half of a row flag going
+// off.
+func hideWindow(w *widget.Window) {
+	theme.ShowWidget(w.GetContainer().GetWidget(), false)
 }
 
 // pumpKit runs one frame (Sync, Update, Draw) at the given screen size
