@@ -686,7 +686,10 @@ func TestSupportCyclePractice(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sc.Queue(CmdActivate{Slot: injectModule(t, sc, "mod-cap-booster")})
+	booster := injectModule(t, sc, "mod-cap-booster")
+	sc.Queue(CmdSetAmmo{Slot: booster, Item: capCellID}) // the cell is picked
+	sc.Step()
+	sc.Queue(CmdActivate{Slot: booster})
 	sc.Step()
 	stepN(sc, 1200) // the cell load cycle runs before the first booster cycle
 	if got := sc.proficiencyXP("capacitor"); got <= 0 {

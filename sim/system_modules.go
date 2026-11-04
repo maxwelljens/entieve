@@ -13,8 +13,9 @@ import (
 // apply the effect, and schedule the next cycle. A failed validation
 // deactivates the module with a log event.
 func (s *Sim) systemModules() {
-	// Bays resolve before any cycle: this is what pre-loads a fresh fit and
-	// reloads an emptied gun the tick after it ran dry.
+	// Bays resolve before any cycle: this is what reloads a bay whose
+	// deadline passed and tops up an emptied gun from its standing order the
+	// tick after it ran dry.
 	s.fillBays()
 	now := s.time
 	for _, e := range sortedEntities(s.Fittings) {
@@ -43,8 +44,8 @@ func (s *Sim) systemModules() {
 				}
 				slot := SlotRef{Class: class, Index: i}
 				// A cap booster burns its cells from a bay like a gun its
-				// shells: an empty bay loads first and the load holds this
-				// cycle (loadClip set the deadline).
+				// shells: an empty bay loads the chosen cell first and the
+				// load holds this cycle (loadClip set the deadline).
 				if def.Kind == content.KindCapBooster {
 					if s.fillClip(e, def, rt) == clipFilled {
 						continue
@@ -255,7 +256,10 @@ func (s *Sim) activate(e ecs.Entity, slot SlotRef, target ecs.Entity, quiet bool
 		}
 	}
 	if def.Kind == content.KindCapBooster {
-		s.fillClip(e, def, rt) // a fresh fit loads its cells on demand
+		if s.fillClip(e, def, rt) == clipWaiting {
+			s.warnOnce(e, rt, def.Name+" waiting for ammo selection", quiet)
+			return false
+		}
 		if rt.Clip.Qty < 1 {
 			s.warnOnce(e, rt, "No cap booster charges in cargo", quiet)
 			return false

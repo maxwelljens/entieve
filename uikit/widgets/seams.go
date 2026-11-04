@@ -105,8 +105,9 @@ type ContentView interface {
 	// rounds, the bay's whole-round capacity for that round, the selected
 	// type and every compatible type in cargo (sorted). ok is false when
 	// the slot holds no bay (a charge-free weapon, a non-charge module).
-	// Rounds == 0 with two or more Options and no Selection is the waiting
-	// state (sim fillClip's clipAmbiguous case).
+	// Rounds == 0, no Selection and at least one Option is the waiting
+	// state: nothing loads until the player picks a type (sim fillClip's
+	// clipWaiting case).
 	Clip(sim.SlotRef) (sim.ClipState, bool)
 
 	// Market is the market domain's reads as one handle (MarketView): the
@@ -429,61 +430,19 @@ func (v *view) ModuleTarget(e ecs.Entity, slot sim.SlotRef) (ecs.Entity, bool) {
 	return v.s.ModuleTarget(e, slot)
 }
 
-// PredictedAmmo is the charge rule once, over the player's bay, cargo and
-// preference: the bay's loaded round or selection first (it is the
-// consumer), then the preference while it still sits in cargo and matches
-// the gun's ammo class, else the first cargo stack of that class in
-// canonical order. It names the shell the next shot would consume, so the
-// predicted DPS figure never disagrees with what the gun fires.
+// PredictedAmmo is the charge the gun would fire, off the sim's own bay read:
+// the round in the bay, else the type its standing order names. No order means
+// the gun fires nothing (""), whatever cargo holds — the sim loads only a
+// chosen type.
 func (v *view) PredictedAmmo(slot sim.SlotRef) content.ItemID {
-	fit, ok := v.s.Fittings.Get(v.s.Player())
+	cs, ok := v.Clip(slot)
 	if !ok {
 		return ""
 	}
-	defs := fit.Defs(slot.Class)
-	if slot.Index < 0 || slot.Index >= len(defs) {
-		return ""
+	if cs.Item != "" {
+		return cs.Item
 	}
-	def, ok := v.c.Module(defs[slot.Index])
-	if !ok || def.Weapon == nil || def.Weapon.AmmoClass == "" {
-		return ""
-	}
-	cargo, ok := v.s.Cargos.Get(v.s.Player())
-	if !ok {
-		return ""
-	}
-	// The bay is the consumer now: a loaded or selected shell is what the gun
-	// fires, whether or not its rounds still sit in cargo.
-	if cs, ok := v.s.Clip(v.s.Player(), slot); ok {
-		if cs.Item != "" {
-			return cs.Item
-		}
-		if cs.Selection != "" {
-			return cs.Selection
-		}
-	}
-	class := def.Weapon.AmmoClass
-	if pref := v.s.AmmoPref(v.s.Player(), slot); pref != "" {
-		for _, st := range cargo.Stacks {
-			if st.Item != pref || st.Qty <= 0 {
-				continue
-			}
-			if item, ok := v.c.Item(pref); ok && item.AmmoClass == class {
-				return pref
-			}
-			break
-		}
-	}
-	for _, st := range cargo.Stacks {
-		if st.Qty <= 0 {
-			continue
-		}
-		item, ok := v.c.Item(st.Item)
-		if ok && item.AmmoClass == class {
-			return st.Item
-		}
-	}
-	return ""
+	return cs.Selection
 }
 
 func (v *view) Market() MarketView { return marketView{v} }

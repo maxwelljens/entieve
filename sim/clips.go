@@ -13,19 +13,22 @@ import (
 // rounds of exactly ONE shell type. Every load takes one firing cycle: the
 // rounds move at the start (take-at-start conservation) and the bay is not
 // ready until the deadline, so the load DEFERS the next shot by one cycle.
-// Only the fresh-fit pre-load at boot is instant (preloadBays). Each shot
-// draws one round; the bay tops itself up from the selected type while that
-// type has cargo stock.
+// Each shot draws one round; the bay tops itself up from the selected type
+// while that type has cargo stock.
 //
-// Selection rule (the only automatic behaviour there is):
-//   - the bay loads the selected type while its cargo stock lasts;
-//   - when that type runs out, the bay switches if exactly one other type
-//     remains in cargo and waits if two or more compete (no cargo-order
-//     following anywhere);
-//   - a fresh fit (or one whose selection was cleared) does the same: one
-//     type present = auto-load, two or more = sit dry and wait for a choice.
+// The selection is a STANDING ORDER, and it is the only thing a player's bay
+// ever loads:
+//   - CmdSetAmmo names the type; that is the only way a load starts;
+//   - the order persists: an emptied bay reloads the same type, and a
+//     stock-out keeps it (the bay stays empty until the type is back);
+//   - with no order the bay loads NOTHING, however much cargo holds: a fresh
+//     fit starts empty and a cleared selection waits for the next pick.
 //
-// Truly dry (empty bay, no matching rounds in cargo) keeps the original
+// NPC bays keep the one guess left, because a rat has no rack to choose from:
+// with no selection and exactly one round type in cargo the bay loads it (the
+// spawn grant is one stack per fitted shell family).
+//
+// Truly dry (empty bay, no rounds of the order in cargo) keeps the original
 // "no charges" warning and deactivates the module.
 
 // cyclePeriod is a module's cycle length: the firing cycle for a gun, the
@@ -83,8 +86,8 @@ func (s *Sim) clipRounds(def *content.ModuleDef, item content.ItemID) int {
 }
 
 // clipTypes lists the distinct round types carried in cargo, sorted by id.
-// Sorted (not stack order) so a bay's choice never depends on how cargo was
-// stacked.
+// Sorted (not stack order) so the NPC one-type guess never depends on how
+// cargo was stacked.
 func (s *Sim) clipTypes(def *content.ModuleDef, stacks []content.CargoStack) []content.ItemID {
 	seen := map[content.ItemID]bool{}
 	var out []content.ItemID
@@ -105,16 +108,18 @@ func (s *Sim) clipTypes(def *content.ModuleDef, stacks []content.CargoStack) []c
 type clipState int
 
 const (
-	clipKept      clipState = iota // bay loaded/loading (or no bay / nothing to load)
-	clipFilled                     // a full-bay load started
-	clipAmbiguous                  // empty bay, no selection, 2+ types in cargo: wait
+	clipKept    clipState = iota // bay loaded/loading (or no bay / nothing to load)
+	clipFilled                   // a full-bay load started
+	clipWaiting                  // empty bay, no selection, rounds in cargo: wait for a pick
 )
 
 // fillClip starts a load into one empty bay from cargo. A loaded or loading
-// bay is never touched; a bay whose selection still has cargo stock takes
-// that type, otherwise the selection clears and the type count decides (1 =
-// load it, 0 = dry, 2+ = wait). A full bay's rounds move at once (take at
-// start: a save mid-load can neither duplicate nor lose rounds) and the bay
+// bay is never touched. A player's bay with a standing order takes that type
+// while cargo holds it and otherwise stays empty (the order is kept, not
+// cleared); with no order it waits for a pick. An NPC's bay carries no rack to
+// ask, so it loads its one granted round type, and re-aims at whatever single
+// type is left when its own runs out. A full bay's rounds move at once (take
+// at start: a save mid-load can neither duplicate nor lose rounds) and the bay
 // holds the load cycle until its deadline (loadClip, finishLoad).
 func (s *Sim) fillClip(e ecs.Entity, def *content.ModuleDef, rt *ModuleRuntime) clipState {
 	bay := clipBay(def)
@@ -123,24 +128,25 @@ func (s *Sim) fillClip(e ecs.Entity, def *content.ModuleDef, rt *ModuleRuntime) 
 		return clipKept
 	}
 	if rt.Selection != "" {
-		if stacksCount(cargo.Stacks, rt.Selection) > 0 {
-			if n := s.loadClip(cargo, def, rt, rt.Selection); n > 0 {
-				return clipFilled
-			}
+		if n := s.loadClip(cargo, def, rt, rt.Selection); n > 0 {
+			return clipFilled
 		}
-		rt.Selection = "" // the selected type is out of cargo
+		if e == s.player {
+			return clipKept // out of stock: the order stands, the bay stays empty
+		}
+		rt.Selection = "" // an NPC has no rack: it re-aims at its one type below
 	}
 	types := s.clipTypes(def, cargo.Stacks)
-	switch len(types) {
-	case 0:
-		return clipKept
-	case 1:
+	if e != s.player && len(types) == 1 {
 		if n := s.loadClip(cargo, def, rt, types[0]); n > 0 {
 			return clipFilled
 		}
 		return clipKept
 	}
-	return clipAmbiguous
+	if len(types) == 0 {
+		return clipKept // nothing in cargo fits the bay: the dry-gun path
+	}
+	return clipWaiting
 }
 
 // loadClip moves up to a full bay of item from cargo into the bay and starts
@@ -182,10 +188,12 @@ func (s *Sim) finishLoad(e ecs.Entity, def *content.ModuleDef, rt *ModuleRuntime
 	s.logLoad(e, def, rt.Clip.Item, rt.Clip.Qty)
 }
 
-// preloadBays resolves the fresh-fit pre-load at boot: fillBays starts the
-// loads and this settles them at once, leaving no clock running. No UI exists
-// before the first tick to show a load cycle; everything after boot is clocked.
-func (s *Sim) preloadBays() {
+// preloadNpcBays resolves the swarm's fresh-fit pre-load at boot: fillBays
+// starts the NPC bays' single granted type and this settles them at once,
+// leaving no clock running (no UI exists before the first tick to show a load
+// cycle). A player's bay is untouched: it has no order at boot, so nothing
+// loads.
+func (s *Sim) preloadNpcBays() {
 	s.fillBays()
 	for _, e := range sortedEntities(s.Fittings) {
 		fit, ok := s.Fittings.Get(e)
@@ -236,10 +244,11 @@ func (s *Sim) logLoad(e ecs.Entity, def *content.ModuleDef, item content.ItemID,
 
 // fillBays resolves every bay before the cycle systems run. It completes loads
 // whose deadline has passed — the module cycle loop skips idle modules, so an
-// idle load has to finish here — and starts a load in every IDLE empty bay.
-// An ACTIVE module starts no load here: it loads at its own cycle boundary,
-// where the load costs a firing cycle (see fireWeapon and the cap booster
-// branch of systemModules). Every load after boot holds the bay for one cycle.
+// idle load has to finish here — and starts a load in every IDLE empty bay
+// that has a standing order (or, for an NPC, its one granted type). An ACTIVE
+// module starts no load here: it loads at its own cycle boundary, where the
+// load costs a firing cycle (see fireWeapon and the cap booster branch of
+// systemModules). Every load holds the bay for one cycle.
 func (s *Sim) fillBays() {
 	now := s.time
 	for _, e := range sortedEntities(s.Fittings) {

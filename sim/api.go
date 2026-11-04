@@ -241,8 +241,10 @@ func New(c *content.Content, w *content.WorldDef, seed int64) (*Sim, error) {
 	if warWorlds[w.ID] {
 		s.newWarState()
 	}
-	// preloadBays fills the fresh fit before the first Step.
-	s.preloadBays()
+	// The fresh fit's own bays start empty: a player's bay loads only an order
+	// given with CmdSetAmmo. The swarm's bays are pre-loaded as they always
+	// were (an NPC has no rack; its spawn grant is one round type).
+	s.preloadNpcBays()
 	return s, nil
 }
 
@@ -330,11 +332,12 @@ func (s *Sim) DrainEvents() []Event { return s.Events() }
 
 // ClipState is one charge module's shell bay as the UI reads it: the loaded
 // rounds and the bay's capacity for that shell (in whole rounds), the shell
-// type the bay tops up from, every shell type in cargo that fits it (sorted by
-// id), and whether a load is in flight. An empty bay with two or more Options
-// is the waiting state — the player must choose (CmdSetAmmo) before the gun
-// fires again. Loading is true from the moment a load moves its rounds into
-// the bay until its cycle completes: the rounds are in but not yet usable.
+// type the bay's standing order names, every shell type in cargo that fits it
+// (sorted by id), and whether a load is in flight. An empty bay with no
+// Selection is the waiting state — nothing loads until the player chooses
+// (CmdSetAmmo); Options lists what can be chosen. Loading is true from the
+// moment a load moves its rounds into the bay until its cycle completes: the
+// rounds are in but not yet usable.
 //
 // BayM3 and CycleSeconds are the bay's spec, derived here from the same
 // privates the load runs on (clipBay, cyclePeriod) so a read side never

@@ -246,10 +246,10 @@ func requireHeld(t *testing.T, s *Sim, want map[content.ItemID]int, when string)
 // TestTransferThreeStacksConserveEveryUnit is the owner's inventory repro at
 // the sim level: the three starting autocannon rounds sit in cargo, two
 // CmdTransfer commands move the first two to the hangar, and the third stack
-// leaves cargo on its own because the idle autocannon's empty bay auto-loads
-// the one round type left (clips.go's selection rule), not a lost stack.
-// The pin: cargo + ore + hangar + bays carries the same units per item after
-// every command.
+// STAYS in cargo — no bay loads a round nobody picked (clips.go), which is
+// exactly the fix for the stack that used to vanish into the autocannon's
+// clip. The pin: cargo + ore + hangar + bays carries the same units per item
+// after every command.
 func TestTransferThreeStacksConserveEveryUnit(t *testing.T) {
 	c, err := content.Load(content.FS())
 	if err != nil {
@@ -295,23 +295,25 @@ func TestTransferThreeStacksConserveEveryUnit(t *testing.T) {
 	if stacksCount(s.Hangar.Items, rounds[0]) != 80 || stacksCount(s.Hangar.Items, rounds[1]) != 40 {
 		t.Fatalf("hangar=%+v want 80 %s + 40 %s", s.Hangar.Items, rounds[0], rounds[1])
 	}
-	// Where the third stack went: the idle autocannon's empty bay auto-loads
-	// the one round type left in cargo (clips.go's selection rule), so the
-	// inventory's cargo list loses it while the gun holds it. Logged, not
-	// asserted: the rule may change, the conservation above may not.
-	bay := 0
-	if fit, ok := s.Fittings.Get(s.player); ok {
-		for _, class := range slotClasses {
-			rts := fit.Runtimes(class)
-			for i := range rts {
-				if rts[i].Clip.Item == rounds[2] {
-					bay += rts[i].Clip.Qty
-				}
+	// Where the third stack went: nowhere. The idle autocannon's bay has no
+	// standing order, so it loads nothing and the stack stays in cargo whole.
+	if got := stacksCount(cargo.Stacks, rounds[2]); got != 20 {
+		t.Fatalf("third stack = %d %s in cargo, want 20 (no bay may take it)", got, rounds[2])
+	}
+	fit, ok := s.Fittings.Get(s.player)
+	if !ok {
+		t.Fatal("fixture: player has no fitting")
+	}
+	for _, class := range slotClasses {
+		rts := fit.Runtimes(class)
+		for i := range rts {
+			if rts[i].Clip.Item == rounds[2] {
+				t.Fatalf("a bay auto-loaded %+v without a pick", rts[i].Clip)
 			}
 		}
 	}
-	t.Logf("%s: cargo=%d bays=%d (the lone round type auto-loads into a bay)",
-		rounds[2], stacksCount(cargo.Stacks, rounds[2]), bay)
+	t.Logf("%s: cargo=%d bays=0 (the third stack stayed in cargo)",
+		rounds[2], stacksCount(cargo.Stacks, rounds[2]))
 }
 
 func TestTransferRejectsMissingOreHold(t *testing.T) {

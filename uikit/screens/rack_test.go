@@ -511,8 +511,8 @@ func TestRackLoadEntriesLoadTheChosenRound(t *testing.T) {
 	r.Sync()
 
 	booster := r.cells[1][1]
-	if !booster.hasClip || booster.waiting {
-		t.Fatalf("booster bay = %+v (clip %v), want a loaded bay", booster.clip, booster.hasClip)
+	if !booster.hasClip {
+		t.Fatalf("booster bay = %+v (clip %v), want a charge bay", booster.clip, booster.hasClip)
 	}
 	rightClick(c, t, booster.btn)
 	ents := env.Menu().Entries()

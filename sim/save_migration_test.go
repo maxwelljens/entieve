@@ -412,8 +412,8 @@ func TestRestoreMigratesOreAndHullIDs(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Schema v2 -> v3: shell bays and per-slot ammo selections arrived with v3.
 // A v2 save has no bay state, so its rounds all sit in cargo; restoring it
-// migrates in place (schema 3, empty bays) and the bay rule then resolves
-// each gun — one shell type auto-loads, 2+ wait for a choice.
+// migrates in place (schema 3, empty bays, no orders), and nothing loads until
+// the player picks a type.
 // ---------------------------------------------------------------------------
 
 // TestRestoreMigratesV2Bays is the red-first pin for the schema bump.
@@ -462,13 +462,22 @@ func TestRestoreMigratesV2Bays(t *testing.T) {
 		t.Fatalf("restored total=%d want %d (rounds conserved)", got, want)
 	}
 	if got := bayRounds(b, slot); got != 0 {
-		t.Fatalf("migrated bay=%d want 0 before the bay rule runs", got)
+		t.Fatalf("migrated bay=%d want 0 before a pick", got)
 	}
-	// …and the next tick starts the single type's load: the rounds move in at
-	// once, the selection lands when the load completes.
+	// …and nothing loads on its own: a v2 save carries no standing order, so
+	// the gun waits until the player names a type.
+	b.Step()
+	if got := bayRounds(b, slot); got != 0 {
+		t.Fatalf("bay after migrate+step=%d want 0 (no order, no load)", got)
+	}
+	if got := b.ammoPref(b.player, slot); got != "" {
+		t.Fatalf("selection=%q want none (a v2 save has no order)", got)
+	}
+	// The explicit pick loads the type, and the migrated gun fires from it.
+	b.Queue(CmdSetAmmo{Slot: slot, Item: "ammo-emp-s"})
 	b.Step()
 	if got := bayRounds(b, slot); got != 5 {
-		t.Fatalf("bay after migrate+step=%d want 5 (rounds in at the start)", got)
+		t.Fatalf("bay after the pick=%d want 5 (rounds in at the start)", got)
 	}
 	if cs, _ := b.Clip(b.player, slot); !cs.Loading {
 		t.Fatalf("clip = %+v, want a load in flight", cs)
@@ -477,7 +486,6 @@ func TestRestoreMigratesV2Bays(t *testing.T) {
 	if got := b.ammoPref(b.player, slot); got != "ammo-emp-s" {
 		t.Fatalf("selection=%q want ammo-emp-s", got)
 	}
-	// The migrated save keeps working: the gun fires from its bay.
 	npc := b.spawnNpc("npc-rat-scuttler", core.Vec2{X: 1e7, Y: 2e3}, 100)
 	forceLock(b, npc)
 	b.Queue(CmdActivate{Slot: slot, Target: npc})

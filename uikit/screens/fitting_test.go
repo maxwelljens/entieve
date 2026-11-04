@@ -403,9 +403,9 @@ func TestFitEHP(t *testing.T) {
 }
 
 // TestFittingSummaryFigures pins the summary's display math against the
-// sim: the predicted DPS follows the shell the gun would load (preference
-// first, then cargo order), and the capacitor figures mirror the sim's own
-// recharge curve.
+// sim: the predicted DPS follows the shell the gun's bay would fire (the
+// loaded round or the standing order; nothing without one), and the
+// capacitor figures mirror the sim's own recharge curve.
 func TestFittingSummaryFigures(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	f := NewFitting(env)
@@ -414,32 +414,33 @@ func TestFittingSummaryFigures(t *testing.T) {
 	frame()
 
 	// The showcase fit: a small autocannon (small shells, 3 s shot time)
-	// and a rocket pod (no ammo, 2.5 s). Cargo order picks the EMP shell
-	// first: (18+4+2+1)/3 + (0+5+4+33)/2.5.
+	// and a rocket pod (no ammo, 2.5 s). No bay has an order at boot, so the
+	// gun fires nothing and only the pod counts: (0+5+4+33)/2.5.
 	fit, ok := env.Sim.Fittings.Get(env.Sim.Player())
 	if !ok {
 		t.Fatal("fixture: player has no fitting")
 	}
-	want := 25.0/3 + 42.0/2.5
+	want := 42.0 / 2.5
 	if got := f.totalDPS(*fit, true); math.Abs(got-want) > 1e-9 {
 		t.Errorf("DPS = %v, want %v", got, want)
 	}
 	if got := f.sum[0].value.Label; got != theme.GroupFloat(want, 1) {
 		t.Errorf("DPS row = %q, want %q", got, theme.GroupFloat(want, 1))
 	}
-	if got := env.PredictedAmmo(sim.SlotRef{Class: content.SlotHigh, Index: 0}); got != "ammo-emp-s" {
-		t.Fatalf("predicted shell = %q, want ammo-emp-s (cargo order)", got)
+	if got := env.PredictedAmmo(sim.SlotRef{Class: content.SlotHigh, Index: 0}); got != "" {
+		t.Fatalf("predicted shell = %q, want none (no order, no shell)", got)
 	}
 
-	// A preferred charge changes both the prediction and the figure.
+	// A chosen shell changes both the prediction and the figure: AP's
+	// (0+12+0+0) replaces the gun's base volley.
 	env.Sim.Queue(sim.CmdSetAmmo{Slot: sim.SlotRef{Class: content.SlotHigh, Index: 0}, Item: "ammo-ap-s"})
 	env.Sim.Step()
 	want = 26.0/3 + 42.0/2.5
 	if got := f.totalDPS(*fit, true); math.Abs(got-want) > 1e-9 {
-		t.Errorf("DPS with a preferred shell = %v, want %v", got, want)
+		t.Errorf("DPS with a chosen shell = %v, want %v", got, want)
 	}
 	if got := env.PredictedAmmo(sim.SlotRef{Class: content.SlotHigh, Index: 0}); got != "ammo-ap-s" {
-		t.Fatalf("predicted shell = %q, want the preferred ammo-ap-s", got)
+		t.Fatalf("predicted shell = %q, want the chosen ammo-ap-s", got)
 	}
 
 	// Capacitor: no running modules reads stable, the bar empty.

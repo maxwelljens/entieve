@@ -929,6 +929,7 @@ func TestTrafficPlayerCanEngageConvoy(t *testing.T) {
 	}
 	e, tc, _ := findHauler(s, "cel-a-dock")
 	teleport(s, s.player, mustPos(s, e))
+	loadBay(t, s, "ammo-emp-s") // the gun fires only a loaded bay
 	// Shoot it down with real turret cycles: the lock is commanded normally
 	// (CmdLock) and forced to completion so the first volley lands before the
 	// convoy reaches its destination; follow the hauler every tick because

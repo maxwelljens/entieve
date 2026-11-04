@@ -450,10 +450,10 @@ func (r *Rack) syncCell(cell *rackCell, id content.ModuleID, rt *sim.ModuleRunti
 	cell.active = active
 	// The bay is the sim's own read (Clip): loaded rounds, selection and
 	// every round type in cargo that fits. A waiting cell (empty bay, no
-	// selection, two or more types competing — sim fillClip's ambiguous
-	// case) wears the badge and its click opens the picker.
+	// selection, something to pick — sim fillClip's clipWaiting case) wears
+	// the badge and its click opens the picker.
 	cell.waiting = cell.hasClip && cell.clip.Rounds == 0 &&
-		cell.clip.Selection == "" && len(cell.clip.Options) >= 2
+		cell.clip.Selection == "" && len(cell.clip.Options) >= 1
 	theme.ShowWidget(cell.badgeGfx.GetWidget(), cell.waiting)
 	if cell.waiting && cell.badgePhase != r.badgePh {
 		// Swap the pre-rendered phase by pointer: no repaint, no Clear.

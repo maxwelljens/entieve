@@ -272,14 +272,13 @@ func (s *Sim) moduleDef(e ecs.Entity, slot SlotRef) (*content.ModuleDef, *Module
 	return def, rt, true
 }
 
-// execSetAmmo applies a CmdSetAmmo: the slot must be a charge-fed weapon, a
-// non-empty item must exist, match the weapon's shell family and sit in
-// cargo, and choosing it dumps the bay back to cargo and starts a full-bay
-// load of the new type immediately (the module stays Active and resumes when
-// the load cycle ends). Item "" clears the selection: the bay dumps and the
-// gun re-resolves by the bay rule — auto-load if exactly one type is left in
-// cargo, otherwise it waits for a choice. Every rejection logs a SevWarning
-// "Cannot load X into Y" and changes nothing.
+// execSetAmmo applies a CmdSetAmmo: the slot must be a charge-fed bay, and a
+// non-empty item must exist, fit that bay (the gun's shell family, or the cap
+// booster's cell) and sit in cargo. Choosing it dumps the bay back to cargo
+// and starts a full-bay load of the new type immediately (the module stays
+// Active and resumes when the load cycle ends). Item "" clears the selection:
+// the bay dumps and loads nothing until the next pick. Every rejection logs a
+// SevWarning "Cannot load X into Y" and changes nothing.
 func (s *Sim) execSetAmmo(c CmdSetAmmo) {
 	p := s.player
 	def, rt, ok := s.moduleDef(p, c.Slot)
@@ -298,15 +297,15 @@ func (s *Sim) execSetAmmo(c CmdSetAmmo) {
 	cannot := func() {
 		s.log(SevWarning, p, "Cannot load "+label+" into "+def.Name)
 	}
-	if def.Kind != content.KindWeapon || def.Weapon == nil || def.Weapon.AmmoClass == "" {
-		cannot()
+	if clipBay(def) <= 0 {
+		cannot() // not a charge-fed module: no bay to fill
 		return
 	}
 	if c.Item == "" {
 		s.dumpClip(p, rt)
 		rt.Selection = ""
 		s.emit(Event{Kind: EvModule, Actor: p, Text: def.Name + " ammo selection cleared"})
-		if s.fillClip(p, def, rt) == clipAmbiguous {
+		if s.fillClip(p, def, rt) == clipWaiting {
 			s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: p,
 				Text: def.Name + " waiting for ammo selection"})
 		}

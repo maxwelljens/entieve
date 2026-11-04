@@ -13,8 +13,8 @@ import (
 // passes, and the one load line fires at completion.
 // ---------------------------------------------------------------------------
 
-// emptyBay leaves the gun's bay empty with no selection and one shell type in
-// cargo, so the idle bay pass starts a fresh load on the next tick.
+// emptyBay leaves the gun's bay empty with its standing order already set (one
+// shell type in cargo), so the idle bay pass starts a load on the next tick.
 func emptyBay(t *testing.T, s *Sim) {
 	t.Helper()
 	_, rt, ok := s.moduleRuntime(s.player, ammoSlot())
@@ -22,7 +22,7 @@ func emptyBay(t *testing.T, s *Sim) {
 		t.Fatal("fixture has no EMP turret slot")
 	}
 	s.dumpClip(s.player, rt) // rounds back to cargo
-	rt.Selection = ""
+	rt.Selection = "ammo-emp-s"
 	setCargo(s, content.CargoStack{Item: "ammo-emp-s", Qty: 20})
 	drain(s)
 }
@@ -131,7 +131,7 @@ func TestSaveMidLoadResumes(t *testing.T) {
 	if err := b.Restore(save); err != nil {
 		t.Fatalf("restore: %v", err)
 	}
-	drain(b) // the fresh sim's boot pre-load line
+	drain(b) // whatever the fresh sim logged before the restore
 	if got, want := b.Hash(), s.Hash(); got != want {
 		t.Fatalf("hash after restore=%016x want %016x", got, want)
 	}
@@ -148,22 +148,26 @@ func TestSaveMidLoadResumes(t *testing.T) {
 	}
 }
 
-// TestFreshFitPreloadIsInstant pins the boot exception: sim.New resolves the
-// fresh-fit pre-load before the first tick (no UI exists yet to show a cycle),
-// so the gun is armed and has no clock running at t=0.
-func TestFreshFitPreloadIsInstant(t *testing.T) {
+// TestFreshFitHasNoClock is the boot half of the standing-order rule: a
+// fresh fit has no order, so it has no rounds and no clock running, and the
+// idle bay pass leaves it waiting.
+func TestFreshFitHasNoClock(t *testing.T) {
 	s := newTestSim(t)
-	if got := bayRounds(s, ammoSlot()); got != 5 {
-		t.Fatalf("fresh bay = %d, want 5", got)
+	if got := bayRounds(s, ammoSlot()); got != 0 {
+		t.Fatalf("fresh bay = %d, want 0", got)
 	}
 	cs, ok := s.Clip(s.player, ammoSlot())
-	if !ok || cs.Loading || cs.Selection != "ammo-emp-s" {
-		t.Fatalf("clip = %+v at boot, want a settled bay", cs)
+	if !ok || cs.Loading || cs.Selection != "" {
+		t.Fatalf("clip = %+v at boot, want empty with no order", cs)
 	}
 	if rt, _ := hudModule(s, ammoSlot()); rt.CycleEnds != 0 {
 		t.Fatalf("boot bay left a clock at %v, want 0", rt.CycleEnds)
 	}
-	if findEvent(drain(s), EvModule, "EMP Turret loaded with EMP Charge (5 rounds)") == nil {
-		t.Fatal("missing boot pre-load line")
+	if findEvent(drain(s), EvModule, "loaded with") != nil {
+		t.Fatal("a fresh fit logged a load")
+	}
+	stepN(s, 240) // the idle bay pass does not pick a type either
+	if got := bayRounds(s, ammoSlot()); got != 0 {
+		t.Fatalf("bay = %d after idle ticks, want 0 (no order)", got)
 	}
 }
