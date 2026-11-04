@@ -441,6 +441,13 @@
     "action": "undock"
   },
   {
+    "at_tick": 108070,
+    "action": "setammo",
+    "slot": "mid2",
+    "item": "charge-cap-cell",
+    "note": "the booster's cell is a pick like any shell: a bay with no standing order loads nothing"
+  },
+  {
     "at_tick": 108100,
     "action": "activate",
     "slot": "mid2",

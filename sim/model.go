@@ -128,10 +128,11 @@ type ModuleRuntime struct {
 	// one shell type at a time; the load cycle moves a full bay from cargo
 	// and defers the next firing cycle by exactly CycleEnds.
 	Clip content.CargoStack
-	// Selection is the shell type the bay tops up from ("" = none: the gun
-	// waits for a choice when 2+ types compete in cargo; also "" while a load
-	// is in flight — it is written when the load completes). Persisted with
-	// the fitting in Save (schema 3).
+	// Selection is the shell type the bay's standing order names ("" = none:
+	// nothing loads until CmdSetAmmo picks a type; also "" while a load is in
+	// flight — it is written when the load completes). The order survives an
+	// empty cargo stack and an empty bay. Persisted with the fitting in Save
+	// (schema 3).
 	Selection content.ItemID
 }
 
@@ -591,13 +592,13 @@ type (
 	// CmdUnfitModule moves a fitted module to the hangar.
 	CmdUnfitModule struct{ Slot SlotRef }
 
-	// CmdSetAmmo selects the shell type for a weapon slot's bay. The bay is
-	// dumped back to cargo, the selection is set and a full-bay load of the
-	// new type starts at once (one firing cycle, module stays Active). Item
-	// "" clears the selection: the bay dumps to cargo and the gun re-resolves
-	// by the bay rule (auto-load when exactly one shell type is in cargo,
-	// wait when two or more compete) — there is no automatic cargo-order
-	// mode. Emits EvModule.
+	// CmdSetAmmo selects the round type for a charge-fed slot's bay (a gun's
+	// shell or the cap booster's cell). The bay is dumped back to cargo, the
+	// selection is set and a full-bay load of the new type starts at once
+	// (one firing cycle, module stays Active). The selection is a standing
+	// order: the bay reloads that type and never another. Item "" clears the
+	// selection: the bay dumps to cargo and loads nothing until the next
+	// pick. Emits EvModule.
 	CmdSetAmmo struct {
 		Slot SlotRef
 		Item content.ItemID
@@ -1155,8 +1156,8 @@ type MissionState struct {
 
 // saveSchemaV3 is the save-schema version written since shell bays (v3):
 // per-slot loaded rounds and the ammo selection travel inside the fitting
-// runtime. Restore migrates v2 saves in place (empty bays, no selection —
-// the guns then auto-resolve per the bay rule) and still rejects older ones,
+// runtime. Restore migrates v2 saves in place (empty bays, no selection, so
+// every gun waits for a pick) and still rejects older ones,
 // the clean-break policy for pre-v2 saves (per-system stock lists with
 // drifting prices).
 const (

@@ -558,7 +558,8 @@ their first free slot (double-click a module does exactly that) and
 **remnant** included): the window opens anywhere, the verbs follow the sim's
 own refusal. A **Fitting summary**
 strip closes the window: the fit's **Total DPS** (each weapon's loaded or
-selected round over its fire period, exactly the round the bay would fire),
+ordered round over its fire period, exactly the round the bay would fire,
+and nothing for a gun whose bay has no order yet),
 the **Cap drain** of the running modules against the
 **Cap recharge** curve's peak, and the verdict (**Cap stable** or
 **Cap unstable (~Ns)**) over a drain-vs-recharge bar. The slots/hangar
@@ -582,18 +583,19 @@ sustained fire; twenty-five cap booster cells). The load is visible: its
 rack cell draws the cycle ring lit while the bay loads (a cancelled cycle
 keeps its ring greyed), and once the bay is loaded and not loading a small
 shell marker appears in the tile's bottom-right corner: armed, as opposed
-to the waiting dot in the top-right, which means the bay needs a choice. With
-one round type in
-cargo the bay looks after itself: pre-loaded when fitted, topped up while
-that type lasts, and switched when it runs out and one other type is left.
-With two or more types in cargo the gun **waits for a choice**: its rack
-cell wears a small blue corner dot, a left click on it opens the cell's
-menu (the charge picker) instead of toggling, and the menu's **Load
-`<round>`** entries pick the type (`CmdSetAmmo`), dumping the loaded
-rounds back to cargo and loading the new ones. A gun with no matching
-rounds at all is dry and warns `no charges`; a waiting gun stays quiet.
-Loaded rounds travel with the ship: unfitting the gun returns them to
-cargo, and a wreck carries whatever was in its bays when it came apart.
+to the waiting dot in the top-right, which means the bay waits for a pick.
+**A bay loads only a round you chose**: a fresh fit starts empty, and the
+only load is a **CmdSetAmmo** pick (the rack menu's **Load `<round>`**
+entries, or Cycle charge), which dumps the loaded rounds back to cargo and
+loads the new type. The pick is a **standing order**: the bay tops itself
+up with that type every time it runs empty, and the order survives a
+stock-out (the bay stays empty until the type is back, then reloads it by
+itself). With no order the gun waits: its rack cell wears a small blue
+corner dot, a left click on it opens the cell's menu (the charge picker)
+instead of toggling. A gun with no rounds of its order in cargo is dry and
+warns `no charges`; a gun with no order waits quietly. Loaded rounds travel
+with the ship: unfitting the gun returns them to cargo, and a wreck carries
+whatever was in its bays when it came apart.
 
 **Damage layers.** Damage hits **shield → armor → structure**, each reduced by
 the ship's four **resists** (EM, thermal, kinetic, explosive). Entieve uses a
@@ -689,9 +691,11 @@ that sits in your cargo (the cap booster's cells included), and **Cycle
 charge**, which steps the bay through those same types in item-id order and
 wraps (the sim validates the family and cargo, dumps the old rounds back
 and logs the load). There is no auto/"none" entry: the bay only ever loads
-a real type. With two or more types in cargo and none chosen the cell shows
-the waiting badge and a left click opens that same menu (the charge
-picker) instead of toggling; every other cell toggles as always.
+a real type. A load is a **standing order**: the bay reloads that type
+whenever it runs empty and keeps the order through a stock-out. With no
+type chosen the cell shows the waiting badge and a left click opens that
+same menu (the charge picker) instead of toggling; every other cell toggles
+as always.
 The module tooltip, on 300 ms of hover over any rack cell, is a structured
 panel: class icon, **bold** module name, a dim `slot · class` line, then
 sectioned stats with values right-aligned on one column (damage mix,

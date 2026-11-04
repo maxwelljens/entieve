@@ -51,9 +51,10 @@ func (s *Sim) systemWeapons() {
 // fireWeapon resolves one weapon cycle: validate, pay, draw a round from the
 // shell bay, roll, and queue damage for the damage system. An empty bay is
 // refilled from cargo by a full-bay load cycle that defers this shot by one
-// firing cycle; 2+ competing shell types leave the gun waiting for a choice
-// (quiet, one line), and a bay with no matching rounds at all is dry: one
-// "no charges" warning per dry cycle, then the module deactivates.
+// firing cycle — but only from the standing order (CmdSetAmmo); a bay with no
+// order waits for a pick (quiet, one line), and a bay with no rounds of its
+// order in cargo is dry: one "no charges" warning per dry cycle, then the
+// module deactivates.
 func (s *Sim) fireWeapon(e ecs.Entity, def *content.ModuleDef, slot SlotRef, rt *ModuleRuntime) {
 	w := def.Weapon
 	if reason, ok := s.checkCycle(e, def, slot); !ok {
@@ -70,9 +71,10 @@ func (s *Sim) fireWeapon(e ecs.Entity, def *content.ModuleDef, slot SlotRef, rt 
 		case clipFilled:
 			// The load cycle replaces this cycle: the shot waits it out.
 			return
-		case clipAmbiguous:
-			// Two or more shell types compete and none is selected: sit dry
-			// and wait for the player's choice, without the dry-gun warning.
+		case clipWaiting:
+			// The bay has no standing order and cargo holds rounds that fit:
+			// nothing loads until the player picks a type. Sit dry and wait,
+			// without the dry-gun warning.
 			s.emit(Event{Kind: EvLog, Severity: SevInfo, Actor: e,
 				Text: def.Name + " waiting for ammo selection"})
 			s.deactivate(e, slot, "", SevInfo)

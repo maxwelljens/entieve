@@ -648,11 +648,12 @@ persist in `Save.Market`.
 
 **Save schema v3** (`Save.Schema` = 3, `saveSchemaV3`; `Restore` accepts and
 migrates v2 in place: `migrateSaveV2ToV3` clears every bay and selection,
-and the bay rule then resolves each gun, and rejects anything older, the
+leaving every gun waiting for a pick, and rejects anything older, the
 clean break of the per-station market tranche, v0.2.0 era). v3 added the
 round-bay state, which rides the existing fitting runtime instead of a new
 Save field: each `ModuleRuntime` carries `Clip` (`{Item, Qty}` loaded rounds)
-and `Selection` (the round type the bay tops up from, `""` = none/waiting).
+and `Selection` (the standing order: the round type the bay loads, `""` =
+none/waiting).
 The living-economy fields riding the schema: `Market` / `MarketLasts` /
 `MarketSeq` (per-station books and the price-time clock), `Belts`
 (persistent belt state), `FactionLedger` (respawn requisition money),

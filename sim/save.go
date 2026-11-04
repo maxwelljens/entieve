@@ -313,8 +313,8 @@ func (s *Sim) restore(save *Save) error {
 		return errf("sim: save not deserializable: %v", err)
 	}
 	save = &sv
-	// Save schema: v2 saves are migrated to v3 (empty bays, no selection —
-	// the guns then auto-resolve by the bay rule); anything older is rejected
+	// Save schema: v2 saves are migrated to v3 (empty bays, no selection, so
+	// every gun waits for a pick); anything older is rejected
 	// outright (the pre-v2 market carried per-system stock lists and drifting
 	// prices, which cannot restore into today's order books).
 	switch save.Schema {
@@ -654,9 +654,8 @@ func (s *Sim) restore(save *Save) error {
 }
 
 // migrateSaveV2ToV3 upgrades a v2 save in place: shell bays did not exist, so
-// every runtime starts with an empty bay and no selection. The bay rule then
-// resolves each gun on the next tick — a single shell type in cargo loads
-// automatically, 2+ leave it waiting for a choice, exactly as a fresh fit.
+// every runtime starts with an empty bay and no selection. Nothing loads until
+// the player picks a type (CmdSetAmmo): a v2 save carries no standing orders.
 func migrateSaveV2ToV3(save *Save) {
 	for i := range save.Entities {
 		f := save.Entities[i].Fitting

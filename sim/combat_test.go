@@ -102,6 +102,7 @@ func TestWreckingShotForcedViaSeed(t *testing.T) {
 	dummy := dummyTarget(t, s, v(1e7+2000, 500), content.Resists{})
 	lockInstantly(t, s, dummy)
 	giveCargo(s, "ammo-emp-s", 10)
+	loadBay(t, s, "ammo-emp-s")
 	slot := SlotRef{Class: content.SlotHigh, Index: 0} // world-fit turret
 
 	st, ok := findWreckingSeed()
@@ -126,13 +127,14 @@ func TestWreckingShotForcedViaSeed(t *testing.T) {
 	}
 }
 
-// TestAmmoConsumedPerShot is the bay rule at the firing path: the fresh fit
-// loaded its 5-round bay (cargo 20 -> 15), and shots draw from the bay — cargo
+// TestAmmoConsumedPerShot is the bay rule at the firing path: the chosen
+// 5-round bay is loaded (cargo 20 -> 15), and shots draw from the bay — cargo
 // only moves when the bay reloads.
 func TestAmmoConsumedPerShot(t *testing.T) {
 	s := newTestSim(t)
 	npc := spawnNearPlayer(t, s)
 	forceLock(s, npc)
+	loadBay(t, s, "ammo-emp-s")
 	if got, want := cargoCount(s, "ammo-emp-s"), 15; got != want {
 		t.Fatalf("start cargo ammo=%d want %d (5 in the bay)", got, want)
 	}
@@ -214,6 +216,7 @@ func TestDamageProfileMatchesAmmo(t *testing.T) {
 
 	// Shot 1: EMP charges -> profile {EM10, Thermal2}.
 	giveCargo(s, "ammo-emp-s", 5)
+	loadBay(t, s, "ammo-emp-s")
 	state1 := s.RNG.Snapshot()
 	s.Queue(CmdActivate{Slot: slot, Target: dummy})
 	s.Step()
@@ -273,6 +276,7 @@ func TestMissEmitsLogEvent(t *testing.T) {
 	m.MaxSpeed = 5000
 	s.Intents.Set(dummy, Intent{Kind: IntentManual, Dir: v(0, 1), SpeedFrac: 1})
 	forceLock(s, dummy)
+	loadBay(t, s, "ammo-emp-s")
 	// Several shot cycles; at least one should miss at chance << 1.
 	slot := SlotRef{Class: content.SlotHigh, Index: 0}
 	s.Queue(CmdActivate{Slot: slot, Target: dummy})
@@ -519,19 +523,22 @@ func TestCapBoosterConsumesCellAndRestores(t *testing.T) {
 	slot := injectModule(t, s, "mod-cap-booster")
 	c, _ := s.Caps.Get(s.player)
 	c.Current = 50
+	// The cell is a pick like any round type: CmdSetAmmo moves it into the bay.
+	s.Queue(CmdSetAmmo{Slot: slot, Item: capCellID})
+	s.Step()
+	drain(s)
 	s.Queue(CmdActivate{Slot: slot, Target: 0})
 	s.Step()
 	drain(s)
-	// The fresh bay's load costs the booster's first cycle: it spends its
-	// first cell when the load completes (ActivationTime 10 s), not on
-	// activation.
+	// The bay's load costs the booster's first cycle: it spends its first cell
+	// when the load completes (ActivationTime 10 s), not on activation.
 	if got := bayRounds(s, slot); got != 5 {
 		t.Fatalf("bay after activation=%d want 5 (rounds in, load in flight)", got)
 	}
 	if cs, _ := s.Clip(s.player, slot); !cs.Loading {
 		t.Fatalf("clip = %+v, want a load in flight", cs)
 	}
-	stepN(s, 599) // one tick before the load's cycle ends
+	stepN(s, 597) // one tick before the load's cycle ends
 	before := c.Current
 	stepN(s, 2)
 	if got := bayRounds(s, slot); got != 4 {

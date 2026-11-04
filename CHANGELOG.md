@@ -50,6 +50,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   help, 170 for the menu and its session), the settings return and the help
   restore from the layout sidecar behave exactly as before, no pixel moves,
   and the scene stack is the world's alone (space, station).
+- **Bay loads are explicit: a pick is a standing order**: no bay loads a
+  round nobody chose. A fitted gun or cap booster starts its bay empty (the
+  fresh-fit pre-load is gone), and the only load is a **Load** / Cycle charge
+  pick in the rack (`CmdSetAmmo`), which dumps the loaded rounds back to
+  cargo and loads the type. The pick is a standing order: an emptied bay
+  reloads that same type, and a stock-out no longer re-aims it (the bay stays
+  empty until the type is back, then reloads it by itself), so the old
+  auto-switch to the last remaining type is gone too, and a lone round type
+  in cargo no longer loads itself. A bay with no order waits: the rack cell's
+  waiting badge now lights for any empty bay that has something to pick, and
+  a left click opens the charge picker. The cap booster's cell is picked the
+  same way (its Load entry used to be refused), and the fitting window's
+  Total DPS counts a gun only once its bay has an order. NPC bays are
+  unchanged: a rat's single granted type still loads itself. The showcase
+  tour picks the booster's cell before firing it.
 - **The Overview and the Selected Item window are Screen rows**: the two
   always-on windows no longer run on a parallel window system (their own
   sidecar table, their own rail slice, their own close and visibility state

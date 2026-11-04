@@ -31,6 +31,7 @@ func TestCombatDamageCarriesStructure(t *testing.T) {
 	npc := spawnNearPlayer(t, s)
 	forceLock(s, npc)
 	drain(s)
+	loadBay(t, s, "ammo-emp-s")
 	s.Queue(CmdActivate{Slot: SlotRef{Class: content.SlotHigh, Index: 0}, Target: npc})
 
 	var acc []Event

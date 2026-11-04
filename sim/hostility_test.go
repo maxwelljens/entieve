@@ -276,6 +276,7 @@ func TestAggroTreatsPlayerAndNpcTheSame(t *testing.T) {
 						// Fire a real cycle: the frozen player work marker.
 						dummy := dummyTarget(t, s, at.Add(v(3000, 0)), content.Resists{})
 						forceLock(s, dummy)
+						loadBay(t, s, "ammo-emp-s") // the shot needs a loaded bay
 						s.Queue(CmdActivate{Slot: SlotRef{Class: content.SlotHigh, Index: 0}, Target: dummy})
 					}
 				} else {

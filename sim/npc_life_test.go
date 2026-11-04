@@ -124,6 +124,7 @@ func TestNpcAggroTriggers(t *testing.T) {
 				// fireWeapon records the work for trigger (c).
 				dummy := dummyTarget(t, s, v(1e7+2000, 500), content.Resists{})
 				forceLock(s, dummy)
+				loadBay(t, s, "ammo-emp-s") // the shot needs a loaded bay
 				s.Queue(CmdActivate{Slot: SlotRef{Class: content.SlotHigh, Index: 0}, Target: dummy})
 				return npc
 			}},

@@ -133,7 +133,9 @@ var rules = map[string]featureRule{
 		return e.capDrainThenRecover(0.5, 0.8), "capacitor never drained then recovered"
 	},
 	"cap-booster": func(c *content.Content, e *evidence) (bool, string) {
-		return e.eventRe(`cap(acitor)? ?(booster|cell|restor)`), "no cap booster activation"
+		// The activation, not the "waiting for ammo selection" warning: a
+		// booster that never loads its picked cell proves nothing.
+		return e.eventRe(`cap(acitor)? ?booster activated`), "no cap booster activation"
 	},
 	"shield-boost": func(c *content.Content, e *evidence) (bool, string) {
 		return e.eventRe(`shield boost`) || e.layerRose("shield", 25), "no shield boost observed"

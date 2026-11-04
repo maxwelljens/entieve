@@ -457,9 +457,8 @@ func dragTile(t *testing.T, ui *ebitenui.UI, env *testEnv, inv *Inventory, from 
 // TestInventoryThreeStacksKeepEveryUnit is the owner's repro: three ammo
 // stacks in cargo (the starting autocannon rounds), two drags to the hangar.
 // The transfer resolves by item id in both views, the popup names the stack
-// that was pressed, and no unit is ever lost: the third stack leaves cargo
-// because the idle autocannon's empty bay auto-loads the one round type left
-// (sim/clips.go's selection rule), so the round is in the gun, not gone.
+// that was pressed, and no unit is ever lost: the third stack stays in cargo,
+// because a bay loads only a round the player picked (sim/clips.go).
 func TestInventoryThreeStacksKeepEveryUnit(t *testing.T) {
 	rounds := []content.ItemID{"ammo-emp-s", "ammo-fusion-s", "ammo-ap-s"}
 	for _, tiles := range []bool{false, true} {
@@ -537,14 +536,23 @@ func TestInventoryThreeStacksKeepEveryUnit(t *testing.T) {
 				hangar[1].Item != rounds[1] || hangar[1].Qty != 40 {
 				t.Errorf("hangar=%+v want 80 %s + 40 %s", hangar, rounds[0], rounds[1])
 			}
-			// The third stack is whole somewhere: cargo, or the idle
-			// autocannon's bay that auto-loads a lone round type (sim/clips.go).
+			// The third stack is whole somewhere: in cargo, because no bay
+			// loads a round nobody picked (sim/clips.go).
 			c, _ = env.Sim.Cargos.Get(env.Sim.Player())
 			if got := heldByItem(env)[rounds[2]]; got != 20 {
 				t.Errorf("%s held=%d want 20", rounds[2], got)
 			}
-			t.Logf("%s: cargo=%d of 20 after the two moves (the idle autocannon auto-loads a lone round type)",
-				rounds[2], len(c.Stacks))
+			inCargo := 0
+			for _, st := range c.Stacks {
+				if st.Item == rounds[2] {
+					inCargo += st.Qty
+				}
+			}
+			if inCargo != 20 {
+				t.Errorf("%s in cargo=%d want 20 (no bay may take it)", rounds[2], inCargo)
+			}
+			t.Logf("%s: cargo=%d of 20 after the two moves (the third stack stayed in cargo)",
+				rounds[2], inCargo)
 		})
 	}
 }

@@ -188,39 +188,43 @@ machinery:
 
 - **Load cycle.** Every load takes exactly one firing cycle, whether it
   starts at an active gun's cycle boundary or in an idle bay that ran empty
-  (a top-up, an auto-switch, `CmdSetAmmo`). The rounds transfer at the start
+  (a top-up, a `CmdSetAmmo`). The rounds transfer at the start
   of the load (so a save mid-load can neither duplicate nor lose them) and
   the bay is not ready until the deadline: `CycleEnds = now + ShotTime` (a
   longer cycle already in flight is kept). Loading costs no capacitor. The
   module cycle loop skips idle modules, so the bay pass itself completes
   idle loads when their deadline passes; one quiet `EvModule` line per
   completed load fires then (`<module> loaded with <round> (N rounds)`).
-  The one exception is the fresh fit at boot: `sim.New` resolves the pre-load
-  instantly (no UI exists yet to show a cycle).
-- **Selection.** `ModuleRuntime.Selection` names the round type the bay
-  tops up from. The rule is the only automatic behaviour: while the selected
-  type has cargo stock the bay reloads it; when it runs out the bay switches
-  if **exactly one** type remains in cargo and **waits** if two or more
-  compete. A fresh fit (no selection) does the same. There is no
-  cargo-order mode: `CmdSetAmmo ""` clears the selection (dumping the bay
-  back to cargo) and re-resolves by that rule.
-- **Waiting vs. dry.** Empty bay + 2+ types = the waiting state: one
-  `EvLog` line (`<module> waiting for ammo selection`, `SevInfo`) and a
-  silent deactivate, never the dry-gun warning. Empty bay + no matching
-  rounds at all is truly dry: the existing `no charges` warning and
-  deactivation, unchanged.
+  The swarm's bays get their single granted type at boot (`preloadNpcBays`,
+  no UI exists yet to show a cycle); a player's fresh fit starts empty.
+- **Selection is a standing order.** `ModuleRuntime.Selection` names the
+  round type `CmdSetAmmo` picked, and it is the only thing a player's bay
+  loads: an emptied bay reloads that type, and the order survives a
+  stock-out (the bay stays empty, dry for that type, until it is back).
+  With no selection the bay loads **nothing**, whatever cargo holds: a fresh
+  fit starts empty, and `CmdSetAmmo ""` clears the order (dumping the bay
+  back to cargo) and waits for the next pick — no cargo-order mode, no
+  one-type guess, no auto-switch. The one exception is an NPC bay: a rat has
+  no rack, so with no selection and exactly one round type in cargo it loads
+  that type (its spawn grant is one stack per fitted shell family).
+- **Waiting vs. dry.** Empty bay + no selection + rounds that fit = the
+  waiting state: one `EvLog` line (`<module> waiting for ammo selection`,
+  `SevInfo`) and a silent deactivate, never the dry-gun warning. Empty bay
+  with no rounds of the order in cargo (or none that fit at all) is truly
+  dry: the existing `no charges` warning and deactivation, unchanged.
 - **Round travels.** `CmdUnfitModule` and `CmdAssemble` dump bays back to
   cargo; a destroyed ship's loaded rounds land in its wreck's loot; docking
   and undocking never touch a bay.
 - **Read surface for the UI.** `Sim.Clip(e, slot) (sim.ClipState, bool)`
   reports `{Item, Rounds, Capacity, Selection, Options, Loading}`: `Options`
-  is every round type in cargo that fits the bay (2+ with `Rounds == 0` is
-  the waiting state the rack will offer a choice from), and `Loading` is true
+  is every round type in cargo that fits the bay (an empty bay with no
+  selection is the waiting state the rack offers a choice from), and
+  `Loading` is true
   from a load's start until its cycle completes (derived from the runtime's
   bay and not-yet-written selection, so a save mid-load restores into the
   same load; no schema field was added).
 - NPCs run the identical machinery; their single-type spawn grant resolves
-  to auto-load with no interaction.
+  to a load at boot with no interaction.
 
 Docking (`execDock`, `sim/system_travel.go`) is a free full restore: every
 fitted module is cleared (active state *and* cycle clock, which also drops
@@ -259,8 +263,9 @@ preserves `Hash()` exactly.
 loaded rounds and ammo selections; both ride the existing fitting runtime
 (`ModuleRuntime.Clip` / `.Selection`, `{Item, Qty}` rounds), so no new Save
 field appeared. `Restore` accepts v2 and **migrates it in place**
-(`migrateSaveV2ToV3`: every bay empty, no selection; the next tick's bay
-rule auto-loads a single round type or waits for a choice), and rejects
+(`migrateSaveV2ToV3`: every bay empty, no selection; the bays then load
+nothing until the player picks a type, because a v2 save carries no standing
+orders), and rejects
 anything older: the **clean break** introduced with the per-station market
 tranche (the v0.2.0 era). Pre-v2 saves carried per-system stock lists with
 drifting prices; restoring one into a book-based economy would silently mean
