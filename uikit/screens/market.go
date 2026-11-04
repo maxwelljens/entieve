@@ -175,29 +175,6 @@ type mktHit struct {
 	Match []int
 }
 
-// marketStations lists every station that offers the market service, in
-// deterministic order (system id, then celestial order) — the roster the
-// availability read walks with BookOrders.
-func marketStations(d *content.Content) []sim.StationID {
-	if d == nil {
-		return nil
-	}
-	sysIDs := make([]content.SystemID, 0, len(d.Systems))
-	for id := range d.Systems {
-		sysIDs = append(sysIDs, id)
-	}
-	slices.Sort(sysIDs)
-	var out []sim.StationID
-	for _, id := range sysIDs {
-		for _, cel := range d.Systems[id].Celestials {
-			if cel.Station != nil && slices.Contains(cel.Station.Services, content.SvcMarket) {
-				out = append(out, sim.StationID(cel.ID))
-			}
-		}
-	}
-	return out
-}
-
 // marketInfo maps each catalog item to its market tree path and its
 // maker's display name ("" for the unattributed defs) — the tree's rows
 // and two of the search's fields.
@@ -287,32 +264,6 @@ func (m *Market) searchHits(q string, scope []content.ItemID) []mktHit {
 			}
 		}
 		out = append(out, mktHit{Item: item, Match: match})
-	}
-	return out
-}
-
-// crossAvail reads every other market station's asks for the catalog: the
-// cheapest sell order resting on each item elsewhere. It only runs while
-// docked (in space there is no local book to compare against). The
-// manufacturing profit table prices a bill line with no local ask from
-// this figure; the market's own columns stay station-local.
-func crossAvail(cv widgets.ContentView, stations []sim.StationID, local sim.StationID) map[content.ItemID]float64 {
-	if local == "" {
-		return nil
-	}
-	out := make(map[content.ItemID]float64)
-	for _, st := range stations {
-		if st == local {
-			continue
-		}
-		for _, o := range cv.BookOrders(st) {
-			if o.Side != sim.OrderSell {
-				continue
-			}
-			if p, ok := out[o.Item]; !ok || o.Price < p {
-				out[o.Item] = o.Price
-			}
-		}
 	}
 	return out
 }

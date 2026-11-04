@@ -531,20 +531,20 @@ func TestRefineryMathTable(t *testing.T) {
 	clickRow(ui, r.ores, oreRowFor(r, "ore-lucidite"))
 	frame()
 
-	// The fixture's figures, from the book the table reads.
-	book := env.Sim.BookOrders(rfStation)
+	// The fixture's figures, from the sim quote the table reads.
 	outs := r.batchOf("ore-lucidite")
-	raw, ok := bookValue(book, "ore-lucidite", sim.OrderBuy, sim.RefineBatch)
-	if !ok {
+	ore := env.Quote(rfStation, "ore-lucidite", sim.OrderSell, sim.RefineBatch)
+	if !ore.Priced {
 		t.Fatal("fixture: no buy order for the ore")
 	}
+	raw := ore.Walk
 	mine := 0.0
 	for _, o := range outs {
-		v, ok := bookValue(book, o.Item, sim.OrderBuy, o.Qty)
-		if !ok {
+		q := env.Quote(rfStation, o.Item, sim.OrderSell, o.Qty)
+		if !q.Priced {
 			t.Fatalf("fixture: no buy order for %s", o.Item)
 		}
-		mine += v
+		mine += q.Walk
 	}
 	// 100 ore at the 72 € bid; 25 Zaffrite at 18 €, 30 Nixium at 12 € and
 	// 20 Vetril at 28 €.
@@ -593,17 +593,13 @@ func TestRefineryMathTableBranches(t *testing.T) {
 	r, _, ui, _, frame := refineryEnv(t)
 	clickRow(ui, r.ores, oreRowFor(r, "ore-cordite"))
 	frame()
-	outs := r.batchOf("ore-cordite")
 	p := theme.DefaultPalette()
 
 	// A book that pays more for the minerals than for the ore: 100 ore at 1 €
 	// against 35 × 5 € and 30 × 12 €.
-	good := []sim.MarketStock{
-		{Item: "ore-cordite", Side: sim.OrderBuy, Price: 1, Qty: 5000},
-		{Item: "min-ferrite", Side: sim.OrderBuy, Price: 5, Qty: 25000},
-		{Item: "min-nickel", Side: sim.OrderBuy, Price: 12, Qty: 8000},
-	}
-	rows := r.refineRows(good, outs)
+	ore := sim.Quote{Walk: 100, Priced: true}
+	good := []sim.Quote{{Walk: 35 * 5, Priced: true}, {Walk: 30 * 12, Priced: true}}
+	rows := r.refineRows(ore, good)
 	if got, want := rowValue(rows, "Refine delta"), mfgSigned(535-100); got != want {
 		t.Errorf("good delta = %q, want %q", got, want)
 	}
@@ -617,7 +613,7 @@ func TestRefineryMathTableBranches(t *testing.T) {
 	}
 
 	// No bid for the ore: ore and derived lines dash with the marker.
-	rows = r.refineRows(good[1:], outs)
+	rows = r.refineRows(sim.Quote{}, good)
 	if got, want := rowValue(rows, "Ore value"), "— · no buy order"; got != want {
 		t.Errorf("no-bid ore value = %q, want %q", got, want)
 	}
@@ -634,7 +630,7 @@ func TestRefineryMathTableBranches(t *testing.T) {
 
 	// No bid for a mineral: the minerals side dashes and the derived lines
 	// with it; the ore side still prices.
-	rows = r.refineRows([]sim.MarketStock{good[0], good[1]}, outs)
+	rows = r.refineRows(ore, []sim.Quote{good[0], {}})
 	if got, want := rowValue(rows, "Minerals value"), "— · no buy order"; got != want {
 		t.Errorf("no-bid minerals value = %q, want %q", got, want)
 	}

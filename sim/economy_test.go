@@ -619,3 +619,146 @@ func TestAssembleUnknownShipFails(t *testing.T) {
 		t.Fatal("hull changed on failed assemble")
 	}
 }
+
+// TestQuoteIsTheWalletMove pins the quote against the wallet itself, both
+// ways: a market order's real debit/credit is the quote's composed figure —
+// the executed walk plus the broker fee on a buy, less the fee and the sales
+// tax on a sell — so a preview built from it cannot disagree with the command.
+func TestQuoteIsTheWalletMove(t *testing.T) {
+	s := newTestSim(t)
+	dockAtHaven(t, s)
+	station := s.dockedStationID()
+
+	buy := s.Quote(station, "ammo-emp-s", OrderBuy, 30)
+	if !buy.Priced || buy.Filled != 30 || buy.Short {
+		t.Fatalf("fixture quote = %+v, want 30 units off the ask", buy)
+	}
+	wallet := s.Wallet()
+	s.Queue(CmdBuy{Item: "ammo-emp-s", Qty: 30})
+	s.Step()
+	if got, want := wallet-s.Wallet(), buy.Executed+buy.Fee; math.Abs(got-want) > 1e-9 {
+		t.Fatalf("buy debited %v, want the quote's %v (walk %v + fee %v)", got, want, buy.Executed, buy.Fee)
+	}
+	drain(s)
+
+	sell := s.Quote(station, "ammo-emp-s", OrderSell, 20)
+	if !sell.Priced || sell.Tax == 0 {
+		t.Fatalf("fixture quote = %+v, want 20 units into the bid with its tax", sell)
+	}
+	wallet = s.Wallet()
+	s.Queue(CmdSell{Item: "ammo-emp-s", Qty: 20})
+	s.Step()
+	if got, want := s.Wallet()-wallet, sell.Executed-sell.Fee-sell.Tax; math.Abs(got-want) > 1e-9 {
+		t.Fatalf("sell credited %v, want the quote's %v (walk %v, fee %v, tax %v)", got, want,
+			sell.Executed, sell.Fee, sell.Tax)
+	}
+	drain(s)
+
+	// A book too thin for the amount: the tail prices the remainder, but the
+	// command only fills what rests — the wallet moves the executed part.
+	thin := s.Quote(station, "ammo-emp-s", OrderBuy, 500)
+	if !thin.Short || thin.Filled >= 500 || thin.Walk == thin.Executed {
+		t.Fatalf("thin quote = %+v, want a short walk priced past the depth", thin)
+	}
+	wallet = s.Wallet()
+	s.Queue(CmdBuy{Item: "ammo-emp-s", Qty: 500})
+	s.Step()
+	if got, want := wallet-s.Wallet(), thin.Executed+thin.Fee; math.Abs(got-want) > 1e-9 {
+		t.Fatalf("short buy debited %v, want the executed part %v (walk %v prices the tail)", got, want, thin.Walk)
+	}
+}
+
+// TestQuoteWalk pins the executed walk: asks joined cheapest first at their
+// own prices, the tail at the last price seen when the depth runs short, and
+// no figure at all for a side that holds nothing.
+func TestQuoteWalk(t *testing.T) {
+	s := newTestSim(t)
+	station := StationID("cel-quote")
+	s.market[station] = &MarketBook{System: "sys-a", Lasts: map[content.ItemID]float64{}, Orders: []MarketStock{
+		{Item: "min-argon", Side: OrderSell, Price: 64, Qty: 800, ID: 1},
+		{Item: "min-argon", Side: OrderSell, Price: 70, Qty: 200, ID: 2},
+		{Item: "min-silex", Side: OrderSell, Price: 38, Qty: 2500, ID: 3},
+		{Item: "min-argon", Side: OrderBuy, Price: 50, Qty: 100, ID: 4},
+	}}
+
+	cases := []struct {
+		name  string
+		item  content.ItemID
+		side  OrderSide
+		qty   int
+		walk  float64
+		found bool
+	}{
+		{"vwap across two asks", "min-argon", OrderBuy, 1000, 800*64 + 200*70, true},
+		{"within the best ask", "min-argon", OrderBuy, 500, 500 * 64, true},
+		{"depth extended at the last ask", "min-argon", OrderBuy, 1200, 800*64 + 400*70, true},
+		{"other item untouched", "min-silex", OrderBuy, 2500, 2500 * 38, true},
+		{"a sell walks the bids", "min-argon", OrderSell, 40, 40 * 50, true},
+		{"no side at all", "min-cobalt", OrderBuy, 10, 0, false},
+		{"an ask is not a bid", "min-cobalt", OrderSell, 10, 0, false},
+		{"nothing needed", "min-cobalt", OrderBuy, 0, 0, true},
+	}
+	for _, c := range cases {
+		q := s.Quote(station, c.item, c.side, c.qty)
+		if q.Priced != c.found {
+			t.Errorf("%s: priced = %v, want %v", c.name, q.Priced, c.found)
+			continue
+		}
+		if q.Walk != c.walk {
+			t.Errorf("%s: walk = %v, want %v", c.name, q.Walk, c.walk)
+		}
+	}
+
+	// The legs are the walk itself: best price first, one tail leg at the last
+	// price when the depth ran out, and the fee/tax on the executed part only.
+	q := s.Quote(station, "min-argon", OrderBuy, 1200)
+	want := []QuoteLeg{{Price: 64, Qty: 800}, {Price: 70, Qty: 200}, {Price: 70, Qty: 200, Tail: true}}
+	if len(q.Legs) != len(want) {
+		t.Fatalf("legs = %+v, want %+v", q.Legs, want)
+	}
+	for i := range want {
+		if q.Legs[i] != want[i] {
+			t.Errorf("leg %d = %+v, want %+v", i, q.Legs[i], want[i])
+		}
+	}
+	if !q.Short || q.Filled != 1000 || q.Executed != 800*64+200*70 {
+		t.Errorf("short quote = %+v, want 1000 executed at the asks", q)
+	}
+	if q.Fee != MarketBrokerFee*q.Executed || q.Tax != 0 {
+		t.Errorf("buy load = fee %v tax %v, want 3%% of the executed value and no tax", q.Fee, q.Tax)
+	}
+	sell := s.Quote(station, "min-argon", OrderSell, 100)
+	if sell.Tax != MarketSalesTax*sell.Executed || sell.Fee != MarketBrokerFee*sell.Executed {
+		t.Errorf("sell load = fee %v tax %v, want both rates on the executed value", sell.Fee, sell.Tax)
+	}
+}
+
+// TestCheapestAsk: the cheapest sell order any market station rests for an
+// item, and no answer at all for one nobody sells.
+func TestCheapestAsk(t *testing.T) {
+	s := newTestSim(t)
+	for _, c := range []struct {
+		item  content.ItemID
+		price float64
+	}{
+		{"ammo-emp-s", 5}, {"min-ferrite", 10}, {"ship-husnek", 50000},
+	} {
+		if got, ok := s.CheapestAsk(c.item); !ok || got != c.price {
+			t.Errorf("CheapestAsk(%s) = %v/%v, want the fixture's ask %v", c.item, got, ok, c.price)
+		}
+	}
+	if _, ok := s.CheapestAsk("loot-navdata"); ok {
+		t.Error("CheapestAsk(loot-navdata) priced an item no station sells")
+	}
+	// A cheaper ask resting on another market station wins: the roster is the
+	// sim's (marketStations), so this fixture gains a second market celestial.
+	s.Content.Systems["sys-a"].Celestials = append(s.Content.Systems["sys-a"].Celestials,
+		content.CelestialDef{ID: "cel-station-b", Name: "Second Berth", Kind: content.CelStation,
+			Station: &content.StationDef{Services: []string{content.SvcMarket}}})
+	s.market[StationID("cel-station-b")] = &MarketBook{System: "sys-a", Orders: []MarketStock{
+		{Item: "ammo-emp-s", Side: OrderSell, Price: 4.5, Qty: 1, ID: 1},
+	}}
+	if got, ok := s.CheapestAsk("ammo-emp-s"); !ok || got != 4.5 {
+		t.Errorf("CheapestAsk after a cheaper ask = %v/%v, want 4.5", got, ok)
+	}
+}

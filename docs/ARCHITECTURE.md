@@ -622,7 +622,15 @@ economy sits on top of:
   raiders dead while the hauler lives). Raiding NPCs never queue respawn
   timers against nearby spawn groups.
 - **Order-book pricing**: the per-station order books are the only price
-  former (the old per-system "market memory" band/decay model is gone).
+  former (the old per-system "market memory" band/decay model is gone), and
+  the sim owns the walk that prices an amount as well as the fills:
+  `Sim.Quote` (`sim/system_economy.go`) returns one side's executed walk
+  (each resting order's price and units, best first, the tail at the last
+  price when the depth runs short) with the broker fee and sales tax on the
+  units that actually fill, and `Sim.CheapestAsk` the cheapest sell order
+  any market station rests. The seam forwards both (`ContentView.Quote` /
+  `CheapestAsk`), so a preview, the profit table and the refine math draw
+  the same figures `execBuy`/`execSell` move and no screen holds a walk.
   A delivery posts the exact units as supply on the destination station's
   book at one tick under `min(cost basis, best sell order)`, so arriving supply
   always improves the displayed price; a lost inbound shipment is an

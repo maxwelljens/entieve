@@ -388,12 +388,42 @@ func (o *QtyWin) detailLine(q int) string {
 			theme.GroupFloat(o.cv.JobDuration(st, o.req.Recipe, q), 1) + " s · fee " +
 			theme.FormatCredits(o.cv.JobFee(o.req.Recipe, q))
 	case widgets.QtyBuy, widgets.QtySell:
-		price := o.cv.PriceLadder(o.cv.DockedMarket(), o.req.Item)
-		return theme.FormatInt(int64(q)) + " × " + theme.FormatCredits(price) + " ≈ " +
-			theme.FormatCredits(price*float64(q))
+		return tradePreview(o.cv, o.req.Item, o.req.Mode, q)
 	default:
 		return theme.FormatInt(int64(q)) + " × " + name
 	}
+}
+
+// tradePreview renders the trade line: the amount at its average unit price
+// and the composed figure the command itself moves — the walk plus the broker
+// fee on a buy, less the fee and the sales tax on a sell (CONTEXT.md "Quote").
+// A book too thin for the amount fills what it holds, so the line reads
+// "30 of 100" and prices those 30.
+func tradePreview(cv widgets.ContentView, item content.ItemID, mode widgets.QtyMode, qty int) string {
+	side, bookSide := sim.OrderBuy, "sell"
+	if mode == widgets.QtySell {
+		side, bookSide = sim.OrderSell, "buy"
+	}
+	n := qty
+	if side == sim.OrderSell {
+		n = min(n, cv.PlayerStock(item)) // the command clamps to the goods held
+	}
+	q := cv.Quote(cv.DockedMarket(), item, side, n)
+	if n <= 0 {
+		return "— · nothing held"
+	}
+	if !q.Priced {
+		return "— · no " + bookSide + " order"
+	}
+	total := q.Executed + q.Fee
+	if side == sim.OrderSell {
+		total = q.Executed - q.Fee - q.Tax
+	}
+	out, unit := theme.FormatInt(int64(n)), n
+	if q.Short {
+		out, unit = theme.FormatInt(int64(q.Filled))+" of "+out, q.Filled
+	}
+	return out + " × " + theme.FormatCredits(total/float64(unit)) + " ≈ " + theme.FormatCredits(total)
 }
 
 // noteLine is the preview's second line.

@@ -840,13 +840,19 @@ small popup: the **quantity picker**. It opens from the gesture that
 already names the action and shows what it is working on, a **slider**,
 the current amount and a live preview of what the amount buys or costs,
 then **Confirm** (the action you came from: Refine, Start, Buy, Sell,
-Move…) and **Cancel**. The window is modal and transient: it never persists a rect,
-and it remembers the amount you last **confirmed** for that action, so a
-second refine or a second trade opens where the first one left off (a
-rebuilt interface starts at 1 again); a move is the exception and always
-opens on the whole dragged stack (see **Inventory**). `Esc` cancels it *before* anything
-else (no window closes behind it and the Esc menu never opens), and a
-cancelled picker commits nothing.
+Move…) and **Cancel**. On a trade the preview is exact: it walks the
+station's book to the amount, adds the broker fee on a buy and takes the
+fee and the sales tax off a sell, so the figure it prints is the money the
+Confirm moves; when the book is too thin for the amount it names how much
+actually fills and prices that, and a side with no resting order reads
+`— · no buy order` / `— · no sell order` instead of guessing a price. The
+window is modal and transient: it never persists a rect, and it remembers
+the amount you last **confirmed** for that action, so a second refine or a
+second trade opens where the first one left off (a rebuilt interface starts
+at 1 again); a move is the exception and always opens on the whole dragged
+stack (see **Inventory**). `Esc` cancels it *before* anything else (no
+window closes behind it and the Esc menu never opens), and a cancelled
+picker commits nothing.
 
 What opens it is the action, not the amount: in the **Refinery** window it
 is the inspector's **Refine** and in the **Manufacturing** window the

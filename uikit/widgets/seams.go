@@ -112,6 +112,13 @@ type ContentView interface {
 	MarketPrice(sim.StationID, content.ItemID) float64
 	DockedMarket() sim.StationID
 
+	// Quote is the sim's executed walk for an amount on one side of a
+	// station's book (the wallet-composable read: walk, fee, tax, depth),
+	// and CheapestAsk the cheapest sell order any market station rests for
+	// an item. The pricing logic lives in sim; the seam only forwards it.
+	Quote(sim.StationID, content.ItemID, sim.OrderSide, int) sim.Quote
+	CheapestAsk(content.ItemID) (float64, bool)
+
 	// PriceLadder is an item's displayed price: at a station, its book's
 	// ladder (last trade, best ask, best bid, base); with station "" the
 	// undocked fallback view's ladder over the shown system's orders
@@ -457,6 +464,14 @@ func (v *view) MarketPrice(st sim.StationID, item content.ItemID) float64 {
 }
 
 func (v *view) DockedMarket() sim.StationID { return v.s.DockedMarket() }
+
+// Quote and CheapestAsk forward the sim's own reads: the walk that prices an
+// amount and the cheapest ask anywhere. No pricing lives here.
+func (v *view) Quote(st sim.StationID, item content.ItemID, side sim.OrderSide, qty int) sim.Quote {
+	return v.s.Quote(st, item, side, qty)
+}
+
+func (v *view) CheapestAsk(item content.ItemID) (float64, bool) { return v.s.CheapestAsk(item) }
 
 // PriceLadder: a station's book carries sim's full ladder (last trade,
 // ask, bid, base); the undocked view has no single book, so it walks the

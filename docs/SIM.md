@@ -611,7 +611,11 @@ no drift model.
   `sim/model.go`), so a book can never cross itself.
 - **Price-time priority.** Canonical book order: item ascending, sell
   orders before buy orders, best price first, arrival id (`MarketSeq`)
-  breaking ties.
+  breaking ties. The same walk is a read: `Sim.Quote` runs `matchCrossing`
+  for an amount and returns the legs it would fill (with the remainder
+  priced at the last price when the depth runs short) plus the broker fee
+  and sales tax on the units that fill, so the interface quotes the figure
+  the command moves; `Sim.CheapestAsk` is its cross-station sibling.
 - **Price ticks.** Every order price is quantized to four significant
   figures (`quantizeTick`, `sim/system_economy.go`): 48 ticks in 0.01
   steps, 195000 in 100s. `tickDown` is the one-tick undercut fresh supply

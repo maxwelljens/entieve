@@ -38,6 +38,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The trade preview is the money the trade moves**: the quantity picker's
+  Buy and Sell line now walks the station's book to the amount and composes
+  the broker fee (buy) or the fee and the sales tax (sell) into its total,
+  the same figure the command debits or credits (a 100-round buy at 120 €
+  read `100 × 120.00 € ≈ 12,000.00 €` and now reads
+  `100 × 123.60 € ≈ 12,360.00 €`). When the book is too thin it names how
+  much actually fills and prices that, and a side with no resting order
+  dashes `— · no buy order` / `— · no sell order` instead of quoting a base
+  price for a trade the station would refuse. The walk itself moved into the
+  sim (`Sim.Quote`, `Sim.CheapestAsk`), so the profit table, the refine math
+  and the picker read one implementation of price formation; their figures
+  are unchanged.
 - **The inventory's view toggle moved to the title bar**: the Tiles/List
   switch is now a small icon-only button immediately left of the window's
   × (its tooltip names the view it switches to), the same title-bar
