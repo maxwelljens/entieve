@@ -832,17 +832,25 @@ in three panes over one seam:
   your stock covers it and red where it falls short. A row that is mostly
   green is nearly runnable; a wide red segment says the bulk of the bill is
   missing.
-- **The selected recipe** (right): the pane is inset from its edges, with
-  the recipe's icon, its name and the verdict tick/cross on one line, then
-  the per-run time, fee and material value, then the **profit table**: one
-  run's materials cost, craft fee, total cost, the product's sale value at
-  its base price, the profit and its margin, as aligned rows (green profit
-  on a profitable recipe, red on a loss). Below it sits the bill itself, one
-  row per mineral with **the cost driver first** (each row: the mineral's
-  own art at three times the row icon size, its share of the run's value and
-  its have/need bar with the exact numbers, green when covered and red when
-  short). **Start job** closes the pane; while the sim would refuse, it is
-  simply grayed.
+- **The selected recipe** (right): the pane is inset from its edges and
+  leads with the product's head, the market's own: the hero icon at the
+  Show Info item size, the product's name carrying the verdict tick/cross,
+  and the product's description wrapped to the pane. Under it sits the
+  **profit table**, priced off the station's live order book (never a
+  content base price): one run's materials cost at the book's asks (walked
+  cheapest first, the tail at the last ask when the depth runs short; a
+  mineral no one here sells prices at another station's cheapest ask, marked
+  with a dagger and a footnote, and one no book sells at all is left out and
+  named; minerals already in your hold do not discount it, since the figure
+  is what buying the run here would cost), the craft fee, the total, the
+  product's sale value at the book's
+  own bids (dashed `no bid` when nobody here buys it), and the profit and
+  margin (green on a profitable run, red on a loss). Below it sits the bill
+  itself, one row per mineral with **the cost driver first** (each row: the
+  mineral's own art at three times the row icon size, its share of the run's
+  value and its have/need bar with the exact numbers, green when covered and
+  red when short). **Start job** closes the pane; while the sim would refuse,
+  it is simply grayed.
 
 **Start** opens the quantity picker on the job's **runs** (1–100, starting
 at the run count you last started); Confirm starts the job. The materials

@@ -134,7 +134,6 @@ type ContentView interface {
 	CanStartJob(sim.StationID, content.RecipeID, int) bool
 	PlayerStock(content.ItemID) int
 	JobDuration(sim.StationID, content.RecipeID, int) float64
-	CraftLevel(sim.StationID, string) int
 
 	// Holds, as the refinery reads them: copies of the general cargo and
 	// the dedicated ore hold (the two places CmdRefine consumes from).
@@ -609,8 +608,6 @@ func (v *view) PlayerStock(item content.ItemID) int { return v.s.PlayerStock(ite
 func (v *view) JobDuration(st sim.StationID, rec content.RecipeID, runs int) float64 {
 	return v.s.JobDuration(st, rec, runs)
 }
-
-func (v *view) CraftLevel(st sim.StationID, family string) int { return v.s.CraftLevel(st, family) }
 
 func (v *view) InfoRefFor(e ecs.Entity) (InfoRef, bool) { return InfoRefFor(v, e) }
 

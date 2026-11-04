@@ -118,17 +118,12 @@ type Market struct {
 	items []content.ItemID
 	group map[content.ItemID]string
 	maker map[content.ItemID]string
-	nodes []mktNode
 
-	// The browse pane: tree is the branch list, search its live filter,
-	// branch the selected path ("" = All), expanded the session-only
-	// branch state, treeSel the highlighted branch (a list selection
-	// highlights the item's own group).
-	tree     *widgets.Table
-	search   *widget.TextInput
-	branch   string
-	treeSel  string
-	expanded map[string]bool
+	// The browse pane: the shared browse tree (its nodes, fold state,
+	// branch and highlight) over the one-column table and the live search.
+	browseTree
+	tree   *widgets.Table
+	search *widget.TextInput
 
 	// Search results: the ranked hits of the current query, in order, and
 	// hit the keyboard-highlighted index (-1 = none).
@@ -159,12 +154,9 @@ type Market struct {
 	mineRows []*widgets.StackRow
 
 	// The head: the item's hero icon and its description above the book (the
-	// hint line replaces them with no selection).
-	headBox   *widget.Container
-	headIcon  *theme.IconBox
-	headName  *widget.Text
-	headProse *widget.Text
-	headHint  *widget.Text
+	// hint line replaces them with no selection). The shared item head the
+	// manufacturing inspector mounts too.
+	*itemHead
 
 	sideBox    *widget.Container
 	sideScroll *widget.ScrollContainer
@@ -179,18 +171,6 @@ type Market struct {
 // The Qty column already reads 0 for a dead market, so the cell stays a
 // dash rather than an empty box.
 const mktNoSide = "—"
-
-// mktNode is one branch of the browse tree: Path is the full group path
-// ("" is never a node — the window renders its own All root), Label the
-// last segment, Depth its indent level (top-level groups are 1).
-type mktNode struct {
-	Path  string
-	Label string
-	Depth int
-}
-
-// mktNodeKey is a tree row's payload (the table rows' stable identity).
-type mktNodeKey struct{ Path string }
 
 // mktHit is one ranked search result: the item and the matched byte
 // positions within its display name (for the highlight runs).
@@ -273,113 +253,6 @@ func (m *Market) itemIcon(item content.ItemID) string {
 // the 31 px row — no density change).
 const mktRowIcon = theme.IconButton
 
-// mktNodes flattens the group tree in depth-first, label-sorted order: a
-// parent always precedes its children.
-func mktNodes(items []content.ItemID, group map[content.ItemID]string) []mktNode {
-	type node struct {
-		label string
-		path  string
-		kids  map[string]*node
-	}
-	root := &node{kids: map[string]*node{}}
-	for _, item := range items {
-		g := group[item]
-		if g == "" {
-			continue
-		}
-		cur := root
-		path := ""
-		for _, seg := range strings.Split(g, "/") {
-			if path == "" {
-				path = seg
-			} else {
-				path += "/" + seg
-			}
-			kid := cur.kids[seg]
-			if kid == nil {
-				kid = &node{label: seg, path: path, kids: map[string]*node{}}
-				cur.kids[seg] = kid
-			}
-			cur = kid
-		}
-	}
-	var out []mktNode
-	var walk func(n *node, depth int)
-	walk = func(n *node, depth int) {
-		keys := make([]string, 0, len(n.kids))
-		for k := range n.kids {
-			keys = append(keys, k)
-		}
-		slices.Sort(keys)
-		for _, k := range keys {
-			kid := n.kids[k]
-			out = append(out, mktNode{Path: kid.path, Label: kid.label, Depth: depth})
-			walk(kid, depth+1)
-		}
-	}
-	walk(root, 1)
-	return out
-}
-
-// mktParent is a group path's parent ("" for a top-level path).
-func mktParent(path string) string {
-	if i := strings.LastIndexByte(path, '/'); i >= 0 {
-		return path[:i]
-	}
-	return ""
-}
-
-// hasKids reports whether any node hangs below path.
-func (m *Market) hasKids(path string) bool {
-	for _, n := range m.nodes {
-		if mktParent(n.Path) == path {
-			return true
-		}
-	}
-	return false
-}
-
-// highlightTree expands the highlighted branch's ancestors so the
-// highlight is visible.
-func (m *Market) highlightTree() {
-	for p := m.treeSel; p != ""; p = mktParent(p) {
-		m.expanded[p] = true
-	}
-}
-
-// treeRows renders the visible browse rows: All first (always), then every
-// node whose ancestors are all expanded.
-func (m *Market) treeRows() []widgets.TableRow {
-	rows := []widgets.TableRow{m.treeRow("", "All", 0)}
-	vis := map[string]bool{"": true}
-	for _, n := range m.nodes {
-		p := mktParent(n.Path)
-		if !vis[p] || !m.expanded[p] {
-			continue
-		}
-		vis[n.Path] = true
-		rows = append(rows, m.treeRow(n.Path, n.Label, n.Depth))
-	}
-	return rows
-}
-
-// treeRow is one browse row: indent by depth, an expansion marker when the
-// branch has children, then the label.
-func (m *Market) treeRow(path, label string, depth int) widgets.TableRow {
-	mark := "  "
-	if m.hasKids(path) {
-		if m.expanded[path] {
-			mark = "↓ "
-		} else {
-			mark = "→ "
-		}
-	}
-	return widgets.TableRow{
-		Cells: []string{strings.Repeat("    ", depth) + mark + label},
-		Data:  mktNodeKey{Path: path},
-	}
-}
-
 // scopeItems is the catalog narrowed to the selected branch: All is the
 // whole catalog, any other branch its own subtree.
 func (m *Market) scopeItems() []content.ItemID {
@@ -388,8 +261,7 @@ func (m *Market) scopeItems() []content.ItemID {
 	}
 	out := make([]content.ItemID, 0, len(m.items))
 	for _, item := range m.items {
-		g := m.group[item]
-		if g == m.branch || strings.HasPrefix(g, m.branch+"/") {
+		if inBranch(m.group[item], m.branch) {
 			out = append(out, item)
 		}
 	}
@@ -435,16 +307,18 @@ func (m *Market) searchHits(q string, scope []content.ItemID) []mktHit {
 // crossAvail reads every other market station's asks for the catalog: the
 // count of stations stocking each item and the cheapest of them. It only
 // runs while docked (in space there is no local book to compare against).
-func (m *Market) crossAvail(local sim.StationID) map[content.ItemID]mktAvail {
+// The market shows the count and the manufacturing profit table prices a
+// bill line with no local ask from its cheapest figure.
+func crossAvail(cv widgets.ContentView, stations []sim.StationID, local sim.StationID) map[content.ItemID]mktAvail {
 	if local == "" {
 		return nil
 	}
 	out := make(map[content.ItemID]mktAvail)
-	for _, st := range m.stations {
+	for _, st := range stations {
 		if st == local {
 			continue
 		}
-		for _, o := range m.cv.BookOrders(st) {
+		for _, o := range cv.BookOrders(st) {
 			if o.Side != sim.OrderSell {
 				continue
 			}
@@ -547,25 +421,16 @@ func sortBookOrders(orders []sim.MarketStock) {
 	})
 }
 
-// mktCell is a row's cell text by column index ("" when the row is short).
-func mktCell(row widgets.TableRow, i int) string {
-	if i < 0 || i >= len(row.Cells) {
-		return ""
-	}
-	return row.Cells[i]
-}
-
 // NewMarket builds the Market window over the shared environment. Mount
 // it on a Kit with Kit.AddWindow and call Sync every frame.
 func NewMarket(env widgets.Seams) *Market {
 	m := &Market{
 		th: env, cv: env, as: env, ptr: env.Pointer(),
-		items:    marketCatalog(env),
-		expanded: map[string]bool{"": true},
-		hit:      -1,
+		items: marketCatalog(env),
+		hit:   -1,
 	}
 	m.group, m.maker = marketInfo(env.Defs(), m.items)
-	m.nodes = mktNodes(m.items, m.group)
+	m.browseTree = newBrowseTree(browseNodes(m.items, m.group))
 	m.stations = marketStations(env.Defs())
 	p := env.Pal()
 
@@ -585,35 +450,12 @@ func NewMarket(env widgets.Seams) *Market {
 	// any other header sorts the items by that column's cell. While a
 	// search query is active the rows arrive ranked and flat: the header
 	// sort yields.
+	itemSort := canonicalFirst("Item", cols)
 	m.tbl.SetSortFunc(func(key string, asc bool, rows []widgets.TableRow) {
 		if m.query != "" {
 			return
 		}
-		idx := -1
-		for i, c := range cols {
-			if c.Key == key {
-				idx = i
-				break
-			}
-		}
-		if idx < 0 {
-			return
-		}
-		if key == "Item" {
-			// The rows arrive in canonical id order: the Item key keeps
-			// it, reversing on a second click.
-			if !asc {
-				slices.Reverse(rows)
-			}
-			return
-		}
-		sort.SliceStable(rows, func(a, b int) bool {
-			x, y := mktCell(rows[a], idx), mktCell(rows[b], idx)
-			if asc {
-				return x < y
-			}
-			return y < x
-		})
+		itemSort(key, asc, rows)
 	})
 	// A click selects the row's item: the toolbar reads it, Buy/Sell trade
 	// it and the right pane shows its order book. The row's declared
@@ -630,31 +472,14 @@ func NewMarket(env widgets.Seams) *Market {
 		m.highlightTree()
 	})
 
-	// The browse pane: a live search field over the content tree. The
-	// tree is a one-column table (the same wheel, selection and rail the
-	// catalog has); its header is a fixed grouping label, so the sort
-	// callback is a no-op and the branch order never moves.
-	m.search = widget.NewTextInput(
-		widget.TextInputOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(0, theme.Px(mktSearchH)),
-		),
-		widget.TextInputOpts.Placeholder("Search"),
-		widget.TextInputOpts.Face(env.Face(theme.StepSmall)),
-		widget.TextInputOpts.Padding(&widget.Insets{
-			Left: theme.Px(4), Right: theme.Px(4), Top: theme.Px(2), Bottom: theme.Px(2),
-		}),
-	)
-	m.tree = widgets.NewTable(env, []widgets.Column{{Key: "Tree", Title: "Browse"}}, widgets.PrefsID("tree"))
-	m.tree.SetSortFunc(func(string, bool, []widgets.TableRow) {})
+	// The browse pane: the house's live search field over the shared
+	// one-column browse tree.
+	m.search = newBrowseSearch(env, "Search", mktSearchH)
+	m.tree = newBrowseTable(env, "tree", "Tree")
 	m.tree.OnSelect(func(r widgets.TableRow) {
 		m.search.Focus(false)
-		n, ok := r.Data.(mktNodeKey)
-		if !ok {
-			return
-		}
-		m.branch, m.treeSel = n.Path, n.Path
-		if m.hasKids(n.Path) {
-			m.expanded[n.Path] = !m.expanded[n.Path]
+		if n, ok := r.Data.(browseNodeKey); ok {
+			m.selectBranch(n.Path)
 		}
 	})
 
@@ -685,25 +510,9 @@ func NewMarket(env widgets.Seams) *Market {
 	// item's order book (aligned cells, asks then bids) over My orders,
 	// riding the house rail (the reserved gutter hides while everything
 	// fits). No fold and no tabs, so a selection shows its book at once.
-	// The head's icon box is the Show Info item hero size; with no
-	// selection the box hides and the hint names the gesture.
-	m.headIcon = theme.NewIconBox(theme.IconHero)
-	m.headIcon.Set("", p.Text)
-	m.headIcon.Widget().GetWidget().LayoutData = widget.AnchorLayoutData{
-		HorizontalPosition: widget.AnchorLayoutPositionCenter,
-		VerticalPosition:   widget.AnchorLayoutPositionCenter,
-	}
-	iconRow := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
-	iconRow.AddChild(m.headIcon.Widget())
-	m.headName = widget.NewText(widget.TextOpts.Text("", env.Face(theme.StepSmall), theme.Solid(p.Accent)))
-	m.headProse = widget.NewText(widget.TextOpts.Text("", env.Face(theme.StepTiny), theme.Solid(p.Text)))
-	m.headHint = widget.NewText(widget.TextOpts.Text("Select an item to see its book", env.Face(theme.StepTiny), theme.Solid(p.Dim)))
-	m.headBox = widget.NewContainer(widget.ContainerOpts.Layout(widget.NewGridLayout(
-		widget.GridLayoutOpts.Columns(1),
-		widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, false, false, false}),
-		widget.GridLayoutOpts.Spacing(0, theme.Px(theme.SpSm)),
-	)))
-	m.headBox.AddChild(iconRow, m.headName, m.headProse, m.headHint)
+	// The head is the one item head (itemhead.go); with no selection its
+	// hint names the gesture.
+	m.itemHead = newItemHead(env, "Select an item to see its book")
 
 	// The section headers are the infowin section bars (glyph, tracked label
 	// at the small step, hairline rule); My orders retitles with its count,
@@ -723,16 +532,7 @@ func NewMarket(env widgets.Seams) *Market {
 		)),
 	)
 	m.sideBox.AddChild(m.headBox, m.bookBar, m.bookTbl.Container(), m.mineBar, m.mineBox)
-	m.sideScroll = widget.NewScrollContainer(
-		widget.ScrollContainerOpts.Content(m.sideBox),
-		widget.ScrollContainerOpts.StretchContentWidth(),
-		// No chrome of the column's own: an invisible frame, the mask
-		// clipping the rows to the viewport (the tables' own mask).
-		widget.ScrollContainerOpts.Image(&widget.ScrollContainerImage{
-			Idle: theme.NineSlice(color.NRGBA{}),
-			Mask: theme.NineSlice(theme.WindowBody(p.BG)),
-		}),
-	)
+	m.sideScroll, m.sideRail = newScrollColumn(env, m.sideBox)
 	// Wheel scrolls the column; ScrollTop is a 0..1 fraction of the
 	// overflow, so the step scales by the measured overflow (the tables'
 	// convention). The rail beside it drags the same offset.
@@ -741,32 +541,13 @@ func NewMarket(env widgets.Seams) *Market {
 			m.scrollSide(ev.Y)
 		}
 	})
-	// Same stash as the tables: the window chrome's translate walk carries
-	// the rows with the viewport instead of re-locating them mid-drag.
-	widgets.AttachScrollContent(m.sideScroll, m.sideBox)
-	m.sideRail = widgets.NewScrollRail(env, m.sideScroll, m.sideScroll, m.sideBox)
 
 	// The right pane spans the full body height (its one scroll column
 	// carries the book and My orders); the catalog keeps the full row
-	// height it always had, its scrollbar rail included.
-	left := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Columns(1),
-			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, true}),
-			widget.GridLayoutOpts.Spacing(0, theme.Px(4)),
-		)),
-	)
-	left.AddChild(tradeBar, catalog)
-
-	// The browse pane: the search field over the tree, both full height.
-	browse := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Columns(1),
-			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, true}),
-			widget.GridLayoutOpts.Spacing(0, theme.Px(4)),
-		)),
-	)
-	browse.AddChild(m.search, m.tree.Container())
+	// height it always had, its scrollbar rail included. The browse pane
+	// is the search field over the tree, both full height.
+	left := paneStack([]bool{false, true}, tradeBar, catalog)
+	browse := paneStack([]bool{false, true}, m.search, m.tree.Container())
 
 	// Body: browse | seam | catalog | seam | right pane. Two draggable
 	// seams; the tree and right panes open at their historical widths
@@ -875,9 +656,7 @@ func marketCatalog(cv widgets.ContentView) []content.ItemID {
 // Sync; a hotkey unmount never reports a committed close, so that path
 // keeps them.
 func (m *Market) Dismissed() {
-	clear(m.expanded)
-	m.expanded[""] = true
-	m.branch, m.treeSel = "", ""
+	m.reset()
 	m.search.Focus(false)
 	if m.search.GetText() != "" {
 		m.search.SelectAll()
@@ -904,7 +683,7 @@ func (m *Market) Sync() {
 	}
 	// The other stations' books (dock the availability read): the Qty
 	// suffix counts them.
-	m.avail = m.crossAvail(docked)
+	m.avail = crossAvail(m.cv, m.stations, docked)
 	ask := func(item content.ItemID) bool {
 		for _, o := range by[item] {
 			if o.Side == sim.OrderSell {
@@ -969,7 +748,7 @@ func (m *Market) Sync() {
 
 	// The browse pane: the branch rows and the highlighted branch.
 	m.tree.SetRows(m.treeRows())
-	m.tree.SelectData(mktNodeKey{Path: m.treeSel})
+	m.tree.SelectData(browseNodeKey{Path: m.treeSel})
 	m.tree.Sync()
 
 	// The right pane: the selected item's book over My orders (rebuilt only
@@ -1202,23 +981,11 @@ func (m *Market) syncSide(gated bool, by map[content.ItemID][]sim.MarketStock) {
 
 	// The head: the item's hero icon (the Show Info item size), its name and
 	// its description; the hint alone with no selection.
+	icon, name, prose := "", "", ""
 	if m.hasSel {
-		m.headIcon.Set(m.itemIcon(m.sel), m.th.Pal().Text)
-		m.headName.Label = m.cv.TradeableName(m.sel)
-		m.headProse.Label = m.itemProse(m.sel)
-	} else {
-		m.headIcon.Set("", m.th.Pal().Text)
-		m.headName.Label = ""
-		m.headProse.Label = ""
+		icon, name, prose = m.itemIcon(m.sel), m.cv.TradeableName(m.sel), itemProse(m.cv, m.sel)
 	}
-	theme.ShowWidget(m.headIcon.Widget().GetWidget(), m.hasSel)
-	theme.ShowWidget(m.headName.GetWidget(), m.hasSel && m.headName.Label != "")
-	theme.ShowWidget(m.headProse.GetWidget(), m.headProse.Label != "")
-	theme.ShowWidget(m.headHint.GetWidget(), !m.hasSel)
-	if m.headProse.Label != "" {
-		m.headProse.MaxWidth = float64(inner)
-	}
-	m.headBox.RequestRelayout()
+	m.set(m.hasSel, icon, name, prose, inner)
 
 	m.book = m.book[:0]
 	if m.hasSel {
@@ -1237,25 +1004,6 @@ func (m *Market) syncSide(gated bool, by map[content.ItemID][]sim.MarketStock) {
 	}
 	m.retitle(m.mineLbl, "MY ORDERS · "+theme.FormatInt(int64(len(orders))))
 	m.sideBox.RequestRelayout()
-}
-
-// itemProse is a tradeable's description ("" when no def or no prose backs
-// it): the item, module or hull def's own text.
-func (m *Market) itemProse(item content.ItemID) string {
-	d := m.cv.Defs()
-	if d == nil {
-		return ""
-	}
-	if def, ok := d.Item(item); ok {
-		return def.Description
-	}
-	if def, ok := d.Module(content.ModuleID(item)); ok {
-		return def.Description
-	}
-	if def, ok := d.Ship(content.ShipID(item)); ok {
-		return def.Description
-	}
-	return ""
 }
 
 // sideInnerW is the right pane's text width inside its ContentsPad inset: the
@@ -1314,11 +1062,6 @@ func (m *Market) orderRow(o sim.MarketStock, gated bool) *widgets.StackRow {
 // the taller of the book's plain rows and My orders' rich rows, so either
 // section scrolls at the same pace.
 func (m *Market) scrollSide(notches float64) {
-	over := m.sideRail.Overflow()
-	if over <= 0 {
-		m.sideScroll.ScrollTop = 0
-		return
-	}
 	face := (*m.th.Face(theme.StepSmall)).Metrics()
 	rowH := int(math.Ceil(face.HAscent + face.HDescent))
 	for _, r := range m.mineRows {
@@ -1326,11 +1069,7 @@ func (m *Market) scrollSide(notches float64) {
 			rowH = h
 		}
 	}
-	if rowH <= 0 {
-		return
-	}
-	top := m.sideScroll.ScrollTop - notches*mineWheelRows*float64(rowH)/over
-	m.sideScroll.ScrollTop = math.Max(0, math.Min(1, top))
+	scrollNotches(m.sideScroll, m.sideRail, rowH, mineWheelRows, notches)
 }
 
 // sideKey is the right pane's change signature: the selection, the docked

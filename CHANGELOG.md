@@ -28,12 +28,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each row carries its verdict as one glyph (a green tick when Start would
   accept, a red cross when it would refuse, no word and no count) over a cost
   strip split per mineral by its share of the run's material value, and an
-  inspector card for the selected recipe, inset from the pane's edges: icon,
-  name and verdict on one line, the per-run time / fee / value, a **profit
-  table** (materials cost, craft fee, total cost, sale price at the content
-  base price, profit and margin, the profit tinted by its sign), then the
-  mineral bill with every mineral's art at three times the row icon size, its
-  share and a have/need bar, the cost driver first. Start job closes the
+  inspector card for the selected recipe, inset from the pane's edges: it
+  leads with the product's head the market's right pane uses (the hero icon,
+  the name with the verdict glyph, the product's own description wrapped to
+  the pane), then a **profit table** priced off the station's live order book
+  instead of a content base price: the bill's asks walked cheapest first
+  (a mineral only another station sells is marked and footnoted, one no book
+  sells is left out and named), the sim's craft fee, the product's own bids
+  as the sale value (dashed `no bid` when nobody here buys it), the profit
+  and margin tinted by their sign. Then the mineral bill with every mineral's
+  art at three times the row icon size, its share and a have/need bar, the
+  cost driver first. The craft-level summary under the window title and the
+  per-run time / fee / value line under the recipe name are gone: the recipe
+  row carries the time and the profit table the money. Start job closes the
   pane and is simply grayed when the sim would refuse (the old
   "Start: short Vetril, Helion" hint line is gone); recipe rows no longer
   quote the fee, and their product icon now matches the market list's. Start
