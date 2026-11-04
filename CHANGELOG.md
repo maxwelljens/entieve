@@ -276,6 +276,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pointer moved inside a hold. It now re-lays out on every pointer move (the
   headless pin covers two move frames at scale 1 and 1.5, the capture pin
   reads its drawn centroid).
+- **A failed interface rebuild no longer claims success**: resetting the
+  settings while the interface cannot be rebuilt reported the failure and
+  then also logged "Settings reset". The four rebuild paths (boot, load, a
+  scale change, a settings reset) now share one operation that reports a
+  build failure once, and the reset skips its success line (and its confirm
+  cue) when the rebuild did not happen. Nothing else changes: the same log
+  and open windows survive, the same selection and camera reset, and no
+  window moves.
 
 ## [0.13.0] - 2026-11-03
 

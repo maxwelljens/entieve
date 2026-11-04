@@ -265,7 +265,7 @@ func New(opts Options) (*Game, error) {
 	theme.SetScale(g.uiScale * g.dev)
 	g.w = int(math.Round(float64(defaultW) * g.dev))
 	g.h = int(math.Round(float64(defaultH) * g.dev))
-	if err := g.buildKit(); err != nil {
+	if err := g.rebuildUI(uiRebuild{}); err != nil {
 		return nil, err
 	}
 	g.space = &SpaceScene{g: g, zoom: 1}
@@ -311,7 +311,9 @@ func (g *Game) Run() error {
 		// Monitor().DeviceScaleFactor, which needs a window).
 		g.dev = ebiten.DeviceScaleFactor()
 	}
-	g.applyScale(false)
+	if err := g.applyScale(false); err != nil {
+		g.report(err, "")
+	}
 	ebiten.SetWindowTitle(title)
 	// Window chrome is in WINDOW pixels: never multiply this by the UI or
 	// device scale (Layout converts the outside size separately).
@@ -726,11 +728,9 @@ func (g *Game) report(err error, okMsg string) {
 // ---------------------------------------------------------------------------
 
 // buildKit constructs the kit, every panel and the root-overlay chrome
-// against the current sim. LoadGame re-runs it: panels hold sim
-// references, so a restore rebuilds the whole interface (selection
-// resets; the host's open flags survive, LoadGame carries the log history
-// across, and LoadGame re-applies the saved window layout after this
-// returns).
+// against the current sim, places the defaults and mounts through the
+// host. It is rebuildUI's construction step; everything a rebuild must
+// carry over lives there.
 func (g *Game) buildKit() error {
 	kit, err := uikit.NewKit(g.opts.Content, g.s, func(cmd sim.Command) { g.enqueue(cmd) }, uikit.WithPointer(g.ptr))
 	if err != nil {
@@ -827,14 +827,65 @@ func (g *Game) buildKit() error {
 
 	g.placeDefaults(g.w, g.h)
 	g.syncMounts()
-	if g.title {
-		// A rebuild (load, scale change) during the title phase: the old
-		// title widgets belonged to the kit just dropped, and the fresh
-		// kit's chrome stays hidden until the title is left.
-		if g.titleUI != nil {
-			g.titleUI.detach()
-			g.titleUI.host.Rebind(kit, g.gameServices())
+	return nil
+}
+
+// uiRebuild declares one interface rebuild's carry-over. The zero value is
+// the boot shape: build at the installed scale over fresh defaults.
+//
+// What every rebuild survives: the event log, the host's open flags and
+// sessions, its placement (the sidecar round trip when the scale moves)
+// and the title host. What every rebuild resets: the selection (a fresh kit
+// starts it empty) and, only where a caller declares it, the space
+// camera. The four callers differ only in these fields: boot installs
+// neither scale nor layout; load restores the saved layout and recentres;
+// a scale change round-trips the placement so windows keep their design
+// position; reset is a scale change at 1×.
+type uiRebuild struct {
+	scale     float64 // install this scale first (0 = the installed one)
+	roundTrip bool    // write the placement out at the old scale first
+	restore   bool    // restore the saved layout over the fresh defaults
+	recenter  bool    // recentre the space camera
+}
+
+// rebuildUI is the one interface rebuild. Order: capture the log, install
+// the scale (round-tripping the placement through the design-unit sidecar),
+// build the kit and its defaults, mount through the host, rebind the title
+// host, restore the log and the saved layout, recentre the camera. A build
+// failure returns one error for the caller to report once; the previous
+// kit and its state stay live.
+func (g *Game) rebuildUI(r uiRebuild) error {
+	var lines []string
+	if lp := bodyOf[*uikit.LogPanel](g.host, idLog); lp != nil {
+		lines = lp.Lines() // before the old panel is dropped
+	}
+	if r.scale > 0 {
+		if r.roundTrip {
+			// Write BEFORE the scale changes: design units = px ÷ old scale.
+			if err := g.writeLayout(); err != nil {
+				g.report(err, "")
+			}
 		}
+		theme.SetScale(r.scale)
+	}
+	if err := g.buildKit(); err != nil {
+		return err
+	}
+	// The title host survives like the game host: its open flags stay, its
+	// widgets belonged to the kit just dropped, and the fresh kit's chrome
+	// stays hidden until the title is left.
+	if g.titleUI != nil {
+		g.titleUI.detach()
+		g.titleUI.host.Rebind(g.kit, g.gameServices())
+	}
+	if lines != nil {
+		bodyOf[*uikit.LogPanel](g.host, idLog).SetLines(lines)
+	}
+	if r.restore {
+		g.applyLayout(g.w, g.h) // fresh windows, fresh mounts
+	}
+	if r.recenter && g.space != nil {
+		g.space.ResetView()
 	}
 	return nil
 }
@@ -1161,28 +1212,16 @@ func (g *Game) nextSavePath() string {
 }
 
 // LoadGame restores the sim from the active save path mid-run and rebuilds
-// the interface against the restored sim (selection resets; open windows
-// stay open; the log history is carried across the rebuild). The saved
-// window layout is restored after the rebuild, over the fresh defaults.
+// the interface against the restored sim. The rebuild carries the log, the
+// open windows and their placement, restores the saved layout over the
+// fresh defaults and recentres the camera; the selection resets.
 func (g *Game) LoadGame() error {
 	var save sim.Save
 	if err := docstore.Plain(g.activeSavePath()).Load(&save); err != nil {
 		return err
 	}
-	// The log is not part of the save: capture it before the rebuild and
-	// restore it into the fresh panel afterwards.
-	logPanel := bodyOf[*uikit.LogPanel](g.host, idLog)
-	lines := logPanel.Lines()
 	if err := g.s.Restore(&save); err != nil {
 		return err
 	}
-	if err := g.buildKit(); err != nil {
-		return err
-	}
-	bodyOf[*uikit.LogPanel](g.host, idLog).SetLines(lines)
-	g.applyLayout(g.w, g.h) // AFTER the rebuild: fresh windows, fresh mounts
-	if g.space != nil {
-		g.space.ResetView()
-	}
-	return nil
+	return g.rebuildUI(uiRebuild{restore: true, recenter: true})
 }

@@ -4,7 +4,6 @@ import (
 	"math"
 
 	"github.com/entieve/entieve/docstore"
-	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -180,8 +179,7 @@ func (g *Game) setUIScale(v float64) {
 // rebuilt against it (every metric and face is built at construction:
 // rebuild IS the relayout), then the saved design-unit rects are restored
 // × new scale. Each window therefore keeps its placement in design space
-// and the current log history; selection resets, exactly like LoadGame's
-// rebuild.
+// and the current log history; selection resets, as in every rebuild.
 func (g *Game) applyUIScale(s float64) {
 	if s == g.uiScale {
 		return
@@ -190,35 +188,23 @@ func (g *Game) applyUIScale(s float64) {
 	if err := g.writeSettings(); err != nil {
 		g.report(err, "")
 	}
-	g.applyScale(true)
+	if err := g.applyScale(true); err != nil {
+		g.report(err, "")
+	}
 }
 
 // applyScale installs uiScale × device into the uikit funnel and rebuilds
 // the interface against it. preserveLayout round-trips the sidecar first
 // and restores it afterwards; the boot path passes false — nothing has
-// been placed or restored yet, so placeDefaults in buildKit is all the
+// been placed or restored yet, so the build's default placement is all the
 // layout there is (the sidecar is applied later by the first applySize).
-func (g *Game) applyScale(preserveLayout bool) {
+// Nothing to do when the installed scale already matches.
+func (g *Game) applyScale(preserveLayout bool) error {
 	s := g.uiScale * g.deviceScale()
 	if s == theme.Scale() {
-		return // nothing changed (a fresh Game installs its scale in New)
+		return nil
 	}
-	lines := bodyOf[*uikit.LogPanel](g.host, idLog).Lines()
-	if preserveLayout {
-		// Write BEFORE the scale changes: design units = px ÷ old scale.
-		if err := g.writeLayout(); err != nil {
-			g.report(err, "")
-		}
-	}
-	theme.SetScale(s)
-	if err := g.buildKit(); err != nil {
-		g.report(err, "")
-		return
-	}
-	bodyOf[*uikit.LogPanel](g.host, idLog).SetLines(lines)
-	if preserveLayout {
-		g.applyLayout(g.w, g.h) // design rects × the new scale
-	}
+	return g.rebuildUI(uiRebuild{scale: s, roundTrip: preserveLayout, restore: preserveLayout})
 }
 
 // setFullscreen flips the window mode and persists it. The flag is also
@@ -338,7 +324,9 @@ func (g *Game) setShuffle(on bool) {
 // resetAllSettings restores every setting to its default — scale 1×,
 // windowed, vsync on, rail expanded, master 100% / music 70% / UI 80% /
 // shuffle on, no persisted windowed size — then rebuilds the interface at
-// 1× (the live-apply path) and flushes the sidecar once.
+// 1× (the live-apply path) and flushes the sidecar once. A failed rebuild
+// is reported by itself: a reset that did not take must not also claim it
+// did.
 func (g *Game) resetAllSettings() {
 	g.uiScale = defaultUIScale
 	g.fullscreen = false
@@ -349,11 +337,15 @@ func (g *Game) resetAllSettings() {
 	g.flushSize = false
 	ebiten.SetFullscreen(false)
 	g.applyVsync(true)
-	g.applyScale(true)
+	rebuildErr := g.applyScale(true)
 	g.rail.SetCollapsed(false) // also when applyScale short-circuits
 	g.applyAudioSettings()
 	if err := g.writeSettings(); err != nil {
 		g.report(err, "")
+	}
+	if rebuildErr != nil {
+		g.report(rebuildErr, "")
+		return
 	}
 	g.ui.Play(sfxConfirm)
 	g.report(nil, "Settings reset")
