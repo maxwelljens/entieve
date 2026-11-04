@@ -106,14 +106,21 @@ func TestManufacturingCaptureFrame(t *testing.T) {
 			if !f.hasSel || f.sel.recipe != "rec-mod-artillery-l" {
 				fail("selection = %+v (hasSel=%v), want the artillery recipe", f.sel, f.hasSel)
 			}
-			// The row's one-glance verdict and the inspector's gate name the
+			// The row's one-glance verdict and the inspector's glyph name the
 			// same block (the two short minerals), and the job strip lists
-			// the running job.
-			if got := recipeVerdict(f.recipes.Rows[row]); got != "× short 2" {
-				fail("artillery row verdict = %q, want × short 2", got)
+			// the running job. The profit table is filled and the bill's
+			// rows render at the bill's own icon size.
+			if got := recipeVerdict(f.recipes.Rows[row]); got != "×" {
+				fail("artillery row verdict = %q, want the cross", got)
 			}
-			if got := f.gateLbl.Label; !strings.Contains(got, "Vetril") || !strings.Contains(got, "Helion") {
-				fail("inspector gate = %q, want the short minerals named", got)
+			if got := f.inspVerdict.Label; got != "×" {
+				fail("inspector verdict = %q, want the cross", got)
+			}
+			if got := profitValue(f, "Profit"); got == "" || got == "—" {
+				fail("profit table profit = %q, want the run's figure", got)
+			}
+			if got := f.matsRows[0].Icon.Widget().GetWidget().Rect.Dx(); got != theme.Px(mfgMatIcon) {
+				fail("bill icon = %d px, want the %d px box", got, theme.Px(mfgMatIcon))
 			}
 			if len(f.jobs.Rows) != 1 || f.jobs.Rows[0].Cells[4] != "Running" {
 				fail("job strip rows = %+v, want the one running job", f.jobs.Rows)

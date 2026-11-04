@@ -1117,6 +1117,14 @@ func (w *InfoWin) render(p infoPage) {
 // identity blocks, tinted by the section's family otherwise). Show Info and
 // the contact Details dialog draw the same bar.
 func sectionBar(env theme.Theme, label string) *widget.Container {
+	bar, _ := sectionBarText(env, label)
+	return bar
+}
+
+// sectionBarText is sectionBar with its label handed back, for a bar a
+// surface retitles (the market's order sections): the caller sets Label and
+// re-pins the label cell's MinWidth to its new tracked measure.
+func sectionBarText(env theme.Theme, label string) (*widget.Container, *theme.ChromeText) {
 	pal := env.Pal()
 	icon, tint := theme.SectionBar(pal, label)
 	bar := widget.NewContainer(
@@ -1161,7 +1169,7 @@ func sectionBar(env theme.Theme, label string) *widget.Container {
 		})),
 	)
 	bar.AddChild(mark, head, rule)
-	return bar
+	return bar, head
 }
 
 // lineWidget tiles one line's rows: a single row is full-width, two or three

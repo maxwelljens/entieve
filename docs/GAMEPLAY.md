@@ -823,21 +823,26 @@ in three panes over one seam:
   product name, its family and **its inputs**, so typing a mineral finds
   every recipe that eats it.
 - **Recipes** (middle): one row per recipe. The first line is the product
-  and its one-glance verdict, `● ready` or `× short 2` (the count of
-  minerals you are short of; a glyph and a word, never colour alone). The
-  second line is the per-run time and fee beside the **cost strip**: one
-  bar wide, split per mineral by its share of the run's material value in
-  canonical mineral order, each segment green while your stock covers it
-  and red where it falls short. A row that is mostly green is nearly
-  runnable; a wide red segment says the bulk of the bill is missing.
-- **The selected recipe** (right): its icon and name, the verdict, the
-  per-run time, fee and material value, then the bill itself, one row per
-  mineral with **the cost driver first** (each row: the mineral's own art,
-  its share of the run's value and its have/need bar with the exact
-  numbers, green when covered and red when short). Under the bill sit
-  **Start job** and, while it stays grayed, the reason in words: which
-  minerals are short, that no station here offers industry, or that all
-  three slots are busy.
+  (at the market list's item icon size) with its one-glance verdict: a
+  green tick when the sim would start it now, a red cross when it would
+  refuse. The shape carries the state, not the colour alone; there is no
+  word and no count on the row. The second line is the per-run time beside
+  the **cost strip**: one bar wide, split per mineral by its share of the
+  run's material value in canonical mineral order, each segment green while
+  your stock covers it and red where it falls short. A row that is mostly
+  green is nearly runnable; a wide red segment says the bulk of the bill is
+  missing.
+- **The selected recipe** (right): the pane is inset from its edges, with
+  the recipe's icon, its name and the verdict tick/cross on one line, then
+  the per-run time, fee and material value, then the **profit table**: one
+  run's materials cost, craft fee, total cost, the product's sale value at
+  its base price, the profit and its margin, as aligned rows (green profit
+  on a profitable recipe, red on a loss). Below it sits the bill itself, one
+  row per mineral with **the cost driver first** (each row: the mineral's
+  own art at three times the row icon size, its share of the run's value and
+  its have/need bar with the exact numbers, green when covered and red when
+  short). **Start job** closes the pane; while the sim would refuse, it is
+  simply grayed.
 
 **Start** opens the quantity picker on the job's **runs** (1–100, starting
 at the run count you last started); Confirm starts the job. The materials
@@ -888,14 +893,17 @@ item is listed, including the hulls and wares no one sells here: a dim row
 whose **Buy** is grayed until some local order offers it (**Request on
 Market** stays live, and placing the first order is how a market wakes up).
 
-**The right pane.** Selecting an item fills the pane's book section with
-that item's full resting book, asks (price ascending) above bids (price
-descending), one compact row per order with its price, quantity and side;
-your own orders wear the owned green. There is no per-item dropdown: the
-catalog is a plain list, and the book is always one click away. **My
-orders** stacks below it as its own labelled section, both sections
-scrolling together on the pane's one rail; with nothing selected the book
-section reads "Order book: select an item".
+**The right pane.** Selecting an item leads with its **hero icon** (the
+Show Info item size) and its description, then the **Order book**: that
+item's full resting book as a small table, one aligned row per order with
+its side, price and quantity, asks (price ascending) before bids (price
+descending); your own orders wear the owned green. There is no per-item
+dropdown: the catalog is a plain list, and the book is always one click
+away. **My orders** stacks below it, its own section header carrying the
+count, every section scrolling together on the pane's one rail. The pane is
+inset from its edges, and both section headers are the house bar (a glyph,
+the tracked label and a rule). With nothing selected the head shows the
+hint "Select an item to see its book".
 
 **Search.** The field above the tree filters the selected branch live as
 you type (name, group path and maker all match, case-insensitive and

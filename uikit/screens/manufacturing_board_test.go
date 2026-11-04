@@ -247,8 +247,8 @@ func TestManufacturingInspectorBill(t *testing.T) {
 	if got := len(f.matsRows); got != 3 {
 		t.Fatalf("inspector rows after stocking = %d, want 3", got)
 	}
-	if got := f.inspVerdict.Label; got != "● ready" {
-		t.Errorf("stocked verdict = %q, want ● ready", got)
+	if got := f.inspVerdict.Label; got != "✓" {
+		t.Errorf("stocked verdict = %q, want the tick", got)
 	}
 	for _, n := range f.needs(rec.ID, 1) {
 		for _, b := range materialRowBars(f.matRowDef(n, total, theme.DefaultPalette())) {
@@ -371,26 +371,21 @@ func slicesMax(v []int) int {
 	return m
 }
 
-// TestManufacturingVerdict: the row's verdict is the sim's start gate said
-// in a glyph and a word, the short count included, never colour alone.
+// TestManufacturingVerdict: the row's verdict is the sim's start gate said in
+// one glyph, a tick when Start would accept and a cross when it would refuse,
+// the tint the state; no word and no count ride it (the bill names what is
+// short).
 func TestManufacturingVerdict(t *testing.T) {
-	for _, tc := range []struct {
-		ready, station, slots bool
-		short                 int
-		want                  string
-	}{
-		{true, true, true, 0, "● ready"},
-		{false, false, true, 5, "× no station"},
-		{false, true, false, 5, "× slots full"},
-		{false, true, true, 2, "× short 2"},
-		{false, true, true, 0, "× short 0"},
-	} {
-		if got := verdictText(tc.ready, tc.station, tc.slots, tc.short); got != tc.want {
-			t.Errorf("verdict(%v,%v,%v,%d) = %q, want %q", tc.ready, tc.station, tc.slots, tc.short, got, tc.want)
-		}
+	p := theme.DefaultPalette()
+	if got := verdictGlyph(true); got != "✓" {
+		t.Errorf("ready glyph = %q, want the tick", got)
+	}
+	if got := verdictGlyph(false); got != "×" {
+		t.Errorf("blocked glyph = %q, want the cross", got)
 	}
 
-	// Live: the row flips at have >= need, and only there.
+	// Live: the row flips at have >= need, and only there; the glyph is the
+	// only verdict text and its tint carries the state.
 	f, env, _, _, frame := boardEnv(t)
 	rec := env.Content.Recipes["rec-ammo-emp-s"]
 	row := recipeRowFor(f, rec.Product)
@@ -399,20 +394,27 @@ func TestManufacturingVerdict(t *testing.T) {
 		giveItem(env.Sim, m.Item, m.Qty-1) // one short everywhere
 	}
 	frame()
-	if got := recipeVerdict(f.recipes.Rows[row]); got != "× short "+theme.FormatInt(int64(len(need))) {
-		t.Errorf("one-short verdict = %q", got)
+	if got := recipeVerdict(f.recipes.Rows[row]); got != "×" {
+		t.Errorf("one-short verdict = %q, want the cross", got)
+	}
+	if got := recipeVerdictTint(f.recipes.Rows[row]); got != p.Danger {
+		t.Errorf("one-short verdict tint = %v, want Danger", got)
 	}
 	for _, m := range need {
 		giveItem(env.Sim, m.Item, 1)
 	}
 	frame()
-	if got := recipeVerdict(f.recipes.Rows[row]); got != "● ready" {
-		t.Errorf("exact-stock verdict = %q, want ● ready at have == need", got)
+	if got := recipeVerdict(f.recipes.Rows[row]); got != "✓" {
+		t.Errorf("exact-stock verdict = %q, want the tick at have == need", got)
+	}
+	if got := recipeVerdictTint(f.recipes.Rows[row]); got != p.Good {
+		t.Errorf("exact-stock verdict tint = %v, want Good", got)
 	}
 }
 
-// TestManufacturingStartGateNames: a greyed Start names what is missing,
-// mineral by mineral, and the button itself opens nothing.
+// TestManufacturingStartGateNames: a greyed Start carries no hint line (the
+// grey is the gate), the row and inspector verdicts are the cross, and the
+// button itself opens nothing.
 func TestManufacturingStartGateNames(t *testing.T) {
 	f, env, ui, cmds, frame := boardEnv(t)
 	rec := env.Content.Recipes["rec-mod-artillery-l"]
@@ -422,21 +424,26 @@ func TestManufacturingStartGateNames(t *testing.T) {
 	if !f.startBtn.GetWidget().Disabled {
 		t.Fatal("Start enabled with an empty hold")
 	}
-	if got := f.gateLbl.Label; !strings.Contains(got, "Vetril") || !strings.Contains(got, "Helion") {
-		t.Errorf("gate = %q, want the short minerals named", got)
+	if got := f.inspVerdict.Label; got != "×" {
+		t.Errorf("blocked inspector verdict = %q, want the cross", got)
+	}
+	for _, lbl := range inspectorLabels(f) {
+		if strings.Contains(strings.ToLower(lbl), "start:") {
+			t.Errorf("inspector renders a gate hint %q, want none", lbl)
+		}
 	}
 	uitest.FireButton(ui, f.startBtn)
 	if len(*cmds) != 0 || env.QtyWindow().IsOpen() {
 		t.Fatal("a greyed Start opened the picker")
 	}
 
-	// Stocking exactly the bill clears the line and arms the button.
+	// Stocking exactly the bill arms the button and flips the glyph.
 	for _, n := range f.needs(rec.ID, 1) {
 		giveItem(env.Sim, n.Item, n.Need)
 	}
 	frame()
-	if got := f.gateLbl.Label; got != "" {
-		t.Errorf("stocked gate = %q, want no line", got)
+	if got := f.inspVerdict.Label; got != "✓" {
+		t.Errorf("stocked verdict = %q, want the tick", got)
 	}
 	if f.startBtn.GetWidget().Disabled {
 		t.Fatal("Start still greyed with the whole bill stocked")
@@ -445,22 +452,34 @@ func TestManufacturingStartGateNames(t *testing.T) {
 
 // TestManufacturingAcceptanceRead is the research brief's yardstick as a
 // pin: without reading a number, the board says (1) which recipes are ready
-// (the row verdicts), (2) what blocks the rest (the gate line names the
-// minerals) and (3) which mineral dominates the cost (the widest strip
-// segment is the inspector's first row, and it is Sideron at 55%).
+// (the row verdict glyphs), (2) what blocks the rest (the cross and the
+// inspector bill's Danger rows) and (3) which mineral dominates the cost (the
+// widest strip segment is the inspector's first row, and it is Sideron at
+// 55%).
 func TestManufacturingAcceptanceRead(t *testing.T) {
 	f, env, ui, _, frame := boardEnv(t)
 
-	// Nothing stocked: every recipe short, the artillery bill blocked by
-	// its two missing minerals.
+	// Nothing stocked: every recipe short, the artillery bill blocked,
+	// every material row in the Danger tint.
 	art := recipeRowFor(f, "mod-artillery-l")
 	clickRow(ui, f.recipes, art)
 	frame()
-	if got := f.inspVerdict.Label; !strings.HasPrefix(got, "× short ") {
-		t.Errorf("(1) verdict = %q, want the short refusal", got)
+	if got := f.inspVerdict.Label; got != "×" {
+		t.Errorf("(1) verdict = %q, want the cross", got)
 	}
-	if got := f.gateLbl.Label; !strings.Contains(got, "Vetril") || !strings.Contains(got, "Helion") {
-		t.Errorf("(2) gate = %q, want the blocking minerals named", got)
+	short := 0
+	for _, n := range f.needs("rec-mod-artillery-l", 1) {
+		if n.Have < n.Need {
+			short++
+		}
+	}
+	if short == 0 {
+		t.Fatal("fixture: the artillery bill is stocked")
+	}
+	for _, r := range f.matsRows {
+		if _, h := r.Root.PreferredSize(); h == 0 {
+			t.Error("(2) material row never measured")
+		}
 	}
 
 	// (3) The cost driver is the wide segment and the first material row.
@@ -483,19 +502,182 @@ func TestManufacturingAcceptanceRead(t *testing.T) {
 		t.Errorf("value line = %q, want the run's material value", got)
 	}
 
-	// (1)+(2) together: stock the bill and the same row and card flip to
-	// ready, the gate line emptying.
+	// (1)+(2) together: stock the bill and the same row and inspector flip
+	// to the tick.
 	for _, n := range needs {
 		giveItem(env.Sim, n.Item, n.Need)
 	}
 	frame()
-	if got := recipeVerdict(f.recipes.Rows[art]); got != "● ready" {
-		t.Errorf("(1) stocked row verdict = %q, want ● ready", got)
+	if got := recipeVerdict(f.recipes.Rows[art]); got != "✓" {
+		t.Errorf("(1) stocked row verdict = %q, want the tick", got)
 	}
-	if got := f.inspVerdict.Label; got != "● ready" {
-		t.Errorf("(1) stocked card verdict = %q, want ● ready", got)
+	if got := f.inspVerdict.Label; got != "✓" {
+		t.Errorf("(1) stocked inspector verdict = %q, want the tick", got)
 	}
-	if got := f.gateLbl.Label; got != "" {
-		t.Errorf("(2) stocked gate = %q, want nothing blocking", got)
+}
+
+// profitValue is one profit-table row's value cell ("" when the row is gone).
+func profitValue(f *Manufacturing, label string) string {
+	for _, r := range f.profit.RowsForTest() {
+		if len(r.Cells) == 2 && r.Cells[0] == label {
+			return r.Cells[1]
+		}
+	}
+	return ""
+}
+
+// inspectorLabels is every text the inspector draws (the verdict surfaces a
+// rendered-text sweep reads).
+func inspectorLabels(f *Manufacturing) []string {
+	out := []string{f.inspName.Label, f.inspVerdict.Label, f.inspValue.Label, f.matsLbl.Label}
+	for _, r := range f.profit.RowsForTest() {
+		out = append(out, r.Cells...)
+	}
+	return out
+}
+
+// TestManufacturingProfitTable pins the inspector's profit table to the
+// content's own numbers: one run's material bill and craft fee against the
+// product's base-price sale value, the total, the profit and its margin, and
+// the formulas both ways (a base_price edit must fail here).
+func TestManufacturingProfitTable(t *testing.T) {
+	f, env, ui, _, frame := boardEnv(t)
+	rec := env.Content.Recipes["rec-mod-artillery-l"]
+	clickRow(ui, f.recipes, recipeRowFor(f, rec.Product))
+	frame()
+
+	// The fixture's figures, read from the content: 201,680 € of minerals,
+	// a 6,050 € fee, the module's 355,000 € base price at one unit.
+	needs := f.needs(rec.ID, 1)
+	mats := 0.0
+	for _, n := range needs {
+		mats += n.Value
+	}
+	fee := env.JobFee(rec.ID, 1)
+	price := env.Content.Modules["mod-artillery-l"].Price
+	sale := price * float64(rec.Qty)
+
+	for _, c := range []struct{ label, want string }{
+		{"Materials", "201,680 €"},
+		{"Craft fee", "6,050 €"},
+		{"Total cost", "207,730 €"},
+		{"Sale price", "355,000 €"},
+		{"Profit", "+147,270 €"},
+		{"Margin", "41%"},
+	} {
+		if got := profitValue(f, c.label); got != c.want {
+			t.Errorf("profit row %q = %q, want %q", c.label, got, c.want)
+		}
+	}
+	// The formulas both ways, on the same content read.
+	if got, want := profitValue(f, "Total cost"), mfgMoney(mats+fee); got != want {
+		t.Errorf("total = %q, want materials + fee %q", got, want)
+	}
+	if got, want := profitValue(f, "Sale price"), mfgMoney(price*float64(rec.Qty)); got != want {
+		t.Errorf("sale = %q, want base price × qty %q", got, want)
+	}
+	if got, want := profitValue(f, "Profit"), mfgSigned(sale-(mats+fee)); got != want {
+		t.Errorf("profit = %q, want sale - total %q", got, want)
+	}
+	if profit := sale - (mats + fee); profit < 0 {
+		t.Errorf("fixture: profit is negative (%v), want the positive pin", profit)
+	}
+	// The profit row carries the state tint, not colour alone (the sign is
+	// in the string).
+	var profitRow widgets.PlainRow
+	for _, r := range f.profit.RowsForTest() {
+		if len(r.Cells) == 2 && r.Cells[0] == "Profit" {
+			profitRow = r
+		}
+	}
+	if got := profitRow.Tint; got != theme.DefaultPalette().Good {
+		t.Errorf("profit tint = %v, want Good", got)
+	}
+}
+
+// TestManufacturingIconSizes pins the owner's icon bindings here: the recipe
+// row's product icon is the market list's item icon size, the material bill's
+// mineral icon is three times the inline row icon it opened with, and the bill
+// row grows with it while staying inside the pane (the market head's hero-size
+// match is pinned in TestMarketItemHeadLeads).
+func TestManufacturingIconSizes(t *testing.T) {
+	if mktRowIcon != theme.IconButton {
+		t.Fatalf("market row icon = %d, want the 20 px button box", mktRowIcon)
+	}
+	if want := 3 * theme.IconInline; mfgMatIcon != want {
+		t.Errorf("bill icon = %d, want three times the inline %d (%d)", mfgMatIcon, theme.IconInline, want)
+	}
+
+	f, _, ui, _, frame := boardEnv(t)
+	clickRow(ui, f.recipes, recipeRowFor(f, "mod-artillery-l"))
+	frame()
+	frame()
+
+	row := recipeRowFor(f, "mod-artillery-l")
+	if got := f.recipes.Rows[row].IconSize; got != mktRowIcon {
+		t.Errorf("recipe row icon size = %d, want the market list's %d", got, mktRowIcon)
+	}
+	if len(f.matsRows) == 0 {
+		t.Fatal("no material rows")
+	}
+	if got := f.matsRows[0].Icon.Widget().Image.Bounds().Dx(); got != theme.Px(mfgMatIcon) {
+		t.Errorf("bill icon = %d px, want the %d px box", got, theme.Px(mfgMatIcon))
+	}
+	bill := f.matsRows[0].Root.GetWidget().Rect
+	if bill.Dy() <= theme.Px(mfgMatIcon) {
+		t.Errorf("bill row = %d px tall, want it grown past the %d px icon",
+			bill.Dy(), theme.Px(mfgMatIcon))
+	}
+	if view := f.matsScroll.ViewRect(); bill.Dx() > view.Dx() {
+		t.Errorf("bill row %d px wide overflows the %d px viewport", bill.Dx(), view.Dx())
+	}
+}
+
+// TestManufacturingVerdictTextSweep: neither verdict surface spells out the
+// state any more — no "ready", no "short", only the glyphs (the bill's Danger
+// rows still say which mineral is short by name).
+func TestManufacturingVerdictTextSweep(t *testing.T) {
+	f, env, ui, _, frame := boardEnv(t)
+	rec := env.Content.Recipes["rec-mod-artillery-l"]
+	clickRow(ui, f.recipes, recipeRowFor(f, rec.Product))
+	frame()
+	texts := inspectorLabels(f)
+	for _, r := range f.recipes.Rows {
+		for _, line := range r.Stack {
+			for _, s := range line.Segs {
+				texts = append(texts, s.Text)
+			}
+		}
+	}
+	for _, s := range texts {
+		low := strings.ToLower(s)
+		if strings.Contains(low, "ready") || strings.Contains(low, "short") {
+			t.Errorf("verdict surface still renders %q", s)
+		}
+	}
+	// The short minerals are still named where they matter: the bill rows
+	// keep their name cell, their art and the Danger tint.
+	short := 0
+	for _, n := range f.needs(rec.ID, 1) {
+		if n.Have >= n.Need {
+			continue
+		}
+		short++
+		row := f.matRowDef(n, 1, theme.DefaultPalette())
+		if row.Cells[0] == "" || row.Icons[0] == "" {
+			t.Errorf("bill row for %q lost its name or art", n.Item)
+		}
+		danger := false
+		for _, b := range materialRowBars(row) {
+			if b.Tint == theme.DefaultPalette().Danger {
+				danger = true
+			}
+		}
+		if !danger {
+			t.Errorf("bill row for %q is not Danger-tinted", n.Item)
+		}
+	}
+	if short == 0 {
+		t.Fatal("fixture: the artillery bill is stocked")
 	}
 }
