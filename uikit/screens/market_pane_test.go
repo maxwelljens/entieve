@@ -89,7 +89,7 @@ func TestMarketItemHeadLeads(t *testing.T) {
 }
 
 // TestMarketBookTable pins the book's table form: one aligned [side, price,
-// qty] row per resting order, asks price-ascending before bids
+// qty] row per resting order, sell orders price-ascending before buy orders
 // price-descending, the figures ending on the table's right edge.
 func TestMarketBookTable(t *testing.T) {
 	m, _, _, frame, click := mktTreeEnv(t)
@@ -103,10 +103,10 @@ func TestMarketBookTable(t *testing.T) {
 		price float64
 		qty   string
 	}{
-		{"Ask", 100, "5"},
-		{"Ask", 120, "7"},
-		{"Bid", 90, "2"},
-		{"Bid", 80, "3"},
+		{"Sell", 100, "5"},
+		{"Sell", 120, "7"},
+		{"Buy", 90, "2"},
+		{"Buy", 80, "3"},
 	}
 	if got, w := len(m.book), len(want); got != w {
 		t.Fatalf("book rows = %d, want %d", got, w)
@@ -124,11 +124,11 @@ func TestMarketBookTable(t *testing.T) {
 			t.Errorf("book row %d price = %v, want %v", i, got, w.price)
 		}
 		switch r.Cells[0] {
-		case "Ask":
+		case "Sell":
 			if !askPhase {
 				t.Errorf("book row %d: ask after a bid (order moved)", i)
 			}
-		case "Bid":
+		case "Buy":
 			askPhase = false
 		default:
 			t.Errorf("book row %d side = %q", i, r.Cells[0])

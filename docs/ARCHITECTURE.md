@@ -471,7 +471,7 @@ with severity), `EvDestroyed`, `EvWarp{Phase}`, `EvLooted`, `EvDocked`,
 (ID/Name carry the contract ID and title; Value carries the payout).
 `EvWar{Phase, System, Actor, Target, Item, Value}` reports the war with
 phases `"flip" | "contest" | "supply" | "kill" | "skirmish"`: flips
-always, meter moves of 5 % or more, the goods a war bid took, the player's
+always, meter moves of 5 % or more, the goods a war buy order took, the player's
 front kills and any witnessed fleet skirmish (see `docs/SIM.md` §6).
 `EvTraffic{Phase, System, Cel, Item, Value, Text}` reports the
 living-universe convoy lifecycle with phases `"departed" | "jumped" |
@@ -560,7 +560,7 @@ anatomy lives in `docs/SIM.md`):
     agent behavior pass on per-agent cooldowns of 60-600 ticks, the station upkeep cycle every
     3600 ticks),
 20. `war` (the Long Attrition: the hourly contest beat; meters settle and
-    flip, the standing war bids refresh against the treasury, fleets look
+    flip, the standing war buy orders refresh against the treasury, fleets look
     for the front; `sim/war.go`, anatomy in `docs/SIM.md` §6).
 
 After all systems, the **deferred player death respawn** runs (so a
@@ -584,7 +584,7 @@ economy sits on top of:
   through the normal warp profile (align → tunnel → land), deliver cargo
   at station endpoints and despawn at same-system gates/belts. Cargo is
   **sourced at spawn, never conjured**: a station origin withdraws the
-  units from that station's own asks (weighted price = cost basis), a belt
+  units from that station's own sell orders (weighted price = cost basis), a belt
   origin draws the persistent belt state, a gate origin is the economy's
   one sanctioned import (the named world boundary: undebited supply at
   the destination). Cross-system legs (`to_system` lanes) hop gates and
@@ -624,7 +624,7 @@ economy sits on top of:
 - **Order-book pricing**: the per-station order books are the only price
   former (the old per-system "market memory" band/decay model is gone).
   A delivery posts the exact units as supply on the destination station's
-  book at one tick under `min(cost basis, best ask)`, so arriving supply
+  book at one tick under `min(cost basis, best sell order)`, so arriving supply
   always improves the displayed price; a lost inbound shipment is an
   event-only supply-risk signal ("Risk premium — …"), never a price step.
   All traffic constants are derived/pinned in the calibration tables in
@@ -1072,10 +1072,10 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > dependency) over display name + full group path + maker, ranked by its
 > score while a query is up (the header sort yields, restored on clear).
 > Result rows are rich stack rows whose name is split into accent-tinted
-> runs at `Match.MatchedIndexes`; the plain table grew
-> `TableRow.CellRuns` for the dim `· N more` cross-station Qty suffix
-> (read through the existing `BookOrders`/`StationName`/`Defs` seams: no
-> new seam). The search `TextInput` is the second typing surface:
+> runs at `Match.MatchedIndexes`; the Qty cell is a plain right-aligned
+> column (the old cross-station availability suffix and its `CellRuns`
+> render form are gone). Buy/Sell sit pinned below the right pane's scroll
+> column, acting on the selection. The search `TextInput` is the second typing surface:
 > `game.handleKeys` yields world keys while `Market.SearchFocused()` and
 > routes the arrows/Enter/two-step Esc through `Market.SearchKey`;
 > `Ctrl+F` opens the market and focuses the field.

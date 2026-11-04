@@ -9,10 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Buy and Sell moved into the market's right pane**: the two actions now
+  sit pinned below the pane's scroll column, side by side, with the open
+  chest and hand-off glyphs and the Good/Danger roles on their labels and
+  icons (green buy, red sell). They still act on the catalog selection and
+  grey while gated, never hide. The catalog toolbar they used to ride is
+  gone.
+- **The catalog's Qty column lost its availability suffix**: the dim
+  `· N more` tail (another station stocking the item) is removed. It did not
+  obey the Qty column and spilled over the Price/Side boundary; the Qty cell
+  is now one right-aligned number in its own column and the Side cell keeps
+  its own. The manufacturing profit table still prices a short bill line
+  from another station's cheapest sell order, daggered as before.
+- **The order book speaks buy orders and sell orders**: player-facing
+  Bid/Ask is retired everywhere (book side cells read the compact Buy/Sell,
+  prose reads buy order/sell order, the `no bid` dashes read
+  `no buy order`, the profit-table footnotes name sell orders, and the order
+  window's modes read Buy order/Sell order). The sim's identifiers,
+  commands and JSON keep bid/ask; `CONTEXT.md` records the mapping.
 - **The market's right pane carries the order book**: selecting an item fills
   the rightmost pane with that item's full resting book as a small table
-  (aligned side, price and quantity columns), asks (price ascending) above
-  bids (price descending), with your own orders in the owned green. The pane
+  (aligned side, price and quantity columns), sell orders (price ascending)
+  above buy orders (price descending), with your own orders in the owned
+  green. The pane
   now leads with the item's hero icon at the Show Info item size and its
   description, is inset from its edges, and its two sections are proper
   header bars (glyph, tracked label, rule): ORDER BOOK and MY ORDERS with
@@ -35,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of a content base price: the bill's asks walked cheapest first
   (a mineral only another station sells is marked and footnoted, one no book
   sells is left out and named), the sim's craft fee, the product's own bids
-  as the sale value (dashed `no bid` when nobody here buys it), the profit
+  as the sale value (dashed `no buy order` when nobody here buys it), the profit
   and margin tinted by their sign. Then the mineral bill with every mineral's
   art at three times the row icon size, its share and a have/need bar, the
   cost driver first. The craft-level summary under the window title and the
@@ -61,8 +80,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   icon, the ore's name with the verdict glyph, the ore's own description
   wrapped to the pane), then a **refine math** table answering "refine this or
   sell it raw" off the station's live book: what one 100-ore batch fetches at
-  the bids, what its minerals fetch, the signed delta (green when refining
-  pays, red when it does not) and the margin, each side dashed `no bid` with
+  the buy orders, what its minerals fetch, the signed delta (green when
+  refining pays, red when it does not) and the margin, each side dashed
+  `no buy order` with
   the marker where nobody here buys it and no base price standing in; there is
   no fee line because the sim charges no refine fee. Below it the yield bill,
   one row per output mineral, the most valuable first, each with its art at

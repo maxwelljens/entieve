@@ -9,15 +9,14 @@ import (
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/sim"
-	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/sahilm/fuzzy"
 )
 
 // mktSearchEnv docks the showcase game at its market station and builds
-// the window there: the browse tree, the catalog and the cross-station
-// reads all have real content behind them.
+// the window there: the browse tree and the catalog have real content
+// behind them.
 func mktSearchEnv(t *testing.T) (*Market, *testEnv, *ebitenui.UI, func()) {
 	t.Helper()
 	env, _ := newTestEnv(t)
@@ -329,10 +328,10 @@ func TestMarketSearchRescopesOnBranchClick(t *testing.T) {
 	}
 }
 
-// TestMarketBuyGreysWithoutLocalAsk pins the visible gate: an item with no
-// local ask keeps a dim, live row whose Buy is grayed (Request on Market
-// stays live), and the toolbar Buy follows the selected row.
-func TestMarketBuyGreysWithoutLocalAsk(t *testing.T) {
+// TestMarketBuyGreysWithoutLocalSellOrder pins the visible gate: an item
+// with no local sell order keeps a dim, live row whose Buy is grayed (Buy
+// order stays live), and the pinned Buy follows the selected row.
+func TestMarketBuyGreysWithoutLocalSellOrder(t *testing.T) {
 	m, env, _, _ := mktSearchEnv(t)
 
 	ask := map[content.ItemID]bool{}
@@ -373,10 +372,10 @@ func TestMarketBuyGreysWithoutLocalAsk(t *testing.T) {
 	}
 	deadRow := rowOf(dead)
 	if !verbs(deadRow, "Buy") {
-		t.Errorf("Buy live on %q with no local ask", dead)
+		t.Errorf("Buy live on %q with no local sell order", dead)
 	}
-	if verbs(deadRow, "Request on Market") {
-		t.Errorf("Request on Market grayed on %q", dead)
+	if verbs(deadRow, "Buy order") {
+		t.Errorf("Buy order grayed on %q", dead)
 	}
 	if verbs(rowOf(live), "Buy") {
 		t.Errorf("Buy grayed on stocked %q", live)
@@ -385,76 +384,47 @@ func TestMarketBuyGreysWithoutLocalAsk(t *testing.T) {
 	m.selectItem(dead)
 	m.Sync()
 	if !m.buy.GetWidget().Disabled {
-		t.Error("toolbar Buy enabled on an item the book does not sell")
+		t.Error("pinned Buy enabled on an item the book does not sell")
 	}
 	m.selectItem(live)
 	m.Sync()
 	if m.buy.GetWidget().Disabled {
-		t.Error("toolbar Buy disabled on a stocked item")
+		t.Error("pinned Buy disabled on a stocked item")
 	}
 }
 
-// TestMarketAvailabilitySuffix: the Qty cell carries the dim "· N more"
-// suffix for the OTHER stations stocking the item.
-func TestMarketAvailabilitySuffix(t *testing.T) {
-	m, env, _, frame := mktSearchEnv(t)
-	local := env.Sim.BookOrders("cel-haven-rest")
-
-	// The count reads the same books the seam reads: pick an item stocked
-	// both locally and elsewhere.
-	var want content.ItemID
-	var count int
-	stations := marketStations(env.Defs())
-	asks := map[content.ItemID]int{}
-	for _, st := range stations {
-		if st == "cel-haven-rest" {
-			continue
-		}
-		for _, o := range env.Sim.BookOrders(st) {
-			if o.Side == sim.OrderSell {
-				asks[o.Item]++
-			}
-		}
-	}
-	local0 := map[content.ItemID]bool{}
-	for _, o := range local {
-		if o.Side == sim.OrderSell {
-			local0[o.Item] = true
-		}
-	}
-	for _, item := range marketCatalog(env) {
-		if local0[item] && asks[item] >= 1 {
-			want, count = item, asks[item]
-			break
-		}
-	}
-	if want == "" {
-		t.Fatal("fixture: no item stocked both locally and elsewhere")
-	}
-
-	var row widgets.TableRow
-	for _, r := range m.tbl.Rows {
-		if k, ok := r.Data.(mktItemRow); ok && k.Item == want {
-			row = r
-		}
-	}
-	if len(row.CellRuns) == 0 || len(row.CellRuns[2]) < 2 {
-		t.Fatalf("qty cell of %q has no suffix run: %+v", want, row.CellRuns)
-	}
-	suffix := row.CellRuns[2][1]
-	if !strings.Contains(suffix.Text, "more") || !strings.Contains(suffix.Text, theme.FormatInt(int64(count))) {
-		t.Errorf("qty suffix = %q, want the %d-station suffix", suffix.Text, count)
-	}
-	if suffix.Tint != m.th.Pal().Dim {
-		t.Errorf("qty suffix tint = %#v, want the palette's Dim", suffix.Tint)
-	}
-
-	// The title stays the base name; the availability detail is the
-	// column's suffix alone (the title bar carries no state).
-	m.selectItem(want)
+// TestMarketCatalogQtyColumn: the Qty cell obeys its column and the Side
+// cell has one of its own. The availability suffix is gone (it rendered
+// outside the Qty column, over the Price/Side boundary), so every catalog
+// row's Qty is a plain right-aligned number inside the Qty column and the
+// Side cell starts exactly where that column ends. The End anchor itself
+// is pinned by TestHeaderCellAnchorAgreement.
+func TestMarketCatalogQtyColumn(t *testing.T) {
+	m, _, _, frame, _ := mktTreeEnv(t)
 	frame()
-	if got := m.title.Label; got != "Market" {
-		t.Errorf("title = %q, want the base name Market", got)
+	frame()
+
+	hdr := m.tbl.HdrBtnForTest()
+	if len(hdr) != 4 {
+		t.Fatalf("catalog columns = %d, want Item/Price/Qty/Side", len(hdr))
+	}
+	qtyCol := hdr[2].GetWidget().Rect
+	sideCol := hdr[3].GetWidget().Rect
+	for r := range m.tbl.Rows {
+		qty := m.tbl.Texts[r][2].GetWidget().Rect
+		side := m.tbl.Texts[r][3].GetWidget().Rect
+		if qty.Min.X != qtyCol.Min.X || qty.Max.X != qtyCol.Max.X {
+			t.Errorf("row %d qty cell %v, want the Qty column's x range %v", r, qty, qtyCol)
+		}
+		if side.Min.X < sideCol.Min.X || side.Max.X > sideCol.Max.X {
+			t.Errorf("row %d side cell %v, want inside the Side column %v", r, side, sideCol)
+		}
+		if qty.Overlaps(side) || qty.Max.X > side.Min.X {
+			t.Errorf("row %d qty %v spills into side %v", r, qty, side)
+		}
+		if cell := m.tbl.Rows[r].Cells[2]; strings.Contains(cell, "more") || strings.Contains(cell, "·") {
+			t.Errorf("row %d qty cell still carries a suffix: %q", r, cell)
+		}
 	}
 }
 

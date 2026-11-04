@@ -472,11 +472,11 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    economy's one sanctioned import: the named world boundary, where
    shipments arrive undebited and post as supply only at the destination.
    An origin without stock spawns nothing. Delivery posts the shipment as
-   an ask on the destination station's book one tick under
-   `min(cost basis, best ask)`, so arriving supply always improves the
-   displayed price; a posting that crosses the destination's bids executes
-   immediately at the resting bid (never-crossed invariant) and only the
-   remainder rests. Cross-system legs (and haulers whose grid was rebuilt
+   a sell order on the destination station's book one tick under
+   `min(cost basis, best sell order)`, so arriving supply always improves
+   the displayed price; a posting that crosses the destination's buy
+   orders executes immediately at the resting buy order (never-crossed
+   invariant) and only the remainder rests. Cross-system legs (and haulers whose grid was rebuilt
    under them) park as journeys (`Save.TrafficJourneys`) and continue when
    their system loads next; multi-hop routing finds the next gate toward
    the destination (`trafficNextHop`). Authored interval lanes
@@ -609,8 +609,9 @@ no drift model.
   in price-time priority at the *resting* orders' prices; only the
   unfilled remainder rests (`matchCrossing` / `applyMatches` in
   `sim/model.go`), so a book can never cross itself.
-- **Price-time priority.** Canonical book order: item ascending, asks
-  before bids, best price first, arrival id (`MarketSeq`) breaking ties.
+- **Price-time priority.** Canonical book order: item ascending, sell
+  orders before buy orders, best price first, arrival id (`MarketSeq`)
+  breaking ties.
 - **Price ticks.** Every order price is quantized to four significant
   figures (`quantizeTick`, `sim/system_economy.go`): 48 ticks in 0.01
   steps, 195000 in 100s. `tickDown` is the one-tick undercut fresh supply
@@ -631,8 +632,8 @@ no drift model.
   `PlaceOrder` is the resting surface used by traffic supply, agents and
   upkeep.
 
-**Displayed price** (`MarketPrice`) is a ladder: last trade → best ask →
-best bid → the item's base price. Moves print as `EvMarket` lines
+**Displayed price** (`MarketPrice`) is a ladder: last trade → best sell
+order → best buy order → the item's base price. Moves print as `EvMarket` lines
 ("Surplus — … price falls to …" / "Demand — … price rises to …"), the
 displayed price of the book moving, not an external model.
 
@@ -748,10 +749,10 @@ never bought, so a new kind is a deliberate decision) plus every ammo line
 and charge, in ascending item id. Lot sizes are `warBidQty` = 100 for items
 and `warBidModuleQty` = 5 for modules.
 
-The reservation price is **one tick under the best ask**, or one tick
-above the displayed price (last → best bid → base) when no ask rests, so a
-fresh bid never crosses the station's own supply and the war is competitive
-on any book (`warBidPrice`). The fresh book's whole exposure is budgeted
+The reservation price is **one tick under the best sell order**, or one
+tick above the displayed price (last → best buy order → base) when no sell
+order rests, so a fresh buy order never crosses the station's own supply
+and the war is competitive on any book (`warBidPrice`). The fresh book's whole exposure is budgeted
 against the treasury at post time, so a fill can never overdraw it.
 
 A fill (`warFill`, called from `settle`) is the player's delivery to the

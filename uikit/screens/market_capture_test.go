@@ -108,16 +108,16 @@ func TestMarketCaptureFrame(t *testing.T) {
 			asks, bids := 0, 0
 			for _, r := range m.book {
 				switch r.Cells[0] {
-				case "Ask":
+				case "Sell":
 					asks++
-				case "Bid":
+				case "Buy":
 					bids++
 				default:
-					fail("book row side = %q, want Ask or Bid", r.Cells[0])
+					fail("book row side = %q, want Sell or Buy", r.Cells[0])
 				}
 			}
 			if asks == 0 || bids == 0 {
-				fail("%s's book shows %d asks / %d bids, want both sides", item, asks, bids)
+				fail("%s's book shows %d sell orders / %d buy orders, want both sides", item, asks, bids)
 			}
 			if got, want := len(m.bookTbl.RowsForTest()), len(m.book); got != want {
 				fail("book rows rendered = %d, want %d", got, want)

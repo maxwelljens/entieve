@@ -571,7 +571,7 @@ func TestManufacturingProfitTable(t *testing.T) {
 	f, env, ui, _, frame := boardEnv(t)
 	rec := env.Content.Recipes["rec-mod-artillery-l"]
 	// One standing bid for the product: the sale side is the book's, and this
-	// fixture's book opens with no bid for a heavy module.
+	// fixture's book opens with no buy order for a heavy module.
 	if _, ok := env.Sim.PlaceOrder(factoryStation, sim.OrderBuy, rec.Product, 2, 250000, sim.OwnerSystem); !ok {
 		t.Fatal("fixture: the product bid was refused")
 	}
@@ -585,7 +585,7 @@ func TestManufacturingProfitTable(t *testing.T) {
 	for _, n := range needs {
 		cost, ok := bookValue(book, n.Item, sim.OrderSell, n.Need)
 		if !ok {
-			t.Fatalf("fixture: no local ask for %s", n.Item)
+			t.Fatalf("fixture: no local sell order for %s", n.Item)
 		}
 		mats += cost
 	}
@@ -666,7 +666,7 @@ func TestManufacturingNoBidDashes(t *testing.T) {
 		}
 	}
 	for _, c := range []struct{ label, want string }{
-		{"Sale price", "— · no bid"},
+		{"Sale price", "— · no buy order"},
 		{"Profit", "—"},
 		{"Margin", "—"},
 	} {
@@ -719,8 +719,9 @@ func TestBookValue(t *testing.T) {
 }
 
 // TestManufacturingProfitMarks pins the fallback ladder's marks: a bill line
-// with no local ask prices from another station's cheapest ask (daggered and
-// named in the footnote), and one with no ask anywhere is left out of the
+// with no local sell order prices from another station's cheapest sell order
+// (daggered and named in the footnote), and one with no sell order anywhere
+// is left out of the
 // total and named.
 func TestManufacturingProfitMarks(t *testing.T) {
 	f, env, ui, _, frame := boardEnv(t)
@@ -750,7 +751,7 @@ func TestManufacturingProfitMarks(t *testing.T) {
 	if got, want := rowValue(rows, "Materials"), mfgMoney(local+70*390)+" †"; got != want {
 		t.Errorf("remote-priced materials = %q, want %q", got, want)
 	}
-	if !strings.Contains(note, "no local ask") || !strings.Contains(note, "†") {
+	if !strings.Contains(note, "no local sell order") || !strings.Contains(note, "†") {
 		t.Errorf("note = %q, want the remote-ask footnote", note)
 	}
 

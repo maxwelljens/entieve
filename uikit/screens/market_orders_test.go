@@ -15,8 +15,8 @@ import (
 // TestMarketStandingOrderPanel drives the market's standing-order half over
 // the stub seams: the My orders list shows ONLY the player's own orders —
 // its Cancel button emitting CancelOrder for that row's id — and every book
-// row declares the two order-window launch verbs ("Sell on Market" /
-// "Request on Market"), which emit OpenOrder through the row's ActionSink
+// row declares the two order-window launch verbs ("Sell order" /
+// "Buy order"), which emit OpenOrder through the row's ActionSink
 // (the typed order mini-window is the posting surface now; the old Place
 // panel is gone).
 func TestMarketStandingOrderPanel(t *testing.T) {
@@ -64,14 +64,14 @@ func TestMarketStandingOrderPanel(t *testing.T) {
 	// The book row declares the two trade verbs (both opening the quantity
 	// picker on the row's item) and the two order-window launch verbs: Sell
 	// on Market carries the player's holdings as the window's sell default,
-	// Request on Market defaults to 1. Pressing each through a real Menu
+	// Buy order defaults to 1. Pressing each through a real Menu
 	// routes its intent into the sink.
 	spec := m.tbl.Rows[0].Spec
 	wantActions := []widgets.RowAction{
 		{Label: "Buy", Intent: widgets.QtyPick{Mode: widgets.QtyBuy, Item: "item-stub-ore"}},
 		{Label: "Sell", Intent: widgets.QtyPick{Mode: widgets.QtySell, Item: "item-stub-ore"}},
-		{Label: "Sell on Market", Intent: widgets.OpenOrder{Item: "item-stub-ore", Side: sim.OrderSell, Qty: 5}},
-		{Label: "Request on Market", Intent: widgets.OpenOrder{Item: "item-stub-ore", Side: sim.OrderBuy, Qty: 1}},
+		{Label: "Sell order", Intent: widgets.OpenOrder{Item: "item-stub-ore", Side: sim.OrderSell, Qty: 5}},
+		{Label: "Buy order", Intent: widgets.OpenOrder{Item: "item-stub-ore", Side: sim.OrderBuy, Qty: 1}},
 	}
 	if len(spec.Actions) != len(wantActions) {
 		t.Fatalf("row actions = %+v, want %+v", spec.Actions, wantActions)
@@ -95,16 +95,16 @@ func TestMarketStandingOrderPanel(t *testing.T) {
 		}
 		t.Fatalf("menu has no %q entry: %+v", label, menu.Entries())
 	}
-	press("Sell on Market")
-	press("Request on Market")
+	press("Sell order")
+	press("Buy order")
 	if len(rec.got) != 3 {
 		t.Fatalf("order-window launches emitted %#v, want two OpenOrder intents", rec.got)
 	}
 	if got := rec.got[1]; got != (widgets.OpenOrder{Item: "item-stub-ore", Side: sim.OrderSell, Qty: 5}) {
-		t.Errorf("Sell on Market emitted %#v, want OpenOrder{sell, qty 5}", got)
+		t.Errorf("Sell order emitted %#v, want OpenOrder{sell, qty 5}", got)
 	}
 	if got := rec.got[2]; got != (widgets.OpenOrder{Item: "item-stub-ore", Side: sim.OrderBuy, Qty: 1}) {
-		t.Errorf("Request on Market emitted %#v, want OpenOrder{buy, qty 1}", got)
+		t.Errorf("Buy order emitted %#v, want OpenOrder{buy, qty 1}", got)
 	}
 }
 

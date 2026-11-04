@@ -536,13 +536,13 @@ func TestRefineryMathTable(t *testing.T) {
 	outs := r.batchOf("ore-lucidite")
 	raw, ok := bookValue(book, "ore-lucidite", sim.OrderBuy, sim.RefineBatch)
 	if !ok {
-		t.Fatal("fixture: no bid for the ore")
+		t.Fatal("fixture: no buy order for the ore")
 	}
 	mine := 0.0
 	for _, o := range outs {
 		v, ok := bookValue(book, o.Item, sim.OrderBuy, o.Qty)
 		if !ok {
-			t.Fatalf("fixture: no bid for %s", o.Item)
+			t.Fatalf("fixture: no buy order for %s", o.Item)
 		}
 		mine += v
 	}
@@ -588,7 +588,7 @@ func TestRefineryMathTable(t *testing.T) {
 
 // TestRefineryMathTableBranches pins the two branches the fixture cannot show:
 // a batch worth refining (a good delta, tinted Good) and a side the book holds
-// no bid for (the dash and the marker, never a content base price).
+// no buy order for (the dash and the marker, never a content base price).
 func TestRefineryMathTableBranches(t *testing.T) {
 	r, _, ui, _, frame := refineryEnv(t)
 	clickRow(ui, r.ores, oreRowFor(r, "ore-cordite"))
@@ -618,7 +618,7 @@ func TestRefineryMathTableBranches(t *testing.T) {
 
 	// No bid for the ore: ore and derived lines dash with the marker.
 	rows = r.refineRows(good[1:], outs)
-	if got, want := rowValue(rows, "Ore value"), "— · no bid"; got != want {
+	if got, want := rowValue(rows, "Ore value"), "— · no buy order"; got != want {
 		t.Errorf("no-bid ore value = %q, want %q", got, want)
 	}
 	for _, label := range []string{"Refine delta", "Margin"} {
@@ -635,7 +635,7 @@ func TestRefineryMathTableBranches(t *testing.T) {
 	// No bid for a mineral: the minerals side dashes and the derived lines
 	// with it; the ore side still prices.
 	rows = r.refineRows([]sim.MarketStock{good[0], good[1]}, outs)
-	if got, want := rowValue(rows, "Minerals value"), "— · no bid"; got != want {
+	if got, want := rowValue(rows, "Minerals value"), "— · no buy order"; got != want {
 		t.Errorf("no-bid minerals value = %q, want %q", got, want)
 	}
 	for _, label := range []string{"Refine delta", "Margin"} {

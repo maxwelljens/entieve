@@ -33,7 +33,7 @@ func TestMarketRowMenu(t *testing.T) {
 	// Undocked: the trade verbs and the two order-window launches are
 	// visible but disabled.
 	rightClickRow(t, ui, m.tbl, 0)
-	for _, label := range []string{"Show Info", "Buy", "Sell", "Sell on Market", "Request on Market"} {
+	for _, label := range []string{"Show Info", "Buy", "Sell", "Sell order", "Buy order"} {
 		if e := entry(t, env, label); label == "Show Info" {
 			if !e.Bold || e.Disabled {
 				t.Errorf("Show Info = %+v, want bold and enabled", e)
@@ -55,7 +55,7 @@ func TestMarketRowMenu(t *testing.T) {
 	if ref, ok := env.InfoRefOf(wantItem); !ok || spec.Ref == nil || *spec.Ref != ref {
 		t.Fatalf("row Ref = %v (%v), want the row item's ref for %s", spec.Ref, ok, wantItem)
 	}
-	wantLabels := []string{"Buy", "Sell", "Sell on Market", "Request on Market"}
+	wantLabels := []string{"Buy", "Sell", "Sell order", "Buy order"}
 	wantIntents := []widgets.Intent{
 		widgets.QtyPick{Mode: widgets.QtyBuy, Item: wantItem},
 		widgets.QtyPick{Mode: widgets.QtySell, Item: wantItem},
@@ -87,8 +87,8 @@ func TestMarketRowMenu(t *testing.T) {
 	if e := entry(t, env, "Buy"); e.Disabled {
 		t.Fatal("Buy still disabled while docked")
 	}
-	if e := entry(t, env, "Request on Market"); e.Disabled {
-		t.Fatal("Request on Market still disabled while docked")
+	if e := entry(t, env, "Buy order"); e.Disabled {
+		t.Fatal("Buy order still disabled while docked")
 	}
 	pressMenuEntry(t, env, "Buy")
 	if env.Menu().IsOpen() {
@@ -244,7 +244,7 @@ func TestOverviewEntityMenu(t *testing.T) {
 }
 
 // TestInventoryAndFittingMenus: the inventory's rows declare Show Info
-// plus the full-stack "Sell on Market" launch (grayed, never hidden, while
+// plus the full-stack "Sell order" launch (grayed, never hidden, while
 // undocked — orders rest on the docked station's book); a fitting slot row
 // declares Show Info plus Fit/Unefit gated on that row — the menu's
 // actions carry the clicked row's payload, so Unefit arms for a filled slot
@@ -267,15 +267,15 @@ func TestInventoryAndFittingMenus(t *testing.T) {
 	rightClickRow(t, uiInv, inv.cargo, 0)
 	ents := env.Menu().Entries()
 	if len(ents) != 3 || ents[0].Label != "Show Info" || !ents[0].Bold || !ents[1].Sep {
-		t.Fatalf("inventory menu = %+v, want Show Info / sep / Sell on Market", ents)
+		t.Fatalf("inventory menu = %+v, want Show Info / sep / Sell order", ents)
 	}
-	if e := entry(t, env, "Sell on Market"); !e.Disabled {
-		t.Error("Sell on Market enabled while undocked")
+	if e := entry(t, env, "Sell order"); !e.Disabled {
+		t.Error("Sell order enabled while undocked")
 	}
 	// The declared launch carries the clicked stack's item and quantity.
 	if got := inv.cargo.Rows[0].Spec.Actions[0].Intent; got != (widgets.OpenOrder{
 		Item: inv.cargo.Rows[0].Data.(content.ItemID), Side: sim.OrderSell, Qty: stackQty}) {
-		t.Errorf("inventory Sell on Market intent = %#v, want OpenOrder on the clicked stack (qty %d)", got, stackQty)
+		t.Errorf("inventory Sell order intent = %#v, want OpenOrder on the clicked stack (qty %d)", got, stackQty)
 	}
 	pressMenuEntry(t, env, "Show Info")
 	if !env.InfoWindow().IsOpen() {

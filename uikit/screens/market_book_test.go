@@ -14,8 +14,8 @@ import (
 
 // TestMarketSelectionShowsTheBook pins the market's right pane: selecting
 // an item leads with its hero icon and description, then puts that item's
-// full order book there as an aligned table — asks (price ascending) above
-// bids (price descending), one [side, price, qty] row each — while the
+// full order book there as an aligned table — sell orders (price ascending) above
+// buy orders (price descending), one [side, price, qty] row each — while the
 // catalog stays a plain item list with no order rows and no per-item
 // expander. No selection means the head's hint line and an empty book.
 func TestMarketSelectionShowsTheBook(t *testing.T) {
@@ -68,10 +68,10 @@ func TestMarketSelectionShowsTheBook(t *testing.T) {
 		qty   string
 		side  string
 	}{
-		{100, "5", "Ask"},
-		{120, "7", "Ask"},
-		{90, "2", "Bid"},
-		{80, "3", "Bid"},
+		{100, "5", "Sell"},
+		{120, "7", "Sell"},
+		{90, "2", "Buy"},
+		{80, "3", "Buy"},
 	}
 	if len(m.book) != len(want) || len(m.bookTbl.RowsForTest()) != len(want) {
 		t.Fatalf("book rows = %d/%d, want %d", len(m.book), len(m.bookTbl.RowsForTest()), len(want))

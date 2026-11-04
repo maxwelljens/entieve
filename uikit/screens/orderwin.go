@@ -27,8 +27,8 @@ const (
 
 // OrderWin is the player market-order mini-window: a small, draggable,
 // single-instance dialog that posts ONE standing order on the ship's
-// docked station book. It is launched from item context menus ("Sell on
-// Market" / "Request on Market") and re-targeted in place by a second
+// docked station book. It is launched from item context menus ("Sell
+// order" / "Buy order") and re-targeted in place by a second
 // launch — Show-Info-style; its rect is never persisted (transient) and
 // the host closes it when the player undocks.
 //
@@ -95,7 +95,7 @@ func NewOrderWin(env widgets.Seams) *OrderWin {
 		widget.TextOpts.Text("", env.FaceMono(theme.StepTiny), theme.Solid(p.Dim)),
 	)
 
-	o.modeBtn = theme.ActionButton("Sell", o.toggleMode)
+	o.modeBtn = theme.ActionButton("Sell order", o.toggleMode)
 	o.accept = theme.ActionButton("Accept", o.submit)
 	o.cancel = theme.ActionButton("Cancel", o.Close)
 
@@ -201,7 +201,8 @@ func (o *OrderWin) Blur() {
 // FocusPrice focuses the price field (the game's key-gate tests).
 func (o *OrderWin) FocusPrice() { o.price.Focus(true) }
 
-// toggleMode flips Sell ↔ Request and re-applies that mode's defaults.
+// toggleMode flips the buy order and the sell order and re-applies that
+// mode's defaults.
 func (o *OrderWin) toggleMode() {
 	if o.side == sim.OrderSell {
 		o.setMode(sim.OrderBuy)
@@ -211,14 +212,15 @@ func (o *OrderWin) toggleMode() {
 }
 
 // setMode applies a mode: the exact button label, the mode's default price
-// (Sell = best bid + 1 €, Request = best ask − 1 €, empty side = base
-// price) and its default quantity (Sell = the clicked stack, Request = 1).
+// (sell order = best buy order + 1 €, buy order = best sell order − 1 €,
+// empty side = base price) and its default quantity (sell order = the
+// clicked stack, buy order = 1).
 func (o *OrderWin) setMode(side sim.OrderSide) {
 	o.side = side
 	if side == sim.OrderSell {
-		o.modeBtn.SetText("Sell")
+		o.modeBtn.SetText("Sell order")
 	} else {
-		o.modeBtn.SetText("Request")
+		o.modeBtn.SetText("Buy order")
 	}
 	o.price.SetText(strconv.FormatFloat(o.defaultPrice(), 'f', -1, 64))
 	q := 1
@@ -229,9 +231,10 @@ func (o *OrderWin) setMode(side sim.OrderSide) {
 	o.refresh()
 }
 
-// defaultPrice quotes the mode's resting default on the docked book: Sell
-// sits at the best bid + 1 €, Request at the best ask − 1 €; a side with
-// no order falls back to the item's base/registry price.
+// defaultPrice quotes the mode's resting default on the docked book: the
+// sell order sits at the best buy order + 1 €, the buy order at the best
+// sell order − 1 €; a side with no order falls back to the item's
+// base/registry price.
 func (o *OrderWin) defaultPrice() float64 {
 	ask, bid := -1.0, -1.0
 	for _, ord := range o.cv.BookOrders(o.cv.DockedMarket()) {

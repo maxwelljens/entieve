@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"image/color"
 	"math"
 	"strconv"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/internal/uitest"
 	"github.com/entieve/entieve/sim"
+	"github.com/entieve/entieve/uikit/icons"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
@@ -89,8 +91,8 @@ func TestMarketRowIcons(t *testing.T) {
 // TestMarketOrderBookRows pins the catalog and the whole station book: one
 // row per item of the tradeable catalog (canonical order, always listed),
 // and every order of the station's book present exactly once across the
-// items' right-pane books — asks (price ascending) above the bids (price
-// descending) inside each item.
+// items' right-pane books — sell orders (price ascending) above the buy
+// orders (price descending) inside each item.
 func TestMarketOrderBookRows(t *testing.T) {
 	env, _ := newTestEnv(t)
 	m := NewMarket(env)
@@ -120,7 +122,8 @@ func TestMarketOrderBookRows(t *testing.T) {
 	}
 
 	// Selecting each item in turn shows the station's whole book, in book
-	// order inside the item: asks ascending, then bids descending.
+	// order inside the item: sell orders ascending, then buy orders
+	// descending.
 	sys := env.Sim.System()
 	if sys == nil {
 		t.Fatal("no current system")
@@ -151,7 +154,7 @@ func TestMarketOrderBookRows(t *testing.T) {
 			side := r.Cells[0]
 			price := parseCredits(t, r.Cells[1])
 			switch side {
-			case "Ask":
+			case "Sell":
 				if !askPhase {
 					t.Fatalf("%q row %d: ask after bids (book out of order)", item, i)
 				}
@@ -159,14 +162,14 @@ func TestMarketOrderBookRows(t *testing.T) {
 					t.Fatalf("%q row %d: ask %v below a previous ask %v", item, i, price, lastAsk)
 				}
 				lastAsk = price
-			case "Bid":
+			case "Buy":
 				askPhase = false
 				if lastBid >= 0 && price > lastBid {
 					t.Fatalf("%q row %d: bid %v above a previous bid %v", item, i, price, lastBid)
 				}
 				lastBid = price
 			default:
-				t.Fatalf("%q row %d side = %q, want Ask or Bid", item, i, side)
+				t.Fatalf("%q row %d side = %q, want Sell or Buy", item, i, side)
 			}
 		}
 	}
@@ -174,9 +177,9 @@ func TestMarketOrderBookRows(t *testing.T) {
 		t.Fatalf("book rows = %d, want every resting order (%d) listed once", seen, len(orders))
 	}
 
-	// The founding books carry both sides: the showcase station seeds asks
-	// (hulls, modules, charges, materials) and standing bids (loot and the
-	// raw materials its industry buys).
+	// The founding books carry both sides: the showcase station seeds sell
+	// orders (hulls, modules, charges, materials) and standing buy orders
+	// (loot and the raw materials its industry buys).
 	sides := map[string]bool{}
 	for _, item := range want {
 		m.selectItem(item)
@@ -185,8 +188,8 @@ func TestMarketOrderBookRows(t *testing.T) {
 			sides[r.Cells[0]] = true
 		}
 	}
-	if !sides["Ask"] || !sides["Bid"] {
-		t.Fatalf("books show %v, want both Ask and Bid rows", sides)
+	if !sides["Sell"] || !sides["Buy"] {
+		t.Fatalf("books show %v, want both Sell and Buy rows", sides)
 	}
 }
 
@@ -259,22 +262,34 @@ func TestMarketCatalogScrolls(t *testing.T) {
 		t.Errorf("rail position = %d, want 500 (mirror of ScrollTop 0.5)", rail.Current)
 	}
 
-	// The window's own rows are untouched: title line, the Buy/Sell row,
-	// then the catalog under them.
+	// The trade bar is pinned under the right pane's scroll column, inside
+	// that pane, side by side and clear of the catalog.
 	title := m.title.GetWidget().Rect
 	trade := m.buy.GetWidget().Rect.Union(m.sell.GetWidget().Rect)
+	pane := m.sideRail.Container().GetWidget().Rect
 	table := m.tbl.Container().GetWidget().Rect
-	if !(title.Max.Y <= trade.Min.Y && trade.Max.Y <= table.Min.Y) {
-		t.Errorf("stacking changed: title %v, trade row %v, catalog %v (want stacked top to bottom)",
-			title, trade, table)
+	if title.Max.Y > table.Min.Y {
+		t.Errorf("title %v overlaps the catalog %v (want the title above)", title, table)
+	}
+	if !trade.In(m.Win().GetContainer().GetWidget().Rect) {
+		t.Errorf("trade bar %v outside the window", trade)
+	}
+	if trade.Min.X < pane.Min.X || trade.Max.X > pane.Max.X {
+		t.Errorf("trade bar %v not aligned under the right pane %v", trade, pane)
+	}
+	if scroll := m.sideScroll.ViewRect(); scroll.Max.Y > trade.Min.Y {
+		t.Errorf("scroll column %v overlaps the pinned trade bar %v", scroll, trade)
+	}
+	if trade.Overlaps(table) {
+		t.Errorf("trade bar %v overlaps the catalog %v", trade, table)
 	}
 	for name, b := range map[string]*widget.Button{"Buy": m.buy, "Sell": m.sell} {
 		if r := b.GetWidget().Rect; !r.In(trade) {
-			t.Errorf("%s button %v outside the trade row %v", name, r, trade)
+			t.Errorf("%s button %v outside the trade bar %v", name, r, trade)
 		}
-		if r := b.GetWidget().Rect; r.Max.Y > table.Min.Y {
-			t.Errorf("%s button %v overlaps the catalog %v", name, r, table)
-		}
+	}
+	if m.buy.GetWidget().Rect.Overlaps(m.sell.GetWidget().Rect) {
+		t.Error("Buy and Sell overlap, want them side by side")
 	}
 }
 
@@ -395,5 +410,53 @@ func TestPickerReadoutFitsItsValue(t *testing.T) {
 		pumpQty(t, ui, env, inv.Sync, 1280, 720)
 		check(theme.FormatInt(qtyMax))
 		q.Close()
+	}
+}
+
+// TestMarketTradeButtons pins the pane's action bar: Buy and Sell sit side by
+// side with their own glyphs, tinted Good and Danger respectively on the
+// icon states (the label carries the same role), and grey rather than hide
+// while gated.
+func TestMarketTradeButtons(t *testing.T) {
+	env, _ := newTestEnv(t)
+	m := NewMarket(env)
+	ui := newWindowUI(t, env, m.Win())
+	frame := func() { uitest.PumpWindow(t, ui, m.Sync, 1024, 700) }
+	frame()
+	frame()
+
+	p := theme.DefaultPalette()
+	for _, c := range []struct {
+		name string
+		btn  *widget.Button
+		icon string
+		tint color.RGBA
+	}{
+		{"Buy", m.buy, "act_loot", p.Good},
+		{"Sell", m.sell, "ctr_deliver", p.Danger},
+	} {
+		g := c.btn.GraphicImage()
+		if g == nil || g.Idle == nil {
+			t.Fatalf("%s carries no icon", c.name)
+		}
+		if want := icons.Get(c.icon, theme.Px(theme.IconButton), c.tint); g.Idle != want {
+			t.Errorf("%s glyph = %q, want %q tinted %v", c.name, c.icon, c.icon, c.tint)
+		}
+		if c.btn.Text().Label != c.name {
+			t.Errorf("%s label = %q", c.name, c.btn.Text().Label)
+		}
+	}
+	if m.buy.GraphicImage().Idle == m.sell.GraphicImage().Idle {
+		t.Error("Buy and Sell share one glyph, want an honest pair")
+	}
+	if m.buy.GetWidget().Rect.Overlaps(m.sell.GetWidget().Rect) {
+		t.Error("trade buttons overlap")
+	}
+	// Undocked: visible but greyed (never hidden).
+	if !m.buy.GetWidget().IsVisible() || !m.sell.GetWidget().IsVisible() {
+		t.Error("trade buttons hidden while gated")
+	}
+	if !m.buy.GetWidget().Disabled || !m.sell.GetWidget().Disabled {
+		t.Error("trade buttons armed while undocked")
 	}
 }
