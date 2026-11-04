@@ -166,6 +166,7 @@ var sectionStyles = map[string]statStyle{
 	"ORDER BOOK":        {icon: "svc_market", cat: StatEconomy},
 	"MY ORDERS":         {icon: "stat_cash", cat: StatEconomy},
 	"PROFIT":            {icon: "stat_cash", cat: StatEconomy},
+	"RESULT":            {icon: "svc_manufacturing", cat: StatEconomy},
 	"REFINES TO":        {icon: "mod_mining", cat: StatMining},
 	"BEHAVIOR":          {icon: "svc_scanner", cat: StatUtility},
 	"LOOT":              {icon: "act_loot", cat: StatEconomy},

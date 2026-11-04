@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The manufacturing inspector says what a run makes**: a RESULT section
+  under the material bill, one row per output, the product's art and name
+  over its units per run (`×100` for a batch of ammunition or charges, `×1`
+  for a module or a hull) on the bill's one-run basis. Whether a job turns
+  out one round or a hundred is no longer a guess; the quantity picker's run
+  count multiplies it at Start.
+
 ### Changed
 
 - **Buy and Sell moved into the market's right pane**: the two actions now
