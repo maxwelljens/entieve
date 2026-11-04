@@ -394,19 +394,11 @@ func (r *Refinery) batchOf(ore content.ItemID) []rfOut {
 }
 
 // refineOutputs is the exact conversion CmdRefine applies: floor(yield ×
-// qty) per mineral, in sorted mineral-id order, dropping zero yields.
+// qty × the Refining edge) per mineral, in sorted mineral-id order, dropping
+// zero yields. The sim computes it (the same function the command runs), so
+// the preview cannot promise a batch the refinery would not pay.
 func refineOutputs(cv widgets.ContentView, def *content.ItemDef, qty int) []content.CargoStack {
-	if def == nil || qty < 1 {
-		return nil
-	}
-	var out []content.CargoStack
-	for _, id := range yieldIDs(def) {
-		n := int(def.RefineYield[id] * float64(qty))
-		if n > 0 {
-			out = append(out, content.CargoStack{Item: id, Qty: n})
-		}
-	}
-	return out
+	return cv.RefineOutput(def, qty)
 }
 
 // outputsText renders an output list as "45 Sideron · 30 Nixium" ("" for

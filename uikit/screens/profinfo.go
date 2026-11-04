@@ -64,6 +64,8 @@ type ProfInfoWin struct {
 	level    *widget.Graphic
 	levelImg *ebiten.Image
 	desc     *widget.Text
+	edges    *widget.Text
+	edgesBar *widget.Text
 	practice *widget.Text
 
 	page   *widget.Container
@@ -106,8 +108,13 @@ func NewProfInfoWin(env widgets.Seams) *ProfInfoWin {
 		)),
 	)
 	c.desc = wrapped(env.Face(theme.StepSmall), p.Text)
+	c.edges = wrapped(env.Face(theme.StepTiny), p.Text)
 	c.practice = wrapped(env.Face(theme.StepTiny), p.Dim)
-	c.page.AddChild(head("WHAT IT IS FOR"), c.desc, head("PRACTICE"), c.practice)
+	c.edgesBar = head("EDGES")
+	c.page.AddChild(head("WHAT IT IS FOR"), c.desc, c.edgesBar, c.edges, head("PRACTICE"), c.practice)
+	// A family without an authored effect line hides the row entirely (it
+	// takes no space and no gap): only the workshop lines write one.
+	c.showEdges(false)
 
 	// The page rides a scroll viewport (the Show Info idiom), so a long
 	// description or practice list scrolls in the rail's gutter instead of
@@ -186,6 +193,8 @@ func (c *ProfInfoWin) Show(family string, level int, gate string) {
 	c.title.Label = content.FamilyLabel(family)
 	c.paintLevel(level, gate)
 	c.desc.Label = card.Desc
+	c.edges.Label = card.Edges
+	c.showEdges(card.Edges != "")
 	lines := make([]string, 0, len(card.Practice))
 	for _, line := range card.Practice {
 		lines = append(lines, "· "+line)
@@ -194,6 +203,18 @@ func (c *ProfInfoWin) Show(family string, level int, gate string) {
 	c.scroll.ScrollTop = 0 // a new page starts at its top
 	c.fit()
 	theme.ShowWidget(c.win.GetContainer().GetWidget(), true)
+}
+
+// Edges is the card's effect line ("" while the family grants none): the
+// tests pin it against the authored card.
+func (c *ProfInfoWin) Edges() string { return c.edges.Label }
+
+// showEdges shows or hides the EDGES band: a hidden row takes no space in
+// the page's row layout, so a family without an effect line reads exactly as
+// before the row existed.
+func (c *ProfInfoWin) showEdges(show bool) {
+	theme.ShowWidget(c.edgesBar.GetWidget(), show)
+	theme.ShowWidget(c.edges.GetWidget(), show)
 }
 
 // fit sizes the frame to the page it now holds: it hugs the prose up to

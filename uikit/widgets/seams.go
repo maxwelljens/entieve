@@ -134,6 +134,12 @@ type ContentView interface {
 	CanStartJob(sim.StationID, content.RecipeID, int) bool
 	PlayerStock(content.ItemID) int
 	JobDuration(sim.StationID, content.RecipeID, int) float64
+	// PlayerJobOutput is the units a job delivers to the player: the sim's
+	// per-run output under the Manufacturing edge (RESULT shows it at one
+	// run). RefineOutput is the batch conversion the refinery preview and
+	// CmdRefine share, under the Refining edge.
+	PlayerJobOutput(content.RecipeID, int) int
+	RefineOutput(*content.ItemDef, int) []content.CargoStack
 
 	// Holds, as the refinery reads them: copies of the general cargo and
 	// the dedicated ore hold (the two places CmdRefine consumes from).
@@ -607,6 +613,14 @@ func (v *view) PlayerStock(item content.ItemID) int { return v.s.PlayerStock(ite
 
 func (v *view) JobDuration(st sim.StationID, rec content.RecipeID, runs int) float64 {
 	return v.s.JobDuration(st, rec, runs)
+}
+
+func (v *view) PlayerJobOutput(rec content.RecipeID, runs int) int {
+	return v.s.PlayerJobOutput(rec, runs)
+}
+
+func (v *view) RefineOutput(def *content.ItemDef, qty int) []content.CargoStack {
+	return v.s.RefineOutput(def, qty)
 }
 
 func (v *view) InfoRefFor(e ecs.Entity) (InfoRef, bool) { return InfoRefFor(v, e) }

@@ -424,17 +424,21 @@ Show Info.
 
 ## Proficiency
 
-Every hull and module belongs to one **proficiency** (autocannon,
-artillery, rocket, mining, shield, armor, capacitor, propulsion, electronic
-warfare, and the hull classes). You learn a proficiency by using it: every
-point of damage you land pays its weapon proficiency, every mining cycle pays
-the mining proficiency (rarity 1/2/3/4 pays 1/2/4/8), shield and armor reps,
-cap boosters and rechargers, afterburner time and web/scram cycles pay their
-support proficiency, every kill pays the hull you fly, every completed
-delivery pays that hull by the offer's level, and every completed warp pays
-the hull by distance (1 point per 100 AU, half a point per hop at most).
-Mining and combat hits also give the flown hull a 10% cut; kills and
-deliveries pay it in full. Levels run 0 to V; the first level costs 10
+Every hull and module belongs to one **proficiency** (autocannon, artillery,
+rocket, mining, shield, armor, capacitor, propulsion, electronic warfare, and
+the hull classes). Two more are cross-cutting and belong to no gear:
+**Manufacturing** and **Refining**, the workshop lines. You learn a
+proficiency by using it: every point of damage you land pays its weapon
+proficiency, every mining cycle pays the mining proficiency (rarity 1/2/3/4
+pays 1/2/4/8), shield and armor reps, cap boosters and rechargers, afterburner
+time and web/scram cycles pay their support proficiency, every kill pays the
+hull you fly, every completed delivery pays that hull by the offer's level,
+and every completed warp pays the hull by distance (1 point per 100 AU, half a
+point per hop at most). Mining and combat hits also give the flown hull a 10%
+cut; kills and deliveries pay it in full. A completed manufacturing job pays
+the **product's** rarity, and a completed refinery batch pays the **ore's**
+rarity, on the same 1/2/4/8 ladder; only your own jobs count, and one job pays
+once whatever its run count. Levels run 0 to V; the first level costs 10
 practice, the fifth 250, and a proficiency at V banks nothing more.
 
 A level buys two things. It **gates** advanced defs of that proficiency:
@@ -442,21 +446,27 @@ fitting a module and flying (assembling, undocking) a hull need the level
 named on the def, plus the level named by its prerequisite edges (artillery
 after autocannon II, destroyer after frigate II, industrial after frigate I).
 Your starter hull and world-start fit are always legal; the market is never
-gated, so you may buy what you cannot yet run. It also adds 2% per level
-while that proficiency is in use (weapon damage, mining yield, hull speed).
-Show Info draws the level a def requires under PROFICIENCY as the tree's own
-level bars, lit while you meet it, and every level-up prints one line in the
-log (`Proficiency: Autocannon II`). Nothing decays: practice you earned
-stays.
-`T` (or the rail's **Proficiency tree** entry under **Ship**) opens the
+gated, so you may buy what you cannot yet run. It also adds 2% per level while
+that proficiency is in use (weapon damage, mining yield, hull speed). The
+workshop lines spend their levels on the bench instead: Manufacturing cuts a
+job's material bill by 2% a level (10% at V) and, on a recipe that makes more
+than one unit per run, adds 2% a level to its output; Refining adds 2% a level
+to a batch's mineral yield. The material cut stacks additively with the
+station's own craft discount, so a master bill is 18% lighter, and a hull job
+still yields exactly one hull. Neither workshop line gates a def or a
+purchase: they open at level 0 and only ever hand you more. Show Info draws
+the level a def requires under PROFICIENCY as the tree's own level bars, lit
+while you meet it, and every level-up prints one line in the log
+(`Proficiency: Autocannon II`). Nothing decays: practice you earned stays. `T`
+(or the rail's **Proficiency tree** entry under **Ship**) opens the
 **proficiency tree**: a full-screen layer over the world that maps every
 proficiency as a node and every authored prerequisite as an arrow,
-prerequisite to dependent. It is a graph, not a list, so a branch reads at
-a glance: the starter essentials line up in the leftmost rank, and each
-proficiency that needs another sits one rank further right. Because it paints over the world and under
-your windows, an open window stays visible and clickable on top of it;
-presses on the bare tree do nothing to the world, and `Esc` (or `T`, or
-the rail entry) closes it.
+prerequisite to dependent. It is a graph, not a list, so a branch reads at a
+glance: the starter essentials line up in the leftmost rank, and each
+proficiency that needs another sits one rank further right. Because it paints
+over the world and under your windows, an open window stays visible and
+clickable on top of it; presses on the bare tree do nothing to the world, and
+`Esc` (or `T`, or the rail entry) closes it.
 
 Each node carries the proficiency's name, its **level pips** (one box per
 level you can reach, filled up to the level you have), the level readout

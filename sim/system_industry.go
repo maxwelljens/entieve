@@ -249,19 +249,33 @@ func (s *Sim) JobFee(recipe content.RecipeID, runs int) float64 {
 }
 
 // JobMaterials is the per-input integer commit of a job at the station's
-// current craft level:
+// current craft level and the player's Manufacturing level:
 //
-//	ceil((input.Qty × runs) × (1 - 0.02·(L-1)))
+//	ceil((input.Qty × runs) × (craftMatFactor(L) - 0.02·manufacturingLevel))
 //
 // — the exact numbers StartJob takes out of the player's storage and the
-// factory panel's have/need column shows. Inputs with a non-positive
-// quantity contribute nothing.
+// factory panel's have/need column shows. The two discounts compose
+// additively (craft V -8% plus Manufacturing V -10% = -18%), and at level 0
+// the proficiency term is exactly 0, so the bill is byte-identical to the
+// craft-only one. Inputs with a non-positive quantity contribute nothing.
+// An agent's bill never carries the player's edge: jobBill is the owner-aware
+// entry point every job path uses.
 func (s *Sim) JobMaterials(station StationID, recipe content.RecipeID, runs int) []content.CargoStack {
+	return s.jobMaterials(station, recipe, runs, true)
+}
+
+// jobMaterials is JobMaterials' body; player reports whether the player's
+// Manufacturing edge applies (false for a ledger agent's bill, whose
+// behaviour is hashed and must not follow the pilot's practice).
+func (s *Sim) jobMaterials(station StationID, recipe content.RecipeID, runs int, player bool) []content.CargoStack {
 	rec, ok := s.Content.Recipes[recipe]
 	if !ok || rec == nil || runs < 1 {
 		return nil
 	}
 	factor := craftMatFactor(s.CraftLevel(station, rec.Family))
+	if player {
+		factor -= s.mfgMatEdge()
+	}
 	out := make([]content.CargoStack, 0, len(rec.Inputs))
 	for _, in := range rec.Inputs {
 		if in.Qty <= 0 {
@@ -273,6 +287,38 @@ func (s *Sim) JobMaterials(station StationID, recipe content.RecipeID, runs int)
 		}
 	}
 	return out
+}
+
+// jobBill is the bill an owner's job commits: the player's carries the
+// Manufacturing mats edge, an agent's never does (the ledger-agent seam).
+func (s *Sim) jobBill(station StationID, recipe content.RecipeID, runs int, owner string) []content.CargoStack {
+	return s.jobMaterials(station, recipe, runs, s.agentByOwner(owner) == nil)
+}
+
+// mfgMatEdge is the Manufacturing family's material reduction (0 at level 0,
+// 0.10 at V: the level cap is the ±10% clamp).
+func (s *Sim) mfgMatEdge() float64 {
+	return proficiencyEdgePer * float64(s.Proficiency("manufacturing"))
+}
+
+// PlayerJobOutput is the units a job of runs delivers to the player: the
+// recipe's qty under the Manufacturing output edge, floored as the refinery
+// floors its yields. A one-unit recipe is never edged (a hull job does not
+// yield a fraction of a hull), and level 0 multiplies by exactly 1.
+//
+// The edge is read at collection, like the craft time and materials factors
+// are read at start: a level gained while a job runs moves its output, the
+// same drift CancelJob documents for a refund (shortcut: freeze per-job
+// output only if that ever matters).
+func (s *Sim) PlayerJobOutput(recipe content.RecipeID, runs int) int {
+	rec, ok := s.Content.Recipes[recipe]
+	if !ok || rec == nil || runs < 1 {
+		return 0
+	}
+	if rec.Qty <= 1 {
+		return max(0, rec.Qty) * runs
+	}
+	return int(math.Floor(float64(rec.Qty*runs) * s.proficiencyEdge("manufacturing")))
 }
 
 // AllJobs returns every job (all stations) in ascending id order — a copy,
@@ -316,7 +362,7 @@ func (s *Sim) startJobCheck(station StationID, recipe content.RecipeID, runs int
 	if s.jobCount() >= industrySlots {
 		return rec, "All job slots busy", false
 	}
-	for _, m := range s.JobMaterials(station, recipe, runs) {
+	for _, m := range s.jobBill(station, recipe, runs, owner) {
 		have := s.playerStock(m.Item)
 		if a := s.agentByOwner(owner); a != nil {
 			have = a.freeStock(m.Item)
@@ -361,7 +407,7 @@ func (s *Sim) StartJob(station StationID, recipe content.RecipeID, runs int, own
 	// Commit the materials: count first (checked above), then take, and
 	// roll the whole commit back on the impossible mismatch — never keep
 	// a partial commit (execSell's rule).
-	materials := s.JobMaterials(station, recipe, runs)
+	materials := s.jobBill(station, recipe, runs, owner)
 	agent := s.agentByOwner(owner)
 	if agent != nil {
 		for _, m := range materials { // freeStock >= m.Qty was just checked
@@ -439,7 +485,7 @@ func (s *Sim) CollectJob(station StationID, id uint64, owner string) bool {
 		if a := s.agentByOwner(owner); a != nil {
 			addInv(a, rec.Product, rec.Qty*j.Runs)
 		} else {
-			s.storePlayerStock(rec.Product, rec.Qty*j.Runs)
+			s.storePlayerStock(rec.Product, s.PlayerJobOutput(rec.ID, j.Runs))
 		}
 		s.jobs = append(s.jobs[:i], s.jobs[i+1:]...)
 		s.emit(Event{Kind: EvLog, Severity: SevGood, Actor: s.player, Item: rec.Product,
@@ -476,7 +522,7 @@ func (s *Sim) CancelJob(station StationID, id uint64, owner string) bool {
 			return false
 		}
 		agent := s.agentByOwner(owner)
-		for _, m := range s.JobMaterials(station, j.Recipe, j.Runs) {
+		for _, m := range s.jobBill(station, j.Recipe, j.Runs, owner) {
 			if agent != nil {
 				addInv(agent, m.Item, m.Qty)
 			} else {
@@ -563,6 +609,12 @@ func (s *Sim) systemIndustry() {
 			continue // impossible with frozen content (CollectJob guards it)
 		}
 		s.craftComplete(j.Station, rec.Family, float64(j.Runs))
+		// The workshop line is practiced by the pilot's own completed jobs,
+		// at the product's rarity (1/2/4/8). Agent jobs pay nothing:
+		// agents have no proficiency, and their behaviour is hashed.
+		if j.Owner == OwnerPlayer {
+			s.awardProficiency("manufacturing", s.oreRarity(rec.Product))
+		}
 		s.emit(Event{Kind: EvLog, Severity: SevGood, Actor: s.player, Item: rec.Product,
 			Text: "Industry: " + s.itemName(rec.Product) + " complete at " + s.stationName(j.Station)})
 	}

@@ -166,13 +166,15 @@ type mfgOutput struct {
 	Qty  int
 }
 
-// outputsOf is a recipe's outputs per run (none when the recipe no longer
-// loads).
-func outputsOf(def *content.RecipeDef) []mfgOutput {
+// outputsOf is a recipe's outputs per run as the player would collect them
+// (none when the recipe no longer loads): the sim's own figure, so the
+// Manufacturing edge and a one-unit recipe's exemption can never disagree
+// with the job.
+func outputsOf(cv widgets.ContentView, def *content.RecipeDef) []mfgOutput {
 	if def == nil {
 		return nil
 	}
-	return []mfgOutput{{Item: def.Product, Qty: def.Qty}}
+	return []mfgOutput{{Item: def.Product, Qty: cv.PlayerJobOutput(def.ID, 1)}}
 }
 
 // manufacturingRow is the manufacturing tables' row payload: the recipe id
@@ -826,7 +828,8 @@ func (f *Manufacturing) syncInspector(station sim.StationID, slotsFree bool, nee
 	inner := f.inspInnerW()
 	book, fallback := f.quotes(station, needs)
 	product := f.recipeProduct(f.sel.recipe)
-	key := mfgInspKey(station, slotsFree, f.sel, needs, inner, book, fallback, product)
+	out := f.cv.PlayerJobOutput(f.sel.recipe, 1)
+	key := mfgInspKey(station, slotsFree, f.sel, needs, out, inner, book, fallback, product)
 	if key == f.inspKey {
 		return
 	}
@@ -894,7 +897,7 @@ func (f *Manufacturing) syncInspector(station sim.StationID, slotsFree bool, nee
 	// bill and the profit table never showed. It closes the page under the
 	// bill, and Start stays pinned below the viewport; the quantity picker's
 	// run count multiplies this at Start, the inspector quotes one run.
-	if outs := outputsOf(def); len(outs) > 0 {
+	if outs := outputsOf(f.cv, def); len(outs) > 0 {
 		var lbl *theme.ChromeText
 		f.resBar, lbl = sectionBarText(f.th, "RESULT")
 		lbl.Label = "RESULT · one run"
@@ -1041,13 +1044,16 @@ func (f *Manufacturing) resRowDef(o mfgOutput, p theme.Palette) widgets.TableRow
 
 // mfgInspKey is the inspector's change signature: the selection, the station
 // gate, the slot state, the pane's width (the head re-wraps with the seam),
-// every material's need/have, the book rows the profit table reads (the
-// bill's asks and the product's bids) and the fallback prices. A book move
-// rebuilds the card; an idle book does not.
+// every material's need/have, the run's effective output (a Manufacturing
+// level-up moves it), the book rows the profit table reads (the bill's asks
+// and the product's bids) and the fallback prices. A book move rebuilds the
+// card; an idle book does not.
 func mfgInspKey(station sim.StationID, slotsFree bool, row manufacturingRow, needs []mfgNeed,
-	inner int, book []sim.MarketStock, fallback map[content.ItemID]float64, product content.ItemID) string {
+	out, inner int, book []sim.MarketStock, fallback map[content.ItemID]float64, product content.ItemID) string {
 	var b strings.Builder
 	b.WriteString(string(row.recipe))
+	b.WriteByte(';')
+	b.WriteString(strconv.Itoa(out))
 	b.WriteByte(';')
 	b.WriteString(string(station))
 	b.WriteByte(';')

@@ -764,8 +764,10 @@ const RefineBatch = 100
 
 // execRefine converts ore units into minerals via RefineYield at a refine
 // service station. Quantities are whole 100-ore batches — anything else is
-// refused untouched. Output is floor(yield * qty) per mineral (documented)
-// and always lands in the station hangar, whose space is unlimited.
+// refused untouched. Output is RefineOutput (floor(yield × qty × the
+// Refining edge) per mineral, documented) and always lands in the station
+// hangar, whose space is unlimited. A completed batch is practice for the
+// Refining family at the ore's rarity.
 func (s *Sim) execRefine(c CmdRefine) {
 	if _, ok := s.stationAccess(content.SvcRefine); !ok {
 		return
@@ -796,24 +798,7 @@ func (s *Sim) execRefine(c CmdRefine) {
 		return
 	}
 
-	// Deterministic output order: sorted mineral IDs.
-	outs := make([]content.ItemID, 0, len(def.RefineYield))
-	for id := range def.RefineYield {
-		outs = append(outs, id)
-	}
-	sort.Slice(outs, func(i, j int) bool { return outs[i] < outs[j] })
-
-	type outStack struct {
-		item content.ItemID
-		qty  int
-	}
-	var results []outStack
-	for _, id := range outs {
-		n := int(math.Floor(def.RefineYield[id] * float64(qty)))
-		if n > 0 {
-			results = append(results, outStack{id, n})
-		}
-	}
+	results := s.RefineOutput(def, qty)
 
 	// Consume ore (general hold first, then ore hold).
 	var t1, t2 int
@@ -825,15 +810,16 @@ func (s *Sim) execRefine(c CmdRefine) {
 		return
 	}
 	for _, r := range results {
-		s.storePlayerStock(r.item, r.qty)
+		s.storePlayerStock(r.Item, r.Qty)
 	}
+	s.awardProficiency("refining", s.oreRarity(c.Item))
 
 	parts := ""
 	for i, r := range results {
 		if i > 0 {
 			parts += ", "
 		}
-		parts += itoaN(r.qty) + " x " + s.itemName(r.item)
+		parts += itoaN(r.Qty) + " x " + s.itemName(r.Item)
 	}
 	if parts == "" {
 		parts = "nothing"
@@ -841,6 +827,32 @@ func (s *Sim) execRefine(c CmdRefine) {
 	s.emit(Event{Kind: EvLog, Severity: SevGood, Actor: s.player, Item: c.Item,
 		Text:  "Refined " + itoaN(qty) + " x " + def.Name + " into " + parts + " (station hangar)",
 		Value: float64(qty)})
+}
+
+// RefineOutput is one ore conversion's minerals: floor(yield × qty × the
+// Refining yield edge) per mineral, in sorted mineral-id order, zero yields
+// dropped. execRefine and the refinery's preview both read it, so the
+// preview cannot lie about the batch; at level 0 the edge is exactly 1 and
+// the numbers are the authored floor(yield × qty).
+func (s *Sim) RefineOutput(def *content.ItemDef, qty int) []content.CargoStack {
+	if def == nil || qty < 1 {
+		return nil
+	}
+	outs := make([]content.ItemID, 0, len(def.RefineYield))
+	for id := range def.RefineYield {
+		outs = append(outs, id)
+	}
+	// Deterministic output order: sorted mineral IDs.
+	sort.Slice(outs, func(i, j int) bool { return outs[i] < outs[j] })
+	factor := s.proficiencyEdge("refining")
+	var out []content.CargoStack
+	for _, id := range outs {
+		n := int(math.Floor(def.RefineYield[id] * float64(qty) * factor))
+		if n > 0 {
+			out = append(out, content.CargoStack{Item: id, Qty: n})
+		}
+	}
+	return out
 }
 
 // execRepair restores all three layers to maximum for 2 euro per missing HP.
