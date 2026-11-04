@@ -519,7 +519,7 @@ func TestQtyPickIsAHostIntent(t *testing.T) {
 // transfer popup's stack default).
 func cargoQty(env *testEnv, item content.ItemID) int {
 	n := 0
-	for _, st := range env.CargoStacks() {
+	for _, st := range env.Holds().Cargo() {
 		if st.Item == item {
 			n += st.Qty
 		}

@@ -1171,8 +1171,9 @@ func (f *Fitting) slotSpec(pick widgets.SlotPick) widgets.RowSpec {
 // hangarRows renders the hangar's fit-able modules and stored ships
 // (other hangar items live in the Inventory window).
 func (f *Fitting) hangarRows() []widgets.TableRow {
+	h := f.cv.Hangar()
 	var rows []widgets.TableRow
-	for _, st := range f.cv.HangarItems() {
+	for _, st := range h.Items {
 		mod, ok := f.cv.Defs().Module(content.ModuleID(st.Item))
 		if !ok || st.Qty <= 0 {
 			continue
@@ -1185,7 +1186,7 @@ func (f *Fitting) hangarRows() []widgets.TableRow {
 			Spec:  f.hangarSpec(id),
 		})
 	}
-	for _, ss := range f.cv.HangarShips() {
+	for _, ss := range h.Ships {
 		def, ok := f.cv.Defs().Ship(ss.Hull)
 		name, icon := string(ss.Hull), theme.HullIcon
 		if ok {

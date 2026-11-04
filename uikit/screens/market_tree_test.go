@@ -74,7 +74,7 @@ func TestMarketTreeParents(t *testing.T) {
 	live := m.tbl.Rows[mktParentRow(t, m, "item-stub-ore")]
 
 	// The dimmed, orderless item: every cell but the item name says "no
-	// book"; the price still quotes the ladder (the stub's MarketPrice).
+	// book"; the price still quotes the ladder (the stub's PriceLadder).
 	if empty.TextTint != p.Dim {
 		t.Errorf("orderless item row tint = %#v, want the palette's Dim", empty.TextTint)
 	}

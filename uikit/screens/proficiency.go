@@ -11,6 +11,7 @@ import (
 	"github.com/ebitenui/ebitenui/input"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/render"
+	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -18,32 +19,17 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
-// ProfPrereq is one authored dependency edge: a family and the level of it
-// the dependent needs. The ids are the sim's family ids; the screen never
-// resolves them against content.
-type ProfPrereq struct {
-	Family string
-	Level  int
-}
-
-// ProfFamily is one proficiency as the pilot sees it: the level
-// granted, the XP banked toward the next (XP/XPNext, 0 at the cap), the
-// authored prerequisites and whether the gate is satisfied. Gate is the
-// first unmet requirement's sentence, straight from the sim's one walk
-// ("Requires Autocannon II", "" while Meets): the tree and the proficiency card
-// print it and never word a gate themselves.
-type ProfFamily struct {
-	Family   string // stable family id
-	Name     string // display name
-	Level    int    // granted levels (0..MaxLevel)
-	XP       int    // XP banked toward the next level
-	XPNext   int    // XP the next level needs (0 at MaxLevel)
-	MaxLevel int
-	Prereqs  []ProfPrereq // authored dependency edges
-	Meets    bool         // gate satisfied: own level + every prereq
-	Gate     string       // the unmet requirement's sentence ("" while Meets)
-	Starter  bool         // starter essential (gate 0)
-}
+// ProfPrereq is one authored dependency edge and ProfFamily one practice
+// family: the sim's own read types, aliased so the tree, the card and the
+// overview read the sim's walk directly instead of through a UI-shaped
+// copy that a field could silently drift from. sim.ProfFamily documents
+// the fields (level, XP toward the next, prerequisites, Meets and the
+// unmet Gate sentence — the tree and the card print that sentence and never
+// word a gate themselves).
+type (
+	ProfPrereq = sim.ProfPrereq
+	ProfFamily = sim.ProfFamily
+)
 
 // Proficiency geometry, in design units through the Px funnel. The graph
 // is fitted into the layer and then panned/zoomed as one camera: zoom

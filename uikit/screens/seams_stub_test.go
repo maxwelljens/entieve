@@ -32,7 +32,7 @@ type stubView struct {
 	orders   []sim.MarketStock
 	docked   bool
 	wallet   float64
-	station  widgets.StationInfo // docked-at identity + services (nil = none)
+	station  widgets.StationInfo // docked-at identity (nil = none)
 	svc      map[string]bool     // service access table (nil = every service while docked)
 	contacts widgets.Contacts    // the docked contact view read
 	deliver  float64             // deliver-objective progress the stub reports
@@ -75,14 +75,30 @@ func (v *stubView) DockedStation() (widgets.StationInfo, bool) {
 	return v.station, true
 }
 
-// DockedMarket is the stub's market access: a dock that runs the market (an
-// explicit table without "market" is a station that does not).
-func (v *stubView) DockedMarket() sim.StationID {
-	if !v.docked || (v.svc != nil && !v.svc["market"]) {
+// Market is the stub's market domain: the fixed book, the fixed ladder and
+// the stub's own docked rule. The adapter embeds a nil MarketView, so a read
+// beyond this list panics here instead of quietly finding a sim.
+func (v *stubView) Market() widgets.MarketView { return stubMarket{v: v} }
+
+// stubMarket is the stub's market reads (a dock that runs the market: an
+// explicit service table without "market" is a station that does not).
+type stubMarket struct {
+	widgets.MarketView
+	v *stubView
+}
+
+func (m stubMarket) Docked() sim.StationID {
+	if !m.v.docked || (m.v.svc != nil && !m.v.svc["market"]) {
 		return ""
 	}
 	return "cel-stub"
 }
+
+func (m stubMarket) Orders(sim.StationID) []sim.MarketStock { return m.v.orders }
+
+func (m stubMarket) System(content.SystemID) []sim.MarketStock { return m.v.orders }
+
+func (m stubMarket) PriceLadder(sim.StationID, content.ItemID) float64 { return 42 }
 
 // StationName resolves a station id to the stub's own spelling: the Details
 // dialog's destination and claim lines read it.
@@ -92,24 +108,13 @@ func (v *stubView) StationName(st sim.StationID) string { return string(st) }
 // order window's sell default (a fixed 5 in the stub).
 func (v *stubView) PlayerStock(content.ItemID) int { return 5 }
 
-func (v *stubView) BookOrders(sim.StationID) []sim.MarketStock { return v.orders }
-
-func (v *stubView) Market(content.SystemID) []sim.MarketStock { return v.orders }
-
 func (v *stubView) System() *content.SystemDef { return &content.SystemDef{ID: "sys-stub"} }
-
-func (v *stubView) MarketPrice(sim.StationID, content.ItemID) float64 { return 42 }
-
-func (v *stubView) PriceLadder(sim.StationID, content.ItemID) float64 { return 42 }
 
 func (v *stubView) TradeableName(id content.ItemID) string {
 	return widgets.TradeableName(v.c, id)
 }
 
 func (v *stubView) Wallet() float64 { return v.wallet }
-
-// Proficiency is the stub's fixed level (the Show Info requirement rows).
-func (v *stubView) Proficiency(string) int { return 0 }
 
 func (v *stubView) InfoRefOf(data any) (widgets.InfoRef, bool) {
 	switch d := data.(type) {

@@ -583,14 +583,14 @@ func TestManufacturingProfitTable(t *testing.T) {
 	needs := f.needs(rec.ID, 1)
 	mats := 0.0
 	for _, n := range needs {
-		q := env.Quote(factoryStation, n.Item, sim.OrderBuy, n.Need)
+		q := env.Market().Quote(factoryStation, n.Item, sim.OrderBuy, n.Need)
 		if !q.Priced {
 			t.Fatalf("fixture: no local sell order for %s", n.Item)
 		}
 		mats += q.Walk
 	}
-	fee := env.JobFee(rec.ID, 1)
-	bid := env.Quote(factoryStation, rec.Product, sim.OrderSell, rec.Qty)
+	fee := env.Industry().Fee(rec.ID, 1)
+	bid := env.Market().Quote(factoryStation, rec.Product, sim.OrderSell, rec.Qty)
 	if !bid.Priced {
 		t.Fatal("fixture: the product bid did not rest")
 	}

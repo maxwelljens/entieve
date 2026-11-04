@@ -94,9 +94,9 @@ func TestInventoryViewToggleSwitchesEverySection(t *testing.T) {
 		body   *widget.Container
 		stacks int
 	}{
-		{"cargo", inv.cargoBody, len(inv.cv.CargoStacks())},
-		{"ore", inv.oreBody, len(inv.cv.OreStacks())},
-		{"hangar", inv.hangBody, len(inv.cv.HangarItems())},
+		{"cargo", inv.cargoBody, len(inv.cv.Holds().Cargo())},
+		{"ore", inv.oreBody, len(inv.cv.Holds().Ore())},
+		{"hangar", inv.hangBody, len(inv.cv.Hangar().Items)},
 	} {
 		grid := inv.tilesFor(c.hold)
 		if got := c.body.Children()[0]; !sameWidget(got, grid.Container()) {

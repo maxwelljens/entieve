@@ -533,14 +533,14 @@ func TestRefineryMathTable(t *testing.T) {
 
 	// The fixture's figures, from the sim quote the table reads.
 	outs := r.batchOf("ore-lucidite")
-	ore := env.Quote(rfStation, "ore-lucidite", sim.OrderSell, sim.RefineBatch)
+	ore := env.Market().Quote(rfStation, "ore-lucidite", sim.OrderSell, sim.RefineBatch)
 	if !ore.Priced {
 		t.Fatal("fixture: no buy order for the ore")
 	}
 	raw := ore.Walk
 	mine := 0.0
 	for _, o := range outs {
-		q := env.Quote(rfStation, o.Item, sim.OrderSell, o.Qty)
+		q := env.Market().Quote(rfStation, o.Item, sim.OrderSell, o.Qty)
 		if !q.Priced {
 			t.Fatalf("fixture: no buy order for %s", o.Item)
 		}

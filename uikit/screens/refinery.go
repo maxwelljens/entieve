@@ -315,10 +315,10 @@ func (r *Refinery) oreStacks() []content.CargoStack {
 		}
 		out = append(out, st)
 	}
-	for _, st := range r.cv.CargoStacks() {
+	for _, st := range r.cv.Holds().Cargo() {
 		add(st)
 	}
-	for _, st := range r.cv.OreStacks() {
+	for _, st := range r.cv.Holds().Ore() {
 		add(st)
 	}
 	return out
@@ -402,7 +402,7 @@ func (r *Refinery) batchOf(ore content.ItemID) []rfOut {
 // zero yields. The sim computes it (the same function the command runs), so
 // the preview cannot promise a batch the refinery would not pay.
 func refineOutputs(cv widgets.ContentView, def *content.ItemDef, qty int) []content.CargoStack {
-	return cv.RefineOutput(def, qty)
+	return cv.Industry().Refine(def, qty)
 }
 
 // outputsText renders an output list as "45 Sideron · 30 Nixium" ("" for
@@ -473,11 +473,11 @@ func (r *Refinery) Sync() {
 	// The inspector and its refine gate (visible-but-grayed, never hidden):
 	// one page model, rebuilt when it moves.
 	outs := r.batchOf(r.sel.ore)
-	station := r.cv.DockedMarket()
-	ore := r.cv.Quote(station, r.sel.ore, sim.OrderSell, sim.RefineBatch)
+	station := r.cv.Market().Docked()
+	ore := r.cv.Market().Quote(station, r.sel.ore, sim.OrderSell, sim.RefineBatch)
 	mine := make([]sim.Quote, len(outs))
 	for i, o := range outs {
-		mine[i] = r.cv.Quote(station, o.Item, sim.OrderSell, o.Qty)
+		mine[i] = r.cv.Market().Quote(station, o.Item, sim.OrderSell, o.Qty)
 	}
 	boardSync(&r.model, rfPageModel{
 		HasSel: r.hasSel,

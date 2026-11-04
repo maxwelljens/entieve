@@ -1,6 +1,7 @@
 package widgets
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/entieve/entieve/content"
@@ -68,19 +69,19 @@ func TestViewHold(t *testing.T) {
 		Ore:         []content.CargoStack{{Item: "min-ferrite", Qty: 20}}, // vol 0.45
 	})
 
-	if used, capacity, ok := cv.Hold("cargo"); !ok || used != 10 || capacity != 400 {
+	if used, capacity, ok := cv.Holds().Used("cargo"); !ok || used != 10 || capacity != 400 {
 		t.Errorf("Hold(cargo) = %v/%v ok=%v, want 10/400", used, capacity, ok)
 	}
-	if used, capacity, ok := cv.Hold("ore"); !ok || used != 20*ferrite.Volume || capacity != 100 {
+	if used, capacity, ok := cv.Holds().Used("ore"); !ok || used != 20*ferrite.Volume || capacity != 100 {
 		t.Errorf("Hold(ore) = %v/%v ok=%v, want %v/100", used, capacity, ok, 20*ferrite.Volume)
 	}
 
 	// No ore hold fitted: the same rule as the hull's 0 m³.
 	v.s.Cargos.Set(player, sim.Cargo{Capacity: 400})
-	if _, _, ok := cv.Hold("ore"); ok {
+	if _, _, ok := cv.Holds().Used("ore"); ok {
 		t.Error("Hold(ore) ok with OreCapacity 0, want not fitted")
 	}
-	if _, _, ok := cv.Hold("bogus"); ok {
+	if _, _, ok := cv.Holds().Used("bogus"); ok {
 		t.Error("Hold(bogus) ok, want false")
 	}
 }
@@ -92,25 +93,25 @@ func TestViewPriceLadder(t *testing.T) {
 	cv, c := newViewTest(t)
 	// cel-haven-rest seeds min-argon asks at 64 and bids at 48; either way
 	// the ask is the rung.
-	if got, want := cv.PriceLadder("cel-haven-rest", "min-argon"), 64.0; got != want {
+	if got, want := cv.Market().PriceLadder("cel-haven-rest", "min-argon"), 64.0; got != want {
 		t.Errorf("docked PriceLadder(min-argon) = %v, want the seeded best ask %v", got, want)
 	}
-	if got, want := cv.PriceLadder("", "min-argon"), 64.0; got != want {
+	if got, want := cv.Market().PriceLadder("", "min-argon"), 64.0; got != want {
 		t.Errorf("undocked PriceLadder(min-argon) = %v, want %v from the shown system's orders", got, want)
 	}
 	// loot-navdata is bid-only: the bid rung answers both views.
-	if got := cv.PriceLadder("cel-haven-rest", "loot-navdata"); got != 20000 {
+	if got := cv.Market().PriceLadder("cel-haven-rest", "loot-navdata"); got != 20000 {
 		t.Errorf("docked PriceLadder(loot-navdata) = %v, want the bid 20000", got)
 	}
-	if got := cv.PriceLadder("", "loot-navdata"); got != 20000 {
+	if got := cv.Market().PriceLadder("", "loot-navdata"); got != 20000 {
 		t.Errorf("undocked PriceLadder(loot-navdata) = %v, want the bid 20000", got)
 	}
 	// No orders anywhere: the def base price, in both views.
 	base, _ := c.Item("loot-iced-core")
-	if want := base.BasePrice; cv.PriceLadder("cel-haven-rest", "loot-iced-core") != want ||
-		cv.PriceLadder("", "loot-iced-core") != want {
+	if want := base.BasePrice; cv.Market().PriceLadder("cel-haven-rest", "loot-iced-core") != want ||
+		cv.Market().PriceLadder("", "loot-iced-core") != want {
 		t.Errorf("PriceLadder(loot-iced-core) = %v/%v, want the base %v",
-			cv.PriceLadder("cel-haven-rest", "loot-iced-core"), cv.PriceLadder("", "loot-iced-core"), want)
+			cv.Market().PriceLadder("cel-haven-rest", "loot-iced-core"), cv.Market().PriceLadder("", "loot-iced-core"), want)
 	}
 }
 
@@ -153,5 +154,39 @@ func TestViewMeetsStanding(t *testing.T) {
 	}
 	if cv.MeetsStanding(1e-8) {
 		t.Error("MeetsStanding(1e-8) = true, want false (standing 0)")
+	}
+}
+
+// TestContentViewWidthIsTheDomains: the read seam carries one member per
+// domain read, not one per query (C7: 56 members, 53 of them same-named sim
+// forwarders). The count is the ledger; the frozen list is the shape the
+// wave removed, so a re-grown forwarder fails here instead of quietly
+// widening every panel's constructor again.
+func TestContentViewWidthIsTheDomains(t *testing.T) {
+	const want = 38
+	typ := reflect.TypeOf((*ContentView)(nil)).Elem()
+	if typ.NumMethod() != want {
+		names := make([]string, typ.NumMethod())
+		for i := range names {
+			names[i] = typ.Method(i).Name
+		}
+		t.Fatalf("ContentView has %d members, want %d: %v", typ.NumMethod(), want, names)
+	}
+	// The per-query surface the domain reads replaced.
+	for _, gone := range []string{
+		"Proficiency", "Transform", "MarketPrice", "DockedMarket", "BookOrders",
+		"AllJobs", "DockedIndustry", "JobMaterials", "JobFee", "CanStartJob",
+		"PlayerJobOutput", "JobDuration", "RefineOutput", "CargoStacks",
+		"OreStacks", "Hold", "HangarItems", "HangarShips",
+	} {
+		if _, ok := typ.MethodByName(gone); ok {
+			t.Errorf("ContentView still carries %s: the domain read replaced it", gone)
+		}
+	}
+	// The domains themselves: one call, then the reads on it.
+	for _, group := range []string{"Market", "Industry", "Holds", "Hangar", "Contacts", "War"} {
+		if _, ok := typ.MethodByName(group); !ok {
+			t.Errorf("ContentView lost the %s domain read", group)
+		}
 	}
 }
