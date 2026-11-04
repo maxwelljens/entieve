@@ -38,82 +38,12 @@ func (g *Game) Do(i widgets.Intent) {
 	}
 }
 
-// toggleScreen flips the Screen row titled name (case-insensitive). The
-// non-modal rows flip their host flag exactly like their key does; the
-// modal rows are scene-owned, so they push/pop the scene their key drives
-// (Settings is the plain flag, except inside the pause menu's session).
-// Every window is a row now (the two always-on ones included): a name no
-// row carries is not a window this game opens.
+// toggleScreen flips the Screen row titled name (case-insensitive) — the
+// one path a title/rail key and the Esc menu's buttons share. Every
+// window is a row (the modal ones included): the host owns what a modal
+// row's toggle means, so no id needs a case here.
 func (g *Game) toggleScreen(name string) {
 	if id, ok := g.host.ByTitle(name); ok {
-		g.toggleScreenID(id)
-	}
-}
-
-// toggleScreenID is the close semantics one row's title/rail key/× runs.
-func (g *Game) toggleScreenID(id ScreenID) {
-	switch id {
-	case idHelp:
-		g.toggleHelp()
-	case idMenu:
-		if g.menuUp() {
-			g.closeMenu()
-		} else {
-			g.push(&MenuScene{g: g})
-		}
-	case idSettings:
-		// Within the menu's settings session the row belongs to the
-		// session: closing it (×) returns to the pause menu. From the
-		// pause menu it opens that session; everywhere else — the P key,
-		// the title host — it is the plain flag toggle.
-		switch {
-		case g.settingsUp():
-			g.exitSettings()
-		case g.menuUp():
-			g.enterSettings()
-		default:
-			g.host.Toggle(id)
-		}
-	default:
 		g.host.Toggle(id)
 	}
-}
-
-// menuUp reports whether the pause menu is on the scene stack. The menu can
-// sit UNDER another scene (the docked station is pushed above it), so the top
-// scene is not the test: a top-only check turns every menu verb into a second
-// menu pushed above the station, leaving the modal window and its dim up.
-func (g *Game) menuUp() bool {
-	return g.findScene(func(s Scene) bool { _, ok := s.(*MenuScene); return ok })
-}
-
-// closeMenu removes the pause menu wherever it sits; its OnLeave unmounts the
-// menu window, so neither the modal input layer nor MenuScene.Draw's dim
-// survives it.
-func (g *Game) closeMenu() {
-	g.removeScene(func(s Scene) bool { _, ok := s.(*MenuScene); return ok })
-}
-
-// enterSettings turns the pause menu into its settings session: the menu
-// scene and its window go, the SettingsScene takes over the settings window
-// as a modal, dimmed session.
-func (g *Game) enterSettings() {
-	if g.settingsUp() {
-		return
-	}
-	g.closeMenu()
-	g.push(&SettingsScene{g: g})
-}
-
-// exitSettings ends the session and brings the pause menu back: the
-// settings scene closes the window (restoring its plain flag) and the menu
-// remounts above the world.
-func (g *Game) exitSettings() {
-	g.removeScene(func(s Scene) bool { _, ok := s.(*SettingsScene); return ok })
-	g.push(&MenuScene{g: g})
-}
-
-// settingsUp reports whether the settings session is on the scene stack.
-func (g *Game) settingsUp() bool {
-	return g.findScene(func(s Scene) bool { _, ok := s.(*SettingsScene); return ok })
 }

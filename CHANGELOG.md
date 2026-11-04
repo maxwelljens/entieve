@@ -38,6 +38,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Modality is a Screen row property**: the Help overlay, the Esc menu and
+  the menu's Settings session no longer own scenes. Each is an ordinary
+  Screen row with a `Modal` facet (the dim veil's alpha, the pause layer, and
+  for Settings the row its session belongs to), and the Screen host owns the
+  whole step: the row's one toggle opens and closes it (key, rail, ×, menu
+  button), the host paints the veil between the world and the windows in
+  declaration order, Esc closes the open modal rows in reverse declaration
+  order after the proficiency card and the tree, and the Settings session
+  hands back to the Esc menu on Esc or the ×. The ladder, the dims (180 for
+  help, 170 for the menu and its session), the settings return and the help
+  restore from the layout sidecar behave exactly as before, no pixel moves,
+  and the scene stack is the world's alone (space, station).
 - **The Overview and the Selected Item window are Screen rows**: the two
   always-on windows no longer run on a parallel window system (their own
   sidecar table, their own rail slice, their own close and visibility state

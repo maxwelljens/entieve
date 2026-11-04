@@ -116,8 +116,8 @@ type filterEntry interface {
 }
 
 // layoutNames are the persisted windows, in a stable write order: every
-// Screen row that is not transient (the Esc menu is scene-owned and stays
-// out), then Show Info's geometry-only row. Assigned in init from the spec.
+// Screen row that is not transient (the Esc menu stays out), then Show
+// Info's geometry-only row. Assigned in init from the spec.
 var layoutNames []string
 
 // layoutPath is the sidecar location: the resolved save path plus
@@ -289,10 +289,9 @@ func applyFilter(e layoutEntry, f uikit.OvFilter) {
 }
 
 // applyLayout restores the sidecar over the built-in defaults: geometry
-// (clamped to MinSize and the screen) for every named window present,
-// open state for the toggleable ones, and the scene stack for the help
-// overlay, which only exists while its scene is up. Call it
-// after the kit is built and the first real screen size is known —
+// (clamped to MinSize and the screen) for every named window present and
+// open state for the toggleable ones. Call it after the kit is built and
+// the first real screen size is known —
 // startup (first applySize) and after LoadGame's rebuild. A partial
 // sidecar only restores the windows it holds, and each restored window
 // is flagged as the player's arrangement so the composed defaults never
@@ -354,24 +353,10 @@ func (g *Game) applyLayout(screenW, screenH int) {
 		// kind at the default.
 		applyFilter(entry, saved.Filter)
 	}
-	// The help window only exists through its overlay scene (modal + dim
-	// backdrop): sync the stack to the restored flag. The starmap is an
-	// ordinary window now — its restored open flag mounts it like the
-	// rest (syncMounts below).
-	syncOverlay := func(open bool, is func(Scene) bool, make func() Scene) {
-		has := g.findScene(is)
-		switch {
-		case open && !has:
-			g.push(make())
-		case !open && has && is(g.top()):
-			g.pop() // OnLeave re-asserts open=false
-		}
-	}
-	syncOverlay(g.host.IsOpen(idHelp),
-		func(s Scene) bool { _, ok := s.(*HelpScene); return ok },
-		func() Scene { return &HelpScene{g: g} })
 	// Apply restored open flags immediately (LoadGame rebuilt the mounts
-	// before this ran).
+	// before this ran). A restored modal row (the help overlay, a settings
+	// window) mounts like every other row: it needs no scene, so its flag
+	// alone brings its window and its veil (ScreenHost.DrawDim).
 	g.syncMounts()
 }
 

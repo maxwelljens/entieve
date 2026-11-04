@@ -22,10 +22,10 @@ import (
 // what it feeds. The Screen host (game/screenhost.go) mounts, syncs and
 // dismisses the built panels from the same rows.
 //
-// The rows are declarative. Behaviour that belongs to a scene (the help
-// and Esc overlays) stays where it is; a row reaches it through Modal
-// instead of carrying the logic. screenSpecErrors is the well-formedness
-// rule for the whole
+// The rows are declarative. Modality is a row property (the Modal facet):
+// the host owns a modal row's open/close, its dim veil and its place in
+// the Esc ladder, so no window needs a scene of its own.
+// screenSpecErrors is the well-formedness rule for the whole
 // table (New refuses to build on a bad spec, the tests drive it with
 // deliberately broken rows). The left navigation rail derives from the
 // same rows (game/rail.go): every openable, listed row is one rail entry,
@@ -40,8 +40,8 @@ import (
 //
 //	DockFloating    a free overlay: placeDefaults hangs it on the viewport
 //	                from its DefaultRect + Anchor, the sidecar persists it
-//	DockTransient   scene-owned and never persisted — the Esc menu, which
-//	                must not reopen on the next boot
+//	DockTransient   opened by the game and never persisted — the Esc menu,
+//	                which must not reopen on the next boot
 //
 // There is no docked special case any more: a service window opened while
 // docked is an ordinary floating window (the market's three-pane rect, the
@@ -86,6 +86,29 @@ const (
 // anchorLast is the highest valid Anchor (screenSpecErrors' bound).
 const anchorLast = AnchorTopLeft
 
+// Modal is a Screen row's modality. The host owns all of it: the open and
+// close step, the veil it paints between the scene stack and the kit, and
+// the row's place in the Esc ladder. A row that declares no Dim is an
+// ordinary window and keeps whatever modality its own builder gave the
+// window (the title phase's windows own their frame).
+//
+//	Dim     the veil alpha behind the row while it is up, AND the
+//	        modality switch: a row that dims is modal (Esc closes it in
+//	        declaration order, the world key layer yields to it). Zero =
+//	        no modality.
+//	Pauses  the pause layer: while it is up no other key toggles (the Esc
+//	        menu and the session it owns). A viewport overlay like the
+//	        proficiency tree is modal for the world but not a pause.
+//	Session the row this row is a SESSION of: opened from it, this row is
+//	        modal and dimmed and closing hands back to it (the Settings
+//	        window opened from the Esc menu). Opened any other way it is
+//	        the plain floating window its key toggles.
+type Modal struct {
+	Dim     uint8
+	Pauses  bool
+	Session ScreenID
+}
+
 // keyNone marks a screen with no key binding. It cannot be 0: ebiten's
 // zero value is ebiten.KeyA.
 const keyNone ebiten.Key = -1
@@ -123,9 +146,9 @@ const (
 // the registries derive from.
 //
 //	ID            the frozen sidecar key, also the row's label; rows are
-//	              declared in mount order (which fixes the draw order —
-//	              the log lands before the Esc menu). A transient row has
-//	              an id but no sidecar entry (DockPolicy)
+//	              declared in mount order (which fixes the draw order and
+//	              the Esc ladder — the log lands before the Esc menu). A
+//	              transient row has an id but no sidecar entry (DockPolicy)
 //	Title         the window's canonical name (its title bar, the test
 //	              labels; must be non-empty and unique)
 //	Icon          the title-bar glyph AND the navigation rail's entry
@@ -145,14 +168,15 @@ const (
 //	              table (game/keyhints.go), so no surface ever quotes a
 //	              chord frozen at declaration time. The live binding is
 //	              the default overlaid with the player's overrides
-//	              (game/keys.go) — pressScreen resolves by Action. A MODAL
-//	              screen's key is wired to its scene instead (Esc → onEscape,
-//	              H → help), so Modal rows are never flag-toggled here
+//	              (game/keys.go) — pressScreen resolves by Action, so a
+//	              keyed row (modal or not) is flag-toggled here
 //	DefaultRect   default geometry in design units (see Anchor for which
 //	              parts the composition reads)
-//	DockPolicy    floating (persisted under its ID) / transient (scene-owned,
-//	              never persisted)
-//	Modal         the window is modal while up (help, menu)
+//	DockPolicy    floating (persisted under its ID) / transient (opened by
+//	              the game, never persisted — the Esc menu)
+//	Modal         the row's modality (help, menu, the menu's settings
+//	              session): the host paints its veil, closes it on Esc in
+//	              declaration order and hands a session back to its owner
 //	SpaceOnly     mounts only in space (the scanner's docked counterpart
 //	              rule); DockedOnly mounts only while docked (the manufacturing
 //	              and the services view)
@@ -197,7 +221,7 @@ type Screen struct {
 	Anchor      Anchor
 
 	DockPolicy DockPolicy
-	Modal      bool
+	Modal      Modal
 	SpaceOnly  bool
 	DockedOnly bool
 	Persistent bool
@@ -314,14 +338,15 @@ var screens = []Screen{
 		Build:       func(h *ScreenHost) widgets.WindowPanel { return uikit.NewMapView(h.services.Env) },
 	},
 	{
-		// Modal overlay driven by HelpScene; the window sizes itself from
-		// its rows (uikit.NewHelp), so the rect declares the top inset
-		// and the design viewport edges only.
+		// Modal overlay: the host paints its veil and closes it on Esc
+		// (declaration order, so the menu declared below outranks it).
+		// The window sizes itself from its rows (uikit.NewHelp), so the
+		// rect declares the top inset and the design viewport edges only.
 		ID: idHelp, Title: "Help", Icon: "svc_help",
 		Key: ebiten.KeyH, Action: "help", Desc: "toggle help",
 		DefaultRect: image.Rect(0, 24, defaultW, defaultH),
 		Anchor:      AnchorTopCenter,
-		DockPolicy:  DockFloating, Modal: true,
+		DockPolicy:  DockFloating, Modal: Modal{Dim: 180},
 		Group: "Help & System",
 		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewHelp(h.services.Env, h.services.HelpRows()) },
 	},
@@ -349,10 +374,17 @@ var screens = []Screen{
 		// Not a rail launcher (NoRail): its key and its title-menu row are
 		// its doors. The Keybindings button inside it is the second
 		// window's only door, wired per host in Build.
+		//
+		// Modal only as the Esc menu's SESSION: the menu's Settings button
+		// opens it from that row, so it dims, pauses the keys and hands
+		// back to the menu when it closes; its own key (and the title
+		// host, whose table has no menu row) opens the plain floating
+		// window. The session is host state and survives a kit rebuild.
 		ID: idSettings, Title: "Settings", Icon: "kind_unknown",
 		Key: ebiten.KeyP, Action: "settings", Desc: "toggle settings (UI scale, display, layout)",
 		DefaultRect: uikit.SettingsRect(),
 		DockPolicy:  DockFloating, InTitle: true, NoRail: true,
+		Modal: Modal{Dim: 170, Pauses: true, Session: idMenu},
 		Group: "Help & System",
 		Build: func(h *ScreenHost) widgets.WindowPanel {
 			// The Settings window's Keybindings button: one host, one
@@ -463,14 +495,17 @@ var screens = []Screen{
 		},
 	},
 	{
-		// The Esc menu: scene-owned (MenuScene flips the flag), modal,
-		// static buttons — no Sync — and never persisted, so a restart
-		// cannot reopen it. It is deliberately NOT in the rail: the pause
-		// menu keeps its key and its function.
+		// Modal, and the pause layer: while it is up no other key toggles.
+		// The Settings button inside it opens the Settings row as this
+		// row's session (see the settings row below). Static buttons — no
+		// Sync — and never persisted, so a restart cannot reopen it. It is
+		// deliberately NOT in the rail: the pause menu keeps its key and
+		// its function. Declared last: Esc closes it before any modal
+		// declared above it.
 		ID: idMenu, Title: "Menu",
 		Key: ebiten.KeyEscape, Action: "menu", Desc: "menu (Resume / Save / Load / Quit)",
 		DefaultRect: image.Rect(0, 0, 240, 304), // buildMenuWindow's landing rect (5 rows)
-		DockPolicy:  DockTransient, Modal: true,
+		DockPolicy:  DockTransient, Modal: Modal{Dim: 170, Pauses: true},
 		Build: func(h *ScreenHost) widgets.WindowPanel { return h.services.Menu() },
 	},
 }
@@ -536,15 +571,16 @@ func screenBindings(rows []Screen) []Binding {
 func screenLabel(s Screen) string { return string(s.ID) }
 
 // pressScreen performs the toggle a rebindable screen action names: the
-// modal help scene, or the flag of the keyed non-modal row (the Screen
-// spec is the table; the live key for the action is resolved by the
-// caller through Game.actionFor). Reports whether a row claimed it.
+// row's flag (a modal row's too — the host owns the modal step, so no key
+// is wired to a scene). The Screen spec is the table; the live key for
+// the action is resolved by the caller through Game.actionFor. Reports
+// whether a row claimed it.
 func (g *Game) pressScreen(action string) bool {
 	id, ok := g.host.ByAction(action)
 	if !ok {
 		return false
 	}
-	g.toggleScreenID(id)
+	g.host.Toggle(id)
 	return true
 }
 
@@ -653,6 +689,13 @@ func screenSpecErrors(rows []Screen) []string {
 		}
 		if s.DockPolicy > DockTransient {
 			add("row %d (%s): unknown dock policy %d", i, s.Title, s.DockPolicy)
+		}
+		// Modality: the veil is the switch (a row with no Dim is an
+		// ordinary window), so the other two facets need one. The
+		// session's owner id is pinned by the session tests: a title table
+		// carries a session row without its owner and must stay valid.
+		if s.Modal.Dim == 0 && (s.Modal.Pauses || s.Modal.Session != "") {
+			add("row %d (%s): modal facet without a dim veil (Dim is the modality switch)", i, s.Title)
 		}
 
 		// Key binding: a keyed row carries a complete, unique KeyMap row.

@@ -38,7 +38,7 @@ func TestOrderWindowKeyboardGate(t *testing.T) {
 
 	// Esc while typing clears the focus and pushes nothing.
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyEscape}})
-	if _, ok := g.top().(*MenuScene); ok {
+	if g.host.IsOpen(idMenu) {
 		t.Fatal("Esc while typing opened the Esc menu")
 	}
 	if g.kit.OrderTyping() {

@@ -271,7 +271,7 @@ func TestContextMenuGatesWorldInput(t *testing.T) {
 	if err := g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyEscape}}); err != nil {
 		t.Fatalf("handleKeys: %v", err)
 	}
-	if _, ok := g.top().(*MenuScene); ok {
+	if g.host.IsOpen(idMenu) {
 		t.Error("Esc behind a context menu pushed the menu scene")
 	}
 	m.Close()
@@ -282,7 +282,7 @@ func TestContextMenuGatesWorldInput(t *testing.T) {
 	if err := g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyEscape}}); err != nil {
 		t.Fatalf("handleKeys: %v", err)
 	}
-	if _, ok := g.top().(*MenuScene); !ok {
-		t.Error("plain Esc did not push the menu scene")
+	if !g.host.IsOpen(idMenu) {
+		t.Error("plain Esc did not open the menu")
 	}
 }

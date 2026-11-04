@@ -498,13 +498,11 @@ func (g *Game) quitPersist() {
 func (g *Game) handleKeys(in Input) error {
 	ctrl := held(in.KeysDown, ebiten.KeyControl)
 	shift := held(in.KeysDown, ebiten.KeyShift)
-	_, menuOpen := g.top().(*MenuScene)
-	_, settingsSession := g.top().(*SettingsScene)
-	world := false
-	switch g.top().(type) {
-	case *SpaceScene, *StationScene:
-		world = true
-	}
+	// The modal rows own the frame: the pause layer (the menu and its
+	// session) takes every other toggle, and any modal row hides the world
+	// from the key layer even where the screen toggles still answer.
+	paused := g.host.Paused()
+	world := !g.host.ModalUp()
 	typing := g.kit.OrderTyping()
 
 	for _, k := range in.JustPressed {
@@ -536,9 +534,7 @@ func (g *Game) handleKeys(in Input) error {
 			if g.kit.Held() {
 				continue
 			}
-			if err := g.onEscape(); err != nil {
-				return err
-			}
+			g.onEscape()
 		case ctrl && k == ebiten.KeyF:
 			// Ctrl+F opens the market (if closed) and focuses its search
 			// field; the focus lands after the mount, below.
@@ -559,9 +555,9 @@ func (g *Game) handleKeys(in Input) error {
 				continue
 			}
 			switch {
-			case menuOpen || settingsSession:
-				// The Esc menu is modal, and so is the settings session
-				// it opens: nothing else toggles while either is up
+			case paused:
+				// The pause layer (the Esc menu, and the settings session
+				// it opens) is up: nothing else toggles
 				// (save/load/time above still work).
 			case g.kit.Held():
 				// So is a context menu: it owns this frame's keys until
@@ -837,7 +833,7 @@ func (g *Game) buildKit() error {
 		// kit's chrome stays hidden until the title is left.
 		if g.titleUI != nil {
 			g.titleUI.detach()
-			g.titleUI.host.Rebind(kit, g.titleServices())
+			g.titleUI.host.Rebind(kit, g.gameServices())
 		}
 	}
 	return nil
@@ -904,7 +900,6 @@ func (g *Game) gameServices() screenServices {
 			}
 			return g.kit.ProfFamily()
 		},
-		Close:  g.toggleScreenID,
 		Cancel: g.cancelCapture,
 	}
 }
@@ -978,6 +973,9 @@ func (g *Game) Draw(dst *ebiten.Image) {
 	for _, sc := range g.scenes {
 		sc.Draw(dst)
 	}
+	// The modal rows' veils: between the scene stack and the kit, where
+	// the overlay scenes painted them.
+	g.host.DrawDim(dst, g.w, g.h)
 	g.kit.Draw(dst)
 }
 
@@ -1020,39 +1018,27 @@ func (g *Game) removeScene(match func(Scene) bool) {
 	}
 }
 
-// onEscape implements the Esc menu toggle.
-func (g *Game) onEscape() error {
+// onEscape is the one Esc ladder: the proficiency card, then the tree
+// layer, then the open modal rows in reverse declaration order (the menu
+// outranks help, and a session outranks the rows declared before it),
+// and with none up it opens the menu. The modal step is the host's: the
+// rows are the data, so no scene and no id appears here.
+func (g *Game) onEscape() {
 	// The proficiency tree is modal over the world: Esc closes it before
-	// anything behind it (the Esc menu included). An open proficiency card is
-	// one step above the tree: Esc backs out of the card first.
+	// anything behind it (the Esc menu included). An open proficiency card
+	// is one step above the tree: Esc backs out of the card first.
 	if g.kit != nil && g.kit.ProfFamilyOpen() {
 		g.kit.CloseProfFamily()
-		return nil
+		return
 	}
 	if g.host != nil && g.host.IsOpen(idProficiency) {
 		g.host.SetOpen(idProficiency, false)
-		return nil
-	}
-	switch g.top().(type) {
-	case *MenuScene:
-		g.closeMenu()
-	case *SettingsScene:
-		g.exitSettings()
-	case *HelpScene:
-		g.pop()
-	default:
-		g.push(&MenuScene{g: g})
-	}
-	return nil
-}
-
-// toggleHelp opens/closes the key-map overlay (H).
-func (g *Game) toggleHelp() {
-	if _, ok := g.top().(*HelpScene); ok {
-		g.pop() // OnLeave closes the help window
 		return
 	}
-	g.push(&HelpScene{g: g})
+	if _, closed := g.host.EscapeModal(); closed {
+		return
+	}
+	g.host.SetOpen(idMenu, true)
 }
 
 // ---------------------------------------------------------------------------

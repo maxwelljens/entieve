@@ -123,21 +123,11 @@ type titleScreen struct {
 func newTitleScreen(g *Game) *titleScreen {
 	t := &titleScreen{g: g}
 	t.rows = titleRows(t)
-	t.host = newScreenHost(t.rows, titleScope, g.kit, g.titleServices())
+	t.host = newScreenHost(t.rows, titleScope, g.kit, g.gameServices())
 	g.wireUISounds(t.host)
 	t.host.Reconcile(Room{Title: true}) // the boot pass: quiet, nothing open
 	t.buildMenu()
 	return t
-}
-
-// titleServices is the game bundle without the owner's close hook: the
-// title host owns its rows' open flags, so a row's × is a plain toggle on
-// THIS host (with the game's hook it toggled the game host's flag and the
-// title window never closed).
-func (g *Game) titleServices() screenServices {
-	svc := g.gameServices()
-	svc.Close = nil
-	return svc
 }
 
 // titleRows is the title host's one table, in mount order: the title's own
@@ -171,12 +161,13 @@ const (
 )
 
 // saveManagerRow is the title's save manager: transient (never persisted),
-// modal and unkeyed — the menu row is its only way in.
+// modal (its builder's own frame: a title row declares no Modal facet) and
+// unkeyed — the menu row is its only way in.
 func (t *titleScreen) saveManagerRow() Screen {
 	return Screen{
 		ID: idManager, Title: "Save manager", Key: keyNone,
-		DockPolicy: DockTransient, Modal: true,
-		Build: func(*ScreenHost) widgets.WindowPanel { return t.newSaveManager() },
+		DockPolicy: DockTransient,
+		Build:      func(*ScreenHost) widgets.WindowPanel { return t.newSaveManager() },
 	}
 }
 
@@ -184,8 +175,8 @@ func (t *titleScreen) saveManagerRow() Screen {
 func (t *titleScreen) creditsRow() Screen {
 	return Screen{
 		ID: idCredits, Title: "Credits", Key: keyNone,
-		DockPolicy: DockTransient, Modal: true,
-		Build: func(*ScreenHost) widgets.WindowPanel { return t.newCredits() },
+		DockPolicy: DockTransient,
+		Build:      func(*ScreenHost) widgets.WindowPanel { return t.newCredits() },
 	}
 }
 

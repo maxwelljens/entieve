@@ -168,7 +168,7 @@ func TestKeybindReservedAndCancel(t *testing.T) {
 	if k, _ := liveKey(g, "inventory"); k != ebiten.KeyI {
 		t.Errorf("Esc assigned inventory = %v, want the unchanged I", k)
 	}
-	if _, ok := g.top().(*MenuScene); ok {
+	if g.host.IsOpen(idMenu) {
 		t.Error("Esc opened the menu while capture was armed")
 	}
 
