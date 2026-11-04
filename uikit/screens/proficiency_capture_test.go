@@ -109,7 +109,7 @@ func TestProficiencyCaptureFrame(t *testing.T) {
 	// Hide the kit's two always-on windows: the evidence is the tree, its
 	// overview and one floating window above it (Finances) as the stacking
 	// proof.
-	k.SetCoreVisible(false)
+	hideCore(k)
 	p := NewProficiency(k.Env(), proficiencyCaptureFixture, nil, k.ProfFamily)
 	ov := NewProficiencyOverview(k.Env(), proficiencyCaptureFixture)
 	// The second paint of the same model, never mounted: its canvas is the
@@ -247,7 +247,7 @@ func TestProficiencyFamilyCardCapture(t *testing.T) {
 	uitest.UseScale(t, 1)
 	in := &scriptPointer{}
 	k, _ := newTestKitWith(t, widgets.NewPointer(in))
-	k.SetCoreVisible(false)
+	hideCore(k)
 	p := NewProficiency(k.Env(), proficiencyCaptureFixture, nil, k.ProfFamily)
 	p.Sync()
 	k.AddBackdropWindow(p.Win())

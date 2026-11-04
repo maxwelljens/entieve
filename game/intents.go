@@ -42,16 +42,12 @@ func (g *Game) Do(i widgets.Intent) {
 // non-modal rows flip their host flag exactly like their key does; the
 // modal rows are scene-owned, so they push/pop the scene their key drives
 // (Settings is the plain flag, except inside the pause menu's session).
+// Every window is a row now (the two always-on ones included): a name no
+// row carries is not a window this game opens.
 func (g *Game) toggleScreen(name string) {
-	id, ok := g.host.ByTitle(name)
-	if !ok {
-		// Not a Screen row: the two core windows (the rail's Overview /
-		// Selected Item entries) toggle through the kit; anything else
-		// is not a window this game opens.
-		g.kit.ToggleCore(name)
-		return
+	if id, ok := g.host.ByTitle(name); ok {
+		g.toggleScreenID(id)
 	}
-	g.toggleScreenID(id)
 }
 
 // toggleScreenID is the close semantics one row's title/rail key/× runs.

@@ -14,7 +14,7 @@ import (
 // composes starts right of the navigation rail's gutter — uikit.RailInset
 // through theme.Px — at both design sizes, at the identity scale and
 // through the scale funnel (device 1.5×). The composed set covers the kit
-// core windows, the Show Info window, every Screen row (floating,
+// the two always-on windows, the Show Info window, every Screen row (floating,
 // centred, bottom-left and the transient Esc menu alike) and the docked
 // station column; the anchor floors that keep them clear live in
 // anchorRect/centerRect (game/screens.go).
@@ -129,7 +129,7 @@ func TestLandingRectIdentity(t *testing.T) {
 // design viewports and both scales (device 1 and 1.5: the framebuffer
 // grows with the scale, so the design layout is scale-invariant):
 //
-//   - every window placeDefaults composes — the kit's core windows, the
+//   - every window placeDefaults composes (the two always-on windows, the
 //     Show Info window, every Screen row and the docked services column —
 //     starts fully on-screen and right of the navigation rail's gutter;
 //   - the always-on boot set (overview, selected item, log) is pairwise

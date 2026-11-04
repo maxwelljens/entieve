@@ -122,13 +122,13 @@ func (k *Kit) AddWindow(w *widget.Window) widget.RemoveWindowFunc {
 func (k *Kit) addWindow(w *widget.Window, animate bool) widget.RemoveWindowFunc {
 	// Re-mounting a window whose close is still fading = a reopen: the
 	// unmount its remove owed is cancelled right here.
-	k.cancelClose(w)
+	k.CancelClose(w)
 	_, ok := k.chromes[w]
 	if !ok {
 		k.chromes[w] = &winChrome{win: w, ptr: k.pointer, closable: k.closes[w] != nil}
 		// Drag-arming settles the open fade: the fade's park flips would
 		// relayout the subtree the drag translates (CONTEXT.md "Settle").
-		k.chromes[w].settle = func() { k.settleOpen(w) }
+		k.chromes[w].settle = func() { k.SettleOpen(w) }
 	}
 	if m, mounted := k.mountOf(w); mounted {
 		if animate {
@@ -211,6 +211,19 @@ func (k *Kit) unstack(w *widget.Window) {
 		}
 	}
 }
+
+// overviewPanel adapts the kit's Overview window to the Screen panel seam
+// (the Persistent row in game/screens.go). The kit keeps syncing it (the
+// always-on chrome refreshes from Kit.Sync), so the host's per-mount Sync
+// has nothing to add; the table and filter facets are what the host's row
+// surface and the layout sidecar ask for by type.
+type overviewPanel struct{ k *Kit }
+
+func (p overviewPanel) Win() *widget.Window      { return p.k.OverviewWindow() }
+func (p overviewPanel) Sync()                    {}
+func (p overviewPanel) Tables() []*widgets.Table { return []*widgets.Table{p.k.OverviewTable()} }
+func (p overviewPanel) Filter() OvFilter         { return p.k.OverviewFilter() }
+func (p overviewPanel) SetFilter(f OvFilter)     { p.k.SetOverviewFilter(f) }
 
 // buildOverview constructs the Overview window around its Table.
 func (k *Kit) buildOverview() {

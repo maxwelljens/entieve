@@ -148,11 +148,10 @@ func layoutPump(t *testing.T, g *Game, w, h int) {
 	}
 }
 
-// mountedRects returns the screen rect of every visible panel: the kit's
-// core windows, the mounted toggle windows (the log and the services
-// view among them) and the root-overlay chrome (the HUD's pair — status
-// and rack — and the rail). Hidden panels are skipped — they never lay
-// out and keep a stale rect.
+// mountedRects returns the screen rect of every visible panel: the mounted
+// windows (the two always-on ones and the log among them) and the
+// root-overlay chrome (the HUD's pair of status and rack, and the rail).
+// Hidden panels are skipped: they never lay out and keep a stale rect.
 func mountedRects(g *Game) []struct {
 	name string
 	rect image.Rectangle
@@ -170,8 +169,6 @@ func mountedRects(g *Game) []struct {
 			rect image.Rectangle
 		}{name, w.Rect})
 	}
-	add("overview", g.kit.OverviewWindow().GetContainer().GetWidget())
-	add("selected", g.kit.SelectedWindow().GetContainer().GetWidget())
 	for _, p := range g.host.IDs() {
 		if g.host.Mounted(p) {
 			add(panelNames[p], g.host.Window(p).GetContainer().GetWidget())

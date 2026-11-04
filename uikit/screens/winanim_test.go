@@ -105,7 +105,7 @@ func TestOpenAnimationFrameCounting(t *testing.T) {
 func TestOpenFadeKeepsInputLive(t *testing.T) {
 	k, _ := newTestKit(t)
 	fm := useFakeMouse(t)
-	// Park the core windows clear of the log's × so the press cannot
+	// Park the always-on windows clear of the log's × so the press cannot
 	// raise another window (a raise settles fades by design — this test
 	// needs the open fade RUNNING under the press).
 	k.OverviewWindow().SetLocation(image.Rect(700, 8, 1080, 428))
@@ -137,7 +137,7 @@ func TestOpenFadeKeepsInputLive(t *testing.T) {
 func TestCloseFadeDefersUnmountAndStaysInert(t *testing.T) {
 	k, _ := newTestKit(t)
 	fm := useFakeMouse(t)
-	// Park the core windows clear of the log: a press that lands over
+	// Park the always-on windows clear of the log: a press that lands over
 	// ANOTHER visible window raises that window (the raise contract),
 	// and a raise settles running fades by design — the fixture must
 	// keep this test's presses to the closing window alone.
@@ -228,7 +228,12 @@ func TestCloseFadeDefersUnmountAndStaysInert(t *testing.T) {
 // the fade settles; a settled window does not.
 func TestKitClosing(t *testing.T) {
 	k, _ := newTestKit(t)
-	w := k.OverviewWindow()
+	// A host-mounted row (the close is the plain toggle the game wires); the
+	// bare kit's always-on windows emulate the host's hide and settle their
+	// own fade inside the registered close, so they are not fixtures here.
+	w := NewLog(k.Env()).Win()
+	k.AddWindow(w)
+	k.SetWindowClose(w, func() {})
 	if k.Closing(w) {
 		t.Fatal("settled window reports a closing fade")
 	}

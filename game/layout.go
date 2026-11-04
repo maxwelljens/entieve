@@ -89,95 +89,46 @@ type layoutEntry interface {
 	Tables() []*widgets.Table
 }
 
-// coreLayoutEntry is the three kit-owned windows' sidecar row: the two
-// always-on core windows (geometry + open=true) and Show Info (geometry
-// only — it appears on demand, never at boot).
-type coreLayoutEntry struct {
-	name   string
-	win    func(*uikit.Kit) *widget.Window
-	tables func(*uikit.Kit) []*widgets.Table
-	open   bool
-	// filter/setFilter are the row's tick-box state accessor pair (the
-	// overview's kind filters); nil rows persist none.
-	filter    func(*uikit.Kit) uikit.OvFilter
-	setFilter func(*uikit.Kit, uikit.OvFilter)
-}
+// infoLayoutName is the Show Info window's sidecar key. It is the one
+// persisted window that is not a Screen row (it is a Kit dialog: on
+// demand, never open at boot), so it keeps a geometry-only entry of its
+// own. The two always-on windows that used to live beside it here are
+// Screen rows now, and their sidecar key IS their row id ("overview",
+// "selected"), which is what keeps existing files readable unchanged.
+const infoLayoutName = "infowin"
 
-var coreLayout = []coreLayoutEntry{
-	{
-		name: "overview", win: (*uikit.Kit).OverviewWindow, open: true,
-		tables:    func(k *uikit.Kit) []*widgets.Table { return []*widgets.Table{k.OverviewTable()} },
-		filter:    (*uikit.Kit).OverviewFilter,
-		setFilter: (*uikit.Kit).SetOverviewFilter,
-	},
-	{name: "selected", win: (*uikit.Kit).SelectedWindow, open: true},
-	{name: "infowin", win: (*uikit.Kit).InfoWindow, open: false},
-}
+// infoEntry adapts the Show Info window to the geometry-only sidecar row:
+// no open flag (it appears on demand, never at boot), no panes, no tables.
+type infoEntry struct{ kit *uikit.Kit }
+
+func (i infoEntry) Win() *widget.Window      { return i.kit.InfoWindow() }
+func (i infoEntry) PersistOpen() bool        { return false }
+func (i infoEntry) RestoreOpen(bool)         {}
+func (i infoEntry) Splits() []widgets.Seam   { return nil }
+func (i infoEntry) Tables() []*widgets.Table { return nil }
 
 // filterEntry is the optional layout facet for a window carrying tick-box
 // state beside its geometry. Rows without it persist none, so no name
-// switch decides who has one.
+// switch decides who has one (the Overview's panel answers it).
 type filterEntry interface {
 	Filter() uikit.OvFilter
 	SetFilter(uikit.OvFilter)
 }
 
-// coreEntry adapts a core row to the layoutEntry interface.
-type coreEntry struct {
-	kit *uikit.Kit
-	e   coreLayoutEntry
-}
-
-func (c coreEntry) Win() *widget.Window    { return c.e.win(c.kit) }
-func (c coreEntry) PersistOpen() bool      { return c.e.open }
-func (c coreEntry) RestoreOpen(bool)       {}
-func (c coreEntry) Splits() []widgets.Seam { return nil }
-func (c coreEntry) Tables() []*widgets.Table {
-	if c.e.tables == nil {
-		return nil
-	}
-	return c.e.tables(c.kit)
-}
-
-// Filter/SetFilter are the filterEntry facet: the overview row declares the
-// accessor pair, every other core row declares none and persists none.
-func (c coreEntry) Filter() uikit.OvFilter {
-	if c.e.filter == nil {
-		return nil
-	}
-	return c.e.filter(c.kit)
-}
-
-func (c coreEntry) SetFilter(f uikit.OvFilter) {
-	if c.e.setFilter != nil {
-		c.e.setFilter(c.kit, f)
-	}
-}
-
-func coreLayoutNames() []string {
-	names := make([]string, len(coreLayout))
-	for i, e := range coreLayout {
-		names[i] = e.name
-	}
-	return names
-}
-
-// layoutNames are the persisted windows, in a stable write order: the
-// three core windows plus every Screen row that is not transient (the Esc
-// menu is scene-owned and stays out). Assigned in init from the spec.
+// layoutNames are the persisted windows, in a stable write order: every
+// Screen row that is not transient (the Esc menu is scene-owned and stays
+// out), then Show Info's geometry-only row. Assigned in init from the spec.
 var layoutNames []string
 
 // layoutPath is the sidecar location: the resolved save path plus
 // .layout.json (e.g. …/entieve/save.json.layout.json).
 func (g *Game) layoutPath() string { return g.SavePath() + ".layout.json" }
 
-// layoutEntry resolves a persisted name to its window: the core windows,
-// then a host row by its id (which is the sidecar key).
+// layoutEntry resolves a persisted name to its window: Show Info's
+// geometry-only row, or a host row by its id (which is the sidecar key).
 func (g *Game) layoutEntry(name string) layoutEntry {
-	for _, e := range coreLayout {
-		if e.name == name {
-			return coreEntry{kit: g.kit, e: e}
-		}
+	if name == infoLayoutName {
+		return infoEntry{kit: g.kit}
 	}
 	if s := g.host.Slot(name); s != nil {
 		return s

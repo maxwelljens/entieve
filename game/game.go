@@ -650,8 +650,9 @@ func (g *Game) syncMounts() {
 	docked := g.s.Docked.Has(g.s.Player())
 	g.host.Reconcile(Room{Title: g.title, Docked: docked})
 	g.syncProficiencyCompanions()
-	// Space chrome (HUD, rack, the kit's core windows) follows the room;
-	// top chrome (the rail) follows gameplay — the title shows neither.
+	// Space chrome (HUD, rack) follows the room and the host hides the two
+	// always-on windows while docked; top chrome (the rail) follows
+	// gameplay; the title shows neither.
 	g.applyChrome(!docked && !g.title, !g.title)
 
 	// The order mini-window and the contact Details page are transient and
@@ -687,12 +688,13 @@ func (g *Game) syncProficiencyCompanions() {
 	}
 }
 
-// applyChrome is the one visibility rule: the space chrome (HUD, rack,
-// kit core windows) follows space; the top chrome (rail) follows gameplay.
+// applyChrome is the one visibility rule for the root chrome: the space
+// chrome (HUD, rack) follows space; the top chrome (rail) follows gameplay.
+// The two always-on windows are Screen rows now, so the host's room rule
+// hides them while docked (ScreenHost.show) and there is nothing to do here.
 func (g *Game) applyChrome(space, gameplay bool) {
 	theme.ShowWidget(g.hud.Container().GetWidget(), space)
 	theme.ShowWidget(g.rack.Container().GetWidget(), space)
-	g.kit.SetCoreVisible(space)
 	g.kit.SetTopsVisible(gameplay)
 }
 
@@ -815,10 +817,12 @@ func (g *Game) buildKit() error {
 	svc := g.gameServices()
 	if g.host == nil {
 		g.host = newScreenHost(screens, gameScope, kit, svc)
-		// The log is open by default (it used to be non-closable
-		// chrome); a saved layout may override this once applyLayout
-		// runs.
+		// The log and the two always-on windows are open by default (they
+		// used to be non-closable chrome); a saved layout may override this
+		// once applyLayout runs.
 		g.host.SetOpen(idLog, true)
+		g.host.SetOpen(idOverview, true)
+		g.host.SetOpen(idSelected, true)
 	} else {
 		g.host.Rebind(kit, svc)
 	}
@@ -883,6 +887,11 @@ func (g *Game) gameServices() screenServices {
 		},
 		HelpRows: func() []uikit.KeyRow { return helpRowsFor(g) },
 		Menu:     func() widgets.WindowPanel { return winPanel{win: g.buildMenuWindow()} },
+		// The kit's two always-on panels: it builds them (construction and
+		// selection wiring), the host mounts, places, persists and hides
+		// them through their Persistent rows.
+		Overview:     func() widgets.WindowPanel { return g.kit.OverviewPanel() },
+		SelectedItem: func() widgets.WindowPanel { return g.kit.SelectedPanel() },
 		// The proficiency tree's model and the viewport it fills. The model
 		// is the sim's families (see proficiencyModel), gate sentence and all.
 		Proficiency: g.proficiencyModel,
@@ -901,15 +910,13 @@ func (g *Game) gameServices() screenServices {
 }
 
 // placeDefaults (re)places every movable default window for the current
-// screen. The kit's core windows are placed too: Overview takes the
-// viewport's upper-right corner, Selected Item the top-left — both clear
-// of the rail's left gutter (uikit.RailInset — the rail is root chrome
-// and windows never sit under it) — so the two never share a corner and
-// the default set is pairwise disjoint at 1280×720 and at the 1024×700
-// minimum (TestVirginPlacementTable).
-// Every Screen row then places itself from its declared DefaultRect +
-// Anchor (anchorRect): the log's bottom-left pocket, the scanner in the
-// centre column under the top row, the on-demand overlays centred, help
+// screen. Every Screen row places itself from its declared DefaultRect +
+// Anchor (anchorRect), the two always-on windows' corner anchors
+// included (Overview takes the viewport's upper-right corner, Selected
+// Item the top-left, clear of the rail's left gutter), so the default set
+// is pairwise disjoint at 1280×720 and at the 1024×700 minimum
+// (TestVirginPlacementTable). The log's bottom-left pocket, the scanner in
+// the centre column under the top row, the on-demand overlays centred, help
 // top-center, the market/inventory/fitting their own per-type defaults
 // and the station board its column (the panel answers its content floor,
 // FitSize, and the host composes the height there). Nothing is composed
@@ -928,25 +935,6 @@ func (g *Game) placeDefaults(w, h int) {
 	// cells outrun 720). Design-unit margins through the scale funnel.
 	if g.rail != nil {
 		g.rail.SetMaxHeight(h - theme.Px(uikit.RailTopInset) - theme.Px(10))
-	}
-	// Design-unit margins composed through the scale funnel: at scale 1
-	// these are exactly the historical pixels (the layout tests pin them).
-	//
-	// The two core windows hold opposite top corners: the Overview — the
-	// table the player reads first — takes the viewport's upper-right
-	// corner, and the Selected Item window (the verbs for the current
-	// selection) the top-left, clear of the rail's gutter. The two are
-	// 380 + 464 design px wide, so no corner can hold both at the
-	// 1024×700 minimum; the split keeps every default disjoint there.
-	ov := g.kit.OverviewWindow()
-	if r := ov.GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		x, y := w-theme.Px(10)-r.Dx(), theme.Px(8)
-		place(ov, image.Rect(x, y, x+r.Dx(), y+r.Dy()))
-	}
-	sp := g.kit.SelectedWindow()
-	if r := sp.GetContainer().GetWidget().Rect; r.Dx() > 0 {
-		x, y := theme.Px(8+uikit.RailInset), theme.Px(8)
-		place(sp, image.Rect(x, y, x+r.Dx(), y+r.Dy()))
 	}
 	// The screens themselves: declared geometry, one rule per row. The
 	// log keeps its bottom-left pocket — its content floor (logMinW = 260

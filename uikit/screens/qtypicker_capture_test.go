@@ -27,7 +27,7 @@ import (
 //	ENTIEVE_CAPTURE=1 go test ./uikit/screens/ -run TestRefineryPickerCapture
 func TestRefineryPickerCapture(t *testing.T) {
 	k, _ := newTestKit(t)
-	k.SetCoreVisible(false) // the refinery and its picker only
+	hideCore(k) // the refinery and its picker only
 	ref := NewRefinery(k.Env())
 	k.AddWindow(ref.Win())
 	ref.Win().SetLocation(image.Rect(24, 24, 24+theme.Px(rfDefaultW), 24+theme.Px(rfDefaultH)))

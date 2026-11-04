@@ -457,7 +457,7 @@ diameter, 1 px stroke, 7 px apart (41 px block), drawn in the bar's border
 role at alpha 200; nothing filled. They sit `SpMd` from the bar's left
 edge; the icon starts after the block plus `SpMd`, the tracked title after
 the icon plus `IconGap`. Every window bar is `theme.NewTitleBar` (the
-uikit panels, the Overview and Selected Item core windows, the game's Esc
+uikit panels, the Overview and Selected Item windows, the game's Esc
 menu and the title phase's save manager), so they all carry them; the bar
 adds `theme.TitleDotsWidget`'s rings first. Two headers deliberately lead
 with their own mark instead: the fitting window's hull-portrait header and

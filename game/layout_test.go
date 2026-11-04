@@ -614,10 +614,10 @@ func TestLayoutRestoredOnLoad(t *testing.T) {
 	assertInBounds(t, g, 1280, 720)
 }
 
-// TestLayoutPersistsHiddenCoreWindows: while docked the Overview and
+// TestLayoutPersistsHiddenPersistentRows: while docked the Overview and
 // Selected Item windows are hidden — their geometry still round-trips
 // (hidden widgets keep their rect, and writeLayout reads it).
-func TestLayoutPersistsHiddenCoreWindows(t *testing.T) {
+func TestLayoutPersistsHiddenPersistentRows(t *testing.T) {
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
 	pump(t, g, 1280, 720)

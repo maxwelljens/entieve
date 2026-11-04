@@ -16,14 +16,15 @@
 // Integration: call Sync every frame before Update, then Draw after the
 // world render. World clicks feed selection back through Kit.Select; always
 // on chrome mounts via AddContainer (or AddTopContainer for chrome that
-// paints above windows), the built-in windows are reachable via
-// OverviewWindow/SelectedWindow and can be hidden with SetCoreVisible.
+// paints above windows). The kit builds the two always-on panels
+// (Overview and Selected Item) and hands them to the Screen host as
+// OverviewPanel/SelectedPanel: the host mounts, places, persists and
+// hides them like every other row.
 package screens
 
 import (
 	"errors"
 	"image"
-	"strings"
 
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/input"
@@ -186,14 +187,6 @@ type Kit struct {
 	// transient like the picker, never restored.
 	contactWin *ContactWin
 
-	// core visibility (hidden e.g. while docked in a station) and the
-	// player's own close of a core window (the rail's Overview /
-	// Selected Item entries): a window shows when the host shows the
-	// core (coreShown) AND the player has not closed it. State lives on
-	// the kit, so a rebuild (load, scale change) starts open.
-	coreClosed map[string]bool
-	coreShown  bool
-
 	// topsHidden suppresses the top chrome entirely (the title screen
 	// draws no gameplay chrome): drawTops parks the rail instead of
 	// re-showing it every frame.
@@ -262,8 +255,6 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command), opts ...K
 	k.closeBtns = map[*widget.Window]*widget.Button{}
 	k.anims = map[*widget.Window]*winAnim{}
 	k.rows = map[*widget.Window]func(image.Point) bool{}
-	k.coreClosed = map[string]bool{}
-	k.coreShown = true
 
 	// Shared interaction services first: Kit.Env hands them to every
 	// panel (menu + Show Info), and the kit takes over the window's
@@ -308,22 +299,12 @@ func NewKit(c *content.Content, s *sim.Sim, enqueue func(sim.Command), opts ...K
 
 	k.buildOverview()
 	k.buildSelected()
-	// The kit's own windows mount through AddWindow — not the raw
-	// ui.AddWindow — so their resize chrome joins k.chromes too (the
-	// kit's AddWindow is what attaches a chrome, see overview.go) and
-	// the window trees get validated against the theme. The chrome also
-	// makes the resize persistent: the spike has no close affordance.
-	// The two core windows' × closes through the rail's own toggle
-	// (ToggleCore) — hiding, not unmounting; reopening stays the rail's.
-	k.SetWindowClose(k.ov.win, func() { k.ToggleCore("Overview") })
-	k.SetWindowClose(k.sp.win, func() { k.ToggleCore("Selected Item") })
-	k.AddWindow(k.ov.win)
-	k.AddWindow(k.sp.win)
-	// The Overview's table rows are its row surface, registered the same way
-	// every host window's is (SetWindowRows).
-	k.SetWindowRows(k.ov.win, func(pt image.Point) bool {
-		return k.ov.tbl != nil && k.ov.tbl.RowAt(pt)
-	})
+	// The two always-on windows are Screen rows (game/screens.go, the
+	// Persistent facet): the kit builds them (construction, selection
+	// wiring and their table) and the host mounts, places, persists and
+	// hides them through the very same row path as every other window.
+	// Their × is the row's flag (host.build registers it), so a close
+	// hides the window and keeps it mounted; reopening stays the rail's.
 
 	k.Sync()
 	return k, nil
@@ -994,72 +975,14 @@ func (k *Kit) centerDialog(win *widget.Window) {
 	win.SetLocation(image.Rect(x, y, x+w.Dx(), y+w.Dy()))
 }
 
-// SetCoreVisible shows or hides the always-mounted chrome (Overview and
-// Selected Item), e.g. hide while docked in a station scene. The host's
-// rule composes with the player's own close (ToggleCore): the docked
-// veil can never be overridden from the rail, and a player close
-// survives it.
-func (k *Kit) SetCoreVisible(show bool) {
-	k.coreShown = show
-	k.applyCore()
-}
+// OverviewPanel is the Overview Screen row's panel: the kit built it, the
+// Screen host mounts, places, persists and hides it. The window is the
+// same one OverviewWindow returns.
+func (k *Kit) OverviewPanel() widgets.WindowPanel { return overviewPanel{k} }
 
-// ToggleCore flips the player's own open state of a core window by its
-// title — the rail's toggle for the two always-on windows, which are
-// not Screen spec rows. Reports whether the name is a core window (false
-// leaves it untouched).
-func (k *Kit) ToggleCore(name string) bool {
-	key := strings.ToLower(name)
-	if key != "overview" && key != "selected item" {
-		return false
-	}
-	k.coreClosed[key] = !k.coreClosed[key]
-	k.applyCore()
-	return true
-}
-
-// CoreOpen reports whether the player has NOT closed the core window
-// titled name (unknown names read as open — they never toggle).
-func (k *Kit) CoreOpen(name string) bool {
-	return !k.coreClosed[strings.ToLower(name)]
-}
-
-// applyCore resolves the two core windows' visibility from the host rule
-// and the player's close (state writes only; unchanged widgets are not
-// touched, so the per-frame call stays free).
-func (k *Kit) applyCore() {
-	set := func(w *widget.Window, show bool) {
-		if w == nil {
-			return
-		}
-		if show {
-			// A rail/dock re-show while the × close is still fading
-			// cancels that close: the player reopened the window, so no
-			// unmount is owed — it shows at once.
-			k.cancelClose(w)
-		} else {
-			// A host hide (the docked veil) while the open fade runs
-			// settles it: the unpark pass would otherwise show the window
-			// every frame against the host's hide.
-			k.settleOpen(w)
-		}
-		vis := widget.Visibility_Show
-		if !show {
-			vis = widget.Visibility_Hide
-		}
-		if c := w.GetContainer(); c != nil {
-			if wc := c.GetWidget(); wc.GetVisibility() != vis {
-				wc.SetVisibility(vis)
-			}
-		}
-	}
-	if k.ov != nil {
-		set(k.ov.win, k.coreShown && k.CoreOpen("Overview"))
-	}
-	if k.sp != nil {
-		set(k.sp.win, k.coreShown && k.CoreOpen("Selected Item"))
-	}
-}
+// SelectedPanel is the Selected Item Screen row's panel (see
+// OverviewPanel).
+func (k *Kit) SelectedPanel() widgets.WindowPanel { return selectedSurface{k} }
 
 // MenuInput polls the host's pointer and Esc key for the context menu and,
 // if it is up, the quantity picker. It must run BEFORE scene and key

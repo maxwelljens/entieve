@@ -38,6 +38,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The Overview and the Selected Item window are Screen rows**: the two
+  always-on windows no longer run on a parallel window system (their own
+  sidecar table, their own rail slice, their own close and visibility state
+  and their own corner placement in the game). They are ordinary rows of the
+  Screen spec with one facet, `Persistent`: the kit still builds them (the
+  table, the selection wiring), the host mounts, places, persists and hides
+  them, and their open flag is what the rail, the × and the dock rule write.
+  Nothing moves on screen: the same corner landing, the same mount order, the
+  same close-to-hide behaviour and the same layout sidecar bytes for the
+  default arrangement, because their row ids are the keys the old core table
+  wrote (`overview`, `selected`). The one user-visible difference is that
+  their closed/open state now persists in the layout sidecar like every other
+  window's instead of starting open after a load.
 - **One read seam per domain**: the screens' read seam (`ContentView`) now
   carries one member per domain (`Market`, `Industry`, `Holds`, `Hangar`,
   `Contacts`) instead of one forwarder per query, and the proficiency tree
