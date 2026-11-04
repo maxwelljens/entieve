@@ -468,7 +468,13 @@ func (r *Refinery) Sync() {
 
 	// The inspector and its refine gate (visible-but-grayed, never hidden).
 	outs := r.batchOf(r.sel.ore)
-	r.syncInspector(r.cv.BookOrders(r.cv.DockedMarket()), outs)
+	station := r.cv.DockedMarket()
+	ore := r.cv.Quote(station, r.sel.ore, sim.OrderSell, sim.RefineBatch)
+	mine := make([]sim.Quote, len(outs))
+	for i, o := range outs {
+		mine[i] = r.cv.Quote(station, o.Item, sim.OrderSell, o.Qty)
+	}
+	r.syncInspector(r.cv.BookOrders(station), outs, ore, mine)
 	if r.refineBtn != nil {
 		r.refineBtn.GetWidget().Disabled = !r.refineReadyFor(r.sel)
 	}
@@ -536,7 +542,7 @@ func yieldStrip(outs []rfOut, p theme.Palette) []widgets.RowSplit {
 // syncInspector rebuilds the inspector when its content moved: the selected
 // ore, the station's refine gate, the holds, the pane's width or the book rows
 // its money table reads.
-func (r *Refinery) syncInspector(book []sim.MarketStock, outs []rfOut) {
+func (r *Refinery) syncInspector(book []sim.MarketStock, outs []rfOut, ore sim.Quote, mine []sim.Quote) {
 	inner := r.inspInnerW()
 	key := r.inspKeyFor(book, outs, inner)
 	if key == r.inspKey {
@@ -561,7 +567,7 @@ func (r *Refinery) syncInspector(book []sim.MarketStock, outs []rfOut) {
 	} else {
 		r.head.set(false, "", "", "", inner)
 	}
-	r.math.SetRows(r.refineRows(book, outs))
+	r.math.SetRows(r.refineRows(ore, mine))
 
 	// The page: the money table's bar and rows, then the yield bill, one row
 	// per mineral, the most valuable first. The page's children keep their own
@@ -665,12 +671,12 @@ func (r *Refinery) yieldRowDef(o rfOut, total float64, p theme.Palette) widgets.
 }
 
 // refineRows is the inspector's money table: one whole batch sold raw against
-// its minerals, both sides walked over the docked book's bids (bookValue, the
-// profit table's own seam) — the question "refine this or sell it raw" in four
+// its minerals, both sides the sim's quote walk over the docked book's bids
+// (CONTEXT.md "Quote") — the question "refine this or sell it raw" in four
 // lines. There is no fee line: the sim charges none. A side the book holds no
 // bid for dashes with the marker, never a content base price (the profit
 // table's rule), and the two derived lines dash with it.
-func (r *Refinery) refineRows(book []sim.MarketStock, outs []rfOut) []widgets.PlainRow {
+func (r *Refinery) refineRows(ore sim.Quote, mine []sim.Quote) []widgets.PlainRow {
 	p := r.th.Pal()
 	row := func(label, value string, tint color.RGBA) widgets.PlainRow {
 		return widgets.PlainRow{Cells: []string{label, value}, Tint: tint}
@@ -683,18 +689,17 @@ func (r *Refinery) refineRows(book []sim.MarketStock, outs []rfOut) []widgets.Pl
 		return out
 	}
 
-	raw, hasOre := bookValue(book, r.sel.ore, sim.OrderBuy, sim.RefineBatch)
-	mine, hasMine := 0.0, len(outs) > 0
-	for _, o := range outs {
-		v, ok := bookValue(book, o.Item, sim.OrderBuy, o.Qty)
-		if !ok {
+	raw, hasOre := ore.Walk, ore.Priced
+	total, hasMine := 0.0, len(mine) > 0
+	for _, q := range mine {
+		if !q.Priced {
 			hasMine = false
 			break
 		}
-		mine += v
+		total += q.Walk
 	}
 	oreCell, oreTint := mfgMoney(raw), color.RGBA{}
-	mineCell, mineTint := mfgMoney(mine), color.RGBA{}
+	mineCell, mineTint := mfgMoney(total), color.RGBA{}
 	if !hasOre {
 		oreCell, oreTint = "— · no buy order", p.Dim
 	}
@@ -710,14 +715,14 @@ func (r *Refinery) refineRows(book []sim.MarketStock, outs []rfOut) []widgets.Pl
 			row("Refine delta", "—", p.Dim),
 			row("Margin", "—", p.Dim))
 	}
-	delta := mine - raw
+	delta := total - raw
 	tint := p.Good
 	if delta < 0 {
 		tint = p.Danger
 	}
 	margin := "—"
-	if mine > 0 {
-		margin = theme.PctLabel(delta / mine)
+	if total > 0 {
+		margin = theme.PctLabel(delta / total)
 	}
 	return append(out,
 		row("Refine delta", mfgSigned(delta), tint),

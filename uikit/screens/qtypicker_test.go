@@ -36,7 +36,7 @@ func TestQtyPickerFreeflowClamps(t *testing.T) {
 	inv := NewInventory(env)
 	ui := newQtyUI(t, env, inv.Win())
 	q := env.QtyWindow()
-	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
+	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-haven-rest"})
 	pumpQty(t, ui, env, inv.Sync, 1024, 700)
 	clickRow(ui, inv.cargo, 0)
 	pumpQty(t, ui, env, inv.Sync, 1024, 700)
@@ -54,8 +54,10 @@ func TestQtyPickerFreeflowClamps(t *testing.T) {
 	if got := q.Value(); got != qtyMax {
 		t.Errorf("drag to the right end = %d, want %d", got, qtyMax)
 	}
-	if got := q.DetailText(); !strings.HasPrefix(got, theme.FormatInt(qtyMax)+" × ") {
-		t.Errorf("preview = %q, want the %d-unit trade", got, qtyMax)
+	// This fixture's book holds no bid for the cargo's ammo, so the preview
+	// dashes instead of quoting a sale the command would refuse.
+	if got, want := q.DetailText(), "— · no buy order"; got != want {
+		t.Errorf("preview = %q, want %q", got, want)
 	}
 	qtyClick(t, ui, env, inv.Sync, 1)
 	if got := q.Value(); got != 1 {

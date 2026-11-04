@@ -121,13 +121,12 @@ type Manufacturing struct {
 	search *widget.TextInput
 	group  map[content.RecipeID]string
 	query  string
-	// stations is the universe's market roster (the fallback ladder's read).
-	stations []sim.StationID
 
 	// The inspector: one grid rebuilt whenever its key moves (the selected
-	// recipe, the station, the slots, the pane's width or the book the
-	// profit table reads), the material rows in a scroll viewport with the
-	// house rail beside it. The profit table is built once and re-filled.
+	// recipe, the station, the slots, the pane's width or the priced book
+	// rows the profit table reads), the material rows in a scroll viewport
+	// with the house rail beside it. The profit table is built once and
+	// re-filled.
 	insp       *widget.Container
 	inspKey    string
 	head       *itemHead
@@ -210,7 +209,6 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 		f.group[rec.ID] = mfgGroup(env.Defs(), rec.Product)
 	}
 	f.browseTree = newBrowseTree(browseNodes(ids, f.group))
-	f.stations = marketStations(env.Defs())
 
 	// The recipe list: one column of rich rows (product, verdict, cost strip),
 	// its cells only the fit source. The plate band reads through its first
@@ -525,45 +523,47 @@ func verdictGlyph(ready bool) string {
 	return "×"
 }
 
-// bookValue prices qty units of item on one side of a book: the resting
-// orders walked best first (the book's canonical order), each at its own
-// price, and the remainder at the last price seen when the depth runs out.
-// The second result is false when that side holds nothing for the item.
-//
-// shortcut: a book too thin to fill the quantity is priced as if its last
-// price held for the tail; upgrade when a depth-aware quote is worth the reads.
-func bookValue(book []sim.MarketStock, item content.ItemID, side sim.OrderSide, qty int) (float64, bool) {
-	if qty <= 0 {
-		return 0, true
+// mfgQuote is one bill line's priced goods, composed from the sim's quote
+// read (CONTEXT.md "Quote"): the walk at the docked book's asks, or the
+// cheapest ask another market station rests for the item (the † mark), or
+// nothing at all.
+type mfgQuote struct {
+	Walk   float64 // the sim's walk: the goods' value, the tail included
+	Priced bool    // a book priced the line
+	Remote bool    // the price came from another station's cheapest ask
+}
+
+// billQuotes prices one run's bill: the walk the sim quotes at this station's
+// asks, else the cheapest ask any market station rests. The walk, never the
+// composed total: the profit table prices the goods and carries the craft fee
+// on its own row.
+func (f *Manufacturing) billQuotes(station sim.StationID, needs []mfgNeed) []mfgQuote {
+	out := make([]mfgQuote, len(needs))
+	if station == "" {
+		return out // no station docked, no book to price against
 	}
-	left, spend, last := qty, 0.0, 0.0
-	for _, o := range book {
-		if o.Item != item || o.Side != side {
+	for i, n := range needs {
+		if q := f.cv.Quote(station, n.Item, sim.OrderBuy, n.Need); q.Priced {
+			out[i] = mfgQuote{Walk: q.Walk, Priced: true}
 			continue
 		}
-		take := min(left, o.Qty)
-		spend += float64(take) * o.Price
-		left -= take
-		last = o.Price
-		if left == 0 {
-			break
+		if price, ok := f.cv.CheapestAsk(n.Item); ok {
+			out[i] = mfgQuote{Walk: price * float64(n.Need), Priced: true, Remote: true}
 		}
 	}
-	if last == 0 {
-		return 0, false
-	}
-	return spend + float64(left)*last, true
+	return out
 }
 
 // profitRows is the inspector's profit table, priced off the docked book: the
-// asks pay for one run's bill (walked to the depth), the craft fee is the
-// sim's own, and the product's revenue is the bids it would meet. A bill line
-// the book cannot fill prices from the cheapest ask of any other market
-// station (the note says so); a line with no ask anywhere is left out and
-// named. A product with no local bid dashes its revenue: no content base
-// price stands in for a book that would not pay it. The note is the table's
-// footnote ("" when every figure is local and complete).
-func (f *Manufacturing) profitRows(book []sim.MarketStock, fallback map[content.ItemID]float64, needs []mfgNeed, def *content.RecipeDef) ([]widgets.PlainRow, string) {
+// asks pay for one run's bill (the sim's walk to the depth), the craft fee is
+// the sim's own, and the product's revenue is the walk over the bids it would
+// meet. A bill line the book cannot fill is priced from the
+// cheapest ask of any other market station (the note says so); a line with no
+// ask anywhere is left out and named. A product with no local bid dashes its
+// revenue: no content base price stands in for a book that would not pay it.
+// The note is the table's footnote ("" when every figure is local and
+// complete).
+func (f *Manufacturing) profitRows(quotes []mfgQuote, bid sim.Quote, needs []mfgNeed, def *content.RecipeDef) ([]widgets.PlainRow, string) {
 	p := f.th.Pal()
 	row := func(label, value string, tint color.RGBA) widgets.PlainRow {
 		return widgets.PlainRow{Cells: []string{label, value}, Tint: tint}
@@ -579,17 +579,14 @@ func (f *Manufacturing) profitRows(book []sim.MarketStock, fallback map[content.
 	mats, fee := 0.0, f.cv.JobFee(def.ID, 1)
 	marked := false
 	var unpriced []string
-	for _, n := range needs {
-		cost, ok := bookValue(book, n.Item, sim.OrderSell, n.Need)
-		if !ok {
-			price, remote := fallback[n.Item]
-			if !remote {
-				unpriced = append(unpriced, f.cv.TradeableName(n.Item))
-				continue
-			}
-			cost, marked = price*float64(n.Need), true
+	for i, n := range needs {
+		q := quotes[i]
+		if !q.Priced {
+			unpriced = append(unpriced, f.cv.TradeableName(n.Item))
+			continue
 		}
-		mats += cost
+		mats += q.Walk
+		marked = marked || q.Remote
 	}
 	var notes []string
 	if marked {
@@ -612,8 +609,8 @@ func (f *Manufacturing) profitRows(book []sim.MarketStock, fallback map[content.
 		row("Total cost", mfgMoney(total), color.RGBA{}),
 	}
 	note := strings.Join(notes, " · ")
-	sale, hasBid := bookValue(book, def.Product, sim.OrderBuy, def.Qty)
-	if !hasBid {
+	sale := bid.Walk
+	if !bid.Priced {
 		return append(out,
 			row("Sale price", "— · no buy order", p.Dim),
 			row("Profit", "—", p.Dim),
@@ -822,14 +819,19 @@ func (f *Manufacturing) recipeRow(station sim.StationID, rec content.RecipeID, r
 }
 
 // syncInspector rebuilds the inspector when its content moved: the selected
-// recipe, the station, the slot state, the pane's width or the book its
-// profit table reads.
+// recipe, the station, the slot state, the pane's width or the priced book
+// rows its profit table reads.
 func (f *Manufacturing) syncInspector(station sim.StationID, slotsFree bool, needs []mfgNeed) {
 	inner := f.inspInnerW()
-	book, fallback := f.quotes(station, needs)
 	product := f.recipeProduct(f.sel.recipe)
 	out := f.cv.PlayerJobOutput(f.sel.recipe, 1)
-	key := mfgInspKey(station, slotsFree, f.sel, needs, out, inner, book, fallback, product)
+	def, _ := f.cv.Defs().Recipes[f.sel.recipe]
+	quotes := f.billQuotes(station, needs)
+	bid := sim.Quote{}
+	if def != nil {
+		bid = f.cv.Quote(station, def.Product, sim.OrderSell, def.Qty)
+	}
+	key := mfgInspKey(station, slotsFree, f.sel, needs, out, inner, quotes, bid, product)
 	if key == f.inspKey {
 		return
 	}
@@ -844,7 +846,6 @@ func (f *Manufacturing) syncInspector(station sim.StationID, slotsFree bool, nee
 	// Head: the one item head (itemhead.go) the market's right pane leads
 	// with: the product's hero art, its name carrying the one-glance verdict
 	// glyph, and the product's own description wrapped to the pane.
-	def, _ := f.cv.Defs().Recipes[f.sel.recipe]
 	f.head = newItemHead(f.seams(), "")
 	if def != nil && f.hasSel {
 		ready := station != "" && f.cv.CanStartJob(station, f.sel.recipe, 1)
@@ -854,7 +855,7 @@ func (f *Manufacturing) syncInspector(station sim.StationID, slotsFree bool, nee
 	} else {
 		f.head.set(false, "", "No recipe selected", "", inner)
 	}
-	rows, note := f.profitRows(book, fallback, needs, def)
+	rows, note := f.profitRows(quotes, bid, needs, def)
 	f.profit.SetRows(rows)
 
 	// The body page: the profit table's bar and rows (with the footnote the
@@ -928,34 +929,6 @@ func (f *Manufacturing) syncInspector(station sim.StationID, slotsFree bool, nee
 
 	f.insp.AddChild(f.head.headBox, f.matsRail.Container(), startBar)
 	f.insp.RequestRelayout()
-}
-
-// quotes is the inspector's market read: the docked station's book and, for
-// every bill line that book cannot fill, the cheapest ask any other market
-// station rests (the market's own cross-station availability read).
-//
-// shortcut: the fallback walk scans every market book each frame it is
-// needed; the table itself still rebuilds only when its change key moves.
-func (f *Manufacturing) quotes(station sim.StationID, needs []mfgNeed) ([]sim.MarketStock, map[content.ItemID]float64) {
-	if station == "" {
-		return nil, nil
-	}
-	book := f.cv.BookOrders(station)
-	short := false
-	for _, n := range needs {
-		if _, ok := bookValue(book, n.Item, sim.OrderSell, n.Need); !ok {
-			short = true
-			break
-		}
-	}
-	if !short {
-		return book, nil
-	}
-	fallback := make(map[content.ItemID]float64)
-	for item, price := range crossAvail(f.cv, f.stations, station) {
-		fallback[item] = price
-	}
-	return book, fallback
 }
 
 // inspInnerW is the head's text width inside the pane's ContentsPad inset:
@@ -1045,11 +1018,11 @@ func (f *Manufacturing) resRowDef(o mfgOutput, p theme.Palette) widgets.TableRow
 // mfgInspKey is the inspector's change signature: the selection, the station
 // gate, the slot state, the pane's width (the head re-wraps with the seam),
 // every material's need/have, the run's effective output (a Manufacturing
-// level-up moves it), the book rows the profit table reads (the bill's asks
-// and the product's bids) and the fallback prices. A book move rebuilds the
-// card; an idle book does not.
+// level-up moves it) and the priced figures the profit table draws (the
+// bill's walks, the product's bid). A book move that re-prices a row rebuilds
+// the card; an idle book does not.
 func mfgInspKey(station sim.StationID, slotsFree bool, row manufacturingRow, needs []mfgNeed,
-	out, inner int, book []sim.MarketStock, fallback map[content.ItemID]float64, product content.ItemID) string {
+	out, inner int, quotes []mfgQuote, bid sim.Quote, product content.ItemID) string {
 	var b strings.Builder
 	b.WriteString(string(row.recipe))
 	b.WriteByte(';')
@@ -1070,39 +1043,21 @@ func mfgInspKey(station sim.StationID, slotsFree bool, row manufacturingRow, nee
 		b.WriteString(strconv.Itoa(n.Have))
 		b.WriteByte(';')
 	}
-	priced := func(item content.ItemID) bool {
-		if item == product {
-			return true
+	for _, q := range quotes {
+		b.WriteString(strconv.FormatFloat(q.Walk, 'g', -1, 64))
+		if q.Priced {
+			b.WriteByte('p')
 		}
-		for _, n := range needs {
-			if n.Item == item {
-				return true
-			}
+		if q.Remote {
+			b.WriteByte('r')
 		}
-		return false
-	}
-	for _, o := range book {
-		if !priced(o.Item) {
-			continue
-		}
-		b.WriteString(string(o.Item))
-		b.WriteByte(':')
-		b.WriteString(string(o.Side))
-		b.WriteByte(':')
-		b.WriteString(strconv.FormatFloat(o.Price, 'g', -1, 64))
-		b.WriteByte(':')
-		b.WriteString(strconv.Itoa(o.Qty))
 		b.WriteByte(';')
 	}
-	for _, n := range needs {
-		if price, ok := fallback[n.Item]; ok {
-			b.WriteString("f:")
-			b.WriteString(string(n.Item))
-			b.WriteByte(':')
-			b.WriteString(strconv.FormatFloat(price, 'g', -1, 64))
-			b.WriteByte(';')
-		}
+	b.WriteString(strconv.FormatFloat(bid.Walk, 'g', -1, 64))
+	if bid.Priced {
+		b.WriteByte('p')
 	}
+	b.WriteString(string(product))
 	return b.String()
 }
 

@@ -3,6 +3,7 @@ package screens
 import (
 	"image/color"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -578,22 +579,22 @@ func TestManufacturingProfitTable(t *testing.T) {
 	clickRow(ui, f.recipes, recipeRowFor(f, rec.Product))
 	frame()
 
-	// The figures both ways, from the book the table reads.
-	book := env.Sim.BookOrders(factoryStation)
+	// The figures both ways, from the sim quote the table reads.
 	needs := f.needs(rec.ID, 1)
 	mats := 0.0
 	for _, n := range needs {
-		cost, ok := bookValue(book, n.Item, sim.OrderSell, n.Need)
-		if !ok {
+		q := env.Quote(factoryStation, n.Item, sim.OrderBuy, n.Need)
+		if !q.Priced {
 			t.Fatalf("fixture: no local sell order for %s", n.Item)
 		}
-		mats += cost
+		mats += q.Walk
 	}
 	fee := env.JobFee(rec.ID, 1)
-	sale, ok := bookValue(book, rec.Product, sim.OrderBuy, rec.Qty)
-	if !ok {
+	bid := env.Quote(factoryStation, rec.Product, sim.OrderSell, rec.Qty)
+	if !bid.Priced {
 		t.Fatal("fixture: the product bid did not rest")
 	}
+	sale := bid.Walk
 
 	// The fixture's figures: 231,520 € of minerals at the local asks (the
 	// Sideron ask is 12,000 deep, so its tail is priced at the same 7),
@@ -681,48 +682,10 @@ func TestManufacturingNoBidDashes(t *testing.T) {
 	}
 }
 
-// TestBookValue pins the book walk: asks joined cheapest first at their own
-// prices, the tail at the last price seen when the depth runs short, and no
-// figure at all for a side that holds nothing.
-func TestBookValue(t *testing.T) {
-	asks := []sim.MarketStock{
-		{Item: "min-argon", Side: sim.OrderSell, Price: 64, Qty: 800},
-		{Item: "min-argon", Side: sim.OrderSell, Price: 70, Qty: 200},
-		{Item: "min-silex", Side: sim.OrderSell, Price: 38, Qty: 2500},
-	}
-	cases := []struct {
-		name  string
-		item  content.ItemID
-		side  sim.OrderSide
-		qty   int
-		want  float64
-		found bool
-	}{
-		{"vwap across two asks", "min-argon", sim.OrderSell, 1000, 800*64 + 200*70, true},
-		{"within the best ask", "min-argon", sim.OrderSell, 500, 500 * 64, true},
-		{"depth extended at the last ask", "min-argon", sim.OrderSell, 1200, 800*64 + 400*70, true},
-		{"other item untouched", "min-silex", sim.OrderSell, 2500, 2500 * 38, true},
-		{"no side at all", "min-cobalt", sim.OrderSell, 10, 0, false},
-		{"a bid is not an ask", "min-argon", sim.OrderBuy, 10, 0, false},
-		{"nothing needed", "min-cobalt", sim.OrderSell, 0, 0, true},
-	}
-	for _, c := range cases {
-		got, ok := bookValue(asks, c.item, c.side, c.qty)
-		if ok != c.found {
-			t.Errorf("%s: found = %v, want %v", c.name, ok, c.found)
-			continue
-		}
-		if got != c.want {
-			t.Errorf("%s: value = %v, want %v", c.name, got, c.want)
-		}
-	}
-}
-
 // TestManufacturingProfitMarks pins the fallback ladder's marks: a bill line
 // with no local sell order prices from another station's cheapest sell order
 // (daggered and named in the footnote), and one with no sell order anywhere
-// is left out of the
-// total and named.
+// is left out of the total and named.
 func TestManufacturingProfitMarks(t *testing.T) {
 	f, env, ui, _, frame := boardEnv(t)
 	rec := env.Content.Recipes["rec-mod-artillery-l"]
@@ -730,24 +693,30 @@ func TestManufacturingProfitMarks(t *testing.T) {
 	frame()
 	needs := f.needs(rec.ID, 1)
 
-	// A local book short of Argon, with a product bid, and the other
-	// stations' cheapest Argon ask supplied by the reader.
-	book := []sim.MarketStock{
-		{Item: "min-ferrite", Side: sim.OrderSell, Price: 7, Qty: 20000},
-		{Item: "min-nickel", Side: sim.OrderSell, Price: 16, Qty: 5000},
-		{Item: "min-cobalt", Side: sim.OrderSell, Price: 25, Qty: 5000},
-		{Item: "min-silex", Side: sim.OrderSell, Price: 38, Qty: 5000},
-		{Item: rec.Product, Side: sim.OrderBuy, Price: 300000, Qty: 5},
+	// The bill priced as if four minerals had a local ask and Argon did not:
+	// its line falls back to another station's cheapest ask (70 €).
+	prices := map[content.ItemID]float64{
+		"min-ferrite": 7, "min-nickel": 16, "min-cobalt": 25, "min-silex": 38,
 	}
 	local := 0.0
-	for _, n := range needs {
-		if n.Item == "min-argon" {
+	quotes := make([]mfgQuote, len(needs))
+	for i, n := range needs {
+		price, ok := prices[n.Item]
+		if !ok {
 			continue
 		}
-		cost, _ := bookValue(book, n.Item, sim.OrderSell, n.Need)
-		local += cost
+		quotes[i] = mfgQuote{Walk: price * float64(n.Need), Priced: true}
+		local += quotes[i].Walk
 	}
-	rows, note := f.profitRows(book, map[content.ItemID]float64{"min-argon": 70}, needs, rec)
+	bid := sim.Quote{Walk: 300000, Priced: true}
+	remote := slices.Clone(quotes)
+	for i, n := range needs {
+		if n.Item == "min-argon" {
+			remote[i] = mfgQuote{Walk: 70 * float64(n.Need), Priced: true, Remote: true}
+		}
+	}
+
+	rows, note := f.profitRows(remote, bid, needs, rec)
 	if got, want := rowValue(rows, "Materials"), mfgMoney(local+70*390)+" †"; got != want {
 		t.Errorf("remote-priced materials = %q, want %q", got, want)
 	}
@@ -756,12 +725,20 @@ func TestManufacturingProfitMarks(t *testing.T) {
 	}
 
 	// No ask anywhere: the line is left out of the sum and named.
-	rows, note = f.profitRows(book, nil, needs, rec)
+	rows, note = f.profitRows(quotes, bid, needs, rec)
 	if got, want := rowValue(rows, "Materials"), mfgMoney(local)+" †"; got != want {
 		t.Errorf("short materials = %q, want %q", got, want)
 	}
 	if !strings.Contains(note, env.TradeableName("min-argon")) || !strings.Contains(note, "left out") {
 		t.Errorf("note = %q, want the excluded mineral named", note)
+	}
+
+	// The mapping the table receives is the sim's: this fixture's book prices
+	// every line locally, so no line is marked remote.
+	for i, q := range f.billQuotes(factoryStation, needs) {
+		if !q.Priced || q.Remote {
+			t.Errorf("bill line %s = %+v, want the local ask's price", needs[i].Item, q)
+		}
 	}
 }
 

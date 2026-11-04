@@ -218,6 +218,104 @@ func matchValue(ms []match) (qty int, value float64) {
 	return qty, value
 }
 
+// marketFees is the institutional load on one execution: the broker fee on
+// the placed value both ways, the sales tax on the sell side only. The one
+// place the two rates are applied, so a quote and a fill can never charge
+// different money.
+func marketFees(side OrderSide, value float64) (fee, tax float64) {
+	fee = MarketBrokerFee * value
+	if side == OrderSell {
+		tax = MarketSalesTax * value
+	}
+	return fee, tax
+}
+
+// QuoteLeg is one priced slice of a quote's walk: a resting order's fill, or
+// the synthetic tail the walk extends at the last price when the book runs
+// out.
+type QuoteLeg struct {
+	Price float64
+	Qty   int
+	Tail  bool
+}
+
+// Quote is one side's executed walk over a station's book (CONTEXT.md
+// "Quote"): what the amount would trade at, priced exactly as CmdBuy/CmdSell
+// price it — the same matchCrossing walk in price-time priority and the same
+// marketFees load — so a preview can compose the wallet's own number.
+//
+// Walk prices every unit asked for, the tail at the last resting price when
+// the depth runs short (the tables' pricing convention); Executed values only
+// what the book holds, which is all a market order fills. Fee and Tax ride
+// Executed, never the tail.
+type Quote struct {
+	Legs     []QuoteLeg // best price first: ascending asks, descending bids, tail last
+	Walk     float64    // every leg's price × qty, the tail included
+	Executed float64    // the units the book fills, at their own resting prices
+	Filled   int        // units the book fills (what a market order takes)
+	Fee      float64    // broker fee on Executed
+	Tax      float64    // sales tax on Executed (sell side only)
+	Short    bool       // the depth ran out: the last leg is the tail
+	Priced   bool       // that side held at least one order for the item
+}
+
+// Quote is the executed walk for qty units of item on side at station's
+// book. A side with no resting order returns an unpriced quote; nothing is
+// written and no event is emitted.
+func (s *Sim) Quote(station StationID, item content.ItemID, side OrderSide, qty int) Quote {
+	if qty <= 0 {
+		return Quote{Priced: true}
+	}
+	var ms []match
+	if book := s.market[station]; book != nil {
+		ms = book.matchCrossing(side, item, qty, 0)
+	}
+	if len(ms) == 0 {
+		return Quote{}
+	}
+	q := Quote{Priced: true}
+	left := qty
+	for _, m := range ms {
+		q.Legs = append(q.Legs, QuoteLeg{Price: m.order.Price, Qty: m.qty})
+		q.Executed += m.order.Price * float64(m.qty)
+		q.Filled += m.qty
+		left -= m.qty
+	}
+	q.Walk = q.Executed
+	if left > 0 {
+		last := ms[len(ms)-1].order.Price
+		q.Legs = append(q.Legs, QuoteLeg{Price: last, Qty: left, Tail: true})
+		q.Walk += last * float64(left)
+		q.Short = true
+	}
+	q.Fee, q.Tax = marketFees(side, q.Executed)
+	return q
+}
+
+// CheapestAsk is the cheapest sell order resting on item at any market
+// station of the sim's own roster (marketStations), the read a bill line falls
+// back to when the local book holds no ask for it. The local book's own ask
+// answers too: callers ask only for the items it cannot price.
+func (s *Sim) CheapestAsk(item content.ItemID) (float64, bool) {
+	best, ok := 0.0, false
+	for _, st := range marketStations(s.Content) {
+		book := s.market[st]
+		if book == nil {
+			continue
+		}
+		for _, o := range book.Orders { // canonical: asks ascend per book
+			if o.Item != item || o.Side != OrderSell {
+				continue
+			}
+			if !ok || o.Price < best {
+				best, ok = o.Price, true
+			}
+			break
+		}
+	}
+	return best, ok
+}
+
 // settle applies a fill set to the book, settles the RESTING side's
 // obligations (a player's filled bid receives its goods into the hangar, a
 // player's filled ask is paid the proceeds minus the sales tax) and
@@ -374,7 +472,7 @@ func (s *Sim) execBuy(c CmdBuy) {
 		return
 	}
 	qty, cost := matchValue(ms)
-	fee := MarketBrokerFee * cost
+	fee, _ := marketFees(OrderBuy, cost)
 	if s.wallet < cost+fee {
 		s.emit(Event{Kind: EvMarket, Severity: SevWarning, Actor: s.player, Item: c.Item,
 			Text: "Insufficient funds for " + s.itemName(c.Item), Value: cost + fee})
@@ -438,8 +536,7 @@ func (s *Sim) execSell(c CmdSell) {
 	_, proceeds := s.settle(book, ms)
 	// Institutional load on the sell side: broker fee on the placed value
 	// plus the sales tax on execution (both come out of the proceeds).
-	fee := MarketBrokerFee * proceeds
-	tax := MarketSalesTax * proceeds
+	fee, tax := marketFees(OrderSell, proceeds)
 	s.routeFee(fee + tax)
 	// Selling into a standing war bid is the player's own delivery to the
 	// front: the treasury paid, the goods are consumed, the meter will move.
