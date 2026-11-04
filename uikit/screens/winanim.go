@@ -102,6 +102,32 @@ func (k *Kit) startOpen(w *widget.Window) {
 	}
 }
 
+// TitleBarAction hangs one square action cell in a window's title bar,
+// immediately left of the ×: the end-anchored slot any title bar can use
+// (the overview cog's geometry, now shared). The cell is closeBtnH square
+// and ends SpSm clear of the ×'s closeBtnW strip, so the × keeps the bar's
+// last columns and its press never arms a window drag. Its children are
+// laid in order, so a caller may pass the control and a glyph drawn over it.
+//
+// shortcut: the bar's title clears only the × strip, so a long title can
+// run under an action; keep action-bearing bars' labels short until
+// ChromeText learns the action inset.
+func TitleBarAction(title *widget.Container, children ...widget.PreferredSizeLocateableWidget) {
+	cell := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+		widget.ContainerOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(theme.Px(closeBtnH), theme.Px(closeBtnH)),
+			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionEnd,
+				VerticalPosition:   widget.AnchorLayoutPositionCenter,
+				Padding:            &widget.Insets{Right: theme.Px(closeBtnW + theme.SpSm)},
+			}),
+		),
+	)
+	cell.AddChild(children...)
+	title.AddChild(cell)
+}
+
 // SetWindowClose registers win's close semantics — the callback the
 // title bar's × runs — and attaches the × itself (once, and only when
 // the window has a title bar: the station services view owns no title

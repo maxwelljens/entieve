@@ -259,24 +259,11 @@ func (k *Kit) buildOverview() {
 	contents.AddChild(tbl.Container())
 
 	title, _ := theme.NewTitleBar(k.th, "Overview", "")
-	// The cog's square cell: the chrome button stretched edge to edge under
-	// its glyph (services iconCell's twin), end-anchored clear of the ×'s
-	// closeBtnW-column strip by one hairline.
+	// The cog is the title bar's one action: the shared slot's cell, end
+	// anchored clear of the × (see TitleBarAction's geometry).
 	cogBtn, cogGlyph := k.overviewCog()
 	k.ovCog, k.ovCogGlyph = cogBtn, cogGlyph
-	cogCell := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
-		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(theme.Px(closeBtnH), theme.Px(closeBtnH)),
-			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-				HorizontalPosition: widget.AnchorLayoutPositionEnd,
-				VerticalPosition:   widget.AnchorLayoutPositionCenter,
-				Padding:            &widget.Insets{Right: theme.Px(closeBtnW + ovCogGap)},
-			}),
-		),
-	)
-	cogCell.AddChild(cogBtn, cogGlyph) // glyph last: it draws over the chrome
-	title.AddChild(cogCell)
+	TitleBarAction(title, cogBtn, cogGlyph) // glyph last: it draws over the chrome
 
 	o.win = widget.NewWindow(
 		widget.WindowOpts.Contents(contents),
@@ -299,9 +286,9 @@ func (k *Kit) buildOverview() {
 	)
 }
 
-// ovCogGap is the air between the cog cell and the × (design px): the ×
-// owns the bar's last closeBtnW columns and the two bordered buttons must
-// not touch — SpSm, the house hairline.
+// ovCogGap is the air the title-bar action slot leaves between its cell and
+// the × (design px): the × owns the bar's last closeBtnW columns and the two
+// bordered buttons must not touch — SpSm, the house hairline.
 const ovCogGap = theme.SpSm
 
 // overviewCog is the overview title bar's filter door: the manifest's cog

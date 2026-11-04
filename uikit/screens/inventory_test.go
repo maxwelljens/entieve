@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"fmt"
 	"image"
 	"math"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // dragStack drags one section's stack (row i in list view) to the middle of
@@ -405,38 +407,74 @@ func sameWidget(a widget.PreferredSizeLocateableWidget, c widget.Containerer) bo
 	return ok && a.GetWidget() == w.GetWidget()
 }
 
-// TestInventoryDragGhostFollows: while a stack is dragged the ghost chip
-// follows the pointer, carries the item's name, and the hold under it
-// lights as the drop target; release clears both.
+// TestInventoryDragGhostFollows: while a stack is dragged the chip tracks the
+// pointer across two move frames at scale 1 and 1.5, carries the item's name,
+// and the hold under it lights as the drop target; release clears both. The
+// two moves stay inside one drop target on purpose: the old pin crossed into
+// a NEW target, whose highlight flip happened to re-lay the overlay out, so
+// it passed while the chip stood still everywhere else in the real game.
+//
+// This pins the placed box. The DRAWN chip's accent-border centroid is pinned
+// in TestInventoryCaptureFrame's verify (headless tests cannot read pixels
+// back: ebiten's ReadPixels refuses before the loop starts, which is why
+// every pixel assertion in the house is capture-gated).
 func TestInventoryDragGhostFollows(t *testing.T) {
+	defer theme.SetScale(1)
+	for _, sc := range []float64{1, 1.5} {
+		t.Run(fmt.Sprintf("scale %v", sc), func(t *testing.T) {
+			theme.SetScale(sc)
+			runDragGhostFollow(t)
+		})
+	}
+}
+
+func runDragGhostFollow(t *testing.T) {
 	env, _ := newTestEnv(t)
 	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-solace"})
 	inv := NewInventory(env)
 	ui := newWindowUI(t, env, inv.Win())
-	pump := func() { env.Pointer().Begin(); uitest.PumpWindow(t, ui, inv.Sync, 1024, 700) }
-	pump()
-	pump()
+	w, h := theme.Px(1024), theme.Px(700)
+	frame := func() {
+		env.Pointer().Begin()
+		inv.Sync()
+		ui.Update()
+		ui.Draw(ebiten.NewImage(w, h))
+	}
+	frame()
+	frame()
 
 	r := inv.cargo.RowWidgetForTest(0).Rect
 	at := image.Pt(r.Min.X+r.Dx()/2, r.Min.Y+r.Dy()/2)
 	env.in.x, env.in.y = at.X, at.Y
 	env.in.edge, env.in.down = [3]bool{true}, [3]bool{true}
-	pump()
-	over := inv.hangBody.GetWidget().Rect
-	to := image.Pt(over.Min.X+over.Dx()/2, over.Min.Y+over.Dy()/2)
-	env.in.x, env.in.y = to.X, to.Y
-	env.in.edge = [3]bool{}
-	pump()
+	frame()
 
-	ghost := inv.ghost.container.GetWidget()
-	if !ghost.IsVisible() {
-		t.Fatal("no drag ghost while dragging")
+	band := inv.hangBody.GetWidget().Rect
+	p1 := image.Pt(band.Min.X+theme.Px(40), band.Max.Y-theme.Px(30))
+	env.in.x, env.in.y = p1.X, p1.Y
+	env.in.edge = [3]bool{}
+	frame()
+	g1 := inv.ghost.container.GetWidget().Rect
+	if want := ghostBox(inv, p1); g1.Min != want.Min {
+		t.Fatalf("chip at %v, want the pointer offset %v (first move)", g1.Min, want.Min)
 	}
+
+	// The second move stays inside the same (already lit) target: no
+	// highlight flip, so the chip must move on its own.
+	delta := image.Pt(theme.Px(120), 0)
+	p2 := p1.Add(delta)
+	env.in.x, env.in.y = p2.X, p2.Y
+	frame()
+	g2 := inv.ghost.container.GetWidget().Rect
+	if want := ghostBox(inv, p2); g2.Min != want.Min {
+		t.Errorf("chip at %v, want the pointer offset %v (second move)", g2.Min, want.Min)
+	}
+	if got := g2.Min.Sub(g1.Min); got != delta {
+		t.Errorf("chip moved %v, want the pointer delta %v", got, delta)
+	}
+
 	if name := inv.ghost.name.Label; name != env.TradeableName(inv.cargo.Rows[0].Data.(content.ItemID)) {
 		t.Errorf("ghost names %q, want the dragged item", name)
-	}
-	if want := to.Add(image.Pt(theme.Px(12), theme.Px(12))); ghost.Rect.Min != want {
-		t.Errorf("ghost at %v, want the pointer offset %v", ghost.Rect.Min, want)
 	}
 	if !inv.hangFrame.GetWidget().IsVisible() {
 		t.Error("the hovered hold is not lit as the drop target")
@@ -446,10 +484,19 @@ func TestInventoryDragGhostFollows(t *testing.T) {
 	}
 
 	env.in.down = [3]bool{}
-	pump()
+	frame()
 	if inv.ghost.container.GetWidget().IsVisible() || inv.hangFrame.GetWidget().IsVisible() {
 		t.Error("release left the drag chrome up")
 	}
+}
+
+// ghostBox is where the overlay puts the chip for pointer p: p + the 12 px
+// offset, in the chip's own measured size (the placement RULE, not the placed
+// rect, so a stale layout cannot satisfy it).
+func ghostBox(inv *Inventory, p image.Point) image.Rectangle {
+	gw, gh := inv.ghost.container.PreferredSize()
+	at := p.Add(image.Pt(theme.Px(12), theme.Px(12)))
+	return image.Rect(at.X, at.Y, at.X+gw, at.Y+gh)
 }
 
 // TestInventoryDropOnEmptySpace: a release that lands outside every hold's
@@ -479,10 +526,10 @@ func TestInventoryDropOnEmptySpace(t *testing.T) {
 	}
 }
 
-// TestInventoryToolbarHasNoMoveButtons: the three move buttons are gone
-// (the drag replaced them) and Sell stays, greyed until a docked
-// selection.
-func TestInventoryToolbarHasNoMoveButtons(t *testing.T) {
+// TestInventoryToolbarKeepsOnlySell: the three move buttons are gone (the
+// drag replaced them) and the view toggle moved to the title bar, so the
+// toolbar carries Sell alone, greyed until a docked selection.
+func TestInventoryToolbarKeepsOnlySell(t *testing.T) {
 	env, _ := newTestEnv(t)
 	inv := NewInventory(env)
 	ui := newWindowUI(t, env, inv.Win())
@@ -491,14 +538,12 @@ func TestInventoryToolbarHasNoMoveButtons(t *testing.T) {
 	toolbar := inv.body.Children()[1].(*widget.Container)
 	var labels []string
 	for _, ch := range toolbar.Children() {
-		btn, ok := ch.(*widget.Button)
-		if !ok {
-			continue
+		if btn, ok := ch.(*widget.Button); ok {
+			labels = append(labels, btn.Text().Label)
 		}
-		labels = append(labels, btn.Text().Label)
 	}
-	if len(labels) != 2 || labels[0] != "Tiles" || labels[1] != "Sell" {
-		t.Fatalf("toolbar = %v, want Tiles + Sell only (the move buttons are gone)", labels)
+	if len(labels) != 1 || labels[0] != "Sell" {
+		t.Fatalf("toolbar = %v, want Sell alone (the toggle is title-bar furniture)", labels)
 	}
 	if !inv.sell.GetWidget().Disabled {
 		t.Error("Sell armed with no selection")
@@ -508,6 +553,78 @@ func TestInventoryToolbarHasNoMoveButtons(t *testing.T) {
 	uitest.PumpWindow(t, ui, inv.Sync, 1024, 700)
 	if inv.sell.GetWidget().Disabled {
 		t.Error("Sell still greyed with a docked selection")
+	}
+}
+
+// TestInventoryViewToggleIsTitleBarFurniture: the view switch is the title
+// bar's action slot immediately left of the × (one SpSm gap), not a toolbar
+// button: a closeBtnH square, icon-only, its glyph naming the view it
+// switches to (the tooltip carries the word).
+func TestInventoryViewToggleIsTitleBarFurniture(t *testing.T) {
+	k, _ := newTestKit(t)
+	inv := NewInventory(k.Env())
+	k.SetWindowClose(inv.Win(), func() {})
+	k.AddWindow(inv.Win())
+	frame := func() {
+		k.Pointer().Begin()
+		inv.Sync()
+		k.Sync()
+		if err := k.Update(); err != nil {
+			t.Fatalf("Update: %v", err)
+		}
+		k.Draw(ebiten.NewImage(1024, 700))
+	}
+	frame()
+	frame()
+
+	closeBtn := k.CloseButtonOf(inv.Win()).GetWidget().Rect
+	view := inv.view.GetWidget().Rect
+	bar := inv.win.TitleBar.GetWidget().Rect
+	if closeBtn.Empty() || view.Empty() {
+		t.Fatalf("fixture: × %v / toggle %v never laid out", closeBtn, view)
+	}
+	if !view.In(bar) {
+		t.Errorf("view toggle %v is not in the title bar %v", view, bar)
+	}
+	if want := closeBtn.Min.X - theme.Px(theme.SpSm); view.Max.X != want {
+		t.Errorf("toggle right edge %d, want %d (SpSm clear of the × at %d)", view.Max.X, want, closeBtn.Min.X)
+	}
+	if view.Min.Y != closeBtn.Min.Y || view.Dy() != theme.Px(closeBtnH) || view.Dx() != view.Dy() {
+		t.Errorf("toggle %v, want the ×'s %d×%d band (%v)", view, theme.Px(closeBtnH), theme.Px(closeBtnH), closeBtn)
+	}
+	if got := inv.viewIcon.Name(); got != "stat_structure" {
+		t.Errorf("toggle glyph = %q, want stat_structure (the view it switches to)", got)
+	}
+	if got := inv.viewTip.Model().Title; got != "Tiles" {
+		t.Errorf("toggle tooltip = %q, want Tiles", got)
+	}
+
+	// The title bar's furniture is a button like any other: its click
+	// handler is what a press on it runs (ebitenui's own input reads the
+	// OS mouse, which a headless test cannot script; the house fires the
+	// button event instead).
+	click := func() {
+		inv.view.ClickedEvent.Fire(&widget.ButtonClickedEventArgs{Button: inv.view})
+		if err := k.Update(); err != nil {
+			t.Fatalf("Update: %v", err)
+		}
+	}
+	click()
+	if !inv.ViewTiles() {
+		t.Fatal("the title bar's toggle did not switch to the tile view")
+	}
+	if got, want := inv.viewIcon.Name(), "row_module"; got != want {
+		t.Errorf("toggle glyph after the switch = %q, want %q", got, want)
+	}
+	if got := inv.viewTip.Model().Title; got != "List" {
+		t.Errorf("toggle tooltip after the switch = %q, want List", got)
+	}
+	click()
+	if inv.ViewTiles() {
+		t.Error("the title bar's toggle did not switch back to the list view")
+	}
+	if got, want := inv.viewIcon.Name(), "stat_structure"; got != want {
+		t.Errorf("toggle glyph back = %q, want %q", got, want)
 	}
 }
 

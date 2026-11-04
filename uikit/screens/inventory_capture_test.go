@@ -163,6 +163,40 @@ func TestInventoryCaptureFrame(t *testing.T) {
 				fail("popup line = %q, want the item and destination", line)
 			}
 
+			// The drag chip follows the pointer PIXEL for pixel: two move
+			// frames inside one target (no highlight flip to re-lay the
+			// overlay), and the drawn chip's accent-border centroid must
+			// move by exactly the pointer delta. Rendered into scratch
+			// frames; the saved PNG stays the earlier shot.
+			tile := inv.cargoTiles.tiles[0].GetWidget().Rect
+			env.in.x, env.in.y = tile.Min.X+tile.Dx()/2, tile.Min.Y+tile.Dy()/2
+			env.in.edge, env.in.down = [3]bool{true}, [3]bool{true}
+			env.Pointer().Begin()
+			inv.Sync()
+			ui.Update()
+			ore := inv.oreBody.GetWidget().Rect
+			p1 := image.Pt(ore.Min.X+theme.Px(20), ore.Max.Y-theme.Px(20))
+			delta := image.Pt(theme.Px(120), 0)
+			chip := func(p image.Point) (int, image.Point) {
+				env.in.x, env.in.y = p.X, p.Y
+				env.in.edge = [3]bool{}
+				env.Pointer().Begin()
+				inv.Sync()
+				q.Sync()
+				ui.Update()
+				shot := ebiten.NewImage(1280, 720)
+				ui.Draw(shot)
+				return accentInk(shot, ghostBox(inv, p), env.Pal().Accent)
+			}
+			n1, c1 := chip(p1)
+			n2, c2 := chip(p1.Add(delta))
+			env.in.down = [3]bool{}
+			if n1 < 100 || n2 < 100 {
+				fail("the drag chip's border is not drawn where the pointer is (%d/%d accent px)", n1, n2)
+			} else if got := c2.Sub(c1); got != delta {
+				fail("the drag chip's ink moved %v, want the pointer delta %v", got, delta)
+			}
+
 			// Docking swaps the hatch for the table: the same band's
 			// diagonal lines are gone. Rendered into a scratch frame so the
 			// saved PNG stays the undocked shot.
@@ -216,4 +250,32 @@ func hatchPixels(img *ebiten.Image, band image.Rectangle) int {
 		}
 	}
 	return n
+}
+
+// accentInk counts the accent pixels inside box and returns their centroid:
+// the drag chip's border is the only accent ink drawn there, so its centroid
+// is the chip's drawn centre (a stale chip cannot pass the tracking pin).
+func accentInk(img *ebiten.Image, box image.Rectangle, accent color.RGBA) (int, image.Point) {
+	near := func(v uint32, want uint8) bool {
+		x := int(v>>8) - int(want)
+		return x > -24 && x < 24
+	}
+	sx, sy, n := 0, 0, 0
+	for y := max(box.Min.Y, 0); y < min(box.Max.Y, img.Bounds().Dy()); y++ {
+		for x := max(box.Min.X, 0); x < min(box.Max.X, img.Bounds().Dx()); x++ {
+			r, g, b, a := img.At(x, y).RGBA()
+			if a == 0 {
+				continue
+			}
+			if near(r, accent.R) && near(g, accent.G) && near(b, accent.B) {
+				sx += x
+				sy += y
+				n++
+			}
+		}
+	}
+	if n == 0 {
+		return 0, image.Point{}
+	}
+	return n, image.Pt(sx/n, sy/n)
 }
