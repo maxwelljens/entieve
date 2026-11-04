@@ -849,8 +849,13 @@ in three panes over one seam:
   itself, one row per mineral with **the cost driver first** (each row: the
   mineral's own art at three times the row icon size, its share of the run's
   value and its have/need bar with the exact numbers, green when covered and
-  red when short). **Start job** closes the pane; while the sim would refuse,
-  it is simply grayed.
+  red when short). The pane closes on the **RESULT** section, which names
+  what one run actually makes: one row per output, the product's art and name
+  over the units it yields (`×100` for a batch of ammunition or charges, `×1`
+  for a module or a hull), on the same one-run basis as the bill and the
+  profit table (the picker's run count multiplies it at Start).
+  **Start job** closes the pane; while the sim would refuse, it is simply
+  grayed.
 
 **Start** opens the quantity picker on the job's **runs** (1–100, starting
 at the run count you last started); Confirm starts the job. The materials

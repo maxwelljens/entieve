@@ -144,6 +144,17 @@ func TestManufacturingCaptureFrame(t *testing.T) {
 			if got := f.matsRows[0].Icon.Widget().GetWidget().Rect.Dx(); got != theme.Px(mfgMatIcon) {
 				fail("bill icon = %d px, want the %d px box", got, theme.Px(mfgMatIcon))
 			}
+			// The RESULT section closes the card with the run's one output
+			// (the artillery module, one unit), built with the bill and below
+			// the fold at this height, the same wheel away as the bill.
+			def, _ := f.cv.Defs().Recipes["rec-mod-artillery-l"]
+			res := f.resRowDef(mfgOutput{Item: def.Product, Qty: def.Qty}, theme.DefaultPalette())
+			if got := res.Stack[len(res.Stack)-1].Segs[0].Text; got != "×1" {
+				fail("RESULT figure = %q, want the one-unit module \"×1\"", got)
+			}
+			if len(f.resRows) != 1 || f.resRows[0].Root.GetWidget().Rect.Empty() {
+				fail("inspector RESULT row missing or unlaid (%d rows)", len(f.resRows))
+			}
 			if len(f.jobs.Rows) != 1 || f.jobs.Rows[0].Cells[4] != "Running" {
 				fail("job strip rows = %+v, want the one running job", f.jobs.Rows)
 			}

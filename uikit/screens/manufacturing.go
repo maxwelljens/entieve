@@ -54,6 +54,12 @@ const (
 	// icon (16 design px) the bill opened with, so the mineral's art reads at
 	// a glance (the owner's size; the row height follows the box).
 	mfgMatIcon = 48
+
+	// mfgResNameClip is a result row's name budget in runes: the name line
+	// must stay inside the bill's viewport, narrowest at the window's floor.
+	// shortcut: a rune budget, not a measured fit; upgrade to a face measure
+	// if the pane, the faces or the figure change.
+	mfgResNameClip = 14
 )
 
 // mfgDefaultW/H are the window's landing rect (see ManufacturingRect):
@@ -68,9 +74,10 @@ const (
 // products as a browse tree (the market window's own browse column over
 // recipe groups) with a live search, a recipe list whose rows carry the
 // one-glance verdict and a value-share strip, and an inspector for the
-// selected recipe (the item head, the market-priced profit table and the
-// material bill), over the GLOBAL job list (every station, grouped by
-// station) with per-job progress and the Collect / Cancel actions.
+// selected recipe (the item head, the market-priced profit table, the
+// material bill and the RESULT section naming what one run makes), over the
+// GLOBAL job list (every station, grouped by station) with per-job progress
+// and the Collect / Cancel actions.
 //
 // The browse tree scopes the list to a branch (All is the whole catalog) and
 // the search field filters that branch live, ranked by fuzzy score over the
@@ -131,6 +138,8 @@ type Manufacturing struct {
 	matsScroll *widget.ScrollContainer
 	matsRail   *widgets.ScrollRail
 	matsRows   []*widgets.StackRow
+	resBar     *widget.Container
+	resRows    []*widgets.StackRow
 	startBtn   *widget.Button
 
 	collect, cancel *widget.Button
@@ -147,6 +156,23 @@ type mfgNeed struct {
 	Need  int
 	Have  int
 	Value float64
+}
+
+// mfgOutput is one thing one run makes: the product and its units per run.
+// Recipes declare a single product today; the inspector renders a list so a
+// byproduct would just be another row.
+type mfgOutput struct {
+	Item content.ItemID
+	Qty  int
+}
+
+// outputsOf is a recipe's outputs per run (none when the recipe no longer
+// loads).
+func outputsOf(def *content.RecipeDef) []mfgOutput {
+	if def == nil {
+		return nil
+	}
+	return []mfgOutput{{Item: def.Product, Qty: def.Qty}}
 }
 
 // manufacturingRow is the manufacturing tables' row payload: the recipe id
@@ -807,6 +833,7 @@ func (f *Manufacturing) syncInspector(station sim.StationID, slotsFree bool, nee
 	f.inspKey = key
 	f.insp.RemoveChildren()
 	f.matsRows = f.matsRows[:0]
+	f.resBar, f.resRows = nil, f.resRows[:0]
 	f.startBtn, f.profitNote = nil, nil
 
 	p := f.th.Pal()
@@ -861,6 +888,24 @@ func (f *Manufacturing) syncInspector(station sim.StationID, slotsFree bool, nee
 		r := f.matRow(n, total, p)
 		f.matsRows = append(f.matsRows, r)
 		f.matsBox.AddChild(r.Root)
+	}
+
+	// The RESULT section: what one run actually makes, the one number the
+	// bill and the profit table never showed. It closes the page under the
+	// bill, and Start stays pinned below the viewport; the quantity picker's
+	// run count multiplies this at Start, the inspector quotes one run.
+	if outs := outputsOf(def); len(outs) > 0 {
+		var lbl *theme.ChromeText
+		f.resBar, lbl = sectionBarText(f.th, "RESULT")
+		lbl.Label = "RESULT · one run"
+		lbl.GetWidget().MinWidth = int(math.Ceil(
+			theme.MeasureTracked(lbl.Label, *f.th.FaceMono(theme.StepSmall), f.th.TS().Small)))
+		f.matsBox.AddChild(f.resBar)
+		for _, o := range outs {
+			r := f.resRow(o, p)
+			f.resRows = append(f.resRows, r)
+			f.matsBox.AddChild(r.Root)
+		}
 	}
 	f.matsScroll, f.matsRail = newScrollColumn(f.seams(), f.matsBox)
 	f.matsScroll.GetWidget().ScrolledEvent.AddHandler(func(args any) {
@@ -948,23 +993,50 @@ func (f *Manufacturing) matRowDef(n mfgNeed, total float64, p theme.Palette) wid
 	if n.Have < n.Need {
 		state = p.Danger
 	}
-	row := widgets.TableRow{
+	return f.iconRow(name, widgets.TradeableIcon(f.cv.Defs(), n.Item),
+		widgets.RowLine{Segs: []widgets.RowSeg{
+			{Text: name, MinW: theme.Px(mfgMatNameW), Step: theme.StepSmall},
+			{Text: theme.PctLabel(share), MinW: theme.Px(34), Step: theme.StepTiny, Tint: p.Dim},
+		}},
+		widgets.RowLine{Segs: []widgets.RowSeg{
+			{HasBar: true, Bar: frac, MinW: theme.Px(mfgMatBarW), Tint: state},
+			{Text: theme.FormatInt(int64(n.Have)) + " / " + theme.FormatInt(int64(n.Need)),
+				Step: theme.StepTiny, Tint: state},
+		}})
+}
+
+// iconRow is the bill and result rows' shared shape: the row's 48 px art box
+// and name cell around the caller's own lines.
+func (f *Manufacturing) iconRow(name, icon string, lines ...widgets.RowLine) widgets.TableRow {
+	return widgets.TableRow{
 		Cells:    []string{name},
-		Icons:    []string{widgets.TradeableIcon(f.cv.Defs(), n.Item)},
+		Icons:    []string{icon},
 		IconSize: mfgMatIcon,
-		Stack: []widgets.RowLine{
-			{Segs: []widgets.RowSeg{
-				{Text: name, MinW: theme.Px(mfgMatNameW), Step: theme.StepSmall},
-				{Text: theme.PctLabel(share), MinW: theme.Px(34), Step: theme.StepTiny, Tint: p.Dim},
-			}},
-			{Segs: []widgets.RowSeg{
-				{HasBar: true, Bar: frac, MinW: theme.Px(mfgMatBarW), Tint: state},
-				{Text: theme.FormatInt(int64(n.Have)) + " / " + theme.FormatInt(int64(n.Need)),
-					Step: theme.StepTiny, Tint: state},
-			}},
-		},
+		Stack:    lines,
 	}
-	return row
+}
+
+// resRow is one output of the run as a built rich row.
+func (f *Manufacturing) resRow(o mfgOutput, p theme.Palette) *widgets.StackRow {
+	return widgets.NewStackRow(f.seams(), f.resRowDef(o, p), f.th.Face(theme.StepSmall))
+}
+
+// resRowDef is one output: the product's art and name over the units one run
+// makes (the bill's own two-line rhythm), the figure the bill never showed. A
+// recipe with no authored qty dashes it rather than reading as a free run.
+func (f *Manufacturing) resRowDef(o mfgOutput, p theme.Palette) widgets.TableRow {
+	name := f.cv.TradeableName(o.Item)
+	fig := "—"
+	if o.Qty > 0 {
+		fig = "×" + theme.FormatInt(int64(o.Qty))
+	}
+	return f.iconRow(name, widgets.TradeableIcon(f.cv.Defs(), o.Item),
+		widgets.RowLine{Segs: []widgets.RowSeg{
+			{Text: mfgClip(name, mfgResNameClip), Step: theme.StepSmall},
+		}},
+		widgets.RowLine{Segs: []widgets.RowSeg{
+			{Text: fig, Step: theme.StepBase, Tint: p.Accent},
+		}})
 }
 
 // mfgInspKey is the inspector's change signature: the selection, the station
