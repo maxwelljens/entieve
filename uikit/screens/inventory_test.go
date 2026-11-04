@@ -400,6 +400,155 @@ func contains(s, sub string) bool {
 	return false
 }
 
+// heldByItem counts the player's units of every item across the three holds
+// AND the fitted modules' bays. A bay takes its rounds out of cargo at the
+// start of a load (sim/clips.go), so a hold-only count reads the owner's
+// "the third stack disappeared" as a loss when the rounds are in the gun.
+func heldByItem(env *testEnv) map[content.ItemID]int {
+	out := map[content.ItemID]int{}
+	add := func(stacks []content.CargoStack) {
+		for _, st := range stacks {
+			out[st.Item] += st.Qty
+		}
+	}
+	c, _ := env.Sim.Cargos.Get(env.Sim.Player())
+	add(c.Stacks)
+	add(c.Ore)
+	add(env.Sim.Hangar.Items)
+	if fit, ok := env.Sim.Fittings.Get(env.Sim.Player()); ok {
+		for _, class := range []string{"high", "mid", "low"} {
+			rts := fit.Runtimes(class)
+			for i := range rts {
+				if rts[i].Clip.Item != "" {
+					out[rts[i].Clip.Item] += rts[i].Clip.Qty
+				}
+			}
+		}
+	}
+	return out
+}
+
+// dragTile drags one section's tile i to another hold's section, the tile
+// view's twin of dragStack.
+func dragTile(t *testing.T, ui *ebitenui.UI, env *testEnv, inv *Inventory, from string, i int, to string) {
+	t.Helper()
+	pump := func() {
+		env.Pointer().Begin()
+		pumpQty(t, ui, env, inv.Sync, 1024, 700)
+	}
+	fromRect := inv.tilesFor(from).tiles[i].GetWidget().Rect
+	body := inv.hangBody.GetWidget().Rect
+	if to == "cargo" {
+		body = inv.cargoBody.GetWidget().Rect
+	}
+	at := image.Pt(fromRect.Min.X+fromRect.Dx()/2, fromRect.Min.Y+fromRect.Dy()/2)
+	over := image.Pt(body.Min.X+body.Dx()/2, body.Min.Y+body.Dy()/2)
+
+	env.in.x, env.in.y = at.X, at.Y
+	env.in.edge, env.in.down = [3]bool{true, false, false}, [3]bool{true, false, false}
+	pump()
+	env.in.x, env.in.y = over.X, over.Y
+	env.in.edge = [3]bool{}
+	pump()
+	env.in.down = [3]bool{}
+	pump()
+}
+
+// TestInventoryThreeStacksKeepEveryUnit is the owner's repro: three ammo
+// stacks in cargo (the starting autocannon rounds), two drags to the hangar.
+// The transfer resolves by item id in both views, the popup names the stack
+// that was pressed, and no unit is ever lost: the third stack leaves cargo
+// because the idle autocannon's empty bay auto-loads the one round type left
+// (sim/clips.go's selection rule), so the round is in the gun, not gone.
+func TestInventoryThreeStacksKeepEveryUnit(t *testing.T) {
+	rounds := []content.ItemID{"ammo-emp-s", "ammo-fusion-s", "ammo-ap-s"}
+	for _, tiles := range []bool{false, true} {
+		name := "list"
+		if tiles {
+			name = "tiles"
+		}
+		t.Run(name, func(t *testing.T) {
+			env, cmds := newTestEnv(t)
+			c, _ := env.Sim.Cargos.Get(env.Sim.Player())
+			c.Stacks = []content.CargoStack{
+				{Item: rounds[0], Qty: 80}, {Item: rounds[1], Qty: 40}, {Item: rounds[2], Qty: 20},
+			}
+			dockAtStation(t, env.Sim)
+			inv := NewInventory(env)
+			ui := newQtyUI(t, env, inv.Win())
+			q := env.QtyWindow()
+			pump := func() { env.Pointer().Begin(); pumpQty(t, ui, env, inv.Sync, 1024, 700) }
+			pump()
+			if tiles {
+				uitest.FireButton(ui, inv.view)
+				pump()
+			}
+			pump()
+
+			want := heldByItem(env)
+			move := func(item content.ItemID, qty int) {
+				t.Helper()
+				if tiles {
+					dragTile(t, ui, env, inv, "cargo", 0, "hangar")
+				} else {
+					dragStack(t, ui, env, inv, "cargo", 0, "hangar")
+				}
+				if !q.IsOpen() {
+					t.Fatalf("%s: the drop opened no picker", item)
+				}
+				// The popup's mark, name and quantity all come from the id of
+				// the stack that was pressed.
+				if q.req.Item != item {
+					t.Fatalf("popup item=%q want the pressed stack %q", q.req.Item, item)
+				}
+				if got := q.Value(); got != qty {
+					t.Fatalf("popup opens at %d, want the whole %s stack (%d)", got, item, qty)
+				}
+				if got := q.infoLine(); !contains(got, env.TradeableName(item)) {
+					t.Fatalf("popup line %q does not name %q", got, env.TradeableName(item))
+				}
+				if got, want := q.mark.Name(), widgets.TradeableIcon(env.Defs(), item); got != want {
+					t.Fatalf("popup mark=%q want %q (the pressed stack's icon)", got, want)
+				}
+				uitest.FireButton(ui, q.Confirm())
+				if len(*cmds) != 1 {
+					t.Fatalf("%d commands for one Confirm, want 1", len(*cmds))
+				}
+				for _, cmd := range *cmds {
+					env.Sim.Queue(cmd)
+				}
+				*cmds = (*cmds)[:0]
+				env.Sim.Step()
+				for got, n := range heldByItem(env) {
+					if n != want[got] {
+						t.Errorf("after %s: %s held=%d want %d (every unit must still exist)", item, got, n, want[got])
+					}
+				}
+				pump()
+				pump()
+			}
+
+			move(rounds[0], 80)
+			move(rounds[1], 40)
+
+			// The two moved stacks are whole in the hangar.
+			hangar := env.Sim.Hangar.Items
+			if len(hangar) != 2 || hangar[0].Item != rounds[0] || hangar[0].Qty != 80 ||
+				hangar[1].Item != rounds[1] || hangar[1].Qty != 40 {
+				t.Errorf("hangar=%+v want 80 %s + 40 %s", hangar, rounds[0], rounds[1])
+			}
+			// The third stack is whole somewhere: cargo, or the idle
+			// autocannon's bay that auto-loads a lone round type (sim/clips.go).
+			c, _ = env.Sim.Cargos.Get(env.Sim.Player())
+			if got := heldByItem(env)[rounds[2]]; got != 20 {
+				t.Errorf("%s held=%d want 20", rounds[2], got)
+			}
+			t.Logf("%s: cargo=%d of 20 after the two moves (the idle autocannon auto-loads a lone round type)",
+				rounds[2], len(c.Stacks))
+		})
+	}
+}
+
 // sameWidget compares a body child with a panel's container across the
 // two ebitenui interfaces (Containerer does not declare GetWidget).
 func sameWidget(a widget.PreferredSizeLocateableWidget, c widget.Containerer) bool {

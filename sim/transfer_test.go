@@ -198,6 +198,122 @@ func TestTransferRejectsCapacityOverflow(t *testing.T) {
 	}
 }
 
+// playerHeldByItem counts every unit of every item the player holds: the
+// three holds AND the fitted modules' bays. A bay takes its rounds from cargo
+// at the start of a load (clips.go), so a hold-only count reads the owner's
+// "the third stack disappeared" as a loss when the rounds are in the gun.
+func playerHeldByItem(s *Sim) map[content.ItemID]int {
+	out := map[content.ItemID]int{}
+	add := func(st []content.CargoStack) {
+		for _, st := range st {
+			out[st.Item] += st.Qty
+		}
+	}
+	if c, ok := s.Cargos.Get(s.player); ok {
+		add(c.Stacks)
+		add(c.Ore)
+	}
+	add(s.Hangar.Items)
+	if fit, ok := s.Fittings.Get(s.player); ok {
+		for _, class := range slotClasses {
+			rts := fit.Runtimes(class)
+			for i := range rts {
+				if rts[i].Clip.Item != "" {
+					out[rts[i].Clip.Item] += rts[i].Clip.Qty
+				}
+			}
+		}
+	}
+	return out
+}
+
+// requireHeld fails when any item's held total moved from want.
+func requireHeld(t *testing.T, s *Sim, want map[content.ItemID]int, when string) {
+	t.Helper()
+	got := playerHeldByItem(s)
+	for item, n := range want {
+		if got[item] != n {
+			t.Errorf("%s: %s held=%d want %d (every unit must still exist)", when, item, got[item], n)
+		}
+	}
+	for item, n := range got {
+		if n != want[item] {
+			t.Errorf("%s: %s held=%d want %d (every unit must still exist)", when, item, n, want[item])
+		}
+	}
+}
+
+// TestTransferThreeStacksConserveEveryUnit is the owner's inventory repro at
+// the sim level: the three starting autocannon rounds sit in cargo, two
+// CmdTransfer commands move the first two to the hangar, and the third stack
+// leaves cargo on its own because the idle autocannon's empty bay auto-loads
+// the one round type left (clips.go's selection rule), not a lost stack.
+// The pin: cargo + ore + hangar + bays carries the same units per item after
+// every command.
+func TestTransferThreeStacksConserveEveryUnit(t *testing.T) {
+	c, err := content.Load(content.FS())
+	if err != nil {
+		t.Fatalf("content.Load: %v", err)
+	}
+	wd, ok := c.World("world-showcase")
+	if !ok {
+		t.Fatal("world-showcase missing")
+	}
+	s, err := New(c, wd, 42)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	// Dock the way the UI tests do (the station's celestial id): the grid
+	// dock command needs range, and range is not what this pin is about.
+	docked := false
+	for _, cel := range s.System().Celestials {
+		if cel.Station != nil {
+			s.Docked.Set(s.player, Docked{At: cel.ID})
+			docked = true
+			break
+		}
+	}
+	if !docked {
+		t.Fatal("showcase start system has no station")
+	}
+
+	rounds := []content.ItemID{"ammo-emp-s", "ammo-fusion-s", "ammo-ap-s"}
+	cargo, _ := s.Cargos.Get(s.player)
+	cargo.Stacks = []content.CargoStack{
+		{Item: rounds[0], Qty: 80},
+		{Item: rounds[1], Qty: 40},
+		{Item: rounds[2], Qty: 20},
+	}
+	want := playerHeldByItem(s)
+
+	queueTransfer(s, rounds[0], 80, "cargo", "hangar")
+	requireHeld(t, s, want, "after transfer #1")
+	queueTransfer(s, rounds[1], 40, "cargo", "hangar")
+	requireHeld(t, s, want, "after transfer #2")
+
+	// The two moved stacks are in the hangar, whole.
+	if stacksCount(s.Hangar.Items, rounds[0]) != 80 || stacksCount(s.Hangar.Items, rounds[1]) != 40 {
+		t.Fatalf("hangar=%+v want 80 %s + 40 %s", s.Hangar.Items, rounds[0], rounds[1])
+	}
+	// Where the third stack went: the idle autocannon's empty bay auto-loads
+	// the one round type left in cargo (clips.go's selection rule), so the
+	// inventory's cargo list loses it while the gun holds it. Logged, not
+	// asserted: the rule may change, the conservation above may not.
+	bay := 0
+	if fit, ok := s.Fittings.Get(s.player); ok {
+		for _, class := range slotClasses {
+			rts := fit.Runtimes(class)
+			for i := range rts {
+				if rts[i].Clip.Item == rounds[2] {
+					bay += rts[i].Clip.Qty
+				}
+			}
+		}
+	}
+	t.Logf("%s: cargo=%d bays=%d (the lone round type auto-loads into a bay)",
+		rounds[2], stacksCount(cargo.Stacks, rounds[2]), bay)
+}
+
 func TestTransferRejectsMissingOreHold(t *testing.T) {
 	s := newTestSim(t) // fixture sloop has OreHold 0
 	giveCargo(s, "ore-sterngrit", 3)
