@@ -467,7 +467,8 @@ without bookkeeping. The tests in `sim/world_metabolism_test.go` and
    (`Job.StartedAt`/`DoneAt`): zero RNG. Craft grows per
    (station, recipe family): `L = min(5, 1 + floor(sqrt(runs)/2))`, each
    level cutting job time 4 % and materials 2 % below the L1 baseline
-   (both frozen at job start). Every 3600 idle ticks a family's counter
+   (all frozen at job start: the clock, the committed bill and the
+   delivered output). Every 3600 idle ticks a family's counter
    decays one run-equivalent, floor 0 (`sim/system_industry.go`).
 4. **Distribution: real-cargo convoys.** Route cargo is **sourced at
    spawn, never conjured** (`sim/system_traffic.go`): a *station* origin

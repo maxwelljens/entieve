@@ -38,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A job's terms freeze at start**: the material bill committed and the
+  output delivered are fixed when the job starts and persisted with it, so a
+  station craft or pilot Manufacturing level gained mid-job no longer moves a
+  cancel refund or a collection (and a reload keeps both figures). The
+  inspector, picker and Start decision still quote the live pre-start
+  numbers.
+
 - **Modality is a Screen row property**: the Help overlay, the Esc menu and
   the menu's Settings session no longer own scenes. Each is an ordinary
   Screen row with a `Modal` facet (the dim veil's alpha, the pause layer, and

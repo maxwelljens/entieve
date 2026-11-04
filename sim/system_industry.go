@@ -34,8 +34,9 @@ import (
 //	job time    × (1 - 0.04·(L-1))   → -4% per level, -16% at L5
 //	materials   × (1 - 0.02·(L-1))   → -2% per level,  -8% at L5
 //
-// Both factors are frozen at job start (StartJob computes DoneAt and the
-// committed materials once), so a mid-job craft-up never re-times a job.
+// The job's terms are frozen at start (StartJob computes DoneAt, the
+// committed bill and the output once), so a mid-job craft-up never re-times
+// a job, moves its refund or changes its yield.
 //
 // Owner tags mirror the market API: StartJob/CollectJob take an opaque
 // owner (OwnerPlayer, OwnerSystem, or an agent's `agent:<id>` tag) and
@@ -73,9 +74,18 @@ const (
 	JobDone JobState = "done"
 )
 
+// JobTerms is a job's terms frozen at StartJob: the exact bill committed to
+// the owner's stock and the exact units CollectJob delivers. Persisted on the
+// Job so a mid-job level change never moves either figure.
+type JobTerms struct {
+	Bill   []content.CargoStack `json:"bill"`
+	Output int                  `json:"output"`
+}
+
 // Job is one manufacturing job: Runs sequential runs of Recipe at Station,
-// materials committed at StartedAt, output deliverable from DoneAt on.
-// Persisted verbatim in Save.Jobs (ascending id order).
+// materials committed at StartedAt, output deliverable from DoneAt on. The
+// bill and output are frozen at start in Terms. Persisted verbatim in
+// Save.Jobs (ascending id order).
 type Job struct {
 	ID        uint64           `json:"id"`
 	Station   StationID        `json:"station"`
@@ -85,6 +95,9 @@ type Job struct {
 	DoneAt    float64          `json:"done_at"`    // sim clock
 	State     JobState         `json:"state"`
 	Owner     string           `json:"owner,omitempty"` // market-style owner tag
+	// Terms is nil only on a job restored from a save written before the
+	// terms existed; restore backfills it once by re-derivation.
+	Terms *JobTerms `json:"terms,omitempty"`
 }
 
 // SavedCraft is one station's craft counter for one recipe family.
@@ -260,6 +273,9 @@ func (s *Sim) JobFee(recipe content.RecipeID, runs int) float64 {
 // craft-only one. Inputs with a non-positive quantity contribute nothing.
 // An agent's bill never carries the player's edge: jobBill is the owner-aware
 // entry point every job path uses.
+//
+// This is the pre-start quote; StartJob freezes the bill into Job.Terms, so
+// a level gained mid-job never moves a running job's refund.
 func (s *Sim) JobMaterials(station StationID, recipe content.RecipeID, runs int) []content.CargoStack {
 	return s.jobMaterials(station, recipe, runs, true)
 }
@@ -295,6 +311,22 @@ func (s *Sim) jobBill(station StationID, recipe content.RecipeID, runs int, owne
 	return s.jobMaterials(station, recipe, runs, s.agentByOwner(owner) == nil)
 }
 
+// backfillJobTerms freezes a loaded job's terms for a save written before
+// Job.Terms existed: today's re-derivation, frozen once at load so a later
+// level cannot move it.
+func (s *Sim) backfillJobTerms(j *Job) {
+	rec, ok := s.Content.Recipes[j.Recipe]
+	if !ok || rec == nil {
+		j.Terms = &JobTerms{}
+		return
+	}
+	out := s.PlayerJobOutput(j.Recipe, j.Runs)
+	if s.agentByOwner(j.Owner) != nil {
+		out = rec.Qty * j.Runs
+	}
+	j.Terms = &JobTerms{Bill: s.jobBill(j.Station, j.Recipe, j.Runs, j.Owner), Output: out}
+}
+
 // mfgMatEdge is the Manufacturing family's material reduction (0 at level 0,
 // 0.10 at V: the level cap is the ±10% clamp).
 func (s *Sim) mfgMatEdge() float64 {
@@ -306,10 +338,9 @@ func (s *Sim) mfgMatEdge() float64 {
 // floors its yields. A one-unit recipe is never edged (a hull job does not
 // yield a fraction of a hull), and level 0 multiplies by exactly 1.
 //
-// The edge is read at collection, like the craft time and materials factors
-// are read at start: a level gained while a job runs moves its output, the
-// same drift CancelJob documents for a refund (shortcut: freeze per-job
-// output only if that ever matters).
+// This is the pre-start quote (the inspector and picker show it); StartJob
+// freezes the figure into Job.Terms, so a level gained mid-job never moves a
+// running job's output.
 func (s *Sim) PlayerJobOutput(recipe content.RecipeID, runs int) int {
 	rec, ok := s.Content.Recipes[recipe]
 	if !ok || rec == nil || runs < 1 {
@@ -430,6 +461,13 @@ func (s *Sim) StartJob(station StationID, recipe content.RecipeID, runs int, own
 	}
 
 	level := s.CraftLevel(station, rec.Family)
+	// The job's terms are frozen here: the bill is the slice just committed,
+	// and the output is the collecting figure at today's level. An agent's
+	// job delivers its raw recipe qty (agents carry no proficiency edge).
+	output := s.PlayerJobOutput(recipe, runs)
+	if agent != nil {
+		output = rec.Qty * runs
+	}
 	// The player's manufacturing fee is paid up front, before the job
 	// exists (startJobCheck already proved the wallet covers it). Agent
 	// owners settle through their own capital seam and pay no fee.
@@ -449,6 +487,7 @@ func (s *Sim) StartJob(station StationID, recipe content.RecipeID, runs int, own
 		StartedAt: s.time,
 		DoneAt:    s.time + rec.Time*float64(runs)*craftTimeFactor(level),
 		State:     JobRunning, Owner: owner,
+		Terms: &JobTerms{Bill: materials, Output: output},
 	}
 	s.jobs = append(s.jobs, job) // ids ascend: canonical order by construction
 	s.craftUse(station, rec.Family)
@@ -457,13 +496,13 @@ func (s *Sim) StartJob(station StationID, recipe content.RecipeID, runs int, own
 	return job.ID, true
 }
 
-// CollectJob delivers a finished job's output into the player's hangar and
-// frees its slot (hulls land as StoredShips — the storePlayerStock rule);
-// an agent owner's output lands in the agent's inventory instead (the same
-// seam StartJob debits from). Only the job's own owner collects, and only
-// JobDone jobs deliver; a job whose recipe no longer loads is dropped with
-// a warning rather than blocking its slot forever (impossible with frozen
-// content). The player path is Queue(CmdCollectJob{ID}).
+// CollectJob delivers a finished job's frozen output into the player's
+// hangar and frees its slot (hulls land as StoredShips — the storePlayerStock
+// rule); an agent owner's output lands in the agent's inventory instead (the
+// same seam StartJob debits from). Only the job's own owner collects, and
+// only JobDone jobs deliver; a job whose recipe no longer loads is dropped
+// with a warning rather than blocking its slot forever (impossible with
+// frozen content). The player path is Queue(CmdCollectJob{ID}).
 func (s *Sim) CollectJob(station StationID, id uint64, owner string) bool {
 	for i := range s.jobs {
 		j := &s.jobs[i]
@@ -483,9 +522,9 @@ func (s *Sim) CollectJob(station StationID, id uint64, owner string) bool {
 			return false
 		}
 		if a := s.agentByOwner(owner); a != nil {
-			addInv(a, rec.Product, rec.Qty*j.Runs)
+			addInv(a, rec.Product, j.Terms.Output)
 		} else {
-			s.storePlayerStock(rec.Product, s.PlayerJobOutput(rec.ID, j.Runs))
+			s.storePlayerStock(rec.Product, j.Terms.Output)
 		}
 		s.jobs = append(s.jobs[:i], s.jobs[i+1:]...)
 		s.emit(Event{Kind: EvLog, Severity: SevGood, Actor: s.player, Item: rec.Product,
@@ -498,9 +537,8 @@ func (s *Sim) CollectJob(station StationID, id uint64, owner string) bool {
 // CancelJob removes a RUNNING job of owner at station and returns its
 // committed materials to that owner (player hangar; agent inventory), the
 // fee being kept. A finished job is never cancellable — collect it. Only
-// the job's own owner cancels. Refund quantities are recomputed with
-// JobMaterials (a craft level that moved mid-job can drift them by a
-// unit; shortcut: freeze per-job materials only if that ever matters).
+// the job's own owner cancels. The refund is the job's own frozen bill, so
+// it equals the commit by construction whatever the craft level did mid-job.
 // The player path is Queue(CmdCancelJob{ID}).
 func (s *Sim) CancelJob(station StationID, id uint64, owner string) bool {
 	for i := range s.jobs {
@@ -522,7 +560,7 @@ func (s *Sim) CancelJob(station StationID, id uint64, owner string) bool {
 			return false
 		}
 		agent := s.agentByOwner(owner)
-		for _, m := range s.jobBill(station, j.Recipe, j.Runs, owner) {
+		for _, m := range j.Terms.Bill {
 			if agent != nil {
 				addInv(agent, m.Item, m.Qty)
 			} else {

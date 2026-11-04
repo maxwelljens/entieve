@@ -632,6 +632,16 @@ func (s *Sim) restore(save *Save) error {
 	// (park order is the canonical serialization — see buildSave). ---
 	s.trafficJourneys = append([]TrafficJourney(nil), save.TrafficJourneys...)
 
+	// --- jobs written before the frozen terms existed (v3 saves without
+	// Job.Terms): backfill once by today's re-derivation, then the job
+	// behaves as a new one. Runs after craft, proficiency and agents so the
+	// derivation sees the restored state. ---
+	for i := range s.jobs {
+		if s.jobs[i].Terms == nil {
+			s.backfillJobTerms(&s.jobs[i])
+		}
+	}
+
 	// ---- the war: control, the front's meters, the bloc treasury ----
 	// A save written before the war existed (War nil) restores into the
 	// tick-0 map derived from authored security when the world carries the
