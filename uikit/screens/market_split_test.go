@@ -36,10 +36,10 @@ func TestMarketSplitOpensAtTheSideColumn(t *testing.T) {
 	if got, want := panes[2].Dx(), theme.Px(mktSideW); got < want-1 || got > want+1 {
 		t.Errorf("My orders pane = %d px, want the old side column's %d px", got, want)
 	}
-	if got, want := m.split.Ratio(0), mktTreeShare; math.Abs(got-want) > 1e-9 {
+	if got, want := m.split.Ratio(0), mktTreeShare(); math.Abs(got-want) > 1e-9 {
 		t.Errorf("tree seam ratio = %v, want the browse opening share %v", got, want)
 	}
-	if got, want := m.split.Ratio(1), 1-mktSideShare; math.Abs(got-want) > 1e-9 {
+	if got, want := m.split.Ratio(1), 1-mktSideShare(); math.Abs(got-want) > 1e-9 {
 		t.Errorf("orders seam ratio = %v, want the catalog's opening share %v", got, want)
 	}
 	root := m.split.Container().GetWidget().Rect
@@ -117,7 +117,7 @@ func TestMarketSplitDragTradesWidths(t *testing.T) {
 		t.Errorf("pair width = %d px, want the unchanged %d (the pair trades space)",
 			after[0].Dx()+after[1].Dx(), before[0].Dx()+before[1].Dx())
 	}
-	if got := m.split.Ratio(0); math.Abs(got-mktTreeShare) < 1e-6 {
+	if got := m.split.Ratio(0); math.Abs(got-mktTreeShare()) < 1e-6 {
 		t.Error("the drag left the tree seam at its opening share")
 	}
 
@@ -165,8 +165,8 @@ func TestMarketSplitClampsAndFloors(t *testing.T) {
 	// It can never cross the browse pane: the pair it bounds only trades
 	// its own width, so a stored 0 lands on the tree's share.
 	m.split.SetRatio(1, -1)
-	if got := m.split.Ratio(1); math.Abs(got-mktTreeShare) > 1e-9 {
-		t.Errorf("ratio -1 = %v, want the browse share %v (the pair trades itself)", got, mktTreeShare)
+	if got := m.split.Ratio(1); math.Abs(got-mktTreeShare()) > 1e-9 {
+		t.Errorf("ratio -1 = %v, want the browse share %v (the pair trades itself)", got, mktTreeShare())
 	}
 
 	// The window floor (300 px wide): push the orders seam to its extreme

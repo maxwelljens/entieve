@@ -38,6 +38,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The three boards' right pane is one scaffold**: the market's right pane,
+  the manufacturing inspector and the refinery inspector now share one frame
+  (`uikit/screens/board.go`): the item head, the scroll column with the house
+  rail, the pinned verb bar and the measured inner width. The browse column and
+  the two-seam row are built once for all three, and the live search is one
+  ranked machinery with each window's own policy kept (the boards still require
+  a field to contain the query; the market still ranks and highlights). Each
+  window now describes its card as one comparable page model and the pane
+  rebuilds only when that model moves, so a frame that displays nothing new
+  rebuilds nothing. No page looks or behaves differently: the same text, the
+  same rects, the same gates.
 - **The trade preview is the money the trade moves**: the quantity picker's
   Buy and Sell line now walks the station's book to the amount and composes
   the broker fee (buy) or the fee and the sales tax (sell) into its total,
@@ -210,6 +221,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   would give, nor the 20% that would need a tenth craft step).
 ### Fixed
 
+- **The refinery inspector follows the batch**: a batch whose mineral amounts
+  move (a Refining level-up) left the card on the previous figures whenever the
+  ore, the station, the stock and the book stood still, because the inspector's
+  change signature never carried the amounts. The batch's own output quantities
+  are now a page input like every other figure the card draws, so the yield
+  bill and the refine math always quote the batch the sim would pay.
 - **The station windows stop offering what the sim refuses**: every service
   gate now reads the sim's own answer (`Sim.ServiceAvailable`, forwarded by
   the seam) instead of re-deriving it from the dock and the raw service list.

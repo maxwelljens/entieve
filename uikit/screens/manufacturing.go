@@ -16,7 +16,6 @@ import (
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
-	"github.com/sahilm/fuzzy"
 )
 
 // Manufacturing window metrics in design units.
@@ -122,13 +121,12 @@ type Manufacturing struct {
 	group  map[content.RecipeID]string
 	query  string
 
-	// The inspector: one grid rebuilt whenever its key moves (the selected
-	// recipe, the station, the slots, the pane's width or the priced book
-	// rows the profit table reads), the material rows in a scroll viewport
-	// with the house rail beside it. The profit table is built once and
-	// re-filled.
-	insp       *widget.Container
-	inspKey    string
+	// The inspector: one board pane (board.go) over a page model rebuilt only
+	// when the model moves (the selected recipe, the station, the slots, the
+	// pane's width or the priced book rows the profit table reads). The profit
+	// table is built once and re-filled; Start stays pinned in the pane's bar.
+	pane       *boardPane
+	model      mfgPageModel
 	head       *itemHead
 	profit     *widgets.PlainTable
 	profitNote *widget.Text
@@ -155,6 +153,34 @@ type mfgNeed struct {
 	Need  int
 	Have  int
 	Value float64
+}
+
+// mfgPageModel is the inspector's whole visible input, comparable: the
+// selection, the station gate, the slot state, the pane's width (the head and
+// the page re-wrap with the seam), every material's need/have, the run's
+// effective output (a Manufacturing level-up moves it) and the priced figures
+// the profit table draws (the bill's walks, the product's bid). A book move
+// that re-prices a row rebuilds the card; an idle book does not.
+type mfgPageModel struct {
+	HasSel    bool
+	Recipe    content.RecipeID
+	Station   sim.StationID
+	SlotsFree bool
+	Inner     int
+	Out       int
+	Needs     []mfgNeed
+	Quotes    []mfgQuote
+	Bid       sim.Quote
+}
+
+// same is the change detector for Sync: field-wise equality against the last
+// rebuilt model (mfgNeed and mfgQuote are comparable, so the slices compare
+// through slices.Equal; a quote compares on the figures the table draws).
+func (m mfgPageModel) same(o mfgPageModel) bool {
+	return m.HasSel == o.HasSel && m.Recipe == o.Recipe && m.Station == o.Station &&
+		m.SlotsFree == o.SlotsFree && m.Inner == o.Inner && m.Out == o.Out &&
+		slices.Equal(m.Needs, o.Needs) && slices.Equal(m.Quotes, o.Quotes) &&
+		quoteSame(m.Bid, o.Bid)
 }
 
 // mfgOutput is one thing one run makes: the product and its units per run.
@@ -256,26 +282,30 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 			f.selectBranch(n.Path)
 		}
 	})
-	browse := paneStack([]bool{false, true}, f.search, f.tree.Container())
 
-	// The inspector: a fixed three-row grid (the item head, the body
-	// viewport, Start), inset ContentsPad all round so the content never
-	// touches the pane's edges. The body viewport scrolls the
-	// profit table and the material bill as one page; Start stays pinned
-	// below it, so a small window never overlaps the two. Its content is
-	// rebuilt by syncInspector when the bill moves; the grid itself never
-	// changes, so the row split's pane stays one widget.
-	f.insp = widget.NewContainer(widget.ContainerOpts.Layout(widget.NewGridLayout(
-		widget.GridLayoutOpts.Columns(1),
-		widget.GridLayoutOpts.Stretch([]bool{true},
-			[]bool{false, true, false}),
-		widget.GridLayoutOpts.Spacing(0, theme.Px(theme.SpSm)),
-		widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
-	)))
+	// The inspector: one board pane (board.go): the item head pinned above the
+	// page, the page in the scroll column with the house rail, Start in the
+	// bar below it, inset by ContentsPad all round so the content never
+	// touches the pane's edges. Its content is rebuilt by rebuildInspector when
+	// its page model moves; the pane itself never changes, so the row split's
+	// pane stays one widget.
+	f.pane = newBoardPane(env, boardPaneSpec{OpenW: mfgInspW})
+	f.head = f.pane.head
+	f.matsBox, f.matsScroll, f.matsRail = f.pane.page, f.pane.scroll, f.pane.rail
+	f.matsScroll.GetWidget().ScrolledEvent.AddHandler(func(args any) {
+		if ev, ok := args.(*widget.WidgetScrolledEventArgs); ok {
+			f.scrollMats(ev.Y)
+		}
+	})
 	// The profit table: one run's cost math as aligned label/value rows (the
 	// Finances holdings' decorless table; the label column stretches, the
 	// value column ends on the table's right edge like every figure here).
 	f.profit = widgets.NewPlainTable(env, []widgets.PlainColumn{{}, {AlignRight: true}})
+
+	// The inspector's one verb, pinned in the pane's bar.
+	f.startBtn = theme.ActionButton("Start job", f.startClicked)
+	f.startBtn.GetWidget().Disabled = true // armed by Sync's gate
+	f.pane.bar.AddChild(f.startBtn)
 
 	// Job list: the PLAYER's jobs at every station (the global slot pool).
 	f.jobsLbl = widget.NewText(
@@ -294,9 +324,8 @@ func NewManufacturing(env widgets.Seams) *Manufacturing {
 	// Body: the two splits: the board row (browse | list | inspector, two
 	// seams) over the job list (one seam). The board takes the larger
 	// share; every seam is draggable and persists in the layout sidecar.
-	f.cols = widgets.NewSplitPaneRow(env, browse, f.recipes.Container(), f.insp)
-	f.cols.SetDefaultRatio(0, mfgTreeShare())
-	f.cols.SetDefaultRatio(1, 1-mfgInspShare())
+	f.cols = newBoardSplit(env, f.search, f.tree, f.recipes.Container(), f.pane.box,
+		mfgTreeW, mfgInspW, mfgDefaultW)
 	f.split = widgets.NewSplitPane(env,
 		paneStack([]bool{true}, f.cols.Container()),
 		paneStack([]bool{false, true, false}, f.jobsLbl, f.jobs.Container(), collectBar),
@@ -341,23 +370,11 @@ func ManufacturingRect() image.Rectangle {
 	return image.Rect(140, 60, 140+mfgDefaultW, 60+mfgDefaultH)
 }
 
-// mfgTreeShare / mfgInspShare are the row split's opening ratios at the
-// landing width: the split spans the window minus the body padding and both
-// seam tracks (the market's own seam maths). The seam stores the fraction
-// BEFORE it.
-func mfgTreeShare() float64 {
-	return float64(mfgTreeW) / float64(mfgDefaultW-2*theme.ContentsPad-2*widgets.SplitSeamH)
-}
-
-func mfgInspShare() float64 {
-	return float64(mfgInspW) / float64(mfgDefaultW-2*theme.ContentsPad-2*widgets.SplitSeamH)
-}
-
 // Win returns the manufacturing window for Kit.AddWindow.
 func (f *Manufacturing) Win() *widget.Window { return f.win }
 
 // seams repackages the three the window holds as one value, for the widget
-// helpers that take the union (NewStackRow, NewScrollRail).
+// helpers that take the union (NewStackRow).
 func (f *Manufacturing) seams() widgets.Seams {
 	return widgets.NewSeams(f.th, f.cv, f.as, f.ptr)
 }
@@ -446,21 +463,17 @@ func (f *Manufacturing) scopeRecipes() []content.RecipeID {
 // searchHits ranks the branch's recipes over the product name, its group
 // path, its family and its inputs' names, so a mineral query finds every
 // recipe that eats it (search by ingredient, the inverse lookup a
-// six-mineral economy needs). A recipe is a hit when one field contains the
-// query, then the hits are ordered by sahilm/fuzzy's score (a matched
-// subsequence spanning two fields is not a hit: "vetril" cannot match an
-// artillery round through scattered letters). The query and every field are
-// diacritic-folded first (fold.go), so an ASCII keyboard matches accented
-// names.
+// six-mineral economy needs). The machinery is boardSearch (board.go): a
+// recipe is a hit when one field contains the query, then the hits are ordered
+// by sahilm/fuzzy's score (a matched subsequence spanning two fields is not a
+// hit: "vetril" cannot match an artillery round through scattered letters).
+// The query and every field are diacritic-folded first (fold.go), so an ASCII
+// keyboard matches accented names.
 func (f *Manufacturing) searchHits(q string, scope []content.RecipeID) []content.RecipeID {
-	fq, _ := foldString(q)
-	lq := strings.ToLower(fq)
-	ids := make([]content.RecipeID, 0, len(scope))
-	hay := make([]string, 0, len(scope))
-	for _, id := range scope {
+	hits := boardSearch(q, scope, func(id content.RecipeID) []string {
 		rec, ok := f.cv.Defs().Recipes[id]
 		if !ok || rec == nil {
-			continue
+			return nil
 		}
 		fields := []string{f.cv.TradeableName(rec.Product), f.group[id], rec.Family}
 		for _, in := range rec.Inputs {
@@ -468,23 +481,11 @@ func (f *Manufacturing) searchHits(q string, scope []content.RecipeID) []content
 				fields = append(fields, def.Name)
 			}
 		}
-		line, hit := "", false
-		for _, fld := range fields {
-			ff, _ := foldString(fld)
-			line += " " + ff
-			if strings.Contains(strings.ToLower(ff), lq) {
-				hit = true
-			}
-		}
-		if !hit {
-			continue
-		}
-		ids = append(ids, id)
-		hay = append(hay, line)
-	}
-	var out []content.RecipeID
-	for _, m := range fuzzy.Find(fq, hay) {
-		out = append(out, ids[m.Index])
+		return fields
+	}, boardSearchSpec{Gate: true, Lead: true})
+	out := make([]content.RecipeID, 0, len(hits))
+	for _, h := range hits {
+		out = append(out, h.Key)
 	}
 	return out
 }
@@ -752,9 +753,25 @@ func (f *Manufacturing) Sync() {
 	f.tree.SelectData(browseNodeKey{Path: f.treeSel})
 	f.tree.Sync()
 
-	// The inspector and its start gate.
+	// The inspector and its start gate: one page model, rebuilt when it moves.
 	needs := f.needs(f.sel.recipe, runs)
-	f.syncInspector(station, slotsFree, needs)
+	def, _ := f.cv.Defs().Recipes[f.sel.recipe]
+	quotes := f.billQuotes(station, needs)
+	bid := sim.Quote{}
+	if def != nil {
+		bid = f.cv.Quote(station, def.Product, sim.OrderSell, def.Qty)
+	}
+	boardSync(&f.model, mfgPageModel{
+		HasSel:    f.hasSel,
+		Recipe:    f.sel.recipe,
+		Station:   station,
+		SlotsFree: slotsFree,
+		Inner:     f.inspInnerW(),
+		Out:       f.cv.PlayerJobOutput(f.sel.recipe, 1),
+		Needs:     needs,
+		Quotes:    quotes,
+		Bid:       bid,
+	}, f.rebuildInspector)
 
 	// Readouts and gates (visible-but-grayed, never hidden).
 	slots := sim.IndustrySlots()
@@ -766,14 +783,9 @@ func (f *Manufacturing) Sync() {
 		f.startBtn.GetWidget().Disabled = !f.startReadyFor(f.sel)
 	}
 
-	// The material viewport rides the house rail beside it (the tables'
-	// clamp rule: a stale offset would bottom-anchor a list that fits).
-	if f.matsRail != nil {
-		f.matsRail.Sync()
-		if f.matsRail.Overflow() <= 0 {
-			f.matsScroll.ScrollTop = 0
-		}
-	}
+	// The page viewport rides the house rail beside it (the tables' clamp
+	// rule: a stale offset would bottom-anchor a page that fits).
+	f.pane.clampScroll()
 
 	// The title is the base display name only (a window title is
 	// furniture): the selected recipe, its time, fee and material bill are
@@ -818,44 +830,25 @@ func (f *Manufacturing) recipeRow(station sim.StationID, rec content.RecipeID, r
 	}
 }
 
-// syncInspector rebuilds the inspector when its content moved: the selected
-// recipe, the station, the slot state, the pane's width or the priced book
-// rows its profit table reads.
-func (f *Manufacturing) syncInspector(station sim.StationID, slotsFree bool, needs []mfgNeed) {
-	inner := f.inspInnerW()
-	product := f.recipeProduct(f.sel.recipe)
-	out := f.cv.PlayerJobOutput(f.sel.recipe, 1)
-	def, _ := f.cv.Defs().Recipes[f.sel.recipe]
-	quotes := f.billQuotes(station, needs)
-	bid := sim.Quote{}
-	if def != nil {
-		bid = f.cv.Quote(station, def.Product, sim.OrderSell, def.Qty)
-	}
-	key := mfgInspKey(station, slotsFree, f.sel, needs, out, inner, quotes, bid, product)
-	if key == f.inspKey {
-		return
-	}
-	f.inspKey = key
-	f.insp.RemoveChildren()
-	f.matsRows = f.matsRows[:0]
-	f.resBar, f.resRows = nil, f.resRows[:0]
-	f.startBtn, f.profitNote = nil, nil
-
+// rebuildInspector rebuilds the inspector's page from its model: the head, the
+// profit table, the material bill and the RESULT section, one page in the
+// pane's scroll column.
+func (f *Manufacturing) rebuildInspector(m mfgPageModel) {
+	def, _ := f.cv.Defs().Recipes[m.Recipe]
 	p := f.th.Pal()
 
 	// Head: the one item head (itemhead.go) the market's right pane leads
 	// with: the product's hero art, its name carrying the one-glance verdict
 	// glyph, and the product's own description wrapped to the pane.
-	f.head = newItemHead(f.seams(), "")
-	if def != nil && f.hasSel {
-		ready := station != "" && f.cv.CanStartJob(station, f.sel.recipe, 1)
-		f.head.set(true, widgets.TradeableIcon(f.cv.Defs(), def.Product),
+	if def != nil && m.HasSel {
+		ready := m.Station != "" && f.cv.CanStartJob(m.Station, m.Recipe, 1)
+		f.pane.setHead(true, widgets.TradeableIcon(f.cv.Defs(), def.Product),
 			f.cv.TradeableName(def.Product)+"  "+verdictGlyph(ready),
-			itemProse(f.cv, def.Product), inner)
+			itemProse(f.cv, def.Product))
 	} else {
-		f.head.set(false, "", "No recipe selected", "", inner)
+		f.pane.setHead(false, "", "No recipe selected", "")
 	}
-	rows, note := f.profitRows(quotes, bid, needs, def)
+	rows, note := f.profitRows(m.Quotes, m.Bid, m.Needs, def)
 	f.profit.SetRows(rows)
 
 	// The body page: the profit table's bar and rows (with the footnote the
@@ -863,85 +856,49 @@ func (f *Manufacturing) syncInspector(station sim.StationID, slotsFree bool, nee
 	// one row per mineral, the cost driver first (the acceptance answer to
 	// "which mineral dominates"), each row the mineral's own art, its share
 	// of the run's value and its have/need bar.
-	f.matsLbl = widget.NewText(
-		widget.TextOpts.Text("MATERIALS · most value first", f.th.Face(theme.StepTiny), theme.Solid(p.Accent)),
-	)
-	// The page's children keep their own heights (the table is not a bill
-	// row), so the box is a plain vertical run, not the equal-row stack.
-	f.matsBox = widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(theme.Px(theme.SpSm)),
-		)),
-	)
-	f.matsBox.AddChild(sectionBar(f.th, "PROFIT"), f.profit.Container())
+	page := f.pane.beginPage()
+	page.table("PROFIT", f.profit)
+	f.profitNote = nil
 	if note != "" {
 		f.profitNote = widget.NewText(
 			widget.TextOpts.Text(note, f.th.Face(theme.StepTiny), theme.Solid(p.Dim)))
-		f.profitNote.MaxWidth = float64(inner)
-		f.matsBox.AddChild(f.profitNote)
+		f.profitNote.MaxWidth = float64(m.Inner)
+		page.add(f.profitNote)
 	}
-	f.matsBox.AddChild(f.matsLbl)
-	bill := append([]mfgNeed(nil), needs...)
+	f.matsLbl = page.label("MATERIALS · most value first")
+	bill := append([]mfgNeed(nil), m.Needs...)
 	total := 0.0
 	for _, n := range bill {
 		total += n.Value
 	}
 	sort.SliceStable(bill, func(i, j int) bool { return bill[i].Value > bill[j].Value })
+	f.matsRows = f.matsRows[:0]
 	for _, n := range bill {
 		r := f.matRow(n, total, p)
 		f.matsRows = append(f.matsRows, r)
-		f.matsBox.AddChild(r.Root)
+		page.stack(r)
 	}
 
 	// The RESULT section: what one run actually makes, the one number the
 	// bill and the profit table never showed. It closes the page under the
 	// bill, and Start stays pinned below the viewport; the quantity picker's
 	// run count multiplies this at Start, the inspector quotes one run.
+	f.resBar, f.resRows = nil, f.resRows[:0]
 	if outs := outputsOf(f.cv, def); len(outs) > 0 {
 		var lbl *theme.ChromeText
-		f.resBar, lbl = sectionBarText(f.th, "RESULT")
-		lbl.Label = "RESULT · one run"
-		lbl.GetWidget().MinWidth = int(math.Ceil(
-			theme.MeasureTracked(lbl.Label, *f.th.FaceMono(theme.StepSmall), f.th.TS().Small)))
-		f.matsBox.AddChild(f.resBar)
+		f.resBar, lbl = page.bar("RESULT")
+		setBarLabel(f.th, lbl, "RESULT · one run")
 		for _, o := range outs {
 			r := f.resRow(o, p)
 			f.resRows = append(f.resRows, r)
-			f.matsBox.AddChild(r.Root)
+			page.stack(r)
 		}
 	}
-	f.matsScroll, f.matsRail = newScrollColumn(f.seams(), f.matsBox)
-	f.matsScroll.GetWidget().ScrolledEvent.AddHandler(func(args any) {
-		if ev, ok := args.(*widget.WidgetScrolledEventArgs); ok {
-			f.scrollMats(ev.Y)
-		}
-	})
-
-	f.startBtn = theme.ActionButton("Start job", f.startClicked)
-	f.startBtn.GetWidget().Disabled = true // armed by Sync's gate
-	startBar := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-		)),
-	)
-	startBar.AddChild(f.startBtn)
-
-	f.insp.AddChild(f.head.headBox, f.matsRail.Container(), startBar)
-	f.insp.RequestRelayout()
+	f.pane.done()
 }
 
-// inspInnerW is the head's text width inside the pane's ContentsPad inset:
-// the bill viewport's own width plus the rail gutter (the head spans the
-// gutter the bill gives up), or the landing width before the first layout.
-func (f *Manufacturing) inspInnerW() int {
-	if f.matsScroll != nil {
-		if r := f.matsScroll.ViewRect(); r.Dx() > 0 {
-			return r.Dx() + theme.Px(theme.ScrollGutter)
-		}
-	}
-	return theme.Px(mfgInspW - 2*theme.ContentsPad)
-}
+// inspInnerW is the head's text width inside the pane (boardPane.innerW).
+func (f *Manufacturing) inspInnerW() int { return f.pane.innerW() }
 
 // matRow is one mineral of the bill as a built rich row.
 func (f *Manufacturing) matRow(n mfgNeed, total float64, p theme.Palette) *widgets.StackRow {
@@ -1015,62 +972,15 @@ func (f *Manufacturing) resRowDef(o mfgOutput, p theme.Palette) widgets.TableRow
 		}})
 }
 
-// mfgInspKey is the inspector's change signature: the selection, the station
-// gate, the slot state, the pane's width (the head re-wraps with the seam),
-// every material's need/have, the run's effective output (a Manufacturing
-// level-up moves it) and the priced figures the profit table draws (the
-// bill's walks, the product's bid). A book move that re-prices a row rebuilds
-// the card; an idle book does not.
-func mfgInspKey(station sim.StationID, slotsFree bool, row manufacturingRow, needs []mfgNeed,
-	out, inner int, quotes []mfgQuote, bid sim.Quote, product content.ItemID) string {
-	var b strings.Builder
-	b.WriteString(string(row.recipe))
-	b.WriteByte(';')
-	b.WriteString(strconv.Itoa(out))
-	b.WriteByte(';')
-	b.WriteString(string(station))
-	b.WriteByte(';')
-	if slotsFree {
-		b.WriteByte('s')
-	}
-	b.WriteString(strconv.Itoa(inner))
-	b.WriteByte(';')
-	for _, n := range needs {
-		b.WriteString(string(n.Item))
-		b.WriteByte(':')
-		b.WriteString(strconv.Itoa(n.Need))
-		b.WriteByte('/')
-		b.WriteString(strconv.Itoa(n.Have))
-		b.WriteByte(';')
-	}
-	for _, q := range quotes {
-		b.WriteString(strconv.FormatFloat(q.Walk, 'g', -1, 64))
-		if q.Priced {
-			b.WriteByte('p')
-		}
-		if q.Remote {
-			b.WriteByte('r')
-		}
-		b.WriteByte(';')
-	}
-	b.WriteString(strconv.FormatFloat(bid.Walk, 'g', -1, 64))
-	if bid.Priced {
-		b.WriteByte('p')
-	}
-	b.WriteString(string(product))
-	return b.String()
-}
-
-// scrollMats turns wheel notches into the material viewport's offset: two
-// rows of the measured row height per notch, the same 0..1-fraction-of-
-// overflow convention the tables use (a positive notch scrolls towards the
-// top of the list).
+// scrollMats turns wheel notches into the page's offset: two rows of the
+// measured row height per notch, the tables' 0..1-fraction-of-overflow
+// convention (a positive notch scrolls towards the top of the list).
 func (f *Manufacturing) scrollMats(notches float64) {
 	rowH := 0
 	if len(f.matsRows) > 0 {
 		_, rowH = f.matsRows[0].Root.PreferredSize()
 	}
-	scrollNotches(f.matsScroll, f.matsRail, rowH, 2, notches)
+	f.pane.wheel(rowH, 2, notches)
 }
 
 // inputsText renders the have/need line of a job's materials: one
