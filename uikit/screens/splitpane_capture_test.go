@@ -96,8 +96,9 @@ func TestSplitPaneSeamCapture(t *testing.T) {
 				return rows
 			}
 
-			// Inventory: two seams on the thirds of the pane stack.
-			if rows := check("inventory", inv.split); len(rows) == 2 {
+			// Inventory: one seam (the sloop has no ore hold, so Cargo
+			// sits over Hangar at the halves).
+			if rows := check("inventory", inv.split); len(rows) == 1 {
 				panes := splitPanes(inv.split)
 				for i, row := range rows {
 					want := panes[i].Max.Y
@@ -106,7 +107,7 @@ func TestSplitPaneSeamCapture(t *testing.T) {
 					}
 				}
 			} else {
-				fail("inventory: %d seams found, want 2", len(rows))
+				fail("inventory: %d seams found, want 1", len(rows))
 			}
 			// Manufacturing: one seam, at the panes' boundary.
 			for _, c := range []struct {

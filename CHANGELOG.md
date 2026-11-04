@@ -18,6 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The inventory moves stacks by drag and drop, and gains a thumbnail
+  view**: press a stack (row or tile), drag it to another hold's section
+  and release to open the transfer popup (the quantity picker on that
+  move: the item's icon and name, the destination and a 1..stack slider
+  starting at the whole stack). The To Cargo / To Ore / To Hangar toolbar
+  buttons are gone; Sell, Show Info and the row menu stay. A new toolbar
+  toggle switches the whole window between the tables and a wrapped grid
+  of square item tiles (session-only, like the market's folded sections).
+  Each hold's used/capacity line becomes an HP-style fullness bar with the
+  figures on it. A hull with no ore hold no longer shows an empty ore
+  section (nor its seam), and while undocked the hangar section is a
+  procedural crosshatch reading `Not docked`.
 - **Buy and Sell moved into the market's right pane**: the two actions now
   sit pinned below the pane's scroll column, side by side, with the open
   chest and hand-off glyphs and the Good/Danger roles on their labels and

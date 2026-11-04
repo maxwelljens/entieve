@@ -51,6 +51,7 @@ type QtyWin struct {
 
 	dialogShell
 	title *theme.ChromeText
+	mark  *theme.IconBox
 	info  *widget.Text
 
 	sliderRow *widget.Container
@@ -76,6 +77,7 @@ func NewQtyWin(env widgets.Seams) *QtyWin {
 	p := env.Pal()
 	o := &QtyWin{th: env, cv: env, as: env, ptr: env.Pointer(), last: map[widgets.QtyMode]int{}}
 
+	o.mark = theme.NewIconBox(theme.IconButton)
 	o.info = widget.NewText(
 		widget.TextOpts.Text("", env.Face(theme.StepTiny), theme.Solid(p.Dim)),
 	)
@@ -136,7 +138,8 @@ func NewQtyWin(env widgets.Seams) *QtyWin {
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
 		)),
 	)
-	body.AddChild(o.info, o.sliderRow, o.detail, o.note, row(o.confirm, o.cancel))
+	infoRow := row(o.mark.Widget(), o.info)
+	body.AddChild(infoRow, o.sliderRow, o.detail, o.note, row(o.confirm, o.cancel))
 
 	// The title bar carries the base display name; the × close is attached by the
 	// kit's close seam (SetWindowClose), like Show Info and the order window.
@@ -176,6 +179,14 @@ func (o *QtyWin) Show(req widgets.QtyPick) bool {
 	o.qtyLbl.Label = "Qty"
 	if req.Mode == widgets.QtyStart {
 		o.qtyLbl.Label = "Runs"
+	}
+	// The transfer popup leads with the item's own mark (the order window's
+	// economics mark, here the item's). The other faces keep the picker's
+	// original single text line, so their frames do not move.
+	if req.Mode == widgets.QtyTransfer {
+		o.mark.Set(widgets.TradeableIcon(o.cv.Defs(), req.Item), o.th.Pal().Dim)
+	} else {
+		o.mark.Set("", o.th.Pal().Dim)
 	}
 	o.buildSlider(o.seed())
 	o.refresh()
@@ -233,7 +244,7 @@ func (o *QtyWin) buildSlider(v int) {
 	opts := widgets.SliderOpts{
 		Mode:     widgets.SliderFreeflow,
 		Min:      1,
-		Max:      qtyMax,
+		Max:      float64(o.maxQty()),
 		Step:     1,
 		Value:    float64(v),
 		OnChange: func(float64) { o.refresh() },
@@ -258,14 +269,48 @@ func (o *QtyWin) buildSlider(v int) {
 	o.slider = s
 }
 
-// seed is the value the picker opens at: the mode's last confirmed value
-// (1 on a fresh session — the retired ladder's first rung); a notched
-// slider clamps it to the nearest live rung.
+// seed is the value the picker opens at: a transfer opens on the whole
+// dragged stack (the owner's "defaults to all the items in the stack");
+// every other mode opens at its last confirmed value (1 on a fresh
+// session — the retired ladder's first rung). A notched slider clamps it
+// to the nearest live rung.
 func (o *QtyWin) seed() int {
+	if o.req.Mode == widgets.QtyTransfer {
+		return o.stackQty(o.req.From, o.req.Item)
+	}
 	if v := o.last[o.req.Mode]; v >= 1 {
 		return v
 	}
 	return 1
+}
+
+// maxQty is the slider's top: the dragged stack for a transfer, the
+// picker's freeflow ceiling otherwise.
+func (o *QtyWin) maxQty() int {
+	if o.req.Mode == widgets.QtyTransfer {
+		return o.stackQty(o.req.From, o.req.Item)
+	}
+	return qtyMax
+}
+
+// stackQty is one item's units in one hold (the dragged stack's count).
+func (o *QtyWin) stackQty(hold string, item content.ItemID) int {
+	var stacks []content.CargoStack
+	switch hold {
+	case "ore":
+		stacks = o.cv.OreStacks()
+	case "hangar":
+		stacks = o.cv.HangarItems()
+	default:
+		stacks = o.cv.CargoStacks()
+	}
+	n := 0
+	for _, st := range stacks {
+		if st.Item == item {
+			n += st.Qty
+		}
+	}
+	return max(1, n)
 }
 
 // stockOf is the units of one ore in the two holds (the refinery's own
@@ -315,7 +360,8 @@ func (o *QtyWin) infoLine() string {
 		return "1–" + theme.FormatInt(qtyMax) + " units · " +
 			theme.FormatInt(int64(o.cv.PlayerStock(o.req.Item))) + " " + name + " held"
 	default:
-		return "1–" + theme.FormatInt(qtyMax) + " units → " + holdName(o.req.To)
+		return o.cv.TradeableName(o.req.Item) + " · 1–" + theme.FormatInt(int64(o.maxQty())) +
+			" units → " + holdName(o.req.To)
 	}
 }
 
@@ -423,7 +469,7 @@ func holdName(hold string) string {
 	case "ore":
 		return "Ore"
 	case "hangar":
-		return "Hangar"
+		return "Station hangar"
 	default:
 		return "Cargo"
 	}

@@ -60,7 +60,7 @@ func TestLayoutSidecarBytesStable(t *testing.T) {
 	g.syncMounts()
 	pump(t, g, 1280, 720)
 	for _, sm := range g.host.Slot(string(idInventory)).Splits() {
-		if sm.Name == "inventory-ore" {
+		if sm.Name == "inventory-hangar" {
 			sm.Split.SetRatio(sm.Index, 0.42)
 		}
 	}
@@ -117,8 +117,7 @@ const layoutBytesGolden = `{
       "h": 434,
       "open": true,
       "splits": {
-        "inventory-hangar": 0.6666666666666666,
-        "inventory-ore": 0.42
+        "inventory-hangar": 0.42
       },
       "tables": {
         "inventory": {

@@ -27,7 +27,7 @@ import (
 const (
 	hudPortraitW = 240  // hull portrait box width (design px): the owner's twofold frame, 4:1
 	hudPortraitH = 60   // a quarter of the width: the owner's ships are side views (contained, padded)
-	hudBarH      = 18   // one health/capacitor bar height (px)
+	hudBarH      = 18   // one health/capacitor bar height (px; widgets.BarH, pinned by test)
 	hudBarMin    = 128  // capacitor bar width: fits the "1,800.0/1,800.0 GJ" value (px)
 	hudHpGap     = 2    // gap between the three health bars (px)
 	hudColGap    = 4    // gap between readout groups in the status column (px)
@@ -251,6 +251,7 @@ type Hud struct {
 	hpDraws    int // health repaint count (state changes only)
 	capBar     *widget.ProgressBar
 	capValue   *widget.Text
+	capStack   *widget.Container
 	recharging *widget.Text
 	wedge      *ebiten.Image
 	wedgeGfx   *widget.Graphic
@@ -384,18 +385,14 @@ func NewHud(env interface {
 
 	// Capacitor: the same bar idiom, value inside; the "capacitor" caption
 	// is gone (the green bar is the capacitor). The recharge hint keeps a
-	// reserved line so the pair never jumps when it appears.
-	h.capBar = widget.NewProgressBar(
-		widget.ProgressBarOpts.Values(0, hudCapMax, 0),
-		widget.ProgressBarOpts.FillImage(&widget.ProgressBarImage{Idle: theme.NineSlice(theme.Solid(p.Cap))}),
-		widget.ProgressBarOpts.WidgetOpts(widget.WidgetOpts.MinSize(theme.Px(hudBarMin), theme.Px(hudBarH))),
-	)
-	h.capValue = widget.NewText(widget.TextOpts.Text("", env.Face(theme.StepTiny), theme.Solid(p.BGHard)),
-		widget.TextOpts.Position(widget.TextPositionCenter, widget.TextPositionCenter))
-	capStack := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewStackedLayout()),
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
-	)
+	// reserved line so the pair never jumps when it appears. The bar and
+	// its overlaid value are the shared widgets.ValueBar seam (the
+	// inventory's hold fullness is the same construction).
+	vb := widgets.NewValueBar(env, p.Cap, hudBarMin)
+	h.capBar, h.capValue = vb.Bar, vb.Value
+	capStack := vb.Container
+	h.capStack = capStack
+	capStack.GetWidget().LayoutData = widget.RowLayoutData{Stretch: true}
 	capMark := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
 	// The capacitor bar is shorter than a doubled glyph: cap it to the
 	// health bars' inner height (the bar less the outline inset).
@@ -406,7 +403,7 @@ func NewHud(env interface {
 		Padding:            &widget.Insets{Left: theme.Px(4)},
 	}
 	capMark.AddChild(capGlyph)
-	capStack.AddChild(h.capBar, capMark, h.capValue)
+	vb.AddMark(capMark)
 	h.recharging = widget.NewText(widget.TextOpts.Text("recharging", env.Face(theme.StepTiny), theme.Solid(p.Warn)))
 	rechargeRow := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
