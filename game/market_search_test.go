@@ -52,7 +52,7 @@ func TestMarketSearchKeyboardGate(t *testing.T) {
 	if bodyOf[*uikit.Market](g.host, idMarket).SearchFocused() {
 		t.Fatal("Esc did not blur the empty search field")
 	}
-	if _, ok := g.top().(*MenuScene); !ok {
+	if !g.host.IsOpen(idMenu) {
 		t.Fatal("Esc on the empty search field did not fall through to the Esc menu")
 	}
 }

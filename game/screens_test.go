@@ -88,6 +88,7 @@ func TestScreenSpecRejectsMalformedRows(t *testing.T) {
 		{"unknown anchor", func(r []Screen) { r[0].Anchor = Anchor(99) }, "unknown anchor"},
 		{"duplicate title", func(r []Screen) { r[1].Title = "Inventory" }, "title already used by"},
 		{"unknown dock policy", func(r []Screen) { r[0].DockPolicy = DockPolicy(99) }, "unknown dock policy"},
+		{"modal facet without a veil", func(r []Screen) { r[screenIndex(idMenu)].Modal.Dim = 0 }, "without a dim veil"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -216,14 +217,16 @@ func TestScreenPlacementDerivesFromSpec(t *testing.T) {
 	}
 }
 
-// TestScreenKeysToggleTheirPanels: every keyed, non-modal row flips its
-// own flag from the spec (the modal rows are scene-owned: handleKeys
-// routes Esc/N/H to their scenes). A new row's key works without touching
-// handleKeys.
+// TestScreenKeysToggleTheirPanels: every keyed row flips its own flag from
+// the spec — the modal rows too, since modality is a row property and the
+// host owns the step (no key is wired to a scene). A new row's key works
+// without touching handleKeys. One press runs the row's whole open step:
+// a modal row is modal and dimmed while it is up, and a session-capable
+// row opened by its own key stays the plain window.
 func TestScreenKeysToggleTheirPanels(t *testing.T) {
 	g := newShowcaseGame(t)
 	for _, s := range screens {
-		if s.Modal || s.Key == keyNone {
+		if s.Key == keyNone {
 			continue
 		}
 		press := Input{JustPressed: []ebiten.Key{s.Key}}
@@ -236,6 +239,13 @@ func TestScreenKeysToggleTheirPanels(t *testing.T) {
 		}
 		if g.host.IsOpen(s.ID) == before {
 			t.Errorf("%s: %v did not toggle the flag (still %v)", screenLabel(s), s.Key, before)
+		}
+		// The modality the row declares, read back off its window: a plain
+		// modal row is modal the moment it opens, a session row only in
+		// its session (its own key is the plain path).
+		wantModal := s.Modal.Dim > 0 && s.Modal.Session == ""
+		if w := g.host.Window(s.ID); w == nil || w.Modal != wantModal {
+			t.Errorf("%s: window modal = %v after %v, want %v", screenLabel(s), w.Modal, s.Key, wantModal)
 		}
 		if err := g.handleKeys(press); err != nil {
 			t.Fatalf("%s: handleKeys (release): %v", screenLabel(s), err)

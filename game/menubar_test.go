@@ -16,7 +16,7 @@ import (
 // it wears the same bar.
 func TestEscMenuWearsTheHouseTitleBar(t *testing.T) {
 	g := newShowcaseGame(t)
-	g.push(&MenuScene{g: g})
+	g.host.SetOpen(idMenu, true)
 	pump(t, g, 1280, 720)
 
 	// The bar leads with its own children (dots, then the title) and the kit

@@ -169,101 +169,11 @@ func (sc *StationScene) drawDockedTitle(dst *ebiten.Image, a float32) {
 		float32(tw), float32(theme.Px(1)), rule, false)
 }
 
-// ---------------------------------------------------------------------------
-// HelpScene (key map overlay)
-// ---------------------------------------------------------------------------
-
-// HelpScene shows the key map from KeyMap (the single source shared with
-// docs/GAMEPLAY.md) as a modal, closable window. It does not pause the
-// simulation.
-type HelpScene struct{ g *Game }
-
-// OnEnter implements Scene.
-func (sc *HelpScene) OnEnter() { sc.g.host.SetOpen(idHelp, true) }
-
-// OnLeave implements Scene.
-func (sc *HelpScene) OnLeave() { sc.g.host.SetOpen(idHelp, false) }
-
-// Update is a no-op: H / Esc close the scene.
-func (sc *HelpScene) Update(in Input) error { return nil }
-
-// Draw renders the dimmed backdrop; the window is drawn by the kit.
-func (sc *HelpScene) Draw(dst *ebiten.Image) {
-	dimScreen(dst, sc.g.w, sc.g.h, 180)
-}
-
-// ---------------------------------------------------------------------------
-// MenuScene (Esc)
-// ---------------------------------------------------------------------------
-
 // menuItems are the Esc menu buttons, in draw order. Settings is the
 // in-game mouse path to the settings window (the rail no longer
-// launches it): it enters the menu's settings session.
+// launches it): it enters the menu's settings session (the Screen row's
+// Modal.Session, opened by the host).
 var menuItems = []string{"Resume", "Save", "Save as…", "Load", "Settings", "Quit"}
-
-// MenuScene is the Esc menu: a small modal uikit window with Resume /
-// Save / Load / Settings / Quit. Scene and window toggle together.
-type MenuScene struct{ g *Game }
-
-// OnEnter implements Scene: mounts the menu window.
-func (sc *MenuScene) OnEnter() { sc.g.host.SetOpen(idMenu, true) }
-
-// OnLeave implements Scene: unmounts the menu window.
-func (sc *MenuScene) OnLeave() { sc.g.host.SetOpen(idMenu, false) }
-
-// Update is a no-op: the buttons run inside Kit.Update.
-func (sc *MenuScene) Update(in Input) error { return nil }
-
-// Draw dims the screen behind the menu window.
-func (sc *MenuScene) Draw(dst *ebiten.Image) {
-	dimScreen(dst, sc.g.w, sc.g.h, 170)
-}
-
-// ---------------------------------------------------------------------------
-// SettingsScene (the pause menu's settings session)
-// ---------------------------------------------------------------------------
-
-// SettingsScene is the settings window as the pause menu owns it: entering
-// Settings from the Esc menu trades the menu scene for this one, which
-// opens the window modal and dims the screen behind it; Esc (or the
-// window's ×) hands the session back to the menu. The row itself stays
-// non-modal, so the P key's window is still a plain floating one.
-type SettingsScene struct{ g *Game }
-
-// OnEnter implements Scene: opens the settings window and makes it modal
-// for the session only.
-func (sc *SettingsScene) OnEnter() {
-	sc.g.host.SetOpen(idSettings, true)
-	sc.setModal(true)
-}
-
-// OnLeave implements Scene: closes the window and restores its plain
-// (non-modal) flag — the P path must never inherit the session's layer.
-func (sc *SettingsScene) OnLeave() {
-	sc.g.host.SetOpen(idSettings, false)
-	sc.setModal(false)
-}
-
-// Update re-asserts the modal flag: a load rebuilds the kit's windows
-// (LoadGame → buildKit → Warm) and the session outlives the rebuild.
-func (sc *SettingsScene) Update(in Input) error {
-	sc.setModal(true)
-	return nil
-}
-
-// setModal flips the built window's flag (the row's Modal field is the
-// build-time default and stays false).
-func (sc *SettingsScene) setModal(on bool) {
-	if w := sc.g.host.Window(idSettings); w != nil {
-		w.Modal = on
-	}
-}
-
-// Draw dims the screen behind the settings window, like the menu it
-// replaced.
-func (sc *SettingsScene) Draw(dst *ebiten.Image) {
-	dimScreen(dst, sc.g.w, sc.g.h, 170)
-}
 
 // ---------------------------------------------------------------------------
 // Game-built windows (menu, station)

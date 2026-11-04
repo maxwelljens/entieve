@@ -27,7 +27,7 @@ func TestProficiencyOverviewFollowsTheTree(t *testing.T) {
 	}
 
 	// The overview's own × (the row's close) keeps it shut for this visit.
-	g.toggleScreenID(idProficiencyOverview)
+	g.host.Toggle(idProficiencyOverview)
 	pump(t, g, 1280, 720)
 	if g.host.IsOpen(idProficiencyOverview) {
 		t.Fatal("the overview reopened itself after its × close")
@@ -49,9 +49,7 @@ func TestProficiencyOverviewFollowsTheTree(t *testing.T) {
 	}
 
 	// Esc: the tree and its overview go together.
-	if err := g.onEscape(); err != nil {
-		t.Fatalf("onEscape: %v", err)
-	}
+	g.onEscape()
 	pump(t, g, 1280, 720)
 	if g.host.IsOpen(idProficiency) || g.host.IsOpen(idProficiencyOverview) {
 		t.Fatal("Esc left the tree or its overview open")
@@ -70,9 +68,7 @@ func TestProficiencyCardEscBacksOutFirst(t *testing.T) {
 	if !g.kit.ProfFamilyOpen() {
 		t.Fatal("fixture: the family card did not open")
 	}
-	if err := g.onEscape(); err != nil {
-		t.Fatalf("onEscape: %v", err)
-	}
+	g.onEscape()
 	if g.kit.ProfFamilyOpen() {
 		t.Fatal("Esc did not close the family card")
 	}

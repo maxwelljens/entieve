@@ -302,25 +302,25 @@ func TestSceneDrawSmoke(t *testing.T) {
 		assertNoOverlap(t, g, size[0], size[1])
 
 		// Help overlay: full two-column key map.
-		g.push(&HelpScene{g: g})
+		g.host.SetOpen(idHelp, true)
 		g.syncMounts()
 		pump(t, g, size[0], size[1])
 		g.Draw(img)
 
-		// Starmap: an ordinary window now, so it stacks over the help
-		// overlay without a modal scene or a dim backdrop.
+		// Starmap: an ordinary window, so it stacks over the help
+		// overlay without a modal layer of its own.
 		g.host.SetOpen(idMap, true)
 		g.syncMounts()
 		pump(t, g, size[0], size[1])
 		g.Draw(img)
 
-		// Esc menu (modal) above both.
-		g.push(&MenuScene{g: g})
+		// Esc menu (modal) above both, the host's dim under it.
+		g.host.SetOpen(idMenu, true)
 		g.syncMounts()
 		pump(t, g, size[0], size[1])
 		g.Draw(img)
-		g.pop()
-		g.pop()
+		g.host.SetOpen(idMenu, false)
+		g.host.SetOpen(idHelp, false)
 		g.host.SetOpen(idMap, false)
 		g.syncMounts()
 
@@ -498,7 +498,7 @@ func TestPendingLoadSwapsKitAfterPump(t *testing.T) {
 	}
 	oldKit := g.kit
 
-	g.push(&MenuScene{g: g})
+	g.host.SetOpen(idMenu, true)
 	g.syncMounts()
 	if !g.host.Mounted(idMenu) {
 		t.Fatal("menu window not mounted")

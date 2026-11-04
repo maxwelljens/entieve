@@ -2,10 +2,12 @@ package game
 
 // The Screen host: the Game-free state machine between a Screen spec row
 // and its built panel. It owns the open flag, the mount, the committed
-// close, the placement record and a Persistent row's visibility; the panel
-// owns Sync. Two instances run per session: the game host (every row) and
-// the title host (the title-scoped rows, game/title.go), so the title's
-// Settings and Keybindings are the same rows mounted through the same seam.
+// close, the placement record, a Persistent row's visibility and every
+// row's modality (its veil, its Esc step and a session's return to its
+// owner); the panel owns Sync. Two instances run per session: the game
+// host (every row) and the title host (the title-scoped rows,
+// game/title.go), so the title's Settings and Keybindings are the same
+// rows mounted through the same seam.
 
 import (
 	"image"
@@ -15,6 +17,7 @@ import (
 	uikit "github.com/entieve/entieve/uikit/screens"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // hostSink is what the host needs from the interface kit: mount/remove a
@@ -58,10 +61,6 @@ type screenServices struct {
 	// Screen rows hand them to the host to mount, place, persist and hide.
 	Overview     func() widgets.WindowPanel
 	SelectedItem func() widgets.WindowPanel
-	// Close is the owner's close semantics for a row's ×: the game routes
-	// modal rows to their scene, the title host leaves it nil (plain
-	// toggle).
-	Close func(ScreenID)
 	// Cancel disarms an armed keybind capture (the keybindings panel's
 	// Unmounted hook).
 	Cancel func()
@@ -87,6 +86,10 @@ type screenSlot struct {
 	open      bool
 	mount     widget.RemoveWindowFunc
 	dismissed bool
+	// session marks the row open as the Modal.Session of another row (the
+	// Settings window owned by the pause menu): modal and dimmed only
+	// then. It is host state, so a kit rebuild cannot lose it.
+	session bool
 }
 
 // ScreenHost mounts, syncs and dismisses a Screen table's panels.
@@ -145,8 +148,10 @@ func newScreenHost(rows []Screen, scope hostScope, sink hostSink, services scree
 }
 
 // Rebind points the host at a rebuilt interface: panels, mounts and the
-// placement records drop (the old kit owns them), open flags survive —
-// a load rebuild must reopen exactly what the player had open.
+// placement records drop (the old kit owns them), open flags and a row's
+// session survive — a load rebuild must reopen exactly what the player
+// had open, and a settings session outlives it (build re-applies the
+// row's modality on the fresh window).
 func (h *ScreenHost) Rebind(sink hostSink, services screenServices) {
 	h.sink = sink
 	h.services = services
@@ -173,21 +178,80 @@ func (h *ScreenHost) build(s *screenSlot) {
 	}
 	s.panel = s.row.Build(h)
 	win := s.panel.Win()
-	if s.row.Modal && win != nil {
-		win.Modal = true
-	}
+	h.applyModal(s)
 	id := s.row.ID
-	h.sink.SetWindowClose(win, func() { h.closeRow(id) })
+	h.sink.SetWindowClose(win, func() { h.Toggle(id) })
 }
 
-// closeRow runs a row's × semantics: the owner's close hook when it has
-// one (the game's scene-driven modal rows), else a plain toggle.
-func (h *ScreenHost) closeRow(id ScreenID) {
-	if h.services.Close != nil {
-		h.services.Close(id)
+// modalNow reports whether a row is modal in its current state: a row
+// that declares a veil is modal while it is up, and a session row only
+// inside its session — the Settings window's own key still opens the
+// plain floating window.
+func (h *ScreenHost) modalNow(s *screenSlot) bool {
+	switch {
+	case s.row.Modal.Dim == 0:
+		return false
+	case s.row.Modal.Session != "":
+		return s.session
+	}
+	return true
+}
+
+// applyModal writes a row's declared modality onto its window. A row that
+// declares none is left alone: the title phase's windows own their modal
+// frame through their builder.
+func (h *ScreenHost) applyModal(s *screenSlot) {
+	if s.row.Modal.Dim == 0 {
 		return
 	}
-	h.Toggle(id)
+	if win := s.Win(); win != nil {
+		win.Modal = h.modalNow(s)
+	}
+}
+
+// ModalUp reports whether any row is modal in its current state: the
+// world key layer yields to it (a modal covers the world).
+func (h *ScreenHost) ModalUp() bool {
+	for _, s := range h.slots {
+		if s.open && h.modalNow(s) {
+			return true
+		}
+	}
+	return false
+}
+
+// Paused reports whether the pause layer is up: an open modal row that
+// declares Pauses owns the whole key layer (the Esc menu and the session
+// it opens).
+func (h *ScreenHost) Paused() bool {
+	for _, s := range h.slots {
+		if s.open && s.row.Modal.Pauses && h.modalNow(s) {
+			return true
+		}
+	}
+	return false
+}
+
+// DrawDim paints the veil of every open modal row, in declaration order —
+// the order the scene stack painted its overlays in, so a stack of modals
+// composites exactly as it did.
+func (h *ScreenHost) DrawDim(dst *ebiten.Image, w, height int) {
+	for _, a := range h.Veils() {
+		dimScreen(dst, w, height, a)
+	}
+}
+
+// Veils is DrawDim's input read back: one alpha per open modal row, in
+// declaration order. The pins assert the dim from this instead of a pixel
+// readback (ebiten refuses one outside a running loop).
+func (h *ScreenHost) Veils() []uint8 {
+	out := make([]uint8, 0, 2)
+	for _, s := range h.slots {
+		if s.open && h.modalNow(s) {
+			out = append(out, s.row.Modal.Dim)
+		}
+	}
+	return out
 }
 
 // roomAllows is the room's half of a row's rule: a space-only row has no
@@ -363,7 +427,10 @@ func (h *ScreenHost) Sync() {
 }
 
 // SetOpen sets a row's flag. On the title host opening one row closes the
-// others (they are modal there).
+// others (they are modal there). It is the raw flag: the session step
+// belongs to Toggle, which is the path every door (key, rail, ×, menu
+// button) runs. Closing a row ends any session it was open in, so no
+// stale session can turn a later plain open into a modal layer.
 func (h *ScreenHost) SetOpen(id ScreenID, open bool) bool {
 	s := h.byID[id]
 	if s == nil {
@@ -375,16 +442,58 @@ func (h *ScreenHost) SetOpen(id ScreenID, open bool) bool {
 		}
 	}
 	s.open = open
+	if !open {
+		s.session = false
+	}
+	h.applyModal(s)
 	return true
 }
 
-// Toggle flips a row's flag.
+// Toggle flips a row's flag. A session row opened while its owner is up
+// becomes that owner's session: the owner closes, the row turns modal and
+// dimmed, and closing it hands back to the owner (the Esc menu's Settings
+// button, and the × on the window it opens).
 func (h *ScreenHost) Toggle(id ScreenID) bool {
 	s := h.byID[id]
 	if s == nil {
 		return false
 	}
-	return h.SetOpen(id, !s.open)
+	owner := s.row.Modal.Session
+	switch {
+	case owner != "" && !s.session && h.IsOpen(owner):
+		h.SetOpen(owner, false)
+		s.session = true
+		h.SetOpen(id, true)
+	case s.session:
+		// The session ends and the row it belongs to comes back on top.
+		h.SetOpen(id, false)
+		h.SetOpen(owner, true)
+	default:
+		h.SetOpen(id, !s.open)
+	}
+	return true
+}
+
+// EscapeModal runs the modal step of the Esc ladder: the last declared
+// open modal row closes, and a session row hands back to its owner. Rows
+// are in mount order, so the last declaration outranks the ones above it
+// (the menu over help, a session over the rows declared before it).
+// Reports the row that claimed the press.
+func (h *ScreenHost) EscapeModal() (ScreenID, bool) {
+	for i := len(h.slots) - 1; i >= 0; i-- {
+		s := h.slots[i]
+		if s.open && h.modalNow(s) {
+			h.Toggle(s.row.ID)
+			return s.row.ID, true
+		}
+	}
+	return "", false
+}
+
+// Session reports whether a row is open as its declared session.
+func (h *ScreenHost) Session(id ScreenID) bool {
+	s := h.byID[id]
+	return s != nil && s.session
 }
 
 // IsOpen reports a row's flag.
@@ -513,8 +622,13 @@ func (s *screenSlot) Win() *widget.Window {
 	}
 	return s.panel.Win()
 }
-func (s *screenSlot) PersistOpen() bool  { return s.open }
-func (s *screenSlot) RestoreOpen(o bool) { s.open = o }
+func (s *screenSlot) PersistOpen() bool { return s.open }
+func (s *screenSlot) RestoreOpen(o bool) {
+	s.open = o
+	if !o {
+		s.session = false // a restored close is never still a session
+	}
+}
 func (s *screenSlot) Splits() []widgets.Seam {
 	if s.panel == nil {
 		return nil

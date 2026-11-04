@@ -69,7 +69,7 @@ func TestProficiencyRowIsTheFullViewportLayer(t *testing.T) {
 	if g.host.IsOpen(idProficiency) || g.host.Mounted(idProficiency) {
 		t.Fatal("Esc left the proficiency layer open")
 	}
-	if _, menu := g.top().(*MenuScene); menu {
+	if g.host.IsOpen(idMenu) {
 		t.Fatal("Esc opened the menu behind the layer instead of closing the layer")
 	}
 	if o := g.kit.Own(bare); o.Layer != uikit.LayerWorld {

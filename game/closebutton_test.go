@@ -7,37 +7,10 @@ import (
 // The Screen spec's close buttons (spec-driven): every row with a title
 // bar carries a × (the kit attached it through SetWindowClose in
 // buildKit), and pressing it runs THAT ROW'S OWN close semantics — the
-// non-modal rows flip their open flag exactly like their key does, the
-// modal rows pop their scene — after which the row reopens through the
-// same toggle (the rail's and the key's path, unchanged). The one row
-// without a title bar (Station Services) attaches no button by design.
-//
-// rowScene returns the scene a modal row's window is owned by (nil for a
-// non-modal row — the starmap is one of those now).
-func rowScene(g *Game, id ScreenID) Scene {
-	switch id {
-	case idHelp:
-		return &HelpScene{g: g}
-	case idMenu:
-		return &MenuScene{g: g}
-	}
-	return nil
-}
-
-// sceneUp reports whether that scene type is on the stack.
-func sceneUp(g *Game, id ScreenID) bool {
-	return g.findScene(func(sc Scene) bool {
-		switch id {
-		case idHelp:
-			_, ok := sc.(*HelpScene)
-			return ok
-		case idMenu:
-			_, ok := sc.(*MenuScene)
-			return ok
-		}
-		return false
-	})
-}
+// row's one toggle, the same path as its key, the rail and the menu
+// button (the modal rows included: the host owns their modality, so a
+// scene is never involved). The one row without a title bar (Station
+// Services) attaches no button by design.
 
 func TestSpecCloseButtonsFollowTheirRow(t *testing.T) {
 	// Two sessions cover the whole table: rows mount in space by
@@ -71,16 +44,9 @@ func TestSpecCloseButtonsFollowTheirRow(t *testing.T) {
 				return
 			}
 
-			// Open the row the way it opens in play: modals through
-			// their scene, everything else through the open flag.
-			if sc := rowScene(g, s.ID); sc != nil {
-				if sceneUp(g, s.ID) {
-					t.Fatal("fixture: scene already up from a previous row")
-				}
-				g.push(sc)
-			} else {
-				g.host.SetOpen(s.ID, true)
-			}
+			// Open the row the way it opens in play: its flag (the toggle
+			// behind the key, the rail and the menu button).
+			g.host.SetOpen(s.ID, true)
 			pump(t, g, 1280, 720)
 			pump(t, g, 1280, 720)
 			if !g.host.Mounted(s.ID) {
@@ -96,16 +62,12 @@ func TestSpecCloseButtonsFollowTheirRow(t *testing.T) {
 				t.Fatalf("× never laid out: %v", btn.GetWidget().Rect)
 			}
 
-			// Press it — the registered close is this row's own
-			// toggleScreen: the flag flips (modal rows pop their scene
-			// through it), exactly like the key and the rail entry.
+			// Press it — the registered close is this row's own toggle:
+			// the flag flips, exactly like the key and the rail entry.
 			click(t, g, btn)
 			pump(t, g, 1280, 720) // the next reconciliation unmounts
 			if g.host.IsOpen(s.ID) {
 				t.Errorf("× left the row open — close did not run the row's toggle")
-			}
-			if s.Modal && sceneUp(g, s.ID) {
-				t.Error("× did not pop the row's scene")
 			}
 			// A Persistent row hides on its close and stays mounted (the
 			// two always-on windows); every other row unmounts.
@@ -125,9 +87,6 @@ func TestSpecCloseButtonsFollowTheirRow(t *testing.T) {
 			pump(t, g, 1280, 720)
 			if !g.host.IsOpen(s.ID) {
 				t.Error("reopen toggle left the row closed")
-			}
-			if s.Modal != sceneUp(g, s.ID) {
-				t.Errorf("reopen: scene on stack = %v, want modal=%v", sceneUp(g, s.ID), s.Modal)
 			}
 			if !g.host.Mounted(s.ID) || !win.GetContainer().GetWidget().IsVisible() {
 				t.Error("reopened row is not mounted and visible")

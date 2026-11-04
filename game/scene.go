@@ -29,8 +29,8 @@ type Input struct {
 
 // Scene is one entry of the game's scene stack. Scenes are drawn bottom-up;
 // only the top scene receives Update. The interface itself (uikit windows)
-// is pumped by Game regardless of scene — scenes only own world input and
-// overlay dimming.
+// is pumped by Game regardless of scene — scenes own the world and its
+// backdrop; the modal veils belong to the Screen rows (ScreenHost.DrawDim).
 type Scene interface {
 	Update(input Input) error
 	Draw(dst *ebiten.Image)
@@ -272,8 +272,9 @@ func clampF(v, lo, hi float64) float64 {
 	return v
 }
 
-// dimScreen draws a translucent black veil over the whole screen (overlay
-// scenes use it for readability).
+// dimScreen draws a translucent black veil over the whole screen: the
+// docked backdrops and the modal Screen rows' veils (ScreenHost.DrawDim)
+// use it for readability.
 func dimScreen(dst *ebiten.Image, w, h int, alpha uint8) {
 	vector.DrawFilledRect(dst, 0, 0, float32(w), float32(h), color.RGBA{0, 0, 0, alpha}, false)
 }

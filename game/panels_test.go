@@ -46,7 +46,7 @@ func TestPanelMountAndSync(t *testing.T) {
 		g.host.SetOpen(idScanner, true)
 		g.host.SetOpen(idMap, true)
 		g.host.SetOpen(idHelp, true)
-		g.push(&MenuScene{g: g})
+		g.host.SetOpen(idMenu, true)
 		dockAt(t, g)
 		g.syncScenes()
 		g.syncMounts()
@@ -212,7 +212,7 @@ func TestToggleKeys(t *testing.T) {
 		t.Error("plain L toggled the log (loot binding broken)")
 	}
 
-	// N toggles the Starmap window (a plain window: no scene).
+	// N toggles the Starmap window (a plain, non-modal window).
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyN}})
 	if !g.host.IsOpen(idMap) {
 		t.Fatal("N did not open the starmap window")
@@ -230,19 +230,19 @@ func TestToggleKeys(t *testing.T) {
 		t.Fatal("map window still mounted after close")
 	}
 
-	// H toggles the Help scene + window.
+	// H toggles the modal help row.
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyH}})
-	if _, ok := g.top().(*HelpScene); !ok || !g.host.IsOpen(idHelp) {
-		t.Fatal("H did not open the help scene")
+	if !g.host.IsOpen(idHelp) {
+		t.Fatal("H did not open the help row")
 	}
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyH}})
-	if _, ok := g.top().(*HelpScene); ok {
-		t.Fatal("H did not close the help scene")
+	if g.host.IsOpen(idHelp) {
+		t.Fatal("H did not close the help row")
 	}
 
 	// Esc opens the modal menu; while it is open no other key toggles.
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyEscape}})
-	if _, ok := g.top().(*MenuScene); !ok || !g.host.IsOpen(idMenu) {
+	if !g.host.IsOpen(idMenu) {
 		t.Fatal("Esc did not open the menu")
 	}
 	g.syncMounts()
@@ -255,7 +255,7 @@ func TestToggleKeys(t *testing.T) {
 	}
 	// Esc again closes everything menu-related.
 	g.handleKeys(Input{JustPressed: []ebiten.Key{ebiten.KeyEscape}})
-	if _, ok := g.top().(*MenuScene); ok || g.host.IsOpen(idMenu) {
+	if g.host.IsOpen(idMenu) {
 		t.Fatal("Esc did not close the menu")
 	}
 	g.syncMounts()
