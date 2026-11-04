@@ -985,7 +985,8 @@ Stations get better at their own work: every completed run raises that
 station's **craft** in the recipe's family (hulls, modules, charges), up
 to five levels. Higher craft means faster jobs and less material per run.
 Unused craft decays slowly, so a station left idle slides back, and a
-job already running is never re-timed by a mid-job level-up.
+job already running is never re-timed, re-billed or re-yielded by a mid-job
+level-up: its clock, its material bill and its output are fixed at start.
 
 ## The economy
 

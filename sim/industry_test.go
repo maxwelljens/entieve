@@ -968,6 +968,208 @@ func TestIndustryCancelRefundsMaterials(t *testing.T) {
 	}
 }
 
+// TestIndustryCancelRefundsTheCommittedBill pins the frozen-bill rule: a
+// craft level gained mid-job changes nothing about the refund. The old
+// re-derivation would return 54 ferrite (ceil(55 × 0.98)), one less than the
+// 55 committed; the job's own bill returns exactly 55.
+func TestIndustryCancelRefundsTheCommittedBill(t *testing.T) {
+	s := newIndustrySim(t)
+	dockAtHaven(t, s)
+	drain(s)
+	giveCargo(s, "min-ferrite", 1000)
+	giveCargo(s, "min-nickel", 100)
+	wallet := s.Wallet()
+
+	id, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 10, OwnerPlayer)
+	if !ok {
+		t.Fatal("start refused")
+	}
+	j, ok := jobAt(s, "cel-station-a", id)
+	if !ok || j.Terms == nil {
+		t.Fatalf("job has no frozen terms: %+v", j)
+	}
+	if got := j.Terms.Bill; len(got) != 2 || got[0].Item != "min-ferrite" || got[0].Qty != 55 ||
+		got[1].Item != "min-nickel" || got[1].Qty != 30 {
+		t.Fatalf("frozen bill = %+v, want 55 ferrite / 30 nickel", got)
+	}
+	if cargoCount(s, "min-ferrite") != 945 || cargoCount(s, "min-nickel") != 70 {
+		t.Fatalf("commit = %d ferrite / %d nickel, want 945 / 70",
+			cargoCount(s, "min-ferrite"), cargoCount(s, "min-nickel"))
+	}
+
+	// A mid-job level-up that WOULD move a re-derived bill: charges L2 is
+	// 2% off materials, so the quote now reads 54 ferrite.
+	s.craftEntry("cel-station-a", content.FamilyCharges, true).Runs = 4
+	if got := s.CraftLevel("cel-station-a", content.FamilyCharges); got != 2 {
+		t.Fatalf("craft level = %d, want 2 (the mid-job move)", got)
+	}
+	if moved := s.JobMaterials("cel-station-a", "rec-ammo-emp-s", 10); moved[0].Qty != 54 {
+		t.Fatalf("re-derived bill = %+v, want 54 ferrite (the drift this pin removes)", moved)
+	}
+	j, _ = jobAt(s, "cel-station-a", id)
+	if j.Terms.Bill[0].Qty != 55 {
+		t.Fatalf("mid-job level moved the frozen bill: %+v", j.Terms.Bill)
+	}
+
+	if !s.CancelJob("cel-station-a", id, OwnerPlayer) {
+		t.Fatal("cancel refused")
+	}
+	// Refund == commit by construction: the job's own field, not a quote.
+	if got := hangarCount(s, "min-ferrite"); got != 55 {
+		t.Errorf("refunded ferrite = %d, want 55 (the committed bill)", got)
+	}
+	if got := hangarCount(s, "min-nickel"); got != 30 {
+		t.Errorf("refunded nickel = %d, want 30", got)
+	}
+	if got := s.Wallet(); got != wallet-s.JobFee("rec-ammo-emp-s", 10) {
+		t.Errorf("wallet after cancel = %v, want the fee kept", got)
+	}
+}
+
+// TestIndustryCollectDeliversTheFrozenOutput pins the frozen-output rule: a
+// Manufacturing level gained mid-job changes nothing about the delivery. At
+// L2 the quote reads 208 charges for two runs; the job delivers the 200 it
+// froze at start.
+func TestIndustryCollectDeliversTheFrozenOutput(t *testing.T) {
+	s := newIndustrySim(t)
+	dockAtHaven(t, s)
+	drain(s)
+	giveCargo(s, "min-ferrite", 1000)
+	giveCargo(s, "min-nickel", 100)
+
+	id, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 2, OwnerPlayer)
+	if !ok {
+		t.Fatal("start refused")
+	}
+	j, ok := jobAt(s, "cel-station-a", id)
+	if !ok || j.Terms == nil || j.Terms.Output != 200 {
+		t.Fatalf("frozen output = %+v, want 200 at start", j.Terms)
+	}
+
+	// L2 Manufacturing mid-job: the pre-start quote moves to 208.
+	s.awardProficiency("manufacturing", 40)
+	if got := s.PlayerJobOutput("rec-ammo-emp-s", 2); got != 208 {
+		t.Fatalf("re-derived output = %d, want 208 (the drift this pin removes)", got)
+	}
+	j, _ = jobAt(s, "cel-station-a", id)
+	if j.Terms.Output != 200 {
+		t.Fatalf("mid-job level moved the frozen output: %d", j.Terms.Output)
+	}
+
+	stepUntilDone(t, s, "cel-station-a", id)
+	s.Queue(CmdCollectJob{ID: id})
+	s.Step()
+	drain(s)
+	if got := hangarCount(s, "ammo-emp-s"); got != 200 {
+		t.Errorf("delivered = %d, want the frozen 200 (not the 208 quote)", got)
+	}
+}
+
+// TestIndustryFrozenTermsSurviveSave round-trips a save with the terms and
+// then moves both levels: the restored job still cancels for its committed
+// bill and collects its frozen output.
+func TestIndustryFrozenTermsSurviveSave(t *testing.T) {
+	s := newIndustrySim(t)
+	dockAtHaven(t, s)
+	drain(s)
+	giveCargo(s, "min-ferrite", 1000)
+	giveCargo(s, "min-nickel", 100)
+
+	outID, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 2, OwnerPlayer)
+	if !ok {
+		t.Fatal("output job refused")
+	}
+	billID, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 10, OwnerPlayer)
+	if !ok {
+		t.Fatal("bill job refused")
+	}
+	save, err := s.Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	if len(save.Jobs) != 2 || save.Jobs[0].Terms == nil || save.Jobs[0].Terms.Output != 200 ||
+		save.Jobs[1].Terms == nil || save.Jobs[1].Terms.Bill[0].Qty != 55 {
+		t.Fatalf("Save.Jobs terms = %+v, want both frozen figures persisted", save.Jobs)
+	}
+
+	b, err := New(industryContent(), testWorld(), testSeed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Restore(save); err != nil {
+		t.Fatalf("Restore: %v", err)
+	}
+	// Move both levels after the load; a re-derivation would now pay 52/208.
+	b.craftEntry("cel-station-a", content.FamilyCharges, true).Runs = 4
+	b.awardProficiency("manufacturing", 40)
+	if got := b.JobMaterials("cel-station-a", "rec-ammo-emp-s", 10)[0].Qty; got != 52 {
+		t.Fatalf("fixture: re-derived bill %d, want 52", got)
+	}
+	if !b.CancelJob("cel-station-a", billID, OwnerPlayer) {
+		t.Fatal("restored bill job did not cancel")
+	}
+	if got := hangarCount(b, "min-ferrite"); got != 55 {
+		t.Errorf("restored refund = %d ferrite, want the committed 55", got)
+	}
+	stepUntilDone(t, b, "cel-station-a", outID)
+	if !b.CollectJob("cel-station-a", outID, OwnerPlayer) {
+		t.Fatal("restored output job did not collect")
+	}
+	if got := hangarCount(b, "ammo-emp-s"); got != 200 {
+		t.Errorf("restored delivery = %d, want the frozen 200", got)
+	}
+}
+
+// TestIndustryLegacyJobBackfillsTerms is the migration pin: a save written
+// before Job.Terms existed carries jobs without terms, and restore backfills
+// them once with today's re-derivation (the exact figures the old code would
+// have used at cancel). A later level move does not touch the backfilled
+// fields.
+func TestIndustryLegacyJobBackfillsTerms(t *testing.T) {
+	s := newIndustrySim(t)
+	dockAtHaven(t, s)
+	drain(s)
+	giveCargo(s, "min-ferrite", 1000)
+	giveCargo(s, "min-nickel", 100)
+
+	id, ok := s.StartJob("cel-station-a", "rec-ammo-emp-s", 2, OwnerPlayer)
+	if !ok {
+		t.Fatal("start refused")
+	}
+	save, err := s.Snapshot()
+	if err != nil {
+		t.Fatalf("Snapshot: %v", err)
+	}
+	// A v3 save written before the frozen terms existed: no Terms on the job.
+	save.Jobs[0].Terms = nil
+
+	b, err := New(industryContent(), testWorld(), testSeed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := b.Restore(save); err != nil {
+		t.Fatalf("Restore: %v", err)
+	}
+	j, ok := jobAt(b, "cel-station-a", id)
+	if !ok || j.Terms == nil {
+		t.Fatalf("legacy job restored without backfilled terms: %+v", j)
+	}
+	if got := j.Terms.Bill; len(got) != 2 || got[0].Qty != 11 || got[1].Qty != 6 {
+		t.Fatalf("backfilled bill = %+v, want 11 ferrite / 6 nickel", got)
+	}
+	if j.Terms.Output != 200 {
+		t.Fatalf("backfilled output = %d, want 200", j.Terms.Output)
+	}
+
+	b.craftEntry("cel-station-a", content.FamilyCharges, true).Runs = 4
+	if !b.CancelJob("cel-station-a", id, OwnerPlayer) {
+		t.Fatal("legacy job did not cancel")
+	}
+	if got := hangarCount(b, "min-ferrite"); got != 11 {
+		t.Errorf("legacy refund = %d ferrite, want the backfilled 11", got)
+	}
+}
+
 // TestRecipeDurationLadder pins the shipped per-run durations: modules ~3
 // minutes and hulls ~10 minutes at 1× (ammo is another stream's file; the
 // duration math is pinned in TestIndustryCraftFormulas).
