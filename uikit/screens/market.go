@@ -6,7 +6,6 @@ import (
 	"math"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/ebitenui/ebitenui/widget"
@@ -16,7 +15,6 @@ import (
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/sahilm/fuzzy"
 )
 
 const (
@@ -35,13 +33,6 @@ const (
 	mktDefaultW = 760
 	mktDefaultH = 560
 
-	// mktTreeShare / mktSideShare are the two seams' opening ratios at
-	// that landing width: the split spans the window minus the body
-	// padding and both seam tracks. The seam stores the fraction BEFORE
-	// it, so the second seam's default is 1-mktSideShare.
-	mktTreeShare = float64(mktTreeW) / float64(mktDefaultW-2*theme.ContentsPad-2*widgets.SplitSeamH)
-	mktSideShare = float64(mktSideW) / float64(mktDefaultW-2*theme.ContentsPad-2*widgets.SplitSeamH)
-
 	// mktSearchH is the search field's design-px height above the tree.
 	mktSearchH = 28
 
@@ -51,6 +42,13 @@ const (
 	// scroll viewport with the rail's reserved gutter beside it.
 	mineWheelRows = 3
 )
+
+// mktTreeShare / mktSideShare are the two seams' opening ratios at that
+// landing width (paneShare: the split spans the window minus the body padding
+// and both seam tracks, and the seam stores the fraction BEFORE it, so the
+// second seam's default is 1-mktSideShare).
+func mktTreeShare() float64 { return paneShare(mktTreeW, mktDefaultW) }
+func mktSideShare() float64 { return paneShare(mktSideW, mktDefaultW) }
 
 // setStepperValue writes a readout label and re-lays its row out.
 // widget.Text.Label changes do NOT invalidate layout, so without the
@@ -157,10 +155,33 @@ type Market struct {
 	sideBox    *widget.Container
 	sideScroll *widget.ScrollContainer
 	sideRail   *widgets.ScrollRail
-	sideKey    string // change signature of the right pane's content
+	pane       *boardPane   // the right pane's frame (board.go)
+	sideModel  mktPageModel // the page's whole visible input
 
 	sel    content.ItemID
 	hasSel bool
+}
+
+// mktPageModel is the right pane's whole visible input, comparable: the
+// selection, the docked gate, the head's measured width and the book's and My
+// orders' every order. The book is canonical, so the model is stable across
+// equal states; ownership rides in the struct, so a row's owned tint can never
+// go stale.
+type mktPageModel struct {
+	HasSel bool
+	Sel    content.ItemID
+	Gated  bool
+	Inner  int
+	Book   []sim.MarketStock
+	Mine   []sim.MarketStock
+}
+
+// same is the change detector for Sync: field-wise equality against the last
+// rebuilt model (an order is a comparable struct, so the slices compare through
+// slices.Equal).
+func (m mktPageModel) same(o mktPageModel) bool {
+	return m.HasSel == o.HasSel && m.Sel == o.Sel && m.Gated == o.Gated &&
+		m.Inner == o.Inner && slices.Equal(m.Book, o.Book) && slices.Equal(m.Mine, o.Mine)
 }
 
 // mktNoSide is an item row's Side cell: an item has no side of its own.
@@ -233,37 +254,21 @@ func (m *Market) scopeItems() []content.ItemID {
 }
 
 // searchHits ranks the branch's items by fuzzy score over the display
-// name, the full group path and the maker — sahilm/fuzzy's Find, so the
-// ranking is the library's (descending score, stable for ties). Both the
-// query and the haystack are diacritic-folded first (fold.go), so an
+// name, the full group path and the maker (the machinery is boardSearch,
+// board.go). The market's policy is the ungated one: no field need contain
+// the query, so the library's rank decides (descending score, stable for
+// ties), and the hit carries the matched rune starts for the highlight.
+// Both the query and the haystack are diacritic-folded first (fold.go), so an
 // ASCII keyboard matches accented names and a typed diacritic matches
 // back; the library's byte offsets are remapped to the original's rune
 // starts so the highlight tints the whole letter.
 func (m *Market) searchHits(q string, scope []content.ItemID) []mktHit {
-	fq, _ := foldString(q)
-	fnames := make([]string, len(scope))
-	folds := make([][]int, len(scope))
-	hay := make([]string, len(scope))
-	for i, item := range scope {
-		fname, nmap := foldString(m.cv.TradeableName(item))
-		fnames[i], folds[i] = fname, nmap
-		fg, _ := foldString(m.group[item])
-		fm, _ := foldString(m.maker[item])
-		hay[i] = fname + " " + fg + " " + fm
-	}
-	var out []mktHit
-	for _, mt := range fuzzy.Find(fq, hay) {
-		item := scope[mt.Index]
-		match := make([]int, 0, len(mt.MatchedIndexes))
-		for _, i := range mt.MatchedIndexes {
-			if i < len(fnames[mt.Index]) {
-				if folds[mt.Index] != nil {
-					i = folds[mt.Index][i]
-				}
-				match = append(match, i)
-			}
-		}
-		out = append(out, mktHit{Item: item, Match: match})
+	hits := boardSearch(q, scope, func(item content.ItemID) []string {
+		return []string{m.cv.TradeableName(item), m.group[item], m.maker[item]}
+	}, boardSearchSpec{Offsets: true})
+	out := make([]mktHit, 0, len(hits))
+	for _, h := range hits {
+		out = append(out, mktHit{Item: h.Key, Match: h.Match})
 	}
 	return out
 }
@@ -460,13 +465,28 @@ func NewMarket(env widgets.Seams) *Market {
 	catalog.AddChild(m.tbl.Container())
 
 	// The right pane: the selected item's head (its hero icon and its
-	// description) over two labelled sections in ONE scroll column: the
-	// item's order book (aligned cells, sell orders then buy orders) over
-	// My orders, riding the house rail (the reserved gutter hides while
-	// everything fits). No fold and no tabs, so a selection shows its book
-	// at once. The head is the one item head (itemhead.go); with no
-	// selection its hint names the gesture.
-	m.itemHead = newItemHead(env, "Select an item to see its book")
+	// The right pane: one board pane (board.go) whose page leads with the
+	// selected item's head (its hero icon and its description) over two
+	// labelled sections in ONE scroll column: the item's order book (aligned
+	// cells, sell orders then buy orders) over My orders, riding the house
+	// rail (the reserved gutter hides while everything fits). No fold and no
+	// tabs, so a selection shows its book at once. With no selection the
+	// head's hint names the gesture.
+	m.pane = newBoardPane(env, boardPaneSpec{
+		Hint:   "Select an item to see its book",
+		OpenW:  mktSideW,
+		InPage: true,
+	})
+	m.itemHead = m.pane.head
+	m.sideBox, m.sideScroll, m.sideRail = m.pane.page, m.pane.scroll, m.pane.rail
+	// Wheel scrolls the column; ScrollTop is a 0..1 fraction of the
+	// overflow, so the step scales by the measured overflow (the tables'
+	// convention). The rail beside it drags the same offset.
+	m.sideScroll.GetWidget().ScrolledEvent.AddHandler(func(args any) {
+		if ev, ok := args.(*widget.WidgetScrolledEventArgs); ok {
+			m.scrollSide(ev.Y)
+		}
+	})
 
 	// The section headers are the infowin section bars (glyph, tracked label
 	// at the small step, hairline rule); My orders retitles with its count,
@@ -477,54 +497,23 @@ func NewMarket(env widgets.Seams) *Market {
 	m.mineBox = widget.NewContainer(
 		widget.ContainerOpts.Layout(widgets.StackLayout{Gap: theme.Px(theme.ContentsPad)}),
 	)
-	m.sideBox = widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewGridLayout(
-			widget.GridLayoutOpts.Columns(1),
-			widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, false, false, false, false}),
-			widget.GridLayoutOpts.Spacing(0, theme.Px(theme.ContentsPad)),
-			widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
-		)),
-	)
 	m.sideBox.AddChild(m.headBox, m.bookBar, m.bookTbl.Container(), m.mineBar, m.mineBox)
-	m.sideScroll, m.sideRail = newScrollColumn(env, m.sideBox)
-	// Wheel scrolls the column; ScrollTop is a 0..1 fraction of the
-	// overflow, so the step scales by the measured overflow (the tables'
-	// convention). The rail beside it drags the same offset.
-	m.sideScroll.GetWidget().ScrolledEvent.AddHandler(func(args any) {
-		if ev, ok := args.(*widget.WidgetScrolledEventArgs); ok {
-			m.scrollSide(ev.Y)
-		}
-	})
 
 	// The pinned trade bar: the pane's full width less the inset and the
 	// rail gutter, so the buttons end on the book's right edge and ride
 	// below the scroll column however far it scrolls.
-	tradeBar := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(theme.Px(theme.ContentsPad)),
-			widget.RowLayoutOpts.Padding(&widget.Insets{
-				Left:   theme.Px(theme.ContentsPad),
-				Right:  theme.Px(theme.ContentsPad + theme.ScrollGutter),
-				Bottom: theme.Px(theme.ContentsPad),
-			}),
-		)),
-	)
-	tradeBar.AddChild(m.buy, m.sell)
-	side := paneStack([]bool{true, false}, m.sideRail.Container(), tradeBar)
+	m.pane.bar.AddChild(m.buy, m.sell)
 
 	// The catalog keeps the full row height, its scrollbar rail included.
 	// The browse pane is the search field over the tree, both full height.
 	left := paneStack([]bool{true}, catalog)
-	browse := paneStack([]bool{false, true}, m.search, m.tree.Container())
 
 	// Body: browse | seam | catalog | seam | right pane. Two draggable
 	// seams; the tree and right panes open at their historical widths
 	// (176 px of browse, the old 240 px column) and each pane keeps
 	// SplitMinPane.
-	m.split = widgets.NewSplitPaneRow(env, browse, left, side)
-	m.split.SetDefaultRatio(0, mktTreeShare)
-	m.split.SetDefaultRatio(1, 1-mktSideShare)
+	m.split = newBoardSplit(env, m.search, m.tree, left, m.pane.box,
+		mktTreeW, mktSideW, mktDefaultW)
 	body := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(theme.WindowBodyBox(p, theme.WindowBody(p.BG), theme.NRGBA(p.Border, 200))),
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
@@ -723,13 +712,9 @@ func (m *Market) Sync() {
 	// when the selection or either list moves).
 	m.syncSide(gated, by)
 
-	// The column rides the house rail beside it: mirror the offset onto the
-	// handle, and drop a stale offset once the sections fit again — the
-	// tables' clamp rule (ebitenui would otherwise bottom-anchor it).
-	m.sideRail.Sync()
-	if m.sideRail.Overflow() <= 0 {
-		m.sideScroll.ScrollTop = 0
-	}
+	// The column rides the house rail beside it (the tables' clamp rule: a
+	// stale offset would bottom-anchor it).
+	m.pane.clampScroll()
 
 	sys := m.cv.System()
 	if sys != nil {
@@ -922,71 +907,59 @@ func (m *Market) mineOrders() []sim.MarketStock {
 // syncSide rebuilds the right pane's content only when it moved: the selected
 // item's head (icon, name, description), its full book — sell orders
 // ascending, then buy orders descending, the table's canonical order — over
-// one rich row per player
-// order at the docked station, every order listed, its Cancel button the
-// row's trailing action. Both sections carry the same docked gate the trade
-// actions do. No selection hides the head's art and names the gesture.
+// one rich row per player order at the docked station, every order listed, its
+// Cancel button the row's trailing action. Both sections carry the same docked
+// gate the trade actions do. No selection hides the head's art and names the
+// gesture.
 func (m *Market) syncSide(gated bool, by map[content.ItemID][]sim.MarketStock) {
 	orders := m.mineOrders()
 	var book []sim.MarketStock
 	if m.hasSel {
 		book = by[m.sel]
 	}
-	inner := m.sideInnerW()
-	key := sideKey(m.sel, m.hasSel, book, orders, gated, inner)
-	if key == m.sideKey {
-		return
-	}
-	m.sideKey = key
+	boardSync(&m.sideModel, mktPageModel{
+		HasSel: m.hasSel,
+		Sel:    m.sel,
+		Gated:  gated,
+		Inner:  m.sideInnerW(),
+		Book:   book,
+		Mine:   orders,
+	}, m.rebuildSide)
+}
 
+// rebuildSide fills the right pane from its model, in place: the scroll, the
+// rail, the head and the two sections keep their widgets, so a book move never
+// drops the player's scroll position.
+func (m *Market) rebuildSide(model mktPageModel) {
 	// The head: the item's hero icon (the Show Info item size), its name and
 	// its description; the hint alone with no selection.
 	icon, name, prose := "", "", ""
-	if m.hasSel {
-		icon, name, prose = m.itemIcon(m.sel), m.cv.TradeableName(m.sel), itemProse(m.cv, m.sel)
+	if model.HasSel {
+		icon, name, prose = m.itemIcon(model.Sel), m.cv.TradeableName(model.Sel), itemProse(m.cv, model.Sel)
 	}
-	m.set(m.hasSel, icon, name, prose, inner)
+	m.set(model.HasSel, icon, name, prose, model.Inner)
 
 	m.book = m.book[:0]
-	if m.hasSel {
-		for _, o := range book {
-			m.book = append(m.book, m.bookRow(o))
-		}
+	for _, o := range model.Book {
+		m.book = append(m.book, m.bookRow(o))
 	}
 	m.bookTbl.SetRows(m.book)
 
 	m.mineBox.RemoveChildren()
 	m.mineRows = m.mineRows[:0]
-	for _, o := range orders {
-		r := m.orderRow(o, gated)
+	for _, o := range model.Mine {
+		r := m.orderRow(o, model.Gated)
 		m.mineRows = append(m.mineRows, r)
 		m.mineBox.AddChild(r.Root)
 	}
-	m.retitle(m.mineLbl, "MY ORDERS · "+theme.FormatInt(int64(len(orders))))
+	setBarLabel(m.th, m.mineLbl, "MY ORDERS · "+theme.FormatInt(int64(len(model.Mine))))
 	m.sideBox.RequestRelayout()
 }
 
-// sideInnerW is the right pane's text width inside its ContentsPad inset: the
-// scroll viewport's own width once laid out, else the landing width less the
-// rail gutter and the pane's inset.
-func (m *Market) sideInnerW() int {
-	if r := m.sideScroll.ViewRect(); r.Dx() > 0 {
-		return r.Dx() - 2*theme.Px(theme.ContentsPad)
-	}
-	return theme.Px(mktSideW - theme.ScrollGutter - 2*theme.ContentsPad)
-}
-
-// retitle sets a section bar's tracked label and re-pins its cell to the new
-// measurement, so the rule still starts after the text (sectionBarText's
-// contract).
-func (m *Market) retitle(head *theme.ChromeText, label string) {
-	if head.Label == label {
-		return
-	}
-	head.Label = label
-	head.GetWidget().MinWidth = int(math.Ceil(
-		theme.MeasureTracked(label, *m.th.FaceMono(theme.StepSmall), m.th.TS().Small)))
-}
+// sideInnerW is the right pane's text width inside its ContentsPad inset
+// (boardPane.innerW: the market's head rides the page, so it gives the rail
+// gutter up too).
+func (m *Market) sideInnerW() int { return m.pane.innerW() }
 
 // orderRow is one of the player's orders as a rich row: the item beside
 // the Cancel button on line 1, the side, price and remaining quantity on
@@ -1029,39 +1002,5 @@ func (m *Market) scrollSide(notches float64) {
 			rowH = h
 		}
 	}
-	scrollNotches(m.sideScroll, m.sideRail, rowH, mineWheelRows, notches)
-}
-
-// sideKey is the right pane's change signature: the selection, the docked
-// gate, the head's measured width and the book's and My orders' every order
-// id/side/price/remaining (the book is canonical, so the signature is stable
-// across equal states).
-func sideKey(sel content.ItemID, hasSel bool, book, mine []sim.MarketStock, gated bool, inner int) string {
-	var b strings.Builder
-	// Non-empty even with no rows, so the first Sync always builds (the
-	// zero-value key must never read as "unchanged").
-	b.WriteString("s;")
-	b.WriteString(strconv.Itoa(inner))
-	b.WriteByte(';')
-	if hasSel {
-		b.WriteString(string(sel))
-	}
-	b.WriteByte(';')
-	if gated {
-		b.WriteString("g;")
-	}
-	for _, orders := range [][]sim.MarketStock{book, mine} {
-		b.WriteByte('|')
-		for _, o := range orders {
-			b.WriteString(strconv.FormatUint(o.ID, 10))
-			b.WriteByte(':')
-			b.WriteString(string(o.Side))
-			b.WriteByte(':')
-			b.WriteString(strconv.FormatFloat(o.Price, 'g', -1, 64))
-			b.WriteByte(':')
-			b.WriteString(strconv.Itoa(o.Qty))
-			b.WriteByte(';')
-		}
-	}
-	return b.String()
+	m.pane.wheel(rowH, mineWheelRows, notches)
 }

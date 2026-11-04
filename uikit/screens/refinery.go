@@ -5,7 +5,6 @@ import (
 	"image/color"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/ebitenui/ebitenui/widget"
@@ -14,7 +13,6 @@ import (
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/theme"
 	"github.com/entieve/entieve/uikit/widgets"
-	"github.com/sahilm/fuzzy"
 )
 
 // Refinery window metrics in design units: this window's own opening shares at
@@ -78,16 +76,17 @@ type Refinery struct {
 	group  map[content.ItemID]string
 	query  string
 
-	// The inspector: one grid rebuilt whenever its key moves (the selected
-	// ore, the station gate, the holds, the pane's width or the book the money
-	// table reads), the page in a scroll viewport with the house rail beside
-	// it, Refine pinned below. The money table is built once and re-filled.
-	insp       *widget.Container
-	inspKey    string
+	// The inspector: one board pane (board.go) over a page model rebuilt only
+	// when the model moves (the selected ore, the station's refine gate, the
+	// holds, the pane's width, the batch's own output quantities or the priced
+	// book rows the money table reads), the page in the pane's scroll column
+	// with the house rail, Refine pinned in its bar. The money table is built
+	// once and re-filled.
+	pane       *boardPane
+	model      rfPageModel
 	head       *itemHead
 	math       *widgets.PlainTable
 	billLbl    *widget.Text
-	billBox    *widget.Container
 	billScroll *widget.ScrollContainer
 	billRail   *widgets.ScrollRail
 	billRows   []*widgets.StackRow
@@ -116,6 +115,31 @@ type rfOut struct {
 	Item  content.ItemID
 	Qty   int
 	Value float64
+}
+
+// rfPageModel is the inspector's whole visible input, comparable: the
+// selection, the refine gate, the held stock, the pane's width, the batch's own
+// output quantities (a Refining level-up or a content change moves them, and
+// the yield bill prints them) and the quote reads the money table draws.
+type rfPageModel struct {
+	HasSel bool
+	Ore    content.ItemID
+	Ready  bool
+	Stock  int
+	Inner  int
+	Outs   []rfOut
+	OreQ   sim.Quote
+	Mine   []sim.Quote
+}
+
+// same is the change detector for Sync: field-wise equality against the last
+// rebuilt model (rfOut is comparable, every held input is a scalar, and a
+// quote compares on the figures the table draws).
+func (r rfPageModel) same(o rfPageModel) bool {
+	return r.HasSel == o.HasSel && r.Ore == o.Ore && r.Ready == o.Ready &&
+		r.Stock == o.Stock && r.Inner == o.Inner && slices.Equal(r.Outs, o.Outs) &&
+		quoteSame(r.OreQ, o.OreQ) &&
+		slices.EqualFunc(r.Mine, o.Mine, quoteSame)
 }
 
 // NewRefinery builds the refinery window over the shared environment. Mount
@@ -168,29 +192,37 @@ func NewRefinery(env widgets.Seams) *Refinery {
 			r.selectBranch(n.Path)
 		}
 	})
-	browse := paneStack([]bool{false, true}, r.search, r.tree.Container())
 
-	// The inspector: a fixed three-row grid (the item head, the page
-	// viewport, Refine), inset ContentsPad all round so the content never
-	// touches the pane's edges. The page scrolls the money table and the
-	// yield bill as one; Refine stays pinned below it, so a small window never
-	// overlaps the two. Its content is rebuilt by syncInspector when it moves;
-	// the grid itself never changes, so the row split's pane stays one widget.
-	r.insp = widget.NewContainer(widget.ContainerOpts.Layout(widget.NewGridLayout(
-		widget.GridLayoutOpts.Columns(1),
-		widget.GridLayoutOpts.Stretch([]bool{true}, []bool{false, true, false}),
-		widget.GridLayoutOpts.Spacing(0, theme.Px(theme.SpSm)),
-		widget.GridLayoutOpts.Padding(widget.NewInsetsSimple(theme.Px(theme.ContentsPad))),
-	)))
+	// The inspector: one board pane (board.go): the item head pinned above the
+	// page, the page in the scroll column with the house rail, Refine in the
+	// bar below it, inset by ContentsPad all round so the content never touches
+	// the pane's edges. Its content is rebuilt by rebuildInspector when its
+	// page model moves; the pane itself never changes, so the row split's pane
+	// stays one widget.
+	r.pane = newBoardPane(env, boardPaneSpec{
+		Hint:  "Select an ore to refine.",
+		OpenW: rfInspW,
+	})
+	r.head = r.pane.head
+	r.billScroll, r.billRail = r.pane.scroll, r.pane.rail
+	r.billScroll.GetWidget().ScrolledEvent.AddHandler(func(args any) {
+		if ev, ok := args.(*widget.WidgetScrolledEventArgs); ok {
+			r.scrollBill(ev.Y)
+		}
+	})
 	// The money table: the batch's ore value against its minerals as aligned
 	// label/value rows (the profit table's decorless table).
 	r.math = widgets.NewPlainTable(env, []widgets.PlainColumn{{}, {AlignRight: true}})
 
+	// The inspector's one verb, pinned in the pane's bar.
+	r.refineBtn = theme.ActionButton("Refine", r.refineClicked)
+	r.refineBtn.GetWidget().Disabled = true // armed by Sync's gate
+	r.pane.bar.AddChild(r.refineBtn)
+
 	// Body: the one row split (browse | ores | inspector, two seams), each
 	// pane draggable and persisted in the layout sidecar.
-	r.cols = widgets.NewSplitPaneRow(env, browse, r.ores.Container(), r.insp)
-	r.cols.SetDefaultRatio(0, rfTreeShare())
-	r.cols.SetDefaultRatio(1, 1-rfInspShare())
+	r.cols = newBoardSplit(env, r.search, r.tree, r.ores.Container(), r.pane.box,
+		rfTreeW, rfInspW, rfDefaultW)
 
 	body := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewGridLayout(
@@ -229,23 +261,11 @@ func RefineryRect() image.Rectangle {
 	return image.Rect(260, 100, 260+rfDefaultW, 100+rfDefaultH)
 }
 
-// rfTreeShare / rfInspShare are the row split's opening ratios at the landing
-// width: the split spans the window minus the body padding and both seam
-// tracks (the manufacturing board's own seam maths). The seam stores the
-// fraction BEFORE it.
-func rfTreeShare() float64 {
-	return float64(rfTreeW) / float64(rfDefaultW-2*theme.ContentsPad-2*widgets.SplitSeamH)
-}
-
-func rfInspShare() float64 {
-	return float64(rfInspW) / float64(rfDefaultW-2*theme.ContentsPad-2*widgets.SplitSeamH)
-}
-
 // Win returns the refinery window for Kit.AddWindow.
 func (r *Refinery) Win() *widget.Window { return r.win }
 
 // seams repackages the environment for the widget helpers that take the union
-// (NewStackRow, NewScrollRail).
+// (NewStackRow).
 func (r *Refinery) seams() widgets.Seams {
 	return widgets.NewSeams(r.th, r.cv, r.as, r.ptr)
 }
@@ -320,19 +340,15 @@ func (r *Refinery) scopeOres() []content.CargoStack {
 // searchHits ranks the branch's ores over the ore name, its group path and the
 // names of the minerals it yields, so a mineral query finds every ore that
 // produces it (search by output, the inverse lookup of manufacturing's
-// ingredient search). An ore is a hit when one field contains the query, then
-// the hits are ordered by sahilm/fuzzy's score. The query and every field are
-// diacritic-folded first (fold.go), so an ASCII keyboard matches accented
-// names.
+// ingredient search). The machinery is boardSearch (board.go): an ore is a hit
+// when one field contains the query, then the hits are ordered by
+// sahilm/fuzzy's score. The query and every field are diacritic-folded first
+// (fold.go), so an ASCII keyboard matches accented names.
 func (r *Refinery) searchHits(q string, scope []content.CargoStack) []content.CargoStack {
-	fq, _ := foldString(q)
-	lq := strings.ToLower(fq)
-	ids := make([]content.CargoStack, 0, len(scope))
-	hay := make([]string, 0, len(scope))
-	for _, st := range scope {
+	hits := boardSearch(q, scope, func(st content.CargoStack) []string {
 		def, ok := r.cv.Defs().Item(st.Item)
 		if !ok || def == nil {
-			continue
+			return nil
 		}
 		fields := []string{r.cv.TradeableName(st.Item), r.group[st.Item]}
 		for _, id := range yieldIDs(def) {
@@ -340,23 +356,11 @@ func (r *Refinery) searchHits(q string, scope []content.CargoStack) []content.Ca
 				fields = append(fields, m.Name)
 			}
 		}
-		line, hit := "", false
-		for _, fld := range fields {
-			ff, _ := foldString(fld)
-			line += " " + ff
-			if strings.Contains(strings.ToLower(ff), lq) {
-				hit = true
-			}
-		}
-		if !hit {
-			continue
-		}
-		ids = append(ids, st)
-		hay = append(hay, line)
-	}
-	var out []content.CargoStack
-	for _, m := range fuzzy.Find(fq, hay) {
-		out = append(out, ids[m.Index])
+		return fields
+	}, boardSearchSpec{Gate: true, Lead: true})
+	out := make([]content.CargoStack, 0, len(hits))
+	for _, h := range hits {
+		out = append(out, h.Key)
 	}
 	return out
 }
@@ -466,7 +470,8 @@ func (r *Refinery) Sync() {
 	r.tree.SelectData(browseNodeKey{Path: r.treeSel})
 	r.tree.Sync()
 
-	// The inspector and its refine gate (visible-but-grayed, never hidden).
+	// The inspector and its refine gate (visible-but-grayed, never hidden):
+	// one page model, rebuilt when it moves.
 	outs := r.batchOf(r.sel.ore)
 	station := r.cv.DockedMarket()
 	ore := r.cv.Quote(station, r.sel.ore, sim.OrderSell, sim.RefineBatch)
@@ -474,19 +479,23 @@ func (r *Refinery) Sync() {
 	for i, o := range outs {
 		mine[i] = r.cv.Quote(station, o.Item, sim.OrderSell, o.Qty)
 	}
-	r.syncInspector(r.cv.BookOrders(station), outs, ore, mine)
+	boardSync(&r.model, rfPageModel{
+		HasSel: r.hasSel,
+		Ore:    r.sel.ore,
+		Ready:  r.refineReadyFor(r.sel),
+		Stock:  r.stockOf(r.sel.ore),
+		Inner:  r.inspInnerW(),
+		Outs:   outs,
+		OreQ:   ore,
+		Mine:   mine,
+	}, r.rebuildInspector)
 	if r.refineBtn != nil {
 		r.refineBtn.GetWidget().Disabled = !r.refineReadyFor(r.sel)
 	}
 
 	// The page viewport rides the house rail beside it (the tables' clamp
 	// rule: a stale offset would bottom-anchor a page that fits).
-	if r.billRail != nil {
-		r.billRail.Sync()
-		if r.billRail.Overflow() <= 0 {
-			r.billScroll.ScrollTop = 0
-		}
-	}
+	r.pane.clampScroll()
 }
 
 // oreRow is one held ore as a rich row: the ore and its one-glance verdict
@@ -539,90 +548,45 @@ func yieldStrip(outs []rfOut, p theme.Palette) []widgets.RowSplit {
 	return out
 }
 
-// syncInspector rebuilds the inspector when its content moved: the selected
-// ore, the station's refine gate, the holds, the pane's width or the book rows
-// its money table reads.
-func (r *Refinery) syncInspector(book []sim.MarketStock, outs []rfOut, ore sim.Quote, mine []sim.Quote) {
-	inner := r.inspInnerW()
-	key := r.inspKeyFor(book, outs, inner)
-	if key == r.inspKey {
-		return
-	}
-	r.inspKey = key
-	r.insp.RemoveChildren()
-	r.billRows = r.billRows[:0]
-	r.refineBtn = nil
-
+// rebuildInspector rebuilds the inspector's page from its model: the head, the
+// money table and the yield bill, one page in the pane's scroll column.
+func (r *Refinery) rebuildInspector(m rfPageModel) {
 	p := r.th.Pal()
 
 	// Head: the one item head (itemhead.go) the market's right pane and the
 	// manufacturing inspector lead with, its hint line alone while nothing is
 	// selected (the window's empty state).
-	r.head = newItemHead(r.seams(), "Select an ore to refine.")
-	if r.hasSel {
-		ready := r.refineReadyFor(r.sel)
-		r.head.set(true, widgets.TradeableIcon(r.cv.Defs(), r.sel.ore),
-			r.cv.TradeableName(r.sel.ore)+"  "+verdictGlyph(ready),
-			itemProse(r.cv, r.sel.ore), inner)
+	if m.HasSel {
+		r.pane.setHead(true, widgets.TradeableIcon(r.cv.Defs(), m.Ore),
+			r.cv.TradeableName(m.Ore)+"  "+verdictGlyph(m.Ready),
+			itemProse(r.cv, m.Ore))
 	} else {
-		r.head.set(false, "", "", "", inner)
+		r.pane.setHead(false, "", "", "")
 	}
-	r.math.SetRows(r.refineRows(ore, mine))
+	r.math.SetRows(r.refineRows(m.OreQ, m.Mine))
 
 	// The page: the money table's bar and rows, then the yield bill, one row
 	// per mineral, the most valuable first. The page's children keep their own
 	// heights, so the box is a plain vertical run, not an equal-row stack.
-	r.billLbl = widget.NewText(
-		widget.TextOpts.Text("YIELD · most value first", r.th.Face(theme.StepTiny), theme.Solid(p.Accent)),
-	)
-	r.billBox = widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(theme.Px(theme.SpSm)),
-		)),
-	)
-	r.billBox.AddChild(sectionBar(r.th, "PROFIT"), r.math.Container(), r.billLbl)
-	bill := billOrder(outs)
+	page := r.pane.beginPage()
+	page.table("PROFIT", r.math)
+	r.billLbl = page.label("YIELD · most value first")
+	bill := billOrder(m.Outs)
 	total := 0.0
 	for _, o := range bill {
 		total += o.Value
 	}
+	r.billRows = r.billRows[:0]
 	for _, o := range bill {
 		row := r.yieldRow(o, total, p)
 		r.billRows = append(r.billRows, row)
-		r.billBox.AddChild(row.Root)
+		page.stack(row)
 	}
-	r.billScroll, r.billRail = newScrollColumn(r.seams(), r.billBox)
-	r.billScroll.GetWidget().ScrolledEvent.AddHandler(func(args any) {
-		if ev, ok := args.(*widget.WidgetScrolledEventArgs); ok {
-			r.scrollBill(ev.Y)
-		}
-	})
-
-	r.refineBtn = theme.ActionButton("Refine", r.refineClicked)
-	r.refineBtn.GetWidget().Disabled = true // armed by Sync's gate
-	refineBar := widget.NewContainer(
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-		)),
-	)
-	refineBar.AddChild(r.refineBtn)
-
-	r.insp.AddChild(r.head.headBox, r.billRail.Container(), refineBar)
-	r.insp.RequestRelayout()
+	r.pane.done()
 }
 
-// inspInnerW is the head's text width inside the pane's ContentsPad inset: the
-// page viewport's own width plus the rail gutter (the head spans the gutter
-// the bill gives up), or the landing width before the first layout.
-func (r *Refinery) inspInnerW() int {
-	if r.billScroll != nil {
-		if rect := r.billScroll.ViewRect(); rect.Dx() > 0 {
-			return rect.Dx() + theme.Px(theme.ScrollGutter)
-		}
-	}
-	return theme.Px(rfInspW - 2*theme.ContentsPad)
-}
+// inspInnerW is the head's text width inside the pane (boardPane.innerW).
+func (r *Refinery) inspInnerW() int { return r.pane.innerW() }
 
 // billOrder is the yield bill's reading order: the batch's minerals by value,
 // most first (the cost driver's own rule, the bill's acceptance read), ties in
@@ -729,57 +693,15 @@ func (r *Refinery) refineRows(ore sim.Quote, mine []sim.Quote) []widgets.PlainRo
 		row("Margin", margin, tint))
 }
 
-// inspKeyFor is the inspector's change signature: the selection, the refine
-// gate, the holds, the pane's width (the head re-wraps with the seam) and the
-// book rows the money table reads. A book move rebuilds the card; an idle book
-// does not.
-func (r *Refinery) inspKeyFor(book []sim.MarketStock, outs []rfOut, inner int) string {
-	var b strings.Builder
-	b.WriteString(string(r.sel.ore))
-	b.WriteByte(';')
-	if r.refineReadyFor(r.sel) {
-		b.WriteByte('r')
-	}
-	b.WriteString(strconv.Itoa(r.stockOf(r.sel.ore)))
-	b.WriteByte(';')
-	b.WriteString(strconv.Itoa(inner))
-	b.WriteByte(';')
-	priced := func(item content.ItemID) bool {
-		if item == r.sel.ore {
-			return true
-		}
-		for _, o := range outs {
-			if o.Item == item {
-				return true
-			}
-		}
-		return false
-	}
-	for _, o := range book {
-		if !priced(o.Item) {
-			continue
-		}
-		b.WriteString(string(o.Item))
-		b.WriteByte(':')
-		b.WriteString(string(o.Side))
-		b.WriteByte(':')
-		b.WriteString(strconv.FormatFloat(o.Price, 'g', -1, 64))
-		b.WriteByte(':')
-		b.WriteString(strconv.Itoa(o.Qty))
-		b.WriteByte(';')
-	}
-	return b.String()
-}
-
-// scrollBill turns wheel notches into the page viewport's offset: two rows of
-// the measured row height per notch, the same 0..1-fraction-of-overflow
-// convention the tables use.
+// scrollBill turns wheel notches into the page's offset: two rows of the
+// measured row height per notch, the tables' 0..1-fraction-of-overflow
+// convention.
 func (r *Refinery) scrollBill(notches float64) {
 	rowH := 0
 	if len(r.billRows) > 0 {
 		_, rowH = r.billRows[0].Root.PreferredSize()
 	}
-	scrollNotches(r.billScroll, r.billRail, rowH, 2, notches)
+	r.pane.wheel(rowH, 2, notches)
 }
 
 // stockOf is the units of one ore in the two holds (the sim's own
