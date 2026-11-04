@@ -300,7 +300,7 @@ func TestMarketMyOrdersAfterOrderDialog(t *testing.T) {
 	clickRow(mui, m.tbl, mktParentRow(t, m, item))
 	frame()
 	ownedOrders := 0
-	for _, o := range k.Env().BookOrders("cel-haven-rest") {
+	for _, o := range k.Env().Market().Orders("cel-haven-rest") {
 		if o.Owner == sim.OwnerPlayer {
 			ownedOrders++
 		}

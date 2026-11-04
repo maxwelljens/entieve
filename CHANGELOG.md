@@ -38,6 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **One read seam per domain**: the screens' read seam (`ContentView`) now
+  carries one member per domain (`Market`, `Industry`, `Holds`, `Hangar`,
+  `Contacts`) instead of one forwarder per query, and the proficiency tree
+  reads the sim's own family type instead of a hand-kept field-for-field
+  copy. No pixel, gate, figure or text moves: every read answers exactly
+  what it answered before, and the displayed price ladder keeps its one
+  caller (the market catalog's quote column) with a test pinning that.
+  Internal structure only.
 - **The three boards' right pane is one scaffold**: the market's right pane,
   the manufacturing inspector and the refinery inspector now share one frame
   (`uikit/screens/board.go`): the item head, the scroll column with the house

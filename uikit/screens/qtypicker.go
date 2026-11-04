@@ -298,11 +298,11 @@ func (o *QtyWin) stackQty(hold string, item content.ItemID) int {
 	var stacks []content.CargoStack
 	switch hold {
 	case "ore":
-		stacks = o.cv.OreStacks()
+		stacks = o.cv.Holds().Ore()
 	case "hangar":
-		stacks = o.cv.HangarItems()
+		stacks = o.cv.Hangar().Items
 	default:
-		stacks = o.cv.CargoStacks()
+		stacks = o.cv.Holds().Cargo()
 	}
 	n := 0
 	for _, st := range stacks {
@@ -317,12 +317,12 @@ func (o *QtyWin) stackQty(hold string, item content.ItemID) int {
 // availability read: CmdRefine consumes from both).
 func (o *QtyWin) stockOf(ore content.ItemID) int {
 	n := 0
-	for _, st := range o.cv.CargoStacks() {
+	for _, st := range o.cv.Holds().Cargo() {
 		if st.Item == ore {
 			n += st.Qty
 		}
 	}
-	for _, st := range o.cv.OreStacks() {
+	for _, st := range o.cv.Holds().Ore() {
 		if st.Item == ore {
 			n += st.Qty
 		}
@@ -351,7 +351,7 @@ func (o *QtyWin) infoLine() string {
 			" held · whole " + theme.FormatInt(int64(sim.RefineBatch)) + "-ore batches"
 	case widgets.QtyStart:
 		return "1–" + theme.FormatInt(qtyMax) + " runs · " +
-			theme.FormatInt(int64(len(o.cv.AllJobs()))) + "/" + theme.FormatInt(int64(sim.IndustrySlots())) + " job slots · " +
+			theme.FormatInt(int64(len(o.cv.Industry().Jobs()))) + "/" + theme.FormatInt(int64(sim.IndustrySlots())) + " job slots · " +
 			theme.FormatCredits(o.cv.Wallet()) + " in the wallet"
 	case widgets.QtyBuy:
 		return "1–" + theme.FormatInt(qtyMax) + " units · " +
@@ -383,10 +383,10 @@ func (o *QtyWin) detailLine(q int) string {
 		}
 		return "Refine " + theme.FormatInt(int64(q)) + " × " + name + " → " + outs
 	case widgets.QtyStart:
-		st := o.cv.DockedIndustry()
+		st := o.cv.Industry().Docked()
 		return theme.FormatInt(int64(q)) + " runs · " +
-			theme.GroupFloat(o.cv.JobDuration(st, o.req.Recipe, q), 1) + " s · fee " +
-			theme.FormatCredits(o.cv.JobFee(o.req.Recipe, q))
+			theme.GroupFloat(o.cv.Industry().Duration(st, o.req.Recipe, q), 1) + " s · fee " +
+			theme.FormatCredits(o.cv.Industry().Fee(o.req.Recipe, q))
 	case widgets.QtyBuy, widgets.QtySell:
 		return tradePreview(o.cv, o.req.Item, o.req.Mode, q)
 	default:
@@ -408,7 +408,7 @@ func tradePreview(cv widgets.ContentView, item content.ItemID, mode widgets.QtyM
 	if side == sim.OrderSell {
 		n = min(n, cv.PlayerStock(item)) // the command clamps to the goods held
 	}
-	q := cv.Quote(cv.DockedMarket(), item, side, n)
+	q := cv.Market().Quote(cv.Market().Docked(), item, side, n)
 	if n <= 0 {
 		return "— · nothing held"
 	}
@@ -435,7 +435,7 @@ func (o *QtyWin) noteLine(q int) string {
 		}
 		return "→ station hangar"
 	case widgets.QtyStart:
-		return inputsText(o.cv, o.cv.JobMaterials(o.cv.DockedIndustry(), o.req.Recipe, q))
+		return inputsText(o.cv, o.cv.Industry().Materials(o.cv.Industry().Docked(), o.req.Recipe, q))
 	case widgets.QtyBuy, widgets.QtySell:
 		return ""
 	default:
@@ -451,7 +451,7 @@ func (o *QtyWin) ready(q int) bool {
 	case widgets.QtyRefine:
 		return len(o.notches) > 0 && refineService(o.cv)
 	case widgets.QtyStart:
-		return o.cv.CanStartJob(o.cv.DockedIndustry(), o.req.Recipe, q)
+		return o.cv.Industry().CanStart(o.cv.Industry().Docked(), o.req.Recipe, q)
 	}
 	return q >= 1
 }

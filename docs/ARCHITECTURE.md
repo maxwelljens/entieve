@@ -628,7 +628,7 @@ economy sits on top of:
   (each resting order's price and units, best first, the tail at the last
   price when the depth runs short) with the broker fee and sales tax on the
   units that actually fill, and `Sim.CheapestAsk` the cheapest sell order
-  any market station rests. The seam forwards both (`ContentView.Quote` /
+  any market station rests. The seam forwards both (`ContentView.Market().Quote` /
   `CheapestAsk`), so a preview, the profit table and the refine math draw
   the same figures `execBuy`/`execSell` move and no screen holds a walk.
   A delivery posts the exact units as supply on the destination station's

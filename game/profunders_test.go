@@ -2,6 +2,8 @@ package game
 
 import (
 	"image"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/entieve/entieve/uikit/widgets"
@@ -76,5 +78,42 @@ func TestProficiencyCardEscBacksOutFirst(t *testing.T) {
 	}
 	if !g.host.IsOpen(idProficiency) {
 		t.Fatal("Esc closed the tree along with the card")
+	}
+}
+
+// TestProficiencyModelIsTheSim: the tree reads the sim's families directly —
+// uikit aliases sim.ProfFamily — so there is no field-by-field copy that a
+// new sim field could drift past. The grep pin covers the copy's signature;
+// the equality pin covers a hand-written re-map.
+func TestProficiencyModelIsTheSim(t *testing.T) {
+	g := newShowcaseGame(t)
+	model := g.proficiencyModel()
+	families := g.s.ProficiencyFamilies()
+	if len(model) != len(families) {
+		t.Fatalf("model has %d families, want the sim's %d", len(model), len(families))
+	}
+	for i := range families {
+		if model[i].Family != families[i].Family || model[i].Gate != families[i].Gate ||
+			len(model[i].Prereqs) != len(families[i].Prereqs) {
+			t.Fatalf("model[%d] = %+v, want the sim's %+v", i, model[i], families[i])
+		}
+	}
+	ents, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatalf("read package dir: %v", err)
+	}
+	for _, e := range ents {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") || strings.HasSuffix(e.Name(), "_test.go") {
+			continue
+		}
+		src, err := os.ReadFile(e.Name())
+		if err != nil {
+			t.Fatalf("read %s: %v", e.Name(), err)
+		}
+		for _, lit := range []string{"uikit.ProfFamily{", "uikit.ProfPrereq{"} {
+			if strings.Contains(string(src), lit) {
+				t.Errorf("%s builds a %s: the sim's type is aliased, a copy drifts", e.Name(), lit)
+			}
+		}
 	}
 }

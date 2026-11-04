@@ -574,14 +574,14 @@ func (m *Market) Tables() []*widgets.Table {
 // book when it offers the market, else every station's book in the
 // current system (the undocked fallback view).
 func (m *Market) orders() []sim.MarketStock {
-	if st := m.cv.DockedMarket(); st != "" {
-		return m.cv.BookOrders(st)
+	if st := m.cv.Market().Docked(); st != "" {
+		return m.cv.Market().Orders(st)
 	}
 	sys := m.cv.System()
 	if sys == nil {
 		return nil
 	}
-	return m.cv.Market(sys.ID)
+	return m.cv.Market().System(sys.ID)
 }
 
 // marketCatalog is the market's item universe in canonical order: every
@@ -631,10 +631,10 @@ func (m *Market) Sync() {
 	// Trades only happen docked at a station — the same gate feeds the
 	// buttons below and every row's declared Buy/Sell actions.
 	gated := !m.docked()
-	docked := m.cv.DockedMarket()
+	docked := m.cv.Market().Docked()
 	// One quote per item for the parent rows, through the seam's ladder:
 	// the station's book docked, the shown system's orders in space.
-	quote := func(item content.ItemID) float64 { return m.cv.PriceLadder(docked, item) }
+	quote := func(item content.ItemID) float64 { return m.cv.Market().PriceLadder(docked, item) }
 	by := make(map[content.ItemID][]sim.MarketStock, len(m.items))
 	for _, o := range orders {
 		by[o.Item] = append(by[o.Item], o)
@@ -865,7 +865,7 @@ func (m *Market) rowSpec(item content.ItemID, gated, buyOff bool) widgets.RowSpe
 // market-service access (docked at a station that offers and still runs the
 // market), never a bare "is the player docked".
 func (m *Market) docked() bool {
-	return m.cv.DockedMarket() != ""
+	return m.cv.Market().Docked() != ""
 }
 
 // buyClicked opens the quantity picker on the selected item's Buy (the
@@ -891,12 +891,12 @@ func (m *Market) sellClicked() {
 // the one book the market window shows (station-local, exactly like the
 // trade buttons).
 func (m *Market) mineOrders() []sim.MarketStock {
-	st := m.cv.DockedMarket()
+	st := m.cv.Market().Docked()
 	if st == "" {
 		return nil
 	}
 	var out []sim.MarketStock
-	for _, o := range m.cv.BookOrders(st) {
+	for _, o := range m.cv.Market().Orders(st) {
 		if o.Owner == sim.OwnerPlayer {
 			out = append(out, o)
 		}

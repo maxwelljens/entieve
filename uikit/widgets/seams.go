@@ -47,10 +47,6 @@ type ContentView interface {
 	// Wallet is the player's euro balance.
 	Wallet() float64
 
-	// Proficiency is the player's level in a proficiency (0 =
-	// untrained). Show Info renders a def's requirement and this level.
-	Proficiency(family string) int
-
 	// ProficiencyRequirement is a def's proficiency gate as the sim would
 	// refuse it ("Requires Autocannon II"; "" when it clears). The one walk
 	// over family level and prerequisite edges is the sim's; Show Info
@@ -67,18 +63,16 @@ type ContentView interface {
 	// gates on, instead of re-deriving it from DockedStation().Services.
 	ServiceAvailable(string) bool
 
-	// DockedStation is the docked-at identity plus the services that
-	// station offers ("market", "fitting", "industry", "repair",
-	// "refine") — the reads behind the station services view's identity
-	// line and service list (what the station HAS; what the player can USE
-	// is ServiceAvailable). ok is false while undocked.
+	// DockedStation is the docked-at identity (celestial name + system) the
+	// station services strip and the scene host read. It carries no service
+	// list: what the station HAS lives in the sim's station component, what
+	// the player can USE is ServiceAvailable. ok is false while undocked.
 	DockedStation() (StationInfo, bool)
 
 	// Component-store reads (observable state, one per store screens
 	// touch): a value snapshot of one component — the store's own Get,
 	// dereferenced, so nothing hands a screen a live handle to write
 	// through. A missing entity yields the zero value and false.
-	Transform(ecs.Entity) (sim.Transform, bool)
 	Fitting(ecs.Entity) (sim.Fitting, bool)
 	ShipState(ecs.Entity) (sim.ShipState, bool)
 	Motion(ecs.Entity) (sim.Motion, bool)
@@ -88,14 +82,16 @@ type ContentView interface {
 	Asteroid(ecs.Entity) (sim.Asteroid, bool)
 	NpcAI(ecs.Entity) (sim.NpcAI, bool)
 
-	// Hangar is the station hangar's contents (copies: read-only).
-	HangarItems() []content.CargoStack
-	HangarShips() []sim.StoredShip
+	// Hangar is the station hangar's contents as one read: the item stacks
+	// and the stored hulls, both copies (read-only). The hangar window and
+	// the fitting rack read the pair together.
+	Hangar() Hangar
 
-	// PredictedAmmo is the charge the sim would load into one fitted
-	// weapon slot right now — the fitting summary's DPS figure reads it.
-	// The rule is the sim's findCharge (sim/system_weapons.go): the slot's
-	// CmdSetAmmo preference while it still sits in cargo and matches the
+	// PredictedAmmo is the charge the next shot from one fitted weapon slot
+	// would consume, derived here over the player's bay, cargo and
+	// preference so the fitting summary's DPS figure never disagrees with
+	// what the gun fires: the bay's loaded round, else its selection, else
+	// the CmdSetAmmo preference while it still sits in cargo and matches the
 	// gun's ammo class, else the first cargo stack of that class in
 	// canonical order. "" = dry, or not a weapon slot.
 	PredictedAmmo(sim.SlotRef) content.ItemID
@@ -113,58 +109,35 @@ type ContentView interface {
 	// state (sim fillClip's clipAmbiguous case).
 	Clip(sim.SlotRef) (sim.ClipState, bool)
 
-	// Market books and prices.
-	Market(content.SystemID) []sim.MarketStock
-	BookOrders(sim.StationID) []sim.MarketStock
-	MarketPrice(sim.StationID, content.ItemID) float64
-	DockedMarket() sim.StationID
-
-	// Quote is the sim's executed walk for an amount on one side of a
-	// station's book (the wallet-composable read: walk, fee, tax, depth),
-	// and CheapestAsk the cheapest sell order any market station rests for
-	// an item. The pricing logic lives in sim; the seam only forwards it.
-	Quote(sim.StationID, content.ItemID, sim.OrderSide, int) sim.Quote
-	CheapestAsk(content.ItemID) (float64, bool)
-
-	// PriceLadder is an item's displayed price: at a station, its book's
-	// ladder (last trade, best ask, best bid, base); with station "" the
-	// undocked fallback view's ladder over the shown system's orders
-	// (best ask, best bid, base — no station book, no last trade).
-	PriceLadder(sim.StationID, content.ItemID) float64
+	// Market is the market domain's reads as one handle (MarketView): the
+	// docked station, one system's book or one station's, the executed
+	// quote walk, the cheapest ask anywhere and the displayed ladder.
+	Market() MarketView
 
 	// TradeableName is the display name of any marketable id — item,
 	// module or hull — falling back to the raw id. The one name read the
 	// market, orders, contract board and tooltips share.
 	TradeableName(content.ItemID) string
 
-	// Industry: the manufacturing jobs, materials, fees, gating and craft
-	// reads. Jobs are the GLOBAL list (every station) — controls gate on
-	// DockedIndustry.
-	DockedIndustry() sim.StationID
-	AllJobs() []sim.Job
-	StationName(sim.StationID) string
-	JobMaterials(sim.StationID, content.RecipeID, int) []content.CargoStack
-	JobFee(content.RecipeID, int) float64
-	CanStartJob(sim.StationID, content.RecipeID, int) bool
+	// Industry is the industry and refinery domain's reads as one handle
+	// (IndustryView): the docked station, the GLOBAL job list (every
+	// station), and the per-recipe materials, fee, gate, duration and
+	// output the manufacturing and refinery panels preview.
+	Industry() IndustryView
+
+	// PlayerStock is the player's holdings of one item (every hold
+	// summed), the read the order window's sell default and the
+	// manufacturing rows use.
 	PlayerStock(content.ItemID) int
-	JobDuration(sim.StationID, content.RecipeID, int) float64
-	// PlayerJobOutput is the units a job delivers to the player: the sim's
-	// per-run output under the Manufacturing edge (RESULT shows it at one
-	// run). RefineOutput is the batch conversion the refinery preview and
-	// CmdRefine share, under the Refining edge.
-	PlayerJobOutput(content.RecipeID, int) int
-	RefineOutput(*content.ItemDef, int) []content.CargoStack
 
-	// Holds, as the refinery reads them: copies of the general cargo and
-	// the dedicated ore hold (the two places CmdRefine consumes from).
-	CargoStacks() []content.CargoStack
-	OreStacks() []content.CargoStack
+	// StationName is a station's display name, for the job rows and the
+	// contract destinations that name a station the player is not at.
+	StationName(sim.StationID) string
 
-	// Hold is one hold's m³: used volume and capacity, for the hold name
-	// CmdTransfer takes ("cargo", "ore"). ok is false when the player has
-	// no such hold (no cargo at all, or no ore hold fitted).
-	Hold(kind string) (used, capacity float64, ok bool)
-
+	// Holds is the cargo domain's reads as one handle (HoldsView): the
+	// general cargo and the dedicated ore hold — the two places CmdRefine
+	// and CmdTransfer consume from — and one hold's used/capacity volumes.
+	Holds() HoldsView
 	// DeliverProgress is a deliver contract's live objective progress in
 	// the objective's own unit — m³ for volume items, whole units for
 	// volume-less cargo (modules) — capped at the objective's count.
@@ -223,13 +196,12 @@ func (w WarView) Has() bool { return w.Control != nil }
 func (w WarView) WorksHeld(id content.SystemID) bool { return w.Control[id] == "works" }
 
 // StationInfo is one docked station as the interface reads it: the
-// identity the station view shows (celestial name + system name) and the
-// service names it offers. Services is a copy — a screen never holds a
-// live handle into the sim.
+// identity the station view shows (celestial name + system name). What the
+// station HAS is the sim's station component; what the player can USE is
+// ServiceAvailable, so this read carries no second copy of the service list.
 type StationInfo struct {
-	Name     string
-	System   string
-	Services []string
+	Name   string
+	System string
 }
 
 // Contacts is the docked station's contact view as one read (CONTEXT.md
@@ -243,6 +215,81 @@ type Contacts struct {
 	Standing float64
 	Offers   []sim.Offer
 	Active   []sim.MissionState
+}
+
+// Hangar is the station hangar's contents as one read: the item stacks and
+// the stored hulls, both copies (read-only). The zero value is an empty
+// hangar (a stub host may hand us a nil one).
+type Hangar struct {
+	Items []content.CargoStack
+	Ships []sim.StoredShip
+}
+
+// MarketView is the market domain's reads (CONTEXT.md "Market", "Quote",
+// "Price ladder"): one handle, so ContentView carries one member per domain
+// instead of one per query. The pricing lives in the sim; only PriceLadder
+// derives anything here (the undocked fallback). Nothing is snapshotted:
+// each read is callable per row, per frame, with its own arguments.
+type MarketView interface {
+	// Docked is the station whose book the player trades ("" when not
+	// docked at a market).
+	Docked() sim.StationID
+	// System is one system's resting orders (the undocked catalog).
+	System(content.SystemID) []sim.MarketStock
+	// Orders is one station's book.
+	Orders(sim.StationID) []sim.MarketStock
+	// Quote is the sim's executed walk for an amount on one side of a
+	// station's book (the wallet-composable read: walk, fee, tax, depth).
+	Quote(sim.StationID, content.ItemID, sim.OrderSide, int) sim.Quote
+	// CheapestAsk is the cheapest sell order any market station rests for
+	// an item.
+	CheapestAsk(content.ItemID) (float64, bool)
+	// PriceLadder is an item's displayed price: at a station, its book's
+	// ladder (last trade, best ask, best bid, base); with station "" the
+	// undocked fallback view's ladder over the shown system's orders (best
+	// ask, best bid, base — no station book, no last trade). Display only:
+	// a trade path prices with Quote.
+	PriceLadder(sim.StationID, content.ItemID) float64
+}
+
+// IndustryView is the industry and refinery domain's reads (CONTEXT.md
+// "Industry", "Job", "Refinery"): the manufacturing and refinery panels
+// gate, preview and price a job through it. Jobs are the GLOBAL list (every
+// station) — a control gates on Docked.
+type IndustryView interface {
+	// Docked is the station whose industry the player uses ("").
+	Docked() sim.StationID
+	// Jobs is every station's manufacturing job, canonical order.
+	Jobs() []sim.Job
+	// Materials is a job's inputs at runs.
+	Materials(sim.StationID, content.RecipeID, int) []content.CargoStack
+	// Fee is a job's credit fee at runs.
+	Fee(content.RecipeID, int) float64
+	// CanStart is the sim's start gate at runs.
+	CanStart(sim.StationID, content.RecipeID, int) bool
+	// Duration is a job's wall-clock seconds at runs.
+	Duration(sim.StationID, content.RecipeID, int) float64
+	// Output is the units a job delivers to the player at runs: the sim's
+	// per-run output under the Manufacturing edge (RESULT shows it at one
+	// run).
+	Output(content.RecipeID, int) int
+	// Refine is the batch conversion the refinery preview and CmdRefine
+	// share, under the Refining edge.
+	Refine(*content.ItemDef, int) []content.CargoStack
+}
+
+// HoldsView is the cargo domain's reads (CONTEXT.md "Hold"): the two holds
+// CmdRefine and CmdTransfer consume from, each as a copy, plus one hold's
+// volumes. A screen never holds a live handle into the sim.
+type HoldsView interface {
+	// Cargo is a copy of the general hold.
+	Cargo() []content.CargoStack
+	// Ore is a copy of the dedicated ore hold.
+	Ore() []content.CargoStack
+	// Used is one hold's m³: used volume and capacity, for the hold name
+	// CmdTransfer takes ("cargo", "ore"). ok is false when the player has
+	// no such hold (no cargo at all, or no ore hold fitted).
+	Used(kind string) (used, capacity float64, ok bool)
 }
 
 // view is the production ContentView: loaded content plus the live sim,
@@ -270,8 +317,6 @@ func (v *view) Time() float64 { return v.s.Time() }
 
 func (v *view) Wallet() float64 { return v.s.Wallet() }
 
-func (v *view) Proficiency(family string) int { return v.s.Proficiency(family) }
-
 func (v *view) ProficiencyRequirement(family string, gate int) string {
 	return v.s.ProficiencyRequirement(family, gate)
 }
@@ -298,24 +343,7 @@ func (v *view) DockedStation() (StationInfo, bool) {
 			}
 		}
 	}
-	// The station's entity is the celestial with this CelID: the sim's
-	// own dockedStation read walks the same pair (celEntity is private).
-	var services []string
-	v.s.Stations.Each(func(e ecs.Entity, st *sim.Station) {
-		if c, ok := v.s.Celestials.Get(e); ok && c.Cel == at.At && st != nil {
-			services = append([]string(nil), st.Services...)
-		}
-	})
-	info.Services = services
 	return info, true
-}
-
-func (v *view) Transform(e ecs.Entity) (sim.Transform, bool) {
-	c, ok := v.s.Transforms.Get(e)
-	if !ok {
-		return sim.Transform{}, false
-	}
-	return *c, true
 }
 
 func (v *view) Fitting(e ecs.Entity) (sim.Fitting, bool) {
@@ -382,20 +410,13 @@ func (v *view) NpcAI(e ecs.Entity) (sim.NpcAI, bool) {
 	return *c, true
 }
 
-// HangarItems returns the station hangar's item stacks. The hangar is
-// allocated with the sim, but a stub host may hand us a nil one.
-func (v *view) HangarItems() []content.CargoStack {
+// Hangar returns the station hangar's contents. The hangar is allocated
+// with the sim, but a stub host may hand us a nil one.
+func (v *view) Hangar() Hangar {
 	if v.s.Hangar == nil {
-		return nil
+		return Hangar{}
 	}
-	return v.s.Hangar.Items
-}
-
-func (v *view) HangarShips() []sim.StoredShip {
-	if v.s.Hangar == nil {
-		return nil
-	}
-	return v.s.Hangar.Ships
+	return Hangar{Items: v.s.Hangar.Items, Ships: v.s.Hangar.Ships}
 }
 
 // Clip reads one fitted slot's shell bay from the sim, for the player.
@@ -408,9 +429,12 @@ func (v *view) ModuleTarget(e ecs.Entity, slot sim.SlotRef) (ecs.Entity, bool) {
 	return v.s.ModuleTarget(e, slot)
 }
 
-// PredictedAmmo mirrors the sim's findCharge once, over the player's
-// fitting and cargo: it names the shell the next shot would consume, so
-// the predicted DPS figure never disagrees with what the gun fires.
+// PredictedAmmo is the charge rule once, over the player's bay, cargo and
+// preference: the bay's loaded round or selection first (it is the
+// consumer), then the preference while it still sits in cargo and matches
+// the gun's ammo class, else the first cargo stack of that class in
+// canonical order. It names the shell the next shot would consume, so the
+// predicted DPS figure never disagrees with what the gun fires.
 func (v *view) PredictedAmmo(slot sim.SlotRef) content.ItemID {
 	fit, ok := v.s.Fittings.Get(v.s.Player())
 	if !ok {
@@ -462,41 +486,43 @@ func (v *view) PredictedAmmo(slot sim.SlotRef) content.ItemID {
 	return ""
 }
 
-func (v *view) Market(id content.SystemID) []sim.MarketStock { return v.s.Market(id) }
-
-func (v *view) BookOrders(st sim.StationID) []sim.MarketStock { return v.s.BookOrders(st) }
-
-func (v *view) MarketPrice(st sim.StationID, item content.ItemID) float64 {
-	return v.s.MarketPrice(st, item)
-}
-
-func (v *view) DockedMarket() sim.StationID { return v.s.DockedMarket() }
+func (v *view) Market() MarketView { return marketView{v} }
 
 // ServiceAvailable forwards the sim's one access rule: docked + offered +
 // not masked (a remnant's charter services are dark).
 func (v *view) ServiceAvailable(svc string) bool { return v.s.ServiceAvailable(svc) }
 
-// Quote and CheapestAsk forward the sim's own reads: the walk that prices an
-// amount and the cheapest ask anywhere. No pricing lives here.
-func (v *view) Quote(st sim.StationID, item content.ItemID, side sim.OrderSide, qty int) sim.Quote {
-	return v.s.Quote(st, item, side, qty)
+// marketView is the market domain over one view: every read forwards the
+// sim's own answer, except PriceLadder's undocked fallback, which has no
+// single book to forward.
+type marketView struct{ v *view }
+
+func (m marketView) Docked() sim.StationID { return m.v.s.DockedMarket() }
+
+func (m marketView) System(id content.SystemID) []sim.MarketStock { return m.v.s.Market(id) }
+
+func (m marketView) Orders(st sim.StationID) []sim.MarketStock { return m.v.s.BookOrders(st) }
+
+// Quote forwards the sim's executed walk: no pricing lives here.
+func (m marketView) Quote(st sim.StationID, item content.ItemID, side sim.OrderSide, qty int) sim.Quote {
+	return m.v.s.Quote(st, item, side, qty)
 }
 
-func (v *view) CheapestAsk(item content.ItemID) (float64, bool) { return v.s.CheapestAsk(item) }
+func (m marketView) CheapestAsk(item content.ItemID) (float64, bool) { return m.v.s.CheapestAsk(item) }
 
 // PriceLadder: a station's book carries sim's full ladder (last trade,
 // ask, bid, base); the undocked view has no single book, so it walks the
 // shown system's orders for the ask/bid rungs and lets the base rung come
 // from the same sim read.
-func (v *view) PriceLadder(station sim.StationID, item content.ItemID) float64 {
+func (m marketView) PriceLadder(station sim.StationID, item content.ItemID) float64 {
 	if station != "" {
-		return v.s.MarketPrice(station, item)
+		return m.v.s.MarketPrice(station, item)
 	}
 	ask, bid := -1.0, -1.0
-	if sys := v.s.System(); sys != nil {
+	if sys := m.v.s.System(); sys != nil {
 		// shortcut: the undocked quote re-copies the system book per
 		// item; memoise per frame if the catalog grows into the hundreds.
-		for _, o := range v.s.Market(sys.ID) {
+		for _, o := range m.v.s.Market(sys.ID) {
 			if o.Item != item {
 				continue
 			}
@@ -515,7 +541,7 @@ func (v *view) PriceLadder(station sim.StationID, item content.ItemID) float64 {
 	if bid >= 0 {
 		return bid
 	}
-	return v.s.MarketPrice("", item) // base price
+	return m.v.s.MarketPrice("", item) // base price
 }
 
 // TradeableName mirrors the sim's own itemName (items, modules, hulls) so
@@ -524,31 +550,67 @@ func (v *view) TradeableName(id content.ItemID) string {
 	return TradeableName(v.c, id)
 }
 
-func (v *view) DockedIndustry() sim.StationID { return v.s.DockedIndustry() }
-
-func (v *view) AllJobs() []sim.Job { return v.s.AllJobs() }
+func (v *view) Industry() IndustryView { return industryView{v} }
 
 func (v *view) StationName(st sim.StationID) string { return v.s.StationName(st) }
 
-func (v *view) CargoStacks() []content.CargoStack {
-	if c, ok := v.s.Cargos.Get(v.s.Player()); ok {
+func (v *view) PlayerStock(item content.ItemID) int { return v.s.PlayerStock(item) }
+
+func (v *view) Holds() HoldsView { return holdsView{v} }
+
+// industryView is the industry domain over one view: every read forwards
+// the sim's own answer (its edges and gates), nothing is derived here.
+type industryView struct{ v *view }
+
+func (i industryView) Docked() sim.StationID { return i.v.s.DockedIndustry() }
+
+func (i industryView) Jobs() []sim.Job { return i.v.s.AllJobs() }
+
+func (i industryView) Materials(st sim.StationID, rec content.RecipeID, runs int) []content.CargoStack {
+	return i.v.s.JobMaterials(st, rec, runs)
+}
+
+func (i industryView) Fee(rec content.RecipeID, runs int) float64 { return i.v.s.JobFee(rec, runs) }
+
+func (i industryView) CanStart(st sim.StationID, rec content.RecipeID, runs int) bool {
+	return i.v.s.CanStartJob(st, rec, runs)
+}
+
+func (i industryView) Duration(st sim.StationID, rec content.RecipeID, runs int) float64 {
+	return i.v.s.JobDuration(st, rec, runs)
+}
+
+func (i industryView) Output(rec content.RecipeID, runs int) int {
+	return i.v.s.PlayerJobOutput(rec, runs)
+}
+
+func (i industryView) Refine(def *content.ItemDef, qty int) []content.CargoStack {
+	return i.v.s.RefineOutput(def, qty)
+}
+
+// holdsView is the cargo domain over one view: copies of the two holds and
+// the hold-volume rule.
+type holdsView struct{ v *view }
+
+func (h holdsView) Cargo() []content.CargoStack {
+	if c, ok := h.v.s.Cargos.Get(h.v.s.Player()); ok {
 		return append([]content.CargoStack(nil), c.Stacks...)
 	}
 	return nil
 }
 
-func (v *view) OreStacks() []content.CargoStack {
-	if c, ok := v.s.Cargos.Get(v.s.Player()); ok {
+func (h holdsView) Ore() []content.CargoStack {
+	if c, ok := h.v.s.Cargos.Get(h.v.s.Player()); ok {
 		return append([]content.CargoStack(nil), c.Ore...)
 	}
 	return nil
 }
 
-// Hold is the hold-volume rule once: used m³ from the item defs (unknown
+// Used is the hold-volume rule once: used m³ from the item defs (unknown
 // and volume-less ids occupy nothing, the sim's itemVolume rule) and the
 // capacity the hull built.
-func (v *view) Hold(kind string) (used, capacity float64, ok bool) {
-	c, ok := v.s.Cargos.Get(v.s.Player())
+func (h holdsView) Used(kind string) (used, capacity float64, ok bool) {
+	c, ok := h.v.s.Cargos.Get(h.v.s.Player())
 	if !ok {
 		return 0, 0, false
 	}
@@ -565,7 +627,7 @@ func (v *view) Hold(kind string) (used, capacity float64, ok bool) {
 		return 0, 0, false
 	}
 	for _, s := range st {
-		if d, ok := v.c.Item(s.Item); ok && d.Volume > 0 {
+		if d, ok := h.v.c.Item(s.Item); ok && d.Volume > 0 {
 			used += d.Volume * float64(s.Qty)
 		}
 	}
@@ -623,30 +685,6 @@ func (v *view) Contacts() Contacts {
 		Offers:   v.s.ContactOffers(at.At),
 		Active:   v.s.Missions(),
 	}
-}
-
-func (v *view) JobMaterials(st sim.StationID, rec content.RecipeID, runs int) []content.CargoStack {
-	return v.s.JobMaterials(st, rec, runs)
-}
-
-func (v *view) JobFee(rec content.RecipeID, runs int) float64 { return v.s.JobFee(rec, runs) }
-
-func (v *view) CanStartJob(st sim.StationID, rec content.RecipeID, runs int) bool {
-	return v.s.CanStartJob(st, rec, runs)
-}
-
-func (v *view) PlayerStock(item content.ItemID) int { return v.s.PlayerStock(item) }
-
-func (v *view) JobDuration(st sim.StationID, rec content.RecipeID, runs int) float64 {
-	return v.s.JobDuration(st, rec, runs)
-}
-
-func (v *view) PlayerJobOutput(rec content.RecipeID, runs int) int {
-	return v.s.PlayerJobOutput(rec, runs)
-}
-
-func (v *view) RefineOutput(def *content.ItemDef, qty int) []content.CargoStack {
-	return v.s.RefineOutput(def, qty)
 }
 
 func (v *view) InfoRefFor(e ecs.Entity) (InfoRef, bool) { return InfoRefFor(v, e) }

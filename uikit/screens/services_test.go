@@ -21,9 +21,14 @@ import (
 func newServicesView(t *testing.T, inner int, services []string) (*Services, *recordingSink, *chromeUI) {
 	t.Helper()
 	th := theme.NewSeam(theme.DefaultPalette(), theme.DefaultTypeScale())
+	svc := make(map[string]bool, len(services))
+	for _, id := range services {
+		svc[id] = true
+	}
 	cv := &stubView{
 		docked:  true,
-		station: widgets.StationInfo{Name: "Jalvrek", System: "Genesis", Services: services},
+		station: widgets.StationInfo{Name: "Jalvrek", System: "Genesis"},
+		svc:     svc,
 	}
 	sink := &recordingSink{}
 	env := widgets.NewSeams(th, cv, sink, nil)

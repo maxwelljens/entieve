@@ -45,10 +45,10 @@ func TestInventoryCaptureFrame(t *testing.T) {
 	q := env.QtyWindow()
 
 	inv.Sync() // rows exist before the loop reads the dragged stack
-	cargoUsed, cargoCap, _ := env.Hold("cargo")
+	cargoUsed, cargoCap, _ := env.Holds().Used("cargo")
 	dragItem, _ := inv.cargo.Rows[0].Data.(content.ItemID)
 	wantQty := 0
-	for _, st := range env.CargoStacks() {
+	for _, st := range env.Holds().Cargo() {
 		if st.Item == dragItem {
 			wantQty += st.Qty
 		}
@@ -99,8 +99,8 @@ func TestInventoryCaptureFrame(t *testing.T) {
 			if !inv.ViewTiles() {
 				fail("the inventory is not in its thumbnail view")
 			}
-			if len(inv.cargoTiles.tiles) != len(env.CargoStacks()) {
-				fail("cargo tiles = %d, want one per stack (%d)", len(inv.cargoTiles.tiles), len(env.CargoStacks()))
+			if len(inv.cargoTiles.tiles) != len(env.Holds().Cargo()) {
+				fail("cargo tiles = %d, want one per stack (%d)", len(inv.cargoTiles.tiles), len(env.Holds().Cargo()))
 			}
 			// The tile view draws: icon and name pixels inside the first
 			// tile (an empty tile grid would be a silent blank area).

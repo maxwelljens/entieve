@@ -525,7 +525,7 @@ func (inv *Inventory) Sync() {
 // hasHold reports whether a hold exists with a positive capacity (the bar
 // carries a value only then).
 func (inv *Inventory) hasHold(hold string) bool {
-	_, cap, ok := inv.cv.Hold(hold)
+	_, cap, ok := inv.cv.Holds().Used(hold)
 	return ok && cap > 0
 }
 
@@ -533,7 +533,7 @@ func (inv *Inventory) hasHold(hold string) bool {
 // same "used / capacity" figures the label carried before. Hidden by the
 // caller when the hull has no such hold.
 func (inv *Inventory) setBar(bar *widgets.ValueBar, hold string) {
-	used, cap, ok := inv.cv.Hold(hold)
+	used, cap, ok := inv.cv.Holds().Used(hold)
 	if !ok || cap <= 0 {
 		bar.Set(0, "")
 		return
@@ -561,18 +561,18 @@ func (inv *Inventory) oreRows(cargo sim.Cargo, hasCargo bool) []widgets.TableRow
 
 // hangarRows is the station hangar's stacks (for the section total).
 func (inv *Inventory) hangarRows() []content.CargoStack {
-	return inv.cv.HangarItems()
+	return inv.cv.Hangar().Items
 }
 
 // stacksOf is one hold's stacks as the views and the drag read them.
 func (inv *Inventory) stacksOf(hold string) []content.CargoStack {
 	switch hold {
 	case "ore":
-		return inv.cv.OreStacks()
+		return inv.cv.Holds().Ore()
 	case "hangar":
-		return inv.cv.HangarItems()
+		return inv.cv.Hangar().Items
 	default:
-		return inv.cv.CargoStacks()
+		return inv.cv.Holds().Cargo()
 	}
 }
 
@@ -583,7 +583,7 @@ func (inv *Inventory) stacksOf(hold string) []content.CargoStack {
 // sell default.
 func (inv *Inventory) rowsOf(stacks []content.CargoStack) []widgets.TableRow {
 	rows := make([]widgets.TableRow, 0, len(stacks))
-	market := inv.cv.DockedMarket() != ""
+	market := inv.cv.Market().Docked() != ""
 	for _, st := range stacks {
 		vol, name := 0.0, inv.cv.TradeableName(st.Item)
 		if def, ok := inv.cv.Defs().Item(st.Item); ok {
@@ -781,7 +781,7 @@ func (inv *Inventory) transfer(to string) {
 // sellClicked opens the quantity picker on the selected stack's sale
 // (docked at a market station only); Confirm emits the sell.
 func (inv *Inventory) sellClicked() {
-	if !inv.hasSel || inv.cv.DockedMarket() == "" {
+	if !inv.hasSel || inv.cv.Market().Docked() == "" {
 		return
 	}
 	inv.as.Do(widgets.QtyPick{Mode: widgets.QtySell, Item: inv.sel})

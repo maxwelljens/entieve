@@ -116,6 +116,11 @@ func lastCommand(t *testing.T, cmds *[]sim.Command) sim.Command {
 // TestNoPriceWalkInScreens: the walk that prices an amount lives in the sim
 // (CONTEXT.md "Quote"); a screen composes the display from it and holds no
 // second copy. The picker reads the quote, never the displayed-price ladder.
+//
+// The ladder has exactly one surviving reader in the screens: the market
+// catalog's per-row quote column (a display figure, never a trade). Pinned
+// here so no trade path can start pricing off it and quietly disagree with
+// the picker.
 func TestNoPriceWalkInScreens(t *testing.T) {
 	ents, err := os.ReadDir(".")
 	if err != nil {
@@ -135,8 +140,19 @@ func TestNoPriceWalkInScreens(t *testing.T) {
 				t.Errorf("%s still mentions %s: the walk lives in the sim", e.Name(), name)
 			}
 		}
-		if e.Name() == "qtypicker.go" && strings.Contains(string(src), "PriceLadder(") {
-			t.Error("qtypicker.go prices a trade off the ladder, want the sim quote")
+		n := strings.Count(string(src), "PriceLadder(")
+		if e.Name() != "market.go" && n > 0 {
+			t.Errorf("%s reads the price ladder: a trade prices with the sim quote", e.Name())
+		}
+		if e.Name() == "market.go" {
+			if n != 1 {
+				t.Errorf("market.go has %d ladder reads, want the one quote column", n)
+			}
+			for i, line := range strings.Split(string(src), "\n") {
+				if strings.Contains(line, "PriceLadder(") && !strings.Contains(line, "quote :=") {
+					t.Errorf("market.go:%d reads the ladder outside the quote column", i+1)
+				}
+			}
 		}
 	}
 }
@@ -148,11 +164,11 @@ func TestQuoteSeamIsTheSim(t *testing.T) {
 	env.Sim.Docked.Set(env.Sim.Player(), sim.Docked{At: "cel-haven-rest"})
 	for _, item := range []content.ItemID{"ammo-emp-s", "min-ferrite", "loot-navdata"} {
 		want := env.Sim.Quote("cel-haven-rest", item, sim.OrderBuy, 25)
-		if got := env.Quote("cel-haven-rest", item, sim.OrderBuy, 25); got.Walk != want.Walk || got.Priced != want.Priced {
+		if got := env.Market().Quote("cel-haven-rest", item, sim.OrderBuy, 25); got.Walk != want.Walk || got.Priced != want.Priced {
 			t.Errorf("Quote(%s) = %+v, want the sim's %+v", item, got, want)
 		}
 		price, ok := env.Sim.CheapestAsk(item)
-		if got, gotOK := env.CheapestAsk(item); got != price || gotOK != ok {
+		if got, gotOK := env.Market().CheapestAsk(item); got != price || gotOK != ok {
 			t.Errorf("CheapestAsk(%s) = %v/%v, want the sim's %v/%v", item, got, gotOK, price, ok)
 		}
 	}

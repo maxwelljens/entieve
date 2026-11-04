@@ -150,7 +150,7 @@ func (o *OrderWin) Win() *widget.Window { return o.win }
 // open at all: orders rest on the docked station's book, so an undocked
 // player opens nothing (the menu entry is grayed too).
 func (o *OrderWin) Show(item content.ItemID, side sim.OrderSide, qty int) bool {
-	if o.cv == nil || o.cv.DockedMarket() == "" {
+	if o.cv == nil || o.cv.Market().Docked() == "" {
 		return false
 	}
 	o.item = item
@@ -237,7 +237,7 @@ func (o *OrderWin) setMode(side sim.OrderSide) {
 // base/registry price.
 func (o *OrderWin) defaultPrice() float64 {
 	ask, bid := -1.0, -1.0
-	for _, ord := range o.cv.BookOrders(o.cv.DockedMarket()) {
+	for _, ord := range o.cv.Market().Orders(o.cv.Market().Docked()) {
 		if ord.Item != o.item {
 			continue
 		}

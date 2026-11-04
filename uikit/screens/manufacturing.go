@@ -199,7 +199,7 @@ func outputsOf(cv widgets.ContentView, def *content.RecipeDef) []mfgOutput {
 	if def == nil {
 		return nil
 	}
-	return []mfgOutput{{Item: def.Product, Qty: cv.PlayerJobOutput(def.ID, 1)}}
+	return []mfgOutput{{Item: def.Product, Qty: cv.Industry().Output(def.ID, 1)}}
 }
 
 // manufacturingRow is the manufacturing tables' row payload: the recipe id
@@ -500,7 +500,7 @@ func (f *Manufacturing) searchHits(q string, scope []content.RecipeID) []content
 // a row's strip never reorders between frames, recipes or authored input
 // order.
 func (f *Manufacturing) needs(rec content.RecipeID, runs int) []mfgNeed {
-	mats := f.cv.JobMaterials(f.cv.DockedIndustry(), rec, runs)
+	mats := f.cv.Industry().Materials(f.cv.Industry().Docked(), rec, runs)
 	out := make([]mfgNeed, 0, len(mats))
 	for _, m := range mats {
 		n := mfgNeed{Item: m.Item, Need: m.Qty, Have: f.cv.PlayerStock(m.Item)}
@@ -544,11 +544,11 @@ func (f *Manufacturing) billQuotes(station sim.StationID, needs []mfgNeed) []mfg
 		return out // no station docked, no book to price against
 	}
 	for i, n := range needs {
-		if q := f.cv.Quote(station, n.Item, sim.OrderBuy, n.Need); q.Priced {
+		if q := f.cv.Market().Quote(station, n.Item, sim.OrderBuy, n.Need); q.Priced {
 			out[i] = mfgQuote{Walk: q.Walk, Priced: true}
 			continue
 		}
-		if price, ok := f.cv.CheapestAsk(n.Item); ok {
+		if price, ok := f.cv.Market().CheapestAsk(n.Item); ok {
 			out[i] = mfgQuote{Walk: price * float64(n.Need), Priced: true, Remote: true}
 		}
 	}
@@ -577,7 +577,7 @@ func (f *Manufacturing) profitRows(quotes []mfgQuote, bid sim.Quote, needs []mfg
 		return out, ""
 	}
 
-	mats, fee := 0.0, f.cv.JobFee(def.ID, 1)
+	mats, fee := 0.0, f.cv.Industry().Fee(def.ID, 1)
 	marked := false
 	var unpriced []string
 	for i, n := range needs {
@@ -670,8 +670,9 @@ func (f *Manufacturing) Sync() {
 	f.split.Poll(f.ptr)
 	f.cols.Poll(f.ptr)
 	s := f.cv
-	station := s.DockedIndustry()
-	slotsFree := len(s.AllJobs()) < sim.IndustrySlots()
+	ind := s.Industry()
+	station := ind.Docked()
+	slotsFree := len(ind.Jobs()) < sim.IndustrySlots()
 	// The board quotes one run: the chosen run count lives in the quantity
 	// picker (its preview re-prices at the picked value), so the rows stay a
 	// stable per-run reference.
@@ -699,7 +700,7 @@ func (f *Manufacturing) Sync() {
 	// Job list: the PLAYER's jobs at every station (the global slot pool),
 	// grouped by station and ascending by id within a group; only the
 	// docked station's rows act.
-	all := s.AllJobs()
+	all := ind.Jobs()
 	jobs := make([]sim.Job, 0, len(all))
 	for _, j := range all {
 		if j.Owner == sim.OwnerPlayer {
@@ -759,7 +760,7 @@ func (f *Manufacturing) Sync() {
 	quotes := f.billQuotes(station, needs)
 	bid := sim.Quote{}
 	if def != nil {
-		bid = f.cv.Quote(station, def.Product, sim.OrderSell, def.Qty)
+		bid = f.cv.Market().Quote(station, def.Product, sim.OrderSell, def.Qty)
 	}
 	boardSync(&f.model, mfgPageModel{
 		HasSel:    f.hasSel,
@@ -767,7 +768,7 @@ func (f *Manufacturing) Sync() {
 		Station:   station,
 		SlotsFree: slotsFree,
 		Inner:     f.inspInnerW(),
-		Out:       f.cv.PlayerJobOutput(f.sel.recipe, 1),
+		Out:       f.cv.Industry().Output(f.sel.recipe, 1),
 		Needs:     needs,
 		Quotes:    quotes,
 		Bid:       bid,
@@ -805,7 +806,7 @@ func (f *Manufacturing) recipeRow(station sim.StationID, rec content.RecipeID, r
 	}
 	name := f.cv.TradeableName(def.Product)
 	needs := f.needs(rec, runs)
-	ready := station != "" && f.cv.CanStartJob(station, rec, runs)
+	ready := station != "" && f.cv.Industry().CanStart(station, rec, runs)
 	tint := p.Danger
 	if ready {
 		tint = p.Good
@@ -823,7 +824,7 @@ func (f *Manufacturing) recipeRow(station sim.StationID, rec content.RecipeID, r
 				{Text: verdictGlyph(ready), Tint: tint, Step: theme.StepSmall},
 			}},
 			{Segs: []widgets.RowSeg{
-				{Text: theme.GroupFloat(f.cv.JobDuration(station, rec, runs), 1) + " s", Tint: p.Dim, Step: theme.StepTiny},
+				{Text: theme.GroupFloat(f.cv.Industry().Duration(station, rec, runs), 1) + " s", Tint: p.Dim, Step: theme.StepTiny},
 				{Split: stripOf(needs, p), MinW: theme.Px(mfgStripW)},
 			}},
 		},
@@ -841,7 +842,7 @@ func (f *Manufacturing) rebuildInspector(m mfgPageModel) {
 	// with: the product's hero art, its name carrying the one-glance verdict
 	// glyph, and the product's own description wrapped to the pane.
 	if def != nil && m.HasSel {
-		ready := m.Station != "" && f.cv.CanStartJob(m.Station, m.Recipe, 1)
+		ready := m.Station != "" && f.cv.Industry().CanStart(m.Station, m.Recipe, 1)
 		f.pane.setHead(true, widgets.TradeableIcon(f.cv.Defs(), def.Product),
 			f.cv.TradeableName(def.Product)+"  "+verdictGlyph(ready),
 			itemProse(f.cv, def.Product))
@@ -1056,7 +1057,7 @@ func (f *Manufacturing) startReadyFor(row manufacturingRow) bool {
 	if row.recipe == "" {
 		return false
 	}
-	return f.cv.CanStartJob(f.cv.DockedIndustry(), row.recipe, 1)
+	return f.cv.Industry().CanStart(f.cv.Industry().Docked(), row.recipe, 1)
 }
 
 // collectReadyFor is the Collect gate for one job row: the docked
@@ -1065,9 +1066,9 @@ func (f *Manufacturing) collectReadyFor(row manufacturingRow) bool {
 	if row.job == 0 {
 		return false
 	}
-	for _, j := range f.cv.AllJobs() {
+	for _, j := range f.cv.Industry().Jobs() {
 		if j.ID == row.job {
-			return j.Station == f.cv.DockedIndustry() && j.State == sim.JobDone &&
+			return j.Station == f.cv.Industry().Docked() && j.State == sim.JobDone &&
 				j.Owner == sim.OwnerPlayer
 		}
 	}
@@ -1080,9 +1081,9 @@ func (f *Manufacturing) cancelReadyFor(row manufacturingRow) bool {
 	if row.job == 0 {
 		return false
 	}
-	for _, j := range f.cv.AllJobs() {
+	for _, j := range f.cv.Industry().Jobs() {
 		if j.ID == row.job {
-			return j.Station == f.cv.DockedIndustry() && j.State == sim.JobRunning &&
+			return j.Station == f.cv.Industry().Docked() && j.State == sim.JobRunning &&
 				j.Owner == sim.OwnerPlayer
 		}
 	}
@@ -1145,7 +1146,7 @@ func (f *Manufacturing) FocusSearch() { f.search.Focus(true) }
 // gesture (the inspector's button). Nothing opens away from an industry
 // station.
 func (f *Manufacturing) openPicker(row manufacturingRow) {
-	if row.recipe == "" || f.cv.DockedIndustry() == "" {
+	if row.recipe == "" || f.cv.Industry().Docked() == "" {
 		return
 	}
 	f.as.Do(widgets.QtyPick{Mode: widgets.QtyStart, Item: f.recipeProduct(row.recipe), Recipe: row.recipe})
