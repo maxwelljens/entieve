@@ -25,6 +25,10 @@ var proficiencyFamilies = map[string]string{
 	"industrial": "Industrial",
 	"barge":      "Barge",
 	"rat":        "Rat hull",
+	// The two workshop lines: edges on the industry and refinery paths, no
+	// gates of their own (they open at 0, like every gun line).
+	"manufacturing": "Manufacturing",
+	"refining":      "Refining",
 }
 
 // Prereq is one authored prerequisite edge: the family must be at level or
@@ -55,6 +59,10 @@ var proficiencyPrereqs = map[string][]Prereq{
 	"industrial": {{Family: "frigate", Level: 1}},
 	"barge":      {{Family: "industrial", Level: 0}},
 	"rat":        nil,
+	// The workshop lines are cross-cutting effects, not gear: they open
+	// from the start and gate nothing (owner decision, gate 0).
+	"manufacturing": nil,
+	"refining":      nil,
 }
 
 // ProficiencyMax is the house cap (Craft level's five).
@@ -69,6 +77,10 @@ const ProficiencyMax = 5
 type ProfInfo struct {
 	Desc     string   // what the family is for (a paragraph, no em dashes)
 	Practice []string // the acts that award practice, one line each
+	// Edges is the family's effect line (the numbers and their caps) for
+	// the cards that grant a cross-cutting edge. "" for a family whose
+	// edge is the in-use percent its description already states.
+	Edges string
 }
 
 // proficiencyInfo is the family card table. Every shipped family has a page
@@ -180,6 +192,21 @@ var proficiencyInfo = map[string]ProfInfo{
 		Practice: []string{
 			"N/A",
 		},
+	},
+	"manufacturing": {
+		Desc: "Manufacturing is the workshop line: every job you run at an industry station teaches it. Levels cut what a job takes out of your storage, and on a batch recipe (ammunition, charges) they add to what each run makes.",
+		Practice: []string{
+			"Each completed manufacturing job, by product rarity: rarity 1 pays 1, 2 pays 2, 3 pays 4 and 4 pays 8.",
+			"Only the jobs you start yourself count, and the product pays, not the recipe's family.",
+		},
+		Edges: "Materials: 2% less per level, capped at 10% at V, stacking additively with the station's own craft discount. Output: 2% more per level, capped at 10% at V, on recipes that make more than one unit per run.",
+	},
+	"refining": {
+		Desc: "Refining is the refinery line: every whole batch of 100 ore you convert into minerals teaches it. Levels add to the minerals a batch yields, so the same ore comes out richer.",
+		Practice: []string{
+			"Each completed refine batch, by ore rarity: rarity 1 pays 1, 2 pays 2, 3 pays 4 and 4 pays 8.",
+		},
+		Edges: "Yield: 2% more minerals per level, capped at 10% at V, on every mineral a batch yields. The ore a batch eats does not change.",
 	},
 }
 
@@ -312,6 +339,9 @@ func proficiencyCardProblems(cards map[string]ProfInfo, families map[string]stri
 		}
 		if len(card.Practice) == 0 {
 			problems = append(problems, fmt.Sprintf("proficiency: family %q lists no practice", id))
+		}
+		if strings.Contains(card.Edges, "\u2014") {
+			problems = append(problems, fmt.Sprintf("proficiency: family %q edges line carries an em dash", id))
 		}
 		for i, line := range card.Practice {
 			if strings.TrimSpace(line) == "" {

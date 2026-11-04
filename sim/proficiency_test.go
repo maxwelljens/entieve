@@ -195,6 +195,20 @@ func TestProficiencyPracticeMatchesTheActs(t *testing.T) {
 	if got := text("capacitor"); !strings.Contains(got, "recharger") {
 		t.Errorf("capacitor: practice misses the recharger spend: %q", got)
 	}
+	// The workshop lines: the act, and the same rarity ladder the mining
+	// cycle and a product's own rarity pay.
+	for family, act := range map[string]string{
+		"manufacturing": "manufacturing job",
+		"refining":      "refine batch",
+	} {
+		got := text(family)
+		if !strings.Contains(got, act) {
+			t.Errorf("%s: practice does not name its act %q: %q", family, act, got)
+		}
+		if !strings.Contains(got, wantRarity) {
+			t.Errorf("%s: practice %q does not match the rarity ladder %q", family, got, wantRarity)
+		}
+	}
 	for _, family := range []string{"frigate", "destroyer", "industrial", "barge"} {
 		got := text(family)
 		for _, want := range []string{wantCut, "kill", "delivery", wantWarp, wantHop} {
@@ -214,8 +228,8 @@ func TestProficiencyPracticeMatchesTheActs(t *testing.T) {
 			t.Errorf("rat is a machine line, but player hull %s is in it", hull.ID)
 		}
 	}
-	// Every shipped family is covered by one of the two groups above.
-	covered := len(modules) + 4 + 1
+	// Every shipped family is covered by one of the groups above.
+	covered := len(modules) + 2 + 4 + 1
 	if got := len(content.ProficiencyFamilyIDs()); got != covered {
 		t.Errorf("%d families ship, the practice pin covers %d: teach it the new act", got, covered)
 	}
@@ -358,8 +372,8 @@ func TestProficiencyFamiliesReadAPI(t *testing.T) {
 		t.Fatal(err)
 	}
 	fams := s.ProficiencyFamilies()
-	if len(fams) != 14 {
-		t.Fatalf("%d families, want 14", len(fams))
+	if len(fams) != 16 {
+		t.Fatalf("%d families, want 16", len(fams))
 	}
 	for i := 1; i < len(fams); i++ {
 		if fams[i-1].Family >= fams[i].Family {

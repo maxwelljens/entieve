@@ -791,7 +791,7 @@ func (s *Sim) agentPlan(a *Agent, V map[content.ItemID]float64) agentPlan {
 		if !found || p.margin < -agentMarginEps {
 			break // negative-margin production: buy nothing, sell everything
 		}
-		for _, m := range s.JobMaterials(a.Home, p.recipe, materialRunsTarget) {
+		for _, m := range s.jobBill(a.Home, p.recipe, materialRunsTarget, agentOwnerTag(a.ID)) {
 			p.inputs[m.Item] = true
 			p.targets[m.Item] = m.Qty
 		}
@@ -809,7 +809,7 @@ func (s *Sim) agentPlan(a *Agent, V map[content.ItemID]float64) agentPlan {
 func (s *Sim) recipeMargin(a *Agent, rec *content.RecipeDef, V map[content.ItemID]float64) float64 {
 	mv := s.agentBelief(a, rec.Product) * (1 - imputeHaircut) * float64(rec.Qty)
 	cost := 0.0
-	for _, m := range s.JobMaterials(a.Home, rec.ID, 1) {
+	for _, m := range s.jobBill(a.Home, rec.ID, 1, agentOwnerTag(a.ID)) {
 		cost += float64(m.Qty) * s.valueOf(a, V, m.Item)
 	}
 	return mv - cost
@@ -1070,7 +1070,7 @@ func (s *Sim) agentStartJob(a *Agent, p *agentPlan) {
 	runs := 0
 	for r := jobRunsCap; r >= 1; r-- {
 		ok := true
-		for _, m := range s.JobMaterials(a.Home, p.recipe, r) {
+		for _, m := range s.jobBill(a.Home, p.recipe, r, tag) {
 			if a.freeStock(m.Item) < m.Qty {
 				ok = false
 				break

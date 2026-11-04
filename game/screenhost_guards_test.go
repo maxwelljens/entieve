@@ -233,7 +233,7 @@ const layoutBytesGolden = `{
       "x": 97,
       "y": 276,
       "w": 402,
-      "h": 226,
+      "h": 241,
       "open": false
     },
     "refinery": {

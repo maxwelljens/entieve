@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Two workshop proficiencies: Manufacturing and Refining**: cross-cutting
+  lines that open at level 0 with no prerequisite, gate nothing, and are
+  practiced by the pilot's own factory and refinery work. Manufacturing
+  cuts a job's material bill by 2% per level (10% at V) and raises the
+  output of a batch recipe (ammunition, charges, anything that makes more
+  than one unit per run) by 2% per level; Refining raises a batch's mineral
+  yield by 2% per level. A one-unit recipe is never edged: a hull job yields
+  one hull, not 1.1. Practice is the acted item's rarity (1/2/4/8): a
+  completed job pays its product's rarity, a completed 100-ore batch pays
+  the ore's. Nothing here gates the market or a def, and an agent's jobs are
+  untouched.
+- **The proficiency card says what a level buys**: the workshop lines carry
+  an **EDGES** band between WHAT IT IS FOR and PRACTICE, the numbers and
+  their caps in the card's own voice. Families without an authored effect
+  line hide the band and read exactly as before.
+- **The inspector quotes the effective run**: the manufacturing RESULT row
+  and the refinery's batch strip and picker now show the sim's own figures,
+  the same function the job or the command runs, so a preview cannot promise
+  what the collection or the refinery would not pay. At level 0 every figure
+  is the shipped one.
 - **The manufacturing inspector says what a run makes**: a RESULT section
   under the material bill, one row per output, the product's art and name
   over its units per run (`×100` for a batch of ammunition or charges, `×1`
@@ -151,6 +171,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reward with its own icon (coins for the payout, the contracts mark for the
   standing gain, the material's own icon), and the portrait column drops the
   patron line and the "Posted at" line.
+
+- **The proficiency overview is one skill row taller**: two more families
+  do not fit the seven-row columns, so the summary window grew 15 px
+  (fresh layouts only; a saved layout keeps its own rect).
+- **Job materials and batch yields compose**: the station's craft discount
+  and the pilot's Manufacturing reduction add (craft V is 8%, Manufacturing
+  V is 10%, so a bill at both is 18% lighter, not the 17.2% a multiplication
+  would give, nor the 20% that would need a tenth craft step).
 
 ## [0.13.0] - 2026-11-03
 

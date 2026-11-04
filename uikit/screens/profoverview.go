@@ -33,8 +33,8 @@ const (
 	// profOvH is the painted body's height: the totals, the bar and the two
 	// skill columns, with no hint line under them (the tree says its own
 	// controls; the owner had the line removed).
-	profOvH    = 182
-	profOvRows = 7 // skill rows per column (two columns fill today's 14 proficiencies)
+	profOvH    = 197
+	profOvRows = 8 // skill rows per column (two columns fill today's 16 proficiencies)
 
 	profOvLine = 13 // one skill row's height
 	profOvCols = 2
@@ -201,7 +201,7 @@ func (o *ProficiencyOverview) draw(fams []ProfFamily) {
 	for i, f := range fams {
 		col, row := i/profOvRows, i%profOvRows
 		if col >= profOvCols {
-			break // shortcut: more than 14 families needs a taller canvas
+			break // shortcut: more than 16 families needs a taller canvas
 		}
 		x := pad + col*(colW+theme.Px(theme.SpMd))
 		ry := y + row*rowH

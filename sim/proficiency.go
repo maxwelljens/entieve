@@ -285,8 +285,10 @@ func (s *Sim) announceProficiency(family string, before int) {
 	}
 }
 
-// oreRarity is the practice paid by one mining cycle: 2^(rarity-1), so the
-// authored 1..4 rarity maps to 1, 2, 4 or 8 (a def without the field pays 1).
+// oreRarity is the practice one action pays by the acted item's rarity:
+// 2^(rarity-1), so the authored 1..4 rarity maps to 1, 2, 4 or 8 (a def
+// without the field pays 1). A mining cycle pays its rock's ore, a completed
+// job its product, a refine batch its ore: one ladder for all three.
 func (s *Sim) oreRarity(ore content.ItemID) float64 {
 	r := 1
 	if def, ok := s.Content.Item(ore); ok && def.Rarity > 0 {
