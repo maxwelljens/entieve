@@ -1099,3 +1099,81 @@ func TestManufacturingSplitRatioPersists(t *testing.T) {
 		t.Errorf("after reset manufacturing-inspector = %v, want %v", got, inspOpening)
 	}
 }
+
+// TestRefinerySplitRatioPersists: the refinery window's two seams (the ore
+// list between its browse tree and its inspector) are exposed to the sidecar
+// as refinery-tree and refinery-inspector, round-trip their ratios through a
+// version-3 file, restore them on a fresh session, and "Reset window layout"
+// returns each to the panel's own opening shares.
+func TestRefinerySplitRatioPersists(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "save.json")
+	g := newShowcaseGameAt(t, path)
+	g.applySize(1280, 720)
+	// The refinery is docked-only: dock at the start system's refine station
+	// so the host mounts it.
+	g.s.Docked.Set(g.s.Player(), sim.Docked{At: "cel-haven-rest"})
+	g.host.SetOpen(idRefinery, true)
+	g.syncMounts()
+	pump(t, g, 1280, 720)
+
+	// The opening shares: 184 px of browse and 264 px of inspector of the
+	// 736 px the split spans at the 760 px landing rect (760 − 2·ContentsPad
+	// − both 4 px seams).
+	const treeOpening = 184.0 / 736
+	const inspOpening = 1 - 264.0/736
+	seams := g.host.Slot(string(idRefinery)).Splits()
+	if len(seams) != 2 || seams[0].Name != "refinery-tree" || seams[1].Name != "refinery-inspector" {
+		t.Fatalf("refinery seams = %+v, want tree / inspector", seams)
+	}
+	for _, want := range []struct {
+		name  string
+		ratio float64
+	}{{"refinery-tree", treeOpening}, {"refinery-inspector", inspOpening}} {
+		if got := seamRatio(want.name, seams); math.Abs(got-want.ratio) > 1e-9 {
+			t.Errorf("opening %s = %v, want %v", want.name, got, want.ratio)
+		}
+	}
+
+	seams[0].Split.SetRatio(seams[0].Index, 0.31)
+	seams[1].Split.SetRatio(seams[1].Index, 0.8)
+	if err := g.SaveGame(); err != nil {
+		t.Fatalf("SaveGame: %v", err)
+	}
+	doc := readDoc(t, g.layoutPath())
+	if got := doc.Windows["refinery"].Splits["refinery-tree"]; math.Abs(got-0.31) > 1e-9 {
+		t.Errorf("refinery-tree = %v, want the dragged 0.31", got)
+	}
+	if got := doc.Windows["refinery"].Splits["refinery-inspector"]; math.Abs(got-0.8) > 1e-9 {
+		t.Errorf("refinery-inspector = %v, want the dragged 0.8", got)
+	}
+
+	// Next session: the ratios come back, mounted and laid out, and a resize
+	// still tiles the row.
+	g2 := newShowcaseGameAt(t, path)
+	g2.applySize(1280, 720)
+	g2.s.Docked.Set(g2.s.Player(), sim.Docked{At: "cel-haven-rest"})
+	g2.host.SetOpen(idRefinery, true)
+	g2.syncMounts()
+	pump(t, g2, 1280, 720)
+	seams = g2.host.Slot(string(idRefinery)).Splits()
+	if got := seamRatio("refinery-tree", seams); math.Abs(got-0.31) > 1e-9 {
+		t.Errorf("restored refinery-tree = %v, want 0.31", got)
+	}
+	if got := seamRatio("refinery-inspector", seams); math.Abs(got-0.8) > 1e-9 {
+		t.Errorf("restored refinery-inspector = %v, want 0.8", got)
+	}
+	assertSplitRowTiled(t, "refinery", seams[0].Split)
+	g2.applySize(1024, 700)
+	pump(t, g2, 1024, 700)
+	assertSplitRowTiled(t, "refinery", seams[0].Split)
+
+	// Reset window layout: back to the panel's opening shares.
+	g2.resetLayout()
+	seams = g2.host.Slot(string(idRefinery)).Splits()
+	if got := seamRatio("refinery-tree", seams); math.Abs(got-treeOpening) > 1e-9 {
+		t.Errorf("after reset refinery-tree = %v, want %v", got, treeOpening)
+	}
+	if got := seamRatio("refinery-inspector", seams); math.Abs(got-inspOpening) > 1e-9 {
+		t.Errorf("after reset refinery-inspector = %v, want %v", got, inspOpening)
+	}
+}

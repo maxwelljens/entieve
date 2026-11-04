@@ -48,6 +48,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   job list stays in the bottom seam, and the new panes' proportions persist
   with the window's layout.
 
+- **The refinery window is an ore board**: the flat three-column ore table
+  (ore, held, one text line of outputs) and its static status line are gone,
+  replaced by the manufacturing board's idiom over refining. A browse tree of
+  the ore groups with a live search that also matches an ore's OUTPUT minerals
+  (type "Sideron" and every ore that yields it answers), a narrow ore list
+  where each row carries its verdict as one glyph (a green tick when Refine
+  would accept, a red cross when it would refuse) over the held count and a
+  value strip split per output mineral by its share of one batch's mineral
+  value, and an inspector card for the selected ore, inset from the pane's
+  edges: the same head the market and manufacturing panes lead with (the hero
+  icon, the ore's name with the verdict glyph, the ore's own description
+  wrapped to the pane), then a **refine math** table answering "refine this or
+  sell it raw" off the station's live book: what one 100-ore batch fetches at
+  the bids, what its minerals fetch, the signed delta (green when refining
+  pays, red when it does not) and the margin, each side dashed `no bid` with
+  the marker where nobody here buys it and no base price standing in; there is
+  no fee line because the sim charges no refine fee. Below it the yield bill,
+  one row per output mineral, the most valuable first, each with its art at
+  the material bill's icon size, its share, its amount per batch and its
+  value. Refine opens the quantity picker now (the row click only selects and
+  opens the inspector) and is simply grayed when the sim would refuse. The
+  status line's sentences ("Refine needs a station with the refine service.",
+  "Whole 100-ore batches only; Refine opens the quantity picker." and the
+  sub-batch "One batch needs 100 ore; you hold 50 Kerngrit Ore.") are gone, the
+  row's right-click Refine entry with them; the empty state is the head's
+  "Select an ore to refine." hint. The panes' proportions persist with the
+  window's layout.
+
 - **Fitting limits read as boxes**: the Show Info hull page's FITTING block
   and the fitting window's HULL LIMITS block draw a hull's limits instead of
   quoting them. The mounts line stays words; the high/mid/low slots are one
