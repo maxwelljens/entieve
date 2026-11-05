@@ -305,6 +305,7 @@ Show Info line.
 
 | field | current value | proposed value | origin | notes |
 |---|---|---|---|---|
+| Destination arrival line (`uikit/screens/hud.go`) | — | **DESTINATION REACHED** | trade | the top readout's line once the pilot is in the planned system: it fades out over three seconds and the row hides, while the destination itself stays set (the Starmap keeps its route). Owner's wording, approved 2026-11-05 |
 | Finances window title (`game/screens.go`, `uikit/screens/finances.go`) | — | **Finances** | trade | the wallet window: holdings over the transaction ledger. Plain trade vocabulary, no coined term. Approved 2026-10-18 |
 | Finances holdings labels | — | cash · deployed in orders · receivables · total | trade | the three pools the player's money can sit in: the wallet, the escrow held by open buy orders (refundable on cancel) and the rewards still owed on accepted contracts, plus their total. Approved 2026-10-18 |
 | Order mini-window item entry (`uikit/screens/inventory.go`, `uikit/screens/market.go`) | — | **Sell on Market** | trade | posts a standing ask for the clicked stack/item on the docked station's book through the typed order mini-window; grayed (never hidden) while undocked. Approved 2026-10-18 |

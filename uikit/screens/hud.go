@@ -71,10 +71,16 @@ const (
 	// distance, collapsing to nothing while no destination is set.
 	hudDestW      = 420
 	hudDestH      = 26
-	hudDestPad    = 6  // inside the readout panel (px)
-	hudDestArrow  = 18 // the heading arrow box (px)
-	hudDestGap    = 4  // arrow → name, name → final system, panel → distance (px)
-	hudDestSector = 32 // arrow directions: the raw heading is quantised to a repaint step
+	hudDestPad    = 6   // inside the readout panel (px)
+	hudDestArrow  = 18  // the heading arrow box (px)
+	hudDestGap    = 4   // arrow → name, name → final system, panel → distance (px)
+	hudDestSector = 32  // arrow directions: the raw heading is quantised to a repaint step
+	hudDestFade   = 180 // arrival frames before the panel is gone (3 s at 60 fps)
+
+	// destReachedLabel is the arrival line: what the readout says once the
+	// pilot is in the planned system, before it fades out. Registered in
+	// lore/NAMING.md's interface strings.
+	destReachedLabel = "DESTINATION REACHED"
 )
 
 // The velocity wedge shares the health block's band: it is exactly as tall
@@ -248,6 +254,7 @@ type Hud struct {
 	destDrawn   hudDestState
 	destPainted bool
 	destDraws   int
+	destReached int               // arrival frames counted: the fade clock (hudDestFade)
 	pair        *widget.Container // bottom-center: status column + rack slot
 	strip       *widget.Container
 	effects     *widget.Container // EWAR icons above the status (hidden when none)
@@ -297,12 +304,14 @@ type Hud struct {
 // distance and the arrow's bearing against the ship's heading. It is
 // deliberately comparable so Sync repaints only when a value moved.
 type hudDestState struct {
-	show  bool
-	arrow bool
-	angle float64 // radians clockwise from the heading (0 = straight ahead)
-	name  string  // gate or in-system body name
-	dest  string  // final system name ("" when the destination is here)
-	dist  string
+	show    bool
+	arrow   bool
+	angle   float64 // radians clockwise from the heading (0 = straight ahead)
+	name    string  // gate or in-system body name
+	dest    string  // final system name ("" when the destination is here)
+	dist    string
+	reached bool    // the arrival line: the pilot is in the planned system
+	fade    float64 // 1 → 0 over hudDestFade while reached (the repaint driver)
 }
 
 // hudFeed is the combat feed: brief lines scrolling up above the ship status,
@@ -926,37 +935,52 @@ func (h *Hud) syncFeed() {
 // against the ship's heading (its velocity, screen-up when parked).
 func (h *Hud) syncDest(player ecs.Entity) {
 	st := hudDestState{}
+	dest := content.SystemID("")
 	if h.destFn != nil {
-		if dest := h.destFn(); dest != "" {
-			cur := content.SystemID("")
-			if sys := h.cv.System(); sys != nil {
-				cur = sys.ID
-			}
-			// The final system alone is still a readout when the route
-			// cannot name a gate (an empty graph, an unknown id).
-			st = hudDestState{name: h.systemName(dest)}
-			switch {
-			case dest == cur:
-				if info, ok := h.celInfo(sim.KindStar, ""); ok {
-					st = h.stageDest(info, "", player)
-				}
-			case cur != "":
-				if path := routePath(h.cv, cur, dest); len(path) > 1 {
-					if cel, ok := gateTo(h.cv, cur, path[1]); ok {
-						// KindGate, not just the celestial id: Info.Cel
-						// is the NEAREST celestial for loose grid objects
-						// (sim/api.go), so a ship sitting on the gate
-						// carries the same id and would otherwise win
-						// this lookup (Grid is handle-ordered, so that
-						// ship is often the player itself).
-						if info, ok := h.celInfo(sim.KindGate, cel); ok {
-							st = h.stageDest(info, h.systemName(dest), player)
-						}
+		dest = h.destFn()
+	}
+	cur := content.SystemID("")
+	if sys := h.cv.System(); sys != nil {
+		cur = sys.ID
+	}
+	switch {
+	case dest == "":
+		h.destReached = 0
+	case dest == cur:
+		// Arrival: the plan is spent. Say it once and fade the panel out
+		// over hudDestFade frames. The destination itself stays set (the
+		// Starmap keeps its route) and leaving the system resets the
+		// clock, so a later return says it again.
+		if h.destReached < hudDestFade {
+			h.destReached++
+		}
+		fade := 1 - float64(h.destReached)/float64(hudDestFade)
+		if fade <= 0 {
+			st = hudDestState{} // gone: the row hides and stops repainting
+		} else {
+			st = hudDestState{show: true, reached: true, name: destReachedLabel, fade: fade}
+		}
+	default:
+		h.destReached = 0
+		// The final system alone is still a readout when the route
+		// cannot name a gate (an empty graph, an unknown id).
+		st = hudDestState{name: h.systemName(dest)}
+		if cur != "" {
+			if path := routePath(h.cv, cur, dest); len(path) > 1 {
+				if cel, ok := gateTo(h.cv, cur, path[1]); ok {
+					// KindGate, not just the celestial id: Info.Cel
+					// is the NEAREST celestial for loose grid objects
+					// (sim/api.go), so a ship sitting on the gate
+					// carries the same id and would otherwise win
+					// this lookup (Grid is handle-ordered, so that
+					// ship is often the player itself).
+					if info, ok := h.celInfo(sim.KindGate, cel); ok {
+						st = h.stageDest(info, h.systemName(dest), player)
 					}
 				}
 			}
-			st.show = true
 		}
+		st.show = true
 	}
 	h.setDest(st)
 }
@@ -1033,6 +1057,8 @@ func (h *Hud) setDest(st hudDestState) {
 
 // paintDest paints the readout panel: the heading arrow, the next gate's
 // name, the final system and the live distance, all in the house palette.
+// With the plan spent (reached) it paints the arrival line instead, faded
+// by st.fade until the row hides.
 func (h *Hud) paintDest(st hudDestState) {
 	if h.destImg == nil {
 		return
@@ -1040,6 +1066,28 @@ func (h *Hud) paintDest(st hudDestState) {
 	p := h.th.Pal()
 	box := h.destImg.Bounds()
 	h.destImg.Clear()
+	if st.reached {
+		fade := st.fade
+		if fade < 0 {
+			fade = 0
+		}
+		if fade > 1 {
+			fade = 1
+		}
+		if fade > 0 {
+			theme.DrawRoundBox(h.destImg, box,
+				theme.NRGBA(p.BG, uint8(math.Round(float64(p.BG.A)*fade))),
+				theme.NRGBA(p.Border, uint8(math.Round(float64(p.Border.A)*fade))),
+				1, theme.AllRadii(theme.RadiusPanel))
+			face := h.th.Face(theme.StepSmall)
+			_, lineH := text.Measure("Ag", *face, 0)
+			x := (box.Dx() - int(math.Ceil(h.measure(destReachedLabel)))) / 2
+			y := (box.Dy() - int(math.Ceil(lineH))) / 2
+			theme.DrawCardText(h.destImg, destReachedLabel, face, x, y,
+				theme.NRGBA(p.Text, uint8(math.Round(float64(p.Text.A)*fade))))
+		}
+		return
+	}
 	theme.DrawRoundBox(h.destImg, box, theme.Solid(p.BG), theme.NRGBA(p.Border, 160), 1,
 		theme.AllRadii(theme.RadiusPanel))
 

@@ -14,8 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screen, above the target cards. It shows the route's next gate (or the
   system's star when the destination is the current system) with an arrow
   turned against the ship's own heading, the distance, and the final system's
-  name when the destination is further away. The row hides when the
-  destination clears. The overview also tints the next hop's gate row and
+  name when the destination is further away. Arriving in the planned
+  system swaps the panel for the line **DESTINATION REACHED**, which fades
+  out over three seconds and then hides the row (the destination stays set,
+  so the route is still there; leaving and returning says it again). The
+  row also hides when the destination clears. The overview also tints the next hop's gate row and
   kind glyph in the route's teal (never Accent: Accent is the selection
   colour), under the kind's Colour switch; the whole
   plan stays session-only, never saved and never a sim command.

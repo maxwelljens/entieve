@@ -46,17 +46,65 @@ func TestHudDestinationReadout(t *testing.T) {
 		t.Errorf("a set destination leaves the row hidden (%d)", vis)
 	}
 
-	env.SetDestination("sys-solace")
+	env.SetDestination("sys-solace") // the current system: arrival
 	h.Sync()
-	if !h.destRead.show || h.destRead.name != "Struvok" || h.destRead.dest != "" {
-		t.Fatalf("in-system dest = {%v %q %q}, want the star Struvok with no final system",
-			h.destRead.show, h.destRead.name, h.destRead.dest)
+	if !h.destRead.show || !h.destRead.reached || h.destRead.name != destReachedLabel {
+		t.Fatalf("arrival readout = {show:%v reached:%v %q}, want the arrival line",
+			h.destRead.show, h.destRead.reached, h.destRead.name)
 	}
 
 	env.SetDestination("")
 	h.Sync()
 	if h.destRead.show {
 		t.Error("the readout stayed up after the destination cleared")
+	}
+	if h.destReached != 0 {
+		t.Errorf("arrival clock = %d with no destination, want it reset", h.destReached)
+	}
+}
+
+// TestHudDestinationReachedFadesOut: the arrival line holds the panel for
+// hudDestFade frames and then the row hides (the destination itself stays
+// set, so the Starmap keeps its route); leaving the system resets the
+// clock, so a later return says it again.
+func TestHudDestinationReachedFadesOut(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	h := NewHud(env)
+	h.SetDestination(env.Destination)
+	env.SetDestination("sys-solace") // already in solace: arrival
+	h.Sync()
+	if !h.destRead.reached || h.destRead.show && h.destRead.fade >= 1 {
+		t.Fatalf("arrival = {reached:%v show:%v fade:%v}, want the line up below full alpha",
+			h.destRead.reached, h.destRead.show, h.destRead.fade)
+	}
+
+	for i := 0; i < hudDestFade+2; i++ {
+		h.Sync()
+	}
+	if h.destRead.show {
+		t.Errorf("the arrival line is still up after %d frames (fade %v)", hudDestFade, h.destRead.fade)
+	}
+	if vis := h.destRow.GetWidget().GetVisibility(); vis != widget.Visibility_Hide {
+		t.Errorf("the row did not hide after the fade (%d)", vis)
+	}
+
+	// Leaving the system resets the clock and brings the route readout back.
+	env.SetDestination("sys-penumbra")
+	h.Sync()
+	if h.destReached != 0 {
+		t.Errorf("arrival clock = %d outside the destination system, want reset", h.destReached)
+	}
+	if h.destRead.reached || !h.destRead.show {
+		t.Fatalf("outside the system = {reached:%v show:%v}, want the route readout",
+			h.destRead.reached, h.destRead.show)
+	}
+
+	// Returning says it again.
+	env.SetDestination("sys-solace")
+	h.Sync()
+	if !h.destRead.reached || !h.destRead.show {
+		t.Fatalf("on return = {reached:%v show:%v}, want the arrival line again",
+			h.destRead.reached, h.destRead.show)
 	}
 }
 
