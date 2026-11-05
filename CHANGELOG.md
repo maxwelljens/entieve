@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The starmap is a full-screen layer with a system overview**: `N` opens
+  the gate graph as the house's second backdrop layer (title-bar-less,
+  re-fitted to the viewport, closed by `N`, the rail entry and Esc), in
+  three zones: a live fuzzy system browser, the graph, and the selected
+  system's overview. The overview names every celestial with its kind
+  icon, a station's facilities as the service glyph row, a belt's ore
+  chips with their counts and volumes, and a gate's destination as a chip
+  that selects the neighbour; density chips count stations, gates, belts
+  and anomalies. A hover pennant and the solid destination flag replace
+  the two retired hint lines (click to select, click again to set the
+  destination). The search field is the layer's typing surface: arrows
+  walk the list and Enter sets the destination while it is focused.
 - **Two workshop proficiencies: Manufacturing and Refining**: cross-cutting
   lines that open at level 0 with no prerequisite, gate nothing, and are
   practiced by the pilot's own factory and refinery work. Manufacturing

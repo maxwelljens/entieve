@@ -284,8 +284,9 @@ release needs no `assets/` folder next to it.
 
 Default positions: overview top-right, selected item top-left, scanner
 in the center column under the top row, log bottom-left, the HUD pair
-(ship status + module rack) bottom-center, starmap and the Esc menu
-centered, help top-center. Every window type also carries its own default
+(ship status + module rack) bottom-center, the Esc menu centered, help
+top-center. The starmap is a full-screen layer, not a placed window: it
+is the viewport. Every window type also carries its own default
 size and position for its first open (the market's 760×560 three-pane
 rect, the inventory and fitting rects, the manufacturing and refinery,
 finances and settings), and a genuinely
@@ -1097,23 +1098,39 @@ market and little else. Travel system-to-system by flying to a stargate
 and pressing `J`; the starmap (`N`) shows the gate graph with every
 system under its own name and your current system highlighted.
 
-**The starmap is an interactive window** (a normal one: no dimmed
-backdrop, draggable and stacking with the rest). Hovering a system lights
-it and its name; **click** it to open its card in the window's top-left
-corner: display name, zone, its stations and every gate destination.
-**Click the selected system again** to set it as your **destination**: the
-shortest gate route from your current system is drawn in amber, the
-destination wears the widest ring, and the card counts the jumps. Click
-the destination once more (or set the system you are already in) to clear
-it. Destination, selection and hover are session-only view state: they
-are never saved and never command your ship.
+**The starmap is a full-screen layer** (the house's second, after the
+proficiency tree: no title bar, no dimmed backdrop, painted over the world
+and under every window, closed by `N`, the rail entry and `Esc`). It has
+three zones. The **system browser** on the left carries the live search
+field and the system list: each row is its security dot, its display name
+and the current system's hull glyph or the destination's pennant. The
+**graph** in the middle is the gate web, with nodes coloured by zone,
+control shapes, contested fronts, the war key and the zone legend. The
+**system overview** on the right names the selected system: its security
+badge and region, density chips (stations, gates, belts, anomalies), one
+icon row per celestial, a station's facilities as the service glyph row,
+a belt's ore chips with the belt's count and per-asteroid volume, its
+gate destinations as chips and an anomaly row. A gate chip selects the
+system on the other side.
+
+**Hover** a system and it wears the outline pennant; **click** it to
+select it, which fills the overview. **Click the selected system again**
+to set it as your **destination**: the shortest gate route from your
+current system is drawn in amber, the destination wears the widest ring
+and the solid pennant, and the graph's jump badge counts the jumps. Click
+the destination once more (or select the system you are already in) to
+clear it. The search field is the one typing surface: while it is
+focused, the arrows walk the list, `Enter` sets the destination and `Esc`
+clears the query first. Destination, selection and the query are
+session-only view state: they are never saved and never command your
+ship.
 
 **The starmap also carries the war** (see *The Long Attrition* below).
 Every node shows who holds it (**filled** while the Charter holds the
 system, a **hollow outline** once the Old Works take it), and a system on
 the **front** wears an outer blue ring. The top-right corner is the war
 key, ending with the **war treasury**: the corporate fleets' balance, the
-war's health, in one line. The selected system's card adds its holder
+war's health, in one line. The system overview's readout adds its holder
 ("Charter-held" or "Works-held") and, on the front, the meter: "Front: the
 Works press at 42%" where the Works are eroding a charter hold, "Front: the
 charter pushes at 42%" where the charter is pushing a Works system back. In a world without a war the map shows none

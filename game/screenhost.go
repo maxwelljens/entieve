@@ -441,6 +441,16 @@ func (h *ScreenHost) SetOpen(id ScreenID, open bool) bool {
 			o.open = false
 		}
 	}
+	// One full-viewport layer at a time: the kit owns a single backdrop
+	// slot, so opening the starmap closes the proficiency tree and vice
+	// versa. Both are ordinary rows otherwise (key, rail entry, Esc).
+	if open && s.row.Anchor == AnchorViewport {
+		for _, o := range h.slots {
+			if o != s && o.open && o.row.Anchor == AnchorViewport {
+				h.SetOpen(o.row.ID, false)
+			}
+		}
+	}
 	s.open = open
 	if !open {
 		s.session = false

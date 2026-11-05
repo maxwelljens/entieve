@@ -437,7 +437,7 @@ this section is the implementation substrate.
 | Token | Value | Chrome |
 |---|---|---|
 | `RadiusWindow` | 14 | window pieces: title bar TOP corners, body BOTTOM corners |
-| `RadiusPanel` | 8 | in-window panels and cards, HUD boxes, starmap card, context menu* |
+| `RadiusPanel` | 8 | in-window panels and cards, HUD boxes, starmap panels, context menu* |
 | `RadiusControl` | 5 | buttons, text inputs, lists, sliders, checkbox, tooltip, menu |
 
 \* the menu and tooltip use the control radius (5): they are popups, not

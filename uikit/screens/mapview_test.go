@@ -11,7 +11,7 @@ import (
 // paints, an unchanged system does not repaint, a system change does.
 func TestMapViewDrawsAndRedraws(t *testing.T) {
 	env, _ := newChromeEnv(t)
-	m := NewMapView(env)
+	m := NewMapView(env, nil)
 	if m.Win() == nil {
 		t.Fatal("MapView.Win() is nil")
 	}
@@ -43,7 +43,8 @@ func TestMapViewDrawsAndRedraws(t *testing.T) {
 // system ids never reach the map's text).
 func TestMapViewNodesAndProjection(t *testing.T) {
 	env, _ := newChromeEnv(t)
-	m := NewMapView(env)
+	m := NewMapView(env, nil)
+	m.Sync() // lays the columns out; the graph column is the projection area
 	nodes := m.mapNodes()
 	if len(nodes) != len(env.Content.Systems) {
 		t.Fatalf("nodes = %d, want %d", len(nodes), len(env.Content.Systems))
@@ -66,10 +67,14 @@ func TestMapViewNodesAndProjection(t *testing.T) {
 	}
 
 	pts := m.project(nodes)
+	area := m.graph
+	if area.Empty() {
+		t.Fatal("fixture: the graph column was never laid out")
+	}
 	for i, pt := range pts {
-		if pt.x < 0 || pt.x > mapImgW || pt.y < 0 || pt.y > mapImgH {
-			t.Errorf("node %q projects to (%v,%v), outside the %dx%d image",
-				nodes[i].id, pt.x, pt.y, mapImgW, mapImgH)
+		if !image.Pt(int(pt.x), int(pt.y)).In(area) {
+			t.Errorf("node %q projects to (%v,%v), outside the graph column %v",
+				nodes[i].id, pt.x, pt.y, area)
 		}
 		for j := 0; j < i; j++ {
 			if pts[j] == pt {
@@ -94,13 +99,26 @@ func TestMapViewNodesAndProjection(t *testing.T) {
 	}
 }
 
-// TestMapViewDrawSmoke draws the starmap at both design sizes.
+// TestMapViewDrawSmoke draws the starmap at both design sizes. The layer
+// follows the viewport it is given (the game passes the live one); the
+// harness drives the same rect.
 func TestMapViewDrawSmoke(t *testing.T) {
 	env, _ := newChromeEnv(t)
-	m := NewMapView(env)
+	vp := image.Rect(0, 0, 1280, 720)
+	m := NewMapView(env, func() image.Rectangle { return vp })
 	c := newChromeUI(env)
 	c.AddWindow(m)
-	c.Smoke(t)
+	for _, size := range [][2]int{{1280, 720}, {1024, 700}} {
+		vp = image.Rect(0, 0, size[0], size[1])
+		c.Frame(t, size[0], size[1])
+		c.Frame(t, size[0], size[1])
+		for _, w := range c.wins {
+			r := w.GetContainer().GetWidget().Rect
+			if r.Min.X < 0 || r.Min.Y < 0 || r.Max.X > size[0] || r.Max.Y > size[1] {
+				t.Errorf("%dx%d: window %v out of bounds", size[0], size[1], r)
+			}
+		}
+	}
 }
 
 // TestZoneLabel pins the in-universe zone vocabulary of the map legend
@@ -124,7 +142,7 @@ func TestZoneLabel(t *testing.T) {
 func mapUnderTest(t *testing.T) (*MapView, func(content.SystemID) image.Point, func(content.SystemID) image.Point, *testEnv) {
 	t.Helper()
 	env, _ := newChromeEnv(t)
-	m := NewMapView(env)
+	m := NewMapView(env, nil)
 	c := newChromeUI(env)
 	c.AddWindow(m)
 	c.Frame(t, 1280, 720)

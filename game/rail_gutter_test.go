@@ -100,7 +100,7 @@ func TestLandingRectIdentity(t *testing.T) {
 		{idMarket, func() *widget.Window { return uikit.NewMarket(sv.Env).Win() }},
 		{idManufacturing, func() *widget.Window { return uikit.NewManufacturing(sv.Env).Win() }},
 		{idScanner, func() *widget.Window { return uikit.NewScanner(sv.Env).Win() }},
-		{idMap, func() *widget.Window { return uikit.NewMapView(sv.Env).Win() }},
+		{idMap, func() *widget.Window { return uikit.NewMapView(sv.Env, nil).Win() }},
 		{idSettings, func() *widget.Window { return uikit.NewSettings(sv.Env, sv.Settings).Win() }},
 		{idRefinery, func() *widget.Window { return uikit.NewRefinery(sv.Env).Win() }},
 		{idFinances, func() *widget.Window { return uikit.NewFinances(sv.Env).Win() }},

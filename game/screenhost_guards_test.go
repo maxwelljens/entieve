@@ -162,10 +162,10 @@ const layoutBytesGolden = `{
       }
     },
     "map": {
-      "x": 282,
-      "y": 80,
-      "w": 716,
-      "h": 560,
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 720,
       "open": false
     },
     "market": {

@@ -89,6 +89,38 @@ func TestModalEscLadder(t *testing.T) {
 	if g.host.IsOpen(idProficiency) {
 		t.Error("Esc did not close the tree after the card")
 	}
+
+	// The starmap is the second full-viewport layer, one step below the
+	// tree and above every modal row: Esc closes it before the menu
+	// behind it, and with it closed the next Esc opens the menu.
+	g.host.SetOpen(idMap, true)
+	g.onEscape()
+	if g.host.IsOpen(idMap) || g.host.IsOpen(idMenu) {
+		t.Errorf("Esc with the starmap open = {map %v, menu %v}, want the map closed and no menu",
+			g.host.IsOpen(idMap), g.host.IsOpen(idMenu))
+	}
+	g.onEscape()
+	if !g.host.IsOpen(idMenu) {
+		t.Error("Esc after the starmap did not open the menu")
+	}
+	g.onEscape()
+	if g.host.IsOpen(idMenu) {
+		t.Error("Esc did not close the menu after the starmap step")
+	}
+
+	// One backdrop at a time: the two layers evict each other, so the
+	// tree can never sit on top of a mounted starmap (the kit has one
+	// backdrop slot). The last opened is the live one.
+	g.host.SetOpen(idMap, true)
+	g.host.SetOpen(idProficiency, true)
+	if g.host.IsOpen(idMap) || !g.host.IsOpen(idProficiency) {
+		t.Errorf("layers overlapped = {map %v, tree %v}, want the tree only",
+			g.host.IsOpen(idMap), g.host.IsOpen(idProficiency))
+	}
+	g.onEscape()
+	if g.host.IsOpen(idProficiency) {
+		t.Error("Esc did not close the surviving tree layer")
+	}
 	g.onEscape()
 	if !g.host.IsOpen(idMenu) {
 		t.Error("Esc with nothing up did not open the menu")
