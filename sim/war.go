@@ -579,7 +579,42 @@ func (s *Sim) warFleets() {
 		return
 	}
 	pos, spread := s.warFleetAnchor(sys)
+	if s.warFleetUnderPilot(sys, pos) {
+		return // the beat is postponed, not lost: the next one tries again
+	}
 	s.warSpawn(hull, pos, spread, tag)
+}
+
+// warFleetUnderPilot reports whether the landing point sits inside a belt the
+// pilot is standing in. The fleet's business at the front is the Works hull
+// it came for, and landing on that hull under a pilot who just warped in
+// drags the belt's rats off the pilot and into the fleet: they engage on the
+// landing tick (proximity) and the threat-switch rule then keeps them there,
+// because a pilot who has fired nothing has no damage to lead with
+// (CONTEXT.md "Threat switch"). Skipping the spawn leaves the belt's rats to
+// the pilot; contest and bids already ran this beat, so no war progress is
+// lost and the next procure beat tries again.
+func (s *Sim) warFleetUnderPilot(sys *content.SystemDef, pos core.Vec2) bool {
+	if s.player.IsZero() {
+		return false
+	}
+	me, ok := s.posOf(s.player)
+	if !ok {
+		return false
+	}
+	for i := range sys.Celestials {
+		cel := &sys.Celestials[i]
+		if cel.Kind != content.CelBelt {
+			continue
+		}
+		if me.Dist(cel.Position) > cel.Radius {
+			continue // the pilot is not standing in this belt
+		}
+		// The pilot is in this belt: only a landing in the same one is
+		// under their feet (another belt's fight is none of their business).
+		return pos.Dist(cel.Position) <= cel.Radius
+	}
+	return false
 }
 
 // warFleetHull is the hull the fleets fly: the commissioned Corporate Fleets

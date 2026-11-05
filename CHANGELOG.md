@@ -341,6 +341,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   would give, nor the 20% that would need a tenth craft step).
 ### Fixed
 
+- **A war fleet no longer lands on the pilot's belt**: the commissioned
+  Corporate Fleets cutter drops on the Works hull it came for every
+  procure beat, and when that belt is one the pilot stands in, the belt's
+  rats engaged the cutter on the landing tick and the threat-switch rule
+  held them there (an arriving pilot has dealt no damage to lead with), so
+  the belt read as the rats fighting each other instead of targeting the
+  pilot. The fleet now skips that beat and takes the next one: contest and
+  bids already ran, so no war progress is lost. CONTEXT's Hostility row is
+  corrected alongside it (the Corporate Fleets do initiate, on the Old
+  Works).
 - **The starmap no longer lags on hover or steps memory by a gigabyte a
   click**: every repaint drew its node rings with antialiased
   `vector.StrokeCircle`, and the pinned ebiten 2.10.4 turned a

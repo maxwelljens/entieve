@@ -1042,6 +1042,35 @@ func TestWarFleetsSpawnAndEngage(t *testing.T) {
 	}
 }
 
+// TestWarFleetsSkipThePilotsBelt: the commissioned fleet never lands inside
+// a belt the pilot is standing in. Landing on the Works hull it came for
+// under a pilot who just warped in drags that belt's rats off the pilot and
+// into the fleet, and the threat-switch rule keeps them there (a pilot who
+// has fired nothing has no damage to lead with). Owner report: "the Old
+// Works fight each other ... instead of targeting the player." The beat is
+// postponed, not lost: the same beat with the pilot off the belt still
+// brings the fleet.
+func TestWarFleetsSkipThePilotsBelt(t *testing.T) {
+	s := newWarSim(t)
+	if err := s.LoadSystem("sys-w", ""); err != nil {
+		t.Fatal(err)
+	}
+	belt := s.celEntity("cel-belt-w")
+	setPlayerPos(s, mustPos(s, belt)) // standing on Works Belt (radius 1500)
+	drain(s)
+
+	stepToWarBeat(s)
+	if n := countFaction(s, factionFleets); n != 0 {
+		t.Fatalf("a fleet landed in the pilot's belt (%d hulls)", n)
+	}
+
+	setPlayerPos(s, v(-4e6, -4e6)) // well off the belt, as the other pin sets it
+	stepToWarBeat(s)
+	if n := countFaction(s, factionFleets); n == 0 {
+		t.Fatal("no fleet showed up once the pilot left the belt")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // 8. War news
 // ---------------------------------------------------------------------------
