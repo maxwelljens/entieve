@@ -86,6 +86,7 @@ func TestScreenSpecRejectsMalformedRows(t *testing.T) {
 		{"row without a rail icon", func(r []Screen) { r[0].Icon = "" }, "missing icon"},
 		{"space-only and docked-only at once", func(r []Screen) { r[screenIndex(idManufacturing)].SpaceOnly = true }, "never mounts"},
 		{"unknown anchor", func(r []Screen) { r[0].Anchor = Anchor(99) }, "unknown anchor"},
+		{"over-chrome row that is not a viewport layer", func(r []Screen) { r[screenIndex(idInventory)].OverChrome = true }, "OverChrome"},
 		{"duplicate title", func(r []Screen) { r[1].Title = "Inventory" }, "title already used by"},
 		{"unknown dock policy", func(r []Screen) { r[0].DockPolicy = DockPolicy(99) }, "unknown dock policy"},
 		{"modal facet without a veil", func(r []Screen) { r[screenIndex(idMenu)].Modal.Dim = 0 }, "without a dim veil"},

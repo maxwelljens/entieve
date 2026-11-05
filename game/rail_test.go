@@ -221,6 +221,19 @@ func TestRailClicksToggleWindows(t *testing.T) {
 	if !g.host.IsOpen(idOverview) || !ov.IsVisible() {
 		t.Error("rail did not reopen the overview")
 	}
+
+	// The starmap's entry still opens the layer row; once it is up the
+	// layer covers the rail, so Esc (or its key, or its own ×) is the way
+	// back: the rail is a door only while the layer is closed.
+	click(t, g, g.rail.Button("Starmap"))
+	if !g.host.IsOpen(idMap) {
+		t.Fatal("rail click did not open the starmap")
+	}
+	g.onEscape()
+	g.syncMounts()
+	if g.host.IsOpen(idMap) {
+		t.Error("Esc did not close the starmap opened from the rail")
+	}
 }
 
 // TestRailGrayedClicksDoNothing: an entry unavailable in this context is

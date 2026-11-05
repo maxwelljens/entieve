@@ -1096,8 +1096,8 @@ func (g *Game) onEscape() {
 		g.host.SetOpen(idProficiency, false)
 		return
 	}
-	// The starmap is the second full-viewport layer: Esc closes it after
-	// the tree and before any modal row behind it.
+	// The starmap is the over-chrome layer: Esc closes it after the tree
+	// and before any modal row behind it.
 	if g.host != nil && g.host.IsOpen(idMap) {
 		g.host.SetOpen(idMap, false)
 		return

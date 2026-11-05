@@ -116,6 +116,13 @@ type Kit struct {
 	// it carries no window chrome of its own.
 	backdrop *widget.Window
 
+	// front is the one full-viewport layer ABOVE every window and the top
+	// chrome (AddFrontWindow, the starmap): Kit.Draw parks it for the
+	// window and chrome passes and composites it after both, so only the
+	// context menu paints over it; Own answers its rect before the modal
+	// walk, and it carries no window chrome of its own.
+	front *widget.Window
+
 	// rows is each mounted window's registered row surface (SetWindowRows):
 	// the hit test consults it after the window's widget walk fails, because
 	// a table's rows sit in a scroll viewport the walk cannot descend into.
@@ -361,7 +368,8 @@ func (k *Kit) Update() error {
 // recompute → the fade composite (above the settled windows, below the
 // rail: it paints windows, so windows are its place in the order) → the
 // top chrome re-shown and painted over every window (its input layer
-// lifts with it in drawTops) → the context menu, always the last pixels.
+// lifts with it in drawTops) → the front layer, painted over the chrome
+// too (the starmap) → the context menu, always the last pixels.
 func (k *Kit) Draw(screen *ebiten.Image) {
 	k.parkAnims()
 	// The backdrop paints first and is parked for ui.Draw: ebitenui would
@@ -370,6 +378,13 @@ func (k *Kit) Draw(screen *ebiten.Image) {
 	if b := k.backdrop; b != nil {
 		b.Render(screen)
 		b.GetContainer().GetWidget().SetVisibility(widget.Visibility_Hide_Blocking)
+	}
+	// The front layer is parked too, but the other way: it paints after
+	// the window and top-chrome passes, so ui.Draw must not paint it at
+	// all (a hidden container skips Render, which is also why it is shown
+	// again before its own pass below).
+	if f := k.front; f != nil {
+		f.GetContainer().GetWidget().SetVisibility(widget.Visibility_Hide_Blocking)
 	}
 	for _, t := range k.tops {
 		t.SetWindowPass(false) // parked: ui.Draw must not paint it
@@ -391,6 +406,14 @@ func (k *Kit) Draw(screen *ebiten.Image) {
 	k.ov.drawTints(screen, k)
 	k.drawAnims(screen)
 	k.drawTops(screen)
+	// The front layer paints after the chrome: it is the one surface that
+	// covers the rail (the starmap). Shown again before its own pass (a
+	// hidden container renders nothing) and left shown for the next
+	// frame's hit test.
+	if f := k.front; f != nil {
+		f.GetContainer().GetWidget().SetVisibility(widget.Visibility_Show)
+		f.Render(screen)
+	}
 	// The context menu paints last: it is always the topmost pixels,
 	// above every window and tooltip.
 	k.svc.menu.Draw(screen)
@@ -472,8 +495,10 @@ func (k *Kit) modalUp() bool { return k.modalWindow() != nil }
 // park, paints over every window (its tooltips with it), and its input
 // layer is re-added on TOP of the window layers — ui.Draw rebuilt the
 // layer stack moments ago, so setup here lands last, matching paint
-// priority with input priority. Skipped while a modal window is up: the
-// modal's fullscreen layer keeps gating the chrome exactly as before.
+// priority with input priority. The lift is skipped while a modal window
+// is up (the modal's fullscreen layer keeps gating the chrome exactly as
+// before) and while the front layer is up (the chrome paints under it, so
+// it must not take the layer that would let a rail click through).
 func (k *Kit) drawTops(screen *ebiten.Image) {
 	if k.topsHidden {
 		for _, t := range k.tops {
@@ -486,11 +511,11 @@ func (k *Kit) drawTops(screen *ebiten.Image) {
 	// place, not back on ui's queue (which has already drained).
 	var next input.DeferredSetupInputLayerFunc
 	next = func(s input.SetupInputLayerFunc) { s(next) }
-	modal := k.modalUp()
+	covered := k.modalUp() || k.front != nil
 	for _, t := range k.tops {
 		t.SetWindowPass(true)
 		t.Draw(screen)
-		if modal {
+		if covered {
 			continue
 		}
 		c, w := t.Container(), t.Container().GetWidget()
@@ -633,18 +658,36 @@ func (k *Kit) AddTopContainer(t TopChrome, layoutData any) {
 // presses while bare layer space never reaches the world. One layer at a
 // time; the returned func unmounts it.
 func (k *Kit) AddBackdropWindow(w *widget.Window) widget.RemoveWindowFunc {
+	return k.addLayer(&k.backdrop, w)
+}
+
+// AddFrontWindow mounts a full-viewport layer ABOVE every window and the
+// top chrome: Kit.Draw parks it for the window and chrome passes and
+// composites it after both, so only the context menu paints over it.
+// Own answers its whole rect before the modal walk and the chrome, so no
+// window or rail press reaches what it covers, and its space is inert
+// (no control) exactly like the backdrop's. One layer at a time; the
+// returned func unmounts it.
+func (k *Kit) AddFrontWindow(w *widget.Window) widget.RemoveWindowFunc {
+	return k.addLayer(&k.front, w)
+}
+
+// addLayer is the two layer slots' one mount: register, mount with no fade
+// (a layer is not an open window), strip the window chrome it may have
+// inherited, and clear the slot on unmount.
+func (k *Kit) addLayer(slot **widget.Window, w *widget.Window) widget.RemoveWindowFunc {
 	if w == nil {
 		return func() {}
 	}
-	k.backdrop = w
-	remove := k.addWindow(w, false) // no fade: a layer is not an open window
+	*slot = w
+	remove := k.addWindow(w, false)
 	if ch, ok := k.chromes[w]; ok {
 		ch.cancel()
 		delete(k.chromes, w)
 	}
 	return func() {
-		if k.backdrop == w {
-			k.backdrop = nil
+		if *slot == w {
+			*slot = nil
 		}
 		remove()
 	}

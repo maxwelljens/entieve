@@ -16,11 +16,15 @@ import (
 func TestMapViewFitsTheViewport(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	vp := image.Rect(0, 0, 1024, 700)
-	m := NewMapView(env, func() image.Rectangle { return vp })
+	m := NewMapView(env, func() image.Rectangle { return vp }, nil)
 	m.Sync()
 
-	if !m.Backdrop() {
-		t.Error("the starmap does not answer Backdrop(): the host would mount it as an ordinary window")
+	// The two layers differ by data, not by panel: the map is the
+	// over-chrome layer (the Screen row's OverChrome mounts it through
+	// AddFrontWindow), so it must NOT answer Backdrop() and fall into the
+	// under-the-rail path the proficiency tree keeps.
+	if b, ok := any(m).(interface{ Backdrop() bool }); ok && b.Backdrop() {
+		t.Error("the starmap still answers Backdrop(): the host would mount it under the rail")
 	}
 	if m.win.TitleBar != nil {
 		t.Error("the layer grew a title bar")
@@ -171,7 +175,7 @@ func TestOverviewBodiesRealContent(t *testing.T) {
 // canonical id order.
 func TestMapViewSearchNarrowsTheList(t *testing.T) {
 	env, _ := newChromeEnv(t)
-	m := NewMapView(env, nil)
+	m := NewMapView(env, nil, nil)
 	m.Sync()
 	all := m.listedNodes()
 	if len(all) != len(env.Content.Systems) {
@@ -211,7 +215,7 @@ func TestMapViewHasNoInstructionText(t *testing.T) {
 	}
 
 	env, _ := newChromeEnv(t)
-	m := NewMapView(env, nil)
+	m := NewMapView(env, nil, nil)
 	m.Sync()
 
 	var texts []string
@@ -309,7 +313,7 @@ func TestMapViewBrowserAndGateClicks(t *testing.T) {
 // query first and only then blurs (so the next Esc reaches the ladder).
 func TestMapViewSearchKeysWalkTheList(t *testing.T) {
 	env, _ := newChromeEnv(t)
-	m := NewMapView(env, nil)
+	m := NewMapView(env, nil, nil)
 	m.Sync()
 	m.search.Focus(true)
 	if !m.SearchFocused() {

@@ -307,8 +307,8 @@ func TestSceneDrawSmoke(t *testing.T) {
 		pump(t, g, size[0], size[1])
 		g.Draw(img)
 
-		// Starmap: an ordinary window, so it stacks over the help
-		// overlay without a modal layer of its own.
+		// Starmap: the over-chrome layer, so it covers the help overlay
+		// (and the rail) without a modal layer of its own.
 		g.host.SetOpen(idMap, true)
 		g.syncMounts()
 		pump(t, g, size[0], size[1])

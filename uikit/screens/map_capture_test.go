@@ -25,7 +25,7 @@ const mapCaptureFrames = 3
 // The PNG lands in $ENTIEVE_CAPTURE_DIR (default /tmp/opencode).
 func TestMapCaptureFrame(t *testing.T) {
 	env := newWarEnv(t)
-	m := NewMapView(env, nil)
+	m := NewMapView(env, nil, nil)
 	m.sel = "sys-penumbra" // Kvonice: a charter-held front
 	c := newChromeUI(env)
 	c.AddWindow(m)
