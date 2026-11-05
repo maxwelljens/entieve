@@ -4,7 +4,7 @@ go 1.27.1
 
 require (
 	github.com/ebitenui/ebitenui v0.7.3
-	github.com/hajimehoshi/ebiten/v2 v2.10.4
+	github.com/hajimehoshi/ebiten/v2 v2.10.5
 	github.com/sahilm/fuzzy v0.1.3
 	golang.org/x/image v0.46.0
 )
