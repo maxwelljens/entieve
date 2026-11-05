@@ -134,21 +134,22 @@ type MapView struct {
 	// one the market's panes use), drawn over the canvas.
 	search *widget.TextInput
 
-	rect     image.Rectangle // the canvas (and window) the layer covers
-	graph    image.Rectangle // the graph column inside rect
-	layout   mapZones
-	drawn    bool
-	dirty    bool // selection/hover/search changed since the last paint
-	nodes    []mapNode
-	pts      []mapPoint
-	labels   []image.Rectangle // label bands, parallel to pts
-	redraws  int               // graph repaint count (TestMapViewRedraws watches it)
-	system   content.SystemID
-	hover    content.SystemID // pointer's node or row ("" = none)
-	sel      content.SystemID // inspected node ("" = none)
-	dest     content.SystemID // planned destination ("" = none)
-	war      widgets.WarView
-	warShown widgets.WarView
+	rect      image.Rectangle // the canvas (and window) the layer covers
+	graph     image.Rectangle // the graph column inside rect
+	layout    mapZones
+	drawn     bool
+	dirty     bool // selection/hover/search changed since the last paint
+	nodes     []mapNode
+	pts       []mapPoint
+	labels    []image.Rectangle // label bands, parallel to pts
+	redraws   int               // graph repaint count (TestMapViewRedraws watches it)
+	system    content.SystemID
+	hover     content.SystemID       // pointer's node or row ("" = none)
+	sel       content.SystemID       // inspected node ("" = none)
+	dest      content.SystemID       // planned destination ("" = none)
+	writeDest func(content.SystemID) // the session's destination home (nil = nowhere)
+	war       widgets.WarView
+	warShown  widgets.WarView
 
 	shownQuery string   // the search text the last paint read
 	rows       []mapHit // browser rows, for the poll
@@ -218,6 +219,11 @@ func MapViewRect() image.Rectangle { return ProficiencyRect() }
 // row's OverChrome facet, not the panel: the map is the over-chrome layer,
 // the proficiency tree the backdrop one).
 func (m *MapView) Win() *widget.Window { return m.win }
+
+// SetDestination installs the session's destination home: every pick lands
+// there, so the HUD readout and the Overview's gate tint follow the map
+// while it is closed. Session-only, never saved.
+func (m *MapView) SetDestination(fn func(content.SystemID)) { m.writeDest = fn }
 
 // Unmounted clears the search and its focus: the field must not keep the
 // keyboard while the layer is gone, and a reopened map starts unfiltered.
@@ -427,6 +433,9 @@ func (m *MapView) pickSystem(id, cur content.SystemID) {
 	default:
 		m.dest = id
 	}
+	if m.writeDest != nil {
+		m.writeDest(m.dest)
+	}
 	m.dirty = true
 }
 
@@ -478,49 +487,10 @@ func (m *MapView) nodeAt(pt image.Point) (content.SystemID, bool) {
 	return m.nodes[hit].id, true
 }
 
-// route is the shortest gate path from cur to dest, both ends included
-// (nil when either is unknown, they are equal, or no gate chain connects
-// them). Gates are authored both ways; the reverse edge is added so a
-// one-way slip can never hide a route the player can actually fly.
+// route is the shared shortest gate path (destination.go), kept as a method
+// for the map's own call sites and the tests that read it.
 func (m *MapView) route(cur, dest content.SystemID) []content.SystemID {
-	if cur == "" || dest == "" || cur == dest {
-		return nil
-	}
-	adj := make(map[content.SystemID][]content.SystemID, len(m.nodes))
-	for _, n := range m.nodes {
-		def, ok := m.cv.Defs().System(n.id)
-		if !ok {
-			continue
-		}
-		for i := range def.Celestials {
-			if g := def.Celestials[i].Gate; g != nil {
-				adj[n.id] = append(adj[n.id], g.ToSystem)
-				adj[g.ToSystem] = append(adj[g.ToSystem], n.id)
-			}
-		}
-	}
-	prev := make(map[content.SystemID]content.SystemID, len(m.nodes))
-	seen := map[content.SystemID]bool{cur: true}
-	queue := []content.SystemID{cur}
-	for len(queue) > 0 {
-		a := queue[0]
-		queue = queue[1:]
-		if a == dest {
-			path := []content.SystemID{dest}
-			for path[0] != cur {
-				path = append([]content.SystemID{prev[path[0]]}, path...)
-			}
-			return path
-		}
-		for _, b := range adj[a] {
-			if !seen[b] {
-				seen[b] = true
-				prev[b] = a
-				queue = append(queue, b)
-			}
-		}
-	}
-	return nil
+	return routePath(m.cv, cur, dest)
 }
 
 // ---------------------------------------------------------------------------

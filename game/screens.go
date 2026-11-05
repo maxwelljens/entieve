@@ -351,7 +351,11 @@ var screens = []Screen{
 		DockPolicy:  DockFloating,
 		Group:       "World",
 		Build: func(h *ScreenHost) widgets.WindowPanel {
-			return uikit.NewMapView(h.services.Env, h.services.Viewport, func() { h.Toggle(idMap) })
+			m := uikit.NewMapView(h.services.Env, h.services.Viewport, func() { h.Toggle(idMap) })
+			// A picked destination lands in the session, where the HUD
+			// readout and the Overview's gate tint read it.
+			m.SetDestination(h.services.Env.SetDestination)
+			return m
 		},
 	},
 	{

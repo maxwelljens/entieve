@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/theme"
@@ -370,6 +371,18 @@ func (k *Kit) overviewSpec(info sim.Info) widgets.RowSpec {
 // then lets the table sort and diff the widgets. The default filter state
 // keeps every row and tint exactly as it was before the filter existed.
 func (o *overview) sync(k *Kit) {
+	// The route's next gate in the current system: the one row the
+	// destination marks. Computed here, once, from the session's plan.
+	nextGate := content.CelID("")
+	cur := content.SystemID("")
+	if sys := k.cv.System(); sys != nil {
+		cur = sys.ID
+	}
+	if dest := k.sess.Destination(); dest != "" && dest != cur {
+		if path := routePath(k.cv, cur, dest); len(path) > 1 {
+			nextGate, _ = gateTo(k.cv, cur, path[1])
+		}
+	}
 	order := make([]widgets.TableRow, 0, 32)
 	for _, info := range k.cv.Grid() {
 		if !info.Visible {
@@ -389,6 +402,13 @@ func (o *overview) sync(k *Kit) {
 			case info.Hostile:
 				tint = widgets.WithA(k.th.Pal().Danger, 60)
 				iconTint = k.th.Pal().Danger // hostiles wear ColDanger
+			case nextGate != "" && info.Cel == nextGate:
+				// The route's next gate wears the plan's own hue: the
+				// mobility teal, never Accent (Accent is selection, and
+				// a selected row must not read as the way out). Both
+				// channels, under the kind's Colour switch.
+				tint = widgets.WithA(k.th.Pal().StatMobility, 60)
+				iconTint = k.th.Pal().StatMobility
 			}
 		}
 		row := o.rowFor(info)

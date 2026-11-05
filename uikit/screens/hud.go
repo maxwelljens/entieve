@@ -8,6 +8,7 @@ import (
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/entieve/entieve/content"
+	"github.com/entieve/entieve/core"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
 	"github.com/entieve/entieve/uikit/icons"
@@ -64,6 +65,16 @@ const (
 	hudFeedLineH  = 19  // one line (fits StepTiny, like the effect box's name)
 	hudFeedFrames = 300 // frames a line stays up: ~5 s of watching, whatever the time scale
 	hudFeedGap    = 4   // gap between the strip's top edge and the feed (px)
+
+	// The destination readout, the top chrome row above the target cards:
+	// one panel wide enough for a gate name, the final system and the
+	// distance, collapsing to nothing while no destination is set.
+	hudDestW      = 420
+	hudDestH      = 26
+	hudDestPad    = 6  // inside the readout panel (px)
+	hudDestArrow  = 18 // the heading arrow box (px)
+	hudDestGap    = 4  // arrow → name, name → final system, panel → distance (px)
+	hudDestSector = 32 // arrow directions: the raw heading is quantised to a repaint step
 )
 
 // The velocity wedge shares the health block's band: it is exactly as tall
@@ -221,15 +232,28 @@ type Hud struct {
 	cv widgets.ContentView
 
 	container *widget.Container
+	topCol    *widget.Container // destination readout over the target row
 	targetRow *widget.Container
-	cards     *hudChrome        // targetRow as TOP chrome (Cards)
-	feed      *hudFeed          // the combat feed as TOP chrome (Feed)
-	pair      *widget.Container // bottom-center: status column + rack slot
-	strip     *widget.Container
-	effects   *widget.Container // EWAR icons above the status (hidden when none)
-	eff       [2]*hudEffect     // stasis web, warp scram
-	status    *widget.Container
-	boxes     [hudBoxPool]*hudBox
+	destRow   *widget.Container // the readout row (hidden with no destination)
+	destGfx   *widget.Graphic
+	destImg   *ebiten.Image
+	cards     *hudChrome // topCol as TOP chrome (Cards)
+	feed      *hudFeed   // the combat feed as TOP chrome (Feed)
+
+	// destFn is the planned system read (the Starmap's session-only
+	// destination); destRead is the staged readout, destDrawn the last
+	// painted one and destDraws its repaint count.
+	destFn      func() content.SystemID
+	destRead    hudDestState
+	destDrawn   hudDestState
+	destPainted bool
+	destDraws   int
+	pair        *widget.Container // bottom-center: status column + rack slot
+	strip       *widget.Container
+	effects     *widget.Container // EWAR icons above the status (hidden when none)
+	eff         [2]*hudEffect     // stasis web, warp scram
+	status      *widget.Container
+	boxes       [hudBoxPool]*hudBox
 
 	// selectFn is where a target-card click reports the card's entity: the
 	// game wires Kit.Select, the same door a world click uses. pick reads
@@ -266,6 +290,19 @@ type Hud struct {
 	measure     func(string) float64
 	measureTiny func(string) float64
 	timeScale   int
+}
+
+// hudDestState is the destination readout's staged content: the next gate
+// (or in-system body), the final system when it is further away, the
+// distance and the arrow's bearing against the ship's heading. It is
+// deliberately comparable so Sync repaints only when a value moved.
+type hudDestState struct {
+	show  bool
+	arrow bool
+	angle float64 // radians clockwise from the heading (0 = straight ahead)
+	name  string  // gate or in-system body name
+	dest  string  // final system name ("" when the destination is here)
+	dist  string
 }
 
 // hudFeed is the combat feed: brief lines scrolling up above the ship status,
@@ -590,17 +627,16 @@ func NewHud(env interface {
 	h.pair.AddChild(left)
 
 	// Target boxes: a top-center row, hidden while nothing is locked. It
-	// mounts as its own TOP chrome column (h.cards, see Cards) because the
-	// doubled Overview now covers the band at its default placement.
+	// shares the TOP chrome column with the destination readout, which
+	// sits above it (h.cards, see Cards), because the doubled Overview
+	// covers the band at its default placement.
 	h.targetRow = widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
 			widget.RowLayoutOpts.Spacing(theme.Px(hudBoxGap)),
 		)),
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionCenter,
-			VerticalPosition:   widget.AnchorLayoutPositionStart,
-			Padding:            &widget.Insets{Top: theme.Px(10)},
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+			Position: widget.RowLayoutPositionCenter,
 		})),
 	)
 	for i := range h.boxes {
@@ -610,7 +646,23 @@ func NewHud(env interface {
 		h.boxes[i].root.GetWidget().SetVisibility(widget.Visibility_Hide)
 		h.targetRow.AddChild(h.boxes[i].root)
 	}
-	h.cards = &hudChrome{col: h.targetRow}
+	h.destRow = h.newDest()
+	h.topCol = widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Spacing(theme.Px(hudDestGap)),
+		)),
+		// The game overwrites this with the same anchor when it mounts the
+		// column as TOP chrome; the default keeps a bare root mount (the
+		// tests) top-centred too.
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionCenter,
+			VerticalPosition:   widget.AnchorLayoutPositionStart,
+			Padding:            &widget.Insets{Top: theme.Px(10)},
+		})),
+	)
+	h.topCol.AddChild(h.destRow, h.targetRow)
+	h.cards = &hudChrome{col: h.topCol}
 	h.feed = h.newFeed()
 
 	h.container = widget.NewContainer(
@@ -649,8 +701,9 @@ func (c *hudChrome) SetWindowPass(on bool) {
 // Draw paints the column — Kit.Draw's top pass, after every window.
 func (c *hudChrome) Draw(screen *ebiten.Image) { c.col.Render(screen) }
 
-// Cards returns the target-card row's TOP chrome column for
-// Kit.AddTopContainer (the game mounts it with the row's own anchor data).
+// Cards returns the HUD's top column for Kit.AddTopContainer: the
+// destination readout over the target-card row (the game mounts it with
+// the column's own anchor data).
 func (h *Hud) Cards() TopChrome { return h.cards }
 
 // Feed returns the combat feed's TOP chrome column for Kit.AddTopContainer.
@@ -695,6 +748,38 @@ func (h *Hud) newFeed() *hudFeed {
 	f.col.AddChild(f.rows)
 	return f
 }
+
+// newDest builds the destination readout row: one self-drawn panel (arrow,
+// next gate, final system, distance), hidden until a destination is set.
+func (h *Hud) newDest() *widget.Container {
+	h.destImg = ebiten.NewImage(theme.Px(hudDestW), theme.Px(hudDestH))
+	h.destGfx = widget.NewGraphic(
+		widget.GraphicOpts.Image(h.destImg),
+		widget.GraphicOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(theme.Px(hudDestW), theme.Px(hudDestH)),
+			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionCenter,
+				VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			}),
+		),
+	)
+	row := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+		widget.ContainerOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(theme.Px(hudDestW), theme.Px(hudDestH)),
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+				Position: widget.RowLayoutPositionCenter,
+			}),
+		),
+	)
+	row.AddChild(h.destGfx)
+	theme.ShowWidget(row.GetWidget(), false)
+	return row
+}
+
+// SetDestination installs the planned system read: the Starmap's
+// session-only destination. A nil read hides the readout.
+func (h *Hud) SetDestination(fn func() content.SystemID) { h.destFn = fn }
 
 // Push forwards a frame's sim events into the combat feed: only the
 // player-relevant exchange becomes a line (the log keeps every line it
@@ -831,6 +916,184 @@ func (h *Hud) syncFeed() {
 			w.SetLocation(rect)
 			h.feed.col.RequestRelayout()
 		}
+	}
+}
+
+// syncDest stages the destination readout: the next gate of the route (the
+// gate's own name and live distance) and, when the destination is further,
+// its system name; with the destination in the current system the arrow
+// points at the system's star. The arrow's bearing is the target direction
+// against the ship's heading (its velocity, screen-up when parked).
+func (h *Hud) syncDest(player ecs.Entity) {
+	st := hudDestState{}
+	if h.destFn != nil {
+		if dest := h.destFn(); dest != "" {
+			cur := content.SystemID("")
+			if sys := h.cv.System(); sys != nil {
+				cur = sys.ID
+			}
+			// The final system alone is still a readout when the route
+			// cannot name a gate (an empty graph, an unknown id).
+			st = hudDestState{name: h.systemName(dest)}
+			switch {
+			case dest == cur:
+				if info, ok := h.celInfo(sim.KindStar, ""); ok {
+					st = h.stageDest(info, "", player)
+				}
+			case cur != "":
+				if path := routePath(h.cv, cur, dest); len(path) > 1 {
+					if cel, ok := gateTo(h.cv, cur, path[1]); ok {
+						if info, ok := h.celInfo("", cel); ok {
+							st = h.stageDest(info, h.systemName(dest), player)
+						}
+					}
+				}
+			}
+			st.show = true
+		}
+	}
+	h.setDest(st)
+}
+
+// stageDest builds one readout state from a target on the grid. kind picks
+// the first body of that kind (the in-system star); cel picks one celestial
+// (the next gate).
+func (h *Hud) stageDest(target sim.Info, final string, player ecs.Entity) hudDestState {
+	st := hudDestState{
+		show: true, name: target.Name, dest: final,
+		dist: theme.FormatDistance(target.Distance),
+	}
+	me, ok := h.cv.Info(player)
+	if !ok {
+		return st
+	}
+	d := target.Pos.Sub(me.Pos)
+	if d.Len() < 1e-9 {
+		return st
+	}
+	st.arrow = true
+	head := me.Vel
+	if head.Len() < 1e-9 {
+		// A parked hull has no heading in the read seam; screen-up is the
+		// frame the arrow then turns in.
+		head = core.V(0, -1)
+	}
+	st.angle = math.Atan2(head.X*d.Y-head.Y*d.X, head.X*d.X+head.Y*d.Y)
+	step := 2 * math.Pi / hudDestSector
+	st.angle = math.Round(st.angle/step) * step
+	return st
+}
+
+// celInfo is the first grid body of a kind ("" = any) or at a celestial
+// ("" = any). Gates and stars are landmarks, so both are in the grid.
+func (h *Hud) celInfo(kind string, cel content.CelID) (sim.Info, bool) {
+	for _, info := range h.cv.Grid() {
+		if kind != "" && info.Kind != kind {
+			continue
+		}
+		if cel != "" && info.Cel != cel {
+			continue
+		}
+		if kind != "" || cel != "" {
+			return info, true
+		}
+	}
+	return sim.Info{}, false
+}
+
+// systemName is a system's display name ("" when the id is unknown).
+func (h *Hud) systemName(id content.SystemID) string {
+	if def, ok := h.cv.Defs().System(id); ok {
+		return def.Name
+	}
+	return ""
+}
+
+// setDest shows or hides the readout and repaints it only when its content
+// (quantised bearing included) changed.
+func (h *Hud) setDest(st hudDestState) {
+	h.destRead = st
+	if h.destRow == nil {
+		return
+	}
+	theme.ShowWidget(h.destRow.GetWidget(), st.show)
+	if !st.show || (h.destPainted && h.destDrawn == st) {
+		return
+	}
+	h.destPainted, h.destDrawn = true, st
+	h.destDraws++
+	h.paintDest(st)
+}
+
+// paintDest paints the readout panel: the heading arrow, the next gate's
+// name, the final system and the live distance, all in the house palette.
+func (h *Hud) paintDest(st hudDestState) {
+	if h.destImg == nil {
+		return
+	}
+	p := h.th.Pal()
+	box := h.destImg.Bounds()
+	h.destImg.Clear()
+	theme.DrawRoundBox(h.destImg, box, theme.Solid(p.BG), theme.NRGBA(p.Border, 160), 1,
+		theme.AllRadii(theme.RadiusPanel))
+
+	pad := theme.Px(hudDestPad)
+	arrowW := theme.Px(hudDestArrow)
+	x := pad
+	if st.arrow {
+		arrow := image.Rect(pad, (box.Dy()-arrowW)/2, pad+arrowW, (box.Dy()+arrowW)/2)
+		h.drawDestArrow(arrow, st.angle)
+		x = arrow.Max.X + theme.Px(hudDestGap)
+	}
+	face := h.th.Face(theme.StepSmall)
+	_, lineH := text.Measure("Ag", *face, 0)
+	y := (box.Dy() - int(math.Ceil(lineH))) / 2
+
+	distW := int(math.Ceil(h.measureTiny(st.dist)))
+	distX := box.Max.X - pad - distW
+	final, finalW := "", 0.0
+	if st.dest != "" {
+		final = "· " + st.dest
+		finalW = h.measureTiny(final)
+	}
+	room := float64(distX-theme.Px(hudDestGap)-x) - finalW
+	if room < 0 {
+		room = 0
+	}
+	name := widgets.Ellipsize(st.name, room, h.measure)
+	theme.DrawCardText(h.destImg, name, face, x, y, theme.Solid(p.Text))
+	_, tinyH := text.Measure("Ag", *h.th.Face(theme.StepTiny), 0)
+	ty := (box.Dy() - int(math.Ceil(tinyH))) / 2
+	if final != "" {
+		theme.DrawCardText(h.destImg, final,
+			h.th.Face(theme.StepTiny), x+int(math.Ceil(h.measure(name)))+theme.Px(hudDestGap), ty,
+			theme.Solid(p.Dim))
+	}
+	if st.dist != "" {
+		theme.DrawCardText(h.destImg, st.dist, h.th.Face(theme.StepTiny), distX, ty, theme.Solid(p.Dim))
+	}
+}
+
+// drawDestArrow strokes one heading arrow in box, rel radians clockwise from
+// straight up: a shaft and two head strokes, the palette's accent.
+func (h *Hud) drawDestArrow(box image.Rectangle, rel float64) {
+	s := float32(theme.Scale())
+	// The plan's own hue (the overview's next-gate tint wears the same
+	// one): never Accent, which is selection.
+	col := theme.Solid(h.th.Pal().StatMobility)
+	cx := float64(box.Min.X) + float64(box.Dx())/2
+	cy := float64(box.Min.Y) + float64(box.Dy())/2
+	ux, uy := math.Sin(rel), -math.Cos(rel)
+	r := float64(box.Dx())/2 - 3*float64(s)
+	tx, ty := cx+ux*r, cy+uy*r
+	vector.StrokeLine(h.destImg,
+		float32(cx-ux*r), float32(cy-uy*r), float32(tx), float32(ty),
+		2*s, col, true)
+	back := math.Atan2(uy, ux)
+	for _, side := range []float64{-0.5, 0.5} {
+		hx, hy := tx-math.Cos(back+side)*r*0.55, ty-math.Sin(back+side)*r*0.55
+		vector.StrokeLine(h.destImg, float32(tx), float32(ty), float32(hx), float32(hy),
+			2*s, col, true)
 	}
 }
 
@@ -1347,6 +1610,10 @@ func (h *Hud) Sync() {
 	// 6 — the combat feed: spent lines drop and the column re-seats above the
 	// ship status (Sync refreshes it; Push stages the lines from events).
 	h.syncFeed()
+
+	// 7 is the destination readout at the top of the screen (hidden while
+	// no destination is set, so its band collapses).
+	h.syncDest(player)
 }
 
 // blinkBox handles a card slot with no lock this frame. A card whose target

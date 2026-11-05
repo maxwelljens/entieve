@@ -756,6 +756,8 @@ func (g *Game) buildKit() error {
 	env := g.env
 
 	g.hud = uikit.NewHud(env)
+	// The top readout follows the Starmap's session-only destination.
+	g.hud.SetDestination(env.Destination)
 	g.rack = uikit.NewRack(env)
 	// A target-card click selects the card's entity exactly as a world
 	// click does (same door, so the Selected Item panel follows).

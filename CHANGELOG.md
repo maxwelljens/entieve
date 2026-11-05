@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Destination readout and the route's gate in the overview**: setting a
+  destination on the starmap now puts a live heading at the top of the
+  screen, above the target cards. It shows the route's next gate (or the
+  system's star when the destination is the current system) with an arrow
+  turned against the ship's own heading, the distance, and the final system's
+  name when the destination is further away. The row hides when the
+  destination clears. The overview also tints the next hop's gate row and
+  kind glyph in the route's teal (never Accent: Accent is the selection
+  colour), under the kind's Colour switch; the whole
+  plan stays session-only, never saved and never a sim command.
 - **EVE's targeting-time curve, with live signature and scan resolution**:
   lock time is now `t = 40000 / (scan resolution × arcsinh² signature radius)`
   seconds, so a frigate locks a battleship in about a second and a half while

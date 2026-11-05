@@ -28,6 +28,10 @@ type services struct {
 	// contact is the Details dialog of a contact offer: one instance,
 	// re-targeted on every open (CONTEXT.md "Dialog").
 	contact *ContactWin
+	// dest is the planned system ("" = none) the Starmap writes and the
+	// HUD and Overview read. Session-only: never saved, never a sim
+	// command (CONTEXT.md "Destination readout").
+	dest content.SystemID
 	// show/close are the Kit-hosted Show Info lifecycle (mount + raise /
 	// unmount). A bare NewEnv leaves them nil and Show falls back to the
 	// window's own show/hide — a test harness mounts it by hand.
@@ -83,6 +87,14 @@ type Session interface {
 	// click position in screen space). It replaces any menu already up.
 	// Exactly what Do(OpenMenu{…}) executes.
 	OpenMenu(entries []widgets.MenuEntry, at image.Point)
+
+	// Destination is the planned system ("" = none): the Starmap sets it,
+	// the HUD's readout and the Overview's next-gate tint read it. It is
+	// session-only, never saved and never a sim command.
+	Destination() content.SystemID
+
+	// SetDestination records that plan. Only the Starmap calls it.
+	SetDestination(content.SystemID)
 }
 
 // session is the Session implementation NewEnv and Kit.Env return: the
@@ -161,6 +173,19 @@ func (s *session) ShowInfo(ref widgets.InfoRef) {
 func (s *session) OpenMenu(entries []widgets.MenuEntry, at image.Point) {
 	if m := s.Menu(); m != nil {
 		m.Open(entries, at)
+	}
+}
+
+func (s *session) Destination() content.SystemID {
+	if s.svc == nil {
+		return ""
+	}
+	return s.svc.dest
+}
+
+func (s *session) SetDestination(id content.SystemID) {
+	if s.svc != nil {
+		s.svc.dest = id
 	}
 }
 
