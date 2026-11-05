@@ -739,10 +739,15 @@ func (h *Hud) feedLine(ev sim.Event, player ecs.Entity) (hudFeedLine, bool) {
 					return hudFeedLine{pre: "You hit " + tgt.Name + " for ", key: amt}, true
 				}
 			}
-		case sim.CombatWeb, sim.CombatScram:
+		case sim.CombatWeb, sim.CombatScram, sim.CombatPaint, sim.CombatDamp:
 			verb, hit := "web", "Webbed"
-			if ev.Phase == sim.CombatScram {
+			switch ev.Phase {
+			case sim.CombatScram:
 				verb, hit = "scramble", "Scrambled"
+			case sim.CombatPaint:
+				verb, hit = "painted", "Painted"
+			case sim.CombatDamp:
+				verb, hit = "dampened", "Dampened"
 			}
 			if ev.Target == player {
 				return hudFeedLine{key: hit, post: " by " + ev.Name, loss: true}, true

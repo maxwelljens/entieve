@@ -108,8 +108,11 @@ var moduleDemandTable = []struct {
 	{"mod-cap-booster", "", "", ClassI, ""},
 	{"mod-cap-recharger", "", "", ClassI, ""},
 	{"mod-afterburner", "", "", ClassII, ""},
+	{"mod-microwarpdrive", "", "", ClassII, ClassII},
 	{"mod-stasis-web", "", "", ClassI, ClassII},
 	{"mod-warp-scram", "", "", ClassI, ClassII},
+	{"mod-target-painter", "", "", ClassI, ClassII},
+	{"mod-sensor-damp", "", "", ClassI, ClassII},
 }
 
 // TestShippedModuleDemandTable pins every module's mount kind/size and its

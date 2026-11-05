@@ -802,7 +802,8 @@ func TestTrafficPatrolResponseSavesConvoy(t *testing.T) {
 	}
 
 	// The patrol warps in, locks and opens fire on the raiders — the fight
-	// pulls the ambush apart and the hauler warps clear and delivers.
+	// pulls the ambush apart, either the hauler warps clear or the wing
+	// finishes the raiders first, and the convoy goes on to deliver.
 	patrolEngaged := false
 	if !runUntil(t, s, &evs, 6000, func() bool {
 		s.Patrols.Each(func(pe ecs.Entity, _ *Patrol) {
@@ -814,10 +815,11 @@ func TestTrafficPatrolResponseSavesConvoy(t *testing.T) {
 				}
 			}
 		})
-		return firstPhase(evs, EvTraffic, TrafficEscaped) != nil &&
-			firstPhase(evs, EvTraffic, TrafficDelivered) != nil
+		settled := firstPhase(evs, EvTraffic, TrafficEscaped) != nil ||
+			firstPhase(evs, EvTraffic, TrafficSaved) != nil
+		return settled && firstPhase(evs, EvTraffic, TrafficDelivered) != nil
 	}) {
-		t.Fatalf("convoy never escaped and delivered: %v", trafficTexts(evs))
+		t.Fatalf("convoy never escaped or was saved, and delivered: %v", trafficTexts(evs))
 	}
 	if !patrolEngaged {
 		t.Fatal("patrol never engaged the raiders")

@@ -61,8 +61,25 @@ type Motion struct {
 	Agility         float64 // align factor; align time = agility * 10 s
 	SigRadius       float64 // m
 	SpeedMultiplier float64 // 1 = none; set by afterburner cycles
+	SigMultiplier   float64 // 1 = none; set by an active microwarpdrive
 	WebFactor       float64 // multiplier applied while webbed (1 = none)
 	WebbedUntil     float64 // sim time the last web expires
+	PaintFactor     float64 // signature multiplier while painted (1 = none)
+	PaintedUntil    float64 // sim time the last target painter expires
+}
+
+// EffectiveSig returns the signature radius at now: the base radius times the
+// active signature bloom (microwarpdrive) and paint (target painter). A zero
+// multiplier field reads as 1, so a hand-built Motion stays unmodified.
+func (m *Motion) EffectiveSig(now float64) float64 {
+	sig := m.SigRadius
+	if m.SigMultiplier > 0 {
+		sig *= m.SigMultiplier
+	}
+	if now < m.PaintedUntil && m.PaintFactor > 0 {
+		sig *= m.PaintFactor
+	}
+	return sig
 }
 
 // EffectiveMaxSpeed returns speed with prop/web modifiers applied.
@@ -177,10 +194,22 @@ type Lock struct {
 
 // Targeting is locking state and lock capability.
 type Targeting struct {
-	Locks      []Lock
-	MaxTargets int
-	MaxRange   float64 // m
-	ScanRes    float64
+	Locks       []Lock
+	MaxTargets  int
+	MaxRange    float64 // m
+	ScanRes     float64
+	DampFactor  float64 // scan resolution multiplier while damped (1 = none)
+	DampedUntil float64 // sim time the last sensor dampener expires
+}
+
+// EffectiveScanRes returns the scan resolution at now: the base value times
+// the sensor dampener's cut while it runs. A zero factor reads as 1.
+func (t *Targeting) EffectiveScanRes(now float64) float64 {
+	scan := t.ScanRes
+	if now < t.DampedUntil && t.DampFactor > 0 {
+		scan *= t.DampFactor
+	}
+	return scan
 }
 
 // Locked reports whether e is fully locked.
@@ -724,12 +753,15 @@ const (
 	EvCombat EventKind = "combat"
 )
 
-// EvCombat phases: "damage" (Actor hit Target for Value) | "web" | "scram"
-// (Actor applied the EWAR effect to Target, on the effect's first cycle).
+// EvCombat phases: "damage" (Actor hit Target for Value) | "web" | "scram" |
+// "paint" | "damp" (Actor applied the EWAR effect to Target, on the effect's
+// first cycle).
 const (
 	CombatDamage = "damage"
 	CombatWeb    = "web"
 	CombatScram  = "scram"
+	CombatPaint  = "paint"
+	CombatDamp   = "damp"
 )
 
 // EvTraffic phases: "departed" | "jumped" | "delivered" | "attacked" |

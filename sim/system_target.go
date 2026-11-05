@@ -10,15 +10,20 @@ const defaultLockSig float64 = 100
 
 // systemTargeting advances lock progress for every ship.
 //
-// Lock time follows the EVE-classic approximation t_lock = 66 * sig / scanRes
-// seconds. Written as per-tick progress with sig in metres:
+// Lock time follows EVE's targeting-time curve:
+//
+//	t_lock = 40000 / (scanRes * asinh(sig)^2)   seconds
+//
+// with sig in metres. Written as per-tick progress at TickRate:
 //
 //	progress += DT / t_lock
-//	          = (ScanRes/1000) * (60000/sig) / 66 / 3600   (per tick)
+//	          = scanRes * asinh(sig)^2 / (40000 * 60)
 //
-// so a 40 m frigate locked by a 620 mm/s scanner takes ~4.3 s, "a few
-// seconds" as required. Locks drop automatically when the target leaves
-// MaxRange or dies; completion emits EvtTargetLocked.
+// A small signature takes longer to lock and a large one locks faster. Both
+// inputs are live: Targeting.EffectiveScanRes (sensor dampeners) and
+// Motion.EffectiveSig (microwarpdrives, target painters). Locks drop
+// automatically when the target leaves MaxRange or dies; completion emits
+// EvtTargetLocked.
 func (s *Sim) systemTargeting() {
 	for _, e := range sortedEntities(s.Targetings) {
 		t, ok := s.Targetings.Get(e)
@@ -48,10 +53,12 @@ func (s *Sim) systemTargeting() {
 			}
 			if l.Progress < 1 {
 				sig := defaultLockSig
-				if m, ok := s.Motions.Get(l.Target); ok && m.SigRadius > 0 {
-					sig = m.SigRadius
+				if m, ok := s.Motions.Get(l.Target); ok {
+					if es := m.EffectiveSig(s.time); es > 0 {
+						sig = es
+					}
 				}
-				rate := lockProgressPerTick(t.ScanRes, sig)
+				rate := lockProgressPerTick(t.EffectiveScanRes(s.time), sig)
 				l.Progress = math.Min(1, l.Progress+rate)
 				if l.Progress >= 1 {
 					s.emit(Event{Kind: EvTargetLocked, Actor: e, Target: l.Target,
@@ -73,5 +80,6 @@ func lockProgressPerTick(scanRes, sig float64) float64 {
 	if sig <= 0 {
 		sig = defaultLockSig
 	}
-	return (scanRes / 1000) * (60000 / sig) / 66 / 3600
+	a := math.Asinh(sig)
+	return scanRes * a * a / (40000 * TickRate)
 }

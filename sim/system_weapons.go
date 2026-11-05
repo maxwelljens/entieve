@@ -126,8 +126,10 @@ func (s *Sim) fireWeapon(e ecs.Entity, def *content.ModuleDef, slot SlotRef, rt 
 		targetVel = tm.Vel
 	}
 	sig := defaultLockSig
-	if tm != nil && tm.SigRadius > 0 {
-		sig = tm.SigRadius
+	if tm != nil {
+		if es := tm.EffectiveSig(s.time); es > 0 {
+			sig = es
+		}
 	}
 	dist, angular := losKinematics(tr.Pos, ttr.Pos, shooterVel, targetVel)
 	chance := hitChance(angular, w.Tracking, sig, dist, w.Optimal, w.Falloff)

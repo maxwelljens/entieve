@@ -32,9 +32,9 @@ const (
 	// combat damage, support cycles); kills and deliveries stay full rate.
 	hullPracticeShare = 0.1
 	// supportXPPerCycle is one completed support-module cycle's practice
-	// (shield/armor rep, cap booster, afterburner, web/scram). It is a
-	// fraction because those cycles repeat every few seconds; a full point
-	// would cap the family inside one fight.
+	// (shield/armor rep, cap booster, afterburner, web/scram/paint/damp). It
+	// is a fraction because those cycles repeat every few seconds; a full
+	// point would cap the family inside one fight.
 	supportXPPerCycle = 0.1
 	// flightXPMetres is one flight practice point: 100 AU of actual warp
 	// displacement. flightHopCap caps one hop at 50 AU, so a warp pays at
@@ -331,15 +331,16 @@ func (s *Sim) awardJob(family string, xp float64) {
 }
 
 // awardSupportCycle pays one completed support-module cycle: shield and armor
-// reps, cap boosters, afterburner time and web/scram application each train
-// their own family (and the hull at the job share).
+// reps, cap boosters, afterburner time and the ewar effects (web, scram,
+// paint, damp) each train their own family (and the hull at the job share).
 func (s *Sim) awardSupportCycle(e ecs.Entity, def *content.ModuleDef) {
 	if e != s.player || def == nil || def.Family == "" {
 		return
 	}
 	switch def.Kind {
 	case content.KindShieldBoost, content.KindArmorRep, content.KindCapBooster,
-		content.KindAfterburner, content.KindStasisWeb, content.KindWarpScram:
+		content.KindAfterburner, content.KindStasisWeb, content.KindWarpScram,
+		content.KindTargetPainter, content.KindSensorDamp:
 		s.awardJob(def.Family, supportXPPerCycle)
 	}
 }

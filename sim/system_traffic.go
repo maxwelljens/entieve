@@ -2252,7 +2252,8 @@ func (s *Sim) retargetWeapons(e ecs.Entity, target ecs.Entity) {
 				continue
 			}
 			switch def.Kind {
-			case content.KindWeapon, content.KindStasisWeb, content.KindWarpScram:
+			case content.KindWeapon, content.KindStasisWeb, content.KindWarpScram,
+				content.KindTargetPainter, content.KindSensorDamp:
 			default:
 				continue
 			}

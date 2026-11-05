@@ -723,12 +723,19 @@ func ModuleSections(def *content.ModuleDef, charge string, chargeQty int) []Tool
 				{Label: "Restored", Value: signed(b.CapRestore, 1) + " GJ", Tint: goodTint},
 			}})
 		}
-		if b.SpeedMultiplier > 1 {
-			secs = append(secs, TooltipSection{Label: "PROPULSION", Rows: []TooltipRow{
-				{Label: "Speed", Value: "×" + theme.GroupFloat(b.SpeedMultiplier, 2), Tint: goodTint},
-			}})
+		if b.SpeedMultiplier > 1 || b.SigMultiplier > 1 {
+			var rows []TooltipRow
+			if b.SpeedMultiplier > 1 {
+				rows = append(rows, TooltipRow{Label: "Speed", Value: "×" + theme.GroupFloat(b.SpeedMultiplier, 2), Tint: goodTint})
+			}
+			if b.SigMultiplier > 1 {
+				// A bloom is a cost: the bigger signature is easier to lock
+				// and to hit.
+				rows = append(rows, TooltipRow{Label: "Signature", Value: "×" + theme.GroupFloat(b.SigMultiplier, 2), Tint: dangerTint})
+			}
+			secs = append(secs, TooltipSection{Label: "PROPULSION", Rows: rows})
 		}
-		if b.WebStrength > 0 || b.ScramDuration > 0 {
+		if b.WebStrength > 0 || b.ScramDuration > 0 || b.PaintedSigBonus > 0 || b.ScanResReduction > 0 {
 			var rows []TooltipRow
 			if b.WebStrength > 0 {
 				// A negative modifier on the target: tinted by its sign.
@@ -736,6 +743,13 @@ func ModuleSections(def *content.ModuleDef, charge string, chargeQty int) []Tool
 			}
 			if b.ScramDuration > 0 {
 				rows = append(rows, TooltipRow{Label: "Warp scramble", Value: theme.GroupFloat(b.ScramDuration, 1) + " s"})
+			}
+			if b.PaintedSigBonus > 0 {
+				// The target's signature grows: a gain for the painter.
+				rows = append(rows, TooltipRow{Label: "Target signature", Value: "+" + theme.PctLabel(b.PaintedSigBonus), Tint: goodTint})
+			}
+			if b.ScanResReduction > 0 {
+				rows = append(rows, TooltipRow{Label: "Target scan resolution", Value: "−" + theme.PctLabel(b.ScanResReduction), Tint: dangerTint})
 			}
 			secs = append(secs, TooltipSection{Label: "EFFECT", Rows: rows})
 		}
@@ -758,6 +772,10 @@ func ModuleSections(def *content.ModuleDef, charge string, chargeQty int) []Tool
 		}
 		if ps.MaxSpeed > 0 {
 			rows = append(rows, TooltipRow{Label: "Speed", Value: signed(ps.MaxSpeed, 0) + " m/s", Tint: goodTint})
+		}
+		if ps.SigRadius > 0 {
+			// A flat signature addition is a cost: easier to lock and hit.
+			rows = append(rows, TooltipRow{Label: "Signature", Value: signed(ps.SigRadius, 0) + " m", Tint: dangerTint})
 		}
 		for _, rt := range []struct {
 			label string

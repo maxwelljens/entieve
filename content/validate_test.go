@@ -651,9 +651,10 @@ func TestBaseContentIsValid(t *testing.T) {
 
 // TestModuleKindAggression pins the friendly-fire gate's one truth: exactly
 // the kinds that aim at a hull are aggressive (weapons, stasis webs, warp
-// scramblers); every defensive, propulsion and mining kind is not.
+// scramblers and the two signature/scan ewar kinds); every defensive,
+// propulsion and mining kind is not.
 func TestModuleKindAggression(t *testing.T) {
-	aggressive := []string{KindWeapon, KindStasisWeb, KindWarpScram}
+	aggressive := []string{KindWeapon, KindStasisWeb, KindWarpScram, KindTargetPainter, KindSensorDamp}
 	peaceful := []string{
 		KindShieldBoost, KindShieldExtender, KindArmorRep, KindArmorPlate,
 		KindResistCoat, KindCapBooster, KindCapRecharger, KindAfterburner,
@@ -677,11 +678,13 @@ func TestModuleKindAggression(t *testing.T) {
 // fails this coverage check).
 func TestModuleTargetClass(t *testing.T) {
 	want := map[string]TargetClass{
-		KindWeapon:      TargetShip,
-		KindStasisWeb:   TargetAny,
-		KindWarpScram:   TargetAny,
-		KindMiningLaser: TargetRock,
-		KindShieldBoost: TargetNone, KindShieldExtender: TargetNone,
+		KindWeapon:        TargetShip,
+		KindStasisWeb:     TargetAny,
+		KindWarpScram:     TargetAny,
+		KindTargetPainter: TargetAny,
+		KindSensorDamp:    TargetAny,
+		KindMiningLaser:   TargetRock,
+		KindShieldBoost:   TargetNone, KindShieldExtender: TargetNone,
 		KindArmorRep: TargetNone, KindArmorPlate: TargetNone, KindResistCoat: TargetNone,
 		KindCapBooster: TargetNone, KindCapRecharger: TargetNone, KindAfterburner: TargetNone,
 	}

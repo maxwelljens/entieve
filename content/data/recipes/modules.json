@@ -96,6 +96,14 @@
     "family": "modules"
   },
   {
+    "id": "rec-mod-microwarpdrive",
+    "product": "mod-microwarpdrive",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 18000 }, { "item": "min-nickel", "qty": 2000 }, { "item": "min-cobalt", "qty": 1500 }, { "item": "min-silex", "qty": 500 }, { "item": "min-argon", "qty": 150 }],
+    "time": 180,
+    "family": "modules"
+  },
+  {
     "id": "rec-mod-resist-coat",
     "product": "mod-resist-coat",
     "qty": 1,
@@ -132,6 +140,22 @@
     "product": "mod-stasis-web",
     "qty": 1,
     "inputs": [{ "item": "min-ferrite", "qty": 7150 }, { "item": "min-silex", "qty": 520 }, { "item": "min-argon", "qty": 300 }],
+    "time": 180,
+    "family": "modules"
+  },
+  {
+    "id": "rec-mod-target-painter",
+    "product": "mod-target-painter",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 13000 }, { "item": "min-nickel", "qty": 1300 }, { "item": "min-silex", "qty": 450 }, { "item": "min-argon", "qty": 300 }],
+    "time": 180,
+    "family": "modules"
+  },
+  {
+    "id": "rec-mod-sensor-damp",
+    "product": "mod-sensor-damp",
+    "qty": 1,
+    "inputs": [{ "item": "min-ferrite", "qty": 13500 }, { "item": "min-nickel", "qty": 1400 }, { "item": "min-cobalt", "qty": 600 }, { "item": "min-silex", "qty": 480 }, { "item": "min-argon", "qty": 250 }],
     "time": 180,
     "family": "modules"
   },

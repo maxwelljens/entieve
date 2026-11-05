@@ -175,6 +175,36 @@ func (s *Sim) applyActiveEffect(e ecs.Entity, def *content.ModuleDef, slot SlotR
 				}
 			}
 		}
+	case content.KindTargetPainter:
+		if b == nil {
+			return
+		}
+		if tgt, ok := s.modTarget(e, slot); ok {
+			if m, ok := s.Motions.Get(tgt); ok {
+				fresh := now >= m.PaintedUntil
+				m.PaintFactor = 1 + clamp(b.PaintedSigBonus, 0, 3)
+				m.PaintedUntil = now + def.ActivationTime + warpScramGrace
+				if fresh {
+					s.emit(Event{Kind: EvCombat, Phase: CombatPaint, Actor: e, Target: tgt,
+						Name: s.nameOf(e)})
+				}
+			}
+		}
+	case content.KindSensorDamp:
+		if b == nil {
+			return
+		}
+		if tgt, ok := s.modTarget(e, slot); ok {
+			if t, ok := s.Targetings.Get(tgt); ok {
+				fresh := now >= t.DampedUntil
+				t.DampFactor = 1 - clamp(b.ScanResReduction, 0, 0.99)
+				t.DampedUntil = now + def.ActivationTime + warpScramGrace
+				if fresh {
+					s.emit(Event{Kind: EvCombat, Phase: CombatDamp, Actor: e, Target: tgt,
+						Name: s.nameOf(e)})
+				}
+			}
+		}
 	case content.KindWarpScram:
 		if b == nil {
 			return

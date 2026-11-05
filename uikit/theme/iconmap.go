@@ -82,6 +82,10 @@ func ModuleIcon(kind string) string {
 		return "mod_web"
 	case content.KindWarpScram:
 		return "mod_scram"
+	case content.KindTargetPainter:
+		return "stat_signature"
+	case content.KindSensorDamp:
+		return "svc_scanner"
 	case content.KindShieldBoost, content.KindShieldExtender,
 		content.KindArmorRep, content.KindArmorPlate, content.KindResistCoat:
 		return "mod_defense"

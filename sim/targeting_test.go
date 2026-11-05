@@ -12,15 +12,15 @@ func TestLockCompletesInExpectedTime(t *testing.T) {
 	npc := spawnNearPlayer(t, s) // ~1500 m away, within lock range
 	s.Queue(CmdLock{Target: npc})
 
-	stepN(s, 380)
+	stepN(s, 180)
 	tg, _ := s.Targetings.Get(s.player)
 	if len(tg.Locks) != 1 {
 		t.Fatalf("locks=%d want 1", len(tg.Locks))
 	}
 	if tg.Locks[0].Progress >= 1 {
-		t.Fatal("locked suspiciously fast (380 ticks)")
+		t.Fatal("locked suspiciously fast (180 ticks)")
 	}
-	stepN(s, 70)
+	stepN(s, 140)
 	evs := drain(s)
 	if !hasEvent(evs, EvTargetLocked, "Locked Rat Scuttler") {
 		t.Fatalf("no lock event: %v", evs)
@@ -32,9 +32,9 @@ func TestLockCompletesInExpectedTime(t *testing.T) {
 	if !tg.Locked(npc) {
 		t.Fatal("Locked() false after completion")
 	}
-	// EVE-classic: t = 66*sig/scanRes = 66*50/500 = 6.6s = 396 ticks.
-	// The lock must not have completed before ~380 ticks (checked above)
-	// and must complete within a few seconds.
+	// EVE's curve: t = 40000/(500 * asinh(50)^2) = 3.77 s, about 226
+	// ticks. The lock must still be partial at 180 ticks (checked above)
+	// and must complete by 320.
 }
 
 func TestMaxTargetsEnforced(t *testing.T) {
@@ -108,7 +108,8 @@ func TestLockRangeCheckedAtStart(t *testing.T) {
 }
 
 func TestLockProgressFormulaValues(t *testing.T) {
-	// t_lock = 66*sig/scanRes seconds; per-tick progress = 1/(60*t_lock).
+	// EVE's curve: t_lock = 40000/(scanRes * asinh(sig)^2) seconds;
+	// per-tick progress = 1/(60*t_lock).
 	cases := []struct {
 		scanRes, sig float64
 	}{
@@ -117,7 +118,8 @@ func TestLockProgressFormulaValues(t *testing.T) {
 		{620, 100},
 	}
 	for _, c := range cases {
-		want := 1.0 / (60.0 * (66.0 * c.sig / c.scanRes))
+		a := math.Asinh(c.sig)
+		want := c.scanRes * a * a / (40000 * 60)
 		got := lockProgressPerTick(c.scanRes, c.sig)
 		if math.Abs(got-want) > 1e-15 {
 			t.Fatalf("rate(%v,%v)=%v want %v", c.scanRes, c.sig, got, want)
@@ -125,5 +127,15 @@ func TestLockProgressFormulaValues(t *testing.T) {
 	}
 	if lockProgressPerTick(0, 40) != 0 {
 		t.Fatal("zero scan res must not progress")
+	}
+	// EVE's worked example: 600 mm/s and a 400 m signature lock in about
+	// 1.5 s, so the rate is about 1/(60 * 1.5).
+	if got, want := lockProgressPerTick(600, 400), 1/(60*1.5); math.Abs(got-want) > 1e-4 {
+		t.Fatalf("worked-example rate = %v, want about %v", got, want)
+	}
+	// The shape EVE documents: a high scan resolution locks a large
+	// signature quickly and a small signature slowly.
+	if lockProgressPerTick(600, 400) <= lockProgressPerTick(600, 40) {
+		t.Fatal("a large signature must lock faster than a small one")
 	}
 }

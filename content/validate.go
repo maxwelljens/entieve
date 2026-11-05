@@ -19,10 +19,12 @@ var (
 		KindArmorRep: true, KindArmorPlate: true, KindResistCoat: true,
 		KindCapBooster: true, KindCapRecharger: true, KindAfterburner: true,
 		KindMiningLaser: true, KindStasisWeb: true, KindWarpScram: true,
+		KindTargetPainter: true, KindSensorDamp: true,
 	}
 	boostKinds = map[string]bool{
 		KindShieldBoost: true, KindArmorRep: true, KindCapBooster: true,
 		KindAfterburner: true, KindStasisWeb: true, KindWarpScram: true,
+		KindTargetPainter: true, KindSensorDamp: true,
 	}
 	passiveKinds = map[string]bool{
 		KindShieldExtender: true, KindArmorPlate: true, KindResistCoat: true, KindCapRecharger: true,
@@ -68,6 +70,7 @@ var (
 		KindWeapon: true, KindShieldBoost: true, KindArmorRep: true,
 		KindCapBooster: true, KindAfterburner: true, KindMiningLaser: true,
 		KindStasisWeb: true, KindWarpScram: true,
+		KindTargetPainter: true, KindSensorDamp: true,
 	}
 )
 
@@ -495,6 +498,9 @@ func (v *validator) modules() {
 			if p.Capacitor < 0 {
 				v.addf("%s: negative passive capacitor %v", ctx, p.Capacitor)
 			}
+			if p.SigRadius < 0 {
+				v.addf("%s: negative passive sig radius %v", ctx, p.SigRadius)
+			}
 			v.resists(ctx+" passive resist bonus", p.ResistBonus)
 		}
 		if m.Boost != nil {
@@ -511,20 +517,44 @@ func (v *validator) modules() {
 			if b.SpeedMultiplier < 0 {
 				v.addf("%s: negative speed multiplier %v", ctx, b.SpeedMultiplier)
 			}
+			if b.SigMultiplier < 0 {
+				v.addf("%s: negative sig multiplier %v", ctx, b.SigMultiplier)
+			}
 			if b.WebStrength < 0 || b.WebStrength > 1 {
 				v.addf("%s: web strength %v outside [0,1]", ctx, b.WebStrength)
 			}
 			if b.ScramDuration < 0 {
 				v.addf("%s: negative scram duration %v", ctx, b.ScramDuration)
 			}
+			if b.PaintedSigBonus < 0 {
+				v.addf("%s: negative painted sig bonus %v", ctx, b.PaintedSigBonus)
+			}
+			if b.ScanResReduction < 0 || b.ScanResReduction > 1 {
+				v.addf("%s: scan res reduction %v outside [0,1]", ctx, b.ScanResReduction)
+			}
 			// The cap booster burns cells from a bay like a gun burns shells;
-			// no other boosted kind carries one.
+			// no other boosted kind carries one. The same one-kind-per-field
+			// rule holds for the three targeting/propulsion effects, so a
+			// boost block can never carry an effect its kind does not apply.
 			if m.Kind == KindCapBooster {
 				if b.BayM3 <= 0 {
 					v.addf("%s: cap booster declares no cell bay capacity", ctx)
 				}
 			} else if b.BayM3 != 0 {
 				v.addf("%s: kind %q declares a bay of %v m³", ctx, m.Kind, b.BayM3)
+			}
+			for _, f := range []struct {
+				field string
+				val   float64
+				kind  string
+			}{
+				{"sig_multiplier", b.SigMultiplier, KindAfterburner},
+				{"painted_sig_bonus", b.PaintedSigBonus, KindTargetPainter},
+				{"scan_res_reduction", b.ScanResReduction, KindSensorDamp},
+			} {
+				if f.val != 0 && m.Kind != f.kind {
+					v.addf("%s: kind %q declares %s (only %q applies it)", ctx, m.Kind, f.field, f.kind)
+				}
 			}
 		}
 	}

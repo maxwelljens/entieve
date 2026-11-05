@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **EVE's targeting-time curve, with live signature and scan resolution**:
+  lock time is now `t = 40000 / (scan resolution × arcsinh² signature radius)`
+  seconds, so a frigate locks a battleship in about a second and a half while
+  a small signature takes its time. Signature also feeds turret tracking, and
+  both inputs are live. Three modules work the curve: the **Microwarpdrive**
+  (×3 speed for a ×6 signature bloom while it runs), the **Target Painter**
+  (+25% to the locked target's signature per cycle) and the **Sensor
+  Dampener** (−45% to the locked target's scan resolution per cycle). The
+  **Shield Extender** now adds its seven metres of signature, and every module
+  tooltip shows the new effect rows.
 - **Inventory multi-selection**: `Shift`+click takes the range of stacks
   from the last click, `Ctrl`+click adds or removes one stack, and a press
   on an already-selected stack keeps the whole set (that is what drags it).

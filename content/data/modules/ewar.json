@@ -34,5 +34,41 @@
       "scram_duration": 10
     },
     "price": 240000
+  },
+  {
+    "id": "mod-target-painter",
+    "family": "ewar",
+    "group": "Modules/Mid/EWAR",
+    "maker": "corp-borealis",
+    "name": "Target Painter",
+    "description": "Adds 25% to the locked target's signature radius while the cycle runs, drawing 10 GJ every five seconds, so the hull locks faster and turret fire finds it more surely. Bůral's electronic-warfare line pairs it with the stasis web, and the house sells it to hulls that mean to hold what they engage.",
+    "slot": "mid",
+    "kind": "target_painter",
+    "grid_class": "i",
+    "cpu_class": "ii",
+    "activation_cost": 10,
+    "activation_time": 5,
+    "boost": {
+      "painted_sig_bonus": 0.25
+    },
+    "price": 205000
+  },
+  {
+    "id": "mod-sensor-damp",
+    "family": "ewar",
+    "group": "Modules/Mid/EWAR",
+    "maker": "corp-borealis",
+    "name": "Sensor Dampener",
+    "description": "Cuts the locked target's scan resolution by 45% for the duration of each five second cycle, drawing 10 GJ. Bůral's electronic-warfare line fits it beside the painter, and the house says the dampener is what keeps a fast hull from fixing a lock at all.",
+    "slot": "mid",
+    "kind": "sensor_damp",
+    "grid_class": "i",
+    "cpu_class": "ii",
+    "activation_cost": 10,
+    "activation_time": 5,
+    "boost": {
+      "scan_res_reduction": 0.45
+    },
+    "price": 225000
   }
 ]

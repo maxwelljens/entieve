@@ -22,14 +22,15 @@
     "group": "Modules/Mid/Shield",
     "maker": "corp-vantera",
     "name": "Shield Extender",
-    "description": "Adds 280 shield hit points with no activation and no draw of its own, and it costs the hull nothing in signature. Vantera builds it as station shielding adapted for hulls, and the catalogue lists it as the first purchase for a hull that means to hold its ground.",
+    "description": "Adds 280 shield hit points with no activation and no draw of its own, and it costs the hull seven metres of signature radius. Vantera builds it as station shielding adapted for hulls, and the catalogue lists it as the first purchase for a hull that means to hold its ground.",
     "slot": "mid",
     "kind": "shield_extender",
     "grid_class": "i",
     "activation_cost": 0,
     "activation_time": 0,
     "passive": {
-      "shield_hp": 280
+      "shield_hp": 280,
+      "sig_radius": 7
     },
     "price": 140000
   },

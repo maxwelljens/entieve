@@ -212,6 +212,14 @@ const (
 	KindMiningLaser    = "mining_laser"
 	KindStasisWeb      = "stasis_web"
 	KindWarpScram      = "warp_scram"
+	// KindTargetPainter and KindSensorDamp are the two signature/scan ewar
+	// kinds: a painter raises the locked target's signature radius (easier to
+	// lock and to hit), a dampener cuts the locked target's scan resolution
+	// (it locks slower). A microwarpdrive is NOT a kind of its own: its
+	// activation semantics are the afterburner's, and its boost carries a
+	// signature multiplier (BoostAttrs.SigMultiplier).
+	KindTargetPainter = "target_painter"
+	KindSensorDamp    = "sensor_damp"
 )
 
 // WeaponAttrs are weapon-module parameters.
@@ -245,11 +253,14 @@ type MiningAttrs struct {
 type BoostAttrs struct {
 	ShieldBoostPerCycle float64 `json:"shield_boost_per_cycle,omitempty"`
 	ArmorRepPerCycle    float64 `json:"armor_rep_per_cycle,omitempty"`
-	CapRestore          float64 `json:"cap_restore,omitempty"`      // GJ per activation (cap booster)
-	SpeedMultiplier     float64 `json:"speed_multiplier,omitempty"` // afterburner: > 1
-	WebStrength         float64 `json:"web_strength,omitempty"`     // 0..1 target speed reduction
-	ScramDuration       float64 `json:"scram_duration,omitempty"`   // seconds of warp disruption
-	BayM3               float64 `json:"bay_m3,omitempty"`           // cap booster: cell bay capacity in m³
+	CapRestore          float64 `json:"cap_restore,omitempty"`        // GJ per activation (cap booster)
+	SpeedMultiplier     float64 `json:"speed_multiplier,omitempty"`   // afterburner: > 1
+	SigMultiplier       float64 `json:"sig_multiplier,omitempty"`     // microwarpdrive: > 1, the signature bloom that trades speed for being seen
+	WebStrength         float64 `json:"web_strength,omitempty"`       // 0..1 target speed reduction
+	ScramDuration       float64 `json:"scram_duration,omitempty"`     // seconds of warp disruption
+	PaintedSigBonus     float64 `json:"painted_sig_bonus,omitempty"`  // target painter: fraction added to the target's signature radius (0.25 = +25%)
+	ScanResReduction    float64 `json:"scan_res_reduction,omitempty"` // sensor dampener: 0..1 fraction cut from the target's scan resolution
+	BayM3               float64 `json:"bay_m3,omitempty"`             // cap booster: cell bay capacity in m³
 }
 
 // PassiveAttrs are passive-module stat additions.
@@ -259,7 +270,8 @@ type PassiveAttrs struct {
 	Capacitor   float64 `json:"capacitor,omitempty"`
 	Recharge    float64 `json:"recharge,omitempty"` // seconds added to tau (negative = faster)
 	ResistBonus Resists `json:"resist_bonus,omitempty"`
-	MaxSpeed    float64 `json:"max_speed,omitempty"` // absolute override addition, m/s
+	MaxSpeed    float64 `json:"max_speed,omitempty"`  // absolute override addition, m/s
+	SigRadius   float64 `json:"sig_radius,omitempty"` // absolute addition to the signature radius, m (shield extenders)
 }
 
 // ModuleDef defines a fit-able module.
@@ -288,11 +300,13 @@ type ModuleDef struct {
 }
 
 // IsAggressive reports whether the module is aimed at a hull — the kinds the
-// friendly-fire gate watches: weapons, stasis webs and warp scramblers. It is
-// the one truth for "aggressive kind"; no other kind targets a ship.
+// friendly-fire gate watches: weapons, stasis webs, warp scramblers and the
+// two signature/scan ewar kinds (a painter and a dampener both need a locked
+// hull). It is the one truth for "aggressive kind"; no other kind targets a
+// ship.
 func (m *ModuleDef) IsAggressive() bool {
 	switch m.Kind {
-	case KindWeapon, KindStasisWeb, KindWarpScram:
+	case KindWeapon, KindStasisWeb, KindWarpScram, KindTargetPainter, KindSensorDamp:
 		return true
 	}
 	return false
@@ -315,7 +329,7 @@ func (m *ModuleDef) TargetClass() TargetClass {
 	switch m.Kind {
 	case KindWeapon:
 		return TargetShip
-	case KindStasisWeb, KindWarpScram:
+	case KindStasisWeb, KindWarpScram, KindTargetPainter, KindSensorDamp:
 		return TargetAny
 	case KindMiningLaser:
 		return TargetRock

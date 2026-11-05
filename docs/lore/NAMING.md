@@ -159,6 +159,9 @@ Rat hulls, ores, minerals and loot stay unattributed.
 | `mod-mining-laser` | Mining Laser | keep | trade | |
 | `mod-stasis-web` | Stasis Web | keep | trade | |
 | `mod-warp-scram` | Warp Scrambler | keep | trade | |
+| `mod-microwarpdrive` | Microwarpdrive | keep | trade | afterburner kind, ×3 speed for a ×6 signature bloom while running |
+| `mod-target-painter` | Target Painter | keep | trade | raises the locked target's signature by 25% per cycle |
+| `mod-sensor-damp` | Sensor Dampener | keep | trade | cuts the locked target's scan resolution by 45% per cycle |
 
 ### Items: charges and ammo
 

@@ -15,5 +15,24 @@
       "speed_multiplier": 1.75
     },
     "price": 155000
+  },
+  {
+    "id": "mod-microwarpdrive",
+    "family": "propulsion",
+    "group": "Modules/Mid/Propulsion",
+    "maker": "corp-celeritas",
+    "name": "Microwarpdrive",
+    "description": "Triples maximum speed while it runs at a cost of 40 GJ every ten seconds, and blooms the hull's signature radius six times over for the same span. Cylvar builds it for the express couriers who value the run above the quiet, and the house's propulsion line states the trade plainly: speed bought with visibility.",
+    "slot": "mid",
+    "kind": "afterburner",
+    "grid_class": "ii",
+    "cpu_class": "ii",
+    "activation_cost": 40,
+    "activation_time": 10,
+    "boost": {
+      "speed_multiplier": 3.0,
+      "sig_multiplier": 6.0
+    },
+    "price": 265000
   }
 ]

@@ -64,6 +64,7 @@ func TestModuleIconCoversEveryModuleKind(t *testing.T) {
 		content.KindWarpScram, content.KindShieldBoost, content.KindShieldExtender,
 		content.KindArmorRep, content.KindArmorPlate, content.KindResistCoat,
 		content.KindCapBooster, content.KindCapRecharger, content.KindAfterburner,
+		content.KindTargetPainter, content.KindSensorDamp,
 	}
 	seen := map[string]string{}
 	for _, k := range classes {
@@ -73,9 +74,10 @@ func TestModuleIconCoversEveryModuleKind(t *testing.T) {
 		}
 		seen[name] = k
 	}
-	// Six class glyphs ship: weapon / mining / web / scram / defense / utility.
-	if len(seen) != 6 {
-		t.Errorf("%d distinct module glyphs for %d kinds, want 6 (map above is %v)",
+	// Eight class glyphs ship: weapon / mining / web / scram / signature /
+	// scanner / defense / utility.
+	if len(seen) != 8 {
+		t.Errorf("%d distinct module glyphs for %d kinds, want 8 (map above is %v)",
 			len(seen), len(classes), seen)
 	}
 	if got := ModuleIcon("hyperspace-lance"); got != "row_module" {

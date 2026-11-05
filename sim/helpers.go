@@ -482,8 +482,9 @@ func (s *Sim) AmmoPref(e ecs.Entity, slot SlotRef) content.ItemID {
 
 // recomputeFit recomputes all derived ship stats from the hull plus the
 // fitted passive modules: layer maxes, resists, capacitor capacity/tau,
-// base speed, targeting capability, cargo capacities, and the active
-// afterburner speed multiplier. Current layer HP is clamped to the new maxes
+// base speed and signature radius, targeting capability, cargo capacities,
+// and the active afterburner/microwarpdrive multipliers (speed and the
+// signature bloom). Current layer HP is clamped to the new maxes
 // (fitting a module never repairs damage, un-fitting never destroys HP
 // beyond clamping).
 func (s *Sim) recomputeFit(e ecs.Entity) {
@@ -500,7 +501,9 @@ func (s *Sim) recomputeFit(e ecs.Entity) {
 	res := hull.Resists
 	capCap, tau := hull.Capacitor, hull.Recharge
 	speed := hull.MaxSpeed
+	sig := hull.SigRadius
 	abMult := 1.0
+	sigMult := 1.0
 
 	if fit, ok := s.Fittings.Get(e); ok {
 		for _, class := range slotClasses {
@@ -517,10 +520,16 @@ func (s *Sim) recomputeFit(e ecs.Entity) {
 					tau += p.Recharge
 					res = res.Add(p.ResistBonus)
 					speed += p.MaxSpeed
+					sig += p.SigRadius
 				}
 				if def.Kind == content.KindAfterburner && i < len(rts) && rts[i].Active {
-					if def.Boost != nil && def.Boost.SpeedMultiplier > abMult {
-						abMult = def.Boost.SpeedMultiplier
+					if def.Boost != nil {
+						if def.Boost.SpeedMultiplier > abMult {
+							abMult = def.Boost.SpeedMultiplier
+						}
+						if def.Boost.SigMultiplier > sigMult {
+							sigMult = def.Boost.SigMultiplier
+						}
 					}
 				}
 			}
@@ -564,8 +573,9 @@ func (s *Sim) recomputeFit(e ecs.Entity) {
 		m.MaxSpeed = speed
 		m.Mass = hull.Mass
 		m.Agility = hull.Agility
-		m.SigRadius = hull.SigRadius
+		m.SigRadius = sig
 		m.SpeedMultiplier = abMult
+		m.SigMultiplier = sigMult
 	}
 	if t, ok := s.Targetings.Get(e); ok {
 		t.MaxTargets = hull.MaxTargets

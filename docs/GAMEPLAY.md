@@ -634,6 +634,23 @@ tracking (scaled by signature radius), plus distance beyond optimal vs.
 falloff. Fast, small, transversal-moving targets are hard to hit; wrecking
 shots deal ×3 damage.
 
+**Targeting time.** Lock time follows EVE's targeting curve:
+`t = 40000 / (scan resolution × arcsinh²(signature radius))` seconds, advanced
+as per-tick progress. A large signature locks quickly and a small one locks
+slowly, and a higher scan resolution locks faster. Both sides are live: a
+microwarpdrive blooms your own signature ×6 while it runs, a target painter
+adds 25% to the locked target's signature on every cycle, a sensor dampener
+cuts the locked target's scan resolution by 45% per cycle, and a shield
+extender raises your signature by 7 m flat. Signature also feeds turret
+tracking, so a bigger target is easier to lock and easier to hit.
+
+Three modules work this curve directly. The **Microwarpdrive** (Cylvar,
+propulsion) triples speed for a ×6 signature bloom while it runs. The
+**Target Painter** and the **Sensor Dampener** (Bůral, electronic warfare)
+raise the locked target's signature by 25% or cut its scan resolution by 45%
+per cycle. The painter and the dampener are aimed at a hull, so the
+friendly-fire confirmation covers them like the web and the scrambler.
+
 **Warp rules.** `Z` and the Selected Item **Warp** button both warp to the
 selected target at the **Warp to within** selector's range (0 / 10 / 50 km;
 the sim's landing tolerance applies around the chosen point). The drive

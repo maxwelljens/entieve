@@ -110,6 +110,21 @@ func testContent() *content.Content {
 			ActivationCost: 30, ActivationTime: 10, Price: 600,
 			Boost: &content.BoostAttrs{SpeedMultiplier: 1.5},
 		},
+		"mod-microwarpdrive": {
+			ID: "mod-microwarpdrive", Name: "Microwarpdrive", Slot: content.SlotMid, Kind: content.KindAfterburner,
+			ActivationCost: 40, ActivationTime: 10, Price: 600,
+			Boost: &content.BoostAttrs{SpeedMultiplier: 3, SigMultiplier: 6},
+		},
+		"mod-target-painter": {
+			ID: "mod-target-painter", Name: "Target Painter", Slot: content.SlotMid, Kind: content.KindTargetPainter,
+			ActivationCost: 10, ActivationTime: 5, Price: 900,
+			Boost: &content.BoostAttrs{PaintedSigBonus: 0.25},
+		},
+		"mod-sensor-damp": {
+			ID: "mod-sensor-damp", Name: "Sensor Dampener", Slot: content.SlotMid, Kind: content.KindSensorDamp,
+			ActivationCost: 10, ActivationTime: 5, Price: 900,
+			Boost: &content.BoostAttrs{ScanResReduction: 0.45},
+		},
 		"mod-stasis-web": {
 			ID: "mod-stasis-web", Name: "Stasis Webifier", Slot: content.SlotMid, Kind: content.KindStasisWeb,
 			ActivationCost: 10, ActivationTime: 5, Price: 900,
@@ -123,7 +138,7 @@ func testContent() *content.Content {
 		// low: passive tank + reps + cap
 		"mod-shield-extender": {
 			ID: "mod-shield-extender", Name: "Shield Extender", Slot: content.SlotLow, Kind: content.KindShieldExtender,
-			Passive: &content.PassiveAttrs{ShieldHP: 200}, Price: 400,
+			Passive: &content.PassiveAttrs{ShieldHP: 200, SigRadius: 7}, Price: 400,
 		},
 		"mod-armor-rep": {
 			ID: "mod-armor-rep", Name: "Armor Reprocessor", Slot: content.SlotLow, Kind: content.KindArmorRep,
