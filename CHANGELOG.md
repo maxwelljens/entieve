@@ -19,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Dampener** (−45% to the locked target's scan resolution per cycle). The
   **Shield Extender** now adds its seven metres of signature, and every module
   tooltip shows the new effect rows.
+- **The icon rail draws its own art**: twelve full-colour renders replace the
+  rail's silhouettes on the entries they cover (Overview, Inventory, Fitting,
+  Market, Manufacturing, Starmap, Help, Log, Contacts, Refinery, Finances and
+  both Proficiency rows). Each ships as `assets/icons/rail_<name>.png` behind
+  a new `rail_*` icon key, whose manifest entry keeps the row's old glyph as
+  its fallback, so a checkout without the art still draws the rail. The rows
+  the set does not cover (Selected Item, Scanner) keep their glyphs, and the
+  window titles and stat headers those services share keep the flat
+  silhouettes.
 - **Inventory multi-selection**: `Shift`+click takes the range of stacks
   from the last click, `Ctrl`+click adds or removes one stack, and a press
   on an already-selected stack keeps the whole set (that is what drags it).

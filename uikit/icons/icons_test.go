@@ -370,9 +370,12 @@ func TestArtModeIsFullColourAndTintFree(t *testing.T) {
 }
 
 // TestDropinArtIsRegisteredAsArt pins the player's drop-in set on the same
-// draw path as the manifest art: every embedded content id answers Has, draws
-// full-colour (two tints share one image — the tint is ignored) and stays out
-// of the manifest registry.
+// draw path as the manifest art: every embedded content id answers Has and
+// draws full-colour (two tints share one image — the tint is ignored), and
+// stays out of the manifest registry. The icon rail's `rail_*` set is the
+// one deliberate exception: those keys ARE manifest entries (the row's
+// fallback glyph, so a checkout without the art still draws the rail) and
+// the drop-in art is what wins on top of them.
 func TestDropinArtIsRegisteredAsArt(t *testing.T) {
 	ids := dropin.IDs()
 	if len(ids) == 0 {
@@ -384,7 +387,11 @@ func TestDropinArtIsRegisteredAsArt(t *testing.T) {
 		if !Has(id) {
 			t.Errorf("%s: Has = false for a registered drop-in", id)
 		}
-		if _, in := registry[id]; in {
+		_, in := registry[id]
+		switch {
+		case strings.HasPrefix(id, "rail_") && !in:
+			t.Errorf("%s: rail key has no manifest fallback glyph", id)
+		case !strings.HasPrefix(id, "rail_") && in:
 			t.Errorf("%s: drop-in id shadows a manifest entry", id)
 		}
 		if Get(id, Title, red) != Get(id, Title, blue) {

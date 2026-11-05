@@ -27,7 +27,7 @@ it decorates. IDs are the same kebab-case strings the content JSON uses
 | `assets/asteroids/` | ore ID the belt's asteroids carry (`items/ores.json`) | `ore-cordite.png` | unrotated |
 | `assets/backgrounds/` | system ID (`sys-*.json`) or `default` | `default.png` | unrotated |
 | `assets/artwork/` | fixed names (no content id) | `spaceship_hangar.jpg`, `title_background.jpg` | unrotated, cover-fit |
-| `assets/icons/` | the content ID (module, `corp-*`, ore, mineral, loot) | `mod-autocannon-s.png`, `corp-burza.png` | n/a: UI icons, drawn in a square box |
+| `assets/icons/` | a content ID (module, `corp-*`, ore, mineral, loot) or an icon key (the icon rail's `rail_*` art) | `mod-autocannon-s.png`, `corp-burza.png`, `rail_market.png` | n/a: UI icons, drawn in a square box |
 | `assets/portraits/` | contact ID (`ContactDef.id` in `content/data/contacts/*.json`) | `contact-commission-liaison.jpg` | 2:3 face, unrotated (JPEG preferred), cover-fit into the offer row's thumb and the Details dialog's frame |
 
 Sub-JSON lookup is exactly `<directory>/<id>.png` (or `.jpg`/`.jpeg` for
@@ -227,15 +227,18 @@ window title.
   `theme.IconCorp`) in the name column beside it. Inline/button/title glyphs
   (16/20/24) are unchanged.
 - **Drop-in art**: the player's own icons live in `assets/icons/`, one PNG per
-  content id (modules, `corp-*`, ores, minerals, loot); see
+  content id (modules, `corp-*`, ores, minerals, loot) or per icon key (the
+  icon rail's twelve `rail_*` entries); see
   [`assets/README.md`](../assets/README.md#drop-in-icons-icons). The set
   embeds through `assets/icons/icons.go` and registers itself as full-colour
-  art under the content id, so a dropped file wins every icon slot for that id
-  (module tiles, rack, market rows, tooltips, the Show Info hero, and the
-  corporation mark on the info maker line and the fitting maker block) with no
-  manifest edit; a dropped hull icon wins through `theme.HullIconFor`, else
-  the `row_hull` silhouette; content without a file falls back exactly as
-  before.
+  art under that id or key, so a dropped file wins every icon slot for it
+  (module tiles, rack, market rows, tooltips, the Show Info hero, the
+  corporation mark on the info maker line and the fitting maker block, and
+  the rail's entries) with no manifest edit; a dropped hull icon wins through
+  `theme.HullIconFor`, else the `row_hull` silhouette; content without a file
+  falls back exactly as before, and a rail row without its `rail_*.png` draws
+  the same glyph its key carried before (the manifest carries that glyph under
+  the rail key too).
 - **Optical fit**: glyphs that sit off-centre in their frame carry a
   per-icon `nudge` (fractions of the box) in `manifest.json`.
 - **Fallback**: an unknown name renders the neutral gear, so a new kind can

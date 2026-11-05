@@ -3,10 +3,12 @@ package game
 import (
 	"image"
 	"slices"
+	"strings"
 	"testing"
 
 	enuiinput "github.com/ebitenui/ebitenui/input"
 	"github.com/ebitenui/ebitenui/widget"
+	dropin "github.com/entieve/entieve/assets/icons"
 	"github.com/entieve/entieve/content"
 	"github.com/entieve/entieve/ecs"
 	"github.com/entieve/entieve/sim"
@@ -49,7 +51,7 @@ func TestRailDerivesFromScreenSpec(t *testing.T) {
 	for _, e := range entries {
 		byTitle[e.Title]++
 		if !icons.Has(e.Icon) {
-			t.Errorf("%s: icon %q not in the manifest", e.Title, e.Icon)
+			t.Errorf("%s: icon %q is unknown (no manifest glyph, no drop-in art)", e.Title, e.Icon)
 		}
 	}
 	for _, s := range screens {
@@ -120,6 +122,43 @@ func TestRailDerivesFromScreenSpec(t *testing.T) {
 	for _, title := range []string{"HUD", "Modules", "Menu"} {
 		if byTitle[title] != 0 {
 			t.Errorf("%q has a rail entry (permanent chrome / pause menu)", title)
+		}
+	}
+}
+
+// TestRailArtIsWired pins the icon rail's drop-in art: every
+// assets/icons/rail_*.png is named by at least one rail row (art nothing
+// draws is a dead file, and a row reverted to its plain glyph would show up
+// here), and every row that names a rail_* key ships its file, so the rail
+// draws the art instead of falling through to the key's manifest silhouette.
+// The rows that keep plain glyphs (Selected Item, Scanner, and the two
+// off-rail windows) never name one.
+func TestRailArtIsWired(t *testing.T) {
+	art := map[string]bool{}
+	for _, id := range dropin.IDs() {
+		if strings.HasPrefix(id, "rail_") {
+			art[id] = true
+		}
+	}
+	if len(art) == 0 {
+		t.Fatal("no rail art embedded (assets/icons/rail_*.png)")
+	}
+	used := map[string]int{}
+	for _, s := range screens {
+		if s.DockPolicy == DockTransient || s.NoRail || s.Unlisted {
+			continue
+		}
+		if !strings.HasPrefix(s.Icon, "rail_") {
+			continue
+		}
+		used[s.Icon]++
+		if !art[s.Icon] {
+			t.Errorf("%s: icon %q ships no assets/icons/%s.png", s.Title, s.Icon, s.Icon)
+		}
+	}
+	for id := range art {
+		if used[id] == 0 {
+			t.Errorf("%s.png ships but no rail row names it (the art draws nowhere)", id)
 		}
 	}
 }

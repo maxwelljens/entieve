@@ -38,7 +38,11 @@ func TestServiceTableAgreesWithScreens(t *testing.T) {
 		if row.Service != s.ID {
 			t.Errorf("%s: window %q is gated on service %q", s.ID, row.Title, row.Service)
 		}
-		if row.Icon != s.Icon {
+		// The two ends name the same service but may carry different art:
+		// the rail row draws its own `rail_*` drop-in over the table's
+		// glyph, and the table's glyph is what the starmap's facility row
+		// (`serviceIcon`) still draws. Same stem, either namespace.
+		if row.Icon != s.Icon && row.Icon != "rail_"+strings.TrimPrefix(s.Icon, "svc_") {
 			t.Errorf("%s: row icon %q, table icon %q", s.ID, row.Icon, s.Icon)
 		}
 	}

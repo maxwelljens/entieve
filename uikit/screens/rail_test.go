@@ -95,10 +95,12 @@ func TestRailGeometry(t *testing.T) {
 
 // TestRailIconsInsideCells pins the icon anchoring class the playtest
 // caught (defect: glyphs hung over the cell's right edge): every entry's
-// glyph rect sits strictly inside its button square with EQUAL margins
-// on all four sides (±1 px for integer centring), at scale 1 and 1.5.
-// The same cell draws the open-state glow and, collapsed, the rail keeps
-// only the edge tab — neither may move the glyph or leave the column.
+// glyph box is centred in its button square with equal margins on all
+// four sides (±1 px for integer centring) and overhangs that square by no
+// more than the box's own surplus per side, at scale 1 and 1.5. The cell
+// and the button stay 63²; only the glyph grew. The same cell draws the
+// open-state glow and, collapsed, the rail keeps only the edge tab;
+// neither may move the glyph or leave the column.
 func TestRailIconsInsideCells(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -124,10 +126,6 @@ func TestRailIconsInsideCells(t *testing.T) {
 				if glyph.Dx() != theme.Px(railIcon) || glyph.Dy() != theme.Px(railIcon) {
 					t.Errorf("%s: glyph box = %v, want %d² design (the Px funnel)", title, glyph, railIcon)
 				}
-				if !glyph.In(cell) {
-					t.Errorf("%s: glyph %v escapes its cell %v", title, glyph, cell)
-					continue
-				}
 				l, rr := glyph.Min.X-cell.Min.X, cell.Max.X-glyph.Max.X
 				tp, b := glyph.Min.Y-cell.Min.Y, cell.Max.Y-glyph.Max.Y
 				// The cell is a square (63×63, the gutter rides beside
@@ -137,7 +135,16 @@ func TestRailIconsInsideCells(t *testing.T) {
 					t.Errorf("%s: glyph margins L%d R%d T%d B%d in %v, want each pair equal ±1",
 						title, l, rr, tp, b, cell)
 				}
-				if l < 1 || rr < 1 || tp < 1 || b < 1 {
+				// The box may overhang its cell by its own surplus per
+				// side and never more (70 px box, 63 px cell); the −1
+				// absorbs integer centring at scale 1 and 1.5.
+				over := (theme.Px(railIcon) - theme.Px(RailInset-theme.ScrollGutter)) / 2
+				if l < -over-1 || rr < -over-1 || tp < -over-1 || b < -over-1 {
+					t.Errorf("%s: glyph %v overhangs its cell %v beyond the box surplus %d (margins L%d R%d T%d B%d)",
+						title, glyph, cell, over, l, rr, tp, b)
+				}
+				// A box that fits again still keeps its visible air.
+				if theme.Px(railIcon) <= theme.Px(RailInset-theme.ScrollGutter) && (l < 1 || rr < 1 || tp < 1 || b < 1) {
 					t.Errorf("%s: glyph %v touches its cell edge %v (want visible air)", title, glyph, cell)
 				}
 				if cell.Dx() != theme.Px(RailInset-theme.ScrollGutter) || cell.Dy() != theme.Px(RailInset-theme.ScrollGutter) {
@@ -206,17 +213,16 @@ func TestRailColumnCapsAndScrolls(t *testing.T) {
 	}
 }
 
-// TestRailGutterAndGlyphLiterals pins the +75 % itself: the geometry
-// pins above derive from RailInset, so this one pins the constants —
-// the 63×63 entry square sits beside the 24 px scrollbar gutter, so
-// RailInset (cells + gutter) is 87, and the glyph grown with the cell
-// (20 → 35, the Button glyph's own ×1.75).
+// TestRailGutterAndGlyphLiterals pins the constants themselves, since the
+// geometry pins derive from RailInset: the 63×63 entry square sits beside
+// the 24 px scrollbar gutter, so RailInset (cells + gutter) is 87, and the
+// glyph box is twice the Button glyph (20 → 70) while the frame stays put.
 func TestRailGutterAndGlyphLiterals(t *testing.T) {
 	if RailInset != 87 {
 		t.Errorf("RailInset = %d, want 87 (63 cells + 24 gutter)", RailInset)
 	}
-	if railIcon != 35 {
-		t.Errorf("railIcon = %d, want 35 (IconButton 20 × 1.75)", railIcon)
+	if railIcon != 70 {
+		t.Errorf("railIcon = %d, want 70 (IconButton 20 doubled)", railIcon)
 	}
 	// The collapsed edge tab carries the furniture token's air: 20 =
 	// the "<" glyph (≈10) + SpSm on each side.

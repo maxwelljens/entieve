@@ -1,6 +1,8 @@
 package icons
 
 import (
+	"encoding/json"
+	"os"
 	"testing"
 
 	"github.com/entieve/entieve/content"
@@ -27,18 +29,47 @@ func contentIDs(t *testing.T) map[string]bool {
 	return known
 }
 
+// iconKeys is every icon key a drop-in may be named after (the registry's
+// manifest, read as the file it is: this package cannot import
+// uikit/icons, which embeds this one). The rail's own art ships this way —
+// assets/icons/rail_*.png names the key the rail row draws — so a rail
+// icon can be replaced without touching a content id.
+func iconKeys(t *testing.T) map[string]bool {
+	t.Helper()
+	raw, err := os.ReadFile("../../uikit/icons/manifest.json")
+	if err != nil {
+		t.Fatalf("manifest: %v", err)
+	}
+	var m struct {
+		Icons map[string]json.RawMessage `json:"icons"`
+	}
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatalf("manifest: %v", err)
+	}
+	if len(m.Icons) == 0 {
+		t.Fatal("manifest: no icon keys")
+	}
+	keys := make(map[string]bool, len(m.Icons))
+	for k := range m.Icons {
+		keys[k] = true
+	}
+	return keys
+}
+
 // TestDropinIconsAreContentIDs is the scheme guard: the file name is the
-// content id, so a file named for a display name ("kerngrit.png") would be
-// embedded but never drawn. _alt/ must stay outside the embed.
+// content id (or an icon key), so a file named for a display name
+// ("kerngrit.png") would be embedded but never drawn. _alt/ must stay
+// outside the embed.
 func TestDropinIconsAreContentIDs(t *testing.T) {
 	known := contentIDs(t)
+	keys := iconKeys(t)
 	ids := IDs()
 	if len(ids) == 0 {
 		t.Fatal("no drop-in icons embedded")
 	}
 	for _, id := range ids {
-		if !known[id] {
-			t.Errorf("%s.png: not a content id (modules, items, corps) — the file name is the id", id)
+		if !known[id] && !keys[id] {
+			t.Errorf("%s.png: neither a content id (modules, items, corps) nor an icon key (uikit/icons/manifest.json) — the file name is one of those two", id)
 		}
 	}
 	if _, err := FS.Open("_alt/armour_plating_alt.png"); err == nil {

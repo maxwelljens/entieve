@@ -252,7 +252,7 @@ var screens = []Screen{
 		// existing files restore unchanged) and the corner placement.
 		// Persistent: its flag hides it, never unmounts it, and the room
 		// (space) hides it while docked.
-		ID: idOverview, Title: "Overview", Icon: "kind_ship",
+		ID: idOverview, Title: "Overview", Icon: "rail_overview",
 		Key: keyNone, // the rail entry and its × are its doors
 		// Min is the inset pair AnchorTopRight reads: 10 design px from
 		// the right edge, 8 from the top. The window keeps the size its
@@ -281,14 +281,14 @@ var screens = []Screen{
 		// An ordinary floating window, docked or in space: it opens at its
 		// own declared default (uikit.InventoryRect, the panel's landing
 		// rect), not in a composed docked band.
-		ID: idInventory, Title: "Inventory", Icon: "svc_inventory",
+		ID: idInventory, Title: "Inventory", Icon: "rail_inventory",
 		Key: ebiten.KeyI, Action: "inventory", Desc: "toggle inventory",
 		DefaultRect: uikit.InventoryRect(), Anchor: AnchorFixed,
 		DockPolicy: DockFloating, Group: "Trade",
 		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewInventory(h.services.Env) },
 	},
 	{
-		ID: idFitting, Title: "Fitting", Icon: "svc_fitting",
+		ID: idFitting, Title: "Fitting", Icon: "rail_fitting",
 		Key: ebiten.KeyF, Action: "fitting", Desc: "toggle fitting",
 		DefaultRect: uikit.FittingRect(), Anchor: AnchorFixed,
 		DockPolicy: DockFloating,
@@ -301,7 +301,7 @@ var screens = []Screen{
 		// the rail gutter's clear line and stays inside the 1024×700
 		// minimum. Docked or in space it opens here; the old docked band
 		// stretched it across the viewport.
-		ID: idMarket, Title: "Market", Icon: "svc_market",
+		ID: idMarket, Title: "Market", Icon: "rail_market",
 		Key: ebiten.KeyG, Action: "market", Desc: "toggle market window (trade while docked)",
 		DefaultRect: uikit.MarketRect(), Anchor: AnchorFixed,
 		DockPolicy: DockFloating,
@@ -312,7 +312,7 @@ var screens = []Screen{
 		// A station service that floats: it mounts only while docked and
 		// centres like the overlays on first open (its Screen row carries
 		// no Anchor, so the centred fallback applies).
-		ID: idManufacturing, Title: "Manufacturing", Icon: "svc_manufacturing",
+		ID: idManufacturing, Title: "Manufacturing", Icon: "rail_manufacturing",
 		Key: ebiten.KeyB, Action: "manufacturing", Desc: "toggle manufacturing window (manufacture while docked)",
 		DefaultRect: uikit.ManufacturingRect(),
 		DockPolicy:  DockFloating, DockedOnly: true,
@@ -343,7 +343,7 @@ var screens = []Screen{
 		// the viewport every Sync. N, the rail entry, Esc and the canvas
 		// × close it. The search field is the layer's one typing
 		// surface; game.handleKeys yields it the frame while focused.
-		ID: idMap, Title: "Starmap", Icon: "svc_map",
+		ID: idMap, Title: "Starmap", Icon: "rail_starmap",
 		Key: ebiten.KeyN, Action: "starmap", Desc: "toggle starmap",
 		DefaultRect: uikit.MapViewRect(),
 		Anchor:      AnchorViewport,
@@ -359,7 +359,7 @@ var screens = []Screen{
 		// (declaration order, so the menu declared below outranks it).
 		// The window sizes itself from its rows (uikit.NewHelp), so the
 		// rect declares the top inset and the design viewport edges only.
-		ID: idHelp, Title: "Help", Icon: "svc_help",
+		ID: idHelp, Title: "Help", Icon: "rail_help",
 		Key: ebiten.KeyH, Action: "help", Desc: "toggle help",
 		DefaultRect: image.Rect(0, 24, defaultW, defaultH),
 		Anchor:      AnchorTopCenter,
@@ -375,7 +375,7 @@ var screens = []Screen{
 		// 361 right edge, so the log narrows by the rail inset to its
 		// content floor (its overlap with the HUD pair at the 1024×700
 		// minimum is inherent — see TestVirginPlacementTable).
-		ID: idLog, Title: "Log", Icon: "svc_log",
+		ID: idLog, Title: "Log", Icon: "rail_log",
 		Key: ebiten.KeyL, Shift: true, Action: "log", Desc: "toggle log window",
 		DefaultRect: image.Rect(10+uikit.RailInset, defaultH-10-uikit.LogDefaultH,
 			10+uikit.RailInset+uikit.LogDefaultW, defaultH-10),
@@ -422,7 +422,7 @@ var screens = []Screen{
 		// the host composes the column from it (stationRect). Unkeyed by
 		// design — docking opens it, the rail reopens it, and there is
 		// nothing to press in space where it cannot mount.
-		ID: idServices, Title: "Contacts", Icon: "kind_station",
+		ID: idServices, Title: "Contacts", Icon: "rail_station",
 		Key:         keyNone, // docking opens it; the rail reopens it
 		DefaultRect: image.Rect(stationX, stationY, stationX+stationWinW, stationY+stationMinH),
 		Anchor:      AnchorFixed,
@@ -434,7 +434,7 @@ var screens = []Screen{
 		// The refinery: an ore→mineral service window, docked-only like the
 		// manufacturing panel, centred on first open. Its own key would
 		// crowd the bindings; the rail's Industry section opens it.
-		ID: idRefinery, Title: "Refinery", Icon: "svc_refinery",
+		ID: idRefinery, Title: "Refinery", Icon: "rail_refinery",
 		Key:         keyNone,
 		DefaultRect: uikit.RefineryRect(),
 		DockPolicy:  DockFloating, DockedOnly: true,
@@ -445,7 +445,7 @@ var screens = []Screen{
 		// The wallet window: a floating read-only ledger, so it opens in
 		// space and docked alike (nothing in it needs a station service).
 		// K: F and G already belong to fitting and market.
-		ID: idFinances, Title: "Finances", Icon: "svc_finances",
+		ID: idFinances, Title: "Finances", Icon: "rail_finances",
 		Key: ebiten.KeyK, Action: "finances", Desc: "toggle finances window (holdings and transactions)",
 		DefaultRect: uikit.FinancesRect(),
 		DockPolicy:  DockFloating,
@@ -462,7 +462,7 @@ var screens = []Screen{
 		// and its key close it) and re-fits itself to the viewport. The
 		// name distinguishes the row from its summary window, which is the
 		// one titled "Proficiency".
-		ID: idProficiency, Title: "Proficiency tree", Icon: "stat_tracking",
+		ID: idProficiency, Title: "Proficiency tree", Icon: "rail_proficiency",
 		Key: ebiten.KeyT, Action: "proficiency", Desc: "toggle proficiency tree (levels and prerequisites)",
 		DefaultRect: uikit.ProficiencyRect(),
 		Anchor:      AnchorViewport,
@@ -483,7 +483,7 @@ var screens = []Screen{
 		// It lands in the left column just under the Selected Item window,
 		// the one spot the tree's first open leaves free; its placement
 		// persists like every other window's.
-		ID: idProficiencyOverview, Title: "Proficiency", Icon: "stat_tracking",
+		ID: idProficiencyOverview, Title: "Proficiency", Icon: "rail_proficiency",
 		Key:         keyNone,
 		DefaultRect: uikit.ProficiencyOverviewRect(),
 		Anchor:      AnchorFixed,

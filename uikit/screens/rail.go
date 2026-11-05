@@ -41,11 +41,19 @@ const (
 	// windows can never cover an entry.
 	RailInset = 63 + theme.ScrollGutter // 87
 
-	// railIcon is the entry glyph's design box: the 20 px Button glyph
-	// grown with the cell (36 → 63 is ×1.75, so 20 → 35 keeps the
-	// ~56 % fill the rail always had — a 20 px glyph in a 63 px cell
-	// reads as a lost dot).
-	railIcon = 35
+	// railIcon is the entry glyph's design box, doubled to 70. Only the
+	// box grows: the entry cell and its chrome button stay 63×63, so
+	// RailInset (63 cells + ScrollGutter = 87), the scrollbar gutter and
+	// the 20 px edge tab do not move. The glyph anchors dead centre in
+	// the cell (see iconCell), so the larger box overhangs the cell by
+	// (70 − 63)/2 = 3.5 design px a side. That is deliberate. The
+	// drop-in entry art has ink to the frame edge (measured:
+	// assets/icons/rail_market.png, alpha spans the full 1024 width,
+	// ink box 1024x896+0+128), so the ink itself can sit up to ~3.5
+	// design px past the cell square, and at the screen's left edge
+	// (the cell column starts at x = 0) the outer few tenths of the box
+	// fall off-screen.
+	railIcon = 70
 
 	// railTabW is the edge tab's width in the collapsed rail (all that
 	// is left of the column); railTabH its height. 20 gives the glyph the

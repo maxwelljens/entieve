@@ -10,7 +10,7 @@ assets/
 ├── hulls/<hull-id>.png            e.g. ship-vastrek.png       (HUD/fitting/Show Info portrait, not the world: a ship in space is a class icon)
 ├── stations/<celestial-id>.png    e.g. cel-haven-rest.png    (unrotated)
 ├── asteroids/<ore-id>.png         e.g. ore-cordite.png       (unrotated)
-├── icons/<content-id>.png         e.g. mod-autocannon-s.png  (UI icon, square box)
+├── icons/<name>.png               e.g. mod-autocannon-s.png, rail_market.png  (UI icon, square box)
 ├── portraits/<contact-id>.jpg     e.g. contact-commission-liaison.jpg  (2:3 face; JPEG allowed)
 ├── backgrounds/<system-id>.png    e.g. default.png          (unrotated, tiles; default.png serves all systems)
 ├── artwork/spaceship_hangar.jpg   the docked-station backdrop (JPEG, cover-fit)
@@ -25,14 +25,15 @@ crispness); hull sprites point right (+X), the nose direction.
 
 ## Drop-in icons (`icons/`)
 
-The player's own icon art, one PNG per content ID, flat in this directory.
-The file name is **exactly** the content ID (`assets/README.md`'s one rule),
-so a name that is a display string ("kerngrit.png") is embedded and never
-drawn; `assets/icons/icons_test.go` fails the build until it parses as a real
-ID. The set embeds through `icons.go` (`//go:embed *.png`) and registers
-itself in the icon registry (`uikit/icons`) as **art-mode** art keyed by the
-content ID (full-colour, drawn as-is, never tinted), so the drop-in wins
-every slot that content ID reaches:
+The player's own icon art, one PNG per content ID or icon key, flat in this
+directory.
+The file name is **exactly** one of those two names (`assets/README.md`'s one
+rule), so a name that is a display string ("kerngrit.png") is embedded and
+never drawn; `assets/icons/icons_test.go` fails the build until it parses as a
+real ID. The set embeds through `icons.go` (`//go:embed *.png`) and registers
+itself in the icon registry (`uikit/icons`) as **art-mode** art keyed by that
+name (full-colour, drawn as-is, never tinted), so the drop-in wins
+every slot the name reaches:
 
 | Family | IDs | Slots the art reaches |
 |---|---|---|
@@ -41,6 +42,7 @@ every slot that content ID reaches:
 | minerals | `min-ferrite`, `min-nickel`, `min-cobalt`, `min-silex`, `min-glacite`, `min-argon` | market rows, manufacturing/refining rows, Show Info hero |
 | ores | `ore-sterngrit`, `ore-cordite`, `ore-lucidite`, `ore-glacierite` | same |
 | loot | `loot-alloy-scrap`, `loot-iced-core`, `loot-navdata`, `loot-hierarch-crest` | same |
+| rail | `rail_overview`, `rail_inventory`, `rail_fitting`, `rail_market`, `rail_manufacturing`, `rail_starmap`, `rail_help`, `rail_log`, `rail_station`, `rail_refinery`, `rail_finances`, `rail_proficiency` | the icon rail's entries (the 35 px glyph and its tooltip); the key also exists in the manifest as a silhouette, so a missing file draws the glyph the row carried before |
 
 Anything without a file falls back exactly as before (a module's class glyph,
 an item's category silhouette, the corporation's vector emblem). `_alt/`

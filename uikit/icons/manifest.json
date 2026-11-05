@@ -215,6 +215,82 @@
       "url": "https://game-icons.net/1x1/lorc/spider-web.html",
       "file": "spider-web.png"
     },
+    "rail_finances": {
+      "slug": "wallet",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/wallet.html",
+      "file": "wallet.png"
+    },
+    "rail_fitting": {
+      "slug": "gears",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/gears.html",
+      "file": "gears.png"
+    },
+    "rail_help": {
+      "slug": "help",
+      "author": "sbed",
+      "url": "https://game-icons.net/1x1/sbed/help.html",
+      "file": "help.png"
+    },
+    "rail_inventory": {
+      "slug": "light-backpack",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/light-backpack.html",
+      "file": "light-backpack.png"
+    },
+    "rail_log": {
+      "slug": "book-cover",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/book-cover.html",
+      "file": "book-cover.png"
+    },
+    "rail_manufacturing": {
+      "slug": "factory",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/factory.html",
+      "file": "factory.png"
+    },
+    "rail_market": {
+      "slug": "coins",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/coins.html",
+      "file": "coins.png"
+    },
+    "rail_overview": {
+      "slug": "spaceship",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/spaceship.html",
+      "file": "spaceship.png"
+    },
+    "rail_proficiency": {
+      "slug": "on-target",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/on-target.html",
+      "file": "stat_tracking.png"
+    },
+    "rail_refinery": {
+      "slug": "furnace",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/furnace.html",
+      "file": "furnace.png"
+    },
+    "rail_starmap": {
+      "slug": "treasure-map",
+      "author": "Lorc",
+      "url": "https://game-icons.net/1x1/lorc/treasure-map.html",
+      "file": "treasure-map.png"
+    },
+    "rail_station": {
+      "slug": "observatory",
+      "author": "Delapouite",
+      "url": "https://game-icons.net/1x1/delapouite/observatory.html",
+      "file": "observatory.png",
+      "nudge": {
+        "dx": 0.0,
+        "dy": -0.05
+      }
+    },
     "row_hull": {
       "slug": "iron-hulled-warship",
       "author": "Cathelineau",
