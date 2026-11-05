@@ -288,6 +288,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   would give, nor the 20% that would need a tenth craft step).
 ### Fixed
 
+- **The starmap no longer lags on hover or steps memory by a gigabyte a
+  click**: every repaint drew its node rings with antialiased
+  `vector.StrokeCircle`, and the pinned ebiten 2.10.4 turned a
+  fractional-centred circle into a zero-sweep arc whose rounding cusps
+  expanded under round-joined stroking into tens of thousands of path
+  operations. A hover repaint then queued hundreds of megabytes of
+  vertices, and the retained command-queue capacity made a click step RSS
+  by about a gigabyte. The ebiten pin moves to v2.10.5, whose zero-sweep
+  arc fix removes the blow-up; it also closes the incomplete-circle gap
+  the same defect drew at those positions.
 - **The refinery inspector follows the batch**: a batch whose mineral amounts
   move (a Refining level-up) left the card on the previous figures whenever the
   ore, the station, the stock and the book stood still, because the inspector's
