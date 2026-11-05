@@ -15,7 +15,7 @@ import (
 // or the map re-selects a system behind the popup.
 func TestMapViewIgnoresThePopupsPress(t *testing.T) {
 	env, _ := newChromeEnv(t)
-	m := NewMapView(env, nil)
+	m := NewMapView(env, nil, nil)
 	newChromeUI(env).AddWindow(m).Frame(t, 1280, 720)
 
 	// A node point that really hit-tests as its own node.
@@ -53,7 +53,7 @@ func TestMapViewIgnoresThePopupsPress(t *testing.T) {
 // popup: a press on a node selects it, so the pin above is not vacuous.
 func TestMapViewPollsWhenNoPopupClaimedThePress(t *testing.T) {
 	env, _ := newChromeEnv(t)
-	m := NewMapView(env, nil)
+	m := NewMapView(env, nil, nil)
 	newChromeUI(env).AddWindow(m).Frame(t, 1280, 720)
 
 	r := m.gfx.GetWidget().Rect

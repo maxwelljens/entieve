@@ -11,7 +11,7 @@ import (
 // paints, an unchanged system does not repaint, a system change does.
 func TestMapViewDrawsAndRedraws(t *testing.T) {
 	env, _ := newChromeEnv(t)
-	m := NewMapView(env, nil)
+	m := NewMapView(env, nil, nil)
 	if m.Win() == nil {
 		t.Fatal("MapView.Win() is nil")
 	}
@@ -43,7 +43,7 @@ func TestMapViewDrawsAndRedraws(t *testing.T) {
 // system ids never reach the map's text).
 func TestMapViewNodesAndProjection(t *testing.T) {
 	env, _ := newChromeEnv(t)
-	m := NewMapView(env, nil)
+	m := NewMapView(env, nil, nil)
 	m.Sync() // lays the columns out; the graph column is the projection area
 	nodes := m.mapNodes()
 	if len(nodes) != len(env.Content.Systems) {
@@ -105,7 +105,7 @@ func TestMapViewNodesAndProjection(t *testing.T) {
 func TestMapViewDrawSmoke(t *testing.T) {
 	env, _ := newChromeEnv(t)
 	vp := image.Rect(0, 0, 1280, 720)
-	m := NewMapView(env, func() image.Rectangle { return vp })
+	m := NewMapView(env, func() image.Rectangle { return vp }, nil)
 	c := newChromeUI(env)
 	c.AddWindow(m)
 	for _, size := range [][2]int{{1280, 720}, {1024, 700}} {
@@ -142,7 +142,7 @@ func TestZoneLabel(t *testing.T) {
 func mapUnderTest(t *testing.T) (*MapView, func(content.SystemID) image.Point, func(content.SystemID) image.Point, *testEnv) {
 	t.Helper()
 	env, _ := newChromeEnv(t)
-	m := NewMapView(env, nil)
+	m := NewMapView(env, nil, nil)
 	c := newChromeUI(env)
 	c.AddWindow(m)
 	c.Frame(t, 1280, 720)

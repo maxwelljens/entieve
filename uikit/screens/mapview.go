@@ -23,17 +23,33 @@ import (
 
 // Starmap geometry, in design units through the Px funnel: the layer's
 // three columns, the graph's own inset, and the grid pitch.
+//
+// The spacing rhythm, outside in: mapPadOuter frames the layer, mapGutter
+// separates the columns, mapInset pads inside a column, mapCardPad insets
+// an overview section card, mapSection separates two cards. Rows are
+// pitched looser than the glyphs they carry (mapRowH/mapBodyH over
+// icons.Inline) so the text never sits flush.
 const (
-	mapPadOuter = 14 // the layer's outer margin
-	mapHeadH    = 46 // the canvas header band
-	mapInset    = 8  // inside each column
-	mapLeftW    = 268
-	mapRightW   = 312
-	mapSearchH  = 26
-	mapRowH     = 26
-	mapBodyH    = 22
+	mapPadOuter = 18 // the layer's outer margin
+	mapHeadH    = 56 // the canvas header band (title, glyph, ×)
+	mapGutter   = 18 // air between the three columns
+	mapInset    = 12 // inside each column
+	mapLeftW    = 276
+	mapRightW   = 320
+	mapSearchH  = 30
+	mapRowH     = 30 // browser row pitch
+	mapBodyH    = 24 // one overview body row
 
-	mapPad  = 48 // the graph keeps nodes and labels off its edges
+	mapCardPad = 10 // inside an overview section card
+	mapSection = 12 // between two overview cards
+	mapHeadGap = 8  // between a section head and its body
+
+	mapClose = 30 // the layer's own × button
+	mapOreH  = 22 // one belt ore chip
+	mapFacH  = 22 // one station facility chip
+	mapGateH = 24 // one gate chip (two per row)
+
+	mapPad  = 56 // the graph keeps nodes and labels off its edges
 	mapHitR = 10
 
 	mapGridStep = 28 // the kit's lattice pitch
@@ -81,18 +97,21 @@ type overviewOre struct {
 	Volume float64
 }
 
-// MapView is the starmap: the house's second full-viewport layer. It is
-// three zones over one canvas: the system browser (search and list) on the
-// left, the gate graph in the middle and the selected system's overview on
-// the right. The graph keeps its node security colours, the planned route
-// in accent, control shapes and contested front rings; the overview names
-// every celestial, a station's facilities, a belt's available ore and a
-// gate's destination, each as an icon row rather than a sentence.
+// MapView is the starmap: the house's over-chrome layer. It is three
+// zones over one canvas: the system browser (search and list) on the left,
+// the gate graph in the middle and the selected system's overview on the
+// right. The graph keeps its node security colours, the planned route in
+// accent, control shapes and contested front rings; the overview groups
+// the system into section cards (celestials, stations, belts, gates,
+// anomalies), each with a tracked header, a station's facilities as chips,
+// a belt's ore as chips and a gate's destination as a selectable chip.
 //
-// Like the proficiency tree it is mounted through Kit.AddBackdropWindow:
-// it paints over the world and below every window and all chrome, takes no
-// title bar, blocks the world through the hit test (Own) and re-fits itself
-// to the live viewport every Sync. N, the rail entry and Esc close it.
+// Unlike the proficiency tree (a backdrop layer under the rail) it is
+// mounted through Kit.AddFrontWindow: it paints over the world, every
+// window AND all chrome, takes no title bar (its × is drawn in the
+// canvas's top-right corner), blocks what it covers through the hit test
+// (Own) and re-fits itself to the live viewport every Sync. N, the rail
+// entry (while it is closed), Esc and the canvas × close it.
 //
 // Interaction is view state only, never persisted and never a sim command:
 // a press on a node or a browser row selects a system, a second press on
@@ -106,9 +125,11 @@ type MapView struct {
 	ptr      *widgets.Pointer
 	viewport func() image.Rectangle
 
-	win *widget.Window
-	gfx *widget.Graphic
-	img *ebiten.Image
+	win   *widget.Window
+	gfx   *widget.Graphic
+	img   *ebiten.Image
+	close func() // the layer's own × (the Screen row's toggle)
+	overX bool   // the pointer is on the canvas ×
 	// search is the browser's live filter: the house text field (the same
 	// one the market's panes use), drawn over the canvas.
 	search *widget.TextInput
@@ -143,9 +164,11 @@ type mapZones struct {
 
 // NewMapView builds the starmap layer. viewport is the live screen rect in
 // device pixels (nil keeps the design rect, which the chrome harness and
-// the unit tests use). Call Sync after construction to paint the graph.
-func NewMapView(env widgets.Seams, viewport func() image.Rectangle) *MapView {
-	m := &MapView{th: env, cv: env, ptr: env.Pointer(), viewport: viewport}
+// the unit tests use); close is the canvas ×'s semantics (the Screen row's
+// toggle, nil leaves the × inert). Call Sync after construction to paint
+// the graph.
+func NewMapView(env widgets.Seams, viewport func() image.Rectangle, close func()) *MapView {
+	m := &MapView{th: env, cv: env, ptr: env.Pointer(), viewport: viewport, close: close}
 	m.rect = pxRect(MapViewRect())
 	m.img = ebiten.NewImage(m.rect.Dx(), m.rect.Dy())
 	m.gfx = widget.NewGraphic(widget.GraphicOpts.Image(m.img),
@@ -191,12 +214,10 @@ func NewMapView(env widgets.Seams, viewport func() image.Rectangle) *MapView {
 // constructor share.
 func MapViewRect() image.Rectangle { return ProficiencyRect() }
 
-// Win returns the layer for Kit.AddBackdropWindow.
+// Win returns the layer for Kit.AddFrontWindow (the Screen host asks the
+// row's OverChrome facet, not the panel: the map is the over-chrome layer,
+// the proficiency tree the backdrop one).
 func (m *MapView) Win() *widget.Window { return m.win }
-
-// Backdrop marks the panel as the kit's under-window layer (the Screen
-// host mounts it through AddBackdropWindow).
-func (m *MapView) Backdrop() bool { return true }
 
 // Unmounted clears the search and its focus: the field must not keep the
 // keyboard while the layer is gone, and a reopened map starts unfiltered.
@@ -206,7 +227,7 @@ func (m *MapView) Unmounted() {
 		m.search.Focus(false)
 		m.search.SetText("")
 	}
-	m.hover, m.tip = "", ""
+	m.hover, m.tip, m.overX = "", "", false
 	m.dirty = true
 }
 
@@ -254,7 +275,7 @@ func (m *MapView) fit() {
 	m.gfx.Image = m.img
 	m.win.SetLocation(r)
 	m.rows, m.gates, m.facs = nil, nil, nil
-	m.hover, m.tip = "", ""
+	m.hover, m.tip, m.overX = "", "", false
 	m.drawn = false
 }
 
@@ -316,10 +337,11 @@ func (m *MapView) moveSel(d int) {
 	m.dirty = true
 }
 
-// poll reads one frame of pointer input: the cursor drives hover over a
-// node, a browser row or a gate chip, and a press selects. A press on the
-// already-selected system sets the destination, or clears it when it
-// already is the destination or is the current system.
+// poll reads one frame of pointer input: the cursor drives hover over the
+// canvas ×, a node, a browser row, a gate chip or a facility glyph, and a
+// press selects (or closes on the ×). A press on the already-selected
+// system sets the destination, or clears it when it already is the
+// destination or is the current system.
 func (m *MapView) poll(cur content.SystemID) {
 	if m.ptr == nil || m.gfx == nil || len(m.pts) == 0 {
 		return
@@ -328,6 +350,17 @@ func (m *MapView) poll(cur content.SystemID) {
 	r := m.gfx.GetWidget().Rect
 	over := widgets.OwnsAt(m.gfx.GetWidget(), pt, input.LayerEventTypeMouseButton)
 	local := pt.Sub(r.Min)
+
+	// The × is drawn in the canvas, so its hover and its press are
+	// canvas hits like every other region.
+	onX := over && local.In(m.CloseRect())
+	if onX {
+		m.ptr.ClaimShape(ebiten.CursorShapePointer)
+	}
+	if onX != m.overX {
+		m.overX = onX
+		m.dirty = true
+	}
 
 	hover, tip := content.SystemID(""), ""
 	if over {
@@ -358,6 +391,12 @@ func (m *MapView) poll(cur content.SystemID) {
 	// field, so N and Esc are the layer's keys again after a click.
 	if m.SearchFocused() {
 		m.search.Focus(false)
+	}
+	if onX {
+		if m.close != nil {
+			m.close()
+		}
+		return
 	}
 	if id, ok := m.hitAt(m.rows, local); ok {
 		m.pickSystem(id, cur)
@@ -488,19 +527,31 @@ func (m *MapView) route(cur, dest content.SystemID) []content.SystemID {
 // Layout and drawing
 // ---------------------------------------------------------------------------
 
-// zones divides the canvas into the browser, the graph and the overview.
+// zones divides the canvas into the browser, the graph and the overview:
+// one outer margin, a gutter between the columns and an inset line under
+// the header band, so no column starts flush against the chrome.
 func (m *MapView) zones() mapZones {
 	b := m.img.Bounds()
 	pad := theme.Px(mapPadOuter)
-	head := theme.Px(mapHeadH)
-	top, bottom := head, b.Dy()-pad
+	gutter := theme.Px(mapGutter)
+	top, bottom := theme.Px(mapHeadH)+theme.Px(mapInset), b.Dy()-pad
 	left := image.Rect(pad, top, pad+theme.Px(mapLeftW), bottom)
 	right := image.Rect(b.Dx()-pad-theme.Px(mapRightW), top, b.Dx()-pad, bottom)
-	graph := image.Rect(left.Max.X+pad, top, right.Min.X-pad, bottom)
+	graph := image.Rect(left.Max.X+gutter, top, right.Min.X-gutter, bottom)
 	if graph.Dx() < 1 {
 		graph = image.Rect(left.Max.X, top, right.Min.X, bottom)
 	}
 	return mapZones{left: left, graph: graph, right: right}
+}
+
+// CloseRect is the canvas × button in canvas coordinates: the header
+// band's right end, one outer margin clear of the layer's edge. It is the
+// button's hit box too (a driver presses it through the pointer frame).
+func (m *MapView) CloseRect() image.Rectangle {
+	b := m.img.Bounds()
+	sz := theme.Px(mapClose)
+	y := (theme.Px(mapHeadH) - sz) / 2
+	return image.Rect(b.Dx()-theme.Px(mapPadOuter)-sz, y, b.Dx()-theme.Px(mapPadOuter), y+sz)
 }
 
 // drawMap repaints the whole layer: the opaque backdrop, the header, the
@@ -513,7 +564,8 @@ func (m *MapView) drawMap(cur content.SystemID) {
 	m.graph = m.layout.graph
 	m.rows, m.gates, m.facs = m.rows[:0], m.gates[:0], m.facs[:0]
 
-	// The layer is opaque: it covers the world, not the windows above it.
+	// The layer is opaque: it covers the world, every window and the chrome
+	// under it (nothing renders above it but the context menu).
 	vector.DrawFilledRect(m.img, 0, 0, float32(b.Dx()), float32(b.Dy()), theme.Solid(p.BGHard), false)
 
 	m.drawHeader()
@@ -524,7 +576,10 @@ func (m *MapView) drawMap(cur content.SystemID) {
 }
 
 // drawHeader is the canvas's own title band: the region and constellation
-// the dropped title bar used to carry, with the map's glyph.
+// the dropped title bar used to carry, with the map's glyph and the
+// layer's ×. The × is the window chrome's button in canvas form (cell
+// fill, border, accent on hover): a layer has no title bar to hang one on,
+// but it must still be mouse-closable.
 func (m *MapView) drawHeader() {
 	p := m.th.Pal()
 	title := "Starmap"
@@ -532,56 +587,81 @@ func (m *MapView) drawHeader() {
 		title = starmapTitle(u.Region, u.Constellation)
 	}
 	y := theme.Px(mapHeadH) / 2
-	drawIcon(m.img, "svc_map", theme.Px(mapPadOuter), y-theme.Px(icons.Title)/2, theme.Px(icons.Title), p.Accent)
-	theme.DrawCardText(m.img, title, m.th.FaceBold(theme.StepSmall),
-		theme.Px(mapPadOuter)+theme.Px(icons.Title)+theme.Px(8), y-theme.Px(9), p.Text)
-	vector.StrokeLine(m.img, float32(theme.Px(mapPadOuter)), float32(theme.Px(mapHeadH)-1),
-		float32(m.img.Bounds().Dx()-theme.Px(mapPadOuter)), float32(theme.Px(mapHeadH)-1),
+	x := theme.Px(mapPadOuter)
+	drawIcon(m.img, "svc_map", x, y-theme.Px(icons.Title)/2, theme.Px(icons.Title), p.Accent)
+	theme.DrawCardText(m.img, title, m.th.FaceBold(theme.StepBase),
+		x+theme.Px(icons.Title)+theme.Px(theme.SpMd), y-theme.Px(11), p.Text)
+
+	r := m.CloseRect()
+	body, edge := theme.NRGBA(p.Cell, 220), theme.NRGBA(p.Border, 220)
+	if m.overX {
+		body, edge = theme.NRGBA(p.Hover, 18), theme.NRGBA(p.Accent, 200)
+	}
+	theme.DrawRoundBox(m.img, r, body, edge, theme.Px(1), theme.AllRadii(theme.RadiusControl))
+	face := m.th.FaceBold(theme.StepSmall)
+	gw, gh := text.Measure("×", *face, 0)
+	theme.DrawCardText(m.img, "×", face, r.Min.X+(r.Dx()-int(gw))/2, r.Min.Y+(r.Dy()-int(gh))/2-1, p.Text)
+
+	vector.StrokeLine(m.img, float32(x), float32(theme.Px(mapHeadH)-1),
+		float32(m.img.Bounds().Dx()-x), float32(theme.Px(mapHeadH)-1),
 		float32(theme.Px(1)), theme.NRGBA(p.Border, 160), false)
 }
 
-// drawBrowser paints the system list under the search field. A row is a
-// security dot, the display name and the two state markers (a hull for the
-// current system, a pennant for the selected/destination one).
+// drawBrowser paints the system list under the search field: a framed
+// head line (the tracked label and the live count over a rule), then one
+// row per system, pitched on mapRowH with a hairline of air between rows.
+// A row is a security dot, the display name and the two state markers (a
+// hull for the current system, a pennant for the selected/destination one).
 func (m *MapView) drawBrowser(cur content.SystemID) {
 	z := m.layout.left
 	p := m.th.Pal()
 	theme.DrawRoundBox(m.img, z, theme.NRGBA(p.Cell, 235), theme.NRGBA(p.Border, 190), theme.Px(1), theme.AllRadii(theme.RadiusPanel))
 
-	x0 := z.Min.X + theme.Px(6)
-	x1 := z.Max.X - theme.Px(6)
-	top := z.Min.Y + theme.Px(2*mapInset+mapSearchH)
+	x0 := z.Min.X + theme.Px(mapInset)
+	x1 := z.Max.X - theme.Px(mapInset)
+	nodes := m.listedNodes()
+
+	headY := z.Min.Y + theme.Px(mapSearchH) + theme.Px(mapHeadGap)
+	face := *m.th.FaceMono(theme.StepTiny)
+	theme.DrawTracked(m.img, "SYSTEMS", face, m.th.TS().Tiny, float64(x0), float64(headY), p.Dim)
+	count := strconv.Itoa(len(nodes))
+	render.Text(m.img, count, float64(x1)-render.Measure(count, m.th.TS().Tiny), float64(headY), m.th.TS().Tiny, p.Dim)
+	ruleY := headY + theme.Px(16)
+	vector.StrokeLine(m.img, float32(x0), float32(ruleY), float32(x1), float32(ruleY),
+		float32(theme.Px(1)), theme.NRGBA(p.Border, 140), false)
+
+	top := ruleY + theme.Px(theme.SpSm)
 	rowH := theme.Px(mapRowH)
-	for i, n := range m.listedNodes() {
-		r := image.Rect(x0, top+i*rowH, x1, top+(i+1)*rowH)
+	for i, n := range nodes {
+		r := image.Rect(x0, top+i*rowH+theme.Px(1), x1, top+(i+1)*rowH-theme.Px(1))
 		if r.Max.Y > z.Max.Y-theme.Px(mapInset) {
 			break // shortcut: the list clips, not scrolls; upgrade to the house scroll view when it outgrows the column.
 		}
 		switch {
 		case n.id == m.sel:
 			theme.FillRect(m.img, r, theme.NRGBA(p.Hover, 30))
-			theme.FillRect(m.img, image.Rect(r.Min.X, r.Min.Y, r.Min.X+theme.Px(2), r.Max.Y), p.Accent)
+			theme.FillRect(m.img, image.Rect(r.Min.X, r.Min.Y, r.Min.X+theme.Px(3), r.Max.Y), p.Accent)
 		case n.id == m.hover:
 			theme.FillRect(m.img, r, theme.NRGBA(p.Text, 12))
 		}
 		dot := float32(r.Min.Y + r.Dy()/2)
-		vector.DrawFilledCircle(m.img, float32(r.Min.X+theme.Px(8)), dot, float32(theme.Px(4)), m.mapSecurity(n.security), true)
+		vector.DrawFilledCircle(m.img, float32(r.Min.X+theme.Px(10)), dot, float32(theme.Px(4)), m.mapSecurity(n.security), true)
 		col := p.Dim
-		face := m.th.Face(theme.StepSmall)
+		nameFace := m.th.Face(theme.StepSmall)
 		switch {
 		case n.id == cur || n.id == m.dest || n.id == m.sel:
 			col = p.Accent
 		case n.id == m.hover:
 			col = p.Text
 		}
-		theme.DrawCardText(m.img, n.name, face, r.Min.X+theme.Px(18), r.Min.Y+theme.Px(4), col)
+		theme.DrawCardText(m.img, n.name, nameFace, r.Min.X+theme.Px(24), r.Min.Y+theme.Px(6), col)
 		if n.id == m.dest {
-			m.drawFlag(float32(r.Max.X-theme.Px(14)), float32(r.Min.Y+theme.Px(5)), true, p.Accent)
+			m.drawFlag(float32(r.Max.X-theme.Px(16)), float32(r.Min.Y+theme.Px(7)), true, p.Accent)
 		} else if n.id == m.sel {
-			m.drawFlag(float32(r.Max.X-theme.Px(14)), float32(r.Min.Y+theme.Px(5)), false, p.Accent)
+			m.drawFlag(float32(r.Max.X-theme.Px(16)), float32(r.Min.Y+theme.Px(7)), false, p.Accent)
 		}
 		if n.id == cur {
-			drawIcon(m.img, "kind_ship", r.Max.X-theme.Px(40), r.Min.Y+theme.Px(5), theme.Px(icons.Inline), p.Accent)
+			drawIcon(m.img, "kind_ship", r.Max.X-theme.Px(46), r.Min.Y+theme.Px(7), theme.Px(icons.Inline), p.Accent)
 		}
 		m.rows = append(m.rows, mapHit{rect: r, id: n.id, text: n.name})
 	}
@@ -702,9 +782,9 @@ func (m *MapView) drawGraph(cur content.SystemID) {
 			col = p.Text
 		}
 		w, _ := text.Measure(n.name, *face, 0)
-		render.Text(m.img, n.name, pt.x-w/2, pt.y+14*s, m.th.TS().Small, col)
-		m.labels[i] = image.Rect(int(pt.x-w/2)-theme.Px(2), int(pt.y+11*s),
-			int(pt.x+w/2)+theme.Px(2), int(pt.y+34*s))
+		render.Text(m.img, n.name, pt.x-w/2, pt.y+16*s, m.th.TS().Small, col)
+		m.labels[i] = image.Rect(int(pt.x-w/2)-theme.Px(2), int(pt.y+12*s),
+			int(pt.x+w/2)+theme.Px(2), int(pt.y+38*s))
 
 		// The destination flag is the visual affordance the old hint
 		// spelled out: hover carries the outline, the confirmed
@@ -720,14 +800,35 @@ func (m *MapView) drawGraph(cur content.SystemID) {
 	}
 
 	// Zone legend: the node colors decoded in the canon's zone words with
-	// their complementary status labels (docs/lore/UNIVERSE.md — Zones).
-	for i, sec := range zoneSecs {
-		y := float64(z.Max.Y-theme.Px(mapPad)) + float64(i)*16*s
-		vector.DrawFilledCircle(m.img, float32(z.Min.X)+float32(12*s), float32(y)+float32(6*s), float32(4*s), m.mapSecurity(sec), true)
-		render.Text(m.img, zoneLabel(sec), float64(z.Min.X)+24*s, y, m.th.TS().Tiny, p.Dim)
-	}
+	// their complementary status labels (docs/lore/UNIVERSE.md — Zones),
+	// in a card so the graph's corners read as one set of overlays.
+	m.drawZoneKey()
 	m.drawWarKey()
 	m.drawJumpBadge(cur)
+}
+
+// drawZoneKey paints the zone legend card in the graph's bottom-left
+// corner: one security dot and its zone words per code.
+func (m *MapView) drawZoneKey() {
+	z := m.graph
+	p := m.th.Pal()
+	s := theme.Scale()
+	face := m.th.TS().Tiny
+	w := 0.0
+	for _, sec := range zoneSecs {
+		w = math.Max(w, render.Measure(zoneLabel(sec), face))
+	}
+	pad := theme.Px(mapInset)
+	h := pad + len(zoneSecs)*theme.Px(18) + theme.Px(theme.SpSm)
+	r := image.Rect(z.Min.X+pad, z.Max.Y-pad-h,
+		z.Min.X+pad+int(w)+theme.Px(34), z.Max.Y-pad)
+	theme.DrawRoundBox(m.img, r, theme.NRGBA(p.BGHard, 180), theme.NRGBA(p.Border, 110),
+		theme.Px(1), theme.AllRadii(theme.RadiusPanel))
+	for i, sec := range zoneSecs {
+		y := float64(r.Min.Y+pad) + float64(i)*18*s
+		vector.DrawFilledCircle(m.img, float32(r.Min.X+theme.Px(12)), float32(y)+float32(6*s), float32(4*s), m.mapSecurity(sec), true)
+		render.Text(m.img, zoneLabel(sec), float64(r.Min.X+theme.Px(24)), y, face, p.Dim)
+	}
 }
 
 // drawJumpBadge is the route summary as one content chip: the gate glyph
@@ -741,13 +842,13 @@ func (m *MapView) drawJumpBadge(cur content.SystemID) {
 	if jumps := len(m.route(cur, m.dest)) - 1; jumps > 0 {
 		label, col = strconv.Itoa(jumps)+" jumps", p.Accent
 	}
-	x := m.graph.Min.X + theme.Px(12)
-	y := m.graph.Min.Y + theme.Px(12)
-	w := int(render.Measure(label, m.th.TS().Tiny)) + theme.Px(26)
-	h := theme.Px(20)
+	x := m.graph.Min.X + theme.Px(mapInset)
+	y := m.graph.Min.Y + theme.Px(mapInset)
+	w := int(render.Measure(label, m.th.TS().Tiny)) + theme.Px(34)
+	h := theme.Px(24)
 	theme.DrawRoundBox(m.img, image.Rect(x, y, x+w, y+h), theme.NRGBA(col, 26), theme.NRGBA(col, 170), theme.Px(1), theme.AllRadii(theme.RadiusPanel))
-	drawIcon(m.img, "kind_gate", x+theme.Px(4), y+theme.Px(3), theme.Px(icons.Inline), col)
-	render.Text(m.img, label, float64(x+theme.Px(22)), float64(y+theme.Px(3)), m.th.TS().Tiny, col)
+	drawIcon(m.img, "kind_gate", x+theme.Px(7), y+theme.Px(4), theme.Px(icons.Inline), col)
+	render.Text(m.img, label, float64(x+theme.Px(28)), float64(y+theme.Px(5)), m.th.TS().Tiny, col)
 }
 
 // drawFlag paints the destination/selection pennant: a pole and a small
@@ -801,10 +902,11 @@ func drawIcon(dst *ebiten.Image, name string, x, y, size int, tint color.RGBA) {
 	dst.DrawImage(icons.Get(name, size, tint), op)
 }
 
-// drawOverview paints the selected system's overview: name and security
-// badge, the region pair, the count chips, one row per celestial (with a
-// station's facilities, a belt's ore chips and a gate's destination chip),
-// and the war readout at the bottom.
+// drawOverview paints the selected system: the identity block (name at the
+// one large type step, security badge, region pair, a closing rule), the
+// density strip, then one section card per kind family and the war
+// readout's card. Three levels read in order: the system, the sections,
+// the rows and chips inside them.
 func (m *MapView) drawOverview(cur content.SystemID) {
 	z := m.layout.right
 	p := m.th.Pal()
@@ -818,101 +920,80 @@ func (m *MapView) drawOverview(cur content.SystemID) {
 	if !ok {
 		return
 	}
-	x := z.Min.X + theme.Px(mapInset)
+	x0 := z.Min.X + theme.Px(mapInset)
+	x1 := z.Max.X - theme.Px(mapInset)
 	y := z.Min.Y + theme.Px(mapInset)
 
+	// Level one: the system itself.
+	y += theme.Px(theme.SpSm)
 	name := def.Name
 	if name == "" {
 		name = string(def.ID)
 	}
-	face := m.th.FaceBold(theme.StepSmall)
-	theme.DrawCardText(m.img, name, face, x, y, p.Text)
+	face := m.th.FaceBold(theme.StepLarge)
+	name = theme.Ellipsize(name, float64(x1-x0-theme.Px(26)),
+		func(s string) float64 { return text.Advance(s, *face) })
+	theme.DrawCardText(m.img, name, face, x0, y, p.Text)
 	if id == m.sel {
 		nw, _ := text.Measure(name, *face, 0)
-		m.drawFlag(float32(x)+float32(nw)+float32(theme.Px(8)), float32(y)+float32(theme.Px(2)), id == m.dest, p.Accent)
+		m.drawFlag(float32(x0)+float32(nw)+float32(theme.Px(theme.SpMd)), float32(y)+float32(theme.Px(4)), id == m.dest, p.Accent)
 	}
-	y += theme.Px(22)
+	y += theme.Px(30)
 
-	// Security is a colour badge in the map's own zone palette, the zone
-	// words underneath it.
+	// Security is a colour badge in the map's own zone palette; the zone
+	// words sit under the name, the region pair under them.
 	if zl := zoneLabel(def.Security); zl != "" {
 		col := m.mapSecurity(def.Security)
 		tw := int(render.Measure(zl, m.th.TS().Tiny))
-		theme.DrawRoundBox(m.img, image.Rect(x, y, x+tw+theme.Px(22), y+theme.Px(18)),
+		theme.DrawRoundBox(m.img, image.Rect(x0, y, x0+tw+theme.Px(34), y+theme.Px(20)),
 			theme.NRGBA(col, 36), theme.NRGBA(col, 190), theme.Px(1), theme.AllRadii(theme.RadiusPanel))
-		vector.DrawFilledCircle(m.img, float32(x+theme.Px(8)), float32(y+theme.Px(9)), float32(theme.Px(4)), col, true)
-		render.Text(m.img, zl, float64(x+theme.Px(16)), float64(y+theme.Px(3)), m.th.TS().Tiny, p.Text)
-		y += theme.Px(22)
+		vector.DrawFilledCircle(m.img, float32(x0+theme.Px(10)), float32(y+theme.Px(10)), float32(theme.Px(4)), col, true)
+		render.Text(m.img, zl, float64(x0+theme.Px(20)), float64(y+theme.Px(3)), m.th.TS().Tiny, p.Text)
+		y += theme.Px(24)
 	}
 	if rc := regionLine(def.Region, def.Constellation); rc != "" {
-		render.Text(m.img, rc, float64(x), float64(y), m.th.TS().Tiny, p.Dim)
+		render.Text(m.img, rc, float64(x0), float64(y), m.th.TS().Tiny, p.Dim)
 		y += theme.Px(16)
 	}
+	y += theme.Px(theme.SpSm)
+	// The identity block closes on an accent rule: the one warm line in the
+	// column, so the system reads before the sections do.
+	vector.StrokeLine(m.img, float32(x0), float32(y), float32(x1), float32(y),
+		float32(theme.Px(1)), theme.NRGBA(p.Accent, 90), false)
+	y += theme.Px(mapInset)
 
 	bodies := overviewBodies(def)
 	stations, gates, belts, anomalies := overviewCounts(bodies)
-	y += theme.Px(2)
-	y = m.drawCounts(x, y, stations, gates, belts, anomalies)
-	y += theme.Px(6)
-
-	for _, b := range bodies {
-		if y > z.Max.Y-theme.Px(mapInset)-theme.Px(30) {
-			break // shortcut: the overview clips, not scrolls; upgrade when a system outgrows the column.
-		}
-		switch b.Kind {
-		case content.CelStation:
-			y = m.drawBodyRow(x, y, b.Icon, b.Name, p.Text)
-			sz := theme.Px(icons.Inline)
-			fx := x + theme.Px(22)
-			for _, sid := range b.Services {
-				drawIcon(m.img, serviceIcon(sid), fx, y, sz, p.Info)
-				m.facs = append(m.facs, mapHit{rect: image.Rect(fx, y, fx+sz, y+sz), text: serviceLabel(sid)})
-				fx += theme.Px(22)
-			}
-			y += theme.Px(16)
-		case content.CelBelt:
-			y = m.drawBodyRow(x, y, b.Icon, b.Name, p.Text)
-			for _, ore := range b.Ores {
-				if y > z.Max.Y-theme.Px(mapInset)-theme.Px(20) {
-					break
-				}
-				y = m.drawOre(x, y, ore)
-			}
-		case content.CelGate:
-			label := m.systemName(b.Gate)
-			if label == "" {
-				label = b.Name
-			}
-			w := int(render.Measure(label, m.th.TS().Small)) + theme.Px(30)
-			r := image.Rect(x, y, x+w, y+theme.Px(20))
-			theme.DrawRoundBox(m.img, r, theme.NRGBA(p.Info, 24), theme.NRGBA(p.Info, 130), theme.Px(1), theme.AllRadii(theme.RadiusPanel))
-			drawIcon(m.img, b.Icon, x+theme.Px(4), y+theme.Px(2), theme.Px(icons.Inline), p.Info)
-			render.Text(m.img, label, float64(x+theme.Px(24)), float64(y+theme.Px(1)), m.th.TS().Small, p.Text)
-			m.gates = append(m.gates, mapHit{rect: r, id: b.Gate, text: label})
-			y += theme.Px(24)
-		case content.CelAnomaly:
-			y = m.drawBodyRow(x, y, b.Icon, b.Name, p.Danger)
-		default:
-			y = m.drawBodyRow(x, y, b.Icon, b.Name, p.Text)
-		}
+	y = m.drawCounts(x0, x1, y, stations, gates, belts, anomalies)
+	for _, sec := range overviewSections(bodies) {
+		y = m.drawSection(x0, x1, y, sec)
 	}
+	m.drawReadout(x0, x1, y)
+}
 
-	// The war readout the card used to carry: the holder and, on a front,
-	// the meter from the holder's side.
-	if m.sel != "" && y < z.Max.Y-theme.Px(mapInset)-theme.Px(16) {
-		y += theme.Px(4)
-		for _, l := range m.readoutLines() {
-			render.Text(m.img, l.text, float64(x), float64(y), m.th.TS().Tiny, l.col)
-			y += theme.Px(15)
-		}
+// drawCardHead paints a card's header: the tracked chrome label and a
+// hairline rule filling the rest of the row. One painter, so every section
+// scans as the same level.
+func (m *MapView) drawCardHead(x0, x1, y int, head string) {
+	p := m.th.Pal()
+	face := *m.th.FaceMono(theme.StepTiny)
+	theme.DrawTracked(m.img, head, face, m.th.TS().Tiny, float64(x0), float64(y), p.Dim)
+	rx := x0 + int(theme.MeasureTracked(head, face, m.th.TS().Tiny)) + theme.Px(theme.SpMd)
+	if ry := y + theme.Px(8); rx < x1 {
+		vector.StrokeLine(m.img, float32(rx), float32(ry), float32(x1), float32(ry),
+			float32(theme.Px(1)), theme.NRGBA(p.Border, 140), false)
 	}
 }
 
-// drawCounts paints the header's density chips: one icon plus number per
-// counted kind (stations, gates, belts, anomalies).
-func (m *MapView) drawCounts(x, y int, stations, gates, belts, anomalies int) int {
+// drawCounts paints the density strip: one framed band with a chip per
+// counted kind (stations, gates, belts, anomalies), each a dim glyph and
+// its number in a quarter of the width.
+func (m *MapView) drawCounts(x0, x1, y int, stations, gates, belts, anomalies int) int {
 	p := m.th.Pal()
-	items := []struct {
+	h := theme.Px(28)
+	theme.DrawRoundBox(m.img, image.Rect(x0, y, x1, y+h),
+		theme.NRGBA(p.BG, 150), theme.NRGBA(p.Border, 110), theme.Px(1), theme.AllRadii(theme.RadiusPanel))
+	items := [...]struct {
 		n    int
 		icon string
 	}{
@@ -921,36 +1002,235 @@ func (m *MapView) drawCounts(x, y int, stations, gates, belts, anomalies int) in
 		{belts, "kind_belt"},
 		{anomalies, "kind_anomaly"},
 	}
+	cell := (x1 - x0) / len(items)
 	sz := theme.Px(icons.Inline)
-	cx := x
-	for _, it := range items {
-		drawIcon(m.img, it.icon, cx, y, sz, p.Dim)
-		label := strconv.Itoa(it.n)
-		render.Text(m.img, label, float64(cx+theme.Px(18)), float64(y+1), m.th.TS().Tiny, p.Text)
-		cx += theme.Px(18) + int(render.Measure(label, m.th.TS().Tiny)) + theme.Px(12)
+	for i, it := range items {
+		cx := x0 + i*cell + theme.Px(theme.SpMd)
+		cy := y + (h-sz)/2
+		drawIcon(m.img, it.icon, cx, cy, sz, p.Dim)
+		render.Text(m.img, strconv.Itoa(it.n), float64(cx+sz+theme.Px(6)), float64(cy+1), m.th.TS().Small, p.Text)
 	}
-	return y + theme.Px(18)
+	return y + h + theme.Px(mapSection)
 }
 
-// drawBodyRow paints one celestial row (icon and display name).
+// overviewSection is one overview card: the tracked header of a kind
+// family over the bodies that belong to it.
+type overviewSection struct {
+	head   string
+	bodies []overviewBody
+}
+
+// overviewSections groups the ordered bodies into the overview's cards:
+// celestials (star, planet, moon), stations, belts, gates, anomalies.
+func overviewSections(bodies []overviewBody) []overviewSection {
+	var out []overviewSection
+	add := func(head string, b overviewBody) {
+		for i := range out {
+			if out[i].head == head {
+				out[i].bodies = append(out[i].bodies, b)
+				return
+			}
+		}
+		out = append(out, overviewSection{head: head, bodies: []overviewBody{b}})
+	}
+	for _, b := range bodies {
+		switch b.Kind {
+		case content.CelStar, content.CelPlanet, content.CelMoon:
+			add("CELESTIALS", b)
+		case content.CelStation:
+			add("STATIONS", b)
+		case content.CelBelt:
+			add("BELTS", b)
+		case content.CelGate:
+			add("GATES", b)
+		case content.CelAnomaly:
+			add("ANOMALIES", b)
+		default:
+			add("BODIES", b)
+		}
+	}
+	return out
+}
+
+// bodyHeight is one body's ink height inside a section card: the row, plus
+// a station's facility chip line or a belt's ore chips.
+func bodyHeight(b overviewBody) int {
+	switch b.Kind {
+	case content.CelStation:
+		h := theme.Px(mapBodyH)
+		if len(b.Services) > 0 {
+			h += theme.Px(mapFacH)
+		}
+		return h
+	case content.CelBelt:
+		return theme.Px(mapBodyH) + len(b.Ores)*theme.Px(mapOreH)
+	case content.CelGate:
+		return theme.Px(mapGateH)
+	}
+	return theme.Px(mapBodyH)
+}
+
+// sectionHeight is a card's full height: its padding at both ends, the
+// header band and the bodies (a gate chip's pair shares one row).
+func sectionHeight(sec overviewSection) int {
+	h := 2*theme.Px(mapCardPad) + theme.Px(16) + theme.Px(mapHeadGap)
+	gates := 0
+	for _, b := range sec.bodies {
+		if b.Kind == content.CelGate {
+			gates++
+			continue
+		}
+		h += bodyHeight(b)
+	}
+	h += (gates + 1) / 2 * theme.Px(mapGateH)
+	return h
+}
+
+// drawSection paints one section card and returns the next free line. A
+// card stops at the column's bottom edge (the overview clips, never
+// scrolls: shortcut: upgrade to the house scroll view when a system
+// outgrows the column).
+func (m *MapView) drawSection(x0, x1, y int, sec overviewSection) int {
+	limit := m.layout.right.Max.Y - theme.Px(mapInset)
+	if y+theme.Px(mapCardPad)+theme.Px(16)+theme.Px(mapHeadGap) > limit {
+		return limit
+	}
+	p := m.th.Pal()
+	bottom := min(y+sectionHeight(sec), limit)
+	theme.DrawRoundBox(m.img, image.Rect(x0, y, x1, bottom),
+		theme.NRGBA(p.BG, 170), theme.NRGBA(p.Border, 90), theme.Px(1), theme.AllRadii(theme.RadiusPanel))
+	ix0 := x0 + theme.Px(mapCardPad)
+	ix1 := x1 - theme.Px(mapCardPad)
+	m.drawCardHead(ix0, ix1, y+theme.Px(mapCardPad), sec.head)
+
+	cy := y + theme.Px(mapCardPad) + theme.Px(16) + theme.Px(mapHeadGap)
+	gates := 0
+	for _, b := range sec.bodies {
+		if cy+bodyHeight(b) > limit {
+			break
+		}
+		switch b.Kind {
+		case content.CelStation:
+			cy = m.drawBodyRow(ix0, cy, b.Icon, b.Name, p.Text)
+			m.drawFacilities(ix0+theme.Px(22), cy, b.Services)
+			cy += theme.Px(mapFacH)
+		case content.CelBelt:
+			cy = m.drawBodyRow(ix0, cy, b.Icon, b.Name, p.Text)
+			for _, ore := range b.Ores {
+				if cy+theme.Px(mapOreH) > limit {
+					break
+				}
+				cy = m.drawOre(ix0, ix1, cy, ore)
+			}
+		case content.CelGate:
+			// Gates read as a two-column chip grid, so four destinations
+			// cost two rows of air instead of four.
+			col := gates % 2
+			cw := (ix1 - ix0 - theme.Px(theme.SpMd)) / 2
+			m.drawGate(ix0+col*(cw+theme.Px(theme.SpMd)), cy, cw, b)
+			gates++
+			if col == 1 {
+				cy += theme.Px(mapGateH)
+			}
+		case content.CelAnomaly:
+			cy = m.drawBodyRow(ix0, cy, b.Icon, b.Name, p.Danger)
+		default:
+			cy = m.drawBodyRow(ix0, cy, b.Icon, b.Name, p.Text)
+		}
+	}
+	if gates%2 == 1 {
+		cy += theme.Px(mapGateH)
+	}
+	return bottom + theme.Px(mapSection)
+}
+
+// drawFacilities paints a station's service glyphs as a chip row, indented
+// under the station's name; each chip carries its hover label.
+func (m *MapView) drawFacilities(x, y int, services []string) {
+	p := m.th.Pal()
+	sz := theme.Px(icons.Inline)
+	side := theme.Px(mapFacH)
+	for _, sid := range services {
+		chip := image.Rect(x, y, x+side, y+side)
+		theme.DrawRoundBox(m.img, chip, theme.NRGBA(p.BG, 160), theme.NRGBA(p.Border, 110),
+			theme.Px(1), theme.AllRadii(theme.RadiusControl))
+		drawIcon(m.img, serviceIcon(sid), chip.Min.X+(side-sz)/2, chip.Min.Y+(side-sz)/2, sz, p.Info)
+		m.facs = append(m.facs, mapHit{rect: chip, text: serviceLabel(sid)})
+		x += side + theme.Px(theme.SpSm)
+	}
+}
+
+// drawBodyRow paints one celestial row (kind glyph and display name).
 func (m *MapView) drawBodyRow(x, y int, icon, name string, tint color.RGBA) int {
 	sz := theme.Px(icons.Inline)
-	drawIcon(m.img, icon, x, y+theme.Px(1), sz, tint)
-	render.Text(m.img, name, float64(x+sz+theme.Px(6)), float64(y), m.th.TS().Small, tint)
+	cy := y + (theme.Px(mapBodyH)-sz)/2
+	drawIcon(m.img, icon, x, cy, sz, tint)
+	render.Text(m.img, name, float64(x+sz+theme.Px(theme.SpMd)), float64(cy), m.th.TS().Small, tint)
 	return y + theme.Px(mapBodyH)
 }
 
-// drawOre paints one belt's ore chip: the ore's art (drop-in when the
-// player has one, the manifest asteroid otherwise) and the belt's count and
-// per-asteroid volume.
-func (m *MapView) drawOre(x, y int, ore overviewOre) int {
+// drawGate paints a gate's destination as a selectable chip across the
+// cell it is given (the two-column grid keeps the column edges aligned).
+func (m *MapView) drawGate(x, y, w int, b overviewBody) {
 	p := m.th.Pal()
-	drawIcon(m.img, oreIcon(ore.Ore), x, y+theme.Px(1), theme.Px(icons.Inline), p.Warn)
-	render.Text(m.img, m.oreName(ore.Ore), float64(x+theme.Px(20)), float64(y), m.th.TS().Tiny, p.Text)
+	label := m.systemName(b.Gate)
+	if label == "" {
+		label = b.Name
+	}
+	label = theme.Ellipsize(label, float64(w-theme.Px(34)),
+		func(s string) float64 { return render.Measure(s, m.th.TS().Small) })
+	r := image.Rect(x, y+theme.Px(1), x+w, y+theme.Px(1)+theme.Px(mapGateH)-theme.Px(2))
+	theme.DrawRoundBox(m.img, r, theme.NRGBA(p.Info, 24), theme.NRGBA(p.Info, 130),
+		theme.Px(1), theme.AllRadii(theme.RadiusControl))
+	drawIcon(m.img, b.Icon, r.Min.X+theme.Px(6), r.Min.Y+theme.Px(3), theme.Px(icons.Inline), p.Info)
+	render.Text(m.img, label, float64(r.Min.X+theme.Px(28)), float64(r.Min.Y+theme.Px(2)), m.th.TS().Small, p.Text)
+	m.gates = append(m.gates, mapHit{rect: r, id: b.Gate, text: label})
+}
+
+// drawOre paints one belt's ore as a chip: the ore's art (drop-in when the
+// player has one, the manifest asteroid otherwise), its name, and the
+// belt's count and per-asteroid volume set right.
+func (m *MapView) drawOre(x0, x1, y int, ore overviewOre) int {
+	p := m.th.Pal()
+	h := theme.Px(mapOreH) - theme.Px(2)
+	r := image.Rect(x0+theme.Px(10), y+theme.Px(1), x1, y+theme.Px(1)+h)
+	theme.DrawRoundBox(m.img, r, theme.NRGBA(p.BG, 120), theme.NRGBA(p.Border, 70),
+		theme.Px(1), theme.AllRadii(theme.RadiusControl))
+	sz := theme.Px(icons.Inline)
+	drawIcon(m.img, oreIcon(ore.Ore), r.Min.X+theme.Px(theme.SpSm), r.Min.Y+(h-sz)/2, sz, p.Warn)
+	render.Text(m.img, m.oreName(ore.Ore),
+		float64(r.Min.X+theme.Px(theme.SpSm)+sz+theme.Px(theme.SpSm)), float64(r.Min.Y+2), m.th.TS().Tiny, p.Text)
 	read := theme.FormatInt(int64(ore.Count)) + " · " + theme.FormatVolume(ore.Volume)
-	right := m.layout.right.Max.X - theme.Px(mapInset)
-	render.Text(m.img, read, float64(right)-render.Measure(read, m.th.TS().Tiny), float64(y), m.th.TS().Tiny, p.Dim)
-	return y + theme.Px(17)
+	render.Text(m.img, read,
+		float64(r.Max.X-theme.Px(theme.SpSm))-render.Measure(read, m.th.TS().Tiny), float64(r.Min.Y+2), m.th.TS().Tiny, p.Dim)
+	return y + theme.Px(mapOreH)
+}
+
+// drawReadout paints the war readout card: who holds the selected system
+// and, on a front, the meter from the holder's side. No lines, no card.
+func (m *MapView) drawReadout(x0, x1, y int) {
+	if m.sel == "" {
+		return
+	}
+	lines := m.readoutLines()
+	if len(lines) == 0 {
+		return
+	}
+	limit := m.layout.right.Max.Y - theme.Px(mapInset)
+	h := 2*theme.Px(mapCardPad) + theme.Px(16) + theme.Px(mapHeadGap) + len(lines)*theme.Px(18)
+	if y+h > limit {
+		return
+	}
+	p := m.th.Pal()
+	theme.DrawRoundBox(m.img, image.Rect(x0, y, x1, y+h),
+		theme.NRGBA(p.BG, 170), theme.NRGBA(p.Border, 90), theme.Px(1), theme.AllRadii(theme.RadiusPanel))
+	ix0 := x0 + theme.Px(mapCardPad)
+	m.drawCardHead(ix0, x1-theme.Px(mapCardPad), y+theme.Px(mapCardPad), "CONTROL")
+	cy := y + theme.Px(mapCardPad) + theme.Px(16) + theme.Px(mapHeadGap)
+	for _, l := range lines {
+		render.Text(m.img, l.text, float64(ix0), float64(cy), m.th.TS().Tiny, l.col)
+		cy += theme.Px(18)
+	}
 }
 
 // readoutLines is the selected system's war readout: who holds it and, on
@@ -1027,7 +1307,8 @@ func warKeyRows(p theme.Palette, w widgets.WarView) []warKey {
 }
 
 // drawWarKey paints the war legend in the graph's top-right corner (the
-// jump badge owns the top-left).
+// jump badge owns the top-left), framed like the zone key so both read as
+// the same overlay.
 func (m *MapView) drawWarKey() {
 	p := m.th.Pal()
 	rows := warKeyRows(p, m.war)
@@ -1036,15 +1317,21 @@ func (m *MapView) drawWarKey() {
 	}
 	s := theme.Scale()
 	face := m.th.TS().Tiny
+	pad := theme.Px(mapInset)
 	width := 0.0
 	for _, r := range rows {
 		width = math.Max(width, render.Measure(r.text, face))
 	}
-	x := float64(m.graph.Max.X-theme.Px(12)) - width
-	for i, r := range rows {
-		y := float64(m.graph.Min.Y) + 12*s + float64(i)*16*s
+	x := float64(m.graph.Max.X-pad) - width
+	h := pad + len(rows)*theme.Px(18)
+	r := image.Rect(int(x)-theme.Px(24), m.graph.Min.Y+pad,
+		m.graph.Max.X-pad, m.graph.Min.Y+pad+h)
+	theme.DrawRoundBox(m.img, r, theme.NRGBA(p.BGHard, 180), theme.NRGBA(p.Border, 110),
+		theme.Px(1), theme.AllRadii(theme.RadiusPanel))
+	for i, row := range rows {
+		y := float64(r.Min.Y+pad) + float64(i)*18*s
 		mx, my := float32(x-9*s), float32(y+6*s)
-		switch r.mark {
+		switch row.mark {
 		case warMarkCharter:
 			vector.DrawFilledCircle(m.img, mx, my, float32(4*s), p.Dim, true)
 		case warMarkWorks:
@@ -1052,7 +1339,7 @@ func (m *MapView) drawWarKey() {
 		case warMarkFront:
 			vector.StrokeCircle(m.img, mx, my, float32(5*s), float32(1.5*s), p.Info, true)
 		}
-		render.Text(m.img, r.text, x, y, face, r.col)
+		render.Text(m.img, row.text, x, y, face, row.col)
 	}
 }
 

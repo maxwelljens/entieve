@@ -68,9 +68,11 @@ const (
 	AnchorFixed                    // Min = absolute design position
 	AnchorBottomLeft               // Min.X = left inset, defaultH-Max.Y = bottom inset
 	AnchorTopCenter                // Min.Y = top inset, width centred
-	// AnchorViewport is the full-viewport layer (the proficiency tree):
-	// the rect IS the viewport. The rail-gutter floor below does not apply,
-	// because the layer paints underneath the rail by construction.
+	// AnchorViewport is the full-viewport layer (the proficiency tree and
+	// the starmap): the rect IS the viewport. The rail-gutter floor below
+	// does not apply, because a layer is never placed in the rail's
+	// column: which side of the rail it paints on is the row's layer
+	// facet (Screen.OverChrome), not its anchor.
 	AnchorViewport
 	// AnchorTopRight / AnchorTopLeft hang the window on a viewport corner:
 	// Min is the inset pair (from the right and the top / from the left and
@@ -222,6 +224,12 @@ type Screen struct {
 
 	DockPolicy DockPolicy
 	Modal      Modal
+	// OverChrome lifts an AnchorViewport row's layer over every window and
+	// the top chrome (the rail): the host mounts it through
+	// Kit.AddFrontWindow and the hit test answers its whole rect before
+	// the chrome. Without it a viewport row is the backdrop layer, under
+	// the rail (the proficiency tree).
+	OverChrome bool
 	SpaceOnly  bool
 	DockedOnly bool
 	Persistent bool
@@ -327,22 +335,23 @@ var screens = []Screen{
 		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewScanner(h.services.Env) },
 	},
 	{
-		// The starmap: the house's second full-viewport layer (the
-		// proficiency tree was the first). It answers Backdrop(), so the
-		// host mounts it through Kit.AddBackdropWindow: painted over the
-		// world and below every window and all chrome. It has no title
-		// bar (the region and constellation ride inside the canvas) and
-		// re-fits itself to the viewport every Sync. N, the rail entry and
-		// Esc close it. The search field is the layer's one typing
+		// The starmap: the house's over-chrome layer (OverChrome), so the
+		// host mounts it through Kit.AddFrontWindow: painted over the
+		// world, every window and all chrome, including the rail. It has
+		// no title bar (the region and constellation ride inside the
+		// canvas, the × in its top-right corner) and re-fits itself to
+		// the viewport every Sync. N, the rail entry, Esc and the canvas
+		// × close it. The search field is the layer's one typing
 		// surface; game.handleKeys yields it the frame while focused.
 		ID: idMap, Title: "Starmap", Icon: "svc_map",
 		Key: ebiten.KeyN, Action: "starmap", Desc: "toggle starmap",
 		DefaultRect: uikit.MapViewRect(),
 		Anchor:      AnchorViewport,
+		OverChrome:  true,
 		DockPolicy:  DockFloating,
 		Group:       "World",
 		Build: func(h *ScreenHost) widgets.WindowPanel {
-			return uikit.NewMapView(h.services.Env, h.services.Viewport)
+			return uikit.NewMapView(h.services.Env, h.services.Viewport, func() { h.Toggle(idMap) })
 		},
 	},
 	{
@@ -444,12 +453,12 @@ var screens = []Screen{
 		Build:       func(h *ScreenHost) widgets.WindowPanel { return uikit.NewFinances(h.services.Env) },
 	},
 	{
-		// The proficiency tree: the house's one full-viewport layer. It is
-		// an ordinary Screen row (key, rail entry, sidecar entry) whose
-		// panel answers Backdrop(), so the host mounts it through
-		// Kit.AddBackdropWindow: painted over the world and below every
-		// window and all chrome, with its own space inert but blocking the
-		// world. It has no title bar (a layer takes no window chrome: Esc
+		// The proficiency tree: the house's backdrop layer (the starmap is
+		// the over-chrome one). It is an ordinary Screen row (key, rail
+		// entry, sidecar entry) whose panel answers Backdrop(), so the host
+		// mounts it through Kit.AddBackdropWindow: painted over the world and
+		// below every window and all chrome, with its own space inert but
+		// blocking the world. It has no title bar (a layer takes no window chrome: Esc
 		// and its key close it) and re-fits itself to the viewport. The
 		// name distinguishes the row from its summary window, which is the
 		// one titled "Proficiency".
@@ -694,6 +703,11 @@ func screenSpecErrors(rows []Screen) []string {
 		}
 		if s.Anchor > anchorLast {
 			add("row %d (%s): unknown anchor %d", i, s.Title, s.Anchor)
+		}
+		// The over-chrome facet is a viewport layer's: only a layer that is
+		// already the whole screen can cover the rail.
+		if s.OverChrome && s.Anchor != AnchorViewport {
+			add("row %d (%s): OverChrome needs the AnchorViewport layer", i, s.Title)
 		}
 		if s.DockPolicy > DockTransient {
 			add("row %d (%s): unknown dock policy %d", i, s.Title, s.DockPolicy)

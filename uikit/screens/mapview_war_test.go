@@ -130,7 +130,7 @@ func TestMapWarCard(t *testing.T) {
 		},
 		Treasury: 1_000_000,
 	}}
-	m := NewMapView(we, nil)
+	m := NewMapView(we, nil, nil)
 	m.Sync()
 
 	m.sel = "sys-penumbra" // charter-held front: the Works press
@@ -220,7 +220,7 @@ func TestMapWarRepaints(t *testing.T) {
 		Control: map[content.SystemID]string{"sys-solace": "charter", "sys-gloam": "works"},
 		Contest: map[content.SystemID]widgets.ContestView{"sys-penumbra": {Meter: 0.1, Threshold: 1}},
 	}}
-	m := NewMapView(we, nil)
+	m := NewMapView(we, nil, nil)
 	m.Sync()
 	if m.redraws != 1 {
 		t.Fatalf("first sync redraws = %d, want 1", m.redraws)

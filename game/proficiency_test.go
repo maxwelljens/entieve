@@ -15,6 +15,11 @@ import (
 // presses, bare layer space belongs to the layer (never the world), and
 // the rail keeps its top-chrome precedence.
 func TestProficiencyRowIsTheFullViewportLayer(t *testing.T) {
+	// The contrast to the starmap: the tree declares no OverChrome, so its
+	// layer stays the backdrop, under every window and the rail.
+	if screenByID(idProficiency).OverChrome {
+		t.Fatal("the proficiency row declares OverChrome: it must stay under the rail")
+	}
 	g := newShowcaseGame(t)
 	g.applySize(1280, 720)
 	// A window over the tree, so the layer order has something to sit

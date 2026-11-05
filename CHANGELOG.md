@@ -10,10 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **The starmap is a full-screen layer with a system overview**: `N` opens
-  the gate graph as the house's second backdrop layer (title-bar-less,
-  re-fitted to the viewport, closed by `N`, the rail entry and Esc), in
-  three zones: a live fuzzy system browser, the graph, and the selected
-  system's overview. The overview names every celestial with its kind
+  the gate graph as the house's over-chrome layer (it paints over every
+  window and the rail, title-bar-less, re-fitted to the viewport, closed by
+  `N`, Esc and the `×` its own header draws), in three zones: a live fuzzy
+  system browser, the graph, and the selected system's overview. The overview names every celestial with its kind
   icon, a station's facilities as the service glyph row, a belt's ore
   chips with their counts and volumes, and a gate's destination as a chip
   that selects the neighbour; density chips count stations, gates, belts
@@ -49,6 +49,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   count multiplies it at Start.
 
 ### Changed
+
+- **The starmap sits over the chrome, and its panels breathe**: the
+  `map` Screen row now declares `OverChrome`, so the Screen host mounts it
+  through `Kit.AddFrontWindow` and it paints over every window and the rail
+  (the proficiency tree keeps its backdrop slot below the rail, unchanged);
+  the hit test answers it before the modal rows and the chrome, so a rail
+  entry under it takes no press, and the top chrome's input layer is not
+  lifted while it is up. It gains a `×` in the canvas's upper-right corner
+  (the window chrome's button in canvas form, with its hover, closing by
+  the row's one toggle), and the panels get a spacing pass: an outside-in
+  rhythm (outer margin, column gutter, column inset, card pad, card gap),
+  a tracked browser head line, and the overview rebuilt as an identity
+  block (the name at the large type step, security badge, region), a
+  density strip and one framed card per kind family (celestials, stations,
+  belts, gates as a two-column chip grid, anomalies) plus the war readout.
 
 - **A job's terms freeze at start**: the material bill committed and the
   output delivered are fixed when the job starts and persisted with it, so a

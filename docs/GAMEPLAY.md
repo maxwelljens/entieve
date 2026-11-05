@@ -1098,20 +1098,25 @@ market and little else. Travel system-to-system by flying to a stargate
 and pressing `J`; the starmap (`N`) shows the gate graph with every
 system under its own name and your current system highlighted.
 
-**The starmap is a full-screen layer** (the house's second, after the
-proficiency tree: no title bar, no dimmed backdrop, painted over the world
-and under every window, closed by `N`, the rail entry and `Esc`). It has
-three zones. The **system browser** on the left carries the live search
-field and the system list: each row is its security dot, its display name
-and the current system's hull glyph or the destination's pennant. The
-**graph** in the middle is the gate web, with nodes coloured by zone,
-control shapes, contested fronts, the war key and the zone legend. The
-**system overview** on the right names the selected system: its security
-badge and region, density chips (stations, gates, belts, anomalies), one
-icon row per celestial, a station's facilities as the service glyph row,
-a belt's ore chips with the belt's count and per-asteroid volume, its
-gate destinations as chips and an anomaly row. A gate chip selects the
-system on the other side.
+**The starmap is a full-screen layer** and the one surface that paints
+over the chrome: no title bar, no dimmed backdrop, drawn over the world,
+every window and the rail, so a window can never cover it. `N`, `Esc` or
+the **×** in its header's upper-right corner closes it (the rail entry
+reopens it once it is closed; the rail itself sits under the layer while
+it is up). It has three zones on one spacing rhythm. The **system
+browser** on the left carries the live search field, a tracked head line
+with the live system count, and the system list: each row is its security
+dot, its display name and the current system's hull glyph or the
+destination's pennant. The **graph** in the middle is the gate web, with
+nodes coloured by zone, control shapes, contested fronts, the war key and
+the zone legend as framed corner cards, and the jump badge. The
+**system overview** on the right reads top-down: the selected system's
+name at the one large type step, its security badge and region, a density
+strip (stations, gates, belts, anomalies), then one framed card per kind
+family - celestials, stations with their facility chips, belts with
+their ore chips (count and per-asteroid volume), gate destinations as a
+two-column chip grid and anomalies - and the war readout. A gate chip
+selects the system on the other side.
 
 **Hover** a system and it wears the outline pennant; **click** it to
 select it, which fills the overview. **Click the selected system again**

@@ -67,11 +67,11 @@ const (
 // while its card is open, so the tree says which family you are reading.
 // Drag the bare layer to pan, wheel to zoom.
 //
-// It is the house's one full-viewport layer: mounted through
-// Kit.AddBackdropWindow, it paints over the world and BELOW every window
-// and all chrome (Kit.Draw), and Own resolves bare layer space after the
-// window stack and the root chrome, so a click on a window above still
-// reaches it while the world stays blocked. The layer re-fits itself to
+// It is the house's backdrop layer (the starmap is the over-chrome one):
+// mounted through Kit.AddBackdropWindow, it paints over the world and
+// BELOW every window and all chrome (Kit.Draw), and Own resolves bare layer
+// space after the window stack and the root chrome, so a click on a window
+// above still reaches it while the world stays blocked. The layer re-fits itself to
 // the viewport on every Sync: it is not a movable window (no title bar,
 // no grips), and Esc / the Screen row's key close it. The pan/zoom camera
 // is session state only: never persisted, reset when the layer unmounts.

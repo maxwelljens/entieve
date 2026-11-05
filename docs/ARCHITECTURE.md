@@ -992,12 +992,16 @@ NPC traffic delivery + destination-book supply posting, ambush on NPC traffic
 > **One hit test (2026-10, wave 5):** every "does the interface own this
 > point?" question now asks `Kit.Own(pt)` (`screens/hittest.go`, CONTEXT.md
 > "Hit test") instead of keeping its own copy of the layering. It answers
-> `Owner{Layer, Window, Control}`: popup latch, popup rect, a visible
+> `Owner{Layer, Window, Control}`: popup latch, popup rect, the
+> **over-chrome layer** (a Screen row with `OverChrome`, the starmap: it
+> paints over every window and the rail, so it owns its whole rect before
+> them, which is what keeps a rail press from leaking through it), a visible
 > **modal** window (its input layer is fullscreen, so nothing below it is
 > owned, which is also what stops a raise through it), the rail, the window
 > stack topmost first, the HUD/rack's **descendants only** (their container
-> stretches over the whole screen), and last ebitenui's hover flag (gates,
-> never raises). The world gate (`Game.overUI`) is layer ≠ World, the click
+> stretches over the whole screen), the **backdrop layer** (the proficiency
+> tree, under the rail), and last ebitenui's hover flag (gates, never
+> raises). The world gate (`Game.overUI`) is layer ≠ World, the click
 > cue (`Game.uiClick` → `Kit.PressTarget`) is `Control`, and the window
 > raise is a press edge whose owner is a window that is not the stack top.
 > Paint order, input order and the gate can no longer disagree. A

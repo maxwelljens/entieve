@@ -33,7 +33,9 @@ func TestSpecCloseButtonsFollowTheirRow(t *testing.T) {
 				// window keeps its own header instead of a bar (the
 				// services board's strip; the two full-viewport layers,
 				// the proficiency tree and the starmap, closed by Esc,
-				// their keys and the rail entries).
+				// their keys and the rail entries - the starmap draws
+				// its own × in the canvas, which is no title-bar button
+				// and so stays out of this table's rule).
 				win := g.host.Window(s.ID)
 				if win.TitleBar != nil {
 					t.Fatalf("%s window grew a title bar (%v)", s.ID, win.GetContainer().GetWidget().Rect)

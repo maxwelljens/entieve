@@ -90,7 +90,7 @@ func TestModalEscLadder(t *testing.T) {
 		t.Error("Esc did not close the tree after the card")
 	}
 
-	// The starmap is the second full-viewport layer, one step below the
+	// The starmap is the other full-viewport layer, one step below the
 	// tree and above every modal row: Esc closes it before the menu
 	// behind it, and with it closed the next Esc opens the menu.
 	g.host.SetOpen(idMap, true)
@@ -108,9 +108,9 @@ func TestModalEscLadder(t *testing.T) {
 		t.Error("Esc did not close the menu after the starmap step")
 	}
 
-	// One backdrop at a time: the two layers evict each other, so the
-	// tree can never sit on top of a mounted starmap (the kit has one
-	// backdrop slot). The last opened is the live one.
+	// One full-viewport layer at a time: the two layers evict each other
+	// (they paint on opposite sides of the rail), so the tree can never sit
+	// on top of a mounted starmap. The last opened is the live one.
 	g.host.SetOpen(idMap, true)
 	g.host.SetOpen(idProficiency, true)
 	if g.host.IsOpen(idMap) || !g.host.IsOpen(idProficiency) {

@@ -389,12 +389,21 @@ func (h *ScreenHost) setMounted(s *screenSlot, want, quiet bool) {
 	}
 }
 
-// mountWindow mounts a row's window: a panel that paints the full-viewport
-// backdrop (the proficiency tree) goes through the kit's layer path, so it
-// paints below every window; every other panel is an ordinary window. The
-// capability is asked by type on the panel, and the sink answers by type
-// too, so a recorder sink simply mounts it like any window.
+// mountWindow mounts a row's window on the layer its data declares: a row
+// with OverChrome goes through the kit's front slot (the starmap, painted
+// over the chrome), a panel that paints the full-viewport backdrop (the
+// proficiency tree) through its backdrop slot, and every other panel is an
+// ordinary window. The row's facet is data; the backdrop capability is
+// asked by type on the panel. The sink answers by type too, so a recorder
+// sink simply mounts either like any window.
 func (h *ScreenHost) mountWindow(s *screenSlot, win *widget.Window) widget.RemoveWindowFunc {
+	if s.row.OverChrome {
+		if af, ok := h.sink.(interface {
+			AddFrontWindow(*widget.Window) widget.RemoveWindowFunc
+		}); ok {
+			return af.AddFrontWindow(win)
+		}
+	}
 	if b, ok := s.panel.(interface{ Backdrop() bool }); ok && b.Backdrop() {
 		if ab, ok := h.sink.(interface {
 			AddBackdropWindow(*widget.Window) widget.RemoveWindowFunc
@@ -441,9 +450,9 @@ func (h *ScreenHost) SetOpen(id ScreenID, open bool) bool {
 			o.open = false
 		}
 	}
-	// One full-viewport layer at a time: the kit owns a single backdrop
-	// slot, so opening the starmap closes the proficiency tree and vice
-	// versa. Both are ordinary rows otherwise (key, rail entry, Esc).
+	// One full-viewport layer at a time: the two layers paint on opposite
+	// sides of the rail (OverChrome), so opening one closes the other.
+	// Both are ordinary rows otherwise (key, rail entry, Esc).
 	if open && s.row.Anchor == AnchorViewport {
 		for _, o := range h.slots {
 			if o != s && o.open && o.row.Anchor == AnchorViewport {
