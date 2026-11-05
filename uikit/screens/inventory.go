@@ -29,15 +29,19 @@ const (
 // Inventory is the storage window: Cargo / Ore hold / Station hangar as
 // Item/Qty/m³ tables (or as square item tiles) with a fullness bar per
 // hold, a view toggle in the title bar beside the × and one toolbar verb
-// (Sell). Pressing a stack and dragging it to another hold's section opens
-// the quantity picker on that transfer; the Sell action still opens the
-// picker on a selection. Each section is a split pane, so its height is
-// dragged at the seam.
+// (Sell). Selection is the Selection set (CONTEXT.md): a plain press
+// selects one stack (a press on a member keeps the set, which is what
+// drags it), Shift takes the range from the anchor and Ctrl toggles, so a
+// drop or Sell can act on many stacks at once: every selected stack moves
+// or sells WHOLE with no prompts, while one selected stack keeps its
+// quantity picker. Each section is a split pane, so its height is dragged
+// at the seam.
 //
 // Drag-and-drop is the transfer gesture (CONTEXT.md "Transfer popup"):
-// press on a stack row/tile, a ghost chip follows the pointer, the hold
-// under it lights as the drop target, and a release over ANOTHER hold
-// opens the picker ("to Station hangar"). Release on the same section or
+// press on a stack row/tile, a ghost chip follows the pointer (naming the
+// stack count when the drag carries more than one), the hold under it
+// lights as the drop target, and a release over ANOTHER hold moves the
+// selection there ("to Station hangar"). Release on the same section or
 // empty space is a no-op, as is a drop on the undocked hangar.
 type Inventory struct {
 	th  theme.Theme
@@ -68,8 +72,22 @@ type Inventory struct {
 	sell     *widget.Button
 
 	sel    content.ItemID
-	src    string // hold the selected row belongs to
+	src    string // hold the selection lives in
 	hasSel bool
+
+	// The Selection set (CONTEXT.md): the selected stacks as membership
+	// inside src, the Shift anchor (the last plain or Ctrl click, per
+	// hold) and the press's own modifier sample. A gesture applies once:
+	// the press claims it (pressSeen/pressCtrl) and the row's click at
+	// release re-reads that press's sample instead of the keys' current
+	// state, so a Ctrl toggle can never run twice and a Shift range
+	// survives releasing Shift before the button.
+	selSet      map[content.ItemID]bool
+	anchor      content.ItemID
+	anchorHold  string
+	gestureMods widgets.Mods
+	pressSeen   bool
+	pressCtrl   bool
 
 	tiles    bool // the view mode: false = tables, true = item tiles
 	oreShown bool // the hull has an ore hold (the ore section exists)
@@ -418,14 +436,245 @@ func (inv *Inventory) applyHangar() {
 	}
 }
 
-// selectFrom builds a per-section selection callback recording the
-// selected item and the hold it lives in.
+// selectFrom builds the per-section selection callback: the row CLICK half
+// of a selection gesture (tables fire it at release; the press half is
+// stepDrag's, and tile view has no click half at all). It defers to the
+// press when this gesture had one (the press's own modifier sample, and a
+// Ctrl toggle the press already applied, which must not run again) and
+// applies the frame's current sample when the click came with no press
+// (a programmatic click, like the tests' row fire).
 func (inv *Inventory) selectFrom(hold string) func(widgets.TableRow) {
 	return func(r widgets.TableRow) {
+		item, ok := r.Data.(content.ItemID)
+		if !ok {
+			return
+		}
+		mods := inv.ptr.Mods()
+		if inv.pressSeen {
+			m, ctrlDone := inv.gestureMods, inv.pressCtrl
+			inv.pressSeen, inv.pressCtrl = false, false
+			if ctrlDone {
+				return
+			}
+			mods = m
+		}
+		order := inv.displayOrder(hold)
+		idx := indexOf(order, item)
+		if idx < 0 {
+			return
+		}
+		inv.applySelect(hold, item, idx, mods, false)
+	}
+}
+
+// applySelect is the one place a selection gesture lands (both halves, all
+// views): the modifier sample decides between replacing the set (plain,
+// unless the pressed stack is already a member), taking the display-order
+// range from the Shift anchor and toggling membership (Ctrl, Ctrl+Shift
+// adds the range instead of replacing it). A press in ANOTHER hold starts
+// that hold's set: one hold owns the selection, because a transfer has one
+// From. It ends by pushing the set to the tables, so the press's highlight
+// paints in the same frame (as SelectData's single tint used to).
+func (inv *Inventory) applySelect(hold string, item content.ItemID, idx int, mods widgets.Mods, fromPress bool) {
+	shift, ctrl := mods&widgets.ModShift != 0, mods&widgets.ModCtrl != 0
+	if fromPress {
+		inv.gestureMods, inv.pressSeen, inv.pressCtrl = mods, true, ctrl && !shift
+	}
+	order := inv.displayOrder(hold)
+
+	if hold != inv.src {
+		inv.src = hold
+		inv.selSet = map[content.ItemID]bool{item: true}
+		inv.anchor, inv.anchorHold, inv.sel, inv.hasSel = item, hold, item, true
+		inv.pushSelSet()
+		return
+	}
+
+	if shift && inv.anchorHold == hold {
+		if lo, hi, ok := rangeOf(order, inv.anchor, idx); ok {
+			if ctrl {
+				if inv.selSet == nil {
+					inv.selSet = map[content.ItemID]bool{}
+				}
+				for _, id := range order[lo : hi+1] {
+					inv.selSet[id] = true
+				}
+			} else {
+				inv.selSet = make(map[content.ItemID]bool, hi-lo+1)
+				for _, id := range order[lo : hi+1] {
+					inv.selSet[id] = true
+				}
+			}
+			inv.sel, inv.hasSel = item, true
+			inv.pushSelSet()
+			return
+		}
+		// The anchor left this hold (its stack moved away): fall through
+		// to the plain rule, which re-anchors.
+	}
+
+	if ctrl {
+		if inv.selSet == nil {
+			inv.selSet = map[content.ItemID]bool{}
+		}
+		if inv.selSet[item] {
+			delete(inv.selSet, item)
+		} else {
+			inv.selSet[item] = true
+		}
+		inv.anchor, inv.anchorHold = item, hold
+		inv.reprimary()
+		inv.hasSel = len(inv.selSet) > 0
+		inv.pushSelSet()
+		return
+	}
+
+	// Plain: a press on a member keeps the set (the set is what drags);
+	// anything else collapses the selection to this one stack.
+	if !inv.selSet[item] {
+		inv.selSet = map[content.ItemID]bool{item: true}
+	}
+	inv.sel, inv.hasSel = item, true
+	inv.anchor, inv.anchorHold = item, hold
+	inv.pushSelSet()
+}
+
+// displayOrder is the hold's items as the current view shows them (the
+// display-order rows of the list, the grid's order in the thumbnails): the
+// order every range and every bulk walk takes.
+func (inv *Inventory) displayOrder(hold string) []content.ItemID {
+	if inv.tiles {
+		return inv.tilesFor(hold).items
+	}
+	rows := inv.tableFor(hold).Rows
+	out := make([]content.ItemID, 0, len(rows))
+	for _, r := range rows {
 		if id, ok := r.Data.(content.ItemID); ok {
-			inv.sel, inv.src, inv.hasSel = id, hold, true
+			out = append(out, id)
 		}
 	}
+	return out
+}
+
+// indexOf is item's position in the display order (-1 when it has no row:
+// the stack left between the press and the click).
+func indexOf(order []content.ItemID, item content.ItemID) int {
+	for i, id := range order {
+		if id == item {
+			return i
+		}
+	}
+	return -1
+}
+
+// rangeOf is the inclusive display-order span between the anchor and idx,
+// reported as lo/hi slice bounds (ok when the anchor still has a row).
+func rangeOf(order []content.ItemID, anchor content.ItemID, idx int) (int, int, bool) {
+	a := indexOf(order, anchor)
+	if a < 0 || idx < 0 || idx >= len(order) {
+		return 0, 0, false
+	}
+	if a > idx {
+		a, idx = idx, a
+	}
+	return a, idx, true
+}
+
+// reprimary points sel at a member that still exists (the first in
+// display order), or clears it: sel is the chip's identity and the
+// single-stack picker's target, and it must stay inside the set.
+func (inv *Inventory) reprimary() {
+	if inv.sel != "" && inv.selSet[inv.sel] {
+		return
+	}
+	inv.sel = ""
+	for _, id := range inv.displayOrder(inv.src) {
+		if inv.selSet[id] {
+			inv.sel = id
+			break
+		}
+	}
+}
+
+// revalidateSel drops every member whose stack left its hold (a stack that
+// moved away must stop gating the actions) and follows with the primary.
+func (inv *Inventory) revalidateSel() {
+	if len(inv.selSet) == 0 {
+		inv.sel, inv.hasSel = "", false
+		return
+	}
+	have := make(map[content.ItemID]bool, len(inv.selSet))
+	for _, st := range inv.stacksOf(inv.src) {
+		have[st.Item] = true
+	}
+	for id := range inv.selSet {
+		if !have[id] {
+			delete(inv.selSet, id)
+		}
+	}
+	inv.hasSel = len(inv.selSet) > 0
+	if !inv.hasSel {
+		inv.sel = ""
+		return
+	}
+	inv.reprimary()
+}
+
+// pushSelSet hands the set to all three tables: the owning section's
+// members (in display order, so the repaint diff is stable) and an empty
+// set elsewhere, which latches every inventory table into set-driven paint
+// and keeps a stale click highlight from ever showing outside src.
+func (inv *Inventory) pushSelSet() {
+	members := []any{}
+	if inv.src != "" {
+		for _, id := range inv.displayOrder(inv.src) {
+			if inv.selSet[id] {
+				members = append(members, id)
+			}
+		}
+	}
+	inv.cargo.SetSelSet(membersIf(inv.src == "cargo", members))
+	inv.ore.SetSelSet(membersIf(inv.src == "ore", members))
+	inv.hangar.SetSelSet(membersIf(inv.src == "hangar", members))
+}
+
+// membersIf is the set for one section: the members when the section owns
+// the selection, a cleared (non-nil) set otherwise.
+func membersIf(own bool, members []any) []any {
+	if own {
+		return members
+	}
+	return []any{}
+}
+
+// setFor is one tile grid's membership map (nil outside src: no mark).
+func (inv *Inventory) setFor(hold string) map[content.ItemID]bool {
+	if inv.src != hold {
+		return nil
+	}
+	return inv.selSet
+}
+
+// selectedStacks is the selection's stacks in display order, resolved
+// against the hold's live stacks (the walk every bulk move and sale takes).
+func (inv *Inventory) selectedStacks() []content.CargoStack {
+	if len(inv.selSet) == 0 {
+		return nil
+	}
+	stacks := inv.stacksOf(inv.src)
+	var out []content.CargoStack
+	for _, id := range inv.displayOrder(inv.src) {
+		if !inv.selSet[id] {
+			continue
+		}
+		for _, st := range stacks {
+			if st.Item == id {
+				out = append(out, st)
+				break
+			}
+		}
+	}
+	return out
 }
 
 // tableFor returns the section table the hold names (the default keeps
@@ -496,23 +745,18 @@ func (inv *Inventory) Sync() {
 		}
 	}
 
+	// Revalidate the Selection set against the section's live stacks (a
+	// stack that left the hold must stop gating the actions), push it to
+	// the tables and mirror it into the tiles: the click-time set alone
+	// would keep the actions armed on rows that no longer exist.
+	inv.revalidateSel()
+	inv.pushSelSet()
 	if inv.tiles {
-		inv.cargoTiles.Set(inv.stacksOf("cargo"), inv.sel, inv.src == "cargo")
+		inv.cargoTiles.Set(inv.stacksOf("cargo"), inv.setFor("cargo"))
 		if inv.oreShown {
-			inv.oreTiles.Set(inv.stacksOf("ore"), inv.sel, inv.src == "ore")
+			inv.oreTiles.Set(inv.stacksOf("ore"), inv.setFor("ore"))
 		}
-		inv.hangTiles.Set(inv.stacksOf("hangar"), inv.sel, inv.src == "hangar")
-	}
-
-	// Revalidate the cached selection against the section it came from:
-	// a stack that left that hold must stop gating the actions (the
-	// click-time cache alone would keep them armed on a row that no
-	// longer exists).
-	inv.hasSel = false
-	if r, ok := inv.tableFor(inv.src).Selected(); ok {
-		if id, isItem := r.Data.(content.ItemID); isItem {
-			inv.sel, inv.hasSel = id, true
-		}
+		inv.hangTiles.Set(inv.stacksOf("hangar"), inv.setFor("hangar"))
 	}
 
 	// Action gating: selling needs a selection and a docked player (the
@@ -606,9 +850,11 @@ func (inv *Inventory) rowsOf(stacks []content.CargoStack) []widgets.TableRow {
 }
 
 // stepDrag runs the transfer gesture: a press on a stack arms a drag and
-// selects it, a held press moves the ghost and lights the hovered hold,
-// and the release over another hold opens the quantity picker (transfer
-// rules stay transfer()'s and the sim's).
+// applies the click's selection (the frame's modifier sample: range,
+// toggle or replace), a held press moves the ghost and lights the hovered
+// hold, and the release over another hold moves the selection there (the
+// quantity picker on a single stack, every selected stack whole on a set;
+// transfer rules stay transfer()'s and the sim's).
 func (inv *Inventory) stepDrag() {
 	pt := inv.ptr.At()
 	if !inv.dragging {
@@ -619,14 +865,13 @@ func (inv *Inventory) stepDrag() {
 		if !ok {
 			return
 		}
-		item, ok := inv.stackAt(hold, pt)
+		item, idx, ok := inv.stackAt(hold, pt)
 		if !ok {
 			return
 		}
 		inv.dragging, inv.dragHold = true, hold
-		inv.sel, inv.src, inv.hasSel = item, hold, true
-		inv.tableFor(hold).SelectData(item)
-		inv.ghost.Set(item, inv.th.Pal().Text)
+		inv.applySelect(hold, item, idx, inv.ptr.Mods(), true)
+		inv.ghost.Set(item, inv.th.Pal().Text, len(inv.selSet))
 		inv.moveGhost(pt)
 		theme.ShowWidget(inv.ghost.container.GetWidget(), true)
 		inv.highlight("")
@@ -723,18 +968,22 @@ func (inv *Inventory) owns(pt image.Point) bool {
 	return w.IsVisible() && pt.In(w.Rect)
 }
 
-// stackAt is the item under pt in one hold: a table row in list view, a
-// tile in thumbnail view.
-func (inv *Inventory) stackAt(hold string, pt image.Point) (content.ItemID, bool) {
+// stackAt is the item under pt in one hold and its display-order index:
+// a table row in list view, a tile in thumbnail view (the index is what a
+// Shift range counts from).
+func (inv *Inventory) stackAt(hold string, pt image.Point) (content.ItemID, int, bool) {
 	if inv.tiles {
-		return inv.tilesFor(hold).At(pt)
+		return inv.tilesFor(hold).at(pt)
 	}
 	i, ok := inv.tableFor(hold).RowIndexAt(pt)
 	if !ok {
-		return "", false
+		return "", 0, false
 	}
 	id, isItem := inv.tableFor(hold).Rows[i].Data.(content.ItemID)
-	return id, isItem
+	if !isItem {
+		return "", 0, false
+	}
+	return id, i, true
 }
 
 // transferOK reports whether a hold can receive the dragged stack: a
@@ -753,9 +1002,12 @@ func (inv *Inventory) transferOK(to string) bool {
 	return true
 }
 
-// transfer opens the quantity picker on the selected stack moving to hold
-// ("cargo", "ore" or "hangar"); Confirm emits the transfer. The drag's
-// release calls it for the dropped-on hold.
+// transfer moves the selection to hold ("cargo", "ore" or "hangar"): ONE
+// selected stack opens the quantity picker (split it or take it whole),
+// a MULTI-selection moves every selected stack whole with no prompts (one
+// Transfer intent per stack in display order, the sim arbitrating capacity
+// stack by stack, exactly as it arbitrates a single move). Confirm emits
+// the transfer; the drag's release calls it for the dropped-on hold.
 func (inv *Inventory) transfer(to string) {
 	if !inv.hasSel || inv.src == to {
 		return
@@ -770,21 +1022,43 @@ func (inv *Inventory) transfer(to string) {
 			return
 		}
 	}
+	stacks := inv.selectedStacks()
+	if len(stacks) == 0 {
+		return
+	}
+	if len(stacks) > 1 {
+		for _, st := range stacks {
+			inv.as.Do(widgets.Transfer{Item: st.Item, Qty: st.Qty, From: inv.src, To: to})
+		}
+		return
+	}
 	inv.as.Do(widgets.QtyPick{
 		Mode: widgets.QtyTransfer,
-		Item: inv.sel,
+		Item: stacks[0].Item,
 		From: inv.src,
 		To:   to,
 	})
 }
 
-// sellClicked opens the quantity picker on the selected stack's sale
-// (docked at a market station only); Confirm emits the sell.
+// sellClicked sells the selection at the docked station's market: one
+// selected stack opens the quantity picker (partial sales stay on its
+// slider), a MULTI-selection sells every selected stack whole with no
+// prompts (one Sell intent per stack, the stack's own quantity).
 func (inv *Inventory) sellClicked() {
 	if !inv.hasSel || inv.cv.Market().Docked() == "" {
 		return
 	}
-	inv.as.Do(widgets.QtyPick{Mode: widgets.QtySell, Item: inv.sel})
+	stacks := inv.selectedStacks()
+	if len(stacks) == 0 {
+		return
+	}
+	if len(stacks) > 1 {
+		for _, st := range stacks {
+			inv.as.Do(widgets.Sell{Item: st.Item, Qty: st.Qty})
+		}
+		return
+	}
+	inv.as.Do(widgets.QtyPick{Mode: widgets.QtySell, Item: stacks[0].Item})
 }
 
 // ---------------------------------------------------------------------------
@@ -838,28 +1112,39 @@ func (g *tileGrid) Sync() { g.rail.Sync() }
 
 // At is the tile under pt, for the drag's press.
 func (g *tileGrid) At(pt image.Point) (content.ItemID, bool) {
-	for i, c := range g.tiles {
-		if pt.In(c.GetWidget().Rect) {
-			return g.items[i], true
-		}
-	}
-	return "", false
+	id, _, ok := g.at(pt)
+	return id, ok
 }
 
-// Set rebuilds the tiles when the stacks, the selected item or the wrap
-// changed (an identical Set is a no-op).
-func (g *tileGrid) Set(stacks []content.CargoStack, sel content.ItemID, selected bool) {
+// at is At with the tile's index: the display-order position a Shift
+// range counts from.
+func (g *tileGrid) at(pt image.Point) (content.ItemID, int, bool) {
+	for i, c := range g.tiles {
+		if pt.In(c.GetWidget().Rect) {
+			return g.items[i], i, true
+		}
+	}
+	return "", 0, false
+}
+
+// Set rebuilds the tiles when the stacks or the wrapped selection mark
+// changed (an identical Set is a no-op). sel is the owning section's
+// Selection set (nil outside it): every member's tile wears the accent
+// frame, so multi-selection reads in the thumbnail view the way it does in
+// the list.
+func (g *tileGrid) Set(stacks []content.CargoStack, sel map[content.ItemID]bool) {
 	var sig []byte
 	sig = strconv.AppendInt(sig, int64(g.wrap()), 10)
 	sig = append(sig, '|')
 	for _, st := range stacks {
 		sig = append(sig, string(st.Item)...)
 		sig = strconv.AppendInt(sig, int64(st.Qty), 10)
+		if sel[st.Item] {
+			sig = append(sig, '+')
+		} else {
+			sig = append(sig, '-')
+		}
 		sig = append(sig, ',')
-	}
-	sig = append(sig, '|')
-	if selected {
-		sig = append(sig, string(sel)...)
 	}
 	if string(sig) == g.sig {
 		return
@@ -893,7 +1178,7 @@ func (g *tileGrid) Set(stacks []content.CargoStack, sel content.ItemID, selected
 			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
 		)
 		tile.AddChild(icon, name, count)
-		if selected && st.Item == sel {
+		if sel[st.Item] {
 			tile.SetBackgroundImage(theme.Bordered(theme.NRGBA(p.Accent, 36), theme.Solid(p.Accent), theme.Px(1)))
 		}
 		g.grid.AddChild(tile)
@@ -1054,10 +1339,15 @@ func newDragGhost(env widgets.Seams) *dragGhost {
 	return g
 }
 
-// Set points the chip at one item, over the ghost's own theme seam.
-func (g *dragGhost) Set(item content.ItemID, tint color.RGBA) {
+// Set points the chip at one item over the ghost's own theme seam, with
+// the number of stacks the drag carries (a multi-selection names its
+// count beside the item, so the chip never pretends the set is one stack).
+func (g *dragGhost) Set(item content.ItemID, tint color.RGBA, stacks int) {
 	mark := widgets.ResolveTradeable(g.defs, item)
 	g.name.Label = mark.Name
+	if stacks > 1 {
+		g.name.Label = mark.Name + " · " + strconv.Itoa(stacks) + " stacks"
+	}
 	if mark.Icon != "" {
 		g.icon.Image = icons.Get(mark.Icon, theme.Px(theme.IconButton), tint)
 	}

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Inventory multi-selection**: `Shift`+click takes the range of stacks
+  from the last click, `Ctrl`+click adds or removes one stack, and a press
+  on an already-selected stack keeps the whole set (that is what drags it).
+  The selection acts as one: dropping it on another hold moves every
+  selected stack whole with no quantity prompts (a single stack keeps its
+  picker, where splitting still matters), and Sell sells every selected
+  stack whole the same way. Rows and tiles both wear the selection, the
+  drag chip names the stack count, and the set follows its hold (a stack
+  that moves away drops out).
 - **The starmap is a full-screen layer with a system overview**: `N` opens
   the gate graph as the house's over-chrome layer (it paints over every
   window and the rail, title-bar-less, re-fitted to the viewport, closed by

@@ -15,6 +15,7 @@ type scriptInput struct {
 	down   [3]bool
 	edge   [3]bool
 	wheel  float64
+	mods   Mods
 	shape  ebiten.CursorShapeType
 	writes int
 }
@@ -23,6 +24,7 @@ func (s *scriptInput) Cursor() (int, int)        { return s.x, s.y }
 func (s *scriptInput) Down(b Button) bool        { return s.down[b] }
 func (s *scriptInput) JustPressed(b Button) bool { return s.edge[b] }
 func (s *scriptInput) Wheel() float64            { return s.wheel }
+func (s *scriptInput) Mods() Mods                { return s.mods }
 func (s *scriptInput) SetShape(sh ebiten.CursorShapeType) {
 	s.shape, s.writes = sh, s.writes+1
 }
@@ -68,6 +70,36 @@ func TestPointerSourceWithoutWheelStaysStill(t *testing.T) {
 	p.Begin()
 	if got := p.Wheel(); got != 0 {
 		t.Errorf("Wheel() = %v on a source without one, want 0", got)
+	}
+}
+
+// TestPointerModsAreOneSample pins the selection modifiers as part of the
+// frame's one sample: taken at Begin from the source's ModsSource half,
+// unchanged when the source moves mid-frame (the press and the click it
+// produces read the same answer), zero for a source without the optional
+// half and for a nil frame.
+func TestPointerModsAreOneSample(t *testing.T) {
+	src := &scriptInput{mods: ModShift | ModCtrl}
+	p := NewPointer(src)
+	p.Begin()
+	if got := p.Mods(); got != ModShift|ModCtrl {
+		t.Errorf("Mods() = %b, want the frame's sample (Shift and Ctrl held)", got)
+	}
+	src.mods = 0
+	if got := p.Mods(); got != ModShift|ModCtrl {
+		t.Errorf("Mods() re-sampled: %b, want the Begin sample still Shift|Ctrl", got)
+	}
+	src.mods = ModShift
+	p.Begin()
+	if got := p.Mods(); got != ModShift {
+		t.Errorf("Mods() = %b after Begin, want Shift alone (Ctrl released)", got)
+	}
+	// The optional half stays optional, like the wheel.
+	if got := NewPointer(vastInput{}).Mods(); got != 0 {
+		t.Errorf("Mods() = %b on a source without it, want 0", got)
+	}
+	if got := (*Pointer)(nil).Mods(); got != 0 {
+		t.Errorf("nil frame Mods() = %b, want 0", got)
 	}
 }
 

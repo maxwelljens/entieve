@@ -142,7 +142,11 @@ func TestInventorySellFollowsMarketService(t *testing.T) {
 	if a := inv.cargo.Rows[0].Spec.Actions[0]; a.Disabled {
 		t.Error("the inventory's Sell order stayed grey at a market station")
 	}
-	inv.sel, inv.hasSel = inv.cargo.Rows[0].Data.(content.ItemID), true
+	clickRow(ui, inv.cargo, 0)
+	frame()
+	if !inv.hasSel {
+		t.Fatal("fixture: the row click selected nothing")
+	}
 	inv.sellClicked()
 	if !env.QtyWindow().IsOpen() {
 		t.Error("the Sell button opened no picker at a market station")

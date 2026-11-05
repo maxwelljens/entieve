@@ -65,7 +65,8 @@ rebindable (see **Keybindings** below); the global chords (`Esc`, `Ctrl+S`,
 | Left drag | On any window **edge or corner** (≈8 px grip): resize from all four sides, the opposite edge stays fixed, the window never shrinks past its minimum |
 | Left click | On a table column header: sort (click again flips direction); on the **⋯ button** at the header's end: the column menu (hide/show a column) |
 | Left drag | On a column's right edge in a table header (the 6 px strip): widen or narrow that column, the change trades with the next column, the header title is the floor, and the cursor is the left/right arrow |
-| `Ctrl` + left click | Lock target under the cursor (world or Overview row) |
+| `Ctrl` + left click | Lock target under the cursor (world or Overview row); in the Inventory: add or remove the pressed stack from the selection |
+| `Shift` + left click | In the Inventory: select the range from the last-clicked stack through this one (Ctrl+Shift adds the range instead of replacing it) |
 | Left double-click | Show Info: open the item's details window directly, anywhere the item appears (rack, fitting slots and hangar modules, market, inventory, overview, offer rows); on a **hangar module** it fits that module into the first empty slot of its class; on empty space, fly straight toward that point |
 | Right click | Orbit target under cursor (2,500 m) in the world; unchanged |
 | Right click | On an item anywhere it appears: flat context menu, **Show Info** first (always bold), then the surface's actions (grayed-but-visible when impossible); on a charge-fed cell in the module rack: Show Info / Show Info: `<charge>` / ─ / **Load** `<round>` per round type in cargo / **Cycle charge** |

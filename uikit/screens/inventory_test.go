@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"image"
 	"math"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/ebitenui/ebitenui"
@@ -40,6 +42,76 @@ func dragStack(t *testing.T, ui *ebitenui.UI, env *testEnv, inv *Inventory, from
 	pump()
 	env.in.down = [3]bool{}
 	pump()
+}
+
+// clickStack is one full selection GESTURE on a list-view stack row: the
+// press half runs through the production frame with mods held (the press
+// applies the Selection set's Shift/Ctrl semantics), then the release
+// half, in the game's own order (the pointer release frame's Sync first,
+// the row's click event after it). The click half is fired by hand
+// because a headless pump's ebitenui input reads the OS cursor, not the
+// script: clickRow IS the release production would deliver.
+func clickStack(t *testing.T, ui *ebitenui.UI, env *testEnv, inv *Inventory, hold string, row int, mods widgets.Mods) {
+	t.Helper()
+	r := inv.tableFor(hold).RowWidgetForTest(row).Rect
+	at := image.Pt(r.Min.X+r.Dx()/2, r.Min.Y+r.Dy()/2)
+	env.in.x, env.in.y = at.X, at.Y
+	env.in.mods = mods
+	env.in.edge, env.in.down = [3]bool{true}, [3]bool{true}
+	env.Pointer().Begin()
+	pumpQty(t, ui, env, inv.Sync, 1024, 700) // the press half: the frame applies mods
+
+	env.in.edge, env.in.down = [3]bool{}, [3]bool{}
+	env.Pointer().Begin()
+	pumpQty(t, ui, env, inv.Sync, 1024, 700) // the pointer release (drag ends, no drop)
+	clickRow(ui, inv.tableFor(hold), row)    // the release's click half
+	pumpQty(t, ui, env, inv.Sync, 1024, 700)
+	env.in.mods = 0
+}
+
+// clickTile is clickStack for the thumbnail view: tiles declare no click
+// handler (the press is the whole gesture), so the frame alone decides.
+func clickTile(t *testing.T, ui *ebitenui.UI, env *testEnv, inv *Inventory, hold string, row int, mods widgets.Mods) {
+	t.Helper()
+	r := inv.tilesFor(hold).tiles[row].GetWidget().Rect
+	at := image.Pt(r.Min.X+r.Dx()/2, r.Min.Y+r.Dy()/2)
+	env.in.x, env.in.y = at.X, at.Y
+	env.in.mods = mods
+	env.in.edge, env.in.down = [3]bool{true}, [3]bool{true}
+	env.Pointer().Begin()
+	pumpQty(t, ui, env, inv.Sync, 1024, 700)
+	env.in.edge = [3]bool{}
+	env.Pointer().Begin()
+	pumpQty(t, ui, env, inv.Sync, 1024, 700)
+	env.in.down = [3]bool{}
+	env.Pointer().Begin()
+	pumpQty(t, ui, env, inv.Sync, 1024, 700)
+	env.in.mods = 0
+}
+
+// setIDs is the selection set as sorted ids (order-independent asserts).
+func setIDs(inv *Inventory) []content.ItemID {
+	out := make([]content.ItemID, 0, len(inv.selSet))
+	for id := range inv.selSet {
+		out = append(out, id)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
+
+// wantSet fails unless the set holds exactly ids.
+func wantSet(t *testing.T, inv *Inventory, want ...content.ItemID) {
+	t.Helper()
+	got := setIDs(inv)
+	sort.Slice(want, func(i, j int) bool { return want[i] < want[j] })
+	if len(got) != len(want) {
+		t.Fatalf("selection set = %v, want %v", got, want)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Fatalf("selection set = %v, want %v", got, want)
+		}
+	}
 }
 
 // withOreHold fits the showcase sloop with an ore hold (and one ore
@@ -825,5 +897,408 @@ func TestValueBarIsTheSharedSeam(t *testing.T) {
 	// One dialog: the drag and Sell both surface the session's picker.
 	if inv.pane == nil || inv.ghost == nil {
 		t.Error("the drag chrome did not wire")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// The Selection set: modifier selection and the collective actions
+// ---------------------------------------------------------------------------
+
+// multiStacksEnv is the Selection-set fixture: four whole cargo stacks
+// (the three ammo rounds plus one mineral, so one row is never a member),
+// an ore hold (the hold-switch case presses into it) and the docked player
+// the Sell and hangar gates need. Pumped twice, so rows exist.
+func multiStacksEnv(t *testing.T) (*testEnv, *[]sim.Command, *Inventory, *ebitenui.UI) {
+	t.Helper()
+	env, cmds := newTestEnv(t)
+	c, _ := env.Sim.Cargos.Get(env.Sim.Player())
+	c.Stacks = []content.CargoStack{
+		{Item: "ammo-emp-s", Qty: 80}, {Item: "ammo-fusion-s", Qty: 40},
+		{Item: "ammo-ap-s", Qty: 20}, {Item: "min-ferrite", Qty: 60},
+	}
+	withOreHold(env, 30)
+	dockAtStation(t, env.Sim)
+	inv := NewInventory(env)
+	// The window's tall landing rect, like the capture's: with three
+	// sections every pane must hold its header plus its rows, or a row's
+	// centre falls below the pane rect and the drag's section gate (as
+	// ever) never arms.
+	inv.Win().SetLocation(image.Rect(40, 20, 740, 700))
+	ui := newQtyUI(t, env, inv.Win())
+	frame := func() { env.Pointer().Begin(); pumpQty(t, ui, env, inv.Sync, 1024, 700) }
+	frame()
+	frame()
+	if len(inv.cargo.Rows) != 4 {
+		t.Fatalf("fixture: %d cargo rows, want 4", len(inv.cargo.Rows))
+	}
+	return env, cmds, inv, ui
+}
+
+// rounds4 is the fixture's stacks in row (display) order.
+var rounds4 = []content.ItemID{"ammo-emp-s", "ammo-fusion-s", "ammo-ap-s", "min-ferrite"}
+
+// TestInventorySelectionSetFromModifiers is the standard inventory
+// selection grammar: plain replaces (but a press on a MEMBER keeps the
+// set, which is what drags it), Shift takes the display-order range from
+// the anchor, Ctrl toggles EXACTLY once per press (the release's click
+// half shares the press's sample, so a double run would end empty),
+// Ctrl+Shift adds the range instead of replacing it, and a first press in
+// another hold starts that hold's set (one hold owns the selection: the
+// transfer's From is single). The member rows wear the paint; the tables
+// outside src wear none.
+func TestInventorySelectionSetFromModifiers(t *testing.T) {
+	env, _, inv, ui := multiStacksEnv(t)
+
+	// Plain: one stack, anchored there, painted.
+	clickStack(t, ui, env, inv, "cargo", 0, 0)
+	wantSet(t, inv, rounds4[0])
+	if inv.anchor != rounds4[0] || inv.src != "cargo" || !inv.hasSel || inv.sel != rounds4[0] {
+		t.Fatalf("after plain: anchor=%q src=%q hasSel=%v sel=%q, want the pressed stack owning cargo",
+			inv.anchor, inv.src, inv.hasSel, inv.sel)
+	}
+	if !inv.cargo.SelectedAtForTest(0) || inv.cargo.SelectedAtForTest(1) ||
+		inv.cargo.SelectedAtForTest(2) || inv.cargo.SelectedAtForTest(3) {
+		t.Errorf("paint = %v %v %v %v, want row 0 only",
+			inv.cargo.SelectedAtForTest(0), inv.cargo.SelectedAtForTest(1),
+			inv.cargo.SelectedAtForTest(2), inv.cargo.SelectedAtForTest(3))
+	}
+	if inv.ore.SelectedAtForTest(0) || inv.hangar.SelectedAtForTest(0) {
+		t.Error("a section outside src wears the selection paint")
+	}
+
+	// Shift: the range from the anchor, ending primary on the shift-to row.
+	clickStack(t, ui, env, inv, "cargo", 2, widgets.ModShift)
+	wantSet(t, inv, rounds4[0], rounds4[1], rounds4[2])
+	if inv.sel != rounds4[2] {
+		t.Errorf("primary = %q, want the shifted-to stack %q", inv.sel, rounds4[2])
+	}
+	for i, want := range []bool{true, true, true, false} {
+		if got := inv.cargo.SelectedAtForTest(i); got != want {
+			t.Errorf("range paint row %d = %v, want %v", i, got, want)
+		}
+	}
+
+	// Ctrl off, Ctrl ON once, at a row whose PRESS arms (row1: the row's
+	// centre sits inside its pane, so the press half runs and the
+	// release half's dedupe is genuinely exercised — a double run would
+	// drop row 1 right back out).
+	clickStack(t, ui, env, inv, "cargo", 1, widgets.ModCtrl)
+	wantSet(t, inv, rounds4[0], rounds4[2])
+	if inv.selSet[rounds4[1]] {
+		t.Error("ctrl+click left the row selected (toggle did not apply?)")
+	}
+	clickStack(t, ui, env, inv, "cargo", 1, widgets.ModCtrl)
+	wantSet(t, inv, rounds4[0], rounds4[1], rounds4[2])
+	if len(inv.selSet) != 3 {
+		t.Fatalf("set after the second ctrl+click = %v, want 3 members (a double toggle would drop row 1)", setIDs(inv))
+	}
+
+	// Plain on a member keeps the whole set; on a non-member it collapses.
+	clickStack(t, ui, env, inv, "cargo", 1, 0)
+	wantSet(t, inv, rounds4[0], rounds4[1], rounds4[2])
+	clickStack(t, ui, env, inv, "cargo", 3, 0)
+	wantSet(t, inv, rounds4[3])
+
+	// Shift backwards re-anchors from the plain click: row 3 down to 0.
+	clickStack(t, ui, env, inv, "cargo", 0, widgets.ModShift)
+	wantSet(t, inv, rounds4[0], rounds4[1], rounds4[2], rounds4[3])
+
+	// Ctrl toggles one member out of the full range.
+	clickStack(t, ui, env, inv, "cargo", 2, widgets.ModCtrl)
+	wantSet(t, inv, rounds4[0], rounds4[1], rounds4[3])
+
+	// Plain on a member keeps the whole set and re-anchors the range
+	// there (this is also the drag-on-a-set rule).
+	clickStack(t, ui, env, inv, "cargo", 1, 0)
+	wantSet(t, inv, rounds4[0], rounds4[1], rounds4[3])
+
+	// Ctrl+Shift unions the range into the set instead of replacing it:
+	// rows 1..3 join, and row 0, outside the range, survives.
+	clickStack(t, ui, env, inv, "cargo", 3, widgets.ModShift|widgets.ModCtrl)
+	wantSet(t, inv, rounds4[0], rounds4[1], rounds4[2], rounds4[3])
+
+	// A first press in the ore hold starts the ore hold's set (cargo's is
+	// gone: one hold owns the selection).
+	clickStack(t, ui, env, inv, "ore", 0, 0)
+	if inv.src != "ore" || !inv.selSet["ore-cordite"] || len(inv.selSet) != 1 {
+		t.Fatalf("after the ore press: src=%q set=%v, want the ore hold owning {ore-cordite}", inv.src, setIDs(inv))
+	}
+	if !inv.ore.SelectedAtForTest(0) || inv.cargo.SelectedAtForTest(0) {
+		t.Error("the paint did not follow the selection into the ore hold")
+	}
+}
+
+// TestInventoryShiftRangeSurvivesReleasingShiftBeforeTheClick pins the
+// press's own sample: a Shift+click whose Shift is already up by the time
+// the row's click half runs still takes the range (gestures are read at
+// the press, like every other inventory list).
+func TestInventoryShiftRangeSurvivesReleasingShiftBeforeTheClick(t *testing.T) {
+	env, _, inv, ui := multiStacksEnv(t)
+	r := inv.cargo.RowWidgetForTest(1).Rect
+	at := image.Pt(r.Min.X+r.Dx()/2, r.Min.Y+r.Dy()/2)
+
+	clickStack(t, ui, env, inv, "cargo", 0, 0) // the anchor
+
+	// Press half with Shift held (row1's centre sits inside its pane, so
+	// the press arms and claims the gesture)...
+	env.in.x, env.in.y = at.X, at.Y
+	env.in.mods = widgets.ModShift
+	env.in.edge, env.in.down = [3]bool{true}, [3]bool{true}
+	env.Pointer().Begin()
+	pumpQty(t, ui, env, inv.Sync, 1024, 700)
+	// ...Shift gone before the release half and its click.
+	env.in.mods = 0
+	env.in.edge, env.in.down = [3]bool{}, [3]bool{}
+	env.Pointer().Begin()
+	pumpQty(t, ui, env, inv.Sync, 1024, 700)
+	clickRow(ui, inv.cargo, 1)
+	pumpQty(t, ui, env, inv.Sync, 1024, 700)
+
+	wantSet(t, inv, rounds4[0], rounds4[1])
+}
+
+// TestInventoryBulkTransferMovesEveryStackWhole: dropping a MULTI-
+// selection on another hold moves every selected stack whole with NO
+// quantity prompt (the owner's ruling), conserving every unit through the
+// sim's own transfer commands; the stacks that were not selected stay,
+// and the emptied set disarms the actions.
+func TestInventoryBulkTransferMovesEveryStackWhole(t *testing.T) {
+	env, cmds, inv, ui := multiStacksEnv(t)
+	q := env.QtyWindow()
+	pump := func() { env.Pointer().Begin(); pumpQty(t, ui, env, inv.Sync, 1024, 700) }
+
+	// Select rows 0..2 (plain anchor + shift range), leaving row 3 out.
+	clickStack(t, ui, env, inv, "cargo", 0, 0)
+	clickStack(t, ui, env, inv, "cargo", 2, widgets.ModShift)
+	wantSet(t, inv, rounds4[0], rounds4[1], rounds4[2])
+
+	// The chip names the stack count while the set is pressed (one stack
+	// pressed: the set is what moves, so the chip says so).
+	r := inv.cargo.RowWidgetForTest(0).Rect
+	env.in.x, env.in.y = r.Min.X+r.Dx()/2, r.Min.Y+r.Dy()/2
+	env.in.edge, env.in.down = [3]bool{true}, [3]bool{true}
+	env.Pointer().Begin()
+	pumpQty(t, ui, env, inv.Sync, 1024, 700)
+	if got := inv.ghost.name.Label; !strings.Contains(got, "3 stacks") {
+		t.Errorf("ghost label = %q, want the stack count named", got)
+	}
+	env.in.edge, env.in.down = [3]bool{}, [3]bool{}
+	env.Pointer().Begin()
+	pumpQty(t, ui, env, inv.Sync, 1024, 700)
+	wantSet(t, inv, rounds4[0], rounds4[1], rounds4[2]) // the press on a member kept the set
+
+	want := heldByItem(env)
+	dragStack(t, ui, env, inv, "cargo", 0, "hangar")
+	if q.IsOpen() {
+		t.Fatal("the multi-drop opened the quantity picker (a set moves whole, no prompts)")
+	}
+	pump()
+	if len(*cmds) != 3 {
+		t.Fatalf("%d commands, want one Transfer per selected stack: %#v", len(*cmds), *cmds)
+	}
+	for i, cmd := range *cmds {
+		tr, ok := cmd.(sim.CmdTransfer)
+		if !ok {
+			t.Fatalf("command %d = %#v, want CmdTransfer", i, cmd)
+		}
+		if tr.From != "cargo" || tr.To != "hangar" {
+			t.Errorf("command %d = cargo %q -> %q, want the drop's holds", i, tr.From, tr.To)
+		}
+		if tr.Qty != wantedQty(rounds4[i]) {
+			t.Errorf("command %d = %d x %s, want the WHOLE stack (%d)", i, tr.Qty, tr.Item, wantedQty(rounds4[i]))
+		}
+	}
+	for _, cmd := range *cmds {
+		env.Sim.Queue(cmd)
+	}
+	env.Sim.Step()
+	*cmds = (*cmds)[:0]
+
+	// Three whole stacks in the hangar, the unselected one untouched.
+	hangar := env.Sim.Hangar.Items
+	if len(hangar) != 3 {
+		t.Fatalf("hangar = %+v, want the three selected stacks", hangar)
+	}
+	for i, st := range hangar {
+		if st.Item != rounds4[i] || st.Qty != wantedQty(rounds4[i]) {
+			t.Errorf("hangar[%d] = %+v, want %d x %s whole", i, st, wantedQty(rounds4[i]), rounds4[i])
+		}
+	}
+	for got, n := range heldByItem(env) {
+		if n != want[got] {
+			t.Errorf("%s held=%d want=%d (the bulk move must conserve every unit)", got, n, want[got])
+		}
+	}
+
+	// The stacks left their hold: the set empties and the actions disarm.
+	pump()
+	pump()
+	if len(inv.selSet) != 0 || inv.hasSel {
+		t.Errorf("after the move: set=%v hasSel=%v, want the selection emptied", setIDs(inv), inv.hasSel)
+	}
+	if !inv.sell.GetWidget().Disabled {
+		t.Error("Sell stayed armed with nothing selected")
+	}
+	if q.IsOpen() {
+		t.Error("a picker opened somewhere in the bulk path")
+	}
+}
+
+// wantedQty is a fixture stack's quantity by item (the bulk assertions
+// read the expected whole-stack figure from the same table the fixture
+// built).
+func wantedQty(item content.ItemID) int {
+	for _, st := range []content.CargoStack{
+		{Item: "ammo-emp-s", Qty: 80}, {Item: "ammo-fusion-s", Qty: 40},
+		{Item: "ammo-ap-s", Qty: 20}, {Item: "min-ferrite", Qty: 60},
+	} {
+		if st.Item == item {
+			return st.Qty
+		}
+	}
+	return 0
+}
+
+// TestInventoryBulkSellSellsEveryStackWhole: the Sell button mirrors the
+// drop rule. A multi-selection sells every selected stack whole with no
+// prompts (one Sell intent per stack); ONE selected stack keeps its
+// quantity picker, so partial sales stay possible.
+func TestInventoryBulkSellSellsEveryStackWhole(t *testing.T) {
+	env, cmds, inv, ui := multiStacksEnv(t)
+	q := env.QtyWindow()
+	pump := func() { env.Pointer().Begin(); pumpQty(t, ui, env, inv.Sync, 1024, 700) }
+
+	// Two selected stacks: the bulk path.
+	clickStack(t, ui, env, inv, "cargo", 0, 0)
+	clickStack(t, ui, env, inv, "cargo", 1, widgets.ModCtrl)
+	wantSet(t, inv, rounds4[0], rounds4[1])
+	inv.sellClicked()
+	pump()
+	if q.IsOpen() {
+		t.Fatal("the bulk sale opened the quantity picker (a set sells whole, no prompts)")
+	}
+	if len(*cmds) != 2 {
+		t.Fatalf("%d commands, want one Sell per selected stack: %#v", len(*cmds), *cmds)
+	}
+	for i, cmd := range *cmds {
+		sell, ok := cmd.(sim.CmdSell)
+		if !ok {
+			t.Fatalf("command %d = %#v, want CmdSell", i, cmd)
+		}
+		if want := wantedQty(rounds4[i]); sell.Qty != want || sell.Item != rounds4[i] {
+			t.Errorf("sell %d = %d x %s, want the whole stack %d x %s", i, sell.Qty, sell.Item, want, rounds4[i])
+		}
+	}
+	*cmds = (*cmds)[:0]
+
+	// One selected stack: the picker stays (the partial-sale surface).
+	clickStack(t, ui, env, inv, "cargo", 2, 0)
+	wantSet(t, inv, rounds4[2])
+	inv.sellClicked()
+	pump()
+	if !q.IsOpen() {
+		t.Fatal("a single selected stack sold without its quantity picker")
+	}
+	if q.req.Item != rounds4[2] {
+		t.Errorf("picker target = %q, want the single selection %q", q.req.Item, rounds4[2])
+	}
+	if len(*cmds) != 0 {
+		t.Errorf("opening the picker enqueued %d commands, want none", len(*cmds))
+	}
+}
+
+// TestInventoryTileViewMultiSelectAndBulkMove: the thumbnail view runs the
+// same grammar through the press half alone (tiles declare no click
+// handler): every member tile carries the accent frame (the membership
+// mark in the grid's change signature) and the drop moves the set whole.
+func TestInventoryTileViewMultiSelectAndBulkMove(t *testing.T) {
+	env, cmds, inv, ui := multiStacksEnv(t)
+	q := env.QtyWindow()
+	pump := func() { env.Pointer().Begin(); pumpQty(t, ui, env, inv.Sync, 1024, 700) }
+
+	uitest.FireButton(ui, inv.view)
+	pump()
+	pump()
+	if !inv.ViewTiles() || len(inv.cargoTiles.tiles) != 4 {
+		t.Fatalf("fixture: tiles=%v (%d tiles), want the 4-tile thumbnail view", inv.ViewTiles(), len(inv.cargoTiles.tiles))
+	}
+
+	// Press grammar: plain then Ctrl (no click half to dedupe against).
+	clickTile(t, ui, env, inv, "cargo", 0, 0)
+	clickTile(t, ui, env, inv, "cargo", 2, widgets.ModCtrl)
+	wantSet(t, inv, rounds4[0], rounds4[2])
+	if got := strings.Count(inv.cargoTiles.sig, "+"); got != 2 {
+		t.Errorf("tile membership marks = %d, want 2 (the accent-framed tiles)", got)
+	}
+	if strings.Contains(inv.hangTiles.sig, "+") {
+		t.Error("a tile grid outside src carries the membership mark")
+	}
+
+	// The drop moves the set whole: press on a member keeps it.
+	want := heldByItem(env)
+	dragTile(t, ui, env, inv, "cargo", 0, "hangar")
+	if q.IsOpen() {
+		t.Fatal("the tile multi-drop opened the quantity picker")
+	}
+	pump()
+	if len(*cmds) != 2 {
+		t.Fatalf("%d commands, want one Transfer per selected tile: %#v", len(*cmds), *cmds)
+	}
+	for _, cmd := range *cmds {
+		env.Sim.Queue(cmd)
+	}
+	env.Sim.Step()
+	for got, n := range heldByItem(env) {
+		if n != want[got] {
+			t.Errorf("%s held=%d want=%d (the bulk move must conserve every unit)", got, n, want[got])
+		}
+	}
+	hangar := env.Sim.Hangar.Items
+	if len(hangar) != 2 || hangar[0].Item != rounds4[0] || hangar[1].Item != rounds4[2] {
+		t.Errorf("hangar = %+v, want the two selected stacks", hangar)
+	}
+}
+
+// TestInventorySelectionRevalidatesAgainstItsHold: members whose stacks
+// left the hold drop out of the set (the primary follows a member that
+// remains), and an emptied set disarms Sell. The click-time cache alone
+// would keep the actions armed on rows that no longer exist.
+func TestInventorySelectionRevalidatesAgainstItsHold(t *testing.T) {
+	env, _, inv, ui := multiStacksEnv(t)
+	pump := func() { env.Pointer().Begin(); pumpQty(t, ui, env, inv.Sync, 1024, 700) }
+
+	clickStack(t, ui, env, inv, "cargo", 0, 0)
+	clickStack(t, ui, env, inv, "cargo", 2, widgets.ModShift)
+	wantSet(t, inv, rounds4[0], rounds4[1], rounds4[2])
+	if inv.sel != rounds4[2] {
+		t.Fatalf("fixture: primary = %q, want the shift-to stack", inv.sel)
+	}
+
+	// The primary's stack leaves: the set drops it, the primary follows a
+	// member that remains.
+	c, _ := env.Sim.Cargos.Get(env.Sim.Player())
+	c.Stacks = []content.CargoStack{
+		{Item: rounds4[0], Qty: 80}, {Item: rounds4[1], Qty: 40}, {Item: rounds4[3], Qty: 60},
+	}
+	pump()
+	wantSet(t, inv, rounds4[0], rounds4[1])
+	if inv.sel != rounds4[0] {
+		t.Errorf("primary after its stack left = %q, want the first remaining member %q", inv.sel, rounds4[0])
+	}
+	if !inv.hasSel || inv.sell.GetWidget().Disabled {
+		t.Error("the actions disarmed while members remain")
+	}
+
+	// Every member leaves: the set empties and the actions disarm.
+	c.Stacks = []content.CargoStack{{Item: rounds4[3], Qty: 60}}
+	pump()
+	if len(inv.selSet) != 0 || inv.hasSel {
+		t.Fatalf("set=%v hasSel=%v after every member left, want empty", setIDs(inv), inv.hasSel)
+	}
+	if inv.sel != "" {
+		t.Errorf("primary = %q, want cleared with the set", inv.sel)
+	}
+	if !inv.sell.GetWidget().Disabled {
+		t.Error("Sell stayed armed with nothing selected")
 	}
 }

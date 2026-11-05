@@ -271,6 +271,80 @@ func TestSelectDataExternal(t *testing.T) {
 	}
 }
 
+// TestSetSelSetDrivesEveryMember pins the owner-driven multi-selection
+// (the inventory's Selection set): every member wears the single
+// selection's paint (accent row, accent icon), the table's own click
+// selection cannot out-vote the set (its selIdx books on but the paint
+// follows membership), an empty non-nil set clears every highlight while
+// nil hands the paint back, and a sort moves the set's highlights with
+// their rows (Data identity, not indexes).
+func TestSetSelSetDrivesEveryMember(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	tbl := NewTable(env, []Column{{Key: "Name", Title: "Name", Width: 100}})
+	tbl.SetRows([]TableRow{
+		{Cells: []string{"Alpha"}, Data: "alpha"},
+		{Cells: []string{"Beta"}, Data: "beta"},
+		{Cells: []string{"Gamma"}, Data: "gamma"},
+	})
+	accent := WithA(env.Pal().Accent, selectionAlpha)
+
+	// Two members, one row between them: both tint as selected.
+	tbl.SetSelSet([]any{"alpha", "gamma"})
+	if !tbl.selectedAt(0) || tbl.selectedAt(1) || !tbl.selectedAt(2) {
+		t.Fatalf("set paint = %v %v %v, want member/member pattern T F T",
+			tbl.selectedAt(0), tbl.selectedAt(1), tbl.selectedAt(2))
+	}
+	if tbl.applied[0] != accent || tbl.applied[2] != accent {
+		t.Errorf("member backgrounds = %v / %v, want accent %v", tbl.applied[0], tbl.applied[2], accent)
+	}
+	if tbl.applied[1] == accent {
+		t.Error("the row between the members wears the selection tint")
+	}
+	if got := tbl.iconTint(0, tbl.Rows[0]); got != env.Pal().Accent {
+		t.Errorf("member icon tint = %v, want the accent", got)
+	}
+
+	// A click's own selIdx cannot paint outside the set: rowClicked books
+	// selIdx=1 (Beta), but the set still rules the paint.
+	tbl.rowClicked(1)
+	if tbl.SelIdxForTest() != 1 {
+		t.Fatalf("selIdx = %d, want the click booked 1 (Selected keeps working)", tbl.SelIdxForTest())
+	}
+	if tbl.selectedAt(1) || !tbl.selectedAt(0) {
+		t.Errorf("paint after click = member(1)=%v member(0)=%v, want the set unmoved",
+			tbl.selectedAt(1), tbl.selectedAt(0))
+	}
+	if tbl.applied[1] == accent {
+		t.Error("the clicked non-member paints selection over the owner's set")
+	}
+
+	// An empty set clears; nil hands the paint back to selIdx (row 1 from
+	// the click above).
+	tbl.SetSelSet([]any{})
+	if tbl.selectedAt(0) || tbl.selectedAt(2) {
+		t.Error("an empty set left members painted")
+	}
+	tbl.SetSelSet(nil)
+	if tbl.selectedAt(0) || !tbl.selectedAt(1) || tbl.selectedAt(2) {
+		t.Errorf("nil set paint = %v %v %v, want the table's own selIdx (row 1)",
+			tbl.selectedAt(0), tbl.selectedAt(1), tbl.selectedAt(2))
+	}
+
+	// Identity survives a reorder: repaint from the set, sort, and the
+	// highlight moved with its rows (row 0 re-sorted to last).
+	tbl.SetSelSet([]any{"alpha", "gamma"})
+	tbl.SetSortFunc(func(key string, asc bool, rows []TableRow) {
+		for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
+			rows[i], rows[j] = rows[j], rows[i]
+		}
+	})
+	tbl.SetSort("Name", true)
+	if !tbl.selectedAt(2) || tbl.selectedAt(1) || !tbl.selectedAt(0) {
+		t.Errorf("after reverse sort paint = %v %v %v, want alpha/gamma at indexes 2/0",
+			tbl.selectedAt(0), tbl.selectedAt(1), tbl.selectedAt(2))
+	}
+}
+
 // fireWheel sends one wheel notch through the deferred event queue
 // (positive dy = wheel rolled towards the user = wheel up).
 func fireWheel(ui *ebitenui.UI, tbl *Table, dy float64) {

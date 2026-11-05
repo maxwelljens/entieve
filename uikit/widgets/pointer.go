@@ -27,6 +27,9 @@ import (
 //	Spend     Click/Esc consume the frame's gesture: the popup owns the
 //	          press, and nothing underneath sees it that frame.
 //	Down      the held state (a drag), never an edge.
+//	Mods      the keyboard modifiers held this frame (Shift/Ctrl), for
+//	          the clicks that select (a range, a toggle): part of the
+//	          same one sample, from the source's ModsSource half.
 //
 // A frame is also the pointer's SHAPE: claimers only declare (ClaimShape,
 // last claim wins — the chrome steps after the pane polls, so a grip
@@ -42,10 +45,27 @@ type Pointer struct {
 	pressed [3]bool // an edge this frame
 	spent   [3]bool // the frame's gesture was consumed
 	wheel   float64 // this frame's wheel notch (0 = still)
+	mods    Mods    // this frame's keyboard modifiers
 
 	shape   ebiten.CursorShapeType
 	claimed bool
 }
+
+// Mods is the frame's keyboard modifier sample: the handful of selection
+// keys a click can carry (Shift for a range, Ctrl for a toggle). It rides
+// the pointer frame like the buttons do, so every surface asking "what did
+// THIS click mean" reads one shared per-frame answer instead of the OS.
+type Mods uint8
+
+const (
+	ModShift Mods = 1 << iota
+	ModCtrl
+)
+
+// ModsSource is the optional half of a Source: the frame's keyboard
+// modifiers. A source without it (a script that never uses modifiers)
+// samples as no modifiers held, so existing sources need no method.
+type ModsSource interface{ Mods() Mods }
 
 // Button is a pointer button, indexed into the frame's three states.
 type Button int
@@ -95,6 +115,16 @@ func (OSInput) JustPressed(b Button) bool {
 }
 func (OSInput) SetShape(s ebiten.CursorShapeType) { ebiten.SetCursorShape(s) }
 func (OSInput) Wheel() float64                    { _, y := ebiten.Wheel(); return y }
+func (OSInput) Mods() Mods {
+	var m Mods
+	if ebiten.IsKeyPressed(ebiten.KeyShift) {
+		m |= ModShift
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyControl) {
+		m |= ModCtrl
+	}
+	return m
+}
 
 // NewPointer builds a frame over src; nil means the real OS pointer.
 func NewPointer(src Source) *Pointer {
@@ -119,7 +149,21 @@ func (p *Pointer) Begin() {
 	if ws, ok := p.src.(WheelSource); ok {
 		p.wheel = ws.Wheel()
 	}
+	p.mods = 0
+	if ms, ok := p.src.(ModsSource); ok {
+		p.mods = ms.Mods()
+	}
 	p.shape, p.claimed = ebiten.CursorShapeDefault, false
+}
+
+// Mods is this frame's keyboard modifier sample (the Shift/Ctrl state a
+// selection click applies; see Mods). It never changes mid-frame, so a
+// press and the click it produces read the same answer.
+func (p *Pointer) Mods() Mods {
+	if p == nil {
+		return 0
+	}
+	return p.mods
 }
 
 // Wheel is this frame's wheel notch (positive scrolls up — ebiten's

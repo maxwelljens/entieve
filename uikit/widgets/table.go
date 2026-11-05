@@ -575,6 +575,15 @@ type Table struct {
 	selIdx  int // selected row index, -1 = none
 	selData any // Data of the selected row (identity across rebuilds)
 
+	// selSet is the owner's multi-selection driving the row paint (the
+	// inventory's Selection set): row indexes tinted as selected, resolved
+	// from the Data identities in selSetVals (re-resolved with the table's
+	// own selection whenever rows reorder, so a sort moves highlights with
+	// their rows). nil = the table's own selIdx drives, exactly as before
+	// (a table that never calls it).
+	selSet     map[int]bool
+	selSetVals []any
+
 	dbl RowDouble // double-click bookkeeping: the installer's half
 
 	// plateBand, when set, is the artwork band a window paints behind this
@@ -797,6 +806,80 @@ func (t *Table) SelectData(v any) {
 	t.updateRows()
 }
 
+// SetSelSet drives the row paint from an owner-held multi-selection: every
+// row whose Data matches one of vals wears the selection tint (accent row
+// and accent icon, the same paint as a single selection), and the table's
+// own click selection stops tinting while a set is installed (the owner is
+// the authority; its clicks still bookkeep selIdx for Selected, they just
+// cannot out-vote the set). vals == nil hands the paint back to the
+// table's own selection, which is what a table that never calls this keeps
+// forever; an empty non-nil slice clears every highlight. Call it each
+// Sync: the set is re-resolved against the current rows by Data identity
+// (sameData), so a reorder re-tints without the owner re-deriving indexes,
+// and an unchanged set skips the repaint walk.
+func (t *Table) SetSelSet(vals []any) {
+	if vals == nil {
+		if t.selSet != nil {
+			t.selSet, t.selSetVals = nil, nil
+			t.updateRows()
+		}
+		return
+	}
+	m := make(map[int]bool, len(vals))
+	for i, r := range t.Rows {
+		for _, v := range vals {
+			if sameData(r.Data, v) {
+				m[i] = true
+				break
+			}
+		}
+	}
+	if t.selSet != nil && len(m) == len(t.selSet) {
+		same := true
+		for i := range m {
+			if !t.selSet[i] {
+				same = false
+				break
+			}
+		}
+		if same {
+			t.selSetVals = append(t.selSetVals[:0], vals...)
+			return
+		}
+	}
+	t.selSetVals = append([]any(nil), vals...)
+	t.selSet = m
+	for i := range t.Rows {
+		t.updateIcon(i)
+		t.updateBg(i)
+	}
+}
+
+// resolveSelSet re-derives the tinted row indexes from the set's Data
+// identities against the current rows (a member with no row simply tints
+// nothing until its row returns, mirroring selData's reconciliation).
+func (t *Table) resolveSelSet() {
+	m := make(map[int]bool, len(t.selSetVals))
+	for i, r := range t.Rows {
+		for _, v := range t.selSetVals {
+			if sameData(r.Data, v) {
+				m[i] = true
+				break
+			}
+		}
+	}
+	t.selSet = m
+}
+
+// selectedAt is row i's selection paint: membership in the owner's set
+// while one is installed (SetSelSet), the table's own selIdx otherwise.
+func (t *Table) selectedAt(i int) bool {
+	if t.selSet != nil {
+		return t.selSet[i]
+	}
+	return i == t.selIdx
+}
+
 // OnSelect registers the row-click callback (fires on every click).
 // OnDouble replaces the table's Show Info double-click with fn: the second
 // click on the same row runs fn instead of the Show Info gesture (the
@@ -968,6 +1051,18 @@ func (t *Table) colIndex(key string) int {
 // reconcileSelection re-resolves the selection after a reorder/rebuild:
 // Data is the row's stable identity, index only as long as Data is nil.
 func (t *Table) reconcileSelection() {
+	if t.selSet != nil && len(t.selSetVals) > 0 {
+		m := make(map[int]bool, len(t.selSetVals))
+		for i, r := range t.Rows {
+			for _, v := range t.selSetVals {
+				if sameData(r.Data, v) {
+					m[i] = true
+					break
+				}
+			}
+		}
+		t.selSet = m
+	}
 	if t.selIdx < 0 {
 		return
 	}
@@ -1363,7 +1458,7 @@ func (t *Table) updateBg(i int) {
 
 // rowTint is the background the row should show right now.
 func (t *Table) rowTint(i int) color.RGBA {
-	if i == t.selIdx {
+	if t.selectedAt(i) {
 		return WithA(t.th.Pal().Accent, selectionAlpha)
 	}
 	if i < 0 || i >= len(t.Rows) {
@@ -1649,7 +1744,7 @@ func sameData(a, b any) bool {
 // accent, a row with its own tint (own ship → ColInfo, hostiles → ColDanger)
 // keeps it, everything else is primary text.
 func (t *Table) iconTint(i int, row TableRow) color.RGBA {
-	if i == t.selIdx {
+	if t.selectedAt(i) {
 		return t.th.Pal().Accent
 	}
 	if row.IconTint.A != 0 {
@@ -1777,3 +1872,7 @@ func (t *Table) FitWidthForTest() float64 { return t.fittedFor }
 
 // SelIdxForTest is the selected row index (-1 = none).
 func (t *Table) SelIdxForTest() int { return t.selIdx }
+
+// SelectedAtForTest is selectedAt for cross-package pins (the inventory's
+// Selection-set paint: which rows wear the selection as the owner set it).
+func (t *Table) SelectedAtForTest(i int) bool { return t.selectedAt(i) }
