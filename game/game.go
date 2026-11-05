@@ -528,6 +528,16 @@ func (g *Game) handleKeys(in Input) error {
 				continue
 			}
 		}
+		// The starmap's browser field is the third typing surface: while
+		// it holds focus, arrows walk the system list, Enter sets the
+		// destination and Esc clears the query first (then the normal Esc
+		// ladder closes the layer).
+		if mp := bodyOf[*uikit.MapView](g.host, idMap); mp != nil && mp.SearchFocused() {
+			consumed := mp.SearchKey(k)
+			if consumed || k != ebiten.KeyEscape {
+				continue
+			}
+		}
 		switch {
 		case k == ebiten.KeyEscape:
 			// A context menu that was up this frame consumed the Esc
@@ -1070,10 +1080,10 @@ func (g *Game) removeScene(match func(Scene) bool) {
 }
 
 // onEscape is the one Esc ladder: the proficiency card, then the tree
-// layer, then the open modal rows in reverse declaration order (the menu
-// outranks help, and a session outranks the rows declared before it),
-// and with none up it opens the menu. The modal step is the host's: the
-// rows are the data, so no scene and no id appears here.
+// layer, then the starmap layer, then the open modal rows in reverse
+// declaration order (the menu outranks help, and a session outranks the
+// rows declared before it), and with none up it opens the menu. The modal
+// step is the host's: the rows are the data, so no scene appears here.
 func (g *Game) onEscape() {
 	// The proficiency tree is modal over the world: Esc closes it before
 	// anything behind it (the Esc menu included). An open proficiency card
@@ -1084,6 +1094,12 @@ func (g *Game) onEscape() {
 	}
 	if g.host != nil && g.host.IsOpen(idProficiency) {
 		g.host.SetOpen(idProficiency, false)
+		return
+	}
+	// The starmap is the second full-viewport layer: Esc closes it after
+	// the tree and before any modal row behind it.
+	if g.host != nil && g.host.IsOpen(idMap) {
+		g.host.SetOpen(idMap, false)
 		return
 	}
 	if _, closed := g.host.EscapeModal(); closed {

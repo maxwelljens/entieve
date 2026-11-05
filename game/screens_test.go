@@ -208,7 +208,9 @@ func TestScreenPlacementDerivesFromSpec(t *testing.T) {
 			t.Errorf("%dx%d: help at %v, want top inset 24 and x = max(%d, centred %d)",
 				w, h, r.Min, railClearX(), (w-r.Dx())/2)
 		}
-		for _, p := range []ScreenID{idMap, idMenu, idManufacturing, idSettings} {
+		// The starmap is an AnchorViewport layer now (its rect IS the
+		// screen), pinned by the derivation loop above and the layer test.
+		for _, p := range []ScreenID{idMenu, idManufacturing, idSettings} {
 			r := g.host.Window(p).GetContainer().GetWidget().Rect
 			if want := centerRect(r.Dx(), r.Dy(), w, h); r.Min != want.Min {
 				t.Errorf("%dx%d: %s at %v, want centred at %v", w, h, panelNames[p], r.Min, want.Min)

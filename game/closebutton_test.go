@@ -28,12 +28,12 @@ func TestSpecCloseButtonsFollowTheirRow(t *testing.T) {
 				g = docked
 			}
 
-			if s.ID == idServices || s.ID == idProficiency {
-				// The two rows with no title bar: no × to attach, and the
+			if s.ID == idServices || s.ID == idProficiency || s.ID == idMap {
+				// The rows with no title bar: no × to attach, and the
 				// window keeps its own header instead of a bar (the
-				// services board's strip; the proficiency layer is a
-				// full-viewport sheet, closed by Esc, its key and the rail
-				// entry).
+				// services board's strip; the two full-viewport layers,
+				// the proficiency tree and the starmap, closed by Esc,
+				// their keys and the rail entries).
 				win := g.host.Window(s.ID)
 				if win.TitleBar != nil {
 					t.Fatalf("%s window grew a title bar (%v)", s.ID, win.GetContainer().GetWidget().Rect)

@@ -602,7 +602,9 @@ func TestDefaultWindowRectsClearTheRailGutter(t *testing.T) {
 				{"manufacturing", NewManufacturing(env).Win()},
 				{"refinery", NewRefinery(env).Win()},
 				{"scanner", NewScanner(env).Win()},
-				{"starmap", NewMapView(env).Win()},
+				// The starmap is the second full-viewport layer: its rect
+				// IS the viewport, so the gutter floor (a window rule)
+				// does not apply. TestVirginPlacementTable pins it.
 				{"help", NewHelp(env, keyMapRows(8)).Win()},
 				{"settings", NewSettings(env, staticSettingsActions()).Win()},
 			}

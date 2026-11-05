@@ -25,7 +25,7 @@ const mapCaptureFrames = 3
 // The PNG lands in $ENTIEVE_CAPTURE_DIR (default /tmp/opencode).
 func TestMapCaptureFrame(t *testing.T) {
 	env := newWarEnv(t)
-	m := NewMapView(env)
+	m := NewMapView(env, nil)
 	m.sel = "sys-penumbra" // Kvonice: a charter-held front
 	c := newChromeUI(env)
 	c.AddWindow(m)
@@ -49,19 +49,31 @@ func TestMapCaptureFrame(t *testing.T) {
 			return nil
 		},
 		Verify: func(*ebiten.Image) error {
-			// The grid: a scan line near the map image's top crosses the vertical
-			// 28 px lines. Each line is the accent at ~3.5 % (alpha 9); anything
-			// else on the line (gate edges, node rings) is a different alpha.
-			step := float64(theme.Px(mapGridStep)) * theme.Scale()
-			mapImg := m.img
+			// The grid: a scan line inside the graph column crosses the
+			// vertical 28 px lines. Each line is the accent at ~3.5 %
+			// (alpha 9); anything else on the line (gate edges, node
+			// rings) is a different alpha. The graph column is the one
+			// zone the lattice covers (the header and the side columns
+			// are panel chrome).
+			g := m.graph
+			if g.Empty() {
+				return fmt.Errorf("capture %s: the graph column was never laid out", out)
+			}
+			// The layer is opaque, so the 3.5 % accent lattice composites
+			// onto the BGHard backdrop instead of carrying alpha 9. A grid
+			// pixel therefore reads a little brighter than the backdrop
+			// (r 10 → ~19) while a gate edge (r ~56) or a node ring (r
+			// ~255) stays outside the band.
+			step := float64(theme.Px(mapGridStep))
 			grid := 0
-			for x := 0; x < mapImg.Bounds().Dx(); x++ {
-				_, _, _, a := mapImg.At(x, 1).RGBA()
-				if a > 0 && a < 0x2000 { // 9/255 ≈ 0x0909 in 16-bit
+			y := g.Min.Y + 5
+			for x := g.Min.X; x < g.Max.X; x++ {
+				r, _, _, _ := m.img.At(x, y).RGBA()
+				if r >= 0x0c00 && r <= 0x2800 { // 12..40 in 16-bit channels
 					grid++
 				}
 			}
-			want := int(float64(mapImg.Bounds().Dx()) / step)
+			want := int(float64(g.Dx()) / step)
 			if grid < want-2 {
 				return fmt.Errorf("capture %s: map grid: %d lit line samples of %d, want the 28 px lattice", out, grid, want)
 			}

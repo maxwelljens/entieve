@@ -96,7 +96,7 @@ func TestWarSeam(t *testing.T) {
 	}
 }
 
-// cardTexts renders a card model's rows for assertions.
+// cardTexts renders a readout model's rows for assertions.
 func cardTexts(lines []mapCardLine) []string {
 	out := make([]string, len(lines))
 	for i, l := range lines {
@@ -130,11 +130,11 @@ func TestMapWarCard(t *testing.T) {
 		},
 		Treasury: 1_000_000,
 	}}
-	m := NewMapView(we)
+	m := NewMapView(we, nil)
 	m.Sync()
 
 	m.sel = "sys-penumbra" // charter-held front: the Works press
-	lines := m.cardLines("sys-solace")
+	lines := m.readoutLines()
 	if !hasCardLine(lines, "Charter-held") {
 		t.Errorf("charter card lacks the holder line: %q", cardTexts(lines))
 	}
@@ -143,7 +143,7 @@ func TestMapWarCard(t *testing.T) {
 	}
 
 	m.sel = "sys-glusza" // works-held front: the charter pushes
-	lines = m.cardLines("sys-solace")
+	lines = m.readoutLines()
 	if !hasCardLine(lines, "Works-held") {
 		t.Errorf("works card lacks the holder line: %q", cardTexts(lines))
 	}
@@ -152,7 +152,7 @@ func TestMapWarCard(t *testing.T) {
 	}
 
 	m.sel = "sys-solace" // charter-held, behind the front: holder only
-	lines = m.cardLines("sys-solace")
+	lines = m.readoutLines()
 	if !hasCardLine(lines, "Charter-held") {
 		t.Errorf("home card lacks the holder line: %q", cardTexts(lines))
 	}
@@ -166,7 +166,7 @@ func TestMapWarCard(t *testing.T) {
 	m.sel = "sys-penumbra"
 	we.war.Contest["sys-penumbra"] = widgets.ContestView{Meter: 0.004, Threshold: 1}
 	m.Sync()
-	for _, l := range m.cardLines("sys-solace") {
+	for _, l := range m.readoutLines() {
 		if strings.HasPrefix(l.text, "Front") {
 			t.Errorf("a quiet meter still renders %q", l.text)
 		}
@@ -175,7 +175,7 @@ func TestMapWarCard(t *testing.T) {
 	// No war, no war rows.
 	we.war = widgets.WarView{}
 	m.Sync()
-	lines = m.cardLines("sys-solace")
+	lines = m.readoutLines()
 	for _, l := range lines {
 		if strings.HasPrefix(l.text, "Charter-held") || strings.HasPrefix(l.text, "Works-held") || strings.HasPrefix(l.text, "Front") {
 			t.Errorf("war-less card carries %q", l.text)
@@ -220,7 +220,7 @@ func TestMapWarRepaints(t *testing.T) {
 		Control: map[content.SystemID]string{"sys-solace": "charter", "sys-gloam": "works"},
 		Contest: map[content.SystemID]widgets.ContestView{"sys-penumbra": {Meter: 0.1, Threshold: 1}},
 	}}
-	m := NewMapView(we)
+	m := NewMapView(we, nil)
 	m.Sync()
 	if m.redraws != 1 {
 		t.Fatalf("first sync redraws = %d, want 1", m.redraws)

@@ -327,15 +327,23 @@ var screens = []Screen{
 		Build: func(h *ScreenHost) widgets.WindowPanel { return uikit.NewScanner(h.services.Env) },
 	},
 	{
-		// An ordinary floating window: N flips its flag like every other
-		// keyed row, and the graph's own hover/select/destination live in
-		// the view (uikit/screens/mapview.go).
+		// The starmap: the house's second full-viewport layer (the
+		// proficiency tree was the first). It answers Backdrop(), so the
+		// host mounts it through Kit.AddBackdropWindow: painted over the
+		// world and below every window and all chrome. It has no title
+		// bar (the region and constellation ride inside the canvas) and
+		// re-fits itself to the viewport every Sync. N, the rail entry and
+		// Esc close it. The search field is the layer's one typing
+		// surface; game.handleKeys yields it the frame while focused.
 		ID: idMap, Title: "Starmap", Icon: "svc_map",
 		Key: ebiten.KeyN, Action: "starmap", Desc: "toggle starmap",
 		DefaultRect: uikit.MapViewRect(),
+		Anchor:      AnchorViewport,
 		DockPolicy:  DockFloating,
 		Group:       "World",
-		Build:       func(h *ScreenHost) widgets.WindowPanel { return uikit.NewMapView(h.services.Env) },
+		Build: func(h *ScreenHost) widgets.WindowPanel {
+			return uikit.NewMapView(h.services.Env, h.services.Viewport)
+		},
 	},
 	{
 		// Modal overlay: the host paints its veil and closes it on Esc
