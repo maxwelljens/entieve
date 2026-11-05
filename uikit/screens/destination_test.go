@@ -74,7 +74,7 @@ func TestHudDestinationArrowFollowsHeading(t *testing.T) {
 	}
 	var gate sim.Info
 	for _, info := range env.Sim.Grid() {
-		if info.Cel == gateCel {
+		if info.Kind == sim.KindGate && info.Cel == gateCel {
 			gate = info
 		}
 	}
@@ -181,4 +181,141 @@ func TestDestinationStaysSessionOnly(t *testing.T) {
 	if after := env.Sim.Hash(); after != before {
 		t.Errorf("clearing a destination moved the sim hash: %x -> %x", before, after)
 	}
+}
+
+// TestHudDestinationReadoutNamesTheGateNotAShipOnIt: Info.Cel is the
+// NEAREST celestial for loose grid objects (sim/api.go), so a ship parked
+// on the gate carries the gate's id too, and Grid is handle-ordered with
+// the player's own hull near the front. Owner report: "When warping to the
+// gate, it shows my ship name at the top (the navigation guide) instead of
+// the gate." The lookup must ask for the gate, not for anything carrying
+// its id.
+func TestHudDestinationReadoutNamesTheGateNotAShipOnIt(t *testing.T) {
+	env, _ := newChromeEnv(t)
+	h := NewHud(env)
+	h.SetDestination(env.Destination)
+	player := env.Sim.Player()
+	gateCel, ok := gateTo(env, "sys-solace", "sys-penumbra")
+	if !ok {
+		t.Fatal("fixture: Solace has no gate to Penumbra")
+	}
+	var gate sim.Info
+	for _, info := range env.Sim.Grid() {
+		if info.Kind == sim.KindGate && info.Cel == gateCel {
+			gate = info
+		}
+	}
+	if gate.Entity == 0 {
+		t.Fatal("fixture: the gate is not on the grid")
+	}
+	// Park the player on the gate: from then on its own Info carries the
+	// gate's Cel, which is exactly what used to hijack the name.
+	env.Sim.Transforms.Set(player, sim.Transform{Pos: gate.Pos})
+	env.SetDestination("sys-penumbra")
+	h.Sync()
+	if !h.destRead.show {
+		t.Fatal("the readout is down with a destination set")
+	}
+	if h.destRead.name != gate.Name {
+		t.Errorf("readout names %q, want the gate %q (a ship on the gate carries its Cel)",
+			h.destRead.name, gate.Name)
+	}
+}
+
+// TestOverviewTintsOnlyTheGateNotWhatSitsOnIt: the same nearest-celestial
+// rule in the overview. Owner report: "It also highlights ships and other
+// entities at the gate." Every loose entity parked on the next gate must
+// stay untinted while the gate row itself wears the plan's hue.
+func TestOverviewTintsOnlyTheGateNotWhatSitsOnIt(t *testing.T) {
+	k, _ := newTestKit(t)
+	k.Env().SetDestination("sys-penumbra")
+	pumpKit(t, k, 1024, 700)
+	nextCel, ok := gateTo(k.cv, "sys-solace", "sys-penumbra")
+	if !ok {
+		t.Fatal("fixture: Solace has no gate to Penumbra")
+	}
+	var gate sim.Info
+	var impostors []sim.Info
+	player := k.Sim.Player()
+	for _, info := range k.Sim.Grid() {
+		switch {
+		case info.Entity == player:
+		case info.Kind == sim.KindGate && info.Cel == nextCel:
+			gate = info
+		case looseKind(info.Kind) && !info.Hostile:
+			// A neutral loose object (ship, rock, wreck): the class the
+			// nearest-celestial rule gives the gate's id. Celestials are
+			// excluded on purpose: their Cel is their own id by rule.
+			impostors = append(impostors, info)
+		}
+	}
+	if gate.Entity == 0 {
+		t.Fatal("fixture: the gate is not on the grid")
+	}
+	if len(impostors) == 0 {
+		t.Fatal("fixture: no neutral entity to park on the gate")
+	}
+	// Bring the gate to the player and park the impostors exactly on it:
+	// left at the gate's authored distance the rows would be invisible
+	// (Visible = landmark or within sensor range), and an entity that is
+	// not nearest the gate never carries its id either.
+	me, ok := k.Sim.Info(player)
+	if !ok {
+		t.Fatal("fixture: the player is not on the grid")
+	}
+	at := me.Pos.Add(core.V(400, 0))
+	k.Sim.Transforms.Set(gate.Entity, sim.Transform{Pos: at})
+	for _, info := range impostors {
+		k.Sim.Transforms.Set(info.Entity, sim.Transform{Pos: at})
+	}
+	// The fixture must reproduce the owner's bug: every parked entity
+	// carries the gate's id through the nearest-celestial rule.
+	for _, info := range impostors {
+		now, ok := k.Sim.Info(info.Entity)
+		if !ok || now.Cel != nextCel {
+			t.Fatalf("fixture: %q is not nearest the gate (Cel %q, want %q)", info.Name, now.Cel, nextCel)
+		}
+	}
+	pumpKit(t, k, 1024, 700)
+
+	pal := k.th.Pal()
+	teal := widgets.WithA(pal.StatMobility, 60)
+	seenGate, seenImpostor := false, false
+	for _, r := range k.ov.tbl.RowsForTest() {
+		row, ok := r.Data.(*ovRow)
+		if !ok {
+			continue
+		}
+		switch {
+		case row.info.Entity == gate.Entity:
+			seenGate = true
+			if r.Tint != teal || r.IconTint != pal.StatMobility {
+				t.Errorf("gate tint = %v / %v, want the plan's teal %v / %v",
+					r.Tint, r.IconTint, teal, pal.StatMobility)
+			}
+		case row.info.Entity != player && !row.info.Hostile && row.info.Kind != sim.KindGate:
+			seenImpostor = true
+			if r.Tint == teal || r.IconTint == pal.StatMobility {
+				t.Errorf("%q (%s, on the gate) wears the gate's teal (%v / %v)",
+					row.info.Name, row.info.Kind, r.Tint, r.IconTint)
+			}
+		}
+	}
+	if !seenGate {
+		t.Fatal("fixture: the gate row is not in the overview")
+	}
+	if !seenImpostor {
+		t.Log("fixture: no parked entity row reached the overview (all invisible?)")
+	}
+}
+
+// looseKind reports whether an Info is a loose grid object: the class the
+// nearest-celestial rule hands a celestial id to (sim/api.go). Celestials
+// keep their own id and are not impostors.
+func looseKind(kind string) bool {
+	switch kind {
+	case sim.KindShip, sim.KindAsteroid, sim.KindWreck:
+		return true
+	}
+	return false
 }

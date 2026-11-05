@@ -402,11 +402,15 @@ func (o *overview) sync(k *Kit) {
 			case info.Hostile:
 				tint = widgets.WithA(k.th.Pal().Danger, 60)
 				iconTint = k.th.Pal().Danger // hostiles wear ColDanger
-			case nextGate != "" && info.Cel == nextGate:
+			case nextGate != "" && info.Kind == sim.KindGate && info.Cel == nextGate:
 				// The route's next gate wears the plan's own hue: the
 				// mobility teal, never Accent (Accent is selection, and
 				// a selected row must not read as the way out). Both
-				// channels, under the kind's Colour switch.
+				// channels, under the kind's Colour switch. The KindGate
+				// guard is load-bearing: Info.Cel is the NEAREST
+				// celestial for loose grid objects (sim/api.go), so every
+				// ship, wreck and rock sitting on the gate carries this
+				// id too and must not be tinted with it.
 				tint = widgets.WithA(k.th.Pal().StatMobility, 60)
 				iconTint = k.th.Pal().StatMobility
 			}

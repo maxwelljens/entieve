@@ -943,7 +943,13 @@ func (h *Hud) syncDest(player ecs.Entity) {
 			case cur != "":
 				if path := routePath(h.cv, cur, dest); len(path) > 1 {
 					if cel, ok := gateTo(h.cv, cur, path[1]); ok {
-						if info, ok := h.celInfo("", cel); ok {
+						// KindGate, not just the celestial id: Info.Cel
+						// is the NEAREST celestial for loose grid objects
+						// (sim/api.go), so a ship sitting on the gate
+						// carries the same id and would otherwise win
+						// this lookup (Grid is handle-ordered, so that
+						// ship is often the player itself).
+						if info, ok := h.celInfo(sim.KindGate, cel); ok {
 							st = h.stageDest(info, h.systemName(dest), player)
 						}
 					}
