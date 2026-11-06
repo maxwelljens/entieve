@@ -552,16 +552,33 @@ func (s *Sim) Info(e ecs.Entity) (Info, bool) {
 		}
 	}
 
-	// Hostility: an NPC in an aggro state, or a traffic raider mid-ambush
-	// (its AI state machine still reads idle while it hunts a convoy).
+	// Hostile reads "is this YOUR fight": an NPC in an aggressive state
+	// (approach/orbit/flee), or a traffic raider mid-ambush, counts only
+	// when its faction may act against the pilot's - or when its current
+	// target IS the pilot, which is how a guard still reads red as it
+	// turns on an outlaw. Engaged with a third party on its own earns no
+	// danger tint: a commissioned Corporate Fleets cutter trading shots
+	// with the Old Works wore the same red as the belt's rats, and the
+	// owner read that meeting as Works fighting Works
+	// (sim/hostility_test.go TestInfoHostileMeansYourFight). Red is only
+	// ever taken away here, never added: everything that was hostile
+	// before stays hostile unless the fight belonged to someone else.
+	aggressive := false
+	atMe := false
 	if ai, ok := s.AIs.Get(e); ok {
 		switch ai.State {
 		case NpcApproach, NpcOrbit, NpcFlee:
-			info.Hostile = true
+			aggressive = true
+			atMe = !s.player.IsZero() && ai.Target == s.player
 		}
 	}
-	if !info.Hostile && s.isTrafficRaider(e) {
-		info.Hostile = true
+	if !aggressive && s.isTrafficRaider(e) {
+		aggressive = true // the ambush state machine still reads idle
+	}
+	if aggressive && !info.Hostile {
+		if atMe || hostile(s.factionOf(e), s.factionOf(s.player)) {
+			info.Hostile = true
+		}
 	}
 
 	// Capability flags driving the Selected Item actions.

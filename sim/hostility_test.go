@@ -162,6 +162,72 @@ func TestRatDoesNotTurnOnItsOwn(t *testing.T) {
 	}
 }
 
+// TestInfoHostileMeansYourFight: the danger tint (Info.Hostile) answers
+// "is this YOUR fight", not "is this hull shooting at someone". Owner
+// report: "Because the corporate fleets appeared as red in space, I read
+// them as being part of the Old Works, so I thought there was infighting
+// in the Old Works. I expected the corporate fleet to be normal colour,
+// not red, since they are not hostile." A commissioned cutter trading
+// shots with the Works wore the same red as the belt's rats, so a war
+// meeting at the belt read as Works fighting Works. The engagement has
+// to be yours: an engaged Old Works hull stays red (its faction may act
+// against the pilot), and a neutral hull whose target IS the pilot (a
+// guard turning on an outlaw) stays red too - it is only the fight
+// someone else is having that loses the tint.
+func TestInfoHostileMeansYourFight(t *testing.T) {
+	// Real content, so the pin runs on the actual hull the owner saw:
+	// world-default's player is docked (and docked entities are no NPC
+	// candidate at all), so the two spawns below are nobody's business
+	// but each other's.
+	c, err := content.Load(content.FS())
+	if err != nil {
+		t.Fatalf("load content: %v", err)
+	}
+	wd, ok := c.World("world-default")
+	if !ok {
+		t.Fatal("world-default missing")
+	}
+	s, err := New(c, wd, 99)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	setPlayerPos(s, v(-6e6, -6e6))
+	fleet := s.spawnNpc("npc-fleet-cutter", v(4e6, 0), 100)
+	rat := s.spawnNpc("npc-rat-scuttler", v(4e6, 2000), 100)
+	if fleet.IsZero() || rat.IsZero() {
+		t.Fatalf("fixture: spawn failed (fleet=%v rat=%v)", fleet, rat)
+	}
+	// Both open fire: each is the other's damage source, so both flip.
+	damageNPC(s, fleet, rat, scratchDamage(), false)
+	damageNPC(s, rat, fleet, scratchDamage(), false)
+	stepN(s, 5)
+	drain(s)
+	fleetAI, ok := s.AIs.Get(fleet)
+	if !ok || (fleetAI.State != NpcApproach && fleetAI.State != NpcOrbit) {
+		t.Fatalf("Clastor state=%v want engaged", fleetAI)
+	}
+	ratAI, ok := s.AIs.Get(rat)
+	if !ok || (ratAI.State != NpcApproach && ratAI.State != NpcOrbit) {
+		t.Fatalf("rat state=%v want engaged", ratAI)
+	}
+
+	// The Old Works hull is the pilot's enemy: engaged, red.
+	if !infoHostile(s, rat) {
+		t.Error("an engaged Old Works rat reads neutral: the pilot's own enemy must stay red")
+	}
+	// The commissioned cutter is at war with the Works, not with the pilot.
+	if infoHostile(s, fleet) {
+		t.Error("the Corporate Fleets cutter reads red while fighting the Works: it is not hostile to the pilot (owner report)")
+	}
+	// And when it comes for the pilot itself, red again: neutral is not
+	// harmless, it is "not your fight yet".
+	fleetAI.Target = s.player
+	fleetAI.State = NpcOrbit
+	if !infoHostile(s, fleet) {
+		t.Error("a neutral hull coming for the pilot must read red")
+	}
+}
+
 // TestMinerNeverTurnsOnAnything pins the miner's role passivity beyond the
 // player: a miner damaged by the rat already attacking it keeps cutting and
 // never enters the machine (no lock, no aggro state).

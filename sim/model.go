@@ -871,7 +871,7 @@ type Info struct {
 	Pos      core.Vec2
 	Vel      core.Vec2
 	Distance float64 // from the player (m)
-	Hostile  bool    // NPC that is or would be aggressive here
+	Hostile  bool    // the danger tint: engaged AND it is the pilot's fight (its faction may act against the pilot's, or it is coming for the pilot)
 	Health   float64 // structure+armor+shield fraction 0..1 (ships); 1 otherwise
 	CanDock  bool
 	CanJump  bool

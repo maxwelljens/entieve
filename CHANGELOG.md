@@ -344,6 +344,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   would give, nor the 20% that would need a tenth craft step).
 ### Fixed
 
+- **The danger tint now means "hostile to you"**: an NPC wore red for
+  simply being in a fight, so a commissioned Corporate Fleets cutter
+  trading shots with the Old Works at the belt drew the same red as the
+  rats and read as Works fighting Works. Red now requires the fight to
+  be yours: the hull's faction may act against the pilot, or it is
+  coming for the pilot itself (which keeps a guard red as it turns on
+  an outlaw). A hull engaged with someone else reads neutral, and red is
+  only ever taken away by this rule, never added.
+
 - **Jump and Dock act on what you selected, not the neighbour in range**:
   both Selected Item rows are "selected, else nearest", but their
   eligibility carried the range test and eligibility is what the
