@@ -21,6 +21,16 @@ import (
 // fallback only picks entities it accepts. The key path leaves a refusal
 // to the sim (GAMEPLAY's refusal lines are the feedback); Ready is the
 // panel's disabled state and why text only.
+//
+// For a TargetSelectedElseNearest row that split is load-bearing:
+// Eligible asks what the target IS (its kind, in range or not), Ready
+// carries the range and the docked state. Eligible also gates the
+// selection branch, so a range test inside it reads an out-of-range
+// selection as "not a gate" and lets the fallback aim the row at the
+// neighbour the pilot stands next to instead of the gate they selected
+// (owner report; pinned by TestSelectedElseNearestActsOnItsOwnKind).
+// TargetNearest rows keep the range inside Eligible: they have no
+// selection branch to steal.
 type TargetRule int
 
 const (
@@ -75,10 +85,12 @@ var WorldVerbs = []WorldVerb{
 		Eligible: func(r Resolved) bool { return r.Info.CanWarp }, Ready: warpReady,
 		Emit: func(r Resolved) widgets.Intent { return widgets.WarpTo{Entity: r.Entity} }},
 	{Action: "dock", Rule: TargetSelectedElseNearest,
-		Eligible: func(r Resolved) bool { return r.Info.CanDock },
+		Eligible: func(r Resolved) bool { return r.Info.Kind == sim.KindStation },
+		Ready:    dockReady,
 		Emit:     func(r Resolved) widgets.Intent { return widgets.Dock{Entity: r.Entity} }},
 	{Action: "jump", Rule: TargetSelectedElseNearest,
-		Eligible: func(r Resolved) bool { return r.Info.CanJump },
+		Eligible: func(r Resolved) bool { return r.Info.Kind == sim.KindGate },
+		Ready:    jumpReady,
 		Emit:     func(r Resolved) widgets.Intent { return widgets.Jump{Entity: r.Entity} }},
 	{Action: "loot", Rule: TargetNearest,
 		Eligible: func(r Resolved) bool { return r.Info.CanLoot },
@@ -126,6 +138,14 @@ func warpReady(r Resolved) (bool, string) {
 	}
 	return true, ""
 }
+
+// dockReady and jumpReady are the two selected-else-nearest rows' panel
+// gate: range and the docked state, which Info.CanDock / Info.CanJump
+// already answer for whatever row resolved. No why text, deliberately:
+// the grey is the whole message, and the key path's answer is the sim's
+// own refusal line ("Station is out of range", "Stargate is out of range").
+func dockReady(r Resolved) (bool, string) { return r.Info.CanDock, "" }
+func jumpReady(r Resolved) (bool, string) { return r.Info.CanJump, "" }
 
 // needsSelection is Stop's panel gate: the button greys out with nothing
 // selected, while the key still stops the ship (the sim needs no target).

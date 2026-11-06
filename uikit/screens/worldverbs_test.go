@@ -161,6 +161,74 @@ func TestWorldVerbTableResolvesAndEmits(t *testing.T) {
 	}
 }
 
+// TestSelectedElseNearestActsOnItsOwnKind: the owner's report, verbatim
+// ("the 'Jump' button works when selecting any gate, and makes you jump
+// through the gate you are currently within range of, rather than the
+// selected gate"), pinned for the two TargetSelectedElseNearest rows
+// together because they share one root cause: their Eligible carried the
+// RANGE test, and Eligible is what the selection branch asks too, so an
+// out-of-range selection read as "not a gate/station" and the
+// nearest-fallback silently took the row over and aimed it at the
+// neighbour the pilot happens to stand next to.
+//
+// The rule the rows follow now (warp and mine already did): Eligible
+// asks what the target IS (its kind, in range or not) and Ready carries
+// the range, which is the panel's disabled state alone. So a same-kind
+// selection always resolves to ITSELF, greyed while it cannot act, and
+// the key path still hands the sim the command, whose refusal line is
+// the feedback (pinned in sim by TestJumpOutOfRangeRefusesWithALogLine).
+// A selection of a different kind still falls back to the nearest, which
+// is the worldKeyMap desc's "else nearest" half.
+func TestSelectedElseNearestActsOnItsOwnKind(t *testing.T) {
+	f := newVerbFixture(t)
+	// The neighbours the pilot can act on RIGHT NOW are the fixture's own
+	// gate and station (CanJump/CanDock set on them); the selections
+	// below are their out-of-range twins, appended to this test's grid
+	// only, so no other fixture case sees them.
+	farGate := ecs.Entity(90)
+	farStation := ecs.Entity(91)
+	f.grid = append(f.grid,
+		sim.Info{Entity: farGate, Name: "Far Gate", Kind: sim.KindGate, Distance: 9e4, Visible: true},
+		sim.Info{Entity: farStation, Name: "Far Port", Kind: sim.KindStation, Distance: 9e4, Visible: true},
+	)
+
+	cases := []struct {
+		name, action string
+		sel          ecs.Entity
+		want         widgets.Intent
+		wantReady    bool
+	}{
+		{"jump at the selected gate, in range", "jump", f.gate,
+			widgets.Jump{Entity: f.gate}, true},
+		{"jump at the selected gate, out of range", "jump", farGate,
+			widgets.Jump{Entity: farGate}, false},
+		{"jump on a non-gate still falls back to the nearest gate", "jump", f.station,
+			widgets.Jump{Entity: f.gate}, true},
+		{"dock at the selected station, in range", "dock", f.station,
+			widgets.Dock{Entity: f.station}, true},
+		{"dock at the selected station, out of range", "dock", farStation,
+			widgets.Dock{Entity: farStation}, false},
+		{"dock on a non-station still falls back to the nearest station", "dock", f.gate,
+			widgets.Dock{Entity: f.station}, true},
+	}
+	for _, c := range cases {
+		v := mustVerb(t, c.action)
+		res, ok := resolveVerb(v, f.verbView, c.sel, nil)
+		if !ok {
+			t.Errorf("%s: resolveVerb(%q, sel=%v) failed", c.name, c.action, c.sel)
+			continue
+		}
+		if got := v.Emit(res); got != c.want {
+			t.Errorf("%s: %q emitted %#v, want %#v (a selection of the row's own kind is never retargeted)",
+				c.name, c.action, got, c.want)
+		}
+		ready, _ := (&Kit{cv: f.verbView, selected: c.sel}).VerbReady(c.action)
+		if ready != c.wantReady {
+			t.Errorf("%s: VerbReady(%q) = %v, want %v", c.name, c.action, ready, c.wantReady)
+		}
+	}
+}
+
 // TestWorldVerbReadyIsThePanelGate: Eligible says "may act" (the key
 // path); Ready is the panel's disabled state and why text. Warp inside
 // sim.WarpMinRange is the one verb with a reason.
@@ -188,15 +256,22 @@ func TestWorldVerbReadyIsThePanelGate(t *testing.T) {
 		t.Errorf("stop without a selection did not resolve to the player: %+v (ok=%v)", res, ok)
 	}
 
-	// A docked player owns no dockable neighbour: the fallback must stay
-	// empty, never fall back past eligibility.
+	// A docked player owns no dockable neighbour: the PANEL never offers
+	// Dock (Ready carries the range and the docked state), while the
+	// resolver, which is the key path's, answers with the station itself
+	// and leaves the refusal to the sim ("Station is out of range",
+	// "Already docked"). Eligible asks what the target IS, not whether it
+	// can act now: a range test in Eligible is what let the fallback
+	// steal a selected gate (TestSelectedElseNearestActsOnItsOwnKind).
 	f.grid[0].CanDock = false
 	k.selected = 0
 	if ok, _ := k.VerbReady("dock"); ok {
 		t.Error("dock PanelReady with no dockable entity = true, want false")
 	}
-	if _, ok := resolveVerb(mustVerb(t, "dock"), f.verbView, 0, nil); ok {
-		t.Error("dock resolved with no dockable entity")
+	res, ok = resolveVerb(mustVerb(t, "dock"), f.verbView, 0, nil)
+	if !ok || res.Entity != f.grid[0].Entity {
+		t.Errorf("dock resolved {%v ok=%v}, want the station itself for the sim to refuse",
+			res.Entity, ok)
 	}
 }
 

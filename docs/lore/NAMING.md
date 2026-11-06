@@ -305,6 +305,7 @@ Show Info line.
 
 | field | current value | proposed value | origin | notes |
 |---|---|---|---|---|
+| Travel refusal lines (`sim/system_travel.go`) | — | **Station is out of range** · **Stargate is out of range** · **Already docked** · **Cannot jump while docked** | trade | the SevWarning a refused `CmdDock`/`CmdJump` logs: the station or gate sits outside the 2,500 m dock/jump range, or the pilot is already inside. Reachable from the `D`/`J` keys since the selected-else-nearest rows stopped dropping a selection that merely lacks range (the panel greys instead), which is what makes them the key path's feedback. Proposed 2026-11-06 |
 | Destination arrival line (`uikit/screens/hud.go`) | — | **DESTINATION REACHED** | trade | the top readout's line once the pilot is in the planned system: it fades out over three seconds and the row hides, while the destination itself stays set (the Starmap keeps its route). Owner's wording, approved 2026-11-05 |
 | Finances window title (`game/screens.go`, `uikit/screens/finances.go`) | — | **Finances** | trade | the wallet window: holdings over the transaction ledger. Plain trade vocabulary, no coined term. Approved 2026-10-18 |
 | Finances holdings labels | — | cash · deployed in orders · receivables · total | trade | the three pools the player's money can sit in: the wallet, the escrow held by open buy orders (refundable on cancel) and the rewards still owed on accepted contracts, plus their total. Approved 2026-10-18 |

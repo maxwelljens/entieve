@@ -344,6 +344,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   would give, nor the 20% that would need a tenth craft step).
 ### Fixed
 
+- **Jump and Dock act on what you selected, not the neighbour in range**:
+  both Selected Item rows are "selected, else nearest", but their
+  eligibility carried the range test and eligibility is what the
+  selection is judged by as well, so an out-of-range selection read as
+  "not a gate/station" and the row fell back to whatever you were
+  standing next to: selecting any gate lit Jump, and it jumped the gate
+  under your feet instead of the selected one. Eligible now asks what the
+  target IS (its kind) and Ready carries the range, so a selected gate or
+  station always resolves to itself, greyed on the panel while it is out
+  of range and refused by the sim with its log line on the key path;
+  only a selection of a different kind still falls back to the nearest.
+
 - **A war fleet no longer lands on the pilot's belt**: the commissioned
   Corporate Fleets cutter drops on the Works hull it came for every
   procure beat, and when that belt is one the pilot stands in, the belt's

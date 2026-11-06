@@ -215,6 +215,27 @@ func TestInfoCapabilityFlags(t *testing.T) {
 	}
 }
 
+// TestJumpOutOfRangeRefusesWithALogLine: the key path's half of the
+// selected-else-nearest contract (uikit/screens/worldverbs.go, CONTEXT's
+// World verb row). The panel greys Jump while the selected gate sits
+// outside jump range, but the J key still hands over the command for
+// THAT gate, and the sim's refusal line is the feedback: without it the
+// key would read as dead where the button reads as unavailable.
+func TestJumpOutOfRangeRefusesWithALogLine(t *testing.T) {
+	s := newTestSim(t)
+	gate := entityByName(s, "Gate to Beta")
+	setPlayerPos(s, gatePos(s, gate).Add(v(1e6, 0))) // a long way outside dockRange
+	if info, _ := s.Info(gate); info.CanJump {
+		t.Fatal("fixture: the gate is in jump range")
+	}
+	drain(s)
+	s.Queue(CmdJump{Gate: gate})
+	s.Step()
+	if ev := findEvent(drain(s), EvLog, "Stargate is out of range"); ev == nil {
+		t.Fatal("out-of-range jump accepted in silence: the refusal line is the key path's feedback")
+	}
+}
+
 func TestInfoKinds(t *testing.T) {
 	s := newTestSim(t)
 	cases := []struct {
