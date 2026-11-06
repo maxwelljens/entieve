@@ -585,15 +585,29 @@ func (s *Sim) warFleets() {
 	s.warSpawn(hull, pos, spread, tag)
 }
 
-// warFleetUnderPilot reports whether the landing point sits inside a belt the
-// pilot is standing in. The fleet's business at the front is the Works hull
-// it came for, and landing on that hull under a pilot who just warped in
-// drags the belt's rats off the pilot and into the fleet: they engage on the
-// landing tick (proximity) and the threat-switch rule then keeps them there,
-// because a pilot who has fired nothing has no damage to lead with
-// (CONTEXT.md "Threat switch"). Skipping the spawn leaves the belt's rats to
-// the pilot; contest and bids already ran this beat, so no war progress is
-// lost and the next procure beat tries again.
+// warFleetUnderPilot reports whether the landing point sits inside a belt
+// the pilot is standing in OR already flying at. The fleet's business at
+// the front is the Works hull it came for, and landing on that hull while
+// the pilot is bound for the belt drags the belt's rats off the pilot and
+// into the fleet: they engage on the landing tick (proximity) and the
+// threat-switch rule then keeps them there, because a pilot who has fired
+// nothing has no damage to lead with (CONTEXT.md "Threat switch").
+//
+// The commitment is read two ways, and the second is the one the first
+// version missed: an intent naming something inside the belt (align,
+// approach, orbit), and a warp in flight whose landing point is inside it
+// (a warp outlives the intent: Stop or a manual steer overwrites it while
+// the drive still owns the ship). A beat landing in the gate-to-belt warp
+// used to win the race outright: the cutter arrived before the pilot
+// landed, the rats took it by prey-score while the pilot was still
+// outside every aggro range, and the arrival could not buy them back
+// (owner's repeat report: the rats fighting each other on arrival).
+//
+// Skipping the spawn leaves the belt's rats to the pilot; contest and
+// bids already ran this beat, so no war progress is lost and the next
+// procure beat tries again. A commitment to a different belt or a gate is
+// none of this landing's business: only the belt the pilot is in or
+// headed for counts.
 func (s *Sim) warFleetUnderPilot(sys *content.SystemDef, pos core.Vec2) bool {
 	if s.player.IsZero() {
 		return false
@@ -602,16 +616,31 @@ func (s *Sim) warFleetUnderPilot(sys *content.SystemDef, pos core.Vec2) bool {
 	if !ok {
 		return false
 	}
+	// Where the pilot is committed to going, if anywhere: their intent's
+	// target and the landing point of a warp under way.
+	var bound core.Vec2
+	hasBound := false
+	if it, ok := s.Intents.Get(s.player); ok && !it.Target.IsZero() {
+		if bp, ok := s.posOf(it.Target); ok {
+			bound, hasBound = bp, true
+		}
+	}
+	var warpTo core.Vec2
+	hasWarp := false
+	if wd, ok := s.Warps.Get(s.player); ok {
+		warpTo, hasWarp = wd.To, true
+	}
 	for i := range sys.Celestials {
 		cel := &sys.Celestials[i]
 		if cel.Kind != content.CelBelt {
 			continue
 		}
-		if me.Dist(cel.Position) > cel.Radius {
-			continue // the pilot is not standing in this belt
+		standing := me.Dist(cel.Position) <= cel.Radius
+		flying := (hasBound && bound.Dist(cel.Position) <= cel.Radius) ||
+			(hasWarp && warpTo.Dist(cel.Position) <= cel.Radius)
+		if !standing && !flying {
+			continue // the pilot is neither in this belt nor flying at it
 		}
-		// The pilot is in this belt: only a landing in the same one is
-		// under their feet (another belt's fight is none of their business).
 		return pos.Dist(cel.Position) <= cel.Radius
 	}
 	return false

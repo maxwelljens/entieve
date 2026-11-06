@@ -1071,6 +1071,70 @@ func TestWarFleetsSkipThePilotsBelt(t *testing.T) {
 	}
 }
 
+// TestWarFleetsSkipABeatThePilotFliesAt: the inbound half of the same
+// rule, for the owner's repeat report ("the rats are still fighting each
+// other" on arrival). The guard read only where the pilot STANDS when
+// the beat fires, so a beat landing during the gate-to-belt warp put the
+// cutter on the pack BEFORE the pilot landed there: mid-warp the pilot
+// is outside every aggro range, so the rats took the cutter by
+// prey-score on its landing tick, and the Threat switch then held them
+// against an arrival with no damage to lead with. CONTEXT's Corporate
+// Fleets row already promises "never ... under a pilot who just warped
+// in"; this pins the code honouring it for the commitment the pilot has
+// actually made (an align/approach/orbit intent), with the control: the
+// same beat pointed elsewhere still brings the fleet.
+func TestWarFleetsSkipABeatThePilotFliesAt(t *testing.T) {
+	s := newWarSim(t)
+	if err := s.LoadSystem("sys-w", ""); err != nil {
+		t.Fatal(err)
+	}
+	belt := s.celEntity("cel-belt-w")
+	setPlayerPos(s, v(-4e6, -4e6)) // well off the belt: only the commitment counts
+	drain(s)
+
+	s.Intents.Set(s.player, Intent{Kind: IntentAlign, Target: belt})
+	stepToWarBeat(s)
+	if n := countFaction(s, factionFleets); n != 0 {
+		t.Fatalf("a fleet landed while the pilot was flying at the belt (%d hulls)", n)
+	}
+
+	s.Intents.Set(s.player, Intent{Kind: IntentAlign, Target: s.celEntity("cel-gate-w2")})
+	stepToWarBeat(s)
+	if n := countFaction(s, factionFleets); n == 0 {
+		t.Fatal("no fleet once the pilot is flying somewhere else")
+	}
+}
+
+// TestWarFleetGuardReadsAWarpInFlight: the guard's second commitment
+// signal on the guard itself, because an end-to-end warp would have
+// landed (and turned into the standing case) long before the next 60 s
+// beat. The signal matters in play: a warp keeps flying after the pilot
+// presses Stop or steers manually, both of which overwrite the align
+// intent the moment they fire.
+func TestWarFleetGuardReadsAWarpInFlight(t *testing.T) {
+	s := newWarSim(t)
+	if err := s.LoadSystem("sys-w", ""); err != nil {
+		t.Fatal(err)
+	}
+	sys := s.System()
+	belt := s.celEntity("cel-belt-w")
+	pos := mustPos(s, belt) // the landing point on the belt itself
+	setPlayerPos(s, v(-4e6, -4e6))
+	s.Intents.Set(s.player, Intent{Kind: IntentStop})
+
+	if s.warFleetUnderPilot(sys, pos) {
+		t.Error("the guard trips with the pilot committed to nothing")
+	}
+	s.Intents.Set(s.player, Intent{Kind: IntentAlign, Target: s.celEntity("cel-gate-w2")})
+	if s.warFleetUnderPilot(sys, pos) {
+		t.Error("the guard trips on a commitment to a gate, not the belt")
+	}
+	s.Warps.Set(s.player, WarpDrive{Phase: "warp", To: pos})
+	if !s.warFleetUnderPilot(sys, pos) {
+		t.Error("the guard ignores a warp in flight at the belt")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // 8. War news
 // ---------------------------------------------------------------------------

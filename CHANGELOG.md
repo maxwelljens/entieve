@@ -363,7 +363,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   held them there (an arriving pilot has dealt no damage to lead with), so
   the belt read as the rats fighting each other instead of targeting the
   pilot. The fleet now skips that beat and takes the next one: contest and
-  bids already ran, so no war progress is lost. CONTEXT's Hostility row is
+  bids already ran, so no war progress is lost. The skip also covers a
+  pilot flying AT that belt (their align/approach/orbit intent, or a warp
+  in flight with its landing point there): a beat firing during the
+  gate-to-belt warp used to win the race, dropping the cutter on the pack
+  before the pilot landed, where the rats took it by prey-score and the
+  threat switch held it against the arrival. CONTEXT's Hostility row is
   corrected alongside it (the Corporate Fleets do initiate, on the Old
   Works).
 - **The starmap no longer lags on hover or steps memory by a gigabyte a
